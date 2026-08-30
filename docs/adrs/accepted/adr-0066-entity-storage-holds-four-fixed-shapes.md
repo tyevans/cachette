@@ -1,6 +1,6 @@
 # ADR-0066: Entity storage holds four fixed shapes
 
-Status: Draft
+Status: Accepted
 
 ## Context
 

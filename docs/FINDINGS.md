@@ -555,8 +555,8 @@ there.
 ## References
 
 [^1]: Findings register, FND-038, in this document.
-[^2]: ADR-0066, entity storage holds four fixed shapes. `docs/adrs/draft/adr-0066-entity-storage-holds-four-fixed-shapes.md`
+[^2]: ADR-0066, entity storage holds four fixed shapes. `docs/adrs/accepted/adr-0066-entity-storage-holds-four-fixed-shapes.md`
 [^3]: Movement timing note. `docs/research/movement-timing.md`
-[^4]: ADR-0001, one binary gives one answer at any thread count. `docs/adrs/draft/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
+[^4]: ADR-0001, one binary gives one answer at any thread count. `docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
 [^5]: Findings register, FND-004, in this document.
 [^6]: Record scope research. `docs/research/adr-scope-findings.md`

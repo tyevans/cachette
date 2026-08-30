@@ -1,6 +1,6 @@
 # ADR-0002: Simulated and aggregated state holds no floating point number
 
-Status: Draft
+Status: Accepted
 
 ## Context
 
@@ -62,6 +62,6 @@ an index rather than as an estimate.
 
 ## References
 
-[^1]: ADR-0001, one binary gives one answer at any thread count. `docs/adrs/draft/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
+[^1]: ADR-0001, one binary gives one answer at any thread count. `docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
 [^2]: IEEE 754-2019, clause 5. https://ieeexplore.ieee.org/document/8766229
 [^3]: Report 13, the field operator algebra. `docs/research/reports/13-field-operator-algebra.md`

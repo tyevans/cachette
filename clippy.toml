@@ -1,5 +1,5 @@
-# ADR-0001 D2 forbids floating point in simulated or aggregated state.
-# ADR-0001 D3 requires a lint to enforce that boundary.
+# ADR-0002 D1 forbids floating point in simulated or aggregated state.
+# ADR-0002 D2 requires a lint to enforce that boundary.
 #
 # This file applies to the whole workspace. The binding crate may allow a
 # rule locally where a float crosses the Python boundary and never returns
@@ -9,15 +9,15 @@
 msrv = "1.91.1"
 
 disallowed-types = [
-    { path = "f32", reason = "ADR-0001 D2: float addition is not associative. Use Fix32 or Accum." },
-    { path = "f64", reason = "ADR-0001 D2: float addition is not associative. Use Fix64 or Accum." },
+    { path = "f32", reason = "ADR-0002 D1: float addition is not associative. Use Fix32 or Accum." },
+    { path = "f64", reason = "ADR-0002 D1: float addition is not associative. Use Fix64 or Accum." },
 ]
 
 disallowed-methods = [
-    { path = "std::collections::HashMap::iter", reason = "ADR-0001 D6: hash-map iteration order is never used in simulation code." },
-    { path = "std::collections::HashMap::keys", reason = "ADR-0001 D6: hash-map iteration order is never used in simulation code." },
-    { path = "std::collections::HashMap::values", reason = "ADR-0001 D6: hash-map iteration order is never used in simulation code." },
-    { path = "std::collections::HashSet::iter", reason = "ADR-0001 D6: hash-set iteration order is never used in simulation code." },
-    { path = "std::time::Instant::now", reason = "ADR-0001 D8: a time budget makes the result depend on machine load. Use a node budget." },
-    { path = "std::time::SystemTime::now", reason = "ADR-0001 D9: applying an event must not read the wall clock." },
+    { path = "std::collections::HashMap::iter", reason = "ADR-0004 D1: hash-map iteration order is never used in simulation code." },
+    { path = "std::collections::HashMap::keys", reason = "ADR-0004 D1: hash-map iteration order is never used in simulation code." },
+    { path = "std::collections::HashMap::values", reason = "ADR-0004 D1: hash-map iteration order is never used in simulation code." },
+    { path = "std::collections::HashSet::iter", reason = "ADR-0004 D1: hash-set iteration order is never used in simulation code." },
+    { path = "std::time::Instant::now", reason = "ADR-0005 D1: a time budget makes the result depend on machine load. Use a node budget." },
+    { path = "std::time::SystemTime::now", reason = "ADR-0006 D2: applying an event must not read the wall clock." },
 ]

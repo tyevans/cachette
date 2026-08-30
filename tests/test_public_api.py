@@ -36,7 +36,7 @@ def test_a_step_advances_the_tick(seed: int) -> None:
 
 
 def test_the_tile_column_is_an_integer_array(seed: int) -> None:
-    # ADR-0001 D2 forbids floating point in simulated state, so the column
+    # ADR-0002 D1 forbids floating point in simulated state, so the column
     # is an integer array and never a float array.
     world = cachette.World(tile_count=64, seed=seed, faction_count=1)
     values = world.tile_values()
@@ -45,7 +45,7 @@ def test_the_tile_column_is_an_integer_array(seed: int) -> None:
 
 
 def test_the_thread_count_does_not_change_the_result(seed: int) -> None:
-    # ADR-0001 D11: the highest-value test in the project, seen from the
+    # ADR-0001 D4: the highest-value test in the project, seen from the
     # Python side.
     hashes = []
     logs = []
@@ -60,14 +60,14 @@ def test_the_thread_count_does_not_change_the_result(seed: int) -> None:
 
 
 def test_a_step_at_zero_threads_raises_a_typed_error(seed: int) -> None:
-    # ADR-0006 D9: the engine never raises a bare runtime error.
+    # ADR-0046: the engine never raises a bare runtime error.
     world = cachette.World(tile_count=16, seed=seed, faction_count=1)
     with pytest.raises(cachette.StepError):
         world.step(threads=0)
 
 
 def test_every_error_type_sits_under_one_root() -> None:
-    # ADR-0006 D9: a user catches broadly or narrowly.
+    # ADR-0046: a user catches broadly or narrowly.
     for error in (
         cachette.StepError,
         cachette.SelectorError,
@@ -80,7 +80,7 @@ def test_every_error_type_sits_under_one_root() -> None:
 
 
 def test_two_worlds_run_independently(seed: int) -> None:
-    # ADR-0006 D10: many worlds in one interpreter.
+    # ADR-0047: many worlds in one interpreter.
     first = cachette.World(tile_count=128, seed=seed, faction_count=2)
     second = cachette.World(tile_count=128, seed=seed, faction_count=2)
     first.step(threads=1)

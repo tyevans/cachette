@@ -29,7 +29,7 @@ fn a_step_advances_the_tick_and_holds_the_invariants() {
 
 #[test]
 fn the_whole_tile_column_is_one_flat_slice() {
-    // ADR-0006 D5: a whole component column is one flat array.
+    // ADR-0044: a whole component column is one flat array.
     let world = World::new(WorldConfig::default());
     assert_eq!(world.tile_values().len(), world.tile_count());
 }
@@ -63,7 +63,7 @@ fn two_worlds_with_two_seeds_differ() {
 
 #[test]
 fn the_generator_holds_no_state() {
-    // ADR-0001 D5: the draw is a function of its key. Calling it twice with
+    // ADR-0003 D1: the draw is a function of its key. Calling it twice with
     // one key gives one value.
     let first = rng::draw(7, rng::SYSTEM_TILE_STUB, 3, 11, 0);
     let second = rng::draw(7, rng::SYSTEM_TILE_STUB, 3, 11, 0);
@@ -84,7 +84,7 @@ fn the_generator_stays_inside_the_bound() {
 
 #[test]
 fn the_generator_gives_the_known_answers() {
-    // ADR-0001 D5 requires known-answer tests, because the project writes
+    // ADR-0001 D4 requires known-answer tests, because the project writes
     // the mixer instead of taking it from a dependency. Record a new value
     // only when the mixer changes on purpose.
     assert_eq!(rng::draw(0, 1, 0, 0, 0), 0x1957_a760_4e21_5178);

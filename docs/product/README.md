@@ -80,7 +80,7 @@ A refined backlog item names the record it serves, next to the decision
 records that govern it.[^3]
 
 ```
-implements: [ADR-0001 D11]
+implements: [ADR-0001 D4]
 serves:     [PRD-0001]
 ```
 

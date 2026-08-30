@@ -1,6 +1,6 @@
 # ADR-0007: Content supplies a key vector, never a comparator
 
-Status: Draft
+Status: Accepted
 
 ## Context
 
@@ -46,5 +46,5 @@ correctness.
 
 ## References
 
-[^1]: ADR-0001, one binary gives one answer at any thread count. `docs/adrs/draft/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
+[^1]: ADR-0001, one binary gives one answer at any thread count. `docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
 [^2]: Report 04, the selector engine and verbs. `docs/research/reports/04-selector-engine-and-verbs.md`

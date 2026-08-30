@@ -9,8 +9,8 @@
 //!
 //! # References
 //!
-//! [^1]: ADR-0006, The Python boundary, decision D2. `docs/adrs/draft/adr-0006-python-is-a-control-plane.md`
-//! [^2]: ADR-0006, The Python boundary, decision D3. `docs/adrs/draft/adr-0006-python-is-a-control-plane.md`
+//! [^1]: ADR-0041, a crate split enforces the boundary at compile time. `docs/adrs/REGISTRY.md`
+//! [^2]: ADR-0042, the interpreter is released for the whole step. `docs/adrs/REGISTRY.md`
 
 use cachette_core::{World as CoreWorld, WorldConfig};
 use numpy::{PyArray1, ToPyArray};
@@ -18,7 +18,7 @@ use pyo3::create_exception;
 use pyo3::exceptions::PyException;
 use pyo3::prelude::*;
 
-// ADR-0006 D9: one root exception type holds the whole hierarchy. The
+// ADR-0046: one root exception type holds the whole hierarchy. The
 // engine never raises a bare runtime error. The macro builds the types,
 // because subclassing a Python class under the stable ABI needs a later
 // interpreter version and the macro does not.
@@ -108,7 +108,7 @@ impl PyWorld {
     ///
     /// The method releases the global interpreter lock for the whole step.
     fn step(&self, python: Python<'_>, threads: usize) -> PyResult<usize> {
-        // ADR-0006 D3: release the interpreter for the whole step. The
+        // ADR-0042: release the interpreter for the whole step. The
         // closure may not capture the interpreter token, so the compiler
         // rejects a mid-step callback a second time.
         python.detach(|| {

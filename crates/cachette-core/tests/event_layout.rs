@@ -6,7 +6,7 @@
 //!
 //! # References
 //!
-//! [^1]: ADR-0001, Determinism as the primary constraint, decision D9. `docs/adrs/draft/adr-0001-determinism-outranks-every-other-constraint.md`
+//! [^1]: ADR-0006, an event is plain data and applying it is pure, decision D1. `docs/adrs/accepted/adr-0006-an-event-is-plain-data-and-applying-it-is-pure.md`
 
 use cachette_core::event::CHANGE_KIND_RAISED;
 use cachette_core::types::{FactionId, TileIdx};
@@ -27,7 +27,7 @@ fn the_event_declares_every_padding_byte() {
 
 #[test]
 fn the_event_moves_in_whole_registers() {
-    // ADR-0002 D11: size and align a migrating structure to 8 or 16 bytes.
+    // ADR-0011: size and align a migrating structure to 8 or 16 bytes.
     assert_eq!(size_of::<TileChanged>() % 8, 0);
     assert_eq!(align_of::<TileChanged>(), 8);
 }

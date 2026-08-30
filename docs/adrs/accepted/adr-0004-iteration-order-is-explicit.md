@@ -1,6 +1,6 @@
 # ADR-0004: Iteration order is explicit, and unordered reductions need slots
 
-Status: Draft
+Status: Accepted
 
 ## Context
 
@@ -50,5 +50,5 @@ is not associative and commutative, look for the slots.
 
 ## References
 
-[^1]: ADR-0001, one binary gives one answer at any thread count. `docs/adrs/draft/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
+[^1]: ADR-0001, one binary gives one answer at any thread count. `docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
 [^2]: Report 06, algorithms and scheduling. `docs/research/reports/06-algorithms-and-scheduling.md`

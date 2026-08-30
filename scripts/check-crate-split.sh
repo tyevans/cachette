@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Proves that the simulation core does not depend on PyO3.
 #
-# ADR-0006 D2 puts the simulation in a core crate that has no PyO3
+# ADR-0041 puts the simulation in a core crate that has no PyO3
 # dependency at all. That turns a convention into a compile error: no type
 # in the core can name a Python object, and no function in it can take an
 # interpreter token. The split also lets Miri run over the unsafe storage
@@ -29,6 +29,6 @@ done
 if [ "$status" -eq 0 ]; then
     printf 'crate split: cachette-core is free of PyO3.\n'
 else
-    printf '\nADR-0006 D2 requires that the core crate never links the interpreter.\n' >&2
+    printf '\nADR-0041 requires that the core crate never links the interpreter.\n' >&2
 fi
 exit "$status"

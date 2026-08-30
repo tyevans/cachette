@@ -8,7 +8,7 @@ version = "0.0.0"
 description = "A deterministic world simulation engine."
 readme = "README.md"
 license = "MIT OR Apache-2.0"
-# ADR-0006 D8 sets the minimum interpreter version. Raise it only in a
+# The contributing guide sets the minimum interpreter version. Raise it only in a
 # record that supersedes that one.
 requires-python = ">=3.11"
 dependencies = ["numpy>=1.26"]
@@ -81,7 +81,7 @@ ignore = [
 convention = "pep257"
 
 [tool.mypy]
-# ADR-0006 D8 requires that continuous integration checks the type stubs.
+# The contributing guide requires that continuous integration checks the type stubs.
 # The version is not pinned here. mypy then checks against the interpreter
 # that runs it, and the continuous integration matrix chooses the version.
 strict = true

@@ -115,11 +115,11 @@ took.[^1]
 
 [^1]: Definition of done. `.claude/rules/definition-of-done.md`
 [^2]: ADR registry. `docs/adrs/REGISTRY.md`
-[^3]: ADR-0001, Determinism as the primary constraint, decision D2. `docs/adrs/draft/adr-0001-determinism-outranks-every-other-constraint.md`
-[^4]: ADR-0001, Determinism as the primary constraint, decision D3. `docs/adrs/draft/adr-0001-determinism-outranks-every-other-constraint.md`
-[^5]: ADR-0006, The Python boundary, decision D2. `docs/adrs/draft/adr-0006-python-is-a-control-plane.md`
-[^6]: ADR-0001, Determinism as the primary constraint, decision D5. `docs/adrs/draft/adr-0001-determinism-outranks-every-other-constraint.md`
-[^7]: ADR-0001, Determinism as the primary constraint, decision D6. `docs/adrs/draft/adr-0001-determinism-outranks-every-other-constraint.md`
-[^8]: ADR-0001, Determinism as the primary constraint, decision D9. `docs/adrs/draft/adr-0001-determinism-outranks-every-other-constraint.md`
+[^3]: ADR-0002, simulated and aggregated state holds no floating point number, decision D1. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
+[^4]: ADR-0002, simulated and aggregated state holds no floating point number, decision D2. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
+[^5]: ADR-0041, a crate split enforces the boundary at compile time. `docs/adrs/REGISTRY.md`
+[^6]: ADR-0003, every random draw is keyed, never stateful, decision D1. `docs/adrs/accepted/adr-0003-every-random-draw-is-keyed-never-stateful.md`
+[^7]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
+[^8]: ADR-0006, an event is plain data and applying it is pure, decision D1. `docs/adrs/accepted/adr-0006-an-event-is-plain-data-and-applying-it-is-pure.md`
 [^9]: Testing policy. `docs/TESTING.md`
 [^10]: Documentation rules. `.claude/rules/documentation.md`

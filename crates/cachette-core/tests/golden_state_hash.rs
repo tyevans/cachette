@@ -13,8 +13,8 @@
 //!
 //! # References
 //!
-//! [^1]: ADR-0001, Determinism as the primary constraint, decision D11. `docs/adrs/draft/adr-0001-determinism-outranks-every-other-constraint.md`
-//! [^2]: ADR-0001, Determinism as the primary constraint, decision D9. `docs/adrs/draft/adr-0001-determinism-outranks-every-other-constraint.md`
+//! [^1]: ADR-0001, one binary gives one answer at any thread count, decision D4. `docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
+//! [^2]: ADR-0006, an event is plain data and applying it is pure, decision D1. `docs/adrs/accepted/adr-0006-an-event-is-plain-data-and-applying-it-is-pure.md`
 
 use std::path::PathBuf;
 

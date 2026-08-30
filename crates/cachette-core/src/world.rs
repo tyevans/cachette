@@ -20,11 +20,11 @@
 //!
 //! # References
 //!
-//! [^1]: ADR-0001, Determinism as the primary constraint, decision D11. `docs/adrs/draft/adr-0001-determinism-outranks-every-other-constraint.md`
-//! [^2]: ADR-0001, Determinism as the primary constraint, decision D6. `docs/adrs/draft/adr-0001-determinism-outranks-every-other-constraint.md`
-//! [^3]: ADR-0002, Target platform and value types, decision D5. `docs/adrs/draft/adr-0002-value-types-are-exact-and-sized-for-one-target.md`
-//! [^4]: ADR-0001, Determinism as the primary constraint, decision D5. `docs/adrs/draft/adr-0001-determinism-outranks-every-other-constraint.md`
-//! [^5]: ADR-0001, Determinism as the primary constraint, decision D3. `docs/adrs/draft/adr-0001-determinism-outranks-every-other-constraint.md`
+//! [^1]: ADR-0001, one binary gives one answer at any thread count, decision D4. `docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
+//! [^2]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
+//! [^3]: ADR-0009, parallel stages write disjoint outputs, because the memory model is weak. `docs/adrs/REGISTRY.md`
+//! [^4]: ADR-0003, every random draw is keyed, never stateful, decision D1. `docs/adrs/accepted/adr-0003-every-random-draw-is-keyed-never-stateful.md`
+//! [^5]: ADR-0002, simulated and aggregated state holds no floating point number, decision D2. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
 
 use crate::event::{TileChanged, CHANGE_KIND_LOWERED, CHANGE_KIND_RAISED};
 use crate::hash::StateHash;
@@ -77,7 +77,7 @@ impl Default for WorldConfig {
 ///
 /// # References
 ///
-/// [^1]: ADR-0006, The Python boundary, decision D10. `docs/adrs/draft/adr-0006-python-is-a-control-plane.md`
+/// [^1]: ADR-0047, many worlds live in one interpreter. `docs/adrs/REGISTRY.md`
 #[derive(Clone, Debug)]
 pub struct World {
     config: WorldConfig,
@@ -133,7 +133,7 @@ impl World {
     ///
     /// # References
     ///
-    /// [^1]: ADR-0006, The Python boundary, decision D5. `docs/adrs/draft/adr-0006-python-is-a-control-plane.md`
+    /// [^1]: ADR-0044, what copies and what does not is declared at the call site. `docs/adrs/REGISTRY.md`
     #[must_use]
     pub fn tile_values(&self) -> &[Fix32] {
         &self.values
@@ -152,7 +152,7 @@ impl World {
     ///
     /// # References
     ///
-    /// [^1]: ADR-0001, Determinism as the primary constraint, decision D11. `docs/adrs/draft/adr-0001-determinism-outranks-every-other-constraint.md`
+    /// [^1]: ADR-0001, one binary gives one answer at any thread count, decision D4. `docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
     #[must_use]
     pub fn event_log_bytes(&self) -> &[u8] {
         bytemuck::cast_slice(&self.log)
@@ -165,7 +165,7 @@ impl World {
     ///
     /// # References
     ///
-    /// [^1]: ADR-0001, Determinism as the primary constraint, decisions D4 and D7. `docs/adrs/draft/adr-0001-determinism-outranks-every-other-constraint.md`
+    /// [^1]: ADR-0002, simulated and aggregated state holds no floating point number, decision D1. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`, and ADR-0004, iteration order is explicit, decision D2. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
     #[must_use]
     pub fn tile_total(&self) -> Accum {
         let mut total = Accum(0);
@@ -181,7 +181,7 @@ impl World {
     ///
     /// # References
     ///
-    /// [^1]: ADR-0001, Determinism as the primary constraint, decision D11. `docs/adrs/draft/adr-0001-determinism-outranks-every-other-constraint.md`
+    /// [^1]: ADR-0001, one binary gives one answer at any thread count, decision D4. `docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
     #[must_use]
     pub fn state_hash(&self) -> StateHash {
         StateHash::new()
@@ -199,7 +199,7 @@ impl World {
     ///
     /// # References
     ///
-    /// [^1]: ADR-0006, The Python boundary, decision D11. `docs/adrs/draft/adr-0006-python-is-a-control-plane.md`
+    /// [^1]: The testing rule, drive the real caller. `.claude/rules/testing.md`
     #[must_use]
     pub fn check_invariants(&self) -> bool {
         if self.values.len() != self.factions.len() {
@@ -268,7 +268,7 @@ impl World {
 ///
 /// # References
 ///
-/// [^1]: ADR-0001, Determinism as the primary constraint, decision D6. `docs/adrs/draft/adr-0001-determinism-outranks-every-other-constraint.md`
+/// [^1]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
 #[cfg(not(feature = "probe-nondeterminism"))]
 fn ordered_slots(slots: &[Vec<TileChanged>]) -> impl Iterator<Item = &Vec<TileChanged>> {
     slots.iter()
@@ -291,7 +291,7 @@ fn ordered_slots(slots: &[Vec<TileChanged>]) -> impl Iterator<Item = &Vec<TileCh
 ///
 /// # References
 ///
-/// [^1]: ADR-0001, Determinism as the primary constraint, decision D9. `docs/adrs/draft/adr-0001-determinism-outranks-every-other-constraint.md`
+/// [^1]: ADR-0006, an event is plain data and applying it is pure, decision D1. `docs/adrs/accepted/adr-0006-an-event-is-plain-data-and-applying-it-is-pure.md`
 fn update_chunk(
     tick: Tick,
     seed: u64,

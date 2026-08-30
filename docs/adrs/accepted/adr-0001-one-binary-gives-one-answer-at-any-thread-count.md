@@ -1,6 +1,6 @@
 # ADR-0001: One binary gives one answer at any thread count
 
-Status: Draft
+Status: Accepted
 
 ## Context
 

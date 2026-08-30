@@ -105,7 +105,7 @@ A backlog item that is refined names the product requirement record that it
 serves. The backlog item format gains one field.
 
 ```
-implements: [ADR-0001 D11]
+implements: [ADR-0001 D4]
 serves:     [PRD-0004]
 blocked-by: []
 ```

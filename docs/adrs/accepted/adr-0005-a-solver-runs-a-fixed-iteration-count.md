@@ -1,6 +1,6 @@
 # ADR-0005: A solver runs a fixed iteration count, never a convergence test
 
-Status: Draft
+Status: Accepted
 
 ## Context
 
@@ -47,6 +47,6 @@ frame starts. This makes a static schedule possible.
 
 ## References
 
-[^1]: ADR-0001, one binary gives one answer at any thread count. `docs/adrs/draft/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
+[^1]: ADR-0001, one binary gives one answer at any thread count. `docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
 [^2]: Report 06, algorithms and scheduling. `docs/research/reports/06-algorithms-and-scheduling.md`
 [^3]: Report 13, the field operator algebra. `docs/research/reports/13-field-operator-algebra.md`

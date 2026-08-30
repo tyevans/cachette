@@ -1,6 +1,6 @@
 """Type stubs for the compiled extension module.
 
-ADR-0006 D8 requires that continuous integration checks the stubs. The
+The contributing guide requires that continuous integration checks the stubs. The
 build regenerates them and the job fails when the result differs from this
 file. Hand-write the parts that a generator cannot infer.
 """

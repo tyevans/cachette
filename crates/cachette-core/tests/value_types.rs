@@ -7,7 +7,7 @@
 //!
 //! # References
 //!
-//! [^1]: ADR-0002, Target platform and value types, decision D9. `docs/adrs/draft/adr-0002-value-types-are-exact-and-sized-for-one-target.md`
+//! [^1]: ADR-0011, every value type is a newtype with a declared size and alignment. `docs/adrs/REGISTRY.md`
 
 use cachette_core::sim_math;
 use cachette_core::types::{Accum, FIX_FRACTIONAL_BITS};
@@ -23,7 +23,7 @@ fn an_entity_carries_an_index_and_a_generation() {
 
 #[test]
 fn an_entity_of_index_zero_and_generation_zero_does_not_exist() {
-    // ADR-0002 D9: the handle is never zero, so `Option<Entity>` stays 8
+    // ADR-0011: the handle is never zero, so `Option<Entity>` stays 8
     // bytes wide.
     assert_eq!(Entity::new(0, 0), None);
     assert_eq!(size_of::<Option<Entity>>(), 8);

@@ -225,13 +225,13 @@ real. The subjects are not.
 
 ## References
 
-[^1]: ADR-0001, Determinism as the primary constraint. `docs/adrs/draft/adr-0001-determinism-outranks-every-other-constraint.md`
-[^2]: ADR-0006, The Python boundary, decision D11. `docs/adrs/draft/adr-0006-python-is-a-control-plane.md`
-[^3]: ADR-0001, Determinism as the primary constraint, decision D9. `docs/adrs/draft/adr-0001-determinism-outranks-every-other-constraint.md`
-[^4]: ADR-0001, Determinism as the primary constraint, decision D11. `docs/adrs/draft/adr-0001-determinism-outranks-every-other-constraint.md`
+[^1]: ADR-0001, one binary gives one answer at any thread count. `docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
+[^2]: The testing rule, drive the real caller. `.claude/rules/testing.md`
+[^3]: ADR-0006, an event is plain data and applying it is pure, decision D1. `docs/adrs/accepted/adr-0006-an-event-is-plain-data-and-applying-it-is-pure.md`
+[^4]: ADR-0001, one binary gives one answer at any thread count, decision D4. `docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
 [^5]: Testing rules, section 1. `.claude/rules/testing.md`
-[^6]: ADR-0001, Determinism as the primary constraint, decision D7. `docs/adrs/draft/adr-0001-determinism-outranks-every-other-constraint.md`
-[^7]: ADR-0006, The Python boundary, decision D11. `docs/adrs/draft/adr-0006-python-is-a-control-plane.md`
-[^8]: ADR-0006, The Python boundary, decision D2. `docs/adrs/draft/adr-0006-python-is-a-control-plane.md`
-[^9]: ADR-0002, Target platform and value types, decision D8. `docs/adrs/draft/adr-0002-value-types-are-exact-and-sized-for-one-target.md`
-[^10]: ADR-0006, The Python boundary, decision D8. `docs/adrs/draft/adr-0006-python-is-a-control-plane.md`
+[^6]: ADR-0004, iteration order is explicit, decisions D2 and D3. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
+[^7]: The testing rule, drive the real caller. `.claude/rules/testing.md`
+[^8]: ADR-0041, a crate split enforces the boundary at compile time. `docs/adrs/REGISTRY.md`
+[^9]: ADR-0010, the cache line size is a compile-time constant. `docs/adrs/REGISTRY.md`
+[^10]: The contributing guide, the packaging and stub checks. `CONTRIBUTING.md`

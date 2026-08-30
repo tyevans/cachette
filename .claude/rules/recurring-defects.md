@@ -3,8 +3,8 @@
 This rule lists the mistake shapes to check for when you write, review, or
 diagnose work in this project.
 
-**Read the provenance before you trust a shape.** Cachette has no code and no
-defect history. Two shapes below have local evidence from this project. Three
+**Read the provenance before you trust a shape.** Cachette has a foundation
+crate and almost no defect history. Two shapes below have local evidence from this project. Three
 are imported from two sibling projects, where they were derived from an audit of
 about 130 correction commits.[^1] [^2] An imported shape is a prior. It stays a
 prior until someone records a local instance.
@@ -140,6 +140,6 @@ Before you claim work is done, check each line.
 [^4]: Decision Record Scope. `.claude/rules/adr-scope.md`
 [^5]: Commit Message Rules. `.claude/rules/commits.md`
 [^6]: Testing Rules. `.claude/rules/testing.md`
-[^7]: ADR-0001, Determinism as the primary constraint. `docs/adrs/draft/adr-0001-determinism-outranks-every-other-constraint.md`
+[^7]: ADR-0001, one binary gives one answer at any thread count. `docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
 [^8]: Findings, the scope of a decision record. `docs/research/adr-scope-findings.md`
 [^9]: Definition of Done. `.claude/rules/definition-of-done.md`

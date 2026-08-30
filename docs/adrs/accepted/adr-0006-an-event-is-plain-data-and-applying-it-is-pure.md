@@ -1,6 +1,6 @@
 # ADR-0006: An event is plain data and applying it is pure
 
-Status: Draft
+Status: Accepted
 
 ## Context
 
@@ -50,5 +50,5 @@ world and never an artefact of unwritten memory.
 
 ## References
 
-[^1]: ADR-0001, one binary gives one answer at any thread count. `docs/adrs/draft/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
+[^1]: ADR-0001, one binary gives one answer at any thread count. `docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
 [^2]: Report 03, the event log and determinism. `docs/research/reports/03-event-sourcing-cqrs-determinism.md`

@@ -12,7 +12,7 @@
 //!
 //! # References
 //!
-//! [^1]: ADR-0001, Determinism as the primary constraint, decision D5. `docs/adrs/draft/adr-0001-determinism-outranks-every-other-constraint.md`
+//! [^1]: ADR-0003, every random draw is keyed, never stateful, decision D1. `docs/adrs/accepted/adr-0003-every-random-draw-is-keyed-never-stateful.md`
 
 /// The identifier of the system that draws the value.
 ///

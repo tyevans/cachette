@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
 # Closes the gap that clippy leaves in the float ban.
 #
-# ADR-0001 D2 forbids floating point in simulated or aggregated state.
-# ADR-0001 D3 requires a lint to enforce that boundary.
+# ADR-0002 D1 forbids floating point in simulated or aggregated state.
+# ADR-0002 D2 requires a lint to enforce that boundary.
 #
 # clippy `disallowed_types` rejects a named `f32` or `f64`. It does not
 # reject a float literal whose type the compiler infers. `let x = 1.5;`
 # passes clippy and is a float. This script rejects that case.
 #
-# It also rejects the reassociating operations by name. ADR-0001 D3 names
+# It also rejects the reassociating operations by name. ADR-0002 D2 names
 # `f32::algebraic_add` and its siblings. Those methods do not resolve on the
 # pinned toolchain, so a clippy `disallowed_methods` entry cannot name them.
 # The name check covers them until they resolve.
@@ -42,7 +42,7 @@ while IFS= read -r file; do
 done < <(find "$target" -name '*.rs' -type f | sort)
 
 if [ "$status" -ne 0 ]; then
-    printf '\nADR-0001 D2 forbids floating point in the simulation core.\n' >&2
+    printf '\nADR-0002 D1 forbids floating point in the simulation core.\n' >&2
     printf 'Route the arithmetic through cachette_core::sim_math.\n' >&2
 fi
 exit "$status"

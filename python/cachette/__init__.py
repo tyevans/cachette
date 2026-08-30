@@ -9,8 +9,8 @@ API, the verb API and the view scope are not written yet.
 
 References
 ----------
-ADR-0006, The Python boundary, decision D1.
-``docs/adrs/draft/adr-0006-python-is-a-control-plane.md``
+ADR-0040, Python is a control plane, not a data plane.
+``docs/adrs/REGISTRY.md``
 """
 
 from cachette._core import (
