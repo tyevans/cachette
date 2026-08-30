@@ -192,8 +192,8 @@ without stating a constraint is worse than no record.
 | 0053 | A faction is a bit in a mask, and a relation is a plane | Proposed | 0011 | 08 |
 | 0054 | An entity belongs to one of three tiers, declared at creation | Proposed | 0012, 0043 | 14, 15, 16 |
 | 0055 | An effective stat comes from an ordered modifier pipeline | Proposed | 0002, 0054 | 12 |
-| 0056 | Movement is tile-discrete and admitted by sort-then-admit | Proposed | 0004, 0018 | 06, 10 |
-| 0057 | A long path follows a portal graph and a flow tile, never a per-unit search | Proposed | 0056 | 10 |
+| 0056 | Movement is tile-discrete and admitted by sort-then-admit | Draft | 0004, 0018 | 06, 10 |
+| 0057 | A long path follows a portal graph and a flow tile, never a per-unit search | Draft | 0056 | 10 |
 | 0058 | A field update is a flux pair on an edge, so quantity is conserved exactly | Proposed | 0023, 0029 | 13 |
 | 0059 | Fog storage grows with observed area, not with world area | Proposed | 0026, 0053 | 08 |
 | 0060 | An influence map is stored as a shared basis, not one plane per faction | Proposed | 0053, 0058 | 09 |

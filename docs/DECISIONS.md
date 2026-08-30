@@ -23,7 +23,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^ALLOC]
 
-**Next number: DEC-018**
+**Next number: DEC-019**
 
 [^ALLOC]: Findings register, FND-038. `docs/FINDINGS.md`
 
@@ -156,6 +156,33 @@ content also buys.
 ground.[^DEC1] Whichever option wins, that value needs recording.
 
 [^DEC1]: See DEC-008 in this document, and the movement timing note, `docs/research/movement-timing.md`.
+
+### DEC-018 — Where does movement sit in the frame schedule?
+
+The frame schedule is static and known before the frame runs. The order of
+the systems inside it is not recorded anywhere.
+
+The movement design session proposed one order: movement runs after the needs
+system and before the combat system.
+
+**Option A. Movement after needs, before combat.** Movement reads what the
+needs system produces, so a unit acts in the same frame on the need that
+raised it. Combat then sees the positions of this frame.
+
+**Option B. Some other order.** No one has argued for one.
+
+**Recommendation:** option A. The read-after-write dependency between needs
+and movement is real, and combat wants the current positions.
+
+**Assumption in the meantime:** option A.
+
+**Why this is a register row and not a record.** Neither the needs system nor
+the combat system exists. An order between systems that nobody has written is
+an intent, and a record must not state an intent as a fact. Write the order
+into the schedule when the schedule exists. Promote it to a record only if a
+contributor could reasonably choose otherwise and the reasoning does not show
+in the schedule itself.
+
 
 ### DEC-013 — Which toolchain version does the project pin?
 
