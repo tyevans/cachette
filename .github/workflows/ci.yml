@@ -1,0 +1,135 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  # The fast gate. It runs on every push and on every pull request.
+  rust:
+    name: rust
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # rust-toolchain.toml pins the compiler and the primary target of
+      # ADR-0002 D1.
+      - name: Install the toolchain
+        run: rustup show active-toolchain || rustup toolchain install
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Check the formatting
+        run: cargo fmt --all -- --check
+
+      - name: Lint
+        run: cargo clippy --workspace --all-targets -- -D warnings
+
+      # ADR-0001 D3: clippy rejects a named float type. It does not reject
+      # a float literal whose type the compiler infers. This script does.
+      - name: Check the float ban
+        run: ./scripts/check-float-ban.sh
+
+      # ADR-0006 D2: the core crate must never link the interpreter.
+      - name: Check the crate split
+        run: ./scripts/check-crate-split.sh
+
+      # This covers the unit tests, the property tests, and the two
+      # determinism tests of ADR-0001 D11.
+      - name: Test
+        run: cargo test --workspace
+
+      # The runners are x86-64. The primary target is 64-bit ARM on Linux.
+      # `cargo check` needs no linker for a foreign target, so it runs on
+      # the x86-64 runner and catches a target-specific compile error.
+      # A cross-compiled build and a test run on the target are deferred.
+      - name: Check the primary target
+        run: cargo check --workspace --target aarch64-unknown-linux-gnu
+
+  python:
+    name: python
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # ADR-0006 D8 sets the minimum interpreter version at 3.11.
+        python-version: ["3.11", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install the toolchain
+        run: rustup show active-toolchain || rustup toolchain install
+
+      - uses: Swatinem/rust-cache@v2
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Build the extension into the environment
+        run: uv sync --python ${{ matrix.python-version }}
+
+      - name: Check the formatting
+        run: uv run ruff format --check .
+
+      - name: Lint
+        run: uv run ruff check .
+
+      - name: Check the types
+        run: uv run mypy
+
+      # The tests import the installed package, never the source tree.
+      - name: Test
+        run: uv run pytest
+
+  audit:
+    name: licences and advisories
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: EmbarkStudios/cargo-deny-action@v2
+        with:
+          command: check
+
+  # ADR-0006 D8 requires that the wheel pipeline exists before the engine.
+  # The matrix is one platform for now. The record names five. The rest are
+  # deferred, together with the free-threaded job.
+  wheel:
+    name: wheel
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Build the wheel and the source distribution
+        uses: PyO3/maturin-action@v1
+        with:
+          command: build
+          args: --release --sdist --out dist
+          manylinux: auto
+
+      # ADR-0006 D8: test the source distribution. It is the item that is
+      # always skipped, and a broken one is invisible until a user finds it.
+      - name: Install from the source distribution
+        run: |
+          python -m venv /tmp/sdist-venv
+          /tmp/sdist-venv/bin/pip install --no-binary :all: dist/*.tar.gz
+          /tmp/sdist-venv/bin/python -c "import cachette; print(cachette.__version__)"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wheels
+          path: dist
