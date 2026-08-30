@@ -211,6 +211,27 @@ tick rate and width all at once.
 The likeliest defect in the field framework is writing a capacity cap as a
 sink. Caps are idempotent; sinks add twice.
 
+### FND-035 — A crossing time needs the terrain multiplier
+
+**Believed:** a dwell of 2 ticks and a capacity of 8 units give a crossing of
+12.5 seconds for a formation of 1,000 units.
+
+**True:** that arithmetic used the ordinary ground step cost for a mountain
+exit tile. It omitted the terrain multiplier. With the multiplier applied, the
+same combination gives a mountain crossing of about 50 seconds. The
+combination that meets the target is a dwell-2 baseline with a capacity-16
+crossing.
+
+**Evidence:** the movement timing note.[^4] It measured 12.9 seconds for the
+corrected combination. The closed-form throughput law gives 12.5 seconds for
+the same parameters. The 4-tick difference is unresolved and is recorded in
+the note.
+
+**Follows:** a crossing time is a function of three quantities, not two.
+Capacity, dwell and the terrain multiplier all enter it. **Check that a rate
+derivation names every multiplier on its path.** No record states the mountain
+multiplier, so the 50-second figure implies its value rather than citing it.
+
 ## D. Cost estimates that were wrong
 
 ### FND-017 — A decision costs 4.1 nanoseconds, not 400
@@ -444,3 +465,39 @@ drafts carry topic titles and are queued for retitling.
 [^1]: ADR-0001, Determinism, decision D1. `docs/adrs/draft/adr-0001-determinism-outranks-every-other-constraint.md`
 [^2]: Findings register, FND-004, in this document.
 [^3]: Record scope research. `docs/research/adr-scope-findings.md`
+[^4]: Movement timing note. `docs/research/movement-timing.md`
+
+### FND-035 — The float ban lint does not catch an inferred literal
+
+**Believed.** A lint enforces the boundary that keeps floating point out of
+simulated state. The project invariant says so plainly.
+
+**True.** The lint catches a named type. It does not catch `let x = 1.5;`,
+where the type is inferred and never written. It also cannot name the
+reassociating methods, because those do not resolve on the pinned toolchain,
+so a banned-method entry cannot refer to them.
+
+**Evidence.** The scaffolding work proved both gaps by injecting a float, and
+closed them with a script that reads the source directly.
+
+**Follows.** State the enforcement as two mechanisms, not one. A lint plus a
+script. An invariant that names one mechanism invites a reader to trust it
+alone. The word "lint" in the project instructions is now wrong on its own.
+
+### FND-036 — Mutation testing found ten gaps that a passing suite did not
+
+**Believed.** A test suite that passes, with the gates green, covers the code
+it tests.
+
+**True.** The first mutation run surfaced ten real gaps: untested entity
+accessors, untested fixed-point conversions, untested saturation limits, and
+an invariant check that no test could falsify. The suite was green
+throughout.
+
+**Evidence.** The first `cargo mutants` run on the scaffolding: 94 caught, 10
+unviable, 1 equivalent, after the gaps were closed.
+
+**Follows.** A green suite is evidence that the tests pass, not that they
+test. This matters most for the determinism tests, whose failure mode is
+invisible. That is why they now have a proven failure mode of their own.
+

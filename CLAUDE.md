@@ -38,9 +38,11 @@ Do not violate them for convenience.
 1. **No floating point in simulated or aggregated state.** Float addition
    is not associative. An aggregate must combine exactly, in any order.
    Use integer or fixed-point arithmetic. The fixed-point scale is Q16.16.
-2. **Route all simulation arithmetic through the `sim_math` module.** A
-   lint enforces this boundary. The lint bans `f32::algebraic_add` and the
-   other reassociating operations.
+2. **Route all simulation arithmetic through the `sim_math` module.** Two
+   mechanisms enforce this boundary, because one is not enough. A lint bans
+   the float types by name. A script catches what the lint cannot see: a
+   float literal whose type is inferred, and the reassociating methods, which
+   do not resolve on the pinned toolchain and so cannot be named in a lint.
 3. **Seed every random draw from a counter-based generator.** Key each
    draw on the tuple (system, frame, entity, draw). Do not use
    thread-local random state. Thread-local state destroys determinism.
