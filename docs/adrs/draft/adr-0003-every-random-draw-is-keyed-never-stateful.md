@@ -44,4 +44,4 @@ draw, so a snapshot stores no generator state.
 ## References
 
 [^1]: ADR-0001, one binary gives one answer at any thread count. `docs/adrs/draft/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
-[^2]: Report 03, the event log and determinism. `docs/research/reports/03-event-sourcing-and-command-flow.md`
+[^2]: Report 03, the event log and determinism. `docs/research/reports/03-event-sourcing-cqrs-determinism.md`

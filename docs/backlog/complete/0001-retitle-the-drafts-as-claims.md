@@ -1,7 +1,7 @@
 ---
 id: 0001
 title: Retitle the six drafts from topics to claims
-status: refined
+status: complete
 created: 2026-08-30
 implements: []
 changes: [ADR-0001, ADR-0002, ADR-0003, ADR-0004, ADR-0005, ADR-0006]
@@ -38,4 +38,9 @@ A title change is not a decision change, so no record is superseded.
 
 ## Outcome
 
-Filled in on completion.
+Done, then overtaken. The six drafts were retitled from topics to claims and
+their files renamed. The reflow that followed replaced them, so the titles
+this item produced survive only in the registry rows that the reflow derived
+from them.
+
+The registry now holds 65 rows, and every row states a claim.

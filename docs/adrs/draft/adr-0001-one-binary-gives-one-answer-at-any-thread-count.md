@@ -69,7 +69,7 @@ run exactly, which is worth more than the cost above.
 
 ## References
 
-[^1]: Report 03, the event log and determinism. `docs/research/reports/03-event-sourcing-and-command-flow.md`
+[^1]: Report 03, the event log and determinism. `docs/research/reports/03-event-sourcing-cqrs-determinism.md`
 [^2]: Report 07, target platform and value types. `docs/research/reports/07-target-platform-and-value-types.md`
 [^3]: Decision Record Scope, the counter-test. `.claude/rules/adr-scope.md`
 [^4]: Definition of Done. `.claude/rules/definition-of-done.md`

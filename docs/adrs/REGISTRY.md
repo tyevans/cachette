@@ -107,13 +107,13 @@ without stating a constraint is worse than no record.
 
 | No. | Claim | Status | Depends on | Source |
 |---|---|---|---|---|
-| 0001 | One binary gives one answer at any thread count | Proposed | — | 03, 07, 13 |
-| 0002 | Simulated and aggregated state holds no floating point number | Proposed | 0001 | 03, 13 |
-| 0003 | Every random draw is keyed, never stateful | Proposed | 0001 | 03 |
-| 0004 | Iteration order is explicit, and unordered reductions need slots | Proposed | 0001 | 03, 06 |
-| 0005 | A solver runs a fixed iteration count, never a convergence test | Proposed | 0001 | 06, 13 |
-| 0006 | An event is plain data and applying it is pure | Proposed | 0001 | 03 |
-| 0007 | Content supplies a key vector, never a comparator | Proposed | 0001 | 04 |
+| 0001 | One binary gives one answer at any thread count | Draft | — | 03, 07, 13 |
+| 0002 | Simulated and aggregated state holds no floating point number | Draft | 0001 | 03, 13 |
+| 0003 | Every random draw is keyed, never stateful | Draft | 0001 | 03 |
+| 0004 | Iteration order is explicit, and unordered reductions need slots | Draft | 0001 | 03, 06 |
+| 0005 | A solver runs a fixed iteration count, never a convergence test | Draft | 0001 | 06, 13 |
+| 0006 | An event is plain data and applying it is pure | Draft | 0001 | 03 |
+| 0007 | Content supplies a key vector, never a comparator | Draft | 0001 | 04 |
 
 ### Platform and value types
 

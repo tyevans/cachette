@@ -1,7 +1,7 @@
 ---
 id: 0002
 title: Remove the volatile figures from the six drafts
-status: refined
+status: complete
 created: 2026-08-30
 implements: []
 changes: [ADR-0001, ADR-0002, ADR-0003, ADR-0004, ADR-0005, ADR-0006]
@@ -41,4 +41,10 @@ figure-bearing record churns 1.67 times the mean.
 
 ## Outcome
 
-Filled in on completion.
+Done by removal. The fifteen figures were held in the four records that the
+reflow retired, so they went with those records. The baseline list is empty.
+
+The rule now bites forward rather than backward: a record written against a
+registry row may not introduce a figure, and the check fails if one appears.
+No figure was moved to the reference budgets, because each was a derived cost
+with no measurement behind it.
