@@ -83,9 +83,10 @@ layout. The project must write that.
 
 **Priority.** Load-bearing.
 
-**What it unblocks.** The span length, the arena benchmark, and the
-answer to the archetype question that the record calls its
-highest-leverage open question.
+**What it unblocks.** The span length and the arena benchmark. The
+archetype question itself is now answered: entity storage holds four fixed
+shapes, so the benchmark measures a chosen design rather than deciding
+one.[^ARCH]
 
 ### 1.2 Generational handles and slot recycling
 
@@ -1585,9 +1586,10 @@ calls unretrofittable.
    believable for this design. Set up the pinned runner before the
    benchmarks, not after.
 
-5. **Data-oriented design and the arena benchmark.** The record calls the
-   archetype question its highest-leverage open question and cannot answer
-   it without the iteration benchmark.
+5. **Data-oriented design and the arena benchmark.** The archetype
+   question is answered, so the benchmark no longer decides it. The
+   benchmark now sizes the chunk and the span for the four fixed
+   shapes.[^ARCH]
 
 6. **Reinforcement learning environments and batched stepping.** It
    decides `WorldBatch`, which the record says constrains the whole
@@ -1825,3 +1827,4 @@ calls unretrofittable.
 [^181]: tracing and Tracy. https://docs.rs/tracing and https://github.com/wolfpld/tracy
 [^182]: py-spy. https://github.com/benfred/py-spy
 [^183]: Max Willsey et al., "egg: Fast and Extensible Equality Saturation", POPL 2021. https://arxiv.org/abs/2004.03082
+[^ARCH]: ADR-0066, entity storage holds four fixed shapes. `docs/adrs/draft/adr-0066-entity-storage-holds-four-fixed-shapes.md`

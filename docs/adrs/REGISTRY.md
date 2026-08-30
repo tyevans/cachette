@@ -138,6 +138,7 @@ without stating a constraint is worse than no record.
 | 0019 | Change detection is per chunk, never per entity | Proposed | 0012 | 01, 02 |
 | 0020 | Structural change batches at the barrier and applies by tombstone and compact | Proposed | 0001, 0012 | 01 |
 | 0021 | Layout follows the access pattern | Proposed | 0012 | 01 |
+| 0066 | Entity storage holds four fixed shapes | Draft | 0012, 0020 | 01, 05 |
 
 ### The pyramid
 

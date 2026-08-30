@@ -69,9 +69,16 @@ is about 4,000 chunks.
 
 **Evidence:** the Python boundary report.
 
-**Follows:** dropping archetype chunking restores whole-column zero copy.
-Subsets never are. `to_numpy()` copies; document that plainly. Tile data is
-genuinely flat, so it is the honest flagship demonstration.
+**Follows:** dropping archetype chunking would restore whole-column zero
+copy. Subsets never are. `to_numpy()` copies; document that plainly. Tile
+data is genuinely flat, so it is the honest flagship demonstration.
+
+**Later:** the project did not drop chunking. BLK-002 closed with four fixed
+entity shapes, and the record that holds that claim accepts this cost
+explicitly.[^FND3] A caller now reads one view for each shape, or takes a
+copy. This finding stands as the reason the cost was known in advance.
+
+[^FND3]: ADR-0066, entity storage holds four fixed shapes. `docs/adrs/draft/adr-0066-entity-storage-holds-four-fixed-shapes.md`
 
 ### FND-004 — Opinion storage is linear, not quadratic
 
@@ -534,4 +541,3 @@ same happened for DEC-013.
 sibling system on its own. When a rule fixes a class of defect, look for
 every place the class occurs, not only the place it was found. Each register
 now carries an explicit next number, and a writer claims it before writing.
-
