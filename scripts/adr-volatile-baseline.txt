@@ -1,0 +1,28 @@
+# Volatile figures that already exist in the draft records.
+#
+# Each line is a record file name, a tab, and the exact text the check matched.
+# A line here suppresses one failure from the volatile-material check in
+# check_adrs.py. This list may only shrink.
+#
+# These figures are derived costs, not measurements. The record scope rule says
+# they belong in the reference tables, cited from the record. The records that
+# hold them are in review on another branch, so they are baselined rather than
+# edited. Delete a line here in the same change that moves the figure out.
+#
+# The check fails when a line here matches nothing, so this list cannot go
+# stale. Do not add to it.
+adr-0003-storage.md	92 percent
+adr-0003-storage.md	94 percent
+adr-0005-event-log.md	10 milliseconds
+adr-0005-event-log.md	16.6 milliseconds
+adr-0005-event-log.md	27 milliseconds
+adr-0005-event-log.md	5.0 milliseconds
+adr-0005-event-log.md	budget of 1
+adr-0006-python-boundary.md	0.2 milliseconds
+adr-0006-python-boundary.md	0.3 milliseconds
+adr-0006-python-boundary.md	100 milliseconds
+adr-0006-python-boundary.md	17 milliseconds
+adr-0006-python-boundary.md	20 microseconds
+adr-0006-python-boundary.md	30 percent
+adr-0006-python-boundary.md	4.4 milliseconds
+adr-0006-python-boundary.md	70 percent
