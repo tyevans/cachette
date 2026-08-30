@@ -15,6 +15,20 @@ Numbers are permanent. Never reuse one. A resolved blocker keeps its row.
 | Owner | Who can resolve it |
 | Status | `Open`, `Resolved`, or `Dropped` |
 
+
+## Allocating a number
+
+**Claim the next number below before you write the row.** Increment it in the
+same change that adds the row.
+
+A writer that numbers a row by reading the last row collides with any other
+writer working at the same time. That happened, and it is recorded as
+precedent.[^ALLOC]
+
+**Next number: BLK-013**
+
+[^ALLOC]: Findings register, FND-038. `docs/FINDINGS.md`
+
 ## Open
 
 ### BLK-001 — Tile scale, and therefore world extent

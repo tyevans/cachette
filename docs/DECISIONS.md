@@ -13,6 +13,20 @@ the outcome recorded.
 When a decision closes, and it corrected something the project believed,
 record the correction in `FINDINGS.md` as well.
 
+
+## Allocating a number
+
+**Claim the next number below before you write the row.** Increment it in the
+same change that adds the row.
+
+A writer that numbers a row by reading the last row collides with any other
+writer working at the same time. That happened, and it is recorded as
+precedent.[^ALLOC]
+
+**Next number: DEC-018**
+
+[^ALLOC]: Findings register, FND-038. `docs/FINDINGS.md`
+
 ## Open
 
 ### DEC-001 — The commodity split
@@ -117,7 +131,7 @@ A check enforces that a product record contains no decision record citation.
 work, or a reader cannot answer "which need does this record serve" and needs
 to.
 
-### DEC-013 — Is a tile crossing time content-configurable, or fixed by the engine?
+### DEC-017 — Is a tile crossing time content-configurable, or fixed by the engine?
 
 A crossing time depends on the terrain multiplier that scales the step cost of
 a tile. No record states where that multiplier lives.

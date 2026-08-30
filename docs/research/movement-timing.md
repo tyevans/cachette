@@ -97,4 +97,4 @@ question is genuinely open. The decisions register holds it.[^5]
 [^2]: Blockers register, BLK-007. `docs/BLOCKERS.md`
 [^3]: Report 17, Group Spatial Dynamics, section 15.4. `docs/research/reports/17-group-spatial-dynamics.md`
 [^4]: Decisions register, DEC-008. `docs/DECISIONS.md`
-[^5]: Decisions register, DEC-013. `docs/DECISIONS.md`
+[^5]: Decisions register, DEC-017. `docs/DECISIONS.md`

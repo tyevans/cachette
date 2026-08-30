@@ -12,6 +12,20 @@ superseded finding still explains why the project once believed otherwise.
 Each entry gives what the project believed, what is true, the evidence, and
 what follows.
 
+
+## Allocating a number
+
+**Claim the next number below before you write the row.** Increment it in the
+same change that adds the row.
+
+A writer that numbers a row by reading the last row collides with any other
+writer working at the same time. That happened, and it is recorded as
+precedent.[^ALLOC]
+
+**Next number: FND-039**
+
+[^ALLOC]: Findings register, FND-038. `docs/FINDINGS.md`
+
 ## A. Corrections to stated rules
 
 ### FND-001 — A monoid needs EXACT associativity
@@ -211,7 +225,7 @@ tick rate and width all at once.
 The likeliest defect in the field framework is writing a capacity cap as a
 sink. Caps are idempotent; sinks add twice.
 
-### FND-035 — A crossing time needs the terrain multiplier
+### FND-037 — A crossing time needs the terrain multiplier
 
 **Believed:** a dwell of 2 ticks and a capacity of 8 units give a crossing of
 12.5 seconds for a formation of 1,000 units.
@@ -500,4 +514,24 @@ unviable, 1 equivalent, after the gaps were closed.
 **Follows.** A green suite is evidence that the tests pass, not that they
 test. This matters most for the determinism tests, whose failure mode is
 invisible. That is why they now have a proven failure mode of their own.
+
+### FND-038 — The registers had no allocator, and two writers collided
+
+**Believed.** The registry allocates record numbers, so the numbering problem
+was solved. FND-028 recorded the lesson after three collisions in the research
+phase.
+
+**True.** The lesson was applied to the records and not to the registers. The
+findings, decisions and blockers registers number their rows by reading the
+last row, which is the same failure that FND-028 describes. Two writers
+working at the same time on the same day both wrote FND-035 and DEC-013.
+
+**Evidence.** The collision itself. One writer recorded the float ban lint
+gap as FND-035; the other recorded a crossing time correction as FND-035. The
+same happened for DEC-013.
+
+**Follows.** A correct lesson applied to one system does not transfer to a
+sibling system on its own. When a rule fixes a class of defect, look for
+every place the class occurs, not only the place it was found. Each register
+now carries an explicit next number, and a writer claims it before writing.
 

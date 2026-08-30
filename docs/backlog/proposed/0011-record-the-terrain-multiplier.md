@@ -11,7 +11,7 @@ crossing implies a value of 2 against ordinary ground, but the value is
 inferred from a result rather than decided.
 
 Two loose ends need closing. First, the multiplier needs a recorded value and
-a recorded home. DEC-013 asks whether that home is content or engine code.
+a recorded home. DEC-017 asks whether that home is content or engine code.
 Second, a timing check measured 12.9 seconds for a dwell-2 baseline with a
 capacity-16 crossing, and the closed-form throughput law gives 12.5 seconds
 for the same parameters. The 4-tick difference is unexplained. The likely
