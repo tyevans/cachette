@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-040**
+**Next number: FND-042**
 
 ## A. Corrections to stated rules
 
@@ -551,6 +551,49 @@ declaration site, and it decays silently because nothing fails when it
 disagrees. The orientation now points at the register instead of repeating
 it. When a document summarises a register, make it name the register and stop
 there.
+
+### FND-040 — A record split left every citation in the code dangling
+
+**Believed.** The crate cites the records that govern it, so a reader who
+follows a citation reaches the reasoning.
+
+**True.** Commit 4937cd2 deleted six omnibus drafts and re-derived the
+registry from claims. The crate, the Python package, the gate scripts, the
+justfile, the continuous integration workflow and four rules still cited the
+deleted records by their old decision numbers. 81 citations were dangling.
+Nothing failed, because the record check reads only the records, and a
+comment is not compiled.
+
+**Evidence.** Accepting the determinism core required a whole-tree search for
+the old paths and the old decision numbers. Every source file in the crate
+carried at least one. Worse than a dangling path, the numbers were reused:
+`ADR-0002 D9` named a newtype rule when it was written and names the widening
+accumulator now, so a reader who followed it reached a real record with the
+wrong content.
+
+**Follows.** This is the record that no longer describes the code, in its
+cheapest form. A number that is reused is more dangerous than a path that is
+gone, because the reader gets an answer. When a record is split or renumbered,
+the sweep is part of the same change, and the search command belongs in the
+commit body. A check that reads citations in source files, not only in
+records, would have caught this. It does not exist yet.
+
+### FND-041 — The orientation said the project had no code
+
+**Believed.** The project is in design and no code exists. The orientation,
+the testing rule, the recurring-defect rule and the budgets register all said
+so.
+
+**True.** The foundation crate, the Python bindings, the gates and the two
+determinism tests exist and pass.
+
+**Evidence.** Four documents carried the claim while `cargo test --workspace`
+was green.
+
+**Follows.** The redundant declaration shape again. Four documents declared
+one fact about the project state, and no check compared any of them against
+the tree. A status sentence that a reader can check against the tree in one
+command is worth writing; one that repeats a fact four times is not.
 
 ## References
 
