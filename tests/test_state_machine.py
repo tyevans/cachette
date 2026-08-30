@@ -1,6 +1,6 @@
 """The property-based state machine that drives the public API.
 
-ADR-0006 D11 names this the highest-value harness for a stateful engine.
+The testing rule names this the highest-value harness for a stateful engine.
 It belongs on the Python side, because the properties that matter are
 properties of the boundary.
 
@@ -23,8 +23,8 @@ Add these when the engine supports them:
 
 References
 ----------
-ADR-0006, The Python boundary, decision D11.
-``docs/adrs/draft/adr-0006-python-is-a-control-plane.md``
+The testing rule, drive the real caller.
+``.claude/rules/testing.md``
 """
 
 from __future__ import annotations

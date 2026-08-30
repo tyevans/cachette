@@ -72,12 +72,11 @@ The full rule states the test for whether a decision needs a record at all, and
 gives the evidence for each category above. Read it before you write a record.
 It is derived from a measurement of 106 records in two sibling projects.
 
-Two results from that measurement bear on the records this project has already
-drafted. Record length predicts churn, with a correlation near 0.71 in both
-reference corpora, and all six drafts are longer than both reference medians. A
-title that states a claim bounds a record; a title that names a topic does not,
-and a topic title churned twice as often. Five of the six drafts carry a topic
-title.
+Two results from that measurement bear on this project. Record length predicts
+churn, with a correlation near 0.71 in both reference corpora. A title that
+states a claim bounds a record; a title that names a topic does not, and a
+topic title churned twice as often. Every row below therefore states a claim,
+and a record that grows past one claim is split rather than extended.
 
 A script checks the mechanical part of this rule and can run in continuous
 integration. It fails when a record misses a required section, holds a version
@@ -107,13 +106,13 @@ without stating a constraint is worse than no record.
 
 | No. | Claim | Status | Depends on | Source |
 |---|---|---|---|---|
-| 0001 | One binary gives one answer at any thread count | Draft | — | 03, 07, 13 |
-| 0002 | Simulated and aggregated state holds no floating point number | Draft | 0001 | 03, 13 |
-| 0003 | Every random draw is keyed, never stateful | Draft | 0001 | 03 |
-| 0004 | Iteration order is explicit, and unordered reductions need slots | Draft | 0001 | 03, 06 |
-| 0005 | A solver runs a fixed iteration count, never a convergence test | Draft | 0001 | 06, 13 |
-| 0006 | An event is plain data and applying it is pure | Draft | 0001 | 03 |
-| 0007 | Content supplies a key vector, never a comparator | Draft | 0001 | 04 |
+| 0001 | One binary gives one answer at any thread count | Accepted | — | 03, 07, 13 |
+| 0002 | Simulated and aggregated state holds no floating point number | Accepted | 0001 | 03, 13 |
+| 0003 | Every random draw is keyed, never stateful | Accepted | 0001 | 03 |
+| 0004 | Iteration order is explicit, and unordered reductions need slots | Accepted | 0001 | 03, 06 |
+| 0005 | A solver runs a fixed iteration count, never a convergence test | Accepted | 0001 | 06, 13 |
+| 0006 | An event is plain data and applying it is pure | Accepted | 0001 | 03 |
+| 0007 | Content supplies a key vector, never a comparator | Accepted | 0001 | 04 |
 
 ### Platform and value types
 
@@ -138,7 +137,7 @@ without stating a constraint is worse than no record.
 | 0019 | Change detection is per chunk, never per entity | Proposed | 0012 | 01, 02 |
 | 0020 | Structural change batches at the barrier and applies by tombstone and compact | Proposed | 0001, 0012 | 01 |
 | 0021 | Layout follows the access pattern | Proposed | 0012 | 01 |
-| 0066 | Entity storage holds four fixed shapes | Draft | 0012, 0020 | 01, 05 |
+| 0066 | Entity storage holds four fixed shapes | Accepted | 0012, 0020 | 01, 05 |
 
 ### The pyramid
 

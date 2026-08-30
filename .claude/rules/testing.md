@@ -3,7 +3,7 @@
 This rule states how to design a test in this project. The gates that a test
 must pass are in the definition of done.[^1]
 
-No code exists yet. Apply this rule when the first crate exists.
+The foundation crate exists. This rule applies to every test in it.
 
 ## 1. A determinism test must be able to fail
 
@@ -62,5 +62,5 @@ reaches into a private field pins the implementation, not the behaviour.
 ## References
 
 [^1]: Definition of Done. `.claude/rules/definition-of-done.md`
-[^2]: ADR-0001, Determinism as the primary constraint. `docs/adrs/draft/adr-0001-determinism-outranks-every-other-constraint.md`
+[^2]: ADR-0001, one binary gives one answer at any thread count. `docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
 [^3]: Project orientation. `CLAUDE.md`

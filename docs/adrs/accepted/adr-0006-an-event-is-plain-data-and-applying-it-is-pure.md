@@ -1,6 +1,6 @@
 # ADR-0006: An event is plain data and applying it is pure
 
-Status: Draft
+Status: Accepted
 
 ## Context
 
@@ -17,7 +17,7 @@ correct program produces, and reading one is undefined behaviour.
 
 ## Decision
 
-**Every event type is plain data with a declared layout.**
+### D1. An event is plain data with a declared layout
 
 - The type uses the C representation, so the field order is fixed.
 - Padding is declared as an explicit field, so every byte is written.
@@ -26,9 +26,13 @@ correct program produces, and reading one is undefined behaviour.
 - The type satisfies the plain-data traits, so it can be viewed as bytes
   safely.
 
+### D2. Applying an event is pure
+
 **Applying an event is a pure function of the event and the state it
 touches.** It reads no clock, makes no allocation that affects the result,
 and calls no code outside the engine. In particular it never calls Python.
+
+### D3. The claim covers every hashed type
 
 This claim covers any type whose bytes are hashed or written to the log, not
 only types named "event".
@@ -46,5 +50,5 @@ world and never an artefact of unwritten memory.
 
 ## References
 
-[^1]: ADR-0001, one binary gives one answer at any thread count. `docs/adrs/draft/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
+[^1]: ADR-0001, one binary gives one answer at any thread count. `docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
 [^2]: Report 03, the event log and determinism. `docs/research/reports/03-event-sourcing-cqrs-determinism.md`

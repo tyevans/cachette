@@ -1,6 +1,6 @@
 # ADR-0002: Simulated and aggregated state holds no floating point number
 
-Status: Draft
+Status: Accepted
 
 ## Context
 
@@ -18,24 +18,30 @@ error grows with the number of parts.
 
 ## Decision
 
+### D1. State holds no floating point number
+
 **No value in simulated state or in an aggregate is a floating point number.**
 
 Values are integers, or fixed-point numbers held in integers. The fixed-point
 scale is Q16.16: sixteen bits of whole part and sixteen bits of fraction,
 held in a 32-bit integer, with a 64-bit accumulator above it.
 
-Two rules enforce this claim.
+### D2. All simulation arithmetic goes through one module
 
-- **All simulation arithmetic goes through one module.** The module is the
-  only place that defines the operations. A lint bans the reassociating
-  floating point operations everywhere else, including
-  `f32::algebraic_add` and its relatives.
-- **An accumulator widens.** A byte-wide field summed over millions of tiles
-  overflows a 32-bit accumulator, so an aggregate accumulates in 64 bits.
+The module is the only place that defines the operations. A lint bans the
+reassociating floating point operations everywhere else, including
+`f32::algebraic_add` and its relatives.
 
-Floating point is allowed outside simulated state: in rendering, in a
-statistic reported for a human to read, and in a test that compares against a
-reference. None of those feed back into the world.
+### D3. An accumulator widens
+
+A byte-wide field summed over millions of tiles overflows a 32-bit
+accumulator, so an aggregate accumulates in 64 bits.
+
+### D4. Floating point is allowed outside simulated state
+
+It is allowed in rendering, in a statistic reported for a human to read, and
+in a test that compares against a reference. None of those feed back into the
+world.
 
 ## Consequences
 
@@ -56,6 +62,6 @@ an index rather than as an estimate.
 
 ## References
 
-[^1]: ADR-0001, one binary gives one answer at any thread count. `docs/adrs/draft/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
+[^1]: ADR-0001, one binary gives one answer at any thread count. `docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
 [^2]: IEEE 754-2019, clause 5. https://ieeexplore.ieee.org/document/8766229
 [^3]: Report 13, the field operator algebra. `docs/research/reports/13-field-operator-algebra.md`

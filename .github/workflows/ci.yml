@@ -23,7 +23,7 @@ jobs:
       - uses: actions/checkout@v4
 
       # rust-toolchain.toml pins the compiler and the primary target of
-      # ADR-0002 D1.
+      # ADR-0008.
       - name: Install the toolchain
         run: rustup show active-toolchain || rustup toolchain install
 
@@ -35,17 +35,17 @@ jobs:
       - name: Lint
         run: cargo clippy --workspace --all-targets -- -D warnings
 
-      # ADR-0001 D3: clippy rejects a named float type. It does not reject
+      # ADR-0002 D2: clippy rejects a named float type. It does not reject
       # a float literal whose type the compiler infers. This script does.
       - name: Check the float ban
         run: ./scripts/check-float-ban.sh
 
-      # ADR-0006 D2: the core crate must never link the interpreter.
+      # ADR-0041: the core crate must never link the interpreter.
       - name: Check the crate split
         run: ./scripts/check-crate-split.sh
 
       # This covers the unit tests, the property tests, and the two
-      # determinism tests of ADR-0001 D11.
+      # determinism tests of ADR-0001 D4.
       - name: Test
         run: cargo test --workspace
 
@@ -72,7 +72,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # ADR-0006 D8 sets the minimum interpreter version at 3.11.
+        # The contributing guide sets the minimum interpreter version at 3.11.
         python-version: ["3.11", "3.13"]
     steps:
       - uses: actions/checkout@v4
@@ -111,7 +111,7 @@ jobs:
         with:
           command: check
 
-  # ADR-0006 D8 requires that the wheel pipeline exists before the engine.
+  # The contributing guide requires that the wheel pipeline exists before the engine.
   # The matrix is one platform for now. The record names five. The rest are
   # deferred, together with the free-threaded job.
   wheel:
@@ -131,7 +131,7 @@ jobs:
           args: --release --sdist --out dist
           manylinux: auto
 
-      # ADR-0006 D8: test the source distribution. It is the item that is
+      # The contributing guide: test the source distribution. It is the item that is
       # always skipped, and a broken one is invisible until a user finds it.
       - name: Install from the source distribution
         run: |

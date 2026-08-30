@@ -33,7 +33,7 @@ lint-python:
     uv run ruff check python tests
     uv run mypy
 
-# Check the float ban of ADR-0001 D3 and the crate split of ADR-0006 D2.
+# Check the float ban of ADR-0002 D2 and the crate split of ADR-0041.
 invariants:
     ./scripts/check-float-ban.sh
     ./scripts/check-crate-split.sh
@@ -50,7 +50,7 @@ test-python:
     uv sync
     uv run pytest
 
-# Run the two determinism tests of ADR-0001 D11 on their own.
+# Run the two determinism tests of ADR-0001 D4 on their own.
 determinism:
     cargo test --package cachette-core --test thread_equivalence
     cargo test --package cachette-core --test golden_state_hash
@@ -71,7 +71,7 @@ test-slow:
     cargo deny check
     cargo check --workspace --target aarch64-unknown-linux-gnu
 
-# Check that the code compiles for the primary target of ADR-0002 D1.
+# Check that the code compiles for the primary target of ADR-0008.
 target-check:
     cargo check --workspace --target aarch64-unknown-linux-gnu
 

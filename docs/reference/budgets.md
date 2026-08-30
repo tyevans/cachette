@@ -14,7 +14,8 @@ replaces a derivation, say so in the row and give the commit.
 
 ## Status
 
-No measured figure is recorded. The project has no code and no benchmark.
+No measured figure is recorded. The foundation crate exists, and no benchmark
+harness runs on the target platform.
 
 The scale constants below are decided or derived, not measured. Each was held
 here because a blocker governed it. Those blockers are now closed.

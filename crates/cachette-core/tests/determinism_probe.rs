@@ -17,11 +17,11 @@
 //! The feature makes the step join its output slots in reverse order. At
 //! one thread there is one slot, so the order does not change. At more than
 //! one thread the order changes, and the event log changes with it. That is
-//! exactly the defect that ADR-0001 D6 forbids.[^1]
+//! exactly the defect that ADR-0004 D1 forbids.[^1]
 //!
 //! # References
 //!
-//! [^1]: ADR-0001, Determinism as the primary constraint, decisions D6 and D11. `docs/adrs/draft/adr-0001-determinism-outranks-every-other-constraint.md`
+//! [^1]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`, and ADR-0001, one binary gives one answer at any thread count, decision D5. `docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
 #![cfg(feature = "probe-nondeterminism")]
 
 use cachette_core::{World, WorldConfig};

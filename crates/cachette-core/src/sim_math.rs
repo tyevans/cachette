@@ -15,8 +15,8 @@
 //!
 //! # References
 //!
-//! [^1]: ADR-0001, Determinism as the primary constraint, decision D3. `docs/adrs/draft/adr-0001-determinism-outranks-every-other-constraint.md`
-//! [^2]: ADR-0001, Determinism as the primary constraint, decision D7. `docs/adrs/draft/adr-0001-determinism-outranks-every-other-constraint.md`
+//! [^1]: ADR-0002, simulated and aggregated state holds no floating point number, decision D2. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
+//! [^2]: ADR-0004, iteration order is explicit, decisions D2 and D3. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
 
 use crate::types::{Accum, Fix32, FIX_FRACTIONAL_BITS};
 
@@ -43,7 +43,7 @@ pub const fn sub(a: Fix32, b: Fix32) -> Fix32 {
 ///
 /// # References
 ///
-/// [^1]: ADR-0002, Target platform and value types, decision D3. `docs/adrs/draft/adr-0002-value-types-are-exact-and-sized-for-one-target.md`
+/// [^1]: ADR-0008, the primary target is aarch64, and NEON is a baseline rather than a dispatch. `docs/adrs/REGISTRY.md`
 #[must_use]
 pub const fn mul(a: Fix32, b: Fix32) -> Fix32 {
     let wide = (a.0 as i64) * (b.0 as i64);
@@ -71,7 +71,7 @@ pub const fn div(a: Fix32, b: Fix32) -> Option<Fix32> {
 ///
 /// # References
 ///
-/// [^1]: ADR-0001, Determinism as the primary constraint, decision D4. `docs/adrs/draft/adr-0001-determinism-outranks-every-other-constraint.md`
+/// [^1]: ADR-0002, simulated and aggregated state holds no floating point number, decision D1. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
 #[must_use]
 pub const fn accumulate(total: Accum, value: Fix32) -> Accum {
     Accum(total.0.saturating_add(value.0 as i64))
@@ -84,7 +84,7 @@ pub const fn accumulate(total: Accum, value: Fix32) -> Accum {
 ///
 /// # References
 ///
-/// [^1]: ADR-0001, Determinism as the primary constraint, decision D7. `docs/adrs/draft/adr-0001-determinism-outranks-every-other-constraint.md`
+/// [^1]: ADR-0004, iteration order is explicit, decisions D2 and D3. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
 #[must_use]
 pub const fn combine(a: Accum, b: Accum) -> Accum {
     Accum(a.0.saturating_add(b.0))

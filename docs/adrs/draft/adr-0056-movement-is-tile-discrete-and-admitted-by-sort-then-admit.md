@@ -114,12 +114,12 @@ capacity literal in the movement kernel violates D4.
 ## References
 
 [^1]: Report 10, crowd simulation and unit movement. `docs/research/reports/10-crowd-and-movement.md`
-[^2]: ADR-0002, simulated and aggregated state holds no floating point number. `docs/adrs/draft/adr-0002-state-holds-no-floating-point-number.md`
-[^3]: ADR-0004, iteration order is explicit. `docs/adrs/draft/adr-0004-iteration-order-is-explicit.md`
-[^4]: ADR-0001, one binary gives one answer at any thread count. `docs/adrs/draft/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
+[^2]: ADR-0002, simulated and aggregated state holds no floating point number. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
+[^3]: ADR-0004, iteration order is explicit. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
+[^4]: ADR-0001, one binary gives one answer at any thread count. `docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
 [^5]: ADR-0018, the unit-to-tile bridge keeps units sorted by tile. Reserved in the record registry. `docs/adrs/REGISTRY.md`
 [^6]: Findings register, FND-011, the progress accumulator overflows. `docs/FINDINGS.md`
-[^7]: ADR-0007, content supplies a key vector, never a comparator. `docs/adrs/draft/adr-0007-content-supplies-a-key-vector-never-a-comparator.md`
+[^7]: ADR-0007, content supplies a key vector, never a comparator. `docs/adrs/accepted/adr-0007-content-supplies-a-key-vector-never-a-comparator.md`
 [^8]: Findings register, FND-037, a crossing time needs the terrain multiplier. `docs/FINDINGS.md`
 [^9]: Blockers register, BLK-001, tile scale and world extent. `docs/BLOCKERS.md`
 [^10]: Blockers register, BLK-009, tile capacity. `docs/BLOCKERS.md`

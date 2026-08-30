@@ -67,7 +67,7 @@ associative, so a float sum is not a monoid.[^2]
 
 ## References
 
-[^1]: ADR-0001, decision D14. `docs/adrs/draft/adr-0001-foundational-architecture.md`
+[^1]: ADR-0002, decision D1. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
 [^2]: IEEE 754-2019, clause 5. https://ieeexplore.ieee.org/document/8766229
 ```
 

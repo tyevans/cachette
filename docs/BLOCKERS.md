@@ -149,5 +149,5 @@ blood. A title holder may **appoint** him. His children inherit from him
 normally.
 
 [^SCALE]: Budgets and costs, the scale constants. `docs/reference/budgets.md`
-[^SHAPES]: ADR-0066, entity storage holds four fixed shapes. `docs/adrs/draft/adr-0066-entity-storage-holds-four-fixed-shapes.md`
+[^SHAPES]: ADR-0066, entity storage holds four fixed shapes. `docs/adrs/accepted/adr-0066-entity-storage-holds-four-fixed-shapes.md`
 [^TIMING]: Movement timing note. `docs/research/movement-timing.md`

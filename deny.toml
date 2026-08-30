@@ -4,7 +4,7 @@
 # the tree therefore ships to a user, and its licence applies.
 
 [graph]
-# ADR-0002 D1 names the primary target. The check reads the tree for the
+# ADR-0008 names the primary target. The check reads the tree for the
 # development target and for the primary target.
 targets = [
     "x86_64-unknown-linux-gnu",

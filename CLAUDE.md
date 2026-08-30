@@ -12,11 +12,13 @@ The target scale is 16.7 million tiles and one million units.
 
 ## Status
 
-The project is in design. No code exists yet.
+The determinism core is accepted and the foundation crate exists. Eight
+records are binding: the seven determinism records and the entity storage
+record.[^1] Read them before you write code. The registry holds the status of
+every record, and it is the only place that does.[^11]
 
-The foundational architecture decision record is a draft.[^1] It holds 50
-numbered decisions. Read it before you write code. Six research reports
-support it.[^2]
+The rest of the design is open. Most registry rows reserve a number and have
+no file yet. Research reports support them.[^2]
 
 ## Target platform
 
@@ -118,8 +120,11 @@ move one.[^6]
 
 | Path | Contents |
 |------|----------|
+| `docs/adrs/accepted/` | Binding decision records |
 | `docs/adrs/draft/` | Decision records under review |
-| `docs/adrs/background/` | Research that supports each decision record |
+| `docs/research/reports/` | Research that supports each decision record |
+| `crates/` | The Rust core and the Python bindings |
+| `python/` | The Python control plane package |
 | `docs/reference/` | Registers of figures that change |
 | `scripts/` | Checks that run in continuous integration |
 | `.claude/rules/` | Rules that apply to all work in this repository |
@@ -169,7 +174,7 @@ list. A register does not decay; a summary does.[^9]
 
 ## References
 
-[^1]: ADR-0001, one binary gives one answer at any thread count. `docs/adrs/draft/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
+[^1]: The accepted records. `docs/adrs/accepted/`
 [^2]: Research reports 01 to 07. `docs/research/reports/`
 [^3]: Documentation Rules. `.claude/rules/documentation.md`
 [^4]: Decision Record Scope. `.claude/rules/adr-scope.md`
@@ -179,3 +184,4 @@ list. A register does not decay; a summary does.[^9]
 [^8]: Product requirement records. `docs/product/README.md`
 [^9]: Blockers register. `docs/BLOCKERS.md`
 [^10]: Budgets and costs, the scale constants. `docs/reference/budgets.md`
+[^11]: ADR Registry. `docs/adrs/REGISTRY.md`

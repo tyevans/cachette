@@ -62,7 +62,7 @@ id: 0007
 title: Build the thread-count equivalence harness
 status: refined
 created: 2026-08-30
-implements: [ADR-0001 D11]
+implements: [ADR-0001 D4]
 changes: []
 creates: []
 serves: [PRD-0001]
@@ -75,7 +75,7 @@ One paragraph. What problem this solves, or what it enables.
 
 ## Impact review
 
-**Governed by.** ADR-0001 D11 requires this harness before the first solver.
+**Governed by.** ADR-0001 D4 requires this harness before the first solver.
 
 **Changes.** None.
 

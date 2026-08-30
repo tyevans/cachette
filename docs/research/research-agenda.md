@@ -1827,4 +1827,4 @@ calls unretrofittable.
 [^181]: tracing and Tracy. https://docs.rs/tracing and https://github.com/wolfpld/tracy
 [^182]: py-spy. https://github.com/benfred/py-spy
 [^183]: Max Willsey et al., "egg: Fast and Extensible Equality Saturation", POPL 2021. https://arxiv.org/abs/2004.03082
-[^ARCH]: ADR-0066, entity storage holds four fixed shapes. `docs/adrs/draft/adr-0066-entity-storage-holds-four-fixed-shapes.md`
+[^ARCH]: ADR-0066, entity storage holds four fixed shapes. `docs/adrs/accepted/adr-0066-entity-storage-holds-four-fixed-shapes.md`

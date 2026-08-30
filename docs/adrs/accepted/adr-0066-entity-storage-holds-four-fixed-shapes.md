@@ -1,6 +1,6 @@
 # ADR-0066: Entity storage holds four fixed shapes
 
-Status: Draft
+Status: Accepted
 
 ## Context
 
@@ -20,8 +20,9 @@ named the shapes.[^1]
 
 ## Decision
 
-**Entity storage holds four fixed shapes, and each shape gets its own set of
-columns.**
+### D1. Entity storage holds four fixed shapes
+
+**Each shape gets its own set of columns.**
 
 The shapes are the soldier, the settlement, the living character, and the tile
 upgrade.
@@ -32,14 +33,17 @@ upgrade.
   position.
 - A tile upgrade is sparse and attaches to a tile, not to a mobile entity.
 
-A structural change is a move between column sets, so the batched tombstone
-and compact path applies to it.[^2] Chunking applies with it, and the chunk
-size is a compile-time constant that the project measures on the target
-platform.[^3]
+### D2. A structural change is a move between column sets
 
-**The shapes do not vary at run time.** The engine never builds an archetype
-from a component set it discovers while running. A shape that is not one of
-the four is a compile-time error, not a run-time table.
+The batched tombstone and compact path therefore applies to it.[^2] Chunking
+applies with it, and the chunk size is a compile-time constant that the
+project measures on the target platform.[^3]
+
+### D3. The shapes do not vary at run time
+
+The engine never builds an archetype from a component set it discovers while
+running. A shape that is not one of the four is a compile-time error, not a
+run-time table.
 
 ### The alternative this rejects
 
