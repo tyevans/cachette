@@ -1,0 +1,24 @@
+[package]
+name = "cachette-py"
+description = "The PyO3 bindings for the Cachette simulation core."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[lib]
+name = "_core"
+crate-type = ["cdylib", "rlib"]
+
+# ADR-0006 D2: the bindings depend on the core. The core never depends on
+# the bindings, and the core never depends on PyO3.
+# ADR-0006 D8: the array crate tracks the interpreter binding crate minor
+# version exactly. Upgrade the pair in one change, never one alone.
+[dependencies]
+cachette-core = { path = "../cachette-core" }
+pyo3 = { workspace = true, features = ["abi3-py311", "extension-module"] }
+numpy = "0.29.0"
+
+[lints]
+workspace = true
