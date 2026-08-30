@@ -1322,8 +1322,8 @@ Source: report 11, sections 9 and 12.
 
 ## References
 
-[^1]: ADR-0001, Foundational Architecture. Decisions D1 to D50, the byte budget section and the per-tick cost budget section. `docs/adrs/draft/adr-0001-foundational-architecture.md`
-[^2]: Research report 08, Fog of War Representation. Section 6.3 and the storage table. `docs/adrs/background/adr-0001/08-fog-of-war-representation.md`
+[^1]: ADR Registry. The omnibus draft this report fed was deleted and its number reclaimed. Decisions D1 to D50, the byte budget section and the per-tick cost budget section. `docs/adrs/REGISTRY.md`
+[^2]: Research report 08, Fog of War Representation. Section 6.3 and the storage table. `docs/research/reports/08-fog-of-war-representation.md`
 [^3]: Even, S., Itai, A. and Shamir, A., 1976. On the complexity of timetable and multicommodity flow problems. SIAM Journal on Computing, 5(4), pp. 691-703.
 [^4]: Ahuja, R. K., Magnanti, T. L. and Orlin, J. B., 1993. Network Flows: Theory, Algorithms, and Applications. Prentice Hall.
 [^5]: Orlin, J. B., 1997. A polynomial time primal network simplex algorithm for minimum cost flows. Mathematical Programming, 78(2), pp. 109-129.
@@ -1338,10 +1338,10 @@ Source: report 11, sections 9 and 12.
 [^14]: Codenotti, B., McCune, B. and Varadarajan, K., 2005. Market equilibrium via the excess demand function. Proceedings of the 37th ACM Symposium on Theory of Computing (STOC), pp. 74-83.
 [^15]: Cole, R. and Fleischer, L., 2008. Fast-converging tatonnement algorithms for one-time and ongoing market problems. Proceedings of the 40th ACM Symposium on Theory of Computing (STOC), pp. 315-324.
 [^16]: Garg, N. and Konemann, J., 2007. Faster and simpler algorithms for multicommodity flow and other fractional packing problems. SIAM Journal on Computing, 37(2), pp. 630-652.
-[^17]: Research report 06, Simulation Algorithms and Parallel Scheduling. Sections 2, 3, 8.4, 8.5 and 10. `docs/adrs/background/adr-0001/06-algorithms-and-scheduling.md`
+[^17]: Research report 06, Simulation Algorithms and Parallel Scheduling. Sections 2, 3, 8.4, 8.5 and 10. `docs/research/reports/06-algorithms-and-scheduling.md`
 [^18]: Saad, Y., 2003. Iterative Methods for Sparse Linear Systems. 2nd edition. SIAM. Chapter 4, on the convergence rate of stationary iterative methods.
-[^19]: Research report 07, Target Platform and Value Types. The section on the weak memory model. `docs/adrs/background/adr-0001/07-target-platform-and-value-types.md`
-[^20]: Research report 04, Selector Engine and Verbs. Section 8.3, the `transfer` verb. `docs/adrs/background/adr-0001/04-selector-engine-and-verbs.md`
+[^19]: Research report 07, Target Platform and Value Types. The section on the weak memory model. `docs/research/reports/07-target-platform-and-value-types.md`
+[^20]: Research report 04, Selector Engine and Verbs. Section 8.3, the `transfer` verb. `docs/research/reports/04-selector-engine-and-verbs.md`
 [^21]: Paradox Interactive, Victoria 3 developer diary 9, National Markets, and developer diary 37, Market Expansion. https://forum.paradoxplaza.com/forum/threads/victoria-3-dev-diary-9-national-markets.1484917/ and https://www.paradoxinteractive.com/games/victoria-3/news/dev-diary-37-market-expansion
 [^22]: OpenTTD project, Link graph documentation and the cargo distribution manual. https://github.com/OpenTTD/OpenTTD/blob/master/docs/linkgraph.md and https://wiki.openttd.org/en/Manual/Passenger%20and%20cargo%20distribution
 [^23]: Wube Software, Factorio Friday Facts 176, Belts optimization for 0.15. https://www.factorio.com/blog/post/fff-176

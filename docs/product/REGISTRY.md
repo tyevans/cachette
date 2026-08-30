@@ -1,0 +1,54 @@
+# Product Registry (Index)
+
+This document is an **index**. It lists every product requirement record in
+this project and assigns its number.
+
+Rule 4 of the documentation rule exempts a table that lists files and paths
+as data. The tables below are that table.[^1]
+
+## How to use this registry
+
+**Assign the number here before you write the record.** Add the row first,
+with status `Idea` and no file. Then write the file.
+
+This registry is the allocator. A writer that chooses its own number
+collides with another writer. That happened three times during the research
+phase, and it is recorded as precedent.[^2]
+
+**Never reuse a number.** A dropped record keeps its number, because other
+documents cite it.
+
+**An author may set `Shaped`. Only a reviewer may set anything beyond it.**
+
+## Status vocabulary
+
+| Status | Directory | Meaning |
+|---|---|---|
+| `Idea` | `idea/` | The number is reserved. The need is not worked out. |
+| `Shaped` | `shaped/` | The six gate answers are complete. Not committed to. |
+| `Accepted` | `accepted/` | The project commits to the need. |
+| `Shipped` | `shipped/` | The need is met. |
+| `Dropped` | `shipped/` | Considered and declined. This row says why. |
+
+## The records
+
+| No. | Title | Status | Serves | File |
+|---|---|---|---|---|
+| 0001 | A faction sees only what its own units observe | Shaped | Game developer | `shaped/prd-0001-a-faction-sees-only-what-it-observes.md` |
+
+## What does not belong in a record
+
+A product requirement record must not hold material that changes.
+
+- A measured cost. Costs go to the reference budgets.
+- A version or a release name.
+- A value that an open blocker governs. Express it parametrically and cite
+  the blocker.
+- A data structure, an algorithm, or a module arrangement. Those are
+  architectural decisions.[^3]
+
+## References
+
+[^1]: Documentation Rules. `.claude/rules/documentation.md`
+[^2]: Findings register, FND-028. `docs/FINDINGS.md`
+[^3]: Decision record scope rule. `.claude/rules/adr-scope.md`

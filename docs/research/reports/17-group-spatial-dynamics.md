@@ -2272,14 +2272,14 @@ answered.** The parametric form in D173 resolves both as soon as it is.
 ---
 ## References
 
-[^1]: Report 02, Hex Grid and Level of Detail Pyramid. Sections on the block layout, fanout 16, and the group-with-inverse update rule. `docs/adrs/background/adr-0001/02-hex-grid-and-lod-pyramid.md`
-[^2]: Report 10, Crowd and Movement. Sections 4 and 11, on tile-discrete positions, the floor field rule, the density array, sort-then-admit, and the flow tile cache key. `docs/adrs/background/adr-0001/10-crowd-and-movement.md`
-[^3]: Report 14, Character Graph and Inheritance. Section 10, on formations as organisational nodes, the ownership column, the compressed sparse row reverse index, and the bounding level 1 mask. Section 5.3 on the office cascade. `docs/adrs/background/adr-0001/14-character-graph-and-inheritance.md`
-[^4]: Report 01, Entity Component System and Memory Layout. Sections on block-tiled storage and the rank-select structure for sparse tile payloads. `docs/adrs/background/adr-0001/01-ecs-and-memory-layout.md`
-[^5]: Report 12, Entity Economy and Modifiers. Section 3.3 and decision D53, on effective-stat memoisation and the 99.5% to 99.98% hit rate. `docs/adrs/background/adr-0001/12-entity-economy-and-modifiers.md`
-[^6]: Report 16, Individual Agency and Occupations. Owns individual intent selection and the group weight vector. In progress at the time of writing. `docs/adrs/background/adr-0001/16-individual-agency-and-occupations.md`
-[^7]: Report 15, Needs, Consumption and Economy. Section 6, on the four needs, the Q16.16 scale, the decay rates, and the dense-bitset plus sparse-scan threshold pattern. `docs/adrs/background/adr-0001/15-needs-consumption-and-economy.md`
-[^8]: Merge Notes for ADR-0001, section 9, on largest-remainder apportionment for the conserving transfer verb and the accepted Alabama paradox. `docs/adrs/background/adr-0001/MERGE-NOTES.md`
+[^1]: Report 02, Hex Grid and Level of Detail Pyramid. Sections on the block layout, fanout 16, and the group-with-inverse update rule. `docs/research/reports/02-hex-grid-and-lod-pyramid.md`
+[^2]: Report 10, Crowd and Movement. Sections 4 and 11, on tile-discrete positions, the floor field rule, the density array, sort-then-admit, and the flow tile cache key. `docs/research/reports/10-crowd-and-movement.md`
+[^3]: Report 14, Character Graph and Inheritance. Section 10, on formations as organisational nodes, the ownership column, the compressed sparse row reverse index, and the bounding level 1 mask. Section 5.3 on the office cascade. `docs/research/reports/14-character-graph-and-inheritance.md`
+[^4]: Report 01, Entity Component System and Memory Layout. Sections on block-tiled storage and the rank-select structure for sparse tile payloads. `docs/research/reports/01-ecs-and-memory-layout.md`
+[^5]: Report 12, Entity Economy and Modifiers. Section 3.3 and decision D53, on effective-stat memoisation and the 99.5% to 99.98% hit rate. `docs/research/reports/12-entity-economy-and-modifiers.md`
+[^6]: Report 16, Individual Agency and Occupations. Owns individual intent selection and the group weight vector. In progress at the time of writing. `docs/research/reports/16-individual-agency-and-occupations.md`
+[^7]: Report 15, Needs, Consumption and Economy. Section 6, on the four needs, the Q16.16 scale, the decay rates, and the dense-bitset plus sparse-scan threshold pattern. `docs/research/reports/15-needs-consumption-and-economy.md`
+[^8]: Merge Notes for ADR-0001, section 9, on largest-remainder apportionment for the conserving transfer verb and the accepted Alabama paradox. `docs/research/reports/MERGE-NOTES.md`
 [^9]: Burstedde, Klauck, Schadschneider and Zittartz, "Simulation of pedestrian dynamics using a two-dimensional cellular automaton", Physica A 295, 2001, pages 507 to 525.
 [^10]: Balinski and Young, "Fair Representation: Meeting the Ideal of One Man, One Vote", Yale University Press, 1982.
-[^11]: ADR-0001, Foundational Architecture. The hard invariants, the barrier count, and the counter-based random generator rule. `docs/adrs/draft/adr-0001-foundational-architecture.md`
+[^11]: ADR Registry. The omnibus draft this report fed was deleted and its number reclaimed. The hard invariants, the barrier count, and the counter-based random generator rule. `docs/adrs/REGISTRY.md`

@@ -2212,17 +2212,17 @@ section 10 as a design tradition or as community-sourced.
 
 
 [^1]: Cachette project instructions, sections "Hard invariants", "Design principles" and "Target platform". `CLAUDE.md`
-[^2]: Merge notes for ADR-0001, sections 2 and 3, owner and lead decisions. `docs/adrs/background/adr-0001/MERGE-NOTES.md`
-[^3]: Research report 10, Crowd Simulation and Unit Movement, sections 4.1 to 4.8 and 5.1. `docs/adrs/background/adr-0001/10-crowd-and-movement.md`
-[^4]: Research report 13, Field Operator Algebra, sections 5.2, 9.3, 9.4 and 9.5. `docs/adrs/background/adr-0001/13-field-operator-algebra.md`
-[^5]: Research report 12, Entity Economy and Modifiers, sections 2.2, 3.2, 3.5, 5.3 and 8.1. `docs/adrs/background/adr-0001/12-entity-economy-and-modifiers.md`
-[^6]: Research report 15, Needs, Consumption and the Economy, sections 4.3, 5.2, 5.3, 8.1, 12.1, 12.3 and open question 69. `docs/adrs/background/adr-0001/15-needs-consumption-and-economy.md`
+[^2]: Merge notes for ADR-0001, sections 2 and 3, owner and lead decisions. `docs/research/reports/MERGE-NOTES.md`
+[^3]: Research report 10, Crowd Simulation and Unit Movement, sections 4.1 to 4.8 and 5.1. `docs/research/reports/10-crowd-and-movement.md`
+[^4]: Research report 13, Field Operator Algebra, sections 5.2, 9.3, 9.4 and 9.5. `docs/research/reports/13-field-operator-algebra.md`
+[^5]: Research report 12, Entity Economy and Modifiers, sections 2.2, 3.2, 3.5, 5.3 and 8.1. `docs/research/reports/12-entity-economy-and-modifiers.md`
+[^6]: Research report 15, Needs, Consumption and the Economy, sections 4.3, 5.2, 5.3, 8.1, 12.1, 12.3 and open question 69. `docs/research/reports/15-needs-consumption-and-economy.md`
 [^7]: Hardy, G. H., Littlewood, J. E. and Polya, G., 1934. *Inequalities*. Cambridge University Press, theorem 368, the rearrangement inequality.
 [^8]: Mark, D., 2009. *Behavioral Mathematics for Game AI*. Course Technology, Cengage Learning. **Confirm the publisher imprint and the ISBN before publication.**
 [^9]: Mark, D. and Dill, K., 2010. "Improving AI Decision Modeling Through Utility Theory". Game Developers Conference AI Summit. **Confirm the year and the exact talk title, and add the separate Infinite Axis Utility System talk, before publication.**
 [^10]: Rabin, S., editor, 2013 onward. *Game AI Pro* series. CRC Press. Chapters on utility-based and needs-based decision making. **Cite one named chapter, not the series, before publication.** http://www.gameaipro.com
 [^11]: Orkin, J., 2006. "Three States and a Plan: The AI of F.E.A.R.". Game Developers Conference 2006. http://alumni.media.mit.edu/~jorkin/gdc2006_orkin_jeff_fear.pdf
-[^12]: Research report 14, Character Graph and Inheritance, decisions D70, D77, D78, D83, D88 and D89. `docs/adrs/background/adr-0001/14-character-graph-and-inheritance.md`
+[^12]: Research report 14, Character Graph and Inheritance, decisions D70, D77, D78, D83, D88 and D89. `docs/research/reports/14-character-graph-and-inheritance.md`
 [^13]: Arm Ltd. *Arm Neoverse N1 Software Optimization Guide*, instruction throughput and memory system tables. https://developer.arm.com/documentation/swog309707/latest
 [^14]: Kuhn, H. W., 1955. "The Hungarian method for the assignment problem". *Naval Research Logistics Quarterly*, 2(1-2), pp. 83-97. https://doi.org/10.1002/nav.3800020109
 [^15]: Munkres, J., 1957. "Algorithms for the Assignment and Transportation Problems". *Journal of the Society for Industrial and Applied Mathematics*, 5(1), pp. 32-38. https://doi.org/10.1137/0105003
@@ -2230,8 +2230,8 @@ section 10 as a design tradition or as community-sourced.
 [^17]: Bertsekas, D. P., 1988. "The auction algorithm: a distributed relaxation method for the assignment problem". *Annals of Operations Research*, 14(1), pp. 105-123. https://doi.org/10.1007/BF02186476
 [^18]: Burkard, R., Dell'Amico, M. and Martello, S., 2009. *Assignment Problems*. Society for Industrial and Applied Mathematics.
 [^19]: Gale, D. and Shapley, L. S., 1962. "College Admissions and the Stability of Marriage". *The American Mathematical Monthly*, 69(1), pp. 9-15. https://doi.org/10.2307/2312726
-[^20]: Research report 11, Resource and Trade Flow, sections 3.3, 3.4 and 13.5. `docs/adrs/background/adr-0001/11-resource-and-trade-flow.md`
+[^20]: Research report 11, Resource and Trade Flow, sections 3.3, 3.4 and 13.5. `docs/research/reports/11-resource-and-trade-flow.md`
 [^21]: Burkard, R. E., Klinz, B. and Rudolf, R., 1996. "Perspectives of Monge properties in optimization". *Discrete Applied Mathematics*, 70(2), pp. 95-161. https://doi.org/10.1016/0166-218X(95)00103-X
-[^22]: Merge notes for ADR-0001, section 12, soft citations to verify before publication. `docs/adrs/background/adr-0001/MERGE-NOTES.md`
+[^22]: Merge notes for ADR-0001, section 12, soft citations to verify before publication. `docs/research/reports/MERGE-NOTES.md`
 [^23]: A developer-authored account of object programming in The Sims, used in a Northwestern University course on game design. **This citation is unconfirmed. Establish the exact author, title and location before publication, or remove the footnote and mark the claim as community-sourced.**
 [^24]: Burstedde, C., Klauck, K., Schadschneider, A. and Zittartz, J., 2001. "Simulation of pedestrian dynamics using a two-dimensional cellular automaton". *Physica A: Statistical Mechanics and its Applications*, 295(3-4), pp. 507-525. https://doi.org/10.1016/S0378-4371(01)00141-8

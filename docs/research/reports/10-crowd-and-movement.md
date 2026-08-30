@@ -1056,9 +1056,9 @@ written.
 ## References
 
 [^1]: Cachette project instructions, section "Hard invariants". `CLAUDE.md`
-[^2]: Research report 07, Target Platform and Value Types. `docs/adrs/background/adr-0001/07-target-platform-and-value-types.md`
-[^3]: ADR-0001, Foundational Architecture, decisions D1, D15, D21, D28, D29, D44, D45, D46, D49 and D50. `docs/adrs/draft/adr-0001-foundational-architecture.md`
-[^4]: Research report 06, Algorithms and Scheduling, sections 3 and 4. `docs/adrs/background/adr-0001/06-algorithms-and-scheduling.md`
+[^2]: Research report 07, Target Platform and Value Types. `docs/research/reports/07-target-platform-and-value-types.md`
+[^3]: ADR-0001, Foundational Architecture, decisions D1, D15, D21, D28, D29, D44, D45, D46, D49 and D50. `docs/adrs/REGISTRY.md`
+[^4]: Research report 06, Algorithms and Scheduling, sections 3 and 4. `docs/research/reports/06-algorithms-and-scheduling.md`
 [^5]: Reynolds, C. W., 1987. "Flocks, Herds, and Schools: A Distributed Behavioral Model". Computer Graphics (SIGGRAPH '87 Proceedings), volume 21, number 4, pages 25-34. https://doi.org/10.1145/37402.37406
 [^6]: Reynolds, C. W., 1999. "Steering Behaviors For Autonomous Characters". Game Developers Conference 1999, pages 763-782. https://www.red3d.com/cwr/steer/gdc99/
 [^7]: Reynolds, C. W., 2006. "Big Fast Crowds on PS3". Sandbox '06, Proceedings of the 2006 ACM SIGGRAPH Symposium on Videogames, pages 113-121. https://doi.org/10.1145/1183316.1183333

@@ -1,0 +1,27 @@
+[package]
+name = "cachette-core"
+description = "The Cachette simulation core. This crate must never depend on PyO3."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+# ADR-0006 D2: this crate has no PyO3 dependency at all. The check in
+# scripts/check-crate-split.sh fails if one appears in the tree.
+[dependencies]
+bytemuck.workspace = true
+
+# `probe-nondeterminism` is a test-only switch. It makes the step join its
+# output slots in reverse order, so the event log depends on the thread
+# count. The probe test then asserts that the determinism test fails.
+# A determinism test with no proven failure mode is decoration.
+[features]
+probe-nondeterminism = []
+
+[dev-dependencies]
+bytemuck.workspace = true
+proptest.workspace = true
+
+[lints]
+workspace = true

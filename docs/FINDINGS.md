@@ -12,6 +12,20 @@ superseded finding still explains why the project once believed otherwise.
 Each entry gives what the project believed, what is true, the evidence, and
 what follows.
 
+
+## Allocating a number
+
+**Claim the next number below before you write the row.** Increment it in the
+same change that adds the row.
+
+A writer that numbers a row by reading the last row collides with any other
+writer working at the same time. That happened, and it is recorded as
+precedent.[^ALLOC]
+
+**Next number: FND-039**
+
+[^ALLOC]: Findings register, FND-038. `docs/FINDINGS.md`
+
 ## A. Corrections to stated rules
 
 ### FND-001 — A monoid needs EXACT associativity
@@ -211,6 +225,27 @@ tick rate and width all at once.
 The likeliest defect in the field framework is writing a capacity cap as a
 sink. Caps are idempotent; sinks add twice.
 
+### FND-037 — A crossing time needs the terrain multiplier
+
+**Believed:** a dwell of 2 ticks and a capacity of 8 units give a crossing of
+12.5 seconds for a formation of 1,000 units.
+
+**True:** that arithmetic used the ordinary ground step cost for a mountain
+exit tile. It omitted the terrain multiplier. With the multiplier applied, the
+same combination gives a mountain crossing of about 50 seconds. The
+combination that meets the target is a dwell-2 baseline with a capacity-16
+crossing.
+
+**Evidence:** the movement timing note.[^4] It measured 12.9 seconds for the
+corrected combination. The closed-form throughput law gives 12.5 seconds for
+the same parameters. The 4-tick difference is unresolved and is recorded in
+the note.
+
+**Follows:** a crossing time is a function of three quantities, not two.
+Capacity, dwell and the terrain multiplier all enter it. **Check that a rate
+derivation names every multiplier on its path.** No record states the mountain
+multiplier, so the 50-second figure implies its value rather than citing it.
+
 ## D. Cost estimates that were wrong
 
 ### FND-017 — A decision costs 4.1 nanoseconds, not 400
@@ -358,3 +393,145 @@ stale figure.
 **Follows:** when two documents are written concurrently, verify the read
 rather than trusting the citation. The same failure was caught twice by
 searching the file rather than believing the summary.
+
+### FND-030 — A scoped guarantee stated without its scope reads as the wider one
+
+**Believed.** The public description said the engine reproduces a run bit for
+bit at any thread count. That sentence is true.
+
+**True.** A reader takes it to mean more than it says. The guarantee holds for
+one binary. A different processor or a different compiler may produce a
+different hash, and the record says so.[^1] Five readers saw the wider claim,
+and the fifth named it as the one thing it did not believe.
+
+**Evidence.** Five independent cold reads of the public description. Each
+reader had that document and nothing else.
+
+**Follows.** State the bound of a guarantee in the same sentence as the
+guarantee. A true statement that is read as a larger statement is a defect in
+the writing, not in the reader. The public description now says that
+reproducing a study means keeping the binary, not only the seed.
+
+### FND-031 — Opinion state belongs to the character tier, not to every unit
+
+**Believed.** A draft of the public description said each of the one million
+units holds an opinion of the people near it.
+
+**True.** Opinion is a character property. The character tier is planned in
+the tens of thousands, not the millions. The entity tiers make units cheap by
+not giving them a relation graph.
+
+**Evidence.** The entity tier design, and the storage argument that keeps
+opinion linear by capping out-degree.[^2]
+
+**Follows.** A description of the product must not promise a property that
+the entity model does not carry. Check any per-unit claim against the tier
+that owns the field.
+
+### FND-032 — A cold reader finds what an informed reviewer cannot
+
+**Believed.** Reviewing a document against the project's own records is
+enough to find its defects.
+
+**True.** It is not. Five review cycles, each by a reader that could read the
+one document and nothing else, found three factual errors that internal
+review had passed: an overclaimed per-unit property, a guarantee stated
+without its scope, and a disclaimer that defended a figure the document did
+not contain.
+
+**Evidence.** The five review cycles. The reviewers were forbidden to read
+another file, search the repository, or look anything up.
+
+**Follows.** For any document that faces outward, review it at least once
+with a reader that has only that document. An informed reviewer repairs a gap
+from memory and never notices the gap.
+
+### FND-033 — Record length predicts how often a record is edited
+
+**Believed.** A long record is thorough. Length was treated as a cost in
+reading time only.
+
+**True.** Length predicts churn. Across 106 records in two other projects the
+correlation was 0.704 and 0.715, derived independently. Records of 4000 words
+or more were edited 3.7 times as often as records under 1200 words.
+
+**Evidence.** The record scope research.[^3]
+
+**Follows.** A long record holds material that changes. Length is a signal to
+look for that material, not a sign of care.
+
+### FND-034 — A claim title churns less than a topic title
+
+**Believed.** A record title names its subject.
+
+**True.** A title that states the decision predicts a more stable record than
+a title that names a topic. In one corpus the churn was 2.13 against 4.50.
+Both reference projects drifted from topic titles to claim titles on their
+own, from 3 to 21 per cent and from 57 to 82 per cent.
+
+**Evidence.** The record scope research.[^3]
+
+**Follows.** Title a record with the claim it makes. Five of the six current
+drafts carry topic titles and are queued for retitling.
+
+## References
+
+[^1]: ADR-0001, Determinism, decision D1. `docs/adrs/draft/adr-0001-determinism-outranks-every-other-constraint.md`
+[^2]: Findings register, FND-004, in this document.
+[^3]: Record scope research. `docs/research/adr-scope-findings.md`
+[^4]: Movement timing note. `docs/research/movement-timing.md`
+
+### FND-035 — The float ban lint does not catch an inferred literal
+
+**Believed.** A lint enforces the boundary that keeps floating point out of
+simulated state. The project invariant says so plainly.
+
+**True.** The lint catches a named type. It does not catch `let x = 1.5;`,
+where the type is inferred and never written. It also cannot name the
+reassociating methods, because those do not resolve on the pinned toolchain,
+so a banned-method entry cannot refer to them.
+
+**Evidence.** The scaffolding work proved both gaps by injecting a float, and
+closed them with a script that reads the source directly.
+
+**Follows.** State the enforcement as two mechanisms, not one. A lint plus a
+script. An invariant that names one mechanism invites a reader to trust it
+alone. The word "lint" in the project instructions is now wrong on its own.
+
+### FND-036 — Mutation testing found ten gaps that a passing suite did not
+
+**Believed.** A test suite that passes, with the gates green, covers the code
+it tests.
+
+**True.** The first mutation run surfaced ten real gaps: untested entity
+accessors, untested fixed-point conversions, untested saturation limits, and
+an invariant check that no test could falsify. The suite was green
+throughout.
+
+**Evidence.** The first `cargo mutants` run on the scaffolding: 94 caught, 10
+unviable, 1 equivalent, after the gaps were closed.
+
+**Follows.** A green suite is evidence that the tests pass, not that they
+test. This matters most for the determinism tests, whose failure mode is
+invisible. That is why they now have a proven failure mode of their own.
+
+### FND-038 — The registers had no allocator, and two writers collided
+
+**Believed.** The registry allocates record numbers, so the numbering problem
+was solved. FND-028 recorded the lesson after three collisions in the research
+phase.
+
+**True.** The lesson was applied to the records and not to the registers. The
+findings, decisions and blockers registers number their rows by reading the
+last row, which is the same failure that FND-028 describes. Two writers
+working at the same time on the same day both wrote FND-035 and DEC-013.
+
+**Evidence.** The collision itself. One writer recorded the float ban lint
+gap as FND-035; the other recorded a crossing time correction as FND-035. The
+same happened for DEC-013.
+
+**Follows.** A correct lesson applied to one system does not transfer to a
+sibling system on its own. When a rule fixes a class of defect, look for
+every place the class occurs, not only the place it was found. Each register
+now carries an explicit next number, and a writer claims it before writing.
+

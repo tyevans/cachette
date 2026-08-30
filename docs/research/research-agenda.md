@@ -1642,7 +1642,7 @@ calls unretrofittable.
 
 ## References
 
-[^1]: ADR-0001, Foundational Architecture, and its eight background documents. `docs/adrs/draft/adr-0001-foundational-architecture.md`, `docs/adrs/background/adr-0001/`
+[^1]: ADR-0001, Foundational Architecture, and its eight background documents. `docs/adrs/REGISTRY.md`, `docs/research/reports/`
 [^2]: Cachette project instructions, "Hard invariants" and "Design principles". `CLAUDE.md`
 [^3]: Mike Acton, "Data-Oriented Design and C++", CppCon 2014. https://www.youtube.com/watch?v=rX0ItVEVjHc
 [^4]: Richard Fabian, *Data-Oriented Design*, 2018. https://www.dataorienteddesign.com/dodbook/

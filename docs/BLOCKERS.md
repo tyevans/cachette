@@ -15,6 +15,20 @@ Numbers are permanent. Never reuse one. A resolved blocker keeps its row.
 | Owner | Who can resolve it |
 | Status | `Open`, `Resolved`, or `Dropped` |
 
+
+## Allocating a number
+
+**Claim the next number below before you write the row.** Increment it in the
+same change that adds the row.
+
+A writer that numbers a row by reading the last row collides with any other
+writer working at the same time. That happened, and it is recorded as
+precedent.[^ALLOC]
+
+**Next number: BLK-013**
+
+[^ALLOC]: Findings register, FND-038. `docs/FINDINGS.md`
+
 ## Open
 
 ### BLK-001 — Tile scale, and therefore world extent
@@ -90,6 +104,24 @@ names benchmarking on Graviton as blocking most of its own conclusions.
 
 This blocker cannot be resolved by a decision. It needs a benchmark harness
 and a machine.
+
+### BLK-012 — What does one tick represent in simulated time?
+
+**Blocks.** The public description, the needs design, and every rate that a
+content author writes.
+
+**The question.** A need grows by an amount each tick. A content author
+cannot choose that amount without knowing whether a tick is a minute, an
+hour, or a day. Two readers of the public description asked for this and it
+could not be answered.
+
+**Why it is open.** The answer depends on the tile scale, which is itself
+open.[^BLK1] A tile that holds a city implies a slow tick. A tile a soldier
+crosses in seconds implies a fast one.
+
+**What would resolve it.** State what one tile represents. The tick follows.
+
+[^BLK1]: See BLK-001 in this document.
 
 ## Resolved
 

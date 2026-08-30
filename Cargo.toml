@@ -1,0 +1,30 @@
+[workspace]
+resolver = "2"
+members = ["crates/cachette-core", "crates/cachette-py"]
+
+[workspace.package]
+version = "0.0.0"
+edition = "2021"
+rust-version = "1.91.1"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/tyevans/cachette"
+
+[workspace.dependencies]
+bytemuck = { version = "1.25", features = ["derive"] }
+proptest = "1.11"
+pyo3 = "0.29.2"
+
+[workspace.lints.rust]
+unsafe_op_in_unsafe_fn = "deny"
+
+[workspace.lints.clippy]
+disallowed_types = "deny"
+disallowed_methods = "deny"
+
+# ADR-0006 D8: strip, keep line tables, enable LTO, never abort on panic.
+[profile.release]
+strip = "symbols"
+debug = "line-tables-only"
+lto = true
+panic = "unwind"
+codegen-units = 1

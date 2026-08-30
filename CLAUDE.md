@@ -38,9 +38,11 @@ Do not violate them for convenience.
 1. **No floating point in simulated or aggregated state.** Float addition
    is not associative. An aggregate must combine exactly, in any order.
    Use integer or fixed-point arithmetic. The fixed-point scale is Q16.16.
-2. **Route all simulation arithmetic through the `sim_math` module.** A
-   lint enforces this boundary. The lint bans `f32::algebraic_add` and the
-   other reassociating operations.
+2. **Route all simulation arithmetic through the `sim_math` module.** Two
+   mechanisms enforce this boundary, because one is not enough. A lint bans
+   the float types by name. A script catches what the lint cannot see: a
+   float literal whose type is inferred, and the reassociating methods, which
+   do not resolve on the pinned toolchain and so cannot be named in a lint.
 3. **Seed every random draw from a counter-based generator.** Key each
    draw on the tuple (system, frame, entity, draw). Do not use
    thread-local random state. Thread-local state destroys determinism.
@@ -81,6 +83,24 @@ Types parameterise the verbs. Types do not multiply the verbs.
 per-entity loop. Choose an algorithm that uses the whole set. One example
 is a flow field instead of many path searches.
 
+## Product
+
+Work answers to a need. A need lives in `docs/product/` as a numbered product
+requirement record. A registry allocates the number before the record is
+written, in the same way the decision registry does.[^8]
+
+A record moves through four directories: `idea/`, `shaped/`, `accepted/` and
+`shipped/`. **A record is shaped when it answers six questions**: who it is
+for, what that person cannot do today, what good looks like as a checkable
+statement, what it does not do, what it costs at the target scale, and which
+blockers govern it.
+
+**A product record states a need. It never states a structure.** A record
+that names a data structure holds an architectural decision, and that
+decision belongs in a decision record. A check enforces this.
+
+A decision record cites no product record. A refined backlog item cites both.
+
 ## Task management
 
 Work lives in `docs/backlog/`. One file is one item. An item moves between
@@ -92,7 +112,7 @@ change or create, and the blockers that hold it. An item that cannot answer
 those stays in `proposed/`.
 
 Take work from `refined/`. Read the backlog guide before you add an item or
-move one.[^4]
+move one.[^6]
 
 ## Repository layout
 
@@ -104,13 +124,14 @@ move one.[^4]
 | `scripts/` | Checks that run in continuous integration |
 | `.claude/rules/` | Rules that apply to all work in this repository |
 | `docs/backlog/` | The work queue |
+| `docs/product/` | Product requirement records |
 
 ## Definition of done
 
 Work is done when the impact review was made before starting, the
 implementation was checked against each governing record decision by decision,
 the registers were updated, and every gate passes. The full rule holds the
-detail.[^5]
+detail.[^7]
 
 ## Documentation rules
 
@@ -144,10 +165,11 @@ The decision record lists 16 open questions in total.[^1]
 
 ## References
 
-[^1]: ADR-0001, Foundational Architecture. `docs/adrs/draft/adr-0001-foundational-architecture.md`
+[^1]: ADR-0001, Determinism. `docs/adrs/draft/adr-0001-determinism-outranks-every-other-constraint.md`
 [^2]: Research reports 01 to 07. `docs/research/reports/`
 [^3]: Documentation Rules. `.claude/rules/documentation.md`
 [^4]: Decision Record Scope. `.claude/rules/adr-scope.md`
 [^5]: The record check. `scripts/check-adrs.sh`
 [^6]: Backlog guide. `docs/backlog/README.md`
 [^7]: Definition of Done. `.claude/rules/definition-of-done.md`
+[^8]: Product requirement records. `docs/product/README.md`

@@ -1312,8 +1312,8 @@ Do not apply it to the record. The record is a draft under review.
 ## References
 
 [^1]: Cachette project instructions, sections "Hard invariants" and "Design principles". `CLAUDE.md`
-[^2]: ADR-0001, Foundational Architecture, decisions D4, D5, D9, D16, D17, D19, D28, D29, D35, D36, D45, D50, the memory budget table and the per-tick cost budget. `docs/adrs/draft/adr-0001-foundational-architecture.md`
-[^3]: Research report 08, Fog of War Representation, sections 3.1, 6.3, 6.4, 8, 12 and 13. `docs/adrs/background/adr-0001/08-fog-of-war-representation.md`
-[^4]: Research report 06, Algorithms and Scheduling, sections 8.1, 8.2, 8.4, 9.1 and 10. `docs/adrs/background/adr-0001/06-algorithms-and-scheduling.md`
-[^5]: Research report 07, Target Platform and Value Types. `docs/adrs/background/adr-0001/07-target-platform-and-value-types.md`
+[^2]: ADR-0001, Foundational Architecture, decisions D4, D5, D9, D16, D17, D19, D28, D29, D35, D36, D45, D50, the memory budget table and the per-tick cost budget. `docs/adrs/REGISTRY.md`
+[^3]: Research report 08, Fog of War Representation, sections 3.1, 6.3, 6.4, 8, 12 and 13. `docs/research/reports/08-fog-of-war-representation.md`
+[^4]: Research report 06, Algorithms and Scheduling, sections 8.1, 8.2, 8.4, 9.1 and 10. `docs/research/reports/06-algorithms-and-scheduling.md`
+[^5]: Research report 07, Target Platform and Value Types. `docs/research/reports/07-target-platform-and-value-types.md`
 [^6]: Arm Neoverse N1 Software Optimization Guide, instruction throughput and memory system latency tables. https://developer.arm.com/documentation/swog309707/latest

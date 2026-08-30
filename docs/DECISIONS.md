@@ -13,6 +13,20 @@ the outcome recorded.
 When a decision closes, and it corrected something the project believed,
 record the correction in `FINDINGS.md` as well.
 
+
+## Allocating a number
+
+**Claim the next number below before you write the row.** Increment it in the
+same change that adds the row.
+
+A writer that numbers a row by reading the last row collides with any other
+writer working at the same time. That happened, and it is recorded as
+precedent.[^ALLOC]
+
+**Next number: DEC-019**
+
+[^ALLOC]: Findings register, FND-038. `docs/FINDINGS.md`
+
 ## Open
 
 ### DEC-001 — The commodity split
@@ -99,6 +113,118 @@ mountain crossing at 50 seconds. The project owner rejected 50 seconds as the
 ordinary case. The recalibration relocates it to mountains.
 
 **Recommendation:** accept. A mountain pass should be a serious obstacle.
+
+### DEC-012 — Does a product record cite a decision record?
+
+**Decided: no.** Recorded here because the reasoning is easy to lose.
+
+A product record states a need. A decision record answers to a constraint. A
+product direction changes more often than a constraint does, so a citation
+from a decision record to a product record would place changing material
+inside a historical document, which the scope rule forbids.
+
+The join runs the other way and through one place only: a refined backlog
+item names both the record that governs it and the product record it serves.
+A check enforces that a product record contains no decision record citation.
+
+**Revisit if.** The backlog stops being the only route from a need to the
+work, or a reader cannot answer "which need does this record serve" and needs
+to.
+
+### DEC-017 — Is a tile crossing time content-configurable, or fixed by the engine?
+
+A crossing time depends on the terrain multiplier that scales the step cost of
+a tile. No record states where that multiplier lives.
+
+**Option A. Content-configurable for each terrain type.** The multiplier sits
+in the terrain table beside the terrain capacity. A content author tunes a
+crossing without an engine change.
+
+**Option B. Fixed by the engine.** The multiplier sits in engine code. The
+engine can then bound the dwell range at compile time.
+
+**Recommendation:** content-configurable. The terrain capacity table is
+already content, and the capacity and the multiplier describe the same tile.
+Splitting them across content and code would put one crossing's two levers in
+two places. Option B buys a compile-time bound that a validated range in
+content also buys.
+
+**Assumption in the meantime:** content-configurable.
+
+**Related.** The mountain multiplier has no recorded value. The accepted
+50-second mountain crossing implies a multiplier of 2 against ordinary
+ground.[^DEC1] Whichever option wins, that value needs recording.
+
+[^DEC1]: See DEC-008 in this document, and the movement timing note, `docs/research/movement-timing.md`.
+
+### DEC-018 — Where does movement sit in the frame schedule?
+
+The frame schedule is static and known before the frame runs. The order of
+the systems inside it is not recorded anywhere.
+
+The movement design session proposed one order: movement runs after the needs
+system and before the combat system.
+
+**Option A. Movement after needs, before combat.** Movement reads what the
+needs system produces, so a unit acts in the same frame on the need that
+raised it. Combat then sees the positions of this frame.
+
+**Option B. Some other order.** No one has argued for one.
+
+**Recommendation:** option A. The read-after-write dependency between needs
+and movement is real, and combat wants the current positions.
+
+**Assumption in the meantime:** option A.
+
+**Why this is a register row and not a record.** Neither the needs system nor
+the combat system exists. An order between systems that nobody has written is
+an intent, and a record must not state an intent as a fact. Write the order
+into the schedule when the schedule exists. Promote it to a record only if a
+contributor could reasonably choose otherwise and the reasoning does not show
+in the schedule itself.
+
+
+### DEC-013 — Which toolchain version does the project pin?
+
+**Open.** The pin is currently the version the development machine had. That
+is not a reason.
+
+The record scope rule forbids a version in a record body, so this belongs
+here and not in a record. State the property the project needs from the
+toolchain, then pin the lowest version that provides it.
+
+**Recommendation.** Decide the property first. The float ban already depends
+on toolchain behaviour, because the reassociating methods do not resolve on
+the current pin, and a later toolchain may make them resolvable and therefore
+bannable by lint rather than by script.
+
+### DEC-014 — Which hash does the golden state test use?
+
+**Open.** The scaffolding chose FNV-1a. Nothing has ratified it.
+
+This choice is load-bearing for determinism. The golden file is written by
+the hash, so changing the hash invalidates every stored hash. It is cheap to
+change now and expensive later, which is the shape of a decision that earns a
+record once it is settled.
+
+**Recommendation.** Confirm FNV-1a or replace it before the first golden file
+is committed for real content. State the requirement the hash must meet:
+exact, order-sensitive, and stable across the platforms the project builds
+on.
+
+### DEC-015 — The Python mutation gate is off
+
+**Decided, and reversible.** The gate was removed rather than left failing,
+which the definition of done requires. The Python package only re-exports the
+compiled module, so no mutant is covered and the tool exits non-zero.
+
+Turn it on when the Python package holds logic of its own. The testing policy
+says how.
+
+### DEC-016 — Type checking uses mypy, not pyright
+
+**Decided.** Chosen to avoid a second language runtime in continuous
+integration. Recorded because it was made in passing and no record holds it.
 
 ## Decisions to apply at merge
 

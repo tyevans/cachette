@@ -2027,18 +2027,18 @@ review.
 ## References
 
 [^1]: Cachette project instructions, sections "Hard invariants" and "Design principles". `CLAUDE.md`
-[^2]: ADR-0001, Foundational Architecture, decisions D1, D4, D5, D9, D16, D17, D18, D25, D27, D28, D29, D43, D44, D45, D50, the byte budget tables and the per-tick cost budget. `docs/adrs/draft/adr-0001-foundational-architecture.md`
+[^2]: ADR-0001, Foundational Architecture, decisions D1, D4, D5, D9, D16, D17, D18, D25, D27, D28, D29, D43, D44, D45, D50, the byte budget tables and the per-tick cost budget. `docs/adrs/REGISTRY.md`
 [^3]: Wube Software, 2024. "Friday Facts #416 — Fluids 2.0". Factorio development blog. https://www.factorio.com/blog/post/fff-416
 [^4]: Dwarf Fortress Wiki, "DF2014:Pressure" and "DF2014:Flow". https://dwarffortresswiki.org/index.php/DF2014:Pressure
-[^5]: Research report 08, Fog of War Representation, sections 6.1, 6.3, 6.4 and 8. `docs/adrs/background/adr-0001/08-fog-of-war-representation.md`
+[^5]: Research report 08, Fog of War Representation, sections 6.1, 6.3, 6.4 and 8. `docs/research/reports/08-fog-of-war-representation.md`
 [^6]: LeVeque, R. J., 2002. *Finite Volume Methods for Hyperbolic Problems*. Cambridge University Press, chapters 4 and 19.
 [^7]: Desbrun, M., Hirani, A. N., Leok, M. and Marsden, J. E., 2005. "Discrete Exterior Calculus". arXiv preprint math/0508341. https://arxiv.org/abs/math/0508341
 [^8]: Frisch, U., Hasslacher, B. and Pomeau, Y., 1986. "Lattice-Gas Automata for the Navier-Stokes Equation". *Physical Review Letters*, 56(14), pp. 1505-1508. https://doi.org/10.1103/PhysRevLett.56.1505
-[^9]: Research report 09, Influence Maps, sections 4.1, 5.1, 6.1, 6.3, 6.5, 7.1, 7.3 and 12. `docs/adrs/background/adr-0001/09-influence-maps.md`
-[^10]: Research report 02, Hex Grid and LOD Pyramid, sections 1.2, 1.3 and 2.3. `docs/adrs/background/adr-0001/02-hex-grid-and-lod-pyramid.md`
-[^11]: Research report 07, Target Platform and Value Types. `docs/adrs/background/adr-0001/07-target-platform-and-value-types.md`
+[^9]: Research report 09, Influence Maps, sections 4.1, 5.1, 6.1, 6.3, 6.5, 7.1, 7.3 and 12. `docs/research/reports/09-influence-maps.md`
+[^10]: Research report 02, Hex Grid and LOD Pyramid, sections 1.2, 1.3 and 2.3. `docs/research/reports/02-hex-grid-and-lod-pyramid.md`
+[^11]: Research report 07, Target Platform and Value Types. `docs/research/reports/07-target-platform-and-value-types.md`
 [^12]: Sweby, P. K., 1984. "High Resolution Schemes Using Flux Limiters for Hyperbolic Conservation Laws". *SIAM Journal on Numerical Analysis*, 21(5), pp. 995-1011.
-[^13]: Research report 06, Algorithms and Scheduling, sections 8.3, 8.4, 8.5, 8.6, 9.1 and 10. `docs/adrs/background/adr-0001/06-algorithms-and-scheduling.md`
+[^13]: Research report 06, Algorithms and Scheduling, sections 8.3, 8.4, 8.5, 8.6, 9.1 and 10. `docs/research/reports/06-algorithms-and-scheduling.md`
 [^14]: Arm Ltd. *Arm Neoverse N1 Software Optimization Guide*, instruction throughput and memory system tables. https://developer.arm.com/documentation/swog309707/latest
 [^15]: Courant, R., Friedrichs, K. and Lewy, H., 1928. "Über die partiellen Differenzengleichungen der mathematischen Physik". *Mathematische Annalen*, 100(1), pp. 32-74.
 [^16]: Turing, A. M., 1952. "The Chemical Basis of Morphogenesis". *Philosophical Transactions of the Royal Society of London B*, 237(641), pp. 37-72.

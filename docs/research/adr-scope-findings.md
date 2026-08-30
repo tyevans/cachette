@@ -189,4 +189,4 @@ healthy. An amendment that corrects a stale figure is the defect.
 ## References
 
 [^1]: Project A, the `eventsource-py` repository. 61 records under `docs/adrs/`. Measured at commit history to 12 August 2026.
-[^2]: Project B, the `redstring` repository. 45 records under `docs/adr/`. Measured at commit history to 21 August 2026.
+[^2]: Project B, the `redstring` repository. 45 records under `docs/adrs/`. Measured at commit history to 21 August 2026.

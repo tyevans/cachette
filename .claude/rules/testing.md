@@ -62,5 +62,5 @@ reaches into a private field pins the implementation, not the behaviour.
 ## References
 
 [^1]: Definition of Done. `.claude/rules/definition-of-done.md`
-[^2]: ADR-0001, Determinism as the primary constraint. `docs/adrs/draft/adr-0001-determinism.md`
+[^2]: ADR-0001, Determinism as the primary constraint. `docs/adrs/draft/adr-0001-determinism-outranks-every-other-constraint.md`
 [^3]: Project orientation. `CLAUDE.md`

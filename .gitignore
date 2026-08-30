@@ -18,3 +18,14 @@ dist/
 *.swp
 .idea/
 .vscode/
+
+# Tooling
+/mutants.out*/
+.mypy_cache/
+.ruff_cache/
+.hypothesis/
+
+# The editable install writes the extension next to the package.
+python/cachette/*.so
+python/cachette/*.pyd
+python/cachette/*.dylib

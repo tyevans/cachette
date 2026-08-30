@@ -1,0 +1,22 @@
+# Mutation testing for the simulation core.
+#
+# A mutation gate is slow. It runs on a schedule and on a labelled pull
+# request, never on every commit. See .github/workflows/mutants.yml.
+#
+# The scope is the core crate. The binding crate needs a running
+# interpreter to test, so a mutant there cannot be caught by cargo test.
+examine_globs = ["crates/cachette-core/src/**/*.rs"]
+
+exclude_re = [
+    # The display implementations carry no simulation behaviour.
+    "impl Display",
+    "impl core::fmt::Display",
+    # The saturation helper compares against the range limit. A mutation
+    # of `>` into `>=` at that limit gives the same answer, because the
+    # limit itself saturates to itself. Those mutants are equivalent and no
+    # test can kill them.
+    "saturate_i32",
+]
+
+timeout_multiplier = 5.0
+minimum_test_timeout = 60

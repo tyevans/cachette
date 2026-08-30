@@ -1,0 +1,43 @@
+# Licence and advisory checks.
+#
+# The project ships a wheel that holds compiled Rust code. Every crate in
+# the tree therefore ships to a user, and its licence applies.
+
+[graph]
+# ADR-0002 D1 names the primary target. The check reads the tree for the
+# development target and for the primary target.
+targets = [
+    "x86_64-unknown-linux-gnu",
+    "aarch64-unknown-linux-gnu",
+]
+
+[advisories]
+version = 2
+yanked = "deny"
+
+[licenses]
+version = 2
+confidence-threshold = 0.9
+# The allow list names a licence that the current tree may not use. That
+# is not a defect.
+unused-allowed-license = "allow"
+allow = [
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "ISC",
+    "MIT",
+    "MIT-0",
+    "Unicode-3.0",
+    "Zlib",
+]
+
+[bans]
+multiple-versions = "warn"
+wildcards = "deny"
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]
