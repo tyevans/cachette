@@ -12,6 +12,13 @@ repository.workspace = true
 [dependencies]
 bytemuck.workspace = true
 
+# `probe-nondeterminism` is a test-only switch. It makes the step join its
+# output slots in reverse order, so the event log depends on the thread
+# count. The probe test then asserts that the determinism test fails.
+# A determinism test with no proven failure mode is decoration.
+[features]
+probe-nondeterminism = []
+
 [dev-dependencies]
 bytemuck.workspace = true
 proptest.workspace = true

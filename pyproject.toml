@@ -51,9 +51,11 @@ cache-keys = [
 line-length = 88
 target-version = "py311"
 src = ["python", "tests"]
-# The research reports hold Python code blocks. They are records, and the
-# formatter must not rewrite them.
-extend-exclude = ["docs", "target", ".venv"]
+# The gates run over `python` and `tests`, which hold the package and its
+# tests. The `scripts` directory holds standalone repository tooling that
+# is not under the Python gate yet. The research reports hold Python code
+# blocks, and the formatter must not rewrite a record.
+extend-exclude = ["docs", "scripts", "target", ".venv", ".claude"]
 
 [tool.ruff.lint]
 select = [

@@ -79,6 +79,19 @@ To add a scenario, add a row to the `SCENARIOS` table in
 just golden
 ```
 
+**A determinism test must have a proven failure mode.** A test that
+compares a run against itself always passes. The core crate carries a
+test-only feature, `probe-nondeterminism`. It makes the step join its
+output slots in reverse order, which breaks the ordering rule on
+purpose.[^5] Under that feature the thread-count test must fail and
+`determinism_probe.rs` must pass.
+
+```
+just probe
+```
+
+Never build a shipped artefact with that feature.
+
 **Read the difference before you commit a changed golden file.** A changed
 sequence is a changed simulation. Agree that the change is correct first.
 
@@ -89,7 +102,7 @@ The project uses `proptest`. The worked example is
 
 Test the algebraic laws that determinism depends on. Integer addition and
 bitwise OR are exactly commutative and associative, so a parallel
-reduction over them gives one answer at any order.[^5] A property test is
+reduction over them gives one answer at any order.[^6] A property test is
 how the project proves that a new operation holds the same law.
 
 To add one, add a `proptest!` block to an existing file, or add a new file
@@ -102,7 +115,7 @@ The project uses `hypothesis`. The harness is
 
 The record names this the highest-value harness for a stateful engine, and
 it puts the harness on the Python side, because the properties that matter
-are properties of the boundary.[^6]
+are properties of the boundary.[^7]
 
 The machine generates a sequence of commands, applies them, and calls the
 invariant check after every rule.
@@ -157,7 +170,7 @@ a `[tool.mutmut]` section with `source_paths`, and add a job to
 Miri finds aliasing and provenance defects in unsafe code. No test
 replaces it. Miri cannot run the Python interpreter, so it can only run
 over a crate that does not link the interpreter. The crate split is what
-makes this possible.[^7]
+makes this possible.[^8]
 
 Storage will hold unsafe code. Add the Miri job when that code arrives.
 There is no unsafe code today, so there is no Miri job today.
@@ -186,6 +199,7 @@ slow gate of the `justfile`.
 | `just lint` | Clippy, ruff, mypy, and the invariant scripts |
 | `just test` | The fast tests on both sides |
 | `just determinism` | The two determinism tests on their own |
+| `just probe` | Prove that the determinism tests can fail |
 | `just test-slow` | The release tests, the licence audit, the target check |
 | `just mutants` | Mutation testing on both sides |
 | `just check` | Everything a commit must pass |
@@ -196,11 +210,15 @@ slow gate of the `justfile`.
 **No measurement exists on the target platform.** Every cost figure in
 this project is derived, not measured. A performance conclusion taken on a
 development machine does not transfer, because the cache-line size and the
-memory model differ.[^8] There are no benchmarks in this repository yet.
+memory model differ.[^9] There are no benchmarks in this repository yet.
 
 **The wheel matrix is minimal.** Continuous integration builds a wheel for
 Linux on x86-64 only. The record names five platforms. The rest are
-deferred.[^9]
+deferred.[^10]
+
+**The `scripts` directory is not under the Python gate.** It holds
+standalone repository tooling. The gates run over `python` and `tests`.
+Bringing the tooling under the same lint is a separate change.
 
 **There is no engine.** The Rust crates hold stubs. The harnesses are
 real. The subjects are not.
@@ -211,8 +229,9 @@ real. The subjects are not.
 [^2]: ADR-0006, The Python boundary, decision D11. `docs/adrs/draft/adr-0006-python-boundary.md`
 [^3]: ADR-0001, Determinism as the primary constraint, decision D9. `docs/adrs/draft/adr-0001-determinism.md`
 [^4]: ADR-0001, Determinism as the primary constraint, decision D11. `docs/adrs/draft/adr-0001-determinism.md`
-[^5]: ADR-0001, Determinism as the primary constraint, decision D7. `docs/adrs/draft/adr-0001-determinism.md`
-[^6]: ADR-0006, The Python boundary, decision D11. `docs/adrs/draft/adr-0006-python-boundary.md`
-[^7]: ADR-0006, The Python boundary, decision D2. `docs/adrs/draft/adr-0006-python-boundary.md`
-[^8]: ADR-0002, Target platform and value types, decision D8. `docs/adrs/draft/adr-0002-target-platform-and-value-types.md`
-[^9]: ADR-0006, The Python boundary, decision D8. `docs/adrs/draft/adr-0006-python-boundary.md`
+[^5]: Testing rules, section 1. `.claude/rules/testing.md`
+[^6]: ADR-0001, Determinism as the primary constraint, decision D7. `docs/adrs/draft/adr-0001-determinism.md`
+[^7]: ADR-0006, The Python boundary, decision D11. `docs/adrs/draft/adr-0006-python-boundary.md`
+[^8]: ADR-0006, The Python boundary, decision D2. `docs/adrs/draft/adr-0006-python-boundary.md`
+[^9]: ADR-0002, Target platform and value types, decision D8. `docs/adrs/draft/adr-0002-target-platform-and-value-types.md`
+[^10]: ADR-0006, The Python boundary, decision D8. `docs/adrs/draft/adr-0006-python-boundary.md`

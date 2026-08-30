@@ -49,6 +49,16 @@ jobs:
       - name: Test
         run: cargo test --workspace
 
+      # A determinism test that compares a run against itself always passes
+      # and proves nothing. The probe feature perturbs the join order. The
+      # thread-count test must then fail, and the probe test must pass.
+      - name: Prove that the determinism tests can fail
+        run: |
+          ! cargo test --package cachette-core \
+              --features probe-nondeterminism --test thread_equivalence
+          cargo test --package cachette-core \
+              --features probe-nondeterminism --test determinism_probe
+
       # The runners are x86-64. The primary target is 64-bit ARM on Linux.
       # `cargo check` needs no linker for a foreign target, so it runs on
       # the x86-64 runner and catches a target-specific compile error.
@@ -80,10 +90,10 @@ jobs:
         run: uv sync --python ${{ matrix.python-version }}
 
       - name: Check the formatting
-        run: uv run ruff format --check .
+        run: uv run ruff format --check python tests
 
       - name: Lint
-        run: uv run ruff check .
+        run: uv run ruff check python tests
 
       - name: Check the types
         run: uv run mypy

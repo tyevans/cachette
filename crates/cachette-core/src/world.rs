@@ -254,11 +254,34 @@ impl World {
         });
 
         self.log.clear();
-        for slot in &slots {
+        for slot in ordered_slots(&slots) {
             self.log.extend_from_slice(slot);
         }
         Ok(&self.log)
     }
+}
+
+/// Returns the output slots in the order that the log joins them.
+///
+/// The order is slot order. Slot order is the order of the tiles, and it
+/// does not depend on which thread finished first.[^1]
+///
+/// # References
+///
+/// [^1]: ADR-0001, Determinism as the primary constraint, decision D6. `docs/adrs/draft/adr-0001-determinism.md`
+#[cfg(not(feature = "probe-nondeterminism"))]
+fn ordered_slots(slots: &[Vec<TileChanged>]) -> impl Iterator<Item = &Vec<TileChanged>> {
+    slots.iter()
+}
+
+/// Returns the output slots in reverse order.
+///
+/// This is the test-only switch. It breaks the ordering rule on purpose,
+/// so that the determinism tests have a proven failure mode. Never build a
+/// shipped artefact with this feature.
+#[cfg(feature = "probe-nondeterminism")]
+fn ordered_slots(slots: &[Vec<TileChanged>]) -> impl Iterator<Item = &Vec<TileChanged>> {
+    slots.iter().rev()
 }
 
 /// Updates one contiguous chunk of tiles and returns the events it emitted.
