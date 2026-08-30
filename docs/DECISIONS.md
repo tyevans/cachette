@@ -1,0 +1,128 @@
+# Open Decisions (Register)
+
+This document is a **register**. It lists choices that are open, the options,
+and a recommendation.
+
+A decision needs **judgement**. The options are known and work can continue
+under a stated assumption. Compare `BLOCKERS.md`, which lists work that is
+stopped for want of information.
+
+Numbers are permanent. Never reuse one. A closed decision keeps its row, with
+the outcome recorded.
+
+When a decision closes, and it corrected something the project believed,
+record the correction in `FINDINGS.md` as well.
+
+## Open
+
+### DEC-001 — The commodity split
+
+Two reports set different ceilings, and they bound different things.
+
+| Report | Ceiling | Reason |
+|---|---|---|
+| Entity economy | 64 | A presence mask is one `u64`. 64 `i64` values fill exactly 8 cache lines. |
+| Trade and flow | 16, hard limit 32 | Cache residency during the flow solve. |
+| Individual agency | 4 to 8 | What one individual can carry. |
+
+**Recommendation:** 64 may exist, 16 take part in the transport solve, the
+remainder stay local to a settlement, and an individual carries 8. The three
+limits are compatible because they bound existence, participation and carriage
+separately.
+
+**Assumption in the meantime:** the recommendation above.
+
+### DEC-002 — Do units make individual decisions?
+
+The needs report concluded that units do not decide, because a decision cost
+400 nanoseconds and one million decisions would take four times the tick
+budget.
+
+The agency report measured 4.1 nanoseconds. The gathers are sequential, not
+random, because units are sorted by tile index and the fields are level-1
+planes that stay in cache.
+
+**This is now a design choice, not a budget one.**
+
+**Recommendation:** both tiers. Individuals choose where to go; cohorts choose
+what to buy. Cost is 0.18 core-ms. The project owner has asked for individual
+experiences, and this delivers them.
+
+### DEC-003 — Do dead characters keep relation edges?
+
+Retaining them costs 531 MB at 100,000 living characters and 1.39 GB at the
+ceiling. Dropping them loses the ability to reason about a dead person's
+former ties.
+
+**Recommendation:** drop them. The character report notes this is how
+expensive the question is to answer wrongly.
+
+### DEC-004 — One fog layer or two
+
+The fog report specifies explored and visible as separate layers, and asks
+whether both are needed.
+
+**Recommendation:** unresolved. It depends on whether the game shows explored
+terrain differently from currently visible terrain.
+
+### DEC-005 — Does the military influence plane need terrain conductance?
+
+With conductance the solve costs 150 microseconds. Without it, 12
+microseconds. The difference is whether influence flows around mountains or
+through them.
+
+**Recommendation:** include it. Twelve times a small number is still a small
+number, and influence that ignores terrain will look wrong.
+
+### DEC-006 — Simulated or procedural weather
+
+Procedural weather is a deterministic function of position, tick and seed:
+zero storage, no update cost, perfectly reproducible, but no feedback.
+Simulated weather supports orographic rain shadow and fire-driven weather at
+real cost.
+
+**Recommendation:** procedural base with simulated perturbation, if weather is
+built at all. It is not yet in scope.
+
+### DEC-007 — Retained or transient event log
+
+The log is currently transient. Retention costs 3.2 MB per frame, which is
+11.5 GB per minute. Retention would buy rollback, time travel and audit.
+
+**Recommendation:** stay transient. Events are already serialisable and the
+apply step is pure, so retention remains additive.
+
+### DEC-008 — Is a 50-second mountain crossing acceptable?
+
+The approved calibration puts an ordinary crossing at 12.5 seconds and a
+mountain crossing at 50 seconds. The project owner rejected 50 seconds as the
+ordinary case. The recalibration relocates it to mountains.
+
+**Recommendation:** accept. A mountain pass should be a serious obstacle.
+
+## Decisions to apply at merge
+
+These are mechanical. They do not need judgement, but they must not be
+forgotten.
+
+### DEC-009 — Renumber the colliding decision ranges
+
+Reports 10, 11 and 12 all claim D51. Report 15 overlaps report 14 at D90 to
+D95. Every decision number becomes local to its record, so the collision
+disappears when the records are written.
+
+### DEC-010 — The needs report must adopt the agency report's decision cost
+
+The needs report's cohort decision line is 16.00 core-ms and is 92 percent of
+its subsystem. Corrected, it is under 0.05 core-ms. See DEC-002.
+
+### DEC-011 — Re-run the vector storage argument
+
+The vector report computed against a stale copy of the character report. It
+used 8-byte edges at mean degree 8, giving 33.6 MB at the ceiling. The real
+figure is 168 MB. The storage argument for vectors is stronger than the report
+concluded, and it called that argument its weakest.
+
+## Closed
+
+None yet.

@@ -117,5 +117,5 @@ The decision record lists 16 open questions in total.[^1]
 ## References
 
 [^1]: ADR-0001, Foundational Architecture. `docs/adrs/draft/adr-0001-foundational-architecture.md`
-[^2]: Research reports 01 to 07. `docs/adrs/background/adr-0001/`
+[^2]: Research reports 01 to 07. `docs/research/reports/`
 [^3]: Documentation Rules. `.claude/rules/documentation.md`
