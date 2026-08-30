@@ -100,6 +100,8 @@ move one.[^4]
 |------|----------|
 | `docs/adrs/draft/` | Decision records under review |
 | `docs/adrs/background/` | Research that supports each decision record |
+| `docs/reference/` | Registers of figures that change |
+| `scripts/` | Checks that run in continuous integration |
 | `.claude/rules/` | Rules that apply to all work in this repository |
 | `docs/backlog/` | The work queue |
 
@@ -118,6 +120,11 @@ material appears in a footnote. All footnotes appear in one section at
 the end of the document.
 
 The full rule holds the details.[^3]
+
+A separate rule states what belongs in a decision record, what does not, and
+how to decide whether a decision needs a record at all.[^4] A script checks the
+mechanical part of it.[^5] Run the script before you hand over work that
+touches a record.
 
 The documents under `docs/adrs/` predate this rule. They use inline
 links. Convert them before you extend them.
@@ -140,5 +147,7 @@ The decision record lists 16 open questions in total.[^1]
 [^1]: ADR-0001, Foundational Architecture. `docs/adrs/draft/adr-0001-foundational-architecture.md`
 [^2]: Research reports 01 to 07. `docs/research/reports/`
 [^3]: Documentation Rules. `.claude/rules/documentation.md`
-[^4]: Backlog guide. `docs/backlog/README.md`
-[^5]: Definition of Done. `.claude/rules/definition-of-done.md`
+[^4]: Decision Record Scope. `.claude/rules/adr-scope.md`
+[^5]: The record check. `scripts/check-adrs.sh`
+[^6]: Backlog guide. `docs/backlog/README.md`
+[^7]: Definition of Done. `.claude/rules/definition-of-done.md`
