@@ -22,6 +22,8 @@ single system that ignores it destroys the property for the whole engine.
 
 ## Decision
 
+### D1. One binary gives one answer at any thread count
+
 **The engine produces the same result, byte for byte, for one binary at any
 thread count.**
 
@@ -32,21 +34,28 @@ The scope is exact, and the scope matters.
 - **Byte for byte.** The event log and the state hash match exactly. Not
   approximately, and not within a tolerance.
 
+### D2. The claim does not cross a binary
+
 The engine does **not** promise a matching result across a different
 processor, a different compiler, or a different version of a dependency.
 Reproducing a run means keeping the binary, not only the seed.
 
-This claim outranks every other constraint in the project. When a decision
-would make the engine faster and break this claim, the claim wins. A record
+### D3. This claim outranks every other constraint
+
+When a decision would make the engine faster and break D1, D1 wins. A record
 that contradicts this one is wrong, whatever else it argues.
 
-Two tests protect the claim, and both run in continuous integration.
+### D4. Two tests protect the claim
+
+Both run in continuous integration.
 
 1. **Thread-count equivalence.** The same tick runs at 1, 2 and 12 threads.
    The event logs are compared byte for byte. A mismatch names the first
    differing offset.
 2. **The golden state hash.** The whole world is hashed each frame and
    compared against a stored file.
+
+### D5. Both tests must be able to fail
 
 A test that cannot fail protects nothing. A build feature makes both tests
 fail on demand, and continuous integration fails if either test passes while

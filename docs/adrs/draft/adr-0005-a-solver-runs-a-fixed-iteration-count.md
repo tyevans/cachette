@@ -13,14 +13,22 @@ amounts of work in the same time, so the answer depends on the machine.
 
 ## Decision
 
+### D1. A solver runs a fixed iteration count
+
 **Every iterative solver in the simulation runs a fixed number of
 iterations.** The count is content, declared before the frame runs.
 
-**No solver uses a convergence test to decide when to stop.** No solver uses
-a time budget.
+### D2. No solver stops on a convergence test or a time budget
 
-Where a search must be bounded, it is bounded by a **node budget** and not by
+No solver uses a convergence test to decide when to stop. No solver uses a
+time budget.
+
+### D3. A bounded search is bounded by a node budget
+
+Where a search must be bounded, it is bounded by a node budget and not by
 elapsed time. A node budget is a count, so it is the same on every machine.
+
+### D4. A solver reports progress, it never reacts to it
 
 A solver may report how far it got. It may not change how much it does in
 response.

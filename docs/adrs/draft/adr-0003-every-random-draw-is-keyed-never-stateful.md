@@ -14,6 +14,8 @@ primary constraint.
 
 ## Decision
 
+### D1. Every draw is keyed
+
 **Every random draw comes from a counter-based generator, keyed on the tuple
 of the system, the frame, the entity, and the draw index.**
 
@@ -24,7 +26,9 @@ The same entity, in the same frame, in the same system, drawing for the same
 purpose, gets the same number however the work was scheduled. An entity that
 is processed on a different thread gets the same number.
 
-**No thread-local random state exists anywhere in the simulation.** A
+### D2. No thread-local random state exists
+
+No thread-local random state exists anywhere in the simulation. A
 thread-local generator is the single most common way a simulation loses
 determinism, because it is correct on one thread and wrong on two.
 

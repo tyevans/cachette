@@ -16,14 +16,19 @@ The engine cannot check a supplied function for consistency.
 
 ## Decision
 
-**Content supplies a key, never a comparison function.**
+### D1. Content supplies a key, never a comparison function
 
 A content author declares an ordered vector of key fields. The engine
-extracts the key from each item and sorts by the key. Every key field is an
-exact integer, and the final field of every key is a stable identifier, so no
-two items ever tie.
+extracts the key from each item and sorts by the key.
 
-The engine never calls content code from inside a sort.
+### D2. The last key field is a stable identifier
+
+Every key field is an exact integer, and the final field of every key is a
+stable identifier, so no two items ever tie.
+
+### D3. The engine never calls content code from inside a sort
+
+A sort runs on extracted keys only.
 
 ## Consequences
 
