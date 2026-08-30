@@ -24,6 +24,15 @@ nothing cites it. This has happened once: an omnibus draft held number 0001
 before the research was done. It was deleted, not superseded, and 0001 was
 reassigned. The reasoning is in git history.
 
+**An author may set `Draft`. Only a reviewer may set anything beyond it.**
+
+`Proposed` means the number is reserved and no file exists. `Draft` means a
+file exists and is under review. Moving from one to the other is a statement
+of fact, so the author makes it when they write the file.
+
+`Accepted`, `Superseded` and `Rejected` are judgements. A reviewer makes
+those. An author who accepts their own record has reviewed their own work.
+
 **Decision numbers are local to their record.** Write `ADR-0004 D3`, not `D3`.
 Flat global decision numbering collided three times during research and will
 do so again.
@@ -59,7 +68,7 @@ The **rules** are decisions. The **numbers** are living reference.
 
 | No. | Title | Status | Depends on | Source |
 |---|---|---|---|---|
-| 0001 | Determinism as the primary constraint | Proposed | — | 03, 07, 13 |
+| 0001 | Determinism as the primary constraint | Draft | — | 03, 07, 13 |
 
 Everything else follows from this record. It is the only decision that cannot
 be retrofitted.
@@ -68,11 +77,11 @@ be retrofitted.
 
 | No. | Title | Status | Depends on | Source |
 |---|---|---|---|---|
-| 0002 | Target platform and value types | Proposed | 0001 | 07 |
-| 0003 | Storage: dense tiles and a generational arena | Proposed | 0001, 0002 | 01 |
-| 0004 | The level-of-detail pyramid | Proposed | 0001, 0003 | 02 |
-| 0005 | The event log | Proposed | 0001 | 03 |
-| 0006 | The Python boundary | Proposed | 0001, 0003 | 05 |
+| 0002 | Target platform and value types | Draft | 0001 | 07 |
+| 0003 | Storage: dense tiles and a generational arena | Draft | 0001, 0002 | 01 |
+| 0004 | The level-of-detail pyramid | Draft | 0001, 0003 | 02 |
+| 0005 | The event log | Draft | 0001 | 03 |
+| 0006 | The Python boundary | Draft | 0001, 0003 | 05 |
 
 ### Cross-cutting models
 
@@ -85,6 +94,11 @@ be retrofitted.
 | 0011 | The faction model | Proposed | 0002 | 08 |
 | 0012 | The entity tiers | Proposed | 0003, 0006 | 14, 15, 16 |
 | 0013 | The modifier pipeline and effective stats | Proposed | 0001, 0012 | 12 |
+
+**ADR-0004 constrains ADR-0010.** The pyramid's descent returns an `All`
+verdict for a subtree that wholly satisfies a predicate. The selector API must
+be able to carry a range result, not only an enumerated set, or that verdict
+cannot be used and the larger half of the pruning win is lost.
 
 Records 0011 and 0012 have no single source report. Both are decisions that
 emerged across several reports and were never written down. Breaking the
