@@ -18,6 +18,24 @@ just           # list every target
 just check     # everything a commit must pass
 ```
 
+## 1a. Where things live
+
+| Path | Contents |
+|---|---|
+| `crates/cachette-core/` | The simulation. It has no PyO3 dependency. |
+| `crates/cachette-py/` | The PyO3 bindings. They depend on the core. |
+| `python/cachette/` | The Python package. |
+| `tests/` | The Python tests. They import the installed package. |
+| `scripts/` | The checks that the lint cannot express. |
+| `docs/product/` | The product requirement records. What is needed, and for whom. |
+| `docs/adrs/` | The decision records. How the engine is built. |
+| `docs/backlog/` | The work queue. |
+| `docs/research/` | The research behind the records. |
+
+The crate split is an architectural decision and not a layout preference.
+The core crate has no PyO3 dependency at all, so a Python callback inside a
+simulation step is a compile error.
+
 ## 2. Before you write code
 
 Answer four questions. The definition-of-done rule holds the full
