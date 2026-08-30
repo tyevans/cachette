@@ -20,11 +20,9 @@ same change that adds the row.
 
 A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
-precedent.[^ALLOC]
+precedent.[^1]
 
 **Next number: FND-040**
-
-[^ALLOC]: Findings register, FND-038. `docs/FINDINGS.md`
 
 ## A. Corrections to stated rules
 
@@ -75,10 +73,8 @@ data is genuinely flat, so it is the honest flagship demonstration.
 
 **Later:** the project did not drop chunking. BLK-002 closed with four fixed
 entity shapes, and the record that holds that claim accepts this cost
-explicitly.[^FND3] A caller now reads one view for each shape, or takes a
+explicitly.[^2] A caller now reads one view for each shape, or takes a
 copy. This finding stands as the reason the cost was known in advance.
-
-[^FND3]: ADR-0066, entity storage holds four fixed shapes. `docs/adrs/draft/adr-0066-entity-storage-holds-four-fixed-shapes.md`
 
 ### FND-004 — Opinion storage is linear, not quadratic
 
@@ -243,7 +239,7 @@ same combination gives a mountain crossing of about 50 seconds. The
 combination that meets the target is a dwell-2 baseline with a capacity-16
 crossing.
 
-**Evidence:** the movement timing note.[^4] It measured 12.9 seconds for the
+**Evidence:** the movement timing note.[^3] It measured 12.9 seconds for the
 corrected combination. The closed-form throughput law gives 12.5 seconds for
 the same parameters. The 4-tick difference is unresolved and is recorded in
 the note.
@@ -252,6 +248,23 @@ the note.
 Capacity, dwell and the terrain multiplier all enter it. **Check that a rate
 derivation names every multiplier on its path.** No record states the mountain
 multiplier, so the 50-second figure implies its value rather than citing it.
+
+### FND-035 — The float ban lint does not catch an inferred literal
+
+**Believed.** A lint enforces the boundary that keeps floating point out of
+simulated state. The project invariant says so plainly.
+
+**True.** The lint catches a named type. It does not catch `let x = 1.5;`,
+where the type is inferred and never written. It also cannot name the
+reassociating methods, because those do not resolve on the pinned toolchain,
+so a banned-method entry cannot refer to them.
+
+**Evidence.** The scaffolding work proved both gaps by injecting a float, and
+closed them with a script that reads the source directly.
+
+**Follows.** State the enforcement as two mechanisms, not one. A lint plus a
+script. An invariant that names one mechanism invites a reader to trust it
+alone. The word "lint" in the project instructions is now wrong on its own.
 
 ## D. Cost estimates that were wrong
 
@@ -408,7 +421,7 @@ bit at any thread count. That sentence is true.
 
 **True.** A reader takes it to mean more than it says. The guarantee holds for
 one binary. A different processor or a different compiler may produce a
-different hash, and the record says so.[^1] Five readers saw the wider claim,
+different hash, and the record says so.[^4] Five readers saw the wider claim,
 and the fifth named it as the one thing it did not believe.
 
 **Evidence.** Five independent cold reads of the public description. Each
@@ -429,7 +442,7 @@ the tens of thousands, not the millions. The entity tiers make units cheap by
 not giving them a relation graph.
 
 **Evidence.** The entity tier design, and the storage argument that keeps
-opinion linear by capping out-degree.[^2]
+opinion linear by capping out-degree.[^5]
 
 **Follows.** A description of the product must not promise a property that
 the entity model does not carry. Check any per-unit claim against the tier
@@ -462,7 +475,7 @@ reading time only.
 correlation was 0.704 and 0.715, derived independently. Records of 4000 words
 or more were edited 3.7 times as often as records under 1200 words.
 
-**Evidence.** The record scope research.[^3]
+**Evidence.** The record scope research.[^6]
 
 **Follows.** A long record holds material that changes. Length is a signal to
 look for that material, not a sign of care.
@@ -476,34 +489,10 @@ a title that names a topic. In one corpus the churn was 2.13 against 4.50.
 Both reference projects drifted from topic titles to claim titles on their
 own, from 3 to 21 per cent and from 57 to 82 per cent.
 
-**Evidence.** The record scope research.[^3]
+**Evidence.** The record scope research.[^6]
 
 **Follows.** Title a record with the claim it makes. Five of the six current
 drafts carry topic titles and are queued for retitling.
-
-## References
-
-[^1]: ADR-0001, Determinism, decision D1. `docs/adrs/draft/adr-0001-determinism-outranks-every-other-constraint.md`
-[^2]: Findings register, FND-004, in this document.
-[^3]: Record scope research. `docs/research/adr-scope-findings.md`
-[^4]: Movement timing note. `docs/research/movement-timing.md`
-
-### FND-035 — The float ban lint does not catch an inferred literal
-
-**Believed.** A lint enforces the boundary that keeps floating point out of
-simulated state. The project invariant says so plainly.
-
-**True.** The lint catches a named type. It does not catch `let x = 1.5;`,
-where the type is inferred and never written. It also cannot name the
-reassociating methods, because those do not resolve on the pinned toolchain,
-so a banned-method entry cannot refer to them.
-
-**Evidence.** The scaffolding work proved both gaps by injecting a float, and
-closed them with a script that reads the source directly.
-
-**Follows.** State the enforcement as two mechanisms, not one. A lint plus a
-script. An invariant that names one mechanism invites a reader to trust it
-alone. The word "lint" in the project instructions is now wrong on its own.
 
 ### FND-036 — Mutation testing found ten gaps that a passing suite did not
 
@@ -562,3 +551,12 @@ declaration site, and it decays silently because nothing fails when it
 disagrees. The orientation now points at the register instead of repeating
 it. When a document summarises a register, make it name the register and stop
 there.
+
+## References
+
+[^1]: Findings register, FND-038, in this document.
+[^2]: ADR-0066, entity storage holds four fixed shapes. `docs/adrs/draft/adr-0066-entity-storage-holds-four-fixed-shapes.md`
+[^3]: Movement timing note. `docs/research/movement-timing.md`
+[^4]: ADR-0001, one binary gives one answer at any thread count. `docs/adrs/draft/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
+[^5]: Findings register, FND-004, in this document.
+[^6]: Record scope research. `docs/research/adr-scope-findings.md`
