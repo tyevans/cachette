@@ -59,8 +59,36 @@ Put these in the registers and cite them:
 - Per-tick cost budgets. They change with every measurement.
 - The byte budget table.
 - Constant values that depend on an unanswered question.
+- Dependency versions and named releases. Put the version you read in a
+  footnote, where it records what you consulted.
+- Counts, file tables, and survivor lists. Put these in the commit message,
+  which is immutable and scoped to one moment.
+- A module arrangement, unless the arrangement is itself the constraint.
+- A capability that nothing invokes. Do not record an intent as a fact.
 
 The **rules** are decisions. The **numbers** are living reference.
+
+The full rule states the test for whether a decision needs a record at all, and
+gives the evidence for each category above. Read it before you write a record.
+It is derived from a measurement of 106 records in two sibling projects.
+
+Two results from that measurement bear on the records this project has already
+drafted. Record length predicts churn, with a correlation near 0.71 in both
+reference corpora, and all six drafts are longer than both reference medians. A
+title that states a claim bounds a record; a title that names a topic does not,
+and a topic title churned twice as often. Five of the six drafts carry a topic
+title.
+
+A script checks the mechanical part of this rule and can run in continuous
+integration. It fails when a record misses a required section, holds a version
+pin or a volatile figure, cites a number that no record has, or disagrees with
+this registry.
+
+| Path | Purpose |
+|---|---|
+| `.claude/rules/adr-scope.md` | The record scope rule |
+| `docs/research/adr-scope-findings.md` | The measurement behind the rule |
+| `scripts/check-adrs.sh` | The record check |
 
 ## The records
 
@@ -142,7 +170,7 @@ These change over time. Records cite them; records do not contain them.
 | `docs/FINDINGS.md` | What the project believed and had to correct |
 | `docs/research/reports/MERGE-NOTES.md` | Conflicts between the reports |
 | `docs/research/research-agenda.md` | Fields still to investigate |
-| `docs/reference/budgets.md` | Cost and storage tables. Not yet written. |
+| `docs/reference/budgets.md` | Cost and storage tables |
 
 `FINDINGS.md` is precedent. When two sources disagree, look there first — the
 conflict may already be settled.
