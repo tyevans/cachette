@@ -152,20 +152,24 @@ links. Convert them before you extend them.
 
 ## Open questions
 
-Three questions block design work. The project owner must answer them.
+The project owner fixed the tile scale, the population, the character
+count, the settlement count and the tile upgrade fraction. The tick then
+followed by derivation. The blockers register holds the outcomes and the
+scale constants table holds the values.[^9][^10]
 
-1. Name three archetypes that you expect to exist. The answer decides
-   whether the engine needs archetype machinery at all.
-2. Confirm the grid extent and the world shape. A rhombus world removes
-   a coordinate conversion.
-3. State the maximum faction count. Fog of war costs 21.0 MB for each
-   faction at the target scale.
+Two questions still block design work. The project owner must answer them.
 
-The decision record lists 16 open questions in total.[^1]
+1. State the maximum faction count. The storage shape for fog of war
+   depends on it, and it cannot be chosen under an assumption.
+2. Confirm the world shape. A rhombus world removes a coordinate
+   conversion. The extent is settled; the shape is not.
+
+Read the registers for the current list. Do not read this section as the
+list. A register does not decay; a summary does.[^9]
 
 ## References
 
-[^1]: ADR-0001, Determinism. `docs/adrs/draft/adr-0001-determinism-outranks-every-other-constraint.md`
+[^1]: ADR-0001, one binary gives one answer at any thread count. `docs/adrs/draft/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
 [^2]: Research reports 01 to 07. `docs/research/reports/`
 [^3]: Documentation Rules. `.claude/rules/documentation.md`
 [^4]: Decision Record Scope. `.claude/rules/adr-scope.md`
@@ -173,3 +177,5 @@ The decision record lists 16 open questions in total.[^1]
 [^6]: Backlog guide. `docs/backlog/README.md`
 [^7]: Definition of Done. `.claude/rules/definition-of-done.md`
 [^8]: Product requirement records. `docs/product/README.md`
+[^9]: Blockers register. `docs/BLOCKERS.md`
+[^10]: Budgets and costs, the scale constants. `docs/reference/budgets.md`

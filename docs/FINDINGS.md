@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^ALLOC]
 
-**Next number: FND-039**
+**Next number: FND-040**
 
 [^ALLOC]: Findings register, FND-038. `docs/FINDINGS.md`
 
@@ -69,9 +69,16 @@ is about 4,000 chunks.
 
 **Evidence:** the Python boundary report.
 
-**Follows:** dropping archetype chunking restores whole-column zero copy.
-Subsets never are. `to_numpy()` copies; document that plainly. Tile data is
-genuinely flat, so it is the honest flagship demonstration.
+**Follows:** dropping archetype chunking would restore whole-column zero
+copy. Subsets never are. `to_numpy()` copies; document that plainly. Tile
+data is genuinely flat, so it is the honest flagship demonstration.
+
+**Later:** the project did not drop chunking. BLK-002 closed with four fixed
+entity shapes, and the record that holds that claim accepts this cost
+explicitly.[^FND3] A caller now reads one view for each shape, or takes a
+copy. This finding stands as the reason the cost was known in advance.
+
+[^FND3]: ADR-0066, entity storage holds four fixed shapes. `docs/adrs/draft/adr-0066-entity-storage-holds-four-fixed-shapes.md`
 
 ### FND-004 — Opinion storage is linear, not quadratic
 
@@ -535,3 +542,23 @@ sibling system on its own. When a rule fixes a class of defect, look for
 every place the class occurs, not only the place it was found. Each register
 now carries an explicit next number, and a writer claims it before writing.
 
+### FND-039 — The orientation held open questions that no register held
+
+**Believed.** The blockers register lists every question that stops work. A
+reader who wants the open list reads the register.
+
+**True.** The project orientation carried its own list of three open
+questions. One of them was BLK-002. The other two, the maximum faction count
+and the world shape, had no row in any register. They were declared in one
+place and tracked in none.
+
+**Evidence.** Answering BLK-001 to BLK-006 closed one of the three questions
+in the orientation and left the other two with nowhere to live. They are now
+BLK-013 and BLK-014.
+
+**Follows.** This is the redundant declaration shape again, in the form the
+project has already met twice. A summary of a register is a second
+declaration site, and it decays silently because nothing fails when it
+disagrees. The orientation now points at the register instead of repeating
+it. When a document summarises a register, make it name the register and stop
+there.

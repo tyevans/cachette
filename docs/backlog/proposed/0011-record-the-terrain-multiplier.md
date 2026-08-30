@@ -23,4 +23,7 @@ and admitted by sort-then-admit. This work feeds that record. The impact
 review must say whether the multiplier belongs in ADR-0056 or in a separate
 record.
 
-The movement constants stay parametric until BLK-001 answers the tile scale.
+BLK-001 is now answered. The tile edge is 80 metres, the dwell is 2, and the
+crossing-terrain capacity is 16. The scale constants table holds these values,
+so the movement constants no longer need to stay parametric. This item is
+unblocked on that count.

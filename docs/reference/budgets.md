@@ -14,7 +14,39 @@ replaces a derivation, say so in the row and give the commit.
 
 ## Status
 
-No figures are recorded yet. The project has no code and no benchmark.
+No measured figure is recorded. The project has no code and no benchmark.
+
+The scale constants below are decided or derived, not measured. Each was held
+here because a blocker governed it. Those blockers are now closed.
+
+## Scale constants
+
+The project owner fixed these on 30 August 2026. Each row names the blocker
+that held it and says how the value was reached.
+
+| Constant | Value | Blocker | How reached |
+|---|---|---|---|
+| Tile edge | 80 m | BLK-001 | Owner decision, from the report 17 calibration |
+| World extent | about 330 km across | BLK-001 | Derived from the tile edge at 16.7 million tiles |
+| March rate | 24 km in a simulated day | BLK-001 | Historical rate, held fixed through the calibration |
+| Dwell | 2 ticks | BLK-001 | Derived from the tile edge and the march rate |
+| Ordinary crossing | 12.5 s | BLK-001 | Approved calibration, consistent at an 80 m tile |
+| Crossing-terrain capacity | 16 units | BLK-001, BLK-009 | Derived from dwell 2 at the approved crossing time |
+| Ordinary tile capacity | 8 units | BLK-009 | Owner decision, stored as `u8` |
+| Tiles crossed in a simulated day | 300 | BLK-012 | March rate divided by the tile edge |
+| Ticks in a simulated day | 600 | BLK-012 | Tiles crossed multiplied by the dwell |
+| Simulated time in one tick | 2.4 minutes | BLK-012 | A simulated day divided by the ticks in it |
+| Real time for a simulated day | 60 s | BLK-012 | Ticks in a day at 10 ticks for each second |
+| Total population | 1,000,000 | BLK-003 | Owner decision. Soldiers are a fraction of it |
+| Living characters | 50,000 | BLK-004 | Owner decision, inside the report recommendation |
+| Character ceiling | 262,144 | BLK-004 | Hard ceiling, two to the eighteenth |
+| Character layer at the target | about 85 MB | BLK-004 | Linear scaling from the character report. Not measured |
+| Settlements | 5,000 | BLK-005 | Owner decision, confirming the report assumption |
+| Tiles carrying an upgrade | fewer than one in twenty | BLK-006 | Owner decision, agreeing with the report estimate |
+
+The tile upgrade fraction picks sparse storage over dense storage. The
+character layer figure is derived by scaling, not measured. BLK-007 still holds
+every cost figure in this project.
 
 ## What belongs here
 
