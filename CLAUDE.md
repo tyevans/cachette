@@ -81,6 +81,19 @@ Types parameterise the verbs. Types do not multiply the verbs.
 per-entity loop. Choose an algorithm that uses the whole set. One example
 is a flow field instead of many path searches.
 
+## Task management
+
+Work lives in `docs/backlog/`. One file is one item. An item moves between
+three directories: `proposed/`, `refined/`, and `complete/`.
+
+**An item is refined when its architectural impact review is done.** That
+review names the decision records that govern the work, the records it will
+change or create, and the blockers that hold it. An item that cannot answer
+those stays in `proposed/`.
+
+Take work from `refined/`. Read the backlog guide before you add an item or
+move one.[^4]
+
 ## Repository layout
 
 | Path | Contents |
@@ -90,6 +103,14 @@ is a flow field instead of many path searches.
 | `docs/reference/` | Registers of figures that change |
 | `scripts/` | Checks that run in continuous integration |
 | `.claude/rules/` | Rules that apply to all work in this repository |
+| `docs/backlog/` | The work queue |
+
+## Definition of done
+
+Work is done when the impact review was made before starting, the
+implementation was checked against each governing record decision by decision,
+the registers were updated, and every gate passes. The full rule holds the
+detail.[^5]
 
 ## Documentation rules
 
@@ -128,3 +149,5 @@ The decision record lists 16 open questions in total.[^1]
 [^3]: Documentation Rules. `.claude/rules/documentation.md`
 [^4]: Decision Record Scope. `.claude/rules/adr-scope.md`
 [^5]: The record check. `scripts/check-adrs.sh`
+[^6]: Backlog guide. `docs/backlog/README.md`
+[^7]: Definition of Done. `.claude/rules/definition-of-done.md`
