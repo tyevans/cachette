@@ -15,8 +15,8 @@
 //!
 //! # References
 //!
-//! [^1]: ADR-0001, Determinism as the primary constraint, decision D3. `docs/adrs/draft/adr-0001-determinism.md`
-//! [^2]: ADR-0001, Determinism as the primary constraint, decision D7. `docs/adrs/draft/adr-0001-determinism.md`
+//! [^1]: ADR-0001, Determinism as the primary constraint, decision D3. `docs/adrs/draft/adr-0001-determinism-outranks-every-other-constraint.md`
+//! [^2]: ADR-0001, Determinism as the primary constraint, decision D7. `docs/adrs/draft/adr-0001-determinism-outranks-every-other-constraint.md`
 
 use crate::types::{Accum, Fix32, FIX_FRACTIONAL_BITS};
 
@@ -43,7 +43,7 @@ pub const fn sub(a: Fix32, b: Fix32) -> Fix32 {
 ///
 /// # References
 ///
-/// [^1]: ADR-0002, Target platform and value types, decision D3. `docs/adrs/draft/adr-0002-target-platform-and-value-types.md`
+/// [^1]: ADR-0002, Target platform and value types, decision D3. `docs/adrs/draft/adr-0002-value-types-are-exact-and-sized-for-one-target.md`
 #[must_use]
 pub const fn mul(a: Fix32, b: Fix32) -> Fix32 {
     let wide = (a.0 as i64) * (b.0 as i64);
@@ -71,7 +71,7 @@ pub const fn div(a: Fix32, b: Fix32) -> Option<Fix32> {
 ///
 /// # References
 ///
-/// [^1]: ADR-0001, Determinism as the primary constraint, decision D4. `docs/adrs/draft/adr-0001-determinism.md`
+/// [^1]: ADR-0001, Determinism as the primary constraint, decision D4. `docs/adrs/draft/adr-0001-determinism-outranks-every-other-constraint.md`
 #[must_use]
 pub const fn accumulate(total: Accum, value: Fix32) -> Accum {
     Accum(total.0.saturating_add(value.0 as i64))
@@ -84,7 +84,7 @@ pub const fn accumulate(total: Accum, value: Fix32) -> Accum {
 ///
 /// # References
 ///
-/// [^1]: ADR-0001, Determinism as the primary constraint, decision D7. `docs/adrs/draft/adr-0001-determinism.md`
+/// [^1]: ADR-0001, Determinism as the primary constraint, decision D7. `docs/adrs/draft/adr-0001-determinism-outranks-every-other-constraint.md`
 #[must_use]
 pub const fn combine(a: Accum, b: Accum) -> Accum {
     Accum(a.0.saturating_add(b.0))

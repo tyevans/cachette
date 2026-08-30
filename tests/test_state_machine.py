@@ -24,7 +24,7 @@ Add these when the engine supports them:
 References
 ----------
 ADR-0006, The Python boundary, decision D11.
-``docs/adrs/draft/adr-0006-python-boundary.md``
+``docs/adrs/draft/adr-0006-python-is-a-control-plane.md``
 """
 
 from __future__ import annotations

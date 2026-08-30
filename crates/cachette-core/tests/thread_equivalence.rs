@@ -12,7 +12,7 @@
 //!
 //! # References
 //!
-//! [^1]: ADR-0001, Determinism as the primary constraint, decision D11. `docs/adrs/draft/adr-0001-determinism.md`
+//! [^1]: ADR-0001, Determinism as the primary constraint, decision D11. `docs/adrs/draft/adr-0001-determinism-outranks-every-other-constraint.md`
 //! [^2]: Testing policy. `docs/TESTING.md`
 
 use cachette_core::{World, WorldConfig};

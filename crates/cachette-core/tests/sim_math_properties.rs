@@ -8,7 +8,7 @@
 //!
 //! # References
 //!
-//! [^1]: ADR-0001, Determinism as the primary constraint, decisions D2 and D7. `docs/adrs/draft/adr-0001-determinism.md`
+//! [^1]: ADR-0001, Determinism as the primary constraint, decisions D2 and D7. `docs/adrs/draft/adr-0001-determinism-outranks-every-other-constraint.md`
 //! [^2]: Testing policy. `docs/TESTING.md`
 
 use cachette_core::sim_math;

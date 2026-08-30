@@ -140,6 +140,6 @@ Before you claim work is done, check each line.
 [^4]: Decision Record Scope. `.claude/rules/adr-scope.md`
 [^5]: Commit Message Rules. `.claude/rules/commits.md`
 [^6]: Testing Rules. `.claude/rules/testing.md`
-[^7]: ADR-0001, Determinism as the primary constraint. `docs/adrs/draft/adr-0001-determinism.md`
+[^7]: ADR-0001, Determinism as the primary constraint. `docs/adrs/draft/adr-0001-determinism-outranks-every-other-constraint.md`
 [^8]: Findings, the scope of a decision record. `docs/research/adr-scope-findings.md`
 [^9]: Definition of Done. `.claude/rules/definition-of-done.md`

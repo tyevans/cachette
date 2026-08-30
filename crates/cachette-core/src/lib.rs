@@ -10,9 +10,9 @@
 //!
 //! # References
 //!
-//! [^1]: ADR-0006, The Python boundary, decision D2. `docs/adrs/draft/adr-0006-python-boundary.md`
-//! [^2]: ADR-0001, Determinism as the primary constraint, decision D3. `docs/adrs/draft/adr-0001-determinism.md`
-//! [^3]: ADR-0001, Determinism as the primary constraint, decision D2. `docs/adrs/draft/adr-0001-determinism.md`
+//! [^1]: ADR-0006, The Python boundary, decision D2. `docs/adrs/draft/adr-0006-python-is-a-control-plane.md`
+//! [^2]: ADR-0001, Determinism as the primary constraint, decision D3. `docs/adrs/draft/adr-0001-determinism-outranks-every-other-constraint.md`
+//! [^3]: ADR-0001, Determinism as the primary constraint, decision D2. `docs/adrs/draft/adr-0001-determinism-outranks-every-other-constraint.md`
 
 pub mod event;
 pub mod hash;

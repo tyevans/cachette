@@ -13,8 +13,8 @@
 //!
 //! # References
 //!
-//! [^1]: ADR-0001, Determinism as the primary constraint, decision D9. `docs/adrs/draft/adr-0001-determinism.md`
-//! [^2]: ADR-0005, The event log, decision D2. `docs/adrs/draft/adr-0005-event-log.md`
+//! [^1]: ADR-0001, Determinism as the primary constraint, decision D9. `docs/adrs/draft/adr-0001-determinism-outranks-every-other-constraint.md`
+//! [^2]: ADR-0005, The event log, decision D2. `docs/adrs/draft/adr-0005-the-log-holds-commands-not-derived-state.md`
 
 use bytemuck::{Pod, Zeroable};
 
@@ -43,7 +43,7 @@ pub const CHANGE_KIND_LOWERED: ChangeKind = 2;
 ///
 /// # References
 ///
-/// [^1]: ADR-0001, Determinism as the primary constraint, decision D9. `docs/adrs/draft/adr-0001-determinism.md`
+/// [^1]: ADR-0001, Determinism as the primary constraint, decision D9. `docs/adrs/draft/adr-0001-determinism-outranks-every-other-constraint.md`
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Pod, Zeroable)]
 pub struct TileChanged {
@@ -88,7 +88,7 @@ impl TileChanged {
     ///
     /// # References
     ///
-    /// [^1]: ADR-0001, Determinism as the primary constraint, decision D6. `docs/adrs/draft/adr-0001-determinism.md`
+    /// [^1]: ADR-0001, Determinism as the primary constraint, decision D6. `docs/adrs/draft/adr-0001-determinism-outranks-every-other-constraint.md`
     #[must_use]
     pub const fn sort_key(&self) -> (u64, u32) {
         (self.tick.0, self.tile.0)

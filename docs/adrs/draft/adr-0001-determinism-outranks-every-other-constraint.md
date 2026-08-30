@@ -1,4 +1,4 @@
-# ADR-0001: Determinism as the primary constraint
+# ADR-0001: Determinism outranks every other constraint
 
 **Status:** Draft
 **Date:** 2026-08-30

@@ -115,11 +115,11 @@ took.[^1]
 
 [^1]: Definition of done. `.claude/rules/definition-of-done.md`
 [^2]: ADR registry. `docs/adrs/REGISTRY.md`
-[^3]: ADR-0001, Determinism as the primary constraint, decision D2. `docs/adrs/draft/adr-0001-determinism.md`
-[^4]: ADR-0001, Determinism as the primary constraint, decision D3. `docs/adrs/draft/adr-0001-determinism.md`
-[^5]: ADR-0006, The Python boundary, decision D2. `docs/adrs/draft/adr-0006-python-boundary.md`
-[^6]: ADR-0001, Determinism as the primary constraint, decision D5. `docs/adrs/draft/adr-0001-determinism.md`
-[^7]: ADR-0001, Determinism as the primary constraint, decision D6. `docs/adrs/draft/adr-0001-determinism.md`
-[^8]: ADR-0001, Determinism as the primary constraint, decision D9. `docs/adrs/draft/adr-0001-determinism.md`
+[^3]: ADR-0001, Determinism as the primary constraint, decision D2. `docs/adrs/draft/adr-0001-determinism-outranks-every-other-constraint.md`
+[^4]: ADR-0001, Determinism as the primary constraint, decision D3. `docs/adrs/draft/adr-0001-determinism-outranks-every-other-constraint.md`
+[^5]: ADR-0006, The Python boundary, decision D2. `docs/adrs/draft/adr-0006-python-is-a-control-plane.md`
+[^6]: ADR-0001, Determinism as the primary constraint, decision D5. `docs/adrs/draft/adr-0001-determinism-outranks-every-other-constraint.md`
+[^7]: ADR-0001, Determinism as the primary constraint, decision D6. `docs/adrs/draft/adr-0001-determinism-outranks-every-other-constraint.md`
+[^8]: ADR-0001, Determinism as the primary constraint, decision D9. `docs/adrs/draft/adr-0001-determinism-outranks-every-other-constraint.md`
 [^9]: Testing policy. `docs/TESTING.md`
 [^10]: Documentation rules. `.claude/rules/documentation.md`

@@ -1,4 +1,4 @@
-# ADR-0005: The event log
+# ADR-0005: The log holds commands and facts, never derived state
 
 **Status:** Draft
 **Date:** 2026-08-30
@@ -332,7 +332,7 @@ A full snapshot inside one frame, at any scale near the target.
 
 ## References
 
-[^1]: ADR-0001, Determinism as the primary constraint, decisions D6, D8, D9 and D11. `docs/adrs/draft/adr-0001-determinism.md`
+[^1]: ADR-0001, Determinism as the primary constraint, decisions D6, D8, D9 and D11. `docs/adrs/draft/adr-0001-determinism-outranks-every-other-constraint.md`
 [^2]: Research report 03, event sourcing, CQRS and determinism, sections 2, 5 and 8. `docs/research/reports/`
 [^3]: Research report 11, resource and trade flow, open question OQ-E. `docs/research/reports/`
 [^4]: Findings register, entry FND-020. `docs/FINDINGS.md`

@@ -10,7 +10,7 @@
 //!
 //! # References
 //!
-//! [^1]: ADR-0001, Determinism as the primary constraint, decisions D9 and D11. `docs/adrs/draft/adr-0001-determinism.md`
+//! [^1]: ADR-0001, Determinism as the primary constraint, decisions D9 and D11. `docs/adrs/draft/adr-0001-determinism-outranks-every-other-constraint.md`
 
 /// The offset basis of the 64-bit FNV-1a hash.
 const OFFSET_BASIS: u64 = 0xcbf2_9ce4_8422_2325;

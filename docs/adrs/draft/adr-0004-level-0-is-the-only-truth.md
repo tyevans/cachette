@@ -1,4 +1,4 @@
-# ADR-0004: The level-of-detail pyramid
+# ADR-0004: Level 0 is the only truth and every summary derives from it exactly
 
 **Status:** Draft
 **Date:** 2026-08-30
@@ -549,7 +549,7 @@ pyramid with one.
 ## References
 
 [^1]: ADR registry, the section on what does not belong in a record, and the register table. `docs/adrs/REGISTRY.md`
-[^2]: ADR-0001, Determinism as the primary constraint, decisions D2, D4, D6, D7, D8 and D11. `docs/adrs/draft/adr-0001-determinism.md`
+[^2]: ADR-0001, Determinism as the primary constraint, decisions D2, D4, D6, D7, D8 and D11. `docs/adrs/draft/adr-0001-determinism-outranks-every-other-constraint.md`
 [^3]: Research report 02, Hex grid representation, LOD aggregation and spatial indexing, sections 3 and 4. `docs/research/reports/02-hex-grid-and-lod-pyramid.md`
 [^4]: Findings register, entry FND-007. `docs/FINDINGS.md`
 [^5]: Blockers register, entries BLK-001 and BLK-007. `docs/BLOCKERS.md`

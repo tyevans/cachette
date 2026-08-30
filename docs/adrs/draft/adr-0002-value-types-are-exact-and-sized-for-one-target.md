@@ -1,4 +1,4 @@
-# ADR-0002: Target platform and value types
+# ADR-0002: Value types are exact and sized for one target
 
 **Status:** Draft
 **Date:** 2026-08-30
@@ -274,7 +274,7 @@ revisiting both.
 
 ## References
 
-[^1]: ADR-0001, Determinism as the primary constraint, decisions D1, D2, D4, D7 and D9. `docs/adrs/draft/adr-0001-determinism.md`
+[^1]: ADR-0001, Determinism as the primary constraint, decisions D1, D2, D4, D7 and D9. `docs/adrs/draft/adr-0001-determinism-outranks-every-other-constraint.md`
 [^2]: Research report 07, target platform and value types. `docs/research/reports/07-target-platform-and-value-types.md`
 [^3]: Findings register, entry FND-024. `docs/FINDINGS.md`
 [^4]: ADR registry, the registers section. `docs/adrs/REGISTRY.md`

@@ -21,7 +21,7 @@
 //!
 //! # References
 //!
-//! [^1]: ADR-0001, Determinism as the primary constraint, decisions D6 and D11. `docs/adrs/draft/adr-0001-determinism.md`
+//! [^1]: ADR-0001, Determinism as the primary constraint, decisions D6 and D11. `docs/adrs/draft/adr-0001-determinism-outranks-every-other-constraint.md`
 #![cfg(feature = "probe-nondeterminism")]
 
 use cachette_core::{World, WorldConfig};

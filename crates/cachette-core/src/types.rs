@@ -10,7 +10,7 @@
 //!
 //! # References
 //!
-//! [^1]: ADR-0002, Target platform and value types, decision D9. `docs/adrs/draft/adr-0002-target-platform-and-value-types.md`
+//! [^1]: ADR-0002, Target platform and value types, decision D9. `docs/adrs/draft/adr-0002-value-types-are-exact-and-sized-for-one-target.md`
 
 use bytemuck::{Pod, Zeroable};
 
@@ -37,7 +37,7 @@ pub struct Tick(pub u64);
 ///
 /// # References
 ///
-/// [^1]: ADR-0001, Determinism as the primary constraint, decision D4. `docs/adrs/draft/adr-0001-determinism.md`
+/// [^1]: ADR-0001, Determinism as the primary constraint, decision D4. `docs/adrs/draft/adr-0001-determinism-outranks-every-other-constraint.md`
 #[repr(transparent)]
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Pod, Zeroable)]
 pub struct Accum(pub i64);
@@ -50,7 +50,7 @@ pub struct Accum(pub i64);
 ///
 /// # References
 ///
-/// [^1]: ADR-0002, Target platform and value types, decision D9. `docs/adrs/draft/adr-0002-target-platform-and-value-types.md`
+/// [^1]: ADR-0002, Target platform and value types, decision D9. `docs/adrs/draft/adr-0002-value-types-are-exact-and-sized-for-one-target.md`
 #[repr(transparent)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Entity(core::num::NonZeroU64);
@@ -102,8 +102,8 @@ pub const FIX_FRACTIONAL_BITS: u32 = 16;
 ///
 /// # References
 ///
-/// [^1]: ADR-0001, Determinism as the primary constraint, decision D4. `docs/adrs/draft/adr-0001-determinism.md`
-/// [^2]: ADR-0001, Determinism as the primary constraint, decision D3. `docs/adrs/draft/adr-0001-determinism.md`
+/// [^1]: ADR-0001, Determinism as the primary constraint, decision D4. `docs/adrs/draft/adr-0001-determinism-outranks-every-other-constraint.md`
+/// [^2]: ADR-0001, Determinism as the primary constraint, decision D3. `docs/adrs/draft/adr-0001-determinism-outranks-every-other-constraint.md`
 #[repr(transparent)]
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Pod, Zeroable)]
 pub struct Fix32(pub i32);

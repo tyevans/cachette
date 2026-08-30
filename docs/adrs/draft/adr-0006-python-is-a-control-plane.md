@@ -1,4 +1,4 @@
-# ADR-0006: The Python boundary
+# ADR-0006: Python is a control plane, and a crate split enforces it
 
 **Status:** Draft
 **Date:** 2026-08-30

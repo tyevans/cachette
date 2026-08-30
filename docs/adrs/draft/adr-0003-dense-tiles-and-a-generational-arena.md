@@ -1,4 +1,4 @@
-# ADR-0003: Storage — dense tiles and a generational arena
+# ADR-0003: Tiles are dense columns and units are a generational arena
 
 **Status:** Draft
 **Date:** 2026-08-30
@@ -484,11 +484,11 @@ constant in this record.[^17]
 
 ## References
 
-[^1]: ADR-0001, Determinism as the primary constraint, decisions D2, D6, D7 and D10. `docs/adrs/draft/adr-0001-determinism.md`
+[^1]: ADR-0001, Determinism as the primary constraint, decisions D2, D6, D7 and D10. `docs/adrs/draft/adr-0001-determinism-outranks-every-other-constraint.md`
 [^2]: Research report 01, ECS core, memory layout and cache-aligned data structures. `docs/research/reports/01-ecs-and-memory-layout.md`
 [^3]: Research report 02, hex grid and level-of-detail pyramid. `docs/research/reports/02-hex-grid-and-lod-pyramid.md`
 [^4]: Merge notes for the research reports, section 6, defects found in the superseded draft. `docs/research/reports/MERGE-NOTES.md`
-[^5]: ADR-0002, Target platform and value types. `docs/adrs/draft/adr-0002-target-platform-and-value-types.md`
+[^5]: ADR-0002, Target platform and value types. `docs/adrs/draft/adr-0002-value-types-are-exact-and-sized-for-one-target.md`
 [^6]: Findings register, entry FND-003. `docs/FINDINGS.md`
 [^7]: Blockers register, entry BLK-002. `docs/BLOCKERS.md`
 [^8]: Budgets register, cost and storage tables. `docs/reference/budgets.md`

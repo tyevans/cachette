@@ -92,62 +92,120 @@ this registry.
 
 ## The records
 
-### Core
+Every row states a **claim**, not a topic. A title that names a topic has no
+boundary, so any material about the topic can be added to the file. A claim
+title has a boundary, and material that does not support the claim has
+nowhere to go. In one reference corpus a topic-titled record churned 4.50
+times on average against 2.13 for a claim-titled one.[^4]
 
-| No. | Title | Status | Depends on | Source |
+**`Proposed` reserves the number. It does not promise the record.** Before you
+write the file, apply the three-condition test in the scope rule.[^5] If the
+claim fails it, drop the row and retire the number. A record that binds work
+without stating a constraint is worse than no record.
+
+### Determinism
+
+| No. | Claim | Status | Depends on | Source |
 |---|---|---|---|---|
-| 0001 | Determinism as the primary constraint | Draft | — | 03, 07, 13 |
+| 0001 | One binary gives one answer at any thread count | Proposed | — | 03, 07, 13 |
+| 0002 | Simulated and aggregated state holds no floating point number | Proposed | 0001 | 03, 13 |
+| 0003 | Every random draw is keyed, never stateful | Proposed | 0001 | 03 |
+| 0004 | Iteration order is explicit, and unordered reductions need slots | Proposed | 0001 | 03, 06 |
+| 0005 | A solver runs a fixed iteration count, never a convergence test | Proposed | 0001 | 06, 13 |
+| 0006 | An event is plain data and applying it is pure | Proposed | 0001 | 03 |
+| 0007 | Content supplies a key vector, never a comparator | Proposed | 0001 | 04 |
 
-Everything else follows from this record. It is the only decision that cannot
-be retrofitted.
+### Platform and value types
 
-### Foundations
-
-| No. | Title | Status | Depends on | Source |
+| No. | Claim | Status | Depends on | Source |
 |---|---|---|---|---|
-| 0002 | Target platform and value types | Draft | 0001 | 07 |
-| 0003 | Storage: dense tiles and a generational arena | Draft | 0001, 0002 | 01 |
-| 0004 | The level-of-detail pyramid | Draft | 0001, 0003 | 02 |
-| 0005 | The event log | Draft | 0001 | 03 |
-| 0006 | The Python boundary | Draft | 0001, 0003 | 05 |
+| 0008 | The primary target is aarch64, and NEON is a baseline rather than a dispatch | Proposed | 0001 | 07 |
+| 0009 | Parallel stages write disjoint outputs, because the memory model is weak | Proposed | 0001, 0008 | 07 |
+| 0010 | The cache line size is a compile-time constant | Proposed | 0008 | 07 |
+| 0011 | Every value type is a newtype with a declared size and alignment | Proposed | 0002, 0008 | 07 |
 
-### Cross-cutting models
+### Storage
 
-| No. | Title | Status | Depends on | Source |
+| No. | Claim | Status | Depends on | Source |
 |---|---|---|---|---|
-| 0007 | The kernel vocabulary | Proposed | 0001 | 06, 13 |
-| 0008 | Rate, constraint and set: the composition laws | Proposed | 0001, 0004 | 13 |
-| 0009 | The frame loop and the static schedule | Proposed | 0001, 0005, 0007 | 06 |
-| 0010 | Selectors and verbs | Proposed | 0004, 0007, 0012 | 04 |
-| 0011 | The faction model | Proposed | 0002 | 08 |
-| 0012 | The entity tiers | Proposed | 0003, 0006 | 14, 15, 16 |
-| 0013 | The modifier pipeline and effective stats | Proposed | 0001, 0012 | 12 |
+| 0012 | Tiles are dense columns and units are a generational arena | Proposed | 0001 | 01 |
+| 0013 | The project writes its own entity storage rather than adopting an ECS | Proposed | 0012 | 01 |
+| 0014 | Entity identity is an index plus a generation | Proposed | 0012 | 01 |
+| 0015 | A tile column is narrow, with bitplanes and sparse side tables | Proposed | 0012 | 01 |
+| 0016 | Tiles are stored in block-tiled order at the aggregation block size | Proposed | 0012, 0022 | 01, 02 |
+| 0017 | Tiles are indexed by odd-r offset, not by raw axial | Proposed | 0016 | 02 |
+| 0018 | The unit-to-tile bridge is three structures, and units stay sorted by tile | Proposed | 0012 | 01, 02 |
+| 0019 | Change detection is per chunk, never per entity | Proposed | 0012 | 01, 02 |
+| 0020 | Structural change batches at the barrier and applies by tombstone and compact | Proposed | 0001, 0012 | 01 |
+| 0021 | Layout follows the access pattern | Proposed | 0012 | 01 |
 
-**ADR-0004 constrains ADR-0010.** The pyramid's descent returns an `All`
-verdict for a subtree that wholly satisfies a predicate. The selector API must
-be able to carry a range result, not only an enumerated set, or that verdict
-cannot be used and the larger half of the pruning win is lost.
+### The pyramid
 
-Records 0011 and 0012 have no single source report. Both are decisions that
-emerged across several reports and were never written down. Breaking the
-omnibus apart is what surfaced them.
+| No. | Claim | Status | Depends on | Source |
+|---|---|---|---|---|
+| 0022 | Level 0 is the only truth, and every level above it is derived | Proposed | 0012 | 02 |
+| 0023 | An aggregate combines exactly, in any order | Proposed | 0002, 0022 | 02 |
+| 0024 | Every summary field is declared extensive or intensive at registration | Proposed | 0023 | 02 |
+| 0025 | The pyramid carries two update paths, chosen by a threshold | Proposed | 0022, 0019 | 02 |
+| 0026 | The world holds two pyramids, not one | Proposed | 0022 | 02, 08 |
+| 0027 | The pyramid is the query index and the statistics catalogue | Proposed | 0022 | 02, 04 |
+| 0028 | Descent has a cost model and a flat fallback | Proposed | 0027 | 02 |
+| 0029 | An operator does not commute with aggregation | Proposed | 0023 | 02, 13 |
+
+### The log
+
+| No. | Claim | Status | Depends on | Source |
+|---|---|---|---|---|
+| 0030 | Classic event sourcing is rejected | Proposed | 0001 | 03 |
+| 0031 | Events live in type-segregated arenas of plain data | Proposed | 0006, 0030 | 03 |
+| 0032 | The log holds commands and discontinuous facts, never derived state | Proposed | 0030 | 03 |
+| 0033 | Threads write local buffers and the barrier concatenates them in a fixed order | Proposed | 0001, 0031 | 03 |
+| 0034 | A command queues during the Python phase and seals at the barrier | Proposed | 0032 | 03, 05 |
+| 0035 | Rejection is reported through a closed enumeration | Proposed | 0032 | 03 |
+| 0036 | A snapshot copies dirty chunks, not the world | Proposed | 0019, 0032 | 03 |
+| 0037 | The log is transient, and retention is additive | Proposed | 0032 | 03 |
+| 0038 | The aggregate is the region, never the entity | Proposed | 0030 | 03 |
+| 0039 | The save format is hand-written | Proposed | 0032 | 03 |
+
+### The Python boundary
+
+| No. | Claim | Status | Depends on | Source |
+|---|---|---|---|---|
+| 0040 | Python is a control plane, not a data plane | Proposed | 0001 | 05 |
+| 0041 | A crate split enforces the boundary at compile time | Proposed | 0040 | 05 |
+| 0042 | The interpreter is released for the whole step | Proposed | 0040 | 05 |
+| 0043 | A declared tier enforces the no-loop rule, and the API refuses the loop | Proposed | 0040 | 04, 05 |
+| 0044 | What copies and what does not is declared at the call site | Proposed | 0040, 0015 | 05 |
+| 0045 | View safety needs three layers | Proposed | 0044 | 05 |
+| 0046 | Every error is typed | Proposed | 0040 | 05 |
+| 0047 | Many worlds live in one interpreter | Proposed | 0040 | 05 |
 
 ### Subsystems
 
-| No. | Title | Status | Depends on | Source |
+| No. | Claim | Status | Depends on | Source |
 |---|---|---|---|---|
-| 0014 | Hex coordinates and geometry | Proposed | 0003, 0004 | 02 |
-| 0015 | Movement and pathing | Proposed | 0007, 0014 | 06, 10 |
-| 0016 | The field operator algebra | Proposed | 0004, 0008 | 13 |
-| 0017 | Fog of war | Proposed | 0004, 0011 | 08 |
-| 0018 | Influence maps | Proposed | 0011, 0016 | 09 |
-| 0019 | Trade and resource flow | Proposed | 0008, 0016 | 11 |
-| 0020 | Production and upkeep | Proposed | 0013, 0019 | 12 |
-| 0021 | Needs and consumption | Proposed | 0012, 0020 | 15 |
-| 0022 | Individual agency and occupations | Proposed | 0012, 0016 | 16 |
-| 0023 | Group spatial dynamics and sites | Proposed | 0003, 0015 | 17 |
-| 0024 | The character graph and inheritance | Proposed | 0012 | 14 |
-| 0025 | Vector entity representation | Proposed | 0012, 0013 | 18 |
+| 0048 | A verb declares a pipeline of kernels | Proposed | 0001 | 06, 13 |
+| 0049 | A quantity is a rate, a constraint or a set, and each composes by one law | Proposed | 0023 | 13 |
+| 0050 | The frame schedule is static and known before the frame runs | Proposed | 0001, 0033 | 06 |
+| 0051 | A selector is a lazy expression tree that Rust evaluates | Proposed | 0043 | 04 |
+| 0052 | A selector result may be a range, not only an enumerated set | Proposed | 0051, 0028 | 02, 04 |
+| 0053 | A faction is a bit in a mask, and a relation is a plane | Proposed | 0011 | 08 |
+| 0054 | An entity belongs to one of three tiers, declared at creation | Proposed | 0012, 0043 | 14, 15, 16 |
+| 0055 | An effective stat comes from an ordered modifier pipeline | Proposed | 0002, 0054 | 12 |
+| 0056 | Movement is tile-discrete and admitted by sort-then-admit | Proposed | 0004, 0018 | 06, 10 |
+| 0057 | A long path follows a portal graph and a flow tile, never a per-unit search | Proposed | 0056 | 10 |
+| 0058 | A field update is a flux pair on an edge, so quantity is conserved exactly | Proposed | 0023, 0029 | 13 |
+| 0059 | Fog storage grows with observed area, not with world area | Proposed | 0026, 0053 | 08 |
+| 0060 | An influence map is stored as a shared basis, not one plane per faction | Proposed | 0053, 0058 | 09 |
+| 0061 | Trade solves a flow, never a path for each cart | Proposed | 0049, 0058 | 11 |
+| 0062 | Production and upkeep are rates attached to a site | Proposed | 0055 | 12 |
+| 0063 | A need is a rate with a threshold, and crossing it is a fact | Proposed | 0032, 0062 | 15 |
+| 0064 | A unit chooses by scoring a small fixed option set | Proposed | 0003, 0063 | 16 |
+| 0065 | A group is a site membership, not a region | Proposed | 0038, 0054 | 17 |
+
+### Retired numbers
+
+None yet. A retired number is never reused.
 
 ## Source reports
 

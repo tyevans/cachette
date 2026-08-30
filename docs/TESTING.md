@@ -225,13 +225,13 @@ real. The subjects are not.
 
 ## References
 
-[^1]: ADR-0001, Determinism as the primary constraint. `docs/adrs/draft/adr-0001-determinism.md`
-[^2]: ADR-0006, The Python boundary, decision D11. `docs/adrs/draft/adr-0006-python-boundary.md`
-[^3]: ADR-0001, Determinism as the primary constraint, decision D9. `docs/adrs/draft/adr-0001-determinism.md`
-[^4]: ADR-0001, Determinism as the primary constraint, decision D11. `docs/adrs/draft/adr-0001-determinism.md`
+[^1]: ADR-0001, Determinism as the primary constraint. `docs/adrs/draft/adr-0001-determinism-outranks-every-other-constraint.md`
+[^2]: ADR-0006, The Python boundary, decision D11. `docs/adrs/draft/adr-0006-python-is-a-control-plane.md`
+[^3]: ADR-0001, Determinism as the primary constraint, decision D9. `docs/adrs/draft/adr-0001-determinism-outranks-every-other-constraint.md`
+[^4]: ADR-0001, Determinism as the primary constraint, decision D11. `docs/adrs/draft/adr-0001-determinism-outranks-every-other-constraint.md`
 [^5]: Testing rules, section 1. `.claude/rules/testing.md`
-[^6]: ADR-0001, Determinism as the primary constraint, decision D7. `docs/adrs/draft/adr-0001-determinism.md`
-[^7]: ADR-0006, The Python boundary, decision D11. `docs/adrs/draft/adr-0006-python-boundary.md`
-[^8]: ADR-0006, The Python boundary, decision D2. `docs/adrs/draft/adr-0006-python-boundary.md`
-[^9]: ADR-0002, Target platform and value types, decision D8. `docs/adrs/draft/adr-0002-target-platform-and-value-types.md`
-[^10]: ADR-0006, The Python boundary, decision D8. `docs/adrs/draft/adr-0006-python-boundary.md`
+[^6]: ADR-0001, Determinism as the primary constraint, decision D7. `docs/adrs/draft/adr-0001-determinism-outranks-every-other-constraint.md`
+[^7]: ADR-0006, The Python boundary, decision D11. `docs/adrs/draft/adr-0006-python-is-a-control-plane.md`
+[^8]: ADR-0006, The Python boundary, decision D2. `docs/adrs/draft/adr-0006-python-is-a-control-plane.md`
+[^9]: ADR-0002, Target platform and value types, decision D8. `docs/adrs/draft/adr-0002-value-types-are-exact-and-sized-for-one-target.md`
+[^10]: ADR-0006, The Python boundary, decision D8. `docs/adrs/draft/adr-0006-python-is-a-control-plane.md`

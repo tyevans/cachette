@@ -9,8 +9,8 @@
 //!
 //! # References
 //!
-//! [^1]: ADR-0006, The Python boundary, decision D2. `docs/adrs/draft/adr-0006-python-boundary.md`
-//! [^2]: ADR-0006, The Python boundary, decision D3. `docs/adrs/draft/adr-0006-python-boundary.md`
+//! [^1]: ADR-0006, The Python boundary, decision D2. `docs/adrs/draft/adr-0006-python-is-a-control-plane.md`
+//! [^2]: ADR-0006, The Python boundary, decision D3. `docs/adrs/draft/adr-0006-python-is-a-control-plane.md`
 
 use cachette_core::{World as CoreWorld, WorldConfig};
 use numpy::{PyArray1, ToPyArray};

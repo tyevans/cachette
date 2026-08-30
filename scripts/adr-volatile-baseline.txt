@@ -11,18 +11,18 @@
 #
 # The check fails when a line here matches nothing, so this list cannot go
 # stale. Do not add to it.
-adr-0003-storage.md	92 percent
-adr-0003-storage.md	94 percent
-adr-0005-event-log.md	10 milliseconds
-adr-0005-event-log.md	16.6 milliseconds
-adr-0005-event-log.md	27 milliseconds
-adr-0005-event-log.md	5.0 milliseconds
-adr-0005-event-log.md	budget of 1
-adr-0006-python-boundary.md	0.2 milliseconds
-adr-0006-python-boundary.md	0.3 milliseconds
-adr-0006-python-boundary.md	100 milliseconds
-adr-0006-python-boundary.md	17 milliseconds
-adr-0006-python-boundary.md	20 microseconds
-adr-0006-python-boundary.md	30 percent
-adr-0006-python-boundary.md	4.4 milliseconds
-adr-0006-python-boundary.md	70 percent
+adr-0003-dense-tiles-and-a-generational-arena.md	92 percent
+adr-0003-dense-tiles-and-a-generational-arena.md	94 percent
+adr-0005-the-log-holds-commands-not-derived-state.md	10 milliseconds
+adr-0005-the-log-holds-commands-not-derived-state.md	16.6 milliseconds
+adr-0005-the-log-holds-commands-not-derived-state.md	27 milliseconds
+adr-0005-the-log-holds-commands-not-derived-state.md	5.0 milliseconds
+adr-0005-the-log-holds-commands-not-derived-state.md	budget of 1
+adr-0006-python-is-a-control-plane.md	0.2 milliseconds
+adr-0006-python-is-a-control-plane.md	0.3 milliseconds
+adr-0006-python-is-a-control-plane.md	100 milliseconds
+adr-0006-python-is-a-control-plane.md	17 milliseconds
+adr-0006-python-is-a-control-plane.md	20 microseconds
+adr-0006-python-is-a-control-plane.md	30 percent
+adr-0006-python-is-a-control-plane.md	4.4 milliseconds
+adr-0006-python-is-a-control-plane.md	70 percent

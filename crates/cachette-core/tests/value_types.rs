@@ -7,7 +7,7 @@
 //!
 //! # References
 //!
-//! [^1]: ADR-0002, Target platform and value types, decision D9. `docs/adrs/draft/adr-0002-target-platform-and-value-types.md`
+//! [^1]: ADR-0002, Target platform and value types, decision D9. `docs/adrs/draft/adr-0002-value-types-are-exact-and-sized-for-one-target.md`
 
 use cachette_core::sim_math;
 use cachette_core::types::{Accum, FIX_FRACTIONAL_BITS};

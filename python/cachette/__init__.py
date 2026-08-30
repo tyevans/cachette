@@ -10,7 +10,7 @@ API, the verb API and the view scope are not written yet.
 References
 ----------
 ADR-0006, The Python boundary, decision D1.
-``docs/adrs/draft/adr-0006-python-boundary.md``
+``docs/adrs/draft/adr-0006-python-is-a-control-plane.md``
 """
 
 from cachette._core import (

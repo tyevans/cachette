@@ -441,6 +441,6 @@ drafts carry topic titles and are queued for retitling.
 
 ## References
 
-[^1]: ADR-0001, Determinism, decision D1. `docs/adrs/draft/adr-0001-determinism.md`
+[^1]: ADR-0001, Determinism, decision D1. `docs/adrs/draft/adr-0001-determinism-outranks-every-other-constraint.md`
 [^2]: Findings register, FND-004, in this document.
 [^3]: Record scope research. `docs/research/adr-scope-findings.md`

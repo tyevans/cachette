@@ -6,7 +6,7 @@
 //!
 //! # References
 //!
-//! [^1]: ADR-0001, Determinism as the primary constraint, decision D9. `docs/adrs/draft/adr-0001-determinism.md`
+//! [^1]: ADR-0001, Determinism as the primary constraint, decision D9. `docs/adrs/draft/adr-0001-determinism-outranks-every-other-constraint.md`
 
 use cachette_core::event::CHANGE_KIND_RAISED;
 use cachette_core::types::{FactionId, TileIdx};

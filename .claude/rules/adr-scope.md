@@ -204,7 +204,7 @@ judgement. The check only stops the failures that a regular expression can see.
 [^1]: ADR Registry. `docs/adrs/REGISTRY.md`
 [^2]: The `eventsource-py` and `redstring` repositories, measured 30 August 2026.
 [^3]: Findings, the scope of a decision record. `docs/research/adr-scope-findings.md`
-[^4]: ADR-0001, Determinism as the primary constraint. `docs/adrs/draft/adr-0001-determinism.md`
+[^4]: ADR-0001, Determinism as the primary constraint. `docs/adrs/draft/adr-0001-determinism-outranks-every-other-constraint.md`
 [^5]: Commit Message Rules. `.claude/rules/commits.md`
 [^6]: Blockers register. `docs/BLOCKERS.md`
 [^7]: Documentation Rules. `.claude/rules/documentation.md`

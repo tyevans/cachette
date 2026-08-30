@@ -163,7 +163,7 @@ The decision record lists 16 open questions in total.[^1]
 
 ## References
 
-[^1]: ADR-0001, Determinism. `docs/adrs/draft/adr-0001-determinism.md`
+[^1]: ADR-0001, Determinism. `docs/adrs/draft/adr-0001-determinism-outranks-every-other-constraint.md`
 [^2]: Research reports 01 to 07. `docs/research/reports/`
 [^3]: Documentation Rules. `.claude/rules/documentation.md`
 [^4]: Decision Record Scope. `.claude/rules/adr-scope.md`
