@@ -2043,21 +2043,21 @@ Fix the option count before the cohort count.
 
 ## References
 
-[^1]: Research report 12, Entity Economy and Modifiers. Sections 1, 5, 7, 8, 9 and 11, and decisions D51 to D59. `docs/adrs/background/adr-0001/12-entity-economy-and-modifiers.md`
-[^2]: Research report 11, Resource and Trade Flow. Sections 3.5, 3.6 and 6.4, and decisions D54, D58 and D60. `docs/adrs/background/adr-0001/11-resource-and-trade-flow.md`
-[^3]: Research report 14, Character Graph and Inheritance. Sections 5 and 6, and decisions D77 and D79. `docs/adrs/background/adr-0001/14-character-graph-and-inheritance.md`
-[^4]: ADR-0001, Foundational Architecture. Decisions D4, D5, D16, D27, D29, D42, the byte budget section and the per-tick cost budget section. `docs/adrs/draft/adr-0001-foundational-architecture.md`
-[^5]: Research report 13, Field Operator Algebra. Sections 4.7, 5.3 and 6.2 to 6.4. `docs/adrs/background/adr-0001/13-field-operator-algebra.md`
-[^6]: ADR-0001, Foundational Architecture. Decision D16, the corrected aggregation rule and its statistics table. `docs/adrs/draft/adr-0001-foundational-architecture.md`
+[^1]: Research report 12, Entity Economy and Modifiers. Sections 1, 5, 7, 8, 9 and 11, and decisions D51 to D59. `docs/research/reports/12-entity-economy-and-modifiers.md`
+[^2]: Research report 11, Resource and Trade Flow. Sections 3.5, 3.6 and 6.4, and decisions D54, D58 and D60. `docs/research/reports/11-resource-and-trade-flow.md`
+[^3]: Research report 14, Character Graph and Inheritance. Sections 5 and 6, and decisions D77 and D79. `docs/research/reports/14-character-graph-and-inheritance.md`
+[^4]: ADR Registry. The omnibus draft this report fed was deleted and its number reclaimed. Decisions D4, D5, D16, D27, D29, D42, the byte budget section and the per-tick cost budget section. `docs/adrs/REGISTRY.md`
+[^5]: Research report 13, Field Operator Algebra. Sections 4.7, 5.3 and 6.2 to 6.4. `docs/research/reports/13-field-operator-algebra.md`
+[^6]: ADR Registry. The omnibus draft this report fed was deleted and its number reclaimed. Decision D16, the corrected aggregation rule and its statistics table. `docs/adrs/REGISTRY.md`
 [^7]: Leontief, W. W., 1936. Quantitative Input and Output Relations in the Economic System of the United States. The Review of Economics and Statistics, 18(3), pp. 105-125. https://doi.org/10.2307/1927837
 [^8]: Leontief, W. W., 1941. The Structure of American Economy, 1919-1929: An Empirical Application of Equilibrium Analysis. Cambridge, Massachusetts: Harvard University Press. The revised and enlarged second edition, covering 1919-1939, appeared in 1951 from Oxford University Press.
 [^9]: Hawkins, D. and Simon, H. A., 1949. Note: Some Conditions of Macroeconomic Stability. Econometrica, 17(3/4), pp. 245-248. https://doi.org/10.2307/1905526
 [^10]: Berman, A. and Plemmons, R. J., 1994. Nonnegative Matrices in the Mathematical Sciences. Classics in Applied Mathematics 9. Philadelphia: SIAM. Chapter 6 covers M-matrices, the Hawkins-Simon condition and the equivalence with a spectral radius below 1. https://doi.org/10.1137/1.9781611971262
 [^11]: Horn, R. A. and Johnson, C. R., 2013. Matrix Analysis. 2nd ed. Cambridge: Cambridge University Press. Section 5.6 gives the Neumann series, its convergence condition and the truncation bound.
 [^12]: Arrow, K. J., Chenery, H. B., Minhas, B. S. and Solow, R. M., 1961. Capital-Labor Substitution and Economic Efficiency. The Review of Economics and Statistics, 43(3), pp. 225-250. https://doi.org/10.2307/1927286
-[^13]: Research report 09, Influence Maps. Section 7.5, the cost of the whole schedule. `docs/adrs/background/adr-0001/09-influence-maps.md`
+[^13]: Research report 09, Influence Maps. Section 7.5, the cost of the whole schedule. `docs/research/reports/09-influence-maps.md`
 [^14]: Paradox Interactive. Victoria II. Official developer diary series, 2010 to 2012, published on the Paradox Interactive forums. The source of the population-unit model that this report adapts. **The exact diary numbers and their URLs were not verified when this report was written. Verify before publication.**
 [^15]: Paradox Interactive. Victoria 3. Official developer diary series, 2021 onward, published on the Paradox Interactive forums and as Steam news items. The source of the pop and market model that this report adapts. **The exact diary numbers and their URLs were not verified when this report was written. Verify before publication.**
-[^16]: Merge Notes for ADR-0001. Section 2, owner decisions; section 9, the accepted Alabama paradox trade; and the running per-tick budget table. `docs/adrs/background/adr-0001/MERGE-NOTES.md`
+[^16]: Merge Notes for ADR-0001. Section 2, owner decisions; section 9, the accepted Alabama paradox trade; and the running per-tick budget table. `docs/research/reports/MERGE-NOTES.md`
 [^17]: Balinski, M. L. and Young, H. P., 1982. Fair Representation: Meeting the Ideal of One Man, One Vote. New Haven: Yale University Press. The largest-remainder method appears there as Hamilton's method of apportionment.
 [^18]: Tesfatsion, L., 2006. Agent-Based Computational Economics: A Constructive Approach to Economic Theory. In: L. Tesfatsion and K. L. Judd, eds. Handbook of Computational Economics, Volume 2: Agent-Based Computational Economics. Amsterdam: North-Holland, chapter 16, pp. 831-880. https://doi.org/10.1016/S1574-0021(05)02016-2

@@ -1303,9 +1303,9 @@ so it is 2.5 times the new worst case and 5.3 times the new typical case.
 ## References
 
 [^1]: Cachette project instructions, sections "Hard invariants" and "Design principles". `CLAUDE.md`
-[^2]: ADR-0001, Foundational Architecture, decisions D34, D35, D48, the memory budget table, and open question OQ5. `docs/adrs/draft/adr-0001-foundational-architecture.md`
-[^3]: Research report 06, Algorithms and Scheduling, sections 4.3, 4.4 and 6.1. `docs/adrs/background/adr-0001/06-algorithms-and-scheduling.md`
-[^4]: Research report 06, Algorithms and Scheduling, section 10, per-tick cost budget. `docs/adrs/background/adr-0001/06-algorithms-and-scheduling.md`
+[^2]: ADR-0001, Foundational Architecture, decisions D34, D35, D48, the memory budget table, and open question OQ5. `docs/adrs/REGISTRY.md`
+[^3]: Research report 06, Algorithms and Scheduling, sections 4.3, 4.4 and 6.1. `docs/research/reports/06-algorithms-and-scheduling.md`
+[^4]: Research report 06, Algorithms and Scheduling, section 10, per-tick cost budget. `docs/research/reports/06-algorithms-and-scheduling.md`
 [^5]: Arm Neoverse N1 Software Optimization Guide, memory system latency tables. https://developer.arm.com/documentation/swog309707/latest
-[^6]: Research report 04, Selector Engine and Verbs, section 3, result representation. `docs/adrs/background/adr-0001/04-selector-engine-and-verbs.md`
-[^7]: Research report 07, Target Platform and Value Types. `docs/adrs/background/adr-0001/07-target-platform-and-value-types.md`
+[^6]: Research report 04, Selector Engine and Verbs, section 3, result representation. `docs/research/reports/04-selector-engine-and-verbs.md`
+[^7]: Research report 07, Target Platform and Value Types. `docs/research/reports/07-target-platform-and-value-types.md`

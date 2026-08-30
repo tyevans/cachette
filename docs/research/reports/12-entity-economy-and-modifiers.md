@@ -1328,11 +1328,11 @@ handler and it decides the largest line in the wall-clock column.
 
 ## References
 
-[^1]: ADR-0001 background report 07, Target Platform and Value Types. `docs/adrs/background/adr-0001/07-target-platform-and-value-types.md`
-[^2]: ADR-0001, Foundational Architecture, decisions D4, D5, D9, D10, D13, D17, D18, D19, D24, D27, D28, D29, D40, D41, D42, D44, D50, and the byte and per-tick budget tables. `docs/adrs/draft/adr-0001-foundational-architecture.md`
+[^1]: ADR-0001 background report 07, Target Platform and Value Types. `docs/research/reports/07-target-platform-and-value-types.md`
+[^2]: ADR-0001, Foundational Architecture, decisions D4, D5, D9, D10, D13, D17, D18, D19, D24, D27, D28, D29, D40, D41, D42, D44, D50, and the byte and per-tick budget tables. `docs/adrs/REGISTRY.md`
 [^3]: Paradox Interactive forum, discussion of additive against multiplicative modifiers in the Clausewitz engine. https://forum.paradoxplaza.com/forum/threads/additive-bonuses-vs-multiplicative-bonuses.1144836/
 [^4]: RimWorld modding documentation, XML definition files and inheritance. https://rimworldwiki.com/wiki/Modding_Tutorials/XML_Defs and https://spdskatr.github.io/RWModdingResources/abstracts.html
 [^5]: Factorio data-stage documentation, prototype definition and the one-time bake. https://lua-api.factorio.com/latest/types/Data.html
 [^6]: Civilization VI modding community documentation, the Modifiers and RequirementSets database tables. Source not verified at the time of writing; the CivFanatics modding forum is the usual location.
-[^7]: ADR-0001 background report 04, Selector Engine, Verb Vocabulary, and Data-Driven Types, sections 4, 6.2, 6.3, 6.4 and 8.3. `docs/adrs/background/adr-0001/04-selector-engine-and-verbs.md`
-[^8]: ADR-0001 background report 01, ECS and Memory Layout, section 8 on sparse side tables and the tile byte budget. `docs/adrs/background/adr-0001/01-ecs-and-memory-layout.md`
+[^7]: ADR-0001 background report 04, Selector Engine, Verb Vocabulary, and Data-Driven Types, sections 4, 6.2, 6.3, 6.4 and 8.3. `docs/research/reports/04-selector-engine-and-verbs.md`
+[^8]: ADR-0001 background report 01, ECS and Memory Layout, section 8 on sparse side tables and the tile byte budget. `docs/research/reports/01-ecs-and-memory-layout.md`

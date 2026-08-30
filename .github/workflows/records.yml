@@ -1,0 +1,24 @@
+name: records
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  records:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Check the decision records
+        run: ./scripts/check-adrs.sh
+      - name: Check the product records
+        run: ./scripts/check-prds.sh
+      - name: Prove the product record check can fail
+        run: |
+          if ./scripts/check-prds.sh tests/fixtures/prd-broken; then
+            echo "the check passed against deliberately broken records" >&2
+            exit 1
+          fi

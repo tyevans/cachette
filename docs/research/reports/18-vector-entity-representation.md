@@ -1395,10 +1395,10 @@ a companion four-question test for the vector.
 
 ## References
 
-[^1]: ADR-0001, Foundational Architecture, and the project invariants. `docs/adrs/draft/adr-0001-foundational-architecture.md`
-[^2]: Research report 15, Needs, Consumption and the Input-Output Economy. `docs/adrs/background/adr-0001/15-needs-consumption-and-economy.md`
-[^3]: Research report 14, Character Graph, Offices and Inheritance. `docs/adrs/background/adr-0001/14-character-graph-and-inheritance.md`
-[^4]: Research report 12, Entity Economy and Modifiers. `docs/adrs/background/adr-0001/12-entity-economy-and-modifiers.md`
+[^1]: ADR-0001, Foundational Architecture, and the project invariants. `docs/adrs/REGISTRY.md`
+[^2]: Research report 15, Needs, Consumption and the Input-Output Economy. `docs/research/reports/15-needs-consumption-and-economy.md`
+[^3]: Research report 14, Character Graph, Offices and Inheritance. `docs/research/reports/14-character-graph-and-inheritance.md`
+[^4]: Research report 12, Entity Economy and Modifiers. `docs/research/reports/12-entity-economy-and-modifiers.md`
 [^5]: DeGroot, M.H. "Reaching a Consensus". Journal of the American Statistical Association, volume 69, number 345, pages 118 to 121, 1974. https://doi.org/10.1080/01621459.1974.10480137
 [^6]: Axelrod, R. "The Dissemination of Culture: A Model with Local Convergence and Global Polarization". Journal of Conflict Resolution, volume 41, number 2, pages 203 to 226, 1997. https://doi.org/10.1177/0022002797041002001
 [^7]: Deffuant, G., Neau, D., Amblard, F., Weisbuch, G. "Mixing Beliefs among Interacting Agents". Advances in Complex Systems, volume 3, numbers 1 to 4, pages 87 to 98, 2000. https://doi.org/10.1142/S0219525900000078
@@ -1414,9 +1414,9 @@ a companion four-question test for the vector.
 [^17]: Macy, M.W., Kitts, J.A., Flache, A., Benard, S. "Polarization in Dynamic Networks: A Hopfield Model of Emergent Structure". In Dynamic Social Network Modeling and Analysis, National Academies Press, Washington DC, pages 162 to 173, 2003. https://nap.nationalacademies.org/read/10735/chapter/11
 [^18]: Malkov, Y.A., Yashunin, D.A. "Efficient and Robust Approximate Nearest Neighbor Search Using Hierarchical Navigable Small World Graphs". IEEE Transactions on Pattern Analysis and Machine Intelligence, volume 42, number 4, pages 824 to 836, 2020. https://doi.org/10.1109/TPAMI.2018.2889473
 [^19]: Indyk, P., Motwani, R. "Approximate Nearest Neighbors: Towards Removing the Curse of Dimensionality". Proceedings of the 30th Annual ACM Symposium on Theory of Computing, pages 604 to 613, 1998. https://doi.org/10.1145/276698.276876
-[^20]: Research report 16, Individual Agency and Occupations, section 3.4, for the clock and instructions-per-cycle assumptions. `docs/adrs/background/adr-0001/16-individual-agency-and-occupations.md`
-[^21]: Merge Notes for ADR-0001, sections 12 and 13, for the running per-tick budget and the game-citation finding. `docs/adrs/background/adr-0001/MERGE-NOTES.md`
-[^22]: Research report 13, Field Operator Algebra. `docs/adrs/background/adr-0001/13-field-operator-algebra.md`
+[^20]: Research report 16, Individual Agency and Occupations, section 3.4, for the clock and instructions-per-cycle assumptions. `docs/research/reports/16-individual-agency-and-occupations.md`
+[^21]: Merge Notes for ADR-0001, sections 12 and 13, for the running per-tick budget and the game-citation finding. `docs/research/reports/MERGE-NOTES.md`
+[^22]: Research report 13, Field Operator Algebra. `docs/research/reports/13-field-operator-algebra.md`
 [^23]: Beyer, K., Goldstein, J., Ramakrishnan, R., Shaft, U. "When Is 'Nearest Neighbor' Meaningful?". Proceedings of the 7th International Conference on Database Theory, Lecture Notes in Computer Science volume 1540, pages 217 to 235, 1999. https://doi.org/10.1007/3-540-49257-7_15
 [^24]: Aggarwal, C.C., Hinneburg, A., Keim, D.A. "On the Surprising Behavior of Distance Metrics in High Dimensional Space". Proceedings of the 8th International Conference on Database Theory, Lecture Notes in Computer Science volume 1973, pages 420 to 434, 2001. https://doi.org/10.1007/3-540-44503-X_27
-[^25]: Research report 16, Individual Agency and Occupations, sections 2 and 3. `docs/adrs/background/adr-0001/16-individual-agency-and-occupations.md`
+[^25]: Research report 16, Individual Agency and Occupations, sections 2 and 3. `docs/research/reports/16-individual-agency-and-occupations.md`

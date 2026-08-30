@@ -79,8 +79,13 @@ target-check:
 mutants:
     cargo mutants --no-shuffle
 
+# Check the decision records and the product records.
+records:
+    ./scripts/check-adrs.sh
+    ./scripts/check-prds.sh
+
 # Everything a commit must pass.
-check: fmt-check lint test
+check: fmt-check lint test records
 
 # What continuous integration runs.
 ci: check test-slow
