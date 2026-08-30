@@ -304,3 +304,100 @@ fn update_chunk(
     }
     events
 }
+
+#[cfg(test)]
+mod tests {
+    //! Unit tests for the state that the public API cannot reach.
+    //!
+    //! The testing policy allows a unit test where a test cannot observe
+    //! the case through the public interface. The public API cannot build
+    //! a world that breaks its own invariants, so a test of the invariant
+    //! check must build one here.[^1]
+    //!
+    //! # References
+    //!
+    //! [^1]: Testing policy, section 2. `docs/TESTING.md`
+
+    use super::*;
+
+    /// Builds a world with a mismatched column length.
+    fn broken(change: impl FnOnce(&mut World)) -> World {
+        let mut world = World::new(WorldConfig {
+            tile_count: 8,
+            seed: 1,
+            faction_count: 2,
+        });
+        change(&mut world);
+        world
+    }
+
+    #[test]
+    fn a_sound_world_holds_its_invariants() {
+        assert!(broken(|_| {}).check_invariants());
+    }
+
+    #[test]
+    fn a_short_faction_column_fails_the_check() {
+        assert!(!broken(|world| {
+            world.factions.pop();
+        })
+        .check_invariants());
+    }
+
+    #[test]
+    fn a_short_value_column_fails_the_check() {
+        assert!(!broken(|world| {
+            world.values.pop();
+            world.factions.pop();
+        })
+        .check_invariants());
+    }
+
+    #[test]
+    fn a_faction_above_the_ceiling_fails_the_check() {
+        assert!(!broken(|world| {
+            world.factions[0] = FactionId(2);
+        })
+        .check_invariants());
+        // The ceiling is exclusive. The highest valid identifier passes.
+        assert!(broken(|world| {
+            world.factions[0] = FactionId(1);
+        })
+        .check_invariants());
+    }
+
+    #[test]
+    fn an_event_with_padding_fails_the_check() {
+        assert!(!broken(|world| {
+            let mut event = TileChanged::new(Tick(1), TileIdx(0), Fix32::ZERO, FactionId(0), 1);
+            event.padding[0] = 1;
+            world.log.push(event);
+        })
+        .check_invariants());
+    }
+
+    #[test]
+    fn an_event_that_names_no_tile_fails_the_check() {
+        assert!(!broken(|world| {
+            world.log.push(TileChanged::new(
+                Tick(1),
+                TileIdx(8),
+                Fix32::ZERO,
+                FactionId(0),
+                1,
+            ));
+        })
+        .check_invariants());
+        // The bound is exclusive. The highest valid index passes.
+        assert!(broken(|world| {
+            world.log.push(TileChanged::new(
+                Tick(1),
+                TileIdx(7),
+                Fix32::ZERO,
+                FactionId(0),
+                1,
+            ));
+        })
+        .check_invariants());
+    }
+}

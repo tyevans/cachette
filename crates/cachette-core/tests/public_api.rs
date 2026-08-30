@@ -90,3 +90,66 @@ fn the_generator_gives_the_known_answers() {
     assert_eq!(rng::draw(0, 1, 0, 0, 0), 0x1957_a760_4e21_5178);
     assert_eq!(rng::draw(1, 1, 1, 1, 1), 0xda03_81b1_529a_cb69);
 }
+
+#[test]
+fn the_event_log_and_its_bytes_agree() {
+    let mut world = World::new(WorldConfig {
+        tile_count: 4096,
+        ..WorldConfig::default()
+    });
+    world.step(3).expect("the step must run");
+    let events = world.event_log();
+    assert!(!events.is_empty(), "the scenario must emit events");
+    assert_eq!(world.event_log_bytes().len(), size_of_val(events));
+    assert!(events.iter().all(|event| event.tick == world.tick()));
+}
+
+#[test]
+fn the_tile_total_is_the_sum_of_the_column() {
+    use cachette_core::sim_math;
+    use cachette_core::types::Accum;
+
+    let world = World::new(WorldConfig {
+        tile_count: 512,
+        ..WorldConfig::default()
+    });
+    let expected = world
+        .tile_values()
+        .iter()
+        .fold(Accum(0), |total, value| sim_math::accumulate(total, *value));
+    assert_eq!(world.tile_total(), expected);
+    assert_ne!(world.tile_total(), Accum(0));
+}
+
+#[test]
+fn the_change_kind_matches_the_direction_of_the_change() {
+    use cachette_core::event::{CHANGE_KIND_LOWERED, CHANGE_KIND_RAISED};
+
+    let mut world = World::new(WorldConfig {
+        tile_count: 2048,
+        ..WorldConfig::default()
+    });
+    let before = world.tile_values().to_vec();
+    world.step(2).expect("the step must run");
+    let after = world.tile_values().to_vec();
+
+    let mut raised = 0;
+    let mut lowered = 0;
+    for event in world.event_log() {
+        let index = event.tile.0 as usize;
+        assert_eq!(event.value, after[index]);
+        match event.kind {
+            CHANGE_KIND_RAISED => {
+                assert!(after[index].0 > before[index].0);
+                raised += 1;
+            }
+            CHANGE_KIND_LOWERED => {
+                assert!(after[index].0 < before[index].0);
+                lowered += 1;
+            }
+            other => panic!("an event carries an unknown change kind: {other}"),
+        }
+    }
+    assert!(raised > 0, "the scenario must raise a tile");
+    assert!(lowered > 0, "the scenario must lower a tile");
+}

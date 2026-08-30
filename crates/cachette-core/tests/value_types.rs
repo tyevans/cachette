@@ -79,7 +79,10 @@ fn multiplication_saturates_at_both_limits() {
 fn division_saturates_at_both_limits() {
     let tiny = Fix32(1);
     assert_eq!(sim_math::div(Fix32::from_int(1000), tiny), Some(Fix32::MAX));
-    assert_eq!(sim_math::div(Fix32::from_int(-1000), tiny), Some(Fix32::MIN));
+    assert_eq!(
+        sim_math::div(Fix32::from_int(-1000), tiny),
+        Some(Fix32::MIN)
+    );
 }
 
 #[test]

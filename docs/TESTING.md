@@ -125,6 +125,15 @@ commit. It runs on a schedule and on a pull request that carries the
 just mutants
 ```
 
+The last run reported 105 mutants: 94 caught, 10 unviable, and 1 missed.
+The missed one changes `>` into `>=` where the code tests the sign of a
+value that is never zero, so both forms give the same answer. It is an
+equivalent mutant and no test can kill it.
+
+Read a missed mutant before you exclude it. A real gap looks the same as
+an equivalent mutant in the report, and the first run over this code found
+five real gaps in the value types.
+
 **Python.** The tool is `mutmut`, and the gate is not switched on yet.
 
 `mutmut` wins against `cosmic-ray` for this project. It runs in one
