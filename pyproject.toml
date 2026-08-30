@@ -1,0 +1,101 @@
+[build-system]
+requires = ["maturin>=1.9,<2.0"]
+build-backend = "maturin"
+
+[project]
+name = "cachette"
+version = "0.0.0"
+description = "A deterministic world simulation engine."
+readme = "README.md"
+license = "MIT OR Apache-2.0"
+# ADR-0006 D8 sets the minimum interpreter version. Raise it only in a
+# record that supersedes that one.
+requires-python = ">=3.11"
+dependencies = ["numpy>=1.26"]
+classifiers = [
+    "Programming Language :: Rust",
+    "Programming Language :: Python :: Implementation :: CPython",
+    "Typing :: Typed",
+]
+
+[project.urls]
+Repository = "https://github.com/tyevans/cachette"
+
+[tool.maturin]
+manifest-path = "crates/cachette-py/Cargo.toml"
+module-name = "cachette._core"
+python-source = "python"
+features = ["pyo3/extension-module"]
+strip = true
+
+[dependency-groups]
+dev = [
+    "hypothesis>=6.100",
+    "maturin>=1.9,<2.0",
+    "mypy>=1.11",
+    "numpy>=1.26",
+    "pytest>=8.2",
+    "ruff>=0.6",
+]
+
+[tool.uv]
+# The package is a compiled extension. Rebuild it when the Rust source
+# changes, not on every command.
+cache-keys = [
+    { file = "pyproject.toml" },
+    { file = "crates/**/*.rs" },
+    { file = "crates/**/Cargo.toml" },
+]
+
+[tool.ruff]
+line-length = 88
+target-version = "py311"
+src = ["python", "tests"]
+# The research reports hold Python code blocks. They are records, and the
+# formatter must not rewrite them.
+extend-exclude = ["docs", "target", ".venv"]
+
+[tool.ruff.lint]
+select = [
+    "E", "F", "W",   # pycodestyle and pyflakes
+    "I",             # import order
+    "B",             # common defects
+    "UP",            # obsolete syntax
+    "ANN",           # missing annotations
+    "D",             # docstrings
+    "RUF",
+]
+ignore = [
+    "D203",  # conflicts with D211
+    "D213",  # conflicts with D212
+]
+
+[tool.ruff.lint.per-file-ignores]
+# A test module documents itself in its own docstring. Each test function
+# carries its statement in its name.
+"tests/*" = ["D103", "D102", "D101"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "pep257"
+
+[tool.mypy]
+# ADR-0006 D8 requires that continuous integration checks the type stubs.
+# The version is not pinned here. mypy then checks against the interpreter
+# that runs it, and the continuous integration matrix chooses the version.
+strict = true
+files = ["python", "tests"]
+# The compiled module is described by a stub file next to it.
+mypy_path = "python"
+
+[[tool.mypy.overrides]]
+module = "cachette._core"
+ignore_missing_imports = false
+
+[tool.pytest.ini_options]
+# The tests import the installed package. The source directory is never on
+# the path. See docs/TESTING.md.
+testpaths = ["tests"]
+addopts = "--import-mode=importlib --strict-markers -q"
+markers = [
+    "slow: a test that a fast gate does not run",
+]

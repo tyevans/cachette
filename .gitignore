@@ -18,3 +18,9 @@ dist/
 *.swp
 .idea/
 .vscode/
+
+# Tooling
+/mutants.out*/
+.mypy_cache/
+.ruff_cache/
+.hypothesis/

@@ -16,8 +16,11 @@ crate-type = ["cdylib", "rlib"]
 # ADR-0006 D8: the array crate tracks the interpreter binding crate minor
 # version exactly. Upgrade the pair in one change, never one alone.
 [dependencies]
-cachette-core = { path = "../cachette-core" }
-pyo3 = { workspace = true, features = ["abi3-py311", "extension-module"] }
+cachette-core = { path = "../cachette-core", version = "0.0.0" }
+# `extension-module` is not enabled here. maturin adds it for the wheel
+# build. Enabling it in this file would break the link of a plain test
+# binary.
+pyo3 = { workspace = true, features = ["abi3-py311"] }
 numpy = "0.29.0"
 
 [lints]
