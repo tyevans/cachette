@@ -132,7 +132,7 @@ without stating a constraint is worse than no record.
 | 0014 | Entity identity is an index plus a generation | Proposed | 0012 | 01 |
 | 0015 | A tile column is narrow, with bitplanes and sparse side tables | Proposed | 0012 | 01 |
 | 0016 | Tiles are stored in block-tiled order at the aggregation block size | Proposed | 0012, 0022 | 01, 02 |
-| 0017 | Tiles are indexed by odd-r offset, not by raw axial | Proposed | 0016 | 02 |
+| 0017 | The world is a rhombus, so a tile index is raw axial | Proposed | 0016 | 02 |
 | 0018 | The unit-to-tile bridge is three structures, and units stay sorted by tile | Proposed | 0012 | 01, 02 |
 | 0019 | Change detection is per chunk, never per entity | Proposed | 0012 | 01, 02 |
 | 0020 | Structural change batches at the barrier and applies by tombstone and compact | Proposed | 0001, 0012 | 01 |
@@ -202,6 +202,7 @@ without stating a constraint is worse than no record.
 | 0063 | A need is a rate with a threshold, and crossing it is a fact | Proposed | 0032, 0062 | 15 |
 | 0064 | A unit chooses by scoring a small fixed option set | Proposed | 0003, 0063 | 16 |
 | 0065 | A group is a site membership, not a region | Proposed | 0038, 0054 | 17 |
+| 0067 | The viewer reads a published frame and never writes to the world | Proposed | 0001, 0036 | — |
 
 ### Retired numbers
 
