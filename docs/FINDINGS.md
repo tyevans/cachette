@@ -358,3 +358,89 @@ stale figure.
 **Follows:** when two documents are written concurrently, verify the read
 rather than trusting the citation. The same failure was caught twice by
 searching the file rather than believing the summary.
+
+### FND-030 — A scoped guarantee stated without its scope reads as the wider one
+
+**Believed.** The public description said the engine reproduces a run bit for
+bit at any thread count. That sentence is true.
+
+**True.** A reader takes it to mean more than it says. The guarantee holds for
+one binary. A different processor or a different compiler may produce a
+different hash, and the record says so.[^1] Five readers saw the wider claim,
+and the fifth named it as the one thing it did not believe.
+
+**Evidence.** Five independent cold reads of the public description. Each
+reader had that document and nothing else.
+
+**Follows.** State the bound of a guarantee in the same sentence as the
+guarantee. A true statement that is read as a larger statement is a defect in
+the writing, not in the reader. The public description now says that
+reproducing a study means keeping the binary, not only the seed.
+
+### FND-031 — Opinion state belongs to the character tier, not to every unit
+
+**Believed.** A draft of the public description said each of the one million
+units holds an opinion of the people near it.
+
+**True.** Opinion is a character property. The character tier is planned in
+the tens of thousands, not the millions. The entity tiers make units cheap by
+not giving them a relation graph.
+
+**Evidence.** The entity tier design, and the storage argument that keeps
+opinion linear by capping out-degree.[^2]
+
+**Follows.** A description of the product must not promise a property that
+the entity model does not carry. Check any per-unit claim against the tier
+that owns the field.
+
+### FND-032 — A cold reader finds what an informed reviewer cannot
+
+**Believed.** Reviewing a document against the project's own records is
+enough to find its defects.
+
+**True.** It is not. Five review cycles, each by a reader that could read the
+one document and nothing else, found three factual errors that internal
+review had passed: an overclaimed per-unit property, a guarantee stated
+without its scope, and a disclaimer that defended a figure the document did
+not contain.
+
+**Evidence.** The five review cycles. The reviewers were forbidden to read
+another file, search the repository, or look anything up.
+
+**Follows.** For any document that faces outward, review it at least once
+with a reader that has only that document. An informed reviewer repairs a gap
+from memory and never notices the gap.
+
+### FND-033 — Record length predicts how often a record is edited
+
+**Believed.** A long record is thorough. Length was treated as a cost in
+reading time only.
+
+**True.** Length predicts churn. Across 106 records in two other projects the
+correlation was 0.704 and 0.715, derived independently. Records of 4000 words
+or more were edited 3.7 times as often as records under 1200 words.
+
+**Evidence.** The record scope research.[^3]
+
+**Follows.** A long record holds material that changes. Length is a signal to
+look for that material, not a sign of care.
+
+### FND-034 — A claim title churns less than a topic title
+
+**Believed.** A record title names its subject.
+
+**True.** A title that states the decision predicts a more stable record than
+a title that names a topic. In one corpus the churn was 2.13 against 4.50.
+Both reference projects drifted from topic titles to claim titles on their
+own, from 3 to 21 per cent and from 57 to 82 per cent.
+
+**Evidence.** The record scope research.[^3]
+
+**Follows.** Title a record with the claim it makes. Five of the six current
+drafts carry topic titles and are queued for retitling.
+
+## References
+
+[^1]: ADR-0001, Determinism, decision D1. `docs/adrs/draft/adr-0001-determinism.md`
+[^2]: Findings register, FND-004, in this document.
+[^3]: Record scope research. `docs/research/adr-scope-findings.md`

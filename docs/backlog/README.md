@@ -46,6 +46,9 @@ An item in `refined/` must answer all of this:
   item is refined**, not when the work starts.
 - Which blockers govern it. A value behind a blocker is expressed
   parametrically, not invented.
+- Which product record it serves, if any. A product record states the need
+  the work answers to.[^4] Work that serves no recorded need is allowed, but
+  say so with an empty list rather than by omitting the field.
 - What "done" means for this item, as statements that can be checked.
 
 If you cannot answer these, the item is not refined. Leave it in `proposed/`
@@ -62,6 +65,7 @@ created: 2026-08-30
 implements: [ADR-0001 D11]
 changes: []
 creates: []
+serves: [PRD-0001]
 blocked-by: []
 ---
 
@@ -124,3 +128,4 @@ The backlog holds work. The registers hold state. The records hold decisions.
 [^1]: Definition of Done. `.claude/rules/definition-of-done.md`
 [^2]: ADR Registry. `docs/adrs/REGISTRY.md`
 [^3]: Blockers, Decisions and Findings registers. `docs/`
+[^4]: Product requirement records. `docs/product/README.md`

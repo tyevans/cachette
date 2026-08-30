@@ -100,6 +100,23 @@ ordinary case. The recalibration relocates it to mountains.
 
 **Recommendation:** accept. A mountain pass should be a serious obstacle.
 
+### DEC-012 — Does a product record cite a decision record?
+
+**Decided: no.** Recorded here because the reasoning is easy to lose.
+
+A product record states a need. A decision record answers to a constraint. A
+product direction changes more often than a constraint does, so a citation
+from a decision record to a product record would place changing material
+inside a historical document, which the scope rule forbids.
+
+The join runs the other way and through one place only: a refined backlog
+item names both the record that governs it and the product record it serves.
+A check enforces that a product record contains no decision record citation.
+
+**Revisit if.** The backlog stops being the only route from a need to the
+work, or a reader cannot answer "which need does this record serve" and needs
+to.
+
 ## Decisions to apply at merge
 
 These are mechanical. They do not need judgement, but they must not be
