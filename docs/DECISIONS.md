@@ -68,6 +68,11 @@ Retaining them costs 531 MB at 100,000 living characters and 1.39 GB at the
 ceiling. Dropping them loses the ability to reason about a dead person's
 former ties.
 
+The target is now 50,000 living characters, so retention costs roughly half
+the first figure at the target.[^TARGET] That scaling is derived, not
+measured. The recommendation does not change, because the cost still exceeds
+the whole living character layer.
+
 **Recommendation:** drop them. The character report notes this is how
 expensive the question is to answer wrongly.
 
@@ -252,3 +257,5 @@ concluded, and it called that argument its weakest.
 ## Closed
 
 None yet.
+
+[^TARGET]: Blockers register, BLK-004, and the scale constants. `docs/reference/budgets.md`
