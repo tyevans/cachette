@@ -1,0 +1,18 @@
+# Mutation testing for the simulation core.
+#
+# A mutation gate is slow. It runs on a schedule and on a labelled pull
+# request, never on every commit. See .github/workflows/mutants.yml.
+#
+# The scope is the core crate. The binding crate needs a running
+# interpreter to test, so a mutant there cannot be caught by cargo test.
+examine_globs = ["crates/cachette-core/src/**/*.rs"]
+
+# The display implementations carry no simulation behaviour.
+exclude_re = [
+    "impl Display",
+    "impl core::fmt::Display",
+    "__repr__",
+]
+
+timeout_multiplier = 5.0
+minimum_test_timeout = 60

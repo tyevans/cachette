@@ -35,20 +35,22 @@ impl StateHash {
     }
 
     /// Absorbs a slice of bytes.
+    ///
+    /// The loop is a `for` loop and not an index loop. An index loop holds
+    /// an increment, and a mutation of that increment makes the loop run
+    /// forever instead of failing a test.
     #[must_use]
-    pub const fn write(mut self, bytes: &[u8]) -> Self {
-        let mut index = 0;
-        while index < bytes.len() {
-            self.0 ^= bytes[index] as u64;
+    pub fn write(mut self, bytes: &[u8]) -> Self {
+        for byte in bytes {
+            self.0 ^= u64::from(*byte);
             self.0 = self.0.wrapping_mul(PRIME);
-            index += 1;
         }
         self
     }
 
     /// Absorbs one 64-bit integer in little-endian order.
     #[must_use]
-    pub const fn write_u64(self, value: u64) -> Self {
+    pub fn write_u64(self, value: u64) -> Self {
         self.write(&value.to_le_bytes())
     }
 
