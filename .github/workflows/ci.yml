@@ -136,8 +136,13 @@ jobs:
       - name: Install from the source distribution
         run: |
           python -m venv /tmp/sdist-venv
-          /tmp/sdist-venv/bin/pip install --no-binary :all: dist/*.tar.gz
-          /tmp/sdist-venv/bin/python -c "import cachette; print(cachette.__version__)"
+          # `--no-binary cachette` names this package only. `:all:` also
+          # builds every dependency from source, which means building NumPy,
+          # and that takes longer than the whole pipeline.
+          /tmp/sdist-venv/bin/pip install --no-binary cachette dist/*.tar.gz
+          /tmp/sdist-venv/bin/python -c \
+              "import cachette; w = cachette.World(tile_count=64); \
+               w.step(threads=2); print(cachette.__version__, w.tick)"
 
       - uses: actions/upload-artifact@v4
         with:
