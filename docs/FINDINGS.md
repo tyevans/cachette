@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-043**
+**Next number: FND-047**
 
 ## A. Corrections to stated rules
 
@@ -616,6 +616,142 @@ takes a claim from the registry as the project's position. When a blocker
 governs a claim, the row says so, or the row waits. No record was written
 against the old row, so this cost one table edit rather than a supersession.
 
+**A second instance, found by audit.** ADR-0056 D4 said the capacity values
+depend on the tile scale, "which is an open blocker". BLK-001 and BLK-009
+were both resolved before the audit ran, so the record stated a live question
+that the project had already settled. The correction points at the scale
+constants table, which is where the values now live.
+
+The shape is not a stale value. It is a stale *reference to a blocker*, which
+survives longer because it looks like the careful thing to do. Correct
+parametric writing creates a claim that must be revisited when the blocker
+closes, and nothing revisits it. **When a blocker closes, search the records
+for its number.** The command is in the commit that closed it.
+
+### FND-043 — A value type that cannot hold zero can lose a real value
+
+**Believed.** The entity identity packs a generation above a slot index into
+a value that is never zero, so an absent identity costs no extra space. The
+niche is free.
+
+**True.** The niche is not free. It removes one bit pattern from the value
+space, and that pattern names a real entity: slot zero at generation zero.
+The first entity the engine ever allocates takes slot zero, and a generation
+that starts at zero leaves that entity without a representable identity.
+
+**Evidence.** `Entity::new(0, 0)` returns nothing, because the packed value is
+zero and the type cannot hold zero. A record review found it while reading
+the identity record against the value type. The project had held the type for
+some time and had a test for the refusal, which asserted the refusal was
+correct rather than asking which value it refused.
+
+**Follows.** A niche optimisation removes a value from the space. Say which
+value, and prove that no real thing needs it. Here the identity record now
+starts every generation at one, which vacates the pattern honestly.
+
+The test shape matters more than the fix. Every test that allocates a second
+entity before checking anything would pass. **When a type refuses a value,
+write the test that asks whether the refused value was needed**, not only the
+test that confirms the refusal happens.
+
+### FND-044 — The saved property seeds were never read or written
+
+**Believed.** A property test that fails saves the seed of the failing case
+to a regression file. The file is checked in, so the case that caught a
+defect runs first on every later run. A commit message asserted this.
+
+**True.** Nothing was saved and nothing was replayed. The default persistence
+finds the source root by walking up from the test file looking for a library
+or binary root. An integration test has neither above it, so persistence
+silently disabled itself and the files were inert. They had been committed,
+read as evidence of a working practice, and cited in a commit message.
+
+**Evidence.** Every failing run printed a line saying persistence was set but
+found no root, and the message was lost in the test output. A code review
+counted four of them in one run. Deleting a regression file and re-running a
+deliberately broken build wrote nothing back until the persistence path was
+named explicitly.
+
+**Follows.** The file existed, so the practice looked healthy. This is the
+inert capability shape in a form that is worse than usual, because the
+artefact is present and has content: the seeds were real seeds, written by
+hand or by an earlier run under different conditions, and they simply never
+ran.
+
+**When a tool reports that it disabled itself, that report is a failure.** It
+appeared on standard output among passing tests, where nothing reads it. The
+lesson is not to read more output. It is that a claim about the test suite
+needs the same proof as a claim about the engine: delete the artefact, cause
+the failure, and check that the artefact came back.
+
+### FND-045 — A record was accepted while its review was still running
+
+**Believed.** The review ceremony ran, its findings were in hand, and the
+records could be accepted.
+
+**True.** Four records were accepted on a first review while a second review
+was still reading them. The second review found a claim in one record that
+another record falsifies, and named it as blocking acceptance. By then the
+record was accepted.
+
+**Evidence.** ADR-0018 rejected an offset array over every tile on the
+grounds that a structure growing with the tile count is unaffordable.
+ADR-0056 D4 assumes exactly such an array exists and derives a capacity bound
+from it. Accepting ADR-0018 would have bound the project to a reason that
+another record falsifies. Three further records had outstanding amendments of
+their own, including one record that called the same leak bounded in a
+decision and unbounded in a consequence.
+
+Nothing was pushed, so the acceptances were reverted, the amendments applied,
+and the records accepted once with both reviews read.
+
+**Follows.** The rule that was missing is simple: **prefer not to accept
+while a review is in flight.** A verdict that has not arrived is not a
+verdict, and the absence of an objection is not the absence of a defect.
+
+The remedy chosen at the time was wrong, and the correction matters more than
+the original finding. The records were reverted to `Draft`, amended, and
+accepted a second time. That was unnecessary. The freeze on an accepted
+record protects the things built on it, and nothing had been built on these:
+no other record cited the amended claims, no code implemented them, and the
+acceptance was an hour old. The registry now states a retcon window for
+exactly this case, and states that a draft may simply be edited.[^8]
+
+A process that punishes a cheap correction produces expensive corrections, or
+none.
+
+The second review also disagreed with the first about ADR-0018, which is the
+argument for having had two. A single reviewer that agrees with the author is
+indistinguishable from no reviewer.
+
+### FND-046 — A sweep verified by the local gate misses what the local gate never runs
+
+**Believed.** A rename is complete when the whole tree is searched and the
+check command runs green. The commit that changed the world constructor from
+a tile count to a width and a height searched the source tree and passed
+`just check`.
+
+**True.** The change was incomplete. Continuous integration failed on a smoke
+test written inline in the workflow, which still called the old argument. The
+local gate never ran that line, so it could not have caught it. The value
+type's own text output also still named the removed argument.
+
+**Evidence.** The workflow failed with a type error naming the removed
+keyword, on a pipeline that a green local run had preceded.
+
+**Follows.** Two things, and the second is the useful one.
+
+A whole-tree search must cover the whole tree. A search over the source
+directories is not a search over the tree, and a workflow, a build manifest
+and a justfile are call sites.
+
+**The deeper cause is that the smoke test lived inline in the workflow.** It
+was a second declaration site for the public interface, in a file nobody
+greps when renaming an argument, and no local command ran it. It is now a
+script that both the workflow and the local gate run, so the interface has
+one usage site and the local gate covers it. **When a check exists only in
+continuous integration, the local gate is not the gate.**
+
 ## References
 
 [^1]: Findings register, FND-038, in this document.
@@ -625,3 +761,4 @@ against the old row, so this cost one table edit rather than a supersession.
 [^5]: Findings register, FND-004, in this document.
 [^6]: Record scope research. `docs/research/adr-scope-findings.md`
 [^7]: Decision Record Scope, section 4.5. `.claude/rules/adr-scope.md`
+[^8]: ADR Registry, the retcon window. `docs/adrs/REGISTRY.md`

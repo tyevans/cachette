@@ -1,6 +1,6 @@
 # ADR-0017: The world is a rhombus, so a tile index is raw axial
 
-Status: Draft
+Status: Accepted
 
 ## Context
 
@@ -28,13 +28,18 @@ that the choice was made and why.
 
 ### D1. The world is a rhombus, and a tile index is a raw axial pair
 
-A tile address is an axial pair. The index is the row multiplied by the row
-length, plus the column. The reverse is a division and a remainder.
+A tile address is an axial pair. Deriving the storage index from the address
+is arithmetic on the two components, and nothing else.
 
 **No tile access converts a coordinate.** A conversion function between an
 axial address and an offset address does not exist in the engine. Its
 presence in a tile access path is the violation this record lets a reviewer
 find.
+
+This record does not state the index function. The order in which tiles sit
+in memory is a separate claim, and the record that holds it may choose a
+block order rather than a row order.[^4] Both derive an index from the same
+axial address by arithmetic, which is what this record constrains.
 
 ### D2. The neighbours are six fixed offsets, and the edge does not wrap
 
@@ -52,6 +57,9 @@ An axial component, an index, and a distance are all integers. No coordinate
 is a fixed-point value and none is a floating point value, so the arithmetic
 that derives one is exact.[^3]
 
+An address operation saturates at the range of its type. A saturated address
+lies outside the world, so it has no index and no tile.
+
 ### D4. The engine stores the shape, and the viewer draws it
 
 A rhombus in the index space is a parallelogram on the screen. The viewer
@@ -67,8 +75,8 @@ suits one display does not suit another.
 inherits the index space, so a block is a parallelogram in world space rather
 than a near-rectangle. A conservative bounding radius around a longer, thinner
 block admits more false positives, so a radius query descends into more
-subtrees than a rectangular block would need. The report measures the aspect
-ratios of both.[^1] This is the price of removing the conversion, and it is
+subtrees than a rectangular block would need. The report derives the aspect ratio
+of each.[^1] This is the price of removing the conversion, and it is
 paid by the query path rather than by every tile access.
 
 **A rectangular viewport is not a rectangular index range.** A viewer that
@@ -88,3 +96,4 @@ The answer is this record.
 [^1]: Report 02, the hex grid and the level of detail pyramid, sections 1.2 and 3.4. `docs/research/reports/02-hex-grid-and-lod-pyramid.md`
 [^2]: Blockers register, BLK-014. `docs/BLOCKERS.md`
 [^3]: ADR-0002, simulated and aggregated state holds no floating point number. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
+[^4]: ADR-0016, tiles are stored in block-tiled order at the aggregation block size. `docs/adrs/REGISTRY.md`

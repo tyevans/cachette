@@ -1,0 +1,8 @@
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+cc 9038eca30c481e44417d1e696fbcc53bbd4ef3e7bcb7a2433a30145cb866efc1 # shrinks to keys = [SortKey { fields: [0, 0, 0] }, SortKey { fields: [0, 0, 1] }]
+cc 239aa77915b383cd0f2d6e15a0509759427f1037d481f19d95901797016a36fb # shrinks to keys = [SortKey { fields: [0, 0, 0] }, SortKey { fields: [0, 0, 1] }]

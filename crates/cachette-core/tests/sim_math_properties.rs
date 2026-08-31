@@ -15,6 +15,7 @@ use cachette_core::sim_math;
 use cachette_core::types::Accum;
 use cachette_core::Fix32;
 use proptest::prelude::*;
+use proptest::test_runner::FileFailurePersistence;
 
 /// A strategy that produces a fixed-point value over the whole range.
 fn any_fix32() -> impl Strategy<Value = Fix32> {
@@ -28,6 +29,19 @@ fn any_accum() -> impl Strategy<Value = Accum> {
 }
 
 proptest! {
+    #![proptest_config(ProptestConfig {
+        // An integration test has no lib.rs or main.rs above it, so the
+        // default source-parallel persistence finds no root and silently
+        // disables itself. A failing seed is then never written and never
+        // replayed. Name the file, so that a seed which caught a defect runs
+        // first on every later run.[^1]
+        //
+        // [^1]: Findings register, FND-044. `docs/FINDINGS.md`
+        failure_persistence: Some(Box::new(FileFailurePersistence::Direct(
+            concat!(env!("CARGO_MANIFEST_DIR"), "/tests/sim_math_properties.proptest-regressions"),
+        ))),
+        ..ProptestConfig::default()
+    })]
     /// Accumulator combination is commutative. A parallel reduction over it
     /// therefore needs no declared order.
     #[test]

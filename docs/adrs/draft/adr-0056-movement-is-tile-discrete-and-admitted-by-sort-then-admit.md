@@ -24,9 +24,10 @@ same answer at any thread count, because one binary gives one answer at any
 thread count.[^4] A parallel first-come rule cannot give that answer,
 because arrival order is thread order.
 
-The unit array is already sorted by tile index, and a bridge structure
-keeps it sorted.[^5] Any rule that reads or writes the unit array must
-preserve that invariant.
+A derived bridge structure answers which units stand on a tile. The bridge
+is rebuilt at each barrier, so a system that moves a unit does not maintain
+it.[^5] The unit arena itself is never sorted, because the slot index is half
+of the entity identity.[^11]
 
 ## Decision
 
@@ -78,10 +79,10 @@ The capacity of a crossing terrain is higher than the capacity of ordinary
 terrain. That difference is a design lever, and the movement calibration
 depends on it.[^8]
 
-This record states no capacity value. The values depend on the tile scale,
-which is an open blocker.[^9] The registers hold the current values.[^10]
-The count array that stores the occupancy of a tile bounds the capacity,
-because the count is one byte for each tile.
+This record states no capacity value. The values follow from the tile
+scale, and the scale constants table holds them.[^9] [^10] The count array
+that stores the occupancy of a tile bounds the capacity, because the count
+is one byte for each tile.
 
 ### D5. A rejected unit is not stuck
 
@@ -105,9 +106,6 @@ the decision, and no arithmetic settles whether it looks right.[^1]
 **A formation cannot hold a shape below tile resolution.** A wedge or a
 line of one tile width is not expressible.
 
-**The sorted unit array survives.** The admission step writes positions in
-target tile order, which is the order the bridge structure wants.[^5]
-
 **The capacity value cannot enter engine code.** A contributor who writes a
 capacity literal in the movement kernel violates D4.
 
@@ -117,9 +115,10 @@ capacity literal in the movement kernel violates D4.
 [^2]: ADR-0002, simulated and aggregated state holds no floating point number. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
 [^3]: ADR-0004, iteration order is explicit. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
 [^4]: ADR-0001, one binary gives one answer at any thread count. `docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
-[^5]: ADR-0018, the unit-to-tile bridge keeps units sorted by tile. Reserved in the record registry. `docs/adrs/REGISTRY.md`
+[^5]: ADR-0018, the unit-to-tile bridge is derived, and it rebuilds at the barrier. `docs/adrs/accepted/adr-0018-the-unit-to-tile-bridge-is-derived-and-rebuilds-at-the-barrier.md`
 [^6]: Findings register, FND-011, the progress accumulator overflows. `docs/FINDINGS.md`
 [^7]: ADR-0007, content supplies a key vector, never a comparator. `docs/adrs/accepted/adr-0007-content-supplies-a-key-vector-never-a-comparator.md`
 [^8]: Findings register, FND-037, a crossing time needs the terrain multiplier. `docs/FINDINGS.md`
-[^9]: Blockers register, BLK-001, tile scale and world extent. `docs/BLOCKERS.md`
-[^10]: Blockers register, BLK-009, tile capacity. `docs/BLOCKERS.md`
+[^9]: Blockers register, BLK-001 and BLK-009, both resolved. `docs/BLOCKERS.md`
+[^10]: Budgets and costs, the scale constants. `docs/reference/budgets.md`
+[^11]: ADR-0014, entity identity is an index plus a generation. `docs/adrs/accepted/adr-0014-entity-identity-is-an-index-plus-a-generation.md`

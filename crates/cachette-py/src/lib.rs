@@ -164,9 +164,15 @@ impl PyWorld {
 
     fn __repr__(&self) -> String {
         let world = self.lock();
+        // The arguments name the constructor's own parameters, so that the
+        // output can be pasted back. A repr that names a field the
+        // constructor does not take is a small lie that costs a reader a
+        // failed call.
+        let grid = world.grid();
         format!(
-            "World(tile_count={}, tick={})",
-            world.tile_count(),
+            "World(width={}, height={}, tick={})",
+            grid.width(),
+            grid.height(),
             world.tick().0
         )
     }

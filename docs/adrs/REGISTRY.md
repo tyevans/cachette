@@ -33,6 +33,28 @@ of fact, so the author makes it when they write the file.
 `Accepted`, `Superseded` and `Rejected` are judgements. A reviewer makes
 those. An author who accepts their own record has reviewed their own work.
 
+### Who reviews
+
+The project owner holds review rights and has delegated them to the agent
+that writes the records, for the current phase of work. The delegation is
+recorded here because a reader who sees one name in both roles would
+otherwise read it as the failure this section warns about.
+
+**A delegated reviewer is a weaker reviewer than a second person, and the
+process compensates for it.** An author who reviews their own record cannot
+be surprised by it, so the review must find what surprise would have found:
+
+1. **Review reads the record against the code, not against the intent.** A
+   record is accepted after the work that implements it exists, or its
+   acceptance says plainly that nothing implements it yet.
+2. **A record is reviewed by an agent that did not write it.** The reviewer
+   gets the record and the rule, not the reasoning that produced it.
+3. **The review states what it tried to reject.** A review that lists no
+   attempted objection did not happen.
+
+The owner may withdraw the delegation at any time, and a review by a second
+person supersedes a delegated one.
+
 **Decision numbers are local to their record.** Write `ADR-0004 D3`, not `D3`.
 Flat global decision numbering collided three times during research and will
 do so again.
@@ -49,6 +71,34 @@ do so again.
 
 An accepted record does not change. To change a decision, write a new record
 that supersedes it.
+
+### The retcon window
+
+**The freeze protects a record's dependents, not the record.** A record that
+nothing cites, that no code implements, and that no other record was written
+against has no dependents, so amending it breaks nothing and a supersession
+record would say only that the author changed their mind an hour later.
+
+Amend an accepted record in place when all three hold:
+
+1. **Nothing depends on it yet.** No other record cites it, no source file
+   cites it, and no backlog item was refined against the claim you are
+   changing.
+2. **The amendment repairs the record rather than reversing it.** Correcting
+   false reasoning, a stale reference, or a claim that contradicts a sibling
+   record is a repair. Deciding the opposite thing is not, and that needs a
+   supersession however recent the acceptance.
+3. **The commit says what changed and why the freeze did not apply.** The
+   commit message is the audit trail. A silent edit to an accepted record is
+   the failure this whole section is about.
+
+Outside that window, supersede.
+
+**A draft is not covered by any of this.** A draft exists to be edited. Edit
+it, and do not revert its status to justify doing so.
+
+The window closes the moment someone builds on the record, which is usually
+the next commit. When in doubt, assume it closed.
 
 ## What does not belong in a record
 
@@ -127,13 +177,13 @@ without stating a constraint is worse than no record.
 
 | No. | Claim | Status | Depends on | Source |
 |---|---|---|---|---|
-| 0012 | Tiles are dense columns and units are a generational arena | Proposed | 0001 | 01 |
+| 0012 | Tiles are dense columns and units are a generational arena | Accepted | 0001 | 01 |
 | 0013 | The project writes its own entity storage rather than adopting an ECS | Proposed | 0012 | 01 |
-| 0014 | Entity identity is an index plus a generation | Proposed | 0012 | 01 |
+| 0014 | Entity identity is an index plus a generation | Accepted | 0012 | 01 |
 | 0015 | A tile column is narrow, with bitplanes and sparse side tables | Proposed | 0012 | 01 |
 | 0016 | Tiles are stored in block-tiled order at the aggregation block size | Proposed | 0012, 0022 | 01, 02 |
-| 0017 | The world is a rhombus, so a tile index is raw axial | Draft | 0016 | 02 |
-| 0018 | The unit-to-tile bridge is three structures, and units stay sorted by tile | Proposed | 0012 | 01, 02 |
+| 0017 | The world is a rhombus, so a tile index is raw axial | Accepted | 0016 | 02 |
+| 0018 | The unit-to-tile bridge is derived, and it rebuilds at the barrier | Accepted | 0012 | 01, 02 |
 | 0019 | Change detection is per chunk, never per entity | Proposed | 0012 | 01, 02 |
 | 0020 | Structural change batches at the barrier and applies by tombstone and compact | Proposed | 0001, 0012 | 01 |
 | 0021 | Layout follows the access pattern | Proposed | 0012 | 01 |

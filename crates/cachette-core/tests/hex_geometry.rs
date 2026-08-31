@@ -10,14 +10,15 @@
 //!
 //! # References
 //!
-//! [^1]: ADR-0017, the world is a rhombus, so a tile index is raw axial, decision D1. `docs/adrs/draft/adr-0017-the-world-is-a-rhombus-so-a-tile-index-is-raw-axial.md`
-//! [^2]: ADR-0017, the world is a rhombus, so a tile index is raw axial, decision D2. `docs/adrs/draft/adr-0017-the-world-is-a-rhombus-so-a-tile-index-is-raw-axial.md`
+//! [^1]: ADR-0017, the world is a rhombus, so a tile index is raw axial, decision D1. `docs/adrs/accepted/adr-0017-the-world-is-a-rhombus-so-a-tile-index-is-raw-axial.md`
+//! [^2]: ADR-0017, the world is a rhombus, so a tile index is raw axial, decision D2. `docs/adrs/accepted/adr-0017-the-world-is-a-rhombus-so-a-tile-index-is-raw-axial.md`
 //! [^3]: Testing policy. `docs/TESTING.md`
 
 use cachette_core::hex::{GridError, NEIGHBOURS, NEIGHBOUR_COUNT};
 use cachette_core::types::TileIdx;
 use cachette_core::{Axial, Grid, World, WorldConfig};
 use proptest::prelude::*;
+use proptest::test_runner::FileFailurePersistence;
 
 /// A strategy that produces a grid with a modest extent.
 ///
@@ -38,6 +39,19 @@ fn any_grid_and_address() -> impl Strategy<Value = (Grid, Axial)> {
 }
 
 proptest! {
+    #![proptest_config(ProptestConfig {
+        // An integration test has no lib.rs or main.rs above it, so the
+        // default source-parallel persistence finds no root and silently
+        // disables itself. A failing seed is then never written and never
+        // replayed. Name the file, so that a seed which caught a defect runs
+        // first on every later run.[^1]
+        //
+        // [^1]: Findings register, FND-044. `docs/FINDINGS.md`
+        failure_persistence: Some(Box::new(FileFailurePersistence::Direct(
+            concat!(env!("CARGO_MANIFEST_DIR"), "/tests/hex_geometry.proptest-regressions"),
+        ))),
+        ..ProptestConfig::default()
+    })]
     /// An address converts to an index and back to the same address.
     ///
     /// This is the property that makes the index an address rather than an

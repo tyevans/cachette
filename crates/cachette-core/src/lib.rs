@@ -19,11 +19,15 @@ pub mod hash;
 pub mod hex;
 pub mod rng;
 pub mod sim_math;
+pub mod slots;
+pub mod sort;
 pub mod types;
 pub mod world;
 
 pub use event::TileChanged;
 pub use hash::StateHash;
 pub use hex::{Axial, Grid, GridError};
+pub use slots::{Candidate, SlotError, Slots};
+pub use sort::{SortError, SortKey};
 pub use types::{Accum, Entity, Fix32, Tick, TileIdx};
 pub use world::{StepError, World, WorldConfig, WorldError};

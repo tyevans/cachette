@@ -1,7 +1,7 @@
 ---
 id: 0013
 title: Provide the slot reduction for a reduction that is not order-free
-status: refined
+status: complete
 created: 2026-08-30
 implements: [ADR-0004 D3]
 changes: []
@@ -61,7 +61,22 @@ and exercise it directly.[^4]
 
 ## Outcome
 
-Filled in on completion.
+`crates/cachette-core/src/slots.rs` holds the mechanism. `Slots::filled`
+builds one entry for each unit of parallel work, `combine` folds them in
+index order, and `first_wins`, `minimum` and `maximum` are the three
+reductions that depend on order when values tie. The world step is a caller,
+so the mechanism is not inert.
+
+Two things changed from the plan. The perturbation switch moved out of the
+world and into `Slots::combine`, so the probe now reaches every reduction
+rather than only the log join; that is a change to existing determinism
+machinery, not a pure addition. And `Candidate` shipped with derived
+comparison traits whose tie rule disagreed with `minimum` and `maximum`; the
+code review found it and the derives are gone.
+
+Five mutations were applied and all were killed. Under the probe feature six
+of the eight tests fail, and the probe recipe now asserts that, so the
+failure mode gates a merge.
 
 ## References
 

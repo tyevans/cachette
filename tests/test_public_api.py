@@ -83,6 +83,17 @@ def test_the_world_reports_its_extent(seed: int) -> None:
     assert world.tile_count == 32
 
 
+def test_the_repr_names_the_constructor_arguments(seed: int) -> None:
+    # A repr that names a field the constructor does not take is a small lie
+    # that costs a reader a failed call. This test is what makes the two
+    # agree, because nothing else compares them.
+    world = cachette.World(width=8, height=4, seed=seed, faction_count=1)
+    text = repr(world)
+    assert "width=8" in text
+    assert "height=4" in text
+    assert "tile_count" not in text
+
+
 def test_every_error_type_sits_under_one_root() -> None:
     # ADR-0046: a user catches broadly or narrowly.
     for error in (

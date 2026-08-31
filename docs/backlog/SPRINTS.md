@@ -32,6 +32,25 @@ blocker row rather than waiting.[^3]
 **Review.** Run when the sprint goal is met or abandoned. Demonstrate the
 goal against its checkable sentence. State what shipped and what did not.
 
+**Record review.** Run before a record moves from `Draft` to `Accepted`. An
+agent that did not write the record reads it against the scope rule and
+against the code that implements it. The review states what it tried to
+reject. A review that lists no attempted objection did not happen, and the
+record stays a draft. The registry says who holds review rights and why the
+delegated form needs this.[^5]
+
+**Code review.** Run before work merges. An agent that did not write the code
+reads the diff against every governing record, decision by decision, and
+against the recurring-defect shapes. It reports findings; it does not fix
+them. The author decides what to do with each one and says so.
+
+**A review writes a file.** Both reviews deliver a file under the review
+directory, and the file is the deliverable.[^6] A reviewer that reports only
+by message delivers nothing when the message does not arrive, and a missing
+message looks exactly like a message that says nothing is wrong. This
+happened on the first attempt: four reviewers ran, none delivered, and the
+work went forward on one reading while the log said it had two.
+
 **Retrospective.** Run after the review. Record what to change in the next
 sprint. A correction that the project believed goes to the findings
 register, not here.[^4]
@@ -50,6 +69,28 @@ and the two cannot drift.
 **A record is audited before the work that depends on it.** A draft record
 that governs a sprint is either accepted in that sprint or its claim is
 treated as provisional and cited as a draft.
+
+**Correcting a record is cheap until something depends on it.** A draft is
+edited. A record accepted in the same sprint, with nothing built on it, is
+repaired in place and the commit says so.[^7] Only a record with dependents
+needs a supersession. A process that makes a small correction expensive gets
+expensive corrections, or none.
+
+**Work runs in parallel where the files do not overlap.** Two agents that
+write to one file produce a conflict, and resolving it costs more than the
+parallelism saved. Split by directory: the records, the core, and the
+bindings are three surfaces. When two items must touch one file, sequence
+them and say so in the plan.
+
+**Never stage by wildcard while parallel work runs.** A command that adds
+everything captures whatever another agent has half-written, and the commit
+message then describes work the commit does not contain. Stage the paths the
+commit is about, by name. This has happened once: a record that an agent was
+still writing entered a commit about an unrelated repair, and the commit had
+to be rebuilt.
+
+The parallel surfaces are also the review surfaces. An agent that writes to
+one surface reviews nothing on it.
 
 ## The sequence
 
@@ -132,6 +173,9 @@ is precedent, and precedent does not live in a sprint log.
 [^2]: PRD-0002, a developer watches the world run. `docs/product/REGISTRY.md`
 [^3]: Blockers register. `docs/BLOCKERS.md`
 [^4]: Findings register. `docs/FINDINGS.md`
+[^5]: ADR Registry, who reviews. `docs/adrs/REGISTRY.md`
+[^6]: Reviews index. `docs/reviews/README.md`
+[^7]: ADR Registry, the retcon window. `docs/adrs/REGISTRY.md`
 
 ### Sprint 2 — planning
 

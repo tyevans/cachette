@@ -14,10 +14,10 @@
 //!
 //! # References
 //!
-//! [^1]: ADR-0017, the world is a rhombus, so a tile index is raw axial, decision D1. `docs/adrs/draft/adr-0017-the-world-is-a-rhombus-so-a-tile-index-is-raw-axial.md`
-//! [^2]: ADR-0017, the world is a rhombus, so a tile index is raw axial, decision D2. `docs/adrs/draft/adr-0017-the-world-is-a-rhombus-so-a-tile-index-is-raw-axial.md`
-//! [^3]: ADR-0017, the world is a rhombus, so a tile index is raw axial, decision D3. `docs/adrs/draft/adr-0017-the-world-is-a-rhombus-so-a-tile-index-is-raw-axial.md`
-//! [^4]: ADR-0017, the world is a rhombus, so a tile index is raw axial, decision D4. `docs/adrs/draft/adr-0017-the-world-is-a-rhombus-so-a-tile-index-is-raw-axial.md`
+//! [^1]: ADR-0017, the world is a rhombus, so a tile index is raw axial, decision D1. `docs/adrs/accepted/adr-0017-the-world-is-a-rhombus-so-a-tile-index-is-raw-axial.md`
+//! [^2]: ADR-0017, the world is a rhombus, so a tile index is raw axial, decision D2. `docs/adrs/accepted/adr-0017-the-world-is-a-rhombus-so-a-tile-index-is-raw-axial.md`
+//! [^3]: ADR-0017, the world is a rhombus, so a tile index is raw axial, decision D3. `docs/adrs/accepted/adr-0017-the-world-is-a-rhombus-so-a-tile-index-is-raw-axial.md`
+//! [^4]: ADR-0017, the world is a rhombus, so a tile index is raw axial, decision D4. `docs/adrs/accepted/adr-0017-the-world-is-a-rhombus-so-a-tile-index-is-raw-axial.md`
 
 use bytemuck::{Pod, Zeroable};
 
