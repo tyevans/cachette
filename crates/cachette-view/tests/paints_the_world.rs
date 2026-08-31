@@ -22,11 +22,13 @@ fn world() -> World {
         faction_count: 3,
     })
     .expect("a small extent describes a world");
+    let open = open_tiles(&world);
     for index in 0..12u32 {
         let q = (index % 12) as i32;
         let r = (index % 8) as i32;
+        let at = nearest_open(&open, Axial::new(q, r));
         world
-            .spawn_soldier(Axial::new(q, r), FactionId((index % 3) as u16))
+            .spawn_soldier(at, FactionId((index % 3) as u16))
             .expect("the address and the faction are valid");
     }
     // A spawn makes the derived structure stale. A real caller steps the
@@ -34,6 +36,44 @@ fn world() -> World {
     // rebuild it itself, or the viewer refuses to read.
     world.rebuild_bridge(1).expect("the rebuild must succeed");
     world
+}
+
+/// Returns every address of a world that admits a unit, in index order.
+///
+/// The ground refuses a soldier on water, and which tiles hold water is a
+/// property of the world seed.[^1] A test that wants soldiers spread over the
+/// world therefore takes them from this list rather than naming tiles that a
+/// later change to the generator may flood.
+///
+/// The order is the index order of the grid, which is fixed and does not
+/// depend on how a caller visited the world.[^2] The list is built once for a
+/// world, because the ground is computed on demand and a repeated sweep of a
+/// large world is slow.
+///
+/// # References
+///
+/// [^1]: ADR-0068, terrain is generated from the seed and is never stored as a map, decision D4, a draft record. `docs/adrs/draft/adr-0068-terrain-is-generated-from-the-seed-and-is-never-stored-as-a-map.md`
+/// [^2]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
+fn open_tiles(world: &World) -> Vec<Axial> {
+    let grid = world.grid();
+    let open: Vec<Axial> = (0..grid.tile_count())
+        .map(|index| Axial::new((index % grid.width()) as i32, (index / grid.width()) as i32))
+        .filter(|address| world.admits_a_unit(*address))
+        .collect();
+    assert!(
+        !open.is_empty(),
+        "every tile of the world holds water, so no soldier can stand anywhere"
+    );
+    open
+}
+
+/// Returns the open tile nearest the wanted one, with the lower index winning
+/// a tie.
+fn nearest_open(open: &[Axial], wanted: Axial) -> Axial {
+    *open
+        .iter()
+        .min_by_key(|address| wanted.distance(**address))
+        .expect("the open list holds at least one tile")
 }
 
 #[test]
@@ -107,8 +147,9 @@ fn a_faction_has_its_own_colour() {
     // draw differently, or the picture cannot show who is who.
     let mut first = empty_world();
     let mut second = empty_world();
+    let open = open_tiles(&first);
     for index in 0..6u32 {
-        let at = Axial::new(index as i32, 1);
+        let at = nearest_open(&open, Axial::new(index as i32, 1));
         first
             .spawn_soldier(at, FactionId(0))
             .expect("the address is valid");
@@ -307,10 +348,9 @@ fn large_world() -> World {
         faction_count: 4,
     })
     .expect("a large extent describes a world");
-    let tiles = world.grid().tile_count();
+    let open = open_tiles(&world);
     for index in 0..2200u32 {
-        let tile = index.wrapping_mul(9973) % tiles;
-        let at = Axial::new((tile % WIDE) as i32, (tile / WIDE) as i32);
+        let at = open[(index.wrapping_mul(9973) as usize) % open.len()];
         world
             .spawn_soldier(at, FactionId((index % 4) as u16))
             .expect("the address and the faction are valid");
@@ -522,7 +562,10 @@ fn a_stale_world_is_refused_rather_than_drawn_without_its_soldiers() {
 
     // A spawn makes the structure stale without rebuilding it.
     world
-        .spawn_soldier(Axial::new(3, 3), FactionId(0))
+        .spawn_soldier(
+            nearest_open(&open_tiles(&world), Axial::new(3, 3)),
+            FactionId(0),
+        )
         .expect("the address is valid");
 
     assert!(
@@ -538,8 +581,9 @@ fn a_stale_world_is_refused_rather_than_drawn_without_its_soldiers() {
     fresh_but_empty
         .rebuild_bridge(1)
         .expect("the rebuild must succeed");
+    let open = nearest_open(&open_tiles(&fresh_but_empty), Axial::new(2, 2));
     fresh_but_empty
-        .spawn_soldier(Axial::new(2, 2), FactionId(0))
+        .spawn_soldier(open, FactionId(0))
         .expect("the address is valid");
 
     let mut other = Canvas::new(200, 160);
@@ -561,11 +605,11 @@ fn the_viewer_reads_only_the_blocks_the_window_covers() {
         faction_count: 2,
     })
     .expect("the extent describes a world");
+    let open = open_tiles(&world);
     for index in 0..400u32 {
-        let tile = index * 997 % (96 * 96);
         world
             .spawn_soldier(
-                Axial::new((tile % 96) as i32, (tile / 96) as i32),
+                open[(index as usize * 997) % open.len()],
                 FactionId((index % 2) as u16),
             )
             .expect("the address is valid");
@@ -660,10 +704,11 @@ fn an_empty_region_is_skipped_on_the_bitplane() {
     })
     .expect("the extent describes a world");
     // Every soldier in one corner, so most blocks hold nothing.
+    let open = open_tiles(&world);
     for index in 0..24u32 {
         world
             .spawn_soldier(
-                Axial::new((index % 6) as i32, (index / 6) as i32),
+                nearest_open(&open, Axial::new((index % 6) as i32, (index / 6) as i32)),
                 FactionId(0),
             )
             .expect("the address is valid");

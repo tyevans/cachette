@@ -104,6 +104,15 @@ pub enum SoldierError {
     TileOutsideWorld(Axial),
     /// The faction identifier is at or above the ceiling.
     FactionAboveCeiling(FactionId),
+    /// The ground of the tile admits no unit.[^1]
+    ///
+    /// The address is inside the world. The refusal comes from the kind of
+    /// the ground, not from the extent, and the two never share a variant.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0068, terrain is generated from the seed and is never stored as a map, decision D4, a draft record. `docs/adrs/draft/adr-0068-terrain-is-generated-from-the-seed-and-is-never-stored-as-a-map.md`
+    TileImpassable(Axial),
 }
 
 impl core::fmt::Display for SoldierError {
@@ -119,6 +128,11 @@ impl core::fmt::Display for SoldierError {
                 formatter,
                 "the faction {} is at or above the ceiling {FACTION_CEILING}",
                 faction.0
+            ),
+            Self::TileImpassable(address) => write!(
+                formatter,
+                "the ground at ({}, {}) admits no unit",
+                address.q, address.r
             ),
         }
     }

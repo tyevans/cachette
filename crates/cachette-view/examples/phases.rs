@@ -38,12 +38,19 @@ fn build(width: u32, height: u32, soldiers: u32) -> World {
         faction_count: 4,
     })
     .expect("the extent describes a world");
-    let tiles = world.grid().tile_count();
+    // The ground refuses a soldier on water, so the measurement places its
+    // soldiers on the open ground it finds.[^1]
+    //
+    // [^1]: ADR-0068, terrain is generated from the seed and is never stored as a map, decision D4, a draft record. `docs/adrs/draft/adr-0068-terrain-is-generated-from-the-seed-and-is-never-stored-as-a-map.md`
+    let open: Vec<Axial> = (0..world.grid().tile_count())
+        .map(|index| Axial::new((index % width) as i32, (index / width) as i32))
+        .filter(|address| world.admits_a_unit(*address))
+        .collect();
+    assert!(!open.is_empty(), "the world holds no open ground");
     for index in 0..soldiers {
-        let tile = index.wrapping_mul(SPREAD) % tiles;
         world
             .spawn_soldier(
-                Axial::new((tile % width) as i32, (tile / width) as i32),
+                open[(index.wrapping_mul(SPREAD) as usize) % open.len()],
                 FactionId((index % 4) as u16),
             )
             .expect("the address and the faction are valid");

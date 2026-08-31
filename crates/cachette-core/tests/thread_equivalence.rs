@@ -118,8 +118,18 @@ fn populate(world: &mut World) -> Vec<Entity> {
     let grid = world.grid();
     let mut kept = Vec::new();
     let mut freed = Vec::new();
-    for index in 0..grid.tile_count().min(97) {
-        let address = Axial::new((index % grid.width()) as i32, (index / grid.width()) as i32);
+    // The pattern walks the tiles in index order and passes over the ground
+    // that admits no unit. Water refuses a spawn, and which tiles hold water
+    // is a property of the seed.[^1]
+    //
+    // [^1]: ADR-0068, terrain is generated from the seed and is never stored as a map, decision D4, a draft record. `docs/adrs/draft/adr-0068-terrain-is-generated-from-the-seed-and-is-never-stored-as-a-map.md`
+    let open: Vec<Axial> = (0..grid.tile_count())
+        .map(|index| Axial::new((index % grid.width()) as i32, (index / grid.width()) as i32))
+        .filter(|address| world.admits_a_unit(*address))
+        .take(97)
+        .collect();
+    for (index, address) in open.into_iter().enumerate() {
+        let index = index as u32;
         // The faction must be one the world has. This line read `index % 5`
         // against a scenario of two factions, so the suite spawned soldiers
         // of factions the world did not hold and the invariant check passed.

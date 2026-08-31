@@ -30,15 +30,23 @@ const THREADS: usize = 4;
 
 /// A named scenario. The name is the golden file name.
 ///
-/// The third scenario holds soldiers. The other two leave the arena empty,
-/// so their hashes cover the tile columns and an empty arena only. A golden
-/// file that never sees a populated arena cannot catch a change to how the
-/// soldier state is represented, which is the whole purpose of a golden
-/// file.[^1]
+/// The third and fourth scenarios hold soldiers. The first two leave the
+/// arena empty, so their hashes cover the tile columns and an empty arena
+/// only. A golden file that never sees a populated arena cannot catch a
+/// change to how the soldier state is represented, which is the whole purpose
+/// of a golden file.[^1]
+///
+/// The fourth scenario is wider than the coarsest lattice spacing of the
+/// generator, so its world holds water as well as open ground. The third is
+/// narrower and holds no water at all. A suite of narrow worlds alone cannot
+/// see a change to the rule that the ground refuses a unit, because no
+/// soldier in it ever meets water.[^2] [^3]
 ///
 /// # References
 ///
 /// [^1]: ADR-0001, one binary gives one answer at any thread count, decision D4. `docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
+/// [^2]: ADR-0068, terrain is generated from the seed and is never stored as a map, decision D4, a draft record. `docs/adrs/draft/adr-0068-terrain-is-generated-from-the-seed-and-is-never-stored-as-a-map.md`
+/// [^3]: Testing rules, section 2a. `.claude/rules/testing.md`
 const SCENARIOS: &[(&str, WorldConfig, bool)] = &[
     (
         "small",
@@ -70,6 +78,16 @@ const SCENARIOS: &[(&str, WorldConfig, bool)] = &[
         },
         true,
     ),
+    (
+        "shoreline",
+        WorldConfig {
+            width: 96,
+            height: 96,
+            seed: 0x0cac_4e77_0068,
+            faction_count: 3,
+        },
+        true,
+    ),
 ];
 
 /// Fills a world with soldiers, and frees some of them.
@@ -82,14 +100,24 @@ const SCENARIOS: &[(&str, WorldConfig, bool)] = &[
 ///
 /// [^1]: ADR-0014, entity identity is an index plus a generation, decisions D3 and D4. `docs/adrs/accepted/adr-0014-entity-identity-is-an-index-plus-a-generation.md`
 fn populate(world: &mut World) {
+    // The ground refuses a soldier on water, so the pattern walks the open
+    // tiles in index order rather than the whole grid.[^2] The order is the
+    // index order of the grid, which is fixed.[^3]
     let grid = world.grid();
+    let open: Vec<Axial> = (0..grid.tile_count())
+        .map(|index| Axial::new((index % grid.width()) as i32, (index / grid.width()) as i32))
+        .filter(|address| world.admits_a_unit(*address))
+        .collect();
+    assert!(
+        open.len() >= 64,
+        "the scenario left only {} open tiles, too few to people",
+        open.len()
+    );
     let mut freed = Vec::new();
-    for step in 0..64u32 {
-        let q = (step * 7 % grid.width()) as i32;
-        let r = (step * 5 % grid.height()) as i32;
+    for step in 0..64usize {
         let faction = FactionId((step % 3) as u16);
         let soldier = world
-            .spawn_soldier(Axial::new(q, r), faction)
+            .spawn_soldier(open[step * 7 % open.len()], faction)
             .expect("the spawn must succeed");
         if step % 3 == 0 {
             freed.push(soldier);
@@ -98,11 +126,9 @@ fn populate(world: &mut World) {
     for soldier in freed {
         assert!(world.despawn_soldier(soldier));
     }
-    for step in 0..8u32 {
-        let q = (step * 3 % grid.width()) as i32;
-        let r = (step * 11 % grid.height()) as i32;
+    for step in 0..8usize {
         world
-            .spawn_soldier(Axial::new(q, r), FactionId(0))
+            .spawn_soldier(open[step * 11 % open.len()], FactionId(0))
             .expect("the respawn must reuse a freed slot");
     }
 }
