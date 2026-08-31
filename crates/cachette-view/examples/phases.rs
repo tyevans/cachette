@@ -62,6 +62,21 @@ fn mean_micros(width: u32, height: u32, soldiers: u32, threads: usize) -> f64 {
     at.elapsed().as_secs_f64() * 1_000_000.0 / f64::from(TICKS)
 }
 
+/// Returns the mean cost of one bridge rebuild, in microseconds.
+///
+/// The rebuild is the derived structure the step builds at the barrier. It
+/// is public, so it can be measured on its own, which separates it from the
+/// movement that fills it.
+fn rebuild_micros(width: u32, height: u32, soldiers: u32, threads: usize) -> f64 {
+    let mut world = build(width, height, soldiers);
+    world.rebuild_bridge(threads).expect("the rebuild must run");
+    let at = Lap::start();
+    for _ in 0..TICKS {
+        world.rebuild_bridge(threads).expect("the rebuild must run");
+    }
+    at.elapsed().as_secs_f64() * 1_000_000.0 / f64::from(TICKS)
+}
+
 fn main() {
     let threads = std::thread::available_parallelism()
         .map_or(1, std::num::NonZeroUsize::get)
@@ -80,6 +95,13 @@ fn main() {
     ];
     for (name, width, height, soldiers) in cases {
         let us = mean_micros(*width, *height, *soldiers, threads);
+        println!("{name:<34} {us:>12.0}");
+    }
+
+    println!();
+    println!("{:<34} {:>12}", "rebuild alone", "us");
+    for (name, width, height, soldiers) in cases {
+        let us = rebuild_micros(*width, *height, *soldiers, threads);
         println!("{name:<34} {us:>12.0}");
     }
 
