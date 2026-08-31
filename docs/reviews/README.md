@@ -33,14 +33,18 @@ review belongs to.
 
 ## When a record may be accepted
 
-**Not while a review of it is in flight.** An accepted record does not change
-except in status, so acceptance is the expensive step. A verdict that has not
-arrived is not a verdict, and the absence of an objection is not the absence
-of a defect.
+**Prefer not to accept while a review of it is in flight.** A verdict that
+has not arrived is not a verdict, and the absence of an objection is not the
+absence of a defect.
 
 This has happened once. Four records were accepted on a first review while a
 second was still reading them, and the second found a claim in one record
 that another record falsified.[^2]
+
+The remedy is small, and the first attempt made it large. A record accepted
+an hour ago has no dependents, so the amendment goes in directly under the
+retcon window.[^1] Reverting the status to `Draft` and accepting it again
+records a history that did not happen.
 
 ## Who may review
 

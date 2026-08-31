@@ -72,6 +72,34 @@ do so again.
 An accepted record does not change. To change a decision, write a new record
 that supersedes it.
 
+### The retcon window
+
+**The freeze protects a record's dependents, not the record.** A record that
+nothing cites, that no code implements, and that no other record was written
+against has no dependents, so amending it breaks nothing and a supersession
+record would say only that the author changed their mind an hour later.
+
+Amend an accepted record in place when all three hold:
+
+1. **Nothing depends on it yet.** No other record cites it, no source file
+   cites it, and no backlog item was refined against the claim you are
+   changing.
+2. **The amendment repairs the record rather than reversing it.** Correcting
+   false reasoning, a stale reference, or a claim that contradicts a sibling
+   record is a repair. Deciding the opposite thing is not, and that needs a
+   supersession however recent the acceptance.
+3. **The commit says what changed and why the freeze did not apply.** The
+   commit message is the audit trail. A silent edit to an accepted record is
+   the failure this whole section is about.
+
+Outside that window, supersede.
+
+**A draft is not covered by any of this.** A draft exists to be edited. Edit
+it, and do not revert its status to justify doing so.
+
+The window closes the moment someone builds on the record, which is usually
+the next commit. When in doubt, assume it closed.
+
 ## What does not belong in a record
 
 A record is a historical document. It must not hold material that changes.

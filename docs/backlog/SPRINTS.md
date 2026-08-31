@@ -70,6 +70,12 @@ and the two cannot drift.
 that governs a sprint is either accepted in that sprint or its claim is
 treated as provisional and cited as a draft.
 
+**Correcting a record is cheap until something depends on it.** A draft is
+edited. A record accepted in the same sprint, with nothing built on it, is
+repaired in place and the commit says so.[^7] Only a record with dependents
+needs a supersession. A process that makes a small correction expensive gets
+expensive corrections, or none.
+
 **Work runs in parallel where the files do not overlap.** Two agents that
 write to one file produce a conflict, and resolving it costs more than the
 parallelism saved. Split by directory: the records, the core, and the
@@ -169,6 +175,7 @@ is precedent, and precedent does not live in a sprint log.
 [^4]: Findings register. `docs/FINDINGS.md`
 [^5]: ADR Registry, who reviews. `docs/adrs/REGISTRY.md`
 [^6]: Reviews index. `docs/reviews/README.md`
+[^7]: ADR Registry, the retcon window. `docs/adrs/REGISTRY.md`
 
 ### Sprint 2 — planning
 

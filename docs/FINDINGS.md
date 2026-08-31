@@ -705,11 +705,20 @@ decision and unbounded in a consequence.
 Nothing was pushed, so the acceptances were reverted, the amendments applied,
 and the records accepted once with both reviews read.
 
-**Follows.** The registry says an accepted record does not change except in
-status, which makes acceptance the expensive step and the one to be slow
-about. The rule that was missing is simple: **do not accept while a review is
-in flight.** A verdict that has not arrived is not a verdict, and the absence
-of an objection is not the absence of a defect.
+**Follows.** The rule that was missing is simple: **prefer not to accept
+while a review is in flight.** A verdict that has not arrived is not a
+verdict, and the absence of an objection is not the absence of a defect.
+
+The remedy chosen at the time was wrong, and the correction matters more than
+the original finding. The records were reverted to `Draft`, amended, and
+accepted a second time. That was unnecessary. The freeze on an accepted
+record protects the things built on it, and nothing had been built on these:
+no other record cited the amended claims, no code implemented them, and the
+acceptance was an hour old. The registry now states a retcon window for
+exactly this case, and states that a draft may simply be edited.[^8]
+
+A process that punishes a cheap correction produces expensive corrections, or
+none.
 
 The second review also disagreed with the first about ADR-0018, which is the
 argument for having had two. A single reviewer that agrees with the author is
@@ -724,3 +733,4 @@ indistinguishable from no reviewer.
 [^5]: Findings register, FND-004, in this document.
 [^6]: Record scope research. `docs/research/adr-scope-findings.md`
 [^7]: Decision Record Scope, section 4.5. `.claude/rules/adr-scope.md`
+[^8]: ADR Registry, the retcon window. `docs/adrs/REGISTRY.md`

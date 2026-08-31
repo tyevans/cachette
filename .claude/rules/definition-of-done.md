@@ -82,6 +82,12 @@ is done.
   review rights and what a delegated review must do that a second reader
   would do for free.[^1]
 
+  **Edit a draft freely.** A draft exists to be edited, and its status is not
+  a reason to hesitate. An accepted record with no dependents may be repaired
+  in place inside the retcon window; say so in the commit.[^1] Do not revert
+  an accepted record to `Draft` in order to amend it, because that records a
+  history that did not happen.
+
 ## 5. Pass the gates
 
 - Formatting, lint, and type checks pass.
