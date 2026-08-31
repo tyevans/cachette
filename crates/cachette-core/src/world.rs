@@ -676,15 +676,8 @@ impl World {
         // barrier.[^4]
         //
         // This is not a second barrier. The rebuild at the end of this
-        // function is the barrier of this frame, and it stays last. This call
-        // closes the frame that the caller's own changes belong to, and it
-        // does nothing when the caller already rebuilt or when nothing
-        // changed.
-        //
-        // [^4]: ADR-0018, the unit-to-tile bridge is derived, and it rebuilds at the barrier, decision D3. `docs/adrs/accepted/adr-0018-the-unit-to-tile-bridge-is-derived-and-rebuilds-at-the-barrier.md`
-        if self.bridge.describes(&self.soldiers).is_err() {
-            self.bridge.rebuild(&self.soldiers)?;
-        }
+        // function is the barrier of this frame, and it stays last.
+        self.refresh_bridge()?;
 
         let intents = soldier_moves(tick, seed, self.terrain, &self.soldiers, threads)?;
 
@@ -713,8 +706,42 @@ impl World {
         // [^1]: ADR-0056, movement is tile-discrete and admitted by sort-then-admit, decision D2. `docs/adrs/accepted/adr-0056-movement-is-tile-discrete-and-admitted-by-sort-then-admit.md`
         // [^2]: ADR-0018, the unit-to-tile bridge is derived, and it rebuilds at the barrier, decision D3. `docs/adrs/accepted/adr-0018-the-unit-to-tile-bridge-is-derived-and-rebuilds-at-the-barrier.md`
         // [^3]: ADR-0056, movement is tile-discrete and admitted by sort-then-admit, decision D3. `docs/adrs/accepted/adr-0056-movement-is-tile-discrete-and-admitted-by-sort-then-admit.md`
-        self.bridge.rebuild(&self.soldiers)?;
+        // [^4]: ADR-0018, the unit-to-tile bridge is derived, and it rebuilds at the barrier, decision D3. `docs/adrs/accepted/adr-0018-the-unit-to-tile-bridge-is-derived-and-rebuilds-at-the-barrier.md`
+        self.refresh_bridge()?;
         Ok(&self.log)
+    }
+
+    /// Rebuilds the derived structure when it no longer describes the arena.
+    ///
+    /// One rule governs both rebuild sites in the step: rebuild when the
+    /// arena has moved since the last rebuild, and not otherwise. The
+    /// structure holds the revision it was built from, so the test is one
+    /// comparison and it reads no unit.
+    ///
+    /// **A frame in which no unit moved rebuilds nothing.** A structure that
+    /// already describes the arena is the structure a rebuild would produce,
+    /// so skipping it is not an optimisation that trades a guarantee. The
+    /// record sanctions a rebuild each frame and argues from the merge order
+    /// of incremental writes rather than from frequency, so it neither
+    /// requires the rebuild nor forbids the test.[^1]
+    ///
+    /// A crowd is where this pays. A unit whose every target is full is
+    /// refused every frame, and a world in which nothing was admitted leaves
+    /// the arena untouched.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the rebuild refuses to run.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0018, the unit-to-tile bridge is derived, and it rebuilds at the barrier, decision D3. `docs/adrs/accepted/adr-0018-the-unit-to-tile-bridge-is-derived-and-rebuilds-at-the-barrier.md`
+    fn refresh_bridge(&mut self) -> Result<(), StepError> {
+        if self.bridge.describes(&self.soldiers).is_ok() {
+            return Ok(());
+        }
+        self.bridge.rebuild(&self.soldiers)?;
+        Ok(())
     }
 }
 
