@@ -50,6 +50,10 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 ADR_DIRS = [ROOT / "docs" / "adrs" / "draft", ROOT / "docs" / "adrs" / "accepted"]
 REGISTRY = ROOT / "docs" / "adrs" / "REGISTRY.md"
+PRD_DIRS = [
+    ROOT / "docs" / "product" / d for d in ("idea", "shaped", "accepted", "shipped")
+]
+PRD_REGISTRY = ROOT / "docs" / "product" / "REGISTRY.md"
 
 # The records themselves. check_adrs.py already reads these, and reading them
 # here would report every failure twice.
@@ -71,6 +75,8 @@ SKIP_PATHS = {
     # failure against two paths and blames the wrong tree.
     ROOT / ".claude" / "worktrees",
     ROOT / "scripts" / "check_citations.py",
+    # The product records themselves. check_prds.py already reads these.
+    ROOT / "docs" / "product",
     # Deliberately broken. Continuous integration runs the check against this
     # directory on purpose and fails when the check passes.
     ROOT / "tests" / "fixtures",
@@ -79,6 +85,9 @@ SUFFIXES = {".md", ".rs", ".py", ".pyi", ".toml", ".yml", ".yaml", ".sh", ".txt"
 EXTRA_FILES = {ROOT / "justfile"}
 
 CITE = re.compile(r"\bADR-(\d{4})(?:\s+D(\d+))?")
+PRD_CITE = re.compile(r"\bPRD-(\d{4})")
+PRD_FILENAME = re.compile(r"^prd-(\d{4})-[a-z0-9-]+\.md$")
+PRD_ROW = re.compile(r"^\|\s*(\d{4})\s*\|", re.M)
 CODE_SPAN = re.compile(r"`+[^`\n]*`+")
 FOOTNOTE_PATH = re.compile(r"`(docs/[^`]+\.md)`")
 FILENAME = re.compile(r"^adr-(\d{4})-[a-z0-9-]+\.md$")
@@ -143,6 +152,20 @@ def main() -> int:
     registry = REGISTRY.read_text(encoding="utf-8") if REGISTRY.exists() else ""
     rows = {m.group(1) for m in REGISTRY_ROW.finditer(registry)}
 
+    # A product record has no numbered decisions, so a citation of one is
+    # checked against the files and the registry only.
+    products: set[str] = set()
+    for directory in PRD_DIRS:
+        if not directory.is_dir():
+            continue
+        for path in sorted(directory.glob("*.md")):
+            m = PRD_FILENAME.match(path.name)
+            if m:
+                products.add(m.group(1))
+    if PRD_REGISTRY.exists():
+        text = PRD_REGISTRY.read_text(encoding="utf-8")
+        products |= {m.group(1) for m in PRD_ROW.finditer(text)}
+
     if not decisions:
         print("check_citations: no records found", file=sys.stderr)
         return 1
@@ -177,6 +200,16 @@ def main() -> int:
                 failures.append(
                     f"{name}:{line_of(text, m.start())}: cites ADR-{number} D{decision}, "
                     f"which ADR-{number} does not define"
+                )
+
+        for m in PRD_CITE.finditer(prose):
+            number = m.group(1)
+            checked += 1
+            seen_here += 1
+            if number not in products:
+                failures.append(
+                    f"{name}:{line_of(text, m.start())}: cites PRD-{number}, "
+                    f"which no product record and no registry row has"
                 )
 
         for m in FOOTNOTE_PATH.finditer(text):
