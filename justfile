@@ -50,6 +50,10 @@ test-python:
     uv sync
     uv run pytest
 
+# Open the window and watch the world run. Needs a display.
+watch:
+    cargo run --release --package cachette-view
+
 # Exercise the installed package the way continuous integration does.
 smoke:
     uv sync
@@ -79,7 +83,10 @@ test-slow:
 
 # Check that the code compiles for the primary target of ADR-0008.
 target-check:
-    cargo check --workspace --target aarch64-unknown-linux-gnu
+    # The viewer is excluded. It opens a window, so it links a C library that
+    # needs a cross-compiler, and a window on a headless server means nothing.
+    # ADR-0008 names the primary target for the engine, which is what ships.
+    cargo check --package cachette-core --package cachette-py --target aarch64-unknown-linux-gnu
 
 # Run mutation testing over the Rust core. Slow. Not a commit gate.
 mutants:

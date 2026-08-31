@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["crates/cachette-core", "crates/cachette-py"]
+members = ["crates/cachette-core", "crates/cachette-py", "crates/cachette-view"]
 
 [workspace.package]
 version = "0.0.0"

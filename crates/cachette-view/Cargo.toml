@@ -1,0 +1,17 @@
+[package]
+name = "cachette-view"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+
+# ADR-0067 D5: the viewer depends on the core, and the core never depends on
+# the viewer. The direction is what makes "the engine holds no value that
+# exists for the viewer" a compiler check rather than a reviewer's judgement.
+[dependencies]
+cachette-core = { path = "../cachette-core", version = "0.0.0" }
+minifb = "0.28"
+
+[lints]
+workspace = true
