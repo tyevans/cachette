@@ -66,6 +66,10 @@ SKIP_PATHS = {
     # session held at the moment it was written, including a retired number,
     # and nobody maintains it.
     ROOT / ".claude" / "tackline",
+    # A worktree holds another checkout of this repository. Its files are
+    # checked by the run that owns them, and reading them here reports one
+    # failure against two paths and blames the wrong tree.
+    ROOT / ".claude" / "worktrees",
     ROOT / "scripts" / "check_citations.py",
     # Deliberately broken. Continuous integration runs the check against this
     # directory on purpose and fails when the check passes.
