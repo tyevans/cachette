@@ -728,3 +728,58 @@ fn an_empty_region_is_skipped_on_the_bitplane() {
         "more blocks were read than skipped, though the soldiers sit in one corner",
     );
 }
+
+#[test]
+fn a_run_that_draws_reaches_the_state_a_run_that_does_not_draw_reaches() {
+    // PRD-0002: the engine gives the same results when no window is open.
+    //
+    // The crate already proves that one frame leaves the world unchanged.
+    // That is the weaker statement. This one runs a whole sequence: one
+    // world steps and is drawn after every step, the other steps alone, and
+    // the two must land on one state hash. A viewer that moved the world by
+    // a little on each frame, or that advanced a shared counter the engine
+    // read, passes the single-frame test and fails this one.
+    //
+    // The camera moves between the frames, because the camera is what a
+    // person changes while watching. A camera that reached the engine would
+    // make the drawn run diverge from the run with no window.
+    //
+    // What this cannot fail on: a write the borrow checker already refuses.
+    // The shared reference is the real guard, and this test states the
+    // weaker thing a test can state.
+    let mut unwatched = world();
+    let mut watched = world();
+    assert_eq!(
+        unwatched.state_hash(),
+        watched.state_hash(),
+        "the two worlds must start equal, or the test compares nothing",
+    );
+
+    // The camera moves by a different amount on each frame. The steps are
+    // written as literals, because the workspace bans the float types by
+    // name and the viewer takes its camera step as a float.
+    let steps = [(1.0, 0.0), (0.0, 1.0), (-1.0, 2.0), (2.0, -1.0)];
+    let mut canvas = Canvas::new(200, 160);
+    let mut camera = Camera::fitting(&watched, &canvas);
+    for frame in 0..12usize {
+        unwatched.step(2).expect("the unwatched step must run");
+        watched.step(2).expect("the watched step must run");
+        let (across, down) = steps[frame % steps.len()];
+        camera = camera.stepped(across, down).clamped(&watched, &canvas);
+        paint::draw(&watched, camera, &mut canvas).expect("the bridge must describe the arena");
+    }
+
+    // The run must have moved something, or two frozen worlds would agree
+    // for the wrong reason.
+    assert_ne!(
+        unwatched.state_hash(),
+        world().state_hash(),
+        "twelve steps changed nothing, so the comparison proves nothing",
+    );
+    assert_eq!(
+        unwatched.state_hash(),
+        watched.state_hash(),
+        "the drawn run reached a different state from the run with no window",
+    );
+    assert_eq!(unwatched.tick(), watched.tick());
+}

@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-058**
+**Next number: FND-060**
 
 ## A. Corrections to stated rules
 
@@ -1195,6 +1195,72 @@ that fails when they disagree.[^13] A deferral pair is the inverse: one fact
 stored in no place, with two records that each say it lives in the other.
 Neither check can see it, because each record is well formed on its own.
 
+### FND-058 — A completed item's outcome decays like any other document
+
+**Believed.** An outcome section is history. It says what one item did at one
+moment, so it stays true in the way a commit message stays true.
+
+**True.** An outcome sits in the tree and reads in the present tense. It is a
+document, and it decays. The commit message rule puts a count in the commit
+because a commit is fixed to one change. An outcome is not fixed to one
+change, because later work changes the thing it describes.
+
+**Evidence.** The outcome of the demonstration binary item said the binary
+builds a world of a stated extent with a stated soldier count. Later work
+raised both by more than an order of magnitude. Nothing failed. The audit of
+the product record found it by reading the binary and then the record.
+
+A second instance sits in the review of the viewer boundary record, which
+states the soldier count the binary spawned when the review ran.
+
+**Follows.** Three things.
+
+**Do not put a count in an outcome section.** Put it in the commit message,
+which the item's history already reaches.
+
+**Say what the work achieved, not what the code now holds.** An outcome that
+names a behaviour survives a change to a constant. An outcome that names the
+constant does not.
+
+**This is the document rot shape, in a place the rule did not name.** The
+recurring defect rule warns that a decision record holds no count.[^14] The
+warning applies to every document that a later change can falsify, and an
+outcome section is one.
+
+### FND-059 — A comment can claim that one fact has one site while a second site exists
+
+**Believed.** Tile passability is the tile capacity being zero, and nothing
+else states it. The terrain module says so in its own words, and it says so
+because two rules that can disagree would be one fact in two places.
+
+**True.** A second site exists, and it is the site every caller uses. The
+kind's passability test matches on the water kind by name. It does not read
+the capacity. Four call sites in the engine read the passability test. None
+reads the capacity to decide whether a unit may stand.
+
+The two agree today, because water is the one kind with a capacity of zero. A
+kind added with a capacity of zero and no water in its name would be passable
+and would admit nobody. Nothing fails, and no test compares the two.
+
+**Evidence.** Found while auditing the product record for the viewer. The
+comment that denies the second site sits directly above the capacity table,
+and the passability test sits directly above the comment.
+
+**Follows.** Three things.
+
+**A comment is not a check.** The recurring defect rule already says this: do
+not add a comment that names the winner.[^13] This instance is stronger,
+because the comment does not name a winner. It denies that a second site
+exists at all, which reads as a check and is not one.
+
+**Derive the second site from the first, or add a check that compares them.**
+The passability test can return the capacity being greater than zero. That
+removes the site rather than reconciling it.
+
+**Local evidence now exists for the redundant declaration shape in code.** The
+shape's only local instance was a numbering collision in a register. This one
+is in the engine.
+
 
 ## References
 
@@ -1211,3 +1277,4 @@ Neither check can see it, because each record is well formed on its own.
 [^11]: Findings register, FND-051, in this document.
 [^12]: Decision Record Scope, section 4.1. `.claude/rules/adr-scope.md`
 [^13]: Recurring Defect Shapes, shape 1. `.claude/rules/recurring-defects.md`
+[^14]: Recurring Defect Shapes, shape 2. `.claude/rules/recurring-defects.md`
