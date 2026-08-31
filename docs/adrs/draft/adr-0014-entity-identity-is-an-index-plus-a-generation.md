@@ -149,7 +149,7 @@ of arena designs reaches the same reuse rule and the same retirement rule.[^7]
 ## References
 
 [^1]: ADR-0012, tiles are dense columns and units are a generational arena. `docs/adrs/draft/adr-0012-tiles-are-dense-columns-and-units-are-a-generational-arena.md`
-[^2]: ADR-0018, the unit-to-tile bridge is three structures, and units stay sorted by tile. `docs/adrs/draft/adr-0018-the-unit-to-tile-bridge-is-three-structures-and-units-stay-sorted-by-tile.md`
+[^2]: ADR-0018, the unit-to-tile bridge is three structures, and units stay sorted by tile. `docs/adrs/draft/adr-0018-the-unit-to-tile-bridge-is-derived-and-rebuilds-at-the-barrier.md`
 [^3]: ADR-0001, one binary gives one answer at any thread count. `docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
 [^4]: ADR-0020, structural change batches at the barrier and applies by tombstone and compact. `docs/adrs/REGISTRY.md`
 [^5]: ADR-0004, iteration order is explicit, and unordered reductions need slots. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`

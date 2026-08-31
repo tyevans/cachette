@@ -81,10 +81,11 @@ just golden
 
 **A determinism test must have a proven failure mode.** A test that
 compares a run against itself always passes. The core crate carries a
-test-only feature, `probe-nondeterminism`. It makes the step join its
-output slots in reverse order, which breaks the ordering rule on
-purpose.[^5] Under that feature the thread-count test must fail and
-`determinism_probe.rs` must pass.
+test-only feature, `probe-nondeterminism`. It makes every slot reduction
+read its slots in reverse index order, which breaks the ordering rule on
+purpose.[^5] It reaches the event log join and every minimum, maximum and
+first-wins. Under that feature the thread-count test and the slot reduction
+test must fail, and `determinism_probe.rs` must pass.
 
 ```
 just probe

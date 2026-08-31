@@ -23,6 +23,7 @@
 
 use cachette_core::sort::{self, SortError, SortKey};
 use proptest::prelude::*;
+use proptest::test_runner::FileFailurePersistence;
 
 /// The number of fields in the generated key.
 const FIELDS: usize = 3;
@@ -57,6 +58,19 @@ fn is_a_permutation(order: &[u32], count: usize) -> bool {
 }
 
 proptest! {
+    #![proptest_config(ProptestConfig {
+        // An integration test has no lib.rs or main.rs above it, so the
+        // default source-parallel persistence finds no root and silently
+        // disables itself. A failing seed is then never written and never
+        // replayed. Name the file, so that a seed which caught a defect runs
+        // first on every later run.[^1]
+        //
+        // [^1]: Findings register, FND-044. `docs/FINDINGS.md`
+        failure_persistence: Some(Box::new(FileFailurePersistence::Direct(
+            concat!(env!("CARGO_MANIFEST_DIR"), "/tests/key_vector_sort.proptest-regressions"),
+        ))),
+        ..ProptestConfig::default()
+    })]
     /// The order is identical at every thread count.
     #[test]
     fn the_order_does_not_depend_on_the_thread_count(keys in tied_keys()) {

@@ -18,6 +18,26 @@
 //! lexicographic order of the fields.[^4] An unsigned field permits a radix
 //! sort later, and the interface does not change if that arrives.
 //!
+//! # Why the probe does not make this module fail
+//!
+//! The test-only perturbation reverses slot order, and every determinism test
+//! elsewhere fails under it.[^5] The tests here pass. That is not a gap, and
+//! the reason is worth stating rather than leaving for a reader to rediscover.
+//!
+//! The parallel sort orders each chunk into its own slot and then merges the
+//! runs. The merge picks the lowest remaining key, and every key is unique
+//! because its last field is a stable identifier.[^2] The output is therefore
+//! one exact permutation whatever order the runs are read in. Reversing the
+//! runs changes nothing.
+//!
+//! The runs are still read through the one combine that fixes slot order,
+//! rather than through the raw slot array. The order-independence is a
+//! property of this algorithm, and a later algorithm that loses it must not
+//! also have to remember to change where it reads.
+//!
+//! A determinism test with no proven failure mode is decoration.[^5] This
+//! module states instead that it has no failure mode to prove, and says why.
+//!
 //! Use [`descending`] to invert one field. Use [`from_signed`] to carry a
 //! signed value in a field.
 //!
@@ -27,6 +47,7 @@
 //! [^2]: ADR-0007, content supplies a key vector, never a comparator, decision D2. `docs/adrs/accepted/adr-0007-content-supplies-a-key-vector-never-a-comparator.md`
 //! [^3]: ADR-0007, content supplies a key vector, never a comparator, decision D3. `docs/adrs/accepted/adr-0007-content-supplies-a-key-vector-never-a-comparator.md`
 //! [^4]: ADR-0002, simulated and aggregated state holds no floating point number, decision D1. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
+//! [^5]: Testing Rules, a determinism test must be able to fail. `.claude/rules/testing.md`
 
 use crate::slots::Slots;
 
@@ -198,7 +219,19 @@ pub fn order_on<const N: usize>(
         }
     });
 
-    Ok(merge_runs(runs.entries(), keys))
+    // The runs are read through `combine`, which is the one place that fixes
+    // slot order.[^1] Reading `entries()` here would give the same answer
+    // today, because the merge compares unique keys, but it would put the
+    // sort outside the reach of the probe and leave the thread-count test
+    // with no proven failure mode.[^2]
+    //
+    // [^1]: ADR-0004, iteration order is explicit, decision D3. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
+    // [^2]: Testing Rules, a determinism test must be able to fail. `.claude/rules/testing.md`
+    let ordered: Vec<&[u32]> = runs.combine(Vec::new(), |mut gathered, run| {
+        gathered.push(run.as_slice());
+        gathered
+    });
+    Ok(merge_runs(&ordered, keys))
 }
 
 /// Returns the items in key order.
@@ -268,7 +301,7 @@ fn sorted_run<const N: usize>(chunk: &[SortKey<N>], start: u32) -> Vec<u32> {
 /// # References
 ///
 /// [^1]: ADR-0007, content supplies a key vector, never a comparator, decision D2. `docs/adrs/accepted/adr-0007-content-supplies-a-key-vector-never-a-comparator.md`
-fn merge_runs<const N: usize>(runs: &[Vec<u32>], keys: &[SortKey<N>]) -> Vec<u32> {
+fn merge_runs<const N: usize>(runs: &[&[u32]], keys: &[SortKey<N>]) -> Vec<u32> {
     let mut heads = vec![0usize; runs.len()];
     let mut merged = Vec::with_capacity(keys.len());
     for _ in 0..keys.len() {

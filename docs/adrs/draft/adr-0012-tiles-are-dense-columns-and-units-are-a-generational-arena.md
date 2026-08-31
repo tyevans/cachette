@@ -105,5 +105,5 @@ would rewrite every system.
 [^3]: ADR-0017, the world is a rhombus, so a tile index is raw axial. `docs/adrs/draft/adr-0017-the-world-is-a-rhombus-so-a-tile-index-is-raw-axial.md`
 [^4]: ADR-0015, a tile column is narrow, with bitplanes and sparse side tables. `docs/adrs/REGISTRY.md`
 [^5]: ADR-0014, entity identity is an index plus a generation. `docs/adrs/draft/adr-0014-entity-identity-is-an-index-plus-a-generation.md`
-[^6]: ADR-0018, the unit-to-tile bridge is three structures, and units stay sorted by tile. `docs/adrs/draft/adr-0018-the-unit-to-tile-bridge-is-three-structures-and-units-stay-sorted-by-tile.md`
+[^6]: ADR-0018, the unit-to-tile bridge is three structures, and units stay sorted by tile. `docs/adrs/draft/adr-0018-the-unit-to-tile-bridge-is-derived-and-rebuilds-at-the-barrier.md`
 [^7]: ADR-0016, tiles are stored in block-tiled order at the aggregation block size. `docs/adrs/REGISTRY.md`

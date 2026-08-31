@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-044**
+**Next number: FND-045**
 
 ## A. Corrections to stated rules
 
@@ -653,6 +653,36 @@ The test shape matters more than the fix. Every test that allocates a second
 entity before checking anything would pass. **When a type refuses a value,
 write the test that asks whether the refused value was needed**, not only the
 test that confirms the refusal happens.
+
+### FND-044 — The saved property seeds were never read or written
+
+**Believed.** A property test that fails saves the seed of the failing case
+to a regression file. The file is checked in, so the case that caught a
+defect runs first on every later run. A commit message asserted this.
+
+**True.** Nothing was saved and nothing was replayed. The default persistence
+finds the source root by walking up from the test file looking for a library
+or binary root. An integration test has neither above it, so persistence
+silently disabled itself and the files were inert. They had been committed,
+read as evidence of a working practice, and cited in a commit message.
+
+**Evidence.** Every failing run printed a line saying persistence was set but
+found no root, and the message was lost in the test output. A code review
+counted four of them in one run. Deleting a regression file and re-running a
+deliberately broken build wrote nothing back until the persistence path was
+named explicitly.
+
+**Follows.** The file existed, so the practice looked healthy. This is the
+inert capability shape in a form that is worse than usual, because the
+artefact is present and has content: the seeds were real seeds, written by
+hand or by an earlier run under different conditions, and they simply never
+ran.
+
+**When a tool reports that it disabled itself, that report is a failure.** It
+appeared on standard output among passing tests, where nothing reads it. The
+lesson is not to read more output. It is that a claim about the test suite
+needs the same proof as a claim about the engine: delete the artefact, cause
+the failure, and check that the artefact came back.
 
 ## References
 

@@ -1,4 +1,4 @@
-# ADR-0018: The unit-to-tile bridge is three structures, and units stay sorted by tile
+# ADR-0018: The unit-to-tile bridge is derived, and it rebuilds at the barrier
 
 Status: Draft
 
@@ -22,9 +22,14 @@ must be rebuildable from the unit columns alone.
 
 ## Decision
 
-### D1. The bridge is three structures
+### D1. The bridge is its own arrays, and it owns none of the units
 
-The bridge holds a key array, a unit array, and a block range array.
+The bridge holds a key array, a unit array, a block range array, and a block
+occupancy bitplane. D5 states what the bitplane is for.
+
+The bridge is wholly derived. It holds no fact that the entity columns do not
+already hold, and destroying it loses nothing. The arena is never sorted and
+never compacted, because the slot index is half of the identity.[^7]
 
 The key array holds one bridge key for each occupying unit. The unit array
 holds the matching entity identities in the same order. The block range array
@@ -56,7 +61,9 @@ sorts the occupying units by the bridge key with a radix sort on the integer
 key.
 
 The sort is total. Units that share a bridge key break the tie on the entity
-slot index, so the order is fixed and no two runs disagree.[^4] The bridge
+slot index, so the order is fixed and no two runs disagree.[^4] The key is a
+vector of exact integer fields whose last field is a stable identifier, which
+is the form the engine sorts by everywhere.[^10] The bridge
 holds no result whose order came from a thread finishing first.
 
 The engine never updates the bridge incrementally while systems run. An
@@ -144,3 +151,4 @@ of detail pyramid, so the bridge and the pyramid share one partition.[^9]
 [^7]: ADR-0014, entity identity is an index plus a generation. `docs/adrs/draft/adr-0014-entity-identity-is-an-index-plus-a-generation.md`
 [^8]: Report 01, the entity component system core and the memory layout, section 9. `docs/research/reports/01-ecs-and-memory-layout.md`
 [^9]: Report 02, the hex grid and the level of detail pyramid, sections 3.4 and 7.4. `docs/research/reports/02-hex-grid-and-lod-pyramid.md`
+[^10]: ADR-0007, content supplies a key vector, never a comparator. `docs/adrs/accepted/adr-0007-content-supplies-a-key-vector-never-a-comparator.md`

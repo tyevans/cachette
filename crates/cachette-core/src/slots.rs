@@ -44,7 +44,12 @@ impl std::error::Error for SlotError {}
 /// # References
 ///
 /// [^1]: ADR-0002, simulated and aggregated state holds no floating point number, decision D1. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+// The derived comparison traits are deliberately absent. A lexicographic
+// order on (rank, payload) gives the highest payload on a tied rank, and
+// `minimum` and `maximum` give the lowest slot index. Two orders that
+// disagree, both reachable and both looking authoritative, is the shape this
+// project has met before. Order a candidate through `Slots`, or not at all.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct Candidate<P> {
     /// The value that the reduction compares.
     pub rank: i64,
@@ -123,7 +128,7 @@ impl<T> Slots<T> {
     /// # References
     ///
     /// [^1]: ADR-0004, iteration order is explicit, decision D3. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
-    pub fn combine<A>(&self, initial: A, mut fold: impl FnMut(A, &T) -> A) -> A {
+    pub fn combine<'a, A>(&'a self, initial: A, mut fold: impl FnMut(A, &'a T) -> A) -> A {
         let mut carried = initial;
         for entry in self.in_combine_order() {
             carried = fold(carried, entry);
