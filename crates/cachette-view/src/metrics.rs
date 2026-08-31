@@ -61,13 +61,42 @@ impl Lap {
     }
 }
 
+/// Where the wall clock span comes from.
+///
+/// A run reads a clock. A test that stores a picture of the panel cannot,
+/// because two rows of the panel divide by the span and a clock gives a new
+/// number every time.
+///
+/// The span has one declaration site, so the two sources cannot disagree.[^1]
+///
+/// # References
+///
+/// [^1]: Recurring Defect Shapes, shape 1. `.claude/rules/recurring-defects.md`
+#[derive(Clone, Copy, Debug)]
+enum Wall {
+    /// The span since the run started.
+    Running(Instant),
+    /// A span the caller fixed.
+    Fixed(Duration),
+}
+
+impl Wall {
+    /// Returns the span the run has covered.
+    fn span(self) -> Duration {
+        match self {
+            Self::Running(started) => started.elapsed(),
+            Self::Fixed(span) => span,
+        }
+    }
+}
+
 /// What one run cost.
 ///
 /// The viewer keeps the totals and the extremes. It keeps no history, so the
 /// cost of measuring does not grow with the length of the run.
 #[derive(Debug)]
 pub struct Metrics {
-    started: Instant,
+    wall: Wall,
     ticks: u64,
     frames: u64,
     step_total: Duration,
@@ -82,13 +111,42 @@ impl Metrics {
     #[must_use]
     pub fn start() -> Self {
         Self {
-            started: Instant::now(),
+            wall: Wall::Running(Instant::now()),
             ticks: 0,
             frames: 0,
             step_total: Duration::ZERO,
             step_worst: Duration::ZERO,
             draw_total: Duration::ZERO,
             draw_worst: Duration::ZERO,
+            show_total: Duration::ZERO,
+        }
+    }
+
+    /// Returns measurements that repeat, for a test that stores a picture.
+    ///
+    /// Every figure the panel prints from these is a function of the
+    /// arguments alone. No clock is read, so the same arguments give the same
+    /// rows on every machine and on every run.
+    ///
+    /// Each step is counted as costing `step`, and each painting as costing
+    /// `draw`, so the mean and the worst of both are those two values.
+    ///
+    /// This is not a measurement. It states figures a caller chose, and only
+    /// a test may choose them.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: Definition of Done, report the work honestly. `.claude/rules/definition-of-done.md`
+    #[must_use]
+    pub fn fixed(ticks: u64, frames: u64, step: Duration, draw: Duration, wall: Duration) -> Self {
+        Self {
+            wall: Wall::Fixed(wall),
+            ticks,
+            frames,
+            step_total: step * u32::try_from(ticks).unwrap_or(u32::MAX),
+            step_worst: step,
+            draw_total: draw * u32::try_from(frames).unwrap_or(u32::MAX),
+            draw_worst: draw,
             show_total: Duration::ZERO,
         }
     }
@@ -158,7 +216,7 @@ impl Metrics {
     /// rate the person sees rather than the rate the engine could reach.
     #[must_use]
     pub fn ticks_each_second(&self) -> f64 {
-        let wall = self.started.elapsed().as_secs_f64();
+        let wall = self.wall.span().as_secs_f64();
         if wall > 0.0 {
             self.ticks as f64 / wall
         } else {
@@ -170,7 +228,7 @@ impl Metrics {
     /// spent working, as a number from 0 to 100.
     #[must_use]
     pub fn busy_percent(&self) -> f64 {
-        let wall = self.started.elapsed().as_secs_f64();
+        let wall = self.wall.span().as_secs_f64();
         if wall <= 0.0 {
             return 0.0;
         }
@@ -199,7 +257,7 @@ impl Metrics {
         // Every figure comes from the accessor that the head-up display also
         // reads. One derivation, one answer: a report that recomputed a mean
         // its own way could disagree with the panel and nothing would fail.
-        let wall = self.started.elapsed();
+        let wall = self.wall.span();
         let step_mean = self.step_mean_micros();
         let draw_mean = self.draw_mean_micros();
         let ticks_per_second = self.ticks_each_second();
