@@ -15,6 +15,7 @@ Each file holds one failure shape.
 | `no-such-product-record.md` | A product record number that no product record and no registry row has |
 | `no-such-finding.md` | A register entry number that the register does not hold |
 | `dangling-path.md` | A footnote path that does not resolve on disk |
+| `accepted-record-called-a-draft.md` | A citation that calls an accepted record a draft |
 
 ## References
 

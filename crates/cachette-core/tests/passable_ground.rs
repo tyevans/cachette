@@ -23,7 +23,7 @@
 //!
 //! [^1]: ADR-0068, terrain is generated from the seed and is never stored as a map, decision D4, a draft record. `docs/adrs/draft/adr-0068-terrain-is-generated-from-the-seed-and-is-never-stored-as-a-map.md`
 //! [^2]: Recurring defect shapes, shape 3. `.claude/rules/recurring-defects.md`
-//! [^3]: ADR-0056, movement is tile-discrete and admitted by sort-then-admit, decision D2, a draft record. `docs/adrs/accepted/adr-0056-movement-is-tile-discrete-and-admitted-by-sort-then-admit.md`
+//! [^3]: ADR-0056, movement is tile-discrete and admitted by sort-then-admit, decision D2. `docs/adrs/accepted/adr-0056-movement-is-tile-discrete-and-admitted-by-sort-then-admit.md`
 //! [^4]: Testing rules, section 2a. `.claude/rules/testing.md`
 //! [^5]: Testing policy. `docs/TESTING.md`
 

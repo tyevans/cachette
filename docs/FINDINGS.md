@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-055**
+**Next number: FND-056**
 
 ## A. Corrections to stated rules
 
@@ -1068,6 +1068,41 @@ uniform-input shape, and it is already recorded.[^11]
 **The extent belongs in the fixture, not in the record.** The spacing is a
 constant of the generator. A record that quoted it would hold a value that a
 change to the generator moves.[^12]
+
+### FND-055 — A citation carried a status, and the status went stale
+
+**Believed.** The registry is the only place that holds the status of a
+record, so a citation elsewhere in the tree cannot disagree with it.
+
+**True.** A citation carries the status whenever its prose says so. Five
+citations described ADR-0056 as a draft record. The registry had said
+`Accepted` since the review that accepted it. The claim was false and nothing
+failed, because a citation in a comment is not compiled and no check read what
+a citation says about a record.
+
+The failure inverts the record. A reader who follows the citation reaches an
+accepted record, and the prose beside the citation tells them that nothing may
+cite it as binding.
+
+**Evidence.** The review that accepted the record is in the tree, so the sweep
+that should have followed it never ran. The citations sat in the engine, in
+three test files, and were copied into new work twice more before a check
+found them.
+
+**Follows.** Two things.
+
+**A check reads the claim, and it derives the truth from the tree.** The
+citation check now fails when a footnote definition names a path under the
+accepted directory and calls that record a draft. The path is the derivation,
+so no second listing exists to drift. The opposite drift already fails: a
+record that moves out of the draft directory breaks every citation of its old
+path.
+
+**The check reads a footnote definition and nothing else.** A review states
+what a record's status was on the day it was reviewed, and that statement is
+true and must stay. The line that carries it is a table row, not a footnote,
+so the shape of the line is what separates a live claim from a historical
+one.
 
 ## References
 

@@ -17,6 +17,8 @@ It fails when:
   decision  a citation names ADR-NNNN Dn, the record for NNNN exists, and that
             record defines no decision Dn
   path      a footnote names a `docs/...` path that does not resolve on disk
+  status    a footnote definition names a record under `docs/adrs/accepted/`
+            and calls that record a draft
 
 A citation of a number whose registry row has no file passes. That is the
 documented way to cite a reserved number, and the registry is where its status
@@ -95,6 +97,19 @@ REGISTER_FILES = {
 }
 CODE_SPAN = re.compile(r"`+[^`\n]*`+")
 FOOTNOTE_PATH = re.compile(r"`(docs/[^`]+\.md)`")
+# A footnote that names an accepted record. The status of a record lives in
+# the registry and nowhere else, so a footnote that states one states a second
+# copy of it, and this is the check that fails when the copies disagree.[^1]
+#
+# [^1]: ADR Registry. `docs/adrs/REGISTRY.md`
+ACCEPTED_PATH = re.compile(r"`docs/adrs/accepted/adr-\d{4}-[a-z0-9-]+\.md`")
+# The words by which a citation calls a record a draft.
+CALLS_IT_A_DRAFT = re.compile(r"\bdrafts?\b", re.I)
+# A footnote definition, with whatever comment marker its file puts in front.
+# The check reads these lines alone. A table row or a sentence that records
+# what a record's status once was is a historical statement, and a review is
+# entitled to make one.
+FOOTNOTE_DEFINITION = re.compile(r"^\s*(?://[/!]?|#)?\s*\[\^[^\]]+\]:")
 FILENAME = re.compile(r"^adr-(\d{4})-[a-z0-9-]+\.md$")
 REGISTRY_ROW = re.compile(r"^\|\s*(\d{4})\s*\|\s*([^|]+?)\s*\|\s*(\w+)\s*\|", re.M)
 DECISION = re.compile(r"^#{2,4}\s*(?:ADR-\d{4}\s+)?D(\d+)\b", re.M)
@@ -265,6 +280,25 @@ def main() -> int:
                 failures.append(
                     f"{name}:{line_of(text, m.start())}: footnote path does not "
                     f"exist: {m.group(1)}"
+                )
+
+        # A citation that calls an accepted record a draft tells a reader that
+        # nothing may cite it as binding, which inverts what the record says.
+        # The direction is one way on purpose. A citation of a draft that does
+        # not say so is a convention this project has never held, and the
+        # backlog item that added this check says why it is not read here.
+        for line_number, line in enumerate(text.splitlines(), start=1):
+            if not FOOTNOTE_DEFINITION.match(line):
+                continue
+            if not ACCEPTED_PATH.search(line):
+                continue
+            claim = ACCEPTED_PATH.sub(" ", line)
+            if CALLS_IT_A_DRAFT.search(claim):
+                checked += 1
+                seen_here += 1
+                failures.append(
+                    f"{name}:{line_number}: calls an accepted record a draft. "
+                    f"The registry holds the status of a record"
                 )
 
         if seen_here:
