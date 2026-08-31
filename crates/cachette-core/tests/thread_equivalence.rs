@@ -15,6 +15,7 @@
 //! [^1]: ADR-0001, one binary gives one answer at any thread count, decision D4. `docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
 //! [^2]: Testing policy. `docs/TESTING.md`
 
+use cachette_core::resource::{Amount, ResourceKind};
 use cachette_core::terrain::TileKind;
 use cachette_core::{Axial, Entity, FactionId, World, WorldConfig};
 
@@ -240,6 +241,112 @@ fn a_world_whose_units_contend_is_identical_at_every_thread_count() {
     assert!(
         crowded > 1,
         "only {crowded} scenario held a crowd, so the oversubscribed case is barely covered"
+    );
+}
+
+/// The kind that the gathering scenario takes.
+const GATHERED: ResourceKind = ResourceKind::Wood;
+
+/// Fills the deposits of a patch with gatherers, and returns them.
+///
+/// The units stand on tiles that carry a stock, and every unit is told to
+/// gather. The deposits are small against what the crowd demands, so the
+/// resolve refuses somebody on every contested tile. That is where
+/// determinism is easiest to lose: who takes the last of a deposit must come
+/// from the sort and never from the thread that finished first.[^1] [^2]
+///
+/// The caller asserts that the fixture produced the contested case. A fixture
+/// that only assumed it would measure itself.[^3]
+///
+/// # References
+///
+/// [^1]: ADR-0073, gathering is admitted by sort-then-admit against the tile, decision D2, a draft record. `docs/adrs/draft/adr-0073-gathering-is-admitted-by-sort-then-admit-against-the-tile.md`
+/// [^2]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
+/// [^3]: Findings register, FND-051. `docs/FINDINGS.md`
+fn gatherers(world: &mut World) -> Vec<Entity> {
+    let grid = world.grid();
+    let deposits: Vec<Axial> = (0..grid.tile_count())
+        .map(|index| Axial::new((index % grid.width()) as i32, (index / grid.width()) as i32))
+        .filter(|address| {
+            world.admits_a_unit(*address)
+                && world.tile_stock(*address, GATHERED) > Some(Amount::ZERO)
+        })
+        .take(8)
+        .collect();
+
+    let ceiling = u32::from(world.config().faction_count.max(1));
+    let mut units = Vec::new();
+    for address in deposits {
+        let capacity = world.tile_kind(address).map_or(0, TileKind::capacity);
+        for ordinal in 0..capacity {
+            let unit = world
+                .spawn_soldier(address, FactionId((ordinal % ceiling) as u16))
+                .expect("the open tile admits a unit");
+            assert!(world.order_gather(unit, GATHERED));
+            units.push(unit);
+        }
+    }
+    units
+}
+
+/// Runs the frames over a world whose units contend for a deposit.
+fn run_with_gatherers(config: WorldConfig, frames: u64, threads: usize) -> (Vec<u8>, u64, usize) {
+    let mut world = World::new(config).expect("the extent must describe a world");
+    let units = gatherers(&mut world);
+    if units.is_empty() {
+        return (Vec::new(), 0, 0);
+    }
+    let mut taken = 0usize;
+    for frame in 0..frames {
+        world.step(threads).expect("the step must run");
+        taken += world.gather_log().len();
+        if frame == 0 {
+            // The fixture must produce the contested case. A frame in which
+            // every gatherer took a share proves only that the resolve grants
+            // something. The refused gatherer is what the sort decides.
+            assert!(
+                world.gather_log().len() < units.len(),
+                "every one of {} gatherers took a share, so nobody contended",
+                units.len()
+            );
+        }
+    }
+    assert!(world.check_invariants());
+    let mut bytes = world.event_log_bytes().to_vec();
+    bytes.extend_from_slice(world.gather_log_bytes());
+    (bytes, world.state_hash().finish(), taken)
+}
+
+#[test]
+fn a_world_whose_units_gather_is_identical_at_every_thread_count() {
+    let mut contended = 0;
+    for (name, config, frames) in SCENARIOS {
+        let expected = run_with_gatherers(*config, *frames, THREAD_COUNTS[0]);
+        if expected.2 == 0 {
+            // The scenario holds no deposit on open ground. A world of one
+            // water tile is such a scenario, and it tests nothing here.
+            continue;
+        }
+        contended += 1;
+        for threads in &THREAD_COUNTS[1..] {
+            let produced = run_with_gatherers(*config, *frames, *threads);
+            assert_eq!(
+                produced.0, expected.0,
+                "scenario {name}: the event log differs at {threads} threads"
+            );
+            assert_eq!(
+                produced.1, expected.1,
+                "scenario {name}: the state hash differs at {threads} threads"
+            );
+            assert_eq!(
+                produced.2, expected.2,
+                "scenario {name}: the grant count differs at {threads} threads"
+            );
+        }
+    }
+    assert!(
+        contended > 0,
+        "no scenario held a contested deposit, so the case is not covered"
     );
 }
 

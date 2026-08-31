@@ -23,7 +23,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^ALLOC]
 
-**Next number: DEC-023**
+**Next number: DEC-024**
 
 [^ALLOC]: Findings register, FND-038. `docs/FINDINGS.md`
 
@@ -405,6 +405,34 @@ says how.
 **Decided.** Chosen to avoid a second language runtime in continuous
 integration. Recorded because it was made in passing and no record holds it.
 
+### DEC-023 — What rate does a unit gather at?
+
+A unit told to gather takes an amount from its tile in each step. The engine
+holds one rate for every unit and every ground, and the value is content.[^DEC7]
+
+The value interacts with the stock tables. A rate far below the stock of a tile
+makes a deposit last many frames, and two units on one deposit then never
+contend. A rate at or above the stock empties a deposit in one frame, so the
+contested case is ordinary and every test meets it.
+
+**Option A. One rate, high against the stock of a tile.** The contested case is
+the normal case, so the resolve is exercised by every scenario. A deposit lasts
+one frame, which makes gathering feel instant.
+
+**Option B. One rate, low against the stock of a tile.** A deposit lasts many
+frames, which reads better. Two units contend only on a deposit that is nearly
+empty, so the contested case is rare and a test must build it deliberately.
+
+**Option C. A rate that the unit type carries.** This is the shape the project
+will end at, because a unit type is data.[^DEC8] It needs a unit type table,
+and none exists.
+
+**Recommendation:** option A until a content pipeline exists, then option C.
+Option B is the better game and it makes the case this subsystem exists for
+rare, which is the wrong trade before the subsystem has a second reader.
+
+**Assumption in the meantime:** option A.
+
 ## Decisions to apply at merge
 
 These are mechanical. They do not need judgement, but they must not be
@@ -433,3 +461,5 @@ concluded, and it called that argument its weakest.
 None yet.
 
 [^TARGET]: Blockers register, BLK-004, and the scale constants. `docs/reference/budgets.md`
+[^DEC7]: ADR-0073, gathering is admitted by sort-then-admit against the tile, decision D1, a draft record. `docs/adrs/draft/adr-0073-gathering-is-admitted-by-sort-then-admit-against-the-tile.md`
+[^DEC8]: Project orientation, the design principles. `CLAUDE.md`

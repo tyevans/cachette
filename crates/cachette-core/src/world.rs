@@ -28,10 +28,14 @@
 //! [^5]: ADR-0002, simulated and aggregated state holds no floating point number, decision D2. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
 
 use crate::bridge::{BlockLayout, BridgeError, UnitTileBridge, BLOCK_BITS_DEFAULT};
-use crate::event::{TileChanged, CHANGE_KIND_LOWERED, CHANGE_KIND_RAISED};
+use crate::event::{ResourceTaken, TileChanged, CHANGE_KIND_LOWERED, CHANGE_KIND_RAISED};
 use crate::hash::StateHash;
 use crate::hex::{Axial, Grid, GridError, NEIGHBOUR_COUNT};
 use crate::pyramid::{CellSummary, Pyramid};
+use crate::resource::{
+    ledger_key, Amount, CarryLoad, DepletionLedger, ResourceField, ResourceKind,
+    RESOURCE_KIND_COUNT,
+};
 use crate::rng;
 use crate::sim_math;
 use crate::slots::Slots;
@@ -186,9 +190,25 @@ pub struct World {
     values: Vec<Fix32>,
     factions: Vec<FactionId>,
     log: Vec<TileChanged>,
+    /// The events of the last step, from the gather resolve.
+    gather_log: Vec<ResourceTaken>,
     soldiers: SoldierArena,
     bridge: UnitTileBridge,
     terrain: Terrain,
+    /// The stock that each tile started with. It stores nothing.
+    resources: ResourceField,
+    /// What has been taken from each tile that somebody gathered from.
+    depletion: DepletionLedger,
+    /// What left the world in the hands of a dead unit.
+    ///
+    /// A unit that dies takes its load out of the world. Conservation must
+    /// still balance, so the world records where the load went rather than
+    /// letting it disappear.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0072, a tile stock is generated, and only what was taken is stored, decision D5, a draft record. `docs/adrs/draft/adr-0072-a-tile-stock-is-generated-and-only-what-was-taken-is-stored.md`
+    departed: [u64; RESOURCE_KIND_COUNT],
     /// Level 1 of the pyramid, derived from level 0 at the barrier.
     pyramid: Pyramid,
 }
@@ -225,9 +245,13 @@ impl World {
             values,
             factions,
             log: Vec::new(),
+            gather_log: Vec::new(),
             soldiers,
             bridge,
             terrain,
+            resources: ResourceField::new(terrain),
+            depletion: DepletionLedger::new(),
+            departed: [0; RESOURCE_KIND_COUNT],
             pyramid: Pyramid::new(layout, terrain)?,
         };
         // A world that has never stepped still answers a question about a
@@ -285,6 +309,135 @@ impl World {
     #[must_use]
     pub fn tile_kind(&self, address: Axial) -> Option<TileKind> {
         self.terrain.kind(address)
+    }
+
+    /// Returns the resource field of the world.
+    ///
+    /// The field holds the ground, and nothing else. It costs the same at any
+    /// tile count, because it stores no tile.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0072, a tile stock is generated, and only what was taken is stored, decision D1, a draft record. `docs/adrs/draft/adr-0072-a-tile-stock-is-generated-and-only-what-was-taken-is-stored.md`
+    #[must_use]
+    pub const fn resources(&self) -> ResourceField {
+        self.resources
+    }
+
+    /// Returns the stock that one tile started with.
+    ///
+    /// Returns `None` when the address lies outside the world.
+    #[must_use]
+    pub fn original_stock(&self, address: Axial, kind: ResourceKind) -> Option<Amount> {
+        self.resources.original(address, kind)
+    }
+
+    /// Returns what has been taken from one tile.
+    ///
+    /// Returns `None` when the address lies outside the world.
+    #[must_use]
+    pub fn taken_from(&self, address: Axial, kind: ResourceKind) -> Option<Amount> {
+        let tile = self.grid.index_of(address)?;
+        Some(self.depletion.taken(tile, kind))
+    }
+
+    /// Returns the stock that one tile still holds.
+    ///
+    /// The answer is what the tile started with, less what has been taken.
+    /// The engine stores the second term only, so a tile nobody touched costs
+    /// nothing.[^1]
+    ///
+    /// Returns `None` when the address lies outside the world.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0072, a tile stock is generated, and only what was taken is stored, decision D4, a draft record. `docs/adrs/draft/adr-0072-a-tile-stock-is-generated-and-only-what-was-taken-is-stored.md`
+    #[must_use]
+    pub fn tile_stock(&self, address: Axial, kind: ResourceKind) -> Option<Amount> {
+        let tile = self.grid.index_of(address)?;
+        let original = self.resources.original(address, kind)?;
+        Some(Amount(
+            original
+                .0
+                .saturating_sub(self.depletion.taken(tile, kind).0),
+        ))
+    }
+
+    /// Returns the depletion ledger.
+    ///
+    /// The ledger holds one entry for each tile and kind that somebody
+    /// gathered from. A world in which nothing was gathered holds none.
+    #[must_use]
+    pub const fn depletion(&self) -> &DepletionLedger {
+        &self.depletion
+    }
+
+    /// Returns what one soldier carries.
+    ///
+    /// Returns `None` when the identity is dead.
+    #[must_use]
+    pub fn soldier_carry(&self, entity: Entity) -> Option<CarryLoad> {
+        self.soldiers.carry(entity)
+    }
+
+    /// Tells one soldier to gather a kind of resource.
+    ///
+    /// The soldier then takes from the tile it stands on, once in each step,
+    /// until the caller stops it. Returns `false` when the identity is dead.
+    ///
+    /// The command names a unit and a kind. It never loops over a tile, and it
+    /// runs no work of its own: the step resolves every order of the frame in
+    /// one pass.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0073, gathering is admitted by sort-then-admit against the tile, decision D1, a draft record. `docs/adrs/draft/adr-0073-gathering-is-admitted-by-sort-then-admit-against-the-tile.md`
+    pub fn order_gather(&mut self, entity: Entity, kind: ResourceKind) -> bool {
+        self.soldiers.set_gather_order(entity, Some(kind))
+    }
+
+    /// Tells one soldier to stop gathering.
+    ///
+    /// Returns `false` when the identity is dead.
+    pub fn stop_gather(&mut self, entity: Entity) -> bool {
+        self.soldiers.set_gather_order(entity, None)
+    }
+
+    /// Returns the gather order of one soldier.
+    ///
+    /// The outer option reports whether the identity is live. The inner one
+    /// reports whether the soldier gathers.
+    #[must_use]
+    pub fn gather_order(&self, entity: Entity) -> Option<Option<ResourceKind>> {
+        self.soldiers.gather_order(entity)
+    }
+
+    /// Returns the gather events of the last step.
+    ///
+    /// One event reports one grant. A watcher reads the log to see a resource
+    /// being taken.
+    #[must_use]
+    pub fn gather_log(&self) -> &[ResourceTaken] {
+        &self.gather_log
+    }
+
+    /// Returns the gather events of the last step as bytes.
+    ///
+    /// The thread-count equivalence test compares this slice byte for
+    /// byte.[^1] The cast is safe because the event type is plain data.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0001, one binary gives one answer at any thread count, decision D4. `docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
+    #[must_use]
+    pub fn gather_log_bytes(&self) -> &[u8] {
+        bytemuck::cast_slice(&self.gather_log)
+    }
+
+    /// Returns what left the world in the hands of a dead unit, by kind.
+    #[must_use]
+    pub const fn departed_carry(&self) -> &[u64; RESOURCE_KIND_COUNT] {
+        &self.departed
     }
 
     /// Returns the soldiers of the world.
@@ -360,7 +513,21 @@ impl World {
     ///
     /// [^1]: ADR-0014, entity identity is an index plus a generation, decision D2. `docs/adrs/accepted/adr-0014-entity-identity-is-an-index-plus-a-generation.md`
     pub fn despawn_soldier(&mut self, entity: Entity) -> bool {
-        self.soldiers.despawn(entity)
+        // Read the load before the arena clears it. What the soldier carried
+        // leaves the world, and conservation still has to balance, so the
+        // world records where it went.[^2]
+        //
+        // [^2]: ADR-0072, a tile stock is generated, and only what was taken is stored, decision D5, a draft record. `docs/adrs/draft/adr-0072-a-tile-stock-is-generated-and-only-what-was-taken-is-stored.md`
+        let load = self.soldiers.carry(entity);
+        if !self.soldiers.despawn(entity) {
+            return false;
+        }
+        if let Some(load) = load {
+            for kind in ResourceKind::ALL {
+                self.departed[kind.index()] += u64::from(load.of(kind).0);
+            }
+        }
+        true
     }
 
     /// Moves a soldier to another tile.
@@ -542,6 +709,14 @@ impl World {
         //
         // [^1]: ADR-0001, one binary gives one answer at any thread count, decision D4. `docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
         let hash = self.terrain.hash_into(hash);
+        // The stock a tile started with is generated, so the same argument
+        // holds for it: the seed is the input of the generator and only the
+        // tiles report a change to the generator itself.
+        let hash = self.resources.hash_into(hash);
+        let mut hash = self.depletion.hash_into(hash);
+        for amount in &self.departed {
+            hash = hash.write_u64(*amount);
+        }
         self.soldiers.hash_into(hash)
     }
 
@@ -654,9 +829,75 @@ impl World {
             Err(BridgeError::Stale { .. }) => {}
             Err(_) => return false,
         }
+        if !self.check_conservation() {
+            return false;
+        }
+        if !self
+            .gather_log
+            .iter()
+            .all(|event| event.padding == [0; 7] && (event.tile.0 as usize) < self.values.len())
+        {
+            return false;
+        }
         self.log
             .iter()
             .all(|event| event.padding == [0; 5] && (event.tile.0 as usize) < self.values.len())
+    }
+
+    /// Reports whether the world conserves every resource.
+    ///
+    /// What left the tiles equals what the live units carry, plus what left
+    /// the world in the hands of a dead unit. The equality holds for each kind
+    /// on its own, because a gather never turns one kind into another.[^1]
+    ///
+    /// The check is exact. Every term is a whole number in a 64-bit
+    /// accumulator, so the sum is the same in any order and nothing rounds.[^2]
+    ///
+    /// A determinism test cannot see a broken invariant, because a rule that
+    /// leaks the same amount on every run repeats perfectly.[^3] This check is
+    /// what fails instead.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0072, a tile stock is generated, and only what was taken is stored, decision D5, a draft record. `docs/adrs/draft/adr-0072-a-tile-stock-is-generated-and-only-what-was-taken-is-stored.md`
+    /// [^2]: ADR-0002, simulated and aggregated state holds no floating point number, decision D1. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
+    /// [^3]: Findings register, FND-048. `docs/FINDINGS.md`
+    #[must_use]
+    fn check_conservation(&self) -> bool {
+        if !self.depletion.check_invariants() {
+            return false;
+        }
+        let mut left_the_tiles = [0i64; RESOURCE_KIND_COUNT];
+        for (key, amount) in self.depletion.entries() {
+            let Some(kind) = ResourceKind::from_u8((key & 0b11) as u8) else {
+                return false;
+            };
+            let tile = TileIdx((key >> 2) as u32);
+            // Nothing takes more from a tile than the tile ever held.
+            let Some(original) = self.resources.original_at(tile, kind) else {
+                return false;
+            };
+            if *amount > original.0 {
+                return false;
+            }
+            left_the_tiles[kind.index()] += i64::from(*amount);
+        }
+        let mut arrived = [0i64; RESOURCE_KIND_COUNT];
+        for soldier in self.soldiers.iter() {
+            let Some(load) = self.soldiers.carry(soldier) else {
+                return false;
+            };
+            for kind in ResourceKind::ALL {
+                arrived[kind.index()] += i64::from(load.of(kind).0);
+            }
+        }
+        for kind in ResourceKind::ALL {
+            let index = kind.index();
+            if left_the_tiles[index] != arrived[index] + self.departed[index] as i64 {
+                return false;
+            }
+        }
+        true
     }
 
     /// Runs one frame on the given number of threads.
@@ -746,6 +987,18 @@ impl World {
         // [^4]: ADR-0018, the unit-to-tile bridge is derived, and it rebuilds at the barrier, decision D3. `docs/adrs/accepted/adr-0018-the-unit-to-tile-bridge-is-derived-and-rebuilds-at-the-barrier.md`
         self.refresh_bridge()?;
 
+        // The gather resolve runs after the barrier of this frame. It reads
+        // where each unit stands, and the movement above has just moved
+        // them, so a resolve before the barrier would take from the tile the
+        // unit left.[^6]
+        //
+        // The resolve changes no structure. It writes a load into a column
+        // and an amount into the ledger, and neither moves a unit, so the
+        // barrier above stays the barrier of this frame.
+        //
+        // [^6]: ADR-0073, gathering is admitted by sort-then-admit against the tile, decision D3, a draft record. `docs/adrs/draft/adr-0073-gathering-is-admitted-by-sort-then-admit-against-the-tile.md`
+        self.gather(threads)?;
+
         // Level 1 rebuilds after the structure it reads, and after every
         // change to level 0 that this frame made. It is derived, so it is
         // last.[^5]
@@ -798,6 +1051,107 @@ impl World {
         Ok(())
     }
 
+    /// Resolves every gather order of the frame in one pass.
+    ///
+    /// The resolve sorts the intents by the deposit they name, then by the
+    /// identity of the unit. Each deposit then owns one contiguous segment,
+    /// and the identity is the final key field so no two intents tie.[^1] The
+    /// sort runs on one thread, so no result here takes its order from a
+    /// thread that finished first.[^2]
+    ///
+    /// The resolve scans each segment in its sorted order and grants until the
+    /// deposit is empty. A unit that reaches an empty deposit takes nothing
+    /// and produces no event. One pass over the sorted intents resolves the
+    /// whole set, so the cost follows the number of units that gather and not
+    /// the number of deposits.[^3]
+    ///
+    /// **The resolve never locks a tile and never retries.** Two units that
+    /// name one deposit sit in one segment, and the sort decides which of them
+    /// takes the last of it.[^1]
+    ///
+    /// What leaves each deposit goes to the ledger, and the same amount goes
+    /// into the load of the unit. The two writes come from one grant, so
+    /// nothing is created and nothing is lost.[^4]
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the sort refuses the keys.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0073, gathering is admitted by sort-then-admit against the tile, decision D2, a draft record. `docs/adrs/draft/adr-0073-gathering-is-admitted-by-sort-then-admit-against-the-tile.md`
+    /// [^2]: ADR-0007, content supplies a key vector, never a comparator, decision D2. `docs/adrs/accepted/adr-0007-content-supplies-a-key-vector-never-a-comparator.md`
+    /// [^3]: ADR-0073, gathering is admitted by sort-then-admit against the tile, decision D1, a draft record. `docs/adrs/draft/adr-0073-gathering-is-admitted-by-sort-then-admit-against-the-tile.md`
+    /// [^4]: ADR-0072, a tile stock is generated, and only what was taken is stored, decision D5, a draft record. `docs/adrs/draft/adr-0072-a-tile-stock-is-generated-and-only-what-was-taken-is-stored.md`
+    fn gather(&mut self, threads: usize) -> Result<(), StepError> {
+        self.gather_log.clear();
+        let intents = gather_intents(&self.soldiers, threads)?;
+        if intents.is_empty() {
+            return Ok(());
+        }
+
+        let keys: Vec<BoundedKey> = intents
+            .iter()
+            .map(|intent| {
+                BoundedKey::new(ledger_key(intent.tile, intent.kind), intent.unit.to_bits())
+            })
+            .collect();
+        let last = TileIdx(self.grid.tile_count().saturating_sub(1));
+        let ceiling = ledger_key(last, ResourceKind::ALL[RESOURCE_KIND_COUNT - 1]);
+        let order = gather_order_of(&keys, ceiling)?;
+
+        let tick = self.tick;
+        // The ascending run that the ledger merges. The sorted order is the
+        // key order, so a run built while walking it is already ascending.
+        let mut run: Vec<(u64, u32)> = Vec::new();
+        let mut at = 0usize;
+        while at < order.len() {
+            let key = keys[order[at] as usize].order();
+            let mut end = at;
+            while end < order.len() && keys[order[end] as usize].order() == key {
+                end += 1;
+            }
+            let first = intents[order[at] as usize];
+            // The deposit is read once for the whole segment. The stock a tile
+            // started with is generated, so reading it twice computes it
+            // twice.
+            let original = self
+                .resources
+                .original_at(first.tile, first.kind)
+                .unwrap_or(Amount::ZERO);
+            let mut left = original
+                .0
+                .saturating_sub(self.depletion.taken(first.tile, first.kind).0);
+            let mut granted = 0u32;
+            for position in &order[at..end] {
+                if left == 0 {
+                    break;
+                }
+                let intent = intents[*position as usize];
+                let amount = GATHER_RATE.min(left);
+                left -= amount;
+                granted += amount;
+                let added = self
+                    .soldiers
+                    .add_carry(intent.unit, intent.kind, Amount(amount));
+                debug_assert!(added, "the intent came from a live soldier");
+                self.gather_log.push(ResourceTaken::new(
+                    tick,
+                    intent.unit.to_bits(),
+                    intent.tile,
+                    amount,
+                    intent.kind.to_u8(),
+                ));
+            }
+            if granted > 0 {
+                run.push((key, granted));
+            }
+            at = end;
+        }
+        self.depletion.merge_ascending(&run);
+        Ok(())
+    }
+
     /// Rebuilds the derived structure when it no longer describes the arena.
     ///
     /// One rule governs both rebuild sites in the step: rebuild when the
@@ -830,6 +1184,132 @@ impl World {
         self.bridge.rebuild(&self.soldiers)?;
         Ok(())
     }
+}
+
+/// The amount that one unit takes from one tile in one step.
+///
+/// The rate is content. It is declared here until content exists, and the
+/// register holds the open choice of its value.[^1]
+///
+/// The rate is high against the stock of a tile, so a full tile of gatherers
+/// always empties a deposit and never divides it evenly. That is the case the
+/// resolve exists for, and a lower rate would make the contested case rare
+/// instead of ordinary.[^2]
+///
+/// # References
+///
+/// [^1]: Decisions register, DEC-022. `docs/DECISIONS.md`
+/// [^2]: ADR-0073, gathering is admitted by sort-then-admit against the tile, decision D1, a draft record. `docs/adrs/draft/adr-0073-gathering-is-admitted-by-sort-then-admit-against-the-tile.md`
+const GATHER_RATE: u32 = 4;
+
+/// One gather order, ready for the resolve.
+#[derive(Clone, Copy, Debug)]
+struct GatherIntent {
+    /// The unit that gathers.
+    unit: Entity,
+    /// The tile that the unit stands on.
+    tile: TileIdx,
+    /// The kind that the unit gathers.
+    kind: ResourceKind,
+}
+
+/// Returns the order in which the resolve reads the gather intents.
+///
+/// The order is the key vector sort: by the tile and the kind together, then
+/// by the identity of the unit.[^1] It depends on the key values alone, so it
+/// is the same at any thread count, and it does not follow the slot order of
+/// the arena.[^2]
+///
+/// # Errors
+///
+/// Returns an error when the sort refuses the keys.
+///
+/// # References
+///
+/// [^1]: ADR-0073, gathering is admitted by sort-then-admit against the tile, decision D2, a draft record. `docs/adrs/draft/adr-0073-gathering-is-admitted-by-sort-then-admit-against-the-tile.md`
+/// [^2]: ADR-0001, one binary gives one answer at any thread count, decision D5. `docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
+#[cfg(not(feature = "probe-nondeterminism"))]
+fn gather_order_of(keys: &[BoundedKey], ceiling: u64) -> Result<Vec<u32>, SortError> {
+    sort::order_bounded(keys, ceiling)
+}
+
+/// Returns the gather intents in the order they arrived, which is a defect.
+///
+/// This is the perturbed build. The resolve reads the joined intent list
+/// rather than the sorted one, so who empties a deposit depends on the order
+/// the slots were joined in. The slot probe reverses that order, and the
+/// reversal is visible only above one thread, so the thread-count test then
+/// fails.
+///
+/// The whole point is that it must fail. A determinism test with no proven
+/// failure mode is decoration.[^1]
+///
+/// # Errors
+///
+/// Never. The signature matches the sound build so that the caller does not
+/// change.
+///
+/// # References
+///
+/// [^1]: Testing rules, section 1. `.claude/rules/testing.md`
+#[cfg(feature = "probe-nondeterminism")]
+fn gather_order_of(keys: &[BoundedKey], _ceiling: u64) -> Result<Vec<u32>, SortError> {
+    // A stable sort by the deposit alone. Each deposit still owns one
+    // contiguous segment, which the resolve requires to scan a segment at all,
+    // and within a segment the order is the order the intents arrived in.
+    let mut order: Vec<u32> = (0..keys.len() as u32).collect();
+    order.sort_by_key(|position| keys[*position as usize].order());
+    Ok(order)
+}
+
+/// Returns the gather intent of each live soldier that carries an order.
+///
+/// The soldiers are read in slot order, each thread writes its own output
+/// slot, and the join reads the slots in slot order. The result never depends
+/// on thread completion order.[^1]
+///
+/// A soldier with no order gathers nothing and produces no intent, so a world
+/// in which nobody was told to gather costs one pass over the live set.
+///
+/// # Errors
+///
+/// Returns an error when the caller asks for zero threads.
+///
+/// # References
+///
+/// [^1]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
+fn gather_intents(soldiers: &SoldierArena, threads: usize) -> Result<Vec<GatherIntent>, StepError> {
+    let live: Vec<Entity> = soldiers.iter().collect();
+    if live.is_empty() {
+        return Ok(Vec::new());
+    }
+    let chunk_len = live.len().div_ceil(threads).max(1);
+    let mut slots: Slots<Vec<GatherIntent>> =
+        Slots::filled(threads, Vec::new()).map_err(|_| StepError::ZeroThreads)?;
+
+    std::thread::scope(|scope| {
+        for (chunk, slot) in live.chunks(chunk_len).zip(slots.entries_mut()) {
+            scope.spawn(move || {
+                *slot = chunk
+                    .iter()
+                    .filter_map(|unit| {
+                        let kind = soldiers.gather_order(*unit)??;
+                        let tile = soldiers.tile(*unit)?;
+                        Some(GatherIntent {
+                            unit: *unit,
+                            tile,
+                            kind,
+                        })
+                    })
+                    .collect();
+            });
+        }
+    });
+
+    Ok(slots.combine(Vec::new(), |mut joined, slot| {
+        joined.extend_from_slice(slot);
+        joined
+    }))
 }
 
 /// The draw index of the movement direction.

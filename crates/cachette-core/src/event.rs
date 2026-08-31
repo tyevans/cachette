@@ -20,6 +20,52 @@ use bytemuck::{Pod, Zeroable};
 
 use crate::types::{FactionId, Fix32, Tick, TileIdx};
 
+/// A unit took an amount from a tile.
+///
+/// The event reports one grant of the gather resolve. A watcher reads the log
+/// to see where a resource went, and the amount is exact, so a sum over the
+/// log balances against the ledger.[^2]
+///
+/// The layout is 8 + 8 + 4 + 4 + 1 + 7 bytes, which is 32 bytes at an
+/// alignment of 8. The trailing array declares every padding byte, so the type
+/// holds no uninitialised byte.[^1]
+///
+/// # References
+///
+/// [^1]: ADR-0006, an event is plain data and applying it is pure, decision D1. `docs/adrs/accepted/adr-0006-an-event-is-plain-data-and-applying-it-is-pure.md`
+/// [^2]: ADR-0073, gathering is admitted by sort-then-admit against the tile, decision D4, a draft record. `docs/adrs/draft/adr-0073-gathering-is-admitted-by-sort-then-admit-against-the-tile.md`
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Pod, Zeroable)]
+pub struct ResourceTaken {
+    /// The tick at which the unit took the amount.
+    pub tick: Tick,
+    /// The unit that took the amount, as its identity in bits.
+    pub unit: u64,
+    /// The tile that the amount came from.
+    pub tile: TileIdx,
+    /// The amount that the unit took. It is never zero.
+    pub amount: u32,
+    /// The kind of resource, as its number.
+    pub kind: u8,
+    /// The declared padding. Always zero.
+    pub padding: [u8; 7],
+}
+
+impl ResourceTaken {
+    /// Builds an event with zero padding.
+    #[must_use]
+    pub const fn new(tick: Tick, unit: u64, tile: TileIdx, amount: u32, kind: u8) -> Self {
+        Self {
+            tick,
+            unit,
+            tile,
+            amount,
+            kind,
+            padding: [0; 7],
+        }
+    }
+}
+
 /// The kind of change that a tile event reports.
 ///
 /// The type is a one-byte integer and not an enumeration with a hidden

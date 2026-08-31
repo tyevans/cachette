@@ -32,9 +32,10 @@
 //! [^2]: ADR-0056, movement is tile-discrete and admitted by sort-then-admit, decision D3. `docs/adrs/accepted/adr-0056-movement-is-tile-discrete-and-admitted-by-sort-then-admit.md`
 #![cfg(feature = "probe-nondeterminism")]
 
+use cachette_core::resource::{Amount, ResourceKind};
 use cachette_core::slots::{Candidate, Slots};
 use cachette_core::terrain::TileKind;
-use cachette_core::{Axial, FactionId, Grid, Terrain, World, WorldConfig};
+use cachette_core::{Axial, CarryLoad, FactionId, Grid, Terrain, World, WorldConfig};
 
 /// The scenario. It must hold more tiles than threads, so that a run at
 /// twelve threads fills more than one output slot.
@@ -141,6 +142,134 @@ fn the_key_field_test_fails_when_the_terrain_key_drops_the_row() {
         .collect();
     along.dedup();
     assert!(along.len() > 1, "the probe also removed the column");
+}
+
+/// The extent that the resource probe reads.
+const RESOURCE_EXTENT: u32 = 192;
+
+#[test]
+fn the_stock_key_test_fails_when_the_resource_key_drops_the_row() {
+    // The probe drops the row component of the tile address in the stock draw
+    // key. The field then varies along a row and is constant down a column.
+    //
+    // This defect is invisible to both determinism tests, because the world it
+    // builds is identical on every run and at every thread count. Only a test
+    // of the key itself sees it, which is the case the testing rule names.[^1]
+    //
+    // [^1]: Testing rules, section 2. `.claude/rules/testing.md`
+    let field = World::new(WorldConfig {
+        width: RESOURCE_EXTENT,
+        height: RESOURCE_EXTENT,
+        seed: 0x0123_4567_89ab_cdef,
+        faction_count: 4,
+    })
+    .expect("the extent must describe a world");
+    let column = RESOURCE_EXTENT as i32 / 2;
+
+    let first = field
+        .original_stock(Axial::new(column, 0), ResourceKind::Food)
+        .expect("the address is inside the world");
+    for r in 1..RESOURCE_EXTENT as i32 {
+        assert_eq!(
+            field
+                .original_stock(Axial::new(column, r), ResourceKind::Food)
+                .expect("the address is inside the world"),
+            first,
+            "the probe did not drop the row, so the key-field test has no \
+             proven failure mode"
+        );
+    }
+
+    // The perturbation is confined to one axis. A probe that changed both
+    // would prove less.
+    let row = RESOURCE_EXTENT as i32 / 2;
+    let mut along: Vec<_> = (0..RESOURCE_EXTENT as i32)
+        .map(|q| {
+            field
+                .original_stock(Axial::new(q, row), ResourceKind::Food)
+                .expect("inside")
+        })
+        .collect();
+    along.dedup();
+    assert!(along.len() > 1, "the probe also removed the column");
+}
+
+/// Builds a world whose units contend for a deposit, and returns what each of
+/// them carries after one frame at the given thread count.
+///
+/// A crowd spread over many deposits contends for nothing, so the resolve
+/// refuses nobody and the order it reads its intents in cannot matter. The
+/// probe needs a deposit that runs out, and it must say so rather than assume
+/// it.
+fn gathered_after_a_frame(threads: usize) -> Vec<CarryLoad> {
+    let mut world = World::new(WorldConfig {
+        width: RESOURCE_EXTENT,
+        height: RESOURCE_EXTENT,
+        seed: 0x0cac_4e77_0072,
+        faction_count: 2,
+    })
+    .expect("the extent must describe a world");
+
+    let grid = world.grid();
+    let kind = ResourceKind::Wood;
+    let deposits: Vec<Axial> = (0..grid.tile_count())
+        .map(|index| Axial::new((index % grid.width()) as i32, (index / grid.width()) as i32))
+        .filter(|address| {
+            world.admits_a_unit(*address) && world.tile_stock(*address, kind) > Some(Amount::ZERO)
+        })
+        .take(8)
+        .collect();
+    assert!(
+        deposits.len() == 8,
+        "the probe world holds only {} deposits",
+        deposits.len()
+    );
+
+    let mut units = Vec::new();
+    for address in deposits {
+        let capacity = world.tile_kind(address).map_or(0, TileKind::capacity);
+        assert!(capacity > 1, "one gatherer contends with nobody");
+        for ordinal in 0..capacity {
+            let unit = world
+                .spawn_soldier(address, FactionId((ordinal % 2) as u16))
+                .expect("the open tile admits a unit");
+            assert!(world.order_gather(unit, kind));
+            units.push(unit);
+        }
+    }
+
+    world.step(threads).expect("the step must run");
+    assert!(
+        world.gather_log().len() < units.len(),
+        "every gatherer took a share, so the probe world holds no contest"
+    );
+    units
+        .iter()
+        .map(|unit| world.soldier_carry(*unit).expect("nothing despawned it"))
+        .collect()
+}
+
+#[test]
+fn the_gather_test_fails_when_the_sort_rule_breaks() {
+    // The probe removes the sort from the gather resolve, so who takes the
+    // last of a deposit follows the order the intents were joined in, and the
+    // slot probe makes that order follow the thread count.
+    //
+    // This is the defect ADR-0073 D2 forbids, and it is invisible to a
+    // reviewer: the resolve still grants up to the stock, still refuses the
+    // rest, and still gives one answer on one machine at one thread count.
+    let at_one = gathered_after_a_frame(1);
+    let at_twelve = gathered_after_a_frame(12);
+    assert!(!at_one.is_empty(), "the scenario must hold gatherers");
+    assert_ne!(
+        at_one, at_twelve,
+        "the probe did not perturb the granted set, so the gather \
+         thread-count assertion has no proven failure mode"
+    );
+    // The admission probe also runs in this build, so the units stand on
+    // different tiles at each thread count and the totals taken differ as
+    // well as the order. A companion test that held the total fixed would
+    // therefore prove nothing here, and this file does not claim one.
 }
 
 /// The extent of the crowded world that the admission probe reads.

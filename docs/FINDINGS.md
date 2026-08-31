@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-061**
+**Next number: FND-063**
 
 ## A. Corrections to stated rules
 
@@ -1303,6 +1303,55 @@ removes the site rather than reconciling it.
 shape's only local instance was a numbering collision in a register. This one
 is in the engine.
 
+### FND-061 — A fixture assertion stated over the inputs cannot see the case
+
+**Believed.** A fixture that must produce a contested case proves it by
+asserting over its own inputs. Count the demand, count the supply, and assert
+that the demand is larger.
+
+**True.** The assertion has to be over the outcome. An input assertion needs a
+model of the rule, and the test does not hold that model. When the model is
+wrong the assertion is wrong, and it fails on a fixture that does produce the
+case, or passes on one that does not.
+
+**Evidence.** The gather fixture counted one unit of demand for each gatherer
+and compared it against the stock of the deposits. The engine grants a whole
+rate to each unit until the deposit is empty, and the rate is not visible to
+the test. Eight gatherers on a deposit of nine therefore contended, because
+the first two took the whole rate and the third took what was left. The
+assertion said they did not, and it stopped a run of a fixture that was
+correct.
+
+Restating it over the outcome fixed it: after the first frame, the number of
+grants must be below the number of gatherers. That statement needs no model of
+the rate and it is exactly the case the resolve exists for.
+
+**Follows.** Assert that the fixture produced the case, not that the inputs
+should produce it. This extends the rule that a fixture must be checked rather
+than assumed.[^11] The check is what the engine did, and the rule stays true
+when the engine's constants change.
+
+### FND-062 — A probe build perturbs every subsystem at once
+
+**Believed.** Each probe test has a companion that holds everything else
+fixed. The pair says that the perturbation changed the order and changed
+nothing else, which is what makes the failure evidence about the order.
+
+**True.** The perturbed build turns on every perturbation together. A
+subsystem downstream of another perturbed subsystem therefore sees changed
+inputs, so nothing about it is held fixed and no such companion exists.
+
+**Evidence.** The gather resolve runs after movement, and movement admission
+is perturbed in the same build. A companion test asserted that the total taken
+was the same at one thread and at twelve. It failed, and correctly: the units
+stood on different tiles, so they gathered from different deposits.
+
+The movement companion holds, because nothing upstream of movement is
+perturbed in a way that changes the population.
+
+**Follows.** Write the companion only where nothing upstream of the subject is
+perturbed. Where it cannot hold, say so in the file rather than leaving a
+reader to wonder why one probe has a companion and the next does not.
 
 ## References
 
