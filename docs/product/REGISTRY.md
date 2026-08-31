@@ -45,6 +45,12 @@ documents cite it.
 | 0009 | A unit acts on the world it can see | Shaped | Game developer | `shaped/prd-0009-a-unit-acts-on-the-world-it-can-see.md` |
 | 0010 | A good moves to where it is wanted | Shaped | Game developer | `shaped/prd-0010-a-good-moves-to-where-it-is-wanted.md` |
 | 0011 | A unit is born, holds a job, and dies | Shaped | Game developer | `shaped/prd-0011-a-unit-is-born-holds-a-job-and-dies.md` |
+| 0012 | A world starts small and grows | Shaped | Game developer | `shaped/prd-0012-a-world-starts-small-and-grows.md` |
+| 0013 | A unit consumes to continue | Shaped | Game developer | `shaped/prd-0013-a-unit-consumes-to-continue.md` |
+| 0014 | Everyone needs somewhere to live | Shaped | Game developer | `shaped/prd-0014-everyone-needs-somewhere-to-live.md` |
+| 0015 | A unit has parents and children | Shaped | Game developer | `shaped/prd-0015-a-unit-has-parents-and-children.md` |
+| 0016 | Somebody is in charge | Shaped | Game developer | `shaped/prd-0016-somebody-is-in-charge.md` |
+| 0017 | Work is assigned to the people who can do it | Shaped | Game developer | `shaped/prd-0017-work-is-assigned-to-the-people-who-can-do-it.md` |
 
 ## What does not belong in a record
 
