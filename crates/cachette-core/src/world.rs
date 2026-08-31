@@ -35,6 +35,7 @@ use crate::rng;
 use crate::sim_math;
 use crate::slots::Slots;
 use crate::soldier::{SoldierArena, SoldierError};
+use crate::terrain::{Terrain, TerrainTile, TileKind};
 use crate::types::{Accum, Entity, FactionId, Fix32, Tick, TileIdx, FACTION_CEILING};
 
 /// The reason that a step refused to run.
@@ -166,6 +167,7 @@ pub struct World {
     log: Vec<TileChanged>,
     soldiers: SoldierArena,
     bridge: UnitTileBridge,
+    terrain: Terrain,
 }
 
 impl World {
@@ -201,6 +203,7 @@ impl World {
             log: Vec::new(),
             soldiers,
             bridge,
+            terrain: Terrain::new(config.seed, grid),
         })
     }
 
@@ -216,6 +219,40 @@ impl World {
     #[must_use]
     pub const fn grid(&self) -> Grid {
         self.grid
+    }
+
+    /// Returns the terrain of the world.
+    ///
+    /// The terrain holds the seed and the extent, and nothing else. It costs
+    /// the same at any tile count, because it stores no tile.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0068, terrain is generated from the seed and is never stored as a map, decision D1, a draft record. `docs/adrs/draft/adr-0068-terrain-is-generated-from-the-seed-and-is-never-stored-as-a-map.md`
+    #[must_use]
+    pub const fn terrain(&self) -> Terrain {
+        self.terrain
+    }
+
+    /// Returns the terrain of one tile.
+    ///
+    /// Returns `None` when the address lies outside the world. The call
+    /// computes the tile. It reads no array, so it never goes stale.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0068, terrain is generated from the seed and is never stored as a map, decision D1, a draft record. `docs/adrs/draft/adr-0068-terrain-is-generated-from-the-seed-and-is-never-stored-as-a-map.md`
+    #[must_use]
+    pub fn tile_terrain(&self, address: Axial) -> Option<TerrainTile> {
+        self.terrain.tile(address)
+    }
+
+    /// Returns the terrain kind of one tile.
+    ///
+    /// Returns `None` when the address lies outside the world.
+    #[must_use]
+    pub fn tile_kind(&self, address: Axial) -> Option<TileKind> {
+        self.terrain.kind(address)
     }
 
     /// Returns the soldiers of the world.
@@ -434,6 +471,13 @@ impl World {
             .write_u64(u64::from(self.config.faction_count))
             .write(bytemuck::cast_slice(&self.values))
             .write(bytemuck::cast_slice(&self.factions));
+        // The ground is part of the world, so the whole-world hash covers
+        // it. The seed and the extent are already above, but they are the
+        // inputs of the generator, not its output. A change to the generator
+        // moves every tile of every world, and only the tiles report it.[^1]
+        //
+        // [^1]: ADR-0001, one binary gives one answer at any thread count, decision D4. `docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
+        let hash = self.terrain.hash_into(hash);
         self.soldiers.hash_into(hash)
     }
 
@@ -473,6 +517,15 @@ impl World {
         // The arena holds a copy of the grid. A check must fail when the two
         // copies disagree.
         if self.soldiers.grid() != self.grid {
+            return false;
+        }
+        // The terrain holds a second copy of the seed and of the extent. One
+        // value declared twice needs a check that fails when the copies
+        // disagree, because a silently wrong copy reads back correctly and
+        // changes the whole world.[^1]
+        //
+        // [^1]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`
+        if self.terrain.seed() != self.config.seed || self.terrain.grid() != self.grid {
             return false;
         }
         if !self.soldiers.check_invariants() {

@@ -64,11 +64,15 @@ determinism:
     cargo test --package cachette-core --test thread_equivalence
     cargo test --package cachette-core --test golden_state_hash
 
-# Prove that the determinism tests can fail. The perturbed build must fail
-# the thread-count test and must pass the probe.
+# Prove that the determinism tests and the key-field tests can fail.
+#
+# The perturbed build reverses every slot reduction and drops the row from the
+# terrain lattice key. Three test binaries must then fail, and the probe
+# binary, which asserts that both perturbations are visible, must pass.
 probe:
     ! cargo test --package cachette-core --features probe-nondeterminism --test thread_equivalence
     ! cargo test --package cachette-core --features probe-nondeterminism --test slot_reduction
+    ! cargo test --package cachette-core --features probe-nondeterminism --test terrain
     cargo test --package cachette-core --features probe-nondeterminism --test determinism_probe
 
 # Record the golden state hash files. Read the difference before you commit.

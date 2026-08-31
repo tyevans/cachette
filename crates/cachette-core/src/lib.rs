@@ -23,6 +23,7 @@ pub mod sim_math;
 pub mod slots;
 pub mod soldier;
 pub mod sort;
+pub mod terrain;
 pub mod types;
 pub mod world;
 
@@ -33,5 +34,6 @@ pub use hex::{Axial, Grid, GridError};
 pub use slots::{Candidate, SlotError, Slots};
 pub use soldier::{SoldierArena, SoldierError};
 pub use sort::{SortError, SortKey};
+pub use terrain::{Terrain, TerrainTile, TileKind};
 pub use types::{Accum, Entity, FactionId, Fix32, Tick, TileIdx};
 pub use world::{StepError, World, WorldConfig, WorldError};

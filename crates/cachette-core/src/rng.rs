@@ -30,6 +30,13 @@ pub const SYSTEM_TILE_STUB: SystemId = 1;
 /// draws correlate.
 pub const SYSTEM_SOLDIER_MOVE: SystemId = 2;
 
+/// The system identifier of the terrain generator.
+///
+/// The terrain generator owns this identifier alone. It shares it with no
+/// other system, because two systems that share an identifier draw the same
+/// value from the same frame, entity and draw index.
+pub const SYSTEM_TERRAIN: SystemId = 3;
+
 /// Returns the value for one draw.
 ///
 /// The arguments are the world seed, the system, the frame, the entity, and
