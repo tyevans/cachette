@@ -13,6 +13,7 @@ Each file holds one failure shape.
 | `no-such-record.rs` | A record number that no record and no registry row has |
 | `no-such-decision.py` | A decision number that the record does not define |
 | `no-such-product-record.md` | A product record number that no product record and no registry row has |
+| `no-such-finding.md` | A register entry number that the register does not hold |
 | `dangling-path.md` | A footnote path that does not resolve on disk |
 
 ## References
