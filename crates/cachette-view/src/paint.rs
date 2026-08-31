@@ -14,6 +14,7 @@
 //! [^2]: ADR-0067, the viewer reads the world and never writes to it, decision D3. `docs/adrs/draft/adr-0067-the-viewer-reads-the-world-and-never-writes-to-it.md`
 //! [^3]: ADR-0017, the world is a rhombus, so a tile index is raw axial, decision D4. `docs/adrs/accepted/adr-0017-the-world-is-a-rhombus-so-a-tile-index-is-raw-axial.md`
 
+use cachette_core::terrain::{TileKind, KIND_COUNT};
 use cachette_core::{Axial, BridgeError, FactionId, World};
 
 use crate::text;
@@ -21,8 +22,54 @@ use crate::text;
 /// The colour of the space outside the world.
 const BACKGROUND: u32 = 0x0010_1418;
 
-/// The colour of a tile, before its value shades it.
-const TILE_BASE: u32 = 0x0026_3238;
+/// One colour for each kind of ground, in the order of the kinds.
+///
+/// The palette is the viewer's own. The engine says what a tile is and never
+/// what it looks like, so a colour has no place in it.[^1] [^2] A later
+/// contributor may choose another palette freely: a palette is a property of
+/// the picture, and no record binds it.
+///
+/// The five colours are far enough apart that a person can name each one
+/// against the background, and a test asserts that they stay apart.
+///
+/// # References
+///
+/// [^1]: ADR-0067, the viewer reads the world and never writes to it, decision D2. `docs/adrs/draft/adr-0067-the-viewer-reads-the-world-and-never-writes-to-it.md`
+/// [^2]: ADR-0068, terrain is generated from the seed and is never stored as a map, decision D4, a draft record. `docs/adrs/draft/adr-0068-terrain-is-generated-from-the-seed-and-is-never-stored-as-a-map.md`
+const KIND_COLOURS: [u32; KIND_COUNT] = [
+    // Water. Deep blue, and the only kind that admits no unit.
+    0x0012_3c5e,
+    // Plain. Open green, leaning yellow.
+    0x0055_6b2a,
+    // Forest. Deep green, leaning blue, so that the height shading can never
+    // brighten a forest tile into the colour of a plain one. The shading
+    // moves the brightness of a tile and never its hue, so two kinds are
+    // told apart by hue alone.
+    0x001d_4a2b,
+    // Hill. Dry ochre.
+    0x006e_5a30,
+    // Mountain. Bare grey.
+    0x0070_7478,
+];
+
+/// The number of brightness steps that the height gives a tile.
+///
+/// The height is a fraction of the full range, and the viewer maps that
+/// fraction onto this many steps. The steps are added to each channel, so a
+/// tall tile of one kind is brighter than a short tile of the same kind.
+const HEIGHT_STEPS: i32 = 56;
+
+/// The number of brightness steps that the tile value gives a tile.
+///
+/// The ground is fixed for the life of a world, so a picture of the ground
+/// alone never moves. The simulated value ripples on top of it, so a person
+/// watching a still camera still sees the world step.[^1] The range is small
+/// against the height range, so the ripple never hides the ground.
+///
+/// # References
+///
+/// [^1]: PRD-0002, a developer watches the world run. `docs/product/shaped/prd-0002-a-developer-watches-the-world-run.md`
+const VALUE_STEPS: i32 = 14;
 
 /// One colour for each faction, and one spare.
 ///
@@ -85,6 +132,7 @@ pub struct Canvas {
     blocks_read: u32,
     blocks_skipped: u32,
     painted_by_faction: [u32; COLOURED_FACTIONS],
+    painted_by_kind: [u32; KIND_COUNT],
 }
 
 impl Canvas {
@@ -106,6 +154,7 @@ impl Canvas {
             blocks_read: 0,
             blocks_skipped: 0,
             painted_by_faction: [0; COLOURED_FACTIONS],
+            painted_by_kind: [0; KIND_COUNT],
         }
     }
 
@@ -141,6 +190,24 @@ impl Canvas {
     #[must_use]
     pub const fn tiles_painted(&self) -> u32 {
         self.tiles_painted
+    }
+
+    /// Returns the tiles of each kind that the last draw painted.
+    ///
+    /// The index is the kind number, which the engine fixes and the state
+    /// hash reads. The count is the viewer's own: the engine holds no count
+    /// that exists for a panel.[^1]
+    ///
+    /// The panel names each kind against this count, so a person can say what
+    /// the ground in the window is rather than guess it from the colours.[^2]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0067, the viewer reads the world and never writes to it, decision D2. `docs/adrs/draft/adr-0067-the-viewer-reads-the-world-and-never-writes-to-it.md`
+    /// [^2]: PRD-0003, a developer sees a world worth looking at. `docs/product/shaped/prd-0003-a-developer-sees-a-world-worth-looking-at.md`
+    #[must_use]
+    pub const fn painted_by_kind(&self) -> &[u32; KIND_COUNT] {
+        &self.painted_by_kind
     }
 
     /// Returns the blocks whose units the last draw read.
@@ -266,6 +333,7 @@ impl Canvas {
         self.blocks_read = 0;
         self.blocks_skipped = 0;
         self.painted_by_faction = [0; COLOURED_FACTIONS];
+        self.painted_by_kind = [0; KIND_COUNT];
     }
 
     /// Sets one pixel, and ignores a position outside the canvas.
@@ -598,18 +666,45 @@ fn span(first: f32, last: f32, limit: u32) -> (u32, u32) {
     (first, last.max(first))
 }
 
-/// Shades a tile by its value.
+/// Returns the colour of one tile.
 ///
-/// The value is a fixed-point number in the engine. The viewer reads its raw
-/// bits and turns them into a brightness, which is a conversion out of exact
-/// arithmetic and never back into it.
-fn tile_colour(raw: i32) -> u32 {
-    let shade = ((raw >> 8) & 0x3f) as u32;
-    let base = TILE_BASE;
-    let red = ((base >> 16) & 0xff) + shade;
-    let green = ((base >> 8) & 0xff) + shade;
-    let blue = (base & 0xff) + shade;
-    (red.min(0xff) << 16) | (green.min(0xff) << 8) | blue.min(0xff)
+/// The kind chooses the colour and the height brightens it, so a person reads
+/// the relief of the ground as well as its kind.[^1] The simulated value
+/// ripples on top, so a still camera over a stepping world still moves.
+///
+/// Both the height and the value are fixed-point numbers in the engine. The
+/// viewer reads their raw bits and turns them into a brightness. That is a
+/// conversion out of exact arithmetic, and nothing here goes back into
+/// it.[^2]
+///
+/// # References
+///
+/// [^1]: PRD-0003, a developer sees a world worth looking at. `docs/product/shaped/prd-0003-a-developer-sees-a-world-worth-looking-at.md`
+/// [^2]: ADR-0067, the viewer reads the world and never writes to it, decision D3. `docs/adrs/draft/adr-0067-the-viewer-reads-the-world-and-never-writes-to-it.md`
+fn tile_colour(kind: TileKind, height: i32, value: i32) -> u32 {
+    let base = KIND_COLOURS[kind.to_u8() as usize];
+    // The height is a fraction of the full range in Q16.16, so the unit is
+    // 65536. The shift maps the fraction onto the brightness steps.
+    let relief = (height.clamp(0, 0x0001_0000) * HEIGHT_STEPS) >> 16;
+    let ripple = (((value >> 10) & 0xff) * VALUE_STEPS) >> 8;
+    let shade = relief + ripple;
+    let channel = |offset: u32| (((base >> offset) & 0xff) as i32 + shade).clamp(0, 0xff) as u32;
+    (channel(16) << 16) | (channel(8) << 8) | channel(0)
+}
+
+/// Returns the colour the viewer draws one kind of ground in, at the middle
+/// of the height range and with no ripple.
+///
+/// The head-up display and the tests need the colour of a kind without a
+/// tile to read it from. The engine holds no colour, so the reader is
+/// here.[^1]
+///
+/// # References
+///
+/// [^1]: ADR-0067, the viewer reads the world and never writes to it, decision D2. `docs/adrs/draft/adr-0067-the-viewer-reads-the-world-and-never-writes-to-it.md`
+#[must_use]
+pub fn kind_colour(kind: TileKind) -> u32 {
+    tile_colour(kind, 0x0000_8000, 0)
 }
 
 /// Draws the world onto the canvas.
@@ -621,10 +716,16 @@ fn tile_colour(raw: i32) -> u32 {
 /// # References
 ///
 /// [^1]: ADR-0067, the viewer reads the world and never writes to it, decision D1. `docs/adrs/draft/adr-0067-the-viewer-reads-the-world-and-never-writes-to-it.md`
+/// [^2]: ADR-0068, terrain is generated from the seed and is never stored as a map, decision D1, a draft record. `docs/adrs/draft/adr-0068-terrain-is-generated-from-the-seed-and-is-never-stored-as-a-map.md`
 pub fn draw(world: &World, camera: Camera, canvas: &mut Canvas) -> Result<(), BridgeError> {
     canvas.clear();
     let grid = world.grid();
     let values = world.tile_values();
+    // The ground is a pure function of the seed and the address, so the
+    // viewer computes it for the tiles the window covers and for no other.
+    // A sweep of the whole world every frame is what the record calls a
+    // design mistake.[^2]
+    let terrain = world.terrain();
 
     let tile_side = (camera.tile_width * 0.92).max(1.0) as i32;
     let (first_row, last_row) = camera.visible_rows(world, canvas);
@@ -635,16 +736,20 @@ pub fn draw(world: &World, camera: Camera, canvas: &mut Canvas) -> Result<(), Br
             let Some(index) = grid.index_of(address) else {
                 continue;
             };
-            let raw = values[index.0 as usize].0;
+            let value = values[index.0 as usize].0;
+            let Some(ground) = terrain.tile(address) else {
+                continue;
+            };
             let (x, y) = camera.centre_of(address);
             canvas.fill_rect(
                 x as i32 - tile_side / 2,
                 y as i32 - tile_side / 2,
                 tile_side,
                 tile_side,
-                tile_colour(raw),
+                tile_colour(ground.kind, ground.height.0, value),
             );
             canvas.tiles_painted += 1;
+            canvas.painted_by_kind[ground.kind.to_u8() as usize] += 1;
         }
     }
 

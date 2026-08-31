@@ -30,10 +30,11 @@
 //! [^1]: ADR-0067, the viewer reads the world and never writes to it, decision D2. `docs/adrs/draft/adr-0067-the-viewer-reads-the-world-and-never-writes-to-it.md`
 //! [^2]: ADR-0070, the head-up display reports what the drawing pass read, decision D1. `docs/adrs/draft/adr-0070-the-head-up-display-reports-what-the-drawing-pass-read.md`
 
+use cachette_core::terrain::{TileKind, KIND_COUNT};
 use cachette_core::{Axial, World};
 
 use crate::metrics::Metrics;
-use crate::paint::{faction_colour, Camera, Canvas, COLOURED_FACTIONS};
+use crate::paint::{faction_colour, kind_colour, Camera, Canvas, COLOURED_FACTIONS};
 use crate::text;
 
 /// The gap between the window edge and the panel, in pixels.
@@ -95,6 +96,7 @@ pub struct Readout {
     blocks_read: u32,
     blocks_skipped: u32,
     by_faction: [u32; COLOURED_FACTIONS],
+    by_kind: [u32; KIND_COUNT],
     step_mean: f64,
     step_worst: f64,
     draw_mean: f64,
@@ -141,6 +143,7 @@ impl Readout {
             blocks_read: canvas.blocks_read(),
             blocks_skipped: canvas.blocks_skipped(),
             by_faction: *canvas.painted_by_faction(),
+            by_kind: *canvas.painted_by_kind(),
             step_mean: metrics.step_mean_micros(),
             step_worst: metrics.step_worst_micros(),
             draw_mean: metrics.draw_mean_micros(),
@@ -187,6 +190,29 @@ impl Readout {
         &self.by_faction
     }
 
+    /// Returns the tiles the last drawing pass painted.
+    ///
+    /// The count is of the window. The panel states it beside the counts by
+    /// kind, and a test reads the two together.
+    #[must_use]
+    pub const fn tiles_painted(&self) -> u32 {
+        self.tiles_painted
+    }
+
+    /// Returns the tiles of each kind that the last drawing pass painted.
+    ///
+    /// The index is the kind number that the engine fixes. The panel names
+    /// each kind against this count, so a person can say what the ground in
+    /// the window is.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: PRD-0003, a developer sees a world worth looking at. `docs/product/shaped/prd-0003-a-developer-sees-a-world-worth-looking-at.md`
+    #[must_use]
+    pub const fn by_kind(&self) -> &[u32; KIND_COUNT] {
+        &self.by_kind
+    }
+
     /// Returns the tiles the window shows, across and down.
     #[must_use]
     pub const fn extent_shown(&self) -> (u32, u32) {
@@ -201,6 +227,24 @@ impl Readout {
         (self.factions as usize).clamp(1, COLOURED_FACTIONS)
     }
 }
+
+/// The kinds of ground, in the order the engine numbers them.
+///
+/// The engine gives a kind a number and the viewer reads it back, so the two
+/// orders must agree. A test asserts that each entry sits at its own number,
+/// because a table that silently drifts from the numbering paints the wrong
+/// colour and names the wrong ground.[^1]
+///
+/// # References
+///
+/// [^1]: Recurring Defect Shapes, shape 1. `.claude/rules/recurring-defects.md`
+const KINDS: [TileKind; KIND_COUNT] = [
+    TileKind::Water,
+    TileKind::Plain,
+    TileKind::Forest,
+    TileKind::Hill,
+    TileKind::Mountain,
+];
 
 /// One line of the panel.
 ///
@@ -229,6 +273,8 @@ enum Line {
     Row(&'static str, String),
     /// A colour swatch, the faction it stands for, and its count.
     Legend(usize, u32),
+    /// A colour swatch, the kind of ground it stands for, and its count.
+    Ground(TileKind, u32),
     /// The bar that shows the shares of the visible units.
     Bar,
 }
@@ -238,7 +284,11 @@ impl Line {
     const fn height(&self) -> i32 {
         match self {
             Self::Title(_) => 18,
-            Self::Note(_) | Self::Heading(_) | Self::Row(_, _) | Self::Legend(_, _) => LINE,
+            Self::Note(_)
+            | Self::Heading(_)
+            | Self::Row(_, _)
+            | Self::Legend(_, _)
+            | Self::Ground(_, _) => LINE,
             Self::Rule => 8,
             Self::Bar => BAR_HEIGHT + 8,
         }
@@ -288,6 +338,15 @@ impl Readout {
             lines.push(Line::Legend(slot, *count));
         }
         lines.push(Line::Bar);
+
+        lines.push(Line::Rule);
+        lines.push(Line::Heading("GROUND IN THE WINDOW"));
+        // Every kind gets a row, including a kind the window does not hold.
+        // A row that disappears at zero would let a reader believe the world
+        // has four kinds of ground.
+        for (ordinal, count) in self.by_kind.iter().enumerate() {
+            lines.push(Line::Ground(KINDS[ordinal], *count));
+        }
 
         lines.extend([
             Line::Rule,
@@ -407,6 +466,7 @@ fn paint_line(
         }
         Line::Row(label, value) => row(canvas, left, right, pen, label, value),
         Line::Legend(slot, count) => legend_row(canvas, left, right, pen, *slot, *count),
+        Line::Ground(kind, count) => ground_row(canvas, left, right, pen, *kind, *count),
         Line::Bar => bar(canvas, left, right, pen, readout),
     }
 }
@@ -460,6 +520,46 @@ fn legend_row(canvas: &mut Canvas, left: i32, right: i32, pen: i32, slot: usize,
     canvas.write(left + 14, pen, &format!("faction {slot}"), 1, LABEL);
     let value = grouped(u64::from(count));
     canvas.write(right - text::width_of(&value, 1), pen, &value, 1, VALUE);
+}
+
+/// Draws one ground row: a colour swatch, the kind, and how many tiles of it
+/// the last draw painted.
+///
+/// The name is the viewer's. The engine numbers the kinds and says nothing
+/// about what to call them or how to colour them.[^1]
+///
+/// # References
+///
+/// [^1]: ADR-0067, the viewer reads the world and never writes to it, decision D2. `docs/adrs/draft/adr-0067-the-viewer-reads-the-world-and-never-writes-to-it.md`
+fn ground_row(canvas: &mut Canvas, left: i32, right: i32, pen: i32, kind: TileKind, count: u32) {
+    canvas.block(
+        left,
+        pen,
+        text::GLYPH_HEIGHT,
+        text::GLYPH_HEIGHT,
+        kind_colour(kind),
+    );
+    canvas.write(left + 14, pen, name_of(kind), 1, LABEL);
+    let value = grouped(u64::from(count));
+    canvas.write(right - text::width_of(&value, 1), pen, &value, 1, VALUE);
+}
+
+/// Returns the name the panel gives one kind of ground.
+///
+/// The product record asks that the kinds be few and that a person be able to
+/// name them.[^1] This is where they are named.
+///
+/// # References
+///
+/// [^1]: PRD-0003, a developer sees a world worth looking at. `docs/product/shaped/prd-0003-a-developer-sees-a-world-worth-looking-at.md`
+const fn name_of(kind: TileKind) -> &'static str {
+    match kind {
+        TileKind::Water => "water",
+        TileKind::Plain => "plain",
+        TileKind::Forest => "forest",
+        TileKind::Hill => "hill",
+        TileKind::Mountain => "mountain",
+    }
 }
 
 /// Draws the bar that shows the shares of the units in the window.
