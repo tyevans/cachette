@@ -33,6 +33,28 @@ of fact, so the author makes it when they write the file.
 `Accepted`, `Superseded` and `Rejected` are judgements. A reviewer makes
 those. An author who accepts their own record has reviewed their own work.
 
+### Who reviews
+
+The project owner holds review rights and has delegated them to the agent
+that writes the records, for the current phase of work. The delegation is
+recorded here because a reader who sees one name in both roles would
+otherwise read it as the failure this section warns about.
+
+**A delegated reviewer is a weaker reviewer than a second person, and the
+process compensates for it.** An author who reviews their own record cannot
+be surprised by it, so the review must find what surprise would have found:
+
+1. **Review reads the record against the code, not against the intent.** A
+   record is accepted after the work that implements it exists, or its
+   acceptance says plainly that nothing implements it yet.
+2. **A record is reviewed by an agent that did not write it.** The reviewer
+   gets the record and the rule, not the reasoning that produced it.
+3. **The review states what it tried to reject.** A review that lists no
+   attempted objection did not happen.
+
+The owner may withdraw the delegation at any time, and a review by a second
+person supersedes a delegated one.
+
 **Decision numbers are local to their record.** Write `ADR-0004 D3`, not `D3`.
 Flat global decision numbering collided three times during research and will
 do so again.

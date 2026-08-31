@@ -72,7 +72,9 @@ is done.
 - **Decisions.** If the work closed an open choice, record the outcome and the
   reasoning. If it opened one, add it with options and a recommendation.
 - **Registry.** Set the status of any record you wrote. An author may set
-  `Draft`. Only a reviewer may set `Accepted`.
+  `Draft`. Only a reviewer may set `Accepted`. The registry says who holds
+  review rights and what a delegated review must do that a second reader
+  would do for free.[^1]
 
 ## 5. Pass the gates
 
@@ -119,3 +121,7 @@ is not maintained: the record of why things are the way they are.
 
 Code that violates a record costs a defect. A record that no longer describes
 the code costs every future decision made from it.
+
+## References
+
+[^1]: ADR Registry, who reviews. `docs/adrs/REGISTRY.md`
