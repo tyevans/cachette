@@ -15,7 +15,7 @@
 //! [^1]: ADR-0001, one binary gives one answer at any thread count, decision D4. `docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
 //! [^2]: Testing policy. `docs/TESTING.md`
 
-use cachette_core::{World, WorldConfig};
+use cachette_core::{Axial, Entity, FactionId, World, WorldConfig};
 
 /// The thread counts that every scenario runs at.
 const THREAD_COUNTS: [usize; 3] = [1, 2, 12];
@@ -106,4 +106,106 @@ fn the_log_is_not_empty_for_a_large_scenario() {
 fn a_step_at_zero_threads_returns_an_error() {
     let mut world = World::new(WorldConfig::default()).expect("the extent must describe a world");
     assert!(world.step(0).is_err());
+}
+
+/// Fills a world with soldiers and returns the identities it kept.
+///
+/// The population is a fixed pattern, so it is the same on every run and at
+/// every thread count. The function despawns part of what it spawns, so the
+/// arena carries a free queue and a set of stale identities as well as a
+/// live set.
+fn populate(world: &mut World) -> Vec<Entity> {
+    let grid = world.grid();
+    let mut kept = Vec::new();
+    let mut freed = Vec::new();
+    for index in 0..grid.tile_count().min(97) {
+        let address = Axial::new((index % grid.width()) as i32, (index / grid.width()) as i32);
+        // The faction must be one the world has. This line read `index % 5`
+        // against a scenario of two factions, so the suite spawned soldiers
+        // of factions the world did not hold and the invariant check passed.
+        let ceiling = u32::from(world.config().faction_count.max(1));
+        let faction = FactionId((index % ceiling) as u16);
+        let soldier = world
+            .spawn_soldier(address, faction)
+            .expect("the address and the faction must be valid");
+        if index % 3 == 2 {
+            freed.push(soldier);
+        } else {
+            kept.push(soldier);
+        }
+    }
+    for soldier in &freed {
+        assert!(world.despawn_soldier(*soldier));
+    }
+    kept
+}
+
+/// Runs the frames over a world that holds soldiers.
+fn run_with_soldiers(config: WorldConfig, frames: u64, threads: usize) -> (Vec<u8>, u64, usize) {
+    let mut world = World::new(config).expect("the extent must describe a world");
+    let kept = populate(&mut world);
+    for _ in 0..frames {
+        world.step(threads).expect("the step must run");
+    }
+    // Drive the step, then inspect the arena. A column set that no test
+    // reaches through the engine is inert.[^1]
+    //
+    // [^1]: Findings register, FND-041. `docs/FINDINGS.md`
+    assert!(world.check_invariants());
+    assert!(kept
+        .iter()
+        .all(|soldier| world.soldiers().contains(*soldier)));
+    (
+        world.event_log_bytes().to_vec(),
+        world.state_hash().finish(),
+        world.soldiers().len() as usize,
+    )
+}
+
+#[test]
+fn a_world_that_holds_soldiers_is_identical_at_every_thread_count() {
+    for (name, config, frames) in SCENARIOS {
+        let expected = run_with_soldiers(*config, *frames, THREAD_COUNTS[0]);
+        assert!(
+            expected.2 > 0,
+            "scenario {name}: the world must hold soldiers"
+        );
+        for threads in &THREAD_COUNTS[1..] {
+            let produced = run_with_soldiers(*config, *frames, *threads);
+            assert_eq!(
+                produced.0, expected.0,
+                "scenario {name}: the event log differs at {threads} threads"
+            );
+            assert_eq!(
+                produced.1, expected.1,
+                "scenario {name}: the state hash differs at {threads} threads"
+            );
+            assert_eq!(
+                produced.2, expected.2,
+                "scenario {name}: the live soldier count differs at {threads} threads"
+            );
+        }
+    }
+}
+
+#[test]
+fn the_soldier_columns_reach_the_state_hash() {
+    // A hash that ignored the soldier columns would pass the golden test
+    // while the arena changed underneath it.
+    let config = SCENARIOS[2].1;
+    let bare = World::new(config).expect("the extent must describe a world");
+    let mut peopled = World::new(config).expect("the extent must describe a world");
+    populate(&mut peopled);
+    assert_ne!(bare.state_hash(), peopled.state_hash());
+
+    let mut moved = World::new(config).expect("the extent must describe a world");
+    let kept = populate(&mut moved);
+    assert_eq!(moved.state_hash(), peopled.state_hash());
+    let corner = Axial::new(
+        (moved.grid().width() - 1) as i32,
+        (moved.grid().height() - 1) as i32,
+    );
+    assert_ne!(moved.soldiers().address(kept[0]), Some(corner));
+    assert_eq!(moved.place_soldier(kept[0], corner), Ok(true));
+    assert_ne!(moved.state_hash(), peopled.state_hash());
 }

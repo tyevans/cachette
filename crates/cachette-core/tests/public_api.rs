@@ -8,7 +8,7 @@
 //! [^1]: Testing policy. `docs/TESTING.md`
 
 use cachette_core::rng;
-use cachette_core::{World, WorldConfig};
+use cachette_core::{Axial, FactionId, SoldierError, World, WorldConfig};
 
 #[test]
 fn a_new_world_holds_its_invariants() {
@@ -160,4 +160,35 @@ fn the_change_kind_matches_the_direction_of_the_change() {
     }
     assert!(raised > 0, "the scenario must raise a tile");
     assert!(lowered > 0, "the scenario must lower a tile");
+}
+
+#[test]
+fn a_soldier_survives_a_step_and_the_world_holds_its_invariants() {
+    // FND-041: a column set that no system reaches is inert. The test drives
+    // the step and then inspects the arena.
+    let mut world = World::new(WorldConfig::default()).expect("the extent must describe a world");
+    let soldier = world
+        .spawn_soldier(Axial::new(2, 3), FactionId(1))
+        .expect("the address and the faction must be valid");
+    assert_eq!(world.soldiers().len(), 1);
+    world.step(4).expect("the step must run");
+    assert!(world.check_invariants());
+    assert!(world.soldiers().contains(soldier));
+    assert_eq!(world.soldiers().address(soldier), Some(Axial::new(2, 3)));
+
+    assert!(world.despawn_soldier(soldier));
+    assert!(!world.soldiers().contains(soldier));
+    assert!(!world.despawn_soldier(soldier));
+    assert!(world.check_invariants());
+}
+
+#[test]
+fn the_world_refuses_a_soldier_that_no_tile_holds() {
+    let mut world = World::new(WorldConfig::default()).expect("the extent must describe a world");
+    let outside = Axial::new(-1, 0);
+    assert_eq!(
+        world.spawn_soldier(outside, FactionId(0)),
+        Err(SoldierError::TileOutsideWorld(outside))
+    );
+    assert!(world.soldiers().is_empty());
 }

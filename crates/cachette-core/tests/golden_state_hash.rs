@@ -18,7 +18,8 @@
 
 use std::path::PathBuf;
 
-use cachette_core::{World, WorldConfig};
+use cachette_core::types::FactionId;
+use cachette_core::{Axial, World, WorldConfig};
 
 /// The number of frames that each scenario runs.
 const FRAMES: u64 = 32;
@@ -28,7 +29,17 @@ const FRAMES: u64 = 32;
 const THREADS: usize = 4;
 
 /// A named scenario. The name is the golden file name.
-const SCENARIOS: &[(&str, WorldConfig)] = &[
+///
+/// The third scenario holds soldiers. The other two leave the arena empty,
+/// so their hashes cover the tile columns and an empty arena only. A golden
+/// file that never sees a populated arena cannot catch a change to how the
+/// soldier state is represented, which is the whole purpose of a golden
+/// file.[^1]
+///
+/// # References
+///
+/// [^1]: ADR-0001, one binary gives one answer at any thread count, decision D4. `docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
+const SCENARIOS: &[(&str, WorldConfig, bool)] = &[
     (
         "small",
         WorldConfig {
@@ -37,6 +48,7 @@ const SCENARIOS: &[(&str, WorldConfig)] = &[
             seed: 7,
             faction_count: 2,
         },
+        false,
     ),
     (
         "default",
@@ -46,8 +58,54 @@ const SCENARIOS: &[(&str, WorldConfig)] = &[
             seed: 0x0123_4567_89ab_cdef,
             faction_count: 4,
         },
+        false,
+    ),
+    (
+        "soldiers",
+        WorldConfig {
+            width: 24,
+            height: 24,
+            seed: 0xfeed_face,
+            faction_count: 3,
+        },
+        true,
     ),
 ];
+
+/// Fills a world with soldiers, and frees some of them.
+///
+/// The frees matter. A run that only spawns never exercises the generation
+/// advance, the free queue, or a reused slot, so the golden file would miss
+/// a change to any of them.[^1]
+///
+/// # References
+///
+/// [^1]: ADR-0014, entity identity is an index plus a generation, decisions D3 and D4. `docs/adrs/accepted/adr-0014-entity-identity-is-an-index-plus-a-generation.md`
+fn populate(world: &mut World) {
+    let grid = world.grid();
+    let mut freed = Vec::new();
+    for step in 0..64u32 {
+        let q = (step * 7 % grid.width()) as i32;
+        let r = (step * 5 % grid.height()) as i32;
+        let faction = FactionId((step % 3) as u16);
+        let soldier = world
+            .spawn_soldier(Axial::new(q, r), faction)
+            .expect("the spawn must succeed");
+        if step % 3 == 0 {
+            freed.push(soldier);
+        }
+    }
+    for soldier in freed {
+        assert!(world.despawn_soldier(soldier));
+    }
+    for step in 0..8u32 {
+        let q = (step * 3 % grid.width()) as i32;
+        let r = (step * 11 % grid.height()) as i32;
+        world
+            .spawn_soldier(Axial::new(q, r), FactionId(0))
+            .expect("the respawn must reuse a freed slot");
+    }
+}
 
 /// Returns the path of the golden file for one scenario.
 fn golden_path(name: &str) -> PathBuf {
@@ -58,8 +116,11 @@ fn golden_path(name: &str) -> PathBuf {
 }
 
 /// Runs a scenario and returns one hash line for each frame.
-fn hash_sequence(config: WorldConfig) -> String {
+fn hash_sequence(config: WorldConfig, with_soldiers: bool) -> String {
     let mut world = World::new(config).expect("the extent must describe a world");
+    if with_soldiers {
+        populate(&mut world);
+    }
     let mut lines = String::new();
     lines.push_str(&format!("0 {}\n", world.state_hash()));
     for frame in 1..=FRAMES {
@@ -76,8 +137,8 @@ fn recording() -> bool {
 
 #[test]
 fn the_state_hash_matches_the_golden_file() {
-    for (name, config) in SCENARIOS {
-        let produced = hash_sequence(*config);
+    for (name, config, with_soldiers) in SCENARIOS {
+        let produced = hash_sequence(*config, *with_soldiers);
         let path = golden_path(name);
 
         if recording() {

@@ -1,7 +1,7 @@
 ---
 id: 0019
 title: Implement the soldier column set
-status: refined
+status: complete
 created: 2026-08-30
 implements: [ADR-0066 D1, ADR-0066 D3]
 changes: []
@@ -102,7 +102,45 @@ step and then inspects the arena.
 
 ## Outcome
 
-Filled in on completion.
+`crates/cachette-core/src/soldier.rs` holds the arena. A soldier carries a
+generational handle, a tile address and a faction. The world exposes spawn,
+despawn and place, so the arena has a real caller.
+
+Both repairs are done. `Entity::new` is now reachable only inside the crate,
+and the four call sites in the value type tests were rewritten to mint
+identities through the arena rather than deleted, so they exercise the real
+path. Generations start at one, and a test allocates exactly one entity into
+an empty arena and asserts it has an identity.
+
+Two things changed from the plan.
+
+The golden test gained a third scenario. The plan asked only that the state
+hash cover the soldier columns, which it does. But the two existing golden
+scenarios never spawn a soldier, so their stored hashes covered an empty
+arena and could not catch a change to how soldier state is represented. The
+new scenario spawns, frees and respawns, so it exercises the generation
+advance, the free queue and a reused slot. It was checked against a mutation:
+swapping the free queue to last-in first-out changes the recorded sequence,
+and the two older scenarios stay green.
+
+The mutation check found nothing wrong with the code, and one thing wrong
+with the method. A first pass ran only the integration target and reported
+that a retired slot returning to the queue killed no test. The tests for that
+rule are unit tests inside the module, which that target does not run. The
+tests were right and the measurement was wrong. A mutation check must run
+every target.
+
+The Python bindings do not expose soldiers. Nothing needs them yet, and the
+product record puts the viewer in Rust.
+
+Mutations applied, against every target:
+
+| Mutation | Record | Tests killed |
+|---|---|---|
+| A generation starts at zero | ADR-0014 D6 | 5 |
+| Last-in first-out slot reuse | ADR-0014 D4 | 1 |
+| A retired slot returns to the queue | ADR-0014 D5 | 2 |
+| The generation does not advance on the free | ADR-0014 D3 | 1 |
 
 ## References
 
