@@ -91,14 +91,23 @@ impl std::error::Error for DemoError {}
 fn populate(world: &mut World) -> Result<(), DemoError> {
     let grid = world.grid();
     let factions = world.config().faction_count.max(1);
-    let tiles = grid.tile_count().max(1);
+    // The ground refuses a soldier on water, so the demonstration places its
+    // soldiers on the open ground it finds and never on the whole grid.[^1]
+    // The list is built once, because the ground is computed on demand.
+    //
+    // [^1]: ADR-0068, terrain is generated from the seed and is never stored as a map, decision D4, a draft record. `docs/adrs/draft/adr-0068-terrain-is-generated-from-the-seed-and-is-never-stored-as-a-map.md`
+    let open: Vec<Axial> = (0..grid.tile_count())
+        .map(|index| Axial::new((index % grid.width()) as i32, (index / grid.width()) as i32))
+        .filter(|address| world.admits_a_unit(*address))
+        .collect();
+    if open.is_empty() {
+        return Ok(());
+    }
     for index in 0..SOLDIERS {
-        let tile = index.wrapping_mul(SPREAD) % tiles;
-        let q = (tile % grid.width()) as i32;
-        let r = (tile / grid.width()) as i32;
+        let at = open[(index.wrapping_mul(SPREAD) as usize) % open.len()];
         let faction = FactionId((index % u32::from(factions)) as u16);
         world
-            .spawn_soldier(Axial::new(q, r), faction)
+            .spawn_soldier(at, faction)
             .map_err(DemoError::Soldier)?;
     }
     Ok(())

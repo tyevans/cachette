@@ -9,6 +9,9 @@
 //! A soldier whose chosen neighbour falls outside the world stays put. The
 //! world is a rhombus and it does not wrap.[^2]
 //!
+//! A soldier whose chosen neighbour holds ground that admits no unit also
+//! stays put, and no soldier ever starts on such ground.[^5]
+//!
 //! This covers the intent half of movement only. The step admits every
 //! intent, so two soldiers may hold the same tile.[^3]
 //!
@@ -20,6 +23,7 @@
 //! [^2]: ADR-0017, the world is a rhombus, so a tile index is raw axial, decision D3. `docs/adrs/accepted/adr-0017-the-world-is-a-rhombus-so-a-tile-index-is-raw-axial.md`
 //! [^3]: ADR-0056, movement is tile-discrete and admitted by sort-then-admit, decision D2, a draft record. `docs/adrs/accepted/adr-0056-movement-is-tile-discrete-and-admitted-by-sort-then-admit.md`
 //! [^4]: Testing policy. `docs/TESTING.md`
+//! [^5]: ADR-0068, terrain is generated from the seed and is never stored as a map, decision D4, a draft record. `docs/adrs/draft/adr-0068-terrain-is-generated-from-the-seed-and-is-never-stored-as-a-map.md`
 
 use cachette_core::{Axial, Entity, FactionId, World, WorldConfig};
 use proptest::prelude::*;
@@ -32,6 +36,35 @@ const THREAD_COUNTS: [usize; 3] = [1, 2, 12];
 ///
 /// The population is a fixed pattern, so it is the same on every run and at
 /// every thread count.
+/// The number of soldiers that the fixture world holds.
+const POPULATION: usize = 48;
+
+/// Returns every address of a world, in index order.
+///
+/// The order is the index order of the grid, which is fixed and does not
+/// depend on how a caller visited the world.[^1]
+///
+/// # References
+///
+/// [^1]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
+fn addresses_of(world: &World) -> Vec<Axial> {
+    let grid = world.grid();
+    (0..grid.width() * grid.height())
+        .map(|index| Axial::new((index % grid.width()) as i32, (index / grid.width()) as i32))
+        .collect()
+}
+
+/// Builds a world of the given seed and fills it with soldiers.
+///
+/// The population is a fixed pattern, so it is the same on every run and at
+/// every thread count. The pattern takes the passable tiles in index order,
+/// because the ground refuses a soldier on water and the refusal is a
+/// property of the seed.
+///
+/// A world narrower than the coarsest lattice spacing sits inside one
+/// lattice cell, so a seed can put water on every tile of it. The fixture
+/// therefore takes the open ground it finds and states how much that was. A
+/// caller that needs a population asserts the floor it needs.
 fn peopled(seed: u64) -> (World, Vec<Entity>) {
     let mut world = World::new(WorldConfig {
         width: 12,
@@ -40,10 +73,13 @@ fn peopled(seed: u64) -> (World, Vec<Entity>) {
         faction_count: 3,
     })
     .expect("the extent must describe a world");
-    let grid = world.grid();
+    let open: Vec<Axial> = addresses_of(&world)
+        .into_iter()
+        .filter(|address| world.admits_a_unit(*address))
+        .take(POPULATION)
+        .collect();
     let mut kept = Vec::new();
-    for index in 0..48u32 {
-        let address = Axial::new((index % grid.width()) as i32, (index / grid.width()) as i32);
+    for (index, address) in open.into_iter().enumerate() {
         let soldier = world
             .spawn_soldier(address, FactionId((index % 3) as u16))
             .expect("the address and the faction must be valid");
@@ -131,9 +167,14 @@ fn a_soldier_at_a_corner_stays_put_rather_than_wrapping() {
             faction_count: 1,
         })
         .expect("the extent must describe a world");
+        // The corner of this seed may hold water, and water admits no unit.
+        // That seed tests nothing here, so the loop passes over it.
+        if !world.admits_a_unit(corner) {
+            continue;
+        }
         let soldier = world
             .spawn_soldier(corner, FactionId(0))
-            .expect("the corner is inside the world");
+            .expect("the corner is inside the world and admits a unit");
         world.step(1).expect("the step must run");
         let end = world
             .soldiers()
@@ -198,19 +239,23 @@ fn the_generation_of_an_identity_changes_the_direction() {
         };
 
         let mut first = World::new(config).expect("the extent must describe a world");
+        // The start of this seed may hold water, and water admits no unit.
+        if !first.admits_a_unit(start) {
+            continue;
+        }
         let original = first
             .spawn_soldier(start, FactionId(0))
-            .expect("the address is inside the world");
+            .expect("the address is inside the world and admits a unit");
         first.step(1).expect("the step must run");
 
         let mut second = World::new(config).expect("the extent must describe a world");
         let doomed = second
             .spawn_soldier(start, FactionId(0))
-            .expect("the address is inside the world");
+            .expect("the address is inside the world and admits a unit");
         assert!(second.despawn_soldier(doomed));
         let reused = second
             .spawn_soldier(start, FactionId(0))
-            .expect("the address is inside the world");
+            .expect("the address is inside the world and admits a unit");
         // The respawn takes the same slot at a later generation.
         assert_eq!(reused.index(), doomed.index());
         assert_ne!(reused.generation(), doomed.generation());
@@ -262,6 +307,10 @@ proptest! {
         frames in 1u64..5,
     ) {
         let expected = addresses_after(seed, frames, THREAD_COUNTS[0]);
+        // A world of nearly all water holds nearly no soldier, and two empty
+        // runs agree without proving anything. Reject that seed rather than
+        // pass on it.
+        prop_assume!(expected.len() >= POPULATION / 2);
         for threads in &THREAD_COUNTS[1..] {
             prop_assert_eq!(
                 addresses_after(seed, frames, *threads),
@@ -277,6 +326,7 @@ proptest! {
     /// every soldier on the same tile.
     #[test]
     fn the_same_seed_gives_the_same_run(seed in any::<u64>(), frames in 1u64..5) {
+        prop_assume!(addresses_after(seed, frames, 2).len() >= POPULATION / 2);
         prop_assert_eq!(
             addresses_after(seed, frames, 2),
             addresses_after(seed, frames, 2)

@@ -268,13 +268,42 @@ impl World {
         &self.soldiers
     }
 
+    /// Reports whether the ground at an address admits a unit.
+    ///
+    /// The answer is a property of the ground alone.[^1] It does not depend
+    /// on the tick, on the faction, or on what already stands there. An
+    /// address outside the world gives `false`, and the caller reports that
+    /// refusal under its own name.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0068, terrain is generated from the seed and is never stored as a map, decision D4, a draft record. `docs/adrs/draft/adr-0068-terrain-is-generated-from-the-seed-and-is-never-stored-as-a-map.md`
+    #[must_use]
+    pub fn admits_a_unit(&self, address: Axial) -> bool {
+        self.terrain
+            .kind(address)
+            .is_some_and(TileKind::is_passable)
+    }
+
+    /// Refuses an address that lies inside the world on ground that admits
+    /// no unit.
+    ///
+    /// The extent refusal stays with the arena, which owns the grid. This
+    /// call therefore says nothing about an address outside the world.
+    fn refuse_impassable(&self, address: Axial) -> Result<(), SoldierError> {
+        match self.terrain.kind(address) {
+            Some(kind) if !kind.is_passable() => Err(SoldierError::TileImpassable(address)),
+            _ => Ok(()),
+        }
+    }
+
     /// Adds a soldier to the world and returns its identity.
     ///
     /// # Errors
     ///
     /// Returns an error when the arena holds no free slot, when the address
-    /// is outside the world, or when the faction is at or above the
-    /// ceiling.
+    /// is outside the world, when the ground at the address admits no
+    /// unit, or when the faction is at or above the ceiling.
     pub fn spawn_soldier(
         &mut self,
         address: Axial,
@@ -287,6 +316,7 @@ impl World {
         if faction.0 >= self.config.faction_count.max(1) {
             return Err(SoldierError::FactionAboveCeiling(faction));
         }
+        self.refuse_impassable(address)?;
         self.soldiers.spawn(address, faction)
     }
 
@@ -307,8 +337,10 @@ impl World {
     ///
     /// # Errors
     ///
-    /// Returns an error when the address is outside the world.
+    /// Returns an error when the address is outside the world, or when the
+    /// ground at the address admits no unit.
     pub fn place_soldier(&mut self, entity: Entity, address: Axial) -> Result<bool, SoldierError> {
+        self.refuse_impassable(address)?;
         self.soldiers.place(entity, address)
     }
 
@@ -519,6 +551,19 @@ impl World {
         if self.soldiers.grid() != self.grid {
             return false;
         }
+        // No soldier stands on ground that admits no unit. The spawn, the
+        // placement and the movement each refuse such a tile, and this check
+        // is what fails when a later path forgets to.[^1]
+        //
+        // [^1]: ADR-0068, terrain is generated from the seed and is never stored as a map, decision D4, a draft record. `docs/adrs/draft/adr-0068-terrain-is-generated-from-the-seed-and-is-never-stored-as-a-map.md`
+        if self
+            .soldiers
+            .iter()
+            .filter_map(|soldier| self.soldiers.address(soldier))
+            .any(|address| !self.admits_a_unit(address))
+        {
+            return false;
+        }
         // The terrain holds a second copy of the seed and of the extent. One
         // value declared twice needs a check that fails when the copies
         // disagree, because a silently wrong copy reads back correctly and
@@ -604,11 +649,11 @@ impl World {
         // Every soldier chooses a neighbour, then the step applies the
         // choices. The choice is a pure read of the world, so the two halves
         // never interleave and no soldier sees a half-applied world.[^1]
-        let moves = soldier_moves(tick, seed, &self.soldiers, threads)?;
+        let moves = soldier_moves(tick, seed, self.terrain, &self.soldiers, threads)?;
         for (soldier, address) in moves {
             self.soldiers
                 .place(soldier, address)
-                .expect("the chosen address is inside the world");
+                .expect("the chosen address is inside the world and admits a unit");
         }
 
         // The bridge rebuilds here, at the barrier, and after the structural
@@ -642,6 +687,12 @@ const DRAW_MOVE_DIRECTION: u32 = 0;
 /// world is a rhombus and it does not wrap, so an address outside the
 /// extent names no tile.[^3]
 ///
+/// A soldier whose chosen neighbour holds ground that admits no unit also
+/// stays put.[^6] This refusal belongs to the intent half. The ground refuses
+/// every unit on every frame, whatever else stands there, so the intent never
+/// reaches admission and the soldier takes no lateral step. A tile that is
+/// full is a different refusal, and admission owns it.[^5]
+///
 /// The soldiers are read in slot order, each thread writes its own output
 /// slot, and the step joins the slots in slot order. The result never
 /// depends on thread completion order.[^4]
@@ -657,9 +708,11 @@ const DRAW_MOVE_DIRECTION: u32 = 0;
 /// [^3]: ADR-0017, the world is a rhombus, so a tile index is raw axial, decision D3. `docs/adrs/accepted/adr-0017-the-world-is-a-rhombus-so-a-tile-index-is-raw-axial.md`
 /// [^4]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
 /// [^5]: ADR-0056, movement is tile-discrete and admitted by sort-then-admit, decision D2, a draft record. `docs/adrs/accepted/adr-0056-movement-is-tile-discrete-and-admitted-by-sort-then-admit.md`
+/// [^6]: ADR-0068, terrain is generated from the seed and is never stored as a map, decision D4, a draft record. `docs/adrs/draft/adr-0068-terrain-is-generated-from-the-seed-and-is-never-stored-as-a-map.md`
 fn soldier_moves(
     tick: Tick,
     seed: u64,
+    terrain: Terrain,
     soldiers: &SoldierArena,
     threads: usize,
 ) -> Result<Vec<(Entity, Axial)>, StepError> {
@@ -691,6 +744,12 @@ fn soldier_moves(
                         // soldier then stays put, because the world does not
                         // wrap.
                         let target = grid.neighbour(here, direction)?;
+                        // The ground refuses the soldier outright. The
+                        // soldier stays put, and nothing later in the frame
+                        // sees the intent.
+                        if !terrain.kind(target)?.is_passable() {
+                            return None;
+                        }
                         Some((*soldier, target))
                     })
                     .collect();

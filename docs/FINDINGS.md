@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-054**
+**Next number: FND-055**
 
 ## A. Corrections to stated rules
 
@@ -1025,6 +1025,50 @@ and false of the code at the same time, and the author sees only the design.
 A record that names an algorithm the project has not written must say plainly
 that nothing implements it yet.
 
+### FND-054 — A test world smaller than the lattice spacing holds one terrain
+
+**Believed.** A small world is a scaled-down large world. A fixture of twelve
+tiles by twelve carries the same mix of ground as a fixture of ninety-six by
+ninety-six, so a small fixture is a cheap way to test what a large one tests.
+
+**True.** The ground comes from a lattice, and the coarsest octave of that
+lattice spans sixty-four tiles. A world narrower than that spacing sits inside
+one lattice cell. Every tile of it then falls on the same side of the water
+threshold, so the world is all water or all dry, and which one is a property
+of the seed.
+
+**Evidence.** Three instances, all in one change, the change that made the
+ground refuse a unit.
+
+A property test over arbitrary seeds peopled a world of twelve by twelve. One
+seed put water on every one of its tiles, so the fixture spawned nobody and
+two empty runs compared equal.
+
+The golden state hash suite held one populated scenario, of twenty-four tiles
+by twenty-four. It held no water, so no soldier in it ever met water. The
+suite passed unchanged against the new rule and against the rule removed
+again. A scenario of ninety-six by ninety-six fails in the second case and
+passes in the first.
+
+The generator makes no one-tile island, because the field is coherent. A test
+written for a soldier whose every neighbour is water found no such tile in a
+world of nine thousand.
+
+**Follows.** Three things.
+
+**State the extent a fixture needs, against the lattice and not against
+taste.** A fixture that must hold two kinds of ground is wider than the
+coarsest lattice spacing. A fixture narrower than that tests one kind of
+ground and must say which.
+
+**A property test over seeds must reject a world it cannot use.** A run with
+no soldier in it compares two empty results and passes. That is the
+uniform-input shape, and it is already recorded.[^11]
+
+**The extent belongs in the fixture, not in the record.** The spacing is a
+constant of the generator. A record that quoted it would hold a value that a
+change to the generator moves.[^12]
+
 ## References
 
 [^1]: Findings register, FND-038, in this document.
@@ -1037,3 +1081,5 @@ that nothing implements it yet.
 [^8]: ADR Registry, the retcon window. `docs/adrs/REGISTRY.md`
 [^9]: ADR-0018, the unit-to-tile bridge is derived, and it rebuilds at the barrier, decision D3. `docs/adrs/accepted/adr-0018-the-unit-to-tile-bridge-is-derived-and-rebuilds-at-the-barrier.md`
 [^10]: Decision Record Scope, section 4.6. `.claude/rules/adr-scope.md`
+[^11]: Findings register, FND-051, in this document.
+[^12]: Decision Record Scope, section 4.1. `.claude/rules/adr-scope.md`
