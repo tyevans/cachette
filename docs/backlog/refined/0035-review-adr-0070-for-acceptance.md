@@ -1,5 +1,5 @@
 ---
-id: 0032
+id: 0035
 title: Review ADR-0070 for acceptance
 status: refined
 created: 2026-08-30

@@ -1,5 +1,5 @@
 ---
-id: 0034
+id: 0037
 title: Check the panel layout against a stored picture
 status: proposed
 created: 2026-08-30

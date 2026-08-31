@@ -1,5 +1,5 @@
 ---
-id: 0033
+id: 0036
 title: Decide how a watcher reads a count of the whole world
 status: proposed
 created: 2026-08-30
