@@ -1,7 +1,7 @@
 ---
 id: 0017
 title: Write the tile index record for a rhombus world
-status: refined
+status: complete
 created: 2026-08-30
 implements: []
 changes: []
@@ -66,7 +66,22 @@ its old claim, so nothing cites the old text.[^5]
 
 ## Outcome
 
-Filled in on completion.
+ADR-0017 is written with four numbered decisions and the row is `Draft`.
+
+Two things changed from the plan. The record states a fourth decision the
+plan did not anticipate: the engine stores the shape and the viewer draws it.
+The skew was going to be a consequence, but a consequence is not something a
+reviewer can find a violation of, and "the engine never holds a screen
+position" is. It is a decision.
+
+The rejected alternative section became part of the context rather than a
+section of its own, because the offset index is the force that makes the
+choice hard, not a separate option considered afterwards. The record states
+the aspect-ratio cost as a shape and cites the report for the figures, rather
+than quoting them.
+
+The record check reports ADR-0017 as cited by nothing. Item 0018 is what
+cites it.
 
 ## References
 
