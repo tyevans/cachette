@@ -19,13 +19,22 @@
 //! one thread the order changes, and the event log changes with it. That is
 //! exactly the defect that ADR-0004 D1 forbids.[^1]
 //!
+//! The feature also makes admission read the intents in the order they
+//! arrived rather than in the sorted order. Sorting by a stable key is what
+//! makes the admitted set independent of the thread count, so a sound
+//! admission absorbs the slot reversal and the thread-count test cannot fail
+//! on it. With the sort removed, who enters a full tile follows the join
+//! order, and the join order follows the thread count.[^2]
+//!
 //! # References
 //!
 //! [^1]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`, and ADR-0001, one binary gives one answer at any thread count, decision D5. `docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
+//! [^2]: ADR-0056, movement is tile-discrete and admitted by sort-then-admit, decision D3. `docs/adrs/accepted/adr-0056-movement-is-tile-discrete-and-admitted-by-sort-then-admit.md`
 #![cfg(feature = "probe-nondeterminism")]
 
 use cachette_core::slots::{Candidate, Slots};
-use cachette_core::{Axial, Grid, Terrain, World, WorldConfig};
+use cachette_core::terrain::TileKind;
+use cachette_core::{Axial, FactionId, Grid, Terrain, World, WorldConfig};
 
 /// The scenario. It must hold more tiles than threads, so that a run at
 /// twelve threads fills more than one output slot.
@@ -132,4 +141,96 @@ fn the_key_field_test_fails_when_the_terrain_key_drops_the_row() {
         .collect();
     along.dedup();
     assert!(along.len() > 1, "the probe also removed the column");
+}
+
+/// The extent of the crowded world that the admission probe reads.
+///
+/// The extent is wider than the coarsest lattice spacing of the generator, so
+/// the world holds open ground as well as water.
+const CROWD_EXTENT: u32 = 96;
+
+/// Builds a world whose units contend for their targets, and returns where
+/// each of them stands after one frame at the given thread count.
+///
+/// A population spread over a world contends for nothing, so admission
+/// refuses nobody and the order it reads its intents in cannot matter. The
+/// probe needs a full tile, and it must say so rather than assume it.
+fn crowded_after_a_frame(threads: usize) -> Vec<Axial> {
+    let mut world = World::new(WorldConfig {
+        width: CROWD_EXTENT,
+        height: CROWD_EXTENT,
+        seed: 0x0cac_4e77_0023,
+        faction_count: 2,
+    })
+    .expect("the extent must describe a world");
+
+    let grid = world.grid();
+    let patch: Vec<Axial> = (0..grid.tile_count())
+        .map(|index| Axial::new((index % grid.width()) as i32, (index / grid.width()) as i32))
+        .filter(|address| world.admits_a_unit(*address))
+        .filter(|address| address.q >= 8 && address.q < 20 && address.r >= 8 && address.r < 20)
+        .collect();
+    assert!(
+        patch.len() >= 16,
+        "the probe world holds only {} open tiles in its patch",
+        patch.len()
+    );
+
+    let mut kept = Vec::new();
+    for address in patch {
+        let capacity = world.tile_kind(address).map_or(0, TileKind::capacity);
+        assert!(capacity > 0, "an open tile admits no unit");
+        for ordinal in 0..capacity {
+            kept.push(
+                world
+                    .spawn_soldier(address, FactionId((ordinal % 2) as u16))
+                    .expect("the open tile admits a unit"),
+            );
+        }
+    }
+
+    world.step(threads).expect("the step must run");
+    kept.iter()
+        .map(|soldier| {
+            world
+                .soldiers()
+                .address(*soldier)
+                .expect("nothing despawned the soldier")
+        })
+        .collect()
+}
+
+#[test]
+fn the_admission_test_fails_when_the_sort_rule_breaks() {
+    // The probe removes the sort from admission, so who enters a full tile
+    // follows the order the intents were joined in, and the slot probe makes
+    // that order follow the thread count.
+    //
+    // This is the defect ADR-0056 D3 forbids, and it is invisible to a
+    // reviewer: the code still admits up to the capacity, still refuses the
+    // rest, and still gives one answer on one machine at one thread count.[^1]
+    //
+    // [^1]: ADR-0056, movement is tile-discrete and admitted by sort-then-admit, decision D3. `docs/adrs/accepted/adr-0056-movement-is-tile-discrete-and-admitted-by-sort-then-admit.md`
+    let at_one = crowded_after_a_frame(1);
+    let at_twelve = crowded_after_a_frame(12);
+    assert!(!at_one.is_empty(), "the scenario must hold soldiers");
+    assert_ne!(
+        at_one, at_twelve,
+        "the probe did not perturb the admitted set, so the admission \
+         thread-count assertion has no proven failure mode"
+    );
+}
+
+#[test]
+fn the_perturbed_admission_moves_the_same_number_of_units() {
+    // The probe changes who is admitted and not how many. A probe that also
+    // changed the count would prove less: the thread-count test would then
+    // fail on the population rather than on the order.
+    let at_one = crowded_after_a_frame(1);
+    let at_twelve = crowded_after_a_frame(12);
+    assert_eq!(
+        at_one.len(),
+        at_twelve.len(),
+        "the probe changed the population as well as the order"
+    );
 }
