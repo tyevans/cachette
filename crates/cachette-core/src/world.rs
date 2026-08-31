@@ -84,7 +84,7 @@ pub struct WorldConfig {
     ///
     /// # References
     ///
-    /// [^1]: ADR-0017, the world is a rhombus, so a tile index is raw axial, decision D1. `docs/adrs/draft/adr-0017-the-world-is-a-rhombus-so-a-tile-index-is-raw-axial.md`
+    /// [^1]: ADR-0017, the world is a rhombus, so a tile index is raw axial, decision D1. `docs/adrs/accepted/adr-0017-the-world-is-a-rhombus-so-a-tile-index-is-raw-axial.md`
     pub width: u32,
     /// The number of rows in the world.
     pub height: u32,
@@ -166,7 +166,7 @@ impl World {
     ///
     /// # References
     ///
-    /// [^1]: ADR-0017, the world is a rhombus, so a tile index is raw axial, decision D4. `docs/adrs/draft/adr-0017-the-world-is-a-rhombus-so-a-tile-index-is-raw-axial.md`
+    /// [^1]: ADR-0017, the world is a rhombus, so a tile index is raw axial, decision D4. `docs/adrs/accepted/adr-0017-the-world-is-a-rhombus-so-a-tile-index-is-raw-axial.md`
     #[must_use]
     pub const fn grid(&self) -> Grid {
         self.grid
@@ -179,7 +179,7 @@ impl World {
     ///
     /// # References
     ///
-    /// [^1]: ADR-0017, the world is a rhombus, so a tile index is raw axial, decision D1. `docs/adrs/draft/adr-0017-the-world-is-a-rhombus-so-a-tile-index-is-raw-axial.md`
+    /// [^1]: ADR-0017, the world is a rhombus, so a tile index is raw axial, decision D1. `docs/adrs/accepted/adr-0017-the-world-is-a-rhombus-so-a-tile-index-is-raw-axial.md`
     #[must_use]
     pub fn tile_value(&self, address: Axial) -> Option<Fix32> {
         let index = self.grid.index_of(address)?;

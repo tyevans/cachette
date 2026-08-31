@@ -1,6 +1,6 @@
 # ADR-0017: The world is a rhombus, so a tile index is raw axial
 
-Status: Draft
+Status: Accepted
 
 ## Context
 
@@ -57,6 +57,9 @@ An axial component, an index, and a distance are all integers. No coordinate
 is a fixed-point value and none is a floating point value, so the arithmetic
 that derives one is exact.[^3]
 
+An address operation saturates at the range of its type. A saturated address
+lies outside the world, so it has no index and no tile.
+
 ### D4. The engine stores the shape, and the viewer draws it
 
 A rhombus in the index space is a parallelogram on the screen. The viewer
@@ -72,8 +75,8 @@ suits one display does not suit another.
 inherits the index space, so a block is a parallelogram in world space rather
 than a near-rectangle. A conservative bounding radius around a longer, thinner
 block admits more false positives, so a radius query descends into more
-subtrees than a rectangular block would need. The report measures the aspect
-ratios of both.[^1] This is the price of removing the conversion, and it is
+subtrees than a rectangular block would need. The report derives the aspect ratio
+of each.[^1] This is the price of removing the conversion, and it is
 paid by the query path rather than by every tile access.
 
 **A rectangular viewport is not a rectangular index range.** A viewer that

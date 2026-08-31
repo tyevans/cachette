@@ -1,6 +1,6 @@
 # ADR-0012: Tiles are dense columns and units are a generational arena
 
-Status: Draft
+Status: Accepted
 
 ## Context
 
@@ -48,14 +48,20 @@ This record fixes that a tile field is a column. It does not fix the width of
 a column, the encoding of a boolean field, or the form a rare field takes. A
 separate record holds those.[^4]
 
-### D3. A unit is an entity in the generational arena
+### D3. An entity of any shape lives in the generational arena
 
-A unit lives in the entity storage. It carries an identity that pairs a slot
-index with a generation.[^5] Its columns are the columns of its shape.[^2]
+Every entity lives in the entity storage, whatever its shape. An entity
+carries an identity that pairs a slot index with a generation.[^5] Its
+columns are the columns of its shape.[^2] A unit is one such entity, and the
+word "unit" in this record means an entity of the soldier shape.
 
 The arena holds every one of the four fixed shapes. Tile columns hold none of
-them. A tile upgrade is an entity in the arena, and the tile side of the split
-holds only the marker that says which tiles carry one.[^4]
+them.
+
+A tile upgrade is an entity in the arena. The tile side of the split holds a
+marker that says which tiles carry one. The marker answers whether, not
+which. A structure that maps a marked tile to the identity of its upgrade is
+a separate decision, and this record does not hold it.[^4]
 
 ### The alternative this rejects
 
@@ -102,8 +108,8 @@ would rewrite every system.
 ## References
 [^1]: Report 01, the entity component system core and the memory layout, sections 1 and 8. `docs/research/reports/01-ecs-and-memory-layout.md`
 [^2]: ADR-0066, entity storage holds four fixed shapes. `docs/adrs/accepted/adr-0066-entity-storage-holds-four-fixed-shapes.md`
-[^3]: ADR-0017, the world is a rhombus, so a tile index is raw axial. `docs/adrs/draft/adr-0017-the-world-is-a-rhombus-so-a-tile-index-is-raw-axial.md`
+[^3]: ADR-0017, the world is a rhombus, so a tile index is raw axial. `docs/adrs/accepted/adr-0017-the-world-is-a-rhombus-so-a-tile-index-is-raw-axial.md`
 [^4]: ADR-0015, a tile column is narrow, with bitplanes and sparse side tables. `docs/adrs/REGISTRY.md`
-[^5]: ADR-0014, entity identity is an index plus a generation. `docs/adrs/draft/adr-0014-entity-identity-is-an-index-plus-a-generation.md`
-[^6]: ADR-0018, the unit-to-tile bridge is three structures, and units stay sorted by tile. `docs/adrs/draft/adr-0018-the-unit-to-tile-bridge-is-derived-and-rebuilds-at-the-barrier.md`
+[^5]: ADR-0014, entity identity is an index plus a generation. `docs/adrs/accepted/adr-0014-entity-identity-is-an-index-plus-a-generation.md`
+[^6]: ADR-0018, the unit-to-tile bridge is derived, and it rebuilds at the barrier. `docs/adrs/accepted/adr-0018-the-unit-to-tile-bridge-is-derived-and-rebuilds-at-the-barrier.md`
 [^7]: ADR-0016, tiles are stored in block-tiled order at the aggregation block size. `docs/adrs/REGISTRY.md`

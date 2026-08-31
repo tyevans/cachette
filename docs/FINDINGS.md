@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-045**
+**Next number: FND-046**
 
 ## A. Corrections to stated rules
 
@@ -683,6 +683,37 @@ appeared on standard output among passing tests, where nothing reads it. The
 lesson is not to read more output. It is that a claim about the test suite
 needs the same proof as a claim about the engine: delete the artefact, cause
 the failure, and check that the artefact came back.
+
+### FND-045 — A record was accepted while its review was still running
+
+**Believed.** The review ceremony ran, its findings were in hand, and the
+records could be accepted.
+
+**True.** Four records were accepted on a first review while a second review
+was still reading them. The second review found a claim in one record that
+another record falsifies, and named it as blocking acceptance. By then the
+record was accepted.
+
+**Evidence.** ADR-0018 rejected an offset array over every tile on the
+grounds that a structure growing with the tile count is unaffordable.
+ADR-0056 D4 assumes exactly such an array exists and derives a capacity bound
+from it. Accepting ADR-0018 would have bound the project to a reason that
+another record falsifies. Three further records had outstanding amendments of
+their own, including one record that called the same leak bounded in a
+decision and unbounded in a consequence.
+
+Nothing was pushed, so the acceptances were reverted, the amendments applied,
+and the records accepted once with both reviews read.
+
+**Follows.** The registry says an accepted record does not change except in
+status, which makes acceptance the expensive step and the one to be slow
+about. The rule that was missing is simple: **do not accept while a review is
+in flight.** A verdict that has not arrived is not a verdict, and the absence
+of an objection is not the absence of a defect.
+
+The second review also disagreed with the first about ADR-0018, which is the
+argument for having had two. A single reviewer that agrees with the author is
+indistinguishable from no reviewer.
 
 ## References
 

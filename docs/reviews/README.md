@@ -31,6 +31,17 @@ review belongs to.
 - The verdict for each item: `ACCEPT`, `ACCEPT WITH AMENDMENT`, or `REJECT`.
 - For an amendment, the exact text to change.
 
+## When a record may be accepted
+
+**Not while a review of it is in flight.** An accepted record does not change
+except in status, so acceptance is the expensive step. A verdict that has not
+arrived is not a verdict, and the absence of an objection is not the absence
+of a defect.
+
+This has happened once. Four records were accepted on a first review while a
+second was still reading them, and the second found a claim in one record
+that another record falsified.[^2]
+
 ## Who may review
 
 The registry says who holds review rights and what a delegated review must
@@ -42,3 +53,4 @@ review says so in place of a verdict, and the record stays a draft.
 ## References
 
 [^1]: ADR Registry, who reviews. `docs/adrs/REGISTRY.md`
+[^2]: Findings register, FND-045. `docs/FINDINGS.md`

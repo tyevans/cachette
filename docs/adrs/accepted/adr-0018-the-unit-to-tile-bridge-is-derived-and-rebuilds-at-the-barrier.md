@@ -1,6 +1,6 @@
 # ADR-0018: The unit-to-tile bridge is derived, and it rebuilds at the barrier
 
-Status: Draft
+Status: Accepted
 
 ## Context
 
@@ -9,13 +9,22 @@ two populations therefore live in separate storage, and nothing in either one
 answers the question that movement asks first: which units stand on this tile.
 
 A unit holds the tile it occupies as a field, so the map from a unit to a tile
-is direct. The reverse map is not stored. Movement needs the reverse map,
-because admission must know what already occupies a target tile.[^2]
+is direct. The reverse map is not stored.
+
+The reverse map is what a system asks for whenever it must act on the units
+that share a tile. Any system that joins a tile to the units on it needs it,
+and none of them can build it from the unit columns at the moment of the
+question without scanning the whole population. Admission is the first such
+system: it must know what already occupies a target tile.[^2]
 
 The unit population is sparse against the tile count. The tile count is fixed
 and large. The unit count is smaller and changes every frame. Any structure
 that grows with the tile count therefore spends most of its size recording
 that a tile is empty.
+
+The bridge partitions the world by the same block that the level of detail
+pyramid aggregates over.[^9] One partition serves both. A change to the block
+size therefore changes two subsystems, and neither may choose it alone.
 
 The reverse map is derived. Level 0 is the only source of truth, so the bridge
 must be rebuildable from the unit columns alone.
@@ -27,9 +36,10 @@ must be rebuildable from the unit columns alone.
 The bridge holds a key array, a unit array, a block range array, and a block
 occupancy bitplane. D5 states what the bitplane is for.
 
-The bridge is wholly derived. It holds no fact that the entity columns do not
-already hold, and destroying it loses nothing. The arena is never sorted and
-never compacted, because the slot index is half of the identity.[^7]
+The bridge is wholly derived. It holds no fact that the entity columns do
+not already hold, and destroying it loses nothing. It reorders nothing that
+it does not own: the arena is not sorted to build it, because the slot index
+is half of the identity and never moves.[^7]
 
 The key array holds one bridge key for each occupying unit. The unit array
 holds the matching entity identities in the same order. The block range array
@@ -60,8 +70,11 @@ The engine rebuilds the whole bridge once for each frame, at the barrier. It
 sorts the occupying units by the bridge key with a radix sort on the integer
 key.
 
-The sort is total. Units that share a bridge key break the tie on the entity
-slot index, so the order is fixed and no two runs disagree.[^4] The key is a
+The sort is total. Units that share a bridge key break the tie on the
+identity, taken as one integer, so the order is fixed and no two runs
+disagree.[^4] The identity is opaque, so this record does not say which of
+its parts sorts first; it says only that the whole value is the tie-break and
+that no two live entities share one.[^7] The key is a
 vector of exact integer fields whose last field is a stable identifier, which
 is the form the engine sorts by everywhere.[^10] The bridge
 holds no result whose order came from a thread finishing first.
@@ -94,12 +107,16 @@ range.
 This gives a constant-time per-tile lookup with no search, and it is the
 standard structure for this problem.
 
-The project rejects it because the offset array grows with the tile count
-while the occupancy it describes grows with the unit count. The tile count is
-the larger of the two by a wide margin, and it does not change. Almost every
-offset would repeat the offset before it, and each repeat records that a tile
-is empty. The rebuild would touch the whole array once for each frame, so the
-per-frame cost would follow the tile count rather than the work.
+The project rejects it for the offset array, not for the per-tile array. A
+per-tile array of counts already exists, because admission needs the
+occupancy of a target tile and its departure count in the same tick.[^2]
+
+What the compressed sparse row form adds is an offset array that must be
+exact everywhere. Its rebuild repairs every entry once for each frame, even
+where nothing moved, so the per-frame cost follows the tile count rather than
+the work. The block range array is exact at the block and silent below it, so
+its rebuild cost follows the occupied blocks. The search inside a block is
+what buys that.
 
 **A list or a map for each tile** is also rejected. It allocates for each
 occupied tile, it scatters the payload, and a map introduces an iteration
@@ -113,7 +130,7 @@ to a tile, so their tile field is already the answer and they need no rebuild.
 A living character carries no tile position, so it is absent from the bridge.
 
 **The bridge is derived state, and a test can prove it.** Two rebuilds from
-the same unit columns must give the same three structures, at any thread
+the same unit columns must give the same arrays, at any thread
 count. A property test also checks that every occupying unit appears exactly
 once in the bridge, and that its bridge key matches its tile field.
 
@@ -132,23 +149,31 @@ move applied during the frame does not change what a later system reads in the
 same frame. Every system therefore sees one consistent occupancy for the whole
 frame.
 
-**A stale identity can appear in the unit array.** The array holds identities
-across the barrier, so a reader resolves before it acts.[^7]
+**Every identity in the bridge is live for the whole frame.** The rebuild
+runs after the structural apply at the barrier, and no entity dies while
+systems run, so the unit array names only live entities.[^7] A reader still
+resolves before it acts, because the identity is the only handle it has, but
+the resolution cannot fail during the frame.
 
-**The evidence for the three structures is a research report.** The report
+The ordering inside the barrier is therefore a decision and not an
+implementation detail. Rebuilding before the structural apply would leave a
+dead identity in the array for the whole frame, and every caller would pay a
+branch that this ordering removes.
+
+**The evidence for the block form is a research report.** The report
 compares the offset array against the block form and recommends the block
 form.[^8] The block that the bridge uses is the aggregation block of the level
 of detail pyramid, so the bridge and the pyramid share one partition.[^9]
 
 ## References
 
-[^1]: ADR-0017, the world is a rhombus, so a tile index is raw axial. `docs/adrs/draft/adr-0017-the-world-is-a-rhombus-so-a-tile-index-is-raw-axial.md`
+[^1]: ADR-0017, the world is a rhombus, so a tile index is raw axial. `docs/adrs/accepted/adr-0017-the-world-is-a-rhombus-so-a-tile-index-is-raw-axial.md`
 [^2]: ADR-0056, movement is tile-discrete and admitted by sort then admit. `docs/adrs/draft/adr-0056-movement-is-tile-discrete-and-admitted-by-sort-then-admit.md`
 [^3]: ADR-0016, tiles are stored in block-tiled order at the aggregation block size. `docs/adrs/REGISTRY.md`
 [^4]: ADR-0004, iteration order is explicit, and unordered reductions need slots. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
 [^5]: ADR-0066, entity storage holds four fixed shapes. `docs/adrs/accepted/adr-0066-entity-storage-holds-four-fixed-shapes.md`
 [^6]: Blockers register, BLK-007. `docs/BLOCKERS.md`
-[^7]: ADR-0014, entity identity is an index plus a generation. `docs/adrs/draft/adr-0014-entity-identity-is-an-index-plus-a-generation.md`
+[^7]: ADR-0014, entity identity is an index plus a generation. `docs/adrs/accepted/adr-0014-entity-identity-is-an-index-plus-a-generation.md`
 [^8]: Report 01, the entity component system core and the memory layout, section 9. `docs/research/reports/01-ecs-and-memory-layout.md`
 [^9]: Report 02, the hex grid and the level of detail pyramid, sections 3.4 and 7.4. `docs/research/reports/02-hex-grid-and-lod-pyramid.md`
 [^10]: ADR-0007, content supplies a key vector, never a comparator. `docs/adrs/accepted/adr-0007-content-supplies-a-key-vector-never-a-comparator.md`

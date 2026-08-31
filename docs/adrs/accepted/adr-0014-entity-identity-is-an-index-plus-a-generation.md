@@ -1,6 +1,6 @@
 # ADR-0014: Entity identity is an index plus a generation
 
-Status: Draft
+Status: Accepted
 
 ## Context
 
@@ -30,8 +30,13 @@ The slot index names a row in the entity location table. The generation counts
 how many times that slot has been used.
 
 The identity is one opaque value. The engine never stores the index and the
-generation as two separate fields that a caller can set apart. A caller reads
-the two parts through accessors and never constructs an identity from parts.
+generation as two separate fields that a caller can set apart.
+
+The entity storage is the only thing that builds an identity. Every other
+caller receives one, reads its parts through accessors, and passes it on. A
+caller that assembles an identity from an index it chose has defeated the
+generation, because the index it chose came from somewhere that could not
+know whether the slot still holds the same entity.
 
 ### D2. Resolving an identity can fail, and the caller must handle the failure
 
@@ -74,7 +79,7 @@ the engine never returns the slot to the queue.
 
 Retirement leaks one slot. Reuse after wraparound would make two different
 entities share one identity, which is the exact failure this record exists to
-prevent. The project trades a bounded leak for the removal of the case.
+prevent. The project trades one leaked slot, for each slot that exhausts its range, against the removal of the case.
 
 ### D6. A generation starts at one, never at zero
 
@@ -132,24 +137,26 @@ holds an identity across the barrier cannot assume the entity still exists.
 Resolution is a real branch on the hot path, and the project accepts it.
 
 **The engine can never compact the slot index space.** Compaction would move
-an entity to a different slot and invalidate every identity that names it. The
-location table therefore keeps an entry for every slot ever allocated, and it
-grows with the high water mark of the population rather than with the live
-population.
+an entity to a different slot and invalidate every identity that names it.
+
+The location table therefore holds one entry for each slot the arena has ever
+opened. That count is the high water mark of the live population plus the
+retired slots, and it never falls.
 
 **A test can prove that a stale identity fails.** Free an entity, allocate
 until the slot returns, and resolve the old identity. The result must be
 absent. This test is cheap and it is the direct check of D2, D3 and D4.
 
-**The retirement rule leaks, and the leak is unbounded in principle.** A
-workload that recycles one slot without pause retires it eventually. The
+**The retirement rule leaks, and a hostile workload can grow the leak.** A
+workload that recycles one slot without pause retires it eventually, and then
+retires its successor. The
 project accepts this, because the alternative is a shared identity. A survey
 of arena designs reaches the same reuse rule and the same retirement rule.[^7]
 
 ## References
 
-[^1]: ADR-0012, tiles are dense columns and units are a generational arena. `docs/adrs/draft/adr-0012-tiles-are-dense-columns-and-units-are-a-generational-arena.md`
-[^2]: ADR-0018, the unit-to-tile bridge is three structures, and units stay sorted by tile. `docs/adrs/draft/adr-0018-the-unit-to-tile-bridge-is-derived-and-rebuilds-at-the-barrier.md`
+[^1]: ADR-0012, tiles are dense columns and units are a generational arena. `docs/adrs/accepted/adr-0012-tiles-are-dense-columns-and-units-are-a-generational-arena.md`
+[^2]: ADR-0018, the unit-to-tile bridge is derived, and it rebuilds at the barrier. `docs/adrs/accepted/adr-0018-the-unit-to-tile-bridge-is-derived-and-rebuilds-at-the-barrier.md`
 [^3]: ADR-0001, one binary gives one answer at any thread count. `docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
 [^4]: ADR-0020, structural change batches at the barrier and applies by tombstone and compact. `docs/adrs/REGISTRY.md`
 [^5]: ADR-0004, iteration order is explicit, and unordered reductions need slots. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`

@@ -1,7 +1,7 @@
 ---
 id: 0029
 title: Write the three storage records that entity movement needs
-status: refined
+status: complete
 created: 2026-08-30
 implements: []
 changes: []
@@ -18,8 +18,8 @@ and none of them has a file.
 
 - Row 0012: tiles are dense columns and units are a generational arena.
 - Row 0014: entity identity is an index plus a generation.
-- Row 0018: the unit-to-tile bridge is three structures, and units stay
-  sorted by tile.
+- Row 0018: the unit-to-tile bridge, which the review retitled because units
+  do not stay sorted by tile.
 
 Item 0007 was going to write ten storage records in one pass. It was returned
 to `proposed` at sprint 2 planning, because a record written before the work
@@ -32,7 +32,7 @@ This item takes the three rows the sprint reaches.
 test before its file exists, and a row that fails it is dropped with its
 number retired.[^1] ADR-0066 fixes four entity shapes, so a storage record
 must hold that claim rather than restate it.[^2] ADR-0004 governs row 0018,
-because units that stay sorted by tile need a stable key and an explicit
+because the bridge rebuild needs a stable key and an explicit
 order.[^3] ADR-0017 governs the tile side of the bridge, because a tile is
 addressed by a raw axial pair.[^4]
 
@@ -71,13 +71,29 @@ and not ten.[^6]
 
 ## Outcome
 
-Filled in on completion.
+All three rows have files and all three are accepted. None failed the
+three-condition test.
+
+The review changed all three. ADR-0012 D1 said a tile lookup is an array
+subscript, which pre-empted ADR-0016's block order; it now forbids consulting
+a table instead. ADR-0014 D4 rested on a false premise about slot reuse and
+now states the real force. ADR-0014 gained D6, which is a defect the approver
+missed: the identity packs into a value that cannot be zero, so slot zero at
+generation zero was unrepresentable and the first entity the engine ever
+allocates would have had no identity. ADR-0018's title claimed units stay
+sorted by tile, which the record does not say and ADR-0014 forbids; the title,
+the file name and the registry row all changed.
+
+The last of those reached outside this item. ADR-0056 asserted the same
+invariant in its context and consequences, and it was corrected in the same
+change. A record that depends on a guarantee its dependency does not give is
+worse than an unwritten record, because both look finished.
 
 ## References
 
 [^1]: Decision Record Scope. `.claude/rules/adr-scope.md`
 [^2]: ADR-0066, entity storage holds four fixed shapes. `docs/adrs/accepted/adr-0066-entity-storage-holds-four-fixed-shapes.md`
 [^3]: ADR-0004, iteration order is explicit. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
-[^4]: ADR-0017, the world is a rhombus, so a tile index is raw axial. `docs/adrs/draft/adr-0017-the-world-is-a-rhombus-so-a-tile-index-is-raw-axial.md`
+[^4]: ADR-0017, the world is a rhombus, so a tile index is raw axial. `docs/adrs/accepted/adr-0017-the-world-is-a-rhombus-so-a-tile-index-is-raw-axial.md`
 [^5]: Blockers register, BLK-007. `docs/BLOCKERS.md`
 [^6]: Findings register. `docs/FINDINGS.md`

@@ -20,8 +20,9 @@ which soldiers to draw on a tile it is about to paint. Both questions are the
 same question, and scanning every soldier to answer it costs the whole
 population for one tile.
 
-Registry row 0018 holds the claim: the bridge is three structures, and units
-stay sorted by tile. Item 0029 writes it.
+ADR-0018 holds the claim: the bridge is derived, and it rebuilds at the
+barrier from a sort on a block-major key. The arena itself is never sorted,
+because the slot index is half of the entity identity.
 
 ## Impact review
 
@@ -78,7 +79,7 @@ Filled in on completion.
 
 [^1]: ADR-0007, content supplies a key vector, never a comparator. `docs/adrs/accepted/adr-0007-content-supplies-a-key-vector-never-a-comparator.md`
 [^2]: ADR-0004, iteration order is explicit. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
-[^3]: ADR-0017, the world is a rhombus, so a tile index is raw axial. `docs/adrs/draft/adr-0017-the-world-is-a-rhombus-so-a-tile-index-is-raw-axial.md`
+[^3]: ADR-0017, the world is a rhombus, so a tile index is raw axial. `docs/adrs/accepted/adr-0017-the-world-is-a-rhombus-so-a-tile-index-is-raw-axial.md`
 [^4]: Budgets and costs, the scale constants. `docs/reference/budgets.md`
 [^5]: Blockers register, BLK-007. `docs/BLOCKERS.md`
 [^6]: Findings register, FND-040. `docs/FINDINGS.md`

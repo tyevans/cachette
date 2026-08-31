@@ -1,7 +1,7 @@
 ---
 id: 0014
 title: Provide the key vector sort that content orders through
-status: refined
+status: complete
 created: 2026-08-30
 implements: [ADR-0007 D1, ADR-0007 D2, ADR-0007 D3]
 changes: []
@@ -60,7 +60,23 @@ record stays in draft.[^2]
 
 ## Outcome
 
-Filled in on completion.
+`crates/cachette-core/src/sort.rs` holds the sort. No entry point accepts a
+function of any kind, not a comparator and not a key extractor, so ADR-0007
+D3 holds by construction rather than by discipline. A key with no identifier
+field fails to compile, and a repeated identifier is refused before any
+sorting.
+
+Two things changed from the plan. The plan asked for a proven failure mode
+under the probe; the sort has none, and the module now states why instead of
+pretending otherwise. The merge picks the lowest remaining key and every key
+is unique, so the output is one exact permutation whatever order the runs are
+read in. The runs are still read through `combine` rather than the raw slot
+array, so a later algorithm that loses that property does not also have to
+remember where to read.
+
+The item said to record no throughput figure and none is recorded. The
+comparison sort per chunk can be replaced by a radix sort without changing a
+caller, which is what BLK-007 will decide.
 
 ## References
 
