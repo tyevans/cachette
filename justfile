@@ -83,9 +83,15 @@ mutants:
 records:
     ./scripts/check-adrs.sh
     ./scripts/check-prds.sh
+    ./scripts/check-citations.sh
+
+# Prove that the record checks can fail. Each must reject its broken fixture.
+records-probe:
+    ! ./scripts/check-prds.sh tests/fixtures/prd-broken
+    ! ./scripts/check-citations.sh tests/fixtures/citations-broken
 
 # Everything a commit must pass.
-check: fmt-check lint test records
+check: fmt-check lint test records records-probe
 
 # What continuous integration runs.
 ci: check test-slow

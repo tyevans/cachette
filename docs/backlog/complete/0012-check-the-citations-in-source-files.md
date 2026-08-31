@@ -1,7 +1,7 @@
 ---
 id: 0012
 title: Check the citations in source files, not only in records
-status: refined
+status: complete
 created: 2026-08-30
 implements: []
 changes: []
@@ -61,7 +61,28 @@ declared in two places, with nothing that fails when the copies disagree.[^1]
 
 ## Outcome
 
-Filled in on completion.
+`scripts/check_citations.py` reads every source file, script, workflow, build
+manifest, rule and document outside the records, and fails on all three
+shapes. `just records` runs it and `just records-probe` proves it can fail
+against `tests/fixtures/citations-broken/`. Continuous integration runs both.
+
+Two things changed from the plan.
+
+The check is a second script rather than an addition to the record check.
+The two read different corpora and one already reports every failure the
+other would repeat, so merging them would have meant teaching one script to
+skip half its own input.
+
+A citation inside a code span is now a mention rather than a reference. The
+check found this on its first run: FND-040 quotes `ADR-0002 D9` as its
+example of a reused number, and the check followed the quotation. The
+documentation rule already exempts an identifier in code, so the exemption
+was there to be used rather than invented.
+
+Three directories are out of scope and say why in the source: the records,
+which the record check reads; the research reports, which cite the deleted
+drafts and are backlog item 0004; and the fixture, which is broken on
+purpose.
 
 ## References
 
