@@ -58,7 +58,7 @@ The sprint number is a position in this list. It is not a date.
 | Sprint | Goal | Items |
 |---|---|---|
 | 1 | The world exists, is indexed, and the citations cannot rot | 0012, 0015, 0016, 0017, 0018 |
-| 2 | Entities exist in storage and reach the ordering primitives | 0007, 0013, 0014, 0019, 0020 |
+| 2 | Entities exist in storage and reach the ordering primitives | 0029, 0013, 0014, 0019, 0020 |
 | 3 | Entities choose and move, deterministically | 0021, 0022, 0023 |
 | 4 | The world is visible | 0024, 0025, 0026 |
 | 5 | The demonstration is honest | 0027, 0028 |
@@ -81,9 +81,84 @@ costs less than the sweep that repairs them.[^4]
 
 **Balance.** Record work is 0015, 0016 and 0017. Code work is 0012 and 0018.
 
+### Sprint 1 — review
+
+**Goal met.** The core builds a rhombus world, indexes a tile by a raw axial
+pair with no conversion, and the citation gate fails when a citation names a
+decision that does not exist.
+
+All five committed items shipped. Nothing was abandoned and nothing carried
+over.
+
+| Item | Outcome |
+|---|---|
+| 0012 | The citation check runs in the gates and has a proven failure mode |
+| 0015 | PRD-0002 states the need in nine checkable statements |
+| 0016 | BLK-013 and BLK-014 closed; the scale constants hold both values |
+| 0017 | ADR-0017 states four decisions and the row is `Draft` |
+| 0018 | The world has a grid, and the geometry has a real caller |
+
+**Demonstrated.** `just check` and `just test-slow` both exit 0. The
+geometry tests were checked against three mutations, each of which failed
+four tests.
+
+**Not shipped.** ADR-0017 is a draft. An author may not accept their own
+record, so it stays a draft until a reviewer reads it. The code that
+implements it cites it as a draft, which is correct.
+
+### Sprint 1 — retrospective
+
+**What worked.** Writing the gate first paid inside the same sprint. Item
+0018 added 23 citations, and the check read every one of them without anyone
+remembering to look.
+
+**What to change.** Two of the five items found work the plan did not name.
+Item 0017 found a fourth decision, and item 0018 found that the world
+constructor needed to return a result. Both were small. Neither was a
+surprise in hindsight, and both would have been found by asking one question
+at refinement: what can the caller get wrong? Sprint 2 planning asks it.
+
+**What not to change.** The mutation check on the new tests cost little and
+found that the tests were real. Sprint 2 repeats it. It is not a ceremony; it
+is the difference between a test and a decoration.
+
+**A correction went to the register, not here.** FND-042 records that a
+registry row stated a claim while the blocker that governed it was open. That
+is precedent, and precedent does not live in a sprint log.
+
 ## References
 
 [^1]: Backlog guide, and the definition of done. `docs/backlog/README.md`
 [^2]: PRD-0002, a developer watches the world run. `docs/product/REGISTRY.md`
 [^3]: Blockers register. `docs/BLOCKERS.md`
 [^4]: Findings register. `docs/FINDINGS.md`
+
+### Sprint 2 — planning
+
+**Goal.** A soldier exists in storage, a tile answers which soldiers stand on
+it, and both the slot reduction and the key vector sort have a real caller.
+
+**Committed.** Items 0029, 0013, 0014, 0019 and 0020.
+
+**Why these.** Nothing can move until something holds the movers, and nothing
+can be admitted to a tile until the tile can count what is already there. The
+two ordering mechanisms come first inside the sprint, because item 0020 sorts
+through the interface that item 0014 provides, and a mechanism written to fit
+one caller is written twice.
+
+**Balance.** Record work is 0029. Code work is 0013, 0014, 0019 and 0020.
+
+**One item was returned to `proposed`.** Item 0007 was refined and would have
+written ten storage records in one pass. It is not badly refined; it is too
+large, and the size is the defect. Nine of those ten records have no code
+that needs them, and a record written ahead of its work states what the
+author expects rather than what the code does. Item 0029 takes the three rows
+this sprint reaches. The rest arrive the same way.
+
+**The retrospective's question is in each item.** Every refined item now
+answers what the caller can get wrong, in its own section. Sprint 1 found
+that answer late twice.
+
+**Order inside the sprint.** 0029 first, because it writes the records that
+0019 and 0020 implement. Then 0013 and 0014, which are independent of each
+other. Then 0019. Then 0020, which needs 0014 and 0019 both.

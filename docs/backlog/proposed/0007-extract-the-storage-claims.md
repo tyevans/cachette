@@ -1,7 +1,7 @@
 ---
 id: 0007
 title: Write the storage records, 0012 to 0021
-status: refined
+status: proposed
 created: 2026-08-30
 implements: []
 changes: []
@@ -12,7 +12,18 @@ blocked-by: []
 
 ## Why
 
-The registry allocates rows 0012 to 0021 for storage: the two regimes, identity, the tile column, the ordering, the bridge, and change detection.
+The registry allocates rows 0012 to 0021 for storage: the two regimes,
+identity, the tile column, the ordering, the bridge, and change detection.
+
+**This item was returned to `proposed` at sprint 2 planning.** It is not
+badly refined. It is too large, and the size is the defect: it writes ten
+records in one pass, before any code needs nine of them. A record written
+ahead of its work states what the author expects rather than what the code
+does, and the scope rule exists to stop exactly that.
+
+Item 0029 takes the three rows that entity movement needs. Take the rest the
+same way, one sprint at a time, as the work reaches them. Refine this item
+again only for the rows no sprint has claimed by then.
 
 The material for these claims was drafted as one record and removed when the
 registry was re-derived from claims rather than topics. The reasoning is in
