@@ -29,8 +29,18 @@ item 0029 writes both before this item starts. ADR-0002 D1 keeps every
 soldier field exact. ADR-0004 D1 requires an explicit stable order over the
 column. ADR-0006 D1 governs any field whose bytes reach the state hash.
 
-**Changes.** None. The world gains a column set, and no accepted claim
-changes.
+**Changes.** None to a record. One change to existing code is required, and
+it was found while reviewing ADR-0014.
+
+ADR-0014 D1 says a caller reads the parts of an identity through accessors
+and never constructs an identity from parts. `Entity::new(index, generation)`
+in the value types module is a public constructor from parts, so the code
+contradicts the record. The arena is the only thing that may mint an
+identity. A public constructor lets any caller forge one, which manufactures
+the silent wrong-entity failure that ADR-0014 exists to prevent.
+
+Make the constructor reachable only by the arena. The accessors stay public,
+because D1 requires them.
 
 **Creates.** None, if items 0029's records hold. A decision this work finds
 that no record holds is a deliverable of this item, not a byproduct.
@@ -55,6 +65,13 @@ step and then inspects the arena.
 - A soldier carries a generational handle, a tile address, and a faction.
 - A handle names at most one live soldier. A stale handle reads as absent
   rather than as a different soldier.
+- The generation advances when the arena frees a slot, not when it allocates
+  one, and a test proves that a stale handle fails immediately after the
+  free rather than after the reuse.
+- A freed slot returns to use in first-in first-out order.
+- No caller outside the arena can construct an identity from an index and a
+  generation. The public constructor is gone or restricted, and the whole
+  tree is searched for its call sites.
 - The arena refuses, with a typed error, each of the four caller mistakes
   named above.
 - A soldier is placed on a tile that the grid contains, and placing one
