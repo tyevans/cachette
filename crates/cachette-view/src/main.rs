@@ -15,7 +15,7 @@
 use std::num::NonZeroUsize;
 
 use cachette_core::{Axial, FactionId, World, WorldConfig};
-use cachette_view::{paint, Camera, Canvas, Lap, Metrics};
+use cachette_view::{Camera, Canvas, Lap, Metrics};
 use minifb::{Key, Window, WindowOptions};
 
 /// The size of the window in pixels.
@@ -193,7 +193,11 @@ fn main() -> Result<(), DemoError> {
         // describes it, rather than drawing a picture without its soldiers.
         // The step rebuilds that structure at the barrier, so this cannot
         // happen here, and a refusal means the loop changed.
-        paint::draw(&world, camera, &mut canvas).map_err(DemoError::Bridge)?;
+        // The frame is the world and the panel that says what it holds. The
+        // panel reads the counts of the pass that just ran, so the two belong
+        // in one call and the tests drive that call.
+        cachette_view::draw_frame(&world, camera, &metrics, &mut canvas)
+            .map_err(DemoError::Bridge)?;
         metrics.draw(at.elapsed());
 
         let at = Lap::start();

@@ -11,6 +11,11 @@ publish = false
 # exists for the viewer" a compiler check rather than a reviewer's judgement.
 [dependencies]
 cachette-core = { path = "../cachette-core", version = "0.0.0" }
+# The head-up display writes text into a framebuffer, and a framebuffer has
+# no font. This crate is a public domain bitmap table and nothing else. The
+# default features add a unicode index and the standard library, and the
+# viewer needs neither, so it takes the table alone.
+font8x8 = { version = "0.3", default-features = false }
 minifb = "0.28"
 
 [lints]

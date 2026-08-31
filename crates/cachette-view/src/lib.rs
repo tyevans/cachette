@@ -37,8 +37,44 @@
 // and that scope is correct.
 #![allow(clippy::disallowed_types)]
 
+pub mod hud;
 pub mod metrics;
 pub mod paint;
+pub mod text;
 
+pub use hud::Readout;
 pub use metrics::{Lap, Metrics};
 pub use paint::{Camera, Canvas};
+
+use cachette_core::{BridgeError, World};
+
+/// Draws one frame: the world, and then the panel that says what it holds.
+///
+/// This is the whole picture. The binary calls it, and so does every test
+/// that checks the panel, because a panel that renders proves nothing until
+/// something reaches it.[^1]
+///
+/// The order matters. The world pass clears the canvas and counts what it
+/// paints, so the panel must read the canvas after that pass and draw over
+/// it.
+///
+/// # Errors
+///
+/// Returns an error when the engine's spatial structure no longer describes
+/// its soldiers. The viewer refuses rather than drawing a world without its
+/// units and calling that a success.
+///
+/// # References
+///
+/// [^1]: Testing Rules, drive the real caller. `.claude/rules/testing.md`
+pub fn draw_frame(
+    world: &World,
+    camera: Camera,
+    metrics: &Metrics,
+    canvas: &mut Canvas,
+) -> Result<Readout, BridgeError> {
+    paint::draw(world, camera, canvas)?;
+    let readout = Readout::of(world, camera, canvas, metrics);
+    hud::draw(&readout, canvas);
+    Ok(readout)
+}
