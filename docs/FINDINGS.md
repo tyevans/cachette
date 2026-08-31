@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-058**
+**Next number: FND-059**
 
 ## A. Corrections to stated rules
 
@@ -1195,6 +1195,48 @@ that fails when they disagree.[^13] A deferral pair is the inverse: one fact
 stored in no place, with two records that each say it lives in the other.
 Neither check can see it, because each record is well formed on its own.
 
+### FND-058 — A registry dependency is not a build order
+
+**Believed.** The `Depends on` column of the record registry gives the order in
+which the records should be written. A row that depends on another row waits
+for it. The registry's own writing-order section reads that way: write the
+core, then the cross-cutting models, then the subsystems.[^14]
+
+**True.** The column states which record a record may cite. It says nothing
+about whether the depended-on record needs to exist yet, or whether its claim
+needs to exist at all. Reading it as a build order produces the failure the
+project has already recorded once: a record written for a subsystem nobody had
+built.[^15]
+
+**Evidence.** Found while sequencing the seventeen product records into a build
+plan.
+
+Row 0062 states that production and upkeep are rates attached to a site, and it
+depends on row 0055, an ordered modifier pipeline for an effective stat.
+Production is the next thing the project needs. A modifier pipeline is not: one
+source modifies a rate today, so the pipeline fails the first condition of the
+scope test, because with one source there is no decision to preserve. Writing
+0055 first would produce a record binding a mechanism nothing invokes.[^16]
+
+The same shape appears at row 0058, which states that a field update is a flux
+pair on an edge, and at row 0061, which states that trade solves a flow. Both
+are prerequisites of nothing that exists, because no place in the world holds a
+surplus until production and consumption run.
+
+**Follows.** Three things.
+
+**Read the column as a citation constraint, not as a schedule.** A record may
+cite the record it depends on. It is not obliged to wait for it, and the
+depended-on record may never be written.
+
+**Apply the scope test to the depended-on row before writing it.** A reserved
+row reserves a number and does not promise a record. The registry says so, and
+the dependency column is where that sentence is easiest to forget.[^14]
+
+**A record may state a dependency on a row that stays reserved.** Say in the
+record that the depended-on claim does not exist yet and why. That is a truthful
+statement about the project, and it is cheaper than either writing the record
+early or removing the dependency.
 
 ## References
 
@@ -1211,3 +1253,6 @@ Neither check can see it, because each record is well formed on its own.
 [^11]: Findings register, FND-051, in this document.
 [^12]: Decision Record Scope, section 4.1. `.claude/rules/adr-scope.md`
 [^13]: Recurring Defect Shapes, shape 1. `.claude/rules/recurring-defects.md`
+[^14]: ADR Registry. `docs/adrs/REGISTRY.md`
+[^15]: Findings register, FND-047, in this document.
+[^16]: Decision Record Scope, section 1. `.claude/rules/adr-scope.md`
