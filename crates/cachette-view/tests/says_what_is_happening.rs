@@ -38,7 +38,7 @@ const SOLDIERS: u32 = 2200;
 const FACTIONS: u16 = 4;
 
 /// The size of the window these tests draw into.
-const WINDOW: (usize, usize) = (520, 400);
+const WINDOW: (usize, usize) = (640, 560);
 
 /// Builds a world far larger than the window, with soldiers spread over it.
 fn world() -> World {
@@ -171,7 +171,6 @@ fn a_step_changes_what_the_panel_says() {
     let mut after = canvas();
     let camera = at_the_middle(&world, &before);
 
-    draw_frame(&world, camera, &metrics, &mut before).expect("the world draws");
     let early = draw_frame(&world, camera, &metrics, &mut before).expect("the world draws");
 
     for _ in 0..5 {
@@ -534,5 +533,140 @@ fn the_cost_rows_state_what_the_report_states() {
         world.grid().tile_count(),
         world.soldiers().len() as usize,
         2,
+    );
+}
+
+/// Builds a world the size the demonstration binary runs, sparsely filled.
+///
+/// Two properties matter, and both are needed to reach the widest values the
+/// panel must hold.
+///
+/// The world is large, so a wide view covers many blocks. The stride is
+/// small, so the soldiers cluster into the first rows instead of spreading
+/// over every tile. A clustered world leaves most blocks empty, so the count
+/// of skipped blocks grows alongside the count of read blocks and both reach
+/// two digits.
+///
+/// A world spread by a large stride puts a soldier in nearly every block, and
+/// then nothing is ever skipped. Such a world hides the defect this file
+/// tests for.
+fn sparse_demonstration_world() -> World {
+    let mut world = World::new(WorldConfig {
+        width: 640,
+        height: 440,
+        seed: 0x0cac_4e77_e5ee_d001,
+        faction_count: FACTIONS,
+    })
+    .expect("the extent describes a world");
+    let tiles = world.grid().tile_count();
+    for index in 0..600u32 {
+        let tile = index.wrapping_mul(37) % tiles;
+        world
+            .spawn_soldier(
+                Axial::new((tile % 640) as i32, (tile / 640) as i32),
+                FactionId((index % u32::from(FACTIONS)) as u16),
+            )
+            .expect("the address and the faction are valid");
+    }
+    world.rebuild_bridge(1).expect("the rebuild must succeed");
+    world
+}
+
+#[test]
+fn no_value_is_cut_to_fit_its_column() {
+    // The panel cuts a value that will not fit, so that text never reaches
+    // the panel edge. A cut value states something other than the number it
+    // was given, and it does so in silence.
+    //
+    // This test exists because the edge test cannot see it. A row that named
+    // two block counts in one value did not fit at the widest zoom, and the
+    // cut is exactly what kept it inside the rectangle. The edge test passed
+    // because of the defect, not in spite of it.
+    //
+    // The value the old row produced on this world at the widest zoom was
+    // "12 read, 14 skipped", which is nineteen characters in an eighteen
+    // character column. It reached the panel as "12 read, 14 skippe".
+    let mut world = sparse_demonstration_world();
+    let metrics = stepped(&mut world, 3);
+    let mut canvas = Canvas::new(960, 720);
+
+    // Walk from the closest zoom to the widest. Every step must fit, and the
+    // widest is where the counts are largest.
+    let mut camera = Camera::opening().clamped(&world, &canvas);
+    let opening = draw_frame(&world, camera, &metrics, &mut canvas)
+        .expect("the world draws")
+        .extent_shown();
+    let mut widest = opening;
+
+    // Twenty-four steps take the tile size from the opening twelve pixels
+    // to the smallest the viewer allows.
+    for _ in 0..24 {
+        camera = camera.zoomed_out(&canvas).clamped(&world, &canvas);
+        let readout = draw_frame(&world, camera, &metrics, &mut canvas).expect("the world draws");
+        let cut = cachette_view::hud::values_that_do_not_fit(&readout);
+        assert!(
+            cut.is_empty(),
+            "the panel cut {cut:?} while showing {:?} tiles",
+            readout.extent_shown(),
+        );
+        widest = readout.extent_shown();
+    }
+
+    // The walk must have reached a wide view, or it proved nothing about a
+    // window full of blocks and six-figure counts.
+    assert!(
+        widest.0 > opening.0 * 3 && widest.1 > opening.1 * 3,
+        "the walk went from {opening:?} tiles to {widest:?}, which is not a wide view",
+    );
+
+    // The check must be able to answer no. A check with no proven failure
+    // mode is decoration. This is the exact value the old row produced on
+    // this world at the widest zoom.
+    assert!(
+        !cachette_view::hud::value_fits("12 read, 14 skipped"),
+        "the fit check accepts the value that overran the panel, so it cannot fail",
+    );
+    assert!(
+        cachette_view::hud::value_fits("14"),
+        "the fit check rejects a value that plainly fits",
+    );
+}
+
+#[test]
+fn the_panel_fills_the_rectangle_it_states() {
+    // The height is summed from the same list of lines that the painting
+    // walks. A height that ran ahead of the content would leave a band of
+    // empty panel, and a height that fell behind would let the last lines
+    // paint past the edge.
+    //
+    // The edge test catches the second case. This one catches the first, so
+    // the two together hold the height to the content from both sides.
+    let mut world = world();
+    let metrics = stepped(&mut world, 3);
+    let mut with_panel = canvas();
+    let mut bare = canvas();
+    let camera = at_the_middle(&world, &with_panel);
+
+    let readout = draw_frame(&world, camera, &metrics, &mut with_panel).expect("the world draws");
+    paint::draw(&world, camera, &mut bare).expect("the world draws");
+
+    let (_, top, _, height) = cachette_view::hud::bounds(&readout);
+    let width = with_panel.width();
+    let lowest = with_panel
+        .pixels()
+        .iter()
+        .zip(bare.pixels().iter())
+        .enumerate()
+        .filter(|(_, (panelled, plain))| panelled != plain)
+        .map(|(index, _)| (index / width) as i32)
+        .max()
+        .expect("the panel painted nothing");
+
+    // The panel's own edge is the last row it paints, so the lowest changed
+    // row is the bottom of the rectangle.
+    assert_eq!(
+        lowest,
+        top + height - 1,
+        "the panel states a rectangle {height} tall and paints down to {lowest}",
     );
 }

@@ -200,22 +200,175 @@ impl Readout {
     fn legend_rows(&self) -> usize {
         (self.factions as usize).clamp(1, COLOURED_FACTIONS)
     }
+}
+
+/// One line of the panel.
+///
+/// The panel is a list of these. The list is built once and it is the only
+/// statement of what the panel holds. The height is summed from it and the
+/// painting walks it, so the two cannot disagree.
+///
+/// An earlier version stated the height with its own arithmetic while the
+/// painting produced the same geometry line by line. That is one fact in two
+/// places, and nothing failed when the copies drifted.[^1]
+///
+/// # References
+///
+/// [^1]: Recurring Defect Shapes, shape 1. `.claude/rules/recurring-defects.md`
+#[derive(Clone, Debug)]
+enum Line {
+    /// The name of the viewer, at twice the glyph size.
+    Title(&'static str),
+    /// A dim line that runs the width of the panel.
+    Note(&'static str),
+    /// A hairline between two sections.
+    Rule,
+    /// The name of a section.
+    Heading(&'static str),
+    /// A label on the left and a value against the right edge.
+    Row(&'static str, String),
+    /// A colour swatch, the faction it stands for, and its count.
+    Legend(usize, u32),
+    /// The bar that shows the shares of the visible units.
+    Bar,
+}
+
+impl Line {
+    /// Returns the height this line occupies, in pixels.
+    const fn height(&self) -> i32 {
+        match self {
+            Self::Title(_) => 18,
+            Self::Note(_) | Self::Heading(_) | Self::Row(_, _) | Self::Legend(_, _) => LINE,
+            Self::Rule => 8,
+            Self::Bar => BAR_HEIGHT + 8,
+        }
+    }
+}
+
+impl Readout {
+    /// Builds the lines the panel holds.
+    ///
+    /// This is the whole content of the panel, in order. Nothing else states
+    /// what the panel says.
+    ///
+    /// Each label names one thing, and no two labels name the same thing with
+    /// different words. A reader must be able to tell a count of the world
+    /// from a count of the window by the label alone, never by the section it
+    /// sits under.
+    fn lines(&self) -> Vec<Line> {
+        let mut lines = vec![
+            Line::Title("CACHETTE"),
+            Line::Note("watching the world run"),
+            Line::Rule,
+            Line::Heading("WORLD"),
+            Line::Row("tick", grouped(self.tick)),
+            Line::Row(
+                "extent",
+                format!("{} x {} tiles", self.world_width, self.world_height),
+            ),
+            Line::Row("units alive", grouped(u64::from(self.soldiers_live))),
+            Line::Rule,
+            Line::Heading("VIEW"),
+            Line::Row(
+                "centre tile",
+                format!("q {}  r {}", self.centre.q, self.centre.r),
+            ),
+            Line::Row("zoom", format!("{:.0} px a tile", self.tile_pixels)),
+            Line::Row(
+                "showing",
+                format!("{} x {} tiles", self.columns_shown, self.rows_shown),
+            ),
+            Line::Row("tiles drawn", grouped(u64::from(self.tiles_painted))),
+            Line::Row("units drawn", grouped(u64::from(self.soldiers_painted))),
+            Line::Rule,
+            Line::Heading("FACTIONS IN THE WINDOW"),
+        ];
+
+        for (slot, count) in self.by_faction.iter().enumerate().take(self.legend_rows()) {
+            lines.push(Line::Legend(slot, *count));
+        }
+        lines.push(Line::Bar);
+
+        lines.extend([
+            Line::Rule,
+            Line::Heading("COST ON THIS MACHINE"),
+            Line::Row(
+                "step",
+                format!("{:.0} / {:.0} us", self.step_mean, self.step_worst),
+            ),
+            Line::Row(
+                "draw",
+                format!("{:.0} / {:.0} us", self.draw_mean, self.draw_worst),
+            ),
+            Line::Row("rate", format!("{:.1} a second", self.rate)),
+            Line::Row("busy", format!("{:.0} in 100", self.busy)),
+            // Two rows, not one. A single row that named both counts did not
+            // fit the value column at every zoom, and the clip that kept it
+            // inside the panel cut the last word in half.
+            Line::Row("blocks read", grouped(u64::from(self.blocks_read))),
+            Line::Row("blocks skipped", grouped(u64::from(self.blocks_skipped))),
+            Line::Rule,
+            Line::Note("mean and worst, one run, one"),
+            Line::Note("machine. not the target."),
+        ]);
+
+        lines
+    }
 
     /// Returns the height of the panel in pixels.
     ///
-    /// The height follows the content, so a world with two factions gets a
-    /// shorter panel than a world with six.
+    /// The height is the sum of the lines. It follows the content, so a world
+    /// with two factions gets a shorter panel than a world with six.
     fn height(&self) -> i32 {
-        let sections = 4;
-        let rows = 3 + 5 + self.legend_rows() as i32 + 5;
-        PAD * 2 + 26 + sections * (LINE + 8) + rows * LINE + BAR_HEIGHT + 8 + LINE * 2
+        PAD * 2 + self.lines().iter().map(Line::height).sum::<i32>()
     }
+}
+
+/// Returns the width in pixels that the value column gives a value.
+const fn value_span() -> i32 {
+    PANEL_WIDTH - PAD * 2 - VALUE_COLUMN
+}
+
+/// Returns every value the panel would have to cut to fit its column.
+///
+/// The panel cuts a value that does not fit, so that text can never be
+/// written over the panel edge. A cut value is still a defect: it states
+/// something other than the number it was given, and it does so silently.
+///
+/// This function is how a test sees the cut. A test that only checked the
+/// panel edge would pass because of the cut rather than in spite of it.
+#[must_use]
+pub fn values_that_do_not_fit(readout: &Readout) -> Vec<String> {
+    readout
+        .lines()
+        .iter()
+        .filter_map(|line| match line {
+            Line::Row(_, value) if !value_fits(value) => Some(value.clone()),
+            _ => None,
+        })
+        .collect()
+}
+
+/// Says whether a value fits the column the panel gives it.
+///
+/// A test calls this on a string of its own, to prove that the check above
+/// can answer no. A check with no proven failure mode is decoration.[^1]
+///
+/// # References
+///
+/// [^1]: Testing Rules, a determinism test must be able to fail. `.claude/rules/testing.md`
+#[must_use]
+pub fn value_fits(value: &str) -> bool {
+    text::width_of(value, 1) <= value_span()
 }
 
 /// Draws the panel over a canvas that already holds the world.
 ///
 /// The function reads the readout and nothing else, so one readout always
 /// gives one picture.
+///
+/// It walks the same list of lines that the height was summed from, so the
+/// panel cannot paint past the rectangle it states.
 pub fn draw(readout: &Readout, canvas: &mut Canvas) {
     let (left, top, width, height) = bounds(readout);
     let text_left = left + PAD;
@@ -224,137 +377,38 @@ pub fn draw(readout: &Readout, canvas: &mut Canvas) {
     canvas.shade(left, top, width, height, PANEL, PANEL_WEIGHT);
     outline(canvas, left, top, width, height);
 
+    let lines = readout.lines();
     let mut pen = top + PAD;
+    for line in &lines {
+        paint_line(canvas, text_left, text_right, pen, line, readout);
+        pen += line.height();
+    }
+}
 
-    canvas.write(text_left, pen, "CACHETTE", 2, TITLE);
-    pen += 18;
-    canvas.write(text_left, pen, "watching the world run", 1, LABEL);
-    pen += LINE;
-
-    pen = rule(canvas, text_left, text_right, pen);
-    pen = heading(canvas, text_left, pen, "WORLD");
-    pen = row(
-        canvas,
-        text_left,
-        text_right,
-        pen,
-        "tick",
-        &grouped(readout.tick),
-    );
-    pen = row(
-        canvas,
-        text_left,
-        text_right,
-        pen,
-        "extent",
-        &format!("{} x {} tiles", readout.world_width, readout.world_height),
-    );
-    pen = row(
-        canvas,
-        text_left,
-        text_right,
-        pen,
-        "soldiers",
-        &grouped(u64::from(readout.soldiers_live)),
-    );
-
-    pen = rule(canvas, text_left, text_right, pen);
-    pen = heading(canvas, text_left, pen, "VIEW");
-    pen = row(
-        canvas,
-        text_left,
-        text_right,
-        pen,
-        "centre tile",
-        &format!("q {}  r {}", readout.centre.q, readout.centre.r),
-    );
-    pen = row(
-        canvas,
-        text_left,
-        text_right,
-        pen,
-        "zoom",
-        &format!("{:.0} px a tile", readout.tile_pixels),
-    );
-    pen = row(
-        canvas,
-        text_left,
-        text_right,
-        pen,
-        "showing",
-        &format!("{} x {} tiles", readout.columns_shown, readout.rows_shown),
-    );
-    pen = row(
-        canvas,
-        text_left,
-        text_right,
-        pen,
-        "tiles drawn",
-        &grouped(u64::from(readout.tiles_painted)),
-    );
-    pen = row(
-        canvas,
-        text_left,
-        text_right,
-        pen,
-        "units drawn",
-        &grouped(u64::from(readout.soldiers_painted)),
-    );
-
-    pen = rule(canvas, text_left, text_right, pen);
-    pen = heading(canvas, text_left, pen, "FACTIONS IN THE WINDOW");
-    pen = legend(canvas, text_left, text_right, pen, readout);
-
-    pen = rule(canvas, text_left, text_right, pen);
-    pen = heading(canvas, text_left, pen, "COST ON THIS MACHINE");
-    pen = row(
-        canvas,
-        text_left,
-        text_right,
-        pen,
-        "step",
-        &format!("{:.0} / {:.0} us", readout.step_mean, readout.step_worst),
-    );
-    pen = row(
-        canvas,
-        text_left,
-        text_right,
-        pen,
-        "draw",
-        &format!("{:.0} / {:.0} us", readout.draw_mean, readout.draw_worst),
-    );
-    pen = row(
-        canvas,
-        text_left,
-        text_right,
-        pen,
-        "rate",
-        &format!("{:.1} a second", readout.rate),
-    );
-    pen = row(
-        canvas,
-        text_left,
-        text_right,
-        pen,
-        "busy",
-        &format!("{:.0} in 100", readout.busy),
-    );
-    pen = row(
-        canvas,
-        text_left,
-        text_right,
-        pen,
-        "blocks",
-        &format!(
-            "{} read, {} skipped",
-            readout.blocks_read, readout.blocks_skipped
-        ),
-    );
-
-    pen = rule(canvas, text_left, text_right, pen);
-    canvas.write(text_left, pen, "mean and worst, one run, one", 1, LABEL);
-    pen += LINE;
-    canvas.write(text_left, pen, "machine. not the target.", 1, LABEL);
+/// Paints one line at the given position.
+fn paint_line(
+    canvas: &mut Canvas,
+    left: i32,
+    right: i32,
+    pen: i32,
+    line: &Line,
+    readout: &Readout,
+) {
+    match line {
+        Line::Title(name) => {
+            canvas.write(left, pen, name, 2, TITLE);
+        }
+        Line::Note(note) => {
+            canvas.write(left, pen, note, 1, LABEL);
+        }
+        Line::Rule => canvas.block(left, pen + 3, right - left, 1, EDGE),
+        Line::Heading(name) => {
+            canvas.write(left, pen, name, 1, HEADING);
+        }
+        Line::Row(label, value) => row(canvas, left, right, pen, label, value),
+        Line::Legend(slot, count) => legend_row(canvas, left, right, pen, *slot, *count),
+        Line::Bar => bar(canvas, left, right, pen, readout),
+    }
 }
 
 /// Returns the rectangle the panel occupies, as a left, top, width and
@@ -376,24 +430,16 @@ fn outline(canvas: &mut Canvas, x: i32, y: i32, width: i32, height: i32) {
     canvas.block(x + width - 1, y, 1, height, EDGE);
 }
 
-/// Draws a rule between two sections, and returns the next line position.
-fn rule(canvas: &mut Canvas, left: i32, right: i32, pen: i32) -> i32 {
-    canvas.block(left, pen + 3, right - left, 1, EDGE);
-    pen + 8
-}
-
-/// Draws a section heading, and returns the next line position.
-fn heading(canvas: &mut Canvas, left: i32, pen: i32, name: &str) -> i32 {
-    canvas.write(left, pen, name, 1, HEADING);
-    pen + LINE
-}
-
-/// Draws a label and its value, and returns the next line position.
+/// Draws a label and its value.
 ///
 /// The value sits against the right edge. A value too wide for the column is
 /// cut rather than written over the panel edge, so text never escapes the
 /// panel whatever a caller passes.
-fn row(canvas: &mut Canvas, left: i32, right: i32, pen: i32, label: &str, value: &str) -> i32 {
+///
+/// The cut is a guard, not a layout. A value that reaches it states something
+/// other than the number it was given, and a test reads the same lines to
+/// find one.
+fn row(canvas: &mut Canvas, left: i32, right: i32, pen: i32, label: &str, value: &str) {
     canvas.write(left, pen, label, 1, LABEL);
 
     let column = left + VALUE_COLUMN;
@@ -402,44 +448,39 @@ fn row(canvas: &mut Canvas, left: i32, right: i32, pen: i32, label: &str, value:
 
     let start = column.max(right - text::width_of(&value, 1));
     canvas.write(start, pen, &value, 1, VALUE);
-    pen + LINE
 }
 
-/// Draws the faction legend and the bar that shows the shares.
+/// Draws one legend row: a colour swatch, the faction, and its count.
 ///
-/// Each row names a colour, not a faction identity beyond the colour table.
-/// A world with more factions than colours reuses a colour, and the row after
-/// the legend says so.
-fn legend(canvas: &mut Canvas, left: i32, right: i32, pen: i32, readout: &Readout) -> i32 {
+/// The row names a colour, not a faction identity beyond the colour table. A
+/// world with more factions than colours reuses a colour.
+fn legend_row(canvas: &mut Canvas, left: i32, right: i32, pen: i32, slot: usize, count: u32) {
+    let colour = faction_colour(cachette_core::FactionId(slot as u16));
+    canvas.block(left, pen, text::GLYPH_HEIGHT, text::GLYPH_HEIGHT, colour);
+    canvas.write(left + 14, pen, &format!("faction {slot}"), 1, LABEL);
+    let value = grouped(u64::from(count));
+    canvas.write(right - text::width_of(&value, 1), pen, &value, 1, VALUE);
+}
+
+/// Draws the bar that shows the shares of the units in the window.
+///
+/// A window with no unit draws the empty bar rather than nothing, so the
+/// panel keeps its shape and the reader sees that the answer is zero.
+fn bar(canvas: &mut Canvas, left: i32, right: i32, pen: i32, readout: &Readout) {
     let rows = readout.legend_rows();
-    let mut pen = pen;
-
-    for (slot, count) in readout.by_faction.iter().enumerate().take(rows) {
-        let colour = faction_colour(cachette_core::FactionId(slot as u16));
-        canvas.block(left, pen, text::GLYPH_HEIGHT, text::GLYPH_HEIGHT, colour);
-        canvas.write(left + 14, pen, &format!("faction {slot}"), 1, LABEL);
-        let value = grouped(u64::from(*count));
-        let width = text::width_of(&value, 1);
-        canvas.write(right - width, pen, &value, 1, VALUE);
-        pen += LINE;
-    }
-
-    // The bar shows the shares of what the window holds. A window with no
-    // soldiers draws the empty bar rather than nothing, so the panel keeps
-    // its shape and the reader sees that the answer is zero.
     let total: u32 = readout.by_faction.iter().take(rows).sum();
     let span = right - left;
     canvas.block(left, pen + 2, span, BAR_HEIGHT, EDGE);
-    if total > 0 {
-        let mut filled = 0;
-        for (slot, count) in readout.by_faction.iter().enumerate().take(rows) {
-            let share = (i64::from(*count) * i64::from(span) / i64::from(total)) as i32;
-            let colour = faction_colour(cachette_core::FactionId(slot as u16));
-            canvas.block(left + filled, pen + 2, share, BAR_HEIGHT, colour);
-            filled += share;
-        }
+    if total == 0 {
+        return;
     }
-    pen + BAR_HEIGHT + 8
+    let mut filled = 0;
+    for (slot, count) in readout.by_faction.iter().enumerate().take(rows) {
+        let share = (i64::from(*count) * i64::from(span) / i64::from(total)) as i32;
+        let colour = faction_colour(cachette_core::FactionId(slot as u16));
+        canvas.block(left + filled, pen + 2, share, BAR_HEIGHT, colour);
+        filled += share;
+    }
 }
 
 /// Writes a number with a space between each group of three digits.
