@@ -1,7 +1,7 @@
 ---
 id: 0066
 title: Provide the character column set and the tier declaration
-status: refined
+status: complete
 created: 2026-08-31
 implements: [ADR-0066 D1, ADR-0066 D3, ADR-0012 D3, ADR-0014 D1, ADR-0014 D3, ADR-0004 D4, ADR-0007 D1]
 changes: []
@@ -117,7 +117,73 @@ a second worker can start on day one, beside item 0052.**
 
 ## Outcome
 
-Filled in when the item moves to `complete/`.
+The living character column set exists, and the tier declaration exists. A
+character holds a generational identity, a faction, the tick they were created
+on, and a renown. The world builds the arena, hashes it, and checks it.
+
+**A character carries no tile position.** The arena holds no grid and no tile
+column. It builds without a world shape, which is the test that states the
+absence, because a test cannot assert that a method is missing.
+
+**The identity rule holds.** The generation advances when the arena frees the
+slot, so a character loses their identity at the moment they are lost. A test
+creates a character, removes them, creates another into the same slot, and
+asserts that the old identity resolves to nothing and reads nothing of the new
+one. The test asserts first that the fixture reused the slot, because a fixture
+that opened a second slot would prove nothing.
+
+**The tier is a property of the shape.** Each shape declares its tier as an
+associated constant on a sealed trait. A test reads the tier in a constant
+context, so the item fails to compile if the tier ever becomes a run-time
+value. A caller outside the crate cannot declare a shape or a tier, so an
+assembled component set is a compile-time error.
+
+**The tier states the ceiling, and the check runs once.** The arena refuses a
+capacity above the ceiling of its declared tier when a caller builds it. The
+world builds its arena at that ceiling. No call reads a population and refuses
+on the count.
+
+**The state hash covers the arena.** Every golden file moved, because an empty
+character arena writes its three counters into the hash. A test proves that the
+faction column, the birth column, the renown column and the generation column
+each reach the hash, and it asserts that the fixture leaves the renown it writes
+at zero, so the write is a real change.
+
+**Zero is a real state.** A new character holds a renown of zero, and the type
+represents it. A write of zero is a write.
+
+**There is no demotion here, because there is nothing to demote to.** A test
+removes every soldier in the world and asserts that the character survives with
+their identity.
+
+### What changed from the plan
+
+**Promotion from the mass tier is not built.** The plan asked for the promotion
+scan, the achievement column, the budget, and the debug check that the
+achievement value never falls. The work was narrowed to the shape and the tier,
+so that nothing which uses the shape is built before the shape is reviewed.
+None of the deferred work is foreclosed. A new item holds it.
+
+**A promoted soldier gets no invented ancestry, and the record states why.**
+The decision record forecloses a promotion that mutates one entity into another
+tier, so a promotion must create a character with a new identity. That is the
+rule the resolved blocker asks for, and it holds without a lineage column.[^10]
+
+**The arena holds no relation edge, no house, no parent, no office and no
+biography log.** The research names the biography log as the one character
+structure that grows without bound, and it states the rule that must govern it
+before anything writes one.[^2] Nothing here writes one.
+
+**One finding was opened.** The world's call to an arena invariant check breaks
+no test when it is removed, because no public path can put an arena into a
+state its own check rejects. The finding records what that does and does not
+prove, and it applies to the soldier arena and the settlement arena too.[^14]
+
+### Deliberately out of scope
+
+Promotion, descent, succession, offices, houses, opinion, appointment, and the
+link from a character to the unit that embodies them. Each is a separate item
+with its own record.
 
 ## References
 
@@ -134,3 +200,4 @@ Filled in when the item moves to `complete/`.
 [^11]: Findings register, FND-007. `docs/FINDINGS.md`
 [^12]: Findings register, FND-031. `docs/FINDINGS.md`
 [^13]: Findings register, FND-022. `docs/FINDINGS.md`
+[^14]: Findings register, FND-068. `docs/FINDINGS.md`

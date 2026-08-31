@@ -240,7 +240,7 @@ without stating a constraint is worse than no record.
 | 0051 | A selector is a lazy expression tree that Rust evaluates | Proposed | 0043 | 04 |
 | 0052 | A selector result may be a range, not only an enumerated set | Proposed | 0051, 0028 | 02, 04 |
 | 0053 | A faction is a bit in a mask, and a relation is a plane | Proposed | 0011 | 08 |
-| 0054 | An entity belongs to one of three tiers, declared at creation | Proposed | 0012, 0043 | 14, 15, 16 |
+| 0054 | An entity belongs to one of three tiers, declared at creation | Draft | 0012, 0043 | 14, 15, 16 |
 | 0055 | An effective stat comes from an ordered modifier pipeline | Proposed | 0002, 0054 | 12 |
 | 0056 | Movement is tile-discrete and admitted by sort-then-admit | Accepted | 0004, 0018 | 06, 10 |
 | 0058 | A field update is a flux pair on an edge, so quantity is conserved exactly | Proposed | 0023, 0029 | 13 |

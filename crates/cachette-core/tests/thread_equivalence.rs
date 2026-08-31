@@ -586,3 +586,171 @@ fn the_settlement_columns_reach_the_state_hash() {
     assert_eq!(aged.settlements().len(), settled.settlements().len());
     assert_ne!(aged.state_hash(), settled.state_hash());
 }
+
+/// Creates characters over a world, and removes part of what it creates.
+///
+/// The pattern is fixed, so it is the same on every run and at every thread
+/// count. The losses matter: a run that only creates never exercises the
+/// generation advance, the free queue, or a reused slot.[^1]
+///
+/// A living character carries no tile position, so the pattern needs no
+/// ground and no address.[^2]
+///
+/// # References
+///
+/// [^1]: ADR-0014, entity identity is an index plus a generation, decisions D3 and D4. `docs/adrs/accepted/adr-0014-entity-identity-is-an-index-plus-a-generation.md`
+/// [^2]: ADR-0066, entity storage holds four fixed shapes, decision D1. `docs/adrs/accepted/adr-0066-entity-storage-holds-four-fixed-shapes.md`
+fn people(world: &mut World) -> Vec<Entity> {
+    let ceiling = u32::from(world.config().faction_count.max(1));
+    let mut kept = Vec::new();
+    let mut lost = Vec::new();
+    for index in 0..31u32 {
+        let character = world
+            .create_character(FactionId((index % ceiling) as u16))
+            .expect("the faction must be one the world holds");
+        // A renown of zero is a real state, so the fixture leaves some at
+        // zero and writes others.[^1]
+        //
+        // [^1]: Findings register, FND-043. `docs/FINDINGS.md`
+        if index % 2 == 1 {
+            assert!(world.set_character_renown(character, Fix32::from_int((index % 11) as i16)));
+        }
+        if index % 4 == 3 {
+            lost.push(character);
+        } else {
+            kept.push(character);
+        }
+    }
+    for character in &lost {
+        assert!(world.remove_character(*character));
+    }
+    // Create again, so the run reuses freed slots.
+    let mut reused = 0;
+    for _ in &lost {
+        let made = world
+            .create_character(FactionId(0))
+            .expect("the creation must succeed");
+        if lost.iter().any(|old| old.index() == made.index()) {
+            reused += 1;
+        }
+        kept.push(made);
+    }
+    assert!(
+        reused > 0,
+        "the fixture must reuse a freed slot, or the generation advance is untested"
+    );
+    kept
+}
+
+/// Runs the frames over a world that holds characters.
+fn run_with_characters(config: WorldConfig, frames: u64, threads: usize) -> (Vec<u8>, u64, usize) {
+    let mut world = World::new(config).expect("the extent must describe a world");
+    let kept = people(&mut world);
+    for _ in 0..frames {
+        world.step(threads).expect("the step must run");
+    }
+    // Drive the step, then inspect the arena. A column set that no test
+    // reaches through the engine is inert.[^1]
+    //
+    // [^1]: Findings register, FND-041. `docs/FINDINGS.md`
+    assert!(world.check_invariants());
+    assert!(kept
+        .iter()
+        .all(|character| world.characters().contains(*character)));
+    (
+        world.event_log_bytes().to_vec(),
+        world.state_hash().finish(),
+        world.characters().len() as usize,
+    )
+}
+
+#[test]
+fn a_world_that_holds_characters_is_identical_at_every_thread_count() {
+    let mut peopled = 0;
+    for (name, config, frames) in SCENARIOS {
+        let expected = run_with_characters(*config, *frames, THREAD_COUNTS[0]);
+        assert!(
+            expected.2 > 0,
+            "scenario {name}: the fixture must create a character"
+        );
+        peopled += 1;
+        for threads in &THREAD_COUNTS[1..] {
+            let produced = run_with_characters(*config, *frames, *threads);
+            assert_eq!(
+                produced.0, expected.0,
+                "scenario {name}: the event log differs at {threads} threads"
+            );
+            assert_eq!(
+                produced.1, expected.1,
+                "scenario {name}: the state hash differs at {threads} threads"
+            );
+            assert_eq!(
+                produced.2, expected.2,
+                "scenario {name}: the live character count differs at {threads} threads"
+            );
+        }
+    }
+    assert_eq!(
+        peopled,
+        SCENARIOS.len(),
+        "every scenario must hold characters"
+    );
+}
+
+#[test]
+fn the_character_columns_reach_the_state_hash() {
+    // A hash that ignored the character columns would pass the golden test
+    // while the arena changed underneath it.
+    let config = SCENARIOS[2].1;
+    let bare = World::new(config).expect("the extent must describe a world");
+    let mut peopled = World::new(config).expect("the extent must describe a world");
+    let kept = people(&mut peopled);
+    assert!(!kept.is_empty(), "the fixture must create a character");
+    assert_ne!(bare.state_hash(), peopled.state_hash());
+
+    // A second world built the same way agrees, so the difference above is
+    // the arena and not the run.
+    let mut twin = World::new(config).expect("the extent must describe a world");
+    people(&mut twin);
+    assert_eq!(twin.state_hash(), peopled.state_hash());
+
+    // The renown column reaches the hash. The fixture leaves this renown at
+    // zero, so the write below is a real change.
+    let mut renowned = World::new(config).expect("the extent must describe a world");
+    let renowned_kept = people(&mut renowned);
+    assert_eq!(
+        renowned.characters().renown(renowned_kept[0]),
+        Some(Fix32::ZERO),
+        "the fixture must leave this renown at zero, or the write below changes nothing"
+    );
+    assert!(renowned.set_character_renown(renowned_kept[0], Fix32::from_int(3)));
+    assert_ne!(renowned.state_hash(), peopled.state_hash());
+
+    // The generation column reaches the hash. A loss and a creation leave
+    // the same population, at a later generation.
+    let mut aged = World::new(config).expect("the extent must describe a world");
+    let aged_kept = people(&mut aged);
+    let faction = aged
+        .characters()
+        .faction(aged_kept[0])
+        .expect("the character is live");
+    assert!(aged.remove_character(aged_kept[0]));
+    aged.create_character(faction)
+        .expect("the creation must succeed");
+    assert_eq!(aged.characters().len(), peopled.characters().len());
+    assert_ne!(aged.state_hash(), peopled.state_hash());
+
+    // The birth column reaches the hash. A character created after a step
+    // carries a later tick, and nothing else in the two worlds differs.
+    let mut early = World::new(config).expect("the extent must describe a world");
+    early
+        .create_character(FactionId(0))
+        .expect("the creation must succeed");
+    early.step(1).expect("the step must run");
+    let mut late = World::new(config).expect("the extent must describe a world");
+    late.step(1).expect("the step must run");
+    late.create_character(FactionId(0))
+        .expect("the creation must succeed");
+    assert_eq!(early.characters().len(), late.characters().len());
+    assert_ne!(early.state_hash(), late.state_hash());
+}
