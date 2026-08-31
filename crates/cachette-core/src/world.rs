@@ -38,6 +38,7 @@ use crate::resource::{
 };
 use crate::rng;
 use crate::sim_math;
+use crate::site::{CommodityId, SettlementArena, SettlementError};
 use crate::slots::Slots;
 use crate::soldier::{SoldierArena, SoldierError};
 #[cfg(not(feature = "probe-nondeterminism"))]
@@ -193,6 +194,7 @@ pub struct World {
     /// The events of the last step, from the gather resolve.
     gather_log: Vec<ResourceTaken>,
     soldiers: SoldierArena,
+    settlements: SettlementArena,
     bridge: UnitTileBridge,
     terrain: Terrain,
     /// The stock that each tile started with. It stores nothing.
@@ -235,6 +237,7 @@ impl World {
         }
         let layout = BlockLayout::new(grid, BLOCK_BITS_DEFAULT)?;
         let soldiers = SoldierArena::new(grid);
+        let settlements = SettlementArena::new(grid);
         let mut bridge = UnitTileBridge::new(layout);
         bridge.rebuild(&soldiers)?;
         let terrain = Terrain::new(config.seed, grid);
@@ -247,6 +250,7 @@ impl World {
             log: Vec::new(),
             gather_log: Vec::new(),
             soldiers,
+            settlements,
             bridge,
             terrain,
             resources: ResourceField::new(terrain),
@@ -451,6 +455,80 @@ impl World {
     #[must_use]
     pub const fn soldiers(&self) -> &SoldierArena {
         &self.soldiers
+    }
+
+    /// Returns the settlements of the world.
+    ///
+    /// The settlement is one of the four fixed entity shapes, and it has
+    /// its own column set. It is fixed to a tile and it holds pooled
+    /// stores.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0066, entity storage holds four fixed shapes, decision D1. `docs/adrs/accepted/adr-0066-entity-storage-holds-four-fixed-shapes.md`
+    #[must_use]
+    pub const fn settlements(&self) -> &SettlementArena {
+        &self.settlements
+    }
+
+    /// Founds a settlement in the world and returns its identity.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the arena holds no free slot, when the address
+    /// is outside the world, when the faction is at or above the ceiling,
+    /// or when another settlement already stands on the tile.
+    pub fn found_settlement(
+        &mut self,
+        address: Axial,
+        faction: FactionId,
+    ) -> Result<Entity, SettlementError> {
+        // The arena refuses a faction above the project ceiling. This world
+        // holds a faction count of its own, which is at most that ceiling,
+        // and a settlement of a faction the world does not have is a caller
+        // mistake rather than a storage one.
+        if faction.0 >= self.config.faction_count.max(1) {
+            return Err(SettlementError::FactionAboveCeiling(faction));
+        }
+        self.settlements.found(address, faction)
+    }
+
+    /// Destroys a settlement and reports whether it destroyed one.
+    ///
+    /// A stale identity destroys nothing and returns `false`. The identity
+    /// of a destroyed settlement never resolves again, so the settlement
+    /// founded next in that slot does not answer to it.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0014, entity identity is an index plus a generation, decision D3. `docs/adrs/accepted/adr-0014-entity-identity-is-an-index-plus-a-generation.md`
+    pub fn destroy_settlement(&mut self, entity: Entity) -> bool {
+        self.settlements.destroy(entity)
+    }
+
+    /// Returns the settlement that stands on an address.
+    ///
+    /// Returns `None` when the address is outside the world, and `None`
+    /// when no settlement stands there.
+    #[must_use]
+    pub fn settlement_on(&self, address: Axial) -> Option<Entity> {
+        self.settlements.on_tile(address)
+    }
+
+    /// Writes the quantity of one commodity into the store of a settlement.
+    ///
+    /// Returns `false` when the identity is dead.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the commodity is outside the commodity set.
+    pub fn set_settlement_store(
+        &mut self,
+        entity: Entity,
+        commodity: CommodityId,
+        quantity: Fix32,
+    ) -> Result<bool, SettlementError> {
+        self.settlements.set_store(entity, commodity, quantity)
     }
 
     /// Reports whether the ground at an address admits a unit.
@@ -717,7 +795,8 @@ impl World {
         for amount in &self.departed {
             hash = hash.write_u64(*amount);
         }
-        self.soldiers.hash_into(hash)
+        let hash = self.soldiers.hash_into(hash);
+        self.settlements.hash_into(hash)
     }
 
     /// Reports whether the world holds its invariants.
@@ -806,6 +885,25 @@ impl World {
             return false;
         }
         if !self.soldiers.check_invariants() {
+            return false;
+        }
+        // The settlement arena holds a copy of the grid, and its faction
+        // column stands under the same ceiling as every other faction
+        // column. A check must fail when a copy disagrees.[^1]
+        //
+        // [^1]: Findings register, FND-040. `docs/FINDINGS.md`
+        if self.settlements.grid() != self.grid {
+            return false;
+        }
+        if self
+            .settlements
+            .faction_column()
+            .iter()
+            .any(|faction| faction.0 >= ceiling)
+        {
+            return false;
+        }
+        if !self.settlements.check_invariants() {
             return false;
         }
         // The bridge is a second declaration of where a soldier stands, and

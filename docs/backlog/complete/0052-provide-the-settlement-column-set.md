@@ -1,7 +1,7 @@
 ---
 id: 0052
 title: Provide the settlement column set
-status: refined
+status: complete
 created: 2026-08-31
 implements: [ADR-0066 D1, ADR-0066 D2, ADR-0066 D3, ADR-0012 D3, ADR-0014 D1, ADR-0014 D3, ADR-0004 D1]
 changes: []
@@ -99,7 +99,65 @@ field rebases on this file.
 
 ## Outcome
 
-Filled in when the item moves to `complete/`.
+The settlement column set exists. A settlement holds a generational identity,
+the tile it stands on, a faction, and a pooled store of one commodity
+quantity. The world builds the arena, hashes it, and checks it.
+
+**The identity rule holds.** The generation advances when the arena frees the
+slot, so a destroyed settlement loses its identity at the moment it is lost. A
+test founds a settlement, destroys it, founds another into the same slot, and
+asserts that the old identity resolves to nothing and reads nothing of the new
+one. The test asserts first that the fixture reused the slot, because a fixture
+that opened a second slot would prove nothing.
+
+**One tile holds one settlement.** A settlement pools the stores of its tile,
+so two pools on one tile would give every later question about the tile two
+answers. A second founding on a held tile is a typed refusal.
+
+**The tile back-reference exists now, and the check compares it.** The arena
+keeps a column of holders, indexed by tile, beside the tile column of the
+slots. The founding reads the holders to refuse a second settlement in one
+subscript. The invariant check fails when a holder names the wrong tile, when
+it names a settlement that is gone, and when a live settlement is missing from
+the column.
+
+**The state hash covers the arena.** Every golden file moved, because an empty
+settlement arena writes its three counters into the hash. The difference was
+read before it was recorded: every scenario changed on every frame, which is
+what appending constant bytes to the hash input does, and the shape of each
+sequence is unchanged. A new golden scenario founds settlements, writes part of
+their stores, destroys part of them and founds again into freed slots.
+
+**Zero is a real state.** A new settlement holds a store of zero, and the store
+type represents that. A test writes a quantity, writes it back to zero, and
+reads zero rather than an absent store.
+
+### What changed from the plan
+
+**The batched structural path does not exist, so the founding and the loss do
+not use it.** The record that would define that path holds a reserved registry
+row and no file, and the soldier arena, which the same storage record governs,
+edits its columns inside the call. The settlement arena follows the soldier
+arena. The finding register records the gap, and the backlog holds the item
+that closes it.[^5] [^6]
+
+**No decision record was written.** The impact review said none was needed, and
+that held. The one choice this work made that a contributor could reasonably
+make differently is the dense column of holders against a scan of the slots.
+That choice is private to the module and cheap to change, so it fails the
+second condition of the scope test and states no constraint.[^7]
+
+### Deliberately out of scope
+
+The settlement has no production, no consumption, no residents, no positions,
+no capacity and no terrain rule. A settlement may stand on any tile the world
+holds, including water, because no record states otherwise and this item states
+no new rule. Each of those is a separate item.
+
+### Registers
+
+The findings register gained one row. The blockers register did not move: the
+one open blocker governs cost figures, and this work states none.
 
 ## References
 
@@ -107,3 +165,6 @@ Filled in when the item moves to `complete/`.
 [^2]: Budgets and costs, the scale constants. `docs/reference/budgets.md`
 [^3]: Findings register, FND-040. `docs/FINDINGS.md`
 [^4]: Findings register, FND-043. `docs/FINDINGS.md`
+[^5]: Findings register, FND-063. `docs/FINDINGS.md`
+[^6]: Backlog item 0077. `docs/backlog/proposed/0077-move-the-structural-change-onto-the-batched-path.md`
+[^7]: Decision Record Scope, section 1. `.claude/rules/adr-scope.md`
