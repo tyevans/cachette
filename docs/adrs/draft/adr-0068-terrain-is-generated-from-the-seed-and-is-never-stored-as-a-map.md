@@ -138,17 +138,19 @@ a cleared forest and a built road are each a stored field. Each sits beside
 the generated ground, and each needs its own record. This record does not
 forbid them. It states that they are not terrain.
 
-**The ground is outside the state hash.** The hash already covers the seed and
-the extent. Those two values fix the ground completely, so hashing every
-generated tile adds cost and no coverage.[^10] A reader who expects to find
-the ground in the hash will not find it, which is why this consequence is
-written down.
+**The whole-world hash must cover the generated tiles, not the seed.** The
+ground is part of the world, and the world is hashed each frame against a
+stored file.[^10] Hashing the seed and the extent does not meet that
+requirement. Those are the inputs of the generator. A change to a threshold or
+to the octave count moves every tile of every world and leaves both inputs
+untouched, so a hash over the inputs would not move either.
 
-**Changing the generator changes every world.** There is no stored world to
-migrate and no file to keep. A change to a threshold or to an octave count
-therefore gives every existing seed a different world, and nothing reports it.
-A project that ships saved games will need a generator version, and that is a
-new record.
+**Changing the generator changes every world, and a test says so.** There is
+no stored world to migrate and no file to keep. A change to a threshold or to
+an octave count gives every existing seed a different world, and the golden
+file then fails. That failure is the intended report, and the person who
+changes the generator re-records the file. A project that ships saved games
+will need a generator version as well, and that is a new record.
 
 **A viewer draws the ground by asking for it.** The viewer reads what the
 screen shows and no more, which is what the viewer record requires of every

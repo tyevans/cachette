@@ -471,6 +471,13 @@ impl World {
             .write_u64(u64::from(self.config.faction_count))
             .write(bytemuck::cast_slice(&self.values))
             .write(bytemuck::cast_slice(&self.factions));
+        // The ground is part of the world, so the whole-world hash covers
+        // it. The seed and the extent are already above, but they are the
+        // inputs of the generator, not its output. A change to the generator
+        // moves every tile of every world, and only the tiles report it.[^1]
+        //
+        // [^1]: ADR-0001, one binary gives one answer at any thread count, decision D4. `docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
+        let hash = self.terrain.hash_into(hash);
         self.soldiers.hash_into(hash)
     }
 

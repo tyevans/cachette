@@ -22,6 +22,7 @@
 
 use std::collections::BTreeMap;
 
+use cachette_core::rng;
 use cachette_core::terrain::{Terrain, TileKind, KIND_COUNT, TERRAIN_FRAME};
 use cachette_core::types::Fix32;
 use cachette_core::{Axial, Grid, TileIdx, World, WorldConfig};
@@ -180,6 +181,63 @@ fn the_two_fields_take_different_draw_indices() {
         "the height and the moisture agree on most tiles, so the draw index \
          does not reach the key"
     );
+}
+
+#[test]
+fn the_terrain_owns_its_system_identifier() {
+    // The system is the fourth field of the draw key, and it is the one
+    // field a terrain test cannot vary through the terrain interface,
+    // because the generator names its own system. Two statements together
+    // cover it.
+    //
+    // First, the identifier is distinct. Two systems that share one draw
+    // the same value from the same frame, entity and draw index, so their
+    // fields would correlate.
+    let identifiers = [
+        rng::SYSTEM_TILE_STUB,
+        rng::SYSTEM_SOLDIER_MOVE,
+        rng::SYSTEM_TERRAIN,
+    ];
+    for (first, left) in identifiers.iter().enumerate() {
+        for (second, right) in identifiers.iter().enumerate() {
+            if first != second {
+                assert_ne!(left, right, "two systems share one identifier");
+            }
+        }
+    }
+
+    // Second, the slot reaches the value. A generator that ignored the
+    // system field would give one value for all three, and the distinctness
+    // above would buy nothing.
+    let values: Vec<u64> = identifiers
+        .iter()
+        .map(|system| rng::draw(SEED, *system, TERRAIN_FRAME, 12_345, 0))
+        .collect();
+    assert_ne!(values[0], values[2]);
+    assert_ne!(values[1], values[2]);
+}
+
+#[test]
+fn the_ground_reaches_the_state_hash() {
+    // The ground is part of the world, so the whole-world hash covers it.
+    // Two worlds whose ground differs must hash differently, and the only
+    // thing that differs here is the seed, which reaches the tile columns
+    // too. The stronger statement is the golden file, which pins the
+    // generator itself.
+    let config = WorldConfig {
+        width: 24,
+        height: 24,
+        seed: SEED,
+        faction_count: 2,
+    };
+    let world = World::new(config).expect("the extent must describe a world");
+    let mut other = config;
+    other.seed = SEED ^ 0xff;
+    let other = World::new(other).expect("the extent must describe a world");
+    assert_ne!(world.state_hash(), other.state_hash());
+    // The hash of one world is stable across calls, because the ground is
+    // computed the same way every time.
+    assert_eq!(world.state_hash(), world.state_hash());
 }
 
 #[test]

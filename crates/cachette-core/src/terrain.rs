@@ -25,6 +25,7 @@
 //! [^3]: ADR-0003, every random draw is keyed, never stateful, decision D1. `docs/adrs/accepted/adr-0003-every-random-draw-is-keyed-never-stateful.md`
 //! [^4]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
 
+use crate::hash::StateHash;
 use crate::hex::{Axial, Grid};
 use crate::rng;
 use crate::sim_math;
@@ -213,13 +214,49 @@ impl Terrain {
     pub fn height(self, address: Axial) -> Option<Fix32> {
         Some(self.tile(address)?.height)
     }
+
+    /// Folds every tile of the ground into the state hash.
+    ///
+    /// The ground is part of the world, and the record hashes the whole
+    /// world each frame.[^1] Hashing the seed and the extent alone would not
+    /// meet that, because those are the inputs of the generator and not its
+    /// output. A change to a threshold or to the octave count alters every
+    /// tile of every world, and a hash over the inputs would not move.
+    ///
+    /// The tiles enter in index order, which is fixed and does not depend on
+    /// how a caller visited them.[^2]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0001, one binary gives one answer at any thread count, decision D4. `docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
+    /// [^2]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
+    #[must_use]
+    pub fn hash_into(self, hash: StateHash) -> StateHash {
+        let mut running = hash
+            .write_u64(self.seed)
+            .write_u64(u64::from(self.grid.width()))
+            .write_u64(u64::from(self.grid.height()));
+        let mut index = 0;
+        while index < self.grid.tile_count() {
+            let address = match self.grid.address_of(TileIdx(index)) {
+                Some(address) => address,
+                None => break,
+            };
+            let tile = generate(self.seed, address);
+            running = running
+                .write(&tile.height.0.to_le_bytes())
+                .write(&tile.moisture.0.to_le_bytes())
+                .write(&[tile.kind.to_u8()]);
+            index += 1;
+        }
+        running
+    }
 }
 
 /// Generates one tile from the seed and the address.
 ///
 /// The function reads nothing else. It is the whole of the terrain.
-#[must_use]
-pub fn generate(seed: u64, address: Axial) -> TerrainTile {
+fn generate(seed: u64, address: Axial) -> TerrainTile {
     let height = field(seed, DRAW_HEIGHT, address);
     let moisture = field(seed, DRAW_MOISTURE, address);
     TerrainTile {
@@ -233,8 +270,7 @@ pub fn generate(seed: u64, address: Axial) -> TerrainTile {
 ///
 /// The order of the tests is the order of the thresholds, so exactly one
 /// branch runs and the kinds partition the range.
-#[must_use]
-pub const fn classify(height: Fix32, moisture: Fix32) -> TileKind {
+const fn classify(height: Fix32, moisture: Fix32) -> TileKind {
     if height.0 < HEIGHT_WATER.0 {
         TileKind::Water
     } else if height.0 < HEIGHT_LEVEL.0 {
