@@ -855,6 +855,47 @@ backlog unguarded because a collision there had never happened. Neither fact
 was about the mechanism. **Guard the derivation, not the place that has been
 burned.**
 
+### FND-051 — A fixture chosen for realism can hide the defect it should show
+
+**Believed.** A test that uses the same world the demonstration binary uses
+is a realistic test. Realism makes a test better, because the test then
+exercises what a person will actually run.
+
+**True.** Realism and coverage are different properties, and they can oppose
+each other. A uniform fixture produces a uniform result, and a defect that
+only appears at an extreme of the distribution never gets its input.
+
+**Evidence.** The head-up display clipped a row of the panel to eighteen
+characters, so a value of nineteen characters printed as a word fragment.
+The first test written for it used the demonstration world's placement
+stride, 9973, which puts a unit in nearly every block. The count of skipped
+blocks therefore stayed at zero, the value fit in exactly eighteen
+characters, and **the test passed against the restored defect**. A stride of
+37 clusters the units, drives both counts to two digits, and the test then
+fails as it should.
+
+The same session produced a second instance in a different subsystem. Every
+existing test of the viewer placed its camera at the origin, so no test could
+observe a defect in the block range that begins a row.
+
+**Follows.** Three things.
+
+**Ask what distribution the fixture produces, not whether it looks like the
+real thing.** A defect lives at an extreme. A fixture that models the typical
+case supplies no extreme, and the test then measures the fixture rather than
+the code.
+
+**A test that passes against the restored defect is the only proof that
+matters.** Both instances here were found by putting the defect back and
+watching the test stay green. A test nobody has seen fail is a test nobody
+has checked.
+
+**This is not the weak-test shape.** The testing rule already says a
+determinism test cannot tell correct from consistently wrong, and that a
+determinism test must be able to fail. Those are properties of the assertion.
+This is a property of the input. An assertion strong enough to catch the
+defect still catches nothing when the data never produces it.
+
 ## References
 
 [^1]: Findings register, FND-038, in this document.
