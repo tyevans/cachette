@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-053**
+**Next number: FND-054**
 
 ## A. Corrections to stated rules
 
@@ -978,6 +978,53 @@ history to a saved copy, and name the commit the content came from.
 this was reviewing, not writing, and it changed no tracked file. Running a
 checkout was enough. A reviewing agent gets its own worktree.
 
+### FND-053 — A record stated an algorithm that the code never had
+
+**Believed.** The unit-to-tile bridge sorts the occupying units with a radix
+sort on the integer key. The record for the bridge says so in the text of one
+of its decisions, and that record is accepted.[^9]
+
+**True.** The code ran a parallel comparison sort. It divided the keys into
+chunks, ordered each chunk with a comparison sort, and merged the runs. No
+radix pass existed anywhere in the crate. The record had said radix since the
+day it was accepted, and nothing had ever implemented it.
+
+**Evidence.** A measurement of the rebuild found a cost for each unit that
+matched a comparison sort, and a fixed cost that matched a thread spawn for
+each chunk. A reading of the sort module then found the comparison sort.
+
+The record was not wrong about the constraint. It was wrong about the
+artefact. A reader who took the sentence as a description of the code would
+have concluded that the rebuild was already as cheap as the design allowed,
+and would not have measured. That is what the sentence cost: it did not cause
+a defect, it prevented a measurement.
+
+**Follows.** Three things.
+
+**This is the first local instance of the record-without-code shape, and it
+runs in the direction nobody guarded.** The recurring defect list already
+holds two neighbours, and both are imported priors with no local instance.
+One is inert code that nothing invokes. The other is a record that claimed a
+list of telemetry keys described real behaviour, when several of those keys
+had no write site. Both describe code and a record disagreeing. **This one is
+the inverse: not code without a record, but a record without the code.** A
+reviewer who checks that every capability has a record will not find it,
+because the record is the part that exists.
+
+**A record's statement of an algorithm is not evidence that the algorithm
+exists.** The corpus holds other records that name an algorithm. Nothing in
+this project has ever checked one of those sentences against a source file,
+and the check script cannot: it reads prose. Treat every such sentence as a
+claim to verify, not as a fact to build on. When a record names an algorithm
+and you are about to act on the consequence, open the code.
+
+**Write the constraint the code must satisfy, or write what the code does.**
+The scope rule already forbids a record that states an intent as a fact.[^10]
+The failure is cheap to make, because one sentence can be true of the design
+and false of the code at the same time, and the author sees only the design.
+A record that names an algorithm the project has not written must say plainly
+that nothing implements it yet.
+
 ## References
 
 [^1]: Findings register, FND-038, in this document.
@@ -988,3 +1035,5 @@ checkout was enough. A reviewing agent gets its own worktree.
 [^6]: Record scope research. `docs/research/adr-scope-findings.md`
 [^7]: Decision Record Scope, section 4.5. `.claude/rules/adr-scope.md`
 [^8]: ADR Registry, the retcon window. `docs/adrs/REGISTRY.md`
+[^9]: ADR-0018, the unit-to-tile bridge is derived, and it rebuilds at the barrier, decision D3. `docs/adrs/accepted/adr-0018-the-unit-to-tile-bridge-is-derived-and-rebuilds-at-the-barrier.md`
+[^10]: Decision Record Scope, section 4.6. `.claude/rules/adr-scope.md`

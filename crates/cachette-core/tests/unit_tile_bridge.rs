@@ -22,6 +22,7 @@
 //! [^6]: Testing policy. `docs/TESTING.md`
 
 use cachette_core::bridge::BLOCK_BITS_CEILING;
+use cachette_core::sort::{self, SortKey};
 use cachette_core::{
     Axial, BlockLayout, BridgeError, Entity, FactionId, Grid, SoldierArena, UnitTileBridge, World,
     WorldConfig,
@@ -292,6 +293,58 @@ fn the_keys_of_one_block_hold_one_run_of_the_key_space() {
 }
 
 #[test]
+fn the_key_ceiling_bounds_every_tile_key_at_every_block_edge() {
+    // The bounded order takes the ceiling and derives its pass count from it,
+    // so a ceiling below a real key would refuse a legal world.[^1] The
+    // exponent runs over a range, because a test at one exponent cannot see a
+    // defect in how the exponent enters the derivation.
+    //
+    // [^1]: ADR-0071, the bridge rebuild orders on one thread, decision D1. `docs/adrs/draft/adr-0071-the-bridge-rebuild-orders-on-one-thread.md`
+    for block_bits in 0..=6 {
+        let layout =
+            BlockLayout::new(grid(), block_bits).expect("the exponent is inside the ceiling");
+        let ceiling = layout.key_ceiling();
+        let mut highest = 0u64;
+        for index in 0..grid().tile_count() {
+            let key = layout
+                .key_of(cachette_core::TileIdx(index))
+                .expect("every tile has a key");
+            assert!(
+                key <= ceiling,
+                "the key {key} of a tile lies above the ceiling {ceiling} at exponent {block_bits}"
+            );
+            highest = highest.max(key);
+        }
+        assert!(
+            ceiling >= highest,
+            "the ceiling {ceiling} is below the highest key {highest}"
+        );
+    }
+}
+
+#[test]
+fn a_world_rebuilds_at_every_block_edge() {
+    // The rebuild derives its ceiling from the partition. A rebuild that
+    // refuses a legal world would show here and nowhere else, because every
+    // other test uses one exponent.
+    let arena = populate(40);
+    for block_bits in 0..=6 {
+        let layout =
+            BlockLayout::new(grid(), block_bits).expect("the exponent is inside the ceiling");
+        let mut bridge = UnitTileBridge::new(layout);
+        bridge
+            .rebuild(&arena, 1)
+            .expect("the rebuild must succeed at every exponent");
+        assert_eq!(bridge.len(), arena.len() as usize);
+        for ordinal in 0..(WIDTH * HEIGHT) {
+            let place = address(ordinal);
+            let held = bridge.on_tile(&arena, place).expect("the bridge is fresh");
+            assert_eq!(held, by_scan(&arena, place).as_slice());
+        }
+    }
+}
+
+#[test]
 fn an_empty_block_carries_a_clear_bit_and_an_empty_answer() {
     let mut arena = SoldierArena::new(grid());
     arena
@@ -489,6 +542,49 @@ proptest! {
                 prop_assert_eq!(other.block_is_occupied(block), first.block_is_occupied(block));
             }
         }
+    }
+
+    /// The rebuild gives what the general key vector sort gives.
+    ///
+    /// The bridge orders by a radix sort on the bounded tile key.[^1] The
+    /// general sort compares a key vector of two fields. The two are separate
+    /// algorithms over one definition of the order, so this property holds
+    /// them together. It fails when either one drifts.
+    ///
+    /// The test rebuilds the key vector from the public layout, so it does
+    /// not read a private field of the bridge.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0071, the bridge rebuild orders on one thread, decision D1. `docs/adrs/draft/adr-0071-the-bridge-rebuild-orders-on-one-thread.md`
+    #[test]
+    fn the_rebuild_gives_what_the_general_sort_gives(count in 0u32..120) {
+        let arena = populate(count);
+        let mut bridge = bridge();
+        bridge.rebuild(&arena, 1).expect("the rebuild must succeed");
+
+        let layout = bridge.layout();
+        let units: Vec<Entity> = arena.iter().collect();
+        let keys: Vec<SortKey<2>> = units
+            .iter()
+            .map(|unit| {
+                let tile = arena.tile_column()[unit.index() as usize];
+                let key = layout.key_of(tile).expect("the tile is inside the world");
+                SortKey::new([key, unit.to_bits()])
+            })
+            .collect();
+        let order = sort::order(&keys).expect("the identities are unique");
+        let expected: Vec<Entity> = order.iter().map(|index| units[*index as usize]).collect();
+
+        let mut held: Vec<Entity> = Vec::new();
+        for block in 0..layout.block_count() {
+            if let Some(range) = bridge.block_range(block) {
+                let inside = bridge.in_block(&arena, block).expect("the bridge is fresh");
+                prop_assert_eq!(inside.len(), range.length as usize);
+                held.extend_from_slice(inside);
+            }
+        }
+        prop_assert_eq!(held, expected);
     }
 
     /// A rebuild from the same columns gives the same arrays.

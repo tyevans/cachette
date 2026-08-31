@@ -21,6 +21,12 @@
 //! comparison function.[^6] The last field is the whole identity, taken as
 //! one integer, so no two keys tie.[^7]
 //!
+//! The sort is a radix sort on the tile key, and it runs on one thread.[^8]
+//! The partition states the ceiling of the tile key, so the sort derives its
+//! pass count from the world and never from the units. The radix passes are
+//! stable, so a second step orders each run of one tile key by the identity.
+//! The slot order of the arena therefore never reaches the output.
+//!
 //! # The stale read
 //!
 //! A caller that moves a soldier and then reads the bridge before the rebuild
@@ -63,19 +69,12 @@
 //! [^5]: ADR-0018, the unit-to-tile bridge is derived, and it rebuilds at the barrier, decision D3. `docs/adrs/accepted/adr-0018-the-unit-to-tile-bridge-is-derived-and-rebuilds-at-the-barrier.md`
 //! [^6]: ADR-0007, content supplies a key vector, never a comparator, decision D1. `docs/adrs/accepted/adr-0007-content-supplies-a-key-vector-never-a-comparator.md`
 //! [^7]: ADR-0007, content supplies a key vector, never a comparator, decision D2. `docs/adrs/accepted/adr-0007-content-supplies-a-key-vector-never-a-comparator.md`
+//! [^8]: ADR-0071, the bridge rebuild orders on one thread. `docs/adrs/draft/adr-0071-the-bridge-rebuild-orders-on-one-thread.md`
 
 use crate::hex::{Axial, Grid};
 use crate::soldier::SoldierArena;
-use crate::sort::{self, SortError, SortKey};
+use crate::sort::{self, BoundedKey, SortError};
 use crate::types::{Entity, TileIdx};
-
-/// The number of key fields. The first is the block-major tile key. The
-/// second is the whole identity, which breaks every tie.[^1]
-///
-/// # References
-///
-/// [^1]: ADR-0018, the unit-to-tile bridge is derived, and it rebuilds at the barrier, decision D3. `docs/adrs/accepted/adr-0018-the-unit-to-tile-bridge-is-derived-and-rebuilds-at-the-barrier.md`
-const KEY_FIELDS: usize = 2;
 
 /// The largest block edge exponent that a layout accepts.
 ///
@@ -273,6 +272,23 @@ impl BlockLayout {
     pub const fn block_of_key(self, key: u64) -> u32 {
         (key >> (2 * self.block_bits)) as u32
     }
+
+    /// Returns the largest key that any tile of this world can carry.
+    ///
+    /// The ceiling comes from the partition, never from the units. The order
+    /// that the rebuild runs reads it and derives its pass count from it, so
+    /// the cost of a rebuild does not change when the units move.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0071, the bridge rebuild orders on one thread, decision D1. `docs/adrs/draft/adr-0071-the-bridge-rebuild-orders-on-one-thread.md`
+    #[must_use]
+    pub const fn key_ceiling(self) -> u64 {
+        let blocks = self.block_count() as u64;
+        let highest = blocks.saturating_sub(1);
+        let edge = self.block_edge() as u64;
+        (highest << (2 * self.block_bits)) | (edge * edge - 1)
+    }
 }
 
 /// The start and the length of one block inside the sorted arrays.
@@ -362,16 +378,29 @@ impl UnitTileBridge {
     /// merge order of those writes is the nondeterminism that this project
     /// cannot carry.[^2]
     ///
+    /// The rebuild orders on one thread. It takes the thread count, and it
+    /// uses it only to refuse zero.[^3] No result here takes its order from a
+    /// thread that finished first, because no second thread exists.
+    ///
     /// # Errors
     ///
-    /// Returns an error when the arena describes another world, or when the
-    /// sort refuses the key vector.
+    /// Returns an error when the caller asks for zero threads, when the arena
+    /// describes another world, or when the sort refuses the key vector.
     ///
     /// # References
     ///
     /// [^1]: ADR-0014, entity identity is an index plus a generation, decision D2. `docs/adrs/accepted/adr-0014-entity-identity-is-an-index-plus-a-generation.md`
     /// [^2]: ADR-0018, the unit-to-tile bridge is derived, and it rebuilds at the barrier, decision D3. `docs/adrs/accepted/adr-0018-the-unit-to-tile-bridge-is-derived-and-rebuilds-at-the-barrier.md`
+    /// [^3]: ADR-0071, the bridge rebuild orders on one thread, decision D2. `docs/adrs/draft/adr-0071-the-bridge-rebuild-orders-on-one-thread.md`
     pub fn rebuild(&mut self, arena: &SoldierArena, threads: usize) -> Result<(), BridgeError> {
+        // The rebuild orders on one thread, so it reads the count only to
+        // refuse zero.[^1] Zero threads is a caller mistake whatever the
+        // algorithm, and the caller must hear the same answer as before.
+        //
+        // [^1]: ADR-0071, the bridge rebuild orders on one thread, decision D2. `docs/adrs/draft/adr-0071-the-bridge-rebuild-orders-on-one-thread.md`
+        if threads == 0 {
+            return Err(BridgeError::Sort(SortError::ZeroThreads));
+        }
         if arena.grid() != self.layout.grid() {
             return Err(BridgeError::GridMismatch);
         }
@@ -383,7 +412,7 @@ impl UnitTileBridge {
         // [^2]: ADR-0014, entity identity is an index plus a generation, decision D1. `docs/adrs/accepted/adr-0014-entity-identity-is-an-index-plus-a-generation.md`
         let column = arena.tile_column();
         let mut units: Vec<Entity> = Vec::with_capacity(arena.len() as usize);
-        let mut keys: Vec<SortKey<KEY_FIELDS>> = Vec::with_capacity(arena.len() as usize);
+        let mut keys: Vec<BoundedKey> = Vec::with_capacity(arena.len() as usize);
         for unit in arena.iter() {
             let tile = column[unit.index() as usize];
             let Some(key) = self.layout.key_of(tile) else {
@@ -393,15 +422,15 @@ impl UnitTileBridge {
                 return Err(BridgeError::GridMismatch);
             };
             units.push(unit);
-            keys.push(SortKey::new([key, unit.to_bits()]));
+            keys.push(BoundedKey::new(key, unit.to_bits()));
         }
 
-        let order = sort::order_on(&keys, threads)?;
+        let order = sort::order_bounded(&keys, self.layout.key_ceiling())?;
         self.keys.clear();
         self.units.clear();
         for index in &order {
             let item = *index as usize;
-            self.keys.push(keys[item].fields()[0]);
+            self.keys.push(keys[item].order());
             self.units.push(units[item]);
         }
 

@@ -21,7 +21,7 @@
 //! [^3]: ADR-0007, content supplies a key vector, never a comparator, decision D3. `docs/adrs/accepted/adr-0007-content-supplies-a-key-vector-never-a-comparator.md`
 //! [^4]: Testing policy. `docs/TESTING.md`
 
-use cachette_core::sort::{self, SortError, SortKey};
+use cachette_core::sort::{self, BoundedKey, SortError, SortKey};
 use proptest::prelude::*;
 use proptest::test_runner::FileFailurePersistence;
 
@@ -42,6 +42,49 @@ fn tied_keys() -> impl Strategy<Value = Vec<SortKey<FIELDS>>> {
             .map(|(position, (first, second))| SortKey::new([first, second, position as u64]))
             .collect()
     })
+}
+
+/// The ceiling of every generated bounded key set.
+///
+/// The value is small, so a generated set ties in the ordering field often.
+/// A set that never ties would hide the step that removes the input order.
+const BOUNDED_CEILING: u64 = 300_000;
+
+/// A bounded key set that ties in the ordering field often.
+///
+/// The ordering field comes from a range far narrower than the ceiling, so
+/// two keys share it often. The identifier counts down from the set size, so
+/// it is unique and it runs against the input order. An identifier that rose
+/// with the input order would hide a sort that keeps the input order.
+fn tied_bounded_keys() -> impl Strategy<Value = Vec<BoundedKey>> {
+    prop::collection::vec(0u64..8, 1..200).prop_map(|rows| {
+        let count = rows.len() as u64;
+        rows.into_iter()
+            .enumerate()
+            .map(|(position, order)| BoundedKey::new(order, count - position as u64))
+            .collect()
+    })
+}
+
+/// A bounded key set that spreads over the whole ceiling.
+///
+/// The wide set exercises every radix pass. The narrow set above exercises
+/// only the lowest.
+fn wide_bounded_keys() -> impl Strategy<Value = Vec<BoundedKey>> {
+    prop::collection::vec(0u64..=BOUNDED_CEILING, 1..200).prop_map(|rows| {
+        let count = rows.len() as u64;
+        rows.into_iter()
+            .enumerate()
+            .map(|(position, order)| BoundedKey::new(order, count - position as u64))
+            .collect()
+    })
+}
+
+/// Returns the same keys as a general key vector.
+fn as_general(keys: &[BoundedKey]) -> Vec<SortKey<2>> {
+    keys.iter()
+        .map(|key| SortKey::new([key.order(), key.identifier()]))
+        .collect()
 }
 
 /// Reports whether the order is one exact permutation of the indices.
@@ -113,6 +156,74 @@ proptest! {
         let shuffled_keys: Vec<SortKey<FIELDS>> =
             shuffled.iter().map(|index| rotated[*index as usize]).collect();
         prop_assert_eq!(straight_keys, shuffled_keys);
+    }
+
+    /// The bounded order gives what the general order gives.
+    ///
+    /// The two are separate algorithms over one definition of the order. If
+    /// they ever disagree, one is wrong and neither may be trusted.
+    #[test]
+    fn the_bounded_order_agrees_with_the_general_order(keys in tied_bounded_keys()) {
+        let general = sort::order(&as_general(&keys)).expect("the identifiers are unique");
+        let bounded = sort::order_bounded(&keys, BOUNDED_CEILING)
+            .expect("the identifiers are unique and the keys are inside the ceiling");
+        prop_assert_eq!(bounded, general);
+    }
+
+    /// The bounded order agrees with the general order over the whole range.
+    #[test]
+    fn the_bounded_order_agrees_over_the_whole_range(keys in wide_bounded_keys()) {
+        let general = sort::order(&as_general(&keys)).expect("the identifiers are unique");
+        let bounded = sort::order_bounded(&keys, BOUNDED_CEILING)
+            .expect("the identifiers are unique and the keys are inside the ceiling");
+        prop_assert_eq!(bounded, general);
+    }
+
+    /// The bounded order is one exact permutation of the indices.
+    #[test]
+    fn the_bounded_order_is_one_exact_permutation(keys in tied_bounded_keys()) {
+        let order = sort::order_bounded(&keys, BOUNDED_CEILING)
+            .expect("the identifiers are unique and the keys are inside the ceiling");
+        prop_assert!(is_a_permutation(&order, keys.len()));
+    }
+
+    /// The bounded order does not depend on the input order.
+    ///
+    /// A radix pass is stable, so it keeps the input order for keys that tie.
+    /// The sort replaces that order with the order of the identifiers. Delete
+    /// that step and this property fails, because the rotated set then keeps
+    /// the rotated order.
+    #[test]
+    fn the_bounded_order_does_not_depend_on_the_input_order(
+        keys in tied_bounded_keys(),
+        rotation in 0usize..200,
+    ) {
+        let mut rotated = keys.clone();
+        rotated.rotate_left(rotation % keys.len());
+
+        let straight = sort::order_bounded(&keys, BOUNDED_CEILING)
+            .expect("the identifiers are unique and the keys are inside the ceiling");
+        let shuffled = sort::order_bounded(&rotated, BOUNDED_CEILING)
+            .expect("the identifiers are unique and the keys are inside the ceiling");
+
+        let straight_keys: Vec<BoundedKey> =
+            straight.iter().map(|index| keys[*index as usize]).collect();
+        let shuffled_keys: Vec<BoundedKey> =
+            shuffled.iter().map(|index| rotated[*index as usize]).collect();
+        prop_assert_eq!(straight_keys, shuffled_keys);
+    }
+
+    /// A wider ceiling gives the same answer as a tight one.
+    ///
+    /// The ceiling sets the number of radix passes. A pass over a digit that
+    /// every key holds at zero must change nothing.
+    #[test]
+    fn a_wider_ceiling_gives_the_same_order(keys in tied_bounded_keys()) {
+        let tight = sort::order_bounded(&keys, 7)
+            .expect("the identifiers are unique and the keys are inside the ceiling");
+        let wide = sort::order_bounded(&keys, u64::MAX)
+            .expect("the identifiers are unique and the keys are inside the ceiling");
+        prop_assert_eq!(tight, wide);
     }
 
     /// Sorting the items agrees with sorting the keys.
@@ -203,4 +314,58 @@ fn a_key_reports_its_fields_and_its_identifier() {
     let key = SortKey::new([4, 5, 6]);
     assert_eq!(key.fields(), &[4, 5, 6]);
     assert_eq!(key.identifier(), 6);
+}
+
+#[test]
+fn a_key_above_the_ceiling_is_an_error() {
+    // ADR-0071 D1: the caller states the ceiling, and the sort refuses a key
+    // above it rather than widening itself to fit.
+    let keys = [BoundedKey::new(3, 10), BoundedKey::new(9, 11)];
+    assert_eq!(
+        sort::order_bounded(&keys, 4),
+        Err(SortError::KeyAboveCeiling { key: 9, ceiling: 4 })
+    );
+}
+
+#[test]
+fn a_repeated_identifier_is_an_error_in_the_bounded_order() {
+    // ADR-0007 D2: the last field is a stable identifier, so it is unique.
+    let keys = [
+        BoundedKey::new(1, 7),
+        BoundedKey::new(2, 7),
+        BoundedKey::new(0, 9),
+    ];
+    assert_eq!(
+        sort::order_bounded(&keys, 4),
+        Err(SortError::RepeatedIdentifier(7))
+    );
+}
+
+#[test]
+fn an_empty_set_gives_an_empty_bounded_order() {
+    let keys: [BoundedKey; 0] = [];
+    assert_eq!(sort::order_bounded(&keys, 0), Ok(Vec::new()));
+}
+
+#[test]
+fn a_ceiling_of_zero_orders_a_set_of_one_key_value() {
+    // Every key is zero, so only the identifier orders the set.
+    let keys = [
+        BoundedKey::new(0, 30),
+        BoundedKey::new(0, 10),
+        BoundedKey::new(0, 20),
+    ];
+    let order = sort::order_bounded(&keys, 0).expect("the identifiers are unique");
+    assert_eq!(order, vec![1, 2, 0]);
+}
+
+#[test]
+fn the_identifier_breaks_a_tie_and_the_input_order_does_not() {
+    // The radix pass is stable, so it would leave these two in the order the
+    // caller gave. Delete the step that orders a tied run and this test fails
+    // in one of its two halves.
+    let forward = [BoundedKey::new(5, 90), BoundedKey::new(5, 20)];
+    let backward = [BoundedKey::new(5, 20), BoundedKey::new(5, 90)];
+    assert_eq!(sort::order_bounded(&forward, 8), Ok(vec![1, 0]));
+    assert_eq!(sort::order_bounded(&backward, 8), Ok(vec![0, 1]));
 }
