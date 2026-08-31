@@ -14,7 +14,9 @@
 //! [^2]: ADR-0067, the viewer reads the world and never writes to it, decision D3. `docs/adrs/draft/adr-0067-the-viewer-reads-the-world-and-never-writes-to-it.md`
 //! [^3]: ADR-0017, the world is a rhombus, so a tile index is raw axial, decision D4. `docs/adrs/accepted/adr-0017-the-world-is-a-rhombus-so-a-tile-index-is-raw-axial.md`
 
-use cachette_core::{Axial, BridgeError, World};
+use cachette_core::{Axial, BridgeError, FactionId, World};
+
+use crate::text;
 
 /// The colour of the space outside the world.
 const BACKGROUND: u32 = 0x0010_1418;
@@ -35,6 +37,31 @@ const FACTION_COLOURS: [u32; 6] = [
     0x00b5_6ae8,
     0x00e8_8fc4,
 ];
+
+/// The number of colours the viewer can tell apart.
+///
+/// The legend shows one row for each of them. A faction beyond the table
+/// shares a colour, so the legend says so rather than showing a count it
+/// cannot separate.
+pub const COLOURED_FACTIONS: usize = FACTION_COLOURS.len();
+
+/// Returns the colour the viewer draws a faction in.
+///
+/// The colour is the viewer's own. The engine holds no colour and never
+/// will.[^1]
+///
+/// # References
+///
+/// [^1]: ADR-0067, the viewer reads the world and never writes to it, decision D2. `docs/adrs/draft/adr-0067-the-viewer-reads-the-world-and-never-writes-to-it.md`
+#[must_use]
+pub fn faction_colour(faction: FactionId) -> u32 {
+    FACTION_COLOURS[colour_slot(faction)]
+}
+
+/// Returns the index of the colour a faction shares.
+fn colour_slot(faction: FactionId) -> usize {
+    (faction.0 as usize) % COLOURED_FACTIONS
+}
 
 /// The smallest tile size the viewer will show, in pixels.
 const MIN_TILE: f32 = 2.0;
@@ -57,6 +84,7 @@ pub struct Canvas {
     soldiers_painted: u32,
     blocks_read: u32,
     blocks_skipped: u32,
+    painted_by_faction: [u32; COLOURED_FACTIONS],
 }
 
 impl Canvas {
@@ -77,6 +105,7 @@ impl Canvas {
             soldiers_painted: 0,
             blocks_read: 0,
             blocks_skipped: 0,
+            painted_by_faction: [0; COLOURED_FACTIONS],
         }
     }
 
@@ -136,6 +165,97 @@ impl Canvas {
         self.soldiers_painted
     }
 
+    /// Returns the soldiers the last draw painted, one count for each colour.
+    ///
+    /// This is a census of the window, and the drawing pass produced it. The
+    /// viewer counts a soldier when it paints one, so the count costs nothing
+    /// beyond the draw and grows with the window rather than with the
+    /// population.[^1]
+    ///
+    /// The engine holds no such census, and the viewer must not build one by
+    /// reading every soldier. A count of the whole world is a pass over the
+    /// whole world.[^2]
+    ///
+    /// # References
+    ///
+    /// [^1]: PRD-0002, a developer watches the world run. `docs/product/shaped/prd-0002-a-developer-watches-the-world-run.md`
+    /// [^2]: ADR-0070, the head-up display reports what the drawing pass read, decision D1. `docs/adrs/draft/adr-0070-the-head-up-display-reports-what-the-drawing-pass-read.md`
+    #[must_use]
+    pub const fn painted_by_faction(&self) -> &[u32; COLOURED_FACTIONS] {
+        &self.painted_by_faction
+    }
+
+    /// Fills a rectangle with one colour.
+    ///
+    /// The head-up display draws its panel with this. A position outside the
+    /// canvas is clipped rather than a panic.
+    pub fn block(&mut self, x: i32, y: i32, width: i32, height: i32, colour: u32) {
+        self.fill_rect(x, y, width, height, colour);
+    }
+
+    /// Mixes a colour into a rectangle, keeping part of what is under it.
+    ///
+    /// The head-up display sits over the world. A panel that hid the world
+    /// under it would take away the thing the person is watching, so the
+    /// panel lets the world show through.
+    ///
+    /// The weight runs from 0, which changes nothing, to 255, which covers
+    /// the world completely.
+    pub fn shade(&mut self, x: i32, y: i32, width: i32, height: i32, colour: u32, weight: u8) {
+        for row in y..y + height {
+            for column in x..x + width {
+                if let Some(under) = self.pixel_at(column, row) {
+                    self.put(column, row, mix(under, colour, weight));
+                }
+            }
+        }
+    }
+
+    /// Writes a line of text, and returns the position after the last glyph.
+    ///
+    /// The scale multiplies each glyph pixel into a square, so every edge
+    /// stays on a pixel boundary.
+    ///
+    /// # Panics
+    ///
+    /// Panics when the scale is not positive. A scale of zero draws nothing
+    /// and hides the mistake.
+    pub fn write(&mut self, x: i32, y: i32, line: &str, scale: i32, colour: u32) -> i32 {
+        assert!(scale > 0, "a glyph needs a positive scale");
+        let mut pen = x;
+        for character in line.chars() {
+            let rows = text::glyph(character);
+            for (row, bits) in rows.iter().enumerate() {
+                for column in 0..text::GLYPH_WIDTH {
+                    if bits & (1 << column) == 0 {
+                        continue;
+                    }
+                    self.fill_rect(
+                        pen + column * scale,
+                        y + row as i32 * scale,
+                        scale,
+                        scale,
+                        colour,
+                    );
+                }
+            }
+            pen += text::GLYPH_WIDTH * scale;
+        }
+        pen
+    }
+
+    /// Returns the colour of one pixel, or nothing when it is off the canvas.
+    fn pixel_at(&self, x: i32, y: i32) -> Option<u32> {
+        if x < 0 || y < 0 {
+            return None;
+        }
+        let (x, y) = (x as usize, y as usize);
+        if x >= self.width || y >= self.height {
+            return None;
+        }
+        Some(self.pixels[y * self.width + x])
+    }
+
     /// Fills the whole canvas with the background.
     ///
     /// The counts reset here, so they always describe one draw.
@@ -145,6 +265,7 @@ impl Canvas {
         self.soldiers_painted = 0;
         self.blocks_read = 0;
         self.blocks_skipped = 0;
+        self.painted_by_faction = [0; COLOURED_FACTIONS];
     }
 
     /// Sets one pixel, and ignores a position outside the canvas.
@@ -431,6 +552,27 @@ impl Camera {
     }
 }
 
+/// Mixes two colours by a weight, one channel at a time.
+///
+/// The arithmetic is integer, because a colour is a byte triple and there is
+/// no reason to leave that. It is not simulated state, so the rule that bans
+/// floating point does not reach here either way.[^1]
+///
+/// # References
+///
+/// [^1]: ADR-0002, simulated and aggregated state holds no floating point number, decision D4. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
+fn mix(under: u32, over: u32, weight: u8) -> u32 {
+    let weight = u32::from(weight);
+    let rest = 255 - weight;
+    let mut mixed = 0;
+    for shift in [16, 8, 0] {
+        let a = (under >> shift) & 0xff;
+        let b = (over >> shift) & 0xff;
+        mixed |= ((a * rest + b * weight) / 255) << shift;
+    }
+    mixed
+}
+
 /// Keeps a divisor away from zero.
 ///
 /// A camera with a tile size of zero is a viewer mistake. It must give an
@@ -604,9 +746,13 @@ fn draw_soldiers(
                 if !canvas.holds(x, y, radius) {
                     continue;
                 }
-                let colour = FACTION_COLOURS[(faction.0 as usize) % FACTION_COLOURS.len()];
-                canvas.fill_disc(x as i32, y as i32, radius, colour);
+                let slot = colour_slot(faction);
+                canvas.fill_disc(x as i32, y as i32, radius, FACTION_COLOURS[slot]);
                 canvas.soldiers_painted += 1;
+                // The census is a by-product of the pass that paints. A
+                // separate pass over the soldiers would give the same numbers
+                // and cost the population.
+                canvas.painted_by_faction[slot] += 1;
             }
         }
     }

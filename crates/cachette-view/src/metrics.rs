@@ -33,6 +33,11 @@
 
 use std::time::{Duration, Instant};
 
+/// Returns a span in microseconds.
+fn micros(span: Duration) -> f64 {
+    span.as_secs_f64() * 1_000_000.0
+}
+
 /// A point in time, for measuring one span.
 ///
 /// The type exists so that the clock is named in one module. A caller starts
@@ -117,12 +122,67 @@ impl Metrics {
         self.ticks
     }
 
+    /// Returns the number of paintings.
+    #[must_use]
+    pub const fn frames(&self) -> u64 {
+        self.frames
+    }
+
+    /// Returns the mean cost of one step, in microseconds.
+    #[must_use]
+    pub fn step_mean_micros(&self) -> f64 {
+        Self::mean_micros(self.step_total, self.ticks)
+    }
+
+    /// Returns the worst cost of one step, in microseconds.
+    #[must_use]
+    pub fn step_worst_micros(&self) -> f64 {
+        micros(self.step_worst)
+    }
+
+    /// Returns the mean cost of one painting, in microseconds.
+    #[must_use]
+    pub fn draw_mean_micros(&self) -> f64 {
+        Self::mean_micros(self.draw_total, self.frames)
+    }
+
+    /// Returns the worst cost of one painting, in microseconds.
+    #[must_use]
+    pub fn draw_worst_micros(&self) -> f64 {
+        micros(self.draw_worst)
+    }
+
+    /// Returns the steps each second, over the whole run so far.
+    ///
+    /// The window holds the loop to its own frame rate, so this reports the
+    /// rate the person sees rather than the rate the engine could reach.
+    #[must_use]
+    pub fn ticks_each_second(&self) -> f64 {
+        let wall = self.started.elapsed().as_secs_f64();
+        if wall > 0.0 {
+            self.ticks as f64 / wall
+        } else {
+            0.0
+        }
+    }
+
+    /// Returns the share of the wall clock that the engine and the viewer
+    /// spent working, as a number from 0 to 100.
+    #[must_use]
+    pub fn busy_percent(&self) -> f64 {
+        let wall = self.started.elapsed().as_secs_f64();
+        if wall <= 0.0 {
+            return 0.0;
+        }
+        (self.step_total + self.draw_total).as_secs_f64() / wall * 100.0
+    }
+
     /// Returns the mean of a total over a count, in microseconds.
     fn mean_micros(total: Duration, count: u64) -> f64 {
         if count == 0 {
             return 0.0;
         }
-        total.as_secs_f64() * 1_000_000.0 / count as f64
+        micros(total) / count as f64
     }
 
     /// Writes the report.
@@ -136,15 +196,13 @@ impl Metrics {
     ///
     /// [^1]: Decision Record Scope, section 4.1. `.claude/rules/adr-scope.md`
     pub fn report(&self, tiles: u32, soldiers: usize, threads: usize) {
+        // Every figure comes from the accessor that the head-up display also
+        // reads. One derivation, one answer: a report that recomputed a mean
+        // its own way could disagree with the panel and nothing would fail.
         let wall = self.started.elapsed();
-        let busy = self.step_total + self.draw_total;
-        let step_mean = Self::mean_micros(self.step_total, self.ticks);
-        let draw_mean = Self::mean_micros(self.draw_total, self.frames);
-        let ticks_per_second = if wall.as_secs_f64() > 0.0 {
-            self.ticks as f64 / wall.as_secs_f64()
-        } else {
-            0.0
-        };
+        let step_mean = self.step_mean_micros();
+        let draw_mean = self.draw_mean_micros();
+        let ticks_per_second = self.ticks_each_second();
 
         println!();
         println!("measured on this machine, on this run:");
@@ -158,15 +216,15 @@ impl Metrics {
         println!("  rate         {ticks_per_second:.1} ticks each second");
         println!(
             "  step         {step_mean:.0} us mean, {:.0} us worst",
-            self.step_worst.as_secs_f64() * 1_000_000.0
+            self.step_worst_micros()
         );
         println!(
             "  draw         {draw_mean:.0} us mean, {:.0} us worst",
-            self.draw_worst.as_secs_f64() * 1_000_000.0
+            self.draw_worst_micros()
         );
         println!(
             "  busy         {:.1} percent of the wall clock, the rest waits for the window",
-            busy.as_secs_f64() / wall.as_secs_f64().max(f64::EPSILON) * 100.0
+            self.busy_percent()
         );
 
         if self.draw_total > self.step_total {
