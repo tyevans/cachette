@@ -168,10 +168,10 @@ without stating a constraint is worse than no record.
 
 | No. | Claim | Status | Depends on | Source |
 |---|---|---|---|---|
-| 0008 | The primary target is aarch64, and NEON is a baseline rather than a dispatch | Proposed | 0001 | 07 |
-| 0009 | Parallel stages write disjoint outputs, because the memory model is weak | Proposed | 0001, 0008 | 07 |
+| 0008 | The primary target is aarch64 | Draft | 0001 | 07 |
+| 0009 | Parallel stages write disjoint outputs, because the memory model is weak | Draft | 0001, 0008 | 07 |
 | 0010 | The cache line size is a compile-time constant | Proposed | 0008 | 07 |
-| 0011 | Every value type is a newtype with a declared size and alignment | Proposed | 0002, 0008 | 07 |
+| 0011 | Every value type is a newtype | Draft | 0002, 0008 | 07 |
 
 ### Storage
 
