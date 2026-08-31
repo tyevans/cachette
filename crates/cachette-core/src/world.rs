@@ -26,6 +26,7 @@
 //! [^4]: ADR-0003, every random draw is keyed, never stateful, decision D1. `docs/adrs/accepted/adr-0003-every-random-draw-is-keyed-never-stateful.md`
 //! [^5]: ADR-0002, simulated and aggregated state holds no floating point number, decision D2. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
 
+use crate::bridge::{BlockLayout, BridgeError, UnitTileBridge, BLOCK_BITS_DEFAULT};
 use crate::event::{TileChanged, CHANGE_KIND_LOWERED, CHANGE_KIND_RAISED};
 use crate::hash::StateHash;
 use crate::hex::{Axial, Grid, GridError};
@@ -33,13 +34,21 @@ use crate::rng;
 use crate::sim_math;
 use crate::slots::Slots;
 use crate::soldier::{SoldierArena, SoldierError};
-use crate::types::{Accum, Entity, FactionId, Fix32, Tick, TileIdx};
+use crate::types::{Accum, Entity, FactionId, Fix32, Tick, TileIdx, FACTION_CEILING};
 
 /// The reason that a step refused to run.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum StepError {
     /// The caller asked for zero threads. A step needs at least one.
     ZeroThreads,
+    /// The rebuild of the unit-to-tile bridge refused to run.
+    Bridge(BridgeError),
+}
+
+impl From<BridgeError> for StepError {
+    fn from(error: BridgeError) -> Self {
+        Self::Bridge(error)
+    }
 }
 
 /// The reason that a world refused to build.
@@ -47,12 +56,35 @@ pub enum StepError {
 pub enum WorldError {
     /// The configured extent does not describe a grid.
     Grid(GridError),
+    /// The block partition of the world refused to build.
+    Bridge(BridgeError),
+    /// The configured faction count is above the storage ceiling.
+    ///
+    /// A faction is one bit in a 64-bit mask, so the project holds a fixed
+    /// ceiling. A world may hold fewer factions than the ceiling. It may
+    /// never hold more.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: Budgets and costs, the scale constants. `docs/reference/budgets.md`
+    FactionCountAboveCeiling(u16),
+}
+
+impl From<BridgeError> for WorldError {
+    fn from(error: BridgeError) -> Self {
+        Self::Bridge(error)
+    }
 }
 
 impl core::fmt::Display for WorldError {
     fn fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
             Self::Grid(error) => write!(formatter, "the world extent is not a grid: {error}"),
+            Self::Bridge(error) => write!(formatter, "the world has no block partition: {error}"),
+            Self::FactionCountAboveCeiling(count) => write!(
+                formatter,
+                "the world asks for {count} factions, and the ceiling is {FACTION_CEILING}"
+            ),
         }
     }
 }
@@ -69,6 +101,7 @@ impl core::fmt::Display for StepError {
     fn fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
             Self::ZeroThreads => write!(formatter, "a step needs at least one thread"),
+            Self::Bridge(error) => write!(formatter, "the bridge rebuild refused: {error}"),
         }
     }
 }
@@ -131,6 +164,7 @@ pub struct World {
     factions: Vec<FactionId>,
     log: Vec<TileChanged>,
     soldiers: SoldierArena,
+    bridge: UnitTileBridge,
 }
 
 impl World {
@@ -140,6 +174,9 @@ impl World {
     ///
     /// Returns an error when the configured extent does not describe a grid.
     pub fn new(config: WorldConfig) -> Result<Self, WorldError> {
+        if config.faction_count > FACTION_CEILING {
+            return Err(WorldError::FactionCountAboveCeiling(config.faction_count));
+        }
         let grid = Grid::new(config.width, config.height)?;
         let count = grid.tile_count() as usize;
         let divisor = u64::from(config.faction_count.max(1));
@@ -150,6 +187,10 @@ impl World {
             values.push(Fix32((raw >> 40) as i32));
             factions.push(FactionId((index as u64 % divisor) as u16));
         }
+        let layout = BlockLayout::new(grid, BLOCK_BITS_DEFAULT)?;
+        let soldiers = SoldierArena::new(grid);
+        let mut bridge = UnitTileBridge::new(layout);
+        bridge.rebuild(&soldiers, 1)?;
         Ok(Self {
             config,
             grid,
@@ -157,7 +198,8 @@ impl World {
             values,
             factions,
             log: Vec::new(),
-            soldiers: SoldierArena::new(grid),
+            soldiers,
+            bridge,
         })
     }
 
@@ -200,6 +242,13 @@ impl World {
         address: Axial,
         faction: FactionId,
     ) -> Result<Entity, SoldierError> {
+        // The arena refuses a faction above the project ceiling. This world
+        // holds a faction count of its own, which is at most that ceiling,
+        // and a soldier of a faction the world does not have is a caller
+        // mistake rather than a storage one.
+        if faction.0 >= self.config.faction_count.max(1) {
+            return Err(SoldierError::FactionAboveCeiling(faction));
+        }
         self.soldiers.spawn(address, faction)
     }
 
@@ -223,6 +272,68 @@ impl World {
     /// Returns an error when the address is outside the world.
     pub fn place_soldier(&mut self, entity: Entity, address: Axial) -> Result<bool, SoldierError> {
         self.soldiers.place(entity, address)
+    }
+
+    /// Returns the unit-to-tile bridge.
+    ///
+    /// The bridge is derived from the soldier columns, and it rebuilds at the
+    /// frame barrier.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0018, the unit-to-tile bridge is derived, and it rebuilds at the barrier, decision D3. `docs/adrs/accepted/adr-0018-the-unit-to-tile-bridge-is-derived-and-rebuilds-at-the-barrier.md`
+    #[must_use]
+    pub const fn bridge(&self) -> &UnitTileBridge {
+        &self.bridge
+    }
+
+    /// Returns the soldiers that stand on one tile.
+    ///
+    /// The call reads the block range, then searches inside it. It scans no
+    /// population.[^1]
+    ///
+    /// The answer is the occupancy as it stood at the last barrier. A spawn,
+    /// a despawn or a move since then makes the bridge stale, and the call
+    /// then returns an error rather than a wrong answer.[^2]
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the bridge is stale, or when the address is
+    /// outside the world.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0018, the unit-to-tile bridge is derived, and it rebuilds at the barrier, decision D4. `docs/adrs/accepted/adr-0018-the-unit-to-tile-bridge-is-derived-and-rebuilds-at-the-barrier.md`
+    /// [^2]: ADR-0018, the unit-to-tile bridge is derived, and it rebuilds at the barrier, decision D3. `docs/adrs/accepted/adr-0018-the-unit-to-tile-bridge-is-derived-and-rebuilds-at-the-barrier.md`
+    pub fn soldiers_on(&self, address: Axial) -> Result<&[Entity], BridgeError> {
+        self.bridge.on_tile(&self.soldiers, address)
+    }
+
+    /// Returns the number of soldiers that stand on one tile.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for the same reasons that [`Self::soldiers_on`] does.
+    pub fn soldier_count_on(&self, address: Axial) -> Result<usize, BridgeError> {
+        self.bridge.count_on_tile(&self.soldiers, address)
+    }
+
+    /// Rebuilds the unit-to-tile bridge from the soldier columns.
+    ///
+    /// The step calls this at the barrier. A caller that changes the
+    /// population outside a step calls it to make the bridge readable
+    /// again.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the caller asks for zero threads, or when the
+    /// rebuild refuses.
+    pub fn rebuild_bridge(&mut self, threads: usize) -> Result<(), StepError> {
+        if threads == 0 {
+            return Err(StepError::ZeroThreads);
+        }
+        self.bridge.rebuild(&self.soldiers, threads)?;
+        Ok(())
     }
 
     /// Returns the value of the tile at an address.
@@ -347,6 +458,17 @@ impl World {
         if self.factions.iter().any(|faction| faction.0 >= ceiling) {
             return false;
         }
+        // The soldier faction column is a second population under the same
+        // ceiling. Checking one and not the other let the test suite spawn
+        // soldiers of factions the world did not have, and pass.
+        if self
+            .soldiers
+            .faction_column()
+            .iter()
+            .any(|faction| faction.0 >= ceiling)
+        {
+            return false;
+        }
         // The arena holds a copy of the grid. A check must fail when the two
         // copies disagree.
         if self.soldiers.grid() != self.grid {
@@ -354,6 +476,27 @@ impl World {
         }
         if !self.soldiers.check_invariants() {
             return false;
+        }
+        // The bridge is a second declaration of where a soldier stands, and
+        // the tile column is the first. The check fails when the two
+        // disagree.[^1] A stale bridge cannot be compared against columns it
+        // was not derived from, so the structure check stands alone there.
+        //
+        // [^1]: Findings register, FND-040. `docs/FINDINGS.md`
+        if !self.bridge.check_structure() {
+            return false;
+        }
+        if self.bridge.layout().grid() != self.grid {
+            return false;
+        }
+        match self.bridge.check_invariants(&self.soldiers) {
+            Ok(held) => {
+                if !held {
+                    return false;
+                }
+            }
+            Err(BridgeError::Stale { .. }) => {}
+            Err(_) => return false,
         }
         self.log
             .iter()
@@ -403,6 +546,15 @@ impl World {
             joined.extend_from_slice(slot);
             joined
         });
+
+        // The bridge rebuilds here, at the barrier, and after the structural
+        // apply. Rebuilding before the apply would leave a dead identity in
+        // the unit array for the whole frame.[^1] The stub applies no
+        // structural change yet, so this call is the last thing in the step
+        // and a later apply goes above it.
+        //
+        // [^1]: ADR-0018, the unit-to-tile bridge is derived, and it rebuilds at the barrier, decision D3. `docs/adrs/accepted/adr-0018-the-unit-to-tile-bridge-is-derived-and-rebuilds-at-the-barrier.md`
+        self.bridge.rebuild(&self.soldiers, threads)?;
         Ok(&self.log)
     }
 }

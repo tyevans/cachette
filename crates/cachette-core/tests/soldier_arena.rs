@@ -19,7 +19,9 @@
 //! [^4]: Testing policy. `docs/TESTING.md`
 
 use cachette_core::types::FACTION_CEILING;
-use cachette_core::{Axial, Entity, FactionId, Grid, SoldierArena, SoldierError};
+use cachette_core::{
+    Axial, Entity, FactionId, Grid, SoldierArena, SoldierError, World, WorldConfig,
+};
 use proptest::prelude::*;
 use proptest::test_runner::FileFailurePersistence;
 
@@ -40,6 +42,50 @@ fn address(index: u32) -> Axial {
 }
 
 #[test]
+fn the_world_refuses_a_faction_it_does_not_hold() {
+    // Three ceilings existed and one was enforced. The arena refused a
+    // faction above the project ceiling, the invariant refused a TILE
+    // faction above the world's own count, and nothing refused a SOLDIER
+    // faction above it. The test suite spawned soldiers of factions the
+    // world did not hold, and every check passed.
+    let mut world = World::new(WorldConfig {
+        width: 8,
+        height: 8,
+        seed: 3,
+        faction_count: 2,
+    })
+    .expect("the extent must describe a world");
+
+    assert!(world.spawn_soldier(Axial::new(0, 0), FactionId(1)).is_ok());
+    assert!(world.spawn_soldier(Axial::new(1, 0), FactionId(2)).is_err());
+    assert!(world
+        .spawn_soldier(Axial::new(2, 0), FactionId(62))
+        .is_err());
+    assert!(world.check_invariants());
+}
+
+#[test]
+fn a_world_refuses_a_faction_count_above_the_storage_ceiling() {
+    // A faction is one bit in a 64-bit mask, so the ceiling is a property of
+    // the storage. A world may hold fewer factions. It may never hold more,
+    // and nothing refused that before.
+    assert!(World::new(WorldConfig {
+        width: 4,
+        height: 4,
+        seed: 1,
+        faction_count: FACTION_CEILING,
+    })
+    .is_ok());
+    assert!(World::new(WorldConfig {
+        width: 4,
+        height: 4,
+        seed: 1,
+        faction_count: FACTION_CEILING + 1,
+    })
+    .is_err());
+}
+
+#[test]
 fn the_first_entity_the_arena_ever_allocates_has_an_identity() {
     // ADR-0014 D6: a generation starts at one. Slot zero at generation zero
     // packs to the value zero, which the identity cannot hold, and slot zero
@@ -52,7 +98,14 @@ fn the_first_entity_the_arena_ever_allocates_has_an_identity() {
         .expect("the first spawn must succeed");
     assert_eq!(first.index(), 0);
     assert_eq!(first.generation(), 1);
-    assert!(first.to_bits() != 0);
+    // The packed value of slot zero at generation zero is zero. Assert that
+    // the arena did not produce that packing. Asserting that the handle is
+    // non-zero cannot fail, because the handle wraps a non-zero integer.
+    assert_ne!(
+        (u64::from(first.generation()) << 32) | u64::from(first.index()),
+        0,
+        "the arena packed the one value the identity cannot hold",
+    );
     assert!(arena.contains(first));
     assert_eq!(arena.len(), 1);
     assert!(arena.check_invariants());
@@ -207,6 +260,19 @@ fn the_arena_refuses_a_faction_at_or_above_the_ceiling() {
     assert!(arena
         .spawn(Axial::new(0, 0), FactionId(FACTION_CEILING - 1))
         .is_ok());
+}
+
+#[test]
+fn a_dead_handle_with_a_bad_address_moves_nothing_and_is_not_an_error() {
+    // ADR-0014 D2: a dead identity resolves to nothing. A dead handle moves
+    // nothing whatever address it names, so the answer is Ok(false) and not
+    // an error about an address that was never going to be used.
+    let mut arena = arena();
+    let entity = arena
+        .spawn(Axial::new(0, 0), FactionId(0))
+        .expect("the spawn must succeed");
+    assert!(arena.despawn(entity));
+    assert_eq!(arena.place(entity, Axial::new(99, 99)), Ok(false));
 }
 
 #[test]

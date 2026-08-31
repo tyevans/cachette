@@ -140,6 +140,20 @@ pub struct SoldierArena {
     live_count: u32,
     /// The number of retired slots.
     retired_count: u32,
+    /// The number of structural changes that the arena has taken.
+    ///
+    /// A spawn, a despawn and a move each raise it by one. A derived
+    /// structure records the value it was built from, and it refuses a read
+    /// when the value has moved on. One fact in two places needs a check
+    /// that fails when the copies disagree.[^1]
+    ///
+    /// The counter is bookkeeping. It decides no later frame, so it does not
+    /// reach the state hash.
+    ///
+    /// # References
+    ///
+    /// [^1]: Recurring defect shapes, section 1. `.claude/rules/recurring-defects.md`
+    revision: u64,
 }
 
 impl SoldierArena {
@@ -169,6 +183,7 @@ impl SoldierArena {
             free: VecDeque::new(),
             live_count: 0,
             retired_count: 0,
+            revision: 0,
         }
     }
 
@@ -215,6 +230,19 @@ impl SoldierArena {
         self.retired_count
     }
 
+    /// Returns the number of structural changes that the arena has taken.
+    ///
+    /// A spawn, a despawn and a move each raise the count by one. A derived
+    /// structure reads it to find out whether it is still current.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0018, the unit-to-tile bridge is derived, and it rebuilds at the barrier, decision D3. `docs/adrs/accepted/adr-0018-the-unit-to-tile-bridge-is-derived-and-rebuilds-at-the-barrier.md`
+    #[must_use]
+    pub const fn revision(&self) -> u64 {
+        self.revision
+    }
+
     /// Adds a soldier and returns its identity.
     ///
     /// The arena takes the oldest free slot. It never takes the newest,
@@ -251,6 +279,7 @@ impl SoldierArena {
         self.tiles[index] = tile;
         self.factions[index] = faction;
         self.live_count += 1;
+        self.revision = self.revision.wrapping_add(1);
         Ok(Entity::new(slot, self.generations[index])
             .expect("a generation of one or more makes the identity non-zero"))
     }
@@ -287,8 +316,15 @@ impl SoldierArena {
             return false;
         };
         let index = slot as usize;
+        // The identity resolved, so the slot must be live. The check is local
+        // because the argument that it holds runs across three functions, and
+        // an underflow here wraps the count rather than failing.
+        if self.live[index] != 1 {
+            return false;
+        }
         self.live[index] = 0;
         self.live_count -= 1;
+        self.revision = self.revision.wrapping_add(1);
         if self.generations[index] == LAST_GENERATION {
             // The generation cannot advance, so the slot never returns. One
             // leaked slot beats two soldiers that share one identity.
@@ -362,14 +398,18 @@ impl SoldierArena {
     ///
     /// [^1]: ADR-0014, entity identity is an index plus a generation, decision D2. `docs/adrs/accepted/adr-0014-entity-identity-is-an-index-plus-a-generation.md`
     pub fn place(&mut self, entity: Entity, address: Axial) -> Result<bool, SoldierError> {
+        // Resolve the identity first. A dead handle moves nothing, whatever
+        // address it names, so it gives `Ok(false)` and not an error about an
+        // address that was never going to be used.[^1]
+        let Some(slot) = self.slot_of(entity) else {
+            return Ok(false);
+        };
         let tile = self
             .grid
             .index_of(address)
             .ok_or(SoldierError::TileOutsideWorld(address))?;
-        let Some(slot) = self.slot_of(entity) else {
-            return Ok(false);
-        };
         self.tiles[slot as usize] = tile;
+        self.revision = self.revision.wrapping_add(1);
         Ok(true)
     }
 
@@ -471,8 +511,26 @@ impl SoldierArena {
             }
         }
         // A free slot is never live, and it is never retired.
-        self.free.iter().all(|slot| {
+        if !self.free.iter().all(|slot| {
             self.live[*slot as usize] == 0 && self.generations[*slot as usize] != NO_GENERATION
+        }) {
+            return false;
+        }
+        // No slot appears in the free queue twice. A repeat hands one slot to
+        // two callers, which is the worst failure this structure has, and it
+        // is the one a caller can never detect from outside.
+        let mut queued = vec![0u8; slots];
+        for slot in &self.free {
+            let index = *slot as usize;
+            if index >= slots || queued[index] == 1 {
+                return false;
+            }
+            queued[index] = 1;
+        }
+        // Every slot is live, queued, or retired. A slot that is none of the
+        // three is lost, and nothing else would notice.
+        (0..slots).all(|slot| {
+            self.live[slot] == 1 || queued[slot] == 1 || self.generations[slot] == NO_GENERATION
         })
     }
 }
@@ -510,6 +568,51 @@ mod tests {
         assert_eq!(arena.retired_count(), 1);
         assert!(arena.free.is_empty());
         assert!(arena.check_invariants());
+    }
+
+    #[test]
+    fn a_despawn_of_a_slot_that_is_not_live_changes_nothing() {
+        // The public interface cannot reach this state, because an identity
+        // resolves only while its generation matches and the arena marks a
+        // slot live before it hands out the identity. The guard exists
+        // because the argument that it holds runs across three functions,
+        // and the failure it prevents is a count that wraps rather than a
+        // panic. The test constructs the state the interface cannot.
+        let mut arena = arena();
+        let entity = arena
+            .spawn(Axial::new(0, 0), FactionId(0))
+            .expect("the spawn must succeed");
+        arena.live[0] = 0;
+        assert!(!arena.despawn(entity));
+        assert_eq!(arena.len(), 1, "the live count must not wrap");
+    }
+
+    #[test]
+    fn a_free_queue_that_holds_one_slot_twice_fails_the_check() {
+        // One slot in the queue twice hands one slot to two callers. It is
+        // the worst failure this structure has, and a caller outside cannot
+        // detect it.
+        let mut arena = arena();
+        let entity = arena
+            .spawn(Axial::new(0, 0), FactionId(0))
+            .expect("the spawn must succeed");
+        assert!(arena.despawn(entity));
+        assert!(arena.check_invariants());
+        arena.free.push_back(0);
+        assert!(!arena.check_invariants());
+    }
+
+    #[test]
+    fn a_slot_that_is_neither_live_nor_queued_nor_retired_fails_the_check() {
+        // A lost slot is invisible: it is not live, so nothing reads it, and
+        // it is not queued, so nothing reuses it. The arena simply shrinks.
+        let mut arena = arena();
+        let entity = arena
+            .spawn(Axial::new(0, 0), FactionId(0))
+            .expect("the spawn must succeed");
+        assert!(arena.despawn(entity));
+        arena.free.clear();
+        assert!(!arena.check_invariants());
     }
 
     #[test]

@@ -1,7 +1,7 @@
 ---
 id: 0020
 title: Implement the unit-to-tile bridge
-status: refined
+status: complete
 created: 2026-08-30
 implements: [ADR-0007 D1, ADR-0004 D1, ADR-0004 D4]
 changes: []
@@ -73,7 +73,33 @@ the two disagree, and the invariant check is where it goes.
 
 ## Outcome
 
-Filled in on completion.
+`crates/cachette-core/src/bridge.rs` holds the bridge. It rebuilds at the
+barrier from a sort on a block-major key, through the existing key vector
+sort rather than a second one. The tie-break is the whole opaque identity,
+which is what ADR-0018 D3 asks for after its amendment. The arena is read in
+slot order and never reordered.
+
+The stale read is closed twice, and neither way is a comment. The arena
+counts its structural changes, the bridge records the count it was built
+from, and every read returns a typed error when the two disagree. Separately,
+a read borrows the arena and returns a slice of it, so the compiler refuses a
+spawn, a despawn or a move while a caller still holds a range.
+
+The invariant check compares every bridge key against the arena tile column,
+which is the guard against the second declaration site. Three unit tests
+prove it fails: a key moved within one block, a lost unit, and a short array.
+
+The review of item 0019 landed while this item ran, and its repairs are in
+the same commit. The one that mattered was live and passing: three faction
+ceilings existed and one was enforced. The arena refused a faction above the
+project ceiling, the invariant refused a tile faction above the world's own
+count, and nothing refused a soldier faction above it or a configured count
+above the project ceiling. The thread-count test was spawning soldiers of
+factions its world did not hold, and every check passed.
+
+Seven repairs from that review are applied. Each was checked by reverting it
+and confirming a test fails. The first attempt at the faction repair killed
+no test, because the fix had no test; that is what the check is for.
 
 ## References
 

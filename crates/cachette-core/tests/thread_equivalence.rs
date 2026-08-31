@@ -120,7 +120,11 @@ fn populate(world: &mut World) -> Vec<Entity> {
     let mut freed = Vec::new();
     for index in 0..grid.tile_count().min(97) {
         let address = Axial::new((index % grid.width()) as i32, (index / grid.width()) as i32);
-        let faction = FactionId((index % 5) as u16);
+        // The faction must be one the world has. This line read `index % 5`
+        // against a scenario of two factions, so the suite spawned soldiers
+        // of factions the world did not hold and the invariant check passed.
+        let ceiling = u32::from(world.config().faction_count.max(1));
+        let faction = FactionId((index % ceiling) as u16);
         let soldier = world
             .spawn_soldier(address, faction)
             .expect("the address and the faction must be valid");

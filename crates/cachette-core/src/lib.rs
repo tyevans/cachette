@@ -14,6 +14,7 @@
 //! [^2]: ADR-0002, simulated and aggregated state holds no floating point number, decision D2. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
 //! [^3]: ADR-0002, simulated and aggregated state holds no floating point number, decision D1. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
 
+pub mod bridge;
 pub mod event;
 pub mod hash;
 pub mod hex;
@@ -25,6 +26,7 @@ pub mod sort;
 pub mod types;
 pub mod world;
 
+pub use bridge::{BlockLayout, BlockRange, BridgeError, UnitTileBridge};
 pub use event::TileChanged;
 pub use hash::StateHash;
 pub use hex::{Axial, Grid, GridError};
