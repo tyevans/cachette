@@ -30,8 +30,9 @@
 //! [^1]: ADR-0067, the viewer reads the world and never writes to it, decision D2. `docs/adrs/draft/adr-0067-the-viewer-reads-the-world-and-never-writes-to-it.md`
 //! [^2]: ADR-0070, the head-up display reports what the drawing pass read, decision D1. `docs/adrs/draft/adr-0070-the-head-up-display-reports-what-the-drawing-pass-read.md`
 
+use cachette_core::pyramid::CellSummary;
 use cachette_core::terrain::{TileKind, KIND_COUNT};
-use cachette_core::{Axial, World};
+use cachette_core::{Axial, Fix32, World};
 
 use crate::metrics::Metrics;
 use crate::paint::{faction_colour, kind_colour, Camera, Canvas, COLOURED_FACTIONS};
@@ -97,6 +98,7 @@ pub struct Readout {
     blocks_skipped: u32,
     by_faction: [u32; COLOURED_FACTIONS],
     by_kind: [u32; KIND_COUNT],
+    region: Option<CellSummary>,
     step_mean: f64,
     step_worst: f64,
     draw_mean: f64,
@@ -144,6 +146,12 @@ impl Readout {
             blocks_skipped: canvas.blocks_skipped(),
             by_faction: *canvas.painted_by_faction(),
             by_kind: *canvas.painted_by_kind(),
+            // The level 1 cell that covers the tile under the middle of the
+            // window. The camera reports that tile, and the engine reports
+            // the cell. Neither number is the viewer's.
+            region: world.summary_covering(
+                camera.tile_at(canvas.width() as f32 / 2.0, canvas.height() as f32 / 2.0),
+            ),
             step_mean: metrics.step_mean_micros(),
             step_worst: metrics.step_worst_micros(),
             draw_mean: metrics.draw_mean_micros(),
@@ -211,6 +219,20 @@ impl Readout {
     #[must_use]
     pub const fn by_kind(&self) -> &[u32; KIND_COUNT] {
         &self.by_kind
+    }
+
+    /// Returns the level 1 summary of the region under the middle of the
+    /// window.
+    ///
+    /// The value is the engine's. The panel turns it into text and hands
+    /// nothing back.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0067, the viewer reads the world and never writes to it, decision D3. `docs/adrs/draft/adr-0067-the-viewer-reads-the-world-and-never-writes-to-it.md`
+    #[must_use]
+    pub const fn region(&self) -> Option<CellSummary> {
+        self.region
     }
 
     /// Returns the tiles the window shows, across and down.
@@ -339,6 +361,22 @@ impl Readout {
         }
         lines.push(Line::Bar);
 
+        // The region rows sit under their own heading, because a count of a
+        // region is a third kind of count beside a count of the world and a
+        // count of the window. A reader must tell them apart by the label.
+        if let Some(region) = self.region {
+            lines.extend([
+                Line::Rule,
+                Line::Heading("REGION UNDER THE CROSSHAIR"),
+                Line::Row("tiles", grouped(region.tiles().unsigned_abs())),
+                Line::Row("open ground", grouped(region.open_tiles().unsigned_abs())),
+                Line::Row("units here", grouped(region.units().unsigned_abs())),
+                Line::Row("units a tile", fraction(region.units_for_each_open_tile())),
+                Line::Row("open share", fraction(region.open_share())),
+                Line::Row("mean height", fraction(region.mean_height())),
+            ]);
+        }
+
         lines.push(Line::Rule);
         lines.push(Line::Heading("GROUND IN THE WINDOW"));
         // Every kind gets a row, including a kind the window does not hold.
@@ -380,6 +418,26 @@ impl Readout {
     /// with two factions gets a shorter panel than a world with six.
     fn height(&self) -> i32 {
         PAD * 2 + self.lines().iter().map(Line::height).sum::<i32>()
+    }
+}
+
+/// Returns a fixed-point reading as text, to two decimal places.
+///
+/// A reading that the engine could not give returns a dash rather than a
+/// zero. A mean over no tile is not zero, and printing it as zero gives a
+/// reader a number it cannot tell from a true one.[^1]
+///
+/// The conversion to a decimal happens here. Rendering is outside simulated
+/// state, and nothing formatted is handed back to the engine.[^2]
+///
+/// # References
+///
+/// [^1]: ADR-0024, every summary field is declared extensive or intensive, decision D5, a draft record. `docs/adrs/draft/adr-0024-every-summary-field-is-declared-extensive-or-intensive.md`
+/// [^2]: ADR-0067, the viewer reads the world and never writes to it, decision D3. `docs/adrs/draft/adr-0067-the-viewer-reads-the-world-and-never-writes-to-it.md`
+fn fraction(reading: Option<Fix32>) -> String {
+    match reading {
+        None => "-".to_string(),
+        Some(value) => format!("{:.2}", f64::from(value.0) / 65536.0),
     }
 }
 

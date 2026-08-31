@@ -39,7 +39,15 @@ const SOLDIERS: u32 = 2200;
 const FACTIONS: u16 = 4;
 
 /// The size of the window these tests draw into.
-const WINDOW: (usize, usize) = (640, 560);
+///
+/// The height matches the window the demonstration binary opens. A shorter
+/// canvas cuts the bottom of the panel off, and the panel then states a
+/// rectangle it did not paint. That is a real gap and a backlog item holds
+/// it; a fixture shorter than the real window would test the gap rather than
+/// the panel.[^1]
+///
+/// [^1]: Backlog item 0045. `docs/backlog/proposed/0045-the-panel-has-no-answer-for-a-short-window.md`
+const WINDOW: (usize, usize) = (640, 720);
 
 /// Builds a world far larger than the window, with soldiers spread over it.
 fn world() -> World {
@@ -760,5 +768,72 @@ fn the_ground_legend_follows_the_window_when_the_person_scrolls() {
         before,
         *second.by_kind(),
         "the ground legend said the same thing at two zoom levels, so it counts the world"
+    );
+}
+
+#[test]
+fn the_panel_states_the_region_under_the_crosshair() {
+    // Level 1 exists and only its own tests read it. A person watching the
+    // world sees tiles and units and no region, so the level the engine
+    // maintains every frame is invisible to the person it was built for.
+    let mut world = world();
+    let metrics = stepped(&mut world, 2);
+    let mut canvas = canvas();
+    let camera = at_the_middle(&world, &canvas);
+
+    let readout = draw_frame(&world, camera, &metrics, &mut canvas).expect("the world draws");
+    let region = readout
+        .region()
+        .expect("the middle of the world names a cell");
+
+    // The region is a region and not the window. A cell covers a block of
+    // tiles, and this world is far larger than one block, so the two counts
+    // must differ.
+    let (across, down) = readout.extent_shown();
+    assert!(
+        region.tiles() < i64::from(across) * i64::from(down),
+        "the region covers the window, so the panel reports one thing twice"
+    );
+    assert!(region.tiles() > 0, "the region covers no tile");
+
+    // The engine reports the cell that covers the tile the camera reports.
+    let under = world
+        .summary_covering(readout.centre())
+        .expect("the centre tile names a cell");
+    assert_eq!(
+        region, under,
+        "the panel reports a cell other than the one under the crosshair"
+    );
+}
+
+#[test]
+fn the_panel_reports_a_region_that_holds_units() {
+    // A section that always says zero would satisfy every assertion above and
+    // would show a person nothing. The world spreads units over the ground,
+    // so some cell holds one, and the crosshair must be able to find it.
+    let mut world = world();
+    let metrics = stepped(&mut world, 2);
+    let mut canvas = canvas();
+
+    let mut with_units = 0;
+    for step in 0..8 {
+        let camera = at_the_middle(&world, &canvas).stepped(step as f32 * 40.0, 0.0);
+        let readout = draw_frame(&world, camera, &metrics, &mut canvas).expect("the world draws");
+        if let Some(region) = readout.region() {
+            if region.units() > 0 {
+                with_units += 1;
+                // A cell that holds a unit holds open ground for it to stand
+                // on, so the intensive reading must exist rather than divide
+                // by nothing.
+                assert!(
+                    region.units_for_each_open_tile().is_some(),
+                    "a region holds units and reports no crowding"
+                );
+            }
+        }
+    }
+    assert!(
+        with_units > 0,
+        "no camera position found a region that holds a unit"
     );
 }
