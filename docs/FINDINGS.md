@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-049**
+**Next number: FND-053**
 
 ## A. Corrections to stated rules
 
@@ -939,6 +939,44 @@ determinism test cannot tell correct from consistently wrong, and that a
 determinism test must be able to fail. Those are properties of the assertion.
 This is a property of the input. An assertion strong enough to catch the
 defect still catches nothing when the data never produces it.
+
+### FND-052 — A register was restored from a copy, and an entry left silently
+
+**Believed.** A register is safe under parallel work as long as two writers do
+not edit the same rows. The merge is clean, so the content is correct.
+
+**True.** A clean merge says the two sides did not conflict. It says nothing
+about whether one side carried the whole file. A register restored from a copy
+of an older base loses every entry added between that base and now, and the
+loss looks exactly like a file that was never changed.
+
+**Evidence.** A reviewing agent ran a checkout in the shared working tree and
+moved a session off its branch mid-edit. Recovering meant copying
+`docs/FINDINGS.md` back from a saved copy, and that copy came from the other
+branch, whose base predated FND-049. The restored file therefore held a
+correct new entry and no FND-049. It merged cleanly, because the two sides
+never touched the same lines, and the entry was gone from the register for
+three merges.
+
+The register states the next free number in its own text, and that pointer
+still read FND-049 while three entries above it existed. Neither the loss nor
+the stale pointer failed anything.
+
+**Follows.** Three things.
+
+**A register carries its own allocator, and nothing checked it.** The findings,
+blockers and decisions registers each state a next number. That is a second
+declaration site for a value the rows already carry, which is the shape this
+project keeps finding. A check now fails when a number names two entries, and
+when the stated next number is not one above the highest.
+
+**A whole-file restore is a delete of everything it does not contain.** Copying
+a file back is not the same as restoring a change. Prefer the version control
+history to a saved copy, and name the commit the content came from.
+
+**A shared working tree is not safe for a reviewer.** The agent that caused
+this was reviewing, not writing, and it changed no tracked file. Running a
+checkout was enough. A reviewing agent gets its own worktree.
 
 ## References
 
