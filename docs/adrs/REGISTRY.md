@@ -252,6 +252,9 @@ without stating a constraint is worse than no record.
 | 0064 | A unit chooses by scoring a small fixed option set | Proposed | 0003, 0063 | 16 |
 | 0065 | A group is a site membership, not a region | Proposed | 0038, 0054 | 17 |
 | 0067 | The viewer reads the world and never writes to it | Draft | 0001, 0036 | — |
+| 0068 | Terrain is generated from the seed and is never stored as a map | Reserved | 0001, 0003, 0012 | — |
+| 0069 | Weather is a field the world integrates, never a table it reads | Reserved | 0058, 0068 | — |
+| 0070 | The viewer states what it reads and never derives a simulated value | Reserved | 0067 | — |
 
 ### Retired numbers
 

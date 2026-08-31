@@ -36,6 +36,9 @@ documents cite it.
 |---|---|---|---|---|
 | 0001 | A faction sees only what its own units observe | Shaped | Game developer | `shaped/prd-0001-a-faction-sees-only-what-it-observes.md` |
 | 0002 | A developer watches the world run | Shaped | Game developer | `shaped/prd-0002-a-developer-watches-the-world-run.md` |
+| 0003 | A developer sees a world worth looking at | Reserved | Game developer | — |
+| 0004 | The world has weather that a watcher can read | Reserved | Game developer | — |
+| 0005 | A watcher can tell what is happening and why | Reserved | Game developer | — |
 
 ## What does not belong in a record
 
