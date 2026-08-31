@@ -25,3 +25,21 @@ system holds for the frame it runs in.
 
 The threshold is content. Refine it as a register row with an assumption, in
 the way the admission pass count was.
+
+## Do not build this yet
+
+A unit has no plan. It draws a uniform direction from the keyed generator each
+frame, so a unit refused at one target draws a fresh direction on the next
+frame and does not repeat the choice that failed.
+
+The condition D5 exists for is a unit that keeps trying the same next tile,
+and that condition needs a plan. Building a rejection count now would add a
+column, a threshold and a lateral step that nothing needs, and the project has
+a name for that shape: a capability nobody invokes.[^1]
+
+**Refine this with the work that gives a unit a plan.** Until then D5 is
+unimplemented on purpose, and this item is the record of why.
+
+## References
+
+[^1]: Recurring defect shapes, shape 3. `.claude/rules/recurring-defects.md`

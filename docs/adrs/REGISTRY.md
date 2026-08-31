@@ -193,9 +193,9 @@ without stating a constraint is worse than no record.
 
 | No. | Claim | Status | Depends on | Source |
 |---|---|---|---|---|
-| 0022 | Level 0 is the only truth, and every level above it is derived | Proposed | 0012 | 02 |
-| 0023 | An aggregate combines exactly, in any order | Proposed | 0002, 0022 | 02 |
-| 0024 | Every summary field is declared extensive or intensive at registration | Proposed | 0023 | 02 |
+| 0022 | Level 0 is the only truth, and every level above it is derived | Draft | 0012 | 02 |
+| 0023 | An aggregate combines exactly, in any order | Draft | 0002, 0022 | 02 |
+| 0024 | Every summary field is declared extensive or intensive | Draft | 0023 | 02 |
 | 0025 | The pyramid carries two update paths, chosen by a threshold | Proposed | 0022, 0019 | 02 |
 | 0026 | The world holds two pyramids, not one | Proposed | 0022 | 02, 08 |
 | 0027 | The pyramid is the query index and the statistics catalogue | Proposed | 0022 | 02, 04 |
