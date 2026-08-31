@@ -256,6 +256,8 @@ without stating a constraint is worse than no record.
 | 0069 | Weather is a field the world integrates, never a table it reads | Reserved | 0058, 0068 | — |
 | 0070 | The head-up display reports what the drawing pass read | Accepted | 0067, 0018 | `accepted/adr-0070-the-head-up-display-reports-what-the-drawing-pass-read.md` |
 | 0071 | The bridge rebuild orders on one thread | Draft | 0001, 0004, 0007, 0018 | `draft/adr-0071-the-bridge-rebuild-orders-on-one-thread.md` |
+| 0072 | A tile stock is generated, and only what was taken is stored | Draft | 0002, 0003, 0068 | `draft/adr-0072-a-tile-stock-is-generated-and-only-what-was-taken-is-stored.md` |
+| 0073 | Gathering is admitted by sort-then-admit against the tile | Draft | 0004, 0018, 0056, 0072 | `draft/adr-0073-gathering-is-admitted-by-sort-then-admit-against-the-tile.md` |
 
 ### Retired numbers
 

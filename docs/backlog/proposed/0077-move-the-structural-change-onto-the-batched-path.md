@@ -40,4 +40,4 @@ did about it.[^4]
 [^1]: ADR-0066, entity storage holds four fixed shapes, decision D2. `docs/adrs/accepted/adr-0066-entity-storage-holds-four-fixed-shapes.md`
 [^2]: ADR Registry, row 0020. `docs/adrs/REGISTRY.md`
 [^3]: ADR-0014, entity identity is an index plus a generation, decision D3. `docs/adrs/accepted/adr-0014-entity-identity-is-an-index-plus-a-generation.md`
-[^4]: Findings register, FND-061. `docs/FINDINGS.md`
+[^4]: Findings register, FND-063. `docs/FINDINGS.md`

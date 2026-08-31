@@ -165,6 +165,6 @@ one open blocker governs cost figures, and this work states none.
 [^2]: Budgets and costs, the scale constants. `docs/reference/budgets.md`
 [^3]: Findings register, FND-040. `docs/FINDINGS.md`
 [^4]: Findings register, FND-043. `docs/FINDINGS.md`
-[^5]: Findings register, FND-061. `docs/FINDINGS.md`
+[^5]: Findings register, FND-063. `docs/FINDINGS.md`
 [^6]: Backlog item 0077. `docs/backlog/proposed/0077-move-the-structural-change-onto-the-batched-path.md`
 [^7]: Decision Record Scope, section 1. `.claude/rules/adr-scope.md`

@@ -27,6 +27,7 @@ use std::collections::VecDeque;
 
 use crate::hash::StateHash;
 use crate::hex::{Axial, Grid};
+use crate::resource::{Amount, CarryLoad, ResourceKind};
 use crate::types::{Entity, FactionId, TileIdx, FACTION_CEILING};
 
 /// The generation that means a slot carries no identity.
@@ -70,6 +71,25 @@ const NO_GENERATION: u32 = 0;
 ///
 /// [^1]: ADR-0014, entity identity is an index plus a generation, decision D6. `docs/adrs/accepted/adr-0014-entity-identity-is-an-index-plus-a-generation.md`
 const FIRST_GENERATION: u32 = 1;
+
+/// The gather order that means the soldier gathers nothing.
+///
+/// Any other value is the resource kind number plus one. One value therefore
+/// says both whether the soldier gathers and what it gathers, so no second
+/// column can disagree with this one.[^1]
+///
+/// # References
+///
+/// [^1]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`
+const NO_ORDER: u8 = 0;
+
+/// Returns the gather order that a column value names.
+const fn order_of(value: u8) -> Option<ResourceKind> {
+    if value == NO_ORDER {
+        return None;
+    }
+    ResourceKind::from_u8(value - 1)
+}
 
 /// The largest generation that a slot can hold.
 ///
@@ -168,6 +188,21 @@ pub struct SoldierArena {
     tiles: Vec<TileIdx>,
     /// The faction of each slot.
     factions: Vec<FactionId>,
+    /// What the soldier in each slot carries.
+    ///
+    /// The load is part of the soldier shape, so it is a column of this arena
+    /// and not a side table keyed on the identity.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0073, gathering is admitted by sort-then-admit against the tile, decision D4, a draft record. `docs/adrs/draft/adr-0073-gathering-is-admitted-by-sort-then-admit-against-the-tile.md`
+    carries: Vec<CarryLoad>,
+    /// The gather order of each slot.
+    ///
+    /// The value zero means the soldier gathers nothing. Any other value is
+    /// the kind number plus one. The column holds a small integer and not an
+    /// option, because it is plain data that reaches the state hash.
+    orders: Vec<u8>,
     /// The free slots, oldest first.
     free: VecDeque<u32>,
     /// The number of live soldiers.
@@ -215,6 +250,8 @@ impl SoldierArena {
             live: Vec::new(),
             tiles: Vec::new(),
             factions: Vec::new(),
+            carries: Vec::new(),
+            orders: Vec::new(),
             free: VecDeque::new(),
             live_count: 0,
             retired_count: 0,
@@ -328,6 +365,14 @@ impl SoldierArena {
         self.live[index] = 1;
         self.tiles[index] = tile;
         self.factions[index] = faction;
+        // A reused slot starts empty because the despawn emptied it, and the
+        // arena invariant fails when a dead slot carries anything. A second
+        // reset here would be one fact in two places, and it would read back
+        // correctly while the copy that matters was wrong.[^3]
+        //
+        // [^3]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`
+        debug_assert_eq!(self.carries[index], CarryLoad::EMPTY);
+        debug_assert_eq!(self.orders[index], NO_ORDER);
         self.live_count += 1;
         self.revision = self.revision.wrapping_add(1);
         Ok(Entity::new(slot, self.generations[index])
@@ -344,6 +389,8 @@ impl SoldierArena {
         self.live.push(0);
         self.tiles.push(TileIdx(0));
         self.factions.push(FactionId(0));
+        self.carries.push(CarryLoad::EMPTY);
+        self.orders.push(NO_ORDER);
         Ok(slot)
     }
 
@@ -373,6 +420,13 @@ impl SoldierArena {
             return false;
         }
         self.live[index] = 0;
+        // The load leaves with the soldier. The caller reads it before the
+        // despawn and records where it went, because what leaves a tile must
+        // arrive somewhere exactly.[^3]
+        //
+        // [^3]: ADR-0072, a tile stock is generated, and only what was taken is stored, decision D5, a draft record. `docs/adrs/draft/adr-0072-a-tile-stock-is-generated-and-only-what-was-taken-is-stored.md`
+        self.carries[index] = CarryLoad::EMPTY;
+        self.orders[index] = NO_ORDER;
         self.live_count -= 1;
         self.revision = self.revision.wrapping_add(1);
         if self.generations[index] == LAST_GENERATION {
@@ -501,6 +555,74 @@ impl SoldierArena {
         &self.factions
     }
 
+    /// Returns the whole carry column.
+    #[must_use]
+    pub fn carry_column(&self) -> &[CarryLoad] {
+        &self.carries
+    }
+
+    /// Returns the whole gather order column.
+    #[must_use]
+    pub fn order_column(&self) -> &[u8] {
+        &self.orders
+    }
+
+    /// Returns what one soldier carries.
+    ///
+    /// Returns `None` when the identity is dead.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0014, entity identity is an index plus a generation, decision D2. `docs/adrs/accepted/adr-0014-entity-identity-is-an-index-plus-a-generation.md`
+    #[must_use]
+    pub fn carry(&self, entity: Entity) -> Option<CarryLoad> {
+        let slot = self.slot_of(entity)?;
+        Some(self.carries[slot as usize])
+    }
+
+    /// Adds an amount to what one soldier carries.
+    ///
+    /// Returns `false` when the identity is dead. The gather resolve is the
+    /// only caller, so the visibility stays inside the crate: a load that a
+    /// caller could raise on its own would break conservation in silence.
+    ///
+    /// A load is not a structural fact, so it does not raise the revision. The
+    /// derived unit structure maps a tile to the units on it, and a load moves
+    /// no unit.
+    pub(crate) fn add_carry(&mut self, entity: Entity, kind: ResourceKind, amount: Amount) -> bool {
+        let Some(slot) = self.slot_of(entity) else {
+            return false;
+        };
+        let index = slot as usize;
+        self.carries[index] = self.carries[index].with(kind, amount);
+        true
+    }
+
+    /// Returns the gather order of one soldier.
+    ///
+    /// The outer option reports whether the identity is live. The inner one
+    /// reports whether the soldier gathers.
+    #[must_use]
+    pub fn gather_order(&self, entity: Entity) -> Option<Option<ResourceKind>> {
+        let slot = self.slot_of(entity)?;
+        Some(order_of(self.orders[slot as usize]))
+    }
+
+    /// Sets the gather order of one soldier.
+    ///
+    /// Returns `false` when the identity is dead. An order of `None` stops the
+    /// soldier gathering.
+    pub fn set_gather_order(&mut self, entity: Entity, kind: Option<ResourceKind>) -> bool {
+        let Some(slot) = self.slot_of(entity) else {
+            return false;
+        };
+        self.orders[slot as usize] = match kind {
+            Some(kind) => kind.to_u8() + 1,
+            None => NO_ORDER,
+        };
+        true
+    }
+
     /// Absorbs the soldier columns into the state hash.
     ///
     /// The hash covers every byte that decides a later frame. It therefore
@@ -518,6 +640,8 @@ impl SoldierArena {
             .write_u64(u64::from(self.retired_count))
             .write(bytemuck::cast_slice(&self.tiles))
             .write(bytemuck::cast_slice(&self.factions))
+            .write(bytemuck::cast_slice(&self.carries))
+            .write(&self.orders)
             .write(&self.live);
         for generation in &self.generations {
             hash = hash.write(&generation.to_le_bytes());
@@ -541,6 +665,26 @@ impl SoldierArena {
     pub fn check_invariants(&self) -> bool {
         let slots = self.generations.len();
         if self.live.len() != slots || self.tiles.len() != slots || self.factions.len() != slots {
+            return false;
+        }
+        if self.carries.len() != slots || self.orders.len() != slots {
+            return false;
+        }
+        // An order names a kind the catalogue holds, or it names nothing. A
+        // number outside the catalogue would read as a kind that the resolve
+        // cannot serve, and the soldier would then gather nothing without any
+        // caller asking for that.
+        if self
+            .orders
+            .iter()
+            .any(|order| *order != NO_ORDER && ResourceKind::from_u8(*order - 1).is_none())
+        {
+            return false;
+        }
+        // A dead slot carries nothing. The world returns a dead soldier's load
+        // to the register that records what left the world, so a load left in
+        // a dead slot would be counted twice.
+        if (0..slots).any(|slot| self.live[slot] == 0 && self.carries[slot] != CarryLoad::EMPTY) {
             return false;
         }
         if self.live.iter().filter(|live| **live == 1).count() != self.live_count as usize {
