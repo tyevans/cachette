@@ -35,7 +35,9 @@ use crate::rng;
 use crate::sim_math;
 use crate::slots::Slots;
 use crate::soldier::{SoldierArena, SoldierError};
-use crate::sort::{self, BoundedKey, SortError};
+#[cfg(not(feature = "probe-nondeterminism"))]
+use crate::sort;
+use crate::sort::{BoundedKey, SortError};
 use crate::terrain::{Terrain, TerrainTile, TileKind};
 use crate::types::{Accum, Entity, FactionId, Fix32, Tick, TileIdx, FACTION_CEILING};
 
@@ -897,6 +899,53 @@ impl TileCounts {
     }
 }
 
+/// Returns the order in which admission reads the intents.
+///
+/// The order is the key vector sort: by target tile, then by the identity of
+/// the unit.[^1] It depends on the key values alone, so it is the same at any
+/// thread count.[^2]
+///
+/// # Errors
+///
+/// Returns an error when the sort refuses the keys.
+///
+/// # References
+///
+/// [^1]: ADR-0056, movement is tile-discrete and admitted by sort-then-admit, decision D3. `docs/adrs/accepted/adr-0056-movement-is-tile-discrete-and-admitted-by-sort-then-admit.md`
+/// [^2]: ADR-0001, one binary gives one answer at any thread count, decision D5. `docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
+#[cfg(not(feature = "probe-nondeterminism"))]
+fn admission_order(keys: &[BoundedKey], ceiling: u64) -> Result<Vec<u32>, SortError> {
+    sort::order_bounded(keys, ceiling)
+}
+
+/// Returns the intents in the order they arrived, which is a defect.
+///
+/// This is the perturbed build. Admission reads the joined intent list rather
+/// than the sorted one, so who enters a full tile depends on the order the
+/// slots were joined in. The slot probe reverses that order, and the reversal
+/// is visible only above one thread, so the thread-count test then fails.
+///
+/// The whole point is that it must fail. A determinism test with no proven
+/// failure mode is decoration.[^1]
+///
+/// # Errors
+///
+/// Never. The signature matches the sound build so that the caller does not
+/// change.
+///
+/// # References
+///
+/// [^1]: Testing rules, section 1. `.claude/rules/testing.md`
+#[cfg(feature = "probe-nondeterminism")]
+fn admission_order(keys: &[BoundedKey], _ceiling: u64) -> Result<Vec<u32>, SortError> {
+    // A stable sort by the target alone. Each target still owns one
+    // contiguous segment, which admission requires to scan a segment at all,
+    // and within a segment the order is the order the intents arrived in.
+    let mut order: Vec<u32> = (0..keys.len() as u32).collect();
+    order.sort_by_key(|position| keys[*position as usize].order());
+    Ok(order)
+}
+
 /// One target tile and the run of intents that name it.
 ///
 /// The table is built once for a frame. The capacity and the occupancy are
@@ -1000,7 +1049,7 @@ fn admit(
         keys.push(BoundedKey::new(u64::from(index.0), entity.to_bits()));
     }
     let ceiling = u64::from(grid.tile_count().saturating_sub(1));
-    let order = sort::order_bounded(&keys, ceiling)?;
+    let order = admission_order(&keys, ceiling)?;
 
     // The sorted intents, as a tile beside the intent it belongs to. The
     // passes walk this rather than following the permutation into the keys,
