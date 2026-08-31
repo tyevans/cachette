@@ -247,7 +247,7 @@ without stating a constraint is worse than no record.
 | 0059 | Fog storage grows with observed area, not with world area | Proposed | 0026, 0053 | 08 |
 | 0060 | An influence map is stored as a shared basis, not one plane per faction | Proposed | 0053, 0058 | 09 |
 | 0061 | Trade solves a flow, never a path for each cart | Proposed | 0049, 0058 | 11 |
-| 0062 | Production and upkeep are rates attached to a site | Proposed | 0055 | 12 |
+| 0062 | Production and upkeep are rates attached to a site | Draft | 0055 | 12, `draft/adr-0062-production-and-upkeep-are-rates-attached-to-a-site.md` |
 | 0063 | A need is a rate with a threshold, and crossing it is a fact | Proposed | 0032, 0062 | 15 |
 | 0064 | A unit chooses by scoring a small fixed option set | Proposed | 0003, 0063 | 16 |
 | 0065 | A group is a site membership, not a region | Proposed | 0038, 0054 | 17 |

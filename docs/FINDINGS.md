@@ -1425,6 +1425,63 @@ That is what the item needed, and it holds today.
 arena follows the soldier arena, and the backlog holds the item that moves both
 to the batched path when the record exists.
 
+### FND-064 — A settings struct with public fields prices every new parameter
+
+**Believed.** A new parameter of the world belongs in the settings struct that
+builds the world. The struct is the one place a caller states what a world is,
+so a schedule period belongs there beside the extent and the seed.
+
+**True.** The struct has public fields and no constructor, so every caller
+builds it with a struct literal. Adding one field therefore breaks every
+literal in the tree at once, in three crates and in the Python type stub. The
+work that met this was told to keep its edits inside the core crate and to
+leave the viewer alone. The settings struct made that impossible.
+
+**Evidence.** The site rate work added a period and a phase to the settings
+struct. The compiler then refused twenty-five files, including the viewer, the
+Python binding and the type stub, none of which have anything to say about an
+economy. The work moved the schedule to a default on the world and a setter
+beside it, and the tree compiled unchanged.
+
+**Follows.** Two things.
+
+**A settings struct with public fields is an interface, and adding to it is a
+breaking change.** Treat it as one. A parameter that only one subsystem reads
+does not have to sit there.
+
+**Say who must state a value.** The extent and the seed have no default, so a
+caller must state them. A cadence has a recommended value, so a caller may
+leave it. A value of the second kind belongs on the object with a default and a
+setter, not in the constructor argument.
+
+### FND-065 — A conservation check over a column must name the structural moments
+
+**Believed.** A store column conserves when the sum over the column equals what
+the rates put in, minus what the rates took out. The rate pass is the only
+thing that writes a store, so the sum and the ledger must agree.
+
+**True.** The rate pass is not the only thing that moves the sum. The arena
+leaves the store of a destroyed settlement in the dead slot, and it clears the
+store when a founding reuses that slot. The sum over the whole column therefore
+falls at a founding, and the sum over the live slots falls at a loss. Neither
+fall came from a rate, and a check that knew only the ledger reports a leak
+that nothing leaked.
+
+**Evidence.** The settlement arena clears a store at the founding and not at
+the loss. That is correct: clearing at the founding is what stops a slot from
+handing its holding to its successor. It means the store of a dead slot is a
+residue and not a holding, and a conservation check has to say which of the two
+it is reading.
+
+**Follows.** State the structural moments, and adjust the account at each one.
+The account of what the live stores hold moves at four places: a write from the
+control plane, the loss of a settlement, the rate pass, and nowhere else. The
+check then fails when a fifth place appears, which is what a check is for.
+
+**A conservation check is not a determinism test, and it catches what no
+determinism test can.** A rule that leaks the same amount on every run repeats
+perfectly at every thread count.
+
 ### FND-066 — A constant stated a rule that a comparison already stated
 
 **Believed.** The rule that spreads a holding needs a constant that adds to the
