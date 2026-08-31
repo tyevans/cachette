@@ -44,6 +44,13 @@ reads the diff against every governing record, decision by decision, and
 against the recurring-defect shapes. It reports findings; it does not fix
 them. The author decides what to do with each one and says so.
 
+**A review writes a file.** Both reviews deliver a file under the review
+directory, and the file is the deliverable.[^6] A reviewer that reports only
+by message delivers nothing when the message does not arrive, and a missing
+message looks exactly like a message that says nothing is wrong. This
+happened on the first attempt: four reviewers ran, none delivered, and the
+work went forward on one reading while the log said it had two.
+
 **Retrospective.** Run after the review. Record what to change in the next
 sprint. A correction that the project believed goes to the findings
 register, not here.[^4]
@@ -161,6 +168,7 @@ is precedent, and precedent does not live in a sprint log.
 [^3]: Blockers register. `docs/BLOCKERS.md`
 [^4]: Findings register. `docs/FINDINGS.md`
 [^5]: ADR Registry, who reviews. `docs/adrs/REGISTRY.md`
+[^6]: Reviews index. `docs/reviews/README.md`
 
 ### Sprint 2 — planning
 
