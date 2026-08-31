@@ -228,7 +228,7 @@ impl World {
             soldiers,
             bridge,
             terrain,
-            pyramid: Pyramid::new(layout, terrain, 1)?,
+            pyramid: Pyramid::new(layout, terrain)?,
         };
         // A world that has never stepped still answers a question about a
         // region. A level that nothing rebuilt would describe an empty world
