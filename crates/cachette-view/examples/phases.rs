@@ -18,6 +18,12 @@
 //! [^1]: ADR-0005, a solver runs a fixed iteration count, never a convergence test, decision D2. `docs/adrs/accepted/adr-0005-a-solver-runs-a-fixed-iteration-count.md`
 //! [^2]: Blockers register, BLK-007. `docs/BLOCKERS.md`
 
+// An example is its own crate, so the allowance at the viewer's crate root
+// does not reach it. The reason is the same one: ADR-0067 D3 puts the float
+// boundary at the viewer, and a mean of measured microseconds is a report,
+// never a simulated value.
+#![allow(clippy::disallowed_types)]
+
 use cachette_core::{Axial, FactionId, World, WorldConfig};
 use cachette_view::Lap;
 
