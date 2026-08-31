@@ -1,7 +1,7 @@
 ---
 id: 0037
 title: Check the panel layout against a stored picture
-status: refined
+status: complete
 created: 2026-08-30
 implements: [ADR-0067 D1, ADR-0070 D1]
 changes: []
@@ -88,7 +88,32 @@ row that differs, and states the command that writes the stored picture again.
 
 ## Outcome
 
-Filled in when the item moves to `complete/`.
+The work landed as planned. Nothing in the impact review changed.
+
+A test draws the whole frame into two canvases, one with the panel and one
+without it. It turns the difference into a picture of characters, and it
+compares that picture against a file. It reads the expected picture and never
+computes it.
+
+The measurement type gained a constructor that states its figures instead of
+reading a clock. The wall clock span now has one declaration site, so the
+running source and the fixed source cannot disagree.
+
+The image writer moved out of the example into the viewer crate. The example
+and the failure path of the test now share it.
+
+Three defects were put back into the source, one at a time, to prove the test
+can fail. Two of the three passed every other test in the crate. The commit
+body names them and says how many tests caught each.
+
+One property of the picture is worth stating, because it decides when a person
+must look at it. The picture holds no ground colour, so a change to the
+terrain colours leaves it alone. It does hold the counts the panel prints, so a
+change to what the window holds does change it. That is a change to what the
+panel says, and a person must read it before writing the picture again.
+
+No register entry moved. The work opened no blocker, closed none, and
+corrected nothing the project believed.
 
 ## References
 

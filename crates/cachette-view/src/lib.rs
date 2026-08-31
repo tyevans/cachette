@@ -40,6 +40,7 @@
 pub mod hud;
 pub mod metrics;
 pub mod paint;
+pub mod picture;
 pub mod text;
 
 pub use hud::Readout;
