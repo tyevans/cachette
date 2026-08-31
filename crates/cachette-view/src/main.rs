@@ -32,14 +32,21 @@ const WINDOW_HEIGHT: usize = 720;
 ///
 /// [^1]: PRD-0002, a developer watches the world run. `docs/product/shaped/prd-0002-a-developer-watches-the-world-run.md`
 const DEMO: WorldConfig = WorldConfig {
-    width: 40,
-    height: 28,
+    width: 200,
+    height: 140,
     seed: 0x0cac_4e77_e5ee_d001,
     faction_count: 4,
 };
 
 /// The number of soldiers the demonstration spawns.
-const SOLDIERS: u32 = 220;
+const SOLDIERS: u32 = 2200;
+
+/// The stride that spreads the soldiers over the tiles.
+///
+/// The value is a prime that divides none of the factors of the tile count,
+/// so the placement visits a new tile each time until it has visited them
+/// all. The arithmetic is exact, so the same run reproduces.
+const SPREAD: u32 = 9973;
 
 /// The reason the demonstration stopped.
 #[derive(Debug)]
@@ -78,15 +85,54 @@ impl std::error::Error for DemoError {}
 fn populate(world: &mut World) -> Result<(), DemoError> {
     let grid = world.grid();
     let factions = world.config().faction_count.max(1);
+    let tiles = grid.tile_count().max(1);
     for index in 0..SOLDIERS {
-        let q = (index * 7 % grid.width()) as i32;
-        let r = (index * 5 % grid.height()) as i32;
+        let tile = index.wrapping_mul(SPREAD) % tiles;
+        let q = (tile % grid.width()) as i32;
+        let r = (tile / grid.width()) as i32;
         let faction = FactionId((index % u32::from(factions)) as u16);
         world
             .spawn_soldier(Axial::new(q, r), faction)
             .map_err(DemoError::Soldier)?;
     }
     Ok(())
+}
+
+/// Reads the keyboard and returns the camera the person asked for.
+///
+/// The camera, the scroll position and the zoom belong to the viewer. None
+/// of them is pushed into the world.[^1]
+///
+/// # References
+///
+/// [^1]: ADR-0067, the viewer reads the world and never writes to it, decision D2. `docs/adrs/draft/adr-0067-the-viewer-reads-the-world-and-never-writes-to-it.md`
+fn steer(camera: Camera, window: &Window, world: &World, canvas: &Canvas) -> Camera {
+    let mut camera = camera;
+    if window.is_key_down(Key::Minus) {
+        camera = camera.zoomed_out(canvas);
+    }
+    if window.is_key_down(Key::Equal) {
+        camera = camera.zoomed_in(canvas);
+    }
+
+    // One press moves the view by one and a half tiles, in each direction
+    // the person is holding.
+    let mut across = 0.0;
+    let mut down = 0.0;
+    if window.is_key_down(Key::Left) || window.is_key_down(Key::A) {
+        across -= 1.5;
+    }
+    if window.is_key_down(Key::Right) || window.is_key_down(Key::D) {
+        across += 1.5;
+    }
+    if window.is_key_down(Key::Up) || window.is_key_down(Key::W) {
+        down -= 1.5;
+    }
+    if window.is_key_down(Key::Down) || window.is_key_down(Key::S) {
+        down += 1.5;
+    }
+
+    camera.stepped(across, down).clamped(world, canvas)
 }
 
 fn main() -> Result<(), DemoError> {
@@ -99,7 +145,10 @@ fn main() -> Result<(), DemoError> {
     populate(&mut world)?;
 
     let mut canvas = Canvas::new(WINDOW_WIDTH, WINDOW_HEIGHT);
-    let camera = Camera::fitting(&world, &canvas);
+    // The world is larger than the window, so the camera shows a part of it
+    // at a legible tile size. The person scrolls to see the rest. The camera
+    // is the viewer's own value and never reaches the engine.
+    let mut camera = Camera::opening().clamped(&world, &canvas);
 
     let mut window = Window::new(
         "cachette — watch the world run",
@@ -119,6 +168,7 @@ fn main() -> Result<(), DemoError> {
         DEMO.height,
         world.soldiers().len()
     );
+    println!("arrow keys or WASD scroll, minus and equals zoom");
     println!("close the window or press escape to stop");
 
     // The clock is read here and nowhere that decides anything. The engine
@@ -126,6 +176,8 @@ fn main() -> Result<(), DemoError> {
     let mut metrics = Metrics::start();
 
     while window.is_open() && !window.is_key_down(Key::Escape) {
+        camera = steer(camera, &window, &world, &canvas);
+
         let at = Lap::start();
         world.step(threads).map_err(DemoError::Step)?;
         metrics.step(at.elapsed());

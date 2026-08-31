@@ -19,7 +19,33 @@ Write a test that proves the test can fail. Perturb the seed or the iteration
 order behind a test-only switch, and assert that the determinism test then
 fails. A determinism test with no proven failure mode is decoration.
 
-## 2. Do not assert on time
+## 2. A determinism test cannot tell correct from consistently wrong
+
+The two determinism tests prove that a run repeats. They say nothing about
+whether the run was right.
+
+A defect that is itself deterministic passes both of them. A random draw
+keyed on the wrong field draws the same wrong value on every thread, on every
+run, on every machine. The thread-count test compares two runs and finds them
+identical, because they are.
+
+This has happened once. A movement system keyed its draw on the slot index
+rather than the entity identity, and on the frame count not at all. Both
+defects survived every movement test. Only the golden state hash caught them,
+and it caught them by accident: the hash changed because the behaviour
+changed, not because anything checked the key.
+
+**Test what the value depends on, not only that it repeats.** For a keyed
+draw, that means a test for each field of the key: change the field, and the
+draw must change. Two tests closed the case above. A soldier that takes the
+same step twelve times proves the frame is in the key. A soldier respawned
+into one slot at a later generation, drawing the same direction as the
+soldier that died there, proves the identity is in the key.
+
+A golden file is not this test. It notices that something changed. It cannot
+say which input the output stopped depending on.
+
+## 3. Do not assert on time
 
 Never assert on wall clock time, on elapsed duration, or on a thread finishing
 first. A timing assertion is flaky on a loaded machine, and it teaches everyone
@@ -30,7 +56,7 @@ Measure performance in a benchmark. A benchmark does not gate a merge.
 Benchmark on the target platform. The development machines have a different
 cache line size, so a local measurement misleads on false sharing.[^3]
 
-## 3. Prefer a property to an example
+## 4. Prefer a property to an example
 
 The simulation rules are algebraic. State the property.
 
@@ -42,7 +68,7 @@ The simulation rules are algebraic. State the property.
 Record the seed of every failing property run in the test output, so that a
 reader can repeat the failure.
 
-## 4. Drive the real caller
+## 5. Drive the real caller
 
 A test that builds a mechanism and exercises it proves that the mechanism works.
 It does not prove that anything reaches the mechanism.
@@ -54,7 +80,7 @@ ships inert.
 Ask who must invoke this: the user of the library, or the engine. If the engine
 must invoke it, the test starts at the engine.
 
-## 5. Test at the public interface
+## 6. Test at the public interface
 
 New behaviour needs a test that goes through the public interface. A test that
 reaches into a private field pins the implementation, not the behaviour.

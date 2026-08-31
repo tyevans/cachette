@@ -27,7 +27,7 @@ because arrival order is thread order.
 A derived bridge structure answers which units stand on a tile. The bridge
 is rebuilt at each barrier, so a system that moves a unit does not maintain
 it.[^5] The unit arena itself is never sorted, because the slot index is half
-of the entity identity.[^11]
+of the entity identity.[^14]
 
 ## Decision
 
@@ -43,32 +43,67 @@ unclamped accumulator overflows and enters the state hash.[^6]
 
 ### D2. A move is an intent, and a separate admission step grants it
 
-A unit does not move itself. It writes an intent record. The intent names
-the source tile, the target tile, and the unit's stable key. Writing the
-intent is a pure read of the world.
+A unit does not move itself. It writes an intent, and an intent names the
+unit and the tile it wants. Writing the intent is a pure read of the world.
+
+The intent carries no source tile. The arena already holds where a unit
+stands, and the identity is how admission reads it. A second copy of the
+source tile is one fact in two places, with nothing that fails when the two
+disagree.
 
 A later step admits the intents. The two steps never interleave, so no unit
 sees a half-applied world.
 
 ### D3. Admission sorts by a stable key, then admits in that order
 
-The admission step runs four ordered sub-steps.
+Admission sorts the intents by target tile, then by the unit's identity.
+Each target tile then owns one contiguous segment, and the segments are
+disjoint. The sort is the engine's key vector sort, and the identity is the
+final key field, so no two intents tie.[^7]
 
-1. Reduce the intents by source tile. This gives the departure count of
-   each tile.
-2. Sort the intents by target tile, then by the unit's stable key. Each
-   target tile then owns one contiguous segment.
-3. Admit the intents of a segment in their sorted order, until the target
-   tile reaches its capacity. The departure count of the target tile
-   releases room in the same tick. Reject the remaining intents.
-4. Write the accepted positions, then the departures, then the arrivals.
+Admission then scans each segment in its sorted order and admits until the
+target tile reaches its capacity.
 
-The sort is the engine's stable integer sort. The key ends in a unique
-identifier, so no two intents tie.[^7] The segments are disjoint, so the
-admission scan runs in parallel without an atomic operation.
+**Admission reads the occupancy of a target tile from the derived
+unit-to-tile structure**, which the barrier rebuilt before the intents were
+drawn.[^13] It does not carry a per-tile array of its own. A dense array over
+every tile would be faster and would be a second declaration of where units
+stand, and no record chooses one.
 
-Sub-step 1 is not an optimisation. Without it a column of units in a
-corridor blocks itself, because the tile ahead still looks full.
+**A unit that leaves a tile releases room in that tile, and only an admitted
+departure counts.** An intent is not a departure. A unit that intends to
+leave and is then rejected at its own target has not left, so the room it
+appeared to release was never released.
+
+The distinction is the whole of this decision, and getting it wrong is
+invisible. Take three tiles in a line. The middle tile and the far tile are
+both full. The unit in the middle intends to move to the far tile and is
+rejected. The unit in the first tile is admitted into the middle tile on the
+strength of a departure that never happened, and the middle tile ends the
+tick above its capacity.
+
+**That failure is deterministic.** The same intents give the same wrong
+answer at every thread count, so the thread-count test passes and the state
+hash matches its golden file. Neither determinism test can see a capacity
+violation. Only a test that asserts the invariant can.[^11]
+
+**Admission runs a fixed number of passes.** Each pass admits what it can
+against the room that the previous pass confirmed. A pass admits no unit that
+a previous pass admitted. The count is content, declared before the frame
+runs, and the engine never runs to a fixpoint: a fixpoint needs a convergence
+test, and a solver in this project runs a fixed count.[^12]
+
+The project rejects the alternative of ordering the tiles so that a departure
+always precedes an arrival. No such order exists. Two units that swap
+adjacent tiles each release room for the other, and a ring of units around a
+closed path does the same. A cycle has no admissible order.
+
+**A departure is applied after the scan, not inside it.** The segments are
+disjoint by target tile, so every write addressed to a target tile is free of
+contention. A write addressed to a source tile is not: the units leaving one
+tile are scattered across many segments, because they chose different
+targets. Departures are therefore a separate reduction over the admitted set,
+keyed on the source tile.
 
 ### D4. Capacity is a data-driven property of the terrain
 
@@ -79,10 +114,13 @@ The capacity of a crossing terrain is higher than the capacity of ordinary
 terrain. That difference is a design lever, and the movement calibration
 depends on it.[^8]
 
-This record states no capacity value. The values follow from the tile
-scale, and the scale constants table holds them.[^9] [^10] The count array
-that stores the occupancy of a tile bounds the capacity, because the count
-is one byte for each tile.
+This record states no capacity value. The values follow from the tile scale,
+and the scale constants table holds them.[^9] [^10]
+
+This record does not decide how the engine stores an occupancy count, and no
+record does. Whether occupancy is read from the derived structure or held in
+a dense array over every tile is a storage decision, and the work that needs
+it writes the record.[^13]
 
 ### D5. A rejected unit is not stuck
 
@@ -121,4 +159,7 @@ capacity literal in the movement kernel violates D4.
 [^8]: Findings register, FND-037, a crossing time needs the terrain multiplier. `docs/FINDINGS.md`
 [^9]: Blockers register, BLK-001 and BLK-009, both resolved. `docs/BLOCKERS.md`
 [^10]: Budgets and costs, the scale constants. `docs/reference/budgets.md`
-[^11]: ADR-0014, entity identity is an index plus a generation. `docs/adrs/accepted/adr-0014-entity-identity-is-an-index-plus-a-generation.md`
+[^12]: ADR-0005, a solver runs a fixed iteration count, never a convergence test. `docs/adrs/accepted/adr-0005-a-solver-runs-a-fixed-iteration-count.md`
+[^13]: ADR-0018, the unit-to-tile bridge is derived, and it rebuilds at the barrier. `docs/adrs/accepted/adr-0018-the-unit-to-tile-bridge-is-derived-and-rebuilds-at-the-barrier.md`
+[^11]: Testing Rules, a determinism test cannot tell correct from consistently wrong. `.claude/rules/testing.md`
+[^14]: ADR-0014, entity identity is an index plus a generation. `docs/adrs/accepted/adr-0014-entity-identity-is-an-index-plus-a-generation.md`

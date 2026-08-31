@@ -243,7 +243,6 @@ without stating a constraint is worse than no record.
 | 0054 | An entity belongs to one of three tiers, declared at creation | Proposed | 0012, 0043 | 14, 15, 16 |
 | 0055 | An effective stat comes from an ordered modifier pipeline | Proposed | 0002, 0054 | 12 |
 | 0056 | Movement is tile-discrete and admitted by sort-then-admit | Draft | 0004, 0018 | 06, 10 |
-| 0057 | A long path follows a portal graph and a flow tile, never a per-unit search | Draft | 0056 | 10 |
 | 0058 | A field update is a flux pair on an edge, so quantity is conserved exactly | Proposed | 0023, 0029 | 13 |
 | 0059 | Fog storage grows with observed area, not with world area | Proposed | 0026, 0053 | 08 |
 | 0060 | An influence map is stored as a shared basis, not one plane per faction | Proposed | 0053, 0058 | 09 |
@@ -256,7 +255,32 @@ without stating a constraint is worse than no record.
 
 ### Retired numbers
 
-None yet. A retired number is never reused.
+A retired number is never reused. The row states what the number held and why
+the project stopped holding it.
+
+| No. | Held | Retired because |
+|---|---|---|
+| 0057 | A long path follows a portal graph and a flow tile | It described a subsystem nobody had built, for a need nobody had stated |
+
+**A retired number is mentioned, never cited.** Write it in a code span. A
+citation says "follow this for the claim", and a retired record holds no
+claim to follow. The citation check enforces this, and it caught the first
+attempt.
+
+**ADR-0057 was never accepted and nothing cited it.** It specified a portal
+graph, a flow tile cache and a coarse biasing field, in detail, before any
+path-finding existed and before a product record asked for a long path. It
+failed the first condition of the scope test in the strongest way: there was
+no decision to preserve, because nothing had chosen anything.
+
+The research that supports it is not lost. Report 10 holds the reasoning, and
+a future record that needs a long path starts from the report and takes a
+fresh number.
+
+The project keeps this row because retiring a number is the cheap outcome and
+the row is what makes it cheap. A reader who finds a citation of ADR-0057 in
+an old branch learns here that it went, and why, rather than concluding the
+registry lost a record.
 
 ## Source reports
 

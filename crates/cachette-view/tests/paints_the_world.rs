@@ -283,3 +283,216 @@ fn the_metrics_count_what_happened() {
     // count, which is the shape a dropped frame would give.
     metrics.report(96, 12, 2);
 }
+
+/// The width of the large world these tests scroll around.
+const WIDE: u32 = 200;
+/// The height of the large world these tests scroll around.
+const TALL: u32 = 140;
+
+/// Builds a world far larger than any window in these tests.
+///
+/// The soldiers spread over the tiles by an exact stride, so the same call
+/// gives the same world every time.
+fn large_world() -> World {
+    let mut world = World::new(WorldConfig {
+        width: WIDE,
+        height: TALL,
+        seed: 11,
+        faction_count: 4,
+    })
+    .expect("a large extent describes a world");
+    let tiles = world.grid().tile_count();
+    for index in 0..2200u32 {
+        let tile = index.wrapping_mul(9973) % tiles;
+        let at = Axial::new((tile % WIDE) as i32, (tile / WIDE) as i32);
+        world
+            .spawn_soldier(at, FactionId((index % 4) as u16))
+            .expect("the address and the faction are valid");
+    }
+    world
+}
+
+#[test]
+fn a_small_window_reads_far_fewer_tiles_than_the_world_holds() {
+    // PRD-0002: what the viewer reads follows the window, not the world. A
+    // painter that looped over every tile would paint 28000 of them here.
+    let world = large_world();
+    let mut canvas = Canvas::new(240, 180);
+    let camera = Camera::opening().clamped(&world, &canvas);
+
+    paint::draw(&world, camera, &mut canvas);
+
+    let held = world.grid().tile_count();
+    let painted = canvas.tiles_painted();
+    assert!(painted > 0, "the draw painted no tile at all");
+    assert!(
+        painted * 10 < held,
+        "the draw read {painted} tiles of {held}, so the cost follows the world",
+    );
+}
+
+#[test]
+fn a_wider_window_reads_more_tiles_than_a_narrow_one() {
+    // The count must follow the window. A fixed count would satisfy the test
+    // above by reading one tile.
+    let world = large_world();
+    let mut small = Canvas::new(160, 120);
+    let mut large = Canvas::new(480, 360);
+    let camera = Camera::opening();
+
+    paint::draw(&world, camera, &mut small);
+    paint::draw(&world, camera, &mut large);
+
+    assert!(
+        large.tiles_painted() > small.tiles_painted() * 2,
+        "a window nine times the area read {} tiles against {}",
+        large.tiles_painted(),
+        small.tiles_painted(),
+    );
+}
+
+#[test]
+fn panning_changes_what_is_drawn() {
+    // Scrolling must move the world. A camera that ignored the offset would
+    // draw the same picture wherever the person went.
+    let world = large_world();
+    let mut here = Canvas::new(240, 180);
+    let mut there = Canvas::new(240, 180);
+    let camera = Camera::opening().clamped(&world, &here);
+    let moved = camera.panned(300.0, 200.0).clamped(&world, &there);
+
+    paint::draw(&world, camera, &mut here);
+    paint::draw(&world, moved, &mut there);
+
+    assert_ne!(
+        here.pixels(),
+        there.pixels(),
+        "a pan of 300 by 200 pixels changed no pixel",
+    );
+}
+
+#[test]
+fn panning_reads_a_different_part_of_the_world() {
+    // The pixels could differ while the painter still read the same tiles.
+    // A soldier count on a far part of the world proves the read moved.
+    let world = large_world();
+    let mut canvas = Canvas::new(240, 180);
+    let camera = Camera::opening().clamped(&world, &canvas);
+
+    paint::draw(&world, camera, &mut canvas);
+    let corner = canvas.soldiers_painted();
+
+    let far = camera.panned(1200.0, 900.0).clamped(&world, &canvas);
+    paint::draw(&world, far, &mut canvas);
+
+    assert!(far.origin_x < camera.origin_x, "the pan moved no origin");
+    assert!(
+        canvas.soldiers_painted() > 0,
+        "the panned view showed no soldier, so it left the world",
+    );
+    assert_ne!(
+        corner,
+        canvas.soldiers_painted(),
+        "the corner and a distant part of the world held the same soldiers",
+    );
+}
+
+#[test]
+fn a_camera_scrolled_far_away_draws_without_a_panic() {
+    // A person can hold a key. The viewer must survive an offset far beyond
+    // the world, in either direction.
+    let world = large_world();
+    let mut canvas = Canvas::new(240, 180);
+    let base = Camera::opening();
+
+    for (across, down) in [
+        (1.0e9_f32, 1.0e9_f32),
+        (-1.0e9_f32, -1.0e9_f32),
+        (1.0e9_f32, -1.0e9_f32),
+        (0.0, 1.0e9_f32),
+    ] {
+        paint::draw(&world, base.panned(across, down), &mut canvas);
+    }
+}
+
+#[test]
+fn the_clamp_keeps_the_world_on_the_screen() {
+    // A person who scrolls too far must be able to scroll back. The clamp
+    // is what makes that true, so it must still show world.
+    let world = large_world();
+    let mut canvas = Canvas::new(240, 180);
+    let base = Camera::opening();
+
+    for (across, down) in [
+        (1.0e6_f32, 1.0e6_f32),
+        (-1.0e6_f32, -1.0e6_f32),
+        (1.0e6_f32, -1.0e6_f32),
+        (-1.0e6_f32, 1.0e6_f32),
+    ] {
+        let held = base.panned(across, down).clamped(&world, &canvas);
+        paint::draw(&world, held, &mut canvas);
+        assert!(
+            canvas.tiles_painted() > 0,
+            "a clamped camera at {across} by {down} showed no world",
+        );
+    }
+}
+
+#[test]
+fn an_unclamped_camera_can_lose_the_world() {
+    // The test above proves nothing unless the clamp is what saves it.
+    let world = large_world();
+    let mut canvas = Canvas::new(240, 180);
+    let loose = Camera::opening().panned(-1.0e6, -1.0e6);
+
+    paint::draw(&world, loose, &mut canvas);
+
+    assert_eq!(
+        canvas.tiles_painted(),
+        0,
+        "an unclamped camera far outside the world still found tiles",
+    );
+}
+
+#[test]
+fn a_zoom_holds_the_middle_of_the_window() {
+    // A zoom that threw away what the person was looking at is not a zoom.
+    let world = large_world();
+    let canvas = Canvas::new(240, 180);
+    let camera = Camera::opening().clamped(&world, &canvas);
+
+    let closer = camera.zoomed(2.0, &canvas);
+    assert!(
+        closer.tile_width > camera.tile_width,
+        "the zoom did not act"
+    );
+
+    // The tile under the middle before must sit under the middle after.
+    let middle = camera.tile_at(120.0, 90.0);
+    let after = closer.centre_of(middle);
+
+    assert!((after.0 - 120.0).abs() < closer.tile_width);
+    assert!((after.1 - 90.0).abs() < closer.tile_height);
+}
+
+#[test]
+fn a_soldier_outside_the_window_is_not_painted() {
+    // The soldier pass reads every soldier, because the arena has no spatial
+    // index. It must still not write pixels for one that cannot be seen.
+    let world = large_world();
+    let mut canvas = Canvas::new(240, 180);
+    let camera = Camera::opening().clamped(&world, &canvas);
+
+    paint::draw(&world, camera, &mut canvas);
+
+    let live = world.soldiers().len();
+    assert!(
+        canvas.soldiers_painted() > 0,
+        "no soldier reached the canvas"
+    );
+    assert!(
+        canvas.soldiers_painted() < live / 4,
+        "the draw painted {} soldiers of {live}",
+        canvas.soldiers_painted(),
+    );
+}

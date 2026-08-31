@@ -374,3 +374,67 @@ viewer record rather than left implicit.
 **Order.** 0024 first, because it states what the viewer may not do. Then
 0022, which is engine work and touches no viewer code. Then 0025 and 0026,
 which share the new crate and run serially.
+
+### Sprint 4 — review
+
+**Goal met.** One command opens a window, the hex world appears in it, and
+entities move on it under random behaviour while a developer watches. The
+project owner ran it: 1374 ticks, a clean exit, and a printed state hash.
+
+| Item | Outcome |
+|---|---|
+| 0024 | ADR-0067, five decisions, the viewer boundary stated |
+| 0022 | Movement from a keyed draw, through the arena |
+| 0025 | The painter, and the skew that the engine does not apply |
+| 0026 | The demonstration binary, and metrics on exit |
+
+**Eight of the nine checkable statements in the product record hold.** The
+ninth does not: no tile holds more entities than its capacity allows. Nothing
+enforces capacity yet, so soldiers stack without limit.
+
+### Sprint 4 — retrospective
+
+**What worked.** The mutation check, for the fourth sprint running, and this
+time on prose-free ground. It found that drawing no soldiers at all killed no
+test, so the product record's "entities appear on the world" had no test.
+Eleven tests had passed with entities invisible.
+
+**What the agents found that the process did not.** The movement agent
+discovered that its first two mutations were killed only by the golden state
+hash, because a wrongly keyed draw is exactly as deterministic as a correctly
+keyed one. **A determinism test cannot tell correct from consistently
+wrong.** That sentence is worth more than the fix, and it belongs in the
+testing rule rather than in a sprint log.
+
+**What went wrong, and it was procedural.** Five commits were made to a
+branch after its pull request had merged, so the mainline did not have them
+while the sprint log said the work was done. The working tree had moved to
+the mainline and the commits had not. Nothing was lost, and the report was
+wrong for about an hour.
+
+The rule that follows is small: **a branch ends when its pull request
+merges.** Start a new branch from the mainline, and never add to a merged
+one.
+
+**A number that was reported without being measured.** The gate was described
+as taking up to thirty minutes, because a defensive timeout was quoted as if
+it were a duration. It takes about twenty six seconds. The project owner
+asked, and the answer took one command that nobody had run.
+
+### Sprint 5 — planning
+
+**Goal.** No tile holds more soldiers than its capacity allows, and the
+determinism tests cover every system that now exists.
+
+**Committed.** Items 0021, 0023, 0027 and 0028.
+
+**Why these.** Item 0023 closes the last of the nine statements in the product
+record. Item 0021 must come first, because 0023 implements ADR-0056 and that
+record is still a draft with dependencies that changed underneath it. Items
+0027 and 0028 close the sequence out.
+
+**Balance.** Record work is 0021. Code work is 0023 and 0027. Item 0028 is
+the review and the registers.
+
+**Order.** 0021 alone, then 0023, then 0027, then 0028. All of them touch the
+core, so none of them runs beside another.
