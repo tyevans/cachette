@@ -22,6 +22,7 @@
 //! [^6]: Testing policy. `docs/TESTING.md`
 
 use cachette_core::bridge::BLOCK_BITS_CEILING;
+use cachette_core::sort::{self, SortKey};
 use cachette_core::{
     Axial, BlockLayout, BridgeError, Entity, FactionId, Grid, SoldierArena, UnitTileBridge, World,
     WorldConfig,
@@ -39,8 +40,6 @@ const WIDTH: u32 = 10;
 const HEIGHT: u32 = 9;
 /// The block edge exponent that the tests partition by. Four tiles.
 const BLOCK_BITS: u32 = 2;
-/// The thread counts that every rebuild runs at.
-const THREAD_COUNTS: [usize; 3] = [1, 2, 12];
 
 /// Builds the world shape that the tests use.
 fn grid() -> Grid {
@@ -130,7 +129,7 @@ fn a_bridge_refuses_an_arena_it_was_not_built_from() {
 
     let layout = BlockLayout::new(grid, BLOCK_BITS).expect("the exponent is inside the ceiling");
     let mut bridge = UnitTileBridge::new(layout);
-    bridge.rebuild(&first, 1).expect("the rebuild must succeed");
+    bridge.rebuild(&first).expect("the rebuild must succeed");
 
     assert!(bridge.on_tile(&first, Axial::new(0, 0)).is_ok());
     assert_eq!(
@@ -169,7 +168,7 @@ fn a_read_after_a_move_is_refused_rather_than_answered() {
         .spawn(Axial::new(1, 1), FactionId(0))
         .expect("the spawn must succeed");
     let mut bridge = bridge();
-    bridge.rebuild(&arena, 1).expect("the rebuild must succeed");
+    bridge.rebuild(&arena).expect("the rebuild must succeed");
     assert_eq!(bridge.on_tile(&arena, Axial::new(1, 1)), Ok(&[soldier][..]));
 
     assert_eq!(arena.place(soldier, Axial::new(9, 8)), Ok(true));
@@ -187,7 +186,7 @@ fn a_read_after_a_move_is_refused_rather_than_answered() {
         Err(BridgeError::Stale { .. })
     ));
 
-    bridge.rebuild(&arena, 1).expect("the rebuild must succeed");
+    bridge.rebuild(&arena).expect("the rebuild must succeed");
     assert_eq!(bridge.on_tile(&arena, Axial::new(1, 1)), Ok(&[][..]));
     assert_eq!(bridge.on_tile(&arena, Axial::new(9, 8)), Ok(&[soldier][..]));
 }
@@ -196,7 +195,7 @@ fn a_read_after_a_move_is_refused_rather_than_answered() {
 fn a_spawn_and_a_despawn_each_make_the_bridge_stale() {
     let mut arena = SoldierArena::new(grid());
     let mut bridge = bridge();
-    bridge.rebuild(&arena, 1).expect("the rebuild must succeed");
+    bridge.rebuild(&arena).expect("the rebuild must succeed");
     let soldier = arena
         .spawn(Axial::new(2, 2), FactionId(0))
         .expect("the spawn must succeed");
@@ -205,7 +204,7 @@ fn a_spawn_and_a_despawn_each_make_the_bridge_stale() {
         Err(BridgeError::Stale { .. })
     ));
 
-    bridge.rebuild(&arena, 1).expect("the rebuild must succeed");
+    bridge.rebuild(&arena).expect("the rebuild must succeed");
     assert!(arena.despawn(soldier));
     assert!(matches!(
         bridge.on_tile(&arena, Axial::new(2, 2)),
@@ -217,7 +216,7 @@ fn a_spawn_and_a_despawn_each_make_the_bridge_stale() {
 fn a_bridge_over_another_world_is_refused() {
     let arena = SoldierArena::new(Grid::new(4, 4).expect("a small extent describes a grid"));
     let mut bridge = bridge();
-    assert_eq!(bridge.rebuild(&arena, 1), Err(BridgeError::GridMismatch));
+    assert_eq!(bridge.rebuild(&arena), Err(BridgeError::GridMismatch));
     assert_eq!(
         bridge.on_tile(&arena, Axial::new(0, 0)),
         Err(BridgeError::GridMismatch)
@@ -228,7 +227,7 @@ fn a_bridge_over_another_world_is_refused() {
 fn an_address_outside_the_world_is_refused() {
     let arena = SoldierArena::new(grid());
     let mut bridge = bridge();
-    bridge.rebuild(&arena, 1).expect("the rebuild must succeed");
+    bridge.rebuild(&arena).expect("the rebuild must succeed");
     let outside = Axial::new(WIDTH as i32, 0);
     assert_eq!(
         bridge.on_tile(&arena, outside),
@@ -243,13 +242,6 @@ fn a_block_edge_above_the_ceiling_is_refused() {
         BlockLayout::new(grid(), bits),
         Err(BridgeError::BlockBitsAboveCeiling(bits))
     );
-}
-
-#[test]
-fn a_rebuild_at_zero_threads_is_refused() {
-    let arena = SoldierArena::new(grid());
-    let mut bridge = bridge();
-    assert!(bridge.rebuild(&arena, 0).is_err());
 }
 
 #[test]
@@ -292,13 +284,93 @@ fn the_keys_of_one_block_hold_one_run_of_the_key_space() {
 }
 
 #[test]
+fn the_key_ceiling_bounds_every_tile_key_at_every_block_edge() {
+    // The bounded order takes the ceiling and derives its pass count from it,
+    // so a ceiling below a real key would refuse a legal world.[^1] The
+    // exponent runs over a range, because a test at one exponent cannot see a
+    // defect in how the exponent enters the derivation.
+    //
+    // [^1]: ADR-0071, the bridge rebuild orders on one thread, decision D1. `docs/adrs/draft/adr-0071-the-bridge-rebuild-orders-on-one-thread.md`
+    for block_bits in 0..=6 {
+        let layout =
+            BlockLayout::new(grid(), block_bits).expect("the exponent is inside the ceiling");
+        let ceiling = layout.key_ceiling();
+        let mut highest = 0u64;
+        for index in 0..grid().tile_count() {
+            let key = layout
+                .key_of(cachette_core::TileIdx(index))
+                .expect("every tile has a key");
+            assert!(
+                key <= ceiling,
+                "the key {key} of a tile lies above the ceiling {ceiling} at exponent {block_bits}"
+            );
+            highest = highest.max(key);
+        }
+        assert!(
+            ceiling >= highest,
+            "the ceiling {ceiling} is below the highest key {highest}"
+        );
+    }
+}
+
+#[test]
+fn a_block_aligned_world_reaches_its_key_ceiling_and_still_rebuilds() {
+    // The extent of the other tests does not divide by the block edge, so no
+    // tile there carries the ceiling itself. A world that divides evenly
+    // does, and the rebuild must accept it.
+    let world = Grid::new(8, 8).expect("the extent describes a world");
+    let layout = BlockLayout::new(world, 2).expect("the exponent is inside the ceiling");
+    let highest = (0..world.tile_count())
+        .map(|index| {
+            layout
+                .key_of(cachette_core::TileIdx(index))
+                .expect("every tile has a key")
+        })
+        .max()
+        .expect("the world holds a tile");
+    assert_eq!(highest, layout.key_ceiling());
+
+    let mut arena = SoldierArena::new(world);
+    arena
+        .spawn(Axial::new(7, 7), FactionId(0))
+        .expect("the spawn must succeed");
+    let mut bridge = UnitTileBridge::new(layout);
+    bridge
+        .rebuild(&arena)
+        .expect("a tile at the ceiling must not refuse the rebuild");
+    assert_eq!(bridge.len(), 1);
+}
+
+#[test]
+fn a_world_rebuilds_at_every_block_edge() {
+    // The rebuild derives its ceiling from the partition. A rebuild that
+    // refuses a legal world would show here and nowhere else, because every
+    // other test uses one exponent.
+    let arena = populate(40);
+    for block_bits in 0..=6 {
+        let layout =
+            BlockLayout::new(grid(), block_bits).expect("the exponent is inside the ceiling");
+        let mut bridge = UnitTileBridge::new(layout);
+        bridge
+            .rebuild(&arena)
+            .expect("the rebuild must succeed at every exponent");
+        assert_eq!(bridge.len(), arena.len() as usize);
+        for ordinal in 0..(WIDTH * HEIGHT) {
+            let place = address(ordinal);
+            let held = bridge.on_tile(&arena, place).expect("the bridge is fresh");
+            assert_eq!(held, by_scan(&arena, place).as_slice());
+        }
+    }
+}
+
+#[test]
 fn an_empty_block_carries_a_clear_bit_and_an_empty_answer() {
     let mut arena = SoldierArena::new(grid());
     arena
         .spawn(Axial::new(0, 0), FactionId(0))
         .expect("the spawn must succeed");
     let mut bridge = bridge();
-    bridge.rebuild(&arena, 1).expect("the rebuild must succeed");
+    bridge.rebuild(&arena).expect("the rebuild must succeed");
     let layout = bridge.layout();
 
     let held = layout
@@ -414,7 +486,7 @@ proptest! {
     fn the_bridge_holds_exactly_the_live_soldiers(count in 0u32..120) {
         let arena = populate(count);
         let mut bridge = bridge();
-        bridge.rebuild(&arena, 1).expect("the rebuild must succeed");
+        bridge.rebuild(&arena).expect("the rebuild must succeed");
 
         prop_assert!(bridge.check_structure());
         prop_assert_eq!(bridge.check_invariants(&arena), Ok(true));
@@ -433,7 +505,7 @@ proptest! {
     fn a_per_tile_query_gives_what_a_scan_gives(count in 0u32..90) {
         let arena = populate(count);
         let mut bridge = bridge();
-        bridge.rebuild(&arena, 1).expect("the rebuild must succeed");
+        bridge.rebuild(&arena).expect("the rebuild must succeed");
 
         let mut total = 0usize;
         for ordinal in 0..(WIDTH * HEIGHT) {
@@ -446,49 +518,60 @@ proptest! {
         prop_assert_eq!(total, arena.len() as usize);
     }
 
-    /// The rebuild gives one answer at every thread count.
+    /// The rebuild gives what the general key vector sort gives.
     ///
-    /// The population shares tiles, so the identity tie-break is what fixes
-    /// the order inside a tile.[^1]
+    /// The bridge orders by a radix sort on the bounded tile key.[^1] The
+    /// general sort compares a key vector of two fields. The two are separate
+    /// algorithms over one definition of the order, so this property holds
+    /// them together. It fails when either one drifts.
+    ///
+    /// The test rebuilds the key vector from the public layout, so it does
+    /// not read a private field of the bridge.
     ///
     /// # References
     ///
-    /// [^1]: ADR-0018, the unit-to-tile bridge is derived, and it rebuilds at the barrier, decision D3. `docs/adrs/accepted/adr-0018-the-unit-to-tile-bridge-is-derived-and-rebuilds-at-the-barrier.md`
+    /// [^1]: ADR-0071, the bridge rebuild orders on one thread, decision D1. `docs/adrs/draft/adr-0071-the-bridge-rebuild-orders-on-one-thread.md`
     #[test]
-    fn the_bridge_is_identical_at_every_thread_count(count in 12u32..120) {
+    fn the_rebuild_gives_what_the_general_sort_gives(count in 12u32..120) {
         let arena = populate(count);
+
+        // The population must share a tile, or no key ties and the step that
+        // orders a tied run never runs. A fixture that supplies no extreme
+        // measures itself.[^2]
+        //
+        // [^2]: Testing Rules, a uniform input hides a defect. `.claude/rules/testing.md`
         let mut shared = 0usize;
         for ordinal in 0..(WIDTH * HEIGHT) {
             shared = shared.max(by_scan(&arena, address(ordinal)).len());
         }
         prop_assert!(shared > 1, "the population must share a tile");
 
-        let mut first = bridge();
-        first.rebuild(&arena, THREAD_COUNTS[0]).expect("the rebuild must succeed");
-        let expected: Vec<Vec<Entity>> = (0..(WIDTH * HEIGHT))
-            .map(|ordinal| {
-                first
-                    .on_tile(&arena, address(ordinal))
-                    .expect("the bridge is fresh")
-                    .to_vec()
+        let mut bridge = bridge();
+        bridge.rebuild(&arena).expect("the rebuild must succeed");
+        prop_assert_eq!(bridge.check_invariants(&arena), Ok(true));
+
+        let layout = bridge.layout();
+        let units: Vec<Entity> = arena.iter().collect();
+        let keys: Vec<SortKey<2>> = units
+            .iter()
+            .map(|unit| {
+                let tile = arena.tile_column()[unit.index() as usize];
+                let key = layout.key_of(tile).expect("the tile is inside the world");
+                SortKey::new([key, unit.to_bits()])
             })
             .collect();
+        let order = sort::order(&keys).expect("the identities are unique");
+        let expected: Vec<Entity> = order.iter().map(|index| units[*index as usize]).collect();
 
-        for threads in &THREAD_COUNTS[1..] {
-            let mut other = bridge();
-            other.rebuild(&arena, *threads).expect("the rebuild must succeed");
-            prop_assert_eq!(other.check_invariants(&arena), Ok(true));
-            for ordinal in 0..(WIDTH * HEIGHT) {
-                let held = other
-                    .on_tile(&arena, address(ordinal))
-                    .expect("the bridge is fresh");
-                prop_assert_eq!(held, expected[ordinal as usize].as_slice());
-            }
-            for block in 0..other.layout().block_count() {
-                prop_assert_eq!(other.block_range(block), first.block_range(block));
-                prop_assert_eq!(other.block_is_occupied(block), first.block_is_occupied(block));
+        let mut held: Vec<Entity> = Vec::new();
+        for block in 0..layout.block_count() {
+            if let Some(range) = bridge.block_range(block) {
+                let inside = bridge.in_block(&arena, block).expect("the bridge is fresh");
+                prop_assert_eq!(inside.len(), range.length as usize);
+                held.extend_from_slice(inside);
             }
         }
+        prop_assert_eq!(held, expected);
     }
 
     /// A rebuild from the same columns gives the same arrays.
@@ -497,9 +580,9 @@ proptest! {
         let arena = populate(count);
         let mut once = bridge();
         let mut twice = bridge();
-        once.rebuild(&arena, 3).expect("the rebuild must succeed");
-        twice.rebuild(&arena, 3).expect("the rebuild must succeed");
-        twice.rebuild(&arena, 1).expect("the rebuild must succeed");
+        once.rebuild(&arena).expect("the rebuild must succeed");
+        twice.rebuild(&arena).expect("the rebuild must succeed");
+        twice.rebuild(&arena).expect("the rebuild must succeed");
         for ordinal in 0..(WIDTH * HEIGHT) {
             let place = address(ordinal);
             prop_assert_eq!(
@@ -522,7 +605,7 @@ proptest! {
     fn a_block_range_holds_exactly_the_units_inside_the_block(count in 0u32..90) {
         let arena = populate(count);
         let mut bridge = bridge();
-        bridge.rebuild(&arena, 2).expect("the rebuild must succeed");
+        bridge.rebuild(&arena).expect("the rebuild must succeed");
         let layout = bridge.layout();
 
         let mut total = 0usize;
@@ -555,7 +638,7 @@ proptest! {
     fn the_bitplane_marks_the_occupied_blocks(count in 0u32..60) {
         let arena = populate(count);
         let mut bridge = bridge();
-        bridge.rebuild(&arena, 2).expect("the rebuild must succeed");
+        bridge.rebuild(&arena).expect("the rebuild must succeed");
         let layout = bridge.layout();
 
         let mut occupied = vec![false; layout.block_count() as usize];

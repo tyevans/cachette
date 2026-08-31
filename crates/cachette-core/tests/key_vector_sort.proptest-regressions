@@ -6,3 +6,4 @@
 # everyone who runs the test benefits from these saved cases.
 cc 9038eca30c481e44417d1e696fbcc53bbd4ef3e7bcb7a2433a30145cb866efc1 # shrinks to keys = [SortKey { fields: [0, 0, 0] }, SortKey { fields: [0, 0, 1] }]
 cc 239aa77915b383cd0f2d6e15a0509759427f1037d481f19d95901797016a36fb # shrinks to keys = [SortKey { fields: [0, 0, 0] }, SortKey { fields: [0, 0, 1] }]
+cc 5e66fdf93f45c6d8859be5dd369f2b632c86105617145f5060b76934136a4087 # shrinks to keys = [BoundedKey { order: 33216, identifier: 2 }, BoundedKey { order: 33216, identifier: 1 }]
