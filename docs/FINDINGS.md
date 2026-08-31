@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-061**
+**Next number: FND-062**
 
 ## A. Corrections to stated rules
 
@@ -1304,6 +1304,41 @@ shape's only local instance was a numbering collision in a register. This one
 is in the engine.
 
 
+### FND-061 — A refined item asked for a path that no record and no code held
+
+**Believed.** A backlog item that adds an entity shape can require the founding
+and the loss of that shape to go through the batched structural path. The
+storage record states that a structural change is a move between column sets,
+and that the batched tombstone and compact path applies to it.[^2] [^18]
+
+**True.** No batched structural path exists. The record that would define it
+holds a reserved registry row and no file, so the claim the item cites is a
+number and not a decision.[^14] The one arena that exists edits its columns at
+once, inside the call. An item cannot honour a path that nothing has written.
+
+**Evidence.** The settlement arena was written against the item, and the item
+asked for the batched path in its list of checkable statements. The soldier
+arena, which the same storage record governs and which the project accepted,
+spawns and despawns inside the call. Building the settlement arena on a
+different path would have made the two shapes disagree, with no record that
+says which is right.
+
+**Follows.** Three things.
+
+**A cited decision that has no file cannot gate an item.** Read the registry
+status of every record an item names before the item is refined. A reserved row
+reserves a number and does not promise a record.[^14] This is the same shape as
+the registry finding, seen from the backlog rather than from the registry.[^19]
+
+**The identity rule carries the weight the batched path was asked to carry.**
+The generation advances when the arena frees the slot, so a destroyed entity
+loses its identity at the moment it dies, whatever path the change took.[^20]
+That is what the item needed, and it holds today.
+
+**State the gap in the item, and open a row for the work.** The settlement
+arena follows the soldier arena, and the backlog holds the item that moves both
+to the batched path when the record exists.
+
 ## References
 
 [^1]: Findings register, FND-038, in this document.
@@ -1323,3 +1358,6 @@ is in the engine.
 [^15]: Findings register, FND-047, in this document.
 [^16]: Decision Record Scope, section 1. `.claude/rules/adr-scope.md`
 [^17]: Recurring Defect Shapes, shape 2. `.claude/rules/recurring-defects.md`
+[^18]: ADR-0066, entity storage holds four fixed shapes, decision D2. `docs/adrs/accepted/adr-0066-entity-storage-holds-four-fixed-shapes.md`
+[^19]: Findings register, FND-058, in this document.
+[^20]: ADR-0014, entity identity is an index plus a generation, decision D3. `docs/adrs/accepted/adr-0014-entity-identity-is-an-index-plus-a-generation.md`
