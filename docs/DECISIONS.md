@@ -481,6 +481,54 @@ columns should write that row.[^DEC16] The backlog holds the item.[^DEC17]
 
 **Assumption in the meantime:** option A.
 
+### DEC-030 — Is the founding the only way to people a world?
+
+**Decided. It is one of two ways.** The founding is a call a caller makes. The
+direct spawn stays as it is, and every fixture that spawns a unit keeps
+working.
+
+The alternative was to make the founding the only entry, and to remove the
+direct spawn or to hide it. That was rejected for three reasons.
+
+The founding is built on the direct spawn. A founding that placed a unit by
+some other route would be a second write path into one arena, which is the
+first recurring defect shape.[^DEC18]
+
+A test needs to place a unit where the test chooses. A fixture that must ask
+the engine where to put its units cannot build the extreme the assertion needs,
+and a fixture that supplies no extreme measures itself.[^DEC19]
+
+Every golden file would be re-recorded, and a re-recorded golden file proves
+nothing about the change that caused it. A new scenario for a founded world is
+the cheaper and the stronger test, because the old files stay as the control.
+
+**What follows.** No existing fixture changes and no existing golden file
+moves. The founding adds one scenario and one golden file. The demonstration
+binary founds a run rather than spawning a full world, because the
+demonstration is what a watcher looks at.
+
+### DEC-031 — What does a founding score read?
+
+**Decided for now. It reads the ground and the stock the ground carries.**
+
+The founding happens before the first frame, so the only properties that exist
+are the ones the seed fixes. The score therefore reads the terrain kind of a
+place, the food and the wood and the stone within a small radius of it, how
+much of that radius admits a unit, and whether open water touches it.
+
+The product record says plainly that it does not decide which properties make
+a place good, and it names water, food, high ground and reachable ground as
+candidates.[^DEC20] This row records the set that was taken, so that a later
+change to it is a change to something written down.
+
+**What is not in the score.** Nothing that a run produces. No faction holding,
+no neighbour settlement, no route. Each of those is a property of a world that
+has stepped, and the founding runs before any of them exists.
+
+**Revisit when** a second founding exists. A group that splits off from a
+settlement chooses against a world that has stepped, and the set above is then
+too small.
+
 ## Decisions to apply at merge
 
 These are mechanical. They do not need judgement, but they must not be
@@ -520,3 +568,6 @@ None yet.
 [^DEC15]: Decision Record Scope, section 1. `.claude/rules/adr-scope.md`
 [^DEC16]: ADR Registry, reserved row 0021. `docs/adrs/REGISTRY.md`
 [^DEC17]: Backlog item 0097. `docs/backlog/proposed/0097-write-the-layout-record-with-the-descent-columns.md`
+[^DEC18]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`
+[^DEC19]: Testing rules, section 2a. `.claude/rules/testing.md`
+[^DEC20]: PRD-0012, a world starts small and grows. `docs/product/shaped/prd-0012-a-world-starts-small-and-grows.md`
