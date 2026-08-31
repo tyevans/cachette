@@ -41,6 +41,10 @@ documents cite it.
 | 0005 | A watcher can tell what is happening and why | Idea | Game developer | — |
 | 0006 | A place belongs to somebody | Shaped | Game developer | `shaped/prd-0006-a-place-belongs-to-somebody.md` |
 | 0007 | The world holds things worth taking | Shaped | Game developer | `shaped/prd-0007-the-world-holds-things-worth-taking.md` |
+| 0008 | A unit changes the ground it stands on | Shaped | Game developer | `shaped/prd-0008-a-unit-changes-the-ground-it-stands-on.md` |
+| 0009 | A unit acts on the world it can see | Shaped | Game developer | `shaped/prd-0009-a-unit-acts-on-the-world-it-can-see.md` |
+| 0010 | A good moves to where it is wanted | Shaped | Game developer | `shaped/prd-0010-a-good-moves-to-where-it-is-wanted.md` |
+| 0011 | A unit is born, holds a job, and dies | Shaped | Game developer | `shaped/prd-0011-a-unit-is-born-holds-a-job-and-dies.md` |
 
 ## What does not belong in a record
 
