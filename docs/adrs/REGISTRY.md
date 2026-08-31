@@ -252,7 +252,7 @@ without stating a constraint is worse than no record.
 | 0063 | A need is a rate with a threshold, and crossing it is a fact | Proposed | 0032, 0062 | 15 |
 | 0064 | A unit chooses by scoring a small fixed option set | Proposed | 0003, 0063 | 16 |
 | 0065 | A group is a site membership, not a region | Proposed | 0038, 0054 | 17 |
-| 0067 | The viewer reads a published frame and never writes to the world | Proposed | 0001, 0036 | — |
+| 0067 | The viewer reads the world and never writes to it | Draft | 0001, 0036 | — |
 
 ### Retired numbers
 

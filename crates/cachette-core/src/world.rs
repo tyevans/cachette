@@ -1,9 +1,10 @@
 //! The world, and the frame step.
 //!
-//! This is a stub. It holds one tile field, one event type, and one system.
-//! It exists so that the determinism harnesses have a subject before the
-//! first solver is written.[^1] Replace the body of the step. Do not replace
-//! the shape of it.
+//! The world holds one tile field, one event type, and two systems. The
+//! tile system is a stub, and it exists so that the determinism harnesses
+//! have a subject before the first solver is written.[^1] The movement
+//! system gives each soldier one neighbour tile each frame. Replace the body
+//! of a system. Do not replace the shape of the step.
 //!
 //! The step shows three rules that every later system must follow.
 //!
@@ -29,7 +30,7 @@
 use crate::bridge::{BlockLayout, BridgeError, UnitTileBridge, BLOCK_BITS_DEFAULT};
 use crate::event::{TileChanged, CHANGE_KIND_LOWERED, CHANGE_KIND_RAISED};
 use crate::hash::StateHash;
-use crate::hex::{Axial, Grid, GridError};
+use crate::hex::{Axial, Grid, GridError, NEIGHBOUR_COUNT};
 use crate::rng;
 use crate::sim_math;
 use crate::slots::Slots;
@@ -547,16 +548,107 @@ impl World {
             joined
         });
 
+        // Every soldier chooses a neighbour, then the step applies the
+        // choices. The choice is a pure read of the world, so the two halves
+        // never interleave and no soldier sees a half-applied world.[^1]
+        let moves = soldier_moves(tick, seed, &self.soldiers, threads)?;
+        for (soldier, address) in moves {
+            self.soldiers
+                .place(soldier, address)
+                .expect("the chosen address is inside the world");
+        }
+
         // The bridge rebuilds here, at the barrier, and after the structural
         // apply. Rebuilding before the apply would leave a dead identity in
-        // the unit array for the whole frame.[^1] The stub applies no
-        // structural change yet, so this call is the last thing in the step
-        // and a later apply goes above it.
+        // the unit array for the whole frame.[^2] The movement above is the
+        // structural apply, so this call stays last in the step.
         //
-        // [^1]: ADR-0018, the unit-to-tile bridge is derived, and it rebuilds at the barrier, decision D3. `docs/adrs/accepted/adr-0018-the-unit-to-tile-bridge-is-derived-and-rebuilds-at-the-barrier.md`
+        // [^1]: ADR-0056, movement is tile-discrete and admitted by sort-then-admit, decision D2, a draft record. `docs/adrs/draft/adr-0056-movement-is-tile-discrete-and-admitted-by-sort-then-admit.md`
+        // [^2]: ADR-0018, the unit-to-tile bridge is derived, and it rebuilds at the barrier, decision D3. `docs/adrs/accepted/adr-0018-the-unit-to-tile-bridge-is-derived-and-rebuilds-at-the-barrier.md`
         self.bridge.rebuild(&self.soldiers, threads)?;
         Ok(&self.log)
     }
+}
+
+/// The draw index of the movement direction.
+///
+/// The movement system takes one draw for each soldier in each frame. A
+/// second draw in the same system and frame must take the next index.
+const DRAW_MOVE_DIRECTION: u32 = 0;
+
+/// Returns the move that each live soldier chose, in slot order.
+///
+/// Each soldier draws one direction from the counter-based generator. The
+/// key is the tuple of the system, the frame, the entity and the draw
+/// index, so the same soldier in the same frame gets the same direction
+/// however the work was scheduled.[^1] The key holds the entity identity,
+/// which pairs the slot index with the generation, and not the slot index
+/// alone.[^2]
+///
+/// A soldier whose chosen neighbour falls outside the world stays put. The
+/// world is a rhombus and it does not wrap, so an address outside the
+/// extent names no tile.[^3]
+///
+/// The soldiers are read in slot order, each thread writes its own output
+/// slot, and the step joins the slots in slot order. The result never
+/// depends on thread completion order.[^4]
+///
+/// This is the intent half of movement only. The step admits every intent.
+/// Two soldiers may therefore choose the same tile, and both enter it.
+/// Capacity and admission are not built yet.[^5]
+///
+/// # References
+///
+/// [^1]: ADR-0003, every random draw is keyed, never stateful, decision D1. `docs/adrs/accepted/adr-0003-every-random-draw-is-keyed-never-stateful.md`
+/// [^2]: ADR-0014, entity identity is an index plus a generation, decision D1. `docs/adrs/accepted/adr-0014-entity-identity-is-an-index-plus-a-generation.md`
+/// [^3]: ADR-0017, the world is a rhombus, so a tile index is raw axial, decision D3. `docs/adrs/accepted/adr-0017-the-world-is-a-rhombus-so-a-tile-index-is-raw-axial.md`
+/// [^4]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
+/// [^5]: ADR-0056, movement is tile-discrete and admitted by sort-then-admit, decision D2, a draft record. `docs/adrs/draft/adr-0056-movement-is-tile-discrete-and-admitted-by-sort-then-admit.md`
+fn soldier_moves(
+    tick: Tick,
+    seed: u64,
+    soldiers: &SoldierArena,
+    threads: usize,
+) -> Result<Vec<(Entity, Axial)>, StepError> {
+    let live: Vec<Entity> = soldiers.iter().collect();
+    if live.is_empty() {
+        return Ok(Vec::new());
+    }
+    let grid = soldiers.grid();
+    let chunk_len = live.len().div_ceil(threads).max(1);
+    let mut slots: Slots<Vec<(Entity, Axial)>> =
+        Slots::filled(threads, Vec::new()).map_err(|_| StepError::ZeroThreads)?;
+
+    std::thread::scope(|scope| {
+        for (chunk, slot) in live.chunks(chunk_len).zip(slots.entries_mut()) {
+            scope.spawn(move || {
+                *slot = chunk
+                    .iter()
+                    .filter_map(|soldier| {
+                        let here = soldiers.address(*soldier)?;
+                        let direction = rng::draw_below(
+                            seed,
+                            rng::SYSTEM_SOLDIER_MOVE,
+                            tick.0,
+                            soldier.to_bits(),
+                            DRAW_MOVE_DIRECTION,
+                            NEIGHBOUR_COUNT as u64,
+                        ) as usize;
+                        // A neighbour outside the world gives `None`. The
+                        // soldier then stays put, because the world does not
+                        // wrap.
+                        let target = grid.neighbour(here, direction)?;
+                        Some((*soldier, target))
+                    })
+                    .collect();
+            });
+        }
+    });
+
+    Ok(slots.combine(Vec::new(), |mut joined, slot| {
+        joined.extend_from_slice(slot);
+        joined
+    }))
 }
 
 /// Updates one contiguous chunk of tiles and returns the events it emitted.

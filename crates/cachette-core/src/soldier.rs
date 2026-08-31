@@ -38,6 +38,26 @@ use crate::types::{Entity, FactionId, TileIdx, FACTION_CEILING};
 /// # References
 ///
 /// [^1]: ADR-0014, entity identity is an index plus a generation, decision D6. `docs/adrs/accepted/adr-0014-entity-identity-is-an-index-plus-a-generation.md`
+/// Hands out one identifier for each arena that the process builds.
+///
+/// A derived structure must know which arena it was built from, and not only
+/// how many changes that arena has taken. Two arenas of one extent, each
+/// holding one soldier on a different tile, both sit at revision one: a
+/// counter alone lets a bridge built from the first answer questions about
+/// the second, and every check passes.[^1]
+///
+/// The counter is process-wide and never enters simulated state, so it
+/// reaches no state hash and no event log.
+///
+/// # References
+///
+/// [^1]: ADR-0018, the unit-to-tile bridge is derived, and it rebuilds at the barrier, decision D3. `docs/adrs/accepted/adr-0018-the-unit-to-tile-bridge-is-derived-and-rebuilds-at-the-barrier.md`
+fn next_arena_identity() -> u64 {
+    use core::sync::atomic::{AtomicU64, Ordering};
+    static NEXT: AtomicU64 = AtomicU64::new(1);
+    NEXT.fetch_add(1, Ordering::Relaxed)
+}
+
 const NO_GENERATION: u32 = 0;
 
 /// The first generation of a slot.
@@ -154,6 +174,7 @@ pub struct SoldierArena {
     ///
     /// [^1]: Recurring defect shapes, section 1. `.claude/rules/recurring-defects.md`
     revision: u64,
+    identity: u64,
 }
 
 impl SoldierArena {
@@ -184,6 +205,7 @@ impl SoldierArena {
             live_count: 0,
             retired_count: 0,
             revision: 0,
+            identity: next_arena_identity(),
         }
     }
 
@@ -238,6 +260,20 @@ impl SoldierArena {
     /// # References
     ///
     /// [^1]: ADR-0018, the unit-to-tile bridge is derived, and it rebuilds at the barrier, decision D3. `docs/adrs/accepted/adr-0018-the-unit-to-tile-bridge-is-derived-and-rebuilds-at-the-barrier.md`
+    /// Returns the identifier of this arena.
+    ///
+    /// The identifier names the arena. The revision counts its changes. A
+    /// derived structure needs both, because a matching count from a
+    /// different arena is not a match.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0018, the unit-to-tile bridge is derived, and it rebuilds at the barrier, decision D3. `docs/adrs/accepted/adr-0018-the-unit-to-tile-bridge-is-derived-and-rebuilds-at-the-barrier.md`
+    #[must_use]
+    pub const fn identity(&self) -> u64 {
+        self.identity
+    }
+
     #[must_use]
     pub const fn revision(&self) -> u64 {
         self.revision

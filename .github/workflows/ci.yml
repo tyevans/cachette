@@ -63,8 +63,11 @@ jobs:
       # `cargo check` needs no linker for a foreign target, so it runs on
       # the x86-64 runner and catches a target-specific compile error.
       # A cross-compiled build and a test run on the target are deferred.
+      # The viewer is excluded on purpose. It opens a window, so it links a C
+      # library that needs a cross-compiler, and a window on a headless
+      # server means nothing. The engine is what ships to the target.
       - name: Check the primary target
-        run: cargo check --workspace --target aarch64-unknown-linux-gnu
+        run: cargo check --package cachette-core --package cachette-py --target aarch64-unknown-linux-gnu
 
   python:
     name: python

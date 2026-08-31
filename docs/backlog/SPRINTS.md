@@ -89,6 +89,19 @@ commit is about, by name. This has happened once: a record that an agent was
 still writing entered a commit about an unrelated repair, and the commit had
 to be rebuilt.
 
+**Do not dispatch an agent to a surface you intend to touch.** This rule
+replaces an earlier one, which said to establish that the tree is settled
+before judging it. That rule was broken three times by the person who wrote
+it, which is enough evidence that it asks for the wrong thing. It asks for
+vigilance at the moment of acting, and the moment of acting is exactly when
+a reviewer's finding or a failing gate makes editing feel urgent.
+
+The new rule is a decision made once, at dispatch, when nothing is urgent.
+Before an agent starts, its directories belong to it. If a review lands
+during that time and its repairs touch those directories, the repairs wait,
+or the agent is stopped first. Waiting has cost this project nothing so far.
+Racing has cost it three near misses and one rebuilt commit.
+
 The parallel surfaces are also the review surfaces. An agent that writes to
 one surface reviews nothing on it.
 

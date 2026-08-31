@@ -24,17 +24,35 @@
 //! # The stale read
 //!
 //! A caller that moves a soldier and then reads the bridge before the rebuild
-//! gets an answer that looks correct and is not. This module makes that read
-//! impossible to perform by accident, in two ways.
+//! gets an answer that looks correct and is not.
 //!
-//! A read takes the arena. The arena counts its own structural changes, the
-//! bridge records the count it was built from, and a read against a different
-//! count returns [`BridgeError::Stale`]. A comment that says "rebuild first"
-//! would be the defect shape this project records.[^4]
+//! **A read that names a unit is guarded. A read that reports a shape is
+//! not.** The distinction is deliberate and it is stated here because an
+//! earlier version of this comment claimed every read was guarded, which was
+//! false for five of them.
 //!
-//! A read borrows the arena for as long as the caller holds the result. A
-//! spawn, a despawn and a move all need the arena by mutable reference, so
-//! the compiler refuses a structural change while a range is alive.
+//! A guarded read takes the arena: `on_tile`, `in_block`, `count_on_tile`
+//! and `check_invariants`. The arena names itself and counts its own
+//! structural changes, the bridge records both, and a read against a
+//! different arena or a different count returns an error. A comment that
+//! says "rebuild first" would be the defect shape this project
+//! records.[^4]
+//!
+//! The identifier matters as much as the count. Two arenas of one extent,
+//! each holding one soldier on a different tile, both sit at revision one.
+//! A count alone would let this bridge answer questions about an arena it
+//! was never built from, and every check would pass.
+//!
+//! An unguarded read takes no arena and reports the shape of the last
+//! rebuild: `len`, `is_empty`, `block_range`, `block_is_occupied` and
+//! `check_structure`. Each answers a question about the bridge itself. A
+//! caller that wants to know whether that shape still describes the world
+//! asks a guarded read.
+//!
+//! A guarded read borrows the arena for as long as the caller holds the
+//! result. A spawn, a despawn and a move all need the arena by mutable
+//! reference, so the compiler refuses a structural change while a range is
+//! alive.
 //!
 //! # References
 //!
@@ -97,6 +115,11 @@ pub enum BridgeError {
     },
     /// The bridge was never built, so it holds no answer.
     NeverBuilt,
+    /// The bridge was built from a different arena.
+    ///
+    /// The revision counts changes and does not name the arena, so a
+    /// matching count from another arena of the same extent is not a match.
+    WrongArena,
     /// The arena describes another world than the bridge does.
     GridMismatch,
     /// The address is outside the world. The world does not wrap.[^1]
@@ -121,6 +144,10 @@ impl core::fmt::Display for BridgeError {
                 "the bridge holds revision {built} and the arena holds revision {current}"
             ),
             Self::NeverBuilt => write!(formatter, "the bridge was never built"),
+            Self::WrongArena => write!(
+                formatter,
+                "the bridge was built from a different arena of the same extent"
+            ),
             Self::GridMismatch => write!(formatter, "the arena describes another world"),
             Self::AddressOutsideWorld(address) => write!(
                 formatter,
@@ -270,6 +297,7 @@ pub struct UnitTileBridge {
     layout: BlockLayout,
     /// The arena revision that the last rebuild read.
     built: Option<u64>,
+    source: Option<u64>,
     /// The bridge key of each occupying unit, in key order.
     keys: Vec<u64>,
     /// The identity of each occupying unit, in the same order as the keys.
@@ -291,6 +319,7 @@ impl UnitTileBridge {
         Self {
             layout,
             built: None,
+            source: None,
             keys: Vec::new(),
             units: Vec::new(),
             ranges: vec![BlockRange::default(); blocks],
@@ -304,13 +333,19 @@ impl UnitTileBridge {
         self.layout
     }
 
-    /// Returns the number of units that the bridge holds.
+    /// Returns the number of units that the last rebuild held.
+    ///
+    /// This read takes no arena and performs no freshness check. A caller
+    /// that needs a current answer asks a read that takes the arena.
     #[must_use]
     pub fn len(&self) -> usize {
         self.units.len()
     }
 
-    /// Reports whether the bridge holds no unit.
+    /// Reports whether the last rebuild held no unit.
+    ///
+    /// This read takes no arena and performs no freshness check. A caller
+    /// that needs a current answer asks a read that takes the arena.
     #[must_use]
     pub fn is_empty(&self) -> bool {
         self.units.is_empty()
@@ -372,6 +407,7 @@ impl UnitTileBridge {
 
         self.rebuild_ranges();
         self.built = Some(arena.revision());
+        self.source = Some(arena.identity());
         Ok(())
     }
 
@@ -419,6 +455,10 @@ impl UnitTileBridge {
     /// # References
     ///
     /// [^1]: ADR-0018, the unit-to-tile bridge is derived, and it rebuilds at the barrier, decision D5. `docs/adrs/accepted/adr-0018-the-unit-to-tile-bridge-is-derived-and-rebuilds-at-the-barrier.md`
+    ///
+    /// This read takes no arena and performs no freshness check. It reports
+    /// whether the last rebuild found a unit in a block, which may no longer describe the world. A caller that
+    /// needs a current answer asks a read that takes the arena.
     #[must_use]
     pub fn block_is_occupied(&self, block: u32) -> bool {
         let slot = block as usize;
@@ -430,6 +470,10 @@ impl UnitTileBridge {
 
     /// Returns the range of a block, or `None` when the world has no such
     /// block.
+    ///
+    /// This read takes no arena and performs no freshness check. It reports
+    /// the range that the last rebuild gave a block, which may no longer describe the world. A caller that
+    /// needs a current answer asks a read that takes the arena.
     #[must_use]
     pub fn block_range(&self, block: u32) -> Option<BlockRange> {
         self.ranges.get(block as usize).copied()
@@ -526,6 +570,14 @@ impl UnitTileBridge {
     fn check_fresh(&self, arena: &SoldierArena) -> Result<(), BridgeError> {
         if arena.grid() != self.layout.grid() {
             return Err(BridgeError::GridMismatch);
+        }
+        // The revision counts changes; it does not name the arena. Two arenas
+        // of one extent, each holding one soldier on a different tile, both
+        // sit at revision one, so a count alone lets this bridge answer
+        // questions about an arena it was never built from.
+        let source = self.source.ok_or(BridgeError::NeverBuilt)?;
+        if source != arena.identity() {
+            return Err(BridgeError::WrongArena);
         }
         let built = self.built.ok_or(BridgeError::NeverBuilt)?;
         if built == arena.revision() {

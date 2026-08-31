@@ -174,7 +174,16 @@ fn a_soldier_survives_a_step_and_the_world_holds_its_invariants() {
     world.step(4).expect("the step must run");
     assert!(world.check_invariants());
     assert!(world.soldiers().contains(soldier));
-    assert_eq!(world.soldiers().address(soldier), Some(Axial::new(2, 3)));
+    // The step moves each soldier to a neighbour, or leaves it in place when
+    // the chosen neighbour falls outside the world. The address therefore
+    // stays within one tile of the spawn.[^1]
+    //
+    // [^1]: ADR-0003, every random draw is keyed, never stateful, decision D1. `docs/adrs/accepted/adr-0003-every-random-draw-is-keyed-never-stateful.md`
+    let address = world
+        .soldiers()
+        .address(soldier)
+        .expect("the soldier is alive");
+    assert!(Axial::new(2, 3).distance(address) <= 1);
 
     assert!(world.despawn_soldier(soldier));
     assert!(!world.soldiers().contains(soldier));
