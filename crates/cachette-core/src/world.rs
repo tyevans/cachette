@@ -31,6 +31,7 @@ use crate::bridge::{BlockLayout, BridgeError, UnitTileBridge, BLOCK_BITS_DEFAULT
 use crate::event::{TileChanged, CHANGE_KIND_LOWERED, CHANGE_KIND_RAISED};
 use crate::hash::StateHash;
 use crate::hex::{Axial, Grid, GridError, NEIGHBOUR_COUNT};
+use crate::pyramid::{CellSummary, Pyramid};
 use crate::rng;
 use crate::sim_math;
 use crate::slots::Slots;
@@ -188,6 +189,8 @@ pub struct World {
     soldiers: SoldierArena,
     bridge: UnitTileBridge,
     terrain: Terrain,
+    /// Level 1 of the pyramid, derived from level 0 at the barrier.
+    pyramid: Pyramid,
 }
 
 impl World {
@@ -214,7 +217,8 @@ impl World {
         let soldiers = SoldierArena::new(grid);
         let mut bridge = UnitTileBridge::new(layout);
         bridge.rebuild(&soldiers)?;
-        Ok(Self {
+        let terrain = Terrain::new(config.seed, grid);
+        let mut world = Self {
             config,
             grid,
             tick: Tick(0),
@@ -223,8 +227,16 @@ impl World {
             log: Vec::new(),
             soldiers,
             bridge,
-            terrain: Terrain::new(config.seed, grid),
-        })
+            terrain,
+            pyramid: Pyramid::new(layout, terrain, 1)?,
+        };
+        // A world that has never stepped still answers a question about a
+        // region. A level that nothing rebuilt would describe an empty world
+        // and would be wrong rather than absent.
+        world
+            .pyramid
+            .rebuild(&world.values, &world.soldiers, &world.bridge, 1)?;
+        Ok(world)
     }
 
     /// Returns the shape of the world.
@@ -571,6 +583,31 @@ impl World {
         if self.soldiers.grid() != self.grid {
             return false;
         }
+        // Level 1 covers the world once, and at a barrier it counts the
+        // population the arena holds.
+        //
+        // The full equality between a level and the level below is a sweep of
+        // every tile, and this check runs after every rule the control plane
+        // applies, so it reads the totals instead. The equality itself is a
+        // test.[^4]
+        //
+        // The tile total holds at every moment, because the ground does not
+        // change. The unit total holds at a barrier only: a spawn made between
+        // two frames leaves the level as stale as the structure it was built
+        // from, which is the documented state and not a defect. The freshness
+        // of the derived structure is what says which moment this is.
+        //
+        // [^4]: ADR-0023, an aggregate combines exactly, in any order, decision D5, a draft record. `docs/adrs/draft/adr-0023-an-aggregate-combines-exactly-in-any-order.md`
+        let total = self.pyramid.total();
+        if total.tiles() != i64::from(self.grid.tile_count()) {
+            return false;
+        }
+        if self.bridge.describes(&self.soldiers).is_ok()
+            && total.units() != i64::from(self.soldiers.len())
+        {
+            return false;
+        }
+
         // No soldier stands on ground that admits no unit. The spawn, the
         // placement and the movement each refuse such a tile, and this check
         // is what fails when a later path forgets to.[^1]
@@ -708,7 +745,49 @@ impl World {
         // [^3]: ADR-0056, movement is tile-discrete and admitted by sort-then-admit, decision D3. `docs/adrs/accepted/adr-0056-movement-is-tile-discrete-and-admitted-by-sort-then-admit.md`
         // [^4]: ADR-0018, the unit-to-tile bridge is derived, and it rebuilds at the barrier, decision D3. `docs/adrs/accepted/adr-0018-the-unit-to-tile-bridge-is-derived-and-rebuilds-at-the-barrier.md`
         self.refresh_bridge()?;
+
+        // Level 1 rebuilds after the structure it reads, and after every
+        // change to level 0 that this frame made. It is derived, so it is
+        // last.[^5]
+        //
+        // [^5]: ADR-0022, level 0 is the only truth, and every level above it is derived, decision D2, a draft record. `docs/adrs/draft/adr-0022-level-0-is-the-only-truth-and-every-level-above-it-is-derived.md`
+        self.rebuild_pyramid(threads)?;
         Ok(&self.log)
+    }
+
+    /// Returns level 1 of the pyramid.
+    ///
+    /// The level is derived from level 0 and holds no fact of its own.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0022, level 0 is the only truth, and every level above it is derived, decision D1, a draft record. `docs/adrs/draft/adr-0022-level-0-is-the-only-truth-and-every-level-above-it-is-derived.md`
+    #[must_use]
+    pub const fn pyramid(&self) -> &Pyramid {
+        &self.pyramid
+    }
+
+    /// Returns the level 1 summary of the cell that covers one tile.
+    #[must_use]
+    pub fn summary_covering(&self, address: Axial) -> Option<CellSummary> {
+        self.pyramid.cell_covering(address)
+    }
+
+    /// Rebuilds level 1 from level 0.
+    ///
+    /// The engine calls this at the barrier. A caller that changed level 0
+    /// outside a frame calls it too, in the same way it rebuilds the derived
+    /// unit structure.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the derived unit structure does not describe the
+    /// arena.
+    pub fn rebuild_pyramid(&mut self, threads: usize) -> Result<(), StepError> {
+        self.refresh_bridge()?;
+        self.pyramid
+            .rebuild(&self.values, &self.soldiers, &self.bridge, threads)?;
+        Ok(())
     }
 
     /// Rebuilds the derived structure when it no longer describes the arena.
