@@ -32,7 +32,8 @@ use crate::hex::{Axial, Grid, GridError};
 use crate::rng;
 use crate::sim_math;
 use crate::slots::Slots;
-use crate::types::{Accum, FactionId, Fix32, Tick, TileIdx};
+use crate::soldier::{SoldierArena, SoldierError};
+use crate::types::{Accum, Entity, FactionId, Fix32, Tick, TileIdx};
 
 /// The reason that a step refused to run.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -129,6 +130,7 @@ pub struct World {
     values: Vec<Fix32>,
     factions: Vec<FactionId>,
     log: Vec<TileChanged>,
+    soldiers: SoldierArena,
 }
 
 impl World {
@@ -155,6 +157,7 @@ impl World {
             values,
             factions,
             log: Vec::new(),
+            soldiers: SoldierArena::new(grid),
         })
     }
 
@@ -170,6 +173,56 @@ impl World {
     #[must_use]
     pub const fn grid(&self) -> Grid {
         self.grid
+    }
+
+    /// Returns the soldiers of the world.
+    ///
+    /// The soldier is one of the four fixed entity shapes, and it has its
+    /// own column set.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0066, entity storage holds four fixed shapes, decision D1. `docs/adrs/accepted/adr-0066-entity-storage-holds-four-fixed-shapes.md`
+    #[must_use]
+    pub const fn soldiers(&self) -> &SoldierArena {
+        &self.soldiers
+    }
+
+    /// Adds a soldier to the world and returns its identity.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the arena holds no free slot, when the address
+    /// is outside the world, or when the faction is at or above the
+    /// ceiling.
+    pub fn spawn_soldier(
+        &mut self,
+        address: Axial,
+        faction: FactionId,
+    ) -> Result<Entity, SoldierError> {
+        self.soldiers.spawn(address, faction)
+    }
+
+    /// Removes a soldier and reports whether it removed one.
+    ///
+    /// A stale identity removes nothing and returns `false`.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0014, entity identity is an index plus a generation, decision D2. `docs/adrs/accepted/adr-0014-entity-identity-is-an-index-plus-a-generation.md`
+    pub fn despawn_soldier(&mut self, entity: Entity) -> bool {
+        self.soldiers.despawn(entity)
+    }
+
+    /// Moves a soldier to another tile.
+    ///
+    /// Returns `false` when the identity is dead.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the address is outside the world.
+    pub fn place_soldier(&mut self, entity: Entity, address: Axial) -> Result<bool, SoldierError> {
+        self.soldiers.place(entity, address)
     }
 
     /// Returns the value of the tile at an address.
@@ -261,14 +314,15 @@ impl World {
     /// [^1]: ADR-0001, one binary gives one answer at any thread count, decision D4. `docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
     #[must_use]
     pub fn state_hash(&self) -> StateHash {
-        StateHash::new()
+        let hash = StateHash::new()
             .write_u64(self.tick.0)
             .write_u64(self.config.seed)
             .write_u64(u64::from(self.config.width))
             .write_u64(u64::from(self.config.height))
             .write_u64(u64::from(self.config.faction_count))
             .write(bytemuck::cast_slice(&self.values))
-            .write(bytemuck::cast_slice(&self.factions))
+            .write(bytemuck::cast_slice(&self.factions));
+        self.soldiers.hash_into(hash)
     }
 
     /// Reports whether the world holds its invariants.
@@ -291,6 +345,14 @@ impl World {
         }
         let ceiling = self.config.faction_count.max(1);
         if self.factions.iter().any(|faction| faction.0 >= ceiling) {
+            return false;
+        }
+        // The arena holds a copy of the grid. A check must fail when the two
+        // copies disagree.
+        if self.soldiers.grid() != self.grid {
+            return false;
+        }
+        if !self.soldiers.check_invariants() {
             return false;
         }
         self.log

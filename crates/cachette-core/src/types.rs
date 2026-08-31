@@ -19,6 +19,17 @@ use bytemuck::{Pod, Zeroable};
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Pod, Zeroable)]
 pub struct TileIdx(pub u32);
 
+/// The largest number of factions that the project supports.
+///
+/// A faction is one bit in a 64-bit mask, and one value is reserved for no
+/// faction. A faction identifier is therefore a bit index below this
+/// value.[^1]
+///
+/// # References
+///
+/// [^1]: Budgets and costs, the scale constants. `docs/reference/budgets.md`
+pub const FACTION_CEILING: u16 = 63;
+
 /// The identifier of a faction.
 #[repr(transparent)]
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Pod, Zeroable)]
@@ -58,10 +69,25 @@ pub struct Entity(core::num::NonZeroU64);
 impl Entity {
     /// Builds a handle from an index and a generation.
     ///
+    /// The entity storage is the only thing that builds an identity. Every
+    /// other caller receives one and reads its parts through the accessors
+    /// below. A caller that assembles an identity from an index it chose has
+    /// defeated the generation, because that index came from somewhere that
+    /// could not know whether the slot still holds the same entity.[^1]
+    ///
+    /// The visibility is therefore restricted to this crate, and the arena
+    /// is the only caller inside it.
+    ///
     /// Returns `None` when both parts are zero, because the handle may not
-    /// hold the value zero.
+    /// hold the value zero. A generation starts at one, so the arena never
+    /// meets that case.[^2]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0014, entity identity is an index plus a generation, decision D1. `docs/adrs/accepted/adr-0014-entity-identity-is-an-index-plus-a-generation.md`
+    /// [^2]: ADR-0014, entity identity is an index plus a generation, decision D6. `docs/adrs/accepted/adr-0014-entity-identity-is-an-index-plus-a-generation.md`
     #[must_use]
-    pub const fn new(index: u32, generation: u32) -> Option<Self> {
+    pub(crate) const fn new(index: u32, generation: u32) -> Option<Self> {
         let raw = ((generation as u64) << 32) | (index as u64);
         match core::num::NonZeroU64::new(raw) {
             Some(value) => Some(Self(value)),

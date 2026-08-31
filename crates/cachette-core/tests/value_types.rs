@@ -11,33 +11,58 @@
 
 use cachette_core::sim_math;
 use cachette_core::types::{Accum, FIX_FRACTIONAL_BITS};
-use cachette_core::{Entity, Fix32, StateHash};
+use cachette_core::{Axial, Entity, FactionId, Fix32, Grid, SoldierArena, StateHash};
 
 #[test]
 fn an_entity_carries_an_index_and_a_generation() {
-    let entity = Entity::new(7, 3).expect("the handle is not zero");
-    assert_eq!(entity.index(), 7);
-    assert_eq!(entity.generation(), 3);
-    assert_eq!(entity.to_bits(), (3u64 << 32) | 7);
+    // The arena mints every identity. A caller reads the parts through the
+    // accessors and never builds one from parts.[^1]
+    //
+    // [^1]: ADR-0014, entity identity is an index plus a generation,
+    // decision D1. `docs/adrs/accepted/adr-0014-entity-identity-is-an-index-plus-a-generation.md`
+    let mut arena = SoldierArena::new(Grid::new(4, 4).expect("a small extent describes a grid"));
+    let entity = arena
+        .spawn(Axial::new(1, 2), FactionId(0))
+        .expect("the spawn must succeed");
+    assert_eq!(entity.index(), 0);
+    assert_eq!(entity.generation(), 1);
+    assert_eq!(
+        entity.to_bits(),
+        (u64::from(entity.generation()) << 32) | u64::from(entity.index())
+    );
 }
 
 #[test]
-fn an_entity_of_index_zero_and_generation_zero_does_not_exist() {
+fn an_absent_entity_costs_no_extra_space() {
     // ADR-0011: the handle is never zero, so `Option<Entity>` stays 8
     // bytes wide.
-    assert_eq!(Entity::new(0, 0), None);
     assert_eq!(size_of::<Option<Entity>>(), 8);
 }
 
 #[test]
 fn an_entity_keeps_the_two_parts_apart() {
-    let first = Entity::new(1, 0).expect("the handle is not zero");
-    let second = Entity::new(0, 1).expect("the handle is not zero");
-    assert_ne!(first, second);
-    assert_eq!(first.index(), 1);
-    assert_eq!(first.generation(), 0);
-    assert_eq!(second.index(), 0);
+    let mut arena = SoldierArena::new(Grid::new(4, 4).expect("a small extent describes a grid"));
+    let first = arena
+        .spawn(Axial::new(0, 0), FactionId(0))
+        .expect("the spawn must succeed");
+    let second = arena
+        .spawn(Axial::new(1, 0), FactionId(0))
+        .expect("the spawn must succeed");
+    // Slot zero returns at the next generation, so the two identities differ
+    // in the generation and share nothing else.
+    assert!(arena.despawn(first));
+    let reused = arena
+        .spawn(Axial::new(2, 0), FactionId(0))
+        .expect("the spawn must succeed");
+
+    assert_eq!(first.index(), 0);
+    assert_eq!(first.generation(), 1);
+    assert_eq!(second.index(), 1);
     assert_eq!(second.generation(), 1);
+    assert_eq!(reused.index(), 0);
+    assert_eq!(reused.generation(), 2);
+    assert_ne!(first, second);
+    assert_ne!(first, reused);
 }
 
 #[test]
