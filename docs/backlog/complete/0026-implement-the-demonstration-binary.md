@@ -50,4 +50,4 @@ not build. The findings register holds the shape.[^1]
 
 ## References
 
-[^1]: Findings register, FND-058. `docs/FINDINGS.md`
+[^1]: Findings register, FND-059. `docs/FINDINGS.md`

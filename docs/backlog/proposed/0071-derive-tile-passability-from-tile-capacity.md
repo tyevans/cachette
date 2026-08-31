@@ -27,4 +27,4 @@ Refine this against the terrain record, which is still a draft.
 ## References
 
 [^1]: Recurring Defect Shapes, shape 1. `.claude/rules/recurring-defects.md`
-[^2]: Findings register, FND-059. `docs/FINDINGS.md`
+[^2]: Findings register, FND-060. `docs/FINDINGS.md`
