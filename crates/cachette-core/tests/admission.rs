@@ -330,3 +330,62 @@ fn a_sparse_world_admits_every_intent() {
         kept.len()
     );
 }
+
+#[test]
+fn a_world_in_which_nothing_moves_still_answers_after_a_step() {
+    // The step rebuilds the derived structure when the arena has moved since
+    // the last rebuild, and not otherwise. A frame in which admission granted
+    // nothing leaves the arena untouched, so the structure is not rebuilt,
+    // and this is the path that a stalled world takes.
+    //
+    // The structure must still answer afterwards. A skip that left it unable
+    // to answer would be a skip that traded a guarantee.
+    //
+    // A world of one tile is the stalled world. Every neighbour of its only
+    // tile lies outside the extent, and the world does not wrap, so no draw
+    // ever names a tile. The generator makes coherent ground and no one-tile
+    // island, so this is the shape that exists rather than the one the record
+    // pictures.
+    let mut world = None;
+    for seed in 0..64u64 {
+        let candidate = World::new(WorldConfig {
+            width: 1,
+            height: 1,
+            seed,
+            faction_count: 1,
+        })
+        .expect("the extent describes a world");
+        if candidate.admits_a_unit(Axial::new(0, 0)) {
+            world = Some(candidate);
+            break;
+        }
+    }
+    let mut world = world.expect("no seed of the first sixty-four gave a world of open ground");
+    let only = Axial::new(0, 0);
+    let soldier = world
+        .spawn_soldier(only, FactionId(0))
+        .expect("the tile admits a unit");
+    world.rebuild_bridge(1).expect("the rebuild must succeed");
+
+    let revision_before = world.soldiers().revision();
+    for frame in 0..8 {
+        world.step(1).expect("the step must run");
+        assert_eq!(
+            world.soldiers().address(soldier),
+            Some(only),
+            "the soldier left the only tile after frame {frame}"
+        );
+        assert_eq!(
+            world
+                .soldier_count_on(only)
+                .expect("the structure must answer after a step"),
+            1,
+            "the structure lost the soldier after frame {frame}"
+        );
+    }
+    assert_eq!(
+        world.soldiers().revision(),
+        revision_before,
+        "the arena moved, so the stalled path was never taken"
+    );
+}
