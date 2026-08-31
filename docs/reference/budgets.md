@@ -44,10 +44,17 @@ that held it and says how the value was reached.
 | Character layer at the target | about 85 MB | BLK-004 | Linear scaling from the character report. Not measured |
 | Settlements | 5,000 | BLK-005 | Owner decision, confirming the report assumption |
 | Tiles carrying an upgrade | fewer than one in twenty | BLK-006 | Owner decision, agreeing with the report estimate |
+| World shape | Rhombus | BLK-014 | Owner decision. A tile index is a raw axial pair |
+| Maximum factions | 63 | BLK-013 | Owner decision. One bit for each faction in a 64-bit mask, with one value reserved for no faction |
 
 The tile upgrade fraction picks sparse storage over dense storage. The
 character layer figure is derived by scaling, not measured. BLK-007 still holds
 every cost figure in this project.
+
+The world shape and the faction ceiling are decided, not derived. The rhombus
+removes the coordinate conversion that an offset index pays on every tile
+access. The faction ceiling makes a relation one plane and a presence set one
+word.
 
 ## What belongs here
 

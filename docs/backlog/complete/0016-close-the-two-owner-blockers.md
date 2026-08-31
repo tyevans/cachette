@@ -1,7 +1,7 @@
 ---
 id: 0016
 title: Close BLK-013 and BLK-014, and re-derive the rows they governed
-status: refined
+status: complete
 created: 2026-08-30
 implements: []
 changes: []
@@ -62,7 +62,19 @@ world shape is fixed.
 
 ## Outcome
 
-Filled in on completion.
+BLK-013 and BLK-014 are closed with their outcomes. The scale constants table
+gains the world shape and the faction ceiling, both marked as owner decisions
+rather than derivations. Registry row 0017 states the rhombus claim. FND-042
+records the correction.
+
+One thing changed from the plan. The orientation's open-questions section was
+going to lose two list items. It lost the list instead: FND-039 already
+recorded that a summary of a register decays, and the section was the summary
+that finding is about. It now points at the register and states the one
+blocker that engineering still owns.
+
+The whole-tree searches that closed the sweep are in the commit body. No new
+blocker opened.
 
 ## References
 

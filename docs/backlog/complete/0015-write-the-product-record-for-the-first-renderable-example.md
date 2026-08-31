@@ -1,7 +1,7 @@
 ---
 id: 0015
 title: Write the product record for the first renderable example
-status: refined
+status: complete
 created: 2026-08-30
 implements: []
 changes: []
@@ -58,7 +58,18 @@ and none of them was checked. This record states a need, not a state.[^4]
 
 ## Outcome
 
-Filled in on completion.
+PRD-0002 is written and sits in `shaped/`. The registry row was allocated
+before the file existed.
+
+Two things changed from the plan. The audience is the game developer, not a
+separate engine developer: the product guide names three audiences, and
+inventing a fourth for one record would have made the row incomparable with
+PRD-0001. The blocker section names only BLK-007, because the owner answered
+BLK-013 and BLK-014 while this item was being refined, so the record states
+the world shape and the faction ceiling as settled rather than parametrically.
+
+No register entry opened or closed. The product check passes with 2 records
+and 0 failures.
 
 ## References
 

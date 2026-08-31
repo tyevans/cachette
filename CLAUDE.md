@@ -157,20 +157,14 @@ links. Convert them before you extend them.
 
 ## Open questions
 
-The project owner fixed the tile scale, the population, the character
-count, the settlement count and the tile upgrade fraction. The tick then
-followed by derivation. The blockers register holds the outcomes and the
-scale constants table holds the values.[^9][^10]
+**Read the blockers register for the list.**[^9] Do not read this section as
+the list. A register does not decay; a summary does. This section held a
+summary once, it went stale, and the finding records what that cost.[^12]
 
-Two questions still block design work. The project owner must answer them.
-
-1. State the maximum faction count. The storage shape for fog of war
-   depends on it, and it cannot be chosen under an assumption.
-2. Confirm the world shape. A rhombus world removes a coordinate
-   conversion. The extent is settled; the shape is not.
-
-Read the registers for the current list. Do not read this section as the
-list. A register does not decay; a summary does.[^9]
+Every question the project owner owned is answered. The scale constants
+table holds the values.[^10] One blocker stays open, and engineering owns
+it: no measurement exists on the target platform, so every cost figure in
+this project is derived.
 
 ## References
 
@@ -185,3 +179,4 @@ list. A register does not decay; a summary does.[^9]
 [^9]: Blockers register. `docs/BLOCKERS.md`
 [^10]: Budgets and costs, the scale constants. `docs/reference/budgets.md`
 [^11]: ADR Registry. `docs/adrs/REGISTRY.md`
+[^12]: Findings register, FND-039. `docs/FINDINGS.md`

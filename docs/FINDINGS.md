@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-042**
+**Next number: FND-043**
 
 ## A. Corrections to stated rules
 
@@ -595,6 +595,27 @@ one fact about the project state, and no check compared any of them against
 the tree. A status sentence that a reader can check against the tree in one
 command is worth writing; one that repeats a fact four times is not.
 
+### FND-042 — The tile index was designed against an unanswered question
+
+**Believed.** Tiles are indexed by odd-r offset, not by raw axial. Registry
+row 0017 stated that claim, and row 0016 was written above it.
+
+**True.** The world is a rhombus, so a tile address is a raw axial pair and a
+tile access converts no coordinate. Row 0017 now states the opposite of what
+it stated before.
+
+**Evidence.** BLK-014 held the world shape and named the offset conversion as
+the cost that the shape decides. The row was written anyway, under the
+rectangular assumption, while the blocker that governed it stayed open.
+
+**Follows.** The scope rule already forbids a record from holding a value
+that an unanswered question governs, and requires the value to be expressed
+parametrically with the blocker cited.[^7] A registry row is not a record,
+and the rule did not reach it. It should: a row states a claim, and a reader
+takes a claim from the registry as the project's position. When a blocker
+governs a claim, the row says so, or the row waits. No record was written
+against the old row, so this cost one table edit rather than a supersession.
+
 ## References
 
 [^1]: Findings register, FND-038, in this document.
@@ -603,3 +624,4 @@ command is worth writing; one that repeats a fact four times is not.
 [^4]: ADR-0001, one binary gives one answer at any thread count. `docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
 [^5]: Findings register, FND-004, in this document.
 [^6]: Record scope research. `docs/research/adr-scope-findings.md`
+[^7]: Decision Record Scope, section 4.5. `.claude/rules/adr-scope.md`

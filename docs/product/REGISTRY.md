@@ -35,7 +35,7 @@ documents cite it.
 | No. | Title | Status | Serves | File |
 |---|---|---|---|---|
 | 0001 | A faction sees only what its own units observe | Shaped | Game developer | `shaped/prd-0001-a-faction-sees-only-what-it-observes.md` |
-| 0002 | A developer watches the world run | Idea | Engine developer | — |
+| 0002 | A developer watches the world run | Shaped | Game developer | `shaped/prd-0002-a-developer-watches-the-world-run.md` |
 
 ## What does not belong in a record
 

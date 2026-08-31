@@ -42,33 +42,23 @@ names benchmarking on Graviton as blocking most of its own conclusions.
 This blocker cannot be resolved by a decision. It needs a benchmark harness
 and a machine.
 
+## Resolved
+
 ### BLK-013 — Maximum faction count
 
-**Owner:** project owner. **Blocks:** the fog of war storage design, and the
-faction model.
-
-The superseded fog design costs a fixed amount for each faction, so its total
-scales with the count. The current design holds a fixed amount that does not
-grow with the count. The trade-off between the two only settles when the
-ceiling is known.
-
-The reports work two cases. A count fixed at or near 63 makes a transposed
-level 0 grid affordable. A count in the thousands does not.
-
-This question stood in the project orientation before it had a number.
+**Resolved.** The ceiling is 63. A faction is one bit in a 64-bit mask, and
+one value is reserved for no faction. The transposed level 0 grid is
+therefore affordable, a relation is one plane, and a presence set is one
+word. The value is in the scale constants table.[^SCALE]
 
 ### BLK-014 — The world shape
 
-**Owner:** project owner. **Blocks:** the hex coordinate conversion, and the
-shape of every tile index.
-
-BLK-001 fixed the tile edge and the extent. The shape is a separate question.
-A rhombus world removes one coordinate conversion on every tile access. A
-rectangular world keeps it.
-
-This question stood in the project orientation before it had a number.
-
-## Resolved
+**Resolved.** The world is a rhombus. A tile index is a raw axial pair, so no
+tile access converts a coordinate. The cost falls on the viewer: a rhombus is
+a parallelogram on the screen, so the viewer applies the skew and the engine
+does not. The registry row for the tile index was written for an offset
+index and now states the rhombus claim.[^SHAPE] The finding records the
+correction.[^TILEIDX]
 
 ### BLK-001 — Tile scale, and therefore world extent
 
@@ -150,4 +140,6 @@ normally.
 
 [^SCALE]: Budgets and costs, the scale constants. `docs/reference/budgets.md`
 [^SHAPES]: ADR-0066, entity storage holds four fixed shapes. `docs/adrs/accepted/adr-0066-entity-storage-holds-four-fixed-shapes.md`
+[^SHAPE]: ADR Registry, row 0017. `docs/adrs/REGISTRY.md`
+[^TILEIDX]: Findings register, FND-042. `docs/FINDINGS.md`
 [^TIMING]: Movement timing note. `docs/research/movement-timing.md`
