@@ -39,7 +39,7 @@ invariants:
     ./scripts/check-crate-split.sh
 
 # Run the fast tests on both sides.
-test: test-rust probe test-python
+test: test-rust probe test-python smoke
 
 # Run the Rust tests. They go through the public crate API.
 test-rust:
@@ -49,6 +49,11 @@ test-rust:
 test-python:
     uv sync
     uv run pytest
+
+# Exercise the installed package the way continuous integration does.
+smoke:
+    uv sync
+    uv run python scripts/smoke.py
 
 # Run the two determinism tests of ADR-0001 D4 on their own.
 determinism:

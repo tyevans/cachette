@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-046**
+**Next number: FND-047**
 
 ## A. Corrections to stated rules
 
@@ -723,6 +723,34 @@ none.
 The second review also disagreed with the first about ADR-0018, which is the
 argument for having had two. A single reviewer that agrees with the author is
 indistinguishable from no reviewer.
+
+### FND-046 — A sweep verified by the local gate misses what the local gate never runs
+
+**Believed.** A rename is complete when the whole tree is searched and the
+check command runs green. The commit that changed the world constructor from
+a tile count to a width and a height searched the source tree and passed
+`just check`.
+
+**True.** The change was incomplete. Continuous integration failed on a smoke
+test written inline in the workflow, which still called the old argument. The
+local gate never ran that line, so it could not have caught it. The value
+type's own text output also still named the removed argument.
+
+**Evidence.** The workflow failed with a type error naming the removed
+keyword, on a pipeline that a green local run had preceded.
+
+**Follows.** Two things, and the second is the useful one.
+
+A whole-tree search must cover the whole tree. A search over the source
+directories is not a search over the tree, and a workflow, a build manifest
+and a justfile are call sites.
+
+**The deeper cause is that the smoke test lived inline in the workflow.** It
+was a second declaration site for the public interface, in a file nobody
+greps when renaming an argument, and no local command ran it. It is now a
+script that both the workflow and the local gate run, so the interface has
+one usage site and the local gate covers it. **When a check exists only in
+continuous integration, the local gate is not the gate.**
 
 ## References
 
