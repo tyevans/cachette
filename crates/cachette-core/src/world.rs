@@ -23,7 +23,7 @@
 //!
 //! [^1]: ADR-0001, one binary gives one answer at any thread count, decision D4. `docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
 //! [^2]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
-//! [^3]: ADR-0009, parallel stages write disjoint outputs, because the memory model is weak. `docs/adrs/REGISTRY.md`
+//! [^3]: ADR-0009, parallel stages write disjoint outputs, because the memory model is weak, a draft record. `docs/adrs/draft/adr-0009-parallel-stages-write-disjoint-outputs.md`
 //! [^4]: ADR-0003, every random draw is keyed, never stateful, decision D1. `docs/adrs/accepted/adr-0003-every-random-draw-is-keyed-never-stateful.md`
 //! [^5]: ADR-0002, simulated and aggregated state holds no floating point number, decision D2. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
 
@@ -1140,7 +1140,7 @@ fn bump(run: &mut Vec<(u32, u32)>, tile: u32) {
 /// [^4]: ADR-0018, the unit-to-tile bridge is derived, and it rebuilds at the barrier, decision D3. `docs/adrs/accepted/adr-0018-the-unit-to-tile-bridge-is-derived-and-rebuilds-at-the-barrier.md`
 /// [^5]: ADR-0001, one binary gives one answer at any thread count, decision D4. `docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
 /// [^6]: ADR-0068, terrain is generated from the seed and is never stored as a map, decision D1, a draft record. `docs/adrs/draft/adr-0068-terrain-is-generated-from-the-seed-and-is-never-stored-as-a-map.md`
-/// [^7]: ADR-0009, parallel stages write disjoint outputs, because the memory model is weak. `docs/adrs/REGISTRY.md`
+/// [^7]: ADR-0009, parallel stages write disjoint outputs, because the memory model is weak, a draft record. `docs/adrs/draft/adr-0009-parallel-stages-write-disjoint-outputs.md`
 fn admit(
     intents: &[(Entity, Axial)],
     soldiers: &SoldierArena,

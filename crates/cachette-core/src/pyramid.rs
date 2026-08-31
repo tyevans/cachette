@@ -432,7 +432,7 @@ impl Pyramid {
     /// # References
     ///
     /// [^1]: ADR-0022, level 0 is the only truth, and every level above it is derived, decision D3, a draft record. `docs/adrs/draft/adr-0022-level-0-is-the-only-truth-and-every-level-above-it-is-derived.md`
-    /// [^2]: ADR-0009, parallel stages write disjoint outputs, because the memory model is weak. `docs/adrs/REGISTRY.md`
+    /// [^2]: ADR-0009, parallel stages write disjoint outputs, because the memory model is weak, a draft record. `docs/adrs/draft/adr-0009-parallel-stages-write-disjoint-outputs.md`
     /// [^3]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
     /// [^4]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`
     pub fn rebuild(
