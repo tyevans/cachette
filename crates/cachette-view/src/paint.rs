@@ -11,7 +11,7 @@
 //! # References
 //!
 //! [^1]: ADR-0002, simulated and aggregated state holds no floating point number, decision D4. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
-//! [^2]: ADR-0067, the viewer reads the world and never writes to it, decision D3. `docs/adrs/draft/adr-0067-the-viewer-reads-the-world-and-never-writes-to-it.md`
+//! [^2]: ADR-0067, the viewer reads the world and never writes to it, decision D3. `docs/adrs/accepted/adr-0067-the-viewer-reads-the-world-and-never-writes-to-it.md`
 //! [^3]: ADR-0017, the world is a rhombus, so a tile index is raw axial, decision D4. `docs/adrs/accepted/adr-0017-the-world-is-a-rhombus-so-a-tile-index-is-raw-axial.md`
 
 use cachette_core::terrain::{TileKind, KIND_COUNT};
@@ -34,7 +34,7 @@ const BACKGROUND: u32 = 0x0010_1418;
 ///
 /// # References
 ///
-/// [^1]: ADR-0067, the viewer reads the world and never writes to it, decision D2. `docs/adrs/draft/adr-0067-the-viewer-reads-the-world-and-never-writes-to-it.md`
+/// [^1]: ADR-0067, the viewer reads the world and never writes to it, decision D2. `docs/adrs/accepted/adr-0067-the-viewer-reads-the-world-and-never-writes-to-it.md`
 /// [^2]: ADR-0068, terrain is generated from the seed and is never stored as a map, decision D4, a draft record. `docs/adrs/draft/adr-0068-terrain-is-generated-from-the-seed-and-is-never-stored-as-a-map.md`
 const KIND_COLOURS: [u32; KIND_COUNT] = [
     // Water. Deep blue, and the only kind that admits no unit.
@@ -99,7 +99,7 @@ pub const COLOURED_FACTIONS: usize = FACTION_COLOURS.len();
 ///
 /// # References
 ///
-/// [^1]: ADR-0067, the viewer reads the world and never writes to it, decision D2. `docs/adrs/draft/adr-0067-the-viewer-reads-the-world-and-never-writes-to-it.md`
+/// [^1]: ADR-0067, the viewer reads the world and never writes to it, decision D2. `docs/adrs/accepted/adr-0067-the-viewer-reads-the-world-and-never-writes-to-it.md`
 #[must_use]
 pub fn faction_colour(faction: FactionId) -> u32 {
     FACTION_COLOURS[colour_slot(faction)]
@@ -186,7 +186,7 @@ impl Canvas {
     /// # References
     ///
     /// [^1]: PRD-0002, a developer watches the world run. `docs/product/shaped/prd-0002-a-developer-watches-the-world-run.md`
-    /// [^2]: ADR-0067, the viewer reads the world and never writes to it, decision D2. `docs/adrs/draft/adr-0067-the-viewer-reads-the-world-and-never-writes-to-it.md`
+    /// [^2]: ADR-0067, the viewer reads the world and never writes to it, decision D2. `docs/adrs/accepted/adr-0067-the-viewer-reads-the-world-and-never-writes-to-it.md`
     #[must_use]
     pub const fn tiles_painted(&self) -> u32 {
         self.tiles_painted
@@ -203,7 +203,7 @@ impl Canvas {
     ///
     /// # References
     ///
-    /// [^1]: ADR-0067, the viewer reads the world and never writes to it, decision D2. `docs/adrs/draft/adr-0067-the-viewer-reads-the-world-and-never-writes-to-it.md`
+    /// [^1]: ADR-0067, the viewer reads the world and never writes to it, decision D2. `docs/adrs/accepted/adr-0067-the-viewer-reads-the-world-and-never-writes-to-it.md`
     /// [^2]: PRD-0003, a developer sees a world worth looking at. `docs/product/shaped/prd-0003-a-developer-sees-a-world-worth-looking-at.md`
     #[must_use]
     pub const fn painted_by_kind(&self) -> &[u32; KIND_COUNT] {
@@ -246,7 +246,7 @@ impl Canvas {
     /// # References
     ///
     /// [^1]: PRD-0002, a developer watches the world run. `docs/product/shaped/prd-0002-a-developer-watches-the-world-run.md`
-    /// [^2]: ADR-0070, the head-up display reports what the drawing pass read, decision D1. `docs/adrs/draft/adr-0070-the-head-up-display-reports-what-the-drawing-pass-read.md`
+    /// [^2]: ADR-0070, the head-up display reports what the drawing pass read, decision D1. `docs/adrs/accepted/adr-0070-the-head-up-display-reports-what-the-drawing-pass-read.md`
     #[must_use]
     pub const fn painted_by_faction(&self) -> &[u32; COLOURED_FACTIONS] {
         &self.painted_by_faction
@@ -391,7 +391,7 @@ impl Canvas {
 ///
 /// # References
 ///
-/// [^1]: ADR-0067, the viewer reads the world and never writes to it, decision D2. `docs/adrs/draft/adr-0067-the-viewer-reads-the-world-and-never-writes-to-it.md`
+/// [^1]: ADR-0067, the viewer reads the world and never writes to it, decision D2. `docs/adrs/accepted/adr-0067-the-viewer-reads-the-world-and-never-writes-to-it.md`
 #[derive(Clone, Copy, Debug)]
 pub struct Camera {
     /// The width of one tile in pixels.
@@ -484,7 +484,7 @@ impl Camera {
     ///
     /// # References
     ///
-    /// [^1]: ADR-0067, the viewer reads the world and never writes to it, decision D3. `docs/adrs/draft/adr-0067-the-viewer-reads-the-world-and-never-writes-to-it.md`
+    /// [^1]: ADR-0067, the viewer reads the world and never writes to it, decision D3. `docs/adrs/accepted/adr-0067-the-viewer-reads-the-world-and-never-writes-to-it.md`
     #[must_use]
     pub fn tile_at(self, x: f32, y: f32) -> Axial {
         let r = (y - self.origin_y) / positive(self.tile_height);
@@ -500,7 +500,7 @@ impl Camera {
     ///
     /// # References
     ///
-    /// [^1]: ADR-0067, the viewer reads the world and never writes to it, decision D2. `docs/adrs/draft/adr-0067-the-viewer-reads-the-world-and-never-writes-to-it.md`
+    /// [^1]: ADR-0067, the viewer reads the world and never writes to it, decision D2. `docs/adrs/accepted/adr-0067-the-viewer-reads-the-world-and-never-writes-to-it.md`
     #[must_use]
     pub fn panned(self, across: f32, down: f32) -> Self {
         Self {
@@ -680,7 +680,7 @@ fn span(first: f32, last: f32, limit: u32) -> (u32, u32) {
 /// # References
 ///
 /// [^1]: PRD-0003, a developer sees a world worth looking at. `docs/product/shaped/prd-0003-a-developer-sees-a-world-worth-looking-at.md`
-/// [^2]: ADR-0067, the viewer reads the world and never writes to it, decision D3. `docs/adrs/draft/adr-0067-the-viewer-reads-the-world-and-never-writes-to-it.md`
+/// [^2]: ADR-0067, the viewer reads the world and never writes to it, decision D3. `docs/adrs/accepted/adr-0067-the-viewer-reads-the-world-and-never-writes-to-it.md`
 fn tile_colour(kind: TileKind, height: i32, value: i32) -> u32 {
     let base = KIND_COLOURS[kind.to_u8() as usize];
     // The height is a fraction of the full range in Q16.16, so the unit is
@@ -701,7 +701,7 @@ fn tile_colour(kind: TileKind, height: i32, value: i32) -> u32 {
 ///
 /// # References
 ///
-/// [^1]: ADR-0067, the viewer reads the world and never writes to it, decision D2. `docs/adrs/draft/adr-0067-the-viewer-reads-the-world-and-never-writes-to-it.md`
+/// [^1]: ADR-0067, the viewer reads the world and never writes to it, decision D2. `docs/adrs/accepted/adr-0067-the-viewer-reads-the-world-and-never-writes-to-it.md`
 #[must_use]
 pub fn kind_colour(kind: TileKind) -> u32 {
     tile_colour(kind, 0x0000_8000, 0)
@@ -715,7 +715,7 @@ pub fn kind_colour(kind: TileKind) -> u32 {
 ///
 /// # References
 ///
-/// [^1]: ADR-0067, the viewer reads the world and never writes to it, decision D1. `docs/adrs/draft/adr-0067-the-viewer-reads-the-world-and-never-writes-to-it.md`
+/// [^1]: ADR-0067, the viewer reads the world and never writes to it, decision D1. `docs/adrs/accepted/adr-0067-the-viewer-reads-the-world-and-never-writes-to-it.md`
 /// [^2]: ADR-0068, terrain is generated from the seed and is never stored as a map, decision D1, a draft record. `docs/adrs/draft/adr-0068-terrain-is-generated-from-the-seed-and-is-never-stored-as-a-map.md`
 pub fn draw(world: &World, camera: Camera, canvas: &mut Canvas) -> Result<(), BridgeError> {
     canvas.clear();

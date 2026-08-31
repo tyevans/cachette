@@ -89,4 +89,4 @@ change if that review accepts it.[^2]
 ## References
 
 [^1]: Review 0035, the head-up display record. `docs/reviews/0035-the-head-up-display-record.md`
-[^2]: Backlog item 0047. `docs/backlog/refined/0047-review-adr-0067-for-acceptance.md`
+[^2]: Backlog item 0047. `docs/backlog/complete/0047-review-adr-0067-for-acceptance.md`

@@ -4,7 +4,7 @@
 
 | Item | Value |
 |---|---|
-| `docs/adrs/draft/adr-0070-the-head-up-display-reports-what-the-drawing-pass-read.md` | Status `Draft` |
+| `docs/adrs/accepted/adr-0070-the-head-up-display-reports-what-the-drawing-pass-read.md` | Status `Draft` |
 | Branch | `docs/review-adr-0070-for-acceptance` |
 | Code read | `crates/cachette-view/src/hud.rs`, `crates/cachette-view/src/paint.rs`, `crates/cachette-view/src/metrics.rs`, `crates/cachette-view/src/main.rs` |
 
@@ -207,4 +207,4 @@ review by a second person supersedes this one.[^2]
 [^1]: Blockers register, BLK-007. `docs/BLOCKERS.md`
 [^2]: ADR Registry, who reviews. `docs/adrs/REGISTRY.md`
 [^3]: Findings register, FND-042 and FND-055. `docs/FINDINGS.md`
-[^4]: Backlog item 0047. `docs/backlog/refined/0047-review-adr-0067-for-acceptance.md`
+[^4]: Backlog item 0047. `docs/backlog/complete/0047-review-adr-0067-for-acceptance.md`

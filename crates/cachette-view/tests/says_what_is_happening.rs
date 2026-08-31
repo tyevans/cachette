@@ -16,8 +16,8 @@
 //! # References
 //!
 //! [^1]: Testing Rules, drive the real caller. `.claude/rules/testing.md`
-//! [^2]: ADR-0070, the head-up display reports what the drawing pass read. `docs/adrs/draft/adr-0070-the-head-up-display-reports-what-the-drawing-pass-read.md`
-//! [^3]: ADR-0067, the viewer reads the world and never writes to it. `docs/adrs/draft/adr-0067-the-viewer-reads-the-world-and-never-writes-to-it.md`
+//! [^2]: ADR-0070, the head-up display reports what the drawing pass read. `docs/adrs/accepted/adr-0070-the-head-up-display-reports-what-the-drawing-pass-read.md`
+//! [^3]: ADR-0067, the viewer reads the world and never writes to it. `docs/adrs/accepted/adr-0067-the-viewer-reads-the-world-and-never-writes-to-it.md`
 
 // An integration test is its own crate, so the allowance at the viewer's
 // crate root does not reach it. The reason is the same one: ADR-0067 D3 puts

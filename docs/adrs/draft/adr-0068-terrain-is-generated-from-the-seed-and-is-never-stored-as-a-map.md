@@ -173,4 +173,4 @@ twice, in a different form.[^4]
 [^8]: Testing rules, section 2. `.claude/rules/testing.md`
 [^9]: Decisions register, DEC-017. `docs/DECISIONS.md`
 [^10]: ADR-0001, one binary gives one answer at any thread count, decision D4. `docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
-[^11]: ADR-0067, the viewer reads the world and never writes to it, decision D2. `docs/adrs/draft/adr-0067-the-viewer-reads-the-world-and-never-writes-to-it.md`
+[^11]: ADR-0067, the viewer reads the world and never writes to it, decision D2. `docs/adrs/accepted/adr-0067-the-viewer-reads-the-world-and-never-writes-to-it.md`

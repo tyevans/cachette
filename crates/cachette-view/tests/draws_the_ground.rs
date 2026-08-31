@@ -19,7 +19,7 @@
 //! # References
 //!
 //! [^1]: PRD-0003, a developer sees a world worth looking at. `docs/product/shaped/prd-0003-a-developer-sees-a-world-worth-looking-at.md`
-//! [^2]: ADR-0067, the viewer reads the world and never writes to it, decision D2. `docs/adrs/draft/adr-0067-the-viewer-reads-the-world-and-never-writes-to-it.md`
+//! [^2]: ADR-0067, the viewer reads the world and never writes to it, decision D2. `docs/adrs/accepted/adr-0067-the-viewer-reads-the-world-and-never-writes-to-it.md`
 //! [^3]: Testing rules, section 2a. `.claude/rules/testing.md`
 //! [^4]: Findings register, FND-054. `docs/FINDINGS.md`
 

@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-056**
+**Next number: FND-057**
 
 ## A. Corrections to stated rules
 
@@ -1103,6 +1103,43 @@ what a record's status was on the day it was reviewed, and that statement is
 true and must stay. The line that carries it is a table row, not a footnote,
 so the shape of the line is what separates a live claim from a historical
 one.
+
+### FND-056 — A constraint can be stated over a subject wider than itself
+
+**Believed.** A decision record states a constraint, and a reviewer checks the
+code against it. If the constraint is right, the record is right.
+
+**True.** A constraint has a subject as well as a claim, and the subject can be
+wrong while the claim is right. A subject wider than the constraint forbids
+things the constraint was never about, and the record then contradicts itself
+if another of its decisions requires one of them.
+
+**Evidence.** ADR-0067 D1 said the viewer holds a shared reference to the
+world, calls no method that takes a mutable reference, never spawns or moves
+an entity, and never advances a tick. D5 said the viewer is a crate. D4 said
+one loop steps the engine and then draws, and that loop is in that crate. The
+demonstration binary therefore did all three things D1 forbids, and the
+record's own consequences named that binary and described it stepping.
+
+The claim was never in doubt: D1's rationale is that a drawing must not put a
+person's choice of what to look at into simulated state. Stepping the engine
+is not that. The subject was the whole crate when it should have been the path
+from the world to the picture.
+
+Nothing caught it for the life of the draft. The code was right, every test
+passed, and a reader who knew the intent read past the words.
+
+**Follows.** Two things.
+
+**Read a constraint's subject as carefully as its claim.** Ask what the words
+forbid, not what the author meant to forbid, and then ask whether the same
+record requires any of it. Two decisions in one record that contradict each
+other are cheaper to find than two records that do, and nobody looks.
+
+**A constraint a reviewer must read past is not a constraint.** The test is
+whether a reviewer asked to enforce the words alone would reach the right
+answer. If enforcing the record as written would refuse something the project
+requires, the record needs an amendment even though the code needs none.
 
 ## References
 
