@@ -282,3 +282,82 @@ it needs a supersession.
 
 **Order.** 0019 first, alone. Then 0020, which needs the arena and the sort.
 The two do not run in parallel, because both write to the entity storage.
+
+### Sprint 3 — review
+
+**Goal met.** A soldier exists in the arena, a tile answers which soldiers
+stand on it, and neither answer depends on the thread count.
+
+| Item | Outcome |
+|---|---|
+| 0019 | The soldier arena, plus the two repairs the reviews demanded |
+| 0020 | The bridge, rebuilt at the barrier from the shared sort |
+
+**Demonstrated.** Every gate green. The review of item 0019 found a defect
+that the test suite was demonstrating while passing: three faction ceilings
+existed and one was enforced, and the thread-count test spawned soldiers of
+factions its world did not hold.
+
+**Not shipped.** Nothing. The sprint committed two items and delivered two,
+which is what committing to two rather than five buys.
+
+### Sprint 3 — retrospective
+
+**What worked.** Committing to two items. Sprint 2 committed five, delivered
+three, and the two that slipped were the two that mattered. Sprint 3 took
+those two alone and finished both.
+
+**What worked twice.** The mutation check. It found that a repair had no
+test, on the day the repair was written, by reverting it and watching nothing
+fail. A fix with no test is indistinguishable from no fix once the author
+moves on.
+
+**What went wrong, and it is a measurement problem.** Two attempts to count
+mutation kills were both unsound. The first ran one test target and missed
+the unit tests inside the module, which nearly produced a report that a rule
+was untested. The second ran every target but let the runner stop at the
+first failing binary, which undercounted by a factor of five. Both numbers
+were published before they were checked.
+
+**A count is a claim, and a claim needs the same proof as any other.** The
+command is now written down. `cargo test -p cachette-core --no-fail-fast`.
+
+**What to keep.** Serial items when they share a surface. Items 0019 and 0020
+both write to the entity storage, so they ran one after the other, and no
+conflict cost anything. The one cost of that discipline was waiting, and the
+waiting was cheaper than a merge.
+
+### Sprint 4 — planning
+
+**Goal.** One command opens a window, the hex world appears in it, and
+entities move on it under random behaviour while a developer watches.
+
+**Committed.** Items 0024, 0022, 0025 and 0026.
+
+**Why four, when sprint 3 committed two.** Three of them are small and one is
+the goal. Item 0024 is a record. Item 0022 is a behaviour that the arena and
+the keyed generator already support. Item 0025 is the paint routine. Item
+0026 is the loop that joins them. They are serial, they share the same new
+crate, and none of them is the size of the arena.
+
+**Two decisions the project owner made at planning.**
+
+The viewer opens a window through a software framebuffer, with one small
+dependency. The alternative was a graphics-backed surface, which brings a
+large dependency tree, an asynchronous event loop that would shape the
+demonstration binary, and more continuous integration surface. The
+demonstration draws a world small enough to watch, which the product record
+already bounds, so the scale the alternative buys is not needed yet.
+
+The viewer reads the world on the stepping thread: step, then draw. The
+alternative was a published frame with the engine on its own thread, which
+honours the product record's "never slows the engine" literally and would
+exercise the snapshot row. That row has no record yet, and writing one to
+serve a demonstration is the wrong order. The consequence is stated in the
+viewer record rather than left implicit.
+
+**Balance.** Record work is 0024. Code work is 0022, 0025 and 0026.
+
+**Order.** 0024 first, because it states what the viewer may not do. Then
+0022, which is engine work and touches no viewer code. Then 0025 and 0026,
+which share the new crate and run serially.
