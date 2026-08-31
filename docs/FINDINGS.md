@@ -814,49 +814,46 @@ capacity allows. The testing rule already says a determinism test cannot tell
 correct from consistently wrong; this is the same lesson reaching an
 invariant rather than a keyed draw.
 
-### FND-049 — The cost of a step is not where the project assumed
+### FND-050 — An allocator that reads the tree cannot serve parallel work
 
-**Believed.** The tile system is the large cost of a step. It touches every
-tile of a 16.7 million tile world, and the units are far fewer, so the tiles
-dominate.
+**Believed.** The backlog needs no registry. The three directories are the
+index, and a number is allocated by reading the highest one and adding one.
+The decision records need a registry because their numbers carry status; the
+backlog numbers carry nothing.
 
-**True.** The tiles are cheap and the units are expensive. On the measured
-world a tile costs about 17 nanoseconds a tick and a soldier costs about
-0.93 microseconds. A soldier costs about fifty times a tile. More than half
-of what a soldier costs is not the movement at all: it is the rebuild of the
-derived unit-to-tile bridge.
+**True.** The rule is not about status. It is about who reads and who writes,
+and when. A rule that derives the next value from the tree is safe only while
+one worker acts at a time. Two workers that read the same tree derive the same
+value, and each writes a file that looks correct.
 
-**Evidence.** An example runs worlds that differ in one thing at a time. On a
-development machine, release profile, 12 threads, 40 ticks each, a world of
-281600 tiles with no soldiers cost 6904 microseconds a step, and a world of
-2816 tiles with no soldiers cost 2083. The same 281600 tile world cost 31954
-with 22000 soldiers and 13593 with 2200. The rebuild is public and was timed
-alone: 14497 microseconds at 22000 soldiers and 3830 at 2200, against zero
-with no soldiers.
+**Evidence.** Two agents worked at the same time in separate worktrees. Both
+read the highest backlog number, 0031. Both added one. Both delivered a pull
+request holding items 0032, 0033 and 0034, for six different pieces of work.
+Neither agent did anything wrong: each followed the written rule exactly.
 
-Two further facts came from the same run. A fixed cost near 2 milliseconds a
-step does not depend on the world size. The dense world cost more than the
-sparse world at the same soldier count, 38168 against 31954, so density makes
-movement worse.
+The decision record numbers and the product record numbers did not collide in
+the same run, because they were allocated centrally before the work was
+dispatched. The backlog was not, and the reason it was not is that its guide
+says an index is unnecessary.
 
 **Follows.** Three things.
 
-**A derived cost figure can be wrong about which term dominates, not only
-about its size.** Every cost figure in this project is derived, and the
-project treated that as a question of accuracy. It is also a question of
-shape. A derivation that names the wrong dominant term sends the optimisation
-work to the wrong subsystem.
+**An allocator that reads the tree is a redundant declaration site with the
+timing hidden.** The recurring defect list already holds the shape: one value
+declared in more than one place, with nothing that fails when the copies
+disagree. Here the second declaration is the second reader, and the window is
+the time between the read and the write.
 
-**A cost that grows with the units belongs to the derived structures, not
-only to the systems.** The bridge is rebuilt at the barrier and nothing in the
-design made its cost visible, because it is not a system and has no place in
-the frame schedule that a reader would look at.
+**A registry was not the fix.** Adding one would put the numbers in two places
+and create the shape this project keeps finding. The fix is a check that fails
+when one number names more than one item, and a rule that the person who
+dispatches parallel work allocates the numbers first.
 
-**The first measurement changed the plan the moment it was taken.** BLK-007
-asks for measurement on the target platform and stays open. This is a
-development machine, one run, with a cache line the target does not have. It
-is enough to say which term dominates. It is not enough to say what any term
-costs.
+**The rule that fails is the rule nobody suspected.** The project guarded the
+record numbers because a collision there had happened three times. It left the
+backlog unguarded because a collision there had never happened. Neither fact
+was about the mechanism. **Guard the derivation, not the place that has been
+burned.**
 
 ## References
 

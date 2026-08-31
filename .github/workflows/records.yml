@@ -16,12 +16,20 @@ jobs:
         run: ./scripts/check-adrs.sh
       - name: Check the product records
         run: ./scripts/check-prds.sh
+      - name: Check the backlog numbering
+        run: ./scripts/check-backlog.sh
       - name: Check the citations outside the records
         run: ./scripts/check-citations.sh
       - name: Prove the product record check can fail
         run: |
           if ./scripts/check-prds.sh tests/fixtures/prd-broken; then
             echo "the check passed against deliberately broken records" >&2
+            exit 1
+          fi
+      - name: Prove the backlog check can fail
+        run: |
+          if ./scripts/check-backlog.sh tests/fixtures/backlog-broken; then
+            echo "the check passed against a deliberately broken backlog" >&2
             exit 1
           fi
       - name: Prove the citation check can fail
