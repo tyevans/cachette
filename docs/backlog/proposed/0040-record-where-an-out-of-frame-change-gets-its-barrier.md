@@ -19,10 +19,15 @@ when a second structural apply lands inside the frame, because the ordering
 between the two is a real decision then and a comment is not the mechanism
 this project accepts for that class of fact.
 
-Refine this with the item that adds the structural apply, which is where the
-same question is already waiting.[^2]
+**The barrier itself is settled.** The item that asked for it is complete, and
+four tests read the ordering from outside: a rebuild that ran before the
+structural apply leaves the derived structure stale when the step ends.[^2]
+This item is about the other call site, the one at the top of the step, which
+serves a change the caller made outside any frame. That one has no test that
+could fail, because a caller who forgets to rebuild is served rather than
+refused, which is the whole point of the assumption.
 
 ## References
 
 [^1]: Decisions register, DEC-021. `docs/DECISIONS.md`
-[^2]: Backlog item 0030. `docs/backlog/proposed/0030-enforce-the-barrier-ordering.md`
+[^2]: Backlog item 0030. `docs/backlog/complete/0030-enforce-the-barrier-ordering.md`
