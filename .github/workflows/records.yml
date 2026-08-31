@@ -18,6 +18,8 @@ jobs:
         run: ./scripts/check-prds.sh
       - name: Check the backlog numbering
         run: ./scripts/check-backlog.sh
+      - name: Check the register numbering
+        run: ./scripts/check-registers.sh
       - name: Check the citations outside the records
         run: ./scripts/check-citations.sh
       - name: Prove the product record check can fail

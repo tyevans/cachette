@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-049**
+**Next number: FND-053**
 
 ## A. Corrections to stated rules
 
@@ -814,6 +814,50 @@ capacity allows. The testing rule already says a determinism test cannot tell
 correct from consistently wrong; this is the same lesson reaching an
 invariant rather than a keyed draw.
 
+### FND-049 — The cost of a step is not where the project assumed
+
+**Believed.** The tile system is the large cost of a step. It touches every
+tile of a 16.7 million tile world, and the units are far fewer, so the tiles
+dominate.
+
+**True.** The tiles are cheap and the units are expensive. On the measured
+world a tile costs about 17 nanoseconds a tick and a soldier costs about
+0.93 microseconds. A soldier costs about fifty times a tile. More than half
+of what a soldier costs is not the movement at all: it is the rebuild of the
+derived unit-to-tile bridge.
+
+**Evidence.** An example runs worlds that differ in one thing at a time. On a
+development machine, release profile, 12 threads, 40 ticks each, a world of
+281600 tiles with no soldiers cost 6904 microseconds a step, and a world of
+2816 tiles with no soldiers cost 2083. The same 281600 tile world cost 31954
+with 22000 soldiers and 13593 with 2200. The rebuild is public and was timed
+alone: 14497 microseconds at 22000 soldiers and 3830 at 2200, against zero
+with no soldiers.
+
+Two further facts came from the same run. A fixed cost near 2 milliseconds a
+step does not depend on the world size. The dense world cost more than the
+sparse world at the same soldier count, 38168 against 31954, so density makes
+movement worse.
+
+**Follows.** Three things.
+
+**A derived cost figure can be wrong about which term dominates, not only
+about its size.** Every cost figure in this project is derived, and the
+project treated that as a question of accuracy. It is also a question of
+shape. A derivation that names the wrong dominant term sends the optimisation
+work to the wrong subsystem.
+
+**A cost that grows with the units belongs to the derived structures, not
+only to the systems.** The bridge is rebuilt at the barrier and nothing in the
+design made its cost visible, because it is not a system and has no place in
+the frame schedule that a reader would look at.
+
+**The first measurement changed the plan the moment it was taken.** BLK-007
+asks for measurement on the target platform and stays open. This is a
+development machine, one run, with a cache line the target does not have. It
+is enough to say which term dominates. It is not enough to say what any term
+costs.
+
 ### FND-050 — An allocator that reads the tree cannot serve parallel work
 
 **Believed.** The backlog needs no registry. The three directories are the
@@ -895,6 +939,44 @@ determinism test cannot tell correct from consistently wrong, and that a
 determinism test must be able to fail. Those are properties of the assertion.
 This is a property of the input. An assertion strong enough to catch the
 defect still catches nothing when the data never produces it.
+
+### FND-052 — A register was restored from a copy, and an entry left silently
+
+**Believed.** A register is safe under parallel work as long as two writers do
+not edit the same rows. The merge is clean, so the content is correct.
+
+**True.** A clean merge says the two sides did not conflict. It says nothing
+about whether one side carried the whole file. A register restored from a copy
+of an older base loses every entry added between that base and now, and the
+loss looks exactly like a file that was never changed.
+
+**Evidence.** A reviewing agent ran a checkout in the shared working tree and
+moved a session off its branch mid-edit. Recovering meant copying
+`docs/FINDINGS.md` back from a saved copy, and that copy came from the other
+branch, whose base predated FND-049. The restored file therefore held a
+correct new entry and no FND-049. It merged cleanly, because the two sides
+never touched the same lines, and the entry was gone from the register for
+three merges.
+
+The register states the next free number in its own text, and that pointer
+still read FND-049 while three entries above it existed. Neither the loss nor
+the stale pointer failed anything.
+
+**Follows.** Three things.
+
+**A register carries its own allocator, and nothing checked it.** The findings,
+blockers and decisions registers each state a next number. That is a second
+declaration site for a value the rows already carry, which is the shape this
+project keeps finding. A check now fails when a number names two entries, and
+when the stated next number is not one above the highest.
+
+**A whole-file restore is a delete of everything it does not contain.** Copying
+a file back is not the same as restoring a change. Prefer the version control
+history to a saved copy, and name the commit the content came from.
+
+**A shared working tree is not safe for a reviewer.** The agent that caused
+this was reviewing, not writing, and it changed no tracked file. Running a
+checkout was enough. A reviewing agent gets its own worktree.
 
 ## References
 
