@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-047**
+**Next number: FND-048**
 
 ## A. Corrections to stated rules
 
@@ -751,6 +751,37 @@ greps when renaming an argument, and no local command ran it. It is now a
 script that both the workflow and the local gate run, so the interface has
 one usage site and the local gate covers it. **When a check exists only in
 continuous integration, the local gate is not the gate.**
+
+### FND-047 — A record was written for a subsystem nobody had built
+
+**Believed.** The research phase produced records for the subsystems it
+studied. A record that states a design well is worth keeping until the
+subsystem arrives.
+
+**True.** ADR-0057 specified a portal graph, a flow tile cache keyed on a
+chunk and an exit, and a coarse biasing field, in five numbered decisions,
+before any path-finding existed and before any product record asked for a
+long path. It was retired rather than accepted.
+
+**Evidence.** The record check reported it as cited by nothing for the whole
+life of the project. That note was the only standing one, and it stopped the
+moment the record went. No record, no source file and no registry row named
+it. The three citations that existed were in the backlog item that scheduled
+its own audit.
+
+**Follows.** The scope rule's first condition asks whether a contributor could
+reasonably choose otherwise, and it assumes a choice was made. Here nothing
+had chosen anything: there was no path-finding to constrain, so the record
+preserved a design rather than a decision. **A record written before its
+subsystem exists cannot pass the first condition, because the decision it
+claims to hold has not been taken.**
+
+The research is not lost. Report 10 holds the reasoning, and a future record
+starts from the report with a fresh number.
+
+Retiring cost one row and one backlog edit. Accepting it would have bound the
+first person to write a path-finder to a design nobody had tested against a
+need nobody had stated.
 
 ## References
 
