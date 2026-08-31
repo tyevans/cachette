@@ -15,6 +15,7 @@
 //! [^1]: ADR-0001, one binary gives one answer at any thread count, decision D4. `docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
 //! [^2]: Testing policy. `docs/TESTING.md`
 
+use cachette_core::holding::Holder;
 use cachette_core::resource::{Amount, ResourceKind};
 use cachette_core::site::CommodityId;
 use cachette_core::terrain::TileKind;
@@ -536,6 +537,127 @@ fn a_world_that_holds_settlements_is_identical_at_every_thread_count() {
     );
 }
 
+/// Founds sites that produce and that owe, and returns them.
+///
+/// The pattern gives some sites more upkeep than production, so a long run
+/// reaches the site that cannot pay. That is where determinism is easiest to
+/// lose in this pass: who fell short, and in what order the log records it,
+/// must come from the slot order and never from the thread that finished
+/// first.[^1]
+///
+/// The caller asserts that the fixture produced both cases. A fixture whose
+/// stores never run low would measure itself.[^2]
+///
+/// # References
+///
+/// [^1]: ADR-0004, iteration order is explicit, decision D3. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
+/// [^2]: Findings register, FND-051. `docs/FINDINGS.md`
+fn give_rates(world: &mut World) -> Vec<Entity> {
+    let sites = settle(world);
+    for (index, site) in sites.iter().enumerate() {
+        let index = index as u32;
+        // A rate of zero is a real rate, so part of the population earns
+        // nothing and owes nothing.
+        if index % 5 == 4 {
+            continue;
+        }
+        world
+            .set_production_rate(
+                *site,
+                CommodityId(0),
+                Fix32::from_int((index % 4 + 1) as i16),
+            )
+            .expect("the rate is at or above zero");
+        // The upkeep runs ahead of the production at many of these sites, so
+        // their stores stay at zero and they fall short on every application.
+        // A fixture whose shortfalls land on two adjacent slots cannot tell a
+        // join in slot order from a join in the reverse of it.
+        world
+            .set_upkeep_rate(
+                *site,
+                CommodityId(0),
+                Fix32::from_int((index % 3 + 2) as i16),
+            )
+            .expect("the rate is at or above zero");
+    }
+    sites
+}
+
+/// Runs the frames over a world whose sites produce and spend.
+fn run_with_rates(config: WorldConfig, frames: u64, threads: usize) -> (Vec<u8>, u64, usize, i64) {
+    let mut world = World::new(config).expect("the extent must describe a world");
+    world
+        .set_economy_schedule(3, 1)
+        .expect("the period is inside the range");
+    let sites = give_rates(&mut world);
+    let mut shortfalls = 0usize;
+    // The log holds the last application only, and the last frame is not
+    // always a tick that the schedule names. Gathering the bytes of every
+    // frame is what makes this comparison read a log that holds something.
+    let mut bytes = Vec::new();
+    for _ in 0..frames.max(12) {
+        world.step(threads).expect("the step must run");
+        shortfalls += world.shortfall_log().len();
+        bytes.extend_from_slice(world.shortfall_log_bytes());
+    }
+    assert!(world.check_invariants());
+    assert!(sites.iter().all(|site| world.settlements().contains(*site)));
+    bytes.extend_from_slice(world.event_log_bytes());
+    (
+        bytes,
+        world.state_hash().finish(),
+        shortfalls,
+        world.rate_ledger().produced[0].0,
+    )
+}
+
+#[test]
+fn a_world_whose_sites_produce_is_identical_at_every_thread_count() {
+    let mut produced = 0;
+    let mut fell_short = 0;
+    let mut logged = 0;
+    for (name, config, frames) in SCENARIOS {
+        let expected = run_with_rates(*config, *frames, THREAD_COUNTS[0]);
+        if expected.3 > 0 {
+            produced += 1;
+        }
+        fell_short += expected.2;
+        logged += expected.0.len();
+        for threads in &THREAD_COUNTS[1..] {
+            let got = run_with_rates(*config, *frames, *threads);
+            assert_eq!(
+                got.0, expected.0,
+                "scenario {name}: the log differs at {threads} threads"
+            );
+            assert_eq!(
+                got.1, expected.1,
+                "scenario {name}: the state hash differs at {threads} threads"
+            );
+            assert_eq!(
+                got.2, expected.2,
+                "scenario {name}: the shortfall count differs at {threads} threads"
+            );
+            assert_eq!(
+                got.3, expected.3,
+                "scenario {name}: the produced total differs at {threads} threads"
+            );
+        }
+    }
+    assert_eq!(
+        produced,
+        SCENARIOS.len(),
+        "every scenario must hold a site that produces"
+    );
+    assert!(
+        fell_short > 0,
+        "no scenario reached a site that could not pay, so the case is not covered"
+    );
+    assert!(
+        logged > 0,
+        "the comparison read no shortfall byte, so it compared two empty logs"
+    );
+}
+
 #[test]
 fn the_settlement_columns_reach_the_state_hash() {
     // A hash that ignored the settlement columns would pass the golden test
@@ -753,4 +875,113 @@ fn the_character_columns_reach_the_state_hash() {
         .expect("the creation must succeed");
     assert_eq!(early.characters().len(), late.characters().len());
     assert_ne!(early.state_hash(), late.state_hash());
+}
+
+/// Places two rival garrisons far apart, and returns how many it placed.
+///
+/// The two holdings grow towards each other and meet, so a tile on the border
+/// is claimed by two factions on one tick. Who takes it must come from the
+/// stable key and never from the thread that decided first.[^1]
+///
+/// The caller asserts that the two holdings met. A fixture that only assumed
+/// it would measure itself.[^2]
+///
+/// # References
+///
+/// [^1]: ADR-0053, a faction is a bit in a mask, and a relation is a plane, decision D6, a draft record. `docs/adrs/draft/adr-0053-a-faction-is-a-bit-in-a-mask-and-a-relation-is-a-plane.md`
+/// [^2]: Findings register, FND-051. `docs/FINDINGS.md`
+fn rivals(world: &mut World) -> usize {
+    let grid = world.grid();
+    let open: Vec<Axial> = (0..grid.tile_count())
+        .map(|index| Axial::new((index % grid.width()) as i32, (index / grid.width()) as i32))
+        .filter(|address| world.admits_a_unit(*address))
+        .collect();
+    if open.len() < 8 || world.config().faction_count < 2 {
+        return 0;
+    }
+    // The two garrisons start a few tiles apart on the same open ground, so
+    // their holdings meet inside the frames that a scenario runs. Garrisons
+    // at opposite ends of a large world never meet, and the border would then
+    // be untested while the test stayed green.
+    let mut placed = 0;
+    for offset in 0..3 {
+        if world.spawn_soldier(open[offset], FactionId(0)).is_ok() {
+            placed += 1;
+        }
+        let rival = offset + 4;
+        if rival < open.len() && world.spawn_soldier(open[rival], FactionId(1)).is_ok() {
+            placed += 1;
+        }
+    }
+    placed
+}
+
+/// Counts the held tiles that touch a tile held by another faction.
+fn border_tiles(world: &World) -> usize {
+    let grid = world.grid();
+    (0..grid.tile_count())
+        .map(|index| Axial::new((index % grid.width()) as i32, (index / grid.width()) as i32))
+        .filter(|address| {
+            let Some(holder) = world.tile_holder(*address).and_then(Holder::faction) else {
+                return false;
+            };
+            grid.neighbours(*address)
+                .into_iter()
+                .flatten()
+                .filter_map(|neighbour| world.tile_holder(neighbour))
+                .filter_map(Holder::faction)
+                .any(|other| other != holder)
+        })
+        .count()
+}
+
+/// Runs the frames over a world whose holdings contend for a border.
+fn run_with_rivals(config: WorldConfig, frames: u64, threads: usize) -> (u64, Vec<i64>, usize) {
+    let mut world = World::new(config).expect("the extent must describe a world");
+    if rivals(&mut world) == 0 {
+        return (0, Vec::new(), 0);
+    }
+    for _ in 0..frames {
+        world.step(threads).expect("the step must run");
+    }
+    assert!(world.check_invariants());
+    let counts: Vec<i64> = (0..config.faction_count)
+        .map(|faction| world.holding_of(FactionId(faction)))
+        .collect();
+    (world.state_hash().finish(), counts, border_tiles(&world))
+}
+
+#[test]
+fn a_world_whose_holdings_contend_is_identical_at_every_thread_count() {
+    // A tile that two factions reach on one tick is where a holding loses
+    // determinism. The scenario must produce one, and the test says so.
+    let mut contested = 0;
+    for (name, config, frames) in SCENARIOS {
+        let expected = run_with_rivals(*config, *frames + 8, THREAD_COUNTS[0]);
+        if expected.1.is_empty() {
+            continue;
+        }
+        if expected.2 > 0 {
+            contested += 1;
+        }
+        for threads in &THREAD_COUNTS[1..] {
+            let produced = run_with_rivals(*config, *frames + 8, *threads);
+            assert_eq!(
+                produced.1, expected.1,
+                "scenario {name}: the holding differs at {threads} threads"
+            );
+            assert_eq!(
+                produced.0, expected.0,
+                "scenario {name}: the state hash differs at {threads} threads"
+            );
+            assert_eq!(
+                produced.2, expected.2,
+                "scenario {name}: the border differs at {threads} threads"
+            );
+        }
+    }
+    assert!(
+        contested > 0,
+        "no scenario produced a border, so the contested case was not covered"
+    );
 }

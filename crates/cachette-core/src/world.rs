@@ -32,14 +32,16 @@ use crate::character::{CharacterArena, CharacterError};
 use crate::event::{ResourceTaken, TileChanged, CHANGE_KIND_LOWERED, CHANGE_KIND_RAISED};
 use crate::hash::StateHash;
 use crate::hex::{Axial, Grid, GridError, NEIGHBOUR_COUNT};
+use crate::holding::{FactionMask, Holder, Holding};
 use crate::pyramid::{CellSummary, Pyramid};
+use crate::rates::{RateError, RateLedger, RateSchedule, RateTable, SiteShortfall};
 use crate::resource::{
     ledger_key, Amount, CarryLoad, DepletionLedger, ResourceField, ResourceKind,
     RESOURCE_KIND_COUNT,
 };
 use crate::rng;
 use crate::sim_math;
-use crate::site::{CommodityId, SettlementArena, SettlementError};
+use crate::site::{CommodityId, SettlementArena, SettlementError, COMMODITY_COUNT};
 use crate::slots::Slots;
 use crate::soldier::{SoldierArena, SoldierError};
 #[cfg(not(feature = "probe-nondeterminism"))]
@@ -62,6 +64,17 @@ pub enum StepError {
     /// The intent half already drops a target outside the extent, so this
     /// says that the two halves disagree rather than that a caller erred.
     TargetOutsideWorld,
+    /// The site rate pass refused to run.
+    Rates(RateError),
+}
+
+impl From<RateError> for StepError {
+    fn from(error: RateError) -> Self {
+        match error {
+            RateError::ZeroThreads => Self::ZeroThreads,
+            other => Self::Rates(other),
+        }
+    }
 }
 
 impl From<SortError> for StepError {
@@ -131,6 +144,7 @@ impl core::fmt::Display for StepError {
             Self::TargetOutsideWorld => {
                 write!(formatter, "an intent named a tile outside the world")
             }
+            Self::Rates(error) => write!(formatter, "the site rate pass refused: {error}"),
         }
     }
 }
@@ -215,6 +229,36 @@ pub struct World {
     departed: [u64; RESOURCE_KIND_COUNT],
     /// Level 1 of the pyramid, derived from level 0 at the barrier.
     pyramid: Pyramid,
+    /// Who holds each tile, and what each faction holds.
+    ///
+    /// The holder column is level 0 and it is the truth. The tile faction
+    /// column above it is the label that the tile stub writes into an event,
+    /// and it is not a holder: it never changes and it covers water.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0053, a faction is a bit in a mask, and a relation is a plane, decision D2, a draft record. `docs/adrs/draft/adr-0053-a-faction-is-a-bit-in-a-mask-and-a-relation-is-a-plane.md`
+    holding: Holding,
+    /// When the site rates apply.
+    schedule: RateSchedule,
+    /// The production rate and the upkeep rate of each site.
+    rates: RateTable,
+    /// Every rate that has applied since the world was built.
+    rate_ledger: RateLedger,
+    /// The sites that could not pay at the last application.
+    shortfall_log: Vec<SiteShortfall>,
+    /// What the live stores hold, by the account of this world.
+    ///
+    /// The store column states the same total a second time, and the
+    /// conservation check is what fails when the two disagree.[^1] The
+    /// world adjusts this account at each place where a store changes
+    /// outside the rate pass: a write from the control plane, and the loss
+    /// of a settlement.
+    ///
+    /// # References
+    ///
+    /// [^1]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`
+    store_account: [Accum; COMMODITY_COUNT],
 }
 
 impl World {
@@ -266,13 +310,23 @@ impl World {
             depletion: DepletionLedger::new(),
             departed: [0; RESOURCE_KIND_COUNT],
             pyramid: Pyramid::new(layout, terrain)?,
+            holding: Holding::new(layout),
+            schedule: RateSchedule::DEFAULT,
+            rates: RateTable::new(),
+            rate_ledger: RateLedger::ZERO,
+            shortfall_log: Vec::new(),
+            store_account: [Accum(0); COMMODITY_COUNT],
         };
         // A world that has never stepped still answers a question about a
         // region. A level that nothing rebuilt would describe an empty world
         // and would be wrong rather than absent.
-        world
-            .pyramid
-            .rebuild(&world.values, &world.soldiers, &world.bridge, 1)?;
+        world.pyramid.rebuild(
+            &world.values,
+            world.holding.holders(),
+            &world.soldiers,
+            &world.bridge,
+            1,
+        )?;
         Ok(world)
     }
 
@@ -499,7 +553,20 @@ impl World {
         if faction.0 >= self.config.faction_count.max(1) {
             return Err(SettlementError::FactionAboveCeiling(faction));
         }
-        self.settlements.found(address, faction)
+        let settlement = self.settlements.found(address, faction)?;
+        // The rate table follows the slot column of the arena, and a founding
+        // may open a slot that the table has never held. A new row earns
+        // nothing and owes nothing.
+        //
+        // The founding does not clear the row. The loss of a settlement does
+        // that, and it is the only place that needs to: a slot the arena has
+        // never handed out already holds an idle row. Clearing the row here as
+        // well would state one fact in two places, and neither copy would fail
+        // when the other was removed.[^1]
+        //
+        // [^1]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`
+        self.rates.open_to(self.settlements.slot_count());
+        Ok(settlement)
     }
 
     /// Destroys a settlement and reports whether it destroyed one.
@@ -512,7 +579,172 @@ impl World {
     ///
     /// [^1]: ADR-0014, entity identity is an index plus a generation, decision D3. `docs/adrs/accepted/adr-0014-entity-identity-is-an-index-plus-a-generation.md`
     pub fn destroy_settlement(&mut self, entity: Entity) -> bool {
-        self.settlements.destroy(entity)
+        // What the settlement held leaves the account here. A dead slot keeps
+        // its bytes until a founding clears them, and those bytes are not a
+        // holding of anybody. The account must fall by the same amount, or
+        // the conservation check finds a difference that no rate made.
+        //
+        // The slot is read before the loss, because the identity stops
+        // resolving the moment the arena frees the slot.[^1]
+        //
+        // [^1]: ADR-0014, entity identity is an index plus a generation, decision D3. `docs/adrs/accepted/adr-0014-entity-identity-is-an-index-plus-a-generation.md`
+        let Some(slot) = self.settlements.slot_of(entity) else {
+            return false;
+        };
+        let store = self
+            .settlements
+            .store(entity)
+            .expect("the identity resolved to a live slot");
+        if !self.settlements.destroy(entity) {
+            return false;
+        }
+        // A rate belongs to the site that earned it. The site is gone, so the
+        // rate goes with it and the slot does not pay its successor.
+        self.rates.clear_slot(slot);
+        for index in 0..COMMODITY_COUNT {
+            let held = store
+                .quantity(CommodityId(index as u16))
+                .expect("the index came from the commodity count");
+            self.store_account[index] =
+                sim_math::combine(self.store_account[index], Accum(-i64::from(held.0)));
+        }
+        true
+    }
+
+    /// Returns the schedule that the site rates apply on.
+    #[must_use]
+    pub const fn economy_schedule(&self) -> RateSchedule {
+        self.schedule
+    }
+
+    /// Sets the schedule that the site rates apply on.
+    ///
+    /// The interval is a parameter of the schedule. No kernel holds it as a
+    /// constant, so a caller changes how often a store moves without
+    /// touching the engine.[^1]
+    ///
+    /// A rate is what one tick earns, so raising the period does not raise
+    /// what a site earns over a span of ticks.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the period is zero, and when the period is
+    /// above the range that the scaling multiply takes.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0062, production and upkeep are rates attached to a site, decision D4, a draft record. `docs/adrs/draft/adr-0062-production-and-upkeep-are-rates-attached-to-a-site.md`
+    pub fn set_economy_schedule(&mut self, period: u32, phase: u32) -> Result<(), RateError> {
+        self.schedule =
+            RateSchedule::new(period, phase).ok_or(RateError::PeriodOutsideRange(period))?;
+        Ok(())
+    }
+
+    /// Returns the rate table of every site.
+    #[must_use]
+    pub const fn rates(&self) -> &RateTable {
+        &self.rates
+    }
+
+    /// Returns every rate that has applied since the world was built.
+    #[must_use]
+    pub const fn rate_ledger(&self) -> RateLedger {
+        self.rate_ledger
+    }
+
+    /// Returns the sites that could not pay at the last application.
+    ///
+    /// The log holds one event for each site and commodity that fell short,
+    /// in slot order. It is empty on a tick that the schedule does not name.
+    #[must_use]
+    pub fn shortfall_log(&self) -> &[SiteShortfall] {
+        &self.shortfall_log
+    }
+
+    /// Returns the shortfall log as bytes.
+    ///
+    /// The event type is plain data with declared padding, so the bytes are
+    /// the same on every run and the determinism test compares them
+    /// directly.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0006, an event is plain data and applying it is pure, decision D1. `docs/adrs/accepted/adr-0006-an-event-is-plain-data-and-applying-it-is-pure.md`
+    #[must_use]
+    pub fn shortfall_log_bytes(&self) -> &[u8] {
+        bytemuck::cast_slice(&self.shortfall_log)
+    }
+
+    /// Returns the production rate of a settlement, for one commodity.
+    ///
+    /// Returns `None` when the identity is dead, and `None` when the
+    /// commodity is outside the set.
+    #[must_use]
+    pub fn production_rate(&self, entity: Entity, commodity: CommodityId) -> Option<Fix32> {
+        let slot = self.settlements.slot_of(entity)?;
+        self.rates.production(slot, commodity)
+    }
+
+    /// Returns the upkeep rate of a settlement, for one commodity.
+    #[must_use]
+    pub fn upkeep_rate(&self, entity: Entity, commodity: CommodityId) -> Option<Fix32> {
+        let slot = self.settlements.slot_of(entity)?;
+        self.rates.upkeep(slot, commodity)
+    }
+
+    /// Writes the production rate of a settlement, for one commodity.
+    ///
+    /// The rate is what one tick earns. The schedule scales it to the
+    /// amount of one application, so raising the period does not raise what
+    /// a site earns over a span of ticks.
+    ///
+    /// Returns `false` when the identity is dead.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the rate is below zero, and when the commodity
+    /// is outside the set.
+    pub fn set_production_rate(
+        &mut self,
+        entity: Entity,
+        commodity: CommodityId,
+        rate: Fix32,
+    ) -> Result<bool, RateError> {
+        let Some(slot) = self.settlements.slot_of(entity) else {
+            return Ok(false);
+        };
+        self.rates.open_to(self.settlements.slot_count());
+        self.rates.set_production(slot, commodity, rate)?;
+        Ok(true)
+    }
+
+    /// Writes the upkeep rate of a settlement, for one commodity.
+    ///
+    /// Upkeep is a rate above zero that subtracts. It is never a production
+    /// rate below zero.[^1]
+    ///
+    /// Returns `false` when the identity is dead.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the rate is below zero, and when the commodity
+    /// is outside the set.
+    ///
+    /// # References
+    ///
+    /// [^1]: Findings register, FND-016. `docs/FINDINGS.md`
+    pub fn set_upkeep_rate(
+        &mut self,
+        entity: Entity,
+        commodity: CommodityId,
+        rate: Fix32,
+    ) -> Result<bool, RateError> {
+        let Some(slot) = self.settlements.slot_of(entity) else {
+            return Ok(false);
+        };
+        self.rates.open_to(self.settlements.slot_count());
+        self.rates.set_upkeep(slot, commodity, rate)?;
+        Ok(true)
     }
 
     /// Returns the settlement that stands on an address.
@@ -537,7 +769,21 @@ impl World {
         commodity: CommodityId,
         quantity: Fix32,
     ) -> Result<bool, SettlementError> {
-        self.settlements.set_store(entity, commodity, quantity)
+        // A write from outside the rate pass changes what the stores hold, so
+        // it must change the account by the same amount. The old quantity is
+        // read before the write, because after the write it is gone.
+        let before = self
+            .settlements
+            .store(entity)
+            .and_then(|store| store.quantity(commodity));
+        let wrote = self.settlements.set_store(entity, commodity, quantity)?;
+        if wrote {
+            let before = before.expect("the write resolved the commodity");
+            let index = commodity.0 as usize;
+            let change = i64::from(quantity.0) - i64::from(before.0);
+            self.store_account[index] = sim_math::combine(self.store_account[index], Accum(change));
+        }
+        Ok(wrote)
     }
 
     /// Returns the characters of the world.
@@ -864,9 +1110,26 @@ impl World {
         for amount in &self.departed {
             hash = hash.write_u64(*amount);
         }
+        // Who holds each tile is simulated state, so the whole-world hash
+        // covers it.
+        let hash = self.holding.hash_into(hash);
         let hash = self.soldiers.hash_into(hash);
         let hash = self.settlements.hash_into(hash);
-        self.characters.hash_into(hash)
+        let hash = self.characters.hash_into(hash);
+        // A rate is state that a later frame reads, and the ledger is the
+        // record of what the rates have already done. A hash that covered
+        // the stores and neither of these would report the same value for
+        // two worlds that must diverge on the next application.
+        let hash = self
+            .rates
+            .hash_into(hash)
+            .write_u64(u64::from(self.schedule.period()))
+            .write_u64(u64::from(self.schedule.phase()));
+        let mut hash = self.rate_ledger.hash_into(hash);
+        for total in &self.store_account {
+            hash = hash.write_u64(total.0 as u64);
+        }
+        hash
     }
 
     /// Reports whether the world holds its invariants.
@@ -989,6 +1252,16 @@ impl World {
         if !self.characters.check_invariants() {
             return false;
         }
+        if !self.check_store_conservation() {
+            return false;
+        }
+        if !self
+            .shortfall_log
+            .iter()
+            .all(|event| event.padding == [0; 2] && event.amount.0 > 0)
+        {
+            return false;
+        }
         // The bridge is a second declaration of where a soldier stands, and
         // the tile column is the first. The check fails when the two
         // disagree.[^1] A stale bridge cannot be compared against columns it
@@ -1010,6 +1283,29 @@ impl World {
             Err(BridgeError::Stale { .. }) => {}
             Err(_) => return false,
         }
+        // The holding covers the same world, no tile names a faction the
+        // world does not have, and no faction holds ground that admits no
+        // unit. The check derives the held list, the census and the block
+        // masks again and compares them against the stored ones.[^1]
+        //
+        // [^1]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`
+        if self.holding.grid() != self.grid {
+            return false;
+        }
+        if !self.holding.check_invariants(self.terrain, ceiling) {
+            return false;
+        }
+        // Level 1 and the running census are two statements of how much
+        // ground is held. The check fails when they disagree.
+        let census: i64 = (0..ceiling)
+            .map(|faction| self.holding.holding_of(FactionId(faction)))
+            .sum();
+        if census != self.holding.held_tiles() {
+            return false;
+        }
+        if self.bridge.describes(&self.soldiers).is_ok() && total.held_tiles() != census {
+            return false;
+        }
         if !self.check_conservation() {
             return false;
         }
@@ -1023,6 +1319,54 @@ impl World {
         self.log
             .iter()
             .all(|event| event.padding == [0; 5] && (event.tile.0 as usize) < self.values.len())
+    }
+
+    /// Reports whether the store column agrees with the account of it.
+    ///
+    /// What a site held, plus what production put in, minus what upkeep
+    /// took, is what the site holds. This check states that equality over
+    /// every live site at once.
+    ///
+    /// The account moves at four places: a write from the control plane,
+    /// the loss of a settlement, the rate pass, and nowhere else. A fifth
+    /// place that changes a store and forgets the account fails here, and it
+    /// fails whatever the thread count was, because a rule that leaks the
+    /// same amount on every run repeats perfectly and no determinism test
+    /// can see it.[^1]
+    ///
+    /// The check is exact. Every term is a whole number in a 64-bit
+    /// accumulator, so the sum is the same in any order and nothing
+    /// rounds.[^2]
+    ///
+    /// The rate table also states a slot count that the arena already
+    /// holds. A check must fail when the two copies disagree.[^3]
+    ///
+    /// # References
+    ///
+    /// [^1]: Findings register, FND-048. `docs/FINDINGS.md`
+    /// [^2]: ADR-0023, an aggregate combines exactly, in any order, decision D3, a draft record. `docs/adrs/draft/adr-0023-an-aggregate-combines-exactly-in-any-order.md`
+    /// [^3]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`
+    #[must_use]
+    fn check_store_conservation(&self) -> bool {
+        if !self.rates.check_invariants() {
+            return false;
+        }
+        if self.rates.slot_count() < self.settlements.slot_count() {
+            return false;
+        }
+        let mut held = [Accum(0); COMMODITY_COUNT];
+        for settlement in self.settlements.iter() {
+            let Some(store) = self.settlements.store(settlement) else {
+                return false;
+            };
+            for (index, total) in held.iter_mut().enumerate() {
+                let Some(quantity) = store.quantity(CommodityId(index as u16)) else {
+                    return false;
+                };
+                *total = sim_math::accumulate(*total, quantity);
+            }
+        }
+        held == self.store_account
     }
 
     /// Reports whether the world conserves every resource.
@@ -1180,6 +1524,32 @@ impl World {
         // [^6]: ADR-0073, gathering is admitted by sort-then-admit against the tile, decision D3, a draft record. `docs/adrs/draft/adr-0073-gathering-is-admitted-by-sort-then-admit-against-the-tile.md`
         self.gather(threads)?;
 
+        // The holding spreads after the barrier of this frame, because it
+        // reads where each unit stands and the movement above has just moved
+        // them. It writes a tile column, and it moves no unit, so the barrier
+        // above stays the barrier of this frame.[^7]
+        //
+        // [^7]: ADR-0053, a faction is a bit in a mask, and a relation is a plane, decision D4, a draft record. `docs/adrs/draft/adr-0053-a-faction-is-a-bit-in-a-mask-and-a-relation-is-a-plane.md`
+        self.holding
+            .advance(self.terrain, &self.soldiers, &self.bridge, threads)?;
+        // The site rates apply after the barrier of this frame and after the
+        // gather resolve, and before level 1 rebuilds.
+        //
+        // The position is stated against the barrier on purpose. The pass
+        // reads no derived structure and changes no structure, so it is not a
+        // barrier and it does not need one. What it needs is to run after
+        // everything that moves a quantity in this frame, so that the store a
+        // derived level reads is the store the frame settled on. The gather
+        // resolve is that work today, and level 1 is the derived level.[^8]
+        //
+        // The pass is skipped on a tick the schedule does not name, and the
+        // schedule is a parameter of the world rather than a constant of this
+        // function.[^9]
+        //
+        // [^8]: ADR-0022, level 0 is the only truth, and every level above it is derived, decision D2, a draft record. `docs/adrs/draft/adr-0022-level-0-is-the-only-truth-and-every-level-above-it-is-derived.md`
+        // [^9]: ADR-0062, production and upkeep are rates attached to a site, decision D4, a draft record. `docs/adrs/draft/adr-0062-production-and-upkeep-are-rates-attached-to-a-site.md`
+        self.apply_rates(threads)?;
+
         // Level 1 rebuilds after the structure it reads, and after every
         // change to level 0 that this frame made. It is derived, so it is
         // last.[^5]
@@ -1192,9 +1562,66 @@ impl World {
         // be quietly repaired instead of refused.
         //
         // [^5]: ADR-0022, level 0 is the only truth, and every level above it is derived, decision D2, a draft record. `docs/adrs/draft/adr-0022-level-0-is-the-only-truth-and-every-level-above-it-is-derived.md`
-        self.pyramid
-            .rebuild(&self.values, &self.soldiers, &self.bridge, threads)?;
+        self.pyramid.rebuild(
+            &self.values,
+            self.holding.holders(),
+            &self.soldiers,
+            &self.bridge,
+            threads,
+        )?;
         Ok(&self.log)
+    }
+
+    /// Returns the holding of the world.
+    ///
+    /// The holding says who holds each tile, and how much ground each
+    /// faction holds.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0053, a faction is a bit in a mask, and a relation is a plane, a draft record. `docs/adrs/draft/adr-0053-a-faction-is-a-bit-in-a-mask-and-a-relation-is-a-plane.md`
+    #[must_use]
+    pub const fn holding(&self) -> &Holding {
+        &self.holding
+    }
+
+    /// Returns who holds one tile.
+    ///
+    /// The answer names a faction, or nobody. It never names two factions,
+    /// because a tile carries one holder.[^1]
+    ///
+    /// Returns `None` when the address lies outside the world.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0053, a faction is a bit in a mask, and a relation is a plane, decision D2, a draft record. `docs/adrs/draft/adr-0053-a-faction-is-a-bit-in-a-mask-and-a-relation-is-a-plane.md`
+    #[must_use]
+    pub fn tile_holder(&self, address: Axial) -> Option<Holder> {
+        self.holding.holder(address)
+    }
+
+    /// Returns the number of tiles one faction holds.
+    ///
+    /// The call reads a running total, so it costs the same whatever the
+    /// size of the world.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0053, a faction is a bit in a mask, and a relation is a plane, decision D4, a draft record. `docs/adrs/draft/adr-0053-a-faction-is-a-bit-in-a-mask-and-a-relation-is-a-plane.md`
+    #[must_use]
+    pub fn holding_of(&self, faction: FactionId) -> i64 {
+        self.holding.holding_of(faction)
+    }
+
+    /// Returns the factions that hold ground in the block covering a tile.
+    ///
+    /// Returns `None` when the address lies outside the world.
+    #[must_use]
+    pub fn holders_near(&self, address: Axial) -> Option<FactionMask> {
+        let tile = self.grid.index_of(address)?;
+        let key = self.holding.layout().key_of(tile)?;
+        self.holding
+            .block_mask(self.holding.layout().block_of_key(key))
     }
 
     /// Returns level 1 of the pyramid.
@@ -1227,8 +1654,13 @@ impl World {
     /// arena.
     pub fn rebuild_pyramid(&mut self, threads: usize) -> Result<(), StepError> {
         self.refresh_bridge()?;
-        self.pyramid
-            .rebuild(&self.values, &self.soldiers, &self.bridge, threads)?;
+        self.pyramid.rebuild(
+            &self.values,
+            self.holding.holders(),
+            &self.soldiers,
+            &self.bridge,
+            threads,
+        )?;
         Ok(())
     }
 
@@ -1358,6 +1790,47 @@ impl World {
     /// # References
     ///
     /// [^1]: ADR-0018, the unit-to-tile bridge is derived, and it rebuilds at the barrier, decision D3. `docs/adrs/accepted/adr-0018-the-unit-to-tile-bridge-is-derived-and-rebuilds-at-the-barrier.md`
+    /// Applies the production rate and the upkeep rate of every site.
+    ///
+    /// The pass writes the store column and nothing else. It runs on the
+    /// tick that the schedule names, and it does nothing on every other
+    /// tick.
+    ///
+    /// The account of what the stores hold moves by the net of the pass.
+    /// That net is what landed minus what was taken, and both are exact
+    /// integers, so the account and the column stay equal.[^1]
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the caller asks for zero threads.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0023, an aggregate combines exactly, in any order, decision D3, a draft record. `docs/adrs/draft/adr-0023-an-aggregate-combines-exactly-in-any-order.md`
+    fn apply_rates(&mut self, threads: usize) -> Result<(), StepError> {
+        self.shortfall_log.clear();
+        self.rates.open_to(self.settlements.slot_count());
+        let schedule = self.schedule;
+        let tick = self.tick;
+        let pass = crate::rates::apply(
+            schedule,
+            tick,
+            &self.rates,
+            self.settlements.store_update(),
+            threads,
+        )?;
+        for index in 0..COMMODITY_COUNT {
+            let net = pass
+                .ledger
+                .net(CommodityId(index as u16))
+                .expect("the index came from the commodity count");
+            self.store_account[index] = sim_math::combine(self.store_account[index], net);
+        }
+        self.rate_ledger = self.rate_ledger.combine(pass.ledger);
+        self.shortfall_log = pass.shortfalls;
+        Ok(())
+    }
+
     fn refresh_bridge(&mut self) -> Result<(), StepError> {
         if self.bridge.describes(&self.soldiers).is_ok() {
             return Ok(());

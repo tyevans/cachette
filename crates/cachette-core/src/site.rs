@@ -154,6 +154,25 @@ impl Store {
     }
 }
 
+/// The columns that a pass over the stores reads and writes.
+///
+/// The store column is mutable and the other two are not. A pass changes
+/// what a settlement holds. It never changes which settlements exist,
+/// because that is a structural change and it belongs to the arena.[^1]
+///
+/// # References
+///
+/// [^1]: ADR-0066, entity storage holds four fixed shapes, decision D2. `docs/adrs/accepted/adr-0066-entity-storage-holds-four-fixed-shapes.md`
+#[derive(Debug)]
+pub struct StoreUpdate<'a> {
+    /// The pooled store of each slot.
+    pub stores: &'a mut [Store],
+    /// One for a live slot, zero otherwise.
+    pub live: &'a [u8],
+    /// The generation of each slot.
+    pub generations: &'a [u32],
+}
+
 /// The reason that the arena refused a caller.
 ///
 /// Each variant is a mistake that a caller can make. The arena returns the
@@ -582,6 +601,24 @@ impl SettlementArena {
     #[must_use]
     pub fn store_column(&self) -> &[Store] {
         &self.stores
+    }
+
+    /// Returns the columns that a pass over the stores needs.
+    ///
+    /// A pass that maps over the stores must also know which slots are live
+    /// and what generation each slot carries. One call hands over all three,
+    /// because three separate calls would borrow the arena three times and
+    /// one of those borrows is mutable.
+    ///
+    /// The arena hands out the columns and keeps the invariant. A caller
+    /// writes a store and never a length, so the columns stay the same
+    /// length as each other.
+    pub fn store_update(&mut self) -> StoreUpdate<'_> {
+        StoreUpdate {
+            stores: &mut self.stores,
+            live: &self.live,
+            generations: &self.generations,
+        }
     }
 
     /// Absorbs the settlement columns into the state hash.

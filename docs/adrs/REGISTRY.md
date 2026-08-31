@@ -239,7 +239,7 @@ without stating a constraint is worse than no record.
 | 0050 | The frame schedule is static and known before the frame runs | Proposed | 0001, 0033 | 06 |
 | 0051 | A selector is a lazy expression tree that Rust evaluates | Proposed | 0043 | 04 |
 | 0052 | A selector result may be a range, not only an enumerated set | Proposed | 0051, 0028 | 02, 04 |
-| 0053 | A faction is a bit in a mask, and a relation is a plane | Proposed | 0011 | 08 |
+| 0053 | A faction is a bit in a mask, and a relation is a plane | Draft | 0011, 0012, 0023, 0024 | 08 |
 | 0054 | An entity belongs to one of three tiers, declared at creation | Draft | 0012, 0043 | 14, 15, 16 |
 | 0055 | An effective stat comes from an ordered modifier pipeline | Proposed | 0002, 0054 | 12 |
 | 0056 | Movement is tile-discrete and admitted by sort-then-admit | Accepted | 0004, 0018 | 06, 10 |
@@ -247,7 +247,7 @@ without stating a constraint is worse than no record.
 | 0059 | Fog storage grows with observed area, not with world area | Proposed | 0026, 0053 | 08 |
 | 0060 | An influence map is stored as a shared basis, not one plane per faction | Proposed | 0053, 0058 | 09 |
 | 0061 | Trade solves a flow, never a path for each cart | Proposed | 0049, 0058 | 11 |
-| 0062 | Production and upkeep are rates attached to a site | Proposed | 0055 | 12 |
+| 0062 | Production and upkeep are rates attached to a site | Draft | 0055 | 12, `draft/adr-0062-production-and-upkeep-are-rates-attached-to-a-site.md` |
 | 0063 | A need is a rate with a threshold, and crossing it is a fact | Proposed | 0032, 0062 | 15 |
 | 0064 | A unit chooses by scoring a small fixed option set | Proposed | 0003, 0063 | 16 |
 | 0065 | A group is a site membership, not a region | Proposed | 0038, 0054 | 17 |

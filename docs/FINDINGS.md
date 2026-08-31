@@ -1431,34 +1431,134 @@ That is what the item needed, and it holds today.
 arena follows the soldier arena, and the backlog holds the item that moves both
 to the batched path when the record exists.
 
+### FND-064 — A settings struct with public fields prices every new parameter
+
+**Believed.** A new parameter of the world belongs in the settings struct that
+builds the world. The struct is the one place a caller states what a world is,
+so a schedule period belongs there beside the extent and the seed.
+
+**True.** The struct has public fields and no constructor, so every caller
+builds it with a struct literal. Adding one field therefore breaks every
+literal in the tree at once, in three crates and in the Python type stub. The
+work that met this was told to keep its edits inside the core crate and to
+leave the viewer alone. The settings struct made that impossible.
+
+**Evidence.** The site rate work added a period and a phase to the settings
+struct. The compiler then refused twenty-five files, including the viewer, the
+Python binding and the type stub, none of which have anything to say about an
+economy. The work moved the schedule to a default on the world and a setter
+beside it, and the tree compiled unchanged.
+
+**Follows.** Two things.
+
+**A settings struct with public fields is an interface, and adding to it is a
+breaking change.** Treat it as one. A parameter that only one subsystem reads
+does not have to sit there.
+
+**Say who must state a value.** The extent and the seed have no default, so a
+caller must state them. A cadence has a recommended value, so a caller may
+leave it. A value of the second kind belongs on the object with a default and a
+setter, not in the constructor argument.
+
+### FND-065 — A conservation check over a column must name the structural moments
+
+**Believed.** A store column conserves when the sum over the column equals what
+the rates put in, minus what the rates took out. The rate pass is the only
+thing that writes a store, so the sum and the ledger must agree.
+
+**True.** The rate pass is not the only thing that moves the sum. The arena
+leaves the store of a destroyed settlement in the dead slot, and it clears the
+store when a founding reuses that slot. The sum over the whole column therefore
+falls at a founding, and the sum over the live slots falls at a loss. Neither
+fall came from a rate, and a check that knew only the ledger reports a leak
+that nothing leaked.
+
+**Evidence.** The settlement arena clears a store at the founding and not at
+the loss. That is correct: clearing at the founding is what stops a slot from
+handing its holding to its successor. It means the store of a dead slot is a
+residue and not a holding, and a conservation check has to say which of the two
+it is reading.
+
+**Follows.** State the structural moments, and adjust the account at each one.
+The account of what the live stores hold moves at four places: a write from the
+control plane, the loss of a settlement, the rate pass, and nowhere else. The
+check then fails when a fifth place appears, which is what a check is for.
+
+**A conservation check is not a determinism test, and it catches what no
+determinism test can.** A rule that leaks the same amount on every run repeats
+perfectly at every thread count.
+
+### FND-066 — A constant stated a rule that a comparison already stated
+
+**Believed.** The rule that spreads a holding needs a constant that adds to the
+support of the faction which already holds a tile. Without it, the belief ran,
+a tile that two factions support equally changes hands on every tick.
+
+**True.** The comparison that admits a challenger already refuses an equal
+claim, because it demands support strictly greater than the holder raises. The
+constant and the comparison were two statements of one rule. The constant was
+the second, and it changed nothing that any test could see.
+
+**Evidence.** The constant was set to zero in the source, and the whole test
+suite stayed green. That is the shape of a second declaration site: it reads
+back correctly and reaches nothing.[^22] The constant was then removed, and the
+comparison was left as the only statement of the rule. A test that gives one
+tile to a holder and then puts an equal claim on it fails when the comparison
+is loosened, so the rule now has one site and one test.
+
+**Follows.** **Set a constant to a value that must change the answer, and run
+the tests.** A constant that no test can see is either dead or duplicated. This
+was found by the practice of putting a defect back and watching the tests stay
+green, and it would not have been found by reading the code.[^23]
+
+### FND-067 — A spread rule that visits the holding costs the area, not the edge
+
+**Believed.** A rule that spreads a holding must visit every tile that anybody
+holds, and the neighbours of each, because any of them might change hands.
+
+**True.** A tile whose six neighbours are all held by its own holder cannot
+change hands under the rule. Its holder draws support from all six neighbours
+and from holding the tile, and no challenger can raise more than that. The rule
+therefore visits the edge of a holding and not its area.
+
+**Evidence.** The candidate list was changed to pass over such a tile, and the
+golden state hash files did not move. An optimisation that changes no hash is
+the strongest evidence available here that it changed no behaviour. The commit
+holds the times measured before and after.
+
+**Follows.** **The cost of the spread grows with the perimeter of a holding and
+with the population, and not with the world.** That is the property the product
+record asks for, and it is a consequence of the rule rather than of a limit
+somebody imposed.[^24] A later rule that lets a claim reach further than one
+tile loses this property, and it must state what replaces it.
 ### FND-072 — A layout finding named the tier when it meant one structure
 
 **Believed.** The character tier wants array-of-structs, and the character
 arena therefore has the wrong layout. The register states the correction as
 "the character pass is a random graph gather", and readers take the character
-pass to mean the descent and succession pass.[^22]
+pass to mean the descent and succession pass.[^25]
 
 **True.** Three things are wrong with that reading.
 
-The figure belongs to the vector report, not to the character report.[^23]
-[^24] The character report recommends struct-of-arrays for the character row
+The figure belongs to the vector report, not to the character report.[^26]
+[^27] The character report recommends struct-of-arrays for the character row
 and says in the same paragraph that the row size is an accounting figure and
-not a claim about locality.[^24]
+not a claim about locality.[^27]
 
 The pass is the personality influence pass, and the structure is a separate
 64-byte trait record that holds twelve current values and twelve anchor
 values. The vector report's own decision keeps the trait record in
-array-of-structs and says nothing about the identity columns.[^23] The two
+array-of-structs and says nothing about the identity columns.[^26] The two
 recommendations do not conflict. They cover different structures.
 
 The descent and succession pass is not a twelve-column gather. The character
 report lists its kernels: the eligibility filter is a map to a mask and a
 compaction scan, the ranking is a map to a key tuple and a sort, the child
 list rebuild is a counting sort, and a cadet split is a map over a contiguous
-range.[^24] Every one of those is a column pass. The two operations that do
+range.[^27] Every one of those is a column pass. The two operations that do
 gather at random, the lowest common ancestor walk and the kinship recursion,
 read two or three columns for each node, and the report already budgets both
-as affordable.[^24]
+as affordable.[^27]
 
 **Evidence.** A whole-tree search for the phrase found it in the vector report
 and in the merge notes, and never in the character report. The character arena
@@ -1470,13 +1570,13 @@ function of the column count, not of the tier. Struct-of-arrays wins at one
 and at two columns, the two layouts meet near three, and array-of-structs wins
 above that. The figures are in the commit body. The machine is not the target,
 so the measurement fixes the shape of the curve and not the position of the
-crossover.[^25]
+crossover.[^28]
 
 **Follows.** Three things.
 
 **Scope a layout claim to the structure and to the pass, never to the tier.**
 This is the same shape as the finding that a constraint can be stated over a
-subject wider than itself.[^26]
+subject wider than itself.[^29]
 
 **Read FND-022 as scoped to the trait record.** Its closing line is correct
 and general: layout follows the access pattern. Its middle line names the
@@ -1508,9 +1608,12 @@ decides the answer. The name of the tier does not.
 [^19]: Findings register, FND-058, in this document.
 [^20]: ADR-0014, entity identity is an index plus a generation, decision D3. `docs/adrs/accepted/adr-0014-entity-identity-is-an-index-plus-a-generation.md`
 [^21]: Testing rules, section 6. `.claude/rules/testing.md`
-[^22]: Findings register, FND-022, in this document.
-[^23]: Vector entity representation, sections 9 and 15, decision D155. `docs/research/reports/18-vector-entity-representation.md`
-[^24]: The character graph and inheritance, sections 2.1, 3.3 and 15.3. `docs/research/reports/14-character-graph-and-inheritance.md`
-[^25]: Blockers register, BLK-007. `docs/BLOCKERS.md`
-[^26]: Findings register, FND-056, in this document.
-[^27]: Findings register, FND-072, in this document.
+[^22]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`
+[^23]: Testing rules, section 2a. `.claude/rules/testing.md`
+[^24]: PRD-0006, a place belongs to somebody. `docs/product/shaped/prd-0006-a-place-belongs-to-somebody.md`
+[^25]: Findings register, FND-022, in this document.
+[^26]: Vector entity representation, sections 9 and 15, decision D155. `docs/research/reports/18-vector-entity-representation.md`
+[^27]: The character graph and inheritance, sections 2.1, 3.3 and 15.3. `docs/research/reports/14-character-graph-and-inheritance.md`
+[^28]: Blockers register, BLK-007. `docs/BLOCKERS.md`
+[^29]: Findings register, FND-056, in this document.
+[^30]: Findings register, FND-072, in this document.
