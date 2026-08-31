@@ -69,6 +69,16 @@ parallelism saved. Split by directory: the records, the core, and the
 bindings are three surfaces. When two items must touch one file, sequence
 them and say so in the plan.
 
+**Never stage by wildcard while parallel work runs.** A command that adds
+everything captures whatever another agent has half-written, and the commit
+message then describes work the commit does not contain. Stage the paths the
+commit is about, by name. This has happened once: a record that an agent was
+still writing entered a commit about an unrelated repair, and the commit had
+to be rebuilt.
+
+The parallel surfaces are also the review surfaces. An agent that writes to
+one surface reviews nothing on it.
+
 ## The sequence
 
 The sprint number is a position in this list. It is not a date.
