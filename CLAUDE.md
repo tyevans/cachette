@@ -12,10 +12,13 @@ The target scale is 16.7 million tiles and one million units.
 
 ## Status
 
-The determinism core is accepted and the foundation crate exists. Eight
-records are binding: the seven determinism records and the entity storage
-record.[^1] Read them before you write code. The registry holds the status of
-every record, and it is the only place that does.[^11]
+The determinism core is accepted and the foundation crate exists. **Read the
+registry for which records are binding, and read those records before you
+write code.**[^11] The accepted records are in one directory.[^1]
+
+Do not read a count here as the list. This section held one, and it was wrong
+by seven records before anyone noticed. The findings register holds this shape
+and now holds two instances of it in this file.[^12]
 
 The rest of the design is open. Most registry rows reserve a number and have
 no file yet. Research reports support them.[^2]
