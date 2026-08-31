@@ -328,6 +328,14 @@ fn a_key_above_the_ceiling_is_an_error() {
 }
 
 #[test]
+fn a_key_at_the_ceiling_is_accepted() {
+    // The ceiling is the highest legal key, not the first illegal one. A
+    // world whose extent divides by the block edge reaches it exactly.
+    let keys = [BoundedKey::new(4, 10), BoundedKey::new(0, 11)];
+    assert_eq!(sort::order_bounded(&keys, 4), Ok(vec![1, 0]));
+}
+
+#[test]
 fn a_repeated_identifier_is_an_error_in_the_bounded_order() {
     // ADR-0007 D2: the last field is a stable identifier, so it is unique.
     let keys = [

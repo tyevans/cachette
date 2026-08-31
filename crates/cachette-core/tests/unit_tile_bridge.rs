@@ -323,6 +323,34 @@ fn the_key_ceiling_bounds_every_tile_key_at_every_block_edge() {
 }
 
 #[test]
+fn a_block_aligned_world_reaches_its_key_ceiling_and_still_rebuilds() {
+    // The extent of the other tests does not divide by the block edge, so no
+    // tile there carries the ceiling itself. A world that divides evenly
+    // does, and the rebuild must accept it.
+    let world = Grid::new(8, 8).expect("the extent describes a world");
+    let layout = BlockLayout::new(world, 2).expect("the exponent is inside the ceiling");
+    let highest = (0..world.tile_count())
+        .map(|index| {
+            layout
+                .key_of(cachette_core::TileIdx(index))
+                .expect("every tile has a key")
+        })
+        .max()
+        .expect("the world holds a tile");
+    assert_eq!(highest, layout.key_ceiling());
+
+    let mut arena = SoldierArena::new(world);
+    arena
+        .spawn(Axial::new(7, 7), FactionId(0))
+        .expect("the spawn must succeed");
+    let mut bridge = UnitTileBridge::new(layout);
+    bridge
+        .rebuild(&arena, 1)
+        .expect("a tile at the ceiling must not refuse the rebuild");
+    assert_eq!(bridge.len(), 1);
+}
+
+#[test]
 fn a_world_rebuilds_at_every_block_edge() {
     // The rebuild derives its ceiling from the partition. A rebuild that
     // refuses a legal world would show here and nowhere else, because every
