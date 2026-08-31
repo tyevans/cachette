@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-057**
+**Next number: FND-058**
 
 ## A. Corrections to stated rules
 
@@ -1153,6 +1153,49 @@ whether a reviewer asked to enforce the words alone would reach the right
 answer. If enforcing the record as written would refuse something the project
 requires, the record needs an amendment even though the code needs none.
 
+### FND-057 — A deferral can name a record that refuses the work
+
+**Believed.** A product record bounds itself by deferring work to another
+record. The deferral is safe, because the other record is named and the reader
+can follow it.
+
+**True.** A deferral names a destination. It does not check that the
+destination accepts the delivery. Two records can each push one need onto the
+other, and the need then belongs to nobody. Nothing fails, because both
+records read as complete and each one points somewhere real.
+
+**Evidence.** Two instances, found while shaping six further product records
+against the eleven that existed.
+
+PRD-0011 states that a unit is assigned a job and that choosing belongs with
+unit behaviour. PRD-0009 is unit behaviour, and it excludes a group decision,
+excludes any goal that outlives a tick, and states that a unit chooses for
+itself. Assigning a job is a decision made for a place and it persists for
+many ticks, so PRD-0009 refuses exactly what PRD-0011 sends it. Neither record
+owned the assignment.
+
+PRD-0007 states that it consumes nothing and that consumption arrives with
+unit lives. PRD-0011 is unit lives, and it carries consumption as one line of
+its checklist and no section. The destination accepted the need in name and
+shaped none of it.
+
+**Follows.** Three things.
+
+**Read the destination before you write a deferral.** A bound is only a bound
+when somebody else holds what it excluded. Open the named record and find the
+statement that accepts the work.
+
+**A one-line mention is not ownership.** A need that appears in another
+record's checklist and in none of its six gate answers has been acknowledged,
+not shaped.
+
+**This is the redundant declaration shape with no declaration at all.** The
+recurring defect rule warns about one fact stored in two places with nothing
+that fails when they disagree.[^13] A deferral pair is the inverse: one fact
+stored in no place, with two records that each say it lives in the other.
+Neither check can see it, because each record is well formed on its own.
+
+
 ## References
 
 [^1]: Findings register, FND-038, in this document.
@@ -1167,3 +1210,4 @@ requires, the record needs an amendment even though the code needs none.
 [^10]: Decision Record Scope, section 4.6. `.claude/rules/adr-scope.md`
 [^11]: Findings register, FND-051, in this document.
 [^12]: Decision Record Scope, section 4.1. `.claude/rules/adr-scope.md`
+[^13]: Recurring Defect Shapes, shape 1. `.claude/rules/recurring-defects.md`
