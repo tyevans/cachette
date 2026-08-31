@@ -31,6 +31,12 @@ create_exception!(
 create_exception!(_core, StepError, CachetteError, "A step refused to run.");
 create_exception!(
     _core,
+    ConfigError,
+    CachetteError,
+    "The world settings do not describe a world."
+);
+create_exception!(
+    _core,
     SelectorError,
     CachetteError,
     "A selector was not valid."
@@ -64,16 +70,37 @@ pub struct PyWorld {
 #[pymethods]
 impl PyWorld {
     /// Builds a world.
+    ///
+    /// The world is a rhombus, so the extent is a width and a height.
+    ///
+    /// # Errors
+    ///
+    /// Raises `ConfigError` when the extent does not describe a world.
     #[new]
-    #[pyo3(signature = (tile_count = 4096, seed = 0x0123_4567_89ab_cdef, faction_count = 4))]
-    fn new(tile_count: u32, seed: u64, faction_count: u16) -> Self {
-        Self {
-            inner: std::sync::Mutex::new(CoreWorld::new(WorldConfig {
-                tile_count,
-                seed,
-                faction_count,
-            })),
-        }
+    #[pyo3(signature = (width = 64, height = 64, seed = 0x0123_4567_89ab_cdef, faction_count = 4))]
+    fn new(width: u32, height: u32, seed: u64, faction_count: u16) -> PyResult<Self> {
+        let world = CoreWorld::new(WorldConfig {
+            width,
+            height,
+            seed,
+            faction_count,
+        })
+        .map_err(|error| ConfigError::new_err(error.to_string()))?;
+        Ok(Self {
+            inner: std::sync::Mutex::new(world),
+        })
+    }
+
+    /// Returns the number of columns in the world.
+    #[getter]
+    fn width(&self) -> u32 {
+        self.lock().grid().width()
+    }
+
+    /// Returns the number of rows in the world.
+    #[getter]
+    fn height(&self) -> u32 {
+        self.lock().grid().height()
     }
 
     /// Returns the current tick.
@@ -166,6 +193,7 @@ fn cachette_core_module(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(version, module)?)?;
     module.add("CachetteError", module.py().get_type::<CachetteError>())?;
     module.add("StepError", module.py().get_type::<StepError>())?;
+    module.add("ConfigError", module.py().get_type::<ConfigError>())?;
     module.add("SelectorError", module.py().get_type::<SelectorError>())?;
     module.add("VerbError", module.py().get_type::<VerbError>())?;
     module.add("ViewError", module.py().get_type::<ViewError>())?;

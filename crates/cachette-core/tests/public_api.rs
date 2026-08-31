@@ -12,16 +12,16 @@ use cachette_core::{World, WorldConfig};
 
 #[test]
 fn a_new_world_holds_its_invariants() {
-    let world = World::new(WorldConfig::default());
+    let world = World::new(WorldConfig::default()).expect("the extent must describe a world");
     assert!(world.check_invariants());
     assert_eq!(world.tick().0, 0);
-    assert_eq!(world.tile_count(), world.config().tile_count as usize);
+    assert_eq!(world.tile_count(), world.grid().tile_count() as usize);
     assert!(world.event_log().is_empty());
 }
 
 #[test]
 fn a_step_advances_the_tick_and_holds_the_invariants() {
-    let mut world = World::new(WorldConfig::default());
+    let mut world = World::new(WorldConfig::default()).expect("the extent must describe a world");
     world.step(2).expect("the step must run");
     assert_eq!(world.tick().0, 1);
     assert!(world.check_invariants());
@@ -30,15 +30,15 @@ fn a_step_advances_the_tick_and_holds_the_invariants() {
 #[test]
 fn the_whole_tile_column_is_one_flat_slice() {
     // ADR-0044: a whole component column is one flat array.
-    let world = World::new(WorldConfig::default());
+    let world = World::new(WorldConfig::default()).expect("the extent must describe a world");
     assert_eq!(world.tile_values().len(), world.tile_count());
 }
 
 #[test]
 fn two_worlds_with_one_seed_agree() {
     let config = WorldConfig::default();
-    let mut first = World::new(config);
-    let mut second = World::new(config);
+    let mut first = World::new(config).expect("the extent must describe a world");
+    let mut second = World::new(config).expect("the extent must describe a world");
     for _ in 0..8 {
         first.step(1).expect("the step must run");
         second.step(7).expect("the step must run");
@@ -51,11 +51,13 @@ fn two_worlds_with_two_seeds_differ() {
     let mut first = World::new(WorldConfig {
         seed: 1,
         ..WorldConfig::default()
-    });
+    })
+    .expect("the extent must describe a world");
     let mut second = World::new(WorldConfig {
         seed: 2,
         ..WorldConfig::default()
-    });
+    })
+    .expect("the extent must describe a world");
     first.step(1).expect("the step must run");
     second.step(1).expect("the step must run");
     assert_ne!(first.state_hash(), second.state_hash());
@@ -94,9 +96,11 @@ fn the_generator_gives_the_known_answers() {
 #[test]
 fn the_event_log_and_its_bytes_agree() {
     let mut world = World::new(WorldConfig {
-        tile_count: 4096,
+        width: 64,
+        height: 64,
         ..WorldConfig::default()
-    });
+    })
+    .expect("the extent must describe a world");
     world.step(3).expect("the step must run");
     let events = world.event_log();
     assert!(!events.is_empty(), "the scenario must emit events");
@@ -110,9 +114,11 @@ fn the_tile_total_is_the_sum_of_the_column() {
     use cachette_core::types::Accum;
 
     let world = World::new(WorldConfig {
-        tile_count: 512,
+        width: 32,
+        height: 16,
         ..WorldConfig::default()
-    });
+    })
+    .expect("the extent must describe a world");
     let expected = world
         .tile_values()
         .iter()
@@ -126,9 +132,11 @@ fn the_change_kind_matches_the_direction_of_the_change() {
     use cachette_core::event::{CHANGE_KIND_LOWERED, CHANGE_KIND_RAISED};
 
     let mut world = World::new(WorldConfig {
-        tile_count: 2048,
+        width: 64,
+        height: 32,
         ..WorldConfig::default()
-    });
+    })
+    .expect("the extent must describe a world");
     let before = world.tile_values().to_vec();
     world.step(2).expect("the step must run");
     let after = world.tile_values().to_vec();

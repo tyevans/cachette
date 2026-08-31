@@ -29,14 +29,15 @@ use cachette_core::{World, WorldConfig};
 /// The scenario. It must hold more tiles than threads, so that a run at
 /// twelve threads fills more than one output slot.
 const CONFIG: WorldConfig = WorldConfig {
-    tile_count: 1_024,
+    width: 32,
+    height: 32,
     seed: 0x0123_4567_89ab_cdef,
     faction_count: 4,
 };
 
 /// Runs one frame and returns the event log as bytes.
 fn run(threads: usize) -> Vec<u8> {
-    let mut world = World::new(CONFIG);
+    let mut world = World::new(CONFIG).expect("the extent must describe a world");
     world.step(threads).expect("the step must run");
     world.event_log_bytes().to_vec()
 }

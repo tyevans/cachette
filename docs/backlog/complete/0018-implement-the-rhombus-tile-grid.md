@@ -1,7 +1,7 @@
 ---
 id: 0018
 title: Implement the rhombus tile grid and the axial index
-status: refined
+status: complete
 created: 2026-08-30
 implements: [ADR-0017 D1, ADR-0002 D1, ADR-0004 D1]
 changes: []
@@ -68,7 +68,30 @@ new code the gate covers.[^6]
 
 ## Outcome
 
-Filled in on completion.
+`crates/cachette-core/src/hex.rs` holds `Axial` and `Grid`. The world takes a
+width and a height instead of a flat tile count, and reads a tile through an
+address, so the geometry has a real caller rather than a test that drives it
+directly.
+
+Three things changed from the plan.
+
+`World::new` now returns a result. The plan assumed the extent could not be
+wrong, but a zero side and a tile count that overflows the index are both
+reachable from the public interface, and a panic there is not a typed error.
+The Python side gained `ConfigError` to match, under the same root.
+
+The state hash covers the width and the height rather than a tile count, so
+the golden files were re-recorded. The difference was read before it was
+recorded: the hash input changed shape, and the scenario extents changed with
+it.
+
+The tests were checked against three mutations rather than assumed to work: a
+neighbour offset that breaks the symmetric pair, a transposed index formula,
+and a `contains` that never rejects an outside address. Each mutation failed
+four tests. The commands are in the commit body.
+
+No new record was needed. The neighbour convention and the wrap rule are both
+part of the ADR-0017 D2 claim.
 
 ## References
 

@@ -25,7 +25,8 @@ const SCENARIOS: &[(&str, WorldConfig, u64)] = &[
     (
         "one tile",
         WorldConfig {
-            tile_count: 1,
+            width: 1,
+            height: 1,
             seed: 1,
             faction_count: 1,
         },
@@ -34,7 +35,8 @@ const SCENARIOS: &[(&str, WorldConfig, u64)] = &[
     (
         "fewer tiles than threads",
         WorldConfig {
-            tile_count: 7,
+            width: 7,
+            height: 1,
             seed: 0xdead_beef,
             faction_count: 2,
         },
@@ -43,7 +45,8 @@ const SCENARIOS: &[(&str, WorldConfig, u64)] = &[
     (
         "an uneven split",
         WorldConfig {
-            tile_count: 1_003,
+            width: 17,
+            height: 59,
             seed: 0x0123_4567_89ab_cdef,
             faction_count: 4,
         },
@@ -52,7 +55,8 @@ const SCENARIOS: &[(&str, WorldConfig, u64)] = &[
     (
         "many tiles",
         WorldConfig {
-            tile_count: 65_536,
+            width: 256,
+            height: 256,
             seed: 42,
             faction_count: 16,
         },
@@ -62,7 +66,7 @@ const SCENARIOS: &[(&str, WorldConfig, u64)] = &[
 
 /// Runs the frames and returns the log of the last frame and the state hash.
 fn run(config: WorldConfig, frames: u64, threads: usize) -> (Vec<u8>, u64) {
-    let mut world = World::new(config);
+    let mut world = World::new(config).expect("the extent must describe a world");
     for _ in 0..frames {
         world.step(threads).expect("the step must run");
     }
@@ -100,6 +104,6 @@ fn the_log_is_not_empty_for_a_large_scenario() {
 
 #[test]
 fn a_step_at_zero_threads_returns_an_error() {
-    let mut world = World::new(WorldConfig::default());
+    let mut world = World::new(WorldConfig::default()).expect("the extent must describe a world");
     assert!(world.step(0).is_err());
 }

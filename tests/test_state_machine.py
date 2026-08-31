@@ -62,14 +62,15 @@ class WorldMachine(RuleBasedStateMachine):
         self.hashes: list[int] = []
 
     @initialize(
-        tile_count=st.integers(min_value=1, max_value=2048),
+        width=st.integers(min_value=1, max_value=64),
+        height=st.integers(min_value=1, max_value=64),
         seed=st.integers(min_value=0, max_value=2**64 - 1),
         faction_count=st.integers(min_value=1, max_value=8),
     )
-    def build(self, tile_count: int, seed: int, faction_count: int) -> None:
+    def build(self, width: int, height: int, seed: int, faction_count: int) -> None:
         """Build the world under test."""
         self.world = cachette.World(
-            tile_count=tile_count, seed=seed, faction_count=faction_count
+            width=width, height=height, seed=seed, faction_count=faction_count
         )
         self.expected_tick = 0
         self.hashes = [self.world.state_hash()]

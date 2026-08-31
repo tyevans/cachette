@@ -1,0 +1,10 @@
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+cc 3a341910f1d4a2ed2240515a8069a9d45c53d7f9911c7a1c91d78b6477d1b515 # shrinks to (grid, address) = (Grid { width: 3, height: 2 }, Axial { q: 2, r: 0 })
+cc d0a2dcb52de6f01b278b575944342d44b9feee8641db50c1ec51a9ee33b99df1 # shrinks to (grid, address) = (Grid { width: 2, height: 2 }, Axial { q: 0, r: 1 })
+cc 1e22a75d4c451d38a0d662f216914b9559a4e77e38ab4c29bea3277faa02ba54 # shrinks to (grid, address) = (Grid { width: 3, height: 1 }, Axial { q: 1, r: 0 })
+cc eeadea3e09b5867da9844f41ddab0b4b5a1b2a638a1abcaa766e182da94817c7 # shrinks to width = 8, height = 1

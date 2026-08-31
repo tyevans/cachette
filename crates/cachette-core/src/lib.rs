@@ -16,6 +16,7 @@
 
 pub mod event;
 pub mod hash;
+pub mod hex;
 pub mod rng;
 pub mod sim_math;
 pub mod types;
@@ -23,5 +24,6 @@ pub mod world;
 
 pub use event::TileChanged;
 pub use hash::StateHash;
+pub use hex::{Axial, Grid, GridError};
 pub use types::{Accum, Entity, Fix32, Tick, TileIdx};
-pub use world::{StepError, World, WorldConfig};
+pub use world::{StepError, World, WorldConfig, WorldError};

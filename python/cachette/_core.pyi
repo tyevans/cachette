@@ -29,12 +29,16 @@ class DeterminismError(CachetteError):
 class EnginePanic(CachetteError):
     """A Rust panic reached the boundary."""
 
+class ConfigError(CachetteError):
+    """The world settings do not describe a world."""
+
 class World:
     """A simulated world."""
 
     def __init__(
         self,
-        tile_count: int = ...,
+        width: int = ...,
+        height: int = ...,
         seed: int = ...,
         faction_count: int = ...,
     ) -> None: ...
@@ -42,6 +46,10 @@ class World:
     def tick(self) -> int: ...
     @property
     def tile_count(self) -> int: ...
+    @property
+    def width(self) -> int: ...
+    @property
+    def height(self) -> int: ...
     @property
     def event_count(self) -> int: ...
     def state_hash(self) -> int: ...

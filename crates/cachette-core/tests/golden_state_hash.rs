@@ -32,7 +32,8 @@ const SCENARIOS: &[(&str, WorldConfig)] = &[
     (
         "small",
         WorldConfig {
-            tile_count: 256,
+            width: 16,
+            height: 16,
             seed: 7,
             faction_count: 2,
         },
@@ -40,7 +41,8 @@ const SCENARIOS: &[(&str, WorldConfig)] = &[
     (
         "default",
         WorldConfig {
-            tile_count: 4_096,
+            width: 64,
+            height: 64,
             seed: 0x0123_4567_89ab_cdef,
             faction_count: 4,
         },
@@ -57,7 +59,7 @@ fn golden_path(name: &str) -> PathBuf {
 
 /// Runs a scenario and returns one hash line for each frame.
 fn hash_sequence(config: WorldConfig) -> String {
-    let mut world = World::new(config);
+    let mut world = World::new(config).expect("the extent must describe a world");
     let mut lines = String::new();
     lines.push_str(&format!("0 {}\n", world.state_hash()));
     for frame in 1..=FRAMES {
@@ -106,7 +108,7 @@ fn the_state_hash_matches_the_golden_file() {
 fn the_hash_changes_when_the_state_changes() {
     // A hash that never changes would pass the golden test and prove
     // nothing.
-    let mut world = World::new(SCENARIOS[1].1);
+    let mut world = World::new(SCENARIOS[1].1).expect("the extent must describe a world");
     let before = world.state_hash().finish();
     world.step(THREADS).expect("the step must run");
     assert_ne!(before, world.state_hash().finish());

@@ -15,6 +15,7 @@ ADR-0040, Python is a control plane, not a data plane.
 
 from cachette._core import (
     CachetteError,
+    ConfigError,
     DeterminismError,
     EnginePanic,
     SelectorError,
@@ -27,6 +28,7 @@ from cachette._core import (
 
 __all__ = [
     "CachetteError",
+    "ConfigError",
     "DeterminismError",
     "EnginePanic",
     "SelectorError",
