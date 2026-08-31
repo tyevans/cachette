@@ -1,7 +1,7 @@
 ---
 id: 0003
 title: Point the definition of done at the record scope rule
-status: refined
+status: complete
 created: 2026-08-30
 implements: []
 changes: []
@@ -37,4 +37,17 @@ file was under review elsewhere at the time.
 
 ## Outcome
 
-Filled in on completion.
+The clause in the definition of done that says a record must not hold material
+that changes now cites the scope rule, and says that the rule names each
+category from a measurement rather than from argument. It also points at the
+script that checks the mechanical part.
+
+**The pointer goes both ways now.** The scope rule already cited the
+definition of done for what a record the code contradicts costs. A reader who
+starts at either one reaches the other.
+
+**One sentence was added beyond the item's scope, and it is the useful one.**
+The scope rule's first section is the test for whether a decision needs a
+record at all, and a reader who arrives from the definition of done is about
+to write one. Telling them only which material to leave out would send them
+past the question of whether to write it.

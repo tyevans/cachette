@@ -118,6 +118,11 @@ prose rules rather than to tests. The record must follow the documentation
 rule, must not hold material that changes, and must cite its evidence in
 footnotes.
 
+The scope rule says which material changes, and it names each category from a
+measurement of two mature record corpora.[^3] Read it before you write a
+record, because it also gives the test for whether the decision needs one at
+all. A script checks the mechanical part of it.[^4]
+
 **Research.** Sections 1 and 4 apply. Deliver findings, not a survey. Mark a
 claim you could not verify as unverified rather than asserting it. Say plainly
 where the research contradicts a record.
@@ -138,3 +143,5 @@ the code costs every future decision made from it.
 
 [^1]: ADR Registry, who reviews. `docs/adrs/REGISTRY.md`
 [^2]: Findings register, FND-042. `docs/FINDINGS.md`
+[^3]: Decision Record Scope, sections 1 and 4. `.claude/rules/adr-scope.md`
+[^4]: The record check script. `scripts/check_adrs.py`
