@@ -10,9 +10,9 @@ serves: [PRD-0003]
 blocked-by: []
 ---
 
-The core generates a terrain kind and a height for every tile. The viewer
-still paints every tile the same. A developer therefore cannot see the ground
-that the tests prove exists.
+The core generates a terrain kind and a height for every tile. No system reads
+either one. The viewer still paints every tile the same, so a developer cannot
+see the ground that the tests prove exists.
 
 The work colours a tile by its kind and shades it by its height. The viewer
 reads only the tiles the screen shows, and it derives the colour itself. The

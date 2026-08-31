@@ -13,8 +13,15 @@ blocked-by: []
 The terrain says whether a unit may stand on a tile. Nothing reads that
 answer. A soldier walks into water, and no test fails.
 
-This is the inert-capability shape: the project declares a capability, tests
-it directly, and nothing invokes it. The test must start at the engine.
+State the wider truth plainly: **no system reads the terrain at all.** Nothing
+in the engine, nothing in the viewer, and nothing in the Python control plane
+reads a kind, a height, a moisture or a passability. The state hash folds
+every generated tile in, so a change to the generator fails a test, but no
+behaviour depends on what the ground is. This is the inert-capability shape:
+the project declares a capability, tests it directly, and nothing acts on it.
+The test must start at the engine.
+
+This item is the first consumer. Backlog 0032 is the second.
 
 The work makes the movement system reject an impassable target, and makes a
 spawn onto an impassable tile an error. A test then drives a stepping world
