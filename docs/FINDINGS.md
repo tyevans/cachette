@@ -552,6 +552,18 @@ disagrees. The orientation now points at the register instead of repeating
 it. When a document summarises a register, make it name the register and stop
 there.
 
+**Second instance, in the same file.** The status section of the same
+orientation file said "Eight records are binding" and named them. The registry
+held thirteen accepted records at the time it was noticed, and fifteen by the
+time it was repaired. The sentence sat two sentences before the file's own
+statement that the registry holds the status of every record and is the only
+place that does, so the file contradicted itself.
+
+Nothing failed. The count decays every time a record is accepted, which the
+project does on purpose and often, and no check reads prose for a number. The
+status section now points at the registry and says plainly that a count there
+is not the list.
+
 ### FND-040 — A record split left every citation in the code dangling
 
 **Believed.** The crate cites the records that govern it, so a reader who
