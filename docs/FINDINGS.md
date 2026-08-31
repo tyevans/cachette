@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-069**
+**Next number: FND-073**
 
 ## A. Corrections to stated rules
 
@@ -325,6 +325,12 @@ one. A twelve times difference.
 
 **Follows:** layout follows access pattern, not habit. Sequential passes want
 struct-of-arrays; random gathers want array-of-structs.
+
+**Later:** the row names the tier and means one structure. The pass is the
+personality influence pass and the structure is a separate 64-byte trait
+record. The descent and succession pass reads two or three columns, so it wants
+struct-of-arrays, and the character arena is correct as it stands. Read this row
+as scoped to the trait record.[^27]
 
 ### FND-023 — Stagger by cell index, not entity id
 
@@ -1525,6 +1531,59 @@ with the population, and not with the world.** That is the property the product
 record asks for, and it is a consequence of the rule rather than of a limit
 somebody imposed.[^24] A later rule that lets a claim reach further than one
 tile loses this property, and it must state what replaces it.
+### FND-072 — A layout finding named the tier when it meant one structure
+
+**Believed.** The character tier wants array-of-structs, and the character
+arena therefore has the wrong layout. The register states the correction as
+"the character pass is a random graph gather", and readers take the character
+pass to mean the descent and succession pass.[^25]
+
+**True.** Three things are wrong with that reading.
+
+The figure belongs to the vector report, not to the character report.[^26]
+[^27] The character report recommends struct-of-arrays for the character row
+and says in the same paragraph that the row size is an accounting figure and
+not a claim about locality.[^27]
+
+The pass is the personality influence pass, and the structure is a separate
+64-byte trait record that holds twelve current values and twelve anchor
+values. The vector report's own decision keeps the trait record in
+array-of-structs and says nothing about the identity columns.[^26] The two
+recommendations do not conflict. They cover different structures.
+
+The descent and succession pass is not a twelve-column gather. The character
+report lists its kernels: the eligibility filter is a map to a mask and a
+compaction scan, the ranking is a map to a key tuple and a sort, the child
+list rebuild is a counting sort, and a cadet split is a map over a contiguous
+range.[^27] Every one of those is a column pass. The two operations that do
+gather at random, the lowest common ancestor walk and the kinship recursion,
+read two or three columns for each node, and the report already budgets both
+as affordable.[^27]
+
+**Evidence.** A whole-tree search for the phrase found it in the vector report
+and in the merge notes, and never in the character report. The character arena
+holds five columns today and holds no parent edge, so the pass the finding is
+read to govern does not exist.
+
+A gather benchmark on a development machine measured the crossover as a
+function of the column count, not of the tier. Struct-of-arrays wins at one
+and at two columns, the two layouts meet near three, and array-of-structs wins
+above that. The figures are in the commit body. The machine is not the target,
+so the measurement fixes the shape of the curve and not the position of the
+crossover.[^28]
+
+**Follows.** Three things.
+
+**Scope a layout claim to the structure and to the pass, never to the tier.**
+This is the same shape as the finding that a constraint can be stated over a
+subject wider than itself.[^29]
+
+**Read FND-022 as scoped to the trait record.** Its closing line is correct
+and general: layout follows the access pattern. Its middle line names the
+tier, and the tier was never the subject.
+
+**Count the columns before you choose a layout.** The column count of the pass
+decides the answer. The name of the tier does not.
 
 ## References
 
@@ -1552,3 +1611,9 @@ tile loses this property, and it must state what replaces it.
 [^22]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`
 [^23]: Testing rules, section 2a. `.claude/rules/testing.md`
 [^24]: PRD-0006, a place belongs to somebody. `docs/product/shaped/prd-0006-a-place-belongs-to-somebody.md`
+[^25]: Findings register, FND-022, in this document.
+[^26]: Vector entity representation, sections 9 and 15, decision D155. `docs/research/reports/18-vector-entity-representation.md`
+[^27]: The character graph and inheritance, sections 2.1, 3.3 and 15.3. `docs/research/reports/14-character-graph-and-inheritance.md`
+[^28]: Blockers register, BLK-007. `docs/BLOCKERS.md`
+[^29]: Findings register, FND-056, in this document.
+[^30]: Findings register, FND-072, in this document.
