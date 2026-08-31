@@ -75,8 +75,6 @@ SKIP_PATHS = {
     # failure against two paths and blames the wrong tree.
     ROOT / ".claude" / "worktrees",
     ROOT / "scripts" / "check_citations.py",
-    # The product records themselves. check_prds.py already reads these.
-    ROOT / "docs" / "product",
     # Deliberately broken. Continuous integration runs the check against this
     # directory on purpose and fails when the check passes.
     ROOT / "tests" / "fixtures",
@@ -88,6 +86,13 @@ CITE = re.compile(r"\bADR-(\d{4})(?:\s+D(\d+))?")
 PRD_CITE = re.compile(r"\bPRD-(\d{4})")
 PRD_FILENAME = re.compile(r"^prd-(\d{4})-[a-z0-9-]+\.md$")
 PRD_ROW = re.compile(r"^\|\s*(\d{4})\s*\|", re.M)
+# The three registers. A citation of one names an entry that must exist.
+REGISTER_CITE = re.compile(r"\b(FND|BLK|DEC)-(\d+)\b")
+REGISTER_FILES = {
+    "FND": ROOT / "docs" / "FINDINGS.md",
+    "BLK": ROOT / "docs" / "BLOCKERS.md",
+    "DEC": ROOT / "docs" / "DECISIONS.md",
+}
 CODE_SPAN = re.compile(r"`+[^`\n]*`+")
 FOOTNOTE_PATH = re.compile(r"`(docs/[^`]+\.md)`")
 FILENAME = re.compile(r"^adr-(\d{4})-[a-z0-9-]+\.md$")
@@ -122,6 +127,22 @@ def sources(scan: Path) -> list[Path]:
 
 def line_of(text: str, pos: int) -> int:
     return text.count("\n", 0, pos) + 1
+
+
+POINTER = re.compile(r"^\*\*Next number:[^\n]*$", re.M)
+
+
+def blank_pointer(text: str) -> str:
+    """Blank the line by which a register states its next free number.
+
+    That line names an entry that does not exist yet. It is an allocator, not
+    a citation, and a separate check holds it to one above the highest.[^1]
+
+    # References
+
+    [^1]: The register check. `scripts/check_registers.py`
+    """
+    return POINTER.sub(lambda m: " " * len(m.group(0)), text)
 
 
 def blank_code_spans(text: str) -> str:
@@ -170,6 +191,20 @@ def main() -> int:
         print("check_citations: no records found", file=sys.stderr)
         return 1
 
+    # An entry of each register, by number, as the register writes it.
+    entries: dict[str, set[str]] = {}
+    for prefix, path in REGISTER_FILES.items():
+        found: set[str] = set()
+        if path.is_file():
+            body = path.read_text(encoding="utf-8")
+            found = {
+                m.group(1)
+                for m in re.finditer(
+                    rf"^#{{2,4}}\s*{prefix}-(\d+)\b", body, re.M
+                )
+            }
+        entries[prefix] = found
+
     failures: list[str] = []
     checked = 0
     files_with_citations = 0
@@ -181,7 +216,7 @@ def main() -> int:
             continue
         name = path.relative_to(ROOT) if ROOT in path.parents else path
         seen_here = 0
-        prose = blank_code_spans(text)
+        prose = blank_pointer(blank_code_spans(text))
 
         for m in CITE.finditer(prose):
             number, decision = m.group(1), m.group(2)
@@ -210,6 +245,19 @@ def main() -> int:
                 failures.append(
                     f"{name}:{line_of(text, m.start())}: cites PRD-{number}, "
                     f"which no product record and no registry row has"
+                )
+
+        for m in REGISTER_CITE.finditer(prose):
+            prefix, number = m.group(1), m.group(2)
+            known = entries.get(prefix, set())
+            if not known:
+                continue
+            checked += 1
+            seen_here += 1
+            if number not in known:
+                failures.append(
+                    f"{name}:{line_of(text, m.start())}: cites {prefix}-{number}, "
+                    f"which the register does not hold"
                 )
 
         for m in FOOTNOTE_PATH.finditer(text):
