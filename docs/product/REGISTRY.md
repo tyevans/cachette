@@ -39,6 +39,8 @@ documents cite it.
 | 0003 | A developer sees a world worth looking at | Idea | Game developer | — |
 | 0004 | The world has weather that a watcher can read | Shaped | Game developer | `shaped/prd-0004-the-world-has-weather-that-a-watcher-can-read.md` |
 | 0005 | A watcher can tell what is happening and why | Idea | Game developer | — |
+| 0006 | A place belongs to somebody | Shaped | Game developer | `shaped/prd-0006-a-place-belongs-to-somebody.md` |
+| 0007 | The world holds things worth taking | Shaped | Game developer | `shaped/prd-0007-the-world-holds-things-worth-taking.md` |
 
 ## What does not belong in a record
 
