@@ -37,6 +37,14 @@ pub const SYSTEM_SOLDIER_MOVE: SystemId = 2;
 /// value from the same frame, entity and draw index.
 pub const SYSTEM_TERRAIN: SystemId = 3;
 
+/// The system identifier of the resource field.
+///
+/// The resource field owns this identifier alone. It does not share the
+/// identifier of the terrain generator, because two systems that share an
+/// identifier draw the same value from the same frame, entity and draw index.
+/// The stock of a tile would then follow the height of that tile exactly.
+pub const SYSTEM_RESOURCE: SystemId = 4;
+
 /// Returns the value for one draw.
 ///
 /// The arguments are the world seed, the system, the frame, the entity, and
