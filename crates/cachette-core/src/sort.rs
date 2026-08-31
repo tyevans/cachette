@@ -31,6 +31,13 @@
 //! field takes the bounded order. A caller that cannot takes the general
 //! one.
 //!
+//! **No engine code calls [`order_on`] today, and that is not the inert
+//! capability shape.**[^8] The general order is the independent oracle that
+//! the bounded order is tested against. Two algorithms that agree are
+//! evidence. One algorithm compared against itself is not. An oracle whose
+//! only caller is a test is doing the job it exists for, so do not delete
+//! this one because nothing in the engine reaches it.
+//!
 //! # Why the probe does not make this module fail
 //!
 //! The test-only perturbation reverses slot order, and every determinism test
@@ -70,6 +77,7 @@
 //! [^5]: Testing Rules, a determinism test must be able to fail. `.claude/rules/testing.md`
 //! [^6]: ADR-0071, the bridge rebuild orders on one thread, decisions D1 and D2. `docs/adrs/draft/adr-0071-the-bridge-rebuild-orders-on-one-thread.md`
 //! [^7]: ADR-0007, content supplies a key vector, never a comparator, the consequences. `docs/adrs/accepted/adr-0007-content-supplies-a-key-vector-never-a-comparator.md`
+//! [^8]: Recurring defect shapes, section 3. `.claude/rules/recurring-defects.md`
 
 use crate::slots::Slots;
 

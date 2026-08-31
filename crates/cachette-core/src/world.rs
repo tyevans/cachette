@@ -193,7 +193,7 @@ impl World {
         let layout = BlockLayout::new(grid, BLOCK_BITS_DEFAULT)?;
         let soldiers = SoldierArena::new(grid);
         let mut bridge = UnitTileBridge::new(layout);
-        bridge.rebuild(&soldiers, 1)?;
+        bridge.rebuild(&soldiers)?;
         Ok(Self {
             config,
             grid,
@@ -370,7 +370,7 @@ impl World {
         if threads == 0 {
             return Err(StepError::ZeroThreads);
         }
-        self.bridge.rebuild(&self.soldiers, threads)?;
+        self.bridge.rebuild(&self.soldiers)?;
         Ok(())
     }
 
@@ -618,7 +618,7 @@ impl World {
         //
         // [^1]: ADR-0056, movement is tile-discrete and admitted by sort-then-admit, decision D2, a draft record. `docs/adrs/accepted/adr-0056-movement-is-tile-discrete-and-admitted-by-sort-then-admit.md`
         // [^2]: ADR-0018, the unit-to-tile bridge is derived, and it rebuilds at the barrier, decision D3. `docs/adrs/accepted/adr-0018-the-unit-to-tile-bridge-is-derived-and-rebuilds-at-the-barrier.md`
-        self.bridge.rebuild(&self.soldiers, threads)?;
+        self.bridge.rebuild(&self.soldiers)?;
         Ok(&self.log)
     }
 }

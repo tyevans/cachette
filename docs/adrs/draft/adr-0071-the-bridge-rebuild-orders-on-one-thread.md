@@ -48,9 +48,10 @@ set and names the key. It does not widen itself to fit.
 
 ### D2. The bridge rebuild runs on one thread
 
-The rebuild takes a thread count from its caller and orders on one thread. It
-still refuses a thread count of zero, because zero threads is a caller mistake
-whatever the algorithm.
+The rebuild orders on one thread, and it accepts no thread count. A signature
+that accepted one would invite a caller to believe that the rebuild scales
+with it. The engine still refuses a step at zero threads, because the step
+does run on many.
 
 A radix pass is a scan of the whole set with one shared histogram. To run it on
 many threads, the engine would have to split the histogram, combine the parts
@@ -82,6 +83,11 @@ answer.
 before.** The old reason was that the merge reads the slots in index order. The
 new reason is that no second thread exists. A reviewer can check the new reason
 by reading the call graph.
+
+A test that ran the rebuild at several thread counts would now compare a run
+against itself, which proves nothing.[^10] The property that replaces it
+compares the rebuild against the general order, which is a separate
+algorithm.
 
 **The bridge no longer scales with the thread count.** A world that grows far
 past the target unit count will reach a point where one thread is too slow. At
@@ -130,3 +136,4 @@ nondeterminism this project cannot carry.[^1] That reasoning is unchanged.
 [^7]: Commit Message Rules. `.claude/rules/commits.md`
 [^8]: Blockers register, BLK-007. `docs/BLOCKERS.md`
 [^9]: Testing Rules, a determinism test cannot tell correct from consistently wrong. `.claude/rules/testing.md`
+[^10]: Testing Rules, a determinism test must be able to fail. `.claude/rules/testing.md`

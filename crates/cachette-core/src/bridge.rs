@@ -378,29 +378,22 @@ impl UnitTileBridge {
     /// merge order of those writes is the nondeterminism that this project
     /// cannot carry.[^2]
     ///
-    /// The rebuild orders on one thread. It takes the thread count, and it
-    /// uses it only to refuse zero.[^3] No result here takes its order from a
-    /// thread that finished first, because no second thread exists.
+    /// The rebuild orders on one thread, and it takes no thread count.[^3] A
+    /// signature that accepted one would invite a caller to believe that the
+    /// rebuild scales with it. No result here takes its order from a thread
+    /// that finished first, because no second thread exists.
     ///
     /// # Errors
     ///
-    /// Returns an error when the caller asks for zero threads, when the arena
-    /// describes another world, or when the sort refuses the key vector.
+    /// Returns an error when the arena describes another world, or when the
+    /// sort refuses the key vector.
     ///
     /// # References
     ///
     /// [^1]: ADR-0014, entity identity is an index plus a generation, decision D2. `docs/adrs/accepted/adr-0014-entity-identity-is-an-index-plus-a-generation.md`
     /// [^2]: ADR-0018, the unit-to-tile bridge is derived, and it rebuilds at the barrier, decision D3. `docs/adrs/accepted/adr-0018-the-unit-to-tile-bridge-is-derived-and-rebuilds-at-the-barrier.md`
     /// [^3]: ADR-0071, the bridge rebuild orders on one thread, decision D2. `docs/adrs/draft/adr-0071-the-bridge-rebuild-orders-on-one-thread.md`
-    pub fn rebuild(&mut self, arena: &SoldierArena, threads: usize) -> Result<(), BridgeError> {
-        // The rebuild orders on one thread, so it reads the count only to
-        // refuse zero.[^1] Zero threads is a caller mistake whatever the
-        // algorithm, and the caller must hear the same answer as before.
-        //
-        // [^1]: ADR-0071, the bridge rebuild orders on one thread, decision D2. `docs/adrs/draft/adr-0071-the-bridge-rebuild-orders-on-one-thread.md`
-        if threads == 0 {
-            return Err(BridgeError::Sort(SortError::ZeroThreads));
-        }
+    pub fn rebuild(&mut self, arena: &SoldierArena) -> Result<(), BridgeError> {
         if arena.grid() != self.layout.grid() {
             return Err(BridgeError::GridMismatch);
         }
@@ -759,7 +752,7 @@ mod tests {
             .expect("the spawn must succeed");
         let layout = BlockLayout::new(grid, 2).expect("the exponent is inside the ceiling");
         let mut bridge = UnitTileBridge::new(layout);
-        bridge.rebuild(&arena, 1).expect("the rebuild must succeed");
+        bridge.rebuild(&arena).expect("the rebuild must succeed");
         (arena, bridge)
     }
 

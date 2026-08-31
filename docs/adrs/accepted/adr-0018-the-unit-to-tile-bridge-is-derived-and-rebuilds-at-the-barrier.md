@@ -67,8 +67,9 @@ declared twice with nothing to fail when the copies diverge.
 ### D3. The bridge rebuilds at the frame barrier by a sort on the key
 
 The engine rebuilds the whole bridge once for each frame, at the barrier. It
-sorts the occupying units by the bridge key with a radix sort on the integer
-key.
+sorts the occupying units by the bridge key. This record does not name the
+algorithm. The key is an exact integer, so the choice is open, and another
+record holds it.[^11]
 
 The sort is total. Units that share a bridge key break the tie on the
 identity, taken as one integer, so the order is fixed and no two runs
@@ -177,3 +178,4 @@ of detail pyramid, so the bridge and the pyramid share one partition.[^9]
 [^8]: Report 01, the entity component system core and the memory layout, section 9. `docs/research/reports/01-ecs-and-memory-layout.md`
 [^9]: Report 02, the hex grid and the level of detail pyramid, sections 3.4 and 7.4. `docs/research/reports/02-hex-grid-and-lod-pyramid.md`
 [^10]: ADR-0007, content supplies a key vector, never a comparator. `docs/adrs/accepted/adr-0007-content-supplies-a-key-vector-never-a-comparator.md`
+[^11]: ADR-0071, the bridge rebuild orders on one thread, decision D1. `docs/adrs/draft/adr-0071-the-bridge-rebuild-orders-on-one-thread.md`
