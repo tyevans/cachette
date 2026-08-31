@@ -24,6 +24,7 @@
 // the float boundary at the viewer, and a camera is a viewer value.
 #![allow(clippy::disallowed_types)]
 
+use cachette_core::terrain::KIND_COUNT;
 use cachette_core::{Axial, FactionId, World, WorldConfig};
 use cachette_view::paint::COLOURED_FACTIONS;
 use cachette_view::{draw_frame, paint, Camera, Canvas, Lap, Metrics};
@@ -703,5 +704,61 @@ fn the_panel_fills_the_rectangle_it_states() {
         lowest,
         top + height - 1,
         "the panel states a rectangle {height} tall and paints down to {lowest}",
+    );
+}
+
+#[test]
+fn the_panel_names_the_ground_in_the_window() {
+    // The product record asks that the kinds be few and that a person be able
+    // to name them.[^1] A picture of five colours with no names leaves the
+    // reader guessing which green is forest.
+    //
+    // [^1]: PRD-0003, a developer sees a world worth looking at. `docs/product/shaped/prd-0003-a-developer-sees-a-world-worth-looking-at.md`
+    let mut world = world();
+    let metrics = stepped(&mut world, 2);
+    let mut canvas = canvas();
+    let camera = Camera::fitting(&world, &canvas);
+
+    let readout = draw_frame(&world, camera, &metrics, &mut canvas).expect("the world draws");
+
+    let counted: u32 = readout.by_kind().iter().sum();
+    assert_eq!(
+        counted,
+        readout.tiles_painted(),
+        "the ground legend and the drawing pass disagree on how many tiles were painted"
+    );
+
+    // Every kind must appear, or the fixture supplies no case and the
+    // assertion measures the fixture.
+    let named = readout.by_kind().iter().filter(|count| **count > 0).count();
+    assert_eq!(
+        named, KIND_COUNT,
+        "the window holds {named} of the {KIND_COUNT} kinds of ground, so the \
+         panel cannot be shown to name all of them"
+    );
+}
+
+#[test]
+fn the_ground_legend_follows_the_window_when_the_person_scrolls() {
+    // The count is of the window, not of the world. A panel that reported the
+    // whole world would not move when the camera does.
+    let mut world = world();
+    let metrics = stepped(&mut world, 1);
+    let mut canvas = canvas();
+
+    let here = Camera::fitting(&world, &canvas);
+    let first = draw_frame(&world, here, &metrics, &mut canvas).expect("the world draws");
+    let before = *first.by_kind();
+
+    let there = here
+        .zoomed_in(&canvas)
+        .zoomed_in(&canvas)
+        .zoomed_in(&canvas);
+    let second = draw_frame(&world, there, &metrics, &mut canvas).expect("the world draws");
+
+    assert_ne!(
+        before,
+        *second.by_kind(),
+        "the ground legend said the same thing at two zoom levels, so it counts the world"
     );
 }
