@@ -645,7 +645,7 @@ Not verdicts. For whoever maintains them.
 
 [^1]: The foundation crate. `crates/cachette-core/src/`
 [^2]: ADR Registry, who reviews, and the retcon window. `docs/adrs/REGISTRY.md`
-[^3]: Backlog item 0023, implement sort-then-admit movement. `docs/backlog/proposed/0023-implement-sort-then-admit-movement.md`
+[^3]: Backlog item 0023, implement sort-then-admit movement. `docs/backlog/complete/0023-implement-sort-then-admit-movement.md`
 [^4]: Decision Record Scope. `.claude/rules/adr-scope.md`
 [^5]: Report 10, crowd simulation and unit movement. `docs/research/reports/10-crowd-and-movement.md`
 [^6]: ADR-0001, one binary gives one answer at any thread count. `docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`

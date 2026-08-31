@@ -18,6 +18,7 @@
 
 use std::path::PathBuf;
 
+use cachette_core::terrain::TileKind;
 use cachette_core::types::FactionId;
 use cachette_core::{Axial, World, WorldConfig};
 
@@ -47,7 +48,7 @@ const THREADS: usize = 4;
 /// [^1]: ADR-0001, one binary gives one answer at any thread count, decision D4. `docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
 /// [^2]: ADR-0068, terrain is generated from the seed and is never stored as a map, decision D4, a draft record. `docs/adrs/draft/adr-0068-terrain-is-generated-from-the-seed-and-is-never-stored-as-a-map.md`
 /// [^3]: Testing rules, section 2a. `.claude/rules/testing.md`
-const SCENARIOS: &[(&str, WorldConfig, bool)] = &[
+const SCENARIOS: &[(&str, WorldConfig, Population)] = &[
     (
         "small",
         WorldConfig {
@@ -56,7 +57,7 @@ const SCENARIOS: &[(&str, WorldConfig, bool)] = &[
             seed: 7,
             faction_count: 2,
         },
-        false,
+        Population::Empty,
     ),
     (
         "default",
@@ -66,7 +67,7 @@ const SCENARIOS: &[(&str, WorldConfig, bool)] = &[
             seed: 0x0123_4567_89ab_cdef,
             faction_count: 4,
         },
-        false,
+        Population::Empty,
     ),
     (
         "soldiers",
@@ -76,7 +77,7 @@ const SCENARIOS: &[(&str, WorldConfig, bool)] = &[
             seed: 0xfeed_face,
             faction_count: 3,
         },
-        true,
+        Population::Spread,
     ),
     (
         "shoreline",
@@ -86,9 +87,72 @@ const SCENARIOS: &[(&str, WorldConfig, bool)] = &[
             seed: 0x0cac_4e77_0068,
             faction_count: 3,
         },
-        true,
+        Population::Spread,
+    ),
+    (
+        "crowd",
+        WorldConfig {
+            width: 96,
+            height: 96,
+            seed: 0x0cac_4e77_0023,
+            faction_count: 2,
+        },
+        Population::Crowd,
     ),
 ];
+
+/// How a scenario fills its world.
+///
+/// A world whose units never contend for a tile cannot see the admission
+/// rule. The spread scenarios put one unit here and one there, so no target
+/// ever reaches its capacity and a golden file taken from them does not move
+/// when the rule changes. The crowd scenario fills a patch of ground to the
+/// capacity of each tile, so admission must refuse.[^1] [^2]
+///
+/// # References
+///
+/// [^1]: ADR-0056, movement is tile-discrete and admitted by sort-then-admit, decision D3. `docs/adrs/accepted/adr-0056-movement-is-tile-discrete-and-admitted-by-sort-then-admit.md`
+/// [^2]: Testing rules, section 2a. `.claude/rules/testing.md`
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Population {
+    /// No unit at all. The hash covers the tile columns and an empty arena.
+    Empty,
+    /// Units spread over the open ground, contending for nothing.
+    Spread,
+    /// A patch of ground filled to the capacity of each of its tiles.
+    Crowd,
+}
+
+/// Fills a patch of open ground to the capacity of each tile.
+///
+/// The patch is taken in index order, so the units sit beside each other and
+/// every draw names a tile a neighbour wants. The capacity is read from the
+/// ground rather than named here, because the value is content.[^1]
+///
+/// # References
+///
+/// [^1]: ADR-0056, movement is tile-discrete and admitted by sort-then-admit, decision D4. `docs/adrs/accepted/adr-0056-movement-is-tile-discrete-and-admitted-by-sort-then-admit.md`
+fn crowd(world: &mut World) {
+    let grid = world.grid();
+    let patch: Vec<Axial> = (0..grid.tile_count())
+        .map(|index| Axial::new((index % grid.width()) as i32, (index / grid.width()) as i32))
+        .filter(|address| world.admits_a_unit(*address))
+        .filter(|address| address.q >= 8 && address.q < 20 && address.r >= 8 && address.r < 20)
+        .collect();
+    assert!(
+        patch.len() >= 16,
+        "the crowd scenario found only {} open tiles in its patch",
+        patch.len()
+    );
+    for address in patch {
+        let capacity = world.tile_kind(address).map_or(0, TileKind::capacity);
+        for ordinal in 0..capacity {
+            world
+                .spawn_soldier(address, FactionId((ordinal % 2) as u16))
+                .expect("the open tile admits a unit");
+        }
+    }
+}
 
 /// Fills a world with soldiers, and frees some of them.
 ///
@@ -142,10 +206,12 @@ fn golden_path(name: &str) -> PathBuf {
 }
 
 /// Runs a scenario and returns one hash line for each frame.
-fn hash_sequence(config: WorldConfig, with_soldiers: bool) -> String {
+fn hash_sequence(config: WorldConfig, population: Population) -> String {
     let mut world = World::new(config).expect("the extent must describe a world");
-    if with_soldiers {
-        populate(&mut world);
+    match population {
+        Population::Empty => {}
+        Population::Spread => populate(&mut world),
+        Population::Crowd => crowd(&mut world),
     }
     let mut lines = String::new();
     lines.push_str(&format!("0 {}\n", world.state_hash()));
@@ -163,8 +229,8 @@ fn recording() -> bool {
 
 #[test]
 fn the_state_hash_matches_the_golden_file() {
-    for (name, config, with_soldiers) in SCENARIOS {
-        let produced = hash_sequence(*config, *with_soldiers);
+    for (name, config, population) in SCENARIOS {
+        let produced = hash_sequence(*config, *population);
         let path = golden_path(name);
 
         if recording() {
