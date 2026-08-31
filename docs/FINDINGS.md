@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-043**
+**Next number: FND-044**
 
 ## A. Corrections to stated rules
 
@@ -627,6 +627,32 @@ survives longer because it looks like the careful thing to do. Correct
 parametric writing creates a claim that must be revisited when the blocker
 closes, and nothing revisits it. **When a blocker closes, search the records
 for its number.** The command is in the commit that closed it.
+
+### FND-043 — A value type that cannot hold zero can lose a real value
+
+**Believed.** The entity identity packs a generation above a slot index into
+a value that is never zero, so an absent identity costs no extra space. The
+niche is free.
+
+**True.** The niche is not free. It removes one bit pattern from the value
+space, and that pattern names a real entity: slot zero at generation zero.
+The first entity the engine ever allocates takes slot zero, and a generation
+that starts at zero leaves that entity without a representable identity.
+
+**Evidence.** `Entity::new(0, 0)` returns nothing, because the packed value is
+zero and the type cannot hold zero. A record review found it while reading
+the identity record against the value type. The project had held the type for
+some time and had a test for the refusal, which asserted the refusal was
+correct rather than asking which value it refused.
+
+**Follows.** A niche optimisation removes a value from the space. Say which
+value, and prove that no real thing needs it. Here the identity record now
+starts every generation at one, which vacates the pattern honestly.
+
+The test shape matters more than the fix. Every test that allocates a second
+entity before checking anything would pass. **When a type refuses a value,
+write the test that asks whether the refused value was needed**, not only the
+test that confirms the refusal happens.
 
 ## References
 

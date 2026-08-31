@@ -28,13 +28,18 @@ that the choice was made and why.
 
 ### D1. The world is a rhombus, and a tile index is a raw axial pair
 
-A tile address is an axial pair. The index is the row multiplied by the row
-length, plus the column. The reverse is a division and a remainder.
+A tile address is an axial pair. Deriving the storage index from the address
+is arithmetic on the two components, and nothing else.
 
 **No tile access converts a coordinate.** A conversion function between an
 axial address and an offset address does not exist in the engine. Its
 presence in a tile access path is the violation this record lets a reviewer
 find.
+
+This record does not state the index function. The order in which tiles sit
+in memory is a separate claim, and the record that holds it may choose a
+block order rather than a row order.[^4] Both derive an index from the same
+axial address by arithmetic, which is what this record constrains.
 
 ### D2. The neighbours are six fixed offsets, and the edge does not wrap
 
@@ -88,3 +93,4 @@ The answer is this record.
 [^1]: Report 02, the hex grid and the level of detail pyramid, sections 1.2 and 3.4. `docs/research/reports/02-hex-grid-and-lod-pyramid.md`
 [^2]: Blockers register, BLK-014. `docs/BLOCKERS.md`
 [^3]: ADR-0002, simulated and aggregated state holds no floating point number. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
+[^4]: ADR-0016, tiles are stored in block-tiled order at the aggregation block size. `docs/adrs/REGISTRY.md`

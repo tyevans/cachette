@@ -28,8 +28,12 @@ the split and does not state it.[^2]
 Tile data lives outside the entity storage. A tile has no identity, no
 generation, and no row in the entity location table.
 
-A tile is addressed by its tile index alone.[^3] The index is the address, so
-a tile lookup is an array subscript and never a resolution.
+A tile is addressed by its tile index alone.[^3] A tile lookup derives its
+storage position from the address by arithmetic, and never consults a table.
+There is nothing to resolve, because there is no identity to check.
+
+The derivation is arithmetic whichever order the tiles sit in. A block order
+adds a shift and a mask; it adds no lookup.[^7]
 
 ### D2. Each tile field is its own dense column
 
@@ -102,3 +106,4 @@ would rewrite every system.
 [^4]: ADR-0015, a tile column is narrow, with bitplanes and sparse side tables. `docs/adrs/REGISTRY.md`
 [^5]: ADR-0014, entity identity is an index plus a generation. `docs/adrs/draft/adr-0014-entity-identity-is-an-index-plus-a-generation.md`
 [^6]: ADR-0018, the unit-to-tile bridge is three structures, and units stay sorted by tile. `docs/adrs/draft/adr-0018-the-unit-to-tile-bridge-is-three-structures-and-units-stay-sorted-by-tile.md`
+[^7]: ADR-0016, tiles are stored in block-tiled order at the aggregation block size. `docs/adrs/REGISTRY.md`

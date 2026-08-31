@@ -42,6 +42,16 @@ the silent wrong-entity failure that ADR-0014 exists to prevent.
 Make the constructor reachable only by the arena. The accessors stay public,
 because D1 requires them.
 
+A second defect in the same type came out of the same review. The identity
+packs the generation above the slot index in a value that cannot be zero, so
+slot zero at generation zero has no representable identity. Under D3 a fresh
+slot starts at its first generation, and the first entity the engine ever
+allocates takes slot zero. ADR-0014 D6 now says a generation starts at one,
+which removes the case for every slot at once. The arena must honour it, and
+a test must allocate the very first entity and assert that it has an
+identity, because every test that allocates a second entity first would pass
+without it.
+
 **Creates.** None, if items 0029's records hold. A decision this work finds
 that no record holds is a deliverable of this item, not a byproduct.
 
@@ -72,6 +82,9 @@ step and then inspects the arena.
 - No caller outside the arena can construct an identity from an index and a
   generation. The public constructor is gone or restricted, and the whole
   tree is searched for its call sites.
+- The first entity that the arena ever allocates has a representable
+  identity. A test allocates exactly one entity into an empty arena and
+  asserts this, because a test that allocates two would not see the defect.
 - The arena refuses, with a typed error, each of the four caller mistakes
   named above.
 - A soldier is placed on a tile that the grid contains, and placing one

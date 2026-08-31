@@ -76,7 +76,31 @@ Retirement leaks one slot. Reuse after wraparound would make two different
 entities share one identity, which is the exact failure this record exists to
 prevent. The project trades a bounded leak for the removal of the case.
 
-### D6. The location table is a dense array indexed by the slot
+### D6. A generation starts at one, never at zero
+
+The first generation of every slot is one. No slot ever holds generation
+zero.
+
+The identity packs the generation and the slot index into one value, and that
+value is never zero, so an absent identity costs no extra space.[^9] A slot
+index of zero at a generation of zero packs to zero, which the identity
+cannot hold. The first entity that the engine ever allocates takes slot zero,
+so a generation that started at zero would leave that one entity without a
+representable identity.
+
+The failure is silent in the worst way. It appears once, at the first
+allocation, and only for one slot. Every test that allocates a second entity
+first would pass.
+
+Starting the generation at one removes the case for every slot at once. The
+project rejects the alternative, which is to forbid the allocator from ever
+issuing slot zero: that wastes a slot, and it puts the rule in the allocator
+where each future allocator must remember it, rather than in the identity
+where it holds once.
+
+Generation zero therefore means that a slot has never been used.
+
+### D7. The location table is a dense array indexed by the slot
 
 The engine finds an entity by subscripting the location table with the slot
 index. It never looks an entity up in a hash map.
@@ -132,3 +156,4 @@ of arena designs reaches the same reuse rule and the same retirement rule.[^7]
 [^6]: ADR-0066, entity storage holds four fixed shapes. `docs/adrs/accepted/adr-0066-entity-storage-holds-four-fixed-shapes.md`
 [^7]: Report 01, the entity component system core and the memory layout, section 4. `docs/research/reports/01-ecs-and-memory-layout.md`
 [^8]: ADR-0014, decision D5, in this record.
+[^9]: ADR-0011, every value type is a newtype with a declared size and alignment. `docs/adrs/REGISTRY.md`
