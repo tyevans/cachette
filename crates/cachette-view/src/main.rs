@@ -10,7 +10,7 @@
 //! # References
 //!
 //! [^1]: PRD-0002, a developer watches the world run. `docs/product/shaped/prd-0002-a-developer-watches-the-world-run.md`
-//! [^2]: ADR-0067, the viewer reads the world and never writes to it, decision D4. `docs/adrs/draft/adr-0067-the-viewer-reads-the-world-and-never-writes-to-it.md`
+//! [^2]: ADR-0067, the viewer reads the world and never writes to it, decision D4. `docs/adrs/accepted/adr-0067-the-viewer-reads-the-world-and-never-writes-to-it.md`
 
 use std::num::NonZeroUsize;
 
@@ -120,7 +120,7 @@ fn populate(world: &mut World) -> Result<(), DemoError> {
 ///
 /// # References
 ///
-/// [^1]: ADR-0067, the viewer reads the world and never writes to it, decision D2. `docs/adrs/draft/adr-0067-the-viewer-reads-the-world-and-never-writes-to-it.md`
+/// [^1]: ADR-0067, the viewer reads the world and never writes to it, decision D2. `docs/adrs/accepted/adr-0067-the-viewer-reads-the-world-and-never-writes-to-it.md`
 fn steer(camera: Camera, window: &Window, world: &World, canvas: &Canvas) -> Camera {
     let mut camera = camera;
     if window.is_key_down(Key::Minus) {

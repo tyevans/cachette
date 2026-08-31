@@ -1,6 +1,6 @@
 # ADR-0070: The head-up display reports what the drawing pass read
 
-Status: Draft
+Status: Accepted
 
 ## Context
 
@@ -122,8 +122,8 @@ checking against the picture is the whole purpose of the panel.
 
 ## References
 
-[^1]: ADR-0067, the viewer reads the world and never writes to it, decisions D1 and D2. `docs/adrs/draft/adr-0067-the-viewer-reads-the-world-and-never-writes-to-it.md`
+[^1]: ADR-0067, the viewer reads the world and never writes to it, decisions D1 and D2. `docs/adrs/accepted/adr-0067-the-viewer-reads-the-world-and-never-writes-to-it.md`
 [^2]: Budgets and costs, the scale constants. `docs/reference/budgets.md`
 [^3]: ADR-0018, the unit-to-tile bridge is derived, and it rebuilds at the barrier, decision D5. `docs/adrs/accepted/adr-0018-the-unit-to-tile-bridge-is-derived-and-rebuilds-at-the-barrier.md`
-[^4]: ADR-0067, the viewer reads the world and never writes to it, decision D4. `docs/adrs/draft/adr-0067-the-viewer-reads-the-world-and-never-writes-to-it.md`
+[^4]: ADR-0067, the viewer reads the world and never writes to it, decision D4. `docs/adrs/accepted/adr-0067-the-viewer-reads-the-world-and-never-writes-to-it.md`
 [^5]: Recurring Defect Shapes, shape 1. `.claude/rules/recurring-defects.md`

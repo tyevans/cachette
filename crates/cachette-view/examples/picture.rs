@@ -13,7 +13,7 @@
 //!
 //! # References
 //!
-//! [^1]: ADR-0067, the viewer reads the world and never writes to it, decision D1. `docs/adrs/draft/adr-0067-the-viewer-reads-the-world-and-never-writes-to-it.md`
+//! [^1]: ADR-0067, the viewer reads the world and never writes to it, decision D1. `docs/adrs/accepted/adr-0067-the-viewer-reads-the-world-and-never-writes-to-it.md`
 
 use std::io::Write;
 

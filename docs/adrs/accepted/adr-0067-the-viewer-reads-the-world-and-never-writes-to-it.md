@@ -1,6 +1,6 @@
 # ADR-0067: The viewer reads the world and never writes to it
 
-Status: Draft
+Status: Accepted
 
 ## Context
 
@@ -25,14 +25,20 @@ reviewer can find a crossing.
 
 ## Decision
 
-### D1. The viewer reads the world through the public interface, and never writes to it
+### D1. The drawing and the reporting read the world through the public interface, and never write to it
 
-The viewer holds a shared reference to the world. It calls no method that
-takes a mutable reference. It never spawns, moves, or removes an entity, and
-it never advances a tick.
+Every function that draws the world, or that reports a number about it, holds
+a shared reference. It calls no method that takes a mutable reference. It
+never spawns, moves, or removes an entity, and it never advances a tick.
 
-A viewer that could write to the world would put a person's choice of what to
+A drawing that could write to the world would put a person's choice of what to
 look at into the simulated state.
+
+**The program that owns the loop is not bound by this.** It builds the world
+it is going to show, and it steps the engine before it draws, which D4
+requires of it. The constraint is on the path from the world to the picture,
+not on the program that owns both ends of it. A decision stated over the whole
+crate would forbid the loop that another decision here requires.
 
 ### D2. The engine holds no value that exists for the viewer
 

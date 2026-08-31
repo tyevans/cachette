@@ -7,7 +7,7 @@
 //!
 //! # References
 //!
-//! [^1]: ADR-0067, the viewer reads the world and never writes to it. `docs/adrs/draft/adr-0067-the-viewer-reads-the-world-and-never-writes-to-it.md`
+//! [^1]: ADR-0067, the viewer reads the world and never writes to it. `docs/adrs/accepted/adr-0067-the-viewer-reads-the-world-and-never-writes-to-it.md`
 //! [^2]: Testing Rules, drive the real caller. `.claude/rules/testing.md`
 
 use cachette_core::{Axial, FactionId, World, WorldConfig};

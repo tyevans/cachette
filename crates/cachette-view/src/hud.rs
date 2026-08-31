@@ -27,8 +27,8 @@
 //!
 //! # References
 //!
-//! [^1]: ADR-0067, the viewer reads the world and never writes to it, decision D2. `docs/adrs/draft/adr-0067-the-viewer-reads-the-world-and-never-writes-to-it.md`
-//! [^2]: ADR-0070, the head-up display reports what the drawing pass read, decision D1. `docs/adrs/draft/adr-0070-the-head-up-display-reports-what-the-drawing-pass-read.md`
+//! [^1]: ADR-0067, the viewer reads the world and never writes to it, decision D2. `docs/adrs/accepted/adr-0067-the-viewer-reads-the-world-and-never-writes-to-it.md`
+//! [^2]: ADR-0070, the head-up display reports what the drawing pass read, decision D1. `docs/adrs/accepted/adr-0070-the-head-up-display-reports-what-the-drawing-pass-read.md`
 
 use cachette_core::pyramid::CellSummary;
 use cachette_core::terrain::{TileKind, KIND_COUNT};
@@ -119,7 +119,7 @@ impl Readout {
     ///
     /// # References
     ///
-    /// [^1]: ADR-0067, the viewer reads the world and never writes to it, decision D1. `docs/adrs/draft/adr-0067-the-viewer-reads-the-world-and-never-writes-to-it.md`
+    /// [^1]: ADR-0067, the viewer reads the world and never writes to it, decision D1. `docs/adrs/accepted/adr-0067-the-viewer-reads-the-world-and-never-writes-to-it.md`
     #[must_use]
     pub fn of(world: &World, camera: Camera, canvas: &Canvas, metrics: &Metrics) -> Self {
         let grid = world.grid();
@@ -192,7 +192,7 @@ impl Readout {
     ///
     /// # References
     ///
-    /// [^1]: ADR-0070, the head-up display reports what the drawing pass read, decision D2. `docs/adrs/draft/adr-0070-the-head-up-display-reports-what-the-drawing-pass-read.md`
+    /// [^1]: ADR-0070, the head-up display reports what the drawing pass read, decision D2. `docs/adrs/accepted/adr-0070-the-head-up-display-reports-what-the-drawing-pass-read.md`
     #[must_use]
     pub const fn by_faction(&self) -> &[u32; COLOURED_FACTIONS] {
         &self.by_faction
@@ -229,7 +229,7 @@ impl Readout {
     ///
     /// # References
     ///
-    /// [^1]: ADR-0067, the viewer reads the world and never writes to it, decision D3. `docs/adrs/draft/adr-0067-the-viewer-reads-the-world-and-never-writes-to-it.md`
+    /// [^1]: ADR-0067, the viewer reads the world and never writes to it, decision D3. `docs/adrs/accepted/adr-0067-the-viewer-reads-the-world-and-never-writes-to-it.md`
     #[must_use]
     pub const fn region(&self) -> Option<CellSummary> {
         self.region
@@ -433,7 +433,7 @@ impl Readout {
 /// # References
 ///
 /// [^1]: ADR-0024, every summary field is declared extensive or intensive, decision D5, a draft record. `docs/adrs/draft/adr-0024-every-summary-field-is-declared-extensive-or-intensive.md`
-/// [^2]: ADR-0067, the viewer reads the world and never writes to it, decision D3. `docs/adrs/draft/adr-0067-the-viewer-reads-the-world-and-never-writes-to-it.md`
+/// [^2]: ADR-0067, the viewer reads the world and never writes to it, decision D3. `docs/adrs/accepted/adr-0067-the-viewer-reads-the-world-and-never-writes-to-it.md`
 fn fraction(reading: Option<Fix32>) -> String {
     match reading {
         None => "-".to_string(),
@@ -588,7 +588,7 @@ fn legend_row(canvas: &mut Canvas, left: i32, right: i32, pen: i32, slot: usize,
 ///
 /// # References
 ///
-/// [^1]: ADR-0067, the viewer reads the world and never writes to it, decision D2. `docs/adrs/draft/adr-0067-the-viewer-reads-the-world-and-never-writes-to-it.md`
+/// [^1]: ADR-0067, the viewer reads the world and never writes to it, decision D2. `docs/adrs/accepted/adr-0067-the-viewer-reads-the-world-and-never-writes-to-it.md`
 fn ground_row(canvas: &mut Canvas, left: i32, right: i32, pen: i32, kind: TileKind, count: u32) {
     canvas.block(
         left,
