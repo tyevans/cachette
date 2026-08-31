@@ -96,6 +96,7 @@ mutants:
 records:
     ./scripts/check-adrs.sh
     ./scripts/check-prds.sh
+    ./scripts/check-backlog.sh
     ./scripts/check-citations.sh
 
 # Prove that the record checks can fail. Each must reject its broken fixture.

@@ -23,6 +23,17 @@ adding one.** There is no separate index. The directories are the index.
 ls docs/backlog/*/ | grep -o '^[0-9]\{4\}' | sort -n | tail -1
 ```
 
+**This rule has no defence against two people who read the same highest
+number.** Both add one, both get the same number, and both files look right.
+Nothing in the directory listing says which came first. A check fails when
+one number names more than one item, and that check is the only thing that
+sees it.
+
+When work runs in parallel, the person who dispatches it allocates every
+number first and gives each worker its own. Do not ask two workers to read
+the highest number themselves. This has happened once, and the finding
+records what it cost.[^5]
+
 A number is never reused, including by a dropped item. Delete a dropped item's
 file only if it was never refined; otherwise move it to `complete/` and record
 why it was dropped.
@@ -129,3 +140,4 @@ The backlog holds work. The registers hold state. The records hold decisions.
 [^2]: ADR Registry. `docs/adrs/REGISTRY.md`
 [^3]: Blockers, Decisions and Findings registers. `docs/`
 [^4]: Product requirement records. `docs/product/README.md`
+[^5]: Findings register, FND-050. `docs/FINDINGS.md`
