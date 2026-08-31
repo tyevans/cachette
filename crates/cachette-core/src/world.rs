@@ -750,8 +750,16 @@ impl World {
         // change to level 0 that this frame made. It is derived, so it is
         // last.[^5]
         //
+        // The rebuild is called here rather than through the public wrapper,
+        // because the wrapper refreshes the structure first and the barrier
+        // above has already done that. Two refreshes would be one decision in
+        // two places, and the second would hide a rebuild that ran in the
+        // wrong order: a structure left stale by a barrier out of order would
+        // be quietly repaired instead of refused.
+        //
         // [^5]: ADR-0022, level 0 is the only truth, and every level above it is derived, decision D2, a draft record. `docs/adrs/draft/adr-0022-level-0-is-the-only-truth-and-every-level-above-it-is-derived.md`
-        self.rebuild_pyramid(threads)?;
+        self.pyramid
+            .rebuild(&self.values, &self.soldiers, &self.bridge, threads)?;
         Ok(&self.log)
     }
 

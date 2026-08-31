@@ -172,7 +172,7 @@ ground.[^DEC1] Whichever option wins, that value needs recording.
 
 [^DEC6]: ADR-0018, the unit-to-tile bridge is derived, and it rebuilds at the barrier, decision D3. `docs/adrs/accepted/adr-0018-the-unit-to-tile-bridge-is-derived-and-rebuilds-at-the-barrier.md`
 
-[^DEC7]: Backlog item 0030. `docs/backlog/proposed/0030-enforce-the-barrier-ordering.md`
+[^DEC7]: Backlog item 0030. `docs/backlog/complete/0030-enforce-the-barrier-ordering.md`
 
 ### DEC-018 — Where does movement sit in the frame schedule?
 
@@ -309,7 +309,13 @@ rather than the spawn that caused it. Option C contradicts the record.
 part a reviewer might object to, and the objection is about one function
 rather than about a constraint on the project. Promote it to a record if a
 second structural apply lands inside the frame, because the ordering between
-the two is then a real decision.[^DEC7]
+the two is then a real decision.
+
+The ordering of the barrier itself is settled and enforced. A test reads it
+from outside: a rebuild that ran before the structural apply leaves the
+derived structure stale when the step ends, and four tests fail on that.[^DEC7]
+The open part here is the refresh at the top of the step, which serves a
+change the caller made outside any frame.
 
 ### DEC-013 — Which toolchain version does the project pin?
 
