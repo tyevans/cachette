@@ -31,6 +31,7 @@ use crate::hash::StateHash;
 use crate::hex::{Axial, Grid, GridError};
 use crate::rng;
 use crate::sim_math;
+use crate::slots::Slots;
 use crate::types::{Accum, FactionId, Fix32, Tick, TileIdx};
 
 /// The reason that a step refused to run.
@@ -319,11 +320,12 @@ impl World {
         let count = values.len();
         let chunk_len = count.div_ceil(threads).max(1);
 
-        let mut slots: Vec<Vec<TileChanged>> = vec![Vec::new(); threads];
+        let mut slots: Slots<Vec<TileChanged>> =
+            Slots::filled(threads, Vec::new()).map_err(|_| StepError::ZeroThreads)?;
 
         std::thread::scope(|scope| {
             let mut base = 0usize;
-            for (chunk, slot) in values.chunks_mut(chunk_len).zip(slots.iter_mut()) {
+            for (chunk, slot) in values.chunks_mut(chunk_len).zip(slots.entries_mut()) {
                 let start = base;
                 base += chunk.len();
                 let owned_factions = &factions[start..base];
@@ -333,35 +335,14 @@ impl World {
             }
         });
 
-        self.log.clear();
-        for slot in ordered_slots(&slots) {
-            self.log.extend_from_slice(slot);
-        }
+        let mut log = core::mem::take(&mut self.log);
+        log.clear();
+        self.log = slots.combine(log, |mut joined, slot| {
+            joined.extend_from_slice(slot);
+            joined
+        });
         Ok(&self.log)
     }
-}
-
-/// Returns the output slots in the order that the log joins them.
-///
-/// The order is slot order. Slot order is the order of the tiles, and it
-/// does not depend on which thread finished first.[^1]
-///
-/// # References
-///
-/// [^1]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
-#[cfg(not(feature = "probe-nondeterminism"))]
-fn ordered_slots(slots: &[Vec<TileChanged>]) -> impl Iterator<Item = &Vec<TileChanged>> {
-    slots.iter()
-}
-
-/// Returns the output slots in reverse order.
-///
-/// This is the test-only switch. It breaks the ordering rule on purpose,
-/// so that the determinism tests have a proven failure mode. Never build a
-/// shipped artefact with this feature.
-#[cfg(feature = "probe-nondeterminism")]
-fn ordered_slots(slots: &[Vec<TileChanged>]) -> impl Iterator<Item = &Vec<TileChanged>> {
-    slots.iter().rev()
 }
 
 /// Updates one contiguous chunk of tiles and returns the events it emitted.
