@@ -255,6 +255,7 @@ without stating a constraint is worse than no record.
 | 0068 | Terrain is generated from the seed and is never stored as a map | Draft | 0001, 0002, 0003, 0012 | — |
 | 0069 | Weather is a field the world integrates, never a table it reads | Reserved | 0058, 0068 | — |
 | 0070 | The head-up display reports what the drawing pass read | Draft | 0067, 0018 | `draft/adr-0070-the-head-up-display-reports-what-the-drawing-pass-read.md` |
+| 0071 | The bridge rebuild orders on one thread | Proposed | 0001, 0004, 0007, 0018 | — |
 
 ### Retired numbers
 
