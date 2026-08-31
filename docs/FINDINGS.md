@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-064**
+**Next number: FND-069**
 
 ## A. Corrections to stated rules
 
@@ -1353,6 +1353,43 @@ perturbed in a way that changes the population.
 perturbed. Where it cannot hold, say so in the file rather than leaving a
 reader to wonder why one probe has a companion and the next does not.
 
+### FND-068 — The world's call to an arena invariant check cannot fail today
+
+**Believed.** The world's invariant check covers each entity arena, because it
+calls the check of every arena and refuses the world when one of them fails.
+Removing one of those calls would therefore break a test.
+
+**True.** It breaks no test. Every failure state that an arena check detects is
+unreachable from the public interface. The arena marks a slot live before it
+mints the identity, it advances the generation before it queues the slot, and
+it writes every column in one call. So a caller who drives the world can never
+put an arena into a state its own check rejects.
+
+**Evidence.** Found while building the character column set. The call to the
+character arena check was removed from the world, and the whole suite stayed
+green: the arena tests, the thread-count suite and the golden state hash all
+passed. The arena's own failure states are reached only by the unit tests
+inside the module, which write the columns directly.
+
+The soldier arena and the settlement arena have the same property. Nothing in
+the tree distinguishes the three.
+
+**Follows.** Three things.
+
+**Keep the call.** It is a guard against a future write path that edits the
+columns outside the arena, and the batched structural path will be exactly
+that. A guard for a path that does not exist yet is not the same as a
+capability nobody invokes.
+
+**Do not read a green suite as proof that the world-level call works.** The
+unit tests prove the check works. Nothing proves the world reaches it. Say
+which of the two a test proves.
+
+**The test that would close this needs a write path that can corrupt an
+arena.** Write it when that path exists, and not before, because a test that
+reaches through a private field pins the implementation rather than the
+behaviour.[^21]
+
 ### FND-063 — A refined item asked for a path that no record and no code held
 
 **Believed.** A backlog item that adds an entity shape can require the founding
@@ -1410,3 +1447,4 @@ to the batched path when the record exists.
 [^18]: ADR-0066, entity storage holds four fixed shapes, decision D2. `docs/adrs/accepted/adr-0066-entity-storage-holds-four-fixed-shapes.md`
 [^19]: Findings register, FND-058, in this document.
 [^20]: ADR-0014, entity identity is an index plus a generation, decision D3. `docs/adrs/accepted/adr-0014-entity-identity-is-an-index-plus-a-generation.md`
+[^21]: Testing rules, section 6. `.claude/rules/testing.md`

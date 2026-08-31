@@ -15,6 +15,7 @@
 //! [^3]: ADR-0002, simulated and aggregated state holds no floating point number, decision D1. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
 
 pub mod bridge;
+pub mod character;
 pub mod event;
 pub mod hash;
 pub mod hex;
@@ -27,10 +28,12 @@ pub mod slots;
 pub mod soldier;
 pub mod sort;
 pub mod terrain;
+pub mod tier;
 pub mod types;
 pub mod world;
 
 pub use bridge::{BlockLayout, BlockRange, BridgeError, UnitTileBridge};
+pub use character::{CharacterArena, CharacterError};
 pub use event::{ResourceTaken, TileChanged};
 pub use hash::StateHash;
 pub use hex::{Axial, Grid, GridError};
@@ -40,5 +43,6 @@ pub use slots::{Candidate, SlotError, Slots};
 pub use soldier::{SoldierArena, SoldierError};
 pub use sort::{SortError, SortKey};
 pub use terrain::{Terrain, TerrainTile, TileKind};
+pub use tier::{EntityTier, Shape, CHARACTER_CEILING};
 pub use types::{Accum, Entity, FactionId, Fix32, Tick, TileIdx};
 pub use world::{StepError, World, WorldConfig, WorldError};

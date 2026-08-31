@@ -28,6 +28,7 @@
 //! [^5]: ADR-0002, simulated and aggregated state holds no floating point number, decision D2. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
 
 use crate::bridge::{BlockLayout, BridgeError, UnitTileBridge, BLOCK_BITS_DEFAULT};
+use crate::character::{CharacterArena, CharacterError};
 use crate::event::{ResourceTaken, TileChanged, CHANGE_KIND_LOWERED, CHANGE_KIND_RAISED};
 use crate::hash::StateHash;
 use crate::hex::{Axial, Grid, GridError, NEIGHBOUR_COUNT};
@@ -195,6 +196,7 @@ pub struct World {
     gather_log: Vec<ResourceTaken>,
     soldiers: SoldierArena,
     settlements: SettlementArena,
+    characters: CharacterArena,
     bridge: UnitTileBridge,
     terrain: Terrain,
     /// The stock that each tile started with. It stores nothing.
@@ -238,6 +240,12 @@ impl World {
         let layout = BlockLayout::new(grid, BLOCK_BITS_DEFAULT)?;
         let soldiers = SoldierArena::new(grid);
         let settlements = SettlementArena::new(grid);
+        // The character tier states its own ceiling, and the arena checks
+        // it here, once, when the world is built. Nothing checks a count on
+        // a later call.[^1]
+        //
+        // [^1]: ADR-0054, an entity belongs to one of three tiers, declared at creation, decision D3, a draft record. `docs/adrs/draft/adr-0054-an-entity-belongs-to-one-of-three-tiers-declared-at-creation.md`
+        let characters = CharacterArena::new();
         let mut bridge = UnitTileBridge::new(layout);
         bridge.rebuild(&soldiers)?;
         let terrain = Terrain::new(config.seed, grid);
@@ -251,6 +259,7 @@ impl World {
             gather_log: Vec::new(),
             soldiers,
             settlements,
+            characters,
             bridge,
             terrain,
             resources: ResourceField::new(terrain),
@@ -531,6 +540,66 @@ impl World {
         self.settlements.set_store(entity, commodity, quantity)
     }
 
+    /// Returns the characters of the world.
+    ///
+    /// The living character is one of the four fixed entity shapes, and it
+    /// has its own column set. It carries no tile position.[^1] The shape
+    /// declares the character tier at the type, so a caller may walk the
+    /// population.[^2]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0066, entity storage holds four fixed shapes, decision D1. `docs/adrs/accepted/adr-0066-entity-storage-holds-four-fixed-shapes.md`
+    /// [^2]: ADR-0054, an entity belongs to one of three tiers, declared at creation, decision D1, a draft record. `docs/adrs/draft/adr-0054-an-entity-belongs-to-one-of-three-tiers-declared-at-creation.md`
+    #[must_use]
+    pub const fn characters(&self) -> &CharacterArena {
+        &self.characters
+    }
+
+    /// Creates a character in the world and returns their identity.
+    ///
+    /// The character is born on the current tick of the world.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the arena holds no free slot, or when the
+    /// faction is one the world does not have.
+    pub fn create_character(&mut self, faction: FactionId) -> Result<Entity, CharacterError> {
+        // The arena refuses a faction above the project ceiling. This world
+        // holds a faction count of its own, which is at most that ceiling,
+        // and a character of a faction the world does not have is a caller
+        // mistake rather than a storage one.
+        if faction.0 >= self.config.faction_count.max(1) {
+            return Err(CharacterError::FactionAboveCeiling(faction));
+        }
+        self.characters.create(faction, self.tick)
+    }
+
+    /// Removes a character and reports whether it removed one.
+    ///
+    /// A stale identity removes nothing and returns `false`. The identity
+    /// of a character who is gone never resolves again, so the character
+    /// created next in that slot does not answer to it.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0014, entity identity is an index plus a generation, decision D3. `docs/adrs/accepted/adr-0014-entity-identity-is-an-index-plus-a-generation.md`
+    pub fn remove_character(&mut self, entity: Entity) -> bool {
+        self.characters.remove(entity)
+    }
+
+    /// Writes the renown of a character and reports whether it wrote.
+    ///
+    /// Returns `false` when the identity is dead. A renown of zero is a
+    /// real state, so a write of zero is a write.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: Findings register, FND-043. `docs/FINDINGS.md`
+    pub fn set_character_renown(&mut self, entity: Entity, renown: Fix32) -> bool {
+        self.characters.set_renown(entity, renown)
+    }
+
     /// Reports whether the ground at an address admits a unit.
     ///
     /// The answer is a property of the ground alone.[^1] It does not depend
@@ -796,7 +865,8 @@ impl World {
             hash = hash.write_u64(*amount);
         }
         let hash = self.soldiers.hash_into(hash);
-        self.settlements.hash_into(hash)
+        let hash = self.settlements.hash_into(hash);
+        self.characters.hash_into(hash)
     }
 
     /// Reports whether the world holds its invariants.
@@ -904,6 +974,19 @@ impl World {
             return false;
         }
         if !self.settlements.check_invariants() {
+            return false;
+        }
+        // The character faction column stands under the same ceiling as
+        // every other faction column.
+        if self
+            .characters
+            .faction_column()
+            .iter()
+            .any(|faction| faction.0 >= ceiling)
+        {
+            return false;
+        }
+        if !self.characters.check_invariants() {
             return false;
         }
         // The bridge is a second declaration of where a soldier stands, and
