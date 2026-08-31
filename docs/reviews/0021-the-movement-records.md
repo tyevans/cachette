@@ -20,7 +20,7 @@
 
 | Item | Value |
 |---|---|
-| `docs/adrs/draft/adr-0056-movement-is-tile-discrete-and-admitted-by-sort-then-admit.md` | Status `Draft` |
+| `docs/adrs/accepted/adr-0056-movement-is-tile-discrete-and-admitted-by-sort-then-admit.md` | Status `Draft` |
 | Retired. `docs/adrs/REGISTRY.md` | Status `Draft` |
 | Branch | `feat/sprint-5-admission` |
 | Commit | `7411bd4` |

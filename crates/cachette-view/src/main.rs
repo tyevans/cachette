@@ -32,14 +32,14 @@ const WINDOW_HEIGHT: usize = 720;
 ///
 /// [^1]: PRD-0002, a developer watches the world run. `docs/product/shaped/prd-0002-a-developer-watches-the-world-run.md`
 const DEMO: WorldConfig = WorldConfig {
-    width: 200,
-    height: 140,
+    width: 640,
+    height: 440,
     seed: 0x0cac_4e77_e5ee_d001,
     faction_count: 4,
 };
 
 /// The number of soldiers the demonstration spawns.
-const SOLDIERS: u32 = 2200;
+const SOLDIERS: u32 = 22_000;
 
 /// The stride that spreads the soldiers over the tiles.
 ///
@@ -59,6 +59,8 @@ enum DemoError {
     Soldier(cachette_core::SoldierError),
     /// The window could not open.
     Window(minifb::Error),
+    /// The spatial structure no longer describes the world.
+    Bridge(cachette_core::BridgeError),
 }
 
 impl std::fmt::Display for DemoError {
@@ -68,6 +70,10 @@ impl std::fmt::Display for DemoError {
             Self::Step(error) => write!(formatter, "the step refused to run: {error}"),
             Self::Soldier(error) => write!(formatter, "a soldier refused to spawn: {error}"),
             Self::Window(error) => write!(formatter, "the window refused to open: {error}"),
+            Self::Bridge(error) => write!(
+                formatter,
+                "the viewer refused to draw a world it could not read: {error}"
+            ),
         }
     }
 }
@@ -183,7 +189,11 @@ fn main() -> Result<(), DemoError> {
         metrics.step(at.elapsed());
 
         let at = Lap::start();
-        paint::draw(&world, camera, &mut canvas);
+        // The viewer refuses a world whose spatial structure no longer
+        // describes it, rather than drawing a picture without its soldiers.
+        // The step rebuilds that structure at the barrier, so this cannot
+        // happen here, and a refusal means the loop changed.
+        paint::draw(&world, camera, &mut canvas).map_err(DemoError::Bridge)?;
         metrics.draw(at.elapsed());
 
         let at = Lap::start();

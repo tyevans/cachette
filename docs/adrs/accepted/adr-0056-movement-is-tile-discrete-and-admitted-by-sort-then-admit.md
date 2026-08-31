@@ -1,6 +1,6 @@
 # ADR-0056: Movement is tile-discrete and admitted by sort-then-admit
 
-Status: Draft
+Status: Accepted
 
 ## Context
 

@@ -168,7 +168,7 @@ of detail pyramid, so the bridge and the pyramid share one partition.[^9]
 ## References
 
 [^1]: ADR-0017, the world is a rhombus, so a tile index is raw axial. `docs/adrs/accepted/adr-0017-the-world-is-a-rhombus-so-a-tile-index-is-raw-axial.md`
-[^2]: ADR-0056, movement is tile-discrete and admitted by sort then admit. `docs/adrs/draft/adr-0056-movement-is-tile-discrete-and-admitted-by-sort-then-admit.md`
+[^2]: ADR-0056, movement is tile-discrete and admitted by sort then admit. `docs/adrs/accepted/adr-0056-movement-is-tile-discrete-and-admitted-by-sort-then-admit.md`
 [^3]: ADR-0016, tiles are stored in block-tiled order at the aggregation block size. `docs/adrs/REGISTRY.md`
 [^4]: ADR-0004, iteration order is explicit, and unordered reductions need slots. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
 [^5]: ADR-0066, entity storage holds four fixed shapes. `docs/adrs/accepted/adr-0066-entity-storage-holds-four-fixed-shapes.md`

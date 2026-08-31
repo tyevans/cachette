@@ -18,7 +18,7 @@
 //!
 //! [^1]: ADR-0003, every random draw is keyed, never stateful, decision D1. `docs/adrs/accepted/adr-0003-every-random-draw-is-keyed-never-stateful.md`
 //! [^2]: ADR-0017, the world is a rhombus, so a tile index is raw axial, decision D3. `docs/adrs/accepted/adr-0017-the-world-is-a-rhombus-so-a-tile-index-is-raw-axial.md`
-//! [^3]: ADR-0056, movement is tile-discrete and admitted by sort-then-admit, decision D2, a draft record. `docs/adrs/draft/adr-0056-movement-is-tile-discrete-and-admitted-by-sort-then-admit.md`
+//! [^3]: ADR-0056, movement is tile-discrete and admitted by sort-then-admit, decision D2, a draft record. `docs/adrs/accepted/adr-0056-movement-is-tile-discrete-and-admitted-by-sort-then-admit.md`
 //! [^4]: Testing policy. `docs/TESTING.md`
 
 use cachette_core::{Axial, Entity, FactionId, World, WorldConfig};
