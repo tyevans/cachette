@@ -18,8 +18,9 @@
 
 use std::path::PathBuf;
 
+use cachette_core::site::CommodityId;
 use cachette_core::terrain::TileKind;
-use cachette_core::types::FactionId;
+use cachette_core::types::{FactionId, Fix32};
 use cachette_core::{Axial, World, WorldConfig};
 
 /// The number of frames that each scenario runs.
@@ -99,6 +100,16 @@ const SCENARIOS: &[(&str, WorldConfig, Population)] = &[
         },
         Population::Crowd,
     ),
+    (
+        "settlements",
+        WorldConfig {
+            width: 32,
+            height: 32,
+            seed: 0x0cac_4e77_0052,
+            faction_count: 3,
+        },
+        Population::Settled,
+    ),
 ];
 
 /// How a scenario fills its world.
@@ -121,6 +132,66 @@ enum Population {
     Spread,
     /// A patch of ground filled to the capacity of each of its tiles.
     Crowd,
+    /// Settlements founded over the world, with part of them destroyed.
+    ///
+    /// A golden file that never sees a settlement cannot catch a change to
+    /// how the settlement state is represented.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0066, entity storage holds four fixed shapes, decision D1. `docs/adrs/accepted/adr-0066-entity-storage-holds-four-fixed-shapes.md`
+    Settled,
+}
+
+/// Founds settlements over a world, and destroys part of them.
+///
+/// The losses matter. A run that only founds never exercises the generation
+/// advance, the free queue, or a reused slot.[^1]
+///
+/// Part of the stores stay at zero, because zero is a real state and the
+/// golden file must cover it.[^2]
+///
+/// # References
+///
+/// [^1]: ADR-0014, entity identity is an index plus a generation, decisions D3 and D4. `docs/adrs/accepted/adr-0014-entity-identity-is-an-index-plus-a-generation.md`
+/// [^2]: Findings register, FND-043. `docs/FINDINGS.md`
+fn settle(world: &mut World) {
+    let grid = world.grid();
+    let tiles: Vec<Axial> = (0..grid.tile_count())
+        .map(|index| Axial::new((index % grid.width()) as i32, (index / grid.width()) as i32))
+        .filter(|address| (address.q + address.r) % 5 == 0)
+        .collect();
+    assert!(
+        tiles.len() >= 64,
+        "the scenario found only {} tiles to settle",
+        tiles.len()
+    );
+    let mut lost = Vec::new();
+    for (step, address) in tiles.into_iter().take(96).enumerate() {
+        let settlement = world
+            .found_settlement(address, FactionId((step % 3) as u16))
+            .expect("the founding must succeed");
+        if step % 2 == 1 {
+            world
+                .set_settlement_store(
+                    settlement,
+                    CommodityId(0),
+                    Fix32::from_int((step % 13) as i16),
+                )
+                .expect("the commodity is in the set");
+        }
+        if step % 3 == 0 {
+            lost.push((settlement, address));
+        }
+    }
+    for (settlement, _) in &lost {
+        assert!(world.destroy_settlement(*settlement));
+    }
+    for (_, address) in lost.iter().take(8) {
+        world
+            .found_settlement(*address, FactionId(0))
+            .expect("the founding must reuse a freed slot");
+    }
 }
 
 /// Fills a patch of open ground to the capacity of each tile.
@@ -212,6 +283,7 @@ fn hash_sequence(config: WorldConfig, population: Population) -> String {
         Population::Empty => {}
         Population::Spread => populate(&mut world),
         Population::Crowd => crowd(&mut world),
+        Population::Settled => settle(&mut world),
     }
     let mut lines = String::new();
     lines.push_str(&format!("0 {}\n", world.state_hash()));

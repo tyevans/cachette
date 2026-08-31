@@ -15,8 +15,9 @@
 //! [^1]: ADR-0001, one binary gives one answer at any thread count, decision D4. `docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
 //! [^2]: Testing policy. `docs/TESTING.md`
 
+use cachette_core::site::CommodityId;
 use cachette_core::terrain::TileKind;
-use cachette_core::{Axial, Entity, FactionId, World, WorldConfig};
+use cachette_core::{Axial, Entity, FactionId, Fix32, World, WorldConfig};
 
 /// The thread counts that every scenario runs at.
 const THREAD_COUNTS: [usize; 3] = [1, 2, 12];
@@ -311,4 +312,170 @@ fn the_soldier_columns_reach_the_state_hash() {
     assert_ne!(moved.soldiers().address(kept[0]), Some(corner));
     assert_eq!(moved.place_soldier(kept[0], corner), Ok(true));
     assert_ne!(moved.state_hash(), peopled.state_hash());
+}
+
+/// Founds settlements over a world, and destroys part of what it founds.
+///
+/// The pattern is fixed, so it is the same on every run and at every thread
+/// count. The losses matter: a run that only founds never exercises the
+/// generation advance, the free queue, or a reused slot.[^1]
+///
+/// A settlement is fixed to a tile, and two settlements cannot stand on one
+/// tile, so the pattern walks distinct tiles.[^2]
+///
+/// # References
+///
+/// [^1]: ADR-0014, entity identity is an index plus a generation, decisions D3 and D4. `docs/adrs/accepted/adr-0014-entity-identity-is-an-index-plus-a-generation.md`
+/// [^2]: ADR-0066, entity storage holds four fixed shapes, decision D1. `docs/adrs/accepted/adr-0066-entity-storage-holds-four-fixed-shapes.md`
+fn settle(world: &mut World) -> Vec<Entity> {
+    let grid = world.grid();
+    let tiles: Vec<Axial> = (0..grid.tile_count())
+        .map(|index| Axial::new((index % grid.width()) as i32, (index / grid.width()) as i32))
+        .take(23)
+        .collect();
+    let ceiling = u32::from(world.config().faction_count.max(1));
+    let mut kept = Vec::new();
+    let mut lost = Vec::new();
+    for (index, address) in tiles.into_iter().enumerate() {
+        let index = index as u32;
+        let settlement = world
+            .found_settlement(address, FactionId((index % ceiling) as u16))
+            .expect("the address and the faction must be valid");
+        // A store of zero is a real state, so the fixture leaves some stores
+        // at zero and writes others.[^1]
+        //
+        // [^1]: Findings register, FND-043. `docs/FINDINGS.md`
+        if index % 2 == 1 {
+            world
+                .set_settlement_store(
+                    settlement,
+                    CommodityId(0),
+                    Fix32::from_int((index % 11) as i16),
+                )
+                .expect("the commodity is in the set");
+        }
+        if index % 4 == 3 {
+            lost.push((settlement, address));
+        } else {
+            kept.push(settlement);
+        }
+    }
+    for (settlement, _) in &lost {
+        assert!(world.destroy_settlement(*settlement));
+    }
+    // Found again on the freed tiles, so the run reuses freed slots.
+    for (_, address) in &lost {
+        kept.push(
+            world
+                .found_settlement(*address, FactionId(0))
+                .expect("the tile is free again"),
+        );
+    }
+    kept
+}
+
+/// Runs the frames over a world that holds settlements.
+fn run_with_settlements(config: WorldConfig, frames: u64, threads: usize) -> (Vec<u8>, u64, usize) {
+    let mut world = World::new(config).expect("the extent must describe a world");
+    let kept = settle(&mut world);
+    for _ in 0..frames {
+        world.step(threads).expect("the step must run");
+    }
+    // Drive the step, then inspect the arena. A column set that no test
+    // reaches through the engine is inert.[^1]
+    //
+    // [^1]: Findings register, FND-041. `docs/FINDINGS.md`
+    assert!(world.check_invariants());
+    assert!(kept
+        .iter()
+        .all(|settlement| world.settlements().contains(*settlement)));
+    (
+        world.event_log_bytes().to_vec(),
+        world.state_hash().finish(),
+        world.settlements().len() as usize,
+    )
+}
+
+#[test]
+fn a_world_that_holds_settlements_is_identical_at_every_thread_count() {
+    let mut settled = 0;
+    for (name, config, frames) in SCENARIOS {
+        let expected = run_with_settlements(*config, *frames, THREAD_COUNTS[0]);
+        assert!(
+            expected.2 > 0,
+            "scenario {name}: the fixture must found a settlement"
+        );
+        settled += 1;
+        for threads in &THREAD_COUNTS[1..] {
+            let produced = run_with_settlements(*config, *frames, *threads);
+            assert_eq!(
+                produced.0, expected.0,
+                "scenario {name}: the event log differs at {threads} threads"
+            );
+            assert_eq!(
+                produced.1, expected.1,
+                "scenario {name}: the state hash differs at {threads} threads"
+            );
+            assert_eq!(
+                produced.2, expected.2,
+                "scenario {name}: the live settlement count differs at {threads} threads"
+            );
+        }
+    }
+    assert_eq!(
+        settled,
+        SCENARIOS.len(),
+        "every scenario must hold settlements"
+    );
+}
+
+#[test]
+fn the_settlement_columns_reach_the_state_hash() {
+    // A hash that ignored the settlement columns would pass the golden test
+    // while the arena changed underneath it.
+    let config = SCENARIOS[2].1;
+    let bare = World::new(config).expect("the extent must describe a world");
+    let mut settled = World::new(config).expect("the extent must describe a world");
+    let kept = settle(&mut settled);
+    assert!(!kept.is_empty(), "the fixture must found a settlement");
+    assert_ne!(bare.state_hash(), settled.state_hash());
+
+    // A second world built the same way agrees, so the difference above is
+    // the arena and not the run.
+    let mut twin = World::new(config).expect("the extent must describe a world");
+    settle(&mut twin);
+    assert_eq!(twin.state_hash(), settled.state_hash());
+
+    // The store column reaches the hash. The fixture leaves this store at
+    // zero, so the write below is a real change.
+    let mut stored = World::new(config).expect("the extent must describe a world");
+    let stored_kept = settle(&mut stored);
+    assert_eq!(
+        stored
+            .settlements()
+            .store(stored_kept[0])
+            .and_then(|store| store.quantity(CommodityId(0))),
+        Some(Fix32::ZERO),
+        "the fixture must leave this store at zero, or the write below changes nothing"
+    );
+    assert_eq!(
+        stored.set_settlement_store(stored_kept[0], CommodityId(0), Fix32::from_int(3)),
+        Ok(true)
+    );
+    assert_ne!(stored.state_hash(), settled.state_hash());
+
+    // The generation column reaches the hash. A loss and a founding on the
+    // same tile leave the same population on the same tiles, at a later
+    // generation.
+    let mut aged = World::new(config).expect("the extent must describe a world");
+    let aged_kept = settle(&mut aged);
+    let address = aged
+        .settlements()
+        .address(aged_kept[0])
+        .expect("the settlement is live");
+    assert!(aged.destroy_settlement(aged_kept[0]));
+    aged.found_settlement(address, FactionId(0))
+        .expect("the tile is free again");
+    assert_eq!(aged.settlements().len(), settled.settlements().len());
+    assert_ne!(aged.state_hash(), settled.state_hash());
 }
