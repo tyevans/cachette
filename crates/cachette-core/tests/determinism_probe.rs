@@ -25,7 +25,7 @@
 #![cfg(feature = "probe-nondeterminism")]
 
 use cachette_core::slots::{Candidate, Slots};
-use cachette_core::{World, WorldConfig};
+use cachette_core::{Axial, Grid, Terrain, World, WorldConfig};
 
 /// The scenario. It must hold more tiles than threads, so that a run at
 /// twelve threads fills more than one output slot.
@@ -90,4 +90,46 @@ fn the_slot_reduction_test_fails_when_the_order_rule_breaks() {
     // tie. The property test asserts the lowest slot wins, so it fails.
     assert_eq!(tied_minimum(1), Some(Candidate::new(0, 0)));
     assert_eq!(tied_minimum(12), Some(Candidate::new(0, 11)));
+}
+
+/// The extent that the terrain probe reads.
+const TERRAIN_EXTENT: u32 = 192;
+
+#[test]
+fn the_key_field_test_fails_when_the_terrain_key_drops_the_row() {
+    // The probe drops the row component of the lattice node key. The field
+    // then varies along a row and is constant down a column.
+    //
+    // This defect is invisible to both determinism tests, because the world
+    // it builds is identical on every run and at every thread count. Only a
+    // test of the key itself sees it, which is the case the testing rule
+    // names.[^1]
+    //
+    // [^1]: Testing rules, section 2. `.claude/rules/testing.md`
+    let grid = Grid::new(TERRAIN_EXTENT, TERRAIN_EXTENT).expect("the extent must describe a grid");
+    let field = Terrain::new(0x0123_4567_89ab_cdef, grid);
+    let column = TERRAIN_EXTENT as i32 / 2;
+
+    let first = field
+        .height(Axial::new(column, 0))
+        .expect("the address is inside the world");
+    for r in 1..TERRAIN_EXTENT as i32 {
+        assert_eq!(
+            field
+                .height(Axial::new(column, r))
+                .expect("the address is inside the world"),
+            first,
+            "the probe did not drop the row, so the key-field test has no \
+             proven failure mode"
+        );
+    }
+
+    // The perturbation is confined to one axis. A probe that changed both
+    // would prove less.
+    let row = TERRAIN_EXTENT as i32 / 2;
+    let mut along: Vec<_> = (0..TERRAIN_EXTENT as i32)
+        .map(|q| field.height(Axial::new(q, row)).expect("inside"))
+        .collect();
+    along.dedup();
+    assert!(along.len() > 1, "the probe also removed the column");
 }

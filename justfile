@@ -69,6 +69,7 @@ determinism:
 probe:
     ! cargo test --package cachette-core --features probe-nondeterminism --test thread_equivalence
     ! cargo test --package cachette-core --features probe-nondeterminism --test slot_reduction
+    ! cargo test --package cachette-core --features probe-nondeterminism --test terrain
     cargo test --package cachette-core --features probe-nondeterminism --test determinism_probe
 
 # Record the golden state hash files. Read the difference before you commit.
