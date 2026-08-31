@@ -20,6 +20,7 @@ pub mod event;
 pub mod hash;
 pub mod hex;
 pub mod pyramid;
+pub mod rates;
 pub mod resource;
 pub mod rng;
 pub mod sim_math;
@@ -37,8 +38,13 @@ pub use character::{CharacterArena, CharacterError};
 pub use event::{ResourceTaken, TileChanged};
 pub use hash::StateHash;
 pub use hex::{Axial, Grid, GridError};
+pub use rates::{
+    RateError, RateLedger, RatePass, RateSchedule, RateTable, SiteRate, SiteShortfall,
+};
 pub use resource::{Amount, CarryLoad, DepletionLedger, ResourceField, ResourceKind};
-pub use site::{CommodityId, SettlementArena, SettlementError, Store, COMMODITY_COUNT};
+pub use site::{
+    CommodityId, SettlementArena, SettlementError, Store, StoreUpdate, COMMODITY_COUNT,
+};
 pub use slots::{Candidate, SlotError, Slots};
 pub use soldier::{SoldierArena, SoldierError};
 pub use sort::{SortError, SortKey};

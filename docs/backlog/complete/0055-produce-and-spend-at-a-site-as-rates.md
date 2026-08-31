@@ -1,7 +1,7 @@
 ---
 id: 0055
 title: Produce and spend at a site as rates
-status: refined
+status: complete
 created: 2026-08-31
 implements: [ADR-0002 D1, ADR-0002 D3, ADR-0004 D2, ADR-0066 D1]
 changes: []
@@ -100,7 +100,41 @@ the same reduction.
 
 ## Outcome
 
-Filled in when the item moves to `complete/`.
+**Done.** A site carries a production rate and an upkeep rate for each
+commodity, and a pass over the sites applies both to the pooled store. The
+record is written and the registry row is `Draft`.[^12]
+
+**What the work built.** A rate is a Q16.16 value at or above zero. The rate
+table is a dense column beside the settlement columns, indexed by the slot.
+One application produces into the store, then spends from it. The store
+saturates at both ends: production that does not fit is a spill and upkeep
+that cannot be paid is a shortfall, and the engine reports both. A ledger
+holds the running totals, and an account of what the live stores hold makes
+the conservation equality an invariant that runs on every frame.
+
+**The interval is a parameter.** The schedule holds a period and a phase, and
+the world carries a setter for both. The stored rate is what one tick earns,
+and the pass multiplies it by the period, so raising the period does not raise
+what a site earns over a span of ticks.
+
+**Where it runs.** The pass runs after the gather resolve and before the
+pyramid rebuild. It reads no derived structure and changes no structure, so it
+is not a barrier.
+
+**What the work did not build.** No modifier pipeline. The record says so
+plainly and gives the reason: one source modifies a rate, so ADR-0055 fails
+the first condition of the record scope test today. The registry row for it
+stays reserved.
+
+**Registers.** Two findings opened. FND-064 records that a settings struct with
+public fields prices every new parameter, which is why the schedule lives on
+the world and not in the settings struct. FND-065 records that a conservation
+check over a column must name the structural moments that move the column.[^13]
+
+**A departure from the item.** The item asked for the interval as a schedule
+parameter and did not say where the parameter lives. The first attempt put it
+in the settings struct of the world and broke twenty-five files across three
+crates. FND-064 holds the reasoning for the second attempt.[^13]
 
 ## References
 
@@ -115,3 +149,5 @@ Filled in when the item moves to `complete/`.
 [^9]: Open decisions register, DEC-001. `docs/DECISIONS.md`
 [^10]: Findings register, FND-012. `docs/FINDINGS.md`
 [^11]: Findings register, FND-016. `docs/FINDINGS.md`
+[^12]: ADR-0062, production and upkeep are rates attached to a site, a draft record. `docs/adrs/draft/adr-0062-production-and-upkeep-are-rates-attached-to-a-site.md`
+[^13]: Findings register, FND-064 and FND-065. `docs/FINDINGS.md`
