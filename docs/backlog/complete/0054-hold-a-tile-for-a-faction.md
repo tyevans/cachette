@@ -1,7 +1,7 @@
 ---
 id: 0054
 title: Hold a tile for a faction
-status: refined
+status: complete
 created: 2026-08-31
 implements: [ADR-0002 D1, ADR-0004 D1, ADR-0012 D2, ADR-0023 D1]
 changes: []
@@ -90,7 +90,33 @@ it beside item 0053 only if one of the two lands first**; both edit the step.
 
 ## Outcome
 
-Filled in when the item moves to `complete/`.
+Done, with one statement of the product record left open.
+
+**What was built.** A tile carries a holder, which names a faction or nobody.
+A spread rule runs at the barrier of each frame. A unit standing on a tile
+claims it, a claim spreads from a held tile to its neighbours, and the ground
+sets the support that a claim must raise. Open water admits no holder. The
+world keeps a running count for each faction, a list of the tiles that
+somebody holds, and one faction mask for each block. Level 1 carries the held
+ground as an extensive field.
+
+**What changed from the plan.** Two things.
+
+The plan expected level 1 to answer what a faction holds. It answers how much
+ground is held, and it does not say by whom, because a summary field indexed
+by the faction is the shape the record rejects. The per-faction answer is a
+running total instead, and the block masks answer where. The record states
+both.
+
+The plan named a holder rule that spreads. The rule as written visits the edge
+of a holding and not its area, because a tile inside a holding cannot change
+hands. The findings register holds the reasoning and the evidence.
+
+**What is not done.** The viewer draws no holder layer, so a watcher cannot
+yet see a boundary. Item 0085 holds that work.
+
+**Registers.** FND-066 and FND-067 opened. The registry row for ADR-0053 moved
+to `Draft`. No blocker opened or closed. Items 0084 and 0085 opened.
 
 ## References
 
