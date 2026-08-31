@@ -35,6 +35,7 @@ use crate::rng;
 use crate::sim_math;
 use crate::slots::Slots;
 use crate::soldier::{SoldierArena, SoldierError};
+use crate::sort::{self, BoundedKey, SortError};
 use crate::terrain::{Terrain, TerrainTile, TileKind};
 use crate::types::{Accum, Entity, FactionId, Fix32, Tick, TileIdx, FACTION_CEILING};
 
@@ -45,6 +46,19 @@ pub enum StepError {
     ZeroThreads,
     /// The rebuild of the unit-to-tile bridge refused to run.
     Bridge(BridgeError),
+    /// The admission sort refused the intent keys.
+    Sort(SortError),
+    /// An intent named a tile outside the world.
+    ///
+    /// The intent half already drops a target outside the extent, so this
+    /// says that the two halves disagree rather than that a caller erred.
+    TargetOutsideWorld,
+}
+
+impl From<SortError> for StepError {
+    fn from(error: SortError) -> Self {
+        Self::Sort(error)
+    }
 }
 
 impl From<BridgeError> for StepError {
@@ -104,6 +118,10 @@ impl core::fmt::Display for StepError {
         match self {
             Self::ZeroThreads => write!(formatter, "a step needs at least one thread"),
             Self::Bridge(error) => write!(formatter, "the bridge rebuild refused: {error}"),
+            Self::Sort(error) => write!(formatter, "the admission sort refused: {error}"),
+            Self::TargetOutsideWorld => {
+                write!(formatter, "an intent named a tile outside the world")
+            }
         }
     }
 }
@@ -649,11 +667,40 @@ impl World {
         // Every soldier chooses a neighbour, then the step applies the
         // choices. The choice is a pure read of the world, so the two halves
         // never interleave and no soldier sees a half-applied world.[^1]
-        let moves = soldier_moves(tick, seed, self.terrain, &self.soldiers, threads)?;
-        for (soldier, address) in moves {
+        // A spawn or a despawn made between two frames is a structural change
+        // that has not passed a barrier, and it leaves the derived structure
+        // stale. Admission reads the occupancy of a target from that
+        // structure, so the step opens by giving those changes their
+        // barrier.[^4]
+        //
+        // This is not a second barrier. The rebuild at the end of this
+        // function is the barrier of this frame, and it stays last. This call
+        // closes the frame that the caller's own changes belong to, and it
+        // does nothing when the caller already rebuilt or when nothing
+        // changed.
+        //
+        // [^4]: ADR-0018, the unit-to-tile bridge is derived, and it rebuilds at the barrier, decision D3. `docs/adrs/accepted/adr-0018-the-unit-to-tile-bridge-is-derived-and-rebuilds-at-the-barrier.md`
+        if self.bridge.describes(&self.soldiers).is_err() {
+            self.bridge.rebuild(&self.soldiers)?;
+        }
+
+        let intents = soldier_moves(tick, seed, self.terrain, &self.soldiers, threads)?;
+
+        // Admission grants the intents. It reads the occupancy of a target
+        // from the derived structure, which the last barrier rebuilt, so it
+        // must run before anything moves.[^3]
+        let granted = admit(
+            &intents,
+            &self.soldiers,
+            &self.bridge,
+            self.terrain,
+            self.grid,
+            threads,
+        )?;
+        for (soldier, address) in granted {
             self.soldiers
                 .place(soldier, address)
-                .expect("the chosen address is inside the world and admits a unit");
+                .expect("the granted address is inside the world and admits a unit");
         }
 
         // The bridge rebuilds here, at the barrier, and after the structural
@@ -663,6 +710,7 @@ impl World {
         //
         // [^1]: ADR-0056, movement is tile-discrete and admitted by sort-then-admit, decision D2. `docs/adrs/accepted/adr-0056-movement-is-tile-discrete-and-admitted-by-sort-then-admit.md`
         // [^2]: ADR-0018, the unit-to-tile bridge is derived, and it rebuilds at the barrier, decision D3. `docs/adrs/accepted/adr-0018-the-unit-to-tile-bridge-is-derived-and-rebuilds-at-the-barrier.md`
+        // [^3]: ADR-0056, movement is tile-discrete and admitted by sort-then-admit, decision D3. `docs/adrs/accepted/adr-0056-movement-is-tile-discrete-and-admitted-by-sort-then-admit.md`
         self.bridge.rebuild(&self.soldiers)?;
         Ok(&self.log)
     }
@@ -697,9 +745,9 @@ const DRAW_MOVE_DIRECTION: u32 = 0;
 /// slot, and the step joins the slots in slot order. The result never
 /// depends on thread completion order.[^4]
 ///
-/// This is the intent half of movement only. The step admits every intent.
-/// Two soldiers may therefore choose the same tile, and both enter it.
-/// Capacity and admission are not built yet.[^5]
+/// This is the intent half of movement only. A separate step admits the
+/// intents against the capacity of each target, and it may refuse any of
+/// them.[^5]
 ///
 /// # References
 ///
@@ -761,6 +809,333 @@ fn soldier_moves(
         joined.extend_from_slice(slot);
         joined
     }))
+}
+
+/// The number of admission passes that one frame runs.
+///
+/// Each pass admits what it can against the room the previous pass
+/// confirmed. The engine never runs to a fixpoint, because a fixpoint needs
+/// a convergence test and a solver in this project runs a fixed count.[^1]
+///
+/// The count is content. It is declared here until content exists, and the
+/// register holds the open choice of its value.[^2]
+///
+/// One pass admits no chain: a unit cannot follow another out of a full
+/// tile in the same frame. Two passes admit a chain of two. A longer chain
+/// waits for the next frame, which is a delay and never a wrong answer.
+///
+/// # References
+///
+/// [^1]: ADR-0005, a solver runs a fixed iteration count, decision D1. `docs/adrs/accepted/adr-0005-a-solver-runs-a-fixed-iteration-count.md`
+/// [^2]: Decisions register, DEC-019. `docs/DECISIONS.md`
+const ADMISSION_PASSES: usize = 2;
+
+/// A running count for each tile that the admission touched.
+///
+/// The tiles are held sorted by index, so a lookup is a binary search and the
+/// order never depends on how the counts were gathered. A dense array over
+/// every tile would be faster to update and would cost the whole world in
+/// memory for a frame that touches a handful of tiles.[^1]
+///
+/// A count is merged in ascending runs, never inserted one at a time.
+/// Inserting into the middle of a vector moves every later entry, which is
+/// quadratic in the number of tiles the frame touches, and the target scale
+/// is a million units.[^2]
+///
+/// # References
+///
+/// [^1]: ADR-0056, movement is tile-discrete and admitted by sort-then-admit, decision D3. `docs/adrs/accepted/adr-0056-movement-is-tile-discrete-and-admitted-by-sort-then-admit.md`
+/// [^2]: Budgets and costs, the scale constants. `docs/reference/budgets.md`
+#[derive(Debug, Default)]
+struct TileCounts {
+    entries: Vec<(u32, u32)>,
+    scratch: Vec<(u32, u32)>,
+}
+
+impl TileCounts {
+    /// Returns the count that one tile carries.
+    fn get(&self, tile: u32) -> u32 {
+        match self.entries.binary_search_by_key(&tile, |(key, _)| *key) {
+            Ok(at) => self.entries[at].1,
+            Err(_) => 0,
+        }
+    }
+
+    /// Adds a run of counts, given in ascending tile order.
+    ///
+    /// The caller states the order and the merge relies on it. A run out of
+    /// order would silently produce an unsorted result, and every later
+    /// lookup would then read the wrong tile, so the merge asserts it.
+    fn merge_ascending(&mut self, run: &[(u32, u32)]) {
+        debug_assert!(
+            run.windows(2).all(|pair| pair[0].0 < pair[1].0),
+            "a merged run must be sorted by tile and hold each tile once"
+        );
+        if run.is_empty() {
+            return;
+        }
+        self.scratch.clear();
+        self.scratch.reserve(self.entries.len() + run.len());
+        let (mut here, mut there) = (0usize, 0usize);
+        while here < self.entries.len() && there < run.len() {
+            let (mine, theirs) = (self.entries[here], run[there]);
+            if mine.0 < theirs.0 {
+                self.scratch.push(mine);
+                here += 1;
+            } else if theirs.0 < mine.0 {
+                self.scratch.push(theirs);
+                there += 1;
+            } else {
+                self.scratch.push((mine.0, mine.1 + theirs.1));
+                here += 1;
+                there += 1;
+            }
+        }
+        self.scratch.extend_from_slice(&self.entries[here..]);
+        self.scratch.extend_from_slice(&run[there..]);
+        core::mem::swap(&mut self.entries, &mut self.scratch);
+    }
+}
+
+/// One target tile and the run of intents that name it.
+///
+/// The table is built once for a frame. The capacity and the occupancy are
+/// read once for each target rather than once for each pass, because the
+/// ground is computed on demand and reading it twice computes it twice.[^1]
+///
+/// # References
+///
+/// [^1]: ADR-0068, terrain is generated from the seed and is never stored as a map, decision D1, a draft record. `docs/adrs/draft/adr-0068-terrain-is-generated-from-the-seed-and-is-never-stored-as-a-map.md`
+#[derive(Clone, Copy, Debug)]
+struct Segment {
+    /// The target tile that owns the segment.
+    tile: u32,
+    /// The first sorted position of the segment.
+    start: usize,
+    /// One past the last sorted position of the segment.
+    end: usize,
+    /// The units the ground of the target admits.
+    capacity: u32,
+    /// The units that stood on the target at the last barrier.
+    standing: u32,
+}
+
+/// Adds one to the last entry of an ascending run, or starts a new one.
+///
+/// The caller visits the tiles in ascending order, so a repeat is always the
+/// last entry.
+fn bump(run: &mut Vec<(u32, u32)>, tile: u32) {
+    match run.last_mut() {
+        Some(last) if last.0 == tile => last.1 += 1,
+        _ => run.push((tile, 1)),
+    }
+}
+
+/// Returns the intents that admission granted, in the sorted admission order.
+///
+/// Admission sorts the intents by target tile, then by the identity of the
+/// unit. Each target tile then owns one contiguous segment, and the identity
+/// is the final key field so no two intents tie.[^1] The sort is the engine's
+/// key vector sort, and it runs on one thread, so no result here takes its
+/// order from a thread that finished first.[^2]
+///
+/// Admission scans each segment in its sorted order and admits until the
+/// target reaches the capacity of its ground. The capacity comes from the
+/// terrain table. This function holds no capacity value of its own.[^3]
+///
+/// **The occupancy of a target comes from the derived structure**, which the
+/// barrier rebuilt before the intents were drawn.[^4] Admission carries no
+/// dense array over every tile.
+///
+/// **Only an admitted departure releases room.** An intent is not a
+/// departure. A unit that intends to leave and is then rejected at its own
+/// target has not left, and the room it appeared to release was never
+/// released. Take three tiles in a line, with the middle and the far tile
+/// both full. The unit in the middle is rejected at the far tile. A rule that
+/// counted its intent would admit the unit behind it into the middle tile,
+/// and the middle tile would end the tick above its capacity.[^1]
+///
+/// That failure is deterministic, so neither determinism test can see it.
+/// Only a test that asserts the capacity invariant can.[^5]
+///
+/// **A departure is applied after the scan, not inside it.** The segments are
+/// disjoint by target, so the room of a target is read once for each segment.
+/// The units leaving one tile are scattered across many segments, because
+/// they chose different targets, so the departures are a separate reduction
+/// over the admitted set, keyed on the source tile.[^1]
+///
+/// # Errors
+///
+/// Returns an error when the sort refuses the keys, or when the derived
+/// structure cannot answer for a tile.
+///
+/// # References
+///
+/// [^1]: ADR-0056, movement is tile-discrete and admitted by sort-then-admit, decision D3. `docs/adrs/accepted/adr-0056-movement-is-tile-discrete-and-admitted-by-sort-then-admit.md`
+/// [^2]: ADR-0007, content supplies a key vector, never a comparator, decision D2. `docs/adrs/accepted/adr-0007-content-supplies-a-key-vector-never-a-comparator.md`
+/// [^3]: ADR-0056, movement is tile-discrete and admitted by sort-then-admit, decision D4. `docs/adrs/accepted/adr-0056-movement-is-tile-discrete-and-admitted-by-sort-then-admit.md`
+/// [^4]: ADR-0018, the unit-to-tile bridge is derived, and it rebuilds at the barrier, decision D3. `docs/adrs/accepted/adr-0018-the-unit-to-tile-bridge-is-derived-and-rebuilds-at-the-barrier.md`
+/// [^5]: ADR-0001, one binary gives one answer at any thread count, decision D4. `docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
+/// [^6]: ADR-0068, terrain is generated from the seed and is never stored as a map, decision D1, a draft record. `docs/adrs/draft/adr-0068-terrain-is-generated-from-the-seed-and-is-never-stored-as-a-map.md`
+/// [^7]: ADR-0009, parallel stages write disjoint outputs, because the memory model is weak. `docs/adrs/REGISTRY.md`
+fn admit(
+    intents: &[(Entity, Axial)],
+    soldiers: &SoldierArena,
+    bridge: &UnitTileBridge,
+    terrain: Terrain,
+    grid: Grid,
+    threads: usize,
+) -> Result<Vec<(Entity, Axial)>, StepError> {
+    if intents.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    // The ordering field is the target tile index and the identifier is the
+    // entity. One unit writes one intent, so no two identifiers collide.
+    let mut keys = Vec::with_capacity(intents.len());
+    for (entity, target) in intents {
+        let index = grid
+            .index_of(*target)
+            .ok_or(StepError::TargetOutsideWorld)?;
+        keys.push(BoundedKey::new(u64::from(index.0), entity.to_bits()));
+    }
+    let ceiling = u64::from(grid.tile_count().saturating_sub(1));
+    let order = sort::order_bounded(&keys, ceiling)?;
+
+    // The sorted intents, as a tile beside the intent it belongs to. The
+    // passes walk this rather than following the permutation into the keys,
+    // so a pass reads its tiles in order rather than at random.
+    let sorted: Vec<(u32, u32)> = order
+        .iter()
+        .map(|position| (keys[*position as usize].order() as u32, *position))
+        .collect();
+
+    // The segment table, built once. Each target owns one contiguous segment,
+    // and the segments are disjoint.[^1]
+    //
+    // The capacity and the occupancy are read here and not inside the passes.
+    // The ground is a pure function of the seed and the address, so reading
+    // it twice computes it twice, and the record calls a repeated sweep of
+    // the ground a design mistake.[^6] The occupancy comes from the structure
+    // the last barrier built, and that answer does not change during the
+    // frame either: what changes is the arrivals and the departures this
+    // admission grants, and those are counted separately.
+    let mut segments: Vec<Segment> = Vec::new();
+    let mut at = 0usize;
+    while at < sorted.len() {
+        let tile = sorted[at].0;
+        let mut end = at;
+        while end < sorted.len() && sorted[end].0 == tile {
+            end += 1;
+        }
+        segments.push(Segment {
+            tile,
+            start: at,
+            end,
+            capacity: 0,
+            standing: 0,
+        });
+        at = end;
+    }
+
+    // The capacity and the occupancy of each target are read in parallel.
+    // Each thread writes its own chunk of the table, and a chunk is named by
+    // its position in the table rather than by the thread that filled it, so
+    // the result never depends on which thread finished first.[^7]
+    let chunk_len = segments.len().div_ceil(threads).max(1);
+    let mut refusal: Option<BridgeError> = None;
+    std::thread::scope(|scope| {
+        let mut handles = Vec::new();
+        for chunk in segments.chunks_mut(chunk_len) {
+            handles.push(scope.spawn(move || {
+                for segment in chunk.iter_mut() {
+                    let Some(address) = grid.address_of(TileIdx(segment.tile)) else {
+                        // The tile came from a key the sort built out of a
+                        // grid index, so it names a tile. An address that
+                        // does not resolve is a defect in the caller and the
+                        // whole step refuses below.
+                        continue;
+                    };
+                    segment.capacity = terrain
+                        .kind(address)
+                        .map_or(0, crate::terrain::TileKind::capacity);
+                    match bridge.count_on_tile(soldiers, address) {
+                        Ok(standing) => segment.standing = standing as u32,
+                        Err(error) => return Err(error),
+                    }
+                }
+                Ok(())
+            }));
+        }
+        for handle in handles {
+            if let Ok(Err(error)) = handle.join() {
+                refusal.get_or_insert(error);
+            }
+        }
+    });
+    if let Some(error) = refusal {
+        return Err(error.into());
+    }
+
+    let mut granted = vec![false; intents.len()];
+    let mut arrived = TileCounts::default();
+    let mut departed = TileCounts::default();
+    let mut admitted: Vec<(Entity, Axial)> = Vec::new();
+
+    for _ in 0..ADMISSION_PASSES {
+        let first = admitted.len();
+        // The segments come in ascending tile order, so the arrivals of one
+        // pass are already an ascending run.
+        let mut arrivals: Vec<(u32, u32)> = Vec::new();
+
+        for segment in &segments {
+            // A departure only ever leaves a tile a unit stood on, so the
+            // subtraction cannot go below zero. It saturates rather than
+            // wrapping, because a wrap here would read as a full tile and
+            // reject every unit in silence.
+            let occupancy = segment.standing.saturating_sub(departed.get(segment.tile))
+                + arrived.get(segment.tile);
+            let mut room = segment.capacity.saturating_sub(occupancy);
+            if room == 0 {
+                continue;
+            }
+
+            for (_, position) in &sorted[segment.start..segment.end] {
+                if room == 0 {
+                    break;
+                }
+                let position = *position as usize;
+                if granted[position] {
+                    continue;
+                }
+                granted[position] = true;
+                admitted.push(intents[position]);
+                bump(&mut arrivals, segment.tile);
+                room -= 1;
+            }
+        }
+        arrived.merge_ascending(&arrivals);
+
+        // The scan is over. Only now does a departure release room, and only
+        // an admitted one. The reduction is keyed on the source tile.
+        let mut sources: Vec<u32> = admitted[first..]
+            .iter()
+            .filter_map(|(entity, _)| soldiers.tile(*entity))
+            .map(|tile| tile.0)
+            .collect();
+        if sources.is_empty() {
+            // Nothing moved in this pass, so no later pass can move anything.
+            break;
+        }
+        sources.sort_unstable();
+        let mut departures: Vec<(u32, u32)> = Vec::new();
+        for tile in sources {
+            bump(&mut departures, tile);
+        }
+        departed.merge_ascending(&departures);
+    }
+
+    Ok(admitted)
 }
 
 /// Updates one contiguous chunk of tiles and returns the events it emitted.

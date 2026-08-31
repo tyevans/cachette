@@ -15,6 +15,7 @@
 //! [^1]: ADR-0001, one binary gives one answer at any thread count, decision D4. `docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
 //! [^2]: Testing policy. `docs/TESTING.md`
 
+use cachette_core::terrain::TileKind;
 use cachette_core::{Axial, Entity, FactionId, World, WorldConfig};
 
 /// The thread counts that every scenario runs at.
@@ -148,6 +149,98 @@ fn populate(world: &mut World) -> Vec<Entity> {
         assert!(world.despawn_soldier(*soldier));
     }
     kept
+}
+
+/// Fills a patch of open ground to the capacity of each of its tiles.
+///
+/// A population spread over a world contends for nothing, so admission
+/// refuses nobody and the equivalence proves only that the intents agree. A
+/// tile that is oversubscribed is where determinism is easiest to lose: the
+/// answer depends on the order in which admission sees the intents, and that
+/// order must come from the sort and never from the thread that finished
+/// first.[^1] [^2]
+///
+/// # References
+///
+/// [^1]: ADR-0056, movement is tile-discrete and admitted by sort-then-admit, decision D3. `docs/adrs/accepted/adr-0056-movement-is-tile-discrete-and-admitted-by-sort-then-admit.md`
+/// [^2]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
+fn crowd(world: &mut World) -> Vec<Entity> {
+    let grid = world.grid();
+    let patch: Vec<Axial> = (0..grid.tile_count())
+        .map(|index| Axial::new((index % grid.width()) as i32, (index / grid.width()) as i32))
+        .filter(|address| world.admits_a_unit(*address))
+        .take(24)
+        .collect();
+    // A world of one tile, or a world of water, holds no crowd. The caller
+    // passes over such a scenario rather than failing on it, and the test
+    // asserts that some scenario did hold one.
+    let mut kept = Vec::new();
+    let ceiling = u32::from(world.config().faction_count.max(1));
+    for address in patch {
+        let capacity = world.tile_kind(address).map_or(0, TileKind::capacity);
+        for ordinal in 0..capacity {
+            kept.push(
+                world
+                    .spawn_soldier(address, FactionId((ordinal % ceiling) as u16))
+                    .expect("the open tile admits a unit"),
+            );
+        }
+    }
+    kept
+}
+
+/// Runs the frames over a world whose units contend for their targets.
+fn run_with_a_crowd(config: WorldConfig, frames: u64, threads: usize) -> (Vec<u8>, u64, usize) {
+    let mut world = World::new(config).expect("the extent must describe a world");
+    let kept = crowd(&mut world);
+    for _ in 0..frames {
+        world.step(threads).expect("the step must run");
+    }
+    assert!(world.check_invariants());
+    assert!(kept
+        .iter()
+        .all(|soldier| world.soldiers().contains(*soldier)));
+    (
+        world.event_log_bytes().to_vec(),
+        world.state_hash().finish(),
+        world.soldiers().len() as usize,
+    )
+}
+
+#[test]
+fn a_world_whose_units_contend_is_identical_at_every_thread_count() {
+    // The item that added admission asks for this: the thread-count test must
+    // cover a tile that is oversubscribed, because that is where determinism
+    // is easiest to lose and hardest to see.
+    let mut crowded = 0;
+    for (name, config, frames) in SCENARIOS {
+        let expected = run_with_a_crowd(*config, *frames, THREAD_COUNTS[0]);
+        if expected.2 == 0 {
+            // The scenario has no open ground to crowd. A world of one water
+            // tile is such a scenario, and it tests nothing here.
+            continue;
+        }
+        crowded += 1;
+        for threads in &THREAD_COUNTS[1..] {
+            let produced = run_with_a_crowd(*config, *frames, *threads);
+            assert_eq!(
+                produced.0, expected.0,
+                "scenario {name}: the event log differs at {threads} threads"
+            );
+            assert_eq!(
+                produced.1, expected.1,
+                "scenario {name}: the state hash differs at {threads} threads"
+            );
+            assert_eq!(
+                produced.2, expected.2,
+                "scenario {name}: the live soldier count differs at {threads} threads"
+            );
+        }
+    }
+    assert!(
+        crowded > 1,
+        "only {crowded} scenario held a crowd, so the oversubscribed case is barely covered"
+    );
 }
 
 /// Runs the frames over a world that holds soldiers.

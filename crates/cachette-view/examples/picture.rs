@@ -91,6 +91,11 @@ fn main() {
         readout.tick(),
         readout.tiles_painted()
     );
+    println!(
+        "  step: {:.0} us mean, {:.0} us worst, on this machine and not the target",
+        metrics.step_mean_micros(),
+        metrics.step_worst_micros()
+    );
     for (ordinal, count) in readout.by_kind().iter().enumerate() {
         println!("  kind {ordinal}: {count} tiles");
     }

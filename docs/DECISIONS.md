@@ -23,7 +23,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^ALLOC]
 
-**Next number: DEC-019**
+**Next number: DEC-022**
 
 [^ALLOC]: Findings register, FND-038. `docs/FINDINGS.md`
 
@@ -162,6 +162,18 @@ ground.[^DEC1] Whichever option wins, that value needs recording.
 
 [^DEC1]: See DEC-008 in this document, and the movement timing note, `docs/research/movement-timing.md`.
 
+[^DEC2]: ADR-0005, a solver runs a fixed iteration count, decision D1. `docs/adrs/accepted/adr-0005-a-solver-runs-a-fixed-iteration-count.md`
+
+[^DEC3]: Blockers register, BLK-007. `docs/BLOCKERS.md`
+
+[^DEC4]: ADR-0056, movement is tile-discrete and admitted by sort-then-admit, decision D3. `docs/adrs/accepted/adr-0056-movement-is-tile-discrete-and-admitted-by-sort-then-admit.md`
+
+[^DEC5]: ADR-0056, movement is tile-discrete and admitted by sort-then-admit, decision D4. `docs/adrs/accepted/adr-0056-movement-is-tile-discrete-and-admitted-by-sort-then-admit.md`
+
+[^DEC6]: ADR-0018, the unit-to-tile bridge is derived, and it rebuilds at the barrier, decision D3. `docs/adrs/accepted/adr-0018-the-unit-to-tile-bridge-is-derived-and-rebuilds-at-the-barrier.md`
+
+[^DEC7]: Backlog item 0030. `docs/backlog/proposed/0030-enforce-the-barrier-ordering.md`
+
 ### DEC-018 — Where does movement sit in the frame schedule?
 
 The frame schedule is static and known before the frame runs. The order of
@@ -188,6 +200,116 @@ into the schedule when the schedule exists. Promote it to a record only if a
 contributor could reasonably choose otherwise and the reasoning does not show
 in the schedule itself.
 
+
+### DEC-019 — How many admission passes does one frame run?
+
+The admission step runs a fixed number of passes. Each pass admits what it
+can against the room the previous pass confirmed. The engine never runs to a
+fixpoint, because a fixpoint needs a convergence test and a solver in this
+project runs a fixed count.[^DEC2]
+
+The record states that the count is content and declared before the frame
+runs. It states no value, and no value follows from the tile scale.
+
+One pass admits no chain. A unit cannot follow another out of a full tile in
+the same frame, so a column of units on a road advances one unit for each
+frame however long the column is.
+
+Each further pass admits a chain one unit longer, and costs one more scan of
+the intents. A chain longer than the pass count waits for the next frame,
+which is a delay and never a wrong answer.
+
+**Option A. Two passes.** A unit may follow one departure. This admits the
+common case, a unit stepping into the tile a neighbour just left, and costs
+one extra scan.
+
+**Option B. One pass.** The cheapest, and it admits no chain at all.
+
+**Option C. More than two.** Each pass buys a longer chain. Nobody has
+measured what a chain costs or how long a real column is.
+
+**Recommendation:** option A. It admits the case that a person watching the
+world would call obviously correct, and it is the smallest count that admits
+any chain. The value is content, so raising it later costs nothing.
+
+**Assumption in the meantime:** two passes.
+
+**What would settle it.** A measurement of how often a chain longer than two
+appears in a run, on the target platform. That measurement waits on the
+benchmark harness.[^DEC3]
+
+### DEC-020 — Must a spawn respect the tile capacity?
+
+Admission never raises a tile above the capacity of its ground.[^DEC4] A
+spawn does not read the capacity at all, so a caller may place a hundred
+units on one tile and the engine accepts it.
+
+The record binds admission and says nothing about a spawn. The question is
+whether the capacity is a property of the world at rest or a rule that
+movement obeys.
+
+**Option A. A spawn refuses a tile at capacity.** The capacity is then a
+world invariant, and one check can state it. The spawn must read the
+occupancy of the tile, and the record leaves the storage of an occupancy
+count undecided, so this option forces that decision.[^DEC5] Counting by a
+scan of the arena costs the population for each spawn, which the target scale
+does not permit.
+
+**Option B. A spawn may over-fill, and movement never does.** The invariant
+is then the one admission gives: no tile gains a unit beyond its capacity. A
+tile that starts over capacity can only lose units. No new storage is needed
+and the record needs no amendment.
+
+**Option C. A spawn refuses, and the engine holds a dense occupancy array.**
+One byte for each tile at the target scale. This is the storage decision the
+record defers, and it buys a constant-time spawn as well as a constant-time
+admission.
+
+**Recommendation:** option B until something needs otherwise. It is what the
+record already states, it needs no storage decision, and the scenario it
+allows is a caller mistake rather than a state the simulation reaches.
+
+**Assumption in the meantime:** option B. The movement suite asserts that no
+tile gains a unit beyond its capacity, and it does not assert that no tile is
+ever above it.
+
+**What would settle it.** A caller that must trust the capacity of a tile
+without having placed the units itself. The Python control plane is the
+likely one, and it does not spawn units yet.
+
+### DEC-021 — Where does a structural change made outside a frame get its barrier?
+
+The bridge rebuilds at the barrier, after the structural apply.[^DEC6]
+Admission reads the occupancy of a target from the bridge, so the bridge must
+describe the arena before the intents are admitted.
+
+A spawn or a despawn made between two frames is a structural change that has
+passed no barrier. It leaves the bridge stale, and the first step after it
+then has nothing to read.
+
+**Option A. The step opens by rebuilding a stale bridge.** The step gives the
+caller's changes the barrier they never had. It costs a revision comparison
+when nothing changed. The rebuild at the end of the step stays last and stays
+the barrier of that frame, so there are two call sites for one operation.
+
+**Option B. The caller rebuilds before it steps.** One call site. Every
+caller that spawns must remember, and a caller that forgets gets an error
+from the first step rather than from the spawn.
+
+**Option C. A spawn maintains the bridge itself.** The bridge stops being
+derived at the barrier, which the record forbids.
+
+**Recommendation:** option A. Option B makes a correct program depend on a
+convention that nothing enforces, and the error it raises names the bridge
+rather than the spawn that caused it. Option C contradicts the record.
+
+**Assumption in the meantime:** option A.
+
+**Why this is a register row and not a record.** The two call sites are the
+part a reviewer might object to, and the objection is about one function
+rather than about a constraint on the project. Promote it to a record if a
+second structural apply lands inside the frame, because the ordering between
+the two is then a real decision.[^DEC7]
 
 ### DEC-013 — Which toolchain version does the project pin?
 

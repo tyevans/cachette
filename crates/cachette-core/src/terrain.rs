@@ -134,7 +134,48 @@ impl TileKind {
     pub const fn is_passable(self) -> bool {
         !matches!(self, Self::Water)
     }
+
+    /// Returns the number of units that may stand on a tile of this kind.
+    ///
+    /// The capacity is a property of the ground, and the movement system
+    /// reads it from here.[^1] A capacity literal in the movement kernel is
+    /// the violation that record names, so the table lives with the kind.
+    ///
+    /// This table is the terrain table until content exists. When a content
+    /// pipeline lands, the table moves into content and this function reads
+    /// it. The record already says the capacity is data.
+    ///
+    /// The ground that admits no unit has a capacity of zero. Two rules that
+    /// can disagree would be one fact in two places, so passability is the
+    /// capacity being zero and nothing else states it.
+    ///
+    /// The values come from the scale constants table.[^2] No crossing
+    /// terrain exists yet, so no kind carries the crossing capacity.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0056, movement is tile-discrete and admitted by sort-then-admit, decision D4. `docs/adrs/accepted/adr-0056-movement-is-tile-discrete-and-admitted-by-sort-then-admit.md`
+    /// [^2]: Budgets and costs, the scale constants. `docs/reference/budgets.md`
+    #[must_use]
+    pub const fn capacity(self) -> u32 {
+        match self {
+            Self::Water => 0,
+            Self::Plain | Self::Forest | Self::Hill | Self::Mountain => ORDINARY_CAPACITY,
+        }
+    }
 }
+
+/// The number of units that stand on a tile of ordinary ground.
+///
+/// The value is in the scale constants table, and the register records the
+/// blocker that fixed it.[^1] It is stored as a `u8` there; the engine reads
+/// it as a wider integer because a count that reaches the ceiling is compared
+/// against a sum.
+///
+/// # References
+///
+/// [^1]: Budgets and costs, the scale constants. `docs/reference/budgets.md`
+const ORDINARY_CAPACITY: u32 = 8;
 
 /// One generated tile.
 ///
