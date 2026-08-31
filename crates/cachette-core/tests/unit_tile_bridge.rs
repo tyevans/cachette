@@ -350,7 +350,7 @@ fn the_world_answers_a_tile_after_the_step_rebuilds_the_bridge() {
         // it on the tile it reached and not on the tile it left. The move is
         // one tile at most.[^1]
         //
-        // [^1]: ADR-0056, movement is tile-discrete and admitted by sort-then-admit, decision D1, a draft record. `docs/adrs/draft/adr-0056-movement-is-tile-discrete-and-admitted-by-sort-then-admit.md`
+        // [^1]: ADR-0056, movement is tile-discrete and admitted by sort-then-admit, decision D1, a draft record. `docs/adrs/accepted/adr-0056-movement-is-tile-discrete-and-admitted-by-sort-then-admit.md`
         let place = world
             .soldiers()
             .address(*soldier)

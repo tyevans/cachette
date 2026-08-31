@@ -14,7 +14,7 @@
 //! [^2]: ADR-0067, the viewer reads the world and never writes to it, decision D3. `docs/adrs/draft/adr-0067-the-viewer-reads-the-world-and-never-writes-to-it.md`
 //! [^3]: ADR-0017, the world is a rhombus, so a tile index is raw axial, decision D4. `docs/adrs/accepted/adr-0017-the-world-is-a-rhombus-so-a-tile-index-is-raw-axial.md`
 
-use cachette_core::{Axial, World};
+use cachette_core::{Axial, BridgeError, World};
 
 /// The colour of the space outside the world.
 const BACKGROUND: u32 = 0x0010_1418;
@@ -55,6 +55,8 @@ pub struct Canvas {
     pixels: Vec<u32>,
     tiles_painted: u32,
     soldiers_painted: u32,
+    blocks_read: u32,
+    blocks_skipped: u32,
 }
 
 impl Canvas {
@@ -73,6 +75,8 @@ impl Canvas {
             pixels: vec![BACKGROUND; width * height],
             tiles_painted: 0,
             soldiers_painted: 0,
+            blocks_read: 0,
+            blocks_skipped: 0,
         }
     }
 
@@ -110,6 +114,22 @@ impl Canvas {
         self.tiles_painted
     }
 
+    /// Returns the blocks whose units the last draw read.
+    ///
+    /// A block is read only when the occupancy bitplane says it holds a unit
+    /// and the window covers it. The count is the viewer's evidence that its
+    /// reading follows the window rather than the population.
+    #[must_use]
+    pub const fn blocks_read(&self) -> u32 {
+        self.blocks_read
+    }
+
+    /// Returns the blocks the last draw skipped on the bitplane alone.
+    #[must_use]
+    pub const fn blocks_skipped(&self) -> u32 {
+        self.blocks_skipped
+    }
+
     /// Returns the number of soldiers the last draw painted.
     #[must_use]
     pub const fn soldiers_painted(&self) -> u32 {
@@ -123,6 +143,8 @@ impl Canvas {
         self.pixels.fill(BACKGROUND);
         self.tiles_painted = 0;
         self.soldiers_painted = 0;
+        self.blocks_read = 0;
+        self.blocks_skipped = 0;
     }
 
     /// Sets one pixel, and ignores a position outside the canvas.
@@ -457,7 +479,7 @@ fn tile_colour(raw: i32) -> u32 {
 /// # References
 ///
 /// [^1]: ADR-0067, the viewer reads the world and never writes to it, decision D1. `docs/adrs/draft/adr-0067-the-viewer-reads-the-world-and-never-writes-to-it.md`
-pub fn draw(world: &World, camera: Camera, canvas: &mut Canvas) {
+pub fn draw(world: &World, camera: Camera, canvas: &mut Canvas) -> Result<(), BridgeError> {
     canvas.clear();
     let grid = world.grid();
     let values = world.tile_values();
@@ -485,20 +507,108 @@ pub fn draw(world: &World, camera: Camera, canvas: &mut Canvas) {
     }
 
     let radius = ((camera.tile_width * 0.3) as i32).max(1);
+    draw_soldiers(world, camera, canvas, radius, first_row, last_row)
+}
+
+/// Draws the soldiers that stand inside the visible blocks.
+///
+/// The viewer reads the engine's own spatial structure rather than scanning
+/// the population. The structure sorts the units block by block, holds the
+/// range of each block, and marks every occupied block in a bitplane.[^1]
+/// Testing that bitplane and skipping an empty block is what the bitplane is
+/// for.[^2]
+///
+/// The cost follows the blocks the window covers. It does not follow the
+/// population, which is what the product record asks of every viewer
+/// read.[^3]
+///
+/// The viewer builds no index of its own. A second structure that says where
+/// a unit stands is one fact in two places, and nothing would fail when the
+/// two disagreed.[^4]
+///
+/// A stale read returns an error rather than a wrong picture. The step
+/// rebuilds the structure at the barrier, so a viewer that draws after a step
+/// reads a current one. A viewer that draws after moving a soldier itself
+/// cannot, and it must not: it would be drawing a world that no longer
+/// exists.
+///
+/// # References
+///
+/// [^1]: ADR-0018, the unit-to-tile bridge is derived, and it rebuilds at the barrier, decision D1. `docs/adrs/accepted/adr-0018-the-unit-to-tile-bridge-is-derived-and-rebuilds-at-the-barrier.md`
+/// [^2]: ADR-0018, the unit-to-tile bridge is derived, and it rebuilds at the barrier, decision D5. `docs/adrs/accepted/adr-0018-the-unit-to-tile-bridge-is-derived-and-rebuilds-at-the-barrier.md`
+/// [^3]: PRD-0002, a developer watches the world run. `docs/product/shaped/prd-0002-a-developer-watches-the-world-run.md`
+/// [^4]: Recurring Defect Shapes, shape 1. `.claude/rules/recurring-defects.md`
+fn draw_soldiers(
+    world: &World,
+    camera: Camera,
+    canvas: &mut Canvas,
+    radius: i32,
+    first_row: u32,
+    last_row: u32,
+) -> Result<(), BridgeError> {
     let arena = world.soldiers();
-    for soldier in arena.iter() {
-        let Some(address) = arena.address(soldier) else {
-            continue;
-        };
-        let Some(faction) = arena.faction(soldier) else {
-            continue;
-        };
-        let (x, y) = camera.centre_of(address);
-        if !canvas.holds(x, y, radius) {
+    let bridge = world.bridge();
+    let layout = bridge.layout();
+    let edge = layout.block_edge();
+    if edge == 0 || last_row <= first_row {
+        return Ok(());
+    }
+
+    // Ask once, before trusting the bitplane. The bitplane is an unguarded
+    // read: a stale one reports every block empty, so a viewer that skipped
+    // on it alone would draw no units and report success. That is a wrong
+    // picture presented as a right one, which is worse than a refusal.
+    bridge.describes(arena)?;
+
+    let first_block_row = first_row / edge;
+    let last_block_row = (last_row - 1) / edge;
+
+    for block_row in first_block_row..=last_block_row.min(layout.blocks_high().saturating_sub(1)) {
+        // The column range depends on the row, because a rhombus shears. Take
+        // the widest column span of the rows this block covers, so a block is
+        // read when any of its rows is visible.
+        let row_lo = (block_row * edge).max(first_row);
+        let row_hi = ((block_row + 1) * edge - 1).min(last_row - 1);
+        let (mut lo, mut hi) = (u32::MAX, 0u32);
+        for row in [row_lo, row_hi] {
+            let (a, b) = camera.visible_columns(row, world, canvas);
+            lo = lo.min(a);
+            hi = hi.max(b);
+        }
+        if hi <= lo {
             continue;
         }
-        let colour = FACTION_COLOURS[(faction.0 as usize) % FACTION_COLOURS.len()];
-        canvas.fill_disc(x as i32, y as i32, radius, colour);
-        canvas.soldiers_painted += 1;
+
+        let first_block_column = lo / edge;
+        let last_block_column = ((hi - 1) / edge).min(layout.blocks_wide().saturating_sub(1));
+        for block_column in first_block_column..=last_block_column {
+            let block = block_row * layout.blocks_wide() + block_column;
+            if !bridge.block_is_occupied(block) {
+                canvas.blocks_skipped += 1;
+                continue;
+            }
+            // The structure must describe this arena. Drawing a remembered
+            // answer would be a picture of a world that no longer exists,
+            // and a viewer that drew one silently would be the worst of the
+            // three outcomes.
+            let units = bridge.in_block(arena, block)?;
+            canvas.blocks_read += 1;
+            for soldier in units {
+                let Some(address) = arena.address(*soldier) else {
+                    continue;
+                };
+                let Some(faction) = arena.faction(*soldier) else {
+                    continue;
+                };
+                let (x, y) = camera.centre_of(address);
+                if !canvas.holds(x, y, radius) {
+                    continue;
+                }
+                let colour = FACTION_COLOURS[(faction.0 as usize) % FACTION_COLOURS.len()];
+                canvas.fill_disc(x as i32, y as i32, radius, colour);
+                canvas.soldiers_painted += 1;
+            }
+        }
     }
+    Ok(())
 }

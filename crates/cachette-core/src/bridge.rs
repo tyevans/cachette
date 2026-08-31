@@ -540,6 +540,26 @@ impl UnitTileBridge {
     /// # References
     ///
     /// [^1]: ADR-0018, the unit-to-tile bridge is derived, and it rebuilds at the barrier, decision D4. `docs/adrs/accepted/adr-0018-the-unit-to-tile-bridge-is-derived-and-rebuilds-at-the-barrier.md`
+    /// Reports whether this structure still describes the arena.
+    ///
+    /// A caller that is about to trust an unguarded read asks this first. The
+    /// shape reads — the length, the block range and the occupancy bitplane —
+    /// answer from the last rebuild and cannot refuse a stale question. A
+    /// caller that skips work on the strength of the bitplane therefore skips
+    /// silently when the bitplane is stale, and never reaches a guarded read
+    /// that would have refused.
+    ///
+    /// That is not a hypothetical. A viewer skipped every block of a stale
+    /// bitplane, drew no units at all, and reported success.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the structure was never built, when it was built
+    /// from another arena, or when that arena has changed since.
+    pub fn describes(&self, arena: &SoldierArena) -> Result<(), BridgeError> {
+        self.check_fresh(arena)
+    }
+
     pub fn in_block<'a>(
         &'a self,
         arena: &'a SoldierArena,

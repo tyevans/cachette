@@ -62,6 +62,10 @@ SKIP_PATHS = {
     # check.
     ROOT / "docs" / "research" / "reports",
     ROOT / "docs" / "superpowers",
+    # A tool's session scratch, not project prose. It quotes whatever the
+    # session held at the moment it was written, including a retired number,
+    # and nobody maintains it.
+    ROOT / ".claude" / "tackline",
     ROOT / "scripts" / "check_citations.py",
     # Deliberately broken. Continuous integration runs the check against this
     # directory on purpose and fails when the check passes.

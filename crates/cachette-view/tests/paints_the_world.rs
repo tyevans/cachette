@@ -29,6 +29,10 @@ fn world() -> World {
             .spawn_soldier(Axial::new(q, r), FactionId((index % 3) as u16))
             .expect("the address and the faction are valid");
     }
+    // A spawn makes the derived structure stale. A real caller steps the
+    // engine, which rebuilds it at the barrier; a test that only spawns must
+    // rebuild it itself, or the viewer refuses to read.
+    world.rebuild_bridge(1).expect("the rebuild must succeed");
     world
 }
 
@@ -41,7 +45,7 @@ fn drawing_changes_the_canvas() {
     let camera = Camera::fitting(&world, &canvas);
 
     let before = canvas.pixels().to_vec();
-    paint::draw(&world, camera, &mut canvas);
+    paint::draw(&world, camera, &mut canvas).expect("the bridge must describe the arena");
     assert_ne!(before, canvas.pixels(), "the draw painted nothing");
 }
 
@@ -52,7 +56,7 @@ fn drawing_paints_more_than_one_colour() {
     let world = world();
     let mut canvas = Canvas::new(200, 160);
     let camera = Camera::fitting(&world, &canvas);
-    paint::draw(&world, camera, &mut canvas);
+    paint::draw(&world, camera, &mut canvas).expect("the bridge must describe the arena");
 
     let mut seen: Vec<u32> = canvas.pixels().to_vec();
     seen.sort_unstable();
@@ -87,8 +91,8 @@ fn soldiers_are_drawn() {
     let mut painted = Canvas::new(200, 160);
     let mut bare = Canvas::new(200, 160);
     let camera = Camera::fitting(&with, &painted);
-    paint::draw(&with, camera, &mut painted);
-    paint::draw(&without, camera, &mut bare);
+    paint::draw(&with, camera, &mut painted).expect("the bridge must describe the arena");
+    paint::draw(&without, camera, &mut bare).expect("the bridge must describe the arena");
 
     assert_ne!(
         painted.pixels(),
@@ -112,12 +116,14 @@ fn a_faction_has_its_own_colour() {
             .spawn_soldier(at, FactionId(1))
             .expect("the address is valid");
     }
+    first.rebuild_bridge(1).expect("the rebuild must succeed");
+    second.rebuild_bridge(1).expect("the rebuild must succeed");
 
     let mut left = Canvas::new(200, 160);
     let mut right = Canvas::new(200, 160);
     let camera = Camera::fitting(&first, &left);
-    paint::draw(&first, camera, &mut left);
-    paint::draw(&second, camera, &mut right);
+    paint::draw(&first, camera, &mut left).expect("the bridge must describe the arena");
+    paint::draw(&second, camera, &mut right).expect("the bridge must describe the arena");
 
     assert_ne!(
         left.pixels(),
@@ -134,7 +140,7 @@ fn the_tiles_are_not_one_flat_colour() {
     let world = empty_world();
     let mut canvas = Canvas::new(200, 160);
     let camera = Camera::fitting(&world, &canvas);
-    paint::draw(&world, camera, &mut canvas);
+    paint::draw(&world, camera, &mut canvas).expect("the bridge must describe the arena");
 
     let mut seen: Vec<u32> = canvas.pixels().to_vec();
     seen.sort_unstable();
@@ -154,13 +160,13 @@ fn a_step_changes_what_is_drawn() {
     let mut canvas = Canvas::new(200, 160);
     let camera = Camera::fitting(&world, &canvas);
 
-    paint::draw(&world, camera, &mut canvas);
+    paint::draw(&world, camera, &mut canvas).expect("the bridge must describe the arena");
     let before = canvas.pixels().to_vec();
 
     for _ in 0..4 {
         world.step(2).expect("the step must run");
     }
-    paint::draw(&world, camera, &mut canvas);
+    paint::draw(&world, camera, &mut canvas).expect("the bridge must describe the arena");
 
     assert_ne!(before, canvas.pixels(), "four steps changed no pixel");
 }
@@ -179,8 +185,8 @@ fn drawing_leaves_the_world_unchanged() {
 
     let mut canvas = Canvas::new(200, 160);
     let camera = Camera::fitting(&world, &canvas);
-    paint::draw(&world, camera, &mut canvas);
-    paint::draw(&world, camera, &mut canvas);
+    paint::draw(&world, camera, &mut canvas).expect("the bridge must describe the arena");
+    paint::draw(&world, camera, &mut canvas).expect("the bridge must describe the arena");
 
     assert_eq!(hash, world.state_hash());
     assert_eq!(tick, world.tick());
@@ -198,8 +204,8 @@ fn one_world_drawn_twice_gives_one_picture() {
 
     let mut first = Canvas::new(200, 160);
     let mut second = Canvas::new(200, 160);
-    paint::draw(&world, camera, &mut first);
-    paint::draw(&world, camera, &mut second);
+    paint::draw(&world, camera, &mut first).expect("the bridge must describe the arena");
+    paint::draw(&world, camera, &mut second).expect("the bridge must describe the arena");
 
     assert_eq!(first.pixels(), second.pixels());
 }
@@ -218,8 +224,8 @@ fn two_worlds_from_one_seed_draw_the_same_picture() {
     let mut left = Canvas::new(200, 160);
     let mut right = Canvas::new(200, 160);
     let camera = Camera::fitting(&first, &left);
-    paint::draw(&first, camera, &mut left);
-    paint::draw(&second, camera, &mut right);
+    paint::draw(&first, camera, &mut left).expect("the bridge must describe the arena");
+    paint::draw(&second, camera, &mut right).expect("the bridge must describe the arena");
 
     assert_eq!(
         left.pixels(),
@@ -258,7 +264,7 @@ fn a_soldier_outside_the_canvas_is_clipped_rather_than_a_panic() {
         origin_x: -5000.0,
         origin_y: -5000.0,
     };
-    paint::draw(&world, camera, &mut canvas);
+    paint::draw(&world, camera, &mut canvas).expect("the bridge must describe the arena");
 }
 
 #[test]
@@ -309,6 +315,10 @@ fn large_world() -> World {
             .spawn_soldier(at, FactionId((index % 4) as u16))
             .expect("the address and the faction are valid");
     }
+    // A spawn makes the derived structure stale. A real caller steps the
+    // engine, which rebuilds it at the barrier; a test that only spawns must
+    // rebuild it itself, or the viewer refuses to read.
+    world.rebuild_bridge(1).expect("the rebuild must succeed");
     world
 }
 
@@ -320,7 +330,7 @@ fn a_small_window_reads_far_fewer_tiles_than_the_world_holds() {
     let mut canvas = Canvas::new(240, 180);
     let camera = Camera::opening().clamped(&world, &canvas);
 
-    paint::draw(&world, camera, &mut canvas);
+    paint::draw(&world, camera, &mut canvas).expect("the bridge must describe the arena");
 
     let held = world.grid().tile_count();
     let painted = canvas.tiles_painted();
@@ -340,8 +350,8 @@ fn a_wider_window_reads_more_tiles_than_a_narrow_one() {
     let mut large = Canvas::new(480, 360);
     let camera = Camera::opening();
 
-    paint::draw(&world, camera, &mut small);
-    paint::draw(&world, camera, &mut large);
+    paint::draw(&world, camera, &mut small).expect("the bridge must describe the arena");
+    paint::draw(&world, camera, &mut large).expect("the bridge must describe the arena");
 
     assert!(
         large.tiles_painted() > small.tiles_painted() * 2,
@@ -361,8 +371,8 @@ fn panning_changes_what_is_drawn() {
     let camera = Camera::opening().clamped(&world, &here);
     let moved = camera.panned(300.0, 200.0).clamped(&world, &there);
 
-    paint::draw(&world, camera, &mut here);
-    paint::draw(&world, moved, &mut there);
+    paint::draw(&world, camera, &mut here).expect("the bridge must describe the arena");
+    paint::draw(&world, moved, &mut there).expect("the bridge must describe the arena");
 
     assert_ne!(
         here.pixels(),
@@ -379,11 +389,11 @@ fn panning_reads_a_different_part_of_the_world() {
     let mut canvas = Canvas::new(240, 180);
     let camera = Camera::opening().clamped(&world, &canvas);
 
-    paint::draw(&world, camera, &mut canvas);
+    paint::draw(&world, camera, &mut canvas).expect("the bridge must describe the arena");
     let corner = canvas.soldiers_painted();
 
     let far = camera.panned(1200.0, 900.0).clamped(&world, &canvas);
-    paint::draw(&world, far, &mut canvas);
+    paint::draw(&world, far, &mut canvas).expect("the bridge must describe the arena");
 
     assert!(far.origin_x < camera.origin_x, "the pan moved no origin");
     assert!(
@@ -411,7 +421,8 @@ fn a_camera_scrolled_far_away_draws_without_a_panic() {
         (1.0e9_f32, -1.0e9_f32),
         (0.0, 1.0e9_f32),
     ] {
-        paint::draw(&world, base.panned(across, down), &mut canvas);
+        paint::draw(&world, base.panned(across, down), &mut canvas)
+            .expect("the bridge must describe the arena");
     }
 }
 
@@ -430,7 +441,7 @@ fn the_clamp_keeps_the_world_on_the_screen() {
         (-1.0e6_f32, 1.0e6_f32),
     ] {
         let held = base.panned(across, down).clamped(&world, &canvas);
-        paint::draw(&world, held, &mut canvas);
+        paint::draw(&world, held, &mut canvas).expect("the bridge must describe the arena");
         assert!(
             canvas.tiles_painted() > 0,
             "a clamped camera at {across} by {down} showed no world",
@@ -445,7 +456,7 @@ fn an_unclamped_camera_can_lose_the_world() {
     let mut canvas = Canvas::new(240, 180);
     let loose = Camera::opening().panned(-1.0e6, -1.0e6);
 
-    paint::draw(&world, loose, &mut canvas);
+    paint::draw(&world, loose, &mut canvas).expect("the bridge must describe the arena");
 
     assert_eq!(
         canvas.tiles_painted(),
@@ -483,7 +494,7 @@ fn a_soldier_outside_the_window_is_not_painted() {
     let mut canvas = Canvas::new(240, 180);
     let camera = Camera::opening().clamped(&world, &canvas);
 
-    paint::draw(&world, camera, &mut canvas);
+    paint::draw(&world, camera, &mut canvas).expect("the bridge must describe the arena");
 
     let live = world.soldiers().len();
     assert!(
@@ -494,5 +505,181 @@ fn a_soldier_outside_the_window_is_not_painted() {
         canvas.soldiers_painted() < live / 4,
         "the draw painted {} soldiers of {live}",
         canvas.soldiers_painted(),
+    );
+}
+
+#[test]
+fn a_stale_world_is_refused_rather_than_drawn_without_its_soldiers() {
+    // The occupancy bitplane is an unguarded read. A stale one reports every
+    // block empty, so a viewer that skipped on it alone would draw the tiles,
+    // draw no soldiers, and report success. A wrong picture presented as a
+    // right one is worse than a refusal, and this test is here because the
+    // first version of the block reader did exactly that.
+    let mut world = world();
+    let mut canvas = Canvas::new(200, 160);
+    let camera = Camera::fitting(&world, &canvas);
+    paint::draw(&world, camera, &mut canvas).expect("a fresh world draws");
+
+    // A spawn makes the structure stale without rebuilding it.
+    world
+        .spawn_soldier(Axial::new(3, 3), FactionId(0))
+        .expect("the address is valid");
+
+    assert!(
+        paint::draw(&world, camera, &mut canvas).is_err(),
+        "a stale world drew a picture instead of refusing",
+    );
+
+    // The sharper case: a structure built over an EMPTY arena marks every
+    // block clear. A viewer that trusted the bitplane would skip every block,
+    // never reach a guarded read, draw no soldiers and report success. The
+    // freshness check exists for this case and only this case.
+    let mut fresh_but_empty = empty_world();
+    fresh_but_empty
+        .rebuild_bridge(1)
+        .expect("the rebuild must succeed");
+    fresh_but_empty
+        .spawn_soldier(Axial::new(2, 2), FactionId(0))
+        .expect("the address is valid");
+
+    let mut other = Canvas::new(200, 160);
+    assert!(
+        paint::draw(&fresh_but_empty, camera, &mut other).is_err(),
+        "a stale and empty bitplane drew a soldierless picture and called it success",
+    );
+}
+
+#[test]
+fn the_viewer_reads_only_the_blocks_the_window_covers() {
+    // The point of reading through the engine's spatial structure is that the
+    // cost follows the window. A small window onto a large world must leave
+    // most blocks unread.
+    let mut world = World::new(WorldConfig {
+        width: 96,
+        height: 96,
+        seed: 11,
+        faction_count: 2,
+    })
+    .expect("the extent describes a world");
+    for index in 0..400u32 {
+        let tile = index * 997 % (96 * 96);
+        world
+            .spawn_soldier(
+                Axial::new((tile % 96) as i32, (tile / 96) as i32),
+                FactionId((index % 2) as u16),
+            )
+            .expect("the address is valid");
+    }
+    world.rebuild_bridge(1).expect("the rebuild must succeed");
+
+    let mut small = Canvas::new(64, 64);
+    let camera = Camera {
+        tile_width: 8.0,
+        tile_height: 8.0,
+        origin_x: 4.0,
+        origin_y: 4.0,
+    };
+    paint::draw(&world, camera, &mut small).expect("the world draws");
+
+    let touched = small.blocks_read() + small.blocks_skipped();
+    let total = world.bridge().layout().block_count();
+    assert!(
+        touched < total,
+        "the viewer touched {touched} of {total} blocks, so it read the world and not the window",
+    );
+    assert!(
+        small.soldiers_painted() < 400,
+        "a 64 by 64 window painted every one of the 400 soldiers",
+    );
+
+    // Panning must move which blocks are touched, or the range is not being
+    // computed from the camera at all.
+    let mut far = Canvas::new(64, 64);
+    let away = camera.panned(-40.0 * 8.0, -40.0 * 8.0);
+    paint::draw(&world, away, &mut far).expect("the world draws");
+    assert_ne!(
+        (small.blocks_read(), small.blocks_skipped()),
+        (far.blocks_read(), far.blocks_skipped()),
+        "panning read the same blocks, so the block range ignores the camera",
+    );
+
+    // The count must stay bounded by the window. A viewer that started its
+    // block range at the world edge rather than the window edge would still
+    // pass every assertion above, because the totals would still differ and
+    // still fall below the world total.
+    let far_touched = far.blocks_read() + far.blocks_skipped();
+    let window_blocks = {
+        let layout = world.bridge().layout();
+        let across = 64 / 8 / layout.block_edge() + 2;
+        let down = 64 / 8 / layout.block_edge() + 2;
+        across * down
+    };
+    assert!(
+        far_touched <= window_blocks,
+        "a 64 by 64 window touched {far_touched} blocks, and the window covers about {window_blocks}",
+    );
+    assert!(
+        touched <= window_blocks,
+        "a 64 by 64 window touched {touched} blocks, and the window covers about {window_blocks}",
+    );
+
+    // Look at the MIDDLE of the world. The cameras above both start at the
+    // origin, so a viewer that began its block range at row zero rather than
+    // at the window would have passed every assertion so far.
+    let mut middle = Canvas::new(64, 64);
+    let inward = camera.panned(50.0 * 8.0, 50.0 * 8.0);
+    paint::draw(&world, inward, &mut middle).expect("the world draws");
+    let middle_touched = middle.blocks_read() + middle.blocks_skipped();
+    assert!(
+        middle_touched > 0,
+        "a window over the middle of the world touched no block at all",
+    );
+    // A window of fixed size touches a bounded number of blocks wherever it
+    // points. That is the whole claim. A viewer that began its range at the
+    // world edge rather than the window edge would touch more blocks the
+    // further it looked, and would still pass a bound stated against the
+    // world total.
+    assert!(
+        middle_touched <= touched + 1,
+        "a window over the middle touched {middle_touched} blocks and the same \
+         window at the origin touched {touched}, so the cost follows where it \
+         looks rather than how much it shows",
+    );
+}
+
+#[test]
+fn an_empty_region_is_skipped_on_the_bitplane() {
+    // ADR-0018 D5 exists so a query can test the bitplane and skip an empty
+    // block without reading its units. A viewer that read every block anyway
+    // would pass every other test here.
+    let mut world = World::new(WorldConfig {
+        width: 96,
+        height: 96,
+        seed: 4,
+        faction_count: 1,
+    })
+    .expect("the extent describes a world");
+    // Every soldier in one corner, so most blocks hold nothing.
+    for index in 0..24u32 {
+        world
+            .spawn_soldier(
+                Axial::new((index % 6) as i32, (index / 6) as i32),
+                FactionId(0),
+            )
+            .expect("the address is valid");
+    }
+    world.rebuild_bridge(1).expect("the rebuild must succeed");
+
+    let mut canvas = Canvas::new(400, 400);
+    let camera = Camera::fitting(&world, &canvas);
+    paint::draw(&world, camera, &mut canvas).expect("the world draws");
+
+    assert!(
+        canvas.blocks_skipped() > 0,
+        "no block was skipped on the bitplane, so every block was read",
+    );
+    assert!(
+        canvas.blocks_read() < canvas.blocks_skipped(),
+        "more blocks were read than skipped, though the soldiers sit in one corner",
     );
 }
