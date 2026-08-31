@@ -23,7 +23,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^ALLOC]
 
-**Next number: DEC-024**
+**Next number: DEC-033**
 
 [^ALLOC]: Findings register, FND-038. `docs/FINDINGS.md`
 
@@ -433,6 +433,54 @@ rare, which is the wrong trade before the subsystem has a second reader.
 
 **Assumption in the meantime:** option A.
 
+### DEC-032 — What layout does the character arena hold?
+
+The character arena holds its columns as struct-of-arrays, in the same style as
+the soldier arena and the settlement arena. A register row says the character
+tier wants array-of-structs, and it gives a difference of twelve cache lines
+against one for a random graph gather.[^DEC9] The descent and succession pass is
+not built yet, so the project must answer this before that work starts.
+
+**The premise is misattributed, and the finding records the correction.**[^DEC10]
+The twelve-against-one figure belongs to the vector report and it covers the
+personality influence pass over a separate 64-byte trait record.[^DEC11] The
+character report covers descent and succession, and it recommends
+struct-of-arrays for the character row.[^DEC12] The two reports do not conflict,
+because they describe two structures.
+
+**Option A. Keep struct-of-arrays.** Every descent and succession kernel is a
+column pass: a map to a mask and a compaction scan for eligibility, a map to a
+key tuple and a sort for ranking, a counting sort for the child list, and a map
+over a contiguous range for a cadet split.[^DEC12] The two operations that
+gather at random, the lowest common ancestor walk and the kinship recursion,
+read two or three columns for each node.
+
+**Option B. Move the arena to array-of-structs.** This charges every column pass
+a full row read to serve a gather that reads two columns. It also breaks the
+zero-copy column view that the Python control plane takes for each shape.
+
+**Option C. A hybrid, with the hot descent fields in one row.** This declares
+one value at two sites unless the split is exact, and the split cannot be exact
+while nothing has written the pass.[^DEC13]
+
+**Option D. Defer for want of evidence.** The question is not blocked. It turns
+on the column count of the pass, which the character report already states.
+
+**Recommendation: option A.** Keep struct-of-arrays for the character arena.
+Hold array-of-structs for the trait record, which is a separate structure that
+nothing has written. A gather benchmark on a development machine measured the
+crossover as a function of the column count, and the crossover sits well above
+the two columns that descent reads. The figures are in the commit body, because
+the machine is not the target and a measured figure decays.[^DEC14]
+
+**Do not write a decision record yet.** The scope rule needs all three
+conditions, and the second fails: the arena holds five columns and no parent
+edge, so a later change is cheap.[^DEC15] The registry reserves a row for the
+claim that layout follows the access pattern, and the work that adds the descent
+columns should write that row.[^DEC16] The backlog holds the item.[^DEC17]
+
+**Assumption in the meantime:** option A.
+
 ## Decisions to apply at merge
 
 These are mechanical. They do not need judgement, but they must not be
@@ -463,3 +511,12 @@ None yet.
 [^TARGET]: Blockers register, BLK-004, and the scale constants. `docs/reference/budgets.md`
 [^DEC7]: ADR-0073, gathering is admitted by sort-then-admit against the tile, decision D1, a draft record. `docs/adrs/draft/adr-0073-gathering-is-admitted-by-sort-then-admit-against-the-tile.md`
 [^DEC8]: Project orientation, the design principles. `CLAUDE.md`
+[^DEC9]: Findings register, FND-022. `docs/FINDINGS.md`
+[^DEC10]: Findings register, FND-072. `docs/FINDINGS.md`
+[^DEC11]: Vector entity representation, section 9 and decision D155. `docs/research/reports/18-vector-entity-representation.md`
+[^DEC12]: The character graph and inheritance, sections 2.1, 3.3 and 15.3. `docs/research/reports/14-character-graph-and-inheritance.md`
+[^DEC13]: Recurring Defect Shapes, shape 1. `.claude/rules/recurring-defects.md`
+[^DEC14]: Blockers register, BLK-007. `docs/BLOCKERS.md`
+[^DEC15]: Decision Record Scope, section 1. `.claude/rules/adr-scope.md`
+[^DEC16]: ADR Registry, reserved row 0021. `docs/adrs/REGISTRY.md`
+[^DEC17]: Backlog item 0097. `docs/backlog/proposed/0097-write-the-layout-record-with-the-descent-columns.md`
