@@ -90,4 +90,4 @@ twenty-four is 0.676.
 
 ## References
 
-[^1]: Backlog item 0045. `docs/backlog/proposed/0045-the-panel-has-no-answer-for-a-short-window.md`
+[^1]: Backlog item 0045. `docs/backlog/complete/0045-the-panel-has-no-answer-for-a-short-window.md`

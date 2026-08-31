@@ -99,6 +99,7 @@ pub struct Readout {
     by_faction: [u32; COLOURED_FACTIONS],
     by_kind: [u32; KIND_COUNT],
     region: Option<CellSummary>,
+    canvas_height: usize,
     step_mean: f64,
     step_worst: f64,
     draw_mean: f64,
@@ -149,6 +150,7 @@ impl Readout {
             // The level 1 cell that covers the tile under the middle of the
             // window. The camera reports that tile, and the engine reports
             // the cell. Neither number is the viewer's.
+            canvas_height: canvas.height(),
             region: world.summary_covering(
                 camera.tile_at(canvas.width() as f32 / 2.0, canvas.height() as f32 / 2.0),
             ),
@@ -409,7 +411,7 @@ impl Readout {
             Line::Note("machine. not the target."),
         ]);
 
-        lines
+        cut_to_fit(lines, self.canvas_height)
     }
 
     /// Returns the height of the panel in pixels.
@@ -420,6 +422,53 @@ impl Readout {
         PAD * 2 + self.lines().iter().map(Line::height).sum::<i32>()
     }
 }
+
+/// Returns as much of the list as the window has room for.
+///
+/// The panel's height follows its content, and the content grows with the
+/// faction count and with every section. A window shorter than the content
+/// cuts the bottom off, and the panel then states a rectangle it did not
+/// paint.
+///
+/// The list is shortened here rather than at the drawing, because one list is
+/// the only statement of what the panel holds and both the height and the
+/// painting are derived from it. Shortening it in one place keeps the two in
+/// step.
+///
+/// **The last line says the panel was cut.** A number that is missing and
+/// says so is a number a reader knows to look elsewhere for. A number that is
+/// missing in silence is the failure the record forbids for a number the
+/// panel cannot afford, and a number below the edge of the window is exactly
+/// that.[^1]
+///
+/// # References
+///
+/// [^1]: ADR-0070, the head-up display reports what the drawing pass read, decision D2. `docs/adrs/accepted/adr-0070-the-head-up-display-reports-what-the-drawing-pass-read.md`
+fn cut_to_fit(lines: Vec<Line>, canvas_height: usize) -> Vec<Line> {
+    let notice = Line::Note(CUT_NOTICE);
+    // The panel sits below the margin and must end above the far edge.
+    let room = canvas_height as i32 - MARGIN * 2 - PAD * 2;
+    let whole: i32 = lines.iter().map(Line::height).sum();
+    if whole <= room {
+        return lines;
+    }
+
+    let mut kept: Vec<Line> = Vec::with_capacity(lines.len());
+    let mut used = notice.height();
+    for line in lines {
+        let height = line.height();
+        if used + height > room {
+            break;
+        }
+        used += height;
+        kept.push(line);
+    }
+    kept.push(notice);
+    kept
+}
+
+/// What the panel says when the window cut it.
+const CUT_NOTICE: &str = "window too short. panel cut.";
 
 /// Returns a fixed-point reading as text, to two decimal places.
 ///

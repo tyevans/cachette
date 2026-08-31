@@ -40,13 +40,11 @@ const FACTIONS: u16 = 4;
 
 /// The size of the window these tests draw into.
 ///
-/// The height matches the window the demonstration binary opens. A shorter
-/// canvas cuts the bottom of the panel off, and the panel then states a
-/// rectangle it did not paint. That is a real gap and a backlog item holds
-/// it; a fixture shorter than the real window would test the gap rather than
-/// the panel.[^1]
+/// The height matches the window the demonstration binary opens, so these
+/// tests measure the panel a person sees. A shorter canvas now cuts the panel
+/// and says that it did, and two tests below read that case on purpose.[^1]
 ///
-/// [^1]: Backlog item 0045. `docs/backlog/proposed/0045-the-panel-has-no-answer-for-a-short-window.md`
+/// [^1]: Backlog item 0045. `docs/backlog/complete/0045-the-panel-has-no-answer-for-a-short-window.md`
 const WINDOW: (usize, usize) = (640, 720);
 
 /// Builds a world far larger than the window, with soldiers spread over it.
@@ -835,5 +833,78 @@ fn the_panel_reports_a_region_that_holds_units() {
     assert!(
         with_units > 0,
         "no camera position found a region that holds a unit"
+    );
+}
+
+#[test]
+fn a_short_window_cuts_the_panel_and_the_panel_says_so() {
+    // The panel's height follows its content, and nothing bounded it against
+    // the window. A canvas shorter than the panel cut the bottom off, and
+    // `bounds` then stated a rectangle the panel did not paint.
+    //
+    // A number below the edge of the window is a number the panel silently
+    // does not have, which is the failure ADR-0070 D2 exists to prevent for a
+    // number the panel cannot afford.
+    let mut world = world();
+    let metrics = stepped(&mut world, 1);
+
+    let mut tall = Canvas::new(WINDOW.0, WINDOW.1);
+    let camera = at_the_middle(&world, &tall);
+    let full = draw_frame(&world, camera, &metrics, &mut tall).expect("the world draws");
+    let (_, top, _, full_height) = cachette_view::hud::bounds(&full);
+
+    // A window that cannot hold the whole panel. The fixture must actually be
+    // short, or the assertions below pass on a panel nothing cut.
+    let short_height = (top + full_height) as usize - 80;
+    assert!(
+        short_height < WINDOW.1,
+        "the short window is not shorter than the tall one"
+    );
+    let mut short = Canvas::new(WINDOW.0, short_height);
+    let camera = at_the_middle(&world, &short);
+    let cut = draw_frame(&world, camera, &metrics, &mut short).expect("the world draws");
+    let (_, top, _, cut_height) = cachette_view::hud::bounds(&cut);
+
+    assert!(
+        cut_height < full_height,
+        "the panel states the same height in a window {} pixels shorter",
+        WINDOW.1 - short_height
+    );
+    assert!(
+        top + cut_height <= short_height as i32,
+        "the panel states a rectangle {cut_height} tall that runs past a canvas of {short_height}"
+    );
+}
+
+#[test]
+fn a_cut_panel_paints_the_rectangle_it_states() {
+    // The claim in the drawing code is that the panel cannot paint past the
+    // rectangle it states. A cut panel must keep it.
+    let mut world = world();
+    let metrics = stepped(&mut world, 1);
+
+    let mut bare = Canvas::new(WINDOW.0, 320);
+    let camera = at_the_middle(&world, &bare);
+    paint::draw(&world, camera, &mut bare).expect("the world draws");
+
+    let mut with_panel = Canvas::new(WINDOW.0, 320);
+    let readout = draw_frame(&world, camera, &metrics, &mut with_panel).expect("the world draws");
+    let (_, top, _, height) = cachette_view::hud::bounds(&readout);
+
+    let width = with_panel.width();
+    let lowest = with_panel
+        .pixels()
+        .iter()
+        .zip(bare.pixels().iter())
+        .enumerate()
+        .filter(|(_, (panelled, plain))| panelled != plain)
+        .map(|(index, _)| (index / width) as i32)
+        .max()
+        .expect("the panel painted nothing");
+
+    assert_eq!(
+        lowest,
+        top + height - 1,
+        "the cut panel states a rectangle {height} tall and paints down to {lowest}"
     );
 }
