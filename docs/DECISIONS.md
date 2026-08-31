@@ -23,7 +23,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^ALLOC]
 
-**Next number: DEC-022**
+**Next number: DEC-023**
 
 [^ALLOC]: Findings register, FND-038. `docs/FINDINGS.md`
 
@@ -174,6 +174,8 @@ ground.[^DEC1] Whichever option wins, that value needs recording.
 
 [^DEC7]: Backlog item 0030. `docs/backlog/complete/0030-enforce-the-barrier-ordering.md`
 
+[^DEC8]: ADR-0067, the viewer reads the world and never writes to it, decision D4 and its consequences. `docs/adrs/accepted/adr-0067-the-viewer-reads-the-world-and-never-writes-to-it.md`
+
 ### DEC-018 — Where does movement sit in the frame schedule?
 
 The frame schedule is static and known before the frame runs. The order of
@@ -316,6 +318,50 @@ from outside: a rebuild that ran before the structural apply leaves the
 derived structure stale when the step ends, and four tests fail on that.[^DEC7]
 The open part here is the refresh at the top of the step, which serves a
 change the caller made outside any frame.
+
+### DEC-022 — May the viewer make the engine wait?
+
+The product record for the first renderable example states that the window
+keeps up with the engine, or drops what it cannot draw and reports the drop,
+and that it never makes the engine wait. It also states that the engine costs
+the same when a viewer is attached.
+
+The viewer record decides the opposite for now. One loop steps and then
+draws, so the drawing rate and the tick rate are one number. Its consequences
+section says plainly that a slow drawing slows the simulation in the
+demonstration binary, and that this is acceptable for a demonstration.[^DEC8]
+The binary also caps its own frame rate, so the engine waits on every frame
+that finishes early.
+
+Nothing drops a frame and nothing reports a drop. The two block counts the
+panel shows count empty spatial blocks, not dropped frames.
+
+**This is a real contradiction, not a defect in either document.** The viewer
+record knew it was choosing against the product record, and it named what
+would supersede the choice.
+
+**Option A. Amend the product record.** The statement about waiting becomes a
+statement about the engine when a viewer is attached through a snapshot, and
+the demonstration is excluded by name. The product record then describes what
+the project built.
+
+**Option B. Separate the two rates.** The engine runs on its own thread and
+publishes a frame the viewer reads. This is what the viewer record names as
+its own successor. It needs the snapshot record, which does not exist.
+
+**Option C. Leave both as they are.** The product record then states
+something the code does not do, and it cannot reach `Shipped`.
+
+**Recommendation:** option A now, option B when a caller needs the two rates
+apart. The product record asked for a property of the engine, and it stated
+it over the demonstration. Writing the snapshot record to serve a
+demonstration is the wrong order, which the viewer record already argues.
+
+**Assumption in the meantime:** option C. The product record stays in
+`shaped/` and this row holds the reason.
+
+**What would settle it.** A person who must watch a world that steps faster
+than a screen refreshes.
 
 ### DEC-013 — Which toolchain version does the project pin?
 
