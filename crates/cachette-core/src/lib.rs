@@ -18,6 +18,7 @@ pub mod bridge;
 pub mod event;
 pub mod hash;
 pub mod hex;
+pub mod pyramid;
 pub mod rng;
 pub mod sim_math;
 pub mod slots;
