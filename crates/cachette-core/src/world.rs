@@ -32,6 +32,7 @@ use crate::character::{CharacterArena, CharacterError};
 use crate::event::{ResourceTaken, TileChanged, CHANGE_KIND_LOWERED, CHANGE_KIND_RAISED};
 use crate::hash::StateHash;
 use crate::hex::{Axial, Grid, GridError, NEIGHBOUR_COUNT};
+use crate::holding::{FactionMask, Holder, Holding};
 use crate::pyramid::{CellSummary, Pyramid};
 use crate::rates::{RateError, RateLedger, RateSchedule, RateTable, SiteShortfall};
 use crate::resource::{
@@ -228,6 +229,16 @@ pub struct World {
     departed: [u64; RESOURCE_KIND_COUNT],
     /// Level 1 of the pyramid, derived from level 0 at the barrier.
     pyramid: Pyramid,
+    /// Who holds each tile, and what each faction holds.
+    ///
+    /// The holder column is level 0 and it is the truth. The tile faction
+    /// column above it is the label that the tile stub writes into an event,
+    /// and it is not a holder: it never changes and it covers water.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0053, a faction is a bit in a mask, and a relation is a plane, decision D2, a draft record. `docs/adrs/draft/adr-0053-a-faction-is-a-bit-in-a-mask-and-a-relation-is-a-plane.md`
+    holding: Holding,
     /// When the site rates apply.
     schedule: RateSchedule,
     /// The production rate and the upkeep rate of each site.
@@ -299,6 +310,7 @@ impl World {
             depletion: DepletionLedger::new(),
             departed: [0; RESOURCE_KIND_COUNT],
             pyramid: Pyramid::new(layout, terrain)?,
+            holding: Holding::new(layout),
             schedule: RateSchedule::DEFAULT,
             rates: RateTable::new(),
             rate_ledger: RateLedger::ZERO,
@@ -308,9 +320,13 @@ impl World {
         // A world that has never stepped still answers a question about a
         // region. A level that nothing rebuilt would describe an empty world
         // and would be wrong rather than absent.
-        world
-            .pyramid
-            .rebuild(&world.values, &world.soldiers, &world.bridge, 1)?;
+        world.pyramid.rebuild(
+            &world.values,
+            world.holding.holders(),
+            &world.soldiers,
+            &world.bridge,
+            1,
+        )?;
         Ok(world)
     }
 
@@ -1094,6 +1110,9 @@ impl World {
         for amount in &self.departed {
             hash = hash.write_u64(*amount);
         }
+        // Who holds each tile is simulated state, so the whole-world hash
+        // covers it.
+        let hash = self.holding.hash_into(hash);
         let hash = self.soldiers.hash_into(hash);
         let hash = self.settlements.hash_into(hash);
         let hash = self.characters.hash_into(hash);
@@ -1263,6 +1282,29 @@ impl World {
             }
             Err(BridgeError::Stale { .. }) => {}
             Err(_) => return false,
+        }
+        // The holding covers the same world, no tile names a faction the
+        // world does not have, and no faction holds ground that admits no
+        // unit. The check derives the held list, the census and the block
+        // masks again and compares them against the stored ones.[^1]
+        //
+        // [^1]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`
+        if self.holding.grid() != self.grid {
+            return false;
+        }
+        if !self.holding.check_invariants(self.terrain, ceiling) {
+            return false;
+        }
+        // Level 1 and the running census are two statements of how much
+        // ground is held. The check fails when they disagree.
+        let census: i64 = (0..ceiling)
+            .map(|faction| self.holding.holding_of(FactionId(faction)))
+            .sum();
+        if census != self.holding.held_tiles() {
+            return false;
+        }
+        if self.bridge.describes(&self.soldiers).is_ok() && total.held_tiles() != census {
+            return false;
         }
         if !self.check_conservation() {
             return false;
@@ -1482,6 +1524,14 @@ impl World {
         // [^6]: ADR-0073, gathering is admitted by sort-then-admit against the tile, decision D3, a draft record. `docs/adrs/draft/adr-0073-gathering-is-admitted-by-sort-then-admit-against-the-tile.md`
         self.gather(threads)?;
 
+        // The holding spreads after the barrier of this frame, because it
+        // reads where each unit stands and the movement above has just moved
+        // them. It writes a tile column, and it moves no unit, so the barrier
+        // above stays the barrier of this frame.[^7]
+        //
+        // [^7]: ADR-0053, a faction is a bit in a mask, and a relation is a plane, decision D4, a draft record. `docs/adrs/draft/adr-0053-a-faction-is-a-bit-in-a-mask-and-a-relation-is-a-plane.md`
+        self.holding
+            .advance(self.terrain, &self.soldiers, &self.bridge, threads)?;
         // The site rates apply after the barrier of this frame and after the
         // gather resolve, and before level 1 rebuilds.
         //
@@ -1490,14 +1540,14 @@ impl World {
         // barrier and it does not need one. What it needs is to run after
         // everything that moves a quantity in this frame, so that the store a
         // derived level reads is the store the frame settled on. The gather
-        // resolve is that work today, and level 1 is the derived level.[^7]
+        // resolve is that work today, and level 1 is the derived level.[^8]
         //
         // The pass is skipped on a tick the schedule does not name, and the
         // schedule is a parameter of the world rather than a constant of this
-        // function.[^8]
+        // function.[^9]
         //
-        // [^7]: ADR-0022, level 0 is the only truth, and every level above it is derived, decision D2, a draft record. `docs/adrs/draft/adr-0022-level-0-is-the-only-truth-and-every-level-above-it-is-derived.md`
-        // [^8]: ADR-0062, production and upkeep are rates attached to a site, decision D4, a draft record. `docs/adrs/draft/adr-0062-production-and-upkeep-are-rates-attached-to-a-site.md`
+        // [^8]: ADR-0022, level 0 is the only truth, and every level above it is derived, decision D2, a draft record. `docs/adrs/draft/adr-0022-level-0-is-the-only-truth-and-every-level-above-it-is-derived.md`
+        // [^9]: ADR-0062, production and upkeep are rates attached to a site, decision D4, a draft record. `docs/adrs/draft/adr-0062-production-and-upkeep-are-rates-attached-to-a-site.md`
         self.apply_rates(threads)?;
 
         // Level 1 rebuilds after the structure it reads, and after every
@@ -1512,9 +1562,66 @@ impl World {
         // be quietly repaired instead of refused.
         //
         // [^5]: ADR-0022, level 0 is the only truth, and every level above it is derived, decision D2, a draft record. `docs/adrs/draft/adr-0022-level-0-is-the-only-truth-and-every-level-above-it-is-derived.md`
-        self.pyramid
-            .rebuild(&self.values, &self.soldiers, &self.bridge, threads)?;
+        self.pyramid.rebuild(
+            &self.values,
+            self.holding.holders(),
+            &self.soldiers,
+            &self.bridge,
+            threads,
+        )?;
         Ok(&self.log)
+    }
+
+    /// Returns the holding of the world.
+    ///
+    /// The holding says who holds each tile, and how much ground each
+    /// faction holds.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0053, a faction is a bit in a mask, and a relation is a plane, a draft record. `docs/adrs/draft/adr-0053-a-faction-is-a-bit-in-a-mask-and-a-relation-is-a-plane.md`
+    #[must_use]
+    pub const fn holding(&self) -> &Holding {
+        &self.holding
+    }
+
+    /// Returns who holds one tile.
+    ///
+    /// The answer names a faction, or nobody. It never names two factions,
+    /// because a tile carries one holder.[^1]
+    ///
+    /// Returns `None` when the address lies outside the world.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0053, a faction is a bit in a mask, and a relation is a plane, decision D2, a draft record. `docs/adrs/draft/adr-0053-a-faction-is-a-bit-in-a-mask-and-a-relation-is-a-plane.md`
+    #[must_use]
+    pub fn tile_holder(&self, address: Axial) -> Option<Holder> {
+        self.holding.holder(address)
+    }
+
+    /// Returns the number of tiles one faction holds.
+    ///
+    /// The call reads a running total, so it costs the same whatever the
+    /// size of the world.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0053, a faction is a bit in a mask, and a relation is a plane, decision D4, a draft record. `docs/adrs/draft/adr-0053-a-faction-is-a-bit-in-a-mask-and-a-relation-is-a-plane.md`
+    #[must_use]
+    pub fn holding_of(&self, faction: FactionId) -> i64 {
+        self.holding.holding_of(faction)
+    }
+
+    /// Returns the factions that hold ground in the block covering a tile.
+    ///
+    /// Returns `None` when the address lies outside the world.
+    #[must_use]
+    pub fn holders_near(&self, address: Axial) -> Option<FactionMask> {
+        let tile = self.grid.index_of(address)?;
+        let key = self.holding.layout().key_of(tile)?;
+        self.holding
+            .block_mask(self.holding.layout().block_of_key(key))
     }
 
     /// Returns level 1 of the pyramid.
@@ -1547,8 +1654,13 @@ impl World {
     /// arena.
     pub fn rebuild_pyramid(&mut self, threads: usize) -> Result<(), StepError> {
         self.refresh_bridge()?;
-        self.pyramid
-            .rebuild(&self.values, &self.soldiers, &self.bridge, threads)?;
+        self.pyramid.rebuild(
+            &self.values,
+            self.holding.holders(),
+            &self.soldiers,
+            &self.bridge,
+            threads,
+        )?;
         Ok(())
     }
 

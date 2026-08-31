@@ -55,6 +55,7 @@
 use crate::bridge::{BlockLayout, BridgeError, UnitTileBridge};
 use crate::hash::StateHash;
 use crate::hex::Axial;
+use crate::holding::Holder;
 use crate::sim_math;
 use crate::soldier::SoldierArena;
 use crate::terrain::Terrain;
@@ -78,6 +79,7 @@ pub struct CellSummary {
     tiles: i64,
     open_tiles: i64,
     units: i64,
+    held_tiles: i64,
     value_total: Accum,
     height_total: Accum,
 }
@@ -96,6 +98,7 @@ impl CellSummary {
         tiles: 0,
         open_tiles: 0,
         units: 0,
+        held_tiles: 0,
         value_total: Accum(0),
         height_total: Accum(0),
     };
@@ -121,6 +124,7 @@ impl CellSummary {
             tiles: self.tiles.saturating_add(other.tiles),
             open_tiles: self.open_tiles.saturating_add(other.open_tiles),
             units: self.units.saturating_add(other.units),
+            held_tiles: self.held_tiles.saturating_add(other.held_tiles),
             value_total: sim_math::combine(self.value_total, other.value_total),
             height_total: sim_math::combine(self.height_total, other.height_total),
         }
@@ -142,6 +146,7 @@ impl CellSummary {
             tiles: self.tiles.saturating_sub(other.tiles),
             open_tiles: self.open_tiles.saturating_sub(other.open_tiles),
             units: self.units.saturating_sub(other.units),
+            held_tiles: self.held_tiles.saturating_sub(other.held_tiles),
             value_total: Accum(self.value_total.0.saturating_sub(other.value_total.0)),
             height_total: Accum(self.height_total.0.saturating_sub(other.height_total.0)),
         }
@@ -163,6 +168,37 @@ impl CellSummary {
     #[must_use]
     pub const fn units(self) -> i64 {
         self.units
+    }
+
+    /// Returns the tiles that a faction holds. Extensive.
+    ///
+    /// The field counts the tiles whose holder is a faction rather than
+    /// nobody. It does not say which faction, because a field indexed by the
+    /// faction would multiply the world by the faction count, and the record
+    /// rejects that shape.[^1] The accumulator is 64 bits wide, because a
+    /// one-byte count summed over the tile count of the target world
+    /// overflows a 32-bit accumulator.[^2]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0053, a faction is a bit in a mask, and a relation is a plane, decision D3, a draft record. `docs/adrs/draft/adr-0053-a-faction-is-a-bit-in-a-mask-and-a-relation-is-a-plane.md`
+    /// [^2]: ADR-0023, an aggregate combines exactly, in any order, decision D3, a draft record. `docs/adrs/draft/adr-0023-an-aggregate-combines-exactly-in-any-order.md`
+    #[must_use]
+    pub const fn held_tiles(self) -> i64 {
+        self.held_tiles
+    }
+
+    /// Returns the share of the ground that a faction holds. Intensive.
+    ///
+    /// The value is not stored. It is the held count divided by the tile
+    /// count, both of which are stored, and the division happens here.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0024, every summary field is declared extensive or intensive, decision D3, a draft record. `docs/adrs/draft/adr-0024-every-summary-field-is-declared-extensive-or-intensive.md`
+    #[must_use]
+    pub fn held_share(self) -> Option<Fix32> {
+        ratio_of(self.held_tiles, self.tiles)
     }
 
     /// Returns the sum of the tile values. Extensive.
@@ -234,6 +270,7 @@ impl CellSummary {
         hash.write_u64(self.tiles as u64)
             .write_u64(self.open_tiles as u64)
             .write_u64(self.units as u64)
+            .write_u64(self.held_tiles as u64)
             .write_u64(self.value_total.0 as u64)
             .write_u64(self.height_total.0 as u64)
     }
@@ -403,8 +440,8 @@ impl Pyramid {
 
     /// Rebuilds every cell from level 0.
     ///
-    /// The rebuild reads the ground, the tile values and the derived unit
-    /// structure, and writes the summaries. It is the one mechanism that
+    /// The rebuild reads the ground, the tile values, the tile holders and
+    /// the derived unit structure, and writes the summaries. It is the one mechanism that
     /// maintains this level: no simulation system writes here.[^1]
     ///
     /// Each thread fills its own run of cells, and a cell is named by its
@@ -438,6 +475,7 @@ impl Pyramid {
     pub fn rebuild(
         &mut self,
         values: &[Fix32],
+        holders: &[Holder],
         arena: &SoldierArena,
         bridge: &UnitTileBridge,
         threads: usize,
@@ -457,7 +495,7 @@ impl Pyramid {
         // no constant of its own.
         if self.cells.len() <= threads {
             for (block, cell) in self.cells.iter_mut().enumerate() {
-                let moving = moving_part(layout, values, arena, bridge, block as u32)?;
+                let moving = moving_part(layout, values, holders, arena, bridge, block as u32)?;
                 *cell = ground[block].combine(moving);
             }
             return Ok(());
@@ -474,7 +512,7 @@ impl Pyramid {
                 handles.push(scope.spawn(move || {
                     for (offset, cell) in chunk.iter_mut().enumerate() {
                         let block = first + offset as u32;
-                        let moving = moving_part(layout, values, arena, bridge, block)?;
+                        let moving = moving_part(layout, values, holders, arena, bridge, block)?;
                         *cell = ground[block as usize].combine(moving);
                     }
                     Ok(())
@@ -526,6 +564,7 @@ fn ground_of_block(layout: BlockLayout, terrain: Terrain, block: u32) -> CellSum
             tiles: 1,
             open_tiles: i64::from(ground.kind.is_passable()),
             units: 0,
+            held_tiles: 0,
             value_total: Accum(0),
             height_total: sim_math::accumulate(Accum(0), ground.height),
         });
@@ -545,6 +584,7 @@ fn ground_of_block(layout: BlockLayout, terrain: Terrain, block: u32) -> CellSum
 fn moving_part(
     layout: BlockLayout,
     values: &[Fix32],
+    holders: &[Holder],
     arena: &SoldierArena,
     bridge: &UnitTileBridge,
     block: u32,
@@ -558,14 +598,20 @@ fn moving_part(
     // contiguous run of it. Summing a run rather than a tile at a time is the
     // difference between a coordinate conversion for each tile and none.
     let mut value_total = Accum(0);
+    let mut held_tiles = 0i64;
     for row in first_row..(first_row + edge).min(grid.height()) {
         let start = (row * grid.width() + first_column) as usize;
         let end = (row * grid.width() + (first_column + edge).min(grid.width())) as usize;
-        if start >= end || end > values.len() {
+        if start >= end || end > values.len() || end > holders.len() {
             continue;
         }
         for value in &values[start..end] {
             value_total = sim_math::accumulate(value_total, *value);
+        }
+        // The holder column is indexed the same way as the value column, so
+        // one row of a block is one contiguous run of it too.
+        for holder in &holders[start..end] {
+            held_tiles += i64::from(!holder.is_nobody());
         }
     }
 
@@ -573,6 +619,7 @@ fn moving_part(
         tiles: 0,
         open_tiles: 0,
         units: bridge.in_block(arena, block)?.len() as i64,
+        held_tiles,
         value_total,
         height_total: Accum(0),
     })

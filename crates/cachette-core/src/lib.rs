@@ -19,6 +19,7 @@ pub mod character;
 pub mod event;
 pub mod hash;
 pub mod hex;
+pub mod holding;
 pub mod pyramid;
 pub mod rates;
 pub mod resource;
@@ -38,6 +39,7 @@ pub use character::{CharacterArena, CharacterError};
 pub use event::{ResourceTaken, TileChanged};
 pub use hash::StateHash;
 pub use hex::{Axial, Grid, GridError};
+pub use holding::{FactionMask, Holder, Holding};
 pub use rates::{
     RateError, RateLedger, RatePass, RateSchedule, RateTable, SiteRate, SiteShortfall,
 };

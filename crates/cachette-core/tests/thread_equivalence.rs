@@ -15,6 +15,7 @@
 //! [^1]: ADR-0001, one binary gives one answer at any thread count, decision D4. `docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
 //! [^2]: Testing policy. `docs/TESTING.md`
 
+use cachette_core::holding::Holder;
 use cachette_core::resource::{Amount, ResourceKind};
 use cachette_core::site::CommodityId;
 use cachette_core::terrain::TileKind;
@@ -874,4 +875,113 @@ fn the_character_columns_reach_the_state_hash() {
         .expect("the creation must succeed");
     assert_eq!(early.characters().len(), late.characters().len());
     assert_ne!(early.state_hash(), late.state_hash());
+}
+
+/// Places two rival garrisons far apart, and returns how many it placed.
+///
+/// The two holdings grow towards each other and meet, so a tile on the border
+/// is claimed by two factions on one tick. Who takes it must come from the
+/// stable key and never from the thread that decided first.[^1]
+///
+/// The caller asserts that the two holdings met. A fixture that only assumed
+/// it would measure itself.[^2]
+///
+/// # References
+///
+/// [^1]: ADR-0053, a faction is a bit in a mask, and a relation is a plane, decision D6, a draft record. `docs/adrs/draft/adr-0053-a-faction-is-a-bit-in-a-mask-and-a-relation-is-a-plane.md`
+/// [^2]: Findings register, FND-051. `docs/FINDINGS.md`
+fn rivals(world: &mut World) -> usize {
+    let grid = world.grid();
+    let open: Vec<Axial> = (0..grid.tile_count())
+        .map(|index| Axial::new((index % grid.width()) as i32, (index / grid.width()) as i32))
+        .filter(|address| world.admits_a_unit(*address))
+        .collect();
+    if open.len() < 8 || world.config().faction_count < 2 {
+        return 0;
+    }
+    // The two garrisons start a few tiles apart on the same open ground, so
+    // their holdings meet inside the frames that a scenario runs. Garrisons
+    // at opposite ends of a large world never meet, and the border would then
+    // be untested while the test stayed green.
+    let mut placed = 0;
+    for offset in 0..3 {
+        if world.spawn_soldier(open[offset], FactionId(0)).is_ok() {
+            placed += 1;
+        }
+        let rival = offset + 4;
+        if rival < open.len() && world.spawn_soldier(open[rival], FactionId(1)).is_ok() {
+            placed += 1;
+        }
+    }
+    placed
+}
+
+/// Counts the held tiles that touch a tile held by another faction.
+fn border_tiles(world: &World) -> usize {
+    let grid = world.grid();
+    (0..grid.tile_count())
+        .map(|index| Axial::new((index % grid.width()) as i32, (index / grid.width()) as i32))
+        .filter(|address| {
+            let Some(holder) = world.tile_holder(*address).and_then(Holder::faction) else {
+                return false;
+            };
+            grid.neighbours(*address)
+                .into_iter()
+                .flatten()
+                .filter_map(|neighbour| world.tile_holder(neighbour))
+                .filter_map(Holder::faction)
+                .any(|other| other != holder)
+        })
+        .count()
+}
+
+/// Runs the frames over a world whose holdings contend for a border.
+fn run_with_rivals(config: WorldConfig, frames: u64, threads: usize) -> (u64, Vec<i64>, usize) {
+    let mut world = World::new(config).expect("the extent must describe a world");
+    if rivals(&mut world) == 0 {
+        return (0, Vec::new(), 0);
+    }
+    for _ in 0..frames {
+        world.step(threads).expect("the step must run");
+    }
+    assert!(world.check_invariants());
+    let counts: Vec<i64> = (0..config.faction_count)
+        .map(|faction| world.holding_of(FactionId(faction)))
+        .collect();
+    (world.state_hash().finish(), counts, border_tiles(&world))
+}
+
+#[test]
+fn a_world_whose_holdings_contend_is_identical_at_every_thread_count() {
+    // A tile that two factions reach on one tick is where a holding loses
+    // determinism. The scenario must produce one, and the test says so.
+    let mut contested = 0;
+    for (name, config, frames) in SCENARIOS {
+        let expected = run_with_rivals(*config, *frames + 8, THREAD_COUNTS[0]);
+        if expected.1.is_empty() {
+            continue;
+        }
+        if expected.2 > 0 {
+            contested += 1;
+        }
+        for threads in &THREAD_COUNTS[1..] {
+            let produced = run_with_rivals(*config, *frames + 8, *threads);
+            assert_eq!(
+                produced.1, expected.1,
+                "scenario {name}: the holding differs at {threads} threads"
+            );
+            assert_eq!(
+                produced.0, expected.0,
+                "scenario {name}: the state hash differs at {threads} threads"
+            );
+            assert_eq!(
+                produced.2, expected.2,
+                "scenario {name}: the border differs at {threads} threads"
+            );
+        }
+    }
+    assert!(
+        contested > 0,
+        "no scenario produced a border, so the contested case was not covered"
+    );
 }

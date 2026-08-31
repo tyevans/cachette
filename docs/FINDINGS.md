@@ -1482,6 +1482,49 @@ check then fails when a fifth place appears, which is what a check is for.
 determinism test can.** A rule that leaks the same amount on every run repeats
 perfectly at every thread count.
 
+### FND-066 — A constant stated a rule that a comparison already stated
+
+**Believed.** The rule that spreads a holding needs a constant that adds to the
+support of the faction which already holds a tile. Without it, the belief ran,
+a tile that two factions support equally changes hands on every tick.
+
+**True.** The comparison that admits a challenger already refuses an equal
+claim, because it demands support strictly greater than the holder raises. The
+constant and the comparison were two statements of one rule. The constant was
+the second, and it changed nothing that any test could see.
+
+**Evidence.** The constant was set to zero in the source, and the whole test
+suite stayed green. That is the shape of a second declaration site: it reads
+back correctly and reaches nothing.[^22] The constant was then removed, and the
+comparison was left as the only statement of the rule. A test that gives one
+tile to a holder and then puts an equal claim on it fails when the comparison
+is loosened, so the rule now has one site and one test.
+
+**Follows.** **Set a constant to a value that must change the answer, and run
+the tests.** A constant that no test can see is either dead or duplicated. This
+was found by the practice of putting a defect back and watching the tests stay
+green, and it would not have been found by reading the code.[^23]
+
+### FND-067 — A spread rule that visits the holding costs the area, not the edge
+
+**Believed.** A rule that spreads a holding must visit every tile that anybody
+holds, and the neighbours of each, because any of them might change hands.
+
+**True.** A tile whose six neighbours are all held by its own holder cannot
+change hands under the rule. Its holder draws support from all six neighbours
+and from holding the tile, and no challenger can raise more than that. The rule
+therefore visits the edge of a holding and not its area.
+
+**Evidence.** The candidate list was changed to pass over such a tile, and the
+golden state hash files did not move. An optimisation that changes no hash is
+the strongest evidence available here that it changed no behaviour. The commit
+holds the times measured before and after.
+
+**Follows.** **The cost of the spread grows with the perimeter of a holding and
+with the population, and not with the world.** That is the property the product
+record asks for, and it is a consequence of the rule rather than of a limit
+somebody imposed.[^24] A later rule that lets a claim reach further than one
+tile loses this property, and it must state what replaces it.
 
 ## References
 
@@ -1506,3 +1549,6 @@ perfectly at every thread count.
 [^19]: Findings register, FND-058, in this document.
 [^20]: ADR-0014, entity identity is an index plus a generation, decision D3. `docs/adrs/accepted/adr-0014-entity-identity-is-an-index-plus-a-generation.md`
 [^21]: Testing rules, section 6. `.claude/rules/testing.md`
+[^22]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`
+[^23]: Testing rules, section 2a. `.claude/rules/testing.md`
+[^24]: PRD-0006, a place belongs to somebody. `docs/product/shaped/prd-0006-a-place-belongs-to-somebody.md`
