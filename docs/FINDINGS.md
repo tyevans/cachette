@@ -616,6 +616,18 @@ takes a claim from the registry as the project's position. When a blocker
 governs a claim, the row says so, or the row waits. No record was written
 against the old row, so this cost one table edit rather than a supersession.
 
+**A second instance, found by audit.** ADR-0056 D4 said the capacity values
+depend on the tile scale, "which is an open blocker". BLK-001 and BLK-009
+were both resolved before the audit ran, so the record stated a live question
+that the project had already settled. The correction points at the scale
+constants table, which is where the values now live.
+
+The shape is not a stale value. It is a stale *reference to a blocker*, which
+survives longer because it looks like the careful thing to do. Correct
+parametric writing creates a claim that must be revisited when the blocker
+closes, and nothing revisits it. **When a blocker closes, search the records
+for its number.** The command is in the commit that closed it.
+
 ## References
 
 [^1]: Findings register, FND-038, in this document.

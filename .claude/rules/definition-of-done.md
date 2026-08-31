@@ -69,6 +69,12 @@ is done.
   This is precedent, and it is how future conflicts get settled cheaply.
 - **Blockers.** If the work resolved one, close the row and record the
   outcome. If it found a new one, open a row.
+
+  **When you close a blocker, search the tree for its number and repair every
+  record that calls it open.** Put the search command in the commit body. A
+  record written parametrically under a blocker is correct when it is
+  written, and it states a false thing the moment the blocker closes. Nothing
+  fails, because a record is prose. This has happened twice.[^2]
 - **Decisions.** If the work closed an open choice, record the outcome and the
   reasoning. If it opened one, add it with options and a recommendation.
 - **Registry.** Set the status of any record you wrote. An author may set
@@ -125,3 +131,4 @@ the code costs every future decision made from it.
 ## References
 
 [^1]: ADR Registry, who reviews. `docs/adrs/REGISTRY.md`
+[^2]: Findings register, FND-042. `docs/FINDINGS.md`

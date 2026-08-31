@@ -78,10 +78,10 @@ The capacity of a crossing terrain is higher than the capacity of ordinary
 terrain. That difference is a design lever, and the movement calibration
 depends on it.[^8]
 
-This record states no capacity value. The values depend on the tile scale,
-which is an open blocker.[^9] The registers hold the current values.[^10]
-The count array that stores the occupancy of a tile bounds the capacity,
-because the count is one byte for each tile.
+This record states no capacity value. The values follow from the tile
+scale, and the scale constants table holds them.[^9] [^10] The count array
+that stores the occupancy of a tile bounds the capacity, because the count
+is one byte for each tile.
 
 ### D5. A rejected unit is not stuck
 
@@ -121,5 +121,5 @@ capacity literal in the movement kernel violates D4.
 [^6]: Findings register, FND-011, the progress accumulator overflows. `docs/FINDINGS.md`
 [^7]: ADR-0007, content supplies a key vector, never a comparator. `docs/adrs/accepted/adr-0007-content-supplies-a-key-vector-never-a-comparator.md`
 [^8]: Findings register, FND-037, a crossing time needs the terrain multiplier. `docs/FINDINGS.md`
-[^9]: Blockers register, BLK-001, tile scale and world extent. `docs/BLOCKERS.md`
-[^10]: Blockers register, BLK-009, tile capacity. `docs/BLOCKERS.md`
+[^9]: Blockers register, BLK-001 and BLK-009, both resolved. `docs/BLOCKERS.md`
+[^10]: Budgets and costs, the scale constants. `docs/reference/budgets.md`
