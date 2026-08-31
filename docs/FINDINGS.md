@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-048**
+**Next number: FND-049**
 
 ## A. Corrections to stated rules
 
@@ -758,7 +758,7 @@ continuous integration, the local gate is not the gate.**
 studied. A record that states a design well is worth keeping until the
 subsystem arrives.
 
-**True.** ADR-0057 specified a portal graph, a flow tile cache keyed on a
+**True.** `ADR-0057` specified a portal graph, a flow tile cache keyed on a
 chunk and an exit, and a coarse biasing field, in five numbered decisions,
 before any path-finding existed and before any product record asked for a
 long path. It was retired rather than accepted.
@@ -782,6 +782,37 @@ starts from the report with a fresh number.
 Retiring cost one row and one backlog edit. Accepting it would have bound the
 first person to write a path-finder to a design nobody had tested against a
 need nobody had stated.
+
+### FND-048 — A determinism test cannot see a broken invariant
+
+**Believed.** The two determinism tests are the project's strongest guard.
+A run that repeats byte for byte at every thread count, and matches a stored
+hash, is a run the project can trust.
+
+**True.** They guard one property and only one. A defect that is itself
+deterministic passes both, because the wrong answer is the same wrong answer
+on every thread and every run.
+
+**Evidence.** An audit of the movement record found that its admission rule
+does not hold the capacity invariant the rule exists to hold. Departures were
+counted from intents rather than from admitted moves, so a unit rejected at
+its own target still released room behind it, and a tile could end a tick
+above its capacity. The failure is a pure function of the intent set, so the
+thread-count test and the golden state test would both have passed.
+
+The defect was in a draft record and not yet in code, which is the only
+reason this cost a paragraph rather than a supersession.
+
+**Follows.** An invariant needs a test that asserts the invariant. This
+sounds obvious and was not done: the movement work was planned with
+thread-count equivalence and a golden hash as its determinism coverage, and
+both would have shipped the defect.
+
+**A property that must hold after every tick belongs in a test that checks it
+after every tick.** For admission that is: no tile holds more units than its
+capacity allows. The testing rule already says a determinism test cannot tell
+correct from consistently wrong; this is the same lesson reaching an
+invariant rather than a keyed draw.
 
 ## References
 

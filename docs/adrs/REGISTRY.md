@@ -262,6 +262,11 @@ the project stopped holding it.
 |---|---|---|
 | 0057 | A long path follows a portal graph and a flow tile | It described a subsystem nobody had built, for a need nobody had stated |
 
+**A retired number is mentioned, never cited.** Write it in a code span. A
+citation says "follow this for the claim", and a retired record holds no
+claim to follow. The citation check enforces this, and it caught the first
+attempt.
+
 **ADR-0057 was never accepted and nothing cited it.** It specified a portal
 graph, a flow tile cache and a coarse biasing field, in detail, before any
 path-finding existed and before a product record asked for a long path. It
