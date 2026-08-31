@@ -45,6 +45,25 @@ soldier that died there, proves the identity is in the key.
 A golden file is not this test. It notices that something changed. It cannot
 say which input the output stopped depending on.
 
+## 2a. A fixture supplies the input, and a uniform input hides a defect
+
+Section 2 is about the assertion. This one is about the data.
+
+A defect usually lives at an extreme of a distribution. A fixture that models
+the typical case supplies no extreme, so the assertion never receives the
+input that would fail it. The test then measures the fixture.
+
+Do not build a fixture by copying the demonstration binary's world. That world
+is chosen to look right, not to produce edge values. Ask instead what
+distribution the test needs, and build the world that produces it.
+
+This has happened twice, in two subsystems, in one session. The findings hold
+the detail.[^4]
+
+**Put the defect back and watch the test stay green.** That is the only proof
+that a fixture reaches the case. Both instances were found that way, and
+neither would have been found by reading the test.
+
 ## 3. Do not assert on time
 
 Never assert on wall clock time, on elapsed duration, or on a thread finishing
@@ -90,3 +109,4 @@ reaches into a private field pins the implementation, not the behaviour.
 [^1]: Definition of Done. `.claude/rules/definition-of-done.md`
 [^2]: ADR-0001, one binary gives one answer at any thread count. `docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
 [^3]: Project orientation. `CLAUDE.md`
+[^4]: Findings register, FND-051 and FND-048. `docs/FINDINGS.md`
