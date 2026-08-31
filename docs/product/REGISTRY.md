@@ -38,7 +38,7 @@ documents cite it.
 | 0002 | A developer watches the world run | Shaped | Game developer | `shaped/prd-0002-a-developer-watches-the-world-run.md` |
 | 0003 | A developer sees a world worth looking at | Idea | Game developer | — |
 | 0004 | The world has weather that a watcher can read | Shaped | Game developer | `shaped/prd-0004-the-world-has-weather-that-a-watcher-can-read.md` |
-| 0005 | A watcher can tell what is happening and why | Idea | Game developer | — |
+| 0005 | A watcher can tell what is happening and why | Shaped | Game developer | `shaped/prd-0005-a-watcher-can-tell-what-is-happening-and-why.md` |
 | 0006 | A place belongs to somebody | Shaped | Game developer | `shaped/prd-0006-a-place-belongs-to-somebody.md` |
 | 0007 | The world holds things worth taking | Shaped | Game developer | `shaped/prd-0007-the-world-holds-things-worth-taking.md` |
 | 0008 | A unit changes the ground it stands on | Shaped | Game developer | `shaped/prd-0008-a-unit-changes-the-ground-it-stands-on.md` |
