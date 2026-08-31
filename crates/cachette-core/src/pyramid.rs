@@ -302,10 +302,18 @@ impl Pyramid {
     /// because the ground does not change for the life of a world. A rebuild
     /// then reads only what a frame can change.[^1]
     ///
-    /// **This one is parallel and the rebuild is not.** This reads the ground
-    /// of every tile of the world, which is one whole-world sweep and the only
-    /// one the pyramid performs. A rebuild reads a small array. The two have
-    /// different costs and take different answers.
+    /// **This runs on the calling thread.** It reads the ground of every tile
+    /// of the world, which is one whole-world sweep and the only one the
+    /// pyramid performs. It is the most expensive thing in building a world.
+    ///
+    /// It runs on one thread because no caller states a thread count when it
+    /// builds a world, and a parameter that every caller passes as one is a
+    /// branch nothing takes. A caller that needs this faster asks for the
+    /// parameter, and the item that measured the cost says what it buys.[^2]
+    ///
+    /// # References
+    ///
+    /// [^2]: Backlog item 0046. `docs/backlog/proposed/0046-read-the-ground-of-a-new-world-in-parallel.md`
     ///
     /// The cells start at their ground contribution, so a level that nothing
     /// has rebuilt describes a world with no units rather than a world with no
@@ -318,26 +326,14 @@ impl Pyramid {
     /// # References
     ///
     /// [^1]: ADR-0068, terrain is generated from the seed and is never stored as a map, decision D1, a draft record. `docs/adrs/draft/adr-0068-terrain-is-generated-from-the-seed-and-is-never-stored-as-a-map.md`
-    pub fn new(layout: BlockLayout, terrain: Terrain, threads: usize) -> Result<Self, BridgeError> {
+    pub fn new(layout: BlockLayout, terrain: Terrain) -> Result<Self, BridgeError> {
         if layout.grid() != terrain.grid() {
             return Err(BridgeError::GridMismatch);
         }
         let count = layout.block_count() as usize;
-        let mut ground = vec![CellSummary::IDENTITY; count];
-        let threads = threads.max(1);
-        let chunk_len = count.div_ceil(threads).max(1);
-        std::thread::scope(|scope| {
-            let mut base = 0u32;
-            for chunk in ground.chunks_mut(chunk_len) {
-                let first = base;
-                base += chunk.len() as u32;
-                scope.spawn(move || {
-                    for (offset, cell) in chunk.iter_mut().enumerate() {
-                        *cell = ground_of_block(layout, terrain, first + offset as u32);
-                    }
-                });
-            }
-        });
+        let ground: Vec<CellSummary> = (0..count as u32)
+            .map(|block| ground_of_block(layout, terrain, block))
+            .collect();
         Ok(Self {
             layout,
             cells: ground.clone(),
