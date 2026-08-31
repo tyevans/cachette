@@ -112,6 +112,38 @@ fn populate(count: u32) -> SoldierArena {
 }
 
 #[test]
+fn a_bridge_refuses_an_arena_it_was_not_built_from() {
+    // The revision counts changes; it does not name the arena. Two arenas of
+    // one extent, each holding one soldier on a different tile, both sit at
+    // revision one. A guard that compared only the count would pass, and the
+    // bridge would answer questions about an arena it never read.
+    let grid = grid();
+    let mut first = SoldierArena::new(grid);
+    let mut second = SoldierArena::new(grid);
+    first
+        .spawn(Axial::new(0, 0), FactionId(0))
+        .expect("the spawn must succeed");
+    second
+        .spawn(Axial::new(4, 4), FactionId(0))
+        .expect("the spawn must succeed");
+    assert_eq!(first.revision(), second.revision());
+
+    let layout = BlockLayout::new(grid, BLOCK_BITS).expect("the exponent is inside the ceiling");
+    let mut bridge = UnitTileBridge::new(layout);
+    bridge.rebuild(&first, 1).expect("the rebuild must succeed");
+
+    assert!(bridge.on_tile(&first, Axial::new(0, 0)).is_ok());
+    assert_eq!(
+        bridge.on_tile(&second, Axial::new(4, 4)),
+        Err(BridgeError::WrongArena),
+    );
+    assert_eq!(
+        bridge.count_on_tile(&second, Axial::new(4, 4)),
+        Err(BridgeError::WrongArena),
+    );
+}
+
+#[test]
 fn a_bridge_that_was_never_built_refuses_every_read() {
     let arena = SoldierArena::new(grid());
     let bridge = bridge();
@@ -313,15 +345,25 @@ fn the_world_answers_a_tile_after_the_step_rebuilds_the_bridge() {
     world.step(4).expect("the step must run");
     assert!(world.check_invariants());
 
-    for (soldier, place) in &expected {
-        let held = world.soldiers_on(*place).expect("the bridge is fresh");
+    for (soldier, spawn) in &expected {
+        // The step moves each soldier to a neighbour, so the bridge must name
+        // it on the tile it reached and not on the tile it left. The move is
+        // one tile at most.[^1]
+        //
+        // [^1]: ADR-0056, movement is tile-discrete and admitted by sort-then-admit, decision D1, a draft record. `docs/adrs/draft/adr-0056-movement-is-tile-discrete-and-admitted-by-sort-then-admit.md`
+        let place = world
+            .soldiers()
+            .address(*soldier)
+            .expect("the soldier is alive");
+        assert!(spawn.distance(place) <= 1);
+        let held = world.soldiers_on(place).expect("the bridge is fresh");
         assert!(
             held.contains(soldier),
             "the bridge must name the soldier on ({}, {})",
             place.q,
             place.r
         );
-        assert_eq!(world.soldier_count_on(*place), Ok(held.len()));
+        assert_eq!(world.soldier_count_on(place), Ok(held.len()));
     }
     assert_eq!(world.soldiers_on(Axial::new(39, 39)), Ok(&[][..]));
     assert_eq!(world.bridge().len(), expected.len());
