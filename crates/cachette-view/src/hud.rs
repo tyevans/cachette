@@ -705,3 +705,100 @@ fn grouped(value: u64) -> String {
     }
     out
 }
+
+/// The character that stands for a pixel the panel did not write.
+const GROUND: char = '.';
+
+/// The character that stands for a colour no part of the panel writes with.
+const UNKNOWN: char = '?';
+
+/// Returns every colour the panel writes with, and the character that stands
+/// for it in a picture of the layout.
+///
+/// The list is the whole ink of the panel. A colour that is missing from it
+/// paints as an unknown mark, so a new colour shows up in a stored picture
+/// rather than passing as one of the old ones.
+///
+/// Two roles share one amber. The title and the fourth faction swatch are the
+/// same colour, so they take the same character. A picture cannot separate
+/// two things that a person cannot separate either.
+#[must_use]
+pub fn ink_key() -> Vec<(u32, char)> {
+    let mut key = vec![
+        (EDGE, '#'),
+        (HEADING, 'h'),
+        (LABEL, 'l'),
+        (VALUE, 'v'),
+        (TITLE, 'y'),
+    ];
+    for (slot, mark) in ['r', 'b', 'g', 'y', 'm', 'c'].iter().enumerate() {
+        key.push((faction_colour(cachette_core::FactionId(slot as u16)), *mark));
+    }
+    for (kind, mark) in KINDS.iter().zip(['W', 'P', 'F', 'H', 'M']) {
+        key.push((kind_colour(*kind), mark));
+    }
+    key
+}
+
+/// Returns a picture of the panel's layout, one character for each pixel.
+///
+/// # What the picture holds
+///
+/// A pixel becomes a character. A pixel the panel left alone becomes the
+/// ground character, and so does a pixel that the panel only shaded. Every
+/// other pixel is ink, and takes the character of the colour it was written
+/// in.
+///
+/// The ground character therefore covers the world under the panel. A picture
+/// made this way says where the panel put ink, and says nothing about what
+/// the ground looks like, so a change to the terrain colours does not change
+/// it.[^1]
+///
+/// The trailing ground of each row is cut. The position of a character in a
+/// row is still its pixel column, because only the tail is missing.
+///
+/// # Why a picture and not a list of numbers
+///
+/// The other tests of the panel read one line at a time. A line that is
+/// correct on its own can still sit over the line above it, drift out of its
+/// column, or fall off the bottom of the window. A picture shows the layout
+/// as a whole, which is the only way those three are visible.
+///
+/// # Panics
+///
+/// Panics when the two canvases are not the same size. The bare canvas holds
+/// the same drawing without the panel, so a different size means the caller
+/// passed two unrelated pictures.
+///
+/// # References
+///
+/// [^1]: Backlog item 0037. `docs/backlog/complete/0037-check-the-panel-layout-against-a-stored-picture.md`
+#[must_use]
+pub fn ink_map(panelled: &Canvas, bare: &Canvas) -> String {
+    assert!(
+        panelled.width() == bare.width() && panelled.height() == bare.height(),
+        "the two canvases must be the same size",
+    );
+    let key = ink_key();
+    let width = panelled.width();
+    let mut out = String::new();
+    for row in 0..panelled.height() {
+        let mut line = String::with_capacity(width);
+        for column in 0..width {
+            let index = row * width + column;
+            let over = panelled.pixels()[index];
+            let under = bare.pixels()[index];
+            let mark = if over == under || over == crate::paint::mix(under, PANEL, PANEL_WEIGHT) {
+                GROUND
+            } else {
+                key.iter()
+                    .find(|(ink, _)| *ink == over)
+                    .map_or(UNKNOWN, |(_, mark)| *mark)
+            };
+            line.push(mark);
+        }
+        out.push_str(line.trim_end_matches(GROUND));
+        out.push('\n');
+    }
+    out
+}

@@ -110,9 +110,9 @@ The plan expected a fixture assertion over the demand and the supply. That
 assertion needed a model of the rate that the test does not hold, and it
 refused a fixture that was correct. The assertion is now over the outcome.
 
-**Registers.** FND-057 records the fixture assertion. FND-058 records that a
+**Registers.** FND-061 records the fixture assertion. FND-062 records that a
 probe build perturbs every subsystem at once, so a companion test that holds
-everything else fixed is not always available. DEC-022 opens the gather rate.
+everything else fixed is not always available. DEC-023 opens the gather rate.
 BLK-007 stays open, and this item quotes no cost figure.
 
 **Registry.** ADR-0072 and ADR-0073 exist as drafts. The author may not accept

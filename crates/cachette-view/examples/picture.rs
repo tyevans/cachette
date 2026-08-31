@@ -15,9 +15,8 @@
 //!
 //! [^1]: ADR-0067, the viewer reads the world and never writes to it, decision D1. `docs/adrs/accepted/adr-0067-the-viewer-reads-the-world-and-never-writes-to-it.md`
 
-use std::io::Write;
-
 use cachette_core::{Axial, FactionId, World, WorldConfig};
+use cachette_view::picture::write_ppm;
 use cachette_view::{draw_frame, Camera, Canvas, Lap, Metrics};
 
 /// The side of the picture in pixels.
@@ -77,14 +76,7 @@ fn main() {
 
     let mut file =
         std::io::BufWriter::new(std::fs::File::create(&path).expect("the output file must open"));
-    write!(file, "P6\n{SIDE} {SIDE}\n255\n").expect("the header must write");
-    let mut bytes = Vec::with_capacity(SIDE * SIDE * 3);
-    for pixel in canvas.pixels() {
-        bytes.push(((pixel >> 16) & 0xff) as u8);
-        bytes.push(((pixel >> 8) & 0xff) as u8);
-        bytes.push((pixel & 0xff) as u8);
-    }
-    file.write_all(&bytes).expect("the pixels must write");
+    write_ppm(&canvas, &mut file).expect("the pixels must write");
 
     println!(
         "{path}: seed {seed}, {extent} x {extent} tiles, tick {}, {} tiles drawn",

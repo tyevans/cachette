@@ -629,7 +629,7 @@ impl Camera {
 /// # References
 ///
 /// [^1]: ADR-0002, simulated and aggregated state holds no floating point number, decision D4. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
-fn mix(under: u32, over: u32, weight: u8) -> u32 {
+pub(crate) fn mix(under: u32, over: u32, weight: u8) -> u32 {
     let weight = u32::from(weight);
     let rest = 255 - weight;
     let mut mixed = 0;

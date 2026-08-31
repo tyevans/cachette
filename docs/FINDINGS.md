@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-059**
+**Next number: FND-063**
 
 ## A. Corrections to stated rules
 
@@ -1153,7 +1153,157 @@ whether a reviewer asked to enforce the words alone would reach the right
 answer. If enforcing the record as written would refuse something the project
 requires, the record needs an amendment even though the code needs none.
 
-### FND-057 — A fixture assertion stated over the inputs cannot see the case
+### FND-057 — A deferral can name a record that refuses the work
+
+**Believed.** A product record bounds itself by deferring work to another
+record. The deferral is safe, because the other record is named and the reader
+can follow it.
+
+**True.** A deferral names a destination. It does not check that the
+destination accepts the delivery. Two records can each push one need onto the
+other, and the need then belongs to nobody. Nothing fails, because both
+records read as complete and each one points somewhere real.
+
+**Evidence.** Two instances, found while shaping six further product records
+against the eleven that existed.
+
+PRD-0011 states that a unit is assigned a job and that choosing belongs with
+unit behaviour. PRD-0009 is unit behaviour, and it excludes a group decision,
+excludes any goal that outlives a tick, and states that a unit chooses for
+itself. Assigning a job is a decision made for a place and it persists for
+many ticks, so PRD-0009 refuses exactly what PRD-0011 sends it. Neither record
+owned the assignment.
+
+PRD-0007 states that it consumes nothing and that consumption arrives with
+unit lives. PRD-0011 is unit lives, and it carries consumption as one line of
+its checklist and no section. The destination accepted the need in name and
+shaped none of it.
+
+**Follows.** Three things.
+
+**Read the destination before you write a deferral.** A bound is only a bound
+when somebody else holds what it excluded. Open the named record and find the
+statement that accepts the work.
+
+**A one-line mention is not ownership.** A need that appears in another
+record's checklist and in none of its six gate answers has been acknowledged,
+not shaped.
+
+**This is the redundant declaration shape with no declaration at all.** The
+recurring defect rule warns about one fact stored in two places with nothing
+that fails when they disagree.[^13] A deferral pair is the inverse: one fact
+stored in no place, with two records that each say it lives in the other.
+Neither check can see it, because each record is well formed on its own.
+
+### FND-058 — A registry dependency is not a build order
+
+**Believed.** The `Depends on` column of the record registry gives the order in
+which the records should be written. A row that depends on another row waits
+for it. The registry's own writing-order section reads that way: write the
+core, then the cross-cutting models, then the subsystems.[^14]
+
+**True.** The column states which record a record may cite. It says nothing
+about whether the depended-on record needs to exist yet, or whether its claim
+needs to exist at all. Reading it as a build order produces the failure the
+project has already recorded once: a record written for a subsystem nobody had
+built.[^15]
+
+**Evidence.** Found while sequencing the seventeen product records into a build
+plan.
+
+Row 0062 states that production and upkeep are rates attached to a site, and it
+depends on row 0055, an ordered modifier pipeline for an effective stat.
+Production is the next thing the project needs. A modifier pipeline is not: one
+source modifies a rate today, so the pipeline fails the first condition of the
+scope test, because with one source there is no decision to preserve. Writing
+0055 first would produce a record binding a mechanism nothing invokes.[^16]
+
+The same shape appears at row 0058, which states that a field update is a flux
+pair on an edge, and at row 0061, which states that trade solves a flow. Both
+are prerequisites of nothing that exists, because no place in the world holds a
+surplus until production and consumption run.
+
+**Follows.** Three things.
+
+**Read the column as a citation constraint, not as a schedule.** A record may
+cite the record it depends on. It is not obliged to wait for it, and the
+depended-on record may never be written.
+
+**Apply the scope test to the depended-on row before writing it.** A reserved
+row reserves a number and does not promise a record. The registry says so, and
+the dependency column is where that sentence is easiest to forget.[^14]
+
+**A record may state a dependency on a row that stays reserved.** Say in the
+record that the depended-on claim does not exist yet and why. That is a truthful
+statement about the project, and it is cheaper than either writing the record
+early or removing the dependency.
+### FND-059 — A completed item's outcome decays like any other document
+
+**Believed.** An outcome section is history. It says what one item did at one
+moment, so it stays true in the way a commit message stays true.
+
+**True.** An outcome sits in the tree and reads in the present tense. It is a
+document, and it decays. The commit message rule puts a count in the commit
+because a commit is fixed to one change. An outcome is not fixed to one
+change, because later work changes the thing it describes.
+
+**Evidence.** The outcome of the demonstration binary item said the binary
+builds a world of a stated extent with a stated soldier count. Later work
+raised both by more than an order of magnitude. Nothing failed. The audit of
+the product record found it by reading the binary and then the record.
+
+A second instance sits in the review of the viewer boundary record, which
+states the soldier count the binary spawned when the review ran.
+
+**Follows.** Three things.
+
+**Do not put a count in an outcome section.** Put it in the commit message,
+which the item's history already reaches.
+
+**Say what the work achieved, not what the code now holds.** An outcome that
+names a behaviour survives a change to a constant. An outcome that names the
+constant does not.
+
+**This is the document rot shape, in a place the rule did not name.** The
+recurring defect rule warns that a decision record holds no count.[^17] The
+warning applies to every document that a later change can falsify, and an
+outcome section is one.
+
+### FND-060 — A comment can claim that one fact has one site while a second site exists
+
+**Believed.** Tile passability is the tile capacity being zero, and nothing
+else states it. The terrain module says so in its own words, and it says so
+because two rules that can disagree would be one fact in two places.
+
+**True.** A second site exists, and it is the site every caller uses. The
+kind's passability test matches on the water kind by name. It does not read
+the capacity. Four call sites in the engine read the passability test. None
+reads the capacity to decide whether a unit may stand.
+
+The two agree today, because water is the one kind with a capacity of zero. A
+kind added with a capacity of zero and no water in its name would be passable
+and would admit nobody. Nothing fails, and no test compares the two.
+
+**Evidence.** Found while auditing the product record for the viewer. The
+comment that denies the second site sits directly above the capacity table,
+and the passability test sits directly above the comment.
+
+**Follows.** Three things.
+
+**A comment is not a check.** The recurring defect rule already says this: do
+not add a comment that names the winner.[^13] This instance is stronger,
+because the comment does not name a winner. It denies that a second site
+exists at all, which reads as a check and is not one.
+
+**Derive the second site from the first, or add a check that compares them.**
+The passability test can return the capacity being greater than zero. That
+removes the site rather than reconciling it.
+
+**Local evidence now exists for the redundant declaration shape in code.** The
+shape's only local instance was a numbering collision in a register. This one
+is in the engine.
+
+### FND-061 — A fixture assertion stated over the inputs cannot see the case
 
 **Believed.** A fixture that must produce a contested case proves it by
 asserting over its own inputs. Count the demand, count the supply, and assert
@@ -1181,7 +1331,7 @@ should produce it. This extends the rule that a fixture must be checked rather
 than assumed.[^11] The check is what the engine did, and the rule stays true
 when the engine's constants change.
 
-### FND-058 — A probe build perturbs every subsystem at once
+### FND-062 — A probe build perturbs every subsystem at once
 
 **Believed.** Each probe test has a companion that holds everything else
 fixed. The pair says that the perturbation changed the order and changed
@@ -1217,3 +1367,8 @@ reader to wonder why one probe has a companion and the next does not.
 [^10]: Decision Record Scope, section 4.6. `.claude/rules/adr-scope.md`
 [^11]: Findings register, FND-051, in this document.
 [^12]: Decision Record Scope, section 4.1. `.claude/rules/adr-scope.md`
+[^13]: Recurring Defect Shapes, shape 1. `.claude/rules/recurring-defects.md`
+[^14]: ADR Registry. `docs/adrs/REGISTRY.md`
+[^15]: Findings register, FND-047, in this document.
+[^16]: Decision Record Scope, section 1. `.claude/rules/adr-scope.md`
+[^17]: Recurring Defect Shapes, shape 2. `.claude/rules/recurring-defects.md`

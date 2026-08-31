@@ -35,10 +35,19 @@ stepping thread and states the consequence.
 
 ## Outcome
 
-`just watch` runs it. The binary builds a world of 40 by 28 tiles with 220
-soldiers, steps the real engine at the machine's thread count, and draws
-each frame.
+`just watch` runs it. The binary builds a small world, spreads soldiers over
+its open ground, steps the real engine at the machine's thread count, and
+draws each frame. The extent and the soldier count are constants in the
+binary, and later work changed both.
 
-The loop is nine lines: step, draw, show. There is no simulation in the
-binary, which is what the product record's "the window shows the simulation,
-not a copy" asks for.
+The loop steps, draws, then shows. There is no simulation in the binary,
+which is what the product record's "the window shows the simulation, not a
+copy" asks for.
+
+**A correction.** This outcome first named the extent and the soldier count.
+Later work changed both, and the record then stated a world the binary does
+not build. The findings register holds the shape.[^1]
+
+## References
+
+[^1]: Findings register, FND-059. `docs/FINDINGS.md`
