@@ -23,6 +23,13 @@ pub type SystemId = u32;
 /// The system identifier of the stub tile system.
 pub const SYSTEM_TILE_STUB: SystemId = 1;
 
+/// The system identifier of the soldier movement system.
+///
+/// The movement system owns this identifier alone. It does not share the
+/// identifier of the tile system, because a shared identifier makes the two
+/// draws correlate.
+pub const SYSTEM_SOLDIER_MOVE: SystemId = 2;
+
 /// Returns the value for one draw.
 ///
 /// The arguments are the world seed, the system, the frame, the entity, and
