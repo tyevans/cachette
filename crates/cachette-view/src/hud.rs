@@ -377,7 +377,7 @@ impl Readout {
     ///
     /// # References
     ///
-    /// [^1]: PRD-0003, a developer sees a world worth looking at. `docs/product/shaped/prd-0003-a-developer-sees-a-world-worth-looking-at.md`
+    /// [^1]: PRD-0003, a developer sees a world worth looking at. `docs/product/accepted/prd-0003-a-developer-sees-a-world-worth-looking-at.md`
     #[must_use]
     pub const fn by_kind(&self) -> &[u32; KIND_COUNT] {
         &self.by_kind
@@ -931,7 +931,7 @@ fn ground_row(canvas: &mut Canvas, left: i32, right: i32, pen: i32, kind: TileKi
 ///
 /// # References
 ///
-/// [^1]: PRD-0003, a developer sees a world worth looking at. `docs/product/shaped/prd-0003-a-developer-sees-a-world-worth-looking-at.md`
+/// [^1]: PRD-0003, a developer sees a world worth looking at. `docs/product/accepted/prd-0003-a-developer-sees-a-world-worth-looking-at.md`
 const fn name_of(kind: TileKind) -> &'static str {
     match kind {
         TileKind::Water => "water",

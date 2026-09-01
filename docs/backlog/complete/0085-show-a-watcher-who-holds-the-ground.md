@@ -216,7 +216,7 @@ engine file changed.
 
 ## References
 
-[^1]: PRD-0006, a place belongs to somebody. `docs/product/shaped/prd-0006-a-place-belongs-to-somebody.md`
+[^1]: PRD-0006, a place belongs to somebody. `docs/product/accepted/prd-0006-a-place-belongs-to-somebody.md`
 [^2]: ADR-0067, the viewer reads the world and never writes to it, decision D5. `docs/adrs/accepted/adr-0067-the-viewer-reads-the-world-and-never-writes-to-it.md`
 [^3]: Recurring Defect Shapes, shape 1. `.claude/rules/recurring-defects.md`
 [^4]: ADR-0067, the viewer reads the world and never writes to it, decision D2. `docs/adrs/accepted/adr-0067-the-viewer-reads-the-world-and-never-writes-to-it.md`
@@ -234,4 +234,4 @@ engine file changed.
 [^16]: Findings register, FND-054. `docs/FINDINGS.md`
 [^17]: Findings register, FND-061. `docs/FINDINGS.md`
 [^18]: Findings register, FND-051. `docs/FINDINGS.md`
-[^19]: PRD-0005, a watcher can tell what is happening and why. `docs/product/shaped/prd-0005-a-watcher-can-tell-what-is-happening-and-why.md`
+[^19]: PRD-0005, a watcher can tell what is happening and why. `docs/product/shipped/prd-0005-a-watcher-can-tell-what-is-happening-and-why.md`

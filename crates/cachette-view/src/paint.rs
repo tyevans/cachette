@@ -80,7 +80,7 @@ const HEIGHT_STEPS: i32 = 56;
 ///
 /// # References
 ///
-/// [^1]: PRD-0002, a developer watches the world run. `docs/product/shaped/prd-0002-a-developer-watches-the-world-run.md`
+/// [^1]: PRD-0002, a developer watches the world run. `docs/product/shipped/prd-0002-a-developer-watches-the-world-run.md`
 const VALUE_STEPS: i32 = 14;
 
 /// One colour for each faction, and one spare.
@@ -119,7 +119,7 @@ const HOLDER_WEIGHT: u8 = 96;
 ///
 /// # References
 ///
-/// [^1]: PRD-0006, a place belongs to somebody. `docs/product/shaped/prd-0006-a-place-belongs-to-somebody.md`
+/// [^1]: PRD-0006, a place belongs to somebody. `docs/product/accepted/prd-0006-a-place-belongs-to-somebody.md`
 const EDGE_WEIGHT: u8 = 230;
 
 /// Returns the colour the viewer draws a faction in.
@@ -281,7 +281,7 @@ impl Canvas {
     ///
     /// # References
     ///
-    /// [^1]: PRD-0002, a developer watches the world run. `docs/product/shaped/prd-0002-a-developer-watches-the-world-run.md`
+    /// [^1]: PRD-0002, a developer watches the world run. `docs/product/shipped/prd-0002-a-developer-watches-the-world-run.md`
     /// [^2]: ADR-0067, the viewer reads the world and never writes to it, decision D2. `docs/adrs/accepted/adr-0067-the-viewer-reads-the-world-and-never-writes-to-it.md`
     #[must_use]
     pub const fn tiles_painted(&self) -> u32 {
@@ -300,7 +300,7 @@ impl Canvas {
     /// # References
     ///
     /// [^1]: ADR-0067, the viewer reads the world and never writes to it, decision D2. `docs/adrs/accepted/adr-0067-the-viewer-reads-the-world-and-never-writes-to-it.md`
-    /// [^2]: PRD-0003, a developer sees a world worth looking at. `docs/product/shaped/prd-0003-a-developer-sees-a-world-worth-looking-at.md`
+    /// [^2]: PRD-0003, a developer sees a world worth looking at. `docs/product/accepted/prd-0003-a-developer-sees-a-world-worth-looking-at.md`
     #[must_use]
     pub const fn painted_by_kind(&self) -> &[u32; KIND_COUNT] {
         &self.painted_by_kind
@@ -341,7 +341,7 @@ impl Canvas {
     ///
     /// # References
     ///
-    /// [^1]: PRD-0002, a developer watches the world run. `docs/product/shaped/prd-0002-a-developer-watches-the-world-run.md`
+    /// [^1]: PRD-0002, a developer watches the world run. `docs/product/shipped/prd-0002-a-developer-watches-the-world-run.md`
     /// [^2]: ADR-0070, the head-up display reports what the drawing pass read, decision D1. `docs/adrs/accepted/adr-0070-the-head-up-display-reports-what-the-drawing-pass-read.md`
     #[must_use]
     pub const fn painted_by_faction(&self) -> &[u32; COLOURED_FACTIONS] {
@@ -836,7 +836,7 @@ fn span(first: f32, last: f32, limit: u32) -> (u32, u32) {
 ///
 /// # References
 ///
-/// [^1]: PRD-0003, a developer sees a world worth looking at. `docs/product/shaped/prd-0003-a-developer-sees-a-world-worth-looking-at.md`
+/// [^1]: PRD-0003, a developer sees a world worth looking at. `docs/product/accepted/prd-0003-a-developer-sees-a-world-worth-looking-at.md`
 /// [^2]: ADR-0067, the viewer reads the world and never writes to it, decision D3. `docs/adrs/accepted/adr-0067-the-viewer-reads-the-world-and-never-writes-to-it.md`
 fn tile_colour(kind: TileKind, height: i32, value: i32) -> u32 {
     let base = KIND_COLOURS[kind.to_u8() as usize];
@@ -1009,7 +1009,7 @@ fn outline(canvas: &mut Canvas, left: i32, top: i32, side: i32, colour: u32) {
 ///
 /// [^1]: ADR-0018, the unit-to-tile bridge is derived, and it rebuilds at the barrier, decision D1. `docs/adrs/accepted/adr-0018-the-unit-to-tile-bridge-is-derived-and-rebuilds-at-the-barrier.md`
 /// [^2]: ADR-0018, the unit-to-tile bridge is derived, and it rebuilds at the barrier, decision D5. `docs/adrs/accepted/adr-0018-the-unit-to-tile-bridge-is-derived-and-rebuilds-at-the-barrier.md`
-/// [^3]: PRD-0002, a developer watches the world run. `docs/product/shaped/prd-0002-a-developer-watches-the-world-run.md`
+/// [^3]: PRD-0002, a developer watches the world run. `docs/product/shipped/prd-0002-a-developer-watches-the-world-run.md`
 /// [^4]: Recurring Defect Shapes, shape 1. `.claude/rules/recurring-defects.md`
 fn draw_soldiers(
     world: &World,

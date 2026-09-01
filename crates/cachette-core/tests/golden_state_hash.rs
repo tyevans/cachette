@@ -176,7 +176,7 @@ enum Population {
 ///
 /// # References
 ///
-/// [^1]: PRD-0012, a world starts small and grows. `docs/product/shaped/prd-0012-a-world-starts-small-and-grows.md`
+/// [^1]: PRD-0012, a world starts small and grows. `docs/product/accepted/prd-0012-a-world-starts-small-and-grows.md`
 fn found(world: &mut World) {
     let founded = world
         .found_run(30, FactionId(0))

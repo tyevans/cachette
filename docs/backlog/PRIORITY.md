@@ -30,6 +30,7 @@ engine gets wrong today.
 | 0057 | A shortage must end a unit, or consumption has no consequence either. |
 | 0084 | Two values name a tile's owner, and the event log publishes the wrong one to Python.[^7] |
 | 0092 | A settlement stands on water. The owner has stated this is not wanted. |
+| 0102 | A settlement reads its own ground rule, not the passability rule. Blocked by 0071 and 0092, in that order. |
 | 0094 | BLK-018 is answered: every faction founds one group. The engine still founds one.[^4] |
 
 ## Next
@@ -38,11 +39,13 @@ These close a gap a review found, or they unblock the items above.
 
 | No. | Why it sits here |
 |---|---|
-| 0070 | The viewer makes the engine wait, and a record chose that knowingly. Settle it. |
 | 0059 | Housing. The population cannot be bounded by anything until a place has capacity. |
 | 0060 | Population growth from the store and the housing. |
 | 0071 | Passability has two declaration sites. Item 0092 must not add a third. |
 | 0095 | Two foundings can over-fill a tile. |
+| 0103 | A household has no home. DEC-039 answers it: derive the household from the dwelling slot. |
+| 0104 | A ruler decides nothing that reaches anybody. DEC-040 carries the writ in the influence field. |
+| 0112 | Building a world passes over every tile. PRD-0003 states it must not, so the record is false of the code. |
 | 0080 | The settings struct prices every new parameter at twenty-five files. |
 | 0098 | The gate suite has no budget and the golden test grows unwatched.[^5] |
 | 0101 | A behavioural claim about terrain is defended by a test of constants.[^8] |
@@ -54,6 +57,13 @@ These are real and none of them blocks anything today.
 | No. | Why it sits here |
 |---|---|
 | 0062 | Ranked positions at a site. Wanted by job assignment. |
+| 0105 | Goods over a network. Three reserved records are unwritten, and nothing holds a surplus yet. |
+| 0106 | Show a watcher what is moving. The display shape follows from 0105. |
+| 0107 | Decide how a faction stores what it observes. Nothing hides anything yet. |
+| 0108 | Let a unit observe the tiles around it. Follows 0107. |
+| 0109 | Decide how the world holds a condition that moves. |
+| 0110 | Advance a weather condition each tick. Follows 0109. |
+| 0111 | Let the weather change a unit and show it. Follows 0110. |
 | 0063 | Assigning a unit to a position. Waits on 0062. |
 | 0065 | Letting the job decide what a unit weighs. Waits on 0063 and 0064. |
 | 0058 | Improvements. Waits on a site that produces. |
@@ -65,7 +75,6 @@ These are real and none of them blocks anything today.
 | 0099 | The faction mask union has no engine caller. |
 | 0072 | The panel fit check has no production caller. |
 | 0077 | The batched structural path, once its record exists. |
-| 0073 | Review the renderable example again, after 0069 and 0070. |
 | 0053 | Superseded in substance by the completed resource work. Close it or restate it. |
 | 0036 | How a watcher reads a count of the whole world. |
 | 0043 | How a level 1 cell is repaired. |

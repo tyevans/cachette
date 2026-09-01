@@ -724,7 +724,7 @@ fn the_panel_names_the_ground_in_the_window() {
     // to name them.[^1] A picture of five colours with no names leaves the
     // reader guessing which green is forest.
     //
-    // [^1]: PRD-0003, a developer sees a world worth looking at. `docs/product/shaped/prd-0003-a-developer-sees-a-world-worth-looking-at.md`
+    // [^1]: PRD-0003, a developer sees a world worth looking at. `docs/product/accepted/prd-0003-a-developer-sees-a-world-worth-looking-at.md`
     let mut world = world();
     let metrics = stepped(&mut world, 2);
     let mut canvas = canvas();

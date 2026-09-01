@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-081**
+**Next number: FND-088**
 
 ## A. Corrections to stated rules
 
@@ -118,6 +118,37 @@ saturating integer addition; it saturates.
 an unproductive recipe table before release. Runtime insolvency is an explicit
 ledger comparison. One piece survives: comparing solved gross output against
 productive capacity gives **structural** insolvency, distinct from financial.
+
+### FND-085 — A rule that bans a measurement can leave a real cost unowned
+
+**Believed.** That every cost figure in this project belongs to the target
+platform, and that no measurement exists there, was a complete rule about
+cost. It reads as complete. It is stated as a general fact about figures, and
+two rules enforce it.
+
+**True.** The rule governs one quantity: how the engine performs at the target
+scale. A second quantity exists, and the rule is silent about it. How long a
+contributor waits for the gate suite is a property of the development loop,
+and the machine that runs it owns that. The silence read as a prohibition, so
+nothing owned the cost.
+
+**Evidence.** The golden state hash test grew as each subsystem entered the
+state hash, four in one session, until it dominated a debug run of the suite.
+No gate, no register and no budget noticed. The rule that would have caught an
+equivalent regression at the target does not apply to a development machine,
+and no other rule did.
+
+**Follows.** Two things.
+
+The project now keeps two registers with different standing. A figure from one
+is never evidence about the other. The separation is a file boundary rather
+than a note in a shared file, so a row cannot drift across it. The blocker
+about the target stays open, because it is about the target.
+
+**The general shape is the part worth keeping.** A rule that correctly refuses
+a class of figure can leave a legitimate quantity with no owner. When the
+project bans a measurement, ask what the ban also silences.
+
 
 ## B. Claims refuted
 
@@ -266,6 +297,99 @@ closed them with a script that reads the source directly.
 script. An invariant that names one mechanism invites a reader to trust it
 alone. The word "lint" in the project instructions is now wrong on its own.
 
+### FND-081 — Two accepted records disagreed on whether a per-tile count exists
+
+**Believed.** The accepted records agreed about how admission reads the
+occupancy of a tile.
+
+**True.** They did not. ADR-0018 rejects an offset array, and it rests part of
+that rejection on the claim that a per-tile array of counts already exists,
+because admission needs the occupancy of a target and its departure count in
+one tick. ADR-0056 D3 states that admission reads occupancy from the derived
+structure and carries no per-tile array of its own. Both records are accepted.
+Both are cited by code.
+
+**Evidence.** An agent found the pair while it read ADR-0056 to write a
+superseding record. Neither record cites the other on this point, so nothing
+brought the two claims together. The check suite passed throughout, because a
+record is prose.
+
+**Follows.** Three things.
+
+The owner answered DEC-020 with a dense occupancy count. That answer makes
+ADR-0018's stated reason true, so it closes the contradiction rather than
+opening one. ADR-0074 states the repair and names ADR-0056 D3 as the claim
+that gives way.
+
+A record that rejects an option on the strength of another record's mechanism
+must cite that record. ADR-0018 named a mechanism it did not own, and the
+mechanism did not exist.
+
+This is the same pair of records as FND-045, which found them disagreeing on
+whether a per-tile structure is affordable. One pair of records has now
+produced two findings. Read both before either record is amended again.
+
+
+### FND-086 — A product record stated a cost the engine never met
+
+**Believed.** The product record for a world worth looking at states that
+building a world must not cost a pass over every tile before the first frame.
+The record reached `Shaped`, and nobody had checked the statement against the
+code.
+
+**True.** The engine makes that pass. Building a world loops once for each
+tile, draws a value, and fills two vectors sized to the tile count. At the
+target scale that is a whole-world pass and two proportional allocations
+before anything is drawn.
+
+**Evidence.** An agent checked each statement of the record against the crate
+while it carried out the owner's ruling that every product record moves past
+`Shaped`. The columns that make the pass belong to the tile stub, not to the
+terrain the record introduced, so the record is false of the code by
+inheritance rather than by its own subject.
+
+**Follows.** Two things.
+
+**A checkable statement is not checked until somebody runs it.** The shaping
+gate asks for statements a reader can check. It does not ask anyone to check
+them, and the record passed every gate the project has while stating something
+untrue. The promotion review is where that gets caught, so a record must not
+reach `Shipped` on the strength of its citing items having closed.
+
+The record stays `Accepted` and an item tracks the repair. Accepting a need
+the engine does not meet is correct. Claiming the need is met would be the
+defect.
+
+### FND-087 — A product record can carry a structure without naming one
+
+**Believed.** The rule that a product record states a need and never states a
+structure is enforced by a check, and the check looks for a citation to a
+decision record.
+
+**True.** A record can fix a structure without citing anything. The record for
+parents and children said that units who are related and who live together
+form a household. That sentence decides that a household is a kinship
+grouping. The project has since decided the opposite: a household is every
+unit that carries one dwelling slot, and two strangers under one roof are one
+household.
+
+**Evidence.** An agent found the sentence while it checked the record against
+the newly closed decision. Every check passed before and after, because the
+record cites no decision record and names no data structure. The structural
+claim sat in ordinary prose about people.
+
+**Follows.** Two things.
+
+**Read a product record for the choices its wording forecloses, not only for
+the structures it names.** A need stated in terms of who and what is still
+capable of deciding how, and the check cannot see it.
+
+A structural decision that contradicts a product record must send someone back
+to the record. This one did, and the record was corrected in the same pass.
+Had the decision landed without that reading, the two documents would have
+disagreed quietly, which is the shape that costs every future decision made
+from either.
+
 ## D. Cost estimates that were wrong
 
 ### FND-017 — A decision costs 4.1 nanoseconds, not 400
@@ -395,6 +519,35 @@ description in the survey.
 - Versu is 2014, volume 6 number 2.
 - Tarn Adams edited *Procedural Generation in Game Design*; he did not write a
   chapter in it.
+
+### FND-082 — A register cited a record that did not support its claim
+
+**Believed.** The decisions register stated that the engine clears a lost
+site's units by scanning every unit, and it cited a record for that claim.
+
+**True.** The cited decision says that the location table is a dense array
+indexed by the slot, and that it is never a hash map. It says nothing about a
+scan from a site to its units. The claim is right and the citation does not
+reach it. The register also wrote the clear in the present tense. No
+settlement destruction path exists in the engine, so the clear it describes is
+not code. The only site-to-unit traversal in the tree is an invariant check.
+
+**Evidence.** An agent read the record while it confirmed that DEC-036 changed
+nothing. A second instance sits nearby: ADR-0067 cites a product requirement
+record in a footnote, and DEC-012 decided that a decision record cites no
+product record. That citation predates the decision.
+
+**Follows.** Two things.
+
+A footnote is a claim about a source. A reader who follows it and finds
+nothing loses more than the citation, because the register spent its
+authority. Check that the cited decision states the thing, not that the cited
+record covers the topic.
+
+**Write the tense the tree supports.** A register that describes intended code
+in the present tense reads as a description of the engine. That is the shape
+the scope rule names as recording an intent as a fact.
+
 
 ## G. Process
 
@@ -1825,6 +1978,62 @@ the window entirely. That is a change to three registers and their check, and
 it is not made here.
 
 
+### FND-083 — A footnote label defined twice sends half its citations elsewhere
+
+**Believed.** A repeated footnote label in one document is a formatting
+untidiness.
+
+**True.** It silently retargets citations. The decisions register defined
+`[^DEC7]` twice, once as a backlog item and once as an accepted record, and
+defined `[^DEC8]` twice in the same way. A Markdown renderer resolves a
+duplicate label to one definition. Every citation using the other meaning then
+pointed a reader at the wrong document, and the text around it still read
+correctly. Two further labels were each defined three and four times.
+
+**Evidence.** An agent found the duplicates while it closed the register's
+rows. The citation check passed before and after, because every path in every
+definition existed. The check verifies that a path resolves. It did not verify
+that a label means one thing.
+
+**Follows.** Two things.
+
+The documentation rule already forbids repeating a footnote. The rule had no
+check, so the tree drifted from it. A rule without a check is a preference.
+
+**This is the through-line shape.** One label is one name, and the file gave it
+two declaration sites with no precedence and nothing that fails. Prefer a
+descriptive label over a serial number, because a serial number invites a
+second writer to reach the same value independently.
+
+### FND-084 — A tree-wide repair reached the worktrees the tree ignores
+
+**Believed.** A repair driven by a whole-tree search touches the tree the
+project keeps.
+
+**True.** The working copy holds many git worktrees under an ignored
+directory. Each is a separate checkout on its own branch. A recursive search
+from the repository root walks into all of them. A repair that rewrites what
+it finds therefore edits many branches that the change does not concern, and
+the ignore rule hides the damage, because the status of the main repository
+never mentions it.
+
+**Evidence.** A path repair after several backlog items moved directory
+rewrote a line in each of the ignored worktrees as well as in the tree. The
+edits were reverted after each worktree was checked to hold no other
+uncommitted change. Nothing was lost. The commit rule already asks for a
+whole-tree search after a sweep, and the search it asks for is the one that
+found the extra files.
+
+**Follows.** Two things.
+
+**Scope a sweep to the tree the change owns, then search wider to verify.** The
+search and the repair want different boundaries. A search that is too narrow
+misses a call site. A repair that is too wide edits work that is not yours.
+
+Before a repair rewrites a file, confirm the file belongs to the change. An
+ignored directory is not empty, and the status command will not say so.
+
+
 ## References
 
 [^1]: Findings register, FND-038, in this document.
@@ -1850,7 +2059,7 @@ it is not made here.
 [^21]: Testing rules, section 6. `.claude/rules/testing.md`
 [^22]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`
 [^23]: Testing rules, section 2a. `.claude/rules/testing.md`
-[^24]: PRD-0006, a place belongs to somebody. `docs/product/shaped/prd-0006-a-place-belongs-to-somebody.md`
+[^24]: PRD-0006, a place belongs to somebody. `docs/product/accepted/prd-0006-a-place-belongs-to-somebody.md`
 [^25]: Findings register, FND-022, in this document.
 [^26]: Vector entity representation, sections 9 and 15, decision D155. `docs/research/reports/18-vector-entity-representation.md`
 [^27]: The character graph and inheritance, sections 2.1, 3.3 and 15.3. `docs/research/reports/14-character-graph-and-inheritance.md`
@@ -1862,12 +2071,12 @@ it is not made here.
 [^33]: Testing rules, section 2a. `.claude/rules/testing.md`
 [^34]: Findings register, FND-049, in this document.
 [^35]: ADR-0075, the founding choice reads a bounded sample of the world. `docs/adrs/accepted/adr-0075-the-founding-choice-reads-a-bounded-sample-of-the-world.md`
-[^36]: PRD-0012, a world starts small and grows. `docs/product/shaped/prd-0012-a-world-starts-small-and-grows.md`
+[^36]: PRD-0012, a world starts small and grows. `docs/product/accepted/prd-0012-a-world-starts-small-and-grows.md`
 [^37]: Recurring defect shapes, shape 3. `.claude/rules/recurring-defects.md`
 [^38]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`
 [^39]: Backlog item 0085. `docs/backlog/complete/0085-show-a-watcher-who-holds-the-ground.md`
 [^40]: ADR-0053, a faction is a bit in a mask, and a relation is a plane, decision D2. `docs/adrs/accepted/adr-0053-a-faction-is-a-bit-in-a-mask-and-a-relation-is-a-plane.md`
-[^41]: PRD-0006, a place belongs to somebody. `docs/product/shaped/prd-0006-a-place-belongs-to-somebody.md`
+[^41]: PRD-0006, a place belongs to somebody. `docs/product/accepted/prd-0006-a-place-belongs-to-somebody.md`
 [^42]: Backlog item 0084. `docs/backlog/proposed/0084-give-a-tile-one-faction-column.md`
 [^43]: Testing Rules, section 2. `.claude/rules/testing.md`
 [^44]: Findings register, FND-075. `docs/FINDINGS.md`

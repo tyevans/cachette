@@ -38,7 +38,7 @@
 //!
 //! # References
 //!
-//! [^1]: PRD-0006, a place belongs to somebody. `docs/product/shaped/prd-0006-a-place-belongs-to-somebody.md`
+//! [^1]: PRD-0006, a place belongs to somebody. `docs/product/accepted/prd-0006-a-place-belongs-to-somebody.md`
 //! [^2]: ADR-0053, a faction is a bit in a mask, and a relation is a plane, decision D2. `docs/adrs/accepted/adr-0053-a-faction-is-a-bit-in-a-mask-and-a-relation-is-a-plane.md`
 //! [^3]: ADR-0070, the head-up display reports what the drawing pass read, decision D2. `docs/adrs/accepted/adr-0070-the-head-up-display-reports-what-the-drawing-pass-read.md`
 //! [^4]: Findings register, FND-061. `docs/FINDINGS.md`
@@ -581,7 +581,7 @@ fn the_panel_names_every_holder_colour_the_frame_drew() {
     // The layer draws no new colour, so the legend the panel already states
     // names the holder colours too. This test is what says so.[^1]
     //
-    // [^1]: PRD-0005, a watcher can tell what is happening and why. `docs/product/shaped/prd-0005-a-watcher-can-tell-what-is-happening-and-why.md`
+    // [^1]: PRD-0005, a watcher can tell what is happening and why. `docs/product/shipped/prd-0005-a-watcher-can-tell-what-is-happening-and-why.md`
     let world = two_holdings_that_meet();
     let mut canvas = Canvas::new(WINDOW.0, WINDOW.1);
     let camera = close_camera(&world, &canvas);

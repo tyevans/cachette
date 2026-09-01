@@ -105,7 +105,7 @@ the ground and a reviewer can attach the picture to a change.
 
 ## References
 
-[^1]: PRD-0003, a developer sees a world worth looking at. `docs/product/shaped/prd-0003-a-developer-sees-a-world-worth-looking-at.md`
+[^1]: PRD-0003, a developer sees a world worth looking at. `docs/product/accepted/prd-0003-a-developer-sees-a-world-worth-looking-at.md`
 [^2]: Blockers register, BLK-007. `docs/BLOCKERS.md`
 [^3]: Recurring defect shapes, shape 3. `.claude/rules/recurring-defects.md`
 [^4]: Testing rules, section 2a. `.claude/rules/testing.md`

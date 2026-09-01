@@ -223,4 +223,4 @@ whole population, which is the failure this record exists to prevent.[^6]
 [^14]: ADR-0004, iteration order is explicit, decision D4. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
 [^15]: ADR-0022, level 0 is the only truth, and every level above it is derived, decision D3. `docs/adrs/accepted/adr-0022-level-0-is-the-only-truth-and-every-level-above-it-is-derived.md`
 [^16]: ADR-0022, level 0 is the only truth, and every level above it is derived, decision D4. `docs/adrs/accepted/adr-0022-level-0-is-the-only-truth-and-every-level-above-it-is-derived.md`
-[^17]: PRD-0009, a unit acts on the world it can see. `docs/product/shaped/prd-0009-a-unit-acts-on-the-world-it-can-see.md`
+[^17]: PRD-0009, a unit acts on the world it can see. `docs/product/accepted/prd-0009-a-unit-acts-on-the-world-it-can-see.md`

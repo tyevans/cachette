@@ -664,7 +664,7 @@ impl World {
     ///
     /// # References
     ///
-    /// [^1]: PRD-0012, a world starts small and grows. `docs/product/shaped/prd-0012-a-world-starts-small-and-grows.md`
+    /// [^1]: PRD-0012, a world starts small and grows. `docs/product/accepted/prd-0012-a-world-starts-small-and-grows.md`
     /// [^2]: Open decisions register, DEC-030. `docs/DECISIONS.md`
     pub fn found_run(&mut self, group: u32, faction: FactionId) -> Result<Founding, FoundingError> {
         let survey = self.survey_founding(group)?;

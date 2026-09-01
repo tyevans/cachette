@@ -207,5 +207,5 @@ engine file changed.
 [^12]: Findings register, FND-071. `docs/FINDINGS.md`
 [^13]: Findings register, FND-051. `docs/FINDINGS.md`
 [^14]: Findings register, FND-061. `docs/FINDINGS.md`
-[^15]: PRD-0012, a world starts small and grows. `docs/product/shaped/prd-0012-a-world-starts-small-and-grows.md`
-[^16]: PRD-0005, a watcher can tell what is happening and why. `docs/product/shaped/prd-0005-a-watcher-can-tell-what-is-happening-and-why.md`
+[^15]: PRD-0012, a world starts small and grows. `docs/product/accepted/prd-0012-a-world-starts-small-and-grows.md`
+[^16]: PRD-0005, a watcher can tell what is happening and why. `docs/product/shipped/prd-0005-a-watcher-can-tell-what-is-happening-and-why.md`

@@ -224,6 +224,6 @@ holds the list and the counts.
 [^13]: Findings register, FND-051. `docs/FINDINGS.md`
 [^14]: Findings register, FND-061. `docs/FINDINGS.md`
 [^15]: Findings register, FND-070. `docs/FINDINGS.md`
-[^16]: Backlog item 0073. `docs/backlog/proposed/0073-review-the-first-renderable-example-again.md`
+[^16]: Backlog item 0073. `docs/backlog/complete/0073-review-the-first-renderable-example-again.md`
 [^17]: Commit Message Rules, after a sweep. `.claude/rules/commits.md`
 [^18]: Findings register, FND-048. `docs/FINDINGS.md`

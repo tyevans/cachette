@@ -103,7 +103,7 @@ second read.[^7]
 [^1]: Decisions register, DEC-019. `docs/DECISIONS.md`
 [^2]: Decisions register, DEC-020. `docs/DECISIONS.md`
 [^3]: Decisions register, DEC-021. `docs/DECISIONS.md`
-[^4]: Backlog item 0040. `docs/backlog/proposed/0040-record-where-an-out-of-frame-change-gets-its-barrier.md`
+[^4]: Backlog item 0040. `docs/backlog/refined/0040-record-where-an-out-of-frame-change-gets-its-barrier.md`
 [^5]: Commit Message Rules. `.claude/rules/commits.md`
 [^6]: Blockers register, BLK-007. `docs/BLOCKERS.md`
 [^7]: Backlog item 0041. `docs/backlog/proposed/0041-read-the-ground-once-for-each-target.md`

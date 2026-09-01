@@ -172,5 +172,5 @@ normally.
 [^SHAPE]: ADR Registry, row 0017. `docs/adrs/REGISTRY.md`
 [^TILEIDX]: Findings register, FND-042. `docs/FINDINGS.md`
 [^TIMING]: Movement timing note. `docs/research/movement-timing.md`
-[^FOUND]: PRD-0012, a world starts small and grows. `docs/product/shaped/prd-0012-a-world-starts-small-and-grows.md`
+[^FOUND]: PRD-0012, a world starts small and grows. `docs/product/accepted/prd-0012-a-world-starts-small-and-grows.md`
 [^SEP]: Decisions register, DEC-037. `docs/DECISIONS.md`

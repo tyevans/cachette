@@ -29,7 +29,7 @@
 //!
 //! # References
 //!
-//! [^1]: PRD-0002, a developer watches the world run. `docs/product/shaped/prd-0002-a-developer-watches-the-world-run.md`
+//! [^1]: PRD-0002, a developer watches the world run. `docs/product/shipped/prd-0002-a-developer-watches-the-world-run.md`
 //! [^2]: Decisions register, DEC-020. `docs/DECISIONS.md`
 //! [^3]: ADR-0067, the viewer reads the world and never writes to it, decision D1. `docs/adrs/accepted/adr-0067-the-viewer-reads-the-world-and-never-writes-to-it.md`
 //! [^4]: Findings register, FND-051. `docs/FINDINGS.md`

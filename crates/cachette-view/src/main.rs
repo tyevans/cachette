@@ -9,7 +9,7 @@
 //!
 //! # References
 //!
-//! [^1]: PRD-0002, a developer watches the world run. `docs/product/shaped/prd-0002-a-developer-watches-the-world-run.md`
+//! [^1]: PRD-0002, a developer watches the world run. `docs/product/shipped/prd-0002-a-developer-watches-the-world-run.md`
 //! [^2]: ADR-0067, the viewer reads the world and never writes to it, decision D4. `docs/adrs/accepted/adr-0067-the-viewer-reads-the-world-and-never-writes-to-it.md`
 
 use std::num::NonZeroUsize;
@@ -30,7 +30,7 @@ const WINDOW_HEIGHT: usize = 720;
 ///
 /// # References
 ///
-/// [^1]: PRD-0002, a developer watches the world run. `docs/product/shaped/prd-0002-a-developer-watches-the-world-run.md`
+/// [^1]: PRD-0002, a developer watches the world run. `docs/product/shipped/prd-0002-a-developer-watches-the-world-run.md`
 const DEMO: WorldConfig = WorldConfig {
     width: 640,
     height: 440,
@@ -45,7 +45,7 @@ const DEMO: WorldConfig = WorldConfig {
 ///
 /// # References
 ///
-/// [^1]: PRD-0012, a world starts small and grows. `docs/product/shaped/prd-0012-a-world-starts-small-and-grows.md`
+/// [^1]: PRD-0012, a world starts small and grows. `docs/product/accepted/prd-0012-a-world-starts-small-and-grows.md`
 const GROUP: u32 = 30;
 
 /// The reason the demonstration stopped.
@@ -89,7 +89,7 @@ impl std::error::Error for DemoError {}
 ///
 /// # References
 ///
-/// [^1]: PRD-0012, a world starts small and grows. `docs/product/shaped/prd-0012-a-world-starts-small-and-grows.md`
+/// [^1]: PRD-0012, a world starts small and grows. `docs/product/accepted/prd-0012-a-world-starts-small-and-grows.md`
 /// [^2]: ADR-0075, the founding choice reads a bounded sample of the world, decision D1. `docs/adrs/accepted/adr-0075-the-founding-choice-reads-a-bounded-sample-of-the-world.md`
 fn found(world: &mut World) -> Result<cachette_core::Founding, DemoError> {
     let founded = world
