@@ -29,9 +29,11 @@ rule.
 
 ## Waiting for review
 
-None. The project owner read all fourteen drafts and accepted them, so every
-written record now binds. A record that arrives here binds nothing until a
-reviewer moves it, and this section names the ones waiting.
+A record here is written and binds nothing until a reviewer moves it.
+
+| No. | Why it sits here |
+|---|---|
+| 0063 | A need is a rate with a threshold. The consumption pass implements it. |
 
 ## Reserved and not written
 
@@ -42,7 +44,6 @@ reserved until the code that needs them exists.[^6]
 | No. | Why it sits here |
 |---|---|
 | 0064 | A unit chooses by scoring an option set. The next item written will write it. |
-| 0063 | A need is a rate with a threshold. Wanted by consumption. |
 | 0021 | Layout follows the access pattern. Write it with the descent columns, not before.[^7] |
 | 0069 | Weather. Nothing needs it. |
 | 0055 | The modifier pipeline. One source modifies a rate, so the test fails today.[^8] |
