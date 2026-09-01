@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-073**
+**Next number: FND-074**
 
 ## A. Corrections to stated rules
 
@@ -1585,6 +1585,54 @@ tier, and the tier was never the subject.
 **Count the columns before you choose a layout.** The column count of the pass
 decides the answer. The name of the tier does not.
 
+### FND-073 — The remedy for a colliding allocator cannot be written in the register it protects
+
+**Believed.** A number collision between parallel workers is solved by the
+rule that the person who dispatches the work allocates every number first and
+gives each worker its own.[^31]
+
+**True.** The rule holds for the backlog and for the two registries, because a
+number there is a file name or a table row, and a reserved range can be
+written down. It does not hold for the findings register, the decisions
+register or the blockers register. Each of those states its next free number
+in its own text, and the check requires that line to be exactly one past the
+highest row the file holds.[^32] A dispatcher therefore cannot reserve a
+range inside the register. The reservation lives only in the instruction given
+to each worker, and nothing fails when a worker ignores it or never receives
+it.
+
+**Evidence.** Five workers ran in separate worktrees in one session. Three
+collisions followed, in three registers: two workers took FND-057, a third
+took FND-058 that a fourth had already taken, and two took DEC-022. Every
+worker had been given its own range. Each collision was found at merge, by
+hand, and each cost a renumbering sweep across the tree for the citations that
+had moved with it.
+
+One worker was told to set the next-number line past its whole allocated
+range, so that the reservation would be visible to the next worker. It could
+not: the register check fails on any value other than the maximum plus one,
+and that check gates the whole suite. The worker followed the gate and
+reported the conflict.
+
+**Follows.** Three things.
+
+**A range reservation must be visible in the file, or it is not a
+reservation.** The registers that carry a next-number line cannot hold one
+today. Until they can, a dispatcher who runs parallel work must expect to
+renumber at merge, and must sweep the tree for citations rather than trusting
+the register alone.
+
+**The collision is cheap to find and expensive to repair.** The check catches
+a duplicate row immediately. What it cannot catch is a citation elsewhere in
+the tree that names the number the merge moved. That sweep is manual, and it
+is the part that costs.
+
+**Prefer a register a worker does not have to number.** A register whose next
+number is derived at read time, or whose rows are numbered at merge, removes
+the window entirely. That is a change to three registers and their check, and
+it is not made here.
+
+
 ## References
 
 [^1]: Findings register, FND-038, in this document.
@@ -1617,3 +1665,5 @@ decides the answer. The name of the tier does not.
 [^28]: Blockers register, BLK-007. `docs/BLOCKERS.md`
 [^29]: Findings register, FND-056, in this document.
 [^30]: Findings register, FND-072, in this document.
+[^31]: Findings register, FND-050, in this document.
+[^32]: The register check script. `scripts/check_registers.py`
