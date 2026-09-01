@@ -366,28 +366,36 @@ benchmark harness.[^BLK7]
 
 ### DEC-020 — Must a spawn respect the tile capacity?
 
-**Outcome. A spawn refuses a tile at capacity, and the engine holds a dense
-occupancy array of one byte for each tile.**
+**Outcome. No. A spawn may over-fill a tile, and admission is the only rule
+that enforces the capacity. The engine holds no dense per-tile count.**
 
-**The owner chose against the recommendation.** The recommendation was to let a
-spawn over-fill and to rely on the invariant that admission already gives. The
-owner chose the stronger invariant and paid for the storage.
+**This row was decided twice, and the second answer stands.** The row first
+recorded that a spawn refuses a tile at capacity and that the engine holds a
+dense occupancy array. The owner reversed that before any code was written.
+The first answer is kept here because a reader who finds the reversed record
+needs to know the project held both positions and why it moved.
 
 Admission never raises a tile above the capacity of its ground.[^ADR56D3] A
-spawn did not read the capacity at all, so a caller could place a hundred units
-on one tile and the engine accepted it. The question was whether the capacity
-is a property of the world at rest or a rule that movement obeys. It is a
-property of the world at rest.
+spawn reads the faction ceiling and the passability of the ground, and it does
+not read the capacity. A caller may therefore place a hundred units on one
+tile and the engine accepts it. The capacity is a rule that movement obeys,
+not a property of the world at rest.
 
-What follows is that the capacity becomes a world invariant, and one check can
-state it. The dense occupancy array settles the occupancy storage question that
-the movement record defers.[^ADR56D4] It buys a constant-time spawn and a
-constant-time admission. Counting by a scan of the arena was the alternative,
-and it costs the population for each spawn, which the target scale does not
-permit.
+**The guarantee this gives is monotone, and that is the point.** Admission
+computes the room of a target as the capacity less the occupancy, and it
+saturates at zero. A tile that stands above its capacity therefore admits
+nobody, while its units may still leave. An over-full tile drains and never
+fills further. Crowding is a state the world can reach and then relieve,
+rather than a state the engine refuses to represent.
 
-The movement suite asserts today that no tile gains a unit beyond its capacity.
-It must also assert that no tile is ever above it.
+**What the project gives up.** The capacity is not a world invariant, so no
+single check can state it. A test may assert that no tile gains a unit beyond
+its capacity. It may not assert that no tile is ever above one.
+
+**What this costs nowhere.** The engine already behaves this way, so the
+reversal changed no code. The dense array is not written, so the occupancy
+storage question that the movement record defers stays deferred, and the
+project pays no second declaration of where units stand.[^SHAPE1]
 
 ### DEC-021 — Where does a structural change made outside a frame get its barrier?
 

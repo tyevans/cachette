@@ -9,8 +9,15 @@ between three directories as it progresses.
 | `refined/` | Ready to pick up. The impact review is done. |
 | `complete/` | Finished. Kept for the record. |
 
-An item moves by `git mv`. Its file name never changes, so its history
-follows it.
+An item moves by `git mv`. Its number never changes, and its file name does
+not change when the item moves between directories, so its history follows it.
+
+**Rename the file only when the claim of the item changes.** A title states
+what the item does. If a decision reverses that claim, a file name that
+describes the old claim is worse than a rename, because it tells a reader the
+wrong thing before they open it. Use `git mv` for the rename, so the history
+still follows the file, and repair every citation of the old path in the same
+change.[^7]
 
 ## Which item comes next
 
@@ -152,3 +159,4 @@ The backlog holds work. The registers hold state. The records hold decisions.
 [^4]: Product requirement records. `docs/product/README.md`
 [^5]: Findings register, FND-050. `docs/FINDINGS.md`
 [^6]: Backlog priority index. `docs/backlog/PRIORITY.md`
+[^7]: Commit Message Rules, the section on a sweep. `.claude/rules/commits.md`

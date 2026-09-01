@@ -46,6 +46,7 @@ These close a gap a review found, or they unblock the items above.
 | 0103 | A household has no home. DEC-039 answers it: derive the household from the dwelling slot. |
 | 0104 | A ruler decides nothing that reaches anybody. DEC-040 carries the writ in the influence field. |
 | 0112 | Building a world passes over every tile. PRD-0003 states it must not, so the record is false of the code. |
+| 0113 | Admission enforces the capacity from a bridge count that no test compares against a scan. |
 | 0080 | The settings struct prices every new parameter at twenty-five files. |
 | 0098 | The gate suite has no budget and the golden test grows unwatched.[^5] |
 | 0101 | A behavioural claim about terrain is defended by a test of constants.[^8] |

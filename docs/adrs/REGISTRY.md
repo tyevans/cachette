@@ -264,7 +264,7 @@ without stating a constraint is worse than no record.
 | 0071 | The bridge rebuild orders on one thread | Accepted | 0001, 0004, 0007, 0018 | `accepted/adr-0071-the-bridge-rebuild-orders-on-one-thread.md` |
 | 0072 | A tile stock is generated, and only what was taken is stored | Accepted | 0002, 0003, 0068 | `accepted/adr-0072-a-tile-stock-is-generated-and-only-what-was-taken-is-stored.md` |
 | 0073 | Gathering is admitted by sort-then-admit against the tile | Accepted | 0004, 0018, 0056, 0072 | `accepted/adr-0073-gathering-is-admitted-by-sort-then-admit-against-the-tile.md` |
-| 0074 | A tile occupancy count is stored densely, and a spawn refuses a full tile | Draft | 0018, 0056 | `draft/adr-0074-a-tile-occupancy-count-is-stored-densely-and-a-spawn-refuses-a-full-tile.md` |
+| 0074 | A spawn may over-fill a tile, and only admission enforces the capacity | Draft | 0018, 0056 | `draft/adr-0074-a-spawn-may-over-fill-a-tile-and-only-admission-enforces-the-capacity.md` |
 | 0075 | The founding choice reads a bounded sample of the world | Accepted | 0002, 0003, 0004, 0068 | `accepted/adr-0075-the-founding-choice-reads-a-bounded-sample-of-the-world.md` |
 | 0076 | A founding keeps a fixed minimum distance from every founding before it | Proposed | 0075 | — |
 | 0077 | The golden state hash is exact, order-sensitive and stable across build platforms | Reserved | 0001 | — |

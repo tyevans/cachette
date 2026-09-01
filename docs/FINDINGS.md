@@ -314,12 +314,26 @@ superseding record. Neither record cites the other on this point, so nothing
 brought the two claims together. The check suite passed throughout, because a
 record is prose.
 
+**The code settles which claim is true, and it is not the one the first
+attempt assumed.** Admission builds a working set of segments over the tiles
+that some intent named, fills each from the derived structure, and discards
+the set at the end of the tick. That is what ADR-0056 D3 describes. No array
+over every tile exists, and none ever did.
+
 **Follows.** Three things.
 
-The owner answered DEC-020 with a dense occupancy count. That answer makes
-ADR-0018's stated reason true, so it closes the contradiction rather than
-opening one. ADR-0074 states the repair and names ADR-0056 D3 as the claim
-that gives way.
+**ADR-0018's stated reason is false, and it was never load-bearing.** The
+first answer to DEC-020 would have made it true by adding the array. The owner
+reversed that answer, so nothing adds one. ADR-0074 now records that no dense
+count exists, and it is the document a reader lands on when they meet the two
+claims. ADR-0018's rejection of the offset array stands on its other argument,
+that such an array must be exact everywhere before any query is correct, so
+its rebuild follows the tile count rather than the work.
+
+ADR-0018 is not superseded for this. It has four dependent records and eight
+citing source files, and the false sentence changes no decision it makes.
+Superseding a record over an aside is disproportionate, and a reader who meets
+the disagreement is served by the record that resolves it.
 
 A record that rejects an option on the strength of another record's mechanism
 must cite that record. ADR-0018 named a mechanism it did not own, and the

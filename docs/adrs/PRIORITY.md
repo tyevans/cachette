@@ -38,7 +38,7 @@ A record here binds nothing until a reviewer moves it.
 | No. | What it claims |
 |---|---|
 | 0064 | A unit chooses by scoring a small fixed option set. Backlog item 0064 wrote it, and the code it describes exists. |
-| 0074 | A tile occupancy count is stored densely, and a spawn refuses a full tile. **Nothing implements it yet.** Backlog item 0095 is the work. |
+| 0074 | A spawn may over-fill a tile, and only admission enforces the capacity. The engine already does this. A reviewer rewrote the draft around the opposite claim, so a second reviewer must read it. |
 
 ## Reserved and not written
 
