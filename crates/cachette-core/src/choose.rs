@@ -25,8 +25,8 @@
 //! [^1]: ADR-0064, a unit chooses by scoring a small fixed option set, decision D1. `docs/adrs/draft/adr-0064-a-unit-chooses-by-scoring-a-small-fixed-option-set.md`
 //! [^2]: ADR-0022, level 0 is the only truth, and every level above it is derived, decision D1. `docs/adrs/accepted/adr-0022-level-0-is-the-only-truth-and-every-level-above-it-is-derived.md`
 //! [^3]: ADR-0002, simulated and aggregated state holds no floating point number, decision D2. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
-//! [^4]: ADR-0004, iteration order is explicit, decision D4. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
-//! [^5]: ADR-0007, content supplies a key vector, never a comparator, decision D3. `docs/adrs/accepted/adr-0007-content-supplies-a-key-vector-never-a-comparator.md`
+//! [^4]: ADR-0004, iteration order is explicit, decisions D1 and D3. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
+//! [^5]: ADR-0007, content supplies a key vector, never a comparator, decisions D1 and D3. `docs/adrs/accepted/adr-0007-content-supplies-a-key-vector-never-a-comparator.md`
 
 use crate::cohort::NEED_FULL;
 use crate::pyramid::CellSummary;
@@ -58,7 +58,7 @@ pub const NO_INTENT: u8 = u8::MAX;
 ///
 /// # References
 ///
-/// [^1]: ADR-0007, content supplies a key vector, never a comparator, decision D3. `docs/adrs/accepted/adr-0007-content-supplies-a-key-vector-never-a-comparator.md`
+/// [^1]: ADR-0007, content supplies a key vector, never a comparator, decisions D1 and D3. `docs/adrs/accepted/adr-0007-content-supplies-a-key-vector-never-a-comparator.md`
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum CellField {
     /// The share of the tiles of the cell that admit a unit.
@@ -108,7 +108,7 @@ pub struct OptionRow {
 ///
 /// # References
 ///
-/// [^1]: ADR-0004, iteration order is explicit, decision D4. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
+/// [^1]: ADR-0004, iteration order is explicit, decisions D1 and D3. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
 pub const OPTIONS: [OptionRow; OPTION_COUNT] = [
     OptionRow {
         name: "roam",
@@ -233,12 +233,17 @@ impl ChoiceSchedule {
 
     /// Reports whether a unit in one cell chooses on one frame.
     ///
-    /// **The key is the level 1 cell, not the identity of the unit.** The
-    /// unit array is held in tile order, and the cell index is a fixed
-    /// function of the tile index, so a cell key gives the active units as a
-    /// few long contiguous runs. An identity key gives one scattered unit
-    /// for each run and reads a whole cache line to use a few bytes of
-    /// it.[^1] [^2]
+    /// **The key is the level 1 cell, not the identity of the unit.** A cell
+    /// key gives one frame to a whole cell: every unit that shares a cell
+    /// chooses on the same frame, whatever order the array holds. An identity
+    /// key gives one frame to a scattered set instead, and reads a whole cache
+    /// line to use a few bytes of it.[^1] [^2]
+    ///
+    /// The contiguity this buys depends on the order of the array, and the
+    /// arena is not ordered by tile. It is a slot array in spawn order that
+    /// reuses a freed slot, and it never compacts, because compaction would
+    /// invalidate every identity that names a slot. A cell key gives long runs
+    /// only where spawn order happens to follow tile order.
     ///
     /// The phase mixes the cell index. A bare mask of the cell index would
     /// choose a regular spatial stripe of the world on each tick, which ties
@@ -284,7 +289,7 @@ pub const fn stagger_phase(cell: u32, period_log2: u32) -> u32 {
 ///
 /// # References
 ///
-/// [^1]: ADR-0007, content supplies a key vector, never a comparator, decision D3. `docs/adrs/accepted/adr-0007-content-supplies-a-key-vector-never-a-comparator.md`
+/// [^1]: ADR-0007, content supplies a key vector, never a comparator, decisions D1 and D3. `docs/adrs/accepted/adr-0007-content-supplies-a-key-vector-never-a-comparator.md`
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct WeightProfile {
     weights: [Fix32; OPTION_COUNT],
@@ -388,7 +393,7 @@ pub fn score(need: Fix32, weight: Fix32, summary: CellSummary, option: OptionRow
 ///
 /// # References
 ///
-/// [^1]: ADR-0004, iteration order is explicit, decision D4. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
+/// [^1]: ADR-0004, iteration order is explicit, decisions D1 and D3. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
 #[cfg(not(feature = "probe-nondeterminism"))]
 #[must_use]
 pub const fn option_order() -> [u8; OPTION_COUNT] {
@@ -466,7 +471,7 @@ impl ChoiceExplanation {
 ///
 /// # References
 ///
-/// [^1]: ADR-0004, iteration order is explicit, decision D4. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
+/// [^1]: ADR-0004, iteration order is explicit, decisions D1 and D3. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
 /// [^2]: Findings register, FND-014. `docs/FINDINGS.md`
 #[must_use]
 pub fn best_option(need: Fix32, summary: CellSummary, profile: &WeightProfile) -> u8 {

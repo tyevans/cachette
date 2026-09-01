@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-105**
+**Next number: FND-106**
 
 ## A. Corrections to stated rules
 
@@ -2191,6 +2191,42 @@ assuming a rule must pass over the world.
 Search the deferrals when a storage decision lands, and say in the commit which
 ones it answered.
 
+### FND-105 — A record justified a decision with a property the engine cannot have
+
+**Believed.** The engine holds the unit array in tile order. A stagger keyed on
+the level 1 cell therefore selects a few long contiguous runs, and an identity
+key would scatter the same units. ADR-0064 stated this three times, and the
+choice module repeated it in a doc comment.
+
+**True.** The unit arena is a slot array in spawn order that reuses a freed
+slot, and it never compacts. It is not ordered by tile, and it cannot become so:
+an accepted record forbids compaction, because compaction would invalidate every
+identity that names a slot.[^51] The array can therefore never hold the property
+the justification asserts.
+
+**Evidence.** A review of ADR-0064 against the code found the claim in the fifth
+force, in decision D4 and in the rejected alternative for an identity stagger,
+and again in the choice module. The arena states its own behaviour in its doc
+comment, and the free-list reuse is visible at the spawn path. Nothing failed,
+because a justification is prose.
+
+**Follows.** Three things.
+
+**The decision survives; only the reason was wrong.** A cell key gives one frame
+to a whole cell whatever order the array holds, and that is the property the
+test actually asserts. The register already holds the separate evidence for
+staggering by cell rather than by identity.[^52]
+
+**State the condition, not the property.** The record now says that the
+contiguity depends on the order of the array, and that the array is not so
+ordered today. A conditional claim stays true when the condition changes.
+
+**A justification that names a fact about the engine decays like a count.** The
+scope rule keeps a count out of a record because the next change makes it
+false.[^53] A load-bearing claim about how storage is arranged carries the same
+risk and has no rule against it. Read a "because the engine does X" sentence as
+a figure, and check it against the code before you rely on it.
+
 
 ## References
 
@@ -2244,3 +2280,6 @@ ones it answered.
 [^48]: ADR-0008, the primary target is `aarch64-unknown-linux-gnu`, decision D2. `docs/adrs/accepted/adr-0008-the-primary-target-is-aarch64.md`
 [^49]: ADR-0072, a tile stock is generated, and only what was taken is stored. `docs/adrs/accepted/adr-0072-a-tile-stock-is-generated-and-only-what-was-taken-is-stored.md`
 [^50]: PRD-0018, a depleted deposit comes back. `docs/product/shaped/prd-0018-a-depleted-deposit-comes-back.md`
+[^51]: ADR-0014, entity identity is an index plus a generation, decision D1. `docs/adrs/accepted/adr-0014-entity-identity-is-an-index-plus-a-generation.md`
+[^52]: Findings register, FND-023, in this document.
+[^53]: Decision Record Scope, section 4.3. `.claude/rules/adr-scope.md`

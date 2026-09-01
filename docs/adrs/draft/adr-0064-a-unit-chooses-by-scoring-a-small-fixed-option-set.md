@@ -108,11 +108,21 @@ The choice does not run on every tick. It runs at an interval, and a stagger
 spreads the population across the ticks of that interval.
 
 **The stagger key is the level 1 cell, and it is never the identity of the
-unit.** The engine holds the unit array in tile order, and the cell index is a
-fixed function of the tile index, so a cell key selects a few long runs that
-lie together. An identity key selects the same number of units and scatters
-them.[^7] This choice is neutral for determinism and large for cost, which is
-why this record holds it rather than the code.
+unit.** A cell key gives one frame to a whole cell. Every unit that shares a
+cell chooses on the same frame, whatever order the array holds. An identity key
+gives no such property, and the project has recorded what a scattered read
+costs.[^7]
+
+**The locality this buys depends on the order of the array, and the array is
+not ordered by tile today.** The unit arena is a slot array in spawn order that
+reuses a freed slot, and it never compacts. A separate record forbids the
+compaction that would order it by tile, because compaction would invalidate
+every identity that names a slot.[^18] A cell key therefore selects contiguous
+runs only where spawn order happens to follow tile order. State this as a
+condition, not as a property of the engine.
+
+This choice is neutral for determinism and large for cost, which is why this
+record holds it rather than the code.
 
 The key mixes the cell index. A bare mask of the cell index selects a regular
 stripe of the map on each tick, which ties the phase of the decision to the
@@ -198,8 +208,9 @@ determinism. It would add a generator call to the hot loop and buy nothing. A
 tie between two options of equal value is not a case that needs variety.[^3]
 
 **A stagger keyed on the identity of the unit.** This is the obvious schedule
-and it repeats. It selects a scattered set out of an array held in tile order,
-and the project has recorded what that costs.[^7]
+and it repeats. It gives one frame to a scattered set of units rather than to a
+cell, so it reads a whole cache line to use a few bytes of it, and the project
+has recorded what that costs.[^7]
 
 **No floor at all.** The comparison chain always selects something, so a rule
 with no floor is shorter. It also turns a near-flat world into a walk of the
@@ -214,13 +225,14 @@ whole population, which is the failure this record exists to prevent.[^6]
 [^5]: ADR-0002, simulated and aggregated state holds no floating point number, decision D1. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
 [^6]: Findings register, FND-014. `docs/FINDINGS.md`
 [^7]: Findings register, FND-023. `docs/FINDINGS.md`
-[^8]: ADR-0007, content supplies a key vector, never a comparator, decision D3. `docs/adrs/accepted/adr-0007-content-supplies-a-key-vector-never-a-comparator.md`
+[^8]: ADR-0007, content supplies a key vector, never a comparator, decisions D1 and D3. `docs/adrs/accepted/adr-0007-content-supplies-a-key-vector-never-a-comparator.md`
 [^9]: ADR-0002, simulated and aggregated state holds no floating point number, decision D2. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
 [^10]: ADR-0001, one binary gives one answer at any thread count, decision D4. `docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
 [^11]: Budgets and costs, the choice pass. `docs/reference/budgets.md`
 [^12]: Blockers register, BLK-007. `docs/BLOCKERS.md`
 [^13]: ADR-0001, one binary gives one answer at any thread count, decision D1. `docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
-[^14]: ADR-0004, iteration order is explicit, decision D4. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
+[^14]: ADR-0004, iteration order is explicit, decisions D1 and D3. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
 [^15]: ADR-0022, level 0 is the only truth, and every level above it is derived, decision D3. `docs/adrs/accepted/adr-0022-level-0-is-the-only-truth-and-every-level-above-it-is-derived.md`
 [^16]: ADR-0022, level 0 is the only truth, and every level above it is derived, decision D4. `docs/adrs/accepted/adr-0022-level-0-is-the-only-truth-and-every-level-above-it-is-derived.md`
 [^17]: PRD-0009, a unit acts on the world it can see. `docs/product/accepted/prd-0009-a-unit-acts-on-the-world-it-can-see.md`
+[^18]: ADR-0014, entity identity is an index plus a generation, decision D1. `docs/adrs/accepted/adr-0014-entity-identity-is-an-index-plus-a-generation.md`
