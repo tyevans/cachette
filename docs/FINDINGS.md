@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-106**
+**Next number: FND-110**
 
 ## A. Corrections to stated rules
 
@@ -994,10 +994,22 @@ thread-count equivalence and a golden hash as its determinism coverage, and
 both would have shipped the defect.
 
 **A property that must hold after every tick belongs in a test that checks it
-after every tick.** For admission that is: no tile holds more units than its
-capacity allows. The testing rule already says a determinism test cannot tell
+after every tick.** The testing rule already says a determinism test cannot tell
 correct from consistently wrong; this is the same lesson reaching an
 invariant rather than a keyed draw.
+
+**Corrected on 1 September 2026.** This entry named the property for admission
+as "no tile holds more units than its capacity allows". That is false of the
+engine, and a contributor who wrote a test in that form would watch it fail on a
+legitimate world. A spawn places a unit without reading the capacity, admission
+is the only reader of it, and nothing establishes the strong form at rest. The
+property for admission is that **no tile gains a unit beyond its capacity**. A
+tile that a caller over-filled may stay above its capacity, and it may never
+rise. The record that decides this states the reasoning.[^56]
+
+The lesson of this entry is unchanged. Only the sentence naming the invariant
+was wrong, and it was not visible as wrong when it was written, because the
+question of whether a spawn refuses was an open decision at the time.
 
 ### FND-049 — The cost of a step is not where the project assumed
 
@@ -2293,6 +2305,44 @@ false.[^53] A load-bearing claim about how storage is arranged carries the same
 risk and has no rule against it. Read a "because the engine does X" sentence as
 a figure, and check it against the code before you rely on it.
 
+### FND-109 — A whole-tree search cannot find a claim that wraps
+
+**Believed.** A sweep is done when a whole-tree search for the name comes back
+clean. The commit rule asks for that search, and asks for the command in the
+commit body, so that a reviewer can run it again.
+
+**True.** The search the rule asks for cannot see a claim that spans two lines.
+Prose in this repository wraps at eighty columns, so a claim long enough to
+matter is split, and a line-based search for the sentence returns nothing. The
+control reports clean because it cannot see the site, not because the site is
+absent.
+
+**Evidence.** A review of ADR-0074 searched the tree for the old answer and
+reported one site. A second search, for the terms separately rather than for the
+phrase, found four. The site the first search missed reads "is an open" at the
+end of one line and "choice" at the start of the next, and a search for "an open
+choice" returns nothing. Two of the four sites were live: a test header that
+calls a decided question open, and a register entry whose stated invariant the
+decision had made false.[^57]
+
+**Follows.** Three things.
+
+**Search for the terms, not for the sentence.** Pick the two or three words of
+the claim least likely to wrap together, search for each, and read the hits. A
+single search for a whole sentence is a search that reports clean.
+
+**Join the lines before matching when the claim must be searched as a whole.**
+A search that strips the line breaks first sees what a reader sees.
+
+**A control that cannot fail is not a control.** This one returned clean for a
+tree that held four sites, and nothing about the result said so. Treat a clean
+sweep as evidence only when the search could have found the thing.
+
+The cost is not the missed site. It is that a search command in a commit body
+reads as proof, and it is not one. State in the commit body which method the
+sweep used, so that a reader can tell a search that could have failed from a
+search that could not.
+
 
 ## References
 
@@ -2351,3 +2401,5 @@ a figure, and check it against the code before you rely on it.
 [^53]: Decision Record Scope, section 4.3. `.claude/rules/adr-scope.md`
 [^54]: Backlog item 0071. `docs/backlog/complete/0071-derive-tile-passability-from-tile-capacity.md`
 [^55]: Testing rules, section 2a. `.claude/rules/testing.md`
+[^56]: ADR-0074, a spawn may over-fill a tile and only admission enforces the capacity, decision D2. `docs/adrs/draft/adr-0074-a-spawn-may-over-fill-a-tile-and-only-admission-enforces-the-capacity.md`
+[^57]: Commit Message Rules, after a sweep. `.claude/rules/commits.md`

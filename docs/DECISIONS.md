@@ -49,63 +49,6 @@ rule and accept that a shortage which empties a need is fatal.
 The values are content, and no content pipeline exists.[^DEC34REF] The row
 therefore asks for a default, not for a rule.
 
-### DEC-049 — Which resource kinds recover, and how fast?
-
-**Open. The project owner decides.** The product record for a deposit that
-comes back states the recovery period as a parameter of the resource kind and
-states no value.[^PRD18]
-
-The world holds three kinds: food, wood and stone. Two of them are alive in
-the ordinary meaning and one is not, so the shape of the answer is probably
-one period for each kind, with one of the periods absent.
-
-**The options.**
-
-1. Food and wood recover. Stone does not. A period for each of the two.
-2. Every kind recovers, with stone far slower than the others.
-3. One period for the whole world, and no difference between the kinds.
-
-**The recommendation is option 1.** It matches what a player expects, it needs
-no value for stone, and it makes the absent case a real case that the engine
-must carry from the first day rather than a case somebody adds later.
-
-**How to state a period.** State it in simulated time and derive the tick
-count. One tick is a fixed span of simulated time, and the register holds
-that constant.[^SCALE] A period given in ticks alone would go stale if the
-tick span ever moved.
-
-**What holds it back.** Nothing. Work can start under option 1 with the two
-periods as parameters, and the parameters carry the same name in the engine
-and in this row.
-
-### DEC-050 — Does a deposit that reached nothing recover?
-
-**Open. The project owner decides.** The product record states this as a
-parameter and states no value.[^PRD18]
-
-A deposit that units emptied is a different case from one they reduced. The
-question is whether the world treats it as a wound that heals or as a thing
-that is gone.
-
-**The options.**
-
-1. It recovers, in the same way as any other depleted deposit. Nothing in the
-   world is ever permanently spent.
-2. It never recovers. A deposit that reached nothing stays at nothing.
-3. It recovers only when a neighbouring tile of the same kind still holds
-   something.
-
-**The recommendation is option 1 for now, and option 3 is a later need.**
-Option 1 is the cheap one and the one that keeps the rule uniform. Option 2
-gives a player a way to ruin ground, which is interesting, and the product
-record names permanent ruin as a separate need on purpose. Option 3 reads a
-neighbourhood, so its cost does not follow the depleted set alone, and this
-row should not choose it without a measurement the project cannot take
-today.[^BLK7]
-
-**Why this is a decision and not a blocker.** Both options are known and work
-continues under either. Only the value of one parameter changes.
-
 
 ### DEC-038 — Which slot does the faction take in the founding draw key?
 
@@ -224,6 +167,93 @@ figure is 168 MB. The storage argument for vectors is stronger than the report
 concluded, and it called that argument its weakest.
 
 ## Closed
+
+### DEC-049 — Which resource kinds recover, and how fast?
+
+**Decided under delegated authority, 1 September 2026. Food and wood recover.
+Stone does not.** This is option 1, as recommended below.
+
+The project owner delegated the decision for this session and left the run
+unattended. This row states that work continues under any of the options and
+that only the value of a parameter changes, so deciding it is cheap to reverse
+and blocking the work overnight was not. **The owner may reverse this without
+supersession, because it is a parameter and not a constraint.**
+
+The reasoning is the one the recommendation gives. It matches what a player
+expects. It needs no value for stone. It makes the absent case a real case that
+the engine carries from the first day, rather than one somebody adds later and
+then discovers the shape does not hold.
+
+The row as it stood follows.
+
+The product record for a deposit that comes back states the recovery period as
+a parameter of the resource kind and states no value.[^PRD18]
+
+The world holds three kinds: food, wood and stone. Two of them are alive in
+the ordinary meaning and one is not, so the shape of the answer is probably
+one period for each kind, with one of the periods absent.
+
+**The options.**
+
+1. Food and wood recover. Stone does not. A period for each of the two.
+2. Every kind recovers, with stone far slower than the others.
+3. One period for the whole world, and no difference between the kinds.
+
+**The recommendation is option 1.** It matches what a player expects, it needs
+no value for stone, and it makes the absent case a real case that the engine
+must carry from the first day rather than a case somebody adds later.
+
+**How to state a period.** State it in simulated time and derive the tick
+count. One tick is a fixed span of simulated time, and the register holds
+that constant.[^SCALE] A period given in ticks alone would go stale if the
+tick span ever moved.
+
+**What holds it back.** Nothing. Work can start under option 1 with the two
+periods as parameters, and the parameters carry the same name in the engine
+and in this row.
+
+### DEC-050 — Does a deposit that reached nothing recover?
+
+**Decided under delegated authority, 1 September 2026. A deposit that reached
+nothing recovers, in the same way as any other depleted deposit.** This is
+option 1, as recommended below. **The owner may reverse this without
+supersession.**
+
+The same reasoning applies as for the row above: this row states that work
+continues under either option and that only the value of a parameter changes.
+
+Option 2 stays interesting and stays unchosen. Permanent ruin is a separate
+need, and the product record names it as one on purpose, so it should arrive as
+a need rather than as a side effect of this parameter. Option 3 reads a
+neighbourhood, so its cost stops following the depleted set alone, and no
+measurement exists on the target platform to justify that.[^BLK7]
+
+The row as it stood follows.
+
+The product record states this as a parameter and states no value.[^PRD18]
+
+A deposit that units emptied is a different case from one they reduced. The
+question is whether the world treats it as a wound that heals or as a thing
+that is gone.
+
+**The options.**
+
+1. It recovers, in the same way as any other depleted deposit. Nothing in the
+   world is ever permanently spent.
+2. It never recovers. A deposit that reached nothing stays at nothing.
+3. It recovers only when a neighbouring tile of the same kind still holds
+   something.
+
+**The recommendation is option 1 for now, and option 3 is a later need.**
+Option 1 is the cheap one and the one that keeps the rule uniform. Option 2
+gives a player a way to ruin ground, which is interesting, and the product
+record names permanent ruin as a separate need on purpose. Option 3 reads a
+neighbourhood, so its cost does not follow the depleted set alone, and this
+row should not choose it without a measurement the project cannot take
+today.[^BLK7]
+
+**Why this is a decision and not a blocker.** Both options are known and work
+continues under either. Only the value of one parameter changes.
 
 ### DEC-043 — What deficit ends a unit?
 

@@ -9,7 +9,7 @@ Two parts of the engine put units on a tile. Admission moves a unit that
 already stands in the world onto a tile it asked for.[^2] A spawn places a new
 unit. A founding is a spawn that places a group over one disc of tiles.
 
-Admission reads the occupancy of a target tile and grants no intent that would
+Admission reads the occupancy of a target tile. It grants no intent that would
 carry the tile above the capacity of its ground.[^2] A spawn reads no
 occupancy at all. It refuses impassable ground and it refuses a faction the
 world does not hold, and then it places the unit. Two foundings whose discs
@@ -58,8 +58,10 @@ ground. That is the whole of the guarantee, and it is narrower than it looks.
 
 The guarantee is that **no tile gains a unit beyond its capacity**. It is not
 that no tile is ever above its capacity. A tile that a spawn over-filled stays
-over its capacity until its units leave. It may not rise, and it may not rise
-above its capacity from below.
+over its capacity until its units leave. An over-full tile does not rise. A tile below its capacity rises no higher than
+the capacity. The subtraction that computes the room saturates rather than
+wrapping, so a tile already above its capacity offers no room at all. That
+saturation is a decision of this record and a property of admission.
 
 **An over-full tile drains and never fills.** Admission computes the room of a
 target tile by subtracting the occupancy from the capacity, and the
@@ -81,12 +83,14 @@ the barrier rebuilt before the intents were drawn.[^2] The derived structure
 is the one declaration of where units stand.
 
 **The movement record holds the true claim, and the bridge record's aside is
-false.**[^2] [^4] The bridge record rejects an offset array over every tile
-because such an array must be exact everywhere before any query is correct, so
-its rebuild repairs every entry once for each frame, even where nothing moved.
-That reason stands on its own. The per-tile array of counts that the record
-names beside it never existed, it does not exist now, and the rejection never
-needed it. A reader who meets the two claims must land here, and this record
+false.**[^2] [^4] The bridge record rejects an offset array over every tile. Such an array must be
+exact everywhere before any query is correct. Its rebuild therefore repairs every
+entry once for each frame, even where nothing moved.
+That reason stands on its own. Admission keeps counts over the tiles that some intent named. It counts the
+arrivals and the departures of one tick, it holds no entry for a tile no intent
+named, and it discards the set when the tick ends. It never holds an occupancy.
+The per-tile array of counts that the bridge record names is an occupancy array
+over every tile. No such array exists, and the rejection never needed one. A reader who meets the two claims must land here, and this record
 says the bridge record was wrong about the mechanism and right about the
 rejection.
 
@@ -139,9 +143,9 @@ carries no per-tile array, and the storage of the world does not grow with the
 tile count on account of the occupancy.
 
 **A later contributor who wants a spawn to refuse must supersede this record.**
-The change is not local. It needs an occupancy answer that is valid outside a
-frame, a refusal outcome at every caller of a spawn, and a decision about what
-a founding does with a placement it could not make.
+The change is not local. It needs an occupancy answer that is valid outside a frame. It needs a refusal
+outcome at every caller of a spawn. It also needs a decision about what a
+founding does with a placement it could not make.
 
 ## References
 
