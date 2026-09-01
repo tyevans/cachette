@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-121**
+**Next number: FND-122**
 
 ## A. Corrections to stated rules
 
@@ -2613,6 +2613,44 @@ it.[^53]
 the ones a contributor reads before they read the record: the function, its
 comment, and the test beside it. A sweep that starts with the documents finds the
 documents.
+
+### FND-121 — An index paraphrased a rule, and the paraphrase was quoted as the rule
+
+**Believed.** The scope rule opens by saying that a record for a subsystem
+nobody has built is the failure it exists to prevent. A record therefore waits
+for its code.
+
+**True.** The scope rule says no such thing. Section 1 opens with "Do not write a
+record because a topic exists. Write a record because a constraint exists", and
+its three conditions test for a constraint. None of them asks whether the code
+exists. The registry states the opposite of the believed rule directly: a record
+may be accepted before its implementation, provided the acceptance says plainly
+that nothing implements it yet.[^1]
+
+**Evidence.** The sentence lives in the decision record priority index, which
+paraphrased the rule in words the rule does not contain and attributed the
+paraphrase to it in a footnote. A search of the rule for the terms of the
+paraphrase returns nothing. The dispatcher read the index, believed it, and
+repeated it in three worker prompts in one night, including in the prompt that
+framed a review of two records written ahead of their code. The reviewer checked
+the source rather than the framing and reported that the text does not exist.
+
+**Follows.** Three things.
+
+**An index may not paraphrase the rule it points at.** A summary of a rule is a
+second declaration of the rule, and nothing fails when the two disagree. State
+the rule's own words or state only the pointer. This is shape 1 in prose.
+
+**A footnote makes a paraphrase look sourced.** The citation was correct: it
+named the right document. What it could not show was that the sentence above it
+was not in that document. A reader who follows a footnote checks that the source
+exists, not that it says the thing.
+
+**Check the source before you put a rule in a worker's prompt.** A dispatcher
+who quotes a rule to a worker is not passing on a constraint but creating one,
+because the worker cannot weigh it against a document it was told not to
+question. The reviewer that caught this was told its first duty was to consider
+withdrawing two records, on the authority of a rule that does not say that.
 
 
 ## References

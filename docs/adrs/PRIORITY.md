@@ -55,8 +55,11 @@ reserved until the code that needs them exists.[^6]
 | 0077 | The golden state hash. Write it when the first real golden file is committed, not before.[^9] |
 | 0055 | The modifier pipeline. One source modifies a rate, so the test fails today.[^8] |
 
-Every other reserved row in the registry is left alone on purpose. A record for
-a subsystem nobody has built is the failure the scope rule opens with.[^6]
+Every other reserved row in the registry is left alone on purpose. The scope
+rule asks whether a constraint exists, not whether the code exists, and most
+reserved rows name a topic rather than a constraint.[^6] A record may be
+accepted before its code, and the registry says how: the acceptance states
+plainly that nothing implements it yet.[^1]
 
 ## References
 
