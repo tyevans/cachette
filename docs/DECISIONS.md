@@ -64,9 +64,22 @@ the faction is the actor. The key then means what the names of its fields say.
 
 **Why this is the cheap answer as well as the correct one.** Every faction
 that keys alike draws alike. A separation rule against an identical sample
-seats the first faction and refuses the rest, for a reason that belongs to the
-key and not to the world. Keying on the faction gives each faction its own
-sample, so the refusals become rare by construction. The project buys that
+narrows the pool that every founding after the first draws from, for a reason
+that belongs to the key and not to the world. Keying on the faction gives each
+faction its own sample, so a founding after the first chooses from the whole
+pool rather than from what the foundings before it left. The project buys that
+with a field assignment rather than with a mechanism, and DEC-037 keeps the
+fixed sample it chose.
+
+**Corrected on 1 September 2026.** This paragraph said that an identical sample
+seats the first faction and refuses the rest. It does not. The sample holds many
+places, they stand far apart at this extent, and a founding after the first takes
+a lower-ranked place that still keeps the distance. The work that implemented
+this decision removed the faction from the key and counted the factions seated
+at four, six, eight and twelve factions; every faction was seated every
+time.[^FND106] The decision is unchanged and the reasoning above is narrowed to
+what is true. A consequence test built on the stronger claim was written,
+found to catch nothing, and deleted. The project buys that
 with a field assignment rather than with a mechanism, and DEC-037 keeps the
 fixed sample it chose.
 
@@ -895,3 +908,4 @@ a failed founding is correct.[^PRD12]
 [^BLK18]: Blockers register, BLK-018. `docs/BLOCKERS.md`
 [^ITEM0094]: Backlog item 0094. `docs/backlog/complete/0094-decide-how-many-groups-found-a-world.md`
 [^ADR75]: ADR-0075, the founding choice reads a bounded sample of the world. `docs/adrs/accepted/adr-0075-the-founding-choice-reads-a-bounded-sample-of-the-world.md`
+[^FND106]: Findings register, FND-106. `docs/FINDINGS.md`
