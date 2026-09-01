@@ -83,6 +83,11 @@ const DRAW_COLUMN: u32 = 0;
 /// # References
 ///
 /// [^1]: Testing rules, section 2. `.claude/rules/testing.md`
+///
+/// The perturbed build drops the row draw and holds one row, so nothing reads
+/// this constant there. The allowance is narrowed to that build, so the
+/// ordinary build still reports the constant if its last reader goes.
+#[cfg_attr(feature = "probe-nondeterminism", allow(dead_code))]
 const DRAW_ROW: u32 = 8;
 
 /// The number of candidate places the founding draws.
