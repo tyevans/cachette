@@ -16,7 +16,11 @@ written**. They are different work and they have different owners.
 
 **Review is the bottleneck.** An author may set `Draft`. Only a reviewer may
 set `Accepted`.[^1] A draft binds nothing, so work built on one is built on
-sand, and every draft below is already implemented in the crate.
+sand.
+
+**A draft below is not always implemented.** Most describe code that exists.
+A record that runs ahead of the code says so in its own row, because a
+reviewer must know whether the claim was tested or only argued.[^5]
 
 **Every draft and every reserved row appears exactly once.** A check enforces
 it, so a written record cannot wait for review unseen.[^4] When no record is
@@ -34,6 +38,7 @@ A record here binds nothing until a reviewer moves it.
 | No. | What it claims |
 |---|---|
 | 0064 | A unit chooses by scoring a small fixed option set. Backlog item 0064 wrote it, and the code it describes exists. |
+| 0074 | A tile occupancy count is stored densely, and a spawn refuses a full tile. **Nothing implements it yet.** Backlog item 0095 is the work. |
 
 ## Reserved and not written
 
@@ -45,6 +50,7 @@ reserved until the code that needs them exists.[^6]
 |---|---|
 | 0021 | Layout follows the access pattern. Write it with the descent columns, not before.[^7] |
 | 0069 | Weather. Nothing needs it. |
+| 0077 | The golden state hash. Write it when the first real golden file is committed, not before.[^9] |
 | 0055 | The modifier pipeline. One source modifies a rate, so the test fails today.[^8] |
 
 Every other reserved row in the registry is left alone on purpose. A record for
@@ -60,3 +66,4 @@ a subsystem nobody has built is the failure the scope rule opens with.[^6]
 [^6]: Decision Record Scope, section 1. `.claude/rules/adr-scope.md`
 [^7]: Decisions register, DEC-032. `docs/DECISIONS.md`
 [^8]: ADR-0062, decision D7. `docs/adrs/accepted/adr-0062-production-and-upkeep-are-rates-attached-to-a-site.md`
+[^9]: Decisions register, DEC-014. `docs/DECISIONS.md`
