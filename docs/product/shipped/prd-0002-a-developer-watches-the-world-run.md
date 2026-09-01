@@ -45,8 +45,8 @@ Each statement below can be checked.
 - Entities appear on the world. Each entity stands on a tile.
 - The entities move between tiles while the developer watches. The developer
   gives no input.
-- No tile holds more entities than its capacity allows, and a viewer can see
-  that this holds.
+- A viewer sees how full each tile is. It shows a tile that holds more
+  entities than its capacity allows, and it marks that tile.
 - The window shows the simulation. It does not show a copy. The code that
   moves the entities is the engine that the tests exercise.
 - The same world, from the same seed, shows the same behaviour on every run.
