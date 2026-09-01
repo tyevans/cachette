@@ -257,7 +257,7 @@ impl ChoiceSchedule {
     ///
     /// [^1]: Findings register, FND-023. `docs/FINDINGS.md`
     /// [^2]: ADR-0064, a unit chooses by scoring a small fixed option set, decision D4. `docs/adrs/draft/adr-0064-a-unit-chooses-by-scoring-a-small-fixed-option-set.md`
-    /// [^3]: ADR-0001, one binary gives one answer at any thread count, decision D5. `docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
+    /// [^3]: ADR-0001, one binary gives one answer at any thread count, decision D1. `docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
     #[must_use]
     pub const fn chooses_now(self, cell: u32, frame: u64) -> bool {
         let mask = self.period() - 1;
