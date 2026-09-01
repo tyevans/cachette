@@ -1,7 +1,7 @@
 ---
 id: 0071
 title: Derive tile passability from tile capacity
-status: refined
+status: complete
 created: 2026-08-31
 implements: [ADR-0056 D4, ADR-0068 D4]
 changes: []
@@ -171,7 +171,32 @@ the compiler refuses a kind with no capacity.
 
 ## Outcome
 
-Filled in when the item moves to `complete/`.
+**Done.** The passability reader returns the capacity being greater than zero.
+It matches no kind by name. A small function takes the capacity and answers
+whether the ground admits a unit, so the rule can be stated for a capacity that
+no kind carries today. The capacity table is the one declaration, and its match
+is exhaustive over the kinds.
+
+**The kind list moved into the source.** The terrain kind now carries an array
+of every kind, and the length of that array is the kind count. The test reads
+the array, so it names no kind of its own. A new kind that the array omits is a
+compile error. The old test listed the four passable kinds by hand.
+
+**No caller changed.** The reader keeps its name, its signature and its
+constant qualifier. No golden state hash file moved.
+
+**The proof that the test can fail.** The work restored the name match and set
+the water capacity to the ordinary value. The equivalence test then reported
+that water answered the two questions differently. The restored defect is two
+lines and one test run.
+
+**The kind set cannot carry a test-only kind with a capacity of zero.** The
+kind is a plain enumeration, and a state hash and a viewer palette both read
+it. An extra kind behind a feature would move the hash and would need a colour.
+The evidence is therefore the compiler exhaustiveness over the capacity match,
+and a test of the rule against a capacity of zero that no kind carries.
+
+**FND-060 is closed in its own entry.**
 
 ## References
 

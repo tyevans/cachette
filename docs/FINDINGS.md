@@ -1476,6 +1476,14 @@ removes the site rather than reconciling it.
 shape's only local instance was a numbering collision in a register. This one
 is in the engine.
 
+**Closed.** The second site is gone. The passability reader now returns the
+capacity being greater than zero, and it matches no kind by name. The capacity
+table is the one declaration, and its match is exhaustive, so the compiler
+refuses a kind that states no capacity. A test asserts the two answers agree
+over every kind. The proof that the test can fail restored the name match and
+set the water capacity to the ordinary value; the test then reported that
+water answered the two questions differently.[^46]
+
 ### FND-061 — A fixture assertion stated over the inputs cannot see the case
 
 **Believed.** A fixture that must produce a contested case proves it by
@@ -2095,3 +2103,4 @@ ignored directory is not empty, and the status command will not say so.
 [^43]: Testing Rules, section 2. `.claude/rules/testing.md`
 [^44]: Findings register, FND-075. `docs/FINDINGS.md`
 [^45]: Findings register, FND-078. `docs/FINDINGS.md`
+[^46]: Backlog item 0071. `docs/backlog/complete/0071-derive-tile-passability-from-tile-capacity.md`

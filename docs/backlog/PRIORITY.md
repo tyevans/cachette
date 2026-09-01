@@ -41,7 +41,6 @@ These close a gap a review found, or they unblock the items above.
 |---|---|
 | 0059 | Housing. The population cannot be bounded by anything until a place has capacity. |
 | 0060 | Population growth from the store and the housing. |
-| 0071 | Passability has two declaration sites. Item 0092 must not add a third. |
 | 0095 | Two foundings can over-fill a tile. |
 | 0103 | A household has no home. DEC-039 answers it: derive the household from the dwelling slot. |
 | 0104 | A ruler decides nothing that reaches anybody. DEC-040 carries the writ in the influence field. |

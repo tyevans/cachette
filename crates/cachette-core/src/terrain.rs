@@ -112,6 +112,19 @@ pub enum TileKind {
 }
 
 impl TileKind {
+    /// Every kind, in the order of the numbering.
+    ///
+    /// A caller that must reason over the whole set reads this rather than
+    /// writing a list of its own. The length is fixed by the kind count, so a
+    /// new kind that is not added here is a compile error.
+    pub const ALL: [Self; KIND_COUNT] = [
+        Self::Water,
+        Self::Plain,
+        Self::Forest,
+        Self::Hill,
+        Self::Mountain,
+    ];
+
     /// Returns the kind as a small integer.
     ///
     /// A caller that writes the kind into a buffer needs the number. The
@@ -123,6 +136,12 @@ impl TileKind {
 
     /// Reports whether a unit may stand on a tile of this kind.
     ///
+    /// The answer is the capacity being greater than zero. Ground that holds
+    /// nobody admits nobody, so this reader states no rule of its own and it
+    /// matches no kind by name. A second rule beside the capacity table would
+    /// be one fact in two places, and nothing would fail when the two
+    /// disagreed.
+    ///
     /// This module states which tiles admit a unit. It does not state what a
     /// tile costs to cross. The cost multiplier is an open choice, and the
     /// register holds it.[^1]
@@ -132,7 +151,7 @@ impl TileKind {
     /// [^1]: Decisions register, DEC-017. `docs/DECISIONS.md`
     #[must_use]
     pub const fn is_passable(self) -> bool {
-        !matches!(self, Self::Water)
+        admits_a_unit(self.capacity())
     }
 
     /// Returns the number of units that may stand on a tile of this kind.
@@ -145,9 +164,10 @@ impl TileKind {
     /// pipeline lands, the table moves into content and this function reads
     /// it. The record already says the capacity is data.
     ///
-    /// The ground that admits no unit has a capacity of zero. Two rules that
-    /// can disagree would be one fact in two places, so passability is the
-    /// capacity being zero and nothing else states it.
+    /// This table is the one declaration of which ground admits a unit. The
+    /// ground that admits no unit has a capacity of zero, and the passability
+    /// reader derives its answer from this table. The match is exhaustive over
+    /// the kinds, so the compiler refuses a kind that states no capacity.
     ///
     /// The values come from the scale constants table.[^2] No crossing
     /// terrain exists yet, so no kind carries the crossing capacity.
@@ -176,6 +196,16 @@ impl TileKind {
 ///
 /// [^1]: Budgets and costs, the scale constants. `docs/reference/budgets.md`
 const ORDINARY_CAPACITY: u32 = 8;
+
+/// Reports whether ground of a given capacity admits a unit.
+///
+/// This is the whole of passability. Ground that holds nobody admits nobody.
+/// The function takes the capacity rather than the kind, so a test can state
+/// the rule for a capacity that no kind carries today.
+#[must_use]
+pub const fn admits_a_unit(capacity: u32) -> bool {
+    capacity > 0
+}
 
 /// One generated tile.
 ///

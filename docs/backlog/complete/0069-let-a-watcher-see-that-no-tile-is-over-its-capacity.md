@@ -220,7 +220,7 @@ holds the list and the counts.
 [^9]: Blockers register, BLK-009. `docs/BLOCKERS.md`
 [^10]: Decisions register, DEC-022. `docs/DECISIONS.md`
 [^11]: Findings register, FND-060. `docs/FINDINGS.md`
-[^12]: Backlog item 0071. `docs/backlog/refined/0071-derive-tile-passability-from-tile-capacity.md`
+[^12]: Backlog item 0071. `docs/backlog/complete/0071-derive-tile-passability-from-tile-capacity.md`
 [^13]: Findings register, FND-051. `docs/FINDINGS.md`
 [^14]: Findings register, FND-061. `docs/FINDINGS.md`
 [^15]: Findings register, FND-070. `docs/FINDINGS.md`
