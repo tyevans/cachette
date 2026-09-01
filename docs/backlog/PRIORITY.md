@@ -39,6 +39,7 @@ These close a gap a review found, or they unblock the items above.
 
 | No. | Why it sits here |
 |---|---|
+| 0120 | The engine gains state the window never shows. Refining it is the work.[^9] |
 | 0059 | Housing. The population cannot be bounded by anything until a place has capacity. |
 | 0060 | Population growth from the store and the housing. |
 | 0071 | Passability has two declaration sites. Item 0092 must not add a third. |
@@ -103,3 +104,4 @@ These are real and none of them blocks anything today.
 [^6]: Decisions register, DEC-032. `docs/DECISIONS.md`
 [^7]: Findings register, FND-079. `docs/FINDINGS.md`
 [^8]: Findings register, FND-080. `docs/FINDINGS.md`
+[^9]: Findings register, FND-100. `docs/FINDINGS.md`

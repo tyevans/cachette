@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-088**
+**Next number: FND-101**
 
 ## A. Corrections to stated rules
 
@@ -2047,6 +2047,40 @@ misses a call site. A repair that is too wide edits work that is not yours.
 Before a repair rewrites a file, confirm the file belongs to the change. An
 ignored directory is not empty, and the status command will not say so.
 
+### FND-100 — "A watcher can read it" was counted as "a watcher can see it"
+
+**Believed.** An item whose acceptance list says a watcher reads a value has
+answered the need to show that value. The product record that asks for a world
+worth looking at is therefore served by the same work that serves the engine.
+
+**True.** The word names two different interfaces. In the open backlog it means
+the public interface of the library in almost every case, and the window in
+almost none. An item can satisfy every line of its acceptance list, add state
+to the engine, and put nothing on the screen. Nothing fails, because no check
+compares what the engine holds against what the viewer draws.
+
+**Evidence.** A scan of the acceptance list of every open item found the word
+in ten of them. One of those ten changes what the window shows. Two open items
+name the viewer product record as what they serve, and neither of them draws
+anything: one is a world-build cost item and the other is a terrain regression
+test. The product index already carries the symptom in its own note, and the
+note had gone unactioned because no backlog item held it.
+
+**Follows.** Three things.
+
+**An item that adds state a watcher should see states which interface it
+reaches.** Write the window, or write the public interface. Do not write the
+word that covers both.
+
+**The viewer product record needs an item that draws, or it accrues debt in
+silence.** A need with no item against it is not a paused need. It is a need
+nobody is measuring.
+
+**Read the display gap as a shape, not as an oversight.** The engine work is
+governed by records and the display work is governed by nothing, so the two
+drift apart at the speed the engine moves. That is shape 2 with the roles
+reversed: the specific thing that rots is the picture, not the prose.[^46]
+
 
 ## References
 
@@ -2095,3 +2129,4 @@ ignored directory is not empty, and the status command will not say so.
 [^43]: Testing Rules, section 2. `.claude/rules/testing.md`
 [^44]: Findings register, FND-075. `docs/FINDINGS.md`
 [^45]: Findings register, FND-078. `docs/FINDINGS.md`
+[^46]: Recurring defect shapes, shape 2. `.claude/rules/recurring-defects.md`
