@@ -28,7 +28,7 @@ engine gets wrong today.
 | No. | Why it sits here |
 |---|---|
 | 0057 | A shortage must end a unit, or consumption has no consequence either. |
-| 0084 | Two values name a tile's owner, and the event log publishes the wrong one to Python.[^7] |
+| 0084 | Two values name a tile's owner, and the event log publishes the wrong one to Python.[^6] |
 | 0092 | A settlement stands on water. The owner has stated this is not wanted. |
 | 0102 | A settlement reads its own ground rule, not the passability rule. Blocked by 0071 and 0092, in that order. |
 | 0094 | BLK-018 is answered: every faction founds one group. The engine still founds one.[^4] |
@@ -48,8 +48,7 @@ These close a gap a review found, or they unblock the items above.
 | 0112 | Building a world passes over every tile. PRD-0003 states it must not, so the record is false of the code. |
 | 0113 | Admission enforces the capacity from a bridge count that no test compares against a scan. |
 | 0080 | The settings struct prices every new parameter at twenty-five files. |
-| 0098 | The gate suite has no budget and the golden test grows unwatched.[^5] |
-| 0101 | A behavioural claim about terrain is defended by a test of constants.[^8] |
+| 0101 | A behavioural claim about terrain is defended by a test of constants.[^7] |
 
 ## Later
 
@@ -71,7 +70,7 @@ These are real and none of them blocks anything today.
 | 0067 | Descent. Waits on the character tier being used for something. |
 | 0068 | A ruler and a succession. Waits on 0067. |
 | 0088 | Promotion into the character tier. |
-| 0097 | The layout record. Write it with the descent columns, not before.[^6] |
+| 0097 | The layout record. Write it with the descent columns, not before.[^5] |
 | 0050 | Four product collisions still carried. |
 | 0099 | The faction mask union has no engine caller. |
 | 0072 | The panel fit check has no production caller. |
@@ -99,7 +98,6 @@ These are real and none of them blocks anything today.
 [^2]: Backlog guide. `docs/backlog/README.md`
 [^3]: The priority check script. `scripts/check_priority.py`
 [^4]: Blockers register, BLK-018. `docs/BLOCKERS.md`
-[^5]: Decisions register, DEC-033. `docs/DECISIONS.md`
-[^6]: Decisions register, DEC-032. `docs/DECISIONS.md`
-[^7]: Findings register, FND-079. `docs/FINDINGS.md`
-[^8]: Findings register, FND-080. `docs/FINDINGS.md`
+[^5]: Decisions register, DEC-032. `docs/DECISIONS.md`
+[^6]: Findings register, FND-079. `docs/FINDINGS.md`
+[^7]: Findings register, FND-080. `docs/FINDINGS.md`

@@ -733,7 +733,7 @@ a failed founding is correct.[^PRD12]
 [^SCOPE1]: Decision Record Scope, section 1. `.claude/rules/adr-scope.md`
 [^REG21]: ADR Registry, reserved row 0021. `docs/adrs/REGISTRY.md`
 [^ITEM0097]: Backlog item 0097. `docs/backlog/refined/0097-write-the-layout-record-with-the-descent-columns.md`
-[^ITEM0098]: Backlog item 0098. `docs/backlog/refined/0098-give-the-gate-suite-a-development-budget.md`
+[^ITEM0098]: Backlog item 0098. `docs/backlog/complete/0098-give-the-gate-suite-a-development-budget.md`
 [^ITEM0092]: Backlog item 0092. `docs/backlog/refined/0092-refuse-a-settlement-on-the-ground-that-cannot-carry-one.md`
 [^ADR14D7]: ADR-0014, entity identity is an index plus a generation, decision D7. `docs/adrs/accepted/adr-0014-entity-identity-is-an-index-plus-a-generation.md`
 [^BLK18]: Blockers register, BLK-018. `docs/BLOCKERS.md`
