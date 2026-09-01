@@ -27,7 +27,7 @@ engine gets wrong today.
 
 | No. | Why it sits here |
 |---|---|
-| 0084 | Two values name a tile's owner, and the event log publishes the wrong one to Python.[^6] |
+| 0084 | Two values name a tile's owner, and the event log publishes the wrong one to Python.[^5] |
 | 0102 | A settlement reads its own ground rule, not the passability rule. Blocked by 0071 and 0092, in that order. |
 
 ## Next
@@ -36,7 +36,7 @@ These close a gap a review found, or they unblock the items above.
 
 | No. | Why it sits here |
 |---|---|
-| 0120 | The engine gains state the window never shows. Refining it is the work.[^8] |
+| 0120 | The engine gains state the window never shows. Refining it is the work.[^7] |
 | 0059 | Housing. The population cannot be bounded by anything until a place has capacity. |
 | 0060 | Population growth from the store and the housing. |
 | 0095 | Two foundings can over-fill a tile. |
@@ -45,7 +45,7 @@ These close a gap a review found, or they unblock the items above.
 | 0112 | Building a world passes over every tile. PRD-0003 states it must not, so the record is false of the code. |
 | 0113 | Admission enforces the capacity from a bridge count that no test compares against a scan. |
 | 0080 | The settings struct prices every new parameter at twenty-five files. |
-| 0101 | A behavioural claim about terrain is defended by a test of constants.[^7] |
+| 0101 | A behavioural claim about terrain is defended by a test of constants.[^6] |
 
 ## Later
 
@@ -64,13 +64,13 @@ These are real and none of them blocks anything today.
 | 0063 | Assigning a unit to a position. Waits on 0062. |
 | 0065 | Letting the job decide what a unit weighs. Waits on 0063 and 0064. |
 | 0058 | Improvements. Waits on a site that produces. |
-| 0123 | A deposit never comes back. Waits on 0057, because nothing drains the world until a shortage bites.[^9] |
+| 0123 | A deposit never comes back. Waits on 0057, because nothing drains the world until a shortage bites.[^8] |
 | 0124 | A fully recovered deposit still stores a take of zero. Follows 0123. |
 | 0125 | Show a watcher a deposit recovering. Follows 0123. |
 | 0067 | Descent. Waits on the character tier being used for something. |
 | 0068 | A ruler and a succession. Waits on 0067. |
 | 0088 | Promotion into the character tier. |
-| 0097 | The layout record. Write it with the descent columns, not before.[^5] |
+| 0097 | The layout record. Write it with the descent columns, not before.[^4] |
 | 0050 | Four product collisions still carried. |
 | 0099 | The faction mask union has no engine caller. |
 | 0072 | The panel fit check has no production caller. |
@@ -97,9 +97,8 @@ These are real and none of them blocks anything today.
 [^1]: Documentation Rules. `.claude/rules/documentation.md`
 [^2]: Backlog guide. `docs/backlog/README.md`
 [^3]: The priority check script. `scripts/check_priority.py`
-[^4]: Blockers register, BLK-018. `docs/BLOCKERS.md`
-[^5]: Decisions register, DEC-032. `docs/DECISIONS.md`
-[^6]: Findings register, FND-079. `docs/FINDINGS.md`
-[^7]: Findings register, FND-080. `docs/FINDINGS.md`
-[^8]: Findings register, FND-100. `docs/FINDINGS.md`
-[^9]: PRD-0018, a depleted deposit comes back. `docs/product/shaped/prd-0018-a-depleted-deposit-comes-back.md`
+[^4]: Decisions register, DEC-032. `docs/DECISIONS.md`
+[^5]: Findings register, FND-079. `docs/FINDINGS.md`
+[^6]: Findings register, FND-080. `docs/FINDINGS.md`
+[^7]: Findings register, FND-100. `docs/FINDINGS.md`
+[^8]: PRD-0018, a depleted deposit comes back. `docs/product/shaped/prd-0018-a-depleted-deposit-comes-back.md`
