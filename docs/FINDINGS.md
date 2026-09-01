@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-106**
+**Next number: FND-108**
 
 ## A. Corrections to stated rules
 
@@ -2294,6 +2294,69 @@ risk and has no rule against it. Read a "because the engine does X" sentence as
 a figure, and check it against the code before you rely on it.
 
 
+### FND-106 — One shared sample was expected to starve every founding after the first
+
+**Believed.** The candidate ordinal alone gives every faction one sample, so a
+run of several foundings would seat one faction and refuse the rest. The
+refined item states this, and it treats the refusal as the visible symptom of a
+key that holds no faction.[^56]
+
+**True.** A shared sample seats every faction. The sample holds many places,
+and the places stand far apart in a world of this extent, so each founding
+after the first takes a lower-ranked place that still keeps the minimum
+distance. The defect narrows the pool that every founding after the first draws
+from. It does not empty it.
+
+**Evidence.** The faction was removed from the frame slot of the draw key, the
+smallest change that violates the claim, and the founding tests ran. The test
+that changes the faction and compares the samples failed. A test that founded
+for four, six, eight and twelve factions and counted the factions seated stayed
+green at every count, and so did every other test in the file. The command and
+the counts are in the commit body.
+
+**Follows.** Three things.
+
+**A consequence test was written and then deleted.** It asserted that a run
+seats every faction, and it named the shared sample as the defect it caught. It
+caught nothing. A test that passes because the defect is milder than expected
+is a guard, and the register already holds that shape.[^57]
+
+**The key test is the only guard on the faction slot.** It changes the faction
+and asserts that the sample changes, which is what the testing rule asks for a
+keyed draw.[^43]
+
+**A predicted symptom is not evidence.** The item predicted the symptom from
+the key, which is sound reasoning and was still wrong about the size. Put the
+defect back and read what fails, rather than writing the test the prediction
+implies.
+
+### FND-107 — A four-faction fixture could not see the separation rule
+
+**Believed.** A test that founds a run and asserts the distance between every
+pair of places defends the separation rule.
+
+**True.** It defends nothing in a world of four factions. Four samples in a
+world of that extent land far apart by chance. The whole separation rule was
+removed and the test stayed green, because the places it measured were tens of
+tiles apart either way. The same test over eight factions failed at once, on a
+pair one tile apart.
+
+**Evidence.** The separation comparison was replaced by a constant, and the
+founding tests ran. The pairwise distance test passed over four factions and
+failed over eight. The register already holds this shape twice, in two other
+subsystems.[^33]
+
+**Follows.** Two things.
+
+**Ask what distribution the assertion needs.** The fixture must crowd the world
+enough that two foundings compete for one place. A fixture that models the
+ordinary run supplies no such pair.
+
+**The boundary test is the stronger one.** A test that admits a place at the
+minimum distance and refuses one step closer caught both the removed rule and a
+distance one step off, and it needed no crowd.[^58]
+
+
 ## References
 
 [^1]: Findings register, FND-038, in this document.
@@ -2351,3 +2414,6 @@ a figure, and check it against the code before you rely on it.
 [^53]: Decision Record Scope, section 4.3. `.claude/rules/adr-scope.md`
 [^54]: Backlog item 0071. `docs/backlog/complete/0071-derive-tile-passability-from-tile-capacity.md`
 [^55]: Testing rules, section 2a. `.claude/rules/testing.md`
+[^56]: Backlog item 0094. `docs/backlog/complete/0094-decide-how-many-groups-found-a-world.md`
+[^57]: Findings register, FND-093, in this document.
+[^58]: ADR-0076, a founding keeps a fixed distance from the foundings before it, decision D1. `docs/adrs/draft/adr-0076-a-founding-keeps-a-fixed-distance-from-the-foundings-before-it.md`

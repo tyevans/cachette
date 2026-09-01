@@ -1,7 +1,7 @@
 ---
 id: 0094
 title: Found one group for each faction, at a fixed minimum distance
-status: refined
+status: complete
 created: 2026-08-31
 implements: [ADR-0075 D1, ADR-0075 D2, ADR-0075 D4, ADR-0075 D5, ADR-0053 D1]
 changes: []
@@ -223,7 +223,34 @@ the run.[^1]
 
 ## Outcome
 
-Filled in when the item moves to `complete/`.
+**A run founds one group for each faction, in ascending faction index.** The
+run-level call reads the faction set the world holds. It reports one outcome
+for each faction, so a caller reads which factions were seated and which were
+refused. A refused faction leaves the foundings before it standing.
+
+**ADR-0076 holds the three claims.** A founding refuses a place inside the
+minimum distance of a place taken. A run founds in ascending faction index and
+reports one outcome for each faction. The faction fills the frame slot of the
+draw key. The record is a draft and a reviewer holds the acceptance.[^15]
+
+**The minimum distance is a constant of the founding rule, and the record
+states no value.** A compile-time assertion fails when the distance falls to
+twice the survey radius, so the floor and the radius cannot disagree in
+silence.
+
+**The demonstration founds one group for each faction.** A watcher sees four
+settled places in the window rather than one.
+
+**Two findings came out of the work.** A shared sample does not starve the
+foundings after the first, which the item predicted that it would.[^16] A
+fixture of four factions cannot see the separation rule at all, and the test
+that measured it was a guard until the fixture crowded.[^17]
+
+**The golden state hash file for the founding scenario moved**, because the
+scenario now founds one group for each faction. The commit body names the file
+and the command that recorded it.
+
+**One decision closed.** The frame slot holds the faction.[^18]
 
 ## References
 
@@ -241,3 +268,7 @@ Filled in when the item moves to `complete/`.
 [^12]: ADR-0004, iteration order is explicit, decision D4. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
 [^13]: The founding error type. `crates/cachette-core/src/founding.rs`
 [^14]: Testing rules, section 2. `.claude/rules/testing.md`
+[^15]: ADR-0076, a founding keeps a fixed distance from the foundings before it. `docs/adrs/draft/adr-0076-a-founding-keeps-a-fixed-distance-from-the-foundings-before-it.md`
+[^16]: Findings register, FND-106. `docs/FINDINGS.md`
+[^17]: Findings register, FND-107. `docs/FINDINGS.md`
+[^18]: Decisions register, DEC-051. `docs/DECISIONS.md`

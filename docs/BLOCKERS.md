@@ -62,9 +62,9 @@ for why a society splits, and no record holds one. It is a later question, and
 it does not block the founding rule: a run that founds one group for each
 faction can still gain a fracture rule afterwards.
 
-The engine already takes the group size and the faction at the founding call,
-so a caller founds one group or several without an engine change. The
-demonstration founds one and must now found one for each faction.
+The engine takes the group size and the faction at the founding call, so a
+caller founds one group or several. The run-level call founds one group for
+each faction the world holds, and the demonstration calls it.[^FOUNDDIST]
 
 **Two questions this answer does not settle, and the work needs both.** How
 far apart two foundings must be, and whether a second founding may widen its
@@ -174,3 +174,4 @@ normally.
 [^TIMING]: Movement timing note. `docs/research/movement-timing.md`
 [^FOUND]: PRD-0012, a world starts small and grows. `docs/product/accepted/prd-0012-a-world-starts-small-and-grows.md`
 [^SEP]: Decisions register, DEC-037. `docs/DECISIONS.md`
+[^FOUNDDIST]: ADR-0076, a founding keeps a fixed distance from the foundings before it. `docs/adrs/draft/adr-0076-a-founding-keeps-a-fixed-distance-from-the-foundings-before-it.md`
