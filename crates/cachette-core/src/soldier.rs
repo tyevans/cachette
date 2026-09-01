@@ -378,6 +378,23 @@ impl SoldierArena {
         self.generations.len() as u32
     }
 
+    /// Returns the generation that one slot carries.
+    ///
+    /// A slot that carries no identity returns zero, and zero is never a
+    /// generation of a live unit.[^1] A caller that holds a slot index
+    /// rebuilds the identity from this value.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0014, entity identity is an index plus a generation, decision D6. `docs/adrs/accepted/adr-0014-entity-identity-is-an-index-plus-a-generation.md`
+    #[must_use]
+    pub fn generation_of(&self, slot: u32) -> u32 {
+        self.generations
+            .get(slot as usize)
+            .copied()
+            .unwrap_or(NO_GENERATION)
+    }
+
     /// Returns the number of slots that the arena has retired.
     #[must_use]
     pub const fn retired_count(&self) -> u32 {

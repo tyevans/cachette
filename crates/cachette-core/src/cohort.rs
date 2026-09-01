@@ -147,6 +147,8 @@ pub struct NeedRule {
     /// What one tick takes off the deficit of a unit that is not in
     /// deficit.
     recovery: Fix32,
+    /// The deficit at which a unit ends.
+    bound: Fix32,
 }
 
 impl NeedRule {
@@ -155,11 +157,20 @@ impl NeedRule {
     /// The ration equals the decay, so a unit that receives its whole
     /// ration holds its need level. That equality is the reason the two
     /// values are stated together rather than in two places.
+    ///
+    /// The bound is the deficit at which a unit ends. It is content, it is
+    /// declared here until content exists, and the register holds the open
+    /// choice of it.[^1] A caller changes it without touching a kernel.
+    ///
+    /// # References
+    ///
+    /// [^1]: Decisions register, DEC-043. `docs/DECISIONS.md`
     pub const DEFAULT: Self = Self {
         decay: Fix32(NEED_FULL.0 / 16),
         ration: Fix32(NEED_FULL.0 / 16),
         threshold: Fix32(NEED_FULL.0 / 2),
         recovery: Fix32(NEED_FULL.0 / 16),
+        bound: Fix32(NEED_FULL.0 * 4),
     };
 
     /// Builds a rule.
@@ -172,6 +183,7 @@ impl NeedRule {
         ration: Fix32,
         threshold: Fix32,
         recovery: Fix32,
+        bound: Fix32,
     ) -> Result<Self, CohortError> {
         if decay.0 < 0 {
             return Err(CohortError::RateBelowZero(decay));
@@ -185,11 +197,15 @@ impl NeedRule {
         if recovery.0 < 0 {
             return Err(CohortError::RateBelowZero(recovery));
         }
+        if bound.0 < 0 {
+            return Err(CohortError::RateBelowZero(bound));
+        }
         Ok(Self {
             decay,
             ration,
             threshold,
             recovery,
+            bound,
         })
     }
 
@@ -217,6 +233,39 @@ impl NeedRule {
         self.recovery
     }
 
+    /// Returns the deficit at which a unit ends.
+    ///
+    /// The bound is a parameter of the rule. A caller sets it, and no
+    /// kernel here holds a value of its own.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0063, a need is a rate with a threshold, and crossing it is a fact, decision D3. `docs/adrs/accepted/adr-0063-a-need-is-a-rate-with-a-threshold-and-crossing-it-is-a-fact.md`
+    #[must_use]
+    pub const fn bound(self) -> Fix32 {
+        self.bound
+    }
+
+    /// Returns the condition that one deficit puts a unit in.
+    ///
+    /// The condition is the deficit read against the bound, and it is the
+    /// name a watcher uses. A watcher that read the raw accumulator would
+    /// hold the threshold rule in a second place.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`
+    #[must_use]
+    pub const fn condition(self, deficit: Fix32) -> NeedCondition {
+        if deficit.0 <= 0 {
+            NeedCondition::Fed
+        } else if deficit.0 < self.bound.0 {
+            NeedCondition::Short
+        } else {
+            NeedCondition::Starved
+        }
+    }
+
     /// Absorbs the rule into the state hash.
     #[must_use]
     pub fn hash_into(&self, hash: StateHash) -> StateHash {
@@ -224,6 +273,7 @@ impl NeedRule {
             .write(&self.ration.0.to_le_bytes())
             .write(&self.threshold.0.to_le_bytes())
             .write(&self.recovery.0.to_le_bytes())
+            .write(&self.bound.0.to_le_bytes())
     }
 }
 
@@ -918,4 +968,268 @@ pub fn satisfy(
         }
     });
     Ok(())
+}
+
+/// What a shortage has done to one unit.
+///
+/// The condition is a name, and a watcher reads it instead of reading the
+/// accumulator. The three values cover the whole range of the accumulator,
+/// so a watcher never compares a number against a rule of its own.[^1]
+///
+/// # References
+///
+/// [^1]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum NeedCondition {
+    /// The unit carries no deficit.
+    Fed,
+    /// The unit carries a deficit below the bound. It recovers when the
+    /// shortage ends.
+    Short,
+    /// The unit carries a deficit at or above the bound. The next scan of
+    /// the death plane ends it.
+    Starved,
+}
+
+impl core::fmt::Display for NeedCondition {
+    fn fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            Self::Fed => write!(formatter, "fed"),
+            Self::Short => write!(formatter, "short"),
+            Self::Starved => write!(formatter, "starved"),
+        }
+    }
+}
+
+/// The number of unit slots that one word of the death plane covers.
+const PLANE_BITS: usize = 64;
+
+/// A unit that a shortage ended, and the tick that ended it.
+///
+/// The layout is 8 + 8 + 4 + 4 bytes, which is 24 bytes at an alignment of
+/// 8. The trailing array declares every padding byte.[^1]
+///
+/// # References
+///
+/// [^1]: ADR-0006, an event is plain data and applying it is pure, decision D1. `docs/adrs/accepted/adr-0006-an-event-is-plain-data-and-applying-it-is-pure.md`
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Pod, Zeroable)]
+pub struct UnitStarved {
+    /// The tick at which the scan ended the unit.
+    pub tick: Tick,
+    /// The unit that ended, as its identity in bits.
+    pub unit: u64,
+    /// The deficit that the unit carried. It is at or above the bound.
+    pub deficit: Fix32,
+    /// The declared padding. Always zero.
+    pub padding: [u8; 4],
+}
+
+impl UnitStarved {
+    /// Builds an event with zero padding.
+    #[must_use]
+    pub const fn new(tick: Tick, unit: u64, deficit: Fix32) -> Self {
+        Self {
+            tick,
+            unit,
+            deficit,
+            padding: [0; 4],
+        }
+    }
+}
+
+/// One bit for each unit slot: the units that a shortage has ended.
+///
+/// The plane is dense, so the mark pass writes into disjoint words and the
+/// plane is identical at any thread count. A bitwise write into a word that
+/// one thread owns is commutative. The scan that reads the plane is ordered
+/// all the same, because the deaths apply in the order the scan finds
+/// them.[^1]
+///
+/// # References
+///
+/// [^1]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct DeathPlane {
+    /// One bit for each slot, in slot order, least significant bit first.
+    words: Vec<u64>,
+}
+
+impl DeathPlane {
+    /// Builds an empty plane.
+    #[must_use]
+    pub const fn new() -> Self {
+        Self { words: Vec::new() }
+    }
+
+    /// Returns the words of the plane.
+    #[must_use]
+    pub fn words(&self) -> &[u64] {
+        &self.words
+    }
+
+    /// Clears every bit and covers the given number of slots.
+    pub fn cover(&mut self, slots: usize) {
+        self.words.clear();
+        self.words.resize(slots.div_ceil(PLANE_BITS), 0);
+    }
+
+    /// Reports whether the plane marks a slot.
+    #[must_use]
+    pub fn marks(&self, slot: usize) -> bool {
+        match self.words.get(slot / PLANE_BITS) {
+            Some(word) => word & (1u64 << (slot % PLANE_BITS)) != 0,
+            None => false,
+        }
+    }
+
+    /// Returns the number of slots that the plane marks.
+    #[must_use]
+    pub fn count(&self) -> u32 {
+        self.words.iter().map(|word| word.count_ones()).sum()
+    }
+}
+
+/// Marks every live unit whose deficit reached the bound.
+///
+/// The pass is a map over the unit slots. Each thread owns a contiguous run
+/// of whole words, so no two threads write one word and the plane is the
+/// same at any thread count.[^1]
+///
+/// The pass ends nothing. It states which units the scan must end, and the
+/// scan runs after the barrier.[^2]
+///
+/// # Errors
+///
+/// Returns an error when the caller asks for zero threads, when the bound
+/// of the rule is below zero, and when the columns hold different lengths.
+///
+/// # References
+///
+/// [^1]: ADR-0009, parallel stages write disjoint outputs, decision D1. `docs/adrs/accepted/adr-0009-parallel-stages-write-disjoint-outputs.md`
+/// [^2]: ADR Registry, row 0020. `docs/adrs/REGISTRY.md`
+pub fn mark_starved(
+    rule: NeedRule,
+    deficits: &[Fix32],
+    live: &[u8],
+    plane: &mut DeathPlane,
+    threads: usize,
+) -> Result<(), CohortError> {
+    if threads == 0 {
+        return Err(CohortError::ZeroThreads);
+    }
+    if rule.bound().0 < 0 {
+        return Err(CohortError::RateBelowZero(rule.bound()));
+    }
+    if live.len() != deficits.len() {
+        return Err(CohortError::ColumnsDisagree);
+    }
+    plane.cover(deficits.len());
+    if deficits.is_empty() {
+        return Ok(());
+    }
+    let word_chunk = plane.words.len().div_ceil(threads).max(1);
+    let count = deficits.len();
+    std::thread::scope(|scope| {
+        let mut base = 0usize;
+        for span in plane.words.chunks_mut(word_chunk) {
+            let start = (base * PLANE_BITS).min(count);
+            base += span.len();
+            let stop = (base * PLANE_BITS).min(count);
+            let deficit_span = &deficits[start..stop];
+            let live_span = &live[start..stop];
+            scope.spawn(move || {
+                for (offset, deficit) in deficit_span.iter().enumerate() {
+                    if live_span[offset] != 1 {
+                        continue;
+                    }
+                    // The condition of the rule is the one statement of
+                    // when a unit ends. A comparison against the bound here
+                    // would be that rule in a second place.[^1]
+                    //
+                    // [^1]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`
+                    if rule.condition(*deficit) == NeedCondition::Starved {
+                        span[offset / PLANE_BITS] |= 1u64 << (offset % PLANE_BITS);
+                    }
+                }
+            });
+        }
+    });
+    Ok(())
+}
+
+/// Returns the marked slots in ascending slot order.
+///
+/// The scan reads word by word and bit by bit, from the lowest slot to the
+/// highest. It reads no thread and no join, so the order is a property of
+/// the plane alone.[^1]
+///
+/// # Errors
+///
+/// Returns an error when the caller asks for zero threads.
+///
+/// # References
+///
+/// [^1]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
+#[cfg(not(feature = "probe-nondeterminism"))]
+pub fn starved_order(plane: &DeathPlane, threads: usize) -> Result<Vec<u32>, CohortError> {
+    if threads == 0 {
+        return Err(CohortError::ZeroThreads);
+    }
+    let mut order = Vec::with_capacity(plane.count() as usize);
+    for (index, word) in plane.words.iter().enumerate() {
+        let mut rest = *word;
+        while rest != 0 {
+            let bit = rest.trailing_zeros() as usize;
+            order.push((index * PLANE_BITS + bit) as u32);
+            rest &= rest - 1;
+        }
+    }
+    Ok(order)
+}
+
+/// Returns the marked slots in the order the output slots joined, which is
+/// a defect.
+///
+/// This is the perturbed build. The scan collects each span of the plane
+/// into an output slot and joins the slots, so the order of the deaths
+/// follows the join order. The slot probe reverses that order, and the
+/// reversal is visible only above one thread, so the thread-count test then
+/// fails.
+///
+/// The whole point is that it must fail. A determinism test with no proven
+/// failure mode is decoration.[^1]
+///
+/// # Errors
+///
+/// Returns an error when the caller asks for zero threads.
+///
+/// # References
+///
+/// [^1]: Testing rules, section 1. `.claude/rules/testing.md`
+#[cfg(feature = "probe-nondeterminism")]
+pub fn starved_order(plane: &DeathPlane, threads: usize) -> Result<Vec<u32>, CohortError> {
+    if threads == 0 {
+        return Err(CohortError::ZeroThreads);
+    }
+    let word_chunk = plane.words.len().div_ceil(threads).max(1);
+    let mut slots: Slots<Vec<u32>> =
+        Slots::filled(threads, Vec::new()).map_err(|_| CohortError::ZeroThreads)?;
+    let mut base = 0usize;
+    for (span, slot) in plane.words.chunks(word_chunk).zip(slots.entries_mut()) {
+        let start = base;
+        base += span.len();
+        for (index, word) in span.iter().enumerate() {
+            let mut rest = *word;
+            while rest != 0 {
+                let bit = rest.trailing_zeros() as usize;
+                slot.push(((start + index) * PLANE_BITS + bit) as u32);
+                rest &= rest - 1;
+            }
+        }
+    }
+    Ok(slots.combine(Vec::new(), |mut carried: Vec<u32>, found| {
+        carried.extend_from_slice(found);
+        carried
+    }))
 }
