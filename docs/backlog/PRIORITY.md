@@ -30,7 +30,6 @@ engine gets wrong today.
 | 0064 | Units walk at random. This is the item that makes them act, and the owner has asked for it. |
 | 0056 | Nothing consumes anything, so gathering has no consequence. |
 | 0057 | A shortage must end a unit, or consumption has no consequence either. |
-| 0085 | A faction holds ground and no watcher can see it. PRD-0006 states this and it is not met. |
 | 0092 | A settlement stands on water. The owner has stated this is not wanted. |
 | 0094 | One faction founds and three begin empty. This needs the owner's answer.[^4] |
 

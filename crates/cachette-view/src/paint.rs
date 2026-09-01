@@ -8,14 +8,26 @@
 //! the screen. The skew belongs here. The engine holds no screen
 //! position.[^3]
 //!
+//! # The holder layer
+//!
+//! A tile that a faction holds takes that faction's colour, mixed over the
+//! ground. A tile that nobody holds draws as the ground alone. A held tile
+//! whose neighbour has another holder takes a border in the same colour, so
+//! a watcher sees where one holding meets another.
+//!
+//! The colour comes from the one table this module holds. The engine holds no
+//! colour, and a second table would be one fact in two places.[^2] [^4]
+//!
 //! # References
 //!
 //! [^1]: ADR-0002, simulated and aggregated state holds no floating point number, decision D4. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
 //! [^2]: ADR-0067, the viewer reads the world and never writes to it, decision D3. `docs/adrs/accepted/adr-0067-the-viewer-reads-the-world-and-never-writes-to-it.md`
 //! [^3]: ADR-0017, the world is a rhombus, so a tile index is raw axial, decision D4. `docs/adrs/accepted/adr-0017-the-world-is-a-rhombus-so-a-tile-index-is-raw-axial.md`
+//! [^4]: Recurring Defect Shapes, shape 1. `.claude/rules/recurring-defects.md`
 
+use cachette_core::hex::NEIGHBOURS;
 use cachette_core::terrain::{TileKind, KIND_COUNT};
-use cachette_core::{Axial, BridgeError, FactionId, World};
+use cachette_core::{Axial, BridgeError, FactionId, Holder, World};
 
 use crate::text;
 
@@ -92,6 +104,24 @@ const FACTION_COLOURS: [u32; 6] = [
 /// cannot separate.
 pub const COLOURED_FACTIONS: usize = FACTION_COLOURS.len();
 
+/// How much of the holder's colour covers the ground it holds.
+///
+/// The ground stays legible under the holding, because a watcher must read
+/// the kind of ground and the holder of it at once. The weight is a property
+/// of the picture. No record binds it, and a later contributor may change it
+/// freely.
+const HOLDER_WEIGHT: u8 = 96;
+
+/// How much of the holder's colour covers the edge of a holding.
+///
+/// The edge is nearly the pure colour, because the edge is what the product
+/// record asks a watcher to see.[^1]
+///
+/// # References
+///
+/// [^1]: PRD-0006, a place belongs to somebody. `docs/product/shaped/prd-0006-a-place-belongs-to-somebody.md`
+const EDGE_WEIGHT: u8 = 230;
+
 /// Returns the colour the viewer draws a faction in.
 ///
 /// The colour is the viewer's own. The engine holds no colour and never
@@ -133,6 +163,8 @@ pub struct Canvas {
     blocks_skipped: u32,
     painted_by_faction: [u32; COLOURED_FACTIONS],
     painted_by_kind: [u32; KIND_COUNT],
+    holder_reads: u32,
+    tiles_held: u32,
 }
 
 impl Canvas {
@@ -155,6 +187,8 @@ impl Canvas {
             blocks_skipped: 0,
             painted_by_faction: [0; COLOURED_FACTIONS],
             painted_by_kind: [0; KIND_COUNT],
+            holder_reads: 0,
+            tiles_held: 0,
         }
     }
 
@@ -174,6 +208,36 @@ impl Canvas {
     #[must_use]
     pub const fn height(&self) -> usize {
         self.height
+    }
+
+    /// Returns the number of holders the last draw read.
+    ///
+    /// The drawing reads the holder of every tile it paints, and the six
+    /// neighbours of every tile that somebody holds. The count is therefore a
+    /// function of the window and never of the world.[^1] A test reads it to
+    /// check that, because a layer that swept the world would still paint the
+    /// right picture.[^2]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0070, the head-up display reports what the drawing pass read, decision D1. `docs/adrs/accepted/adr-0070-the-head-up-display-reports-what-the-drawing-pass-read.md`
+    /// [^2]: Findings register, FND-071. `docs/FINDINGS.md`
+    #[must_use]
+    pub const fn holder_reads(&self) -> u32 {
+        self.holder_reads
+    }
+
+    /// Returns the number of painted tiles that a faction holds.
+    ///
+    /// The count is of the window, in the same way every other count of the
+    /// drawing pass is.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0070, the head-up display reports what the drawing pass read, decision D2. `docs/adrs/accepted/adr-0070-the-head-up-display-reports-what-the-drawing-pass-read.md`
+    #[must_use]
+    pub const fn tiles_held(&self) -> u32 {
+        self.tiles_held
     }
 
     /// Returns the number of tiles the last draw painted.
@@ -334,6 +398,8 @@ impl Canvas {
         self.blocks_skipped = 0;
         self.painted_by_faction = [0; COLOURED_FACTIONS];
         self.painted_by_kind = [0; KIND_COUNT];
+        self.holder_reads = 0;
+        self.tiles_held = 0;
     }
 
     /// Sets one pixel, and ignores a position outside the canvas.
@@ -735,6 +801,8 @@ pub fn kind_colour(kind: TileKind) -> u32 {
 ///
 /// [^1]: ADR-0067, the viewer reads the world and never writes to it, decision D1. `docs/adrs/accepted/adr-0067-the-viewer-reads-the-world-and-never-writes-to-it.md`
 /// [^2]: ADR-0068, terrain is generated from the seed and is never stored as a map, decision D1. `docs/adrs/accepted/adr-0068-terrain-is-generated-from-the-seed-and-is-never-stored-as-a-map.md`
+/// [^3]: ADR-0070, the head-up display reports what the drawing pass read, decision D1. `docs/adrs/accepted/adr-0070-the-head-up-display-reports-what-the-drawing-pass-read.md`
+/// [^4]: ADR-0053, a faction is a bit in a mask, and a relation is a plane, decision D2. `docs/adrs/accepted/adr-0053-a-faction-is-a-bit-in-a-mask-and-a-relation-is-a-plane.md`
 pub fn draw(world: &World, camera: Camera, canvas: &mut Canvas) -> Result<(), BridgeError> {
     canvas.clear();
     let grid = world.grid();
@@ -759,13 +827,44 @@ pub fn draw(world: &World, camera: Camera, canvas: &mut Canvas) -> Result<(), Br
                 continue;
             };
             let (x, y) = camera.centre_of(address);
-            canvas.fill_rect(
-                x as i32 - tile_side / 2,
-                y as i32 - tile_side / 2,
-                tile_side,
-                tile_side,
-                tile_colour(ground.kind, ground.height.0, value),
-            );
+            let ground_colour = tile_colour(ground.kind, ground.height.0, value);
+            let left = x as i32 - tile_side / 2;
+            let top = y as i32 - tile_side / 2;
+
+            // The holder of this tile, read at the tile that is being
+            // painted, on the loop that already runs. The layer starts no
+            // pass of its own.[^3]
+            //
+            // This reads the holder of the world. It never reads the tile
+            // faction column of the stub system, which is written when the
+            // world is built, never changes, and is not a holder. A layer
+            // that drew that column would give a full, still map of holdings
+            // that no rule ever made.[^4]
+            let holder = world.tile_holder(address);
+            canvas.holder_reads += 1;
+            match holder.and_then(Holder::faction) {
+                None => canvas.fill_rect(left, top, tile_side, tile_side, ground_colour),
+                Some(faction) => {
+                    let held = faction_colour(faction);
+                    canvas.fill_rect(
+                        left,
+                        top,
+                        tile_side,
+                        tile_side,
+                        mix(ground_colour, held, HOLDER_WEIGHT),
+                    );
+                    canvas.tiles_held += 1;
+                    if on_an_edge(world, address, holder, canvas) {
+                        outline(
+                            canvas,
+                            left,
+                            top,
+                            tile_side,
+                            mix(ground_colour, held, EDGE_WEIGHT),
+                        );
+                    }
+                }
+            }
             canvas.tiles_painted += 1;
             canvas.painted_by_kind[ground.kind.to_u8() as usize] += 1;
         }
@@ -773,6 +872,40 @@ pub fn draw(world: &World, camera: Camera, canvas: &mut Canvas) -> Result<(), Br
 
     let radius = ((camera.tile_width * 0.3) as i32).max(1);
     draw_soldiers(world, camera, canvas, radius, first_row, last_row)
+}
+
+/// Reports whether a tile sits on the edge of its holding.
+///
+/// The six neighbours are fixed offsets, and the edge of the world does not
+/// wrap. A neighbour outside the world reads as nobody, so the boundary of
+/// the world counts as an edge rather than as a wrap to the far side.[^1]
+///
+/// The read is of level 0, which is the only truth. A summary level could
+/// state a holding that the tiles below it no longer hold.[^2]
+///
+/// # References
+///
+/// [^1]: ADR-0017, the world is a rhombus, so a tile index is raw axial, decision D2. `docs/adrs/accepted/adr-0017-the-world-is-a-rhombus-so-a-tile-index-is-raw-axial.md`
+/// [^2]: ADR-0022, level 0 is the only truth, and every level above it is derived, decision D1. `docs/adrs/accepted/adr-0022-level-0-is-the-only-truth-and-every-level-above-it-is-derived.md`
+fn on_an_edge(world: &World, address: Axial, holder: Option<Holder>, canvas: &mut Canvas) -> bool {
+    let mut edge = false;
+    for offset in NEIGHBOURS {
+        let beside = world.tile_holder(address.add(offset));
+        canvas.holder_reads += 1;
+        // The loop does not stop at the first difference. A short loop would
+        // make the count of reads depend on where the neighbour sits, and the
+        // cost of the layer would then follow the shape of the holdings.
+        edge = edge || beside.unwrap_or(Holder::NOBODY) != holder.unwrap_or(Holder::NOBODY);
+    }
+    edge
+}
+
+/// Draws a one pixel border inside a square.
+fn outline(canvas: &mut Canvas, left: i32, top: i32, side: i32, colour: u32) {
+    canvas.fill_rect(left, top, side, 1, colour);
+    canvas.fill_rect(left, top + side - 1, side, 1, colour);
+    canvas.fill_rect(left, top, 1, side, colour);
+    canvas.fill_rect(left + side - 1, top, 1, side, colour);
 }
 
 /// Draws the soldiers that stand inside the visible blocks.
