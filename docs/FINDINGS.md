@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-115**
+**Next number: FND-116**
 
 ## A. Corrections to stated rules
 
@@ -2391,6 +2391,33 @@ test that passes because an earlier stage already excluded the bad case is a
 guard, not evidence.[^58] Both rules stay in the code, because the second
 mechanism is an ordering that a later change can move, and neither costs
 anything. Neither is counted as covered.
+
+### FND-115 — A fixture that asks for the first kind a tile carries selects one kind
+
+**Believed.** A fixture that walks the open tiles and takes, for each tile, the
+first resource kind that the tile carries builds a mixed set of deposits. The
+world holds three kinds, so a set of twelve tiles will hold several of them.
+
+**True.** It selected stone on every one of the twelve tiles, and stone is the
+one kind that does not recover. The scenario gathered, stored a take for each
+tile, and recovered nothing. Every assertion about the ledger passed, because
+the ledger held exactly what a correct run would hold.
+
+**Evidence.** The golden scenario for gathering asserts after its run that the
+world stored a take and that something recovered. The second assertion failed
+on the first run of the scenario. The order the fixture searched in put food
+first, so the outcome was not the order but the world: the tiles it reached
+carry no food and no wood.
+
+**Follows.** Choose the case, do not search for it. A fixture that asks the
+world for "the first thing that fits" takes whatever the world offers first,
+and the world is not trying to give the test a hard case. The scenario now
+names how many deposits of each kind it wants, and fails when it cannot find
+them.
+
+**A fixture needs an assertion about itself.** This one was caught by a check
+that the run reached the case, not by reading the code, and the file it would
+have recorded would have looked correct for as long as anyone left it.[^55]
 
 
 ## References

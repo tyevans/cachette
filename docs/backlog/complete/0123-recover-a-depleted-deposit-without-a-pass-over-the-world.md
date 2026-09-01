@@ -130,6 +130,16 @@ ADR-0080 was written with the code, and it is a draft. Two rows opened in the
 decisions register: the period value of each recovering kind, and whether a
 period returns one unit or the whole deposit. Two findings were recorded.
 
+**What the tests do not prove.** Two of them are guards rather than evidence.
+The test that compares the work of one recovery pass across two extents reads a
+visit count that equals the number of ledger entries by construction, so it
+cannot disagree with itself; the guarantee that matters is structural, that the
+pass receives no grid and no tile count. The test that a gather takes what the
+deposit holds cannot catch over-taking either, because the resolve clamps to an
+amount it read from the same ledger. Two rules of the ageing function also have
+no observable failure through the engine today, and they are recorded as
+defence and not as coverage.
+
 **What is left undone.** An entry that owes nothing stays in the ledger, so the
 depleted set grows and never shrinks. That is item 0124, and the priority index
 now states the cost. Nothing shows a watcher a deposit recovering, which is item
