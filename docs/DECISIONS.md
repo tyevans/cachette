@@ -49,6 +49,12 @@ rule and accept that a shortage which empties a need is fatal.
 The values are content, and no content pipeline exists.[^DEC34REF] The row
 therefore asks for a default, not for a rule.
 
+**A refined item now waits on this row.** Growth adds mouths to the same
+store, so under the default rule a site that grows into a shortage loses the
+population it grew and does not recover. The item states its behavioural
+tests against a rule it chooses rather than against the default, so the work
+can proceed, and it records the fatal default as a test of its own.[^DEC44ITEM]
+
 
 ### DEC-038 — Which slot does the faction take in the founding draw key?
 
@@ -874,3 +880,4 @@ a failed founding is correct.[^PRD12]
 [^BLK18]: Blockers register, BLK-018. `docs/BLOCKERS.md`
 [^ITEM0094]: Backlog item 0094. `docs/backlog/refined/0094-decide-how-many-groups-found-a-world.md`
 [^ADR75]: ADR-0075, the founding choice reads a bounded sample of the world. `docs/adrs/accepted/adr-0075-the-founding-choice-reads-a-bounded-sample-of-the-world.md`
+[^DEC44ITEM]: Backlog item 0060. `docs/backlog/refined/0060-grow-the-population-from-the-store-and-the-housing.md`

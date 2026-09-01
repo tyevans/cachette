@@ -38,8 +38,8 @@ These close a gap a review found, or they unblock the items above.
 | No. | Why it sits here |
 |---|---|
 | 0120 | The engine gains state the window never shows. Refining it is the work.[^8] |
-| 0059 | Housing. The population cannot be bounded by anything until a place has capacity. |
-| 0060 | Population growth from the store and the housing. |
+| 0059 | Housing. The population cannot be bounded by anything until a place has capacity. ADR-0081 holds the decisions and waits for review. |
+| 0060 | Population growth from the store and the housing. It waits on 0059, and DEC-044 decides whether a grown population can survive.[^10] |
 | 0095 | Two foundings can over-fill a tile. |
 | 0103 | A household has no home. DEC-039 answers it: derive the household from the dwelling slot. |
 | 0104 | A ruler decides nothing that reaches anybody. DEC-040 carries the writ in the influence field. |
@@ -105,3 +105,4 @@ These are real and none of them blocks anything today.
 [^7]: Findings register, FND-080. `docs/FINDINGS.md`
 [^8]: Findings register, FND-100. `docs/FINDINGS.md`
 [^9]: PRD-0018, a depleted deposit comes back. `docs/product/shaped/prd-0018-a-depleted-deposit-comes-back.md`
+[^10]: Decisions register, DEC-044. `docs/DECISIONS.md`
