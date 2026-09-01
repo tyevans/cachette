@@ -37,8 +37,8 @@ These close a gap a review found, or they unblock the items above.
 | No. | Why it sits here |
 |---|---|
 | 0120 | The engine gains state the window never shows. Refining it is the work.[^8] |
-| 0059 | Housing. The population cannot be bounded by anything until a place has capacity. |
-| 0060 | Population growth from the store and the housing. |
+| 0059 | Housing. The population cannot be bounded by anything until a place has capacity. ADR-0081 holds the decisions and waits for review. |
+| 0060 | Population growth from the store and the housing. It waits on 0059, and DEC-044 decides whether a grown population can survive.[^9] |
 | 0103 | A household has no home. DEC-039 answers it: derive the household from the dwelling slot. |
 | 0104 | A ruler decides nothing that reaches anybody. DEC-040 carries the writ in the influence field. |
 | 0112 | Building a world passes over every tile. PRD-0003 states it must not, so the record is false of the code. |

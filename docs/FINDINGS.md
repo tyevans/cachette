@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-111**
+**Next number: FND-117**
 
 ## A. Corrections to stated rules
 
@@ -2439,6 +2439,40 @@ frame.** A tile that drains below its capacity inside the frame admits for a
 reason the rule does not name, so a test built on a small over-fill measures the
 drain rather than the refusal. The suite that found this places enough units
 that the tile stays above its capacity through every frame.
+### FND-116 — Housing already has a residence column and an eviction path
+
+**Believed.** A unit belongs to nothing. Backlog item 0059 plans a new
+residence column on the soldier arena, and plans an eviction that clears the
+residents of a lost site. The product record states that a unit lives nowhere
+today.[^61]
+
+**True.** Both exist. The consumption work gave the soldier arena a home
+column that holds a slot of the settlement arena, with a reader and a writer
+on the arena and a wrapper on the world. Under the record that fixes a
+settlement to a tile and gives it the pooled store, the site a unit draws from
+and the place a unit lives are one fact, so a second column would be a second
+declaration of it.[^62] Destroying a settlement already clears the home of
+every unit that named the lost slot.
+
+**Evidence.** The soldier arena holds the column, its reader, its writer and
+its slice reader. The founding writes the home of every unit it places. The
+destroy path clears the home of every resident of the lost site. The
+consumption pass and the cohort rebuild both read the column.
+
+**Follows.** Three things.
+
+**Item 0059 extends the home column. It adds none.** A residence column beside
+the home column is the defect shape this register meets most often.[^63]
+
+**The eviction exists, and its cost shape is the open part.** The destroy path
+reads every unit of the world to find the residents of one site. That is a
+pass over the population for a fact that a reverse index would answer
+directly. Whether such an index exists is a decision, and the item names it.
+
+**A separation of the two facts is a later decision, not a default.** A unit
+that draws from one site and lives in another is a world the project may want.
+Nothing needs it today, and the item that needs it owns the record.
+
 
 ## References
 
@@ -2502,3 +2536,6 @@ that the tile stays above its capacity through every frame.
 [^58]: Backlog item 0094. `docs/backlog/complete/0094-decide-how-many-groups-found-a-world.md`
 [^59]: Findings register, FND-093, in this document.
 [^60]: ADR-0076, a founding keeps a fixed distance from the foundings before it, decision D1. `docs/adrs/draft/adr-0076-a-founding-keeps-a-fixed-distance-from-the-foundings-before-it.md`
+[^61]: PRD-0014, everyone needs somewhere to live. `docs/product/accepted/prd-0014-everyone-needs-somewhere-to-live.md`
+[^62]: ADR-0066, entity storage holds four fixed shapes, decision D1. `docs/adrs/accepted/adr-0066-entity-storage-holds-four-fixed-shapes.md`
+[^63]: Recurring Defect Shapes, shape 1. `.claude/rules/recurring-defects.md`

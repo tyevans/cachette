@@ -38,6 +38,8 @@ A record here binds nothing until a reviewer moves it.
 | No. | What it claims |
 |---|---|
 | 0076 | A founding keeps a fixed distance from the foundings before it, a run founds in ascending faction index, and the faction fills the frame slot of the draw key. Backlog item 0094 wrote it, and the code it describes exists. |
+| 0081 | Housing. Nothing in the queue can bound a population until this is settled. Read it against ADR-0074 D3, which answers the tile case the other way. |
+| 0082 | Population growth. It depends on 0081, so review 0081 first. |
 
 ## Reserved and not written
 

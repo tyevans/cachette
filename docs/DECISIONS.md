@@ -49,6 +49,12 @@ rule and accept that a shortage which empties a need is fatal.
 The values are content, and no content pipeline exists.[^DEC34REF] The row
 therefore asks for a default, not for a rule.
 
+**A refined item now waits on this row.** Growth adds mouths to the same
+store, so under the default rule a site that grows into a shortage loses the
+population it grew and does not recover. The item states its behavioural
+tests against a rule it chooses rather than against the default, so the work
+can proceed, and it records the fatal default as a test of its own.[^DEC44ITEM]
+
 
 ### DEC-038 — Which slot does the faction take in the founding draw key?
 
@@ -79,9 +85,7 @@ this decision removed the faction from the key and counted the factions seated
 at four, six, eight and twelve factions; every faction was seated every
 time.[^FND106] The decision is unchanged and the reasoning above is narrowed to
 what is true. A consequence test built on the stronger claim was written,
-found to catch nothing, and deleted. The project buys that
-with a field assignment rather than with a mechanism, and DEC-037 keeps the
-fixed sample it chose.
+found to catch nothing, and deleted.
 
 **What this opens, and does not decide.** A per-faction sample can later carry
 a per-faction bias, so that factions value different ground. Nothing decides
@@ -908,4 +912,8 @@ a failed founding is correct.[^PRD12]
 [^BLK18]: Blockers register, BLK-018. `docs/BLOCKERS.md`
 [^ITEM0094]: Backlog item 0094. `docs/backlog/complete/0094-decide-how-many-groups-found-a-world.md`
 [^ADR75]: ADR-0075, the founding choice reads a bounded sample of the world. `docs/adrs/accepted/adr-0075-the-founding-choice-reads-a-bounded-sample-of-the-world.md`
+<<<<<<< HEAD
 [^FND106]: Findings register, FND-106. `docs/FINDINGS.md`
+=======
+[^DEC44ITEM]: Backlog item 0060. `docs/backlog/refined/0060-grow-the-population-from-the-store-and-the-housing.md`
+>>>>>>> worktree-agent-a4ea51fa97c6b231a
