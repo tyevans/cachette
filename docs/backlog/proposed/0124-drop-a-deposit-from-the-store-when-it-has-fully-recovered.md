@@ -38,5 +38,5 @@ Filled in when the item moves to `complete/`.
 
 ## References
 
-[^1]: Backlog item 0123. `docs/backlog/refined/0123-recover-a-depleted-deposit-without-a-pass-over-the-world.md`
+[^1]: Backlog item 0123. `docs/backlog/complete/0123-recover-a-depleted-deposit-without-a-pass-over-the-world.md`
 [^2]: PRD-0018, a depleted deposit comes back. `docs/product/shaped/prd-0018-a-depleted-deposit-comes-back.md`

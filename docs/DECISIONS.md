@@ -23,9 +23,59 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^ALLOC]
 
-**Next number: DEC-051**
+**Next number: DEC-056**
 
 ## Open
+
+### DEC-054 — What period does each recovering kind take?
+
+**Open. The recommendation is one simulated day for food and several for wood.**
+
+The decision that food and wood recover and that stone does not is closed, and
+it states the period as a parameter of the kind.[^DEC49REF] It states no value.
+The engine now needs one, because a default rule set must hold something.
+
+The engine carries a default in one place, and a caller replaces the whole rule
+set. The value is therefore cheap to change and no second site holds it.
+
+**The options.** Any pair of periods. The shape does not change with the value,
+so this row asks for a judgement about how a run should feel and not for
+information.
+
+**The recommendation.** Food returns fast enough that a worked patch is worth
+returning to within a run, and wood returns several times slower, because a
+felled wood is a longer loss than a grazed field. The engine holds that pair
+until the owner or a content pipeline replaces it.
+
+**What holds it back.** Nothing. No measurement governs a content value, and no
+blocker names one.
+
+### DEC-055 — Does a period return one unit or the whole deposit?
+
+**Open. The recommendation is one unit, and the engine holds that today.**
+
+A recovery period must say what it is the period of. Two readings are
+available, and the record for recovery states the shape and not the
+reading.[^ADR80]
+
+**The options.**
+
+1. The period returns one unit of stock. A deposit that lost more takes longer
+   to return, in proportion to what it lost.
+2. The period returns the whole deposit. Every depleted deposit is whole again
+   after one period, whatever it lost.
+
+**The recommendation is option 1.** It makes heavy extraction cost more than
+light extraction, which is the statement the product record asks the world to
+be able to make.[^PRD18] It also keeps the arithmetic a whole-number division
+with no reference to the generated stock of the tile.
+
+Option 2 stays available and costs the same to compute. The row exists because
+a reader of the code cannot tell which reading was chosen on purpose.
+
+**What holds it back.** Nothing. Work continues under either reading, and only
+the meaning of one parameter changes.
+
 
 ### DEC-044 — Should the default ration be above the decay?
 
@@ -843,6 +893,8 @@ a failed founding is correct.[^PRD12]
 [^AGENCY]: Individual agency and occupations, the decision cost, and DEC-002 above. `docs/research/reports/16-individual-agency-and-occupations.md`
 [^ADR60]: ADR Registry, proposed row 0060, an influence map is stored as a shared basis. `docs/adrs/REGISTRY.md`
 [^DEC5REF]: See DEC-005 in this document.
+[^DEC49REF]: Decisions register, DEC-049, in this document.
+[^ADR80]: ADR-0080, a depleted deposit recovers by ageing the stored take. `docs/adrs/draft/adr-0080-a-depleted-deposit-recovers-by-ageing-the-stored-take.md`
 [^PRD18]: Product record PRD-0018, a depleted deposit comes back. `docs/product/shaped/prd-0018-a-depleted-deposit-comes-back.md`
 [^SCALE]: Budgets and costs, the scale constants. `docs/reference/budgets.md`
 

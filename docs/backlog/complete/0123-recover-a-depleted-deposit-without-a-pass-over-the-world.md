@@ -1,13 +1,13 @@
 ---
 id: 0123
 title: Recover a depleted deposit without a pass over the world
-status: refined
+status: complete
 created: 2026-08-31
 implements: [ADR-0072 D1, ADR-0072 D4, ADR-0002 D1, ADR-0003 D1, ADR-0004 D1, ADR-0001 D4]
 changes: []
 creates: [ADR-0080]
 serves: [PRD-0018]
-blocked-by: [DEC-049, DEC-050]
+blocked-by: []
 ---
 
 ## Why
@@ -110,7 +110,30 @@ fails when the copies disagree.
 
 ## Outcome
 
-Filled in when the item moves to `complete/`.
+**Done. A depleted deposit recovers by ageing the stored take.**
+
+The ledger entry now carries the tick that its amount was last brought up to
+date at. A pass ages every stored take forward to the tick, in the key order the
+ledger holds, and it takes no grid and no tile count. The step runs the pass
+before the gather resolve, so a unit takes what the deposit holds at that tick.
+
+The recovery period is one parameter for each kind. It is stated in simulated
+days and converted in one place. A kind may state that it does not recover, and
+stone does. A caller replaces the whole rule set, so no second site holds a
+period.
+
+The conservation check gained a second term, because recovery gives a part of
+the take back to the tile. The stored take alone no longer balances what the
+units hold.
+
+ADR-0080 was written with the code, and it is a draft. Two rows opened in the
+decisions register: the period value of each recovering kind, and whether a
+period returns one unit or the whole deposit. Two findings were recorded.
+
+**What is left undone.** An entry that owes nothing stays in the ledger, so the
+depleted set grows and never shrinks. That is item 0124, and the priority index
+now states the cost. Nothing shows a watcher a deposit recovering, which is item
+0125. The control plane cannot read or replace the recovery rules.
 
 ## References
 

@@ -65,9 +65,8 @@ These are real and none of them blocks anything today.
 | 0063 | Assigning a unit to a position. Waits on 0062. |
 | 0065 | Letting the job decide what a unit weighs. Waits on 0063 and 0064. |
 | 0058 | Improvements. Waits on a site that produces. |
-| 0123 | A deposit never comes back. Waits on 0057, because nothing drains the world until a shortage bites.[^9] |
-| 0124 | A fully recovered deposit still stores a take of zero. Follows 0123. |
-| 0125 | Show a watcher a deposit recovering. Follows 0123. |
+| 0124 | A fully recovered deposit still stores a take of zero. The recovery pass now reads that entry on every tick, so the depleted set grows and never shrinks. |
+| 0125 | Show a watcher a deposit recovering. The engine recovers a deposit, and nothing shows it. |
 | 0067 | Descent. Waits on the character tier being used for something. |
 | 0068 | A ruler and a succession. Waits on 0067. |
 | 0088 | Promotion into the character tier. |

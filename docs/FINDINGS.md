@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-110**
+**Next number: FND-115**
 
 ## A. Corrections to stated rules
 
@@ -2343,6 +2343,55 @@ reads as proof, and it is not one. State in the commit body which method the
 sweep used, so that a reader can tell a search that could have failed from a
 search that could not.
 
+### FND-113 — A per-tick ageing pass that resets its clock recovers nothing
+
+**Believed.** A recovery that runs on every tick can hold its progress in the
+tick it last ran at. The pass reads the elapsed ticks, divides by the period of
+the kind, and stores the tick it ran at as the new anchor.
+
+**True.** That rule recovers nothing at all whenever the period is longer than
+one tick. The pass runs every tick, so the elapsed ticks are always one, the
+division always gives zero, and the anchor moves forward every time. The
+remainder of the division is the whole of the progress, and resetting the anchor
+throws it away on every tick.
+
+**Evidence.** The perturbation was put into the ageing function of the resource
+module, and six tests of the recovery suite failed. The correct rule advances
+the anchor by the whole periods it spent, and never to the tick it ran at.
+
+**Follows.** When a pass reduces a stored value at a rate slower than the pass
+runs, the remainder is state. Advance the clock by what was spent, not to the
+present. A test that only asserts that the value falls over a long run cannot
+tell the two rules apart; assert the exact amount at the exact tick.
+
+### FND-114 — Two defences of the recovery rule are not observable through the engine
+
+**Believed.** Every rule that a function states can be defended by a test that
+drives the engine. Putting the defect back and watching a test fail is the
+evidence that the test covers the rule.
+
+**True.** Two rules of the ageing function have no observable failure through
+the engine as the step runs today, because a second mechanism already excludes
+the case.
+
+The first is the clamp that stops an entry recovering more than it owes. The
+subtraction already saturates at nothing owed, so removing the clamp changes no
+answer.
+
+The second is the ageing of an entry at the moment a new take joins it. The step
+ages every entry before it resolves the orders to gather, so no entry is ever
+stale when a take arrives.
+
+**Evidence.** Both perturbations were put back, and the whole resource suite
+stayed green. Two other perturbations of the same function failed six tests and
+one test respectively.
+
+**Follows.** Say plainly which rules a suite defends and which it only states. A
+test that passes because an earlier stage already excluded the bad case is a
+guard, not evidence.[^58] Both rules stay in the code, because the second
+mechanism is an ordering that a later change can move, and neither costs
+anything. Neither is counted as covered.
+
 
 ## References
 
@@ -2403,3 +2452,4 @@ search that could not.
 [^55]: Testing rules, section 2a. `.claude/rules/testing.md`
 [^56]: ADR-0074, a spawn may over-fill a tile and only admission enforces the capacity, decision D2. `docs/adrs/accepted/adr-0074-a-spawn-may-over-fill-a-tile-and-only-admission-enforces-the-capacity.md`
 [^57]: Commit Message Rules, after a sweep. `.claude/rules/commits.md`
+[^58]: Findings register, FND-093, in this document.
