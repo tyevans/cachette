@@ -810,6 +810,7 @@ impl World {
             .ok_or(FoundingError::NoPlaceFound(survey.drawn()))?;
         let place = chosen.address();
         let (settlement, people) = self.settle_group(place, group, faction)?;
+        self.provision_site(settlement, chosen.provision().food);
         Ok(Founding::new(place, settlement, people, survey))
     }
 
@@ -838,7 +839,46 @@ impl World {
             .chosen()
             .ok_or(FoundingError::NoPlaceFound(survey.drawn()))?;
         let (settlement, people) = self.settle_group(address, group, faction)?;
+        self.provision_site(settlement, chosen.provision().food);
         Ok(Founding::new(chosen.address(), settlement, people, survey))
+    }
+
+    /// Sets the food a founded site produces, from the ground it reaches.
+    ///
+    /// A founding seats a group and gives it a store. Nothing else fills
+    /// that store, so a site founded without a rate feeds nobody, and every
+    /// unit in it crosses the bound at the same tick.[^1] The founding
+    /// therefore sets the rate, because the founding is the one call that
+    /// has both the site and the survey that measured the ground.
+    ///
+    /// The rule is that one unit of food the place reaches feeds one person.
+    /// The ration comes from the need rule and is not repeated here, so the
+    /// amount a person eats has one declaration site.[^2] A place that
+    /// reaches more food than the group needs therefore holds a surplus, and
+    /// a place that reaches less runs the group short. The survey score
+    /// weighs food, so the choice the engine makes now decides whether the
+    /// group lives.[^3]
+    ///
+    /// The rate never reaches the upkeep table. Upkeep is a rate above zero
+    /// that subtracts, and this is production.[^4]
+    ///
+    /// # References
+    ///
+    /// [^1]: Findings register, FND-124. `docs/FINDINGS.md`
+    /// [^2]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`
+    /// [^3]: ADR-0075, the founding choice reads a bounded sample of the world, decision D5. `docs/adrs/accepted/adr-0075-the-founding-choice-reads-a-bounded-sample-of-the-world.md`
+    /// [^4]: ADR-0062, production and upkeep are rates attached to a site, decision D2. `docs/adrs/accepted/adr-0062-production-and-upkeep-are-rates-attached-to-a-site.md`
+    fn provision_site(&mut self, settlement: Entity, food: Amount) {
+        // The count saturates at the range the fixed-point constructor
+        // takes. A survey reads a bounded sample, so the food it reports is
+        // bounded, and the saturation is a guard rather than a case.
+        let reached = i16::try_from(food.0).unwrap_or(i16::MAX);
+        let rate = sim_math::mul(self.need_rule.ration(), Fix32::from_int(reached));
+        // The identity is live, because this call site founded it in the
+        // same function. A refusal here is a programming error in the
+        // founding, not a caller mistake.
+        self.set_production_rate(settlement, CommodityId(0), rate)
+            .expect("the rate is at or above zero and the commodity is in the set");
     }
 
     /// Seats a settlement at a place and spreads a group over its disc.

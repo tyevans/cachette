@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-124**
+**Next number: FND-125**
 
 ## A. Corrections to stated rules
 
@@ -2730,6 +2730,45 @@ The answer is a sentence in a record, and if no record holds one then the order
 is load-bearing and unrecorded, whatever the tests say today.
 
 
+### FND-124 — A founded group had no food and the whole map died together
+
+**Believed.** The founding seats a group, gives it a home site, and the engine
+then runs. The demonstration showed a world that lives.
+
+**True.** The founding left the store empty and set no rate, and nothing else
+filled the store. Every unit therefore drew nothing on every draw, and the whole
+population ended within one hundred ticks of the start.
+
+Two things can fill a site store. A caller writes a quantity into it, or a
+production rate earns one, and a founding did neither. A unit that gathers is
+not a third: a gathered amount goes to the carry of the unit, and no pass moves
+a carry into a store.[^69]
+
+**Evidence.** A run of the demonstration world, four factions and thirty people
+each, printed the store of each site and the condition of each person for two
+hundred frames. The store held zero on every frame. Every person was short from
+frame nine and gone by frame ninety. The commit body holds the figures and the
+command.
+
+**Follows.** Three things.
+
+**The founding now sets the rate.** One unit of food that the place reaches
+feeds one person, at the ration the need rule holds. The founding is the one
+call that has both the site and the survey that measured the ground, so the rate
+is set there and the ration is read rather than repeated.[^70]
+
+**The survey score now decides whether the group lives.** The score weighs the
+food a place reaches, and until now that weight changed nothing after the
+founding. A place that reaches less food than its group needs now runs that
+group short.
+
+**No test asked whether a founded world survives.** Every founding test
+asserted on the founding. Every consumption test built its own store. Neither
+side drove the founding into the run, so the gap between them was invisible to a
+green suite. The test that closes it removes the rate and watches the population
+end, which is the only proof that the assertion reaches the case.[^71]
+
+
 ## References
 
 [^1]: Findings register, FND-038, in this document.
@@ -2800,3 +2839,6 @@ is load-bearing and unrecorded, whatever the tests say today.
 [^66]: ADR-0063, a need is a rate with a threshold, and crossing it is a fact, decision D3. `docs/adrs/accepted/adr-0063-a-need-is-a-rate-with-a-threshold-and-crossing-it-is-a-fact.md`
 [^67]: Decision Record Scope, section 1, the counter-test. `.claude/rules/adr-scope.md`
 [^68]: Recurring defect shapes, shape 4. `.claude/rules/recurring-defects.md`
+[^69]: ADR-0073, gathering is admitted by sort-then-admit against the tile. `docs/adrs/accepted/adr-0073-gathering-is-admitted-by-sort-then-admit-against-the-tile.md`
+[^70]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`
+[^71]: Testing rules, section 2a. `.claude/rules/testing.md`
