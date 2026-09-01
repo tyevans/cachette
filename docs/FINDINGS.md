@@ -1735,5 +1735,5 @@ it is not made here.
 [^32]: The register check script. `scripts/check_registers.py`
 [^33]: Testing rules, section 2a. `.claude/rules/testing.md`
 [^34]: Findings register, FND-049, in this document.
-[^35]: ADR-0075, the founding choice reads a bounded sample of the world, a draft record. `docs/adrs/draft/adr-0075-the-founding-choice-reads-a-bounded-sample-of-the-world.md`
+[^35]: ADR-0075, the founding choice reads a bounded sample of the world. `docs/adrs/accepted/adr-0075-the-founding-choice-reads-a-bounded-sample-of-the-world.md`
 [^36]: PRD-0012, a world starts small and grows. `docs/product/shaped/prd-0012-a-world-starts-small-and-grows.md`

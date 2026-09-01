@@ -131,7 +131,7 @@ pub enum SoldierError {
     ///
     /// # References
     ///
-    /// [^1]: ADR-0068, terrain is generated from the seed and is never stored as a map, decision D4, a draft record. `docs/adrs/draft/adr-0068-terrain-is-generated-from-the-seed-and-is-never-stored-as-a-map.md`
+    /// [^1]: ADR-0068, terrain is generated from the seed and is never stored as a map, decision D4. `docs/adrs/accepted/adr-0068-terrain-is-generated-from-the-seed-and-is-never-stored-as-a-map.md`
     TileImpassable(Axial),
 }
 
@@ -195,7 +195,7 @@ pub struct SoldierArena {
     ///
     /// # References
     ///
-    /// [^1]: ADR-0073, gathering is admitted by sort-then-admit against the tile, decision D4, a draft record. `docs/adrs/draft/adr-0073-gathering-is-admitted-by-sort-then-admit-against-the-tile.md`
+    /// [^1]: ADR-0073, gathering is admitted by sort-then-admit against the tile, decision D4. `docs/adrs/accepted/adr-0073-gathering-is-admitted-by-sort-then-admit-against-the-tile.md`
     carries: Vec<CarryLoad>,
     /// The gather order of each slot.
     ///
@@ -424,7 +424,7 @@ impl SoldierArena {
         // despawn and records where it went, because what leaves a tile must
         // arrive somewhere exactly.[^3]
         //
-        // [^3]: ADR-0072, a tile stock is generated, and only what was taken is stored, decision D5, a draft record. `docs/adrs/draft/adr-0072-a-tile-stock-is-generated-and-only-what-was-taken-is-stored.md`
+        // [^3]: ADR-0072, a tile stock is generated, and only what was taken is stored, decision D5. `docs/adrs/accepted/adr-0072-a-tile-stock-is-generated-and-only-what-was-taken-is-stored.md`
         self.carries[index] = CarryLoad::EMPTY;
         self.orders[index] = NO_ORDER;
         self.live_count -= 1;

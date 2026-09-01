@@ -41,7 +41,7 @@ fn build(width: u32, height: u32, soldiers: u32) -> World {
     // The ground refuses a soldier on water, so the measurement places its
     // soldiers on the open ground it finds.[^1]
     //
-    // [^1]: ADR-0068, terrain is generated from the seed and is never stored as a map, decision D4, a draft record. `docs/adrs/draft/adr-0068-terrain-is-generated-from-the-seed-and-is-never-stored-as-a-map.md`
+    // [^1]: ADR-0068, terrain is generated from the seed and is never stored as a map, decision D4. `docs/adrs/accepted/adr-0068-terrain-is-generated-from-the-seed-and-is-never-stored-as-a-map.md`
     let open: Vec<Axial> = (0..world.grid().tile_count())
         .map(|index| Axial::new((index % width) as i32, (index / width) as i32))
         .filter(|address| world.admits_a_unit(*address))

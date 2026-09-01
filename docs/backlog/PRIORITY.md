@@ -67,6 +67,7 @@ These are real and none of them blocks anything today.
 | 0097 | The layout record. Write it with the descent columns, not before.[^6] |
 | 0050 | Four product collisions still carried. |
 | 0099 | The faction mask union has no engine caller. |
+| 0100 | A record states its status twice, in twenty-four of twenty-nine files. |
 | 0072 | The panel fit check has no production caller. |
 | 0077 | The batched structural path, once its record exists. |
 | 0073 | Review the renderable example again, after 0069 and 0070. |

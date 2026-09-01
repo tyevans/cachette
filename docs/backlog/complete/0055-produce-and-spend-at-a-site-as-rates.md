@@ -149,5 +149,5 @@ crates. FND-064 holds the reasoning for the second attempt.[^13]
 [^9]: Open decisions register, DEC-001. `docs/DECISIONS.md`
 [^10]: Findings register, FND-012. `docs/FINDINGS.md`
 [^11]: Findings register, FND-016. `docs/FINDINGS.md`
-[^12]: ADR-0062, production and upkeep are rates attached to a site, a draft record. `docs/adrs/draft/adr-0062-production-and-upkeep-are-rates-attached-to-a-site.md`
+[^12]: ADR-0062, production and upkeep are rates attached to a site. `docs/adrs/accepted/adr-0062-production-and-upkeep-are-rates-attached-to-a-site.md`
 [^13]: Findings register, FND-064 and FND-065. `docs/FINDINGS.md`

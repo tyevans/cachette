@@ -142,7 +142,7 @@ fn the_survey_cost_does_not_grow_with_the_world() {
     // the survey reads stay under one ceiling, and no world extent enters
     // that ceiling.[^1]
     //
-    // [^1]: ADR-0075, the founding choice reads a bounded sample of the world, decision D1, a draft record. `docs/adrs/draft/adr-0075-the-founding-choice-reads-a-bounded-sample-of-the-world.md`
+    // [^1]: ADR-0075, the founding choice reads a bounded sample of the world, decision D1. `docs/adrs/accepted/adr-0075-the-founding-choice-reads-a-bounded-sample-of-the-world.md`
     let mut counts = Vec::new();
     for extent in [128u32, 256, 512, 1024] {
         let world = World::new(WorldConfig {
@@ -186,7 +186,7 @@ fn a_watcher_asks_why_the_place_was_chosen() {
     // answer a question about it, so no copy can disagree with the choice
     // that was made.[^1]
     //
-    // [^1]: ADR-0075, the founding choice reads a bounded sample of the world, decision D5, a draft record. `docs/adrs/draft/adr-0075-the-founding-choice-reads-a-bounded-sample-of-the-world.md`
+    // [^1]: ADR-0075, the founding choice reads a bounded sample of the world, decision D5. `docs/adrs/accepted/adr-0075-the-founding-choice-reads-a-bounded-sample-of-the-world.md`
     assert_eq!(chosen.score(), chosen.provision().score());
     assert!(chosen.is_eligible());
     assert!(chosen.provision().room >= GROUP);
@@ -255,7 +255,7 @@ fn two_places_that_score_the_same_resolve_by_the_tile_index() {
     // world, finds two eligible places whose scores are equal, and asserts
     // that the lower tile index wins in both input orders.[^1]
     //
-    // [^1]: ADR-0075, the founding choice reads a bounded sample of the world, decision D4, a draft record. `docs/adrs/draft/adr-0075-the-founding-choice-reads-a-bounded-sample-of-the-world.md`
+    // [^1]: ADR-0075, the founding choice reads a bounded sample of the world, decision D4. `docs/adrs/accepted/adr-0075-the-founding-choice-reads-a-bounded-sample-of-the-world.md`
     let world = world_of(0x0cac_4e77_0061);
     let field = world.resources();
 

@@ -31,7 +31,7 @@
 //!
 //! [^1]: ADR-0066, entity storage holds four fixed shapes, decision D1. `docs/adrs/accepted/adr-0066-entity-storage-holds-four-fixed-shapes.md`
 //! [^2]: ADR-0066, entity storage holds four fixed shapes, decision D3. `docs/adrs/accepted/adr-0066-entity-storage-holds-four-fixed-shapes.md`
-//! [^3]: ADR-0054, an entity belongs to one of three tiers, declared at creation, decisions D1 and D3, a draft record. `docs/adrs/draft/adr-0054-an-entity-belongs-to-one-of-three-tiers-declared-at-creation.md`
+//! [^3]: ADR-0054, an entity belongs to one of three tiers, declared at creation, decisions D1 and D3. `docs/adrs/accepted/adr-0054-an-entity-belongs-to-one-of-three-tiers-declared-at-creation.md`
 //! [^4]: ADR-0012, tiles are dense columns and units are a generational arena, decision D3. `docs/adrs/accepted/adr-0012-tiles-are-dense-columns-and-units-are-a-generational-arena.md`
 //! [^5]: ADR-0014, entity identity is an index plus a generation, decision D1. `docs/adrs/accepted/adr-0014-entity-identity-is-an-index-plus-a-generation.md`
 //! [^6]: ADR-0014, entity identity is an index plus a generation, decision D3. `docs/adrs/accepted/adr-0014-entity-identity-is-an-index-plus-a-generation.md`
@@ -94,7 +94,7 @@ pub enum CharacterError {
     ///
     /// # References
     ///
-    /// [^1]: ADR-0054, an entity belongs to one of three tiers, declared at creation, decisions D2 and D3, a draft record. `docs/adrs/draft/adr-0054-an-entity-belongs-to-one-of-three-tiers-declared-at-creation.md`
+    /// [^1]: ADR-0054, an entity belongs to one of three tiers, declared at creation, decisions D2 and D3. `docs/adrs/accepted/adr-0054-an-entity-belongs-to-one-of-three-tiers-declared-at-creation.md`
     CapacityAboveCeiling {
         /// The capacity that the caller asked for.
         asked: u32,
@@ -184,7 +184,7 @@ impl CharacterArena {
     ///
     /// # References
     ///
-    /// [^1]: ADR-0054, an entity belongs to one of three tiers, declared at creation, decisions D1 and D3, a draft record. `docs/adrs/draft/adr-0054-an-entity-belongs-to-one-of-three-tiers-declared-at-creation.md`
+    /// [^1]: ADR-0054, an entity belongs to one of three tiers, declared at creation, decisions D1 and D3. `docs/adrs/accepted/adr-0054-an-entity-belongs-to-one-of-three-tiers-declared-at-creation.md`
     #[must_use]
     pub fn new() -> Self {
         Self::with_capacity(Self::ceiling()).expect("the ceiling is not above itself")
@@ -225,7 +225,7 @@ impl CharacterArena {
     ///
     /// # References
     ///
-    /// [^1]: ADR-0054, an entity belongs to one of three tiers, declared at creation, decisions D2 and D3, a draft record. `docs/adrs/draft/adr-0054-an-entity-belongs-to-one-of-three-tiers-declared-at-creation.md`
+    /// [^1]: ADR-0054, an entity belongs to one of three tiers, declared at creation, decisions D2 and D3. `docs/adrs/accepted/adr-0054-an-entity-belongs-to-one-of-three-tiers-declared-at-creation.md`
     pub fn with_capacity(capacity: u32) -> Result<Self, CharacterError> {
         let ceiling = Self::ceiling();
         if capacity > ceiling {
@@ -609,7 +609,7 @@ mod tests {
     /// context. A count could not. This item fails to compile if the tier
     /// ever becomes a run-time value.[^1]
     ///
-    /// [^1]: ADR-0054, an entity belongs to one of three tiers, declared at creation, decision D2, a draft record. `docs/adrs/draft/adr-0054-an-entity-belongs-to-one-of-three-tiers-declared-at-creation.md`
+    /// [^1]: ADR-0054, an entity belongs to one of three tiers, declared at creation, decision D2. `docs/adrs/accepted/adr-0054-an-entity-belongs-to-one-of-three-tiers-declared-at-creation.md`
     const TIER_AT_COMPILE_TIME: EntityTier = <CharacterArena as Shape>::TIER;
 
     #[test]

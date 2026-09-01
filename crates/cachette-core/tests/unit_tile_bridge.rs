@@ -290,7 +290,7 @@ fn the_key_ceiling_bounds_every_tile_key_at_every_block_edge() {
     // exponent runs over a range, because a test at one exponent cannot see a
     // defect in how the exponent enters the derivation.
     //
-    // [^1]: ADR-0071, the bridge rebuild orders on one thread, decision D1. `docs/adrs/draft/adr-0071-the-bridge-rebuild-orders-on-one-thread.md`
+    // [^1]: ADR-0071, the bridge rebuild orders on one thread, decision D1. `docs/adrs/accepted/adr-0071-the-bridge-rebuild-orders-on-one-thread.md`
     for block_bits in 0..=6 {
         let layout =
             BlockLayout::new(grid(), block_bits).expect("the exponent is inside the ceiling");
@@ -530,7 +530,7 @@ proptest! {
     ///
     /// # References
     ///
-    /// [^1]: ADR-0071, the bridge rebuild orders on one thread, decision D1. `docs/adrs/draft/adr-0071-the-bridge-rebuild-orders-on-one-thread.md`
+    /// [^1]: ADR-0071, the bridge rebuild orders on one thread, decision D1. `docs/adrs/accepted/adr-0071-the-bridge-rebuild-orders-on-one-thread.md`
     #[test]
     fn the_rebuild_gives_what_the_general_sort_gives(count in 12u32..120) {
         let arena = populate(count);

@@ -1,6 +1,6 @@
 # ADR-0024: Every summary field is declared extensive or intensive
 
-Status: Draft
+Status: Accepted
 
 ## Context
 
@@ -106,8 +106,8 @@ each way, rather than converted at the call site by whoever remembers to.
 
 ## References
 
-[^1]: ADR-0022, level 0 is the only truth, and every level above it is derived, decision D2. `docs/adrs/draft/adr-0022-level-0-is-the-only-truth-and-every-level-above-it-is-derived.md`
-[^2]: ADR-0023, an aggregate combines exactly, in any order, decisions D1 and D2. `docs/adrs/draft/adr-0023-an-aggregate-combines-exactly-in-any-order.md`
+[^1]: ADR-0022, level 0 is the only truth, and every level above it is derived, decision D2. `docs/adrs/accepted/adr-0022-level-0-is-the-only-truth-and-every-level-above-it-is-derived.md`
+[^2]: ADR-0023, an aggregate combines exactly, in any order, decisions D1 and D2. `docs/adrs/accepted/adr-0023-an-aggregate-combines-exactly-in-any-order.md`
 [^3]: ADR-0002, simulated and aggregated state holds no floating point number, decision D1. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
 [^4]: ADR-0002, simulated and aggregated state holds no floating point number, decision D2. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
-[^5]: ADR-0022, level 0 is the only truth, and every level above it is derived, decision D3. `docs/adrs/draft/adr-0022-level-0-is-the-only-truth-and-every-level-above-it-is-derived.md`
+[^5]: ADR-0022, level 0 is the only truth, and every level above it is derived, decision D3. `docs/adrs/accepted/adr-0022-level-0-is-the-only-truth-and-every-level-above-it-is-derived.md`

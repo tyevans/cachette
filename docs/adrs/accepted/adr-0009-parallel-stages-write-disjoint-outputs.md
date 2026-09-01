@@ -1,6 +1,6 @@
 # ADR-0009: Parallel stages write disjoint outputs, because the memory model is weak
 
-Status: Draft
+Status: Accepted
 
 ## Context
 
@@ -106,6 +106,6 @@ writes its own chunk and each is joined in index order.
 ## References
 
 [^1]: ADR-0001, one binary gives one answer at any thread count, decision D4. `docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
-[^2]: ADR-0008, the primary target is aarch64, decision D1. `docs/adrs/draft/adr-0008-the-primary-target-is-aarch64.md`
-[^3]: ADR-0008, the primary target is aarch64, the consequences. `docs/adrs/draft/adr-0008-the-primary-target-is-aarch64.md`
+[^2]: ADR-0008, the primary target is aarch64, decision D1. `docs/adrs/accepted/adr-0008-the-primary-target-is-aarch64.md`
+[^3]: ADR-0008, the primary target is aarch64, the consequences. `docs/adrs/accepted/adr-0008-the-primary-target-is-aarch64.md`
 [^4]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`

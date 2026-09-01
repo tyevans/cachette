@@ -126,7 +126,7 @@ fn populate(world: &mut World) -> Vec<Entity> {
     // that admits no unit. Water refuses a spawn, and which tiles hold water
     // is a property of the seed.[^1]
     //
-    // [^1]: ADR-0068, terrain is generated from the seed and is never stored as a map, decision D4, a draft record. `docs/adrs/draft/adr-0068-terrain-is-generated-from-the-seed-and-is-never-stored-as-a-map.md`
+    // [^1]: ADR-0068, terrain is generated from the seed and is never stored as a map, decision D4. `docs/adrs/accepted/adr-0068-terrain-is-generated-from-the-seed-and-is-never-stored-as-a-map.md`
     let open: Vec<Axial> = (0..grid.tile_count())
         .map(|index| Axial::new((index % grid.width()) as i32, (index / grid.width()) as i32))
         .filter(|address| world.admits_a_unit(*address))
@@ -262,7 +262,7 @@ const GATHERED: ResourceKind = ResourceKind::Wood;
 ///
 /// # References
 ///
-/// [^1]: ADR-0073, gathering is admitted by sort-then-admit against the tile, decision D2, a draft record. `docs/adrs/draft/adr-0073-gathering-is-admitted-by-sort-then-admit-against-the-tile.md`
+/// [^1]: ADR-0073, gathering is admitted by sort-then-admit against the tile, decision D2. `docs/adrs/accepted/adr-0073-gathering-is-admitted-by-sort-then-admit-against-the-tile.md`
 /// [^2]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
 /// [^3]: Findings register, FND-051. `docs/FINDINGS.md`
 fn gatherers(world: &mut World) -> Vec<Entity> {
@@ -888,7 +888,7 @@ fn the_character_columns_reach_the_state_hash() {
 ///
 /// # References
 ///
-/// [^1]: ADR-0053, a faction is a bit in a mask, and a relation is a plane, decision D6, a draft record. `docs/adrs/draft/adr-0053-a-faction-is-a-bit-in-a-mask-and-a-relation-is-a-plane.md`
+/// [^1]: ADR-0053, a faction is a bit in a mask, and a relation is a plane, decision D6. `docs/adrs/accepted/adr-0053-a-faction-is-a-bit-in-a-mask-and-a-relation-is-a-plane.md`
 /// [^2]: Findings register, FND-051. `docs/FINDINGS.md`
 fn rivals(world: &mut World) -> usize {
     let grid = world.grid();

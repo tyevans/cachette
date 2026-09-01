@@ -90,7 +90,7 @@ impl std::error::Error for DemoError {}
 /// # References
 ///
 /// [^1]: PRD-0012, a world starts small and grows. `docs/product/shaped/prd-0012-a-world-starts-small-and-grows.md`
-/// [^2]: ADR-0075, the founding choice reads a bounded sample of the world, decision D1, a draft record. `docs/adrs/draft/adr-0075-the-founding-choice-reads-a-bounded-sample-of-the-world.md`
+/// [^2]: ADR-0075, the founding choice reads a bounded sample of the world, decision D1. `docs/adrs/accepted/adr-0075-the-founding-choice-reads-a-bounded-sample-of-the-world.md`
 fn found(world: &mut World) -> Result<cachette_core::Founding, DemoError> {
     let founded = world
         .found_run(GROUP, FactionId(0))

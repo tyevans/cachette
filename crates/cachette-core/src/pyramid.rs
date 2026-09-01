@@ -38,19 +38,19 @@
 //!
 //! # References
 //!
-//! [^1]: ADR-0022, level 0 is the only truth, and every level above it is derived, decision D1, a draft record. `docs/adrs/draft/adr-0022-level-0-is-the-only-truth-and-every-level-above-it-is-derived.md`
-//! [^2]: ADR-0022, level 0 is the only truth, and every level above it is derived, decision D2, a draft record. `docs/adrs/draft/adr-0022-level-0-is-the-only-truth-and-every-level-above-it-is-derived.md`
-//! [^3]: ADR-0024, every summary field is declared extensive or intensive, decision D2, a draft record. `docs/adrs/draft/adr-0024-every-summary-field-is-declared-extensive-or-intensive.md`
-//! [^4]: ADR-0024, every summary field is declared extensive or intensive, decision D3, a draft record. `docs/adrs/draft/adr-0024-every-summary-field-is-declared-extensive-or-intensive.md`
-//! [^5]: ADR-0023, an aggregate combines exactly, in any order, decision D3, a draft record. `docs/adrs/draft/adr-0023-an-aggregate-combines-exactly-in-any-order.md`
+//! [^1]: ADR-0022, level 0 is the only truth, and every level above it is derived, decision D1. `docs/adrs/accepted/adr-0022-level-0-is-the-only-truth-and-every-level-above-it-is-derived.md`
+//! [^2]: ADR-0022, level 0 is the only truth, and every level above it is derived, decision D2. `docs/adrs/accepted/adr-0022-level-0-is-the-only-truth-and-every-level-above-it-is-derived.md`
+//! [^3]: ADR-0024, every summary field is declared extensive or intensive, decision D2. `docs/adrs/accepted/adr-0024-every-summary-field-is-declared-extensive-or-intensive.md`
+//! [^4]: ADR-0024, every summary field is declared extensive or intensive, decision D3. `docs/adrs/accepted/adr-0024-every-summary-field-is-declared-extensive-or-intensive.md`
+//! [^5]: ADR-0023, an aggregate combines exactly, in any order, decision D3. `docs/adrs/accepted/adr-0023-an-aggregate-combines-exactly-in-any-order.md`
 //! [^6]: Budgets and costs, the scale constants. `docs/reference/budgets.md`
-//! [^7]: ADR-0023, an aggregate combines exactly, in any order, decision D1, a draft record. `docs/adrs/draft/adr-0023-an-aggregate-combines-exactly-in-any-order.md`
-//! [^8]: ADR-0023, an aggregate combines exactly, in any order, decision D2, a draft record. `docs/adrs/draft/adr-0023-an-aggregate-combines-exactly-in-any-order.md`
-//! [^9]: ADR-0023, an aggregate combines exactly, in any order, decision D4, a draft record. `docs/adrs/draft/adr-0023-an-aggregate-combines-exactly-in-any-order.md`
+//! [^7]: ADR-0023, an aggregate combines exactly, in any order, decision D1. `docs/adrs/accepted/adr-0023-an-aggregate-combines-exactly-in-any-order.md`
+//! [^8]: ADR-0023, an aggregate combines exactly, in any order, decision D2. `docs/adrs/accepted/adr-0023-an-aggregate-combines-exactly-in-any-order.md`
+//! [^9]: ADR-0023, an aggregate combines exactly, in any order, decision D4. `docs/adrs/accepted/adr-0023-an-aggregate-combines-exactly-in-any-order.md`
 //! [^10]: ADR-0018, the unit-to-tile bridge is derived, and it rebuilds at the barrier, decision D2. `docs/adrs/accepted/adr-0018-the-unit-to-tile-bridge-is-derived-and-rebuilds-at-the-barrier.md`
-//! [^11]: ADR-0068, terrain is generated from the seed and is never stored as a map, decision D1, a draft record. `docs/adrs/draft/adr-0068-terrain-is-generated-from-the-seed-and-is-never-stored-as-a-map.md`
+//! [^11]: ADR-0068, terrain is generated from the seed and is never stored as a map, decision D1. `docs/adrs/accepted/adr-0068-terrain-is-generated-from-the-seed-and-is-never-stored-as-a-map.md`
 //! [^12]: PRD-0003, a developer sees a world worth looking at. `docs/product/shaped/prd-0003-a-developer-sees-a-world-worth-looking-at.md`
-//! [^13]: ADR-0068, terrain is generated from the seed and is never stored as a map, the consequences, a draft record. `docs/adrs/draft/adr-0068-terrain-is-generated-from-the-seed-and-is-never-stored-as-a-map.md`
+//! [^13]: ADR-0068, terrain is generated from the seed and is never stored as a map, the consequences. `docs/adrs/accepted/adr-0068-terrain-is-generated-from-the-seed-and-is-never-stored-as-a-map.md`
 
 use crate::bridge::{BlockLayout, BridgeError, UnitTileBridge};
 use crate::hash::StateHash;
@@ -72,8 +72,8 @@ use crate::types::{Accum, Fix32};
 ///
 /// # References
 ///
-/// [^1]: ADR-0024, every summary field is declared extensive or intensive, decision D2, a draft record. `docs/adrs/draft/adr-0024-every-summary-field-is-declared-extensive-or-intensive.md`
-/// [^2]: ADR-0024, every summary field is declared extensive or intensive, decision D3, a draft record. `docs/adrs/draft/adr-0024-every-summary-field-is-declared-extensive-or-intensive.md`
+/// [^1]: ADR-0024, every summary field is declared extensive or intensive, decision D2. `docs/adrs/accepted/adr-0024-every-summary-field-is-declared-extensive-or-intensive.md`
+/// [^2]: ADR-0024, every summary field is declared extensive or intensive, decision D3. `docs/adrs/accepted/adr-0024-every-summary-field-is-declared-extensive-or-intensive.md`
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct CellSummary {
     tiles: i64,
@@ -93,7 +93,7 @@ impl CellSummary {
     ///
     /// # References
     ///
-    /// [^1]: ADR-0023, an aggregate combines exactly, in any order, decision D1, a draft record. `docs/adrs/draft/adr-0023-an-aggregate-combines-exactly-in-any-order.md`
+    /// [^1]: ADR-0023, an aggregate combines exactly, in any order, decision D1. `docs/adrs/accepted/adr-0023-an-aggregate-combines-exactly-in-any-order.md`
     pub const IDENTITY: Self = Self {
         tiles: 0,
         open_tiles: 0,
@@ -115,9 +115,9 @@ impl CellSummary {
     ///
     /// # References
     ///
-    /// [^1]: ADR-0023, an aggregate combines exactly, in any order, decision D1, a draft record. `docs/adrs/draft/adr-0023-an-aggregate-combines-exactly-in-any-order.md`
-    /// [^2]: ADR-0023, an aggregate combines exactly, in any order, decision D2, a draft record. `docs/adrs/draft/adr-0023-an-aggregate-combines-exactly-in-any-order.md`
-    /// [^3]: ADR-0023, an aggregate combines exactly, in any order, decision D4, a draft record. `docs/adrs/draft/adr-0023-an-aggregate-combines-exactly-in-any-order.md`
+    /// [^1]: ADR-0023, an aggregate combines exactly, in any order, decision D1. `docs/adrs/accepted/adr-0023-an-aggregate-combines-exactly-in-any-order.md`
+    /// [^2]: ADR-0023, an aggregate combines exactly, in any order, decision D2. `docs/adrs/accepted/adr-0023-an-aggregate-combines-exactly-in-any-order.md`
+    /// [^3]: ADR-0023, an aggregate combines exactly, in any order, decision D4. `docs/adrs/accepted/adr-0023-an-aggregate-combines-exactly-in-any-order.md`
     #[must_use]
     pub const fn combine(self, other: Self) -> Self {
         Self {
@@ -139,7 +139,7 @@ impl CellSummary {
     ///
     /// # References
     ///
-    /// [^1]: ADR-0023, an aggregate combines exactly, in any order, decision D4, a draft record. `docs/adrs/draft/adr-0023-an-aggregate-combines-exactly-in-any-order.md`
+    /// [^1]: ADR-0023, an aggregate combines exactly, in any order, decision D4. `docs/adrs/accepted/adr-0023-an-aggregate-combines-exactly-in-any-order.md`
     #[must_use]
     pub const fn remove(self, other: Self) -> Self {
         Self {
@@ -181,8 +181,8 @@ impl CellSummary {
     ///
     /// # References
     ///
-    /// [^1]: ADR-0053, a faction is a bit in a mask, and a relation is a plane, decision D3, a draft record. `docs/adrs/draft/adr-0053-a-faction-is-a-bit-in-a-mask-and-a-relation-is-a-plane.md`
-    /// [^2]: ADR-0023, an aggregate combines exactly, in any order, decision D3, a draft record. `docs/adrs/draft/adr-0023-an-aggregate-combines-exactly-in-any-order.md`
+    /// [^1]: ADR-0053, a faction is a bit in a mask, and a relation is a plane, decision D3. `docs/adrs/accepted/adr-0053-a-faction-is-a-bit-in-a-mask-and-a-relation-is-a-plane.md`
+    /// [^2]: ADR-0023, an aggregate combines exactly, in any order, decision D3. `docs/adrs/accepted/adr-0023-an-aggregate-combines-exactly-in-any-order.md`
     #[must_use]
     pub const fn held_tiles(self) -> i64 {
         self.held_tiles
@@ -195,7 +195,7 @@ impl CellSummary {
     ///
     /// # References
     ///
-    /// [^1]: ADR-0024, every summary field is declared extensive or intensive, decision D3, a draft record. `docs/adrs/draft/adr-0024-every-summary-field-is-declared-extensive-or-intensive.md`
+    /// [^1]: ADR-0024, every summary field is declared extensive or intensive, decision D3. `docs/adrs/accepted/adr-0024-every-summary-field-is-declared-extensive-or-intensive.md`
     #[must_use]
     pub fn held_share(self) -> Option<Fix32> {
         ratio_of(self.held_tiles, self.tiles)
@@ -223,8 +223,8 @@ impl CellSummary {
     ///
     /// # References
     ///
-    /// [^1]: ADR-0024, every summary field is declared extensive or intensive, decision D3, a draft record. `docs/adrs/draft/adr-0024-every-summary-field-is-declared-extensive-or-intensive.md`
-    /// [^2]: ADR-0024, every summary field is declared extensive or intensive, decision D5, a draft record. `docs/adrs/draft/adr-0024-every-summary-field-is-declared-extensive-or-intensive.md`
+    /// [^1]: ADR-0024, every summary field is declared extensive or intensive, decision D3. `docs/adrs/accepted/adr-0024-every-summary-field-is-declared-extensive-or-intensive.md`
+    /// [^2]: ADR-0024, every summary field is declared extensive or intensive, decision D5. `docs/adrs/accepted/adr-0024-every-summary-field-is-declared-extensive-or-intensive.md`
     #[must_use]
     pub fn mean_value(self) -> Option<Fix32> {
         mean_of(self.value_total, self.tiles)
@@ -238,7 +238,7 @@ impl CellSummary {
     ///
     /// # References
     ///
-    /// [^1]: ADR-0024, every summary field is declared extensive or intensive, decision D4, a draft record. `docs/adrs/draft/adr-0024-every-summary-field-is-declared-extensive-or-intensive.md`
+    /// [^1]: ADR-0024, every summary field is declared extensive or intensive, decision D4. `docs/adrs/accepted/adr-0024-every-summary-field-is-declared-extensive-or-intensive.md`
     #[must_use]
     pub fn mean_height(self) -> Option<Fix32> {
         mean_of(self.height_total, self.tiles)
@@ -258,7 +258,7 @@ impl CellSummary {
     ///
     /// # References
     ///
-    /// [^1]: ADR-0024, every summary field is declared extensive or intensive, decision D4, a draft record. `docs/adrs/draft/adr-0024-every-summary-field-is-declared-extensive-or-intensive.md`
+    /// [^1]: ADR-0024, every summary field is declared extensive or intensive, decision D4. `docs/adrs/accepted/adr-0024-every-summary-field-is-declared-extensive-or-intensive.md`
     #[must_use]
     pub fn units_for_each_open_tile(self) -> Option<Fix32> {
         ratio_of(self.units, self.open_tiles)
@@ -321,7 +321,7 @@ const fn clamp_to_fix(value: i64) -> i32 {
 ///
 /// # References
 ///
-/// [^1]: ADR-0022, level 0 is the only truth, and every level above it is derived, decision D1, a draft record. `docs/adrs/draft/adr-0022-level-0-is-the-only-truth-and-every-level-above-it-is-derived.md`
+/// [^1]: ADR-0022, level 0 is the only truth, and every level above it is derived, decision D1. `docs/adrs/accepted/adr-0022-level-0-is-the-only-truth-and-every-level-above-it-is-derived.md`
 #[derive(Clone, Debug)]
 pub struct Pyramid {
     layout: BlockLayout,
@@ -362,7 +362,7 @@ impl Pyramid {
     ///
     /// # References
     ///
-    /// [^1]: ADR-0068, terrain is generated from the seed and is never stored as a map, decision D1, a draft record. `docs/adrs/draft/adr-0068-terrain-is-generated-from-the-seed-and-is-never-stored-as-a-map.md`
+    /// [^1]: ADR-0068, terrain is generated from the seed and is never stored as a map, decision D1. `docs/adrs/accepted/adr-0068-terrain-is-generated-from-the-seed-and-is-never-stored-as-a-map.md`
     pub fn new(layout: BlockLayout, terrain: Terrain) -> Result<Self, BridgeError> {
         if layout.grid() != terrain.grid() {
             return Err(BridgeError::GridMismatch);
@@ -429,7 +429,7 @@ impl Pyramid {
     ///
     /// # References
     ///
-    /// [^1]: ADR-0022, level 0 is the only truth, and every level above it is derived, decision D2, a draft record. `docs/adrs/draft/adr-0022-level-0-is-the-only-truth-and-every-level-above-it-is-derived.md`
+    /// [^1]: ADR-0022, level 0 is the only truth, and every level above it is derived, decision D2. `docs/adrs/accepted/adr-0022-level-0-is-the-only-truth-and-every-level-above-it-is-derived.md`
     /// [^2]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
     #[must_use]
     pub fn total(&self) -> CellSummary {
@@ -468,8 +468,8 @@ impl Pyramid {
     ///
     /// # References
     ///
-    /// [^1]: ADR-0022, level 0 is the only truth, and every level above it is derived, decision D3, a draft record. `docs/adrs/draft/adr-0022-level-0-is-the-only-truth-and-every-level-above-it-is-derived.md`
-    /// [^2]: ADR-0009, parallel stages write disjoint outputs, because the memory model is weak, a draft record. `docs/adrs/draft/adr-0009-parallel-stages-write-disjoint-outputs.md`
+    /// [^1]: ADR-0022, level 0 is the only truth, and every level above it is derived, decision D3. `docs/adrs/accepted/adr-0022-level-0-is-the-only-truth-and-every-level-above-it-is-derived.md`
+    /// [^2]: ADR-0009, parallel stages write disjoint outputs, because the memory model is weak. `docs/adrs/accepted/adr-0009-parallel-stages-write-disjoint-outputs.md`
     /// [^3]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
     /// [^4]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`
     pub fn rebuild(

@@ -19,7 +19,8 @@ set `Accepted`.[^1] A draft binds nothing, so work built on one is built on
 sand, and every draft below is already implemented in the crate.
 
 **Every draft and every reserved row appears exactly once.** A check enforces
-it, so a written record cannot wait for review unseen.[^4]
+it, so a written record cannot wait for review unseen.[^4] When no record is
+waiting, the first table is empty and says so.
 
 The second table below is a **selection, not a set.** The registry holds about
 forty proposed rows, and the scope rule says most of them should never be
@@ -28,25 +29,9 @@ rule.
 
 ## Waiting for review
 
-These are written. A reviewer reads the record against the code, decision by
-decision, and accepts or returns it.[^5]
-
-| No. | Why it sits here |
-|---|---|
-| 0068 | Terrain. Every other subsystem now reads it, and it is still a draft. |
-| 0022 | Level 0 is the only truth. The pyramid, the holding and the rates all cite it. |
-| 0023 | An aggregate combines exactly. Cited by every summary field. |
-| 0024 | Extensive or intensive. Cited by the level 1 fields. |
-| 0053 | A faction is a bit in a mask. Written and implemented today. |
-| 0054 | Three entity tiers. The ruler and the family depend on it. |
-| 0062 | Production and upkeep as rates. Written and implemented today. |
-| 0075 | The founding reads a bounded sample. Written and implemented today. |
-| 0071 | The bridge rebuild orders on one thread. |
-| 0072 | Allocated by the resource work. |
-| 0073 | Allocated by the resource work. |
-| 0008 | The primary target is aarch64. Old, and it governs every cost claim. |
-| 0009 | Parallel stages write disjoint outputs. |
-| 0011 | Every value type is a newtype. |
+None. The project owner read all fourteen drafts and accepted them, so every
+written record now binds. A record that arrives here binds nothing until a
+reviewer moves it, and this section names the ones waiting.
 
 ## Reserved and not written
 
@@ -74,4 +59,4 @@ a subsystem nobody has built is the failure the scope rule opens with.[^6]
 [^5]: Definition of Done, section 3. `.claude/rules/definition-of-done.md`
 [^6]: Decision Record Scope, section 1. `.claude/rules/adr-scope.md`
 [^7]: Decisions register, DEC-032. `docs/DECISIONS.md`
-[^8]: ADR-0062, decision D7, a draft record. `docs/adrs/draft/adr-0062-production-and-upkeep-are-rates-attached-to-a-site.md`
+[^8]: ADR-0062, decision D7. `docs/adrs/accepted/adr-0062-production-and-upkeep-are-rates-attached-to-a-site.md`

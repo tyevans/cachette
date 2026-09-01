@@ -604,7 +604,7 @@ concluded, and it called that argument its weakest.
 None yet.
 
 [^TARGET]: Blockers register, BLK-004, and the scale constants. `docs/reference/budgets.md`
-[^DEC7]: ADR-0073, gathering is admitted by sort-then-admit against the tile, decision D1, a draft record. `docs/adrs/draft/adr-0073-gathering-is-admitted-by-sort-then-admit-against-the-tile.md`
+[^DEC7]: ADR-0073, gathering is admitted by sort-then-admit against the tile, decision D1. `docs/adrs/accepted/adr-0073-gathering-is-admitted-by-sort-then-admit-against-the-tile.md`
 [^DEC8]: Project orientation, the design principles. `CLAUDE.md`
 [^DEC9]: Findings register, FND-022. `docs/FINDINGS.md`
 [^DEC10]: Findings register, FND-072. `docs/FINDINGS.md`

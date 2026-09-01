@@ -174,10 +174,10 @@ without stating a constraint is worse than no record.
 
 | No. | Claim | Status | Depends on | Source |
 |---|---|---|---|---|
-| 0008 | The primary target is aarch64 | Draft | 0001 | 07 |
-| 0009 | Parallel stages write disjoint outputs, because the memory model is weak | Draft | 0001, 0008 | 07 |
+| 0008 | The primary target is aarch64 | Accepted | 0001 | 07 |
+| 0009 | Parallel stages write disjoint outputs, because the memory model is weak | Accepted | 0001, 0008 | 07 |
 | 0010 | The cache line size is a compile-time constant | Proposed | 0008 | 07 |
-| 0011 | Every value type is a newtype | Draft | 0002, 0008 | 07 |
+| 0011 | Every value type is a newtype | Accepted | 0002, 0008 | 07 |
 
 ### Storage
 
@@ -199,9 +199,9 @@ without stating a constraint is worse than no record.
 
 | No. | Claim | Status | Depends on | Source |
 |---|---|---|---|---|
-| 0022 | Level 0 is the only truth, and every level above it is derived | Draft | 0012 | 02 |
-| 0023 | An aggregate combines exactly, in any order | Draft | 0002, 0022 | 02 |
-| 0024 | Every summary field is declared extensive or intensive | Draft | 0023 | 02 |
+| 0022 | Level 0 is the only truth, and every level above it is derived | Accepted | 0012 | 02 |
+| 0023 | An aggregate combines exactly, in any order | Accepted | 0002, 0022 | 02 |
+| 0024 | Every summary field is declared extensive or intensive | Accepted | 0023 | 02 |
 | 0025 | The pyramid carries two update paths, chosen by a threshold | Proposed | 0022, 0019 | 02 |
 | 0026 | The world holds two pyramids, not one | Proposed | 0022 | 02, 08 |
 | 0027 | The pyramid is the query index and the statistics catalogue | Proposed | 0022 | 02, 04 |
@@ -245,26 +245,26 @@ without stating a constraint is worse than no record.
 | 0050 | The frame schedule is static and known before the frame runs | Proposed | 0001, 0033 | 06 |
 | 0051 | A selector is a lazy expression tree that Rust evaluates | Proposed | 0043 | 04 |
 | 0052 | A selector result may be a range, not only an enumerated set | Proposed | 0051, 0028 | 02, 04 |
-| 0053 | A faction is a bit in a mask, and a relation is a plane | Draft | 0011, 0012, 0023, 0024 | 08 |
-| 0054 | An entity belongs to one of three tiers, declared at creation | Draft | 0012, 0043 | 14, 15, 16 |
+| 0053 | A faction is a bit in a mask, and a relation is a plane | Accepted | 0011, 0012, 0023, 0024 | 08 |
+| 0054 | An entity belongs to one of three tiers, declared at creation | Accepted | 0012, 0043 | 14, 15, 16 |
 | 0055 | An effective stat comes from an ordered modifier pipeline | Proposed | 0002, 0054 | 12 |
 | 0056 | Movement is tile-discrete and admitted by sort-then-admit | Accepted | 0004, 0018 | 06, 10 |
 | 0058 | A field update is a flux pair on an edge, so quantity is conserved exactly | Proposed | 0023, 0029 | 13 |
 | 0059 | Fog storage grows with observed area, not with world area | Proposed | 0026, 0053 | 08 |
 | 0060 | An influence map is stored as a shared basis, not one plane per faction | Proposed | 0053, 0058 | 09 |
 | 0061 | Trade solves a flow, never a path for each cart | Proposed | 0049, 0058 | 11 |
-| 0062 | Production and upkeep are rates attached to a site | Draft | 0055 | 12, `draft/adr-0062-production-and-upkeep-are-rates-attached-to-a-site.md` |
+| 0062 | Production and upkeep are rates attached to a site | Accepted | 0055 | 12, `accepted/adr-0062-production-and-upkeep-are-rates-attached-to-a-site.md` |
 | 0063 | A need is a rate with a threshold, and crossing it is a fact | Proposed | 0032, 0062 | 15 |
 | 0064 | A unit chooses by scoring a small fixed option set | Proposed | 0003, 0063 | 16 |
 | 0065 | A group is a site membership, not a region | Proposed | 0038, 0054 | 17 |
 | 0067 | The viewer reads the world and never writes to it | Accepted | 0001, 0036 | — |
-| 0068 | Terrain is generated from the seed and is never stored as a map | Draft | 0001, 0002, 0003, 0012 | — |
+| 0068 | Terrain is generated from the seed and is never stored as a map | Accepted | 0001, 0002, 0003, 0012 | — |
 | 0069 | Weather is a field the world integrates, never a table it reads | Reserved | 0058, 0068 | — |
 | 0070 | The head-up display reports what the drawing pass read | Accepted | 0067, 0018 | `accepted/adr-0070-the-head-up-display-reports-what-the-drawing-pass-read.md` |
-| 0071 | The bridge rebuild orders on one thread | Draft | 0001, 0004, 0007, 0018 | `draft/adr-0071-the-bridge-rebuild-orders-on-one-thread.md` |
-| 0072 | A tile stock is generated, and only what was taken is stored | Draft | 0002, 0003, 0068 | `draft/adr-0072-a-tile-stock-is-generated-and-only-what-was-taken-is-stored.md` |
-| 0073 | Gathering is admitted by sort-then-admit against the tile | Draft | 0004, 0018, 0056, 0072 | `draft/adr-0073-gathering-is-admitted-by-sort-then-admit-against-the-tile.md` |
-| 0075 | The founding choice reads a bounded sample of the world | Draft | 0002, 0003, 0004, 0068 | `draft/adr-0075-the-founding-choice-reads-a-bounded-sample-of-the-world.md` |
+| 0071 | The bridge rebuild orders on one thread | Accepted | 0001, 0004, 0007, 0018 | `accepted/adr-0071-the-bridge-rebuild-orders-on-one-thread.md` |
+| 0072 | A tile stock is generated, and only what was taken is stored | Accepted | 0002, 0003, 0068 | `accepted/adr-0072-a-tile-stock-is-generated-and-only-what-was-taken-is-stored.md` |
+| 0073 | Gathering is admitted by sort-then-admit against the tile | Accepted | 0004, 0018, 0056, 0072 | `accepted/adr-0073-gathering-is-admitted-by-sort-then-admit-against-the-tile.md` |
+| 0075 | The founding choice reads a bounded sample of the world | Accepted | 0002, 0003, 0004, 0068 | `accepted/adr-0075-the-founding-choice-reads-a-bounded-sample-of-the-world.md` |
 
 ### Retired numbers
 

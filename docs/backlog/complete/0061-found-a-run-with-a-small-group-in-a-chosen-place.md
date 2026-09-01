@@ -166,7 +166,7 @@ who already stands on a tile.
 [^1]: ADR-0003, every random draw is keyed, never stateful. `docs/adrs/accepted/adr-0003-every-random-draw-is-keyed-never-stateful.md`
 [^2]: ADR-0004, iteration order is explicit. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
 [^3]: ADR-0002, simulated and aggregated state holds no floating point number. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
-[^4]: ADR-0068, terrain is generated from the seed and is never stored as a map, a draft record. `docs/adrs/draft/adr-0068-terrain-is-generated-from-the-seed-and-is-never-stored-as-a-map.md`
+[^4]: ADR-0068, terrain is generated from the seed and is never stored as a map. `docs/adrs/accepted/adr-0068-terrain-is-generated-from-the-seed-and-is-never-stored-as-a-map.md`
 [^5]: Backlog item 0042. `docs/backlog/complete/0042-build-level-1-of-the-pyramid.md`
 [^6]: Blockers register, BLK-003, BLK-005 and BLK-007. `docs/BLOCKERS.md`
 [^7]: Budgets and costs, the scale constants. `docs/reference/budgets.md`

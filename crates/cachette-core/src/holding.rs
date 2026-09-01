@@ -33,9 +33,9 @@
 //!
 //! # References
 //!
-//! [^1]: ADR-0053, a faction is a bit in a mask, and a relation is a plane, a draft record. `docs/adrs/draft/adr-0053-a-faction-is-a-bit-in-a-mask-and-a-relation-is-a-plane.md`
+//! [^1]: ADR-0053, a faction is a bit in a mask, and a relation is a plane. `docs/adrs/accepted/adr-0053-a-faction-is-a-bit-in-a-mask-and-a-relation-is-a-plane.md`
 //! [^2]: ADR-0012, tiles are dense columns and units are a generational arena, decision D2. `docs/adrs/accepted/adr-0012-tiles-are-dense-columns-and-units-are-a-generational-arena.md`
-//! [^3]: ADR-0053, a faction is a bit in a mask, and a relation is a plane, decision D4, a draft record. `docs/adrs/draft/adr-0053-a-faction-is-a-bit-in-a-mask-and-a-relation-is-a-plane.md`
+//! [^3]: ADR-0053, a faction is a bit in a mask, and a relation is a plane, decision D4. `docs/adrs/accepted/adr-0053-a-faction-is-a-bit-in-a-mask-and-a-relation-is-a-plane.md`
 //! [^4]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
 
 use bytemuck::{Pod, Zeroable};
@@ -56,7 +56,7 @@ use crate::types::{FactionId, TileIdx, FACTION_CEILING};
 ///
 /// # References
 ///
-/// [^1]: ADR-0053, a faction is a bit in a mask, and a relation is a plane, decision D1, a draft record. `docs/adrs/draft/adr-0053-a-faction-is-a-bit-in-a-mask-and-a-relation-is-a-plane.md`
+/// [^1]: ADR-0053, a faction is a bit in a mask, and a relation is a plane, decision D1. `docs/adrs/accepted/adr-0053-a-faction-is-a-bit-in-a-mask-and-a-relation-is-a-plane.md`
 pub const MASK_BITS: u32 = 64;
 
 /// The bit that names a faction outside the addressable set.
@@ -78,7 +78,7 @@ pub const OVERFLOW_BIT: u32 = 63;
 ///
 /// # References
 ///
-/// [^1]: ADR-0053, a faction is a bit in a mask, and a relation is a plane, decision D2, a draft record. `docs/adrs/draft/adr-0053-a-faction-is-a-bit-in-a-mask-and-a-relation-is-a-plane.md`
+/// [^1]: ADR-0053, a faction is a bit in a mask, and a relation is a plane, decision D2. `docs/adrs/accepted/adr-0053-a-faction-is-a-bit-in-a-mask-and-a-relation-is-a-plane.md`
 #[repr(transparent)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Pod, Zeroable)]
 pub struct Holder(u16);
@@ -130,7 +130,7 @@ impl Default for Holder {
 ///
 /// # References
 ///
-/// [^1]: ADR-0053, a faction is a bit in a mask, and a relation is a plane, decision D3, a draft record. `docs/adrs/draft/adr-0053-a-faction-is-a-bit-in-a-mask-and-a-relation-is-a-plane.md`
+/// [^1]: ADR-0053, a faction is a bit in a mask, and a relation is a plane, decision D3. `docs/adrs/accepted/adr-0053-a-faction-is-a-bit-in-a-mask-and-a-relation-is-a-plane.md`
 #[repr(transparent)]
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Pod, Zeroable)]
 pub struct FactionMask(u64);
@@ -165,7 +165,7 @@ impl FactionMask {
     ///
     /// # References
     ///
-    /// [^1]: ADR-0023, an aggregate combines exactly, in any order, decision D2, a draft record. `docs/adrs/draft/adr-0023-an-aggregate-combines-exactly-in-any-order.md`
+    /// [^1]: ADR-0023, an aggregate combines exactly, in any order, decision D2. `docs/adrs/accepted/adr-0023-an-aggregate-combines-exactly-in-any-order.md`
     #[must_use]
     pub const fn union(self, other: Self) -> Self {
         Self(self.0 | other.0)
@@ -217,7 +217,7 @@ const PRESENCE_SUPPORT: u32 = NEIGHBOUR_COUNT as u32 + 1;
 ///
 /// # References
 ///
-/// [^1]: ADR-0053, a faction is a bit in a mask, and a relation is a plane, decision D5, a draft record. `docs/adrs/draft/adr-0053-a-faction-is-a-bit-in-a-mask-and-a-relation-is-a-plane.md`
+/// [^1]: ADR-0053, a faction is a bit in a mask, and a relation is a plane, decision D5. `docs/adrs/accepted/adr-0053-a-faction-is-a-bit-in-a-mask-and-a-relation-is-a-plane.md`
 #[must_use]
 pub const fn claim_threshold(kind: TileKind) -> Option<u32> {
     match kind {
@@ -298,7 +298,7 @@ impl Holding {
     ///
     /// # References
     ///
-    /// [^1]: ADR-0053, a faction is a bit in a mask, and a relation is a plane, decision D4, a draft record. `docs/adrs/draft/adr-0053-a-faction-is-a-bit-in-a-mask-and-a-relation-is-a-plane.md`
+    /// [^1]: ADR-0053, a faction is a bit in a mask, and a relation is a plane, decision D4. `docs/adrs/accepted/adr-0053-a-faction-is-a-bit-in-a-mask-and-a-relation-is-a-plane.md`
     #[must_use]
     pub fn holding_of(&self, faction: FactionId) -> i64 {
         self.census
@@ -332,7 +332,7 @@ impl Holding {
     ///
     /// # References
     ///
-    /// [^1]: ADR-0053, a faction is a bit in a mask, and a relation is a plane, decision D3, a draft record. `docs/adrs/draft/adr-0053-a-faction-is-a-bit-in-a-mask-and-a-relation-is-a-plane.md`
+    /// [^1]: ADR-0053, a faction is a bit in a mask, and a relation is a plane, decision D3. `docs/adrs/accepted/adr-0053-a-faction-is-a-bit-in-a-mask-and-a-relation-is-a-plane.md`
     pub fn blocks_held_by(&self, faction: FactionId) -> impl Iterator<Item = u32> + '_ {
         self.block_masks
             .iter()
@@ -348,7 +348,7 @@ impl Holding {
     ///
     /// # References
     ///
-    /// [^1]: ADR-0053, a faction is a bit in a mask, and a relation is a plane, decision D4, a draft record. `docs/adrs/draft/adr-0053-a-faction-is-a-bit-in-a-mask-and-a-relation-is-a-plane.md`
+    /// [^1]: ADR-0053, a faction is a bit in a mask, and a relation is a plane, decision D4. `docs/adrs/accepted/adr-0053-a-faction-is-a-bit-in-a-mask-and-a-relation-is-a-plane.md`
     pub fn tiles_held_by(&self, faction: FactionId) -> impl Iterator<Item = TileIdx> + '_ {
         let holder = Holder::of(faction);
         self.held
@@ -385,7 +385,7 @@ impl Holding {
     ///
     /// # References
     ///
-    /// [^1]: ADR-0053, a faction is a bit in a mask, and a relation is a plane, decision D4, a draft record. `docs/adrs/draft/adr-0053-a-faction-is-a-bit-in-a-mask-and-a-relation-is-a-plane.md`
+    /// [^1]: ADR-0053, a faction is a bit in a mask, and a relation is a plane, decision D4. `docs/adrs/accepted/adr-0053-a-faction-is-a-bit-in-a-mask-and-a-relation-is-a-plane.md`
     /// [^2]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
     pub fn advance(
         &mut self,
@@ -411,7 +411,7 @@ impl Holding {
         // so the joined result is in candidate order at every thread
         // count.[^1] Nothing reads which thread finished first.
         //
-        // [^1]: ADR-0009, parallel stages write disjoint outputs, because the memory model is weak, a draft record. `docs/adrs/draft/adr-0009-parallel-stages-write-disjoint-outputs.md`
+        // [^1]: ADR-0009, parallel stages write disjoint outputs, because the memory model is weak. `docs/adrs/accepted/adr-0009-parallel-stages-write-disjoint-outputs.md`
         let chunk_len = candidates.len().div_ceil(threads).max(1);
         let slot_count = candidates.len().div_ceil(chunk_len);
         let mut slots: Slots<Vec<(TileIdx, Holder)>> = Slots::filled(slot_count, Vec::new())
@@ -462,7 +462,7 @@ impl Holding {
     ///
     /// # References
     ///
-    /// [^1]: ADR-0053, a faction is a bit in a mask, and a relation is a plane, decision D4, a draft record. `docs/adrs/draft/adr-0053-a-faction-is-a-bit-in-a-mask-and-a-relation-is-a-plane.md`
+    /// [^1]: ADR-0053, a faction is a bit in a mask, and a relation is a plane, decision D4. `docs/adrs/accepted/adr-0053-a-faction-is-a-bit-in-a-mask-and-a-relation-is-a-plane.md`
     fn candidates(&self, arena: &SoldierArena) -> Vec<TileIdx> {
         let grid = self.layout.grid();
         let mut candidates: Vec<u32> = Vec::with_capacity(arena.len() as usize);
@@ -591,7 +591,7 @@ impl Holding {
     /// # References
     ///
     /// [^1]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`
-    /// [^2]: ADR-0053, a faction is a bit in a mask, and a relation is a plane, decision D5, a draft record. `docs/adrs/draft/adr-0053-a-faction-is-a-bit-in-a-mask-and-a-relation-is-a-plane.md`
+    /// [^2]: ADR-0053, a faction is a bit in a mask, and a relation is a plane, decision D5. `docs/adrs/accepted/adr-0053-a-faction-is-a-bit-in-a-mask-and-a-relation-is-a-plane.md`
     #[must_use]
     pub fn check_invariants(&self, terrain: Terrain, faction_ceiling: u16) -> bool {
         let grid = self.layout.grid();

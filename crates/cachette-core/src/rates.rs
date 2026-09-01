@@ -31,15 +31,15 @@
 //! # References
 //!
 //! [^1]: ADR-0066, entity storage holds four fixed shapes, decision D1. `docs/adrs/accepted/adr-0066-entity-storage-holds-four-fixed-shapes.md`
-//! [^2]: ADR-0062, production and upkeep are rates attached to a site, decision D1, a draft record. `docs/adrs/draft/adr-0062-production-and-upkeep-are-rates-attached-to-a-site.md`
+//! [^2]: ADR-0062, production and upkeep are rates attached to a site, decision D1. `docs/adrs/accepted/adr-0062-production-and-upkeep-are-rates-attached-to-a-site.md`
 //! [^3]: ADR-0002, simulated and aggregated state holds no floating point number, decision D1. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
 //! [^4]: ADR-0002, simulated and aggregated state holds no floating point number, decision D2. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
 //! [^5]: Findings register, FND-012. `docs/FINDINGS.md`
 //! [^6]: Findings register, FND-016. `docs/FINDINGS.md`
 //! [^7]: Findings register, FND-043. `docs/FINDINGS.md`
-//! [^8]: ADR-0009, parallel stages write disjoint outputs, decision D1, a draft record. `docs/adrs/draft/adr-0009-parallel-stages-write-disjoint-outputs.md`
+//! [^8]: ADR-0009, parallel stages write disjoint outputs, decision D1. `docs/adrs/accepted/adr-0009-parallel-stages-write-disjoint-outputs.md`
 //! [^9]: ADR-0004, iteration order is explicit, decision D3. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
-//! [^10]: ADR-0023, an aggregate combines exactly, in any order, decision D3, a draft record. `docs/adrs/draft/adr-0023-an-aggregate-combines-exactly-in-any-order.md`
+//! [^10]: ADR-0023, an aggregate combines exactly, in any order, decision D3. `docs/adrs/accepted/adr-0023-an-aggregate-combines-exactly-in-any-order.md`
 
 use bytemuck::{Pod, Zeroable};
 
@@ -431,7 +431,7 @@ impl SiteShortfall {
 ///
 /// # References
 ///
-/// [^1]: ADR-0023, an aggregate combines exactly, in any order, decision D3, a draft record. `docs/adrs/draft/adr-0023-an-aggregate-combines-exactly-in-any-order.md`
+/// [^1]: ADR-0023, an aggregate combines exactly, in any order, decision D3. `docs/adrs/accepted/adr-0023-an-aggregate-combines-exactly-in-any-order.md`
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Pod, Zeroable)]
 pub struct RateLedger {
@@ -545,7 +545,7 @@ impl RatePass {
 ///
 /// # References
 ///
-/// [^1]: ADR-0009, parallel stages write disjoint outputs, decision D1, a draft record. `docs/adrs/draft/adr-0009-parallel-stages-write-disjoint-outputs.md`
+/// [^1]: ADR-0009, parallel stages write disjoint outputs, decision D1. `docs/adrs/accepted/adr-0009-parallel-stages-write-disjoint-outputs.md`
 pub fn apply(
     schedule: RateSchedule,
     tick: Tick,
