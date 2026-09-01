@@ -1,7 +1,7 @@
 ---
 id: 0100
 title: Give a record one status site
-status: refined
+status: complete
 created: 2026-08-31
 implements: []
 changes: []
@@ -108,7 +108,21 @@ table a reader scans while thirty files are not.
 
 ## Outcome
 
-Filled in when the item moves to `complete/`.
+The registry won, as the review expected. Every record file lost its status
+line. No decision, title, section or reference changed in any record.
+
+No file disagreed with its registry row before the sweep, so the work filed no
+finding. The commit body holds the count and the search command.
+
+The record check gained a status check and an optional directory argument. The
+argument lets the probe recipe run the check against a broken fixture, in the
+shape the product record check already uses. A new fixture holds one record
+that is correct except for a status line, so the probe fails for one reason
+and names it. The check was also proved against the real tree: a status line
+put back into one accepted record made the check fail, and the removal made it
+pass again.
+
+No register entry opened or closed. The work created no record and no number.
 
 ## References
 
