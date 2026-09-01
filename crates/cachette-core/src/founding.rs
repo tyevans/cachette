@@ -26,7 +26,7 @@
 //!
 //! # References
 //!
-//! [^1]: ADR-0075, the founding choice reads a bounded sample of the world, decision D1, a draft record. `docs/adrs/draft/adr-0075-the-founding-choice-reads-a-bounded-sample-of-the-world.md`
+//! [^1]: ADR-0075, the founding choice reads a bounded sample of the world, decision D1. `docs/adrs/accepted/adr-0075-the-founding-choice-reads-a-bounded-sample-of-the-world.md`
 //! [^2]: PRD-0012, a world starts small and grows. `docs/product/shaped/prd-0012-a-world-starts-small-and-grows.md`
 //! [^3]: ADR-0003, every random draw is keyed, never stateful, decision D1. `docs/adrs/accepted/adr-0003-every-random-draw-is-keyed-never-stateful.md`
 //! [^4]: ADR-0002, simulated and aggregated state holds no floating point number, decision D1. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
@@ -76,7 +76,7 @@ const DRAW_ROW: u32 = 8;
 ///
 /// # References
 ///
-/// [^1]: ADR-0075, the founding choice reads a bounded sample of the world, decision D1, a draft record. `docs/adrs/draft/adr-0075-the-founding-choice-reads-a-bounded-sample-of-the-world.md`
+/// [^1]: ADR-0075, the founding choice reads a bounded sample of the world, decision D1. `docs/adrs/accepted/adr-0075-the-founding-choice-reads-a-bounded-sample-of-the-world.md`
 pub const SAMPLE_SIZE: u32 = 64;
 
 /// The number of rings the founding reads around a candidate.
@@ -102,7 +102,7 @@ pub const SURVEY_TILES: u32 = 1 + 3 * SURVEY_RADIUS * (SURVEY_RADIUS + 1);
 ///
 /// # References
 ///
-/// [^1]: ADR-0075, the founding choice reads a bounded sample of the world, decision D1, a draft record. `docs/adrs/draft/adr-0075-the-founding-choice-reads-a-bounded-sample-of-the-world.md`
+/// [^1]: ADR-0075, the founding choice reads a bounded sample of the world, decision D1. `docs/adrs/accepted/adr-0075-the-founding-choice-reads-a-bounded-sample-of-the-world.md`
 /// [^2]: Testing rules, section 3. `.claude/rules/testing.md`
 pub const SURVEY_CEILING: u64 = SAMPLE_SIZE as u64 * SURVEY_TILES as u64;
 
@@ -135,7 +135,7 @@ const WEIGHT_WATER_EDGE: Fix32 = Fix32::from_int(8);
 ///
 /// # References
 ///
-/// [^1]: ADR-0075, the founding choice reads a bounded sample of the world, decision D5, a draft record. `docs/adrs/draft/adr-0075-the-founding-choice-reads-a-bounded-sample-of-the-world.md`
+/// [^1]: ADR-0075, the founding choice reads a bounded sample of the world, decision D5. `docs/adrs/accepted/adr-0075-the-founding-choice-reads-a-bounded-sample-of-the-world.md`
 /// [^2]: Open decisions register, DEC-031. `docs/DECISIONS.md`
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct Provision {
@@ -162,7 +162,7 @@ impl Provision {
     ///
     /// # References
     ///
-    /// [^1]: ADR-0075, the founding choice reads a bounded sample of the world, decision D3, a draft record. `docs/adrs/draft/adr-0075-the-founding-choice-reads-a-bounded-sample-of-the-world.md`
+    /// [^1]: ADR-0075, the founding choice reads a bounded sample of the world, decision D3. `docs/adrs/accepted/adr-0075-the-founding-choice-reads-a-bounded-sample-of-the-world.md`
     #[must_use]
     pub fn score(self) -> Accum {
         let mut total = Accum(0);
@@ -238,7 +238,7 @@ impl Candidate {
 ///
 /// # References
 ///
-/// [^1]: ADR-0075, the founding choice reads a bounded sample of the world, decision D5, a draft record. `docs/adrs/draft/adr-0075-the-founding-choice-reads-a-bounded-sample-of-the-world.md`
+/// [^1]: ADR-0075, the founding choice reads a bounded sample of the world, decision D5. `docs/adrs/accepted/adr-0075-the-founding-choice-reads-a-bounded-sample-of-the-world.md`
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Survey {
     ordered: Vec<Candidate>,
@@ -366,7 +366,7 @@ pub enum FoundingError {
     ///
     /// # References
     ///
-    /// [^1]: ADR-0075, the founding choice reads a bounded sample of the world, a draft record. `docs/adrs/draft/adr-0075-the-founding-choice-reads-a-bounded-sample-of-the-world.md`
+    /// [^1]: ADR-0075, the founding choice reads a bounded sample of the world. `docs/adrs/accepted/adr-0075-the-founding-choice-reads-a-bounded-sample-of-the-world.md`
     NoPlaceFound(u32),
     /// The address the caller named lies outside the world.
     OutsideWorld(Axial),
@@ -557,7 +557,7 @@ fn candidate_row(_seed: u64, _ordinal: u32, _height: u32) -> i32 {
 ///
 /// # References
 ///
-/// [^1]: ADR-0075, the founding choice reads a bounded sample of the world, decision D1, a draft record. `docs/adrs/draft/adr-0075-the-founding-choice-reads-a-bounded-sample-of-the-world.md`
+/// [^1]: ADR-0075, the founding choice reads a bounded sample of the world, decision D1. `docs/adrs/accepted/adr-0075-the-founding-choice-reads-a-bounded-sample-of-the-world.md`
 pub fn survey(field: ResourceField, group: u32) -> Result<Survey, FoundingError> {
     if group == 0 {
         return Err(FoundingError::EmptyGroup);

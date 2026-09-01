@@ -69,7 +69,7 @@
 //! [^5]: ADR-0018, the unit-to-tile bridge is derived, and it rebuilds at the barrier, decision D3. `docs/adrs/accepted/adr-0018-the-unit-to-tile-bridge-is-derived-and-rebuilds-at-the-barrier.md`
 //! [^6]: ADR-0007, content supplies a key vector, never a comparator, decision D1. `docs/adrs/accepted/adr-0007-content-supplies-a-key-vector-never-a-comparator.md`
 //! [^7]: ADR-0007, content supplies a key vector, never a comparator, decision D2. `docs/adrs/accepted/adr-0007-content-supplies-a-key-vector-never-a-comparator.md`
-//! [^8]: ADR-0071, the bridge rebuild orders on one thread. `docs/adrs/draft/adr-0071-the-bridge-rebuild-orders-on-one-thread.md`
+//! [^8]: ADR-0071, the bridge rebuild orders on one thread. `docs/adrs/accepted/adr-0071-the-bridge-rebuild-orders-on-one-thread.md`
 
 use crate::hex::{Axial, Grid};
 use crate::soldier::SoldierArena;
@@ -281,7 +281,7 @@ impl BlockLayout {
     ///
     /// # References
     ///
-    /// [^1]: ADR-0071, the bridge rebuild orders on one thread, decision D1. `docs/adrs/draft/adr-0071-the-bridge-rebuild-orders-on-one-thread.md`
+    /// [^1]: ADR-0071, the bridge rebuild orders on one thread, decision D1. `docs/adrs/accepted/adr-0071-the-bridge-rebuild-orders-on-one-thread.md`
     #[must_use]
     pub const fn key_ceiling(self) -> u64 {
         let blocks = self.block_count() as u64;
@@ -392,7 +392,7 @@ impl UnitTileBridge {
     ///
     /// [^1]: ADR-0014, entity identity is an index plus a generation, decision D2. `docs/adrs/accepted/adr-0014-entity-identity-is-an-index-plus-a-generation.md`
     /// [^2]: ADR-0018, the unit-to-tile bridge is derived, and it rebuilds at the barrier, decision D3. `docs/adrs/accepted/adr-0018-the-unit-to-tile-bridge-is-derived-and-rebuilds-at-the-barrier.md`
-    /// [^3]: ADR-0071, the bridge rebuild orders on one thread, decision D2. `docs/adrs/draft/adr-0071-the-bridge-rebuild-orders-on-one-thread.md`
+    /// [^3]: ADR-0071, the bridge rebuild orders on one thread, decision D2. `docs/adrs/accepted/adr-0071-the-bridge-rebuild-orders-on-one-thread.md`
     pub fn rebuild(&mut self, arena: &SoldierArena) -> Result<(), BridgeError> {
         if arena.grid() != self.layout.grid() {
             return Err(BridgeError::GridMismatch);

@@ -1,6 +1,6 @@
 # ADR-0022: Level 0 is the only truth, and every level above it is derived
 
-Status: Draft
+Status: Accepted
 
 ## Context
 
@@ -98,6 +98,6 @@ cost decision rather than a correctness one.[^4]
 ## References
 
 [^1]: ADR-0001, one binary gives one answer at any thread count, decision D4. `docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
-[^2]: ADR-0023, an aggregate combines exactly, in any order. `docs/adrs/draft/adr-0023-an-aggregate-combines-exactly-in-any-order.md`
-[^3]: ADR-0024, every summary field is declared extensive or intensive. `docs/adrs/draft/adr-0024-every-summary-field-is-declared-extensive-or-intensive.md`
+[^2]: ADR-0023, an aggregate combines exactly, in any order. `docs/adrs/accepted/adr-0023-an-aggregate-combines-exactly-in-any-order.md`
+[^3]: ADR-0024, every summary field is declared extensive or intensive. `docs/adrs/accepted/adr-0024-every-summary-field-is-declared-extensive-or-intensive.md`
 [^4]: ADR Registry, row 0025. `docs/adrs/REGISTRY.md`

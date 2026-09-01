@@ -481,7 +481,7 @@ const CUT_NOTICE: &str = "window too short. panel cut.";
 ///
 /// # References
 ///
-/// [^1]: ADR-0024, every summary field is declared extensive or intensive, decision D5, a draft record. `docs/adrs/draft/adr-0024-every-summary-field-is-declared-extensive-or-intensive.md`
+/// [^1]: ADR-0024, every summary field is declared extensive or intensive, decision D5. `docs/adrs/accepted/adr-0024-every-summary-field-is-declared-extensive-or-intensive.md`
 /// [^2]: ADR-0067, the viewer reads the world and never writes to it, decision D3. `docs/adrs/accepted/adr-0067-the-viewer-reads-the-world-and-never-writes-to-it.md`
 fn fraction(reading: Option<Fix32>) -> String {
     match reading {

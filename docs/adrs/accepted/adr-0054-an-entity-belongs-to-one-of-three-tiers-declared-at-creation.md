@@ -1,6 +1,6 @@
 # ADR-0054: An entity belongs to one of three tiers, declared at creation
 
-Status: Draft
+Status: Accepted
 
 ## Context
 

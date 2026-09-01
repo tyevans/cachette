@@ -58,6 +58,6 @@ Not done. This item is `proposed` and needs one before anyone takes it.
 
 [^1]: Backlog item 0066. `docs/backlog/complete/0066-provide-the-character-column-set-and-the-tier-declaration.md`
 [^2]: The character graph and inheritance, section 9. `docs/research/reports/14-character-graph-and-inheritance.md`
-[^3]: ADR-0054, an entity belongs to one of three tiers, declared at creation, decision D4, a draft record. `docs/adrs/draft/adr-0054-an-entity-belongs-to-one-of-three-tiers-declared-at-creation.md`
+[^3]: ADR-0054, an entity belongs to one of three tiers, declared at creation, decision D4. `docs/adrs/accepted/adr-0054-an-entity-belongs-to-one-of-three-tiers-declared-at-creation.md`
 [^4]: Blockers register, BLK-011. `docs/BLOCKERS.md`
 [^5]: ADR-0007, content supplies a key vector, never a comparator. `docs/adrs/accepted/adr-0007-content-supplies-a-key-vector-never-a-comparator.md`

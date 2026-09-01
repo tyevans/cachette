@@ -226,9 +226,9 @@ earns over time, and nothing would fail.[^17]
 ## References
 
 [^1]: ADR-0066, entity storage holds four fixed shapes, decision D1. `docs/adrs/accepted/adr-0066-entity-storage-holds-four-fixed-shapes.md`
-[^2]: ADR-0073, gathering is admitted by sort-then-admit against the tile, decision D1, a draft record. `docs/adrs/draft/adr-0073-gathering-is-admitted-by-sort-then-admit-against-the-tile.md`
+[^2]: ADR-0073, gathering is admitted by sort-then-admit against the tile, decision D1. `docs/adrs/accepted/adr-0073-gathering-is-admitted-by-sort-then-admit-against-the-tile.md`
 [^3]: Blockers register, BLK-008. `docs/BLOCKERS.md`
-[^4]: ADR-0023, an aggregate combines exactly, in any order, decision D3, a draft record. `docs/adrs/draft/adr-0023-an-aggregate-combines-exactly-in-any-order.md`
+[^4]: ADR-0023, an aggregate combines exactly, in any order, decision D3. `docs/adrs/accepted/adr-0023-an-aggregate-combines-exactly-in-any-order.md`
 [^5]: ADR-0002, simulated and aggregated state holds no floating point number, decision D1. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
 [^6]: Findings register, FND-043. `docs/FINDINGS.md`
 [^7]: Findings register, FND-012. `docs/FINDINGS.md`
@@ -238,8 +238,8 @@ earns over time, and nothing would fail.[^17]
 [^11]: ADR-0055, an effective stat comes from an ordered modifier pipeline. `docs/adrs/REGISTRY.md`
 [^12]: Decision Record Scope, sections 1 and 4.6. `.claude/rules/adr-scope.md`
 [^13]: Findings register, FND-063. `docs/FINDINGS.md`
-[^14]: ADR-0022, level 0 is the only truth, and every level above it is derived, decision D2, a draft record. `docs/adrs/draft/adr-0022-level-0-is-the-only-truth-and-every-level-above-it-is-derived.md`
-[^15]: ADR-0009, parallel stages write disjoint outputs, decision D1, a draft record. `docs/adrs/draft/adr-0009-parallel-stages-write-disjoint-outputs.md`
+[^14]: ADR-0022, level 0 is the only truth, and every level above it is derived, decision D2. `docs/adrs/accepted/adr-0022-level-0-is-the-only-truth-and-every-level-above-it-is-derived.md`
+[^15]: ADR-0009, parallel stages write disjoint outputs, decision D1. `docs/adrs/accepted/adr-0009-parallel-stages-write-disjoint-outputs.md`
 [^16]: ADR-0004, iteration order is explicit, decisions D2 and D3. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
 [^17]: Recurring defect shapes, shapes 1 and 3. `.claude/rules/recurring-defects.md`
 [^18]: Budgets and costs, the scale constants. `docs/reference/budgets.md`

@@ -100,7 +100,7 @@ proptest! {
     ///
     /// # References
     ///
-    /// [^1]: ADR-0075, the founding choice reads a bounded sample of the world, decisions D4 and D5, a draft record. `docs/adrs/draft/adr-0075-the-founding-choice-reads-a-bounded-sample-of-the-world.md`
+    /// [^1]: ADR-0075, the founding choice reads a bounded sample of the world, decisions D4 and D5. `docs/adrs/accepted/adr-0075-the-founding-choice-reads-a-bounded-sample-of-the-world.md`
     #[test]
     fn every_chosen_place_answers_the_same_test(seed: u64) {
         let world = world_of(seed);

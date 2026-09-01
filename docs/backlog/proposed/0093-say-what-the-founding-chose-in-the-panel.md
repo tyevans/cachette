@@ -66,7 +66,7 @@ Filled in when the item moves to `complete/`.
 
 ## References
 
-[^1]: ADR-0075, the founding choice reads a bounded sample of the world, decision D5, a draft record. `docs/adrs/draft/adr-0075-the-founding-choice-reads-a-bounded-sample-of-the-world.md`
+[^1]: ADR-0075, the founding choice reads a bounded sample of the world, decision D5. `docs/adrs/accepted/adr-0075-the-founding-choice-reads-a-bounded-sample-of-the-world.md`
 [^2]: ADR-0067, the viewer reads the world and never writes to it. `docs/adrs/accepted/adr-0067-the-viewer-reads-the-world-and-never-writes-to-it.md`
 [^3]: ADR-0070, the head-up display reports what the drawing pass read. `docs/adrs/accepted/adr-0070-the-head-up-display-reports-what-the-drawing-pass-read.md`
 [^4]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`

@@ -63,5 +63,5 @@ Filled in when the item moves to `complete/`.
 
 [^1]: PRD-0012, a world starts small and grows. `docs/product/shaped/prd-0012-a-world-starts-small-and-grows.md`
 [^2]: Blockers register, BLK-018. `docs/BLOCKERS.md`
-[^3]: ADR-0075, the founding choice reads a bounded sample of the world, a draft record. `docs/adrs/draft/adr-0075-the-founding-choice-reads-a-bounded-sample-of-the-world.md`
+[^3]: ADR-0075, the founding choice reads a bounded sample of the world. `docs/adrs/accepted/adr-0075-the-founding-choice-reads-a-bounded-sample-of-the-world.md`
 [^4]: Definition of Done, section 4. `.claude/rules/definition-of-done.md`

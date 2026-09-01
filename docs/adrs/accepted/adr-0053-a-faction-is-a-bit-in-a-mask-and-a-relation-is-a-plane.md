@@ -1,6 +1,6 @@
 # ADR-0053: A faction is a bit in a mask, and a relation is a plane
 
-Status: Draft
+Status: Accepted
 
 ## Context
 
@@ -196,7 +196,7 @@ cost this record accepts in exchange for an answer that reads no tile.
 [^3]: Findings register, FND-049. `docs/FINDINGS.md`
 [^4]: Blockers register, BLK-007. `docs/BLOCKERS.md`
 [^5]: Budgets and costs, the scale constants. `docs/reference/budgets.md`
-[^6]: ADR-0023, an aggregate combines exactly, in any order, decisions D2 and D3, a draft record. `docs/adrs/draft/adr-0023-an-aggregate-combines-exactly-in-any-order.md`
-[^7]: ADR-0024, every summary field is declared extensive or intensive, decision D2, a draft record. `docs/adrs/draft/adr-0024-every-summary-field-is-declared-extensive-or-intensive.md`
+[^6]: ADR-0023, an aggregate combines exactly, in any order, decisions D2 and D3. `docs/adrs/accepted/adr-0023-an-aggregate-combines-exactly-in-any-order.md`
+[^7]: ADR-0024, every summary field is declared extensive or intensive, decision D2. `docs/adrs/accepted/adr-0024-every-summary-field-is-declared-extensive-or-intensive.md`
 [^8]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`
 [^9]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`

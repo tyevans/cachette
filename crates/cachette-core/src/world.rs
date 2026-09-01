@@ -23,7 +23,7 @@
 //!
 //! [^1]: ADR-0001, one binary gives one answer at any thread count, decision D4. `docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
 //! [^2]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
-//! [^3]: ADR-0009, parallel stages write disjoint outputs, because the memory model is weak, a draft record. `docs/adrs/draft/adr-0009-parallel-stages-write-disjoint-outputs.md`
+//! [^3]: ADR-0009, parallel stages write disjoint outputs, because the memory model is weak. `docs/adrs/accepted/adr-0009-parallel-stages-write-disjoint-outputs.md`
 //! [^4]: ADR-0003, every random draw is keyed, never stateful, decision D1. `docs/adrs/accepted/adr-0003-every-random-draw-is-keyed-never-stateful.md`
 //! [^5]: ADR-0002, simulated and aggregated state holds no floating point number, decision D2. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
 
@@ -226,7 +226,7 @@ pub struct World {
     ///
     /// # References
     ///
-    /// [^1]: ADR-0072, a tile stock is generated, and only what was taken is stored, decision D5, a draft record. `docs/adrs/draft/adr-0072-a-tile-stock-is-generated-and-only-what-was-taken-is-stored.md`
+    /// [^1]: ADR-0072, a tile stock is generated, and only what was taken is stored, decision D5. `docs/adrs/accepted/adr-0072-a-tile-stock-is-generated-and-only-what-was-taken-is-stored.md`
     departed: [u64; RESOURCE_KIND_COUNT],
     /// Level 1 of the pyramid, derived from level 0 at the barrier.
     pyramid: Pyramid,
@@ -238,7 +238,7 @@ pub struct World {
     ///
     /// # References
     ///
-    /// [^1]: ADR-0053, a faction is a bit in a mask, and a relation is a plane, decision D2, a draft record. `docs/adrs/draft/adr-0053-a-faction-is-a-bit-in-a-mask-and-a-relation-is-a-plane.md`
+    /// [^1]: ADR-0053, a faction is a bit in a mask, and a relation is a plane, decision D2. `docs/adrs/accepted/adr-0053-a-faction-is-a-bit-in-a-mask-and-a-relation-is-a-plane.md`
     holding: Holding,
     /// When the site rates apply.
     schedule: RateSchedule,
@@ -289,7 +289,7 @@ impl World {
         // it here, once, when the world is built. Nothing checks a count on
         // a later call.[^1]
         //
-        // [^1]: ADR-0054, an entity belongs to one of three tiers, declared at creation, decision D3, a draft record. `docs/adrs/draft/adr-0054-an-entity-belongs-to-one-of-three-tiers-declared-at-creation.md`
+        // [^1]: ADR-0054, an entity belongs to one of three tiers, declared at creation, decision D3. `docs/adrs/accepted/adr-0054-an-entity-belongs-to-one-of-three-tiers-declared-at-creation.md`
         let characters = CharacterArena::new();
         let mut bridge = UnitTileBridge::new(layout);
         bridge.rebuild(&soldiers)?;
@@ -352,7 +352,7 @@ impl World {
     ///
     /// # References
     ///
-    /// [^1]: ADR-0068, terrain is generated from the seed and is never stored as a map, decision D1, a draft record. `docs/adrs/draft/adr-0068-terrain-is-generated-from-the-seed-and-is-never-stored-as-a-map.md`
+    /// [^1]: ADR-0068, terrain is generated from the seed and is never stored as a map, decision D1. `docs/adrs/accepted/adr-0068-terrain-is-generated-from-the-seed-and-is-never-stored-as-a-map.md`
     #[must_use]
     pub const fn terrain(&self) -> Terrain {
         self.terrain
@@ -365,7 +365,7 @@ impl World {
     ///
     /// # References
     ///
-    /// [^1]: ADR-0068, terrain is generated from the seed and is never stored as a map, decision D1, a draft record. `docs/adrs/draft/adr-0068-terrain-is-generated-from-the-seed-and-is-never-stored-as-a-map.md`
+    /// [^1]: ADR-0068, terrain is generated from the seed and is never stored as a map, decision D1. `docs/adrs/accepted/adr-0068-terrain-is-generated-from-the-seed-and-is-never-stored-as-a-map.md`
     #[must_use]
     pub fn tile_terrain(&self, address: Axial) -> Option<TerrainTile> {
         self.terrain.tile(address)
@@ -386,7 +386,7 @@ impl World {
     ///
     /// # References
     ///
-    /// [^1]: ADR-0072, a tile stock is generated, and only what was taken is stored, decision D1, a draft record. `docs/adrs/draft/adr-0072-a-tile-stock-is-generated-and-only-what-was-taken-is-stored.md`
+    /// [^1]: ADR-0072, a tile stock is generated, and only what was taken is stored, decision D1. `docs/adrs/accepted/adr-0072-a-tile-stock-is-generated-and-only-what-was-taken-is-stored.md`
     #[must_use]
     pub const fn resources(&self) -> ResourceField {
         self.resources
@@ -419,7 +419,7 @@ impl World {
     ///
     /// # References
     ///
-    /// [^1]: ADR-0072, a tile stock is generated, and only what was taken is stored, decision D4, a draft record. `docs/adrs/draft/adr-0072-a-tile-stock-is-generated-and-only-what-was-taken-is-stored.md`
+    /// [^1]: ADR-0072, a tile stock is generated, and only what was taken is stored, decision D4. `docs/adrs/accepted/adr-0072-a-tile-stock-is-generated-and-only-what-was-taken-is-stored.md`
     #[must_use]
     pub fn tile_stock(&self, address: Axial, kind: ResourceKind) -> Option<Amount> {
         let tile = self.grid.index_of(address)?;
@@ -459,7 +459,7 @@ impl World {
     ///
     /// # References
     ///
-    /// [^1]: ADR-0073, gathering is admitted by sort-then-admit against the tile, decision D1, a draft record. `docs/adrs/draft/adr-0073-gathering-is-admitted-by-sort-then-admit-against-the-tile.md`
+    /// [^1]: ADR-0073, gathering is admitted by sort-then-admit against the tile, decision D1. `docs/adrs/accepted/adr-0073-gathering-is-admitted-by-sort-then-admit-against-the-tile.md`
     pub fn order_gather(&mut self, entity: Entity, kind: ResourceKind) -> bool {
         self.soldiers.set_gather_order(entity, Some(kind))
     }
@@ -585,8 +585,8 @@ impl World {
     ///
     /// # References
     ///
-    /// [^1]: ADR-0075, the founding choice reads a bounded sample of the world, decision D1, a draft record. `docs/adrs/draft/adr-0075-the-founding-choice-reads-a-bounded-sample-of-the-world.md`
-    /// [^2]: ADR-0075, the founding choice reads a bounded sample of the world, decision D5, a draft record. `docs/adrs/draft/adr-0075-the-founding-choice-reads-a-bounded-sample-of-the-world.md`
+    /// [^1]: ADR-0075, the founding choice reads a bounded sample of the world, decision D1. `docs/adrs/accepted/adr-0075-the-founding-choice-reads-a-bounded-sample-of-the-world.md`
+    /// [^2]: ADR-0075, the founding choice reads a bounded sample of the world, decision D5. `docs/adrs/accepted/adr-0075-the-founding-choice-reads-a-bounded-sample-of-the-world.md`
     pub fn survey_founding(&self, group: u32) -> Result<Survey, FoundingError> {
         founding::survey(self.resources, group)
     }
@@ -773,7 +773,7 @@ impl World {
     ///
     /// # References
     ///
-    /// [^1]: ADR-0062, production and upkeep are rates attached to a site, decision D4, a draft record. `docs/adrs/draft/adr-0062-production-and-upkeep-are-rates-attached-to-a-site.md`
+    /// [^1]: ADR-0062, production and upkeep are rates attached to a site, decision D4. `docs/adrs/accepted/adr-0062-production-and-upkeep-are-rates-attached-to-a-site.md`
     pub fn set_economy_schedule(&mut self, period: u32, phase: u32) -> Result<(), RateError> {
         self.schedule =
             RateSchedule::new(period, phase).ok_or(RateError::PeriodOutsideRange(period))?;
@@ -936,7 +936,7 @@ impl World {
     /// # References
     ///
     /// [^1]: ADR-0066, entity storage holds four fixed shapes, decision D1. `docs/adrs/accepted/adr-0066-entity-storage-holds-four-fixed-shapes.md`
-    /// [^2]: ADR-0054, an entity belongs to one of three tiers, declared at creation, decision D1, a draft record. `docs/adrs/draft/adr-0054-an-entity-belongs-to-one-of-three-tiers-declared-at-creation.md`
+    /// [^2]: ADR-0054, an entity belongs to one of three tiers, declared at creation, decision D1. `docs/adrs/accepted/adr-0054-an-entity-belongs-to-one-of-three-tiers-declared-at-creation.md`
     #[must_use]
     pub const fn characters(&self) -> &CharacterArena {
         &self.characters
@@ -995,7 +995,7 @@ impl World {
     ///
     /// # References
     ///
-    /// [^1]: ADR-0068, terrain is generated from the seed and is never stored as a map, decision D4, a draft record. `docs/adrs/draft/adr-0068-terrain-is-generated-from-the-seed-and-is-never-stored-as-a-map.md`
+    /// [^1]: ADR-0068, terrain is generated from the seed and is never stored as a map, decision D4. `docs/adrs/accepted/adr-0068-terrain-is-generated-from-the-seed-and-is-never-stored-as-a-map.md`
     #[must_use]
     pub fn admits_a_unit(&self, address: Axial) -> bool {
         self.terrain
@@ -1050,7 +1050,7 @@ impl World {
         // leaves the world, and conservation still has to balance, so the
         // world records where it went.[^2]
         //
-        // [^2]: ADR-0072, a tile stock is generated, and only what was taken is stored, decision D5, a draft record. `docs/adrs/draft/adr-0072-a-tile-stock-is-generated-and-only-what-was-taken-is-stored.md`
+        // [^2]: ADR-0072, a tile stock is generated, and only what was taken is stored, decision D5. `docs/adrs/accepted/adr-0072-a-tile-stock-is-generated-and-only-what-was-taken-is-stored.md`
         let load = self.soldiers.carry(entity);
         if !self.soldiers.despawn(entity) {
             return false;
@@ -1324,7 +1324,7 @@ impl World {
         // from, which is the documented state and not a defect. The freshness
         // of the derived structure is what says which moment this is.
         //
-        // [^4]: ADR-0023, an aggregate combines exactly, in any order, decision D5, a draft record. `docs/adrs/draft/adr-0023-an-aggregate-combines-exactly-in-any-order.md`
+        // [^4]: ADR-0023, an aggregate combines exactly, in any order, decision D5. `docs/adrs/accepted/adr-0023-an-aggregate-combines-exactly-in-any-order.md`
         let total = self.pyramid.total();
         if total.tiles() != i64::from(self.grid.tile_count()) {
             return false;
@@ -1339,7 +1339,7 @@ impl World {
         // placement and the movement each refuse such a tile, and this check
         // is what fails when a later path forgets to.[^1]
         //
-        // [^1]: ADR-0068, terrain is generated from the seed and is never stored as a map, decision D4, a draft record. `docs/adrs/draft/adr-0068-terrain-is-generated-from-the-seed-and-is-never-stored-as-a-map.md`
+        // [^1]: ADR-0068, terrain is generated from the seed and is never stored as a map, decision D4. `docs/adrs/accepted/adr-0068-terrain-is-generated-from-the-seed-and-is-never-stored-as-a-map.md`
         if self
             .soldiers
             .iter()
@@ -1484,7 +1484,7 @@ impl World {
     /// # References
     ///
     /// [^1]: Findings register, FND-048. `docs/FINDINGS.md`
-    /// [^2]: ADR-0023, an aggregate combines exactly, in any order, decision D3, a draft record. `docs/adrs/draft/adr-0023-an-aggregate-combines-exactly-in-any-order.md`
+    /// [^2]: ADR-0023, an aggregate combines exactly, in any order, decision D3. `docs/adrs/accepted/adr-0023-an-aggregate-combines-exactly-in-any-order.md`
     /// [^3]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`
     #[must_use]
     fn check_store_conservation(&self) -> bool {
@@ -1524,7 +1524,7 @@ impl World {
     ///
     /// # References
     ///
-    /// [^1]: ADR-0072, a tile stock is generated, and only what was taken is stored, decision D5, a draft record. `docs/adrs/draft/adr-0072-a-tile-stock-is-generated-and-only-what-was-taken-is-stored.md`
+    /// [^1]: ADR-0072, a tile stock is generated, and only what was taken is stored, decision D5. `docs/adrs/accepted/adr-0072-a-tile-stock-is-generated-and-only-what-was-taken-is-stored.md`
     /// [^2]: ADR-0002, simulated and aggregated state holds no floating point number, decision D1. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
     /// [^3]: Findings register, FND-048. `docs/FINDINGS.md`
     #[must_use]
@@ -1661,7 +1661,7 @@ impl World {
         // and an amount into the ledger, and neither moves a unit, so the
         // barrier above stays the barrier of this frame.
         //
-        // [^6]: ADR-0073, gathering is admitted by sort-then-admit against the tile, decision D3, a draft record. `docs/adrs/draft/adr-0073-gathering-is-admitted-by-sort-then-admit-against-the-tile.md`
+        // [^6]: ADR-0073, gathering is admitted by sort-then-admit against the tile, decision D3. `docs/adrs/accepted/adr-0073-gathering-is-admitted-by-sort-then-admit-against-the-tile.md`
         self.gather(threads)?;
 
         // The holding spreads after the barrier of this frame, because it
@@ -1669,7 +1669,7 @@ impl World {
         // them. It writes a tile column, and it moves no unit, so the barrier
         // above stays the barrier of this frame.[^7]
         //
-        // [^7]: ADR-0053, a faction is a bit in a mask, and a relation is a plane, decision D4, a draft record. `docs/adrs/draft/adr-0053-a-faction-is-a-bit-in-a-mask-and-a-relation-is-a-plane.md`
+        // [^7]: ADR-0053, a faction is a bit in a mask, and a relation is a plane, decision D4. `docs/adrs/accepted/adr-0053-a-faction-is-a-bit-in-a-mask-and-a-relation-is-a-plane.md`
         self.holding
             .advance(self.terrain, &self.soldiers, &self.bridge, threads)?;
         // The site rates apply after the barrier of this frame and after the
@@ -1686,8 +1686,8 @@ impl World {
         // schedule is a parameter of the world rather than a constant of this
         // function.[^9]
         //
-        // [^8]: ADR-0022, level 0 is the only truth, and every level above it is derived, decision D2, a draft record. `docs/adrs/draft/adr-0022-level-0-is-the-only-truth-and-every-level-above-it-is-derived.md`
-        // [^9]: ADR-0062, production and upkeep are rates attached to a site, decision D4, a draft record. `docs/adrs/draft/adr-0062-production-and-upkeep-are-rates-attached-to-a-site.md`
+        // [^8]: ADR-0022, level 0 is the only truth, and every level above it is derived, decision D2. `docs/adrs/accepted/adr-0022-level-0-is-the-only-truth-and-every-level-above-it-is-derived.md`
+        // [^9]: ADR-0062, production and upkeep are rates attached to a site, decision D4. `docs/adrs/accepted/adr-0062-production-and-upkeep-are-rates-attached-to-a-site.md`
         self.apply_rates(threads)?;
 
         // Level 1 rebuilds after the structure it reads, and after every
@@ -1701,7 +1701,7 @@ impl World {
         // wrong order: a structure left stale by a barrier out of order would
         // be quietly repaired instead of refused.
         //
-        // [^5]: ADR-0022, level 0 is the only truth, and every level above it is derived, decision D2, a draft record. `docs/adrs/draft/adr-0022-level-0-is-the-only-truth-and-every-level-above-it-is-derived.md`
+        // [^5]: ADR-0022, level 0 is the only truth, and every level above it is derived, decision D2. `docs/adrs/accepted/adr-0022-level-0-is-the-only-truth-and-every-level-above-it-is-derived.md`
         self.pyramid.rebuild(
             &self.values,
             self.holding.holders(),
@@ -1719,7 +1719,7 @@ impl World {
     ///
     /// # References
     ///
-    /// [^1]: ADR-0053, a faction is a bit in a mask, and a relation is a plane, a draft record. `docs/adrs/draft/adr-0053-a-faction-is-a-bit-in-a-mask-and-a-relation-is-a-plane.md`
+    /// [^1]: ADR-0053, a faction is a bit in a mask, and a relation is a plane. `docs/adrs/accepted/adr-0053-a-faction-is-a-bit-in-a-mask-and-a-relation-is-a-plane.md`
     #[must_use]
     pub const fn holding(&self) -> &Holding {
         &self.holding
@@ -1734,7 +1734,7 @@ impl World {
     ///
     /// # References
     ///
-    /// [^1]: ADR-0053, a faction is a bit in a mask, and a relation is a plane, decision D2, a draft record. `docs/adrs/draft/adr-0053-a-faction-is-a-bit-in-a-mask-and-a-relation-is-a-plane.md`
+    /// [^1]: ADR-0053, a faction is a bit in a mask, and a relation is a plane, decision D2. `docs/adrs/accepted/adr-0053-a-faction-is-a-bit-in-a-mask-and-a-relation-is-a-plane.md`
     #[must_use]
     pub fn tile_holder(&self, address: Axial) -> Option<Holder> {
         self.holding.holder(address)
@@ -1747,7 +1747,7 @@ impl World {
     ///
     /// # References
     ///
-    /// [^1]: ADR-0053, a faction is a bit in a mask, and a relation is a plane, decision D4, a draft record. `docs/adrs/draft/adr-0053-a-faction-is-a-bit-in-a-mask-and-a-relation-is-a-plane.md`
+    /// [^1]: ADR-0053, a faction is a bit in a mask, and a relation is a plane, decision D4. `docs/adrs/accepted/adr-0053-a-faction-is-a-bit-in-a-mask-and-a-relation-is-a-plane.md`
     #[must_use]
     pub fn holding_of(&self, faction: FactionId) -> i64 {
         self.holding.holding_of(faction)
@@ -1770,7 +1770,7 @@ impl World {
     ///
     /// # References
     ///
-    /// [^1]: ADR-0022, level 0 is the only truth, and every level above it is derived, decision D1, a draft record. `docs/adrs/draft/adr-0022-level-0-is-the-only-truth-and-every-level-above-it-is-derived.md`
+    /// [^1]: ADR-0022, level 0 is the only truth, and every level above it is derived, decision D1. `docs/adrs/accepted/adr-0022-level-0-is-the-only-truth-and-every-level-above-it-is-derived.md`
     #[must_use]
     pub const fn pyramid(&self) -> &Pyramid {
         &self.pyramid
@@ -1832,10 +1832,10 @@ impl World {
     ///
     /// # References
     ///
-    /// [^1]: ADR-0073, gathering is admitted by sort-then-admit against the tile, decision D2, a draft record. `docs/adrs/draft/adr-0073-gathering-is-admitted-by-sort-then-admit-against-the-tile.md`
+    /// [^1]: ADR-0073, gathering is admitted by sort-then-admit against the tile, decision D2. `docs/adrs/accepted/adr-0073-gathering-is-admitted-by-sort-then-admit-against-the-tile.md`
     /// [^2]: ADR-0007, content supplies a key vector, never a comparator, decision D2. `docs/adrs/accepted/adr-0007-content-supplies-a-key-vector-never-a-comparator.md`
-    /// [^3]: ADR-0073, gathering is admitted by sort-then-admit against the tile, decision D1, a draft record. `docs/adrs/draft/adr-0073-gathering-is-admitted-by-sort-then-admit-against-the-tile.md`
-    /// [^4]: ADR-0072, a tile stock is generated, and only what was taken is stored, decision D5, a draft record. `docs/adrs/draft/adr-0072-a-tile-stock-is-generated-and-only-what-was-taken-is-stored.md`
+    /// [^3]: ADR-0073, gathering is admitted by sort-then-admit against the tile, decision D1. `docs/adrs/accepted/adr-0073-gathering-is-admitted-by-sort-then-admit-against-the-tile.md`
+    /// [^4]: ADR-0072, a tile stock is generated, and only what was taken is stored, decision D5. `docs/adrs/accepted/adr-0072-a-tile-stock-is-generated-and-only-what-was-taken-is-stored.md`
     fn gather(&mut self, threads: usize) -> Result<(), StepError> {
         self.gather_log.clear();
         let intents = gather_intents(&self.soldiers, threads)?;
@@ -1946,7 +1946,7 @@ impl World {
     ///
     /// # References
     ///
-    /// [^1]: ADR-0023, an aggregate combines exactly, in any order, decision D3, a draft record. `docs/adrs/draft/adr-0023-an-aggregate-combines-exactly-in-any-order.md`
+    /// [^1]: ADR-0023, an aggregate combines exactly, in any order, decision D3. `docs/adrs/accepted/adr-0023-an-aggregate-combines-exactly-in-any-order.md`
     fn apply_rates(&mut self, threads: usize) -> Result<(), StepError> {
         self.shortfall_log.clear();
         self.rates.open_to(self.settlements.slot_count());
@@ -1993,7 +1993,7 @@ impl World {
 /// # References
 ///
 /// [^1]: Decisions register, DEC-022. `docs/DECISIONS.md`
-/// [^2]: ADR-0073, gathering is admitted by sort-then-admit against the tile, decision D1, a draft record. `docs/adrs/draft/adr-0073-gathering-is-admitted-by-sort-then-admit-against-the-tile.md`
+/// [^2]: ADR-0073, gathering is admitted by sort-then-admit against the tile, decision D1. `docs/adrs/accepted/adr-0073-gathering-is-admitted-by-sort-then-admit-against-the-tile.md`
 const GATHER_RATE: u32 = 4;
 
 /// One gather order, ready for the resolve.
@@ -2020,7 +2020,7 @@ struct GatherIntent {
 ///
 /// # References
 ///
-/// [^1]: ADR-0073, gathering is admitted by sort-then-admit against the tile, decision D2, a draft record. `docs/adrs/draft/adr-0073-gathering-is-admitted-by-sort-then-admit-against-the-tile.md`
+/// [^1]: ADR-0073, gathering is admitted by sort-then-admit against the tile, decision D2. `docs/adrs/accepted/adr-0073-gathering-is-admitted-by-sort-then-admit-against-the-tile.md`
 /// [^2]: ADR-0001, one binary gives one answer at any thread count, decision D5. `docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
 #[cfg(not(feature = "probe-nondeterminism"))]
 fn gather_order_of(keys: &[BoundedKey], ceiling: u64) -> Result<Vec<u32>, SortError> {
@@ -2146,7 +2146,7 @@ const DRAW_MOVE_DIRECTION: u32 = 0;
 /// [^3]: ADR-0017, the world is a rhombus, so a tile index is raw axial, decision D3. `docs/adrs/accepted/adr-0017-the-world-is-a-rhombus-so-a-tile-index-is-raw-axial.md`
 /// [^4]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
 /// [^5]: ADR-0056, movement is tile-discrete and admitted by sort-then-admit, decision D2. `docs/adrs/accepted/adr-0056-movement-is-tile-discrete-and-admitted-by-sort-then-admit.md`
-/// [^6]: ADR-0068, terrain is generated from the seed and is never stored as a map, decision D4, a draft record. `docs/adrs/draft/adr-0068-terrain-is-generated-from-the-seed-and-is-never-stored-as-a-map.md`
+/// [^6]: ADR-0068, terrain is generated from the seed and is never stored as a map, decision D4. `docs/adrs/accepted/adr-0068-terrain-is-generated-from-the-seed-and-is-never-stored-as-a-map.md`
 fn soldier_moves(
     tick: Tick,
     seed: u64,
@@ -2342,7 +2342,7 @@ fn admission_order(keys: &[BoundedKey], _ceiling: u64) -> Result<Vec<u32>, SortE
 ///
 /// # References
 ///
-/// [^1]: ADR-0068, terrain is generated from the seed and is never stored as a map, decision D1, a draft record. `docs/adrs/draft/adr-0068-terrain-is-generated-from-the-seed-and-is-never-stored-as-a-map.md`
+/// [^1]: ADR-0068, terrain is generated from the seed and is never stored as a map, decision D1. `docs/adrs/accepted/adr-0068-terrain-is-generated-from-the-seed-and-is-never-stored-as-a-map.md`
 #[derive(Clone, Copy, Debug)]
 struct Segment {
     /// The target tile that owns the segment.
@@ -2413,8 +2413,8 @@ fn bump(run: &mut Vec<(u32, u32)>, tile: u32) {
 /// [^3]: ADR-0056, movement is tile-discrete and admitted by sort-then-admit, decision D4. `docs/adrs/accepted/adr-0056-movement-is-tile-discrete-and-admitted-by-sort-then-admit.md`
 /// [^4]: ADR-0018, the unit-to-tile bridge is derived, and it rebuilds at the barrier, decision D3. `docs/adrs/accepted/adr-0018-the-unit-to-tile-bridge-is-derived-and-rebuilds-at-the-barrier.md`
 /// [^5]: ADR-0001, one binary gives one answer at any thread count, decision D4. `docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
-/// [^6]: ADR-0068, terrain is generated from the seed and is never stored as a map, decision D1, a draft record. `docs/adrs/draft/adr-0068-terrain-is-generated-from-the-seed-and-is-never-stored-as-a-map.md`
-/// [^7]: ADR-0009, parallel stages write disjoint outputs, because the memory model is weak, a draft record. `docs/adrs/draft/adr-0009-parallel-stages-write-disjoint-outputs.md`
+/// [^6]: ADR-0068, terrain is generated from the seed and is never stored as a map, decision D1. `docs/adrs/accepted/adr-0068-terrain-is-generated-from-the-seed-and-is-never-stored-as-a-map.md`
+/// [^7]: ADR-0009, parallel stages write disjoint outputs, because the memory model is weak. `docs/adrs/accepted/adr-0009-parallel-stages-write-disjoint-outputs.md`
 fn admit(
     intents: &[(Entity, Axial)],
     soldiers: &SoldierArena,

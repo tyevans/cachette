@@ -139,11 +139,11 @@ is not the identity order after a slot is reused.
 [^1]: ADR-0001, one binary gives one answer at any thread count, decision D5. `docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
 [^2]: ADR-0056, movement is tile-discrete and admitted by sort-then-admit, decision D3. `docs/adrs/accepted/adr-0056-movement-is-tile-discrete-and-admitted-by-sort-then-admit.md`
 [^3]: ADR-0018, the unit-to-tile bridge is derived, and it rebuilds at the barrier, decision D3. `docs/adrs/accepted/adr-0018-the-unit-to-tile-bridge-is-derived-and-rebuilds-at-the-barrier.md`
-[^4]: ADR-0072, a tile stock is generated, and only what was taken is stored, decision D4, a draft record. `docs/adrs/draft/adr-0072-a-tile-stock-is-generated-and-only-what-was-taken-is-stored.md`
+[^4]: ADR-0072, a tile stock is generated, and only what was taken is stored, decision D4. `docs/adrs/accepted/adr-0072-a-tile-stock-is-generated-and-only-what-was-taken-is-stored.md`
 [^5]: ADR-0014, entity identity is an index plus a generation, decision D1. `docs/adrs/accepted/adr-0014-entity-identity-is-an-index-plus-a-generation.md`
 [^6]: ADR-0007, content supplies a key vector, never a comparator, decision D2. `docs/adrs/accepted/adr-0007-content-supplies-a-key-vector-never-a-comparator.md`
 [^7]: Testing Rules, a determinism test cannot tell correct from consistently wrong. `.claude/rules/testing.md`
 [^8]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
 [^9]: ADR-0066, entity storage holds four fixed shapes, decision D1. `docs/adrs/accepted/adr-0066-entity-storage-holds-four-fixed-shapes.md`
-[^10]: ADR-0072, a tile stock is generated, and only what was taken is stored, decision D5, a draft record. `docs/adrs/draft/adr-0072-a-tile-stock-is-generated-and-only-what-was-taken-is-stored.md`
+[^10]: ADR-0072, a tile stock is generated, and only what was taken is stored, decision D5. `docs/adrs/accepted/adr-0072-a-tile-stock-is-generated-and-only-what-was-taken-is-stored.md`
 [^11]: Findings register, FND-049. `docs/FINDINGS.md`

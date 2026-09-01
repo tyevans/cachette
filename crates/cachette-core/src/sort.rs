@@ -75,7 +75,7 @@
 //! [^3]: ADR-0007, content supplies a key vector, never a comparator, decision D3. `docs/adrs/accepted/adr-0007-content-supplies-a-key-vector-never-a-comparator.md`
 //! [^4]: ADR-0002, simulated and aggregated state holds no floating point number, decision D1. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
 //! [^5]: Testing Rules, a determinism test must be able to fail. `.claude/rules/testing.md`
-//! [^6]: ADR-0071, the bridge rebuild orders on one thread, decisions D1 and D2. `docs/adrs/draft/adr-0071-the-bridge-rebuild-orders-on-one-thread.md`
+//! [^6]: ADR-0071, the bridge rebuild orders on one thread, decisions D1 and D2. `docs/adrs/accepted/adr-0071-the-bridge-rebuild-orders-on-one-thread.md`
 //! [^7]: ADR-0007, content supplies a key vector, never a comparator, the consequences. `docs/adrs/accepted/adr-0007-content-supplies-a-key-vector-never-a-comparator.md`
 //! [^8]: Recurring defect shapes, section 3. `.claude/rules/recurring-defects.md`
 
@@ -444,7 +444,7 @@ impl BoundedKey {
 ///
 /// [^1]: ADR-0007, content supplies a key vector, never a comparator, decision D2. `docs/adrs/accepted/adr-0007-content-supplies-a-key-vector-never-a-comparator.md`
 /// [^2]: ADR-0007, content supplies a key vector, never a comparator, the consequences. `docs/adrs/accepted/adr-0007-content-supplies-a-key-vector-never-a-comparator.md`
-/// [^3]: ADR-0071, the bridge rebuild orders on one thread, decision D2. `docs/adrs/draft/adr-0071-the-bridge-rebuild-orders-on-one-thread.md`
+/// [^3]: ADR-0071, the bridge rebuild orders on one thread, decision D2. `docs/adrs/accepted/adr-0071-the-bridge-rebuild-orders-on-one-thread.md`
 pub fn order_bounded(keys: &[BoundedKey], ceiling: u64) -> Result<Vec<u32>, SortError> {
     if keys.len() > u32::MAX as usize {
         return Err(SortError::TooManyItems(keys.len()));

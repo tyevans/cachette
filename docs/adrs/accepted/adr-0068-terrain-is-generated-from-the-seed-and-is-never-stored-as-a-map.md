@@ -1,6 +1,6 @@
 # ADR-0068: Terrain is generated from the seed and is never stored as a map
 
-Status: Draft
+Status: Accepted
 
 ## Context
 

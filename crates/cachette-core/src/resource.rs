@@ -20,8 +20,8 @@
 //!
 //! # References
 //!
-//! [^1]: ADR-0072, a tile stock is generated, and only what was taken is stored, decision D1, a draft record. `docs/adrs/draft/adr-0072-a-tile-stock-is-generated-and-only-what-was-taken-is-stored.md`
-//! [^2]: ADR-0072, a tile stock is generated, and only what was taken is stored, decision D4, a draft record. `docs/adrs/draft/adr-0072-a-tile-stock-is-generated-and-only-what-was-taken-is-stored.md`
+//! [^1]: ADR-0072, a tile stock is generated, and only what was taken is stored, decision D1. `docs/adrs/accepted/adr-0072-a-tile-stock-is-generated-and-only-what-was-taken-is-stored.md`
+//! [^2]: ADR-0072, a tile stock is generated, and only what was taken is stored, decision D4. `docs/adrs/accepted/adr-0072-a-tile-stock-is-generated-and-only-what-was-taken-is-stored.md`
 //! [^3]: ADR-0002, simulated and aggregated state holds no floating point number, decision D1. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
 //! [^4]: ADR-0003, every random draw is keyed, never stateful, decision D1. `docs/adrs/accepted/adr-0003-every-random-draw-is-keyed-never-stateful.md`
 
@@ -75,7 +75,7 @@ const CHANCE_DENOMINATOR: u64 = 16;
 ///
 /// # References
 ///
-/// [^1]: ADR-0072, a tile stock is generated, and only what was taken is stored, decision D3, a draft record. `docs/adrs/draft/adr-0072-a-tile-stock-is-generated-and-only-what-was-taken-is-stored.md`
+/// [^1]: ADR-0072, a tile stock is generated, and only what was taken is stored, decision D3. `docs/adrs/accepted/adr-0072-a-tile-stock-is-generated-and-only-what-was-taken-is-stored.md`
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[repr(u8)]
 pub enum ResourceKind {
@@ -162,7 +162,7 @@ impl Amount {
 ///
 /// # References
 ///
-/// [^1]: ADR-0072, a tile stock is generated, and only what was taken is stored, decision D2, a draft record. `docs/adrs/draft/adr-0072-a-tile-stock-is-generated-and-only-what-was-taken-is-stored.md`
+/// [^1]: ADR-0072, a tile stock is generated, and only what was taken is stored, decision D2. `docs/adrs/accepted/adr-0072-a-tile-stock-is-generated-and-only-what-was-taken-is-stored.md`
 const CEILING: [[u32; RESOURCE_KIND_COUNT]; TERRAIN_KIND_COUNT] = [
     // Water. Open water holds nothing that a unit could take, and no unit
     // stands on it.
@@ -184,7 +184,7 @@ const CEILING: [[u32; RESOURCE_KIND_COUNT]; TERRAIN_KIND_COUNT] = [
 ///
 /// # References
 ///
-/// [^1]: ADR-0072, a tile stock is generated, and only what was taken is stored, decision D2, a draft record. `docs/adrs/draft/adr-0072-a-tile-stock-is-generated-and-only-what-was-taken-is-stored.md`
+/// [^1]: ADR-0072, a tile stock is generated, and only what was taken is stored, decision D2. `docs/adrs/accepted/adr-0072-a-tile-stock-is-generated-and-only-what-was-taken-is-stored.md`
 const PRESENCE: [[u64; RESOURCE_KIND_COUNT]; TERRAIN_KIND_COUNT] = [
     // Water.
     [0, 0, 0],
@@ -205,7 +205,7 @@ const PRESENCE: [[u64; RESOURCE_KIND_COUNT]; TERRAIN_KIND_COUNT] = [
 ///
 /// # References
 ///
-/// [^1]: ADR-0072, a tile stock is generated, and only what was taken is stored, decision D1, a draft record. `docs/adrs/draft/adr-0072-a-tile-stock-is-generated-and-only-what-was-taken-is-stored.md`
+/// [^1]: ADR-0072, a tile stock is generated, and only what was taken is stored, decision D1. `docs/adrs/accepted/adr-0072-a-tile-stock-is-generated-and-only-what-was-taken-is-stored.md`
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct ResourceField {
     terrain: Terrain,
@@ -388,7 +388,7 @@ pub const fn ledger_key(tile: TileIdx, kind: ResourceKind) -> u64 {
 ///
 /// # References
 ///
-/// [^1]: ADR-0072, a tile stock is generated, and only what was taken is stored, decision D4, a draft record. `docs/adrs/draft/adr-0072-a-tile-stock-is-generated-and-only-what-was-taken-is-stored.md`
+/// [^1]: ADR-0072, a tile stock is generated, and only what was taken is stored, decision D4. `docs/adrs/accepted/adr-0072-a-tile-stock-is-generated-and-only-what-was-taken-is-stored.md`
 /// [^2]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct DepletionLedger {

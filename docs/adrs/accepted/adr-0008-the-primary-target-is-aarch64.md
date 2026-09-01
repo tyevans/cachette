@@ -1,6 +1,6 @@
 # ADR-0008: The primary target is aarch64
 
-Status: Draft
+Status: Accepted
 
 ## Context
 
@@ -84,4 +84,4 @@ change and not one release.
 
 [^1]: Blockers register, BLK-007. `docs/BLOCKERS.md`
 [^2]: ADR-0001, one binary gives one answer at any thread count, decision D4. `docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
-[^3]: ADR-0009, parallel stages write disjoint outputs. `docs/adrs/draft/adr-0009-parallel-stages-write-disjoint-outputs.md`
+[^3]: ADR-0009, parallel stages write disjoint outputs. `docs/adrs/accepted/adr-0009-parallel-stages-write-disjoint-outputs.md`

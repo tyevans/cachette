@@ -178,4 +178,4 @@ of detail pyramid, so the bridge and the pyramid share one partition.[^9]
 [^8]: Report 01, the entity component system core and the memory layout, section 9. `docs/research/reports/01-ecs-and-memory-layout.md`
 [^9]: Report 02, the hex grid and the level of detail pyramid, sections 3.4 and 7.4. `docs/research/reports/02-hex-grid-and-lod-pyramid.md`
 [^10]: ADR-0007, content supplies a key vector, never a comparator. `docs/adrs/accepted/adr-0007-content-supplies-a-key-vector-never-a-comparator.md`
-[^11]: ADR-0071, the bridge rebuild orders on one thread, decision D1. `docs/adrs/draft/adr-0071-the-bridge-rebuild-orders-on-one-thread.md`
+[^11]: ADR-0071, the bridge rebuild orders on one thread, decision D1. `docs/adrs/accepted/adr-0071-the-bridge-rebuild-orders-on-one-thread.md`

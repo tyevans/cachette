@@ -27,7 +27,7 @@
 //!
 //! [^1]: ADR-0066, entity storage holds four fixed shapes, decision D1. `docs/adrs/accepted/adr-0066-entity-storage-holds-four-fixed-shapes.md`
 //! [^2]: ADR-0066, entity storage holds four fixed shapes, decision D3. `docs/adrs/accepted/adr-0066-entity-storage-holds-four-fixed-shapes.md`
-//! [^3]: ADR-0054, an entity belongs to one of three tiers, declared at creation, decision D2, a draft record. `docs/adrs/draft/adr-0054-an-entity-belongs-to-one-of-three-tiers-declared-at-creation.md`
+//! [^3]: ADR-0054, an entity belongs to one of three tiers, declared at creation, decision D2. `docs/adrs/accepted/adr-0054-an-entity-belongs-to-one-of-three-tiers-declared-at-creation.md`
 //! [^4]: Budgets and costs, the scale constants. `docs/reference/budgets.md`
 
 use crate::character::CharacterArena;
@@ -53,7 +53,7 @@ pub const CHARACTER_CEILING: u32 = 262_144;
 ///
 /// # References
 ///
-/// [^1]: ADR-0054, an entity belongs to one of three tiers, declared at creation, decision D1, a draft record. `docs/adrs/draft/adr-0054-an-entity-belongs-to-one-of-three-tiers-declared-at-creation.md`
+/// [^1]: ADR-0054, an entity belongs to one of three tiers, declared at creation, decision D1. `docs/adrs/accepted/adr-0054-an-entity-belongs-to-one-of-three-tiers-declared-at-creation.md`
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum EntityTier {
     /// The population is larger than a caller may walk. A caller sends a

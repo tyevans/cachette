@@ -1,6 +1,6 @@
 # ADR-0011: Every value type is a newtype
 
-Status: Draft
+Status: Accepted
 
 ## Context
 

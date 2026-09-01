@@ -17,7 +17,7 @@
 //! [^1]: ADR-0066, entity storage holds four fixed shapes, decision D1. `docs/adrs/accepted/adr-0066-entity-storage-holds-four-fixed-shapes.md`
 //! [^2]: ADR-0014, entity identity is an index plus a generation, decision D1. `docs/adrs/accepted/adr-0014-entity-identity-is-an-index-plus-a-generation.md`
 //! [^3]: ADR-0014, entity identity is an index plus a generation, decision D3. `docs/adrs/accepted/adr-0014-entity-identity-is-an-index-plus-a-generation.md`
-//! [^4]: ADR-0054, an entity belongs to one of three tiers, declared at creation, a draft record. `docs/adrs/draft/adr-0054-an-entity-belongs-to-one-of-three-tiers-declared-at-creation.md`
+//! [^4]: ADR-0054, an entity belongs to one of three tiers, declared at creation. `docs/adrs/accepted/adr-0054-an-entity-belongs-to-one-of-three-tiers-declared-at-creation.md`
 //! [^5]: Testing rules, section 5. `.claude/rules/testing.md`
 
 use cachette_core::character::{CharacterArena, CharacterError};
@@ -356,7 +356,7 @@ fn the_tier_is_a_property_of_the_shape_and_not_of_the_count() {
     // The tier resolves in a constant context, so no world and no
     // population takes part in the answer. A count could not do this.[^1]
     //
-    // [^1]: ADR-0054, an entity belongs to one of three tiers, declared at creation, decision D2, a draft record. `docs/adrs/draft/adr-0054-an-entity-belongs-to-one-of-three-tiers-declared-at-creation.md`
+    // [^1]: ADR-0054, an entity belongs to one of three tiers, declared at creation, decision D2. `docs/adrs/accepted/adr-0054-an-entity-belongs-to-one-of-three-tiers-declared-at-creation.md`
     const CHARACTER: EntityTier = <CharacterArena as Shape>::TIER;
     const SOLDIER: EntityTier = <SoldierArena as Shape>::TIER;
     assert_eq!(CHARACTER, EntityTier::Character);
@@ -393,7 +393,7 @@ fn a_capacity_above_the_ceiling_is_refused_when_the_arena_is_built() {
     // The refusal happens once, when a caller builds the arena, and never
     // on a later call.[^1]
     //
-    // [^1]: ADR-0054, an entity belongs to one of three tiers, declared at creation, decision D3, a draft record. `docs/adrs/draft/adr-0054-an-entity-belongs-to-one-of-three-tiers-declared-at-creation.md`
+    // [^1]: ADR-0054, an entity belongs to one of three tiers, declared at creation, decision D3. `docs/adrs/accepted/adr-0054-an-entity-belongs-to-one-of-three-tiers-declared-at-creation.md`
     assert_eq!(
         CharacterArena::with_capacity(CHARACTER_CEILING + 1).err(),
         Some(CharacterError::CapacityAboveCeiling {

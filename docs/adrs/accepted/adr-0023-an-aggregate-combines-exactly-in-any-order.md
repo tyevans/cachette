@@ -1,6 +1,6 @@
 # ADR-0023: An aggregate combines exactly, in any order
 
-Status: Draft
+Status: Accepted
 
 ## Context
 
@@ -114,7 +114,7 @@ an inverse, and a field that cannot state them is not a summary field.
 
 ## References
 
-[^1]: ADR-0022, level 0 is the only truth, and every level above it is derived, decision D2. `docs/adrs/draft/adr-0022-level-0-is-the-only-truth-and-every-level-above-it-is-derived.md`
+[^1]: ADR-0022, level 0 is the only truth, and every level above it is derived, decision D2. `docs/adrs/accepted/adr-0022-level-0-is-the-only-truth-and-every-level-above-it-is-derived.md`
 [^2]: ADR-0001, one binary gives one answer at any thread count, decision D4. `docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
 [^3]: ADR-0002, simulated and aggregated state holds no floating point number, decision D1. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
 [^4]: Findings register, FND-001. `docs/FINDINGS.md`

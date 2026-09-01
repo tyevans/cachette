@@ -47,7 +47,7 @@ const THREADS: usize = 4;
 /// # References
 ///
 /// [^1]: ADR-0001, one binary gives one answer at any thread count, decision D4. `docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
-/// [^2]: ADR-0068, terrain is generated from the seed and is never stored as a map, decision D4, a draft record. `docs/adrs/draft/adr-0068-terrain-is-generated-from-the-seed-and-is-never-stored-as-a-map.md`
+/// [^2]: ADR-0068, terrain is generated from the seed and is never stored as a map, decision D4. `docs/adrs/accepted/adr-0068-terrain-is-generated-from-the-seed-and-is-never-stored-as-a-map.md`
 /// [^3]: Testing rules, section 2a. `.claude/rules/testing.md`
 const SCENARIOS: &[(&str, WorldConfig, Population)] = &[
     (

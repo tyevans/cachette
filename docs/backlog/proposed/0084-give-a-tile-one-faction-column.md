@@ -29,5 +29,5 @@ cover it.
 
 ## References
 
-[^1]: ADR-0053, a faction is a bit in a mask, and a relation is a plane, decision D2, a draft record. `docs/adrs/draft/adr-0053-a-faction-is-a-bit-in-a-mask-and-a-relation-is-a-plane.md`
+[^1]: ADR-0053, a faction is a bit in a mask, and a relation is a plane, decision D2. `docs/adrs/accepted/adr-0053-a-faction-is-a-bit-in-a-mask-and-a-relation-is-a-plane.md`
 [^2]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`
