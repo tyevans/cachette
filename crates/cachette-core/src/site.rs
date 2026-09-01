@@ -597,6 +597,16 @@ impl SettlementArena {
         &self.factions
     }
 
+    /// Returns the whole live column.
+    ///
+    /// The column holds one for a live slot and zero otherwise. A pass that
+    /// reads a column beside it needs this one to know which entries mean
+    /// anything.
+    #[must_use]
+    pub fn live_column(&self) -> &[u8] {
+        &self.live
+    }
+
     /// Returns the whole store column.
     #[must_use]
     pub fn store_column(&self) -> &[Store] {
