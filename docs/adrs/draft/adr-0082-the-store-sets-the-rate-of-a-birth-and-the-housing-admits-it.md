@@ -52,8 +52,16 @@ behaviour, so no reader must ask which limit bit.
 
 This is the shape the project already uses when a limited thing is asked for by
 more askers than it holds: propose, sort by a stable key, admit while room
-remains.[^9] The key here is the site, because a proposal belongs to a site and
-the admission is against that site's places.
+remains.[^9]
+
+**The key orders the proposals within a site, and the site alone cannot do it.**
+A site with one free place and more than one proposal in one frame is the case
+that decides the shape, and every proposal at that site carries the same site
+value. A key constant across the things it orders is a grouping and not an
+order, so the sort would leave the choice to whatever produced the sequence. The
+key is therefore the site and then an index that distinguishes the proposals of
+one site, and the second part is what admits exactly one when one place
+remains.
 
 **The two limits therefore compose by one operation with one answer**, and
 neither limit is applied twice.
@@ -78,13 +86,27 @@ in the same frame. A place that a death freed this frame is free this frame,
 and the occupancy that the admission reads is the settled one.
 
 The draw that a birth needs is keyed on the tuple of system, frame, entity and
-draw, and the site fills the entity slot.[^12] Two sites in one frame draw
-different values, and one site draws a different value in the next frame. No
-thread-local state takes part.[^13]
+draw. **The site fills the entity slot, and the index of the proposal within the
+site fills the draw slot.**[^12] Two sites in one frame draw different values,
+one site draws a different value in the next frame, and two proposals of one
+site in one frame draw different values.
+
+The last of those three is the one that is easy to lose. The site is the actor,
+so it belongs in the entity slot, and a second proposal from the same actor in
+the same frame has nothing left to distinguish it unless the draw slot carries
+the ordinal. The project has already met this and decided it the same way for
+the founding, where the faction is the actor and the candidate ordinal moved to
+the draw index.[^19] No thread-local state takes part.[^13]
 
 A draw keyed on the wrong field draws the same wrong value on every thread and
 every run, so both determinism tests pass while the defect stands. A test for
 each field of the key is what finds it.[^14]
+
+**A test for each field cannot find a field that the key is missing.** Three
+tests are needed here and not two: change the frame, change the site, and take
+two proposals of one site in one frame and assert that they draw different
+values. The third test is the one that fails when the draw slot carries no
+ordinal, and the other two pass whether the ordinal is there or not.
 
 ## Consequences
 
@@ -131,3 +153,4 @@ itself. The spawn path gains no refusal.[^18]
 [^16]: Decisions register, DEC-044. `docs/DECISIONS.md`
 [^17]: Testing Rules, a fixture supplies the input. `.claude/rules/testing.md`
 [^18]: ADR-0074, a spawn may over-fill a tile, and only admission enforces the capacity, decision D4. `docs/adrs/accepted/adr-0074-a-spawn-may-over-fill-a-tile-and-only-admission-enforces-the-capacity.md`
+[^19]: Decisions register, DEC-038. `docs/DECISIONS.md`

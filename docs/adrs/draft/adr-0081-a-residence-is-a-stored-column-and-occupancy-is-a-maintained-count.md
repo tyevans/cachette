@@ -63,8 +63,15 @@ today, and the work that needs it writes the record that splits the column.
 ### D3. A site holds an occupancy count, and a check that can fail guards it
 
 The engine maintains a count of the residents of each site. The change that
-assigns a residence and the change that clears one both update it. No pass over
-the units recomputes it.
+assigns a residence and the change that clears one both update it.
+
+**No pass over the units recomputes the count during a running frame.** That is
+the prohibition, and it is what makes the count worth storing. Two passes are
+permitted and neither is the maintenance path. A world that is restored rather
+than run has no history of changes to have maintained, so it derives the count
+from the residence column once, before the first frame. The check that guards
+the count also walks the units, because a check that read the same stored number
+it is checking would pass by construction.[^15]
 
 This is a second declaration of a fact that the residence column already holds.
 The project accepts it here for two reasons that the tile case does not
@@ -131,3 +138,4 @@ capacity sits on the settlement, and the shapes do not vary at run time.[^13]
 [^11]: ADR-0074, a spawn may over-fill a tile, and only admission enforces the capacity, decision D1. `docs/adrs/accepted/adr-0074-a-spawn-may-over-fill-a-tile-and-only-admission-enforces-the-capacity.md`
 [^12]: ADR-0004, iteration order is explicit, and unordered reductions need slots, decision D4. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
 [^13]: ADR-0066, entity storage holds four fixed shapes, decision D3. `docs/adrs/accepted/adr-0066-entity-storage-holds-four-fixed-shapes.md`
+[^15]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`

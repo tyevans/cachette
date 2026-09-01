@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-122**
+**Next number: FND-123**
 
 ## A. Corrections to stated rules
 
@@ -2651,6 +2651,44 @@ who quotes a rule to a worker is not passing on a constraint but creating one,
 because the worker cannot weigh it against a document it was told not to
 question. The reviewer that caught this was told its first duty was to consider
 withdrawing two records, on the authority of a rule that does not say that.
+
+### FND-122 — A test for each field of a key cannot find the field the key lacks
+
+**Believed.** The testing rule's remedy for a keyed draw is complete. Write a
+test for each field of the key, change that field, and assert that the draw
+changes. A draw keyed on the wrong field then cannot survive.
+
+**True.** The remedy inherits whatever the key already gets wrong. It tests the
+fields the key names, so it is silent about a field the key should name and does
+not. Every such test passes, and it passes for the same reason before and after
+the defect is fixed.
+
+**Evidence.** A review of a draft record found a draw key with the site in the
+entity slot and nothing in the draw slot. Two proposals from one site in one
+frame therefore draw one value. The item that will implement the record requires
+a fixture holding exactly that case, and its acceptance list already named two
+key tests: change the frame, change the site. Both pass whether or not the draw
+slot carries an ordinal. The missing third test is the only one that fails.
+
+The same review found the ordering key had the same shape. Every proposal at one
+site carries the same site value, so a sort on the site alone is a grouping and
+not an order, and the choice would fall to whatever produced the sequence.
+
+**Follows.** Three things.
+
+**Ask what two things the key must separate, before you ask what fields it
+holds.** Name the finest pair the system can produce: two proposals of one site
+in one frame, two candidates of one faction in one founding. Then check the key
+separates them. A field list read forward cannot show an absence.
+
+**A key constant across the things it orders is a grouping.** Sorting on it
+leaves the order to whatever built the sequence, which is the defect the
+iteration rule exists to forbid, wearing the clothes of a stable key.
+
+**The project has met this once already and the precedent transfers.** The
+founding key put the candidate ordinal in the draw slot for exactly this reason,
+because the actor filled the entity slot and a second draw by one actor in one
+frame had nothing left to separate it.[^58]
 
 
 ## References
