@@ -775,9 +775,15 @@ impl DepletionLedger {
     ///
     /// The entries enter in key order, which the ledger holds them in.[^1]
     ///
+    /// The total that recovery returned does not enter. It is a sum of the
+    /// differences between the entries of one frame and the entries of the
+    /// next, and the hash covers those entries on every frame, so a hash that
+    /// wrote it would say the same thing twice.[^2]
+    ///
     /// # References
     ///
     /// [^1]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
+    /// [^2]: ADR-0001, one binary gives one answer at any thread count, decision D4. `docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
     #[must_use]
     pub fn hash_into(&self, hash: StateHash) -> StateHash {
         let mut running = hash.write_u64(self.entries.len() as u64);
@@ -786,9 +792,6 @@ impl DepletionLedger {
                 .write_u64(entry.key)
                 .write(&entry.taken.to_le_bytes())
                 .write_u64(entry.anchor.0);
-        }
-        for total in &self.returned {
-            running = running.write_u64(*total as u64);
         }
         running
     }
