@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-099**
+**Next number: FND-100**
 
 ## A. Corrections to stated rules
 
@@ -2091,6 +2091,38 @@ now runs it.
 list of binaries is a declaration site, and it drifts from the rule it serves
 unless something compares the two.
 
+### FND-099 — The cost of the gate suite is not one number
+
+**Believed.** The gate suite has one wall clock cost on a named machine, and
+one measurement of it gives the project a budget.
+
+**True.** The cost depends on what else runs on the machine, and the spread is
+large enough to change what the figure means. Five workers ran the suite at
+once on one machine of sixteen hardware threads. One of those runs was killed
+after about forty minutes, at a load average near fifteen, with four other runs
+present. A run of the same suite on the same machine, with the load not
+controlled but with no other suite seen in the process list, took about nine
+minutes.
+
+**Evidence.** The forty-minute run and the load average are reported by the
+session that watched them, not measured by the work that wrote this entry. The
+nine-minute figure is one run on an Intel Core i7-1260P, x86_64, 16 hardware
+threads, debug profile, 31 August 2026. It is a development machine figure. It
+is not evidence about the target platform.[^47]
+
+**Follows.** Two things.
+
+**A budget row states the conditions it holds under.** A figure taken under
+contention and a figure taken alone are two quantities, and a table that holds
+one number for both is the shape this project already knows: one fact, two
+meanings, nothing that fails when they disagree. The local register now names
+the conditions in the row.[^46]
+
+**Serialise the suite before you compare two runs of it.** Two suites on one
+machine do not cost twice one suite, and neither figure is the cost of the
+suite.
+
+
 ## References
 
 [^1]: Findings register, FND-038, in this document.
@@ -2139,3 +2171,4 @@ unless something compares the two.
 [^44]: Findings register, FND-075. `docs/FINDINGS.md`
 [^45]: Findings register, FND-078. `docs/FINDINGS.md`
 [^46]: Development budgets, the gate suite budget. `docs/reference/development-budgets.md`
+[^47]: ADR-0008, the primary target is `aarch64-unknown-linux-gnu`, decision D2. `docs/adrs/accepted/adr-0008-the-primary-target-is-aarch64.md`

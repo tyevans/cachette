@@ -130,6 +130,11 @@ row names the machine, the architecture, the build profile and the date. No
 row is evidence about the target platform, and the target register gained
 nothing.[^4]
 
+**The figures are qualified.** Each row names the machine, and each row says
+whether the run controlled the load. None did. The cost of this suite depends
+on what else runs on the machine, so a single number would hide the thing that
+moves it. The finding holds the evidence.[^9]
+
 **The suite reports its own cost.** A wrapper times the gates and prints the
 figure against the budget row for the architecture that runs it. It reads the
 budget from the register, so the figure has one home. It reports and does not
@@ -162,3 +167,4 @@ two.
 [^6]: Testing Rules, section 1. `.claude/rules/testing.md`
 [^7]: Project orientation, the target platform. `CLAUDE.md`
 [^8]: Findings register, FND-097 and FND-098. `docs/FINDINGS.md`
+[^9]: Findings register, FND-099. `docs/FINDINGS.md`
