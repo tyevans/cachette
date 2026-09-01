@@ -215,7 +215,7 @@ fn gathered_after_a_frame(threads: usize) -> Vec<CarryLoad> {
     // it does not move before it has one. This fixture is about the order of
     // a contest, so it sets the interval to every tick.[^C]
     //
-    // [^C]: ADR-0064, a unit chooses by scoring a small fixed option set, decision D4. `docs/adrs/draft/adr-0064-a-unit-chooses-by-scoring-a-small-fixed-option-set.md`
+    // [^C]: ADR-0064, a unit chooses by scoring a small fixed option set, decision D4. `docs/adrs/accepted/adr-0064-a-unit-chooses-by-scoring-a-small-fixed-option-set.md`
     world
         .set_choice_schedule(0)
         .expect("the exponent is inside the range");
@@ -306,7 +306,7 @@ fn crowded_after_a_frame(threads: usize) -> Vec<Axial> {
     // it does not move before it has one. This fixture is about the order of
     // a contest, so it sets the interval to every tick.[^C]
     //
-    // [^C]: ADR-0064, a unit chooses by scoring a small fixed option set, decision D4. `docs/adrs/draft/adr-0064-a-unit-chooses-by-scoring-a-small-fixed-option-set.md`
+    // [^C]: ADR-0064, a unit chooses by scoring a small fixed option set, decision D4. `docs/adrs/accepted/adr-0064-a-unit-chooses-by-scoring-a-small-fixed-option-set.md`
     world
         .set_choice_schedule(0)
         .expect("the exponent is inside the range");

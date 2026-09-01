@@ -2401,5 +2401,5 @@ search that could not.
 [^53]: Decision Record Scope, section 4.3. `.claude/rules/adr-scope.md`
 [^54]: Backlog item 0071. `docs/backlog/complete/0071-derive-tile-passability-from-tile-capacity.md`
 [^55]: Testing rules, section 2a. `.claude/rules/testing.md`
-[^56]: ADR-0074, a spawn may over-fill a tile and only admission enforces the capacity, decision D2. `docs/adrs/draft/adr-0074-a-spawn-may-over-fill-a-tile-and-only-admission-enforces-the-capacity.md`
+[^56]: ADR-0074, a spawn may over-fill a tile and only admission enforces the capacity, decision D2. `docs/adrs/accepted/adr-0074-a-spawn-may-over-fill-a-tile-and-only-admission-enforces-the-capacity.md`
 [^57]: Commit Message Rules, after a sweep. `.claude/rules/commits.md`

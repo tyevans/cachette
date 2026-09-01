@@ -64,7 +64,7 @@ fn world(seed: u64) -> World {
     // before it has one, so a test about movement sets the interval to every
     // tick.[^C]
     //
-    // [^C]: ADR-0064, a unit chooses by scoring a small fixed option set, decision D4. `docs/adrs/draft/adr-0064-a-unit-chooses-by-scoring-a-small-fixed-option-set.md`
+    // [^C]: ADR-0064, a unit chooses by scoring a small fixed option set, decision D4. `docs/adrs/accepted/adr-0064-a-unit-chooses-by-scoring-a-small-fixed-option-set.md`
     world
         .set_choice_schedule(0)
         .expect("the exponent is inside the range");

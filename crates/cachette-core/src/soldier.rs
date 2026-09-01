@@ -278,7 +278,7 @@ pub struct SoldierArena {
     ///
     /// # References
     ///
-    /// [^1]: ADR-0064, a unit chooses by scoring a small fixed option set, decisions D1 and D2. `docs/adrs/draft/adr-0064-a-unit-chooses-by-scoring-a-small-fixed-option-set.md`
+    /// [^1]: ADR-0064, a unit chooses by scoring a small fixed option set, decisions D1 and D2. `docs/adrs/accepted/adr-0064-a-unit-chooses-by-scoring-a-small-fixed-option-set.md`
     intents: Vec<u8>,
     /// The free slots, oldest first.
     free: VecDeque<u32>,
@@ -792,7 +792,7 @@ impl SoldierArena {
     ///
     /// # References
     ///
-    /// [^1]: ADR-0064, a unit chooses by scoring a small fixed option set, decision D3. `docs/adrs/draft/adr-0064-a-unit-chooses-by-scoring-a-small-fixed-option-set.md`
+    /// [^1]: ADR-0064, a unit chooses by scoring a small fixed option set, decision D3. `docs/adrs/accepted/adr-0064-a-unit-chooses-by-scoring-a-small-fixed-option-set.md`
     #[must_use]
     pub fn intent(&self, entity: Entity) -> Option<Option<u8>> {
         let slot = self.slot_of(entity)?;

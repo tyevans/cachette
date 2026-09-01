@@ -156,7 +156,7 @@ a footnote.
 [^2]: ADR Registry. `docs/adrs/REGISTRY.md`
 [^3]: Blockers register. `docs/BLOCKERS.md`
 [^4]: The record check baseline. `scripts/adr-volatile-baseline.txt`
-[^5]: ADR-0064, a unit chooses by scoring a small fixed option set, decisions D3 and D4. `docs/adrs/draft/adr-0064-a-unit-chooses-by-scoring-a-small-fixed-option-set.md`
+[^5]: ADR-0064, a unit chooses by scoring a small fixed option set, decisions D3 and D4. `docs/adrs/accepted/adr-0064-a-unit-chooses-by-scoring-a-small-fixed-option-set.md`
 [^6]: Findings register, FND-014. `docs/FINDINGS.md`
 [^7]: Development budgets, the local register. `docs/reference/development-budgets.md`
 [^8]: Decisions register, DEC-033 and DEC-001. `docs/DECISIONS.md`

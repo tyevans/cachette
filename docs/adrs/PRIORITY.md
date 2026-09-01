@@ -35,10 +35,8 @@ rule.
 
 A record here binds nothing until a reviewer moves it.
 
-| No. | What it claims |
-|---|---|
-| 0064 | A unit chooses by scoring a small fixed option set. Backlog item 0064 wrote it, and the code it describes exists. |
-| 0074 | A spawn may over-fill a tile, and only admission enforces the capacity. The engine already does this. A reviewer rewrote the draft around the opposite claim, so a second reviewer must read it. |
+**No record is waiting for review.** Both drafts were reviewed and accepted on
+1 September 2026, each by an agent that did not write it.
 
 ## Reserved and not written
 

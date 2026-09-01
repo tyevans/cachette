@@ -22,7 +22,7 @@
 //!
 //! # References
 //!
-//! [^1]: ADR-0064, a unit chooses by scoring a small fixed option set, decision D1. `docs/adrs/draft/adr-0064-a-unit-chooses-by-scoring-a-small-fixed-option-set.md`
+//! [^1]: ADR-0064, a unit chooses by scoring a small fixed option set, decision D1. `docs/adrs/accepted/adr-0064-a-unit-chooses-by-scoring-a-small-fixed-option-set.md`
 //! [^2]: ADR-0022, level 0 is the only truth, and every level above it is derived, decision D1. `docs/adrs/accepted/adr-0022-level-0-is-the-only-truth-and-every-level-above-it-is-derived.md`
 //! [^3]: ADR-0002, simulated and aggregated state holds no floating point number, decision D2. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
 //! [^4]: ADR-0004, iteration order is explicit, decisions D1 and D3. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
@@ -41,7 +41,7 @@ use crate::types::Fix32;
 ///
 /// # References
 ///
-/// [^1]: ADR-0064, a unit chooses by scoring a small fixed option set, decision D1. `docs/adrs/draft/adr-0064-a-unit-chooses-by-scoring-a-small-fixed-option-set.md`
+/// [^1]: ADR-0064, a unit chooses by scoring a small fixed option set, decision D1. `docs/adrs/accepted/adr-0064-a-unit-chooses-by-scoring-a-small-fixed-option-set.md`
 pub const OPTION_COUNT: usize = 4;
 
 /// The intent value that means a unit holds what it was doing.
@@ -147,7 +147,7 @@ pub const OPTIONS: [OptionRow; OPTION_COUNT] = [
 /// # References
 ///
 /// [^1]: Findings register, FND-014. `docs/FINDINGS.md`
-/// [^2]: ADR-0064, a unit chooses by scoring a small fixed option set, decision D3. `docs/adrs/draft/adr-0064-a-unit-chooses-by-scoring-a-small-fixed-option-set.md`
+/// [^2]: ADR-0064, a unit chooses by scoring a small fixed option set, decision D3. `docs/adrs/accepted/adr-0064-a-unit-chooses-by-scoring-a-small-fixed-option-set.md`
 /// [^3]: Budgets and costs, the choice pass. `docs/reference/budgets.md`
 pub const SCORE_FLOOR: Fix32 = Fix32(1 << 14);
 
@@ -261,7 +261,7 @@ impl ChoiceSchedule {
     /// # References
     ///
     /// [^1]: Findings register, FND-023. `docs/FINDINGS.md`
-    /// [^2]: ADR-0064, a unit chooses by scoring a small fixed option set, decision D4. `docs/adrs/draft/adr-0064-a-unit-chooses-by-scoring-a-small-fixed-option-set.md`
+    /// [^2]: ADR-0064, a unit chooses by scoring a small fixed option set, decision D4. `docs/adrs/accepted/adr-0064-a-unit-chooses-by-scoring-a-small-fixed-option-set.md`
     /// [^3]: ADR-0001, one binary gives one answer at any thread count, decision D1. `docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
     #[must_use]
     pub const fn chooses_now(self, cell: u32, frame: u64) -> bool {

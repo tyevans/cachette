@@ -92,7 +92,7 @@ Filled in when the item moves to `complete/`.
 
 [^1]: ADR-0056, movement is tile-discrete and admitted by sort-then-admit, decision D3. `docs/adrs/accepted/adr-0056-movement-is-tile-discrete-and-admitted-by-sort-then-admit.md`
 [^2]: ADR-0056, decision D4. `docs/adrs/accepted/adr-0056-movement-is-tile-discrete-and-admitted-by-sort-then-admit.md`
-[^3]: ADR-0074, a spawn may over-fill a tile, and only admission enforces the capacity. `docs/adrs/draft/adr-0074-a-spawn-may-over-fill-a-tile-and-only-admission-enforces-the-capacity.md`
+[^3]: ADR-0074, a spawn may over-fill a tile, and only admission enforces the capacity. `docs/adrs/accepted/adr-0074-a-spawn-may-over-fill-a-tile-and-only-admission-enforces-the-capacity.md`
 [^4]: Findings register, FND-081. `docs/FINDINGS.md`
 [^5]: ADR-0018, the unit-to-tile bridge is derived, and it rebuilds at the barrier. `docs/adrs/accepted/adr-0018-the-unit-to-tile-bridge-is-derived-and-rebuilds-at-the-barrier.md`
 [^6]: ADR Registry, who reviews. `docs/adrs/REGISTRY.md`

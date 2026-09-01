@@ -309,7 +309,7 @@ pub struct World {
     /// # References
     ///
     /// [^1]: ADR-0007, content supplies a key vector, never a comparator, decision D3. `docs/adrs/accepted/adr-0007-content-supplies-a-key-vector-never-a-comparator.md`
-    /// [^2]: ADR-0064, a unit chooses by scoring a small fixed option set, decision D2. `docs/adrs/draft/adr-0064-a-unit-chooses-by-scoring-a-small-fixed-option-set.md`
+    /// [^2]: ADR-0064, a unit chooses by scoring a small fixed option set, decision D2. `docs/adrs/accepted/adr-0064-a-unit-chooses-by-scoring-a-small-fixed-option-set.md`
     weights: WeightProfile,
     /// What the live stores hold, by the account of this world.
     ///
@@ -2190,7 +2190,7 @@ impl World {
     ///
     /// # References
     ///
-    /// [^1]: ADR-0064, a unit chooses by scoring a small fixed option set, decision D3. `docs/adrs/draft/adr-0064-a-unit-chooses-by-scoring-a-small-fixed-option-set.md`
+    /// [^1]: ADR-0064, a unit chooses by scoring a small fixed option set, decision D3. `docs/adrs/accepted/adr-0064-a-unit-chooses-by-scoring-a-small-fixed-option-set.md`
     #[must_use]
     pub fn soldier_intent(&self, entity: Entity) -> Option<Option<u8>> {
         self.soldiers.intent(entity)
@@ -2215,7 +2215,7 @@ impl World {
     ///
     /// # References
     ///
-    /// [^1]: ADR-0064, a unit chooses by scoring a small fixed option set, decision D2. `docs/adrs/draft/adr-0064-a-unit-chooses-by-scoring-a-small-fixed-option-set.md`
+    /// [^1]: ADR-0064, a unit chooses by scoring a small fixed option set, decision D2. `docs/adrs/accepted/adr-0064-a-unit-chooses-by-scoring-a-small-fixed-option-set.md`
     #[must_use]
     pub fn explain_choice(&self, entity: Entity) -> Option<ChoiceExplanation> {
         let slot = self.soldiers.slot_of(entity)?;
@@ -2815,7 +2815,7 @@ const DRAW_MOVE_DIRECTION: u32 = 0;
 /// [^4]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
 /// [^5]: ADR-0056, movement is tile-discrete and admitted by sort-then-admit, decision D2. `docs/adrs/accepted/adr-0056-movement-is-tile-discrete-and-admitted-by-sort-then-admit.md`
 /// [^6]: ADR-0068, terrain is generated from the seed and is never stored as a map, decision D4. `docs/adrs/accepted/adr-0068-terrain-is-generated-from-the-seed-and-is-never-stored-as-a-map.md`
-/// [^7]: ADR-0064, a unit chooses by scoring a small fixed option set, decision D3. `docs/adrs/draft/adr-0064-a-unit-chooses-by-scoring-a-small-fixed-option-set.md`
+/// [^7]: ADR-0064, a unit chooses by scoring a small fixed option set, decision D3. `docs/adrs/accepted/adr-0064-a-unit-chooses-by-scoring-a-small-fixed-option-set.md`
 fn soldier_moves(
     tick: Tick,
     seed: u64,
