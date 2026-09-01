@@ -1,7 +1,7 @@
 ---
 id: 0057
 title: End a unit that a shortage starves
-status: refined
+status: complete
 created: 2026-08-31
 implements: [ADR-0006 D1, ADR-0006 D2, ADR-0004 D1, ADR-0014 D3, ADR-0020]
 changes: []
@@ -99,7 +99,36 @@ run beside item 0056** or **item 0060**; all three write the death path.
 
 ## Outcome
 
-Filled in when the item moves to `complete/`.
+A unit that fails its draw now carries a condition with a name, and a
+shortage that lasts ends it.
+
+**The condition is a name, not a number.** The need rule gained a fifth
+value, the bound, and it answers the condition of any deficit: fed, short, or
+starved. The world reads the condition of a unit through one call, so a
+watcher never compares a deficit against a rule of its own. The death pass
+asks the same rule the watcher asks, so the bound is stated once.
+
+**The plane is written in parallel and read in order.** Each thread owns whole
+words of the death plane, so no two threads write one word. The scan reads the
+plane word by word and bit by bit, from the lowest slot up, and it ends each
+marked unit in that order. The order is visible: the free queue hands the
+freed slots back in it, so a later spawn depends on it. The probe reads the
+plane through the output slots instead, and the thread-count test then fails.
+
+**The scan runs after consumption, and the barrier moves with it.** A death is
+a structural change, so the frame batches it into the plane and applies it
+after the pass that made it. The derived structure refreshes again over the
+apply, before the derived level reads either.
+
+**A recovery is unreachable under the default rule.** A deficit falls only
+while the need is at or above the threshold, and the default ration equals the
+default decay, so a need that reached zero holds at zero. The finding records
+it and a decision row asks for the default.[^10] [^11] The test that watches a
+deficit fall states a ration above the decay.
+
+Each test was checked by putting the defect back. The generation advance, the
+account of what a dead unit carried, the death rule itself and the scan order
+each failed a different test, and the commit bodies name which.
 
 ## References
 
@@ -112,3 +141,5 @@ Filled in when the item moves to `complete/`.
 [^7]: Findings register, FND-048. `docs/FINDINGS.md`
 [^8]: Testing Rules, sections 1 and 2. `.claude/rules/testing.md`
 [^9]: Findings register, FND-051. `docs/FINDINGS.md`
+[^10]: Findings register, FND-089. `docs/FINDINGS.md`
+[^11]: Decisions register, DEC-043 and DEC-044. `docs/DECISIONS.md`

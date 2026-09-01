@@ -23,11 +23,33 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^ALLOC]
 
-**Next number: DEC-042**
+**Next number: DEC-045**
 
 ## Open
 
-No row is open. The project owner answered every open row.
+One row is open. The project owner answered every other row.
+
+### DEC-044 — Should the default ration be above the decay?
+
+**Open. The recommendation is to raise the default ration above the decay.**
+
+The default need rule sets the ration equal to the decay, so a unit that
+receives its whole ration holds the need it has.[^DEC34REF] A unit whose need
+reached zero therefore holds at zero, even when its site feeds it again. Its
+need never climbs back over the threshold, so its deficit never falls.[^FND089]
+
+The consequence changed when a shortage gained an end. A deficit that only
+rises reaches the bound, so every shortage that empties a need is fatal, and
+the recovery rate of the rule reaches nothing.
+
+Three options. Raise the ration above the decay, and a fed population climbs
+back to a full need; this makes a fully served population drift up, which the
+clamp at the top of a need absorbs. Feed the recovery from the ration a unit
+received rather than from the need it holds, which changes a kernel. Leave the
+rule and accept that a shortage which empties a need is fatal.
+
+The values are content, and no content pipeline exists.[^DEC34REF] The row
+therefore asks for a default, not for a rule.
 
 ### DEC-038 — Which slot does the faction take in the founding draw key?
 
@@ -607,6 +629,30 @@ and a home in the reference tables, and a change that exceeds it is visible
 rather than silent. The work is filed.[^ITEM0098] The blocker stays open,
 because it is about the target and this decision does not touch it.
 
+### DEC-043 — What deficit ends a unit?
+
+**Outcome. One default bound in the engine, carried by the need rule, until a
+content pipeline exists.**
+
+A unit that fails its draw builds a deficit. The deficit is a rate against a
+bound, and the unit ends when it reaches the bound. The bound is content, in
+the same way that the decay, the ration, the threshold and the recovery are
+content.[^DEC34REF]
+
+The engine holds the bound as a fifth value of the need rule and refuses a
+value below zero. A caller replaces the whole rule, so the bound is a
+parameter and no kernel holds one. The condition of a unit is read against the
+bound in one place, so a watcher never compares a deficit against a rule of
+its own.[^SHAPE1]
+
+A bound written into the death pass was rejected, because it is the value a
+world tunes most and a kernel is the hardest place to reach. A bound derived
+from the threshold was rejected, because a value derived from another value
+rots silently.[^FND015]
+
+**Revisit when** a unit type table exists. The bound then belongs to the unit
+type, with the rest of the rule.
+
 ### DEC-034 — What does a unit need, and how fast?
 
 **Outcome. One default rule in the engine, until a content pipeline exists.
@@ -739,3 +785,6 @@ a failed founding is correct.[^PRD12]
 [^BLK18]: Blockers register, BLK-018. `docs/BLOCKERS.md`
 [^ITEM0094]: Backlog item 0094. `docs/backlog/refined/0094-decide-how-many-groups-found-a-world.md`
 [^ADR75]: ADR-0075, the founding choice reads a bounded sample of the world. `docs/adrs/accepted/adr-0075-the-founding-choice-reads-a-bounded-sample-of-the-world.md`
+[^DEC34REF]: See DEC-034 in this document.
+[^FND089]: Findings register, FND-089. `docs/FINDINGS.md`
+[^FND015]: Findings register, FND-015. `docs/FINDINGS.md`
