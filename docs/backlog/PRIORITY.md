@@ -40,11 +40,11 @@ These close a gap a review found, or they unblock the items above.
 | 0120 | The engine gains state the window never shows. Refining it is the work.[^8] |
 | 0059 | Housing. The population cannot be bounded by anything until a place has capacity. |
 | 0060 | Population growth from the store and the housing. |
-| 0095 | Two foundings can over-fill a tile. |
 | 0103 | A household has no home. DEC-039 answers it: derive the household from the dwelling slot. |
 | 0104 | A ruler decides nothing that reaches anybody. DEC-040 carries the writ in the influence field. |
 | 0112 | Building a world passes over every tile. PRD-0003 states it must not, so the record is false of the code. |
 | 0113 | Admission enforces the capacity from a bridge count that no test compares against a scan. |
+| 0126 | An accepted record states that an over-full tile admits nobody. The code admits, once the tile has drained inside the frame. Refining it is the work. |
 | 0080 | The settings struct prices every new parameter at twenty-five files. |
 | 0101 | A behavioural claim about terrain is defended by a test of constants.[^7] |
 

@@ -1,7 +1,7 @@
 ---
 id: 0095
 title: Record that a spawn may over-fill a tile
-status: refined
+status: complete
 created: 2026-08-31
 implements: [ADR-0074 D1, ADR-0074 D2, ADR-0074 D3, ADR-0074 D4]
 changes: []
@@ -86,7 +86,27 @@ never existed.[^5]
 
 ## Outcome
 
-Filled in when the item moves to `complete/`.
+The record was accepted before this work started, so the repair was the whole
+of the item. No engine change was needed.
+
+**The tests.** A new suite drives the public interface of the core crate. It
+asserts that a spawn is granted on a tile at its capacity, that a spawn still
+refuses ground that admits no unit and a faction the world does not hold, that
+no tile rises above its capacity in a world that holds an over-full tile, and
+that an over-full tile takes nobody in while its units depart. The suite runs
+the same over-filled world at one, two and twelve threads.
+
+**The documents.** The product record no longer states that no tile holds more
+entities than its capacity allows. It now states what a viewer must show. Two
+test headers called the spawn question an open choice and cited the decisions
+register; both now cite the record that decided it.
+
+**What the work corrected.** The record states that a tile above its capacity
+offers no room and admits nobody. That is false as stated. Admission counts the
+arrivals of a tile against its occupancy after the departures of the same tick,
+and a frame runs several passes, so a tile that drains below its capacity inside
+one frame does admit. The monotone guarantee is untouched. The findings register
+holds the correction, and a new item asks for the repair of the record.[^8] [^9]
 
 ## References
 
@@ -97,3 +117,5 @@ Filled in when the item moves to `complete/`.
 [^5]: ADR-0018, the unit-to-tile bridge is derived, and it rebuilds at the barrier. `docs/adrs/accepted/adr-0018-the-unit-to-tile-bridge-is-derived-and-rebuilds-at-the-barrier.md`
 [^6]: ADR Registry, who reviews. `docs/adrs/REGISTRY.md`
 [^7]: PRD-0002, a developer watches the world run. `docs/product/shipped/prd-0002-a-developer-watches-the-world-run.md`
+[^8]: Findings register, FND-110. `docs/FINDINGS.md`
+[^9]: Backlog item 0126. `docs/backlog/proposed/0126-repair-the-admits-nobody-claim-in-adr-0074.md`
