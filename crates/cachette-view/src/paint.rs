@@ -18,13 +18,29 @@
 //! The colour comes from the one table this module holds. The engine holds no
 //! colour, and a second table would be one fact in two places.[^2] [^4]
 //!
+//! # The condition of a unit
+//!
+//! A unit keeps the colour of its faction, and one mark says that a shortage
+//! holds it. The mark is a dot at half the radius, in one colour, over the
+//! disc of the faction. The faction table stays the only table of colours
+//! the viewer keys on a faction.[^4]
+//!
+//! **The picture cannot show a unit at the moment a shortage ends it.** The
+//! engine scans the death plane inside the step that takes the unit to the
+//! bound, so a unit that a completed step left alive is fed or short and
+//! never starved.[^5] The panel states how many the last scan ended, and
+//! that count is the only thing a watcher can read about a death.
+//!
 //! # References
 //!
 //! [^1]: ADR-0002, simulated and aggregated state holds no floating point number, decision D4. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
 //! [^2]: ADR-0067, the viewer reads the world and never writes to it, decision D3. `docs/adrs/accepted/adr-0067-the-viewer-reads-the-world-and-never-writes-to-it.md`
 //! [^3]: ADR-0017, the world is a rhombus, so a tile index is raw axial, decision D4. `docs/adrs/accepted/adr-0017-the-world-is-a-rhombus-so-a-tile-index-is-raw-axial.md`
 //! [^4]: Recurring Defect Shapes, shape 1. `.claude/rules/recurring-defects.md`
+//! [^5]: Findings register, FND-119. `docs/FINDINGS.md`
 
+use cachette_core::cohort::NeedCondition;
+use cachette_core::founding::FoundingOutcome;
 use cachette_core::hex::NEIGHBOURS;
 use cachette_core::terrain::{Terrain, TileKind, KIND_COUNT};
 use cachette_core::{Axial, BridgeError, FactionId, Holder, World};
@@ -152,6 +168,41 @@ pub const fn over_capacity_colour() -> u32 {
     OVER_CAPACITY
 }
 
+/// Returns the colour the viewer marks a unit that a shortage holds.
+///
+/// One colour marks the condition, and the faction colour table stays the
+/// only table of colours the viewer keys on a faction.[^1] [^2]
+///
+/// A test reads this rather than a literal, so the mark has one declaration
+/// site.[^2]
+///
+/// # References
+///
+/// [^1]: ADR-0067, the viewer reads the world and never writes to it, decision D2. `docs/adrs/accepted/adr-0067-the-viewer-reads-the-world-and-never-writes-to-it.md`
+/// [^2]: Recurring Defect Shapes, shape 1. `.claude/rules/recurring-defects.md`
+#[must_use]
+pub const fn shortage_colour() -> u32 {
+    SHORTAGE
+}
+
+/// Returns the colour the viewer marks a place a faction founded in.
+///
+/// The founding mark carries the colour of the faction that founded, from the
+/// one table this module holds. A watcher reads the mark and the units of
+/// that faction as one colour.[^1]
+///
+/// The core of the mark is the same for every faction, so a mark stays
+/// visible over any ground.[^2]
+///
+/// # References
+///
+/// [^1]: Recurring Defect Shapes, shape 1. `.claude/rules/recurring-defects.md`
+/// [^2]: PRD-0005, a watcher can tell what is happening and why. `docs/product/shipped/prd-0005-a-watcher-can-tell-what-is-happening-and-why.md`
+#[must_use]
+pub const fn founding_core_colour() -> u32 {
+    FOUNDING_CORE
+}
+
 /// Returns the index of the colour a faction shares.
 fn colour_slot(faction: FactionId) -> usize {
     (faction.0 as usize) % COLOURED_FACTIONS
@@ -180,6 +231,34 @@ const ZOOM_STEP: f32 = 1.1;
 /// [^1]: ADR-0067, the viewer reads the world and never writes to it, decision D2. `docs/adrs/accepted/adr-0067-the-viewer-reads-the-world-and-never-writes-to-it.md`
 const OVER_CAPACITY: u32 = 0x00ff_2a1e;
 
+/// The colour of the mark on a unit that a shortage holds.
+///
+/// The engine names the condition. It does not say what a condition looks
+/// like, and it never will.[^1]
+///
+/// The colour is far from every faction colour and from every ground colour,
+/// so a watcher reads the mark against the disc it sits on and against the
+/// ground behind it. A test asserts that distance.
+///
+/// # References
+///
+/// [^1]: ADR-0067, the viewer reads the world and never writes to it, decision D2. `docs/adrs/accepted/adr-0067-the-viewer-reads-the-world-and-never-writes-to-it.md`
+const SHORTAGE: u32 = 0x00f2_f0d8;
+
+/// The colour at the middle of a founding mark.
+///
+/// A founding mark is a ring in the faction's colour around this core. The
+/// core is one colour for every faction, so a watcher finds a founding on any
+/// ground and then reads the ring for the faction that took it.
+const FOUNDING_CORE: u32 = 0x0014_0b04;
+
+/// The smallest side a founding mark takes, in pixels.
+///
+/// The mark is three nested rings, so it needs at least five pixels a side.
+/// A watcher who zooms out to a tile of two pixels still finds the places
+/// that founded.
+const FOUNDING_LEAST_SIDE: i32 = 7;
+
 /// A pixel buffer that the viewer paints and the window shows.
 pub struct Canvas {
     width: usize,
@@ -195,6 +274,9 @@ pub struct Canvas {
     tiles_held: u32,
     crowd_worst: u32,
     tiles_at_capacity: u32,
+    condition_reads: u32,
+    units_short: u32,
+    foundings_marked: u32,
 }
 
 impl Canvas {
@@ -221,6 +303,9 @@ impl Canvas {
             tiles_held: 0,
             crowd_worst: 0,
             tiles_at_capacity: 0,
+            condition_reads: 0,
+            units_short: 0,
+            foundings_marked: 0,
         }
     }
 
@@ -391,6 +476,43 @@ impl Canvas {
     ///
     /// The head-up display draws its panel with this. A position outside the
     /// canvas is clipped rather than a panic.
+    /// Returns the number of conditions the pass read.
+    ///
+    /// The pass reads the condition of every unit it paints, and of no other
+    /// unit. A count above the units painted says that the layer started a
+    /// pass of its own, which the panel record forbids.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0070, the head-up display reports what the drawing pass read, decision D1. `docs/adrs/accepted/adr-0070-the-head-up-display-reports-what-the-drawing-pass-read.md`
+    #[must_use]
+    pub const fn condition_reads(&self) -> u32 {
+        self.condition_reads
+    }
+
+    /// Returns the number of painted units that a shortage holds.
+    ///
+    /// This counts the units the pass painted, and never the units of the
+    /// world. A watcher tells the two apart by the label of the panel row.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0070, the head-up display reports what the drawing pass read, decision D2. `docs/adrs/accepted/adr-0070-the-head-up-display-reports-what-the-drawing-pass-read.md`
+    #[must_use]
+    pub const fn units_short(&self) -> u32 {
+        self.units_short
+    }
+
+    /// Returns the number of founding marks the pass painted.
+    ///
+    /// A founding whose place lies outside the window paints no mark and is
+    /// not counted, in the same way that a unit outside the window is not
+    /// counted.
+    #[must_use]
+    pub const fn foundings_marked(&self) -> u32 {
+        self.foundings_marked
+    }
+
     pub fn block(&mut self, x: i32, y: i32, width: i32, height: i32, colour: u32) {
         self.fill_rect(x, y, width, height, colour);
     }
@@ -473,6 +595,9 @@ impl Canvas {
         self.tiles_held = 0;
         self.crowd_worst = 0;
         self.tiles_at_capacity = 0;
+        self.condition_reads = 0;
+        self.units_short = 0;
+        self.foundings_marked = 0;
     }
 
     /// Sets one pixel, and ignores a position outside the canvas.
@@ -949,6 +1074,59 @@ pub fn draw(world: &World, camera: Camera, canvas: &mut Canvas) -> Result<(), Br
     )
 }
 
+/// Marks each place that a faction founded.
+///
+/// A founded place is history. The world holds no record that a place was
+/// founded, and this pass adds none: it reads the outcomes that the caller
+/// kept when it founded the run.[^1] A caller that founded nothing passes an
+/// empty slice, and the pass marks nothing.
+///
+/// The cost follows the faction count. The pass visits the outcomes and
+/// nothing else. It reads no tile, no unit and no summary, so the cost is the
+/// same at every zoom and does not change after the founding frame.[^2]
+///
+/// The mark is a ring around the place, in the faction's colour. The colour
+/// comes from the one table this module holds, so the mark of a faction and
+/// the units of that faction carry one colour.[^3] A band of one core colour
+/// sits inside the ring, so the mark stands out on any ground.
+///
+/// The ring surrounds the place and does not cover it. A watcher reads the
+/// ground and the units of a founded place through the mark.
+///
+/// A refused faction founded nowhere, so it gets no mark. The panel names it
+/// instead.
+///
+/// Call this after the world pass and before the panel. The world pass clears
+/// the canvas, and the panel draws over the picture.
+///
+/// # References
+///
+/// [^1]: ADR-0067, the viewer reads the world and never writes to it, decision D2. `docs/adrs/accepted/adr-0067-the-viewer-reads-the-world-and-never-writes-to-it.md`
+/// [^2]: ADR-0070, the head-up display reports what the drawing pass read, decision D1. `docs/adrs/accepted/adr-0070-the-head-up-display-reports-what-the-drawing-pass-read.md`
+/// [^3]: Recurring Defect Shapes, shape 1. `.claude/rules/recurring-defects.md`
+pub fn mark_foundings(camera: Camera, canvas: &mut Canvas, outcomes: &[FoundingOutcome]) {
+    // The mark is larger than a tile at every zoom, because a watcher must
+    // find it without knowing where to look. It is not a tile read, so it
+    // owes the tile grid nothing.
+    let side = ((camera.tile_width * 2.0) as i32).max(FOUNDING_LEAST_SIDE);
+    for outcome in outcomes {
+        let Some(founding) = outcome.founding() else {
+            continue;
+        };
+        let (x, y) = camera.centre_of(founding.place());
+        if !canvas.holds(x, y, side / 2) {
+            continue;
+        }
+        let colour = faction_colour(outcome.faction());
+        let left = x as i32 - side / 2;
+        let top = y as i32 - side / 2;
+        outline(canvas, left, top, side, colour);
+        outline(canvas, left + 1, top + 1, side - 2, FOUNDING_CORE);
+        outline(canvas, left + 2, top + 2, side - 4, colour);
+        canvas.foundings_marked += 1;
+    }
+}
+
 /// Reports whether a tile sits on the edge of its holding.
 ///
 /// The six neighbours are fixed offsets, and the edge of the world does not
@@ -1091,6 +1269,31 @@ fn draw_soldiers(
                 let slot = colour_slot(faction);
                 canvas.fill_disc(x as i32, y as i32, radius, FACTION_COLOURS[slot]);
                 canvas.soldiers_painted += 1;
+                // The condition of this unit, read at the unit that is being
+                // painted, on the loop that already runs. The layer starts no
+                // pass of its own.[^7]
+                //
+                // The engine names the condition, and the viewer compares no
+                // number against a bound of its own. A viewer that read the
+                // accumulator would hold the rule a second time.[^8]
+                //
+                // [^7]: ADR-0070, the head-up display reports what the drawing pass read, decision D1. `docs/adrs/accepted/adr-0070-the-head-up-display-reports-what-the-drawing-pass-read.md`
+                // [^8]: ADR-0063, a need is a rate with a threshold, and crossing it is a fact, decision D3. `docs/adrs/accepted/adr-0063-a-need-is-a-rate-with-a-threshold-and-crossing-it-is-a-fact.md`
+                //
+                // A unit that a completed step left alive is fed or short.
+                // The starved arm is here because the engine names three
+                // conditions, and it draws the same mark rather than a mark
+                // that nothing can reach.[^9]
+                //
+                // [^9]: Findings register, FND-119. `docs/FINDINGS.md`
+                canvas.condition_reads += 1;
+                match world.unit_condition(*soldier) {
+                    None | Some(NeedCondition::Fed) => {}
+                    Some(NeedCondition::Short | NeedCondition::Starved) => {
+                        canvas.units_short += 1;
+                        canvas.fill_disc(x as i32, y as i32, (radius / 2).max(1), SHORTAGE);
+                    }
+                }
                 // The census is a by-product of the pass that paints. A
                 // separate pass over the soldiers would give the same numbers
                 // and cost the population.

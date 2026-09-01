@@ -12,7 +12,7 @@
 //!
 //! [^1]: ADR-0067, the viewer reads the world and never writes to it, decision D1. `docs/adrs/accepted/adr-0067-the-viewer-reads-the-world-and-never-writes-to-it.md`
 
-use cachette_core::{FactionId, World, WorldConfig};
+use cachette_core::{World, WorldConfig};
 use cachette_view::picture::write_ppm;
 use cachette_view::{draw_frame, Camera, Canvas, Metrics};
 
@@ -30,16 +30,17 @@ fn main() {
         faction_count: 4,
     })
     .expect("the extent describes a world");
-    let founded = world
-        .found_run(24, FactionId(0))
-        .expect("the world holds a place for the group");
+    let foundings = world.found_run_for_every_faction(24);
+    let place = foundings
+        .iter()
+        .find_map(|outcome| outcome.founding().map(cachette_core::Founding::place))
+        .expect("the world holds a place for a group");
     world.rebuild_bridge(1).expect("the rebuild must succeed");
 
     let mut canvas = Canvas::new(WINDOW.0, WINDOW.1);
     let camera = Camera::opening()
-        .looking_at(founded.place(), &canvas)
+        .looking_at(place, &canvas)
         .clamped(&world, &canvas);
-    let foundings = [founded];
     draw_frame(&world, camera, &Metrics::start(), &foundings, &mut canvas)
         .expect("the world draws");
 

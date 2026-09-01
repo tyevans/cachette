@@ -47,7 +47,8 @@ pub use hud::{FoundingReport, Readout};
 pub use metrics::{Lap, Metrics};
 pub use paint::{Camera, Canvas};
 
-use cachette_core::{BridgeError, Founding, World};
+use cachette_core::founding::FoundingOutcome;
+use cachette_core::{BridgeError, World};
 
 /// Draws one frame: the world, and then the panel that says what it holds.
 ///
@@ -59,11 +60,16 @@ use cachette_core::{BridgeError, Founding, World};
 /// paints, so the panel must read the canvas after that pass and draw over
 /// it.
 ///
-/// The foundings are the reports the caller kept when it founded the run.
-/// The caller owns them, and the world holds no copy, because a field that
-/// existed for the panel would be the violation the boundary record
-/// names.[^2] A caller that founded nothing passes an empty slice, and the
-/// panel then states no founding.
+/// The outcomes are what the caller kept when it founded the run: one for
+/// each faction, whether that faction was seated or refused. The caller owns
+/// them, and the world holds no copy, because a field that existed for the
+/// panel would be the violation the boundary record names.[^2] A caller that
+/// founded nothing passes an empty slice, and the panel then states no
+/// founding.
+///
+/// The frame marks each founded place between the world pass and the panel.
+/// A founded place is history, so the mark comes from the outcomes and never
+/// from a value the engine holds.[^2]
 ///
 /// # Errors
 ///
@@ -79,11 +85,12 @@ pub fn draw_frame(
     world: &World,
     camera: Camera,
     metrics: &Metrics,
-    foundings: &[Founding],
+    outcomes: &[FoundingOutcome],
     canvas: &mut Canvas,
 ) -> Result<Readout, BridgeError> {
     paint::draw(world, camera, canvas)?;
-    let readout = Readout::of(world, camera, canvas, metrics, foundings);
+    paint::mark_foundings(camera, canvas, outcomes);
+    let readout = Readout::of(world, camera, canvas, metrics, outcomes);
     hud::draw(&readout, canvas);
     Ok(readout)
 }

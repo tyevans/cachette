@@ -98,10 +98,11 @@ impl std::error::Error for DemoError {}
 /// [^1]: PRD-0012, a world starts small and grows. `docs/product/accepted/prd-0012-a-world-starts-small-and-grows.md`
 /// [^2]: ADR-0075, the founding choice reads a bounded sample of the world, decision D1. `docs/adrs/accepted/adr-0075-the-founding-choice-reads-a-bounded-sample-of-the-world.md`
 /// [^3]: ADR-0076, a founding keeps a fixed distance from the foundings before it. `docs/adrs/draft/adr-0076-a-founding-keeps-a-fixed-distance-from-the-foundings-before-it.md`
-fn found(world: &mut World) -> Result<Vec<cachette_core::Founding>, DemoError> {
-    let mut seated = Vec::new();
+fn found(world: &mut World) -> Result<Vec<cachette_core::FoundingOutcome>, DemoError> {
+    let outcomes = world.found_run_for_every_faction(GROUP);
+    let mut seated = 0usize;
     let mut refusal = None;
-    for outcome in world.found_run_for_every_faction(GROUP) {
+    for outcome in &outcomes {
         let faction = outcome.faction().0;
         match outcome.result() {
             Ok(founded) => {
@@ -124,7 +125,7 @@ with {} of open water beside it",
                     reached.open_ground,
                     reached.water_edge
                 );
-                seated.push(founded.clone());
+                seated += 1;
             }
             Err(error) => {
                 println!("faction {faction} found no place: {error}");
@@ -132,12 +133,28 @@ with {} of open water beside it",
             }
         }
     }
-    match seated.is_empty() {
-        true => Err(DemoError::Founding(
+    match seated {
+        0 => Err(DemoError::Founding(
             refusal.unwrap_or(cachette_core::FoundingError::EmptyGroup),
         )),
-        false => Ok(seated),
+        _ => Ok(outcomes),
     }
+}
+
+/// Returns the place the window opens on.
+///
+/// The group holds one small part of a large world, so a camera at the corner
+/// shows empty ground. The window opens on the first place that was founded.
+///
+/// # Panics
+///
+/// Panics when no faction founded. The caller stops before this on that
+/// outcome, so reaching here is a programming error in this binary.
+fn opening_place(outcomes: &[cachette_core::FoundingOutcome]) -> cachette_core::Axial {
+    outcomes
+        .iter()
+        .find_map(|outcome| outcome.founding().map(cachette_core::Founding::place))
+        .expect("the run seated at least one faction")
 }
 
 /// Reads the keyboard and returns the camera the person asked for.
@@ -184,7 +201,7 @@ fn main() -> Result<(), DemoError> {
         .min(12);
 
     let mut world = World::new(DEMO).map_err(DemoError::World)?;
-    let foundings = found(&mut world)?;
+    let outcomes = found(&mut world)?;
 
     let mut canvas = Canvas::new(WINDOW_WIDTH, WINDOW_HEIGHT);
     // The world is larger than the window, so the camera shows a part of it
@@ -194,7 +211,7 @@ fn main() -> Result<(), DemoError> {
     // corner would show an empty map. The view opens on the place that was
     // founded, and the person scrolls away from it.
     let mut camera = Camera::opening()
-        .looking_at(foundings[0].place(), &canvas)
+        .looking_at(opening_place(&outcomes), &canvas)
         .clamped(&world, &canvas);
 
     let mut window = Window::new(
@@ -239,7 +256,7 @@ fn main() -> Result<(), DemoError> {
         // in one call and the tests drive that call.
         // The binary owns the founding report and lends it to the panel. The
         // world keeps no copy of it.
-        cachette_view::draw_frame(&world, camera, &metrics, &foundings, &mut canvas)
+        cachette_view::draw_frame(&world, camera, &metrics, &outcomes, &mut canvas)
             .map_err(DemoError::Bridge)?;
         metrics.draw(at.elapsed());
 

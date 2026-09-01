@@ -36,7 +36,6 @@ These close a gap a review found, or they unblock the items above.
 
 | No. | Why it sits here |
 |---|---|
-| 0120 | The engine gains state the window never shows. Refining it is the work.[^8] |
 | 0059 | Housing. The population cannot be bounded by anything until a place has capacity. ADR-0081 holds the decisions and waits for review. |
 | 0060 | Population growth from the store and the housing. It waits on 0059, and DEC-044 decides whether a grown population can survive.[^9] |
 | 0103 | A household has no home. DEC-039 answers it: derive the household from the dwelling slot. |
@@ -66,6 +65,7 @@ These are real and none of them blocks anything today.
 | 0058 | Improvements. Waits on a site that produces. |
 | 0124 | A fully recovered deposit still stores a take of zero. The recovery pass now reads that entry on every tick, so the depleted set grows and never shrinks. |
 | 0125 | Show a watcher a deposit recovering. The engine recovers a deposit, and nothing shows it. |
+| 0133 | The panel is longer than the window and cuts. A watcher cannot reach the rows below the notice. |
 | 0067 | Descent. Waits on the character tier being used for something. |
 | 0068 | A ruler and a succession. Waits on 0067. |
 | 0088 | Promotion into the character tier. |

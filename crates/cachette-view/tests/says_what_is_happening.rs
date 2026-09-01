@@ -24,8 +24,9 @@
 // the float boundary at the viewer, and a camera is a viewer value.
 #![allow(clippy::disallowed_types)]
 
+use cachette_core::founding::FoundingOutcome;
 use cachette_core::terrain::KIND_COUNT;
-use cachette_core::{Axial, FactionId, Founding, World, WorldConfig};
+use cachette_core::{Axial, FactionId, World, WorldConfig};
 use cachette_view::paint::COLOURED_FACTIONS;
 use cachette_view::{draw_frame, paint, Camera, Canvas, Lap, Metrics};
 
@@ -942,7 +943,7 @@ const GROUP: u32 = 24;
 ///
 /// [^1]: Testing Rules, a fixture supplies the input. `.claude/rules/testing.md`
 /// [^2]: Findings register, FND-061. `docs/FINDINGS.md`
-fn founded_world() -> (World, Founding) {
+fn founded_world() -> (World, Vec<FoundingOutcome>) {
     let mut world = World::new(WorldConfig {
         width: WIDE,
         height: TALL,
@@ -950,9 +951,14 @@ fn founded_world() -> (World, Founding) {
         faction_count: FACTIONS,
     })
     .expect("a large extent describes a world");
-    let founded = world
-        .found_run(GROUP, FactionId(0))
-        .expect("the world holds a place for the group");
+    // The run founds one group for each faction. These tests state one
+    // founding section, so the fixture keeps the first outcome. The other
+    // groups stand in the world all the same.
+    let outcomes = world.found_run_for_every_faction(GROUP);
+    let founded = outcomes
+        .first()
+        .and_then(FoundingOutcome::founding)
+        .expect("the world holds a place for the first group");
     let survey = founded.survey();
     let chosen = survey.chosen().expect("the founding chose a place");
     let other = *survey
@@ -966,7 +972,24 @@ fn founded_world() -> (World, Founding) {
          place it took, so a panel that printed one place twice would pass",
     );
     world.rebuild_bridge(1).expect("the rebuild must succeed");
-    (world, founded)
+    (world, outcomes.into_iter().take(1).collect())
+}
+
+/// Returns the survey of the first seated faction.
+fn first_survey(outcomes: &[FoundingOutcome]) -> &cachette_core::founding::Survey {
+    outcomes
+        .iter()
+        .find_map(FoundingOutcome::founding)
+        .expect("the run seated a faction")
+        .survey()
+}
+
+/// Returns the place the first seated faction took.
+fn first_place(outcomes: &[FoundingOutcome]) -> Axial {
+    outcomes
+        .iter()
+        .find_map(|outcome| outcome.founding().map(cachette_core::Founding::place))
+        .expect("the run seated a faction")
 }
 
 /// Returns a camera that looks at one tile.
@@ -980,11 +1003,10 @@ fn looking_at(world: &World, canvas: &Canvas, address: Axial) -> Camera {
 fn the_panel_states_the_place_the_founding_chose() {
     // The row must carry the address the engine reported. A panel that
     // printed the camera centre would look right on the opening frame.
-    let (world, founded) = founded_world();
+    let (world, foundings) = founded_world();
     let metrics = Metrics::start();
     let mut canvas = canvas();
-    let camera = looking_at(&world, &canvas, founded.place());
-    let foundings = [founded];
+    let camera = looking_at(&world, &canvas, first_place(&foundings));
 
     let readout =
         draw_frame(&world, camera, &metrics, &foundings, &mut canvas).expect("the world draws");
@@ -992,7 +1014,7 @@ fn the_panel_states_the_place_the_founding_chose() {
     let report = readout.foundings().first().expect("the panel read one");
     assert_eq!(
         report.place(),
-        foundings[0].place(),
+        first_place(&foundings),
         "the panel names a place the founding did not choose",
     );
 }
@@ -1001,16 +1023,15 @@ fn the_panel_states_the_place_the_founding_chose() {
 fn the_panel_states_the_quantities_the_founding_reported() {
     // The assertion is against the report, not against a constant. A
     // constant would pin the terrain generator rather than the panel.
-    let (world, founded) = founded_world();
+    let (world, foundings) = founded_world();
     let metrics = Metrics::start();
     let mut canvas = canvas();
-    let camera = looking_at(&world, &canvas, founded.place());
-    let foundings = [founded];
+    let camera = looking_at(&world, &canvas, first_place(&foundings));
 
     let readout =
         draw_frame(&world, camera, &metrics, &foundings, &mut canvas).expect("the world draws");
 
-    let survey = foundings[0].survey();
+    let survey = first_survey(&foundings);
     let chosen = survey.chosen().expect("the founding chose a place");
     let report = readout.foundings().first().expect("the panel read one");
     assert_eq!(
@@ -1032,17 +1053,16 @@ fn the_panel_states_the_quantities_the_founding_reported() {
 fn the_panel_states_how_many_places_the_founding_compared() {
     // A watcher tells a choice from a default by this number. One place
     // compared is a default.
-    let (world, founded) = founded_world();
+    let (world, foundings) = founded_world();
     let metrics = Metrics::start();
     let mut canvas = canvas();
-    let camera = looking_at(&world, &canvas, founded.place());
-    let foundings = [founded];
+    let camera = looking_at(&world, &canvas, first_place(&foundings));
 
     let readout =
         draw_frame(&world, camera, &metrics, &foundings, &mut canvas).expect("the world draws");
 
     let report = readout.foundings().first().expect("the panel read one");
-    assert_eq!(report.considered(), foundings[0].survey().considered());
+    assert_eq!(report.considered(), first_survey(&foundings).considered());
     assert!(
         report.considered() > 1,
         "the founding compared {} places, so the panel describes a default \
@@ -1055,17 +1075,15 @@ fn the_panel_states_how_many_places_the_founding_compared() {
 fn the_panel_states_a_place_the_founding_did_not_choose() {
     // The comparison is the point of the section. A panel that stated the
     // chosen place alone would answer half the question.
-    let (world, founded) = founded_world();
+    let (world, foundings) = founded_world();
     let metrics = Metrics::start();
     let mut canvas = canvas();
-    let camera = looking_at(&world, &canvas, founded.place());
-    let foundings = [founded];
+    let camera = looking_at(&world, &canvas, first_place(&foundings));
 
     let readout =
         draw_frame(&world, camera, &metrics, &foundings, &mut canvas).expect("the world draws");
 
-    let best_rejected = *foundings[0]
-        .survey()
+    let best_rejected = *first_survey(&foundings)
         .rejected()
         .first()
         .expect("the founding compared more than one place");
@@ -1091,11 +1109,10 @@ fn the_panel_says_whether_the_window_shows_the_founded_place() {
     // The row must answer both ways. A row that always said yes would be
     // right on the opening frame of the demonstration and wrong after one
     // scroll.
-    let (world, founded) = founded_world();
+    let (world, foundings) = founded_world();
     let metrics = Metrics::start();
     let mut canvas = canvas();
-    let foundings = [founded];
-    let place = foundings[0].place();
+    let place = first_place(&foundings);
 
     let at_the_place = looking_at(&world, &canvas, place);
     let near = draw_frame(&world, at_the_place, &metrics, &foundings, &mut canvas)
@@ -1135,34 +1152,30 @@ fn the_panel_describes_every_founding_the_caller_holds() {
         faction_count: FACTIONS,
     })
     .expect("a large extent describes a world");
-    let first = world
-        .found_run(GROUP, FactionId(0))
-        .expect("the world holds a place for the group");
-
-    // The second group settles at a place the test names, far from the
-    // first, so the two foundings cannot be one report counted twice.
-    let open = open_tiles(&world);
-    let corner = if first.place().q * 2 < WIDE as i32 {
-        Axial::new(WIDE as i32 - 6, TALL as i32 - 6)
-    } else {
-        Axial::new(5, 5)
-    };
-    let second = world
-        .found_group_at(nearest_open(&open, corner), GROUP, FactionId(1))
-        .expect("the named place holds the group");
+    // The run founds one group for each faction, so the fixture holds every
+    // outcome the engine gave and never a list the test assembled.
+    let foundings = world.found_run_for_every_faction(GROUP);
+    let seated = foundings
+        .iter()
+        .filter(|outcome| outcome.is_seated())
+        .count();
+    assert!(
+        seated > 1,
+        "the run seated {seated} factions, so a panel written for one \
+         founding would pass this test",
+    );
     world.rebuild_bridge(1).expect("the rebuild must succeed");
 
     let metrics = Metrics::start();
     let mut canvas = canvas();
     let camera = at_the_middle(&world, &canvas);
-    let foundings = [first, second];
 
     let readout =
         draw_frame(&world, camera, &metrics, &foundings, &mut canvas).expect("the world draws");
 
     assert_eq!(
         readout.foundings().len(),
-        2,
+        seated,
         "the panel dropped a founding the caller holds",
     );
     assert_ne!(
@@ -1170,12 +1183,12 @@ fn the_panel_describes_every_founding_the_caller_holds() {
         readout.foundings()[1].place(),
         "the panel states one place twice",
     );
-    // The second founding compared one place, because the test named it. The
-    // panel then has nothing to compare, and says so rather than printing a
-    // second column that a reader would take for a real place.
-    assert!(
-        readout.foundings()[1].other().is_none(),
-        "the panel states a place that the second founding never compared",
+    // Each row names the faction that founded. Two rows with one faction
+    // would be one report counted twice.
+    assert_ne!(
+        readout.foundings()[0].faction(),
+        readout.foundings()[1].faction(),
+        "the panel gives two foundings to one faction",
     );
 }
 
@@ -1198,11 +1211,10 @@ fn the_founding_rows_fit_their_column() {
     // A value too wide for its column is cut, and a cut value states a
     // number other than the one it was given. The check must see the
     // founding rows, so the readout carries a founding.
-    let (world, founded) = founded_world();
+    let (world, foundings) = founded_world();
     let metrics = Metrics::start();
     let mut canvas = canvas();
-    let camera = looking_at(&world, &canvas, founded.place());
-    let foundings = [founded];
+    let camera = looking_at(&world, &canvas, first_place(&foundings));
 
     let readout =
         draw_frame(&world, camera, &metrics, &foundings, &mut canvas).expect("the world draws");
@@ -1218,12 +1230,11 @@ fn the_founding_rows_fit_their_column() {
 fn the_panel_grows_when_the_caller_holds_a_founding() {
     // The founding section must reach the panel. A readout that held the
     // report and drew none of it would pass every assertion above.
-    let (world, founded) = founded_world();
+    let (world, foundings) = founded_world();
     let metrics = Metrics::start();
     let mut with_founding = canvas();
     let mut without = canvas();
-    let camera = looking_at(&world, &with_founding, founded.place());
-    let foundings = [founded];
+    let camera = looking_at(&world, &with_founding, first_place(&foundings));
 
     let stated = draw_frame(&world, camera, &metrics, &foundings, &mut with_founding)
         .expect("the world draws");

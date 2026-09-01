@@ -56,7 +56,8 @@
 use std::path::PathBuf;
 use std::time::Duration;
 
-use cachette_core::{Axial, FactionId, Founding, World, WorldConfig};
+use cachette_core::founding::FoundingOutcome;
+use cachette_core::{Axial, FactionId, World, WorldConfig};
 use cachette_view::picture::write_ppm;
 use cachette_view::{draw_frame, hud, paint, Camera, Canvas, Metrics};
 
@@ -88,7 +89,7 @@ const SPREAD: u32 = 9973;
 /// The height grows when the panel gains a section. A window that cut the
 /// panel would store a picture of the cut rather than a picture of the
 /// layout, and the ground rows would fall off the bottom first.
-const WINDOW: (usize, usize) = (340, 720);
+const WINDOW: (usize, usize) = (340, 860);
 
 /// The steps the fixed measurements report.
 const TICKS: u64 = 40;
@@ -121,7 +122,7 @@ const GROUP: u32 = 24;
 ///
 /// [^1]: Testing Rules, a fixture supplies the input. `.claude/rules/testing.md`
 /// [^2]: Findings register, FND-061. `docs/FINDINGS.md`
-fn world(factions: u16) -> (World, Founding) {
+fn world(factions: u16) -> (World, Vec<FoundingOutcome>) {
     let mut world = World::new(WorldConfig {
         width: WIDE,
         height: TALL,
@@ -129,9 +130,15 @@ fn world(factions: u16) -> (World, Founding) {
         faction_count: factions,
     })
     .expect("the extent describes a world");
-    let founded = world
-        .found_run(GROUP, FactionId(0))
-        .expect("the world holds a place for the group");
+    // The run founds one group for each faction. The fixture keeps the
+    // first outcome, because this picture is of a panel with one founding
+    // section. The other groups stand in the world all the same.
+    let outcomes = world.found_run_for_every_faction(GROUP);
+    let founded = outcomes
+        .first()
+        .and_then(FoundingOutcome::founding)
+        .expect("the world holds a place for the first group")
+        .clone();
     let survey = founded.survey();
     let chosen = survey.chosen().expect("the founding chose a place");
     let other = *survey
@@ -158,7 +165,7 @@ fn world(factions: u16) -> (World, Founding) {
             .expect("the address and the faction are valid");
     }
     world.rebuild_bridge(1).expect("the rebuild must succeed");
-    (world, founded)
+    (world, outcomes.into_iter().take(1).collect())
 }
 
 /// Returns a camera pointed at the middle of the world.
@@ -205,13 +212,12 @@ const REGENERATE: &str = "UPDATE_PANEL_PICTURE=1 cargo test -p cachette-view \
 ///
 /// [^1]: Testing Rules, drive the real caller. `.claude/rules/testing.md`
 fn taken(factions: u16) -> (String, Canvas) {
-    let (world, founded) = world(factions);
+    let (world, foundings) = world(factions);
     let metrics = measurements();
     let mut panelled = Canvas::new(WINDOW.0, WINDOW.1);
     let mut bare = Canvas::new(WINDOW.0, WINDOW.1);
     let camera = at_the_middle(&world, &panelled);
 
-    let foundings = [founded];
     let readout =
         draw_frame(&world, camera, &metrics, &foundings, &mut panelled).expect("the world draws");
     assert_eq!(

@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-117**
+**Next number: FND-120**
 
 ## A. Corrections to stated rules
 
@@ -2548,6 +2548,42 @@ them.
 **A fixture needs an assertion about itself.** This one was caught by a check
 that the run reached the case, not by reading the code, and the file it would
 have recorded would have looked correct for as long as anyone left it.[^55]
+### FND-119 — A watcher can never see a unit at the moment a shortage ends it
+
+**Believed.** The engine names three conditions, and a viewer that draws the
+condition of a unit draws three cases. Backlog item 0120 planned two marks: one
+for a unit a shortage holds, and one for a unit the shortage has taken to the
+bound.
+
+**True.** Only two of the three conditions reach a watcher. The engine scans
+the death plane inside the step that takes a unit to the bound, so a unit that
+a completed step left alive is fed or short. A viewer that reads the condition
+after a step never reads the third. A second mark would be a capability that
+nothing invokes.[^65] [^66]
+
+**Evidence.** A fixture fed half its sites and starved the other half, and it
+read the condition of every unit after each step. Over sixty-four steps the
+hungry group went from fed to short at step sixteen and was dead at step
+seventeen. No sample held a unit at the bound, at either of two bounds. The
+engine's own starvation tests assert only the fed condition and the short one,
+and neither names the third.
+
+**Follows.** Three things.
+
+**The viewer draws one mark for the condition, and the panel carries the
+death.** The window marks a unit that a shortage holds. The panel states how
+many units the last scan ended. That count is the whole record of a death that
+a watcher can read.
+
+**The log of the scan falls back to zero one step later.** The engine keeps the
+log of one scan, so the row states the deaths of that step and not of the run.
+A panel row that summed a run would state a different thing, and its label
+would then be false.
+
+**A later change to where the scan runs makes the third mark reachable.** A
+contributor who moves the scan out of the step must add the mark, because the
+picture would then be silent about a condition a watcher can read.
+
 
 ## References
 
@@ -2615,3 +2651,5 @@ have recorded would have looked correct for as long as anyone left it.[^55]
 [^62]: ADR-0066, entity storage holds four fixed shapes, decision D1. `docs/adrs/accepted/adr-0066-entity-storage-holds-four-fixed-shapes.md`
 [^63]: Recurring Defect Shapes, shape 1. `.claude/rules/recurring-defects.md`
 [^64]: Findings register, FND-093, in this document.
+[^65]: Recurring Defect Shapes, shape 3. `.claude/rules/recurring-defects.md`
+[^66]: ADR-0063, a need is a rate with a threshold, and crossing it is a fact, decision D3. `docs/adrs/accepted/adr-0063-a-need-is-a-rate-with-a-threshold-and-crossing-it-is-a-fact.md`
