@@ -23,7 +23,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^ALLOC]
 
-**Next number: DEC-037**
+**Next number: DEC-038**
 
 [^ALLOC]: Findings register, FND-038. `docs/FINDINGS.md`
 
@@ -676,6 +676,41 @@ disagrees with the home column.
 **Assumption in the meantime:** option A. Revisit when a rule destroys sites in
 bulk rather than one at a time.
 
+### DEC-037 — How far apart are two foundings, and may a founding widen its sample?
+
+BLK-018 is resolved: every faction founds one group.[^DEC26] That answer needs
+two rules the project does not have, and item 0094 cannot be refined without
+them.[^DEC27]
+
+**The separation.** Two groups drawn from one bounded sample can land on one
+tile, or within one disc of each other. Whether a second founding refuses a
+place near the first, and by how much, is a rule no record holds. A world of
+sixty-three factions founding into one region makes the question sharper than
+a world of four.
+
+**The sample.** The founding record refuses a sample that widens until it
+succeeds, because a sample that grows on failure has no bound.[^DEC28] A
+second founding that must avoid the first will fail more often than the first
+did. Either the sample stays fixed and a founding may fail, or the rule for
+widening it is stated once and bounded.
+
+**Option A. A fixed minimum separation, and a fixed sample.** A founding that
+finds no admissible place fails, and a failed founding is a correct outcome
+that PRD-0012 already allows. Cheapest, and it needs no new mechanism.
+
+**Option B. A separation that scales with the faction count.** The distance
+falls as more factions found, so a crowded world still seats everybody. It
+introduces a second value derived from the faction count, which is a
+declaration site to watch.[^DEC29]
+
+**Option C. Partition the world and give each faction a region.** Every
+faction is seated by construction and no founding fails. It decides map
+structure, which is a larger claim than a founding rule, and it would need its
+own record.
+
+**Assumption in the meantime:** option A. It is the only one that adds no
+mechanism, and PRD-0012 already states that a failed founding is correct.
+
 ## Closed
 
 None yet.
@@ -700,3 +735,7 @@ None yet.
 [^DEC23]: Backlog item 0092. `docs/backlog/refined/0092-refuse-a-settlement-on-the-ground-that-cannot-carry-one.md`
 [^DEC24]: Recurring Defect Shapes, shape 1. `.claude/rules/recurring-defects.md`
 [^DEC25]: ADR-0014, entity identity is an index plus a generation, decision D7. `docs/adrs/accepted/adr-0014-entity-identity-is-an-index-plus-a-generation.md`
+[^DEC26]: Blockers register, BLK-018. `docs/BLOCKERS.md`
+[^DEC27]: Backlog item 0094. `docs/backlog/proposed/0094-decide-how-many-groups-found-a-world.md`
+[^DEC28]: ADR-0075, the founding choice reads a bounded sample of the world. `docs/adrs/accepted/adr-0075-the-founding-choice-reads-a-bounded-sample-of-the-world.md`
+[^DEC29]: Recurring Defect Shapes, shape 1. `.claude/rules/recurring-defects.md`

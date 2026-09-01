@@ -92,10 +92,11 @@ holds, in a second place.
 **Blockers.**
 
 - BLK-007 governs every cost figure, so this item states none.[^10]
-- BLK-018 asks how many groups found a world, and it is open.[^11] The item is
-  therefore written parametrically: **the panel describes the foundings the
-  binary holds, and it does not assume there is one.** A panel row that named
-  "the founding" would state something false the moment a second group founds.
+- BLK-018 is resolved: every faction founds one group.[^11] The item was
+  written before the answer arrived and it holds unchanged, because it was
+  written parametrically: **the panel describes the foundings the binary
+  holds, and it does not assume there is one.** A panel row that named "the
+  founding" would state something false now that a run founds several.
   The row states which founding it describes, and the layout is written for a
   list whose length the binary chooses.
 

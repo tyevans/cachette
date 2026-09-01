@@ -95,9 +95,9 @@ second site is repaired by item 0071, not here.
 the scope rule rather than an omission.[^3]
 
 **Blockers.** BLK-007 governs every cost figure, so this item states
-none.[^11] No blocker governs the rule. BLK-018 asks how many groups found a
-world; it does not bear on this item, because the refusal holds for one
-founding and for many.[^12]
+none.[^11] No blocker governs the rule. BLK-018 is resolved: every faction
+founds one group. It does not bear on this item, because the refusal holds for
+one founding and for many.[^12]
 
 **Precedent.**
 
