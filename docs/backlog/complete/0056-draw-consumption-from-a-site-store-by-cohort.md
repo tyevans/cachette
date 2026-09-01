@@ -1,7 +1,7 @@
 ---
 id: 0056
 title: Draw consumption from a site store by cohort
-status: refined
+status: complete
 created: 2026-08-31
 implements: [ADR-0002 D1, ADR-0002 D3, ADR-0004 D1, ADR-0004 D2, ADR-0066 D1]
 changes: []
@@ -126,7 +126,45 @@ column. `crates/cachette-core/src/world.rs` at the step and the state hash.
 
 ## Outcome
 
-Filled in when the item moves to `complete/`.
+**Done.** A unit carries a need, the need falls at an interval by a saturating
+subtract, and the units of one faction at one site draw against the pooled
+store of that site as one cohort. The record is written and the registry row
+is `Draft`.[^14]
+
+**What the work built.** The unit arena gains three columns: a need, a deficit
+accumulator, and the site that the unit draws from. The cohort table is
+derived from the home column on every application, so the headcount is not a
+second declaration site, and the world check derives it again and compares.
+The draw is one segmented reduction over the cohort rows of a site, then one
+capped transfer. A store that cannot serve every cohort splits what it has in
+proportion to what each asked for, and the remainder goes one unit at a time
+in ascending row order.
+
+**A departure from the item.** The item describes a cohort as the units of one
+kind in one place. The engine keys a cohort on the faction as well as the
+site. Two reasons, and each is sufficient. Two factions in one place must not
+pool a draw against a store that one of them holds. And a site that held one
+cohort had nothing to split, so the exactness rule would have shipped inert.
+The finding holds the evidence.[^15]
+
+**A second departure.** The store falls by the sum of the shares and not by
+the cap that the transfer computed. The two are the same number while the
+split is exact. The finding states why the difference matters.[^15]
+
+**Where it runs.** The pass runs after the rates of the frame, on the same
+schedule, and before the pyramid rebuilds. It reads no derived structure and
+changes no structure, so it is not a barrier.
+
+**The caller.** A founding gives its group the settlement it founded, so the
+demonstration world now eats. Nothing else assigns a site to a unit today.
+
+**What the work did not build.** No rule ends a unit. The deficit accumulator
+is the input that item 0057 reads, and this work stops at the accumulator.
+
+**Registers.** Two findings opened, and one decision.[^15] [^16] FND-074
+records that a rule over a set of one member has no reader. FND-075 records
+that a capped transfer must take what the split handed out. DEC-034 holds the
+open choice of the four values of the need rule.
 
 ## References
 
@@ -143,3 +181,6 @@ Filled in when the item moves to `complete/`.
 [^11]: Findings register, FND-001. `docs/FINDINGS.md`
 [^12]: Findings register, FND-016. `docs/FINDINGS.md`
 [^13]: Findings register, FND-051. `docs/FINDINGS.md`
+[^14]: ADR-0063, a need is a rate with a threshold, and crossing it is a fact. `docs/adrs/draft/adr-0063-a-need-is-a-rate-with-a-threshold-and-crossing-it-is-a-fact.md`
+[^15]: Findings register, FND-074 and FND-075. `docs/FINDINGS.md`
+[^16]: Decisions register, DEC-034. `docs/DECISIONS.md`

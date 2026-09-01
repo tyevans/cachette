@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-074**
+**Next number: FND-076**
 
 ## A. Corrections to stated rules
 
@@ -1531,6 +1531,51 @@ with the population, and not with the world.** That is the property the product
 record asks for, and it is a consequence of the rule rather than of a limit
 somebody imposed.[^24] A later rule that lets a claim reach further than one
 tile loses this property, and it must state what replaces it.
+### FND-074 — A rule that divides a set of one has nothing to divide
+
+**Believed.** A cohort is one row for the units of one kind in one place, and
+the kinds of a unit are content that does not exist yet. One kind was therefore
+enough to build the draw, and the rule that splits a store between the cohorts
+of one place could be written and tested against it.
+
+**True.** With one kind, a place holds one cohort. The split then has one part,
+the part is the whole, and no input reaches the remainder rule. The rule would
+have shipped inert, and its test would have measured the fixture rather than the
+rule.[^37]
+
+**Evidence.** The exactness test was written first and could not be made to
+fail. Every store that was short gave everything it held to the one cohort that
+asked, whatever the split rule said. The remainder loop was then deleted, and
+the whole suite stayed green.
+
+**Follows.** **The cohort is keyed on the faction as well as the place.** That
+is not a device for the test. Two factions in one place must not pool a draw
+against a store that one of them holds, so the second key was already required
+and the inert split is what exposed it. **Before you write a rule over a set,
+ask what makes the set hold more than one member. If nothing does, the rule has
+no reader.**
+
+### FND-075 — A capped transfer must take what the split handed out
+
+**Believed.** A draw takes the smaller of what a store holds and what the
+cohorts asked for. That amount is the cap, so the store falls by the cap and
+the split then divides the cap between the cohorts.
+
+**True.** The cap and the sum of the shares are two statements of one quantity.
+While the split is exact they agree, and a split that lost a unit would take
+that unit out of the store and give it to nobody. The conservation check over
+the world compares the store column against the account of it, and both fall by
+the cap, so nothing fails.
+
+**Evidence.** The remainder loop was deleted from the split. The store still
+fell by the cap, the account still agreed with the column, and the conservation
+test stayed green. Only the test that reads the shares saw the loss.
+
+**Follows.** **Take from the source what the sinks received, and never what the
+transfer meant to give.** The store now falls by the sum of the shares, which
+makes the two copies one copy.[^38] A conservation check that reads only the
+source cannot see a quantity that left the source and reached nobody.
+
 ### FND-072 — A layout finding named the tier when it meant one structure
 
 **Believed.** The character tier wants array-of-structs, and the character
@@ -1737,3 +1782,5 @@ it is not made here.
 [^34]: Findings register, FND-049, in this document.
 [^35]: ADR-0075, the founding choice reads a bounded sample of the world. `docs/adrs/accepted/adr-0075-the-founding-choice-reads-a-bounded-sample-of-the-world.md`
 [^36]: PRD-0012, a world starts small and grows. `docs/product/shaped/prd-0012-a-world-starts-small-and-grows.md`
+[^37]: Recurring defect shapes, shape 3. `.claude/rules/recurring-defects.md`
+[^38]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`

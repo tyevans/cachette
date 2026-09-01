@@ -488,8 +488,17 @@ fn the_rule_refuses_a_rate_below_zero() {
 
 #[test]
 fn a_site_holds_one_cohort_for_each_faction() {
-    assert!(
-        COHORTS_PER_SITE > 1,
-        "a site with one cohort splits nothing"
-    );
+    // A site with one cohort has nothing to split, and the exactness rule
+    // would then be a capability that nothing invokes.
+    let mut table = CohortTable::new();
+    table.rebuild(&[0, 0], &[FactionId(0), FactionId(1)], &[1, 1], 1);
+    assert_eq!(table.rows().len(), COHORTS_PER_SITE);
+    assert_eq!(table.headcount(0, FactionId(0)), Some(1));
+    assert_eq!(table.headcount(0, FactionId(1)), Some(1));
+    assert_eq!(table.headcount(0, FactionId(2)), Some(0));
+    assert_eq!(table.headcount_total().0, 2);
+    assert_eq!(table.unattached(), 0);
+    assert!(table.check_invariants());
+    assert!(table.describes(&[0, 0], &[FactionId(0), FactionId(1)], &[1, 1], 1));
+    assert!(!table.describes(&[0, 0], &[FactionId(0), FactionId(0)], &[1, 1], 1));
 }
