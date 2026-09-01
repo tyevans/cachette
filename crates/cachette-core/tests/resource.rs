@@ -23,7 +23,9 @@
 //! [^2]: Testing rules, section 2. `.claude/rules/testing.md`
 //! [^3]: Testing rules, section 5. `.claude/rules/testing.md`
 
-use cachette_core::resource::{Amount, ResourceKind, RESOURCE_KIND_COUNT};
+use cachette_core::resource::{
+    Amount, RecoveryRules, ResourceKind, RESOURCE_KIND_COUNT, TICKS_IN_A_SIMULATED_DAY,
+};
 use cachette_core::terrain::TileKind;
 use cachette_core::{Axial, Entity, FactionId, TileIdx, World, WorldConfig};
 
@@ -718,4 +720,496 @@ fn the_ledger_holds_one_entry_for_each_deposit_that_gave() {
         Amount::ZERO
     );
     assert!(field.depletion().check_invariants());
+}
+
+// The recovery of a depleted deposit.
+//
+// Recovery is not growth of an amount. The world stores what units took, and
+// recovery ages that stored take away, so a smaller stored take is a fuller
+// deposit.[^R1] The tests below drive the engine and then read the world
+// through the public interface.[^R2]
+//
+// The fixture is built for the extremes and not for the typical case. It holds
+// a deposit that units emptied, a deposit they only reduced, a stone deposit
+// that must never recover, and deposits that nobody touched.[^R3]
+//
+// [^R1]: ADR-0080, a depleted deposit recovers by ageing the stored take. `docs/adrs/draft/adr-0080-a-depleted-deposit-recovers-by-ageing-the-stored-take.md`
+// [^R2]: Testing rules, sections 5 and 6. `.claude/rules/testing.md`
+// [^R3]: Testing rules, section 2a. `.claude/rules/testing.md`
+
+/// The period of food in the tests, in ticks.
+const FOOD_PERIOD: u32 = 3;
+/// The period of wood in the tests, in ticks.
+const WOOD_PERIOD: u32 = 2;
+
+/// The rules that the recovery tests read.
+///
+/// The periods are short, so a test reaches the case in a few frames. The
+/// period is a parameter of the kind, and a caller replaces the whole rule
+/// set, so a test states no period that the engine also states.
+fn quick_rules() -> RecoveryRules {
+    RecoveryRules::from_ticks([Some(FOOD_PERIOD), Some(WOOD_PERIOD), None])
+        .expect("no period is zero")
+}
+
+/// A world in which units have worked some deposits, and the cases it holds.
+///
+/// The fixture drives the engine. It empties one deposit with a crowd, and it
+/// reduces others with single gatherers. It then stops every gatherer, so
+/// nothing takes anything more and recovery is the only thing that moves.
+struct Worked {
+    /// The world.
+    field: World,
+    /// A deposit that units emptied.
+    emptied: (Axial, ResourceKind),
+    /// A deposit that units reduced but did not empty.
+    partial: (Axial, ResourceKind),
+    /// A stone deposit that units took from.
+    stone: (Axial, ResourceKind),
+    /// A deposit that nobody touched.
+    untouched: (Axial, ResourceKind),
+}
+
+/// Returns addresses that carry at least the amount of the kind.
+fn deposits(field: &World, kind: ResourceKind, least: u32, count: usize) -> Vec<Axial> {
+    addresses()
+        .into_iter()
+        .filter(|address| {
+            field.admits_a_unit(*address)
+                && field.original_stock(*address, kind) >= Some(Amount(least))
+        })
+        .take(count)
+        .collect()
+}
+
+/// Builds the worked world.
+///
+/// The world recovers nothing while the units work it, so the fixture states
+/// what was taken without recovery moving underneath it. The caller sets the
+/// rules it wants afterwards.
+fn worked() -> Worked {
+    let mut field = world(SEED);
+    field.set_recovery_rules(RecoveryRules::NONE);
+
+    // A crowd empties one wood deposit in one frame.
+    let (_, _, mut units) = contended(&mut field);
+    // Single gatherers reduce other deposits. Several of each kind, because a
+    // unit may move before the resolve runs and then take from another tile.
+    for (kind, least) in [(ResourceKind::Food, 5), (ResourceKind::Stone, 5)] {
+        for address in deposits(&field, kind, least, 8) {
+            let unit = field
+                .spawn_soldier(address, FactionId(0))
+                .expect("the ground admits a unit");
+            assert!(field.order_gather(unit, kind));
+            units.push(unit);
+        }
+    }
+    field.step(2).expect("the step must run");
+    for unit in &units {
+        field.stop_gather(*unit);
+    }
+
+    // Classify what the frame produced. The units may have moved, so the
+    // ledger is the truth about which deposits gave.
+    let (mut emptied, mut partial, mut stone) = (None, None, None);
+    for entry in field.depletion().entries() {
+        let kind = ResourceKind::from_u8((entry.key & 0b11) as u8).expect("the key names a kind");
+        let tile = TileIdx((entry.key >> 2) as u32);
+        let address = field.grid().address_of(tile).expect("the key names a tile");
+        let original = field
+            .original_stock(address, kind)
+            .expect("the address is inside the world")
+            .0;
+        if kind == ResourceKind::Stone {
+            stone = stone.or(Some((address, kind)));
+        } else if entry.taken == original {
+            emptied = emptied.or(Some((address, kind)));
+        } else if entry.taken > 0 {
+            partial = partial.or(Some((address, kind)));
+        }
+    }
+    // A fixture that reached none of these cases would measure itself.[^1]
+    //
+    // [^1]: Testing rules, section 2a. `.claude/rules/testing.md`
+    let emptied = emptied.expect("the fixture holds no emptied deposit");
+    let partial = partial.expect("the fixture holds no partly depleted deposit");
+    let stone = stone.expect("the fixture holds no worked stone deposit");
+    let untouched = *deposits(&field, ResourceKind::Food, 3, 4096)
+        .iter()
+        .find(|address| field.taken_from(**address, ResourceKind::Food) == Some(Amount::ZERO))
+        .expect("the fixture holds no untouched deposit");
+    Worked {
+        field,
+        emptied,
+        partial,
+        stone,
+        untouched: (untouched, ResourceKind::Food),
+    }
+}
+
+#[test]
+fn the_fixture_holds_the_cases_that_the_tests_need() {
+    // The fixture is the input of every test below. A fixture that reached
+    // only the typical case would never supply the extreme where a defect
+    // lives.[^1]
+    //
+    // [^1]: Testing rules, section 2a. `.claude/rules/testing.md`
+    let worked = worked();
+    assert_eq!(
+        worked.field.tile_stock(worked.emptied.0, worked.emptied.1),
+        Some(Amount::ZERO),
+        "the emptied deposit holds something"
+    );
+    let partial_stock = worked
+        .field
+        .tile_stock(worked.partial.0, worked.partial.1)
+        .expect("inside");
+    let partial_original = worked
+        .field
+        .original_stock(worked.partial.0, worked.partial.1)
+        .expect("inside");
+    assert!(partial_stock > Amount::ZERO);
+    assert!(partial_stock < partial_original);
+    assert!(worked.field.taken_from(worked.stone.0, worked.stone.1) > Some(Amount::ZERO));
+    assert_eq!(
+        worked
+            .field
+            .taken_from(worked.untouched.0, worked.untouched.1),
+        Some(Amount::ZERO)
+    );
+    // The world is far larger than the worked set, so most tiles hold no
+    // stored take at all.
+    assert!(
+        (worked.field.depletion().len() as u32) < worked.field.grid().tile_count() / 100,
+        "the fixture worked {} of {} tiles",
+        worked.field.depletion().len(),
+        worked.field.grid().tile_count()
+    );
+}
+
+#[test]
+fn a_depleted_deposit_holds_more_at_a_later_tick() {
+    // The need this work answers. A deposit that a unit took from must hold
+    // more later, when nothing takes from it again.
+    let mut worked = worked();
+    worked.field.set_recovery_rules(quick_rules());
+    let (address, kind) = worked.partial;
+    let before = worked.field.tile_stock(address, kind).expect("inside");
+    for _ in 0..FOOD_PERIOD.max(WOOD_PERIOD) {
+        worked.field.step(2).expect("the step must run");
+    }
+    let after = worked.field.tile_stock(address, kind).expect("inside");
+    assert!(
+        after > before,
+        "the deposit held {} and now holds {}",
+        before.0,
+        after.0
+    );
+    assert!(worked.field.check_invariants());
+}
+
+#[test]
+fn a_deposit_that_units_emptied_recovers() {
+    // A deposit that reached nothing recovers in the same way as any other
+    // depleted deposit.[^1]
+    //
+    // [^1]: Decisions register, DEC-050. `docs/DECISIONS.md`
+    let mut worked = worked();
+    worked.field.set_recovery_rules(quick_rules());
+    let (address, kind) = worked.emptied;
+    assert_eq!(worked.field.tile_stock(address, kind), Some(Amount::ZERO));
+    for _ in 0..(WOOD_PERIOD.max(FOOD_PERIOD) * 2) {
+        worked.field.step(2).expect("the step must run");
+    }
+    assert!(
+        worked.field.tile_stock(address, kind) > Some(Amount::ZERO),
+        "the emptied deposit stayed empty"
+    );
+    assert!(worked.field.check_invariants());
+}
+
+#[test]
+fn recovery_waits_for_the_whole_period() {
+    // The period is the simulated time in which a deposit regains one unit. A
+    // rule that ignored the elapsed ticks would give the unit back on the
+    // first frame, and a rule that dropped the remainder of the division
+    // would never give it back at all, because the pass runs on every tick.
+    let mut worked = worked();
+    let (address, kind) = worked.partial;
+    let period = match kind {
+        ResourceKind::Food => FOOD_PERIOD,
+        _ => WOOD_PERIOD,
+    };
+    worked.field.set_recovery_rules(quick_rules());
+    let start = worked.field.taken_from(address, kind).expect("inside").0;
+    assert!(start >= 3, "the fixture took too little to measure a rate");
+    for _ in 0..(period - 1) {
+        worked.field.step(2).expect("the step must run");
+        assert_eq!(
+            worked.field.taken_from(address, kind),
+            Some(Amount(start)),
+            "the deposit recovered before the period had passed"
+        );
+    }
+    worked.field.step(2).expect("the step must run");
+    assert_eq!(
+        worked.field.taken_from(address, kind),
+        Some(Amount(start - 1)),
+        "the deposit did not regain one unit at the period"
+    );
+    for _ in 0..period {
+        worked.field.step(2).expect("the step must run");
+    }
+    assert_eq!(
+        worked.field.taken_from(address, kind),
+        Some(Amount(start - 2)),
+        "the deposit did not regain a second unit at the second period"
+    );
+}
+
+#[test]
+fn a_deposit_never_holds_more_than_it_started_with() {
+    // Recovery returns a deposit toward what the generator gave it, and never
+    // past it.
+    let mut worked = worked();
+    worked.field.set_recovery_rules(quick_rules());
+    for _ in 0..64 {
+        worked.field.step(2).expect("the step must run");
+        for entry in worked.field.depletion().entries() {
+            let kind =
+                ResourceKind::from_u8((entry.key & 0b11) as u8).expect("the key names a kind");
+            let tile = TileIdx((entry.key >> 2) as u32);
+            let address = worked
+                .field
+                .grid()
+                .address_of(tile)
+                .expect("the key names a tile");
+            let original = worked
+                .field
+                .original_stock(address, kind)
+                .expect("inside")
+                .0;
+            let stock = worked.field.tile_stock(address, kind).expect("inside").0;
+            assert!(
+                stock <= original,
+                "the deposit holds {stock} against a start of {original}"
+            );
+        }
+    }
+    // Every deposit that recovers has returned to what it started with, and a
+    // recovered deposit is not different from one that nobody touched.
+    let (address, kind) = worked.partial;
+    assert_eq!(
+        worked.field.tile_stock(address, kind),
+        worked.field.original_stock(address, kind)
+    );
+    assert!(worked.field.check_invariants());
+}
+
+#[test]
+fn recovery_never_gives_back_more_than_units_took() {
+    // Recovery creates nothing. The total it returns is bounded by the total
+    // the units took, for each kind on its own.
+    let mut worked = worked();
+    worked.field.set_recovery_rules(quick_rules());
+    let mut took = [0i64; RESOURCE_KIND_COUNT];
+    for event in worked.field.gather_log() {
+        let kind = ResourceKind::from_u8(event.kind).expect("the event names a kind");
+        took[kind.index()] += i64::from(event.amount);
+    }
+    for _ in 0..64 {
+        worked.field.step(2).expect("the step must run");
+        for event in worked.field.gather_log() {
+            let kind = ResourceKind::from_u8(event.kind).expect("the event names a kind");
+            took[kind.index()] += i64::from(event.amount);
+        }
+        for kind in ResourceKind::ALL {
+            let given = worked.field.depletion().returned(kind).0;
+            assert!(
+                given <= took[kind.index()],
+                "recovery returned {given} of {kind:?} against a take of {}",
+                took[kind.index()]
+            );
+        }
+        assert!(worked.field.check_invariants());
+    }
+    assert!(
+        worked.field.depletion().returned(ResourceKind::Food).0 > 0
+            || worked.field.depletion().returned(ResourceKind::Wood).0 > 0,
+        "nothing recovered, so the bound was never tested"
+    );
+}
+
+#[test]
+fn a_kind_that_states_no_period_does_not_recover() {
+    // Stone does not recover. The absent case is a real case, and the engine
+    // carries it from the first day.[^1]
+    //
+    // [^1]: Decisions register, DEC-049. `docs/DECISIONS.md`
+    let mut worked = worked();
+    worked.field.set_recovery_rules(quick_rules());
+    let (address, kind) = worked.stone;
+    let took = worked.field.taken_from(address, kind).expect("inside");
+    assert!(took > Amount::ZERO);
+    for _ in 0..64 {
+        worked.field.step(2).expect("the step must run");
+    }
+    assert_eq!(
+        worked.field.taken_from(address, kind),
+        Some(took),
+        "the stone deposit recovered"
+    );
+    assert_eq!(
+        worked.field.depletion().returned(kind),
+        cachette_core::Accum(0)
+    );
+}
+
+#[test]
+fn the_default_rules_state_a_period_for_each_kind_in_one_place() {
+    // The period of a kind is one named parameter. A kind may state that it
+    // does not recover, and stone does.[^1]
+    //
+    // [^1]: Decisions register, DEC-049. `docs/DECISIONS.md`
+    let field = world(SEED);
+    let rules = field.recovery_rules();
+    assert_eq!(rules, RecoveryRules::DEFAULT);
+    assert!(rules.period_of(ResourceKind::Food).is_some());
+    assert!(rules.period_of(ResourceKind::Wood).is_some());
+    assert_eq!(rules.period_of(ResourceKind::Stone), None);
+    // The period is stated in simulated days and converted to ticks in one
+    // place, so a change to the span of a tick moves every period together.
+    for kind in [ResourceKind::Food, ResourceKind::Wood] {
+        let period = rules.period_of(kind).expect("the kind recovers");
+        assert_eq!(period % TICKS_IN_A_SIMULATED_DAY, 0);
+    }
+    // A period of zero is refused, because it is a second way to say that a
+    // deposit was never depleted.
+    assert!(RecoveryRules::from_ticks([Some(0), None, None]).is_none());
+}
+
+#[test]
+fn a_world_that_gathered_nothing_does_no_recovery_work() {
+    // A tile that nobody gathered from holds no stored take, so recovery has
+    // nothing to age. The cost follows the depleted set and not the tile
+    // count.
+    let mut field = world(SEED);
+    field.set_recovery_rules(quick_rules());
+    for _ in 0..8 {
+        field.step(2).expect("the step must run");
+    }
+    assert!(field.depletion().is_empty());
+    assert_eq!(
+        field.depletion().last_recovery_visits(),
+        0,
+        "recovery read something in a world that stored nothing"
+    );
+}
+
+#[test]
+fn the_recovery_work_does_not_grow_with_the_extent() {
+    // The work of one recovery pass follows the number of depleted deposits.
+    // Two worlds that differ only in extent, and that hold the same worked
+    // deposits, do the same work.
+    fn worked_visits(width: u32, height: u32) -> (u64, usize) {
+        let mut field = World::new(WorldConfig {
+            width,
+            height,
+            seed: SEED,
+            faction_count: 4,
+        })
+        .expect("the extent must describe a world");
+        field
+            .set_choice_schedule(0)
+            .expect("the exponent is inside the range");
+        field.set_recovery_rules(quick_rules());
+        let kind = ResourceKind::Wood;
+        let address = addresses()
+            .into_iter()
+            .filter(|address| address.q < width as i32 && address.r < height as i32)
+            .find(|address| {
+                field.admits_a_unit(*address)
+                    && field.original_stock(*address, kind) > Some(Amount::ZERO)
+            })
+            .expect("the world holds a deposit");
+        let unit = field
+            .spawn_soldier(address, FactionId(0))
+            .expect("the ground admits a unit");
+        assert!(field.order_gather(unit, kind));
+        field.step(2).expect("the step must run");
+        field.stop_gather(unit);
+        field.step(2).expect("the step must run");
+        (
+            field.depletion().last_recovery_visits(),
+            field.depletion().len(),
+        )
+    }
+    let small = worked_visits(64, 64);
+    let large = worked_visits(WIDTH, HEIGHT);
+    assert!(small.1 > 0 && large.1 > 0, "neither world worked a deposit");
+    assert_eq!(
+        small.0, large.0,
+        "the recovery pass read {} entries in the small world and {} in the large one",
+        small.0, large.0
+    );
+}
+
+#[test]
+fn reading_the_world_does_not_change_it() {
+    // A read must not move the world forward. Two reads at one tick give one
+    // answer, and the state hash does not move because somebody looked.
+    let mut worked = worked();
+    worked.field.set_recovery_rules(quick_rules());
+    worked.field.step(2).expect("the step must run");
+    let (address, kind) = worked.partial;
+    let before = worked.field.state_hash().finish();
+    let first = worked.field.tile_stock(address, kind);
+    let second = worked.field.tile_stock(address, kind);
+    assert_eq!(first, second);
+    assert_eq!(
+        worked.field.taken_from(address, kind),
+        worked.field.taken_from(address, kind)
+    );
+    assert_eq!(worked.field.state_hash().finish(), before);
+}
+
+#[test]
+fn a_gather_takes_what_the_deposit_holds_at_that_tick() {
+    // Admission reads the recovered amount and not the raw stored take. A
+    // resolve that read the stale amount would let a unit take what the tile
+    // does not hold, and conservation is what fails.
+    let mut worked = worked();
+    worked.field.set_recovery_rules(quick_rules());
+    let (address, kind) = worked.emptied;
+    // Let the emptied deposit recover a part of its stock.
+    for _ in 0..(WOOD_PERIOD * 2) {
+        worked.field.step(2).expect("the step must run");
+    }
+    let holding = worked.field.tile_stock(address, kind).expect("inside");
+    assert!(holding > Amount::ZERO, "the deposit recovered nothing");
+    let original = worked.field.original_stock(address, kind).expect("inside");
+    assert!(holding < original, "the deposit is already full");
+
+    let unit = worked
+        .field
+        .spawn_soldier(address, FactionId(0))
+        .expect("the ground admits a unit");
+    assert!(worked.field.order_gather(unit, kind));
+    worked.field.step(2).expect("the step must run");
+    let took: u32 = worked
+        .field
+        .gather_log()
+        .iter()
+        .filter(|event| Some(event.tile) == worked.field.grid().index_of(address))
+        .map(|event| event.amount)
+        .sum();
+    // The deposit recovers one more unit on the frame that the unit gathers
+    // on, because recovery runs before the resolve. The unit therefore takes
+    // no more than the deposit holds at that tick.
+    assert!(
+        took <= holding.0 + 1,
+        "the unit took {took} from a deposit holding {}",
+        holding.0
+    );
+    assert!(worked.field.check_invariants());
 }
