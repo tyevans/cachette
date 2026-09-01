@@ -615,5 +615,5 @@ fn an_interval_above_the_ceiling_is_refused() {
         .set_option_weight(choose::OPTION_COUNT as u8, Fix32::ONE)
         .is_err());
     assert_eq!(world.option_weight(choose::OPTION_COUNT as u8), None);
-    assert_eq!(NO_INTENT as usize > choose::OPTION_COUNT, true);
+    assert!(NO_INTENT as usize > choose::OPTION_COUNT);
 }
