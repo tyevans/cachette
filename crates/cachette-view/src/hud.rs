@@ -30,10 +30,10 @@
 //! [^1]: ADR-0067, the viewer reads the world and never writes to it, decision D2. `docs/adrs/accepted/adr-0067-the-viewer-reads-the-world-and-never-writes-to-it.md`
 //! [^2]: ADR-0070, the head-up display reports what the drawing pass read, decision D1. `docs/adrs/accepted/adr-0070-the-head-up-display-reports-what-the-drawing-pass-read.md`
 
-use cachette_core::founding::{Founding, Provision};
+use cachette_core::founding::{Founding, FoundingError, FoundingOutcome, Provision};
 use cachette_core::pyramid::CellSummary;
 use cachette_core::terrain::{TileKind, KIND_COUNT};
-use cachette_core::{Axial, Fix32, World};
+use cachette_core::{Axial, FactionId, Fix32, World};
 
 use crate::metrics::Metrics;
 use crate::paint::{faction_colour, kind_colour, Camera, Canvas, COLOURED_FACTIONS};
@@ -94,6 +94,7 @@ const TITLE: u32 = 0x00e8_c84a;
 /// [^2]: ADR-0075, the founding choice reads a bounded sample of the world, decision D5. `docs/adrs/accepted/adr-0075-the-founding-choice-reads-a-bounded-sample-of-the-world.md`
 #[derive(Clone, Copy, Debug)]
 pub struct FoundingReport {
+    faction: FactionId,
     place: Axial,
     shown: bool,
     considered: usize,
@@ -116,7 +117,13 @@ impl FoundingReport {
     /// [^1]: ADR-0070, the head-up display reports what the drawing pass read, decision D2. `docs/adrs/accepted/adr-0070-the-head-up-display-reports-what-the-drawing-pass-read.md`
     /// [^2]: ADR-0070, the head-up display reports what the drawing pass read, decision D1. `docs/adrs/accepted/adr-0070-the-head-up-display-reports-what-the-drawing-pass-read.md`
     #[must_use]
-    pub fn of(founding: &Founding, world: &World, camera: Camera, canvas: &Canvas) -> Option<Self> {
+    pub fn of(
+        faction: FactionId,
+        founding: &Founding,
+        world: &World,
+        camera: Camera,
+        canvas: &Canvas,
+    ) -> Option<Self> {
         let chosen = founding.survey().chosen()?;
         let other = founding
             .survey()
@@ -124,12 +131,19 @@ impl FoundingReport {
             .first()
             .map(|candidate| (candidate.address(), candidate.provision()));
         Some(Self {
+            faction,
             place: founding.place(),
             shown: shows(founding.place(), world, camera, canvas),
             considered: founding.survey().considered(),
             chosen: chosen.provision(),
             other,
         })
+    }
+
+    /// Returns the faction that founded.
+    #[must_use]
+    pub const fn faction(&self) -> FactionId {
+        self.faction
     }
 
     /// Returns the place the founding chose.
@@ -213,6 +227,9 @@ pub struct Readout {
     by_kind: [u32; KIND_COUNT],
     region: Option<CellSummary>,
     foundings: Vec<FoundingReport>,
+    refusals: Vec<(FactionId, FoundingError)>,
+    units_short: u32,
+    units_ended: usize,
     canvas_height: usize,
     step_mean: f64,
     step_worst: f64,
@@ -241,7 +258,7 @@ impl Readout {
         camera: Camera,
         canvas: &Canvas,
         metrics: &Metrics,
-        foundings: &[Founding],
+        outcomes: &[FoundingOutcome],
     ) -> Self {
         let grid = world.grid();
         let (first_row, last_row) = camera.visible_rows(world, canvas);
@@ -280,10 +297,36 @@ impl Readout {
             // returned. The panel borrows that value and recomputes no part
             // of it, so the list is as long as the caller made it and the
             // layout never assumes one founding.
-            foundings: foundings
+            foundings: outcomes
                 .iter()
-                .filter_map(|founding| FoundingReport::of(founding, world, camera, canvas))
+                .filter_map(|outcome| {
+                    let founding = outcome.founding()?;
+                    FoundingReport::of(outcome.faction(), founding, world, camera, canvas)
+                })
                 .collect(),
+            // A refused faction founded nowhere. The panel names it all the
+            // same, because a run that seats three of four factions and
+            // states three foundings tells a watcher nothing about the
+            // fourth.[^3]
+            //
+            // [^3]: ADR-0076, a founding keeps a fixed distance from the foundings before it, decision D2. `docs/adrs/draft/adr-0076-a-founding-keeps-a-fixed-distance-from-the-foundings-before-it.md`
+            refusals: outcomes
+                .iter()
+                .filter_map(|outcome| match outcome.result() {
+                    Ok(_) => None,
+                    Err(error) => Some((outcome.faction(), *error)),
+                })
+                .collect(),
+            // The drawing pass counted these while it painted. They are
+            // counts of the window.[^4]
+            //
+            // [^4]: ADR-0070, the head-up display reports what the drawing pass read, decision D1. `docs/adrs/accepted/adr-0070-the-head-up-display-reports-what-the-drawing-pass-read.md`
+            units_short: canvas.units_short(),
+            // The engine holds the log of the scan that just ran. This is a
+            // count of the world, and the label of its row says so.[^5]
+            //
+            // [^5]: ADR-0070, the head-up display reports what the drawing pass read, decision D2. `docs/adrs/accepted/adr-0070-the-head-up-display-reports-what-the-drawing-pass-read.md`
+            units_ended: world.starved_log().len(),
             step_mean: metrics.step_mean_micros(),
             step_worst: metrics.step_worst_micros(),
             draw_mean: metrics.draw_mean_micros(),
@@ -410,6 +453,39 @@ impl Readout {
         &self.foundings
     }
 
+    /// Returns each faction that found no place, and the reason.
+    #[must_use]
+    pub fn refusals(&self) -> &[(FactionId, FoundingError)] {
+        &self.refusals
+    }
+
+    /// Returns the number of drawn units that a shortage holds.
+    ///
+    /// This counts the units the frame painted, and never the units of the
+    /// world.
+    #[must_use]
+    pub const fn units_short(&self) -> u32 {
+        self.units_short
+    }
+
+    /// Returns the number of units that the last scan ended.
+    ///
+    /// This is a count of the world, not of the window. The engine keeps the
+    /// log of one scan, so the number falls back to zero on a tick that ends
+    /// nobody.
+    ///
+    /// A watcher cannot see a unit at the moment a shortage ends it, because
+    /// the engine scans inside the step that takes the unit to the bound.
+    /// This row is the whole record of a death that the window holds.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: Findings register, FND-119. `docs/FINDINGS.md`
+    #[must_use]
+    pub const fn units_ended(&self) -> usize {
+        self.units_ended
+    }
+
     /// Returns the tiles the window shows, across and down.
     #[must_use]
     pub const fn extent_shown(&self) -> (u32, u32) {
@@ -472,6 +548,9 @@ enum Line {
     Legend(usize, u32),
     /// A colour swatch, the kind of ground it stands for, and its count.
     Ground(TileKind, u32),
+    /// A colour swatch, the faction it stands for, and what that faction got
+    /// when the run founded.
+    Founded(FactionId, String),
     /// The bar that shows the shares of the visible units.
     Bar,
 }
@@ -485,7 +564,8 @@ impl Line {
             | Self::Heading(_)
             | Self::Row(_, _)
             | Self::Legend(_, _)
-            | Self::Ground(_, _) => LINE,
+            | Self::Ground(_, _)
+            | Self::Founded(_, _) => LINE,
             Self::Rule => 8,
             Self::Bar => BAR_HEIGHT + 8,
         }
@@ -515,6 +595,42 @@ impl Readout {
             ),
             Line::Row("units alive", grouped(u64::from(self.soldiers_live))),
             Line::Rule,
+            // The shortage rows sit high, because a watcher who opens the
+            // window watches units end. A section near the foot is the first
+            // thing a short window cuts.
+            Line::Heading("SHORTAGE"),
+            // Two counts of the window and one of the world. The label of
+            // each row says which, and a note under each pair repeats it.
+            // A reader must never learn it from the heading.[^2]
+            //
+            // [^2]: ADR-0070, the head-up display reports what the drawing pass read, decision D2. `docs/adrs/accepted/adr-0070-the-head-up-display-reports-what-the-drawing-pass-read.md`
+            Line::Row("short in window", grouped(u64::from(self.units_short))),
+            Line::Row("ended in world", grouped(self.units_ended as u64)),
+        ];
+
+        // One row for each faction the run answered, seated or refused. A
+        // panel that listed the foundings alone would say nothing about a
+        // faction that found no place, and a watcher would read three rows
+        // in a world of four factions and learn nothing from the gap.[^3]
+        //
+        // [^3]: ADR-0076, a founding keeps a fixed distance from the foundings before it, decision D2. `docs/adrs/draft/adr-0076-a-founding-keeps-a-fixed-distance-from-the-foundings-before-it.md`
+        if !self.foundings.is_empty() || !self.refusals.is_empty() {
+            lines.push(Line::Rule);
+            lines.push(Line::Heading("WHO FOUNDED"));
+            for founding in &self.foundings {
+                lines.push(Line::Founded(
+                    founding.faction,
+                    format!("q {}  r {}", founding.place.q, founding.place.r),
+                ));
+            }
+            for (faction, error) in &self.refusals {
+                lines.push(Line::Founded(*faction, refusal_text(*error)));
+            }
+            lines.push(Line::Note("a ring marks each place drawn."));
+        }
+
+        lines.extend([
+            Line::Rule,
             Line::Heading("VIEW"),
             Line::Row(
                 "centre tile",
@@ -543,7 +659,7 @@ impl Readout {
             Line::Note("panel has no count of the world."),
             Line::Rule,
             Line::Heading("FACTIONS IN THE WINDOW"),
-        ];
+        ]);
 
         for (slot, count) in self.by_faction.iter().enumerate().take(self.legend_rows()) {
             lines.push(Line::Legend(slot, *count));
@@ -652,6 +768,25 @@ impl Readout {
     /// with two factions gets a shorter panel than a world with six.
     fn height(&self) -> i32 {
         PAD * 2 + self.lines().iter().map(Line::height).sum::<i32>()
+    }
+}
+
+/// Returns the reason a faction found no place, short enough for the value
+/// column.
+///
+/// The engine gives the reason. The viewer shortens it for the column and
+/// invents none, so a reason the engine adds later reaches this function and
+/// not the panel, and the compiler says so.
+fn refusal_text(error: FoundingError) -> String {
+    match error {
+        FoundingError::EmptyGroup => String::from("no people"),
+        FoundingError::NoPlaceFound(drawn) => {
+            format!("read {}, took none", grouped(u64::from(drawn)))
+        }
+        FoundingError::OutsideWorld(_) => String::from("outside"),
+        FoundingError::Order(_) => String::from("no order"),
+        FoundingError::Person(_) => String::from("no person"),
+        FoundingError::Seat(_) => String::from("no seat"),
     }
 }
 
@@ -847,6 +982,7 @@ fn paint_line(
         Line::Row(label, value) => row(canvas, left, right, pen, label, value),
         Line::Legend(slot, count) => legend_row(canvas, left, right, pen, *slot, *count),
         Line::Ground(kind, count) => ground_row(canvas, left, right, pen, *kind, *count),
+        Line::Founded(faction, value) => founded_row(canvas, left, right, pen, *faction, value),
         Line::Bar => bar(canvas, left, right, pen, readout),
     }
 }
@@ -900,6 +1036,34 @@ fn legend_row(canvas: &mut Canvas, left: i32, right: i32, pen: i32, slot: usize,
     canvas.write(left + 14, pen, &format!("faction {slot}"), 1, LABEL);
     let value = grouped(u64::from(count));
     canvas.write(right - text::width_of(&value, 1), pen, &value, 1, VALUE);
+}
+
+/// Draws one founding row: a colour swatch, the faction, and what it got.
+///
+/// The swatch takes the colour of the faction from the one table the viewer
+/// owns, so a watcher matches the row against the mark on the picture and
+/// against the units of that faction.[^1]
+///
+/// # References
+///
+/// [^1]: Recurring Defect Shapes, shape 1. `.claude/rules/recurring-defects.md`
+fn founded_row(
+    canvas: &mut Canvas,
+    left: i32,
+    right: i32,
+    pen: i32,
+    faction: FactionId,
+    value: &str,
+) {
+    canvas.block(
+        left,
+        pen,
+        text::GLYPH_HEIGHT,
+        text::GLYPH_HEIGHT,
+        faction_colour(faction),
+    );
+    canvas.write(left + 14, pen, &format!("faction {}", faction.0), 1, LABEL);
+    canvas.write(right - text::width_of(value, 1), pen, value, 1, VALUE);
 }
 
 /// Draws one ground row: a colour swatch, the kind, and how many tiles of it
