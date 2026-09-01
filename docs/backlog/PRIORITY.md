@@ -69,6 +69,9 @@ These are real and none of them blocks anything today.
 | 0063 | Assigning a unit to a position. Waits on 0062. |
 | 0065 | Letting the job decide what a unit weighs. Waits on 0063 and 0064. |
 | 0058 | Improvements. Waits on a site that produces. |
+| 0123 | A deposit never comes back. Waits on 0057, because nothing drains the world until a shortage bites.[^10] |
+| 0124 | A fully recovered deposit still stores a take of zero. Follows 0123. |
+| 0125 | Show a watcher a deposit recovering. Follows 0123. |
 | 0067 | Descent. Waits on the character tier being used for something. |
 | 0068 | A ruler and a succession. Waits on 0067. |
 | 0088 | Promotion into the character tier. |
@@ -105,3 +108,4 @@ These are real and none of them blocks anything today.
 [^7]: Findings register, FND-079. `docs/FINDINGS.md`
 [^8]: Findings register, FND-080. `docs/FINDINGS.md`
 [^9]: Findings register, FND-100. `docs/FINDINGS.md`
+[^10]: PRD-0018, a depleted deposit comes back. `docs/product/shaped/prd-0018-a-depleted-deposit-comes-back.md`

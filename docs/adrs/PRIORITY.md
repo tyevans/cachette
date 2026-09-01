@@ -52,6 +52,7 @@ reserved until the code that needs them exists.[^6]
 | 0069 | Weather. Nothing needs it. |
 | 0077 | The golden state hash. Write it when the first real golden file is committed, not before.[^9] |
 | 0055 | The modifier pipeline. One source modifies a rate, so the test fails today.[^8] |
+| 0080 | Recovery of a depleted deposit. The three-condition test passes, but no recovery code exists. Backlog item 0123 writes it with the code.[^10] |
 
 Every other reserved row in the registry is left alone on purpose. A record for
 a subsystem nobody has built is the failure the scope rule opens with.[^6]
@@ -67,3 +68,4 @@ a subsystem nobody has built is the failure the scope rule opens with.[^6]
 [^7]: Decisions register, DEC-032. `docs/DECISIONS.md`
 [^8]: ADR-0062, decision D7. `docs/adrs/accepted/adr-0062-production-and-upkeep-are-rates-attached-to-a-site.md`
 [^9]: Decisions register, DEC-014. `docs/DECISIONS.md`
+[^10]: Backlog item 0123. `docs/backlog/refined/0123-recover-a-depleted-deposit-without-a-pass-over-the-world.md`
