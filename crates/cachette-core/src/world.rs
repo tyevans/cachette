@@ -30,7 +30,10 @@
 use crate::bridge::{BlockLayout, BridgeError, UnitTileBridge, BLOCK_BITS_DEFAULT};
 use crate::character::{CharacterArena, CharacterError};
 use crate::choose::{self, ChoiceError, ChoiceExplanation, ChoiceSchedule, WeightProfile};
-use crate::cohort::{self, CohortError, CohortTable, DrawLedger, NeedRule, SiteRationed};
+use crate::cohort::{
+    self, CohortError, CohortTable, DeathPlane, DrawLedger, NeedCondition, NeedRule, SiteRationed,
+    UnitStarved,
+};
 use crate::event::{ResourceTaken, TileChanged, CHANGE_KIND_LOWERED, CHANGE_KIND_RAISED};
 use crate::founding::{self, Founding, FoundingError, Survey};
 use crate::hash::StateHash;
@@ -281,6 +284,17 @@ pub struct World {
     draw_ledger: DrawLedger,
     /// The sites that could not serve every cohort at the last draw.
     rationed_log: Vec<SiteRationed>,
+    /// One bit for each unit that the last shortage ended.
+    ///
+    /// The plane is the batch of a structural change, and the scan of it
+    /// applies the change after the barrier.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR Registry, row 0020. `docs/adrs/REGISTRY.md`
+    death_plane: DeathPlane,
+    /// The units that a shortage ended at the last scan, in slot order.
+    starved_log: Vec<UnitStarved>,
     /// When each unit re-reads the world and chooses again.
     choice: ChoiceSchedule,
     /// The weight that a unit puts on each option of the choice.
@@ -369,6 +383,8 @@ impl World {
             cohorts: CohortTable::new(),
             draw_ledger: DrawLedger::ZERO,
             rationed_log: Vec::new(),
+            death_plane: DeathPlane::new(),
+            starved_log: Vec::new(),
             choice: ChoiceSchedule::DEFAULT,
             weights: WeightProfile::EVEN,
             store_account: [Accum(0); COMMODITY_COUNT],
@@ -826,6 +842,56 @@ impl World {
     #[must_use]
     pub const fn need_rule(&self) -> NeedRule {
         self.need_rule
+    }
+
+    /// Sets the rule that says what a unit needs.
+    ///
+    /// The rule carries the bound at which a shortage ends a unit, so the
+    /// bound is a parameter of the world and never a constant of a
+    /// kernel.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0063, a need is a rate with a threshold, and crossing it is a fact, decision D3. `docs/adrs/accepted/adr-0063-a-need-is-a-rate-with-a-threshold-and-crossing-it-is-a-fact.md`
+    pub const fn set_need_rule(&mut self, rule: NeedRule) {
+        self.need_rule = rule;
+    }
+
+    /// Returns the condition that a shortage has put a unit in.
+    ///
+    /// Returns `None` when the identity is dead.[^1] The condition is a
+    /// name, and it is what a watcher reads. A watcher that read the
+    /// accumulator would hold the bound of the rule a second time.[^2]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0014, entity identity is an index plus a generation, decision D2. `docs/adrs/accepted/adr-0014-entity-identity-is-an-index-plus-a-generation.md`
+    /// [^2]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`
+    #[must_use]
+    pub fn unit_condition(&self, entity: Entity) -> Option<NeedCondition> {
+        self.soldiers
+            .deficit(entity)
+            .map(|deficit| self.need_rule.condition(deficit))
+    }
+
+    /// Returns the units that a shortage ended at the last scan, in slot
+    /// order.
+    #[must_use]
+    pub fn starved_log(&self) -> &[UnitStarved] {
+        &self.starved_log
+    }
+
+    /// Returns the starved log as bytes.
+    ///
+    /// The thread-count equivalence test compares this slice byte for
+    /// byte.[^1] The cast is safe because the event type is plain data.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0001, one binary gives one answer at any thread count, decision D4. `docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
+    #[must_use]
+    pub fn starved_log_bytes(&self) -> &[u8] {
+        bytemuck::cast_slice(&self.starved_log)
     }
 
     /// Returns the cohorts of the last consumption pass.
@@ -1692,9 +1758,21 @@ impl World {
                 return false;
             }
         }
-        self.rationed_log
+        if !self
+            .rationed_log
             .iter()
             .all(|event| event.padding == [0; 6] && event.granted.0 < event.demanded.0)
+        {
+            return false;
+        }
+        // A starved unit is dead by the time anyone reads the log, so the
+        // check states what the event itself must hold: declared padding,
+        // an identity that packs, and a deficit that reached the bound.
+        self.starved_log.iter().all(|event| {
+            event.padding == [0; 4]
+                && event.unit != 0
+                && self.need_rule.condition(event.deficit) == NeedCondition::Starved
+        })
     }
 
     /// Reports whether the cohorts describe the unit columns.
@@ -1992,6 +2070,22 @@ impl World {
         //
         // [^10]: ADR-0063, a need is a rate with a threshold, and crossing it is a fact, decision D5. `docs/adrs/accepted/adr-0063-a-need-is-a-rate-with-a-threshold-and-crossing-it-is-a-fact.md`
         self.consume(threads)?;
+
+        // The scan of the death plane runs after consumption, because
+        // consumption is what moves a deficit to the bound. It is a
+        // structural change, so it is batched into the plane during the
+        // pass and applied here, in one ascending scan, after the frame has
+        // settled.[^12]
+        //
+        // The scan removes units, so the derived structure that the barrier
+        // above rebuilt now names a dead identity. The refresh below is that
+        // barrier taken again over the structural apply, and it must run
+        // before the derived level reads either of them.[^13]
+        //
+        // [^12]: ADR Registry, row 0020. `docs/adrs/REGISTRY.md`
+        // [^13]: ADR-0018, the unit-to-tile bridge is derived, and it rebuilds at the barrier, decision D3. `docs/adrs/accepted/adr-0018-the-unit-to-tile-bridge-is-derived-and-rebuilds-at-the-barrier.md`
+        self.reap(threads)?;
+        self.refresh_bridge()?;
 
         // Level 1 rebuilds after the structure it reads, and after every
         // change to level 0 that this frame made. It is derived, so it is
@@ -2459,6 +2553,70 @@ impl World {
             self.soldiers.need_update(),
             threads,
         )?;
+        Ok(())
+    }
+
+    /// Ends every unit that the shortage marked, in ascending slot order.
+    ///
+    /// The mark pass writes one bit for each unit into a dense plane, and
+    /// each thread owns disjoint words of it, so the plane is the same at
+    /// any thread count. The scan is ordered all the same: the deaths apply
+    /// in the order it finds them, and a free slot returns to the queue in
+    /// that order.[^1]
+    ///
+    /// A death advances the generation of the slot, so the identity of the
+    /// dead unit never resolves to the unit spawned next in that slot.[^2]
+    /// The world removes the unit through its own despawn, which accounts
+    /// for what the unit carried, so conservation still balances.[^3]
+    ///
+    /// The cohort table summarises the home column, and a death changes that
+    /// column, so the table is derived again here. A summary left stale
+    /// would state a headcount that no unit backs.[^4]
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the caller asks for zero threads.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
+    /// [^2]: ADR-0014, entity identity is an index plus a generation, decision D3. `docs/adrs/accepted/adr-0014-entity-identity-is-an-index-plus-a-generation.md`
+    /// [^3]: ADR-0072, a tile stock is generated, and only what was taken is stored, decision D5. `docs/adrs/accepted/adr-0072-a-tile-stock-is-generated-and-only-what-was-taken-is-stored.md`
+    /// [^4]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`
+    fn reap(&mut self, threads: usize) -> Result<(), StepError> {
+        self.starved_log.clear();
+        if !self.schedule.due(self.tick) {
+            return Ok(());
+        }
+        cohort::mark_starved(
+            self.need_rule,
+            self.soldiers.deficit_column(),
+            self.soldiers.live_column(),
+            &mut self.death_plane,
+            threads,
+        )?;
+        let order = cohort::starved_order(&self.death_plane, threads)?;
+        if order.is_empty() {
+            return Ok(());
+        }
+        let tick = self.tick;
+        for slot in order {
+            let index = slot as usize;
+            let deficit = self.soldiers.deficit_column()[index];
+            let generation = self.soldiers.generation_of(slot);
+            let unit = Entity::new(slot, generation)
+                .expect("a marked slot is live, so it holds a generation of one or more");
+            self.starved_log
+                .push(UnitStarved::new(tick, unit.to_bits(), deficit));
+            let ended = self.despawn_soldier(unit);
+            debug_assert!(ended, "a marked slot holds a live unit");
+        }
+        self.cohorts.rebuild(
+            self.soldiers.home_column(),
+            self.soldiers.faction_column(),
+            self.soldiers.live_column(),
+            self.settlements.slot_count(),
+        );
         Ok(())
     }
 
