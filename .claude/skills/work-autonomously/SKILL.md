@@ -26,6 +26,11 @@ bind you and they bind every worker you dispatch.
 
 A backlog item is the only join between a need and a constraint. Keep it so.
 
+**Each system has a priority index.** Read all three before dispatching, and
+take work from the top. An index states the order and nothing else, so it does
+not go stale. Update it when your run changes what should come next; a check
+fails when an open thing is missing from its index.
+
 ## Allocate every number yourself, before dispatch
 
 Give each worker its own range for backlog items, records, findings, decisions

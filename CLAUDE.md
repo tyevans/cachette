@@ -116,6 +116,10 @@ review names the decision records that govern the work, the records it will
 change or create, and the blockers that hold it. An item that cannot answer
 those stays in `proposed/`.
 
+Take the highest item you can start from the priority index.[^13] Each of the
+three systems has one, and each states the order between the things that are
+open. A check fails when an open item is missing from its index.
+
 Take work from `refined/`. Read the backlog guide before you add an item or
 move one.[^6]
 
@@ -183,3 +187,4 @@ this project is derived.
 [^10]: Budgets and costs, the scale constants. `docs/reference/budgets.md`
 [^11]: ADR Registry. `docs/adrs/REGISTRY.md`
 [^12]: Findings register, FND-039. `docs/FINDINGS.md`
+[^13]: Backlog priority index. `docs/backlog/PRIORITY.md`

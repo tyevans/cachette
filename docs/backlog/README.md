@@ -12,6 +12,16 @@ between three directories as it progresses.
 An item moves by `git mv`. Its file name never changes, so its history
 follows it.
 
+## Which item comes next
+
+A separate index states the order between the open items, and nothing else.[^6]
+It carries no title and no status, so it does not go stale when an item moves
+between directories. A check fails when an open item is missing from it, so an
+item cannot be forgotten by being left off.
+
+Take the highest item you can start. An item in `proposed/` must be refined
+first, and refining it is the work.
+
 ## Naming
 
 `NNNN-short-slug.md`, where `NNNN` is a four-digit number.
@@ -141,3 +151,4 @@ The backlog holds work. The registers hold state. The records hold decisions.
 [^3]: Blockers, Decisions and Findings registers. `docs/`
 [^4]: Product requirement records. `docs/product/README.md`
 [^5]: Findings register, FND-050. `docs/FINDINGS.md`
+[^6]: Backlog priority index. `docs/backlog/PRIORITY.md`

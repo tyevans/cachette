@@ -20,6 +20,9 @@ jobs:
         run: ./scripts/check-backlog.sh
       - name: Check the register numbering
         run: ./scripts/check-registers.sh
+
+      - name: Priority indexes
+        run: ./scripts/check-priority.sh
       - name: Check the citations outside the records
         run: ./scripts/check-citations.sh
       - name: Prove the product record check can fail

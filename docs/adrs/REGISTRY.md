@@ -59,6 +59,12 @@ person supersedes a delegated one.
 Flat global decision numbering collided three times during research and will
 do so again.
 
+## Which record comes next
+
+A separate index states which records wait for review and which reserved rows
+the project means to write next.[^PRI] It holds no status. This registry holds
+the status, and it is the only document that does.
+
 ## Status vocabulary
 
 | Status | Meaning |
@@ -333,3 +339,4 @@ subsystem record cites them, so their vocabulary must settle before the rest
 is written.
 
 Then the cross-cutting models, 0007 to 0013. Then the subsystems.
+[^PRI]: Decision record priority index. `docs/adrs/PRIORITY.md`

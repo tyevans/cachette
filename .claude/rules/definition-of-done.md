@@ -62,6 +62,12 @@ invisible at review time and expensive later:
 When implementation and record disagree, one of them changes before the work
 is done.
 
+**Check the priority index.** Each of the three systems has one, and each
+states the order between the things that are open.[^5] [^6] [^7] If this work
+changes what should come next, move the row and say why in the commit body. A
+check fails when an open item is missing from its index, so a new item must be
+placed rather than left at the end.
+
 ## 4. Update the registers
 
 - **Findings.** If the work corrected something the project believed, record
@@ -145,3 +151,6 @@ the code costs every future decision made from it.
 [^2]: Findings register, FND-042. `docs/FINDINGS.md`
 [^3]: Decision Record Scope, sections 1 and 4. `.claude/rules/adr-scope.md`
 [^4]: The record check script. `scripts/check_adrs.py`
+[^5]: Backlog priority index. `docs/backlog/PRIORITY.md`
+[^6]: Product priority index. `docs/product/PRIORITY.md`
+[^7]: Decision record priority index. `docs/adrs/PRIORITY.md`

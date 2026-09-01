@@ -74,6 +74,12 @@ each answer needs its own section.
 If you cannot answer these, the record stays in `idea/`. Say what is
 missing.
 
+## Which need comes next
+
+A separate index states the order between the records that are not yet
+shipped.[^5] It holds no status, because the registry holds that. A high
+position in it is not acceptance.
+
 ## The link to work
 
 A refined backlog item names the record it serves, next to the decision
@@ -121,3 +127,4 @@ product record shows that the record states a structure.
 [^2]: Product registry. `docs/product/REGISTRY.md`
 [^3]: Backlog guide. `docs/backlog/README.md`
 [^4]: Decision record scope rule. `.claude/rules/adr-scope.md`
+[^5]: Product priority index. `docs/product/PRIORITY.md`
