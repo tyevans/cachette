@@ -25,7 +25,7 @@
 #![allow(clippy::disallowed_types)]
 
 use cachette_core::terrain::KIND_COUNT;
-use cachette_core::{Axial, FactionId, World, WorldConfig};
+use cachette_core::{Axial, FactionId, Founding, World, WorldConfig};
 use cachette_view::paint::COLOURED_FACTIONS;
 use cachette_view::{draw_frame, paint, Camera, Canvas, Lap, Metrics};
 
@@ -142,7 +142,7 @@ fn the_frame_draws_the_panel_over_the_world() {
     let mut bare = canvas();
     let camera = at_the_middle(&world, &with_panel);
 
-    draw_frame(&world, camera, &metrics, &mut with_panel).expect("the world draws");
+    draw_frame(&world, camera, &metrics, &[], &mut with_panel).expect("the world draws");
     paint::draw(&world, camera, &mut bare).expect("the world draws");
 
     assert_ne!(
@@ -172,8 +172,8 @@ fn the_panel_lets_the_world_show_through() {
     let camera = at_the_middle(&world, &here);
     let moved = camera.panned(37.0, 23.0).clamped(&world, &there);
 
-    draw_frame(&world, camera, &metrics, &mut here).expect("the world draws");
-    draw_frame(&world, moved, &metrics, &mut there).expect("the world draws");
+    draw_frame(&world, camera, &metrics, &[], &mut here).expect("the world draws");
+    draw_frame(&world, moved, &metrics, &[], &mut there).expect("the world draws");
 
     // The panel says almost the same thing in both frames, so a difference
     // under it must come from the world beneath it.
@@ -199,7 +199,7 @@ fn the_panel_states_the_tick_the_engine_reached() {
     let mut canvas = canvas();
     let camera = at_the_middle(&world, &canvas);
 
-    let readout = draw_frame(&world, camera, &metrics, &mut canvas).expect("the world draws");
+    let readout = draw_frame(&world, camera, &metrics, &[], &mut canvas).expect("the world draws");
 
     assert_eq!(readout.tick(), world.tick().0);
     assert_eq!(readout.tick(), 7, "the world did not reach the tick it ran");
@@ -215,12 +215,12 @@ fn a_step_changes_what_the_panel_says() {
     let mut after = canvas();
     let camera = at_the_middle(&world, &before);
 
-    let early = draw_frame(&world, camera, &metrics, &mut before).expect("the world draws");
+    let early = draw_frame(&world, camera, &metrics, &[], &mut before).expect("the world draws");
 
     for _ in 0..5 {
         world.step(2).expect("the step must run");
     }
-    let late = draw_frame(&world, camera, &metrics, &mut after).expect("the world draws");
+    let late = draw_frame(&world, camera, &metrics, &[], &mut after).expect("the world draws");
 
     assert_ne!(early.tick(), late.tick());
     assert_ne!(
@@ -241,11 +241,13 @@ fn the_panel_states_where_the_person_is_looking() {
     let middle = at_the_middle(&world, &canvas);
     let corner = Camera::opening().clamped(&world, &canvas);
 
-    let looking_in = draw_frame(&world, middle, &metrics, &mut canvas).expect("the world draws");
+    let looking_in =
+        draw_frame(&world, middle, &metrics, &[], &mut canvas).expect("the world draws");
     let inward = looking_in.centre();
     let extent_in = looking_in.extent_shown();
 
-    let looking_out = draw_frame(&world, corner, &metrics, &mut canvas).expect("the world draws");
+    let looking_out =
+        draw_frame(&world, corner, &metrics, &[], &mut canvas).expect("the world draws");
 
     assert_ne!(
         inward,
@@ -278,9 +280,9 @@ fn a_zoom_changes_the_extent_the_panel_states() {
     let camera = at_the_middle(&world, &canvas);
     let closer = camera.zoomed(2.0, &canvas).clamped(&world, &canvas);
 
-    let wide = draw_frame(&world, camera, &metrics, &mut canvas).expect("the world draws");
+    let wide = draw_frame(&world, camera, &metrics, &[], &mut canvas).expect("the world draws");
     let wide_extent = wide.extent_shown();
-    let near = draw_frame(&world, closer, &metrics, &mut canvas).expect("the world draws");
+    let near = draw_frame(&world, closer, &metrics, &[], &mut canvas).expect("the world draws");
 
     assert!(
         near.extent_shown().1 < wide_extent.1,
@@ -300,7 +302,7 @@ fn the_legend_counts_the_window_and_not_the_world() {
     let mut canvas = canvas();
     let camera = at_the_middle(&world, &canvas);
 
-    let readout = draw_frame(&world, camera, &metrics, &mut canvas).expect("the world draws");
+    let readout = draw_frame(&world, camera, &metrics, &[], &mut canvas).expect("the world draws");
 
     let counted: u32 = readout.by_faction().iter().sum();
     assert_eq!(
@@ -342,9 +344,9 @@ fn the_legend_follows_the_window_when_the_person_scrolls() {
     let middle = at_the_middle(&world, &canvas);
     let corner = Camera::opening().clamped(&world, &canvas);
 
-    let inward = draw_frame(&world, middle, &metrics, &mut canvas).expect("the world draws");
+    let inward = draw_frame(&world, middle, &metrics, &[], &mut canvas).expect("the world draws");
     let inward_counts = *inward.by_faction();
-    let outward = draw_frame(&world, corner, &metrics, &mut canvas).expect("the world draws");
+    let outward = draw_frame(&world, corner, &metrics, &[], &mut canvas).expect("the world draws");
 
     assert_ne!(
         inward_counts,
@@ -375,7 +377,7 @@ fn a_world_of_one_faction_counts_only_that_faction() {
 
     let mut canvas = canvas();
     let camera = Camera::fitting(&world, &canvas);
-    let readout = draw_frame(&world, camera, &metrics, &mut canvas).expect("the world draws");
+    let readout = draw_frame(&world, camera, &metrics, &[], &mut canvas).expect("the world draws");
 
     assert_eq!(
         readout.by_faction()[0],
@@ -417,7 +419,7 @@ fn the_panel_still_draws_when_the_window_holds_no_unit() {
     let away = Camera::opening()
         .panned(80.0 * 12.0, 80.0 * 12.0)
         .clamped(&world, &canvas);
-    let readout = draw_frame(&world, away, &metrics, &mut canvas).expect("the world draws");
+    let readout = draw_frame(&world, away, &metrics, &[], &mut canvas).expect("the world draws");
 
     assert_eq!(readout.soldiers_painted(), 0, "the far corner held a unit");
     assert!(
@@ -445,7 +447,7 @@ fn one_readout_gives_one_picture() {
     let metrics = stepped(&mut world, 4);
     let mut first = canvas();
     let camera = at_the_middle(&world, &first);
-    let readout = draw_frame(&world, camera, &metrics, &mut first).expect("the world draws");
+    let readout = draw_frame(&world, camera, &metrics, &[], &mut first).expect("the world draws");
 
     let mut second = canvas();
     paint::draw(&world, camera, &mut second).expect("the world draws");
@@ -475,8 +477,8 @@ fn the_frame_leaves_the_world_unchanged() {
 
     let mut canvas = canvas();
     let camera = at_the_middle(&world, &canvas);
-    draw_frame(&world, camera, &metrics, &mut canvas).expect("the world draws");
-    draw_frame(&world, camera, &metrics, &mut canvas).expect("the world draws");
+    draw_frame(&world, camera, &metrics, &[], &mut canvas).expect("the world draws");
+    draw_frame(&world, camera, &metrics, &[], &mut canvas).expect("the world draws");
 
     assert_eq!(hash, world.state_hash());
     assert_eq!(tick, world.tick());
@@ -493,7 +495,7 @@ fn a_stale_world_is_refused_before_the_panel_is_drawn() {
     let metrics = stepped(&mut world, 1);
     let mut canvas = canvas();
     let camera = at_the_middle(&world, &canvas);
-    draw_frame(&world, camera, &metrics, &mut canvas).expect("a fresh world draws");
+    draw_frame(&world, camera, &metrics, &[], &mut canvas).expect("a fresh world draws");
 
     let open = nearest_open(&open_tiles(&world), Axial::new(3, 3));
     world
@@ -501,7 +503,7 @@ fn a_stale_world_is_refused_before_the_panel_is_drawn() {
         .expect("the address is valid");
 
     assert!(
-        draw_frame(&world, camera, &metrics, &mut canvas).is_err(),
+        draw_frame(&world, camera, &metrics, &[], &mut canvas).is_err(),
         "a stale world drew a frame instead of refusing",
     );
 }
@@ -516,7 +518,8 @@ fn the_panel_stays_inside_its_own_edge() {
     let mut bare = canvas();
     let camera = at_the_middle(&world, &with_panel);
 
-    let readout = draw_frame(&world, camera, &metrics, &mut with_panel).expect("the world draws");
+    let readout =
+        draw_frame(&world, camera, &metrics, &[], &mut with_panel).expect("the world draws");
     paint::draw(&world, camera, &mut bare).expect("the world draws");
 
     // The panel states its own rectangle. Anything it changed must sit inside
@@ -561,7 +564,7 @@ fn the_cost_rows_state_what_the_report_states() {
     let camera = at_the_middle(&world, &canvas);
 
     let at = Lap::start();
-    draw_frame(&world, camera, &metrics, &mut canvas).expect("the world draws");
+    draw_frame(&world, camera, &metrics, &[], &mut canvas).expect("the world draws");
     let mut metrics = metrics;
     metrics.draw(at.elapsed());
 
@@ -635,7 +638,7 @@ fn no_value_is_cut_to_fit_its_column() {
     // Walk from the closest zoom to the widest. Every step must fit, and the
     // widest is where the counts are largest.
     let mut camera = Camera::opening().clamped(&world, &canvas);
-    let opening = draw_frame(&world, camera, &metrics, &mut canvas)
+    let opening = draw_frame(&world, camera, &metrics, &[], &mut canvas)
         .expect("the world draws")
         .extent_shown();
     let mut widest = opening;
@@ -644,7 +647,8 @@ fn no_value_is_cut_to_fit_its_column() {
     // to the smallest the viewer allows.
     for _ in 0..24 {
         camera = camera.zoomed_out(&canvas).clamped(&world, &canvas);
-        let readout = draw_frame(&world, camera, &metrics, &mut canvas).expect("the world draws");
+        let readout =
+            draw_frame(&world, camera, &metrics, &[], &mut canvas).expect("the world draws");
         let cut = cachette_view::hud::values_that_do_not_fit(&readout);
         assert!(
             cut.is_empty(),
@@ -689,7 +693,8 @@ fn the_panel_fills_the_rectangle_it_states() {
     let mut bare = canvas();
     let camera = at_the_middle(&world, &with_panel);
 
-    let readout = draw_frame(&world, camera, &metrics, &mut with_panel).expect("the world draws");
+    let readout =
+        draw_frame(&world, camera, &metrics, &[], &mut with_panel).expect("the world draws");
     paint::draw(&world, camera, &mut bare).expect("the world draws");
 
     let (_, top, _, height) = cachette_view::hud::bounds(&readout);
@@ -725,7 +730,7 @@ fn the_panel_names_the_ground_in_the_window() {
     let mut canvas = canvas();
     let camera = Camera::fitting(&world, &canvas);
 
-    let readout = draw_frame(&world, camera, &metrics, &mut canvas).expect("the world draws");
+    let readout = draw_frame(&world, camera, &metrics, &[], &mut canvas).expect("the world draws");
 
     let counted: u32 = readout.by_kind().iter().sum();
     assert_eq!(
@@ -753,14 +758,14 @@ fn the_ground_legend_follows_the_window_when_the_person_scrolls() {
     let mut canvas = canvas();
 
     let here = Camera::fitting(&world, &canvas);
-    let first = draw_frame(&world, here, &metrics, &mut canvas).expect("the world draws");
+    let first = draw_frame(&world, here, &metrics, &[], &mut canvas).expect("the world draws");
     let before = *first.by_kind();
 
     let there = here
         .zoomed_in(&canvas)
         .zoomed_in(&canvas)
         .zoomed_in(&canvas);
-    let second = draw_frame(&world, there, &metrics, &mut canvas).expect("the world draws");
+    let second = draw_frame(&world, there, &metrics, &[], &mut canvas).expect("the world draws");
 
     assert_ne!(
         before,
@@ -779,7 +784,7 @@ fn the_panel_states_the_region_under_the_crosshair() {
     let mut canvas = canvas();
     let camera = at_the_middle(&world, &canvas);
 
-    let readout = draw_frame(&world, camera, &metrics, &mut canvas).expect("the world draws");
+    let readout = draw_frame(&world, camera, &metrics, &[], &mut canvas).expect("the world draws");
     let region = readout
         .region()
         .expect("the middle of the world names a cell");
@@ -816,7 +821,8 @@ fn the_panel_reports_a_region_that_holds_units() {
     let mut with_units = 0;
     for step in 0..8 {
         let camera = at_the_middle(&world, &canvas).stepped(step as f32 * 40.0, 0.0);
-        let readout = draw_frame(&world, camera, &metrics, &mut canvas).expect("the world draws");
+        let readout =
+            draw_frame(&world, camera, &metrics, &[], &mut canvas).expect("the world draws");
         if let Some(region) = readout.region() {
             if region.units() > 0 {
                 with_units += 1;
@@ -850,7 +856,7 @@ fn a_short_window_cuts_the_panel_and_the_panel_says_so() {
 
     let mut tall = Canvas::new(WINDOW.0, WINDOW.1);
     let camera = at_the_middle(&world, &tall);
-    let full = draw_frame(&world, camera, &metrics, &mut tall).expect("the world draws");
+    let full = draw_frame(&world, camera, &metrics, &[], &mut tall).expect("the world draws");
     let (_, top, _, full_height) = cachette_view::hud::bounds(&full);
 
     // A window that cannot hold the whole panel. The fixture must actually be
@@ -862,7 +868,7 @@ fn a_short_window_cuts_the_panel_and_the_panel_says_so() {
     );
     let mut short = Canvas::new(WINDOW.0, short_height);
     let camera = at_the_middle(&world, &short);
-    let cut = draw_frame(&world, camera, &metrics, &mut short).expect("the world draws");
+    let cut = draw_frame(&world, camera, &metrics, &[], &mut short).expect("the world draws");
     let (_, top, _, cut_height) = cachette_view::hud::bounds(&cut);
 
     assert!(
@@ -888,7 +894,8 @@ fn a_cut_panel_paints_the_rectangle_it_states() {
     paint::draw(&world, camera, &mut bare).expect("the world draws");
 
     let mut with_panel = Canvas::new(WINDOW.0, 320);
-    let readout = draw_frame(&world, camera, &metrics, &mut with_panel).expect("the world draws");
+    let readout =
+        draw_frame(&world, camera, &metrics, &[], &mut with_panel).expect("the world draws");
     let (_, top, _, height) = cachette_view::hud::bounds(&readout);
 
     let width = with_panel.width();
@@ -906,5 +913,332 @@ fn a_cut_panel_paints_the_rectangle_it_states() {
         lowest,
         top + height - 1,
         "the cut panel states a rectangle {height} tall and paints down to {lowest}"
+    );
+}
+
+// The founding rows. The panel says what the founding chose, what it left,
+// and how many places it compared. Every one of these numbers is a value the
+// caller holds from before the first frame, and the panel recomputes none of
+// them.[^1] [^2]
+//
+// [^1]: ADR-0070, the head-up display reports what the drawing pass read, decision D1. `docs/adrs/accepted/adr-0070-the-head-up-display-reports-what-the-drawing-pass-read.md`
+// [^2]: ADR-0075, the founding choice reads a bounded sample of the world, decision D5. `docs/adrs/accepted/adr-0075-the-founding-choice-reads-a-bounded-sample-of-the-world.md`
+
+/// The people a founded run in these tests begins with.
+const GROUP: u32 = 24;
+
+/// Builds a world and founds a run in it.
+///
+/// The world is this test's own. It is not the world the demonstration
+/// binary builds, because that world is chosen to look right rather than to
+/// produce an edge value.[^1]
+///
+/// The fixture asserts its own outcome. It reads the survey back and refuses
+/// a survey whose best rejected place reaches the same quantities as the
+/// chosen place. A panel that printed the chosen quantities in both columns
+/// would pass against such a survey.[^1] [^2]
+///
+/// # References
+///
+/// [^1]: Testing Rules, a fixture supplies the input. `.claude/rules/testing.md`
+/// [^2]: Findings register, FND-061. `docs/FINDINGS.md`
+fn founded_world() -> (World, Founding) {
+    let mut world = World::new(WorldConfig {
+        width: WIDE,
+        height: TALL,
+        seed: 11,
+        faction_count: FACTIONS,
+    })
+    .expect("a large extent describes a world");
+    let founded = world
+        .found_run(GROUP, FactionId(0))
+        .expect("the world holds a place for the group");
+    let survey = founded.survey();
+    let chosen = survey.chosen().expect("the founding chose a place");
+    let other = *survey
+        .rejected()
+        .first()
+        .expect("the founding compared more than one place");
+    assert_ne!(
+        other.provision(),
+        chosen.provision(),
+        "the best place the founding left reaches the same quantities as the \
+         place it took, so a panel that printed one place twice would pass",
+    );
+    world.rebuild_bridge(1).expect("the rebuild must succeed");
+    (world, founded)
+}
+
+/// Returns a camera that looks at one tile.
+fn looking_at(world: &World, canvas: &Canvas, address: Axial) -> Camera {
+    Camera::opening()
+        .looking_at(address, canvas)
+        .clamped(world, canvas)
+}
+
+#[test]
+fn the_panel_states_the_place_the_founding_chose() {
+    // The row must carry the address the engine reported. A panel that
+    // printed the camera centre would look right on the opening frame.
+    let (world, founded) = founded_world();
+    let metrics = Metrics::start();
+    let mut canvas = canvas();
+    let camera = looking_at(&world, &canvas, founded.place());
+    let foundings = [founded];
+
+    let readout =
+        draw_frame(&world, camera, &metrics, &foundings, &mut canvas).expect("the world draws");
+
+    let report = readout.foundings().first().expect("the panel read one");
+    assert_eq!(
+        report.place(),
+        foundings[0].place(),
+        "the panel names a place the founding did not choose",
+    );
+}
+
+#[test]
+fn the_panel_states_the_quantities_the_founding_reported() {
+    // The assertion is against the report, not against a constant. A
+    // constant would pin the terrain generator rather than the panel.
+    let (world, founded) = founded_world();
+    let metrics = Metrics::start();
+    let mut canvas = canvas();
+    let camera = looking_at(&world, &canvas, founded.place());
+    let foundings = [founded];
+
+    let readout =
+        draw_frame(&world, camera, &metrics, &foundings, &mut canvas).expect("the world draws");
+
+    let survey = foundings[0].survey();
+    let chosen = survey.chosen().expect("the founding chose a place");
+    let report = readout.foundings().first().expect("the panel read one");
+    assert_eq!(
+        report.chosen(),
+        chosen.provision(),
+        "the panel states quantities the survey did not read",
+    );
+
+    // The quantities must not be the empty ones. A report of zeroes would
+    // satisfy an equality against a survey that read nothing.
+    assert!(
+        report.chosen().open_ground > 0,
+        "the chosen place reaches no open ground, so the fixture found a \
+         place no group could settle",
+    );
+}
+
+#[test]
+fn the_panel_states_how_many_places_the_founding_compared() {
+    // A watcher tells a choice from a default by this number. One place
+    // compared is a default.
+    let (world, founded) = founded_world();
+    let metrics = Metrics::start();
+    let mut canvas = canvas();
+    let camera = looking_at(&world, &canvas, founded.place());
+    let foundings = [founded];
+
+    let readout =
+        draw_frame(&world, camera, &metrics, &foundings, &mut canvas).expect("the world draws");
+
+    let report = readout.foundings().first().expect("the panel read one");
+    assert_eq!(report.considered(), foundings[0].survey().considered());
+    assert!(
+        report.considered() > 1,
+        "the founding compared {} places, so the panel describes a default \
+         rather than a choice",
+        report.considered(),
+    );
+}
+
+#[test]
+fn the_panel_states_a_place_the_founding_did_not_choose() {
+    // The comparison is the point of the section. A panel that stated the
+    // chosen place alone would answer half the question.
+    let (world, founded) = founded_world();
+    let metrics = Metrics::start();
+    let mut canvas = canvas();
+    let camera = looking_at(&world, &canvas, founded.place());
+    let foundings = [founded];
+
+    let readout =
+        draw_frame(&world, camera, &metrics, &foundings, &mut canvas).expect("the world draws");
+
+    let best_rejected = *foundings[0]
+        .survey()
+        .rejected()
+        .first()
+        .expect("the founding compared more than one place");
+    let report = readout.foundings().first().expect("the panel read one");
+    let (address, provision) = report.other().expect("the panel states a place it left");
+
+    assert_eq!(address, best_rejected.address());
+    assert_eq!(provision, best_rejected.provision());
+    assert_ne!(
+        address,
+        report.place(),
+        "the panel states the chosen place in both columns",
+    );
+    assert_ne!(
+        provision,
+        report.chosen(),
+        "the panel states the chosen quantities in both columns",
+    );
+}
+
+#[test]
+fn the_panel_says_whether_the_window_shows_the_founded_place() {
+    // The row must answer both ways. A row that always said yes would be
+    // right on the opening frame of the demonstration and wrong after one
+    // scroll.
+    let (world, founded) = founded_world();
+    let metrics = Metrics::start();
+    let mut canvas = canvas();
+    let foundings = [founded];
+    let place = foundings[0].place();
+
+    let at_the_place = looking_at(&world, &canvas, place);
+    let near = draw_frame(&world, at_the_place, &metrics, &foundings, &mut canvas)
+        .expect("the world draws");
+    assert!(
+        near.foundings()[0].shown(),
+        "the camera looks at {place:?} and the panel says the window does not show it",
+    );
+
+    // A camera at the far corner from the place cannot hold it, because the
+    // window covers a small part of a world of this extent.
+    let far = if place.q * 2 < WIDE as i32 {
+        Axial::new(WIDE as i32 - 1, TALL as i32 - 1)
+    } else {
+        Axial::new(0, 0)
+    };
+    let away = looking_at(&world, &canvas, far);
+    let distant =
+        draw_frame(&world, away, &metrics, &foundings, &mut canvas).expect("the world draws");
+    assert!(
+        !distant.foundings()[0].shown(),
+        "the camera looks at {far:?} and the panel says the window shows {place:?}",
+    );
+}
+
+#[test]
+fn the_panel_describes_every_founding_the_caller_holds() {
+    // The layout must not assume one founding. A run may found more than
+    // one group, and a panel written for one would then state a false
+    // thing.[^1]
+    //
+    // [^1]: Blockers register, BLK-018. `docs/BLOCKERS.md`
+    let mut world = World::new(WorldConfig {
+        width: WIDE,
+        height: TALL,
+        seed: 11,
+        faction_count: FACTIONS,
+    })
+    .expect("a large extent describes a world");
+    let first = world
+        .found_run(GROUP, FactionId(0))
+        .expect("the world holds a place for the group");
+
+    // The second group settles at a place the test names, far from the
+    // first, so the two foundings cannot be one report counted twice.
+    let open = open_tiles(&world);
+    let corner = if first.place().q * 2 < WIDE as i32 {
+        Axial::new(WIDE as i32 - 6, TALL as i32 - 6)
+    } else {
+        Axial::new(5, 5)
+    };
+    let second = world
+        .found_group_at(nearest_open(&open, corner), GROUP, FactionId(1))
+        .expect("the named place holds the group");
+    world.rebuild_bridge(1).expect("the rebuild must succeed");
+
+    let metrics = Metrics::start();
+    let mut canvas = canvas();
+    let camera = at_the_middle(&world, &canvas);
+    let foundings = [first, second];
+
+    let readout =
+        draw_frame(&world, camera, &metrics, &foundings, &mut canvas).expect("the world draws");
+
+    assert_eq!(
+        readout.foundings().len(),
+        2,
+        "the panel dropped a founding the caller holds",
+    );
+    assert_ne!(
+        readout.foundings()[0].place(),
+        readout.foundings()[1].place(),
+        "the panel states one place twice",
+    );
+    // The second founding compared one place, because the test named it. The
+    // panel then has nothing to compare, and says so rather than printing a
+    // second column that a reader would take for a real place.
+    assert!(
+        readout.foundings()[1].other().is_none(),
+        "the panel states a place that the second founding never compared",
+    );
+}
+
+#[test]
+fn the_panel_states_no_founding_when_the_caller_holds_none() {
+    // A caller that founded nothing must get a panel with no founding
+    // section, rather than a section of zeroes.
+    let mut world = world();
+    let metrics = stepped(&mut world, 1);
+    let mut canvas = canvas();
+    let camera = at_the_middle(&world, &canvas);
+
+    let readout = draw_frame(&world, camera, &metrics, &[], &mut canvas).expect("the world draws");
+
+    assert!(readout.foundings().is_empty());
+}
+
+#[test]
+fn the_founding_rows_fit_their_column() {
+    // A value too wide for its column is cut, and a cut value states a
+    // number other than the one it was given. The check must see the
+    // founding rows, so the readout carries a founding.
+    let (world, founded) = founded_world();
+    let metrics = Metrics::start();
+    let mut canvas = canvas();
+    let camera = looking_at(&world, &canvas, founded.place());
+    let foundings = [founded];
+
+    let readout =
+        draw_frame(&world, camera, &metrics, &foundings, &mut canvas).expect("the world draws");
+
+    let cut = cachette_view::hud::values_that_do_not_fit(&readout);
+    assert!(
+        cut.is_empty(),
+        "the panel cut {cut:?} from the founding rows"
+    );
+}
+
+#[test]
+fn the_panel_grows_when_the_caller_holds_a_founding() {
+    // The founding section must reach the panel. A readout that held the
+    // report and drew none of it would pass every assertion above.
+    let (world, founded) = founded_world();
+    let metrics = Metrics::start();
+    let mut with_founding = canvas();
+    let mut without = canvas();
+    let camera = looking_at(&world, &with_founding, founded.place());
+    let foundings = [founded];
+
+    let stated = draw_frame(&world, camera, &metrics, &foundings, &mut with_founding)
+        .expect("the world draws");
+    let silent = draw_frame(&world, camera, &metrics, &[], &mut without).expect("the world draws");
+
+    let (_, _, _, tall) = cachette_view::hud::bounds(&stated);
+    let (_, _, _, short) = cachette_view::hud::bounds(&silent);
+    assert!(
+        tall > short,
+        "the panel is {tall} pixels tall with a founding and {short} without \
+         it, so the founding section reached no line",
+    );
+    assert_ne!(
+        with_founding.pixels(),
+        without.pixels(),
+        "the founding section painted nothing",
     );
 }

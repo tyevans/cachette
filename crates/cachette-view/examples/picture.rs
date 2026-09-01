@@ -72,7 +72,7 @@ fn main() {
 
     let mut canvas = Canvas::new(SIDE, SIDE);
     let camera = Camera::fitting(&world, &canvas);
-    let readout = draw_frame(&world, camera, &metrics, &mut canvas).expect("the world draws");
+    let readout = draw_frame(&world, camera, &metrics, &[], &mut canvas).expect("the world draws");
 
     let mut file =
         std::io::BufWriter::new(std::fs::File::create(&path).expect("the output file must open"));

@@ -1,7 +1,7 @@
 ---
 id: 0093
 title: Say what the founding chose in the panel
-status: refined
+status: complete
 created: 2026-08-31
 implements: [ADR-0067 D1, ADR-0067 D2, ADR-0070 D1, ADR-0070 D2, ADR-0075 D5]
 changes: []
@@ -163,7 +163,32 @@ item, because it changes no engine file.
 
 ## Outcome
 
-Filled in when the item moves to `complete/`.
+The panel holds a founding section for each founding the caller passes it.
+The section states the number of the founding in the list, the number of
+places the founding compared, the place it took, whether the window shows
+that place, and the place it left. Five rows then compare the two places on
+the quantities the score weighs: the food, the wood, the stone, the open
+ground and the open water beside them.
+
+The viewer holds the report and the engine gained no field. The drawing
+function takes the foundings as a slice, so a caller that founded nothing
+passes an empty slice and the panel states no founding. The demonstration
+binary keeps the value the founding returned and lends it to the panel.
+
+The window test is the viewer's own arithmetic over the camera. It reads the
+row range of the window and the column range of one row, so the panel starts
+no loop over the tiles and no loop over the units.
+
+Four defects were put into the reporting code, one at a time, and each was
+watched failing. A panel that stated empty quantities failed the test that
+compares the rows against the report. A panel that stated one place compared
+failed the test that reads the count back. A window test that always answered
+yes failed the test that moves the camera away. A panel that printed the
+chosen quantities in both columns failed two tests, one of them the stored
+picture, which proves that the picture fixture reaches the case.
+
+The two determinism tests are unaffected. The viewer is outside them, and no
+engine file changed.
 
 ## References
 

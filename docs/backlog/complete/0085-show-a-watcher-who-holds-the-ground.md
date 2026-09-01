@@ -1,7 +1,7 @@
 ---
 id: 0085
 title: Show a watcher who holds the ground
-status: refined
+status: complete
 created: 2026-08-31
 implements: [ADR-0067 D1, ADR-0067 D2, ADR-0053 D2, ADR-0070 D1, ADR-0017 D2, ADR-0022 D1]
 changes: []
@@ -177,7 +177,42 @@ changes no engine file.
 
 ## Outcome
 
-Filled in when the item moves to `complete/`.
+The drawing pass reads the holder of every tile it paints, on the loop that
+already runs. A tile that a faction holds takes that faction's colour, mixed
+over the ground, so a watcher reads the kind of ground and the holder of it at
+once. A tile that nobody holds draws as it did before.
+
+A held tile whose neighbour has another holder takes a border in the same
+colour. The six neighbours are the fixed offsets, and the edge of the world
+does not wrap, so a neighbour outside the world reads as unheld ground rather
+than as a wrap to the far side. The boundary between two holdings and the
+boundary between a holding and unheld ground are both drawn.
+
+The colour comes from the one table the viewer already owns. The layer builds
+no second table and picks no colour from a faction identifier itself. A
+whole-tree search found one table and one reader.
+
+The layer reads the holder of the world, and never the tile faction column of
+the stub system. That column has no public reader, so the viewer cannot reach
+it at all today. The break-it experiment therefore reproduced the column's
+rule inside the layer, which is the tile index modulo the faction count.
+
+The drawing pass counts the holders it reads and the held tiles it paints.
+Two tests read those counts. The first states the rule exactly: one read for
+each painted tile, and six more for each held one. The second draws the same
+window in a world and in a world six times as wide, and the two counts are
+equal.
+
+Four defects went into the drawing code, one at a time, and each was watched
+failing. The wrong faction column failed four tests. A layer that drew no
+border failed the edge test. A layer that swept the world failed both cost
+tests.
+
+The panel needed no new legend row, and a test asserts that the panel names
+every holder colour the frame drew.
+
+The two determinism tests are unaffected. The viewer is outside them, and no
+engine file changed.
 
 ## References
 

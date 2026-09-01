@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-076**
+**Next number: FND-079**
 
 ## A. Corrections to stated rules
 
@@ -1576,6 +1576,31 @@ transfer meant to give.** The store now falls by the sum of the shares, which
 makes the two copies one copy.[^38] A conservation check that reads only the
 source cannot see a quantity that left the source and reached nobody.
 
+### FND-078 — A differential test cannot see a defect that moves both worlds alike
+
+**Believed.** A test that compares a world holding ground against the same
+world holding none proves that the holder layer draws the holder. The
+difference between the two pictures is the holding, so a wrong holder would
+change the difference.
+
+**True.** The difference is blind to any defect that tints both worlds
+identically. The holder layer was pointed at the rule of the stub tile faction
+column, which derives a faction from the tile index and reads no holder at all.
+That rule does not care whether a soldier stands anywhere, so it painted both
+worlds the same way and the difference stayed exactly as it was.
+
+**Evidence.** Two tests passed under the wrong column: the one asserting that a
+tile nobody holds draws as it did before, and the one asserting that open water
+never takes a holder colour. Four other tests failed, and all four read the
+holder back rather than comparing two worlds.[^39]
+
+**Follows.** **A differential assertion measures the difference, not the
+source.** When the property under test is where a value came from, one side of
+the comparison must read that value back. This is the same shape as FND-075,
+where a conservation check that read only the source could not see a quantity
+that left the source and reached nobody. Both are one fact checked in a place
+that cannot see it go wrong.
+
 ### FND-072 — A layout finding named the tier when it meant one structure
 
 **Believed.** The character tier wants array-of-structs, and the character
@@ -1784,3 +1809,4 @@ it is not made here.
 [^36]: PRD-0012, a world starts small and grows. `docs/product/shaped/prd-0012-a-world-starts-small-and-grows.md`
 [^37]: Recurring defect shapes, shape 3. `.claude/rules/recurring-defects.md`
 [^38]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`
+[^39]: Backlog item 0085. `docs/backlog/complete/0085-show-a-watcher-who-holds-the-ground.md`

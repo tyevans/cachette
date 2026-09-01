@@ -30,6 +30,7 @@
 //! [^1]: ADR-0067, the viewer reads the world and never writes to it, decision D2. `docs/adrs/accepted/adr-0067-the-viewer-reads-the-world-and-never-writes-to-it.md`
 //! [^2]: ADR-0070, the head-up display reports what the drawing pass read, decision D1. `docs/adrs/accepted/adr-0070-the-head-up-display-reports-what-the-drawing-pass-read.md`
 
+use cachette_core::founding::{Founding, Provision};
 use cachette_core::pyramid::CellSummary;
 use cachette_core::terrain::{TileKind, KIND_COUNT};
 use cachette_core::{Axial, Fix32, World};
@@ -77,6 +78,116 @@ const VALUE: u32 = 0x00d6_e4ea;
 /// The colour of the title.
 const TITLE: u32 = 0x00e8_c84a;
 
+/// What one founding chose, as the panel states it.
+///
+/// The founding runs once, before the first frame. The program that owns the
+/// loop keeps the report it returned, and the panel borrows it. The engine
+/// holds no copy, because a field that existed to be drawn would be the
+/// violation the boundary record names.[^1]
+///
+/// Every quantity here is the one the survey read. Nothing recomputes a
+/// score, so no copy can disagree with the choice that was made.[^2]
+///
+/// # References
+///
+/// [^1]: ADR-0067, the viewer reads the world and never writes to it, decision D2. `docs/adrs/accepted/adr-0067-the-viewer-reads-the-world-and-never-writes-to-it.md`
+/// [^2]: ADR-0075, the founding choice reads a bounded sample of the world, decision D5. `docs/adrs/accepted/adr-0075-the-founding-choice-reads-a-bounded-sample-of-the-world.md`
+#[derive(Clone, Copy, Debug)]
+pub struct FoundingReport {
+    place: Axial,
+    shown: bool,
+    considered: usize,
+    chosen: Provision,
+    other: Option<(Axial, Provision)>,
+}
+
+impl FoundingReport {
+    /// Reads one founding for the panel.
+    ///
+    /// Returns `None` when the survey names no chosen place. The panel then
+    /// says nothing about that founding, rather than stating a quantity that
+    /// nothing computed.[^1]
+    ///
+    /// The window test is the viewer's own arithmetic over the camera. It
+    /// reads the column range of one row and starts no loop over the world.[^2]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0070, the head-up display reports what the drawing pass read, decision D2. `docs/adrs/accepted/adr-0070-the-head-up-display-reports-what-the-drawing-pass-read.md`
+    /// [^2]: ADR-0070, the head-up display reports what the drawing pass read, decision D1. `docs/adrs/accepted/adr-0070-the-head-up-display-reports-what-the-drawing-pass-read.md`
+    #[must_use]
+    pub fn of(founding: &Founding, world: &World, camera: Camera, canvas: &Canvas) -> Option<Self> {
+        let chosen = founding.survey().chosen()?;
+        let other = founding
+            .survey()
+            .rejected()
+            .first()
+            .map(|candidate| (candidate.address(), candidate.provision()));
+        Some(Self {
+            place: founding.place(),
+            shown: shows(founding.place(), world, camera, canvas),
+            considered: founding.survey().considered(),
+            chosen: chosen.provision(),
+            other,
+        })
+    }
+
+    /// Returns the place the founding chose.
+    #[must_use]
+    pub const fn place(&self) -> Axial {
+        self.place
+    }
+
+    /// Reports whether the window covers the chosen place.
+    #[must_use]
+    pub const fn shown(&self) -> bool {
+        self.shown
+    }
+
+    /// Returns the number of places the founding compared.
+    #[must_use]
+    pub const fn considered(&self) -> usize {
+        self.considered
+    }
+
+    /// Returns the quantities the survey read at the chosen place.
+    #[must_use]
+    pub const fn chosen(&self) -> Provision {
+        self.chosen
+    }
+
+    /// Returns one place the founding did not choose, and its quantities.
+    ///
+    /// Returns `None` when the survey compared one place only.
+    #[must_use]
+    pub const fn other(&self) -> Option<(Axial, Provision)> {
+        self.other
+    }
+}
+
+/// Reports whether the window covers one tile.
+///
+/// The camera gives the row range of the window, and the column range of one
+/// row. Both are the viewer's own arithmetic. The call reads no tile and no
+/// unit.[^1]
+///
+/// # References
+///
+/// [^1]: ADR-0070, the head-up display reports what the drawing pass read, decision D1. `docs/adrs/accepted/adr-0070-the-head-up-display-reports-what-the-drawing-pass-read.md`
+fn shows(address: Axial, world: &World, camera: Camera, canvas: &Canvas) -> bool {
+    if address.q < 0 || address.r < 0 {
+        return false;
+    }
+    let (first_row, last_row) = camera.visible_rows(world, canvas);
+    let row = address.r as u32;
+    if row < first_row || row >= last_row {
+        return false;
+    }
+    let (first_column, last_column) = camera.visible_columns(row, world, canvas);
+    let column = address.q as u32;
+    column >= first_column && column < last_column
+}
+
 /// What the panel says.
 ///
 /// A readout holds numbers and nothing else. It is read once against the
@@ -99,6 +210,7 @@ pub struct Readout {
     by_faction: [u32; COLOURED_FACTIONS],
     by_kind: [u32; KIND_COUNT],
     region: Option<CellSummary>,
+    foundings: Vec<FoundingReport>,
     canvas_height: usize,
     step_mean: f64,
     step_worst: f64,
@@ -122,7 +234,13 @@ impl Readout {
     ///
     /// [^1]: ADR-0067, the viewer reads the world and never writes to it, decision D1. `docs/adrs/accepted/adr-0067-the-viewer-reads-the-world-and-never-writes-to-it.md`
     #[must_use]
-    pub fn of(world: &World, camera: Camera, canvas: &Canvas, metrics: &Metrics) -> Self {
+    pub fn of(
+        world: &World,
+        camera: Camera,
+        canvas: &Canvas,
+        metrics: &Metrics,
+        foundings: &[Founding],
+    ) -> Self {
         let grid = world.grid();
         let (first_row, last_row) = camera.visible_rows(world, canvas);
         let middle_row = (first_row + last_row) / 2;
@@ -154,6 +272,14 @@ impl Readout {
             region: world.summary_covering(
                 camera.tile_at(canvas.width() as f32 / 2.0, canvas.height() as f32 / 2.0),
             ),
+            // The caller founded the run and kept what the founding
+            // returned. The panel borrows that value and recomputes no part
+            // of it, so the list is as long as the caller made it and the
+            // layout never assumes one founding.
+            foundings: foundings
+                .iter()
+                .filter_map(|founding| FoundingReport::of(founding, world, camera, canvas))
+                .collect(),
             step_mean: metrics.step_mean_micros(),
             step_worst: metrics.step_worst_micros(),
             draw_mean: metrics.draw_mean_micros(),
@@ -235,6 +361,19 @@ impl Readout {
     #[must_use]
     pub const fn region(&self) -> Option<CellSummary> {
         self.region
+    }
+
+    /// Returns what each founding chose.
+    ///
+    /// The list is as long as the caller made it. A run with two foundings
+    /// gives two reports, and the panel states both.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: Blockers register, BLK-018. `docs/BLOCKERS.md`
+    #[must_use]
+    pub fn foundings(&self) -> &[FoundingReport] {
+        &self.foundings
     }
 
     /// Returns the tiles the window shows, across and down.
@@ -363,6 +502,51 @@ impl Readout {
         }
         lines.push(Line::Bar);
 
+        // One section for each founding the caller holds. The panel never
+        // says "the founding", because a run may found more than one group.
+        // A row that named one founding would state a false thing the moment
+        // a second group founds.[^1]
+        //
+        // [^1]: Blockers register, BLK-018. `docs/BLOCKERS.md`
+        for (ordinal, founding) in self.foundings.iter().enumerate() {
+            lines.extend([
+                Line::Rule,
+                Line::Heading("FOUNDING"),
+                Line::Row(
+                    "number",
+                    format!("{} of {}", ordinal + 1, self.foundings.len()),
+                ),
+                Line::Row("places compared", grouped(founding.considered as u64)),
+                Line::Row(
+                    "it took",
+                    format!("q {}  r {}", founding.place.q, founding.place.r),
+                ),
+                Line::Row(
+                    "in the window",
+                    String::from(if founding.shown { "yes" } else { "no" }),
+                ),
+            ]);
+            match founding.other {
+                // A survey of one place has nothing to compare. The panel
+                // says so and states the quantities of the chosen place
+                // alone, rather than printing a second column of zeroes that
+                // a reader would take for a real place.
+                None => {
+                    lines.push(Line::Note("it compared no other place."));
+                    lines.push(Line::Heading("WHAT IT TOOK"));
+                    lines.extend(provision_rows(founding.chosen, None));
+                }
+                Some((address, provision)) => {
+                    lines.push(Line::Row(
+                        "it left",
+                        format!("q {}  r {}", address.q, address.r),
+                    ));
+                    lines.push(Line::Heading("TOOK / LEFT"));
+                    lines.extend(provision_rows(founding.chosen, Some(provision)));
+                }
+            }
+        }
+
         // The region rows sit under their own heading, because a count of a
         // region is a third kind of count beside a count of the world and a
         // count of the window. A reader must tell them apart by the label.
@@ -421,6 +605,47 @@ impl Readout {
     fn height(&self) -> i32 {
         PAD * 2 + self.lines().iter().map(Line::height).sum::<i32>()
     }
+}
+
+/// Returns the rows that compare what two places can reach.
+///
+/// Every quantity is the one the survey read. The panel restates the report
+/// and derives nothing from it, so no number here can disagree with the
+/// choice that was made.[^1]
+///
+/// The chosen place and the place that was left share one row for each
+/// quantity, because a watcher compares them. A heading above the rows says
+/// which value is which.[^2]
+///
+/// The fields are the five the score weighs. The room a place holds is not
+/// one of them, so the panel does not state it as a reason for the choice.
+///
+/// # References
+///
+/// [^1]: ADR-0075, the founding choice reads a bounded sample of the world, decision D5. `docs/adrs/accepted/adr-0075-the-founding-choice-reads-a-bounded-sample-of-the-world.md`
+/// [^2]: ADR-0070, the head-up display reports what the drawing pass read, decision D2. `docs/adrs/accepted/adr-0070-the-head-up-display-reports-what-the-drawing-pass-read.md`
+fn provision_rows(took: Provision, left: Option<Provision>) -> Vec<Line> {
+    let pair = |chosen: u32, other: fn(Provision) -> u32| match left {
+        None => grouped(u64::from(chosen)),
+        Some(left) => format!(
+            "{} / {}",
+            grouped(u64::from(chosen)),
+            grouped(u64::from(other(left)))
+        ),
+    };
+    vec![
+        Line::Row("food", pair(took.food.0, |place| place.food.0)),
+        Line::Row("wood", pair(took.wood.0, |place| place.wood.0)),
+        Line::Row("stone", pair(took.stone.0, |place| place.stone.0)),
+        Line::Row(
+            "open ground",
+            pair(took.open_ground, |place| place.open_ground),
+        ),
+        Line::Row(
+            "water beside",
+            pair(took.water_edge, |place| place.water_edge),
+        ),
+    ]
 }
 
 /// Returns as much of the list as the window has room for.
