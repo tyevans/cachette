@@ -18,6 +18,7 @@
 
 use std::path::PathBuf;
 
+use cachette_core::resource::{Amount, RecoveryRules, ResourceKind};
 use cachette_core::site::CommodityId;
 use cachette_core::terrain::TileKind;
 use cachette_core::types::{FactionId, Fix32};
@@ -139,6 +140,17 @@ const SCENARIOS: &[(&str, WorldConfig, Population, u64)] = &[
         FRAMES,
     ),
     (
+        "gathering",
+        WorldConfig {
+            width: 48,
+            height: 48,
+            seed: 0x0cac_4e77_0123,
+            faction_count: 2,
+        },
+        Population::Gathering,
+        FRAMES,
+    ),
+    (
         "founding",
         WorldConfig {
             width: 192,
@@ -196,6 +208,80 @@ enum Population {
     /// [^1]: Open decisions register, DEC-030. `docs/DECISIONS.md`
     /// [^2]: Findings register, FND-054. `docs/FINDINGS.md`
     Founded,
+    /// Gatherers on deposits, in a world whose deposits recover fast.
+    ///
+    /// No other scenario gathers, so no other scenario stores a take and no
+    /// other scenario recovers one. A golden file that never sees a stored
+    /// take cannot catch a change to how the take is represented, and cannot
+    /// see recovery at all.[^1]
+    ///
+    /// The periods are short, so the frames of the scenario reach the case. A
+    /// scenario that ran under the default periods would gather and never
+    /// recover, and the file would then cover half of the rule.[^2]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0072, a tile stock is generated, and only what was taken is stored, decision D4. `docs/adrs/accepted/adr-0072-a-tile-stock-is-generated-and-only-what-was-taken-is-stored.md`
+    /// [^2]: Testing rules, section 2a. `.claude/rules/testing.md`
+    Gathering,
+}
+
+/// Puts gatherers on deposits and makes the deposits recover fast.
+///
+/// The units fill each deposit to the capacity of its tile, so a deposit runs
+/// out and the resolve must refuse somebody. The world then holds a stored
+/// take, which is what recovery ages away.
+///
+/// The caller asserts that the fixture found deposits. A fixture that found
+/// none would record a file that covers nothing.[^1]
+///
+/// # References
+///
+/// [^1]: Testing rules, section 2a. `.claude/rules/testing.md`
+fn gather(world: &mut World) {
+    // The periods are a parameter of the kind, so the scenario states them
+    // and the engine holds no test value.
+    world.set_recovery_rules(
+        RecoveryRules::from_ticks([Some(5), Some(7), None]).expect("no period is zero"),
+    );
+    let grid = world.grid();
+    let open: Vec<Axial> = (0..grid.tile_count())
+        .map(|index| Axial::new((index % grid.width()) as i32, (index / grid.width()) as i32))
+        .filter(|address| world.admits_a_unit(*address))
+        .collect();
+    // Each kind is chosen on purpose. A search for the first kind that a tile
+    // carries picked stone on every tile of this world, so the scenario
+    // gathered only the kind that never recovers and covered half of the rule
+    // while looking complete.[^1]
+    //
+    // [^1]: Testing rules, section 2a. `.claude/rules/testing.md`
+    let mut deposits: Vec<(Axial, ResourceKind)> = Vec::new();
+    for kind in [ResourceKind::Food, ResourceKind::Wood, ResourceKind::Stone] {
+        let wanted = if kind == ResourceKind::Stone { 2 } else { 5 };
+        let found: Vec<(Axial, ResourceKind)> = open
+            .iter()
+            .filter(|address| world.original_stock(**address, kind) > Some(Amount::ZERO))
+            .filter(|address| !deposits.iter().any(|(held, _)| held == *address))
+            .take(wanted)
+            .map(|address| (*address, kind))
+            .collect();
+        assert_eq!(
+            found.len(),
+            wanted,
+            "the gathering scenario found only {} deposits of {kind:?}",
+            found.len()
+        );
+        deposits.extend(found);
+    }
+    for (address, kind) in deposits {
+        let capacity = world.tile_kind(address).map_or(0, TileKind::capacity);
+        for ordinal in 0..capacity {
+            let unit = world
+                .spawn_soldier(address, FactionId((ordinal % 2) as u16))
+                .expect("the open tile admits a unit");
+            assert!(world.order_gather(unit, kind));
+        }
+    }
 }
 
 /// Founds a run: one group for each faction, in a place the engine chose.
@@ -369,12 +455,30 @@ fn hash_sequence(config: WorldConfig, population: Population, frames: u64) -> St
         Population::Crowd => crowd(&mut world),
         Population::Settled => settle(&mut world),
         Population::Founded => found(&mut world),
+        Population::Gathering => gather(&mut world),
     }
     let mut lines = String::new();
     lines.push_str(&format!("0 {}\n", world.state_hash()));
     for frame in 1..=frames {
         world.step(THREADS).expect("the step must run");
         lines.push_str(&format!("{frame} {}\n", world.state_hash()));
+    }
+    if population == Population::Gathering {
+        // The file must cover what it claims to cover. A run that stored no
+        // take, or that recovered nothing, would record a file that moves for
+        // every reason except this one.[^1]
+        //
+        // [^1]: Testing rules, section 2a. `.claude/rules/testing.md`
+        assert!(
+            !world.depletion().is_empty(),
+            "the gathering scenario stored no take"
+        );
+        assert!(
+            ResourceKind::ALL
+                .iter()
+                .any(|kind| world.depletion().returned(*kind).0 > 0),
+            "the gathering scenario recovered nothing"
+        );
     }
     lines
 }

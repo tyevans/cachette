@@ -42,7 +42,7 @@ use crate::holding::{FactionMask, Holder, Holding};
 use crate::pyramid::{CellSummary, Pyramid};
 use crate::rates::{RateError, RateLedger, RateSchedule, RateTable, SiteShortfall};
 use crate::resource::{
-    ledger_key, Amount, CarryLoad, DepletionLedger, ResourceField, ResourceKind,
+    ledger_key, Amount, CarryLoad, DepletionLedger, RecoveryRules, ResourceField, ResourceKind,
     RESOURCE_KIND_COUNT,
 };
 use crate::rng;
@@ -509,6 +509,24 @@ impl World {
     #[must_use]
     pub const fn depletion(&self) -> &DepletionLedger {
         &self.depletion
+    }
+
+    /// Returns how fast each kind of deposit recovers.
+    #[must_use]
+    pub const fn recovery_rules(&self) -> RecoveryRules {
+        self.depletion.recovery()
+    }
+
+    /// Replaces the rules that say how fast each kind of deposit recovers.
+    ///
+    /// The caller replaces the whole rule set, so a period lives in one place
+    /// and no two sites can hold a different value for one kind.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`
+    pub fn set_recovery_rules(&mut self, rules: RecoveryRules) {
+        self.depletion.set_recovery(rules);
     }
 
     /// Returns what one soldier carries.
@@ -1925,7 +1943,8 @@ impl World {
             return false;
         }
         let mut left_the_tiles = [0i64; RESOURCE_KIND_COUNT];
-        for (key, amount) in self.depletion.entries() {
+        for entry in self.depletion.entries() {
+            let (key, amount) = (&entry.key, &entry.taken);
             let Some(kind) = ResourceKind::from_u8((key & 0b11) as u8) else {
                 return false;
             };
@@ -1950,7 +1969,12 @@ impl World {
         }
         for kind in ResourceKind::ALL {
             let index = kind.index();
-            if left_the_tiles[index] != arrived[index] + self.departed[index] as i64 {
+            // Recovery gives a part of the take back to the tile, so the
+            // stored take alone no longer balances what the units hold. The
+            // returned total is the second term, and it is what makes the
+            // equality hold across a recovery.
+            let returned = self.depletion.returned(kind).0;
+            if left_the_tiles[index] + returned != arrived[index] + self.departed[index] as i64 {
                 return false;
             }
         }
@@ -2133,6 +2157,16 @@ impl World {
         // barrier above stays the barrier of this frame.
         //
         // [^6]: ADR-0073, gathering is admitted by sort-then-admit against the tile, decision D3. `docs/adrs/accepted/adr-0073-gathering-is-admitted-by-sort-then-admit-against-the-tile.md`
+        // Recovery runs before the gather resolve, so a unit takes what the
+        // deposit holds at this tick. A resolve that ran first would take
+        // against an amount that the world had already moved past.[^14]
+        //
+        // The pass walks the depleted set and no tile, so a world that
+        // gathered nothing does no work here, at any tile count.[^14]
+        //
+        // [^14]: ADR-0080, a depleted deposit recovers by ageing the stored take, decisions D1 and D2. `docs/adrs/draft/adr-0080-a-depleted-deposit-recovers-by-ageing-the-stored-take.md`
+        self.depletion.recover(tick);
+
         self.gather(threads)?;
 
         // The holding spreads after the barrier of this frame, because it
@@ -2510,7 +2544,7 @@ impl World {
             }
             at = end;
         }
-        self.depletion.merge_ascending(&run);
+        self.depletion.merge_ascending(&run, tick);
         Ok(())
     }
 

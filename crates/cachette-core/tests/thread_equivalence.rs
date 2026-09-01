@@ -16,7 +16,7 @@
 //! [^2]: Testing policy. `docs/TESTING.md`
 
 use cachette_core::holding::Holder;
-use cachette_core::resource::{Amount, ResourceKind};
+use cachette_core::resource::{Amount, RecoveryRules, ResourceKind};
 use cachette_core::site::CommodityId;
 use cachette_core::terrain::TileKind;
 use cachette_core::{Axial, Entity, FactionId, Fix32, World, WorldConfig};
@@ -349,6 +349,79 @@ fn a_world_whose_units_gather_is_identical_at_every_thread_count() {
     assert!(
         contended > 0,
         "no scenario held a contested deposit, so the case is not covered"
+    );
+}
+
+/// Runs a world that gathers and then recovers, and returns what it produced.
+///
+/// The units empty their deposits and then stop, so the frames that follow
+/// hold recovery and nothing else. Recovery reads a stored take and writes a
+/// smaller one, and the state hash covers the ledger, so a pass that took its
+/// order from a thread would show here.[^1]
+///
+/// # References
+///
+/// [^1]: ADR-0080, a depleted deposit recovers by ageing the stored take, decision D3. `docs/adrs/draft/adr-0080-a-depleted-deposit-recovers-by-ageing-the-stored-take.md`
+fn run_with_recovery(config: WorldConfig, frames: u64, threads: usize) -> (Vec<u8>, u64, i64) {
+    let mut world = World::new(config).expect("the extent must describe a world");
+    // The periods are short, so the frames of a scenario reach the case.
+    world.set_recovery_rules(
+        RecoveryRules::from_ticks([Some(2), Some(3), None]).expect("no period is zero"),
+    );
+    let units = gatherers(&mut world);
+    if units.is_empty() {
+        return (Vec::new(), 0, 0);
+    }
+    for _ in 0..frames {
+        world.step(threads).expect("the step must run");
+    }
+    for unit in &units {
+        world.stop_gather(*unit);
+    }
+    for _ in 0..(frames + 8) {
+        world.step(threads).expect("the step must run");
+    }
+    assert!(world.check_invariants());
+    let mut bytes = world.event_log_bytes().to_vec();
+    bytes.extend_from_slice(world.gather_log_bytes());
+    let returned: i64 = ResourceKind::ALL
+        .iter()
+        .map(|kind| world.depletion().returned(*kind).0)
+        .sum();
+    (bytes, world.state_hash().finish(), returned)
+}
+
+#[test]
+fn a_world_that_gathers_and_recovers_is_identical_at_every_thread_count() {
+    let mut recovered = 0;
+    for (name, config, frames) in SCENARIOS {
+        let expected = run_with_recovery(*config, *frames, THREAD_COUNTS[0]);
+        if expected.2 == 0 {
+            // The scenario recovered nothing, so it tests nothing here.
+            continue;
+        }
+        recovered += 1;
+        for threads in &THREAD_COUNTS[1..] {
+            let produced = run_with_recovery(*config, *frames, *threads);
+            assert_eq!(
+                produced.0, expected.0,
+                "scenario {name}: the event log differs at {threads} threads"
+            );
+            assert_eq!(
+                produced.1, expected.1,
+                "scenario {name}: the state hash differs at {threads} threads"
+            );
+            assert_eq!(
+                produced.2, expected.2,
+                "scenario {name}: the recovered total differs at {threads} threads"
+            );
+        }
+    }
+    // A scenario that recovered nothing would compare two worlds in which
+    // recovery never ran.
+    assert!(
+        recovered > 0,
+        "no scenario recovered anything, so the case is not covered"
     );
 }
 

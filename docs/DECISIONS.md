@@ -23,7 +23,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^ALLOC]
 
-**Next number: DEC-052**
+**Next number: DEC-056**
 
 ## Open
 
@@ -184,6 +184,55 @@ figure is 168 MB. The storage argument for vectors is stronger than the report
 concluded, and it called that argument its weakest.
 
 ## Closed
+
+### DEC-055 — Does a period return one unit or the whole deposit?
+
+**Open. The recommendation is one unit, and the engine holds that today.**
+
+A recovery period must say what it is the period of. Two readings are
+available, and the record for recovery states the shape and not the
+reading.[^ADR80]
+
+**The options.**
+
+1. The period returns one unit of stock. A deposit that lost more takes longer
+   to return, in proportion to what it lost.
+2. The period returns the whole deposit. Every depleted deposit is whole again
+   after one period, whatever it lost.
+
+**The recommendation is option 1.** It makes heavy extraction cost more than
+light extraction, which is the statement the product record asks the world to
+be able to make.[^PRD18] It also keeps the arithmetic a whole-number division
+with no reference to the generated stock of the tile.
+
+Option 2 stays available and costs the same to compute. The row exists because
+a reader of the code cannot tell which reading was chosen on purpose.
+
+**What holds it back.** Nothing. Work continues under either reading, and only
+the meaning of one parameter changes.
+
+### DEC-054 — What period does each recovering kind take?
+
+**Open. The recommendation is one simulated day for food and several for wood.**
+
+The decision that food and wood recover and that stone does not is closed, and
+it states the period as a parameter of the kind.[^DEC49REF] It states no value.
+The engine now needs one, because a default rule set must hold something.
+
+The engine carries a default in one place, and a caller replaces the whole rule
+set. The value is therefore cheap to change and no second site holds it.
+
+**The options.** Any pair of periods. The shape does not change with the value,
+so this row asks for a judgement about how a run should feel and not for
+information.
+
+**The recommendation.** Food returns fast enough that a worked patch is worth
+returning to within a run, and wood returns several times slower, because a
+felled wood is a longer loss than a grazed field. The engine holds that pair
+until the owner or a content pipeline replaces it.
+
+**What holds it back.** Nothing. No measurement governs a content value, and no
+blocker names one.
 
 ### DEC-049 — Which resource kinds recover, and how fast?
 
@@ -914,6 +963,7 @@ a failed founding is correct.[^PRD12]
 [^ADR75]: ADR-0075, the founding choice reads a bounded sample of the world. `docs/adrs/accepted/adr-0075-the-founding-choice-reads-a-bounded-sample-of-the-world.md`
 <<<<<<< HEAD
 [^FND106]: Findings register, FND-106. `docs/FINDINGS.md`
+[^DEC44ITEM]: Backlog item 0060. `docs/backlog/refined/0060-grow-the-population-from-the-store-and-the-housing.md`
 =======
 [^DEC44ITEM]: Backlog item 0060. `docs/backlog/refined/0060-grow-the-population-from-the-store-and-the-housing.md`
 >>>>>>> worktree-agent-a4ea51fa97c6b231a

@@ -2473,6 +2473,81 @@ directly. Whether such an index exists is a decision, and the item names it.
 that draws from one site and lives in another is a world the project may want.
 Nothing needs it today, and the item that needs it owns the record.
 
+### FND-113 — A per-tick ageing pass that resets its clock recovers nothing
+
+**Believed.** A recovery that runs on every tick can hold its progress in the
+tick it last ran at. The pass reads the elapsed ticks, divides by the period of
+the kind, and stores the tick it ran at as the new anchor.
+
+**True.** That rule recovers nothing at all whenever the period is longer than
+one tick. The pass runs every tick, so the elapsed ticks are always one, the
+division always gives zero, and the anchor moves forward every time. The
+remainder of the division is the whole of the progress, and resetting the anchor
+throws it away on every tick.
+
+**Evidence.** The perturbation was put into the ageing function of the resource
+module, and six tests of the recovery suite failed. The correct rule advances
+the anchor by the whole periods it spent, and never to the tick it ran at.
+
+**Follows.** When a pass reduces a stored value at a rate slower than the pass
+runs, the remainder is state. Advance the clock by what was spent, not to the
+present. A test that only asserts that the value falls over a long run cannot
+tell the two rules apart; assert the exact amount at the exact tick.
+
+### FND-114 — Two defences of the recovery rule are not observable through the engine
+
+**Believed.** Every rule that a function states can be defended by a test that
+drives the engine. Putting the defect back and watching a test fail is the
+evidence that the test covers the rule.
+
+**True.** Two rules of the ageing function have no observable failure through
+the engine as the step runs today, because a second mechanism already excludes
+the case.
+
+The first is the clamp that stops an entry recovering more than it owes. The
+subtraction already saturates at nothing owed, so removing the clamp changes no
+answer.
+
+The second is the ageing of an entry at the moment a new take joins it. The step
+ages every entry before it resolves the orders to gather, so no entry is ever
+stale when a take arrives.
+
+**Evidence.** Both perturbations were put back, and the whole resource suite
+stayed green. Two other perturbations of the same function failed six tests and
+one test respectively.
+
+**Follows.** Say plainly which rules a suite defends and which it only states. A
+test that passes because an earlier stage already excluded the bad case is a
+guard, not evidence.[^64] Both rules stay in the code, because the second
+mechanism is an ordering that a later change can move, and neither costs
+anything. Neither is counted as covered.
+
+### FND-115 — A fixture that asks for the first kind a tile carries selects one kind
+
+**Believed.** A fixture that walks the open tiles and takes, for each tile, the
+first resource kind that the tile carries builds a mixed set of deposits. The
+world holds three kinds, so a set of twelve tiles will hold several of them.
+
+**True.** It selected stone on every one of the twelve tiles, and stone is the
+one kind that does not recover. The scenario gathered, stored a take for each
+tile, and recovered nothing. Every assertion about the ledger passed, because
+the ledger held exactly what a correct run would hold.
+
+**Evidence.** The golden scenario for gathering asserts after its run that the
+world stored a take and that something recovered. The second assertion failed
+on the first run of the scenario. The order the fixture searched in put food
+first, so the outcome was not the order but the world: the tiles it reached
+carry no food and no wood.
+
+**Follows.** Choose the case, do not search for it. A fixture that asks the
+world for "the first thing that fits" takes whatever the world offers first,
+and the world is not trying to give the test a hard case. The scenario now
+names how many deposits of each kind it wants, and fails when it cannot find
+them.
+
+**A fixture needs an assertion about itself.** This one was caught by a check
+that the run reached the case, not by reading the code, and the file it would
+have recorded would have looked correct for as long as anyone left it.[^55]
 
 ## References
 
@@ -2539,3 +2614,4 @@ Nothing needs it today, and the item that needs it owns the record.
 [^61]: PRD-0014, everyone needs somewhere to live. `docs/product/accepted/prd-0014-everyone-needs-somewhere-to-live.md`
 [^62]: ADR-0066, entity storage holds four fixed shapes, decision D1. `docs/adrs/accepted/adr-0066-entity-storage-holds-four-fixed-shapes.md`
 [^63]: Recurring Defect Shapes, shape 1. `.claude/rules/recurring-defects.md`
+[^64]: Findings register, FND-093, in this document.

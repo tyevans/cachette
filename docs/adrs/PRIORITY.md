@@ -40,6 +40,7 @@ A record here binds nothing until a reviewer moves it.
 | 0076 | A founding keeps a fixed distance from the foundings before it, a run founds in ascending faction index, and the faction fills the frame slot of the draw key. Backlog item 0094 wrote it, and the code it describes exists. |
 | 0081 | Housing. Nothing in the queue can bound a population until this is settled. Read it against ADR-0074 D3, which answers the tile case the other way. |
 | 0082 | Population growth. It depends on 0081, so review 0081 first. |
+| 0080 | Recovery of a depleted deposit. The code exists and the record was written with it. A reviewer should read the cost claim first: the pass reads the depleted set and takes no tile count.[^11] |
 
 ## Reserved and not written
 
@@ -53,7 +54,6 @@ reserved until the code that needs them exists.[^6]
 | 0069 | Weather. Nothing needs it. |
 | 0077 | The golden state hash. Write it when the first real golden file is committed, not before.[^9] |
 | 0055 | The modifier pipeline. One source modifies a rate, so the test fails today.[^8] |
-| 0080 | Recovery of a depleted deposit. The three-condition test passes, but no recovery code exists. Backlog item 0123 writes it with the code.[^10] |
 
 Every other reserved row in the registry is left alone on purpose. A record for
 a subsystem nobody has built is the failure the scope rule opens with.[^6]
@@ -70,3 +70,4 @@ a subsystem nobody has built is the failure the scope rule opens with.[^6]
 [^8]: ADR-0062, decision D7. `docs/adrs/accepted/adr-0062-production-and-upkeep-are-rates-attached-to-a-site.md`
 [^9]: Decisions register, DEC-014. `docs/DECISIONS.md`
 [^10]: Backlog item 0123. `docs/backlog/refined/0123-recover-a-depleted-deposit-without-a-pass-over-the-world.md`
+[^11]: Backlog item 0123. `docs/backlog/complete/0123-recover-a-depleted-deposit-without-a-pass-over-the-world.md`
