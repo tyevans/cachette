@@ -55,7 +55,9 @@ pub use holding::{FactionMask, Holder, Holding};
 pub use rates::{
     RateError, RateLedger, RatePass, RateSchedule, RateTable, SiteRate, SiteShortfall,
 };
-pub use resource::{Amount, CarryLoad, DepletionLedger, ResourceField, ResourceKind};
+pub use resource::{
+    Amount, CarryLoad, DepletionLedger, LedgerEntry, RecoveryRules, ResourceField, ResourceKind,
+};
 pub use site::{
     CommodityId, SettlementArena, SettlementError, Store, StoreUpdate, COMMODITY_COUNT,
 };

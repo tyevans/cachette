@@ -31,7 +31,7 @@ use crate::hash::StateHash;
 use crate::hex::{Axial, Grid};
 use crate::rng;
 use crate::terrain::{Terrain, TileKind, KIND_COUNT as TERRAIN_KIND_COUNT};
-use crate::types::{Accum, TileIdx};
+use crate::types::{Accum, Tick, TileIdx};
 
 /// The frame that every stock draw is keyed on.
 ///
@@ -371,6 +371,187 @@ pub const fn ledger_key(tile: TileIdx, kind: ResourceKind) -> u64 {
     ((tile.0 as u64) << 2) | (kind.to_u8() as u64)
 }
 
+/// The number of ticks in one simulated day.
+///
+/// One tick is a fixed span of simulated time, and the register holds that
+/// span.[^1] A period stated in ticks alone would go stale if the span moved,
+/// so every period below is stated in simulated days and converted here.
+///
+/// # References
+///
+/// [^1]: Budgets and costs, the scale constants. `docs/reference/budgets.md`
+pub const TICKS_IN_A_SIMULATED_DAY: u32 = 600;
+
+/// How long each kind takes to regain one unit of stock, in simulated days.
+///
+/// A kind that holds `None` does not recover at all. Stone holds `None`,
+/// because stone is not alive and does not grow back.[^1]
+///
+/// **This is the only declaration of the recovery period.** A caller replaces
+/// the whole rule set rather than one value, so no second site holds a period
+/// and no check is needed to keep two copies in step.[^2]
+///
+/// # References
+///
+/// [^1]: Decisions register, DEC-049. `docs/DECISIONS.md`
+/// [^2]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`
+const RECOVERY_DAYS: [Option<u32>; RESOURCE_KIND_COUNT] = [Some(1), Some(4), None];
+
+/// How fast each kind of deposit recovers.
+///
+/// The rules are a parameter of the world, not a constant of a kernel. The
+/// value of a period is a judgement that the project owner may reverse, so the
+/// engine holds it where a caller can replace it.[^1]
+///
+/// A period is the simulated time in which one depleted deposit regains one
+/// unit of stock. A kind that states no period does not recover.
+///
+/// # References
+///
+/// [^1]: Decisions register, DEC-049 and DEC-050. `docs/DECISIONS.md`
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct RecoveryRules {
+    periods: [Option<u32>; RESOURCE_KIND_COUNT],
+}
+
+impl RecoveryRules {
+    /// The rules that the content table above states.
+    pub const DEFAULT: Self = {
+        let mut periods = [None; RESOURCE_KIND_COUNT];
+        let mut index = 0;
+        while index < RESOURCE_KIND_COUNT {
+            periods[index] = match RECOVERY_DAYS[index] {
+                Some(days) => Some(days * TICKS_IN_A_SIMULATED_DAY),
+                None => None,
+            };
+            index += 1;
+        }
+        Self { periods }
+    };
+
+    /// The rules under which no kind recovers.
+    pub const NONE: Self = Self {
+        periods: [None; RESOURCE_KIND_COUNT],
+    };
+
+    /// Builds a rule set from a period in ticks for each kind.
+    ///
+    /// Returns `None` when a period is zero. A period of zero returns the
+    /// whole take in one tick, which is a second way to say that a deposit was
+    /// never depleted, and two ways to say one thing is the defect shape this
+    /// project keeps meeting.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`
+    #[must_use]
+    pub const fn from_ticks(periods: [Option<u32>; RESOURCE_KIND_COUNT]) -> Option<Self> {
+        let mut index = 0;
+        while index < RESOURCE_KIND_COUNT {
+            if let Some(period) = periods[index] {
+                if period == 0 {
+                    return None;
+                }
+            }
+            index += 1;
+        }
+        Some(Self { periods })
+    }
+
+    /// Returns the period of one kind, in ticks.
+    ///
+    /// Returns `None` when the kind does not recover.
+    #[must_use]
+    pub const fn period_of(self, kind: ResourceKind) -> Option<u32> {
+        self.periods[kind.index()]
+    }
+}
+
+impl Default for RecoveryRules {
+    fn default() -> Self {
+        Self::DEFAULT
+    }
+}
+
+/// One entry of the depletion ledger.
+///
+/// The entry holds what is still owed to one deposit, and the tick that the
+/// owed amount was last brought up to date at. The two fields are one fact
+/// together: an amount without its anchor cannot be aged, and an anchor
+/// without an amount describes nothing.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct LedgerEntry {
+    /// The tile and kind that the entry describes.
+    pub key: u64,
+    /// What is still missing from the deposit.
+    pub taken: u32,
+    /// The tick that the amount above was brought up to date at.
+    pub anchor: Tick,
+}
+
+/// Ages one entry forward to a tick.
+///
+/// Recovery is not growth of an amount. It is the ageing away of a stored
+/// take: the deposit holds what the generator gave it, less what the ledger
+/// still says was taken, so a smaller stored take is a fuller deposit.[^1]
+///
+/// The arithmetic is whole numbers only. The elapsed ticks divide by the
+/// period, and the anchor moves forward by the whole periods that were spent.
+/// The remainder therefore survives, so the same total of ticks recovers the
+/// same amount however many calls it arrived in. A rule that dropped the
+/// remainder would recover nothing at all when it ran on every tick and the
+/// period was longer than one tick.[^2]
+///
+/// An entry that reaches nothing owed restarts its clock at the tick, because
+/// the ticks it did not need must not carry into the next take.
+///
+/// # References
+///
+/// [^1]: ADR-0072, a tile stock is generated, and only what was taken is stored, decision D4. `docs/adrs/accepted/adr-0072-a-tile-stock-is-generated-and-only-what-was-taken-is-stored.md`
+/// [^2]: ADR-0002, simulated and aggregated state holds no floating point number, decision D1. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
+#[must_use]
+fn aged(entry: LedgerEntry, tick: Tick, period: Option<u32>) -> LedgerEntry {
+    let Some(period) = period else {
+        return entry;
+    };
+    if entry.taken == 0 {
+        return LedgerEntry {
+            anchor: tick,
+            ..entry
+        };
+    }
+    let elapsed = tick.0.saturating_sub(entry.anchor.0);
+    let whole = elapsed / u64::from(period);
+    if whole == 0 {
+        return entry;
+    }
+    let recovered = whole.min(u64::from(entry.taken)) as u32;
+    let taken = entry.taken - recovered;
+    let anchor = if taken == 0 {
+        tick
+    } else {
+        Tick(entry.anchor.0 + u64::from(recovered) * u64::from(period))
+    };
+    LedgerEntry {
+        taken,
+        anchor,
+        ..entry
+    }
+}
+
+/// Returns the recovery period of the kind that a ledger key names.
+///
+/// Returns `None` when the kind does not recover, and when the key names no
+/// kind. A key that named no kind would be a broken ledger, and the
+/// conservation check is what reports that.
+#[must_use]
+fn period_of_key(rules: RecoveryRules, key: u64) -> Option<u32> {
+    match ResourceKind::from_u8((key & 0b11) as u8) {
+        Some(kind) => rules.period_of(kind),
+        None => None,
+    }
+}
+
 /// What has been taken from each tile and kind.
 ///
 /// The ledger holds one entry for each tile and kind that somebody gathered
@@ -392,8 +573,11 @@ pub const fn ledger_key(tile: TileIdx, kind: ResourceKind) -> u64 {
 /// [^2]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct DepletionLedger {
-    entries: Vec<(u64, u32)>,
-    scratch: Vec<(u64, u32)>,
+    entries: Vec<LedgerEntry>,
+    scratch: Vec<LedgerEntry>,
+    rules: RecoveryRules,
+    visits: u64,
+    returned: [i64; RESOURCE_KIND_COUNT],
 }
 
 impl DepletionLedger {
@@ -403,7 +587,80 @@ impl DepletionLedger {
         Self {
             entries: Vec::new(),
             scratch: Vec::new(),
+            rules: RecoveryRules::DEFAULT,
+            visits: 0,
+            returned: [0; RESOURCE_KIND_COUNT],
         }
+    }
+
+    /// Returns the total that recovery has given back, for one kind.
+    ///
+    /// The world took a resource out of the tiles and recovery puts some of it
+    /// back. A conservation check reads both terms, because the stored take
+    /// alone no longer balances what the units hold.[^1]
+    ///
+    /// The accumulator is 64 bits wide and every term is a whole number, so
+    /// the total is the same in any order.[^2]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0072, a tile stock is generated, and only what was taken is stored, decision D5. `docs/adrs/accepted/adr-0072-a-tile-stock-is-generated-and-only-what-was-taken-is-stored.md`
+    /// [^2]: ADR-0002, simulated and aggregated state holds no floating point number, decision D1. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
+    #[must_use]
+    pub const fn returned(&self, kind: ResourceKind) -> Accum {
+        Accum(self.returned[kind.index()])
+    }
+
+    /// Returns the recovery rules that the ledger reads.
+    #[must_use]
+    pub const fn recovery(&self) -> RecoveryRules {
+        self.rules
+    }
+
+    /// Replaces the recovery rules.
+    ///
+    /// The caller replaces the whole rule set, so the period of a kind lives
+    /// in one place and no two sites can disagree.
+    pub fn set_recovery(&mut self, rules: RecoveryRules) {
+        self.rules = rules;
+    }
+
+    /// Returns the number of entries that the last recovery pass read.
+    ///
+    /// The pass reads the depleted set and nothing else. It takes no grid and
+    /// no tile count, so it cannot read a tile that holds no stored take.
+    #[must_use]
+    pub const fn last_recovery_visits(&self) -> u64 {
+        self.visits
+    }
+
+    /// Ages every stored take forward to a tick.
+    ///
+    /// The pass walks the depleted set in key order, which is the order the
+    /// ledger holds, so the result does not depend on how the entries
+    /// arrived.[^1] It visits no tile. A world in which nothing was gathered
+    /// holds no entry, so one pass over it does no work, at any tile
+    /// count.[^2]
+    ///
+    /// The pass leaves an entry that reached nothing owed in place. Removing
+    /// such an entry is a separate change.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
+    /// [^2]: ADR-0072, a tile stock is generated, and only what was taken is stored, decision D4. `docs/adrs/accepted/adr-0072-a-tile-stock-is-generated-and-only-what-was-taken-is-stored.md`
+    pub fn recover(&mut self, tick: Tick) {
+        let rules = self.rules;
+        let mut visits = 0u64;
+        for entry in &mut self.entries {
+            visits += 1;
+            let after = aged(*entry, tick, period_of_key(rules, entry.key));
+            if let Some(kind) = ResourceKind::from_u8((entry.key & 0b11) as u8) {
+                self.returned[kind.index()] += i64::from(entry.taken - after.taken);
+            }
+            *entry = after;
+        }
+        self.visits = visits;
     }
 
     /// Returns the number of entries.
@@ -422,15 +679,29 @@ impl DepletionLedger {
     #[must_use]
     pub fn taken(&self, tile: TileIdx, kind: ResourceKind) -> Amount {
         let key = ledger_key(tile, kind);
-        match self.entries.binary_search_by_key(&key, |(held, _)| *held) {
-            Ok(at) => Amount(self.entries[at].1),
+        match self.entries.binary_search_by_key(&key, |entry| entry.key) {
+            Ok(at) => Amount(self.entries[at].taken),
+            Err(_) => Amount::ZERO,
+        }
+    }
+
+    /// Returns what has been taken from one tile and kind, as at a tick.
+    ///
+    /// The answer is a pure function of the stored entry and the tick. Reading
+    /// it changes nothing, so two readers at one tick get one answer and a
+    /// reader never moves the world forward.
+    #[must_use]
+    pub fn taken_at(&self, tile: TileIdx, kind: ResourceKind, tick: Tick) -> Amount {
+        let key = ledger_key(tile, kind);
+        match self.entries.binary_search_by_key(&key, |entry| entry.key) {
+            Ok(at) => Amount(aged(self.entries[at], tick, self.rules.period_of(kind)).taken),
             Err(_) => Amount::ZERO,
         }
     }
 
     /// Returns the entries, in ascending key order.
     #[must_use]
-    pub fn entries(&self) -> &[(u64, u32)] {
+    pub fn entries(&self) -> &[LedgerEntry] {
         &self.entries
     }
 
@@ -445,8 +716,8 @@ impl DepletionLedger {
     #[must_use]
     pub fn total(&self) -> Accum {
         let mut total = 0i64;
-        for (_, amount) in &self.entries {
-            total += i64::from(*amount);
+        for entry in &self.entries {
+            total += i64::from(entry.taken);
         }
         Accum(total)
     }
@@ -456,7 +727,7 @@ impl DepletionLedger {
     /// The caller states the order and the merge relies on it. A run out of
     /// order would silently produce an unsorted result, and every later lookup
     /// would then read the wrong tile.
-    pub fn merge_ascending(&mut self, run: &[(u64, u32)]) {
+    pub fn merge_ascending(&mut self, run: &[(u64, u32)], tick: Tick) {
         debug_assert!(
             run.windows(2).all(|pair| pair[0].0 < pair[1].0),
             "a merged run must be sorted by key and hold each key once"
@@ -464,25 +735,39 @@ impl DepletionLedger {
         if run.is_empty() {
             return;
         }
+        let rules = self.rules;
         self.scratch.clear();
         self.scratch.reserve(self.entries.len() + run.len());
         let (mut here, mut there) = (0usize, 0usize);
         while here < self.entries.len() && there < run.len() {
             let (mine, theirs) = (self.entries[here], run[there]);
-            if mine.0 < theirs.0 {
+            if mine.key < theirs.0 {
                 self.scratch.push(mine);
                 here += 1;
-            } else if theirs.0 < mine.0 {
-                self.scratch.push(theirs);
+            } else if theirs.0 < mine.key {
+                self.scratch.push(new_entry(theirs, tick));
                 there += 1;
             } else {
-                self.scratch.push((mine.0, mine.1 + theirs.1));
+                // The entry ages to the tick before the new take joins it. A
+                // take added to a stale amount would carry the ticks that
+                // passed before it into its own recovery, and the deposit
+                // would then return the new take faster than the rule says.
+                let current = aged(mine, tick, period_of_key(rules, mine.key));
+                if let Some(kind) = ResourceKind::from_u8((mine.key & 0b11) as u8) {
+                    self.returned[kind.index()] += i64::from(mine.taken - current.taken);
+                }
+                self.scratch.push(LedgerEntry {
+                    taken: current.taken.saturating_add(theirs.1),
+                    ..current
+                });
                 here += 1;
                 there += 1;
             }
         }
         self.scratch.extend_from_slice(&self.entries[here..]);
-        self.scratch.extend_from_slice(&run[there..]);
+        for fresh in &run[there..] {
+            self.scratch.push(new_entry(*fresh, tick));
+        }
         core::mem::swap(&mut self.entries, &mut self.scratch);
     }
 
@@ -496,8 +781,14 @@ impl DepletionLedger {
     #[must_use]
     pub fn hash_into(&self, hash: StateHash) -> StateHash {
         let mut running = hash.write_u64(self.entries.len() as u64);
-        for (key, amount) in &self.entries {
-            running = running.write_u64(*key).write(&amount.to_le_bytes());
+        for entry in &self.entries {
+            running = running
+                .write_u64(entry.key)
+                .write(&entry.taken.to_le_bytes())
+                .write_u64(entry.anchor.0);
+        }
+        for total in &self.returned {
+            running = running.write_u64(*total as u64);
         }
         running
     }
@@ -509,7 +800,21 @@ impl DepletionLedger {
     /// notice.
     #[must_use]
     pub fn check_invariants(&self) -> bool {
-        self.entries.windows(2).all(|pair| pair[0].0 < pair[1].0)
+        self.entries
+            .windows(2)
+            .all(|pair| pair[0].key < pair[1].key)
+    }
+}
+
+/// Builds a ledger entry for a take that no entry held before.
+///
+/// The clock of the entry starts at the tick of the take.
+#[must_use]
+const fn new_entry(run: (u64, u32), tick: Tick) -> LedgerEntry {
+    LedgerEntry {
+        key: run.0,
+        taken: run.1,
+        anchor: tick,
     }
 }
 
