@@ -39,6 +39,7 @@ A record here binds nothing until a reviewer moves it.
 |---|---|
 | 0064 | A unit chooses by scoring a small fixed option set. Backlog item 0064 wrote it, and the code it describes exists. |
 | 0074 | A spawn may over-fill a tile, and only admission enforces the capacity. The engine already does this. A reviewer rewrote the draft around the opposite claim, so a second reviewer must read it. |
+| 0076 | A founding keeps a fixed distance from the foundings before it, a run founds in ascending faction index, and the faction fills the frame slot of the draw key. Backlog item 0094 wrote it, and the code it describes exists. |
 
 ## Reserved and not written
 
