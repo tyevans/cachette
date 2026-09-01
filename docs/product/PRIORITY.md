@@ -41,6 +41,7 @@ A record here is a need, not a plan. The backlog says what work answers it.[^3]
 
 | No. | Why it sits here |
 |---|---|
+| 0018 | A deposit never comes back. Wants 0013, because nothing drains the world until units consume. |
 | 0015 | Family and descent. Wants the character tier to be doing something first. |
 | 0016 | A ruler. Wants a family to succeed from. |
 | 0010 | Goods moving. Nothing holds a surplus until production and consumption run. |

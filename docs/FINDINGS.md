@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-101**
+**Next number: FND-105**
 
 ## A. Corrections to stated rules
 
@@ -2155,6 +2155,42 @@ governed by records and the display work is governed by nothing, so the two
 drift apart at the speed the engine moves. That is shape 2 with the roles
 reversed: the specific thing that rots is the picture, not the prose.[^46]
 
+### FND-104 — Regrowth waited on a cost that the sparse store had already answered
+
+**Believed.** Whether a deposit refills depends on what depletion turns out to
+cost. The product record for the resources of the world deferred the question
+in those words, and nothing else in the project said anything about regrowth.
+
+**True.** The cost of depletion is not what governs it, and the answer arrived
+with the gathering work rather than after it. The engine generates a starting
+stock from the seed and the address, and stores only what units took, only for
+the tiles they took from.[^49] Recovery is therefore the ageing away of a
+stored take, not the growth of a stored amount. Its cost follows the number of
+depleted deposits and never the tile count, and a world in which nothing was
+gathered has nothing to recover.
+
+**Evidence.** The stored take is a sparse ledger keyed by tile and kind, and a
+world with no gathering holds no entry. The generated stock allocates nothing
+at any tile count. Both properties are stated in the module and in the record
+that governs it.[^49]
+
+**Follows.** Three things.
+
+**A deferral states what would answer it, not only that it is deferred.** The
+deferral above named a cost. The thing that answered it was a storage shape,
+so nobody reading the deferral would have recognised the answer when it
+landed. The product record for a deposit that comes back was written eleven
+records later, and only because somebody asked.[^50]
+
+**A cheap shape can arrive before the need that wants it.** The sparse store
+was chosen for the memory cost of the resource field. It also removed the
+per-tile cost of every later rule that changes a stock. Check the store before
+assuming a rule must pass over the world.
+
+**A question deferred to a cost is worth revisiting when the storage changes.**
+Search the deferrals when a storage decision lands, and say in the commit which
+ones it answered.
+
 
 ## References
 
@@ -2206,3 +2242,5 @@ reversed: the specific thing that rots is the picture, not the prose.[^46]
 [^46]: Recurring defect shapes, shape 2. `.claude/rules/recurring-defects.md`
 [^47]: Development budgets, the gate suite budget. `docs/reference/development-budgets.md`
 [^48]: ADR-0008, the primary target is `aarch64-unknown-linux-gnu`, decision D2. `docs/adrs/accepted/adr-0008-the-primary-target-is-aarch64.md`
+[^49]: ADR-0072, a tile stock is generated, and only what was taken is stored. `docs/adrs/accepted/adr-0072-a-tile-stock-is-generated-and-only-what-was-taken-is-stored.md`
+[^50]: PRD-0018, a depleted deposit comes back. `docs/product/shaped/prd-0018-a-depleted-deposit-comes-back.md`

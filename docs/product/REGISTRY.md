@@ -51,6 +51,7 @@ documents cite it.
 | 0015 | A unit has parents and children | Accepted | Game developer | `accepted/prd-0015-a-unit-has-parents-and-children.md` |
 | 0016 | Somebody is in charge | Accepted | Game developer | `accepted/prd-0016-somebody-is-in-charge.md` |
 | 0017 | Work is assigned to the people who can do it | Accepted | Game developer | `accepted/prd-0017-work-is-assigned-to-the-people-who-can-do-it.md` |
+| 0018 | A depleted deposit comes back | Shaped | Game developer | `shaped/prd-0018-a-depleted-deposit-comes-back.md` |
 
 ## What does not belong in a record
 

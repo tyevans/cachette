@@ -23,11 +23,67 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^ALLOC]
 
-**Next number: DEC-042**
+**Next number: DEC-051**
 
 ## Open
 
-No row is open. The project owner answered every open row.
+### DEC-049 — Which resource kinds recover, and how fast?
+
+**Open. The project owner decides.** The product record for a deposit that
+comes back states the recovery period as a parameter of the resource kind and
+states no value.[^PRD18]
+
+The world holds three kinds: food, wood and stone. Two of them are alive in
+the ordinary meaning and one is not, so the shape of the answer is probably
+one period for each kind, with one of the periods absent.
+
+**The options.**
+
+1. Food and wood recover. Stone does not. A period for each of the two.
+2. Every kind recovers, with stone far slower than the others.
+3. One period for the whole world, and no difference between the kinds.
+
+**The recommendation is option 1.** It matches what a player expects, it needs
+no value for stone, and it makes the absent case a real case that the engine
+must carry from the first day rather than a case somebody adds later.
+
+**How to state a period.** State it in simulated time and derive the tick
+count. One tick is a fixed span of simulated time, and the register holds
+that constant.[^SCALE] A period given in ticks alone would go stale if the
+tick span ever moved.
+
+**What holds it back.** Nothing. Work can start under option 1 with the two
+periods as parameters, and the parameters carry the same name in the engine
+and in this row.
+
+### DEC-050 — Does a deposit that reached nothing recover?
+
+**Open. The project owner decides.** The product record states this as a
+parameter and states no value.[^PRD18]
+
+A deposit that units emptied is a different case from one they reduced. The
+question is whether the world treats it as a wound that heals or as a thing
+that is gone.
+
+**The options.**
+
+1. It recovers, in the same way as any other depleted deposit. Nothing in the
+   world is ever permanently spent.
+2. It never recovers. A deposit that reached nothing stays at nothing.
+3. It recovers only when a neighbouring tile of the same kind still holds
+   something.
+
+**The recommendation is option 1 for now, and option 3 is a later need.**
+Option 1 is the cheap one and the one that keeps the rule uniform. Option 2
+gives a player a way to ruin ground, which is interesting, and the product
+record names permanent ruin as a separate need on purpose. Option 3 reads a
+neighbourhood, so its cost does not follow the depleted set alone, and this
+row should not choose it without a measurement the project cannot take
+today.[^BLK7]
+
+**Why this is a decision and not a blocker.** Both options are known and work
+continues under either. Only the value of one parameter changes.
+
 
 ### DEC-038 — Which slot does the faction take in the founding draw key?
 
@@ -711,6 +767,9 @@ a failed founding is correct.[^PRD12]
 [^AGENCY]: Individual agency and occupations, the decision cost, and DEC-002 above. `docs/research/reports/16-individual-agency-and-occupations.md`
 [^ADR60]: ADR Registry, proposed row 0060, an influence map is stored as a shared basis. `docs/adrs/REGISTRY.md`
 [^DEC5REF]: See DEC-005 in this document.
+[^PRD18]: Product record PRD-0018, a depleted deposit comes back. `docs/product/shaped/prd-0018-a-depleted-deposit-comes-back.md`
+[^SCALE]: Budgets and costs, the scale constants. `docs/reference/budgets.md`
+
 [^ALLOC]: Findings register, FND-038. `docs/FINDINGS.md`
 [^TARGET]: Blockers register, BLK-004, and the scale constants. `docs/reference/budgets.md`
 [^MOVETIME]: The movement timing note, and DEC-008 above. `docs/research/movement-timing.md`
