@@ -1,7 +1,7 @@
 ---
 id: 0014
 title: Everyone needs somewhere to live
-status: Shaped
+status: Accepted
 created: 2026-08-31
 ---
 

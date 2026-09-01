@@ -1,7 +1,7 @@
 ---
 id: 0017
 title: Work is assigned to the people who can do it
-status: Shaped
+status: Accepted
 created: 2026-08-31
 ---
 

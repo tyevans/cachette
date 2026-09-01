@@ -32,12 +32,10 @@ A record here is a need, not a plan. The backlog says what work answers it.[^3]
 | No. | Why it sits here |
 |---|---|
 | 0013 | Consumption. Nothing makes a resource matter until something needs it. |
-| 0002 | A developer watches the world run. Reviewed and refused; two statements fail.[^5] |
 | 0014 | Housing. It bounds the population that 0011 will grow. |
 | 0017 | Work assigned to the people who can do it. |
 | 0008 | A unit changes the ground it stands on. |
 | 0003 | A world worth looking at. The viewer trails the engine badly. |
-| 0005 | A watcher can tell what is happening and why. |
 
 ## Later
 

@@ -1,7 +1,7 @@
 ---
 id: 0010
 title: A good moves to where it is wanted
-status: Shaped
+status: Accepted
 created: 2026-08-30
 ---
 

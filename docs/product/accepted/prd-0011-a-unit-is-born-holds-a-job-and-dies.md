@@ -1,7 +1,7 @@
 ---
 id: 0011
 title: A unit is born, holds a job, and dies
-status: Shaped
+status: Accepted
 created: 2026-08-30
 ---
 

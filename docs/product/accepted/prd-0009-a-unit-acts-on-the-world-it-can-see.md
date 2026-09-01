@@ -1,7 +1,7 @@
 ---
 id: 0009
 title: A unit acts on the world it can see
-status: Shaped
+status: Accepted
 created: 2026-08-30
 ---
 

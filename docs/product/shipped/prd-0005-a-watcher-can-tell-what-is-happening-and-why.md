@@ -1,7 +1,7 @@
 ---
 id: 0005
 title: A watcher can tell what is happening and why
-status: Shaped
+status: Shipped
 created: 2026-08-30
 ---
 

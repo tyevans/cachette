@@ -1,7 +1,7 @@
 ---
 id: 0013
 title: A unit consumes to continue
-status: Shaped
+status: Accepted
 created: 2026-08-31
 ---
 

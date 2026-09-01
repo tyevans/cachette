@@ -1,7 +1,7 @@
 ---
 id: 0001
 title: A faction sees only what its own units observe
-status: Shaped
+status: Accepted
 created: 2026-08-30
 ---
 

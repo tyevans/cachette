@@ -1,7 +1,7 @@
 ---
 id: 0003
 title: A developer sees a world worth looking at
-status: Shaped
+status: Accepted
 created: 2026-08-30
 ---
 

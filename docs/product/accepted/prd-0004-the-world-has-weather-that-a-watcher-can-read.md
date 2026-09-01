@@ -1,7 +1,7 @@
 ---
 id: 0004
 title: The world has weather that a watcher can read
-status: Shaped
+status: Accepted
 created: 2026-08-30
 ---
 
@@ -104,8 +104,9 @@ dominates.[^2]
   above states a shape, not a number. A tick budget, a memory figure and an
   update rate are all measurements, so this record states none of them.
 
-This record depends on terrain, which is in progress. It states no terrain
-value, so no terrain decision can make it false.
+This record depends on terrain. The world now gives every tile a kind and a
+height. This record states no terrain value, so no terrain decision can make
+it false.
 
 ## References
 

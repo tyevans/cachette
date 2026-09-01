@@ -1,7 +1,7 @@
 ---
 id: 0015
 title: A unit has parents and children
-status: Shaped
+status: Accepted
 created: 2026-08-31
 ---
 
@@ -45,8 +45,9 @@ Each statement below can be checked.
   is exact.
 - A unit can found a line with no ancestors. Its relation to every existing
   unit is zero, and the world says so rather than inventing a parent.
-- Units who are related and who live together form a household, and a watcher
-  can ask who is in one.
+- Units who live together form a household, and a watcher can ask who is in
+  one. A household follows from where people live. It is not a second fact
+  that somebody declares.
 - A line can end. When no descendant remains, the world reports that the line
   ended.
 - The record of descent survives the death of the unit it names. A watcher can

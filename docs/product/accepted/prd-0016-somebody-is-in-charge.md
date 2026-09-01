@@ -1,7 +1,7 @@
 ---
 id: 0016
 title: Somebody is in charge
-status: Shaped
+status: Accepted
 created: 2026-08-31
 ---
 

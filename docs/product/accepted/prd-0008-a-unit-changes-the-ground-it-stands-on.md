@@ -1,7 +1,7 @@
 ---
 id: 0008
 title: A unit changes the ground it stands on
-status: Shaped
+status: Accepted
 created: 2026-08-30
 ---
 

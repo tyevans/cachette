@@ -1,7 +1,7 @@
 ---
 id: 0007
 title: The world holds things worth taking
-status: Shaped
+status: Accepted
 created: 2026-08-30
 ---
 

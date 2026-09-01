@@ -1,7 +1,7 @@
 ---
 id: 0012
 title: A world starts small and grows
-status: Shaped
+status: Accepted
 created: 2026-08-31
 ---
 
@@ -75,8 +75,8 @@ Each statement below can be checked.
   another place is a separate need.
 - It does not promise that a founding succeeds. A group may fail, and a failed
   founding is a correct outcome.
-- It does not decide how many groups found a world. One group and one group
-  for each faction are both candidates.
+- It does not decide how many groups found a world. The engine is told the
+  number, and this record states none.
 - It does not change the ground. The world the generator made is the world the
   group arrives in.
 
@@ -120,7 +120,9 @@ makes that number start low.[^2]
 
 The target population is answered, and it counts everybody rather than the
 soldiers alone, so this record states no ceiling of its own.[^3] The settlement
-count is answered, so this record states no number of founding places.[^4]
+count is answered, so this record states no number of founding places.[^4] The
+number of founding groups is answered, so this record states no number of its
+own.[^5]
 
 ## References
 
@@ -128,3 +130,4 @@ count is answered, so this record states no number of founding places.[^4]
 [^2]: Findings register, FND-049. `docs/FINDINGS.md`
 [^3]: Blockers register, BLK-003. `docs/BLOCKERS.md`
 [^4]: Blockers register, BLK-005. `docs/BLOCKERS.md`
+[^5]: Blockers register, BLK-018. `docs/BLOCKERS.md`

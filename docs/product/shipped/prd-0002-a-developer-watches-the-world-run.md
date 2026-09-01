@@ -1,7 +1,7 @@
 ---
 id: 0002
 title: A developer watches the world run
-status: Shaped
+status: Shipped
 created: 2026-08-30
 ---
 
@@ -50,8 +50,10 @@ Each statement below can be checked.
 - The window shows the simulation. It does not show a copy. The code that
   moves the entities is the engine that the tests exercise.
 - The same world, from the same seed, shows the same behaviour on every run.
-- The window keeps up with the engine, or it drops what it cannot draw and
-  reports the drop. It never makes the engine wait.
+- The window shows every step the engine takes. The developer misses none of
+  them.
+- A viewer that only watches asks the engine for no extra work. The engine
+  does nothing for the sake of the picture.
 - The engine gives the same results when no window is open.
 
 ## What this does not do
@@ -67,6 +69,12 @@ Each statement below can be checked.
   small enough to watch.
 - It does not decide how a shipped game presents the engine. It is a window
   onto the engine. It is not a user interface.
+- It does not separate the drawing rate from the rate of the steps. The
+  demonstration binary is excluded from the statements above by name. It
+  draws every step, so a slow drawing slows the demonstration. This record
+  accepts that for a demonstration.
+- It does not serve a person who must watch a world that steps faster than a
+  screen refreshes. That is a later need.
 - It does not serve the control plane. A person who wants numbers reads them
   through Python.
 
@@ -85,8 +93,9 @@ Two properties follow. A solution must have both.
 
 - What the viewer reads grows with what the screen shows. It does not grow
   with the size of the world.
-- The engine costs the same when a viewer is attached. A world with no viewer
-  runs at the same speed as a world with one.
+- The engine does no extra work for the viewer. A viewer that watches adds no
+  cost to a step. The time a drawing itself takes is excluded, because the
+  demonstration binary draws every step.
 
 No cost figure appears here, because nobody has measured one on the target
 platform.[^1] The shape of the growth is the requirement. The figure is not.

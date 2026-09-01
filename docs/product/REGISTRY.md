@@ -34,23 +34,23 @@ documents cite it.
 
 | No. | Title | Status | Serves | File |
 |---|---|---|---|---|
-| 0001 | A faction sees only what its own units observe | Shaped | Game developer | `shaped/prd-0001-a-faction-sees-only-what-it-observes.md` |
-| 0002 | A developer watches the world run | Shaped | Game developer | `shaped/prd-0002-a-developer-watches-the-world-run.md` |
-| 0003 | A developer sees a world worth looking at | Shaped | Game developer | `shaped/prd-0003-a-developer-sees-a-world-worth-looking-at.md` |
-| 0004 | The world has weather that a watcher can read | Shaped | Game developer | `shaped/prd-0004-the-world-has-weather-that-a-watcher-can-read.md` |
-| 0005 | A watcher can tell what is happening and why | Shaped | Game developer | `shaped/prd-0005-a-watcher-can-tell-what-is-happening-and-why.md` |
-| 0006 | A place belongs to somebody | Shaped | Game developer | `shaped/prd-0006-a-place-belongs-to-somebody.md` |
-| 0007 | The world holds things worth taking | Shaped | Game developer | `shaped/prd-0007-the-world-holds-things-worth-taking.md` |
-| 0008 | A unit changes the ground it stands on | Shaped | Game developer | `shaped/prd-0008-a-unit-changes-the-ground-it-stands-on.md` |
-| 0009 | A unit acts on the world it can see | Shaped | Game developer | `shaped/prd-0009-a-unit-acts-on-the-world-it-can-see.md` |
-| 0010 | A good moves to where it is wanted | Shaped | Game developer | `shaped/prd-0010-a-good-moves-to-where-it-is-wanted.md` |
-| 0011 | A unit is born, holds a job, and dies | Shaped | Game developer | `shaped/prd-0011-a-unit-is-born-holds-a-job-and-dies.md` |
-| 0012 | A world starts small and grows | Shaped | Game developer | `shaped/prd-0012-a-world-starts-small-and-grows.md` |
-| 0013 | A unit consumes to continue | Shaped | Game developer | `shaped/prd-0013-a-unit-consumes-to-continue.md` |
-| 0014 | Everyone needs somewhere to live | Shaped | Game developer | `shaped/prd-0014-everyone-needs-somewhere-to-live.md` |
-| 0015 | A unit has parents and children | Shaped | Game developer | `shaped/prd-0015-a-unit-has-parents-and-children.md` |
-| 0016 | Somebody is in charge | Shaped | Game developer | `shaped/prd-0016-somebody-is-in-charge.md` |
-| 0017 | Work is assigned to the people who can do it | Shaped | Game developer | `shaped/prd-0017-work-is-assigned-to-the-people-who-can-do-it.md` |
+| 0001 | A faction sees only what its own units observe | Accepted | Game developer | `accepted/prd-0001-a-faction-sees-only-what-it-observes.md` |
+| 0002 | A developer watches the world run | Shipped | Game developer | `shipped/prd-0002-a-developer-watches-the-world-run.md` |
+| 0003 | A developer sees a world worth looking at | Accepted | Game developer | `accepted/prd-0003-a-developer-sees-a-world-worth-looking-at.md` |
+| 0004 | The world has weather that a watcher can read | Accepted | Game developer | `accepted/prd-0004-the-world-has-weather-that-a-watcher-can-read.md` |
+| 0005 | A watcher can tell what is happening and why | Shipped | Game developer | `shipped/prd-0005-a-watcher-can-tell-what-is-happening-and-why.md` |
+| 0006 | A place belongs to somebody | Accepted | Game developer | `accepted/prd-0006-a-place-belongs-to-somebody.md` |
+| 0007 | The world holds things worth taking | Accepted | Game developer | `accepted/prd-0007-the-world-holds-things-worth-taking.md` |
+| 0008 | A unit changes the ground it stands on | Accepted | Game developer | `accepted/prd-0008-a-unit-changes-the-ground-it-stands-on.md` |
+| 0009 | A unit acts on the world it can see | Accepted | Game developer | `accepted/prd-0009-a-unit-acts-on-the-world-it-can-see.md` |
+| 0010 | A good moves to where it is wanted | Accepted | Game developer | `accepted/prd-0010-a-good-moves-to-where-it-is-wanted.md` |
+| 0011 | A unit is born, holds a job, and dies | Accepted | Game developer | `accepted/prd-0011-a-unit-is-born-holds-a-job-and-dies.md` |
+| 0012 | A world starts small and grows | Accepted | Game developer | `accepted/prd-0012-a-world-starts-small-and-grows.md` |
+| 0013 | A unit consumes to continue | Accepted | Game developer | `accepted/prd-0013-a-unit-consumes-to-continue.md` |
+| 0014 | Everyone needs somewhere to live | Accepted | Game developer | `accepted/prd-0014-everyone-needs-somewhere-to-live.md` |
+| 0015 | A unit has parents and children | Accepted | Game developer | `accepted/prd-0015-a-unit-has-parents-and-children.md` |
+| 0016 | Somebody is in charge | Accepted | Game developer | `accepted/prd-0016-somebody-is-in-charge.md` |
+| 0017 | Work is assigned to the people who can do it | Accepted | Game developer | `accepted/prd-0017-work-is-assigned-to-the-people-who-can-do-it.md` |
 
 ## What does not belong in a record
 
