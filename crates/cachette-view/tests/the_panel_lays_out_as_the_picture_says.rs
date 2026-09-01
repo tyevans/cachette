@@ -56,7 +56,7 @@
 use std::path::PathBuf;
 use std::time::Duration;
 
-use cachette_core::{Axial, FactionId, World, WorldConfig};
+use cachette_core::{Axial, FactionId, Founding, World, WorldConfig};
 use cachette_view::picture::write_ppm;
 use cachette_view::{draw_frame, hud, paint, Camera, Canvas, Metrics};
 
@@ -92,17 +92,32 @@ const TICKS: u64 = 40;
 /// The paintings the fixed measurements report.
 const FRAMES: u64 = 40;
 
-/// Builds the world the picture is taken of.
+/// The people the fixture founds its run with.
+const GROUP: u32 = 24;
+
+/// Builds the world the picture is taken of, and founds a run in it.
 ///
 /// The soldiers spread over the whole world with a large stride, so the
 /// window holds soldiers of every faction and the legend rows hold real
 /// counts. A window with no soldier would give a picture of an empty bar and
 /// four zeroes, and the test would then measure the fixture.[^1]
 ///
+/// The run is founded, because the panel now states what the founding chose
+/// beside a place it left. A fixture with no founding would store a picture
+/// with no founding section, and the comparison would then pass against
+/// nothing.
+///
+/// The fixture asserts its own outcome rather than its inputs.[^2] It reads
+/// the survey back and refuses a survey whose best rejected place holds the
+/// same quantities as the chosen one. Such a survey would give two identical
+/// blocks of rows, and a panel that printed the chosen quantities twice would
+/// pass.[^1]
+///
 /// # References
 ///
 /// [^1]: Testing Rules, a fixture supplies the input. `.claude/rules/testing.md`
-fn world(factions: u16) -> World {
+/// [^2]: Findings register, FND-061. `docs/FINDINGS.md`
+fn world(factions: u16) -> (World, Founding) {
     let mut world = World::new(WorldConfig {
         width: WIDE,
         height: TALL,
@@ -110,6 +125,22 @@ fn world(factions: u16) -> World {
         faction_count: factions,
     })
     .expect("the extent describes a world");
+    let founded = world
+        .found_run(GROUP, FactionId(0))
+        .expect("the world holds a place for the group");
+    let survey = founded.survey();
+    let chosen = survey.chosen().expect("the founding chose a place");
+    let other = *survey
+        .rejected()
+        .first()
+        .expect("the founding compared more than one place");
+    assert_ne!(
+        other.provision(),
+        chosen.provision(),
+        "the best place the founding left reaches the same quantities as the \
+         place it took, so the two blocks of rows cannot be told apart",
+    );
+
     let grid = world.grid();
     let open: Vec<Axial> = (0..grid.tile_count())
         .map(|index| Axial::new((index % grid.width()) as i32, (index / grid.width()) as i32))
@@ -123,7 +154,7 @@ fn world(factions: u16) -> World {
             .expect("the address and the faction are valid");
     }
     world.rebuild_bridge(1).expect("the rebuild must succeed");
-    world
+    (world, founded)
 }
 
 /// Returns a camera pointed at the middle of the world.
@@ -170,13 +201,20 @@ const REGENERATE: &str = "UPDATE_PANEL_PICTURE=1 cargo test -p cachette-view \
 ///
 /// [^1]: Testing Rules, drive the real caller. `.claude/rules/testing.md`
 fn taken(factions: u16) -> (String, Canvas) {
-    let world = world(factions);
+    let (world, founded) = world(factions);
     let metrics = measurements();
     let mut panelled = Canvas::new(WINDOW.0, WINDOW.1);
     let mut bare = Canvas::new(WINDOW.0, WINDOW.1);
     let camera = at_the_middle(&world, &panelled);
 
-    let readout = draw_frame(&world, camera, &metrics, &mut panelled).expect("the world draws");
+    let foundings = [founded];
+    let readout =
+        draw_frame(&world, camera, &metrics, &foundings, &mut panelled).expect("the world draws");
+    assert_eq!(
+        readout.foundings().len(),
+        1,
+        "the panel dropped the founding the fixture passed it",
+    );
     paint::draw(&world, camera, &mut bare).expect("the world draws");
 
     // The window must hold the whole panel. A cut panel is a different

@@ -43,11 +43,11 @@ pub mod paint;
 pub mod picture;
 pub mod text;
 
-pub use hud::Readout;
+pub use hud::{FoundingReport, Readout};
 pub use metrics::{Lap, Metrics};
 pub use paint::{Camera, Canvas};
 
-use cachette_core::{BridgeError, World};
+use cachette_core::{BridgeError, Founding, World};
 
 /// Draws one frame: the world, and then the panel that says what it holds.
 ///
@@ -59,6 +59,12 @@ use cachette_core::{BridgeError, World};
 /// paints, so the panel must read the canvas after that pass and draw over
 /// it.
 ///
+/// The foundings are the reports the caller kept when it founded the run.
+/// The caller owns them, and the world holds no copy, because a field that
+/// existed for the panel would be the violation the boundary record
+/// names.[^2] A caller that founded nothing passes an empty slice, and the
+/// panel then states no founding.
+///
 /// # Errors
 ///
 /// Returns an error when the engine's spatial structure no longer describes
@@ -68,14 +74,16 @@ use cachette_core::{BridgeError, World};
 /// # References
 ///
 /// [^1]: Testing Rules, drive the real caller. `.claude/rules/testing.md`
+/// [^2]: ADR-0067, the viewer reads the world and never writes to it, decision D2. `docs/adrs/accepted/adr-0067-the-viewer-reads-the-world-and-never-writes-to-it.md`
 pub fn draw_frame(
     world: &World,
     camera: Camera,
     metrics: &Metrics,
+    foundings: &[Founding],
     canvas: &mut Canvas,
 ) -> Result<Readout, BridgeError> {
     paint::draw(world, camera, canvas)?;
-    let readout = Readout::of(world, camera, canvas, metrics);
+    let readout = Readout::of(world, camera, canvas, metrics, foundings);
     hud::draw(&readout, canvas);
     Ok(readout)
 }

@@ -169,6 +169,13 @@ fn main() -> Result<(), DemoError> {
         .looking_at(founded.place(), &canvas)
         .clamped(&world, &canvas);
 
+    // The demonstration founds one group. The panel is written for a list,
+    // because a run may found more than one and a panel that assumed one
+    // would state a false thing the moment a second group founds.[^1]
+    //
+    // [^1]: Blockers register, BLK-018. `docs/BLOCKERS.md`
+    let foundings = [founded];
+
     let mut window = Window::new(
         "cachette — watch the world run",
         WINDOW_WIDTH,
@@ -209,7 +216,9 @@ fn main() -> Result<(), DemoError> {
         // The frame is the world and the panel that says what it holds. The
         // panel reads the counts of the pass that just ran, so the two belong
         // in one call and the tests drive that call.
-        cachette_view::draw_frame(&world, camera, &metrics, &mut canvas)
+        // The binary owns the founding report and lends it to the panel. The
+        // world keeps no copy of it.
+        cachette_view::draw_frame(&world, camera, &metrics, &foundings, &mut canvas)
             .map_err(DemoError::Bridge)?;
         metrics.draw(at.elapsed());
 
