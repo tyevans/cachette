@@ -696,8 +696,6 @@ fn draw_span(
         } else {
             demanded
         };
-        let taken = Fix32(granted.0 as i32);
-        stores[offset].set_quantity(commodity, sim_math::sub(held, taken));
 
         // The exact split. Each cohort takes the truncated proportion of
         // what it asked for, and the remainder goes one unit at a time in
@@ -719,12 +717,20 @@ fn draw_span(
             }
             *share = sim_math::combine(*share, Accum(1));
             remainder = sim_math::combine(remainder, Accum(-1));
+            handed = sim_math::combine(handed, Accum(1));
         }
 
+        // The store falls by what the cohorts received, and never by what
+        // the transfer meant to give. The two are the same number while the
+        // split is exact, and a split that lost a unit would otherwise take
+        // that unit out of the world in silence.
+        let taken = Fix32(handed.0 as i32);
+        stores[offset].set_quantity(commodity, sim_math::sub(held, taken));
+
         ledger.demanded[index] = sim_math::combine(ledger.demanded[index], demanded);
-        ledger.granted[index] = sim_math::combine(ledger.granted[index], granted);
-        if granted.0 < demanded.0 {
-            let unmet = sim_math::combine(demanded, Accum(-granted.0));
+        ledger.granted[index] = sim_math::combine(ledger.granted[index], handed);
+        if handed.0 < demanded.0 {
+            let unmet = sim_math::combine(demanded, Accum(-handed.0));
             ledger.unmet[index] = sim_math::combine(ledger.unmet[index], unmet);
             let site = Entity::new(start + offset as u32, generations[offset])
                 .expect("a live slot holds a generation of one or more");
@@ -732,7 +738,7 @@ fn draw_span(
                 tick,
                 site.to_bits(),
                 demanded,
-                granted,
+                handed,
                 commodity.0,
             ));
         }

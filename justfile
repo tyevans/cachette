@@ -69,14 +69,16 @@ determinism:
 # The perturbed build reverses every slot reduction, drops the row from the
 # terrain lattice key, from the resource address key and from the founding
 # candidate key, and removes the sort from both admission and the gather
-# resolve. Five test binaries must then fail, and the probe binary, which
-# asserts that every perturbation is visible, must pass.
+# resolve. The reversal reaches the join of the consumption draw as well.
+# Each test binary below must then fail, and the probe binary, which asserts
+# that every perturbation is visible, must pass.
 probe:
     ! cargo test --package cachette-core --features probe-nondeterminism --test thread_equivalence
     ! cargo test --package cachette-core --features probe-nondeterminism --test slot_reduction
     ! cargo test --package cachette-core --features probe-nondeterminism --test terrain
     ! cargo test --package cachette-core --features probe-nondeterminism --test resource
     ! cargo test --package cachette-core --features probe-nondeterminism --test founding
+    ! cargo test --package cachette-core --features probe-nondeterminism --test consumption
     cargo test --package cachette-core --features probe-nondeterminism --test determinism_probe
 
 # Record the golden state hash files. Read the difference before you commit.
