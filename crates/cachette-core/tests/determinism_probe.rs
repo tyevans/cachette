@@ -210,6 +210,14 @@ fn gathered_after_a_frame(threads: usize) -> Vec<CarryLoad> {
         faction_count: 2,
     })
     .expect("the extent must describe a world");
+    // A unit takes an intent at the interval its level 1 cell schedules, and
+    // it does not move before it has one. This fixture is about the order of
+    // a contest, so it sets the interval to every tick.[^C]
+    //
+    // [^C]: ADR-0064, a unit chooses by scoring a small fixed option set, decision D4. `docs/adrs/draft/adr-0064-a-unit-chooses-by-scoring-a-small-fixed-option-set.md`
+    world
+        .set_choice_schedule(0)
+        .expect("the exponent is inside the range");
 
     let grid = world.grid();
     let kind = ResourceKind::Wood;
@@ -293,6 +301,14 @@ fn crowded_after_a_frame(threads: usize) -> Vec<Axial> {
         faction_count: 2,
     })
     .expect("the extent must describe a world");
+    // A unit takes an intent at the interval its level 1 cell schedules, and
+    // it does not move before it has one. This fixture is about the order of
+    // a contest, so it sets the interval to every tick.[^C]
+    //
+    // [^C]: ADR-0064, a unit chooses by scoring a small fixed option set, decision D4. `docs/adrs/draft/adr-0064-a-unit-chooses-by-scoring-a-small-fixed-option-set.md`
+    world
+        .set_choice_schedule(0)
+        .expect("the exponent is inside the range");
 
     let grid = world.grid();
     let patch: Vec<Axial> = (0..grid.tile_count())
@@ -499,4 +515,77 @@ fn the_perturbed_draw_holds_the_same_events_in_a_different_order() {
     at_one.sort_unstable();
     at_twelve.sort_unstable();
     assert_eq!(at_one, at_twelve);
+}
+
+/// The extent of the world that the choice probe reads.
+///
+/// The extent is one level 1 cell, and every tile of it admits a unit, so
+/// the open share of the cell is exactly one.
+const CHOICE_EXTENT: u32 = 32;
+
+#[test]
+fn the_tie_break_test_fails_when_the_option_order_breaks() {
+    // The probe scans the options from the top of the set, so the strict
+    // comparison now gives a tie to the highest option index.
+    //
+    // This defect is invisible to both determinism tests, because the world
+    // it builds is identical on every run and at every thread count. Only a
+    // test that constructs a tie and names the winner sees it, which is the
+    // case the testing rule names.[^1]
+    //
+    // [^1]: Testing rules, section 2. `.claude/rules/testing.md`
+    let mut world = World::new(WorldConfig {
+        width: CHOICE_EXTENT,
+        height: CHOICE_EXTENT,
+        seed: 7,
+        faction_count: 2,
+    })
+    .expect("the extent must describe a world");
+    world
+        .set_choice_schedule(0)
+        .expect("the exponent is inside the range");
+    for option in [0u8, 2, 3] {
+        world
+            .set_option_weight(option, Fix32::MAX)
+            .expect("the index is inside the set");
+    }
+    world
+        .set_option_weight(1, Fix32::ZERO)
+        .expect("the index is inside the set");
+
+    let grid = world.grid();
+    let mut units = Vec::new();
+    for index in 0..grid.tile_count() {
+        let address = Axial::new((index % grid.width()) as i32, (index / grid.width()) as i32);
+        if !world.admits_a_unit(address) {
+            continue;
+        }
+        let capacity = world.tile_kind(address).map_or(0, TileKind::capacity);
+        for ordinal in 0..capacity {
+            if let Ok(unit) = world.spawn_soldier(address, FactionId((ordinal % 2) as u16)) {
+                units.push(unit);
+            }
+        }
+    }
+    assert!(units.len() > 1000, "the probe world holds too few units");
+    world.step(2).expect("the step must run");
+    world.step(2).expect("the step must run");
+
+    let why = world
+        .explain_choice(units[0])
+        .expect("nothing despawned it");
+    assert_eq!(
+        why.scores[0], why.scores[3],
+        "the probe world holds no tie, so the tie-break test has no proven \
+         failure mode"
+    );
+    assert_eq!(
+        why.best, 3,
+        "the probe did not reverse the option order, so the tie-break test \
+         has no proven failure mode"
+    );
+
+    // The perturbation moves the winner and nothing else. A probe that also
+    // changed a score would prove less.
+    assert!(why.scores[2] < why.scores[0], "the probe changed a score");
 }
