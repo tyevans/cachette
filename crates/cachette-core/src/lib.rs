@@ -44,8 +44,8 @@ pub use choose::{
     NO_INTENT, OPTIONS, OPTION_COUNT,
 };
 pub use cohort::{
-    CohortError, CohortRow, CohortTable, DrawLedger, DrawPass, NeedRule, SiteRationed,
-    COHORTS_PER_SITE,
+    CohortError, CohortRow, CohortTable, DeathPlane, DrawLedger, DrawPass, NeedCondition, NeedRule,
+    SiteRationed, UnitStarved, COHORTS_PER_SITE,
 };
 pub use event::{ResourceTaken, TileChanged};
 pub use founding::{Founding, FoundingError, Provision, Survey};

@@ -32,6 +32,7 @@
 //! [^2]: ADR-0056, movement is tile-discrete and admitted by sort-then-admit, decision D3. `docs/adrs/accepted/adr-0056-movement-is-tile-discrete-and-admitted-by-sort-then-admit.md`
 #![cfg(feature = "probe-nondeterminism")]
 
+use cachette_core::cohort::{NeedRule, NEED_FULL};
 use cachette_core::resource::{Amount, ResourceKind};
 use cachette_core::site::CommodityId;
 use cachette_core::slots::{Candidate, Slots};
@@ -588,4 +589,111 @@ fn the_tie_break_test_fails_when_the_option_order_breaks() {
     // The perturbation moves the winner and nothing else. A probe that also
     // changed a score would prove less.
     assert!(why.scores[2] < why.scores[0], "the probe changed a score");
+}
+
+/// The extent that the starvation probe stands on.
+const STARVE_EXTENT: u32 = 48;
+
+/// The number of sites that the starvation probe founds.
+///
+/// The count puts marked units in more than one word of the death plane, so
+/// a span of the plane belongs to more than one output slot.
+const STARVE_SITES: usize = 24;
+
+/// The number of frames that the starvation probe runs.
+const STARVE_FRAMES: usize = 48;
+
+/// Runs a world in which half the units starve, and returns the deaths.
+///
+/// The world founds sites of two kinds. Half produce more than their people
+/// eat, and half produce nothing and start with a store that empties. The
+/// bound of the rule is low, so the shortage ends a unit inside the run.
+fn starved_after_frames(threads: usize) -> Vec<u8> {
+    let mut world = World::new(WorldConfig {
+        width: STARVE_EXTENT,
+        height: STARVE_EXTENT,
+        seed: 42,
+        faction_count: 2,
+    })
+    .expect("the extent must describe a world");
+    world
+        .set_economy_schedule(2, 0)
+        .expect("the period is inside the range");
+    let rule = NeedRule::DEFAULT;
+    world.set_need_rule(
+        NeedRule::new(
+            rule.decay(),
+            rule.ration(),
+            rule.threshold(),
+            rule.recovery(),
+            NEED_FULL,
+        )
+        .expect("every rate is at or above zero"),
+    );
+    let grid = world.grid();
+    let ground: Vec<Axial> = (0..grid.tile_count())
+        .map(|index| Axial::new((index % grid.width()) as i32, (index / grid.width()) as i32))
+        .filter(|address| world.admits_a_unit(*address))
+        .collect();
+    assert!(
+        ground.len() > STARVE_SITES * 4,
+        "the probe world holds only {} open tiles",
+        ground.len()
+    );
+    for index in 0..STARVE_SITES {
+        let site = world
+            .found_settlement(ground[index * 3], FactionId(0))
+            .expect("the tile is free");
+        for ordinal in 0..3u16 {
+            let unit = world
+                .spawn_soldier(ground[index * 3 + 1], FactionId(ordinal % 2))
+                .expect("the ground admits a unit");
+            assert!(world.set_home_site(unit, Some(site)));
+        }
+        if index % 2 == 0 {
+            world
+                .set_production_rate(site, CommodityId(0), Fix32::from_int(1))
+                .expect("the rate is at or above zero");
+        } else {
+            world
+                .set_settlement_store(site, CommodityId(0), Fix32(NEED_FULL.0 / 2))
+                .expect("the commodity is in the set");
+        }
+    }
+    let mut log = Vec::new();
+    for _ in 0..STARVE_FRAMES {
+        world.step(threads).expect("the step must run");
+        log.extend_from_slice(world.starved_log_bytes());
+    }
+    log
+}
+
+#[test]
+fn the_starvation_test_fails_when_the_scan_order_breaks() {
+    // The probe reads the death plane through the output slots rather than
+    // in ascending slot order, and the slot probe reverses the join. The
+    // deaths then arrive in an order that follows the thread count.
+    let at_one = starved_after_frames(1);
+    let at_twelve = starved_after_frames(12);
+    assert!(
+        !at_one.is_empty(),
+        "the probe world ended nobody, so the starvation test has no subject"
+    );
+    assert_ne!(
+        at_one, at_twelve,
+        "the probe did not perturb the death order, so the starvation \
+         determinism test has no proven failure mode"
+    );
+}
+
+#[test]
+fn the_perturbed_scan_ends_the_same_units_in_a_different_order() {
+    // The probe changes the order and nothing else. A probe that also
+    // changed who died would prove less.
+    let mut at_one = starved_after_frames(1);
+    let mut at_twelve = starved_after_frames(12);
+    assert_eq!(at_one.len(), at_twelve.len());
+    at_one.sort_unstable();
+    at_twelve.sort_unstable();
+    assert_eq!(at_one, at_twelve);
 }

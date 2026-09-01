@@ -2129,6 +2129,38 @@ the conditions in the row.[^47]
 machine do not cost twice one suite, and neither figure is the cost of the
 suite.
 
+### FND-089 — A deficit cannot recover under the default need rule
+
+**Believed.** A unit that fails its draw builds a deficit, and the deficit
+falls again when the shortage ends. The consumption kernel holds both
+directions, and the recovery rate is one of the four values of the rule.
+
+**True.** The recovery is unreachable under the default rule. A deficit falls
+only while the need of a unit is at or above the threshold. The need rises by
+the ration and falls by the decay, and the default rule sets the two equal, so
+a unit that receives its whole ration holds the need it has. A unit whose need
+reached zero holds at zero and never climbs back over the threshold. Its
+deficit rises at every application until the shortage ends the unit.
+
+**Evidence.** The test that watches a deficit rise and fall was written
+against the default rule and failed. It passes with a ration above the decay,
+and it then needs many more applications to clear the deficit than it took to
+build it. No kernel changed between the two runs.
+
+**Follows.** Three things.
+
+The equality of the ration and the decay is a content choice, and the register
+holds it. The choice now decides more than it did: with an end for a starving
+unit, the equality makes every shortage that reaches zero need fatal. A new
+row asks whether the default ration should exceed the decay.
+
+**A recovery path needs a test that reaches it.** The rise and the fall are
+one rule in the kernel, and a test of the rise alone passes while the fall is
+unreachable. State the rates the test needs rather than taking the default.
+
+The general shape is the one this register keeps returning to. Two content
+values that hold a relation decide a behaviour that neither of them names.
+
 ### FND-093 — A rule behind an existing filter cannot be proved by the path that filters
 
 **Believed.** A new refusal is proved by a test that drives the whole engine

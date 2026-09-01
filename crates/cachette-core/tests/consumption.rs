@@ -87,6 +87,22 @@ fn build(world: &mut World) -> Fixture {
     world
         .set_economy_schedule(PERIOD, 0)
         .expect("the period is inside the range");
+    // The bound is out of reach of this file. A shortage that lasts ends a
+    // unit, and the subject of every test below is the draw rather than the
+    // end. Another file holds the end.[^2]
+    //
+    // [^2]: Testing rules, section 2a. `.claude/rules/testing.md`
+    let rule = NeedRule::DEFAULT;
+    world.set_need_rule(
+        NeedRule::new(
+            rule.decay(),
+            rule.ration(),
+            rule.threshold(),
+            rule.recovery(),
+            Fix32(NEED_FULL.0 * 1024),
+        )
+        .expect("every rate is at or above zero"),
+    );
     let ground = open_ground(world);
     assert!(
         ground.len() > SITES * 4,
@@ -505,11 +521,13 @@ fn a_unit_of_a_lost_site_belongs_to_no_site() {
 
 #[test]
 fn the_rule_refuses_a_rate_below_zero() {
-    assert!(NeedRule::new(Fix32(-1), Fix32::ZERO, Fix32::ZERO, Fix32::ZERO).is_err());
-    assert!(NeedRule::new(Fix32::ZERO, Fix32(-1), Fix32::ZERO, Fix32::ZERO).is_err());
-    assert!(NeedRule::new(Fix32::ZERO, Fix32::ZERO, Fix32(-1), Fix32::ZERO).is_err());
-    assert!(NeedRule::new(Fix32::ZERO, Fix32::ZERO, Fix32::ZERO, Fix32(-1)).is_err());
-    assert!(NeedRule::new(Fix32::ZERO, Fix32::ZERO, Fix32::ZERO, Fix32::ZERO).is_ok());
+    let zero = Fix32::ZERO;
+    assert!(NeedRule::new(Fix32(-1), zero, zero, zero, zero).is_err());
+    assert!(NeedRule::new(zero, Fix32(-1), zero, zero, zero).is_err());
+    assert!(NeedRule::new(zero, zero, Fix32(-1), zero, zero).is_err());
+    assert!(NeedRule::new(zero, zero, zero, Fix32(-1), zero).is_err());
+    assert!(NeedRule::new(zero, zero, zero, zero, Fix32(-1)).is_err());
+    assert!(NeedRule::new(zero, zero, zero, zero, zero).is_ok());
 }
 
 #[test]

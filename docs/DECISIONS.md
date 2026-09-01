@@ -27,6 +27,28 @@ precedent.[^ALLOC]
 
 ## Open
 
+### DEC-044 — Should the default ration be above the decay?
+
+**Open. The recommendation is to raise the default ration above the decay.**
+
+The default need rule sets the ration equal to the decay, so a unit that
+receives its whole ration holds the need it has.[^DEC34REF] A unit whose need
+reached zero therefore holds at zero, even when its site feeds it again. Its
+need never climbs back over the threshold, so its deficit never falls.[^FND089]
+
+The consequence changed when a shortage gained an end. A deficit that only
+rises reaches the bound, so every shortage that empties a need is fatal, and
+the recovery rate of the rule reaches nothing.
+
+Three options. Raise the ration above the decay, and a fed population climbs
+back to a full need; this makes a fully served population drift up, which the
+clamp at the top of a need absorbs. Feed the recovery from the ration a unit
+received rather than from the need it holds, which changes a kernel. Leave the
+rule and accept that a shortage which empties a need is fatal.
+
+The values are content, and no content pipeline exists.[^DEC34REF] The row
+therefore asks for a default, not for a rule.
+
 ### DEC-049 — Which resource kinds recover, and how fast?
 
 **Open. The project owner decides.** The product record for a deposit that
@@ -202,6 +224,30 @@ figure is 168 MB. The storage argument for vectors is stronger than the report
 concluded, and it called that argument its weakest.
 
 ## Closed
+
+### DEC-043 — What deficit ends a unit?
+
+**Outcome. One default bound in the engine, carried by the need rule, until a
+content pipeline exists.**
+
+A unit that fails its draw builds a deficit. The deficit is a rate against a
+bound, and the unit ends when it reaches the bound. The bound is content, in
+the same way that the decay, the ration, the threshold and the recovery are
+content.[^DEC34REF]
+
+The engine holds the bound as a fifth value of the need rule and refuses a
+value below zero. A caller replaces the whole rule, so the bound is a
+parameter and no kernel holds one. The condition of a unit is read against the
+bound in one place, so a watcher never compares a deficit against a rule of
+its own.[^SHAPE1]
+
+A bound written into the death pass was rejected, because it is the value a
+world tunes most and a kernel is the hardest place to reach. A bound derived
+from the threshold was rejected, because a value derived from another value
+rots silently.[^FND015]
+
+**Revisit when** a unit type table exists. The bound then belongs to the unit
+type, with the rest of the rule.
 
 ### DEC-001 — The commodity split
 
