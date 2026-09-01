@@ -153,6 +153,15 @@ The thread-count test still runs at one, two and twelve threads.
 BLK-007 stays open. It is about the target, and this item measured a
 development machine.
 
+**The worker did not run the whole gate, and the dispatcher ran it instead.**
+Five workers contended for one machine that night, and this worker's own run was
+killed under that contention. It ran the record and register checks green, and
+it handed the last acceptance line over rather than reporting a run it did not
+finish. The gate ran once on merged main, after this work and three other
+branches were merged, and it exited 0. That run covers the change. A serialised
+gate at the merge point tests the tree that ships, which five contended runs on
+five worktrees do not.
+
 Two findings were recorded.[^8] The cost of a wide scenario is its extent
 times its duration. The probe recipe covered one determinism test of the
 two.
