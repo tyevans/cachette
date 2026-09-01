@@ -118,4 +118,4 @@ holds the correction, and a new item asks for the repair of the record.[^8] [^9]
 [^6]: ADR Registry, who reviews. `docs/adrs/REGISTRY.md`
 [^7]: PRD-0002, a developer watches the world run. `docs/product/shipped/prd-0002-a-developer-watches-the-world-run.md`
 [^8]: Findings register, FND-110. `docs/FINDINGS.md`
-[^9]: Backlog item 0126. `docs/backlog/proposed/0126-repair-the-admits-nobody-claim-in-adr-0074.md`
+[^9]: Backlog item 0126. `docs/backlog/complete/0126-repair-the-admits-nobody-claim-in-adr-0074.md`

@@ -1,7 +1,7 @@
 ---
 id: 0126
 title: Repair the admits-nobody claim in ADR-0074
-status: proposed
+status: complete
 created: 2026-09-01
 implements: []
 changes: []
@@ -38,6 +38,27 @@ An over-full tile offers no room while it stays above its capacity.
 The record was accepted on 31 August 2026 and it has no dependent record. A
 reviewer decides whether the repair fits inside the retcon window or needs a
 superseding record.[^3]
+
+## Outcome
+
+**Done.** The reviewer who accepted the record amended it in place on
+1 September 2026, and the record carries the amendment note itself rather than
+leaving the audit trail in a commit message alone.
+
+D2 now states the refusal as a condition. A tile offers no room for as long as
+it stands at or above its capacity, admission reads the occupancy after the
+departures of the pass, and a frame runs several passes. An over-full tile
+therefore takes units in once its own have left. What it never does is rise, and
+that is the guarantee the decision exists to state.
+
+**The retcon window was judged rather than assumed.** The window is written for
+a record nothing depends on, and three source files cited this one when the
+amendment was made. All three were written by the work that found the error and
+all three assert the corrected behaviour, so the amendment made the record agree
+with its dependents rather than breaking them. No other record cites it. A
+superseding record would have said only that one sentence named a mechanism
+wrongly, which the scope rule calls a record nobody needed. The judgement and
+its reasoning are in the record.
 
 ## Done when
 

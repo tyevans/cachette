@@ -1,5 +1,21 @@
 # ADR-0074: A spawn may over-fill a tile, and only admission enforces the capacity
 
+**Amended in place on 1 September 2026, after acceptance.** Decision D2 stated
+that an over-full tile admits nobody. A test written against this record
+measured the opposite: a tile held eleven units on ground that admits eight,
+nine left in the first pass of a frame, and two arrived in a later pass of the
+same frame. The claim was wrong about the mechanism. The decision is unchanged,
+and the monotone guarantee it exists to state is unchanged.
+
+The retcon window is stated for a record that nothing depends on, and this
+record had three source files citing it when the amendment was made. Every one
+of them was written by the work that found the error, and each asserts the
+corrected behaviour, so the amendment makes the record agree with its
+dependents rather than breaking them. No other record cites it. A superseding
+record would have said only that one sentence named the mechanism wrongly,
+which is a record nobody needed. The reviewer who accepted this record made
+that judgement and records it here rather than only in a commit message.[^15]
+
 ## Context
 
 A tile holds a limited number of units. The capacity is a property of the
@@ -63,12 +79,17 @@ the capacity. The subtraction that computes the room saturates rather than
 wrapping, so a tile already above its capacity offers no room at all. That
 saturation is a decision of this record and a property of admission.
 
-**An over-full tile drains and never fills.** Admission computes the room of a
-target tile by subtracting the occupancy from the capacity, and the
-subtraction saturates rather than wrapping.[^2] A tile above its capacity
-therefore offers no room and admits nobody, while the units standing on it may
-still depart. The over-fill relaxes toward the capacity and never away from
-it.
+**An over-full tile relaxes toward its capacity and never away from it.**
+Admission computes the room of a target tile by subtracting the occupancy from
+the capacity, and the subtraction saturates rather than wrapping. A tile offers
+no room for as long as it stands at or above its capacity.
+
+**The refusal is a condition, not a state of the whole frame.** Admission reads
+the occupancy after the departures of the pass, and a frame runs several passes.
+A tile that loses enough units inside one frame falls below its capacity, and a
+later pass of the same frame admits against the lower count. An over-full tile
+therefore does take units in, once its own units have left.[^15] What it never
+does is rise.
 
 **That drain is why D1 is safe, and it is a consequence of this decision
 rather than an accident of the arithmetic.** A future change that gave an
@@ -158,3 +179,4 @@ founding does with a placement it could not make.
 [^7]: Budgets and costs, the scale constants. `docs/reference/budgets.md`
 [^8]: ADR-0067, the viewer reads the world and never writes to it, decision D1. `docs/adrs/accepted/adr-0067-the-viewer-reads-the-world-and-never-writes-to-it.md`
 [^9]: PRD-0002, a developer watches the world run. `docs/product/shipped/prd-0002-a-developer-watches-the-world-run.md`
+[^15]: Findings register, FND-110. `docs/FINDINGS.md`
