@@ -54,8 +54,10 @@ use crate::types::{Accum, Entity, FactionId, Fix32, TileIdx};
 ///
 /// A founding happens before the first frame, so the frame slot carries no
 /// frame. It carries the faction that founds.[^1] Two factions then read two
-/// samples. A key without the faction gives every faction one sample, and
-/// only the first founding of a run could satisfy the separation rule.[^2]
+/// samples. A key without the faction gives every faction one sample, which
+/// narrows the pool that every founding after the first draws from. It does
+/// not empty it, and a run with a shared sample still seats every faction, so
+/// no test of the outcome sees the defect.[^2]
 ///
 /// The slot stays in the key because the key shape is fixed by the
 /// record.[^3]
@@ -80,13 +82,13 @@ const DRAW_COLUMN: u32 = 0;
 /// diagonal of the world, and every determinism test would still pass,
 /// because the defect repeats.[^1]
 ///
-/// # References
-///
-/// [^1]: Testing rules, section 2. `.claude/rules/testing.md`
-///
 /// The perturbed build drops the row draw and holds one row, so nothing reads
 /// this constant there. The allowance is narrowed to that build, so the
 /// ordinary build still reports the constant if its last reader goes.
+///
+/// # References
+///
+/// [^1]: Testing rules, section 2. `.claude/rules/testing.md`
 #[cfg_attr(feature = "probe-nondeterminism", allow(dead_code))]
 const DRAW_ROW: u32 = 8;
 

@@ -66,13 +66,15 @@ Two alternatives were considered and both are refused.
 ### D2. A run founds in ascending faction index, and reports one outcome for each faction
 
 The run founds one group for each faction the world holds, in ascending
-faction index. The order is a property of the run. A caller gives no order, so
-no caller can win the better place for one faction by naming it first. The
-order never comes from the order a thread finished.[^7]
+faction index, and for at least one faction. The order is a property of the
+run. A caller gives no order, so no caller can win the better place for one
+faction by naming it first. The order never comes from the order a thread
+finished.[^7]
 
-The faction set comes from the world. The founding loop holds no count of its
-own, because a faction is a bit in a mask and the world already holds the
-set.[^8]
+The faction count comes from the world settings. The founding loop holds no
+count of its own, and it derives the faction identifiers from that one count.
+A second count in the loop would be a second declaration of how many factions
+the world holds, and nothing would fail when the two disagreed.
 
 **The run reports one outcome for each faction.** A run of several foundings
 can seat some factions and refuse another. One result for the whole run hides

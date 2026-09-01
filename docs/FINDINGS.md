@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-120**
+**Next number: FND-121**
 
 ## A. Corrections to stated rules
 
@@ -2583,6 +2583,36 @@ would then be false.
 **A later change to where the scan runs makes the third mark reachable.** A
 contributor who moves the scan out of the step must add the mark, because the
 picture would then be silent about a condition a watcher can read.
+
+### FND-120 — A correction reached the record and the tests, and not the comment
+
+**Believed.** The sweep that carried a correction into a record, its tests and
+the prose files reached every site of the claim.
+
+**True.** It did not reach the doc comment on the function the record governs.
+The comment still stated the claim the register had already recorded as false,
+and it stated it on the one function a reader opens first when they want to know
+why the key holds what it holds.
+
+**Evidence.** A review of the founding record searched the tree for the terms of
+the corrected claim, separately rather than as a sentence.[^57] It found one live
+site: the comment on the function that builds the frame slot of the founding draw
+key. The record itself carried the correction properly, and so did the test that
+guards the key. Two earlier sweeps of the same claim had passed over the
+comment.
+
+**Follows.** Two things.
+
+**A correction sweep covers doc comments.** A comment is prose, it decays like
+prose, and nothing fails when it goes false. The rule that keeps a count out of a
+record exists because the next change makes the count false; a comment that
+explains why a decision was taken carries the same risk and has no rule against
+it.[^53]
+
+**Search the artefact the record governs first.** The sites that matter most are
+the ones a contributor reads before they read the record: the function, its
+comment, and the test beside it. A sweep that starts with the documents finds the
+documents.
 
 
 ## References
