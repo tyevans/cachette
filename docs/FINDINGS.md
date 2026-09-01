@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-123**
+**Next number: FND-124**
 
 ## A. Corrections to stated rules
 
@@ -2690,6 +2690,45 @@ founding key put the candidate ordinal in the draw slot for exactly this reason,
 because the actor filled the entity slot and a second draw by one actor in one
 frame had nothing left to separate it.[^58]
 
+### FND-123 — The determinism tests guard against introducing a divergence, not against shipping one
+
+**Believed.** The two determinism tests cover an unfixed order. If nothing states
+what fixes the order of a result, the thread-count test or the golden state hash
+will say so.
+
+**True.** They cover two of the three cases and the third is the one that ships.
+
+An order that varies with the thread count fails the thread-count test, and that
+test is doing exactly its job. An order that is stable but no longer matches the
+recorded hash fails the golden test, though it fails uninformatively, because a
+golden file notices that something changed and cannot say which input the output
+stopped depending on.[^43]
+
+An order that is stable and matches the recorded hash fails nothing, ever. An
+implementer who collects results into a structure and applies them in the order
+that structure holds gets a perfectly deterministic order, by accident of the
+data structure rather than by decision. Both tests are green and stay green.
+
+**Evidence.** A review of a draft record found that nothing stated the order in
+which admitted births are applied to the entity arena. A slot comes from a free
+list, the pass that ends a unit runs immediately before growth in the same
+frame, and the slot is part of an identity. Which newborn takes which freed slot
+therefore follows from the application order, and every identity downstream of a
+birth follows from that. The record said only that the new unit takes a slot.
+
+**Follows.** Two things.
+
+**A test cannot distinguish an order fixed by decision from an order fixed by
+accident.** Both produce the same bytes. Only a record separates them, which is
+what the counter-test in the scope rule means when it says a decision governing
+determinism always needs a record even when it looks obvious.[^64]
+
+**Ask the question of the recurring defect rule against the record, not against
+the run.** The rule asks what fixes the order of every parallel result, and says
+that a change with no answer is a defect.[^65] A green suite is not an answer.
+The answer is a sentence in a record, and if no record holds one then the order
+is load-bearing and unrecorded, whatever the tests say today.
+
 
 ## References
 
@@ -2759,3 +2798,5 @@ frame had nothing left to separate it.[^58]
 [^64]: Findings register, FND-093, in this document.
 [^65]: Recurring Defect Shapes, shape 3. `.claude/rules/recurring-defects.md`
 [^66]: ADR-0063, a need is a rate with a threshold, and crossing it is a fact, decision D3. `docs/adrs/accepted/adr-0063-a-need-is-a-rate-with-a-threshold-and-crossing-it-is-a-fact.md`
+[^64]: Decision Record Scope, section 1, the counter-test. `.claude/rules/adr-scope.md`
+[^65]: Recurring defect shapes, shape 4. `.claude/rules/recurring-defects.md`

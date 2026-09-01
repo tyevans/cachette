@@ -79,6 +79,25 @@ disagreed.[^10]
 The new unit takes a slot, and its identity never resolves as the unit that
 held that slot before it.[^11]
 
+**The admitted births are applied to the arena in one ordered scan, in the order
+of the admission key of D2.** The slot a new unit takes therefore follows from
+the world and not from a thread.
+
+This is not a second key. A slot comes from a free list, and the pass that ends
+a unit runs immediately before growth in the same frame, so the slots that
+deaths freed this frame are the slots that births take. Which newborn takes
+which slot is decided by the order the births are applied in, and the slot is
+part of an identity.[^11] An order left to the collection that happened to hold
+the proposals would be stable, would pass both determinism tests, and would
+still be unrecorded, so the next contributor who parallelises the apply or
+changes that collection would move every identity downstream of a birth with
+nothing to say what the order had been.
+
+The key of D2 already orders every admitted birth totally, because a site is
+distinct from another site and an ordinal is distinct within a site. The end of
+a unit is applied the same way, in one ordered scan at the frame, so growth and
+death take the same shape.[^20]
+
 ### D4. Growth runs after the pass that ends a unit, and its draw is keyed
 
 The proposal and the admission run after the pass that removes a starved unit,
@@ -154,3 +173,4 @@ itself. The spawn path gains no refusal.[^18]
 [^17]: Testing Rules, a fixture supplies the input. `.claude/rules/testing.md`
 [^18]: ADR-0074, a spawn may over-fill a tile, and only admission enforces the capacity, decision D4. `docs/adrs/accepted/adr-0074-a-spawn-may-over-fill-a-tile-and-only-admission-enforces-the-capacity.md`
 [^19]: Decisions register, DEC-038. `docs/DECISIONS.md`
+[^20]: ADR-0063, a need is a rate with a threshold, and crossing it is a fact, decision D4. `docs/adrs/accepted/adr-0063-a-need-is-a-rate-with-a-threshold-and-crossing-it-is-a-fact.md`
