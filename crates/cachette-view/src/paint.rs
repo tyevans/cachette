@@ -26,7 +26,7 @@
 //! [^4]: Recurring Defect Shapes, shape 1. `.claude/rules/recurring-defects.md`
 
 use cachette_core::hex::NEIGHBOURS;
-use cachette_core::terrain::{TileKind, KIND_COUNT};
+use cachette_core::terrain::{Terrain, TileKind, KIND_COUNT};
 use cachette_core::{Axial, BridgeError, FactionId, Holder, World};
 
 use crate::text;
@@ -135,6 +135,23 @@ pub fn faction_colour(faction: FactionId) -> u32 {
     FACTION_COLOURS[colour_slot(faction)]
 }
 
+/// Returns the colour the viewer marks an over-filled tile in.
+///
+/// The mark says that a tile holds more units than its ground admits. The
+/// colour is the viewer's own, and the engine holds none.[^1]
+///
+/// A test reads this rather than a literal, so the mark has one declaration
+/// site.[^2]
+///
+/// # References
+///
+/// [^1]: ADR-0067, the viewer reads the world and never writes to it, decision D2. `docs/adrs/accepted/adr-0067-the-viewer-reads-the-world-and-never-writes-to-it.md`
+/// [^2]: Recurring Defect Shapes, shape 1. `.claude/rules/recurring-defects.md`
+#[must_use]
+pub const fn over_capacity_colour() -> u32 {
+    OVER_CAPACITY
+}
+
 /// Returns the index of the colour a faction shares.
 fn colour_slot(faction: FactionId) -> usize {
     (faction.0 as usize) % COLOURED_FACTIONS
@@ -152,6 +169,17 @@ const OPENING_TILE: f32 = 12.0;
 /// The factor one zoom press applies to the tile size.
 const ZOOM_STEP: f32 = 1.1;
 
+/// The colour of the mark on a tile that holds more units than its ground
+/// admits.
+///
+/// The mark is the viewer's own, in the way every colour here is. The engine
+/// says what the ground admits and never what a breach looks like.[^1]
+///
+/// # References
+///
+/// [^1]: ADR-0067, the viewer reads the world and never writes to it, decision D2. `docs/adrs/accepted/adr-0067-the-viewer-reads-the-world-and-never-writes-to-it.md`
+const OVER_CAPACITY: u32 = 0x00ff_2a1e;
+
 /// A pixel buffer that the viewer paints and the window shows.
 pub struct Canvas {
     width: usize,
@@ -165,6 +193,8 @@ pub struct Canvas {
     painted_by_kind: [u32; KIND_COUNT],
     holder_reads: u32,
     tiles_held: u32,
+    crowd_worst: u32,
+    tiles_at_capacity: u32,
 }
 
 impl Canvas {
@@ -189,6 +219,8 @@ impl Canvas {
             painted_by_kind: [0; KIND_COUNT],
             holder_reads: 0,
             tiles_held: 0,
+            crowd_worst: 0,
+            tiles_at_capacity: 0,
         }
     }
 
@@ -316,6 +348,45 @@ impl Canvas {
         &self.painted_by_faction
     }
 
+    /// Returns the largest number of units the last draw painted on one tile.
+    ///
+    /// The count is of the window. The drawing pass reads the units of a
+    /// block in tile order, so the units of one tile arrive as one adjacent
+    /// run, and the length of that run costs one addition for each unit the
+    /// pass was already painting. The viewer starts no second pass.[^1]
+    ///
+    /// This is not the largest number on any tile of the world. Nothing
+    /// knows that without reading every unit, so the panel states no such
+    /// number rather than an estimate of it.[^2]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0070, the head-up display reports what the drawing pass read, decision D1. `docs/adrs/accepted/adr-0070-the-head-up-display-reports-what-the-drawing-pass-read.md`
+    /// [^2]: ADR-0070, the head-up display reports what the drawing pass read, decision D2. `docs/adrs/accepted/adr-0070-the-head-up-display-reports-what-the-drawing-pass-read.md`
+    #[must_use]
+    pub const fn crowd_worst(&self) -> u32 {
+        self.crowd_worst
+    }
+
+    /// Returns the painted tiles that hold at least as many units as their
+    /// ground admits.
+    ///
+    /// The capacity comes from the terrain, which is where the engine reads
+    /// it too. The viewer holds no capacity value of its own, so a change to
+    /// the terrain table reaches the picture with no edit here.[^1]
+    ///
+    /// The count is of the window, in the same way every other count of the
+    /// drawing pass is.[^2]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0056, movement is tile-discrete and admitted by sort-then-admit, decision D4. `docs/adrs/accepted/adr-0056-movement-is-tile-discrete-and-admitted-by-sort-then-admit.md`
+    /// [^2]: ADR-0070, the head-up display reports what the drawing pass read, decision D2. `docs/adrs/accepted/adr-0070-the-head-up-display-reports-what-the-drawing-pass-read.md`
+    #[must_use]
+    pub const fn tiles_at_capacity(&self) -> u32 {
+        self.tiles_at_capacity
+    }
+
     /// Fills a rectangle with one colour.
     ///
     /// The head-up display draws its panel with this. A position outside the
@@ -400,6 +471,8 @@ impl Canvas {
         self.painted_by_kind = [0; KIND_COUNT];
         self.holder_reads = 0;
         self.tiles_held = 0;
+        self.crowd_worst = 0;
+        self.tiles_at_capacity = 0;
     }
 
     /// Sets one pixel, and ignores a position outside the canvas.
@@ -871,7 +944,9 @@ pub fn draw(world: &World, camera: Camera, canvas: &mut Canvas) -> Result<(), Br
     }
 
     let radius = ((camera.tile_width * 0.3) as i32).max(1);
-    draw_soldiers(world, camera, canvas, radius, first_row, last_row)
+    draw_soldiers(
+        world, camera, canvas, radius, tile_side, first_row, last_row,
+    )
 }
 
 /// Reports whether a tile sits on the edge of its holding.
@@ -941,10 +1016,12 @@ fn draw_soldiers(
     camera: Camera,
     canvas: &mut Canvas,
     radius: i32,
+    tile_side: i32,
     first_row: u32,
     last_row: u32,
 ) -> Result<(), BridgeError> {
     let arena = world.soldiers();
+    let terrain = world.terrain();
     let bridge = world.bridge();
     let layout = bridge.layout();
     let edge = layout.block_edge();
@@ -991,6 +1068,15 @@ fn draw_soldiers(
             // three outcomes.
             let units = bridge.in_block(arena, block)?;
             canvas.blocks_read += 1;
+            // The units of one block arrive in tile order, so the units of
+            // one tile are one adjacent run.[^5] The crowd count is the
+            // length of that run. It costs one comparison for each unit on a
+            // path that already visits every unit it paints, so the count
+            // adds no pass over the world.[^6]
+            //
+            // [^5]: ADR-0018, the unit-to-tile bridge is derived, and it rebuilds at the barrier, decision D2. `docs/adrs/accepted/adr-0018-the-unit-to-tile-bridge-is-derived-and-rebuilds-at-the-barrier.md`
+            // [^6]: ADR-0070, the head-up display reports what the drawing pass read, decision D1. `docs/adrs/accepted/adr-0070-the-head-up-display-reports-what-the-drawing-pass-read.md`
+            let mut run: Option<(Axial, u32)> = None;
             for soldier in units {
                 let Some(address) = arena.address(*soldier) else {
                     continue;
@@ -1009,8 +1095,55 @@ fn draw_soldiers(
                 // separate pass over the soldiers would give the same numbers
                 // and cost the population.
                 canvas.painted_by_faction[slot] += 1;
+                match run {
+                    Some((held, count)) if held == address => run = Some((held, count + 1)),
+                    other => {
+                        close_run(canvas, terrain, camera, tile_side, other);
+                        run = Some((address, 1));
+                    }
+                }
             }
+            close_run(canvas, terrain, camera, tile_side, run);
         }
     }
     Ok(())
+}
+
+/// Records what one tile's run of painted units means, and marks the tile
+/// when the run is longer than the ground admits.
+///
+/// The capacity comes from the terrain reader. The viewer holds no capacity
+/// value, so the ground states the rule in one place and a change there
+/// reaches the picture with no edit here.[^1]
+///
+/// A tile with no painted unit closes no run, so an empty tile is neither
+/// counted nor marked.
+///
+/// # References
+///
+/// [^1]: ADR-0056, movement is tile-discrete and admitted by sort-then-admit, decision D4. `docs/adrs/accepted/adr-0056-movement-is-tile-discrete-and-admitted-by-sort-then-admit.md`
+fn close_run(
+    canvas: &mut Canvas,
+    terrain: Terrain,
+    camera: Camera,
+    tile_side: i32,
+    run: Option<(Axial, u32)>,
+) {
+    let Some((address, count)) = run else {
+        return;
+    };
+    canvas.crowd_worst = canvas.crowd_worst.max(count);
+    let Some(ground) = terrain.tile(address) else {
+        return;
+    };
+    let capacity = ground.kind.capacity();
+    if count >= capacity {
+        canvas.tiles_at_capacity += 1;
+    }
+    if count > capacity {
+        let (x, y) = camera.centre_of(address);
+        let left = x as i32 - tile_side / 2;
+        let top = y as i32 - tile_side / 2;
+        outline(canvas, left, top, tile_side, OVER_CAPACITY);
+    }
 }

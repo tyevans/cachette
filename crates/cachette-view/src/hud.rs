@@ -207,6 +207,8 @@ pub struct Readout {
     soldiers_painted: u32,
     blocks_read: u32,
     blocks_skipped: u32,
+    crowd_worst: u32,
+    tiles_at_capacity: u32,
     by_faction: [u32; COLOURED_FACTIONS],
     by_kind: [u32; KIND_COUNT],
     region: Option<CellSummary>,
@@ -263,6 +265,8 @@ impl Readout {
             soldiers_painted: canvas.soldiers_painted(),
             blocks_read: canvas.blocks_read(),
             blocks_skipped: canvas.blocks_skipped(),
+            crowd_worst: canvas.crowd_worst(),
+            tiles_at_capacity: canvas.tiles_at_capacity(),
             by_faction: *canvas.painted_by_faction(),
             by_kind: *canvas.painted_by_kind(),
             // The level 1 cell that covers the tile under the middle of the
@@ -324,6 +328,36 @@ impl Readout {
     #[must_use]
     pub const fn by_faction(&self) -> &[u32; COLOURED_FACTIONS] {
         &self.by_faction
+    }
+
+    /// Returns the largest number of units the drawing pass painted on one
+    /// tile.
+    ///
+    /// The number counts the window. The panel says so, because a reader who
+    /// wants the largest number on any tile of the world must learn that the
+    /// panel has no such number.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0070, the head-up display reports what the drawing pass read, decision D2. `docs/adrs/accepted/adr-0070-the-head-up-display-reports-what-the-drawing-pass-read.md`
+    #[must_use]
+    pub const fn crowd_worst(&self) -> u32 {
+        self.crowd_worst
+    }
+
+    /// Returns the painted tiles that hold at least as many units as their
+    /// ground admits.
+    ///
+    /// The capacity is a property of the terrain, and the viewer reads it
+    /// from there.[^1] The number counts the window.[^2]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0056, movement is tile-discrete and admitted by sort-then-admit, decision D4. `docs/adrs/accepted/adr-0056-movement-is-tile-discrete-and-admitted-by-sort-then-admit.md`
+    /// [^2]: ADR-0070, the head-up display reports what the drawing pass read, decision D2. `docs/adrs/accepted/adr-0070-the-head-up-display-reports-what-the-drawing-pass-read.md`
+    #[must_use]
+    pub const fn tiles_at_capacity(&self) -> u32 {
+        self.tiles_at_capacity
     }
 
     /// Returns the tiles the last drawing pass painted.
@@ -493,6 +527,20 @@ impl Readout {
             ),
             Line::Row("tiles drawn", grouped(u64::from(self.tiles_painted))),
             Line::Row("units drawn", grouped(u64::from(self.soldiers_painted))),
+            Line::Rule,
+            Line::Heading("CROWDING IN THE WINDOW"),
+            // Both rows name the window in the label. The panel holds no
+            // count of the world, and a reader must learn that from the
+            // label alone rather than from the heading above it.[^2]
+            //
+            // [^2]: ADR-0070, the head-up display reports what the drawing pass read, decision D2. `docs/adrs/accepted/adr-0070-the-head-up-display-reports-what-the-drawing-pass-read.md`
+            Line::Row("most on a drawn tile", grouped(u64::from(self.crowd_worst))),
+            Line::Row(
+                "drawn tiles at capacity",
+                grouped(u64::from(self.tiles_at_capacity)),
+            ),
+            Line::Note("of the drawn tiles only. the"),
+            Line::Note("panel has no count of the world."),
             Line::Rule,
             Line::Heading("FACTIONS IN THE WINDOW"),
         ];

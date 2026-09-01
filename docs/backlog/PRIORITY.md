@@ -38,7 +38,6 @@ These close a gap a review found, or they unblock the items above.
 
 | No. | Why it sits here |
 |---|---|
-| 0069 | A tile can hold four hundred units and no watcher can see it. PRD-0002 fails on this. |
 | 0070 | The viewer makes the engine wait, and a record chose that knowingly. Settle it. |
 | 0059 | Housing. The population cannot be bounded by anything until a place has capacity. |
 | 0060 | Population growth from the store and the housing. |

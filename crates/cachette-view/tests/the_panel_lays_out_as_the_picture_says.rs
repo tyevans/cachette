@@ -84,7 +84,11 @@ const SPREAD: u32 = 9973;
 /// The window is only as wide as the panel needs, because every pixel of it
 /// is a character of the stored picture. The height holds the whole panel,
 /// which two assertions below check.
-const WINDOW: (usize, usize) = (340, 640);
+///
+/// The height grows when the panel gains a section. A window that cut the
+/// panel would store a picture of the cut rather than a picture of the
+/// layout, and the ground rows would fall off the bottom first.
+const WINDOW: (usize, usize) = (340, 720);
 
 /// The steps the fixed measurements report.
 const TICKS: u64 = 40;

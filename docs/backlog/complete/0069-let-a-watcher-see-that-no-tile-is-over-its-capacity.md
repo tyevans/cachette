@@ -1,7 +1,7 @@
 ---
 id: 0069
 title: Let a watcher see that no tile is over its capacity
-status: refined
+status: complete
 created: 2026-08-31
 implements: [ADR-0070 D1, ADR-0070 D2, ADR-0067 D1, ADR-0067 D2, ADR-0067 D3, ADR-0056 D4]
 changes: []
@@ -177,7 +177,35 @@ pass and the same panel rows.
 
 ## Outcome
 
-Filled in when the item moves to `complete/`.
+**The watcher can now see the answer.** The drawing pass counts the units it
+paints on each tile, keeps the largest count and the number of painted tiles
+at or above the capacity of their ground, and outlines a painted tile that
+holds more units than its ground admits. The panel states the two numbers
+under one heading, and two notes say that the numbers count the drawn tiles
+and that the panel holds no count of the world.
+
+**The count rides on the pass that paints.** The derived structure hands the
+pass the units of one block in tile order, so the units of one tile arrive as
+one adjacent run. The pass closes a run when the address changes and when the
+block ends. No loop over the units and no loop over the tiles was added.
+
+**The viewer holds no capacity value.** It reads the capacity of each tile
+through the terrain reader, so a change to either capacity reaches the picture
+with no edit here.
+
+**No engine file changed and no golden state hash moved.** The viewer reads
+the world through a shared reference, and a test asserts that the state hash
+of the crowded fixture is the same after a draw.
+
+**This does not move PRD-0002, and the item claims no such thing.** The other
+failing statement of that record belongs to item 0070 and to DEC-022. The
+first half of the capacity statement is the open choice that DEC-020 holds.
+The review that would move the record is a separate item.[^16]
+
+**The tests were watched failing.** The fixture builds a tile under its
+capacity, a tile at exactly its capacity, a tile over it, and an empty tile.
+Four defects were put back one at a time, and each was caught. The commit body
+holds the list and the counts.
 
 ## References
 
