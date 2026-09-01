@@ -168,7 +168,7 @@ Filled in when the item moves to `complete/`.
 [^1]: Backlog item 0052, the outcome. `docs/backlog/complete/0052-provide-the-settlement-column-set.md`
 [^2]: ADR-0053, a faction is a bit in a mask, and a relation is a plane, decision D5. `docs/adrs/accepted/adr-0053-a-faction-is-a-bit-in-a-mask-and-a-relation-is-a-plane.md`
 [^3]: Decision Record Scope, section 1. `.claude/rules/adr-scope.md`
-[^4]: Backlog item 0071. `docs/backlog/proposed/0071-derive-tile-passability-from-tile-capacity.md`
+[^4]: Backlog item 0071. `docs/backlog/refined/0071-derive-tile-passability-from-tile-capacity.md`
 [^5]: Findings register, FND-060. `docs/FINDINGS.md`
 [^6]: Recurring Defect Shapes, shape 1. `.claude/rules/recurring-defects.md`
 [^7]: ADR-0056, movement is tile-discrete and admitted by sort-then-admit, decision D4. `docs/adrs/accepted/adr-0056-movement-is-tile-discrete-and-admitted-by-sort-then-admit.md`
