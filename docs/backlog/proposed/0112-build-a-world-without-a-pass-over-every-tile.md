@@ -59,5 +59,5 @@ Filled in when the item moves to `complete/`.
 
 [^1]: Product record PRD-0003. `docs/product/accepted/prd-0003-a-developer-sees-a-world-worth-looking-at.md`
 [^2]: Definition of Done. `.claude/rules/definition-of-done.md`
-[^3]: Backlog item 0084. `docs/backlog/proposed/0084-give-a-tile-one-faction-column.md`
+[^3]: Backlog item 0084. `docs/backlog/refined/0084-give-a-tile-one-faction-column.md`
 [^4]: Commit Message Rules, after a sweep. `.claude/rules/commits.md`

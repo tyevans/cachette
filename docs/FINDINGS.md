@@ -2125,7 +2125,7 @@ reversed: the specific thing that rots is the picture, not the prose.[^46]
 [^39]: Backlog item 0085. `docs/backlog/complete/0085-show-a-watcher-who-holds-the-ground.md`
 [^40]: ADR-0053, a faction is a bit in a mask, and a relation is a plane, decision D2. `docs/adrs/accepted/adr-0053-a-faction-is-a-bit-in-a-mask-and-a-relation-is-a-plane.md`
 [^41]: PRD-0006, a place belongs to somebody. `docs/product/accepted/prd-0006-a-place-belongs-to-somebody.md`
-[^42]: Backlog item 0084. `docs/backlog/proposed/0084-give-a-tile-one-faction-column.md`
+[^42]: Backlog item 0084. `docs/backlog/refined/0084-give-a-tile-one-faction-column.md`
 [^43]: Testing Rules, section 2. `.claude/rules/testing.md`
 [^44]: Findings register, FND-075. `docs/FINDINGS.md`
 [^45]: Findings register, FND-078. `docs/FINDINGS.md`
