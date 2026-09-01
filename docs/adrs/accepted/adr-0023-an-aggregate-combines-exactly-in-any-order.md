@@ -1,7 +1,5 @@
 # ADR-0023: An aggregate combines exactly, in any order
 
-Status: Accepted
-
 ## Context
 
 A level 1 cell is the combination of the level 0 tiles it covers, and a level

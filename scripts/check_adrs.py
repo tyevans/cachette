@@ -11,6 +11,8 @@ Enforces the mechanical part of `.claude/rules/adr-scope.md`:
              the target record actually has; every record path in a footnote
              resolves on disk
   registry   the registry and the record files agree on number and status
+  status     no record file states a status of its own. The registry holds the
+             status of a record, and it is the only document that does
 
 Reports, without failing:
 
@@ -24,6 +26,9 @@ stale. Do not add to it. Move the figure to the reference tables instead.
 
 Exit 0 when every check passes, 1 otherwise. No dependencies beyond the
 standard library. Run it with `scripts/check-adrs.sh`.
+
+The script reads `docs/adrs` by default. Give it another directory to check a
+broken fixture instead, which is how the probe recipe proves the checks fail.
 """
 
 from __future__ import annotations
@@ -33,8 +38,7 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-ADR_DIRS = [ROOT / "docs" / "adrs" / "draft", ROOT / "docs" / "adrs" / "accepted"]
-REGISTRY = ROOT / "docs" / "adrs" / "REGISTRY.md"
+ADR_ROOT = ROOT / "docs" / "adrs"
 BASELINE = Path(__file__).resolve().parent / "adr-volatile-baseline.txt"
 
 REQUIRED = ["## Context", "## Decision", "## Consequences", "## References"]
@@ -45,6 +49,16 @@ REGISTRY_ROW = re.compile(r"^\|\s*(\d{4})\s*\|\s*([^|]+?)\s*\|\s*(\w+)\s*\|", re
 DECISION = re.compile(r"^#{2,4}\s*(?:ADR-\d{4}\s+)?D(\d+)\b", re.M)
 CITE = re.compile(r"\bADR-(\d{4})(?:\s+D(\d+))?")
 FOOTNOTE_PATH = re.compile(r"`(docs/[^`]+\.md)`")
+# The status of a record lives in the registry and nowhere else. A record file
+# that declares one declares a second copy, and nothing fails when the two
+# disagree. This is the check that fails instead. The pattern reads the status
+# vocabulary of the registry, so it catches a line copied from an old record
+# and leaves ordinary prose alone.
+STATUS_LINE = re.compile(
+    r"^\s*(?:\*\*|__|_|\*)?\s*status\s*(?:\*\*|__|_|\*)?\s*[:=]\s*"
+    r"(?:\*\*|_)?\s*(proposed|draft|accepted|superseded|rejected)\b",
+    re.I,
+)
 
 # Material a measurement or a release can change. Section 4.1 and 4.2 of the
 # rule. Deliberately narrow: a platform constant such as a cache line size is
@@ -75,9 +89,36 @@ def line_of(text: str, pos: int) -> int:
     return text.count("\n", 0, pos) + 1
 
 
-def main() -> int:
+def status_failures(name: str, text: str) -> list[str]:
+    """Report every line of a record that states a status.
+
+    A fenced code block and a table row are exempt. A record may quote a
+    registry row, and the documentation rule exempts both.
+    """
+    out: list[str] = []
+    fenced = False
+    for number, line in enumerate(text.splitlines(), start=1):
+        if line.lstrip().startswith("```"):
+            fenced = not fenced
+            continue
+        if fenced or line.lstrip().startswith("|"):
+            continue
+        if STATUS_LINE.match(line):
+            out.append(
+                f"{name}: line {number} states a status ({line.strip()!r}). "
+                f"The registry holds the status of a record, and it is the only "
+                f"document that does."
+            )
+    return out
+
+
+def main(argv: list[str]) -> int:
     failures: list[str] = []
     notes: list[str] = []
+
+    adr_root = Path(argv[0]).resolve() if argv else ADR_ROOT
+    adr_dirs = [adr_root / "draft", adr_root / "accepted"]
+    registry_path = adr_root / "REGISTRY.md"
 
     baseline: set[str] = set()
     if BASELINE.exists():
@@ -88,7 +129,7 @@ def main() -> int:
     matched_baseline: set[str] = set()
 
     files: dict[str, Path] = {}
-    for d in ADR_DIRS:
+    for d in adr_dirs:
         if not d.is_dir():
             continue
         for p in sorted(d.glob("*.md")):
@@ -107,7 +148,7 @@ def main() -> int:
     bodies = {n: p.read_text(encoding="utf-8") for n, p in files.items()}
     decisions = {n: {d for d in DECISION.findall(t)} for n, t in bodies.items()}
 
-    registry = REGISTRY.read_text(encoding="utf-8") if REGISTRY.exists() else ""
+    registry = registry_path.read_text(encoding="utf-8") if registry_path.exists() else ""
     rows = {m.group(1): (m.group(2), m.group(3)) for m in REGISTRY_ROW.finditer(registry)}
 
     for num, path in sorted(files.items()):
@@ -133,6 +174,9 @@ def main() -> int:
             tail = text.split("## References", 1)[1]
             if re.search(r"^##\s+(?!References)", tail, re.M):
                 failures.append(f"{name}: '## References' must be the last section")
+
+        # one status site
+        failures += status_failures(name, text)
 
         # volatile material
         body = strip_exempt(text)
@@ -198,4 +242,4 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    raise SystemExit(main(sys.argv[1:]))

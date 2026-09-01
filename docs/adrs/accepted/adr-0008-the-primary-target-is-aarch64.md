@@ -1,7 +1,5 @@
 # ADR-0008: The primary target is aarch64
 
-Status: Accepted
-
 ## Context
 
 The engine runs on a server. Which server is not a detail that a project can

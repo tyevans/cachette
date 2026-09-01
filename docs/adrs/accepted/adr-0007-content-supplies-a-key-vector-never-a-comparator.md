@@ -1,7 +1,5 @@
 # ADR-0007: Content supplies a key vector, never a comparator
 
-Status: Accepted
-
 ## Context
 
 Content decides how things are ordered: which target a unit prefers, which

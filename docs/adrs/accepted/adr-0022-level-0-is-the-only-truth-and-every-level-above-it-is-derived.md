@@ -1,7 +1,5 @@
 # ADR-0022: Level 0 is the only truth, and every level above it is derived
 
-Status: Accepted
-
 ## Context
 
 The engine simulates a hex world at three levels of detail. Level 0 holds

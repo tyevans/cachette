@@ -1,7 +1,5 @@
 # ADR-0014: Entity identity is an index plus a generation
 
-Status: Accepted
-
 ## Context
 
 A unit is an entity in a generational arena.[^1] Something must name an entity

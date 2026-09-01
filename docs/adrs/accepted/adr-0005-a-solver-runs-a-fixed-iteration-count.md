@@ -1,7 +1,5 @@
 # ADR-0005: A solver runs a fixed iteration count, never a convergence test
 
-Status: Accepted
-
 ## Context
 
 An iterative solver usually stops when the change between iterations falls

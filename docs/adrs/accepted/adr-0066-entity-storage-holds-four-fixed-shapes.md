@@ -1,7 +1,5 @@
 # ADR-0066: Entity storage holds four fixed shapes
 
-Status: Accepted
-
 ## Context
 
 An archetype is the exact set of component types that an entity carries. It is

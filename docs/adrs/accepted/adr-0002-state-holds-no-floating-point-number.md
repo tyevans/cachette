@@ -1,7 +1,5 @@
 # ADR-0002: Simulated and aggregated state holds no floating point number
 
-Status: Accepted
-
 ## Context
 
 Floating point addition is not associative. Adding the same three numbers in

@@ -1,7 +1,5 @@
 # ADR-0011: Every value type is a newtype
 
-Status: Accepted
-
 ## Context
 
 The engine passes small integers everywhere. A tile index, an entity slot, a

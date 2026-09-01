@@ -1,7 +1,5 @@
 # ADR-0067: The viewer reads the world and never writes to it
 
-Status: Accepted
-
 ## Context
 
 The project needs a person to see the simulation. A developer cannot tell a

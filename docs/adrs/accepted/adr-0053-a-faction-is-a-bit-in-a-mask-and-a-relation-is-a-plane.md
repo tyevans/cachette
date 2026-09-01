@@ -1,7 +1,5 @@
 # ADR-0053: A faction is a bit in a mask, and a relation is a plane
 
-Status: Accepted
-
 ## Context
 
 A faction is a side in the simulated world. A unit belongs to one. A tile is
