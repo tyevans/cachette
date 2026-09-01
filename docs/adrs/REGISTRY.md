@@ -270,7 +270,7 @@ without stating a constraint is worse than no record.
 | 0077 | The golden state hash is exact, order-sensitive and stable across build platforms | Reserved | 0001 | — |
 | 0078 | Descent is a bounded record, and a relation is a bounded recursion | Proposed | 0002, 0004, 0014, 0054 | 14 |
 | 0079 | Succession is filter, then sort by a key vector, then allocate | Proposed | 0004, 0007, 0014, 0078 | 14 |
-| 0080 | A depleted deposit recovers by ageing the stored take, never by a pass over the world | Reserved | 0002, 0003, 0004, 0072, 0073 | — |
+| 0080 | A depleted deposit recovers by ageing the stored take, never by a pass over the world | Draft | 0002, 0003, 0004, 0072, 0073 | `draft/adr-0080-a-depleted-deposit-recovers-by-ageing-the-stored-take.md` |
 
 ### Retired numbers
 
