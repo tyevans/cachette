@@ -2047,6 +2047,49 @@ misses a call site. A repair that is too wide edits work that is not yours.
 Before a repair rewrites a file, confirm the file belongs to the change. An
 ignored directory is not empty, and the status command will not say so.
 
+### FND-097 — A wide golden scenario paid its extent on every frame it did not need
+
+**Believed.** The golden state hash test grew because subsystems entered the
+state hash, so its cost was the price of the coverage it holds.
+
+**True.** Most of the cost was duration, not coverage. Two scenarios exist for
+their extent. The shoreline scenario is wide so that a soldier meets water.
+The founding scenario is wide so that the engine has a good place and a poor
+one to choose between. Both ran the same 32 frames as the narrow scenarios,
+and a wide world costs its tile count on every one of them. The founding
+scenario alone held about two thirds of the test.
+
+**Evidence.** The frames of the two wide scenarios went from 32 to 8. The test
+went from 143 seconds to 36 seconds on one development machine, and the whole
+gate suite fell by about the same amount. The figures and the machine are in
+the commit body, and the budget is in the local register.[^47] Not one hash
+line changed when the golden files were recorded again. The two files lost
+their trailing lines and kept every line they had. The simulation is
+untouched, and the coverage the extent buys is untouched.
+
+**Follows.** A scenario states what it is for. When it is for an extent, the
+duration is a separate choice and it costs the extent on every frame. Ask what
+each dimension of a fixture buys before you copy the dimensions of another
+row.
+
+### FND-098 — The perturbation probe covered one of the two determinism tests
+
+**Believed.** The probe recipe proves that the determinism tests can fail.
+
+**True.** It proved that one of them can. The recipe ran the thread-count test
+and five key-field tests on the perturbed build. It never ran the golden state
+hash test, although the same record asks both determinism tests to be able to
+fail.
+
+**Evidence.** The recipe listed the test binaries by name and the golden test
+was not among them. The golden test does fail on the perturbed build, and it
+fails in under a second, so nothing but the omission kept it out. The recipe
+now runs it.
+
+**Follows.** When a rule names two things, check that the check names both. A
+list of binaries is a declaration site, and it drifts from the rule it serves
+unless something compares the two.
+
 ### FND-100 — "A watcher can read it" was counted as "a watcher can see it"
 
 **Believed.** An item whose acceptance list says a watcher reads a value has
@@ -2130,3 +2173,4 @@ reversed: the specific thing that rots is the picture, not the prose.[^46]
 [^44]: Findings register, FND-075. `docs/FINDINGS.md`
 [^45]: Findings register, FND-078. `docs/FINDINGS.md`
 [^46]: Recurring defect shapes, shape 2. `.claude/rules/recurring-defects.md`
+[^47]: Development budgets, the gate suite budget. `docs/reference/development-budgets.md`

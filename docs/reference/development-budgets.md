@@ -45,14 +45,36 @@ evidence about the target.
 The gate suite is the command that a commit must pass. It runs formatting,
 lint, tests and the record checks.[^5]
 
-| Figure | Value | Machine | How reached |
-|---|---|---|---|
-| Whole gate suite, wall clock | Not set. Needs a measurement | Not set | — |
-| Golden state hash test, wall clock | Not set. Needs a measurement | Not set | — |
+| Figure | Value | Machine | Architecture | Profile | Date |
+|---|---|---|---|---|---|
+| Whole gate suite, wall clock | 544 s | Intel Core i7-1260P, 16 hardware threads | x86_64 | debug | 31 August 2026 |
+| Whole gate suite, budget | 660 s | Intel Core i7-1260P, 16 hardware threads | x86_64 | debug | 31 August 2026 |
+| Golden state hash test, wall clock | 36 s | Intel Core i7-1260P, 16 hardware threads | x86_64 | debug | 31 August 2026 |
 
-**Both rows are deliberately blank.** No measurement has been taken, and this
-project does not state a figure it did not take.[^6] Do not fill a row from an
-estimate.
+The budget is the measured figure plus an allowance of one fifth, rounded up
+to the nearest ten seconds. The allowance covers the load of the machine that
+runs the suite. A run over the budget is a signal to look, not a failure.
+
+**Every row above describes one development machine.** No row is evidence
+about the target platform, and the comparison a row supports is between two
+versions of this code on that machine.[^6]
+
+**A row belongs to one architecture.** The project develops on x86-64 and on
+Apple Silicon, and the two do not perform alike. The suite compares a run
+against a row of the same architecture, and reports without a comparison when
+no such row exists. Add a row for a machine rather than reading another
+machine's row.
+
+### How the suite reports the cost
+
+The gate suite times itself and prints the cost against the row for the
+architecture that runs it.[^5] The script reads the value from the table
+above. The figure has one home, so a change to the budget is a change to this
+file and to nothing else.
+
+The report never fails the build. A wall clock figure on a loaded machine is
+not a gate, and a timing assertion trains a reader to ignore a red
+pipeline.[^7]
 
 ### The command that produces the figures
 
@@ -66,18 +88,11 @@ cargo test --package cachette-core --test golden_state_hash
 State the machine, the architecture, the build profile and the date beside any
 value you record. A figure without those four facts is not usable.
 
-### The budget, until a measurement exists
+### Keeping a row true
 
-Express the budget as a parameter, not as a number.
-
-- Let `T` be the measured wall clock cost of `just check` on the named machine.
-- The budget is the value of `T` recorded on the day the suite is first
-  measured, plus a stated allowance.
-- The suite exceeds its budget when a later run of `T` on the same machine
-  passes that value.
-
-The allowance is a number, so it belongs in the table above and not in this
-paragraph. Set it in the same change that records the first measurement.
+Record a new value when the suite changes cost on purpose, and say in the
+commit what changed. Do not edit a row to make a slow run pass. A row that
+follows the suite records nothing.
 
 ## What belongs here
 
@@ -104,4 +119,5 @@ command, and the date. Cite the source in a footnote.
 [^3]: Decisions register, DEC-033, option 2. `docs/DECISIONS.md`
 [^4]: Blockers register, BLK-007. `docs/BLOCKERS.md`
 [^5]: The gate suite. `justfile`
-[^6]: Definition of Done, section 6. `.claude/rules/definition-of-done.md`
+[^6]: ADR-0008, the primary target is `aarch64-unknown-linux-gnu`, decision D2. `docs/adrs/accepted/adr-0008-the-primary-target-is-aarch64.md`
+[^7]: Testing rules, section 3. `.claude/rules/testing.md`

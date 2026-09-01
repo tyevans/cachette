@@ -23,8 +23,30 @@ use cachette_core::terrain::TileKind;
 use cachette_core::types::{FactionId, Fix32};
 use cachette_core::{Axial, World, WorldConfig};
 
-/// The number of frames that each scenario runs.
+/// The number of frames that a scenario runs unless its row says otherwise.
 const FRAMES: u64 = 32;
+
+/// The number of frames that a wide scenario runs.
+///
+/// The shoreline scenario and the founding scenario are here for their
+/// extent, not for their duration. The shoreline extent gives a soldier
+/// water to meet, and the founding extent gives the engine a good place and
+/// a poor one to choose between. A world that wide costs its tile count on
+/// every frame, and the state hash test collects most of its cost there.
+///
+/// Eight frames keep what the extent buys. The soldiers of the shoreline
+/// scenario stand over the whole world at frame 0, so a soldier that
+/// neighbours water tries to enter it in the first frames. The founding
+/// happens before frame 1. What a long run covers, and a short one does
+/// not, is the behaviour that accumulates over frames, and the narrow
+/// scenarios cover that at the full count for a small part of the cost.
+///
+/// The budget for this cost is in the development budget register.[^1]
+///
+/// # References
+///
+/// [^1]: Development budgets, the gate suite budget. `docs/reference/development-budgets.md`
+const WIDE_FRAMES: u64 = 8;
 
 /// The thread count that records the golden file. The thread-count
 /// equivalence test proves that the count does not change the result.
@@ -49,7 +71,7 @@ const THREADS: usize = 4;
 /// [^1]: ADR-0001, one binary gives one answer at any thread count, decision D4. `docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
 /// [^2]: ADR-0068, terrain is generated from the seed and is never stored as a map, decision D4. `docs/adrs/accepted/adr-0068-terrain-is-generated-from-the-seed-and-is-never-stored-as-a-map.md`
 /// [^3]: Testing rules, section 2a. `.claude/rules/testing.md`
-const SCENARIOS: &[(&str, WorldConfig, Population)] = &[
+const SCENARIOS: &[(&str, WorldConfig, Population, u64)] = &[
     (
         "small",
         WorldConfig {
@@ -59,6 +81,7 @@ const SCENARIOS: &[(&str, WorldConfig, Population)] = &[
             faction_count: 2,
         },
         Population::Empty,
+        FRAMES,
     ),
     (
         "default",
@@ -69,6 +92,7 @@ const SCENARIOS: &[(&str, WorldConfig, Population)] = &[
             faction_count: 4,
         },
         Population::Empty,
+        FRAMES,
     ),
     (
         "soldiers",
@@ -79,6 +103,7 @@ const SCENARIOS: &[(&str, WorldConfig, Population)] = &[
             faction_count: 3,
         },
         Population::Spread,
+        FRAMES,
     ),
     (
         "shoreline",
@@ -89,6 +114,7 @@ const SCENARIOS: &[(&str, WorldConfig, Population)] = &[
             faction_count: 3,
         },
         Population::Spread,
+        WIDE_FRAMES,
     ),
     (
         "crowd",
@@ -99,6 +125,7 @@ const SCENARIOS: &[(&str, WorldConfig, Population)] = &[
             faction_count: 2,
         },
         Population::Crowd,
+        FRAMES,
     ),
     (
         "settlements",
@@ -109,6 +136,7 @@ const SCENARIOS: &[(&str, WorldConfig, Population)] = &[
             faction_count: 3,
         },
         Population::Settled,
+        FRAMES,
     ),
     (
         "founding",
@@ -119,6 +147,7 @@ const SCENARIOS: &[(&str, WorldConfig, Population)] = &[
             faction_count: 4,
         },
         Population::Founded,
+        WIDE_FRAMES,
     ),
 ];
 
@@ -322,7 +351,7 @@ fn golden_path(name: &str) -> PathBuf {
 }
 
 /// Runs a scenario and returns one hash line for each frame.
-fn hash_sequence(config: WorldConfig, population: Population) -> String {
+fn hash_sequence(config: WorldConfig, population: Population, frames: u64) -> String {
     let mut world = World::new(config).expect("the extent must describe a world");
     match population {
         Population::Empty => {}
@@ -333,7 +362,7 @@ fn hash_sequence(config: WorldConfig, population: Population) -> String {
     }
     let mut lines = String::new();
     lines.push_str(&format!("0 {}\n", world.state_hash()));
-    for frame in 1..=FRAMES {
+    for frame in 1..=frames {
         world.step(THREADS).expect("the step must run");
         lines.push_str(&format!("{frame} {}\n", world.state_hash()));
     }
@@ -347,8 +376,8 @@ fn recording() -> bool {
 
 #[test]
 fn the_state_hash_matches_the_golden_file() {
-    for (name, config, population) in SCENARIOS {
-        let produced = hash_sequence(*config, *population);
+    for (name, config, population, frames) in SCENARIOS {
+        let produced = hash_sequence(*config, *population, *frames);
         let path = golden_path(name);
 
         if recording() {

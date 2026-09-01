@@ -73,9 +73,12 @@ determinism:
 # also scans the choice options from the top of the set, so a tie goes to the
 # highest option index rather than the lowest.
 # Each test binary below must then fail, and the probe binary, which asserts
-# that every perturbation is visible, must pass.
+# that every perturbation is visible, must pass. Both determinism tests of
+# ADR-0001 D4 are in the list, because ADR-0001 D5 asks both to be able to
+# fail.
 probe:
     ! cargo test --package cachette-core --features probe-nondeterminism --test thread_equivalence
+    ! cargo test --package cachette-core --features probe-nondeterminism --test golden_state_hash
     ! cargo test --package cachette-core --features probe-nondeterminism --test slot_reduction
     ! cargo test --package cachette-core --features probe-nondeterminism --test terrain
     ! cargo test --package cachette-core --features probe-nondeterminism --test resource
@@ -120,8 +123,14 @@ records-probe:
     ! ./scripts/check-prds.sh tests/fixtures/prd-broken
     ! ./scripts/check-citations.sh tests/fixtures/citations-broken
 
-# Everything a commit must pass.
-check: fmt-check lint test records records-probe
+# Everything a commit must pass. The wrapper times the run and reports the
+# cost against the local budget for this architecture. It reports; it does
+# not fail on a figure, because wall clock on a loaded machine is not a gate.
+check:
+    ./scripts/gate-budget.sh just gates
+
+# The gates themselves. Run `just check` instead, to get the cost report.
+gates: fmt-check lint test records records-probe
 
 # What continuous integration runs.
 ci: check test-slow

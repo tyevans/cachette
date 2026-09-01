@@ -1,7 +1,7 @@
 ---
 id: 0098
 title: Give the gate suite a development budget
-status: refined
+status: complete
 created: 2026-08-31
 implements: [ADR-0008 D2, ADR-0001 D4, ADR-0001 D5]
 changes: []
@@ -123,7 +123,34 @@ and this item must not let one become so.
 
 ## Outcome
 
-Filled in when the item moves to `complete/`.
+**Done.** The local register now holds three rows for one named development
+machine: the measured cost of the gate suite, a budget of that cost plus an
+allowance of one fifth, and the cost of the golden state hash test.[^5] Each
+row names the machine, the architecture, the build profile and the date. No
+row is evidence about the target platform, and the target register gained
+nothing.[^4]
+
+**The suite reports its own cost.** A wrapper times the gates and prints the
+figure against the budget row for the architecture that runs it. It reads the
+budget from the register, so the figure has one home. It reports and does not
+fail, because a wall clock figure on a loaded machine is not a gate.[^6]
+
+**The golden test costs a quarter of what it did.** Two scenarios exist for
+their extent, not for their duration, and both ran the full frame count. Their
+count is now eight. No scenario was removed, and no hash line changed when the
+golden files were recorded again: the two files lost their trailing lines and
+kept every line they had. The commit body holds the figures and the machine.
+
+**Both determinism tests can still fail.** The golden test fails on the
+perturbed build, and the probe recipe now runs it, which it did not before.
+The thread-count test still runs at one, two and twelve threads.
+
+BLK-007 stays open. It is about the target, and this item measured a
+development machine.
+
+Two findings were recorded.[^8] The cost of a wide scenario is its extent
+times its duration. The probe recipe covered one determinism test of the
+two.
 
 ## References
 
@@ -134,3 +161,4 @@ Filled in when the item moves to `complete/`.
 [^5]: Development budgets, the local register. `docs/reference/development-budgets.md`
 [^6]: Testing Rules, section 1. `.claude/rules/testing.md`
 [^7]: Project orientation, the target platform. `CLAUDE.md`
+[^8]: Findings register, FND-097 and FND-098. `docs/FINDINGS.md`
