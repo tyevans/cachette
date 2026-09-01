@@ -77,7 +77,7 @@ Filled in when the item moves to `complete/`.
 
 ## References
 
-[^1]: PRD-0006, a place belongs to somebody. `docs/product/shaped/prd-0006-a-place-belongs-to-somebody.md`
+[^1]: PRD-0006, a place belongs to somebody. `docs/product/accepted/prd-0006-a-place-belongs-to-somebody.md`
 [^2]: Findings register, FND-080. `docs/FINDINGS.md`
 [^3]: Findings register, FND-075. `docs/FINDINGS.md`
 [^4]: Findings register, FND-078. `docs/FINDINGS.md`

@@ -1,13 +1,13 @@
 ---
 id: 0067
 title: Record a parent and walk a line
-status: proposed
+status: refined
 created: 2026-08-31
 implements: [ADR-0002 D1, ADR-0004 D1, ADR-0014 D3, ADR-0003 D1]
 changes: []
-creates: []
+creates: [ADR-0078]
 serves: [PRD-0015]
-blocked-by: [0066]
+blocked-by: []
 ---
 
 ## Why
@@ -26,8 +26,10 @@ who takes a position when its holder dies.
    representable state rather than an invented one.
 2. A watcher walks from a character to its ancestors and to its descendants.
 3. The relation between two characters is a value the world computes exactly.
-4. A line that ends is reported as ended and releases what it held.
-5. The record of descent survives the death of the character it names.
+4. A line that ends is reported as ended.
+5. A death releases the relation edges of the character and keeps its
+   descent.
+6. The record of descent survives the death of the character it names.
 
 ## Impact review
 
@@ -47,43 +49,69 @@ resolved and this item must honour it**: a character raised from the ranks
 receives no invented ancestry, so a line that starts at zero must be
 expressible and must not be a special case in the recursion.[^6]
 
-**Serves.** PRD-0015.
+**Serves.** PRD-0015. This item covers every checkable statement in that
+record except the household one, which item 0059 and item 0103 cover between
+them.[^15]
 
 **Conflict surface.** `crates/cachette-core/src/descent.rs` is new, and
-`crates/cachette-core/src/character.rs`, which item 0066 creates, gains the
-parent columns. **It touches no file outside the character tier**, so once item
-0066 lands it runs beside every item from 0053 to 0065.
+`crates/cachette-core/src/character.rs` gains the parent columns. Item 0066 is
+complete and it created that file, so nothing holds this item now. **It touches
+no file outside the character tier**, so it runs beside every item from 0053 to
+0065.
 
-## What is missing before this is refined
+## The questions that held this item, and their answers
 
-**DEC-003 is open, and this item cannot start under an assumption.** The
-question is whether a dead character keeps its relation edges. The register
-carries a recommendation to drop them and states what retention costs at the
-target, and the recommendation has not been taken.[^7] The answer decides
-whether a line that ends releases storage or keeps it, which is one of the
-five statements this item is meant to satisfy. **Close DEC-003 before refining
-this item.**
+**DEC-003 is answered, and the answer does not block this item.** A dead
+character drops its relation edges. It keeps its row, its two parent edges and
+its child list.[^13] A relation edge is a non-kin social tie. A parent edge is
+descent. The two are different structures, and only the first one goes.[^7]
 
-**The registry row.** This work states a constraint that no reserved row
-holds: **descent is kept for a bounded set, and a relation is computed by a
-bounded recursion, never by walking two lines to a common ancestor.** All three
-conditions of the scope rule hold.[^8] Walking the lines is the obvious
-implementation and PRD-0015 rejects it. Changing it later means rewriting every
-reader. The reasoning is not visible in a recursion. **Allocate the row in the
-registry before writing the record.**[^9]
+The consequences for this item are three.
+
+1. A line is walkable through a dead ancestor, and every statement in the list
+   above stands as written. The genealogy is append-only and it holds every
+   dead character.[^1]
+2. The storage that a death releases is the relation edge set, and never the
+   descent record. Say that where the code releases it, and test it.
+3. The project accepts that it cannot ask who a dead person knew. Do not add a
+   reader for that, and do not keep an edge to serve one.
+
+**The registry row is allocated.** This work states a constraint that no other
+row holds: **descent is kept for a bounded set, and a relation is computed by a
+bounded recursion, never by walking two lines to a common ancestor.** The
+registry holds the row, and the work writes the record.[^9]
+
+All three conditions of the scope rule hold.[^8] Walking the lines is the
+obvious implementation and PRD-0015 rejects it, so a contributor could
+reasonably choose otherwise. Changing it later means rewriting every reader,
+which costs more than the record. The reasoning is not visible in a recursion.
+The counter-test agrees: the record fixes the visit order of a walk, and order
+is a determinism property.
 
 **The truncation depth.** The relation is exact only to a stated depth, and the
 research gives a depth at which no step rounds.[^1] That depth is a parameter
 and it belongs in the reference tables, not in the record.[^10] Read it; do not
 invent it.
 
-**The household.** Point five of item 0050 asks whether the household of
-PRD-0015 and the place to live of PRD-0014 are the same thing.[^11] **This is
-the item where the question becomes cheap, and it is where it should be
-answered.** The recommendation this plan carries is that a household is
-derived, not stored: it is the residents of one site who share a line, and both
-halves already exist by the time this item runs. Confirm or reject that in the
-impact review.
+**The household. Answered, and it leaves this item.** A dwelling is stored and
+a household is derived from it.[^14] A unit carries the slot of the dwelling it
+lives in, and a household is every unit that carries one slot. Nothing stores a
+household and nothing declares one.
+
+**A household therefore reads no descent, and this item does not build one.**
+The recommendation this plan carried was that a household is the residents of
+one site who share a line. That is rejected. A household is a fact about a
+place, not a fact about a family, so it depends on the dwelling slot of item
+0059 and not on the descent this item records. Point five of item 0050 is
+closed.[^11]
+
+Two consequences bind this item.
+
+1. **Do not add a household reader here, and do not add a kinship column to
+   serve one.** The work that derives a household is filed separately.[^15]
+2. **Descent and residence stay two independent facts.** A parent and a child
+   who live apart are still a parent and a child, and two strangers who share
+   a roof are one household. No code in this item may assume otherwise.
 
 ## Done when
 
@@ -99,6 +127,8 @@ impact review.
 - A line that ends is reported as ended.
 - The record of descent survives the death of the character it names, and a
   test reads a dead parent through a living child.
+- A death releases the relation edges of the dead character, and a test reads
+  the descent of that character after the release.[^13]
 - A property test asserts that the parentage is identical, and recorded in the
   same order, at 1, 2 and 12 threads.
 - The birth draw is keyed. A test changes the frame and asserts the draw
@@ -118,9 +148,12 @@ Filled in when the item moves to `complete/`.
 [^4]: ADR-0003, every random draw is keyed, never stateful. `docs/adrs/accepted/adr-0003-every-random-draw-is-keyed-never-stateful.md`
 [^5]: Blockers register, BLK-004. `docs/BLOCKERS.md`
 [^6]: Blockers register, BLK-011. `docs/BLOCKERS.md`
-[^7]: Open decisions register, DEC-003. `docs/DECISIONS.md`
+[^7]: Decisions register, DEC-003. `docs/DECISIONS.md`
 [^8]: Decision Record Scope, section 1. `.claude/rules/adr-scope.md`
-[^9]: ADR Registry. `docs/adrs/REGISTRY.md`
+[^9]: ADR Registry, row 0078. `docs/adrs/REGISTRY.md`
 [^10]: Budgets and costs. `docs/reference/budgets.md`
 [^11]: Backlog item 0050. `docs/backlog/proposed/0050-close-the-gaps-the-product-shaping-opened.md`
 [^12]: Testing Rules, section 2. `.claude/rules/testing.md`
+[^13]: The character graph and inheritance, section 2.2. `docs/research/reports/14-character-graph-and-inheritance.md`
+[^14]: Decisions register, DEC-039. `docs/DECISIONS.md`
+[^15]: Backlog item 0103. `docs/backlog/proposed/0103-derive-a-household-from-the-dwelling-slot.md`

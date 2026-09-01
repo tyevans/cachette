@@ -59,5 +59,5 @@ the answer, the module must say so rather than leaving a reader to guess.
 
 [^1]: Recurring Defect Shapes, shape 3. `.claude/rules/recurring-defects.md`
 [^2]: Backlog item 0072. `docs/backlog/proposed/0072-run-the-panel-fit-check-in-the-drawing-pass.md`
-[^3]: PRD-0006, a place belongs to somebody. `docs/product/shaped/prd-0006-a-place-belongs-to-somebody.md`
+[^3]: PRD-0006, a place belongs to somebody. `docs/product/accepted/prd-0006-a-place-belongs-to-somebody.md`
 [^4]: Testing Rules, section 5. `.claude/rules/testing.md`

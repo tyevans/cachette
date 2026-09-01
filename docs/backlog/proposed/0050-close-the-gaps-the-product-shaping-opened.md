@@ -39,11 +39,15 @@ and any goal that outlives a tick, so it refuses the work. PRD-0017 now owns
 the assignment. PRD-0011 and PRD-0009 both still point the reader at each
 other, and one of them needs an amendment.
 
-**Three. Consumption needs a store, and the store needs a home.** PRD-0013
-says it does not decide where a stock sits, and points at housing. PRD-0014
-says it does not decide what a place holds. Neither record states whether a
-unit draws from what it carries or from a shared store. This is the first
-question an implementation will ask, and no record answers it.
+**Three. Consumption needs a store, and the store needs a home. Closed.** The
+question was whether a unit draws from what it carries or from a shared store.
+Item 0056 answered it and is complete: a unit draws against the store of the
+site it belongs to, and the draw runs by cohort rather than unit by unit.[^2]
+A decision record holds the constraint.[^3] Neither product record needs an
+amendment, because neither one claimed the answer.
+
+This point needs no further work. It stays here so that a reader who finds the
+question again reads the answer instead of asking it a second time.
 
 **Four. Two records both limit population growth.** PRD-0011 says the
 population responds to what a faction has. PRD-0014 says growth slows when
@@ -51,11 +55,22 @@ there is nowhere to live. Two independent limits on one quantity produce a
 result that depends on which one runs first. Decide which limit is the limit,
 or decide how they compose exactly.
 
-**Five. A dwelling has no owner, and a family may need one.** PRD-0014 says it
-gives a dwelling no owner and no heir, and sends inheritance to family.
-PRD-0015 says it models no inheritance. The household in PRD-0015 and the
-place to live in PRD-0014 are close enough that one may turn out to be the
-other, and nothing states the relation between them.
+**Five. A dwelling has no owner, and a family may need one. Closed.** The
+question was whether the household of PRD-0015 and the place to live of
+PRD-0014 are the same thing. They are not, and the relation between them is
+now stated: a dwelling is stored and a household is derived from it.[^4] A
+unit carries the slot of the dwelling it lives in, and a household is every
+unit that carries one slot. Nothing stores a household and nothing declares
+one.
+
+Three things follow. A household forms when people share a roof and dissolves
+when they stop. An inheritance is a transfer of a slot, so PRD-0014 keeps its
+bound and PRD-0015 keeps its bound. A household needs no kinship rule, because
+it is a fact about a place rather than a fact about a family.
+
+PRD-0015 said that units who are related and who live together form a
+household. That reading is now wrong, and the record was corrected. The work
+that derives a household is filed.[^5]
 
 **Six. PRD-0012 changes what an existing record assumed.** Several shaped
 records reason about a world that already holds its target population.
@@ -66,12 +81,14 @@ number. Confirm that, rather than assume it.
 
 ## What is missing before this is refined
 
-- The impact review. No decision record has been read against these six
-  points, so the item cannot name which records govern them.
-- The split. This is six questions in one item, and at least the housing
-  question and the assignment question are separate pieces of work.
-- The order. Some of these questions have an answer that depends on another,
-  and the dependency is not worked out.
+Two of the six points are closed above, and point two has an owner. Four
+points remain, and the item stays in `proposed/` until they are worked out.
+
+- The impact review. No decision record has been read against points one,
+  two, four and six, so the item cannot name which records govern them.
+- The split. Four questions in one item is still more than one piece of work.
+- The order. Point one and point four both concern PRD-0011, and the
+  dependency between them is not worked out.
 
 ## Done when
 
@@ -89,3 +106,7 @@ Filled in when the item moves to `complete/`.
 ## References
 
 [^1]: Findings register, FND-057. `docs/FINDINGS.md`
+[^2]: Backlog item 0056. `docs/backlog/complete/0056-draw-consumption-from-a-site-store-by-cohort.md`
+[^3]: ADR Registry, row 0063. `docs/adrs/REGISTRY.md`
+[^4]: Decisions register, DEC-039. `docs/DECISIONS.md`
+[^5]: Backlog item 0103. `docs/backlog/proposed/0103-derive-a-household-from-the-dwelling-slot.md`

@@ -46,13 +46,20 @@ reasonably choose otherwise, because the alternative contradicts an accepted
 decision. Condition three fails too, because the reasoning is a call to the
 passability reader and a reviewer sees it in the code.
 
-**The item does not decide that a settlement needs a second ground property.**
-A rule under which a unit crosses a mountain and a settlement may not stand on
-one is a different claim. It would need a record, and it would need a
-judgement this item does not hold. This item is scoped to the ground that
-carries nobody at all, which is the ground the owner named. A later item that
-wants a settlement-suitability property separate from passability opens that
-question then.
+**The second ground property is now decided, and it is not this item.** The
+project owner answers that a settlement reads a suitability rule of its own,
+separate from passability.[^6] A unit crosses a mountain, and a settlement
+cannot occupy one. That answer widens this item. It does not rewrite it. This
+item refuses the ground that carries nobody at all, and every such ground stays
+refused under the wider rule.
+
+**A follow-up item adds the second property, and this item keeps its scope.**
+Two reasons decide it this way. The wider rule gives every ground kind a second
+value, which is a second declaration site, and shape 1 of the recurring defect
+rule asks for a check that fails when two sites disagree.[^7] That check is
+work this item does not hold. The wider rule also states a claim a contributor
+could reasonably choose otherwise, so it needs a record of its own, and this
+item creates none.[^3]
 
 ## What makes this more than one call site
 
@@ -67,7 +74,7 @@ site.** This item therefore does not state its own ground rule and does not
 match on a kind. It calls the passability reader, and item 0071 makes that
 reader derive its answer from the capacity. **The order is fixed: 0071 first,
 then this item.** That is why 0071 blocks this one, and it is the answer to
-the recurring defect the rules name first.[^6]
+the recurring defect the rules name first.[^7]
 
 ## Impact review
 
@@ -78,26 +85,28 @@ the recurring defect the rules name first.[^6]
   own.[^2]
 - ADR-0056 D4. The capacity is a data-driven property of the terrain. The
   refusal reads that property through the passability reader and holds no
-  capacity literal of its own.[^7]
+  capacity literal of its own.[^8]
 - ADR-0068 D4. The engine says what a tile is and never what a tile costs. The
   refusal is a statement about what the tile is, so it belongs to the terrain
-  reader and not to the settlement arena.[^8]
+  reader and not to the settlement arena.[^9]
 - ADR-0066 D1. A settlement is one of the four fixed shapes. The refusal adds
-  no shape and no column. It is a condition on an existing founding path.[^9]
+  no shape and no column. It is a condition on an existing founding path.[^10]
 - ADR-0075 D1. The founding reads a bounded sample. The refusal must not widen
   that sample, and a founding that finds no acceptable place in its sample
-  reports the refusal rather than drawing again.[^10]
+  reports the refusal rather than drawing again.[^11]
 
 **Changes.** No record changes. The terrain module comment that denies the
-second site is repaired by item 0071, not here.
+second site is repaired by item 0071, not here. The follow-up item that adds
+the settlement suitability property changes what the founding reads, and it
+runs after this item.[^6]
 
 **Creates.** No record. The reasoning is above, and it is a judgement against
 the scope rule rather than an omission.[^3]
 
 **Blockers.** BLK-007 governs every cost figure, so this item states
-none.[^11] No blocker governs the rule. BLK-018 is resolved: every faction
+none.[^12] No blocker governs the rule. BLK-018 is resolved: every faction
 founds one group. It does not bear on this item, because the refusal holds for
-one founding and for many.[^12]
+one founding and for many.[^13]
 
 **Precedent.**
 
@@ -105,26 +114,26 @@ one founding and for many.[^12]
   derived away rather than reconciled.[^5]
 - FND-054 records that a test world narrower than the coarsest lattice spacing
   holds one kind of ground. A fixture for this item must hold water, and the
-  extent belongs in the fixture.[^13]
+  extent belongs in the fixture.[^14]
 - FND-061 records that a fixture assertion must be stated over the outcome and
-  not over the inputs.[^14]
+  not over the inputs.[^15]
 - FND-070 records that a restored defect must be the smallest change that
-  violates the claim, or the proof cannot run.[^15]
+  violates the claim, or the proof cannot run.[^16]
 
 **Serves.** PRD-0012 and PRD-0006.
 
 PRD-0012 asks that the engine choose the founding place by reading the world,
 and that a group founded in a poor place does worse than a group founded in a
-good one.[^16] A place that carries nobody is not a poor place. It is not a
+good one.[^17] A place that carries nobody is not a poor place. It is not a
 place, and the record's test cannot be applied to it.
 
 PRD-0006 asks that terrain influence a holding, and its consequences state
-that a holding cannot spread over ground that admits no unit.[^17] A
+that a holding cannot spread over ground that admits no unit.[^18] A
 settlement on such ground contradicts the record that serves it.
 
 **PRD-0014 is not served, and the proposed item named it.** No statement in
 that record is about the ground under a place, so this item answers none of
-them.[^18]
+them.[^19]
 
 **Conflict surface.** `crates/cachette-core/src/site.rs` at the founding path
 and at the error type. `crates/cachette-core/src/world.rs` where the world
@@ -147,12 +156,12 @@ it counts who already stands on a tile.
 - A test founds a settlement on water through the public interface and asserts
   the refusal by name.
 - The fixture asserts that the world it built holds water, and it asserts it
-  over the world rather than over the seed that made it.[^13] [^14]
+  over the world rather than over the seed that made it.[^14] [^15]
 - A test founds a run in a world that holds water and asserts that every
   settlement the founding placed stands on ground the rule accepts.
 - The refusal is put back, and the tests are watched failing, before the item
   is claimed done. The restored defect is the smallest change that violates
-  the claim.[^15]
+  the claim.[^16]
 - The founding still reads the same number of tiles in a small world and in a
   large one, so the refusal did not widen the sample.
 - The golden state hash files are regenerated only where a founding moved, and
@@ -170,16 +179,17 @@ Filled in when the item moves to `complete/`.
 [^3]: Decision Record Scope, section 1. `.claude/rules/adr-scope.md`
 [^4]: Backlog item 0071. `docs/backlog/refined/0071-derive-tile-passability-from-tile-capacity.md`
 [^5]: Findings register, FND-060. `docs/FINDINGS.md`
-[^6]: Recurring Defect Shapes, shape 1. `.claude/rules/recurring-defects.md`
-[^7]: ADR-0056, movement is tile-discrete and admitted by sort-then-admit, decision D4. `docs/adrs/accepted/adr-0056-movement-is-tile-discrete-and-admitted-by-sort-then-admit.md`
-[^8]: ADR-0068, terrain is generated from the seed and is never stored as a map, decision D4. `docs/adrs/accepted/adr-0068-terrain-is-generated-from-the-seed-and-is-never-stored-as-a-map.md`
-[^9]: ADR-0066, entity storage holds four fixed shapes, decision D1. `docs/adrs/accepted/adr-0066-entity-storage-holds-four-fixed-shapes.md`
-[^10]: ADR-0075, the founding choice reads a bounded sample of the world, decision D1. `docs/adrs/accepted/adr-0075-the-founding-choice-reads-a-bounded-sample-of-the-world.md`
-[^11]: Blockers register, BLK-007. `docs/BLOCKERS.md`
-[^12]: Blockers register, BLK-018. `docs/BLOCKERS.md`
-[^13]: Findings register, FND-054. `docs/FINDINGS.md`
-[^14]: Findings register, FND-061. `docs/FINDINGS.md`
-[^15]: Findings register, FND-070. `docs/FINDINGS.md`
-[^16]: PRD-0012, a world starts small and grows. `docs/product/shaped/prd-0012-a-world-starts-small-and-grows.md`
-[^17]: PRD-0006, a place belongs to somebody. `docs/product/shaped/prd-0006-a-place-belongs-to-somebody.md`
-[^18]: PRD-0014, everyone needs somewhere to live. `docs/product/shaped/prd-0014-everyone-needs-somewhere-to-live.md`
+[^6]: Decisions register, DEC-035. `docs/DECISIONS.md`
+[^7]: Recurring Defect Shapes, shape 1. `.claude/rules/recurring-defects.md`
+[^8]: ADR-0056, movement is tile-discrete and admitted by sort-then-admit, decision D4. `docs/adrs/accepted/adr-0056-movement-is-tile-discrete-and-admitted-by-sort-then-admit.md`
+[^9]: ADR-0068, terrain is generated from the seed and is never stored as a map, decision D4. `docs/adrs/accepted/adr-0068-terrain-is-generated-from-the-seed-and-is-never-stored-as-a-map.md`
+[^10]: ADR-0066, entity storage holds four fixed shapes, decision D1. `docs/adrs/accepted/adr-0066-entity-storage-holds-four-fixed-shapes.md`
+[^11]: ADR-0075, the founding choice reads a bounded sample of the world, decision D1. `docs/adrs/accepted/adr-0075-the-founding-choice-reads-a-bounded-sample-of-the-world.md`
+[^12]: Blockers register, BLK-007. `docs/BLOCKERS.md`
+[^13]: Blockers register, BLK-018. `docs/BLOCKERS.md`
+[^14]: Findings register, FND-054. `docs/FINDINGS.md`
+[^15]: Findings register, FND-061. `docs/FINDINGS.md`
+[^16]: Findings register, FND-070. `docs/FINDINGS.md`
+[^17]: PRD-0012, a world starts small and grows. `docs/product/accepted/prd-0012-a-world-starts-small-and-grows.md`
+[^18]: PRD-0006, a place belongs to somebody. `docs/product/accepted/prd-0006-a-place-belongs-to-somebody.md`
+[^19]: PRD-0014, everyone needs somewhere to live. `docs/product/accepted/prd-0014-everyone-needs-somewhere-to-live.md`

@@ -50,9 +50,38 @@ may appoint him.[^4]
 ascending slot order, the rank is a key vector, and the identifiers are
 allocated after the budget cut. Never during the scan.[^2] [^5]
 
+## What DEC-002 means for this item
+
+**Both tiers decide. An individual chooses where to go, and a cohort chooses
+what to buy.**[^6] A promoted soldier is embodied: one character row and one
+unit row name the same person through the link this item adds.[^2]
+
+That creates one hazard and one requirement.
+
+**The hazard is a second decision site.** If the character row decides where
+the person goes, and the unit row decides it too, one fact has two authorities
+and nothing fails when they disagree. That is the shape this project meets most
+often.[^7]
+
+**The requirement is that the promotion adds no decision site.** A promotion
+writes one character row and one link. The unit keeps the individual decision
+it already makes, and the character tier decides at its own barrier. The link
+is a reference, not a controller. State that in the impact review and assert it
+with a test: a promoted soldier moves by the same pass as an unpromoted one.
+
+The two-tier answer changes nothing else in the list above. It does not add a
+column, and it does not move the barrier.
+
 ## Impact review
 
-Not done. This item is `proposed` and needs one before anyone takes it.
+Not done. This item is `proposed` and needs one before anyone takes it. Three
+questions are open and this item cannot invent the answers.
+
+- Which decision records govern the promotion pass, by number and decision.
+- Whether the promotion needs a record of its own, or whether the tier record
+  and the key vector record already bind it.[^3] [^5]
+- Which blocker gives the character ceiling that the budget in point five cuts
+  against. Read it; do not invent it.
 
 ## References
 
@@ -61,3 +90,5 @@ Not done. This item is `proposed` and needs one before anyone takes it.
 [^3]: ADR-0054, an entity belongs to one of three tiers, declared at creation, decision D4. `docs/adrs/accepted/adr-0054-an-entity-belongs-to-one-of-three-tiers-declared-at-creation.md`
 [^4]: Blockers register, BLK-011. `docs/BLOCKERS.md`
 [^5]: ADR-0007, content supplies a key vector, never a comparator. `docs/adrs/accepted/adr-0007-content-supplies-a-key-vector-never-a-comparator.md`
+[^6]: Decisions register, DEC-002. `docs/DECISIONS.md`
+[^7]: Recurring Defect Shapes, shape 1. `.claude/rules/recurring-defects.md`
