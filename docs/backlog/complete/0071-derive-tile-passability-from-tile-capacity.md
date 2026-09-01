@@ -202,7 +202,7 @@ and a test of the rule against a capacity of zero that no kind carries.
 
 [^1]: Recurring Defect Shapes, shape 1. `.claude/rules/recurring-defects.md`
 [^2]: Findings register, FND-060. `docs/FINDINGS.md`
-[^3]: Backlog item 0092. `docs/backlog/refined/0092-refuse-a-settlement-on-the-ground-that-cannot-carry-one.md`
+[^3]: Backlog item 0092. `docs/backlog/complete/0092-refuse-a-settlement-on-the-ground-that-cannot-carry-one.md`
 [^4]: ADR-0056, movement is tile-discrete and admitted by sort-then-admit, decision D4. `docs/adrs/accepted/adr-0056-movement-is-tile-discrete-and-admitted-by-sort-then-admit.md`
 [^5]: Commit Message Rules, after a sweep. `.claude/rules/commits.md`
 [^6]: ADR-0068, terrain is generated from the seed and is never stored as a map, decision D4. `docs/adrs/accepted/adr-0068-terrain-is-generated-from-the-seed-and-is-never-stored-as-a-map.md`

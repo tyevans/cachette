@@ -199,6 +199,20 @@ pub enum SettlementError {
     ///
     /// [^1]: ADR-0066, entity storage holds four fixed shapes, decision D1. `docs/adrs/accepted/adr-0066-entity-storage-holds-four-fixed-shapes.md`
     TileAlreadyHeld(Axial),
+    /// The ground of the tile carries no unit, so it carries no settlement.
+    ///
+    /// A record decides that ground which admits no unit admits no
+    /// holder.[^1] A settlement is a holder of ground: the group that founds
+    /// it stands on the tiles around it. The world reads the ground through
+    /// the terrain passability reader, and that reader derives its answer
+    /// from the capacity of the ground. This variant states no ground rule of
+    /// its own.[^2]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0053, a faction is a bit in a mask, and a relation is a plane, decision D5. `docs/adrs/accepted/adr-0053-a-faction-is-a-bit-in-a-mask-and-a-relation-is-a-plane.md`
+    /// [^2]: ADR-0068, terrain is generated from the seed and is never stored as a map, decision D4. `docs/adrs/accepted/adr-0068-terrain-is-generated-from-the-seed-and-is-never-stored-as-a-map.md`
+    TileAdmitsNobody(Axial),
     /// The commodity is outside the commodity set.
     CommodityOutsideSet(CommodityId),
 }
@@ -220,6 +234,11 @@ impl core::fmt::Display for SettlementError {
             Self::TileAlreadyHeld(address) => write!(
                 formatter,
                 "a settlement already stands at ({}, {})",
+                address.q, address.r
+            ),
+            Self::TileAdmitsNobody(address) => write!(
+                formatter,
+                "the ground at ({}, {}) carries no unit",
                 address.q, address.r
             ),
             Self::CommodityOutsideSet(commodity) => write!(

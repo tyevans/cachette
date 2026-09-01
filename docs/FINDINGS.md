@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-088**
+**Next number: FND-094**
 
 ## A. Corrections to stated rules
 
@@ -2056,6 +2056,32 @@ Before a repair rewrites a file, confirm the file belongs to the change. An
 ignored directory is not empty, and the status command will not say so.
 
 
+### FND-093 — A rule behind an existing filter cannot be proved by the path that filters
+
+**Believed.** A new refusal is proved by a test that drives the whole engine
+path. Remove the refusal, and the test goes red.
+
+**True.** The test stays green when an earlier stage of the same path already
+refuses the case. The founding survey drops a candidate whose ground admits no
+unit, so the settlement refusal beneath it never receives a refused place. The
+run test removed the refusal and stayed green. It also stayed green when the
+survey filter itself was removed, because the score prefers good ground and
+chose a passable place anyway.
+
+**Evidence.** The settlement refusal on ground that carries no unit. Two tests
+that call the founding directly went red when the refusal was removed. The
+test that founds a whole run did not.
+
+**Follows.** Two things.
+
+**Name what each test proves.** A test that drives the layered path is a guard
+against a later change that removes an upper filter. It is not evidence that
+the lower rule works. Prove the lower rule at the call that reaches it.
+
+**A green test after a restored defect is a result, not a failure of the
+method.** It says the case does not reach the assertion. Report it rather than
+hiding it.[^47]
+
 ## References
 
 [^1]: Findings register, FND-038, in this document.
@@ -2104,3 +2130,4 @@ ignored directory is not empty, and the status command will not say so.
 [^44]: Findings register, FND-075. `docs/FINDINGS.md`
 [^45]: Findings register, FND-078. `docs/FINDINGS.md`
 [^46]: Backlog item 0071. `docs/backlog/complete/0071-derive-tile-passability-from-tile-capacity.md`
+[^47]: Testing rules, section 2a. `.claude/rules/testing.md`
