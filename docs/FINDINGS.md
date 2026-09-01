@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-110**
+**Next number: FND-111**
 
 ## A. Corrections to stated rules
 
@@ -2343,6 +2343,40 @@ reads as proof, and it is not one. State in the commit body which method the
 sweep used, so that a reader can tell a search that could have failed from a
 search that could not.
 
+
+### FND-110 — An over-full tile does admit, once its own units have left
+
+**Believed.** A tile above its capacity offers no room and admits nobody, while
+the units standing on it may still depart. The record that permits an over-fill
+states it that way.[^56]
+
+**True.** The refusal holds only while the tile stands above its capacity. A
+frame runs several admission passes, and a departure releases room at the end of
+a pass. A tile that loses enough units inside one frame falls below its
+capacity, and a later pass of the same frame admits against the lower count. The
+tile then takes units in.
+
+**Evidence.** A test placed three units above the capacity of a tile, ran a
+frame, and read the arrivals. The tile held eleven units on ground that admits
+eight. Nine units left in the first pass, and two arrived in a later pass. The
+tile ended the frame at four.
+
+**The monotone guarantee is untouched.** No tile gains a unit beyond its
+capacity, and the over-fill still relaxes toward the capacity and never away
+from it. Only the sentence about admitting nobody is wrong, and it is wrong
+about the mechanism rather than about the outcome.
+
+**Follows.** Two things.
+
+**State the refusal against the occupancy after the departures.** An over-full
+tile offers no room while it stays over its capacity. That is the claim the code
+supports.
+
+**A fixture for this rule must hold the tile above its capacity for the whole
+frame.** A tile that drains below its capacity inside the frame admits for a
+reason the rule does not name, so a test built on a small over-fill measures the
+drain rather than the refusal. The suite that found this places enough units
+that the tile stays above its capacity through every frame.
 
 ## References
 
