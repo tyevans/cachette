@@ -29,3 +29,7 @@ dist/
 python/cachette/*.so
 python/cachette/*.pyd
 python/cachette/*.dylib
+
+# Agent worktrees and scratch state. They are not project files.
+.claude/worktrees/
+.claude/tackline/
