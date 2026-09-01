@@ -406,7 +406,9 @@ fn the_candidate_key_test_fails_when_the_founding_key_drops_the_row() {
         faction_count: 4,
     })
     .expect("the extent must describe a world");
-    let survey = world.survey_founding(30).expect("the survey must run");
+    let survey = world
+        .survey_founding(30, FactionId(0))
+        .expect("the survey must run");
 
     let mut rows: Vec<i32> = survey
         .candidates()

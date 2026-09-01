@@ -12,9 +12,15 @@
 //!
 //! Every candidate address comes from the counter-based generator, keyed on
 //! the tuple of system, frame, entity and draw index.[^3] The frame slot holds
-//! a constant, because the founding happens once and before the first frame.
-//! The entity slot holds the candidate ordinal. The draw slot holds the axis,
-//! so the column of a candidate and its row never correlate.
+//! the faction that founds, because a founding happens before the first frame
+//! and the slot is otherwise a constant.[^7] The entity slot holds the
+//! candidate ordinal. The draw slot holds the axis, so the column of a
+//! candidate and its row never correlate.
+//!
+//! A run founds one group for each faction, and each founding keeps a minimum
+//! distance from every place a founding before it took.[^7] A founding that
+//! finds no admissible place in its sample fails. It does not draw again and
+//! it does not widen the sample.
 //!
 //! Every score is an exact integer or a Q16.16 value, and every arithmetic
 //! step goes through the arithmetic module.[^4] [^5] No item in this module
@@ -32,6 +38,7 @@
 //! [^4]: ADR-0002, simulated and aggregated state holds no floating point number, decision D1. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
 //! [^5]: ADR-0002, simulated and aggregated state holds no floating point number, decision D2. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
 //! [^6]: ADR-0004, iteration order is explicit, decision D4. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
+//! [^7]: ADR-0076, a founding keeps a fixed distance from the foundings before it. `docs/adrs/draft/adr-0076-a-founding-keeps-a-fixed-distance-from-the-foundings-before-it.md`
 
 use crate::hex::{Axial, Grid};
 use crate::resource::{Amount, ResourceField, ResourceKind};
@@ -41,18 +48,27 @@ use crate::site::SettlementError;
 use crate::soldier::SoldierError;
 use crate::sort::{self, SortError, SortKey};
 use crate::terrain::TileKind;
-use crate::types::{Accum, Entity, Fix32, TileIdx};
+use crate::types::{Accum, Entity, FactionId, Fix32, TileIdx};
 
-/// The frame that every founding draw is keyed on.
+/// Returns the frame slot that the draws of one founding are keyed on.
 ///
-/// The founding happens once, before the first frame, so the frame slot holds
-/// one constant. The slot stays in the key because the key shape is fixed by
-/// the record.[^1]
+/// A founding happens before the first frame, so the frame slot carries no
+/// frame. It carries the faction that founds.[^1] Two factions then read two
+/// samples. A key without the faction gives every faction one sample, and
+/// only the first founding of a run could satisfy the separation rule.[^2]
+///
+/// The slot stays in the key because the key shape is fixed by the
+/// record.[^3]
 ///
 /// # References
 ///
-/// [^1]: ADR-0003, every random draw is keyed, never stateful, decision D1. `docs/adrs/accepted/adr-0003-every-random-draw-is-keyed-never-stateful.md`
-pub const FOUNDING_FRAME: u64 = 0;
+/// [^1]: ADR-0076, a founding keeps a fixed distance from the foundings before it, decision D3. `docs/adrs/draft/adr-0076-a-founding-keeps-a-fixed-distance-from-the-foundings-before-it.md`
+/// [^2]: Testing rules, section 2. `.claude/rules/testing.md`
+/// [^3]: ADR-0003, every random draw is keyed, never stateful, decision D1. `docs/adrs/accepted/adr-0003-every-random-draw-is-keyed-never-stateful.md`
+#[must_use]
+pub const fn founding_frame(faction: FactionId) -> u64 {
+    faction.0 as u64
+}
 
 /// The draw index of the column of a candidate.
 const DRAW_COLUMN: u32 = 0;
@@ -105,6 +121,27 @@ pub const SURVEY_TILES: u32 = 1 + 3 * SURVEY_RADIUS * (SURVEY_RADIUS + 1);
 /// [^1]: ADR-0075, the founding choice reads a bounded sample of the world, decision D1. `docs/adrs/accepted/adr-0075-the-founding-choice-reads-a-bounded-sample-of-the-world.md`
 /// [^2]: Testing rules, section 3. `.claude/rules/testing.md`
 pub const SURVEY_CEILING: u64 = SAMPLE_SIZE as u64 * SURVEY_TILES as u64;
+
+/// The smallest distance that two foundings of one run keep between them.
+///
+/// The value is a tuning knob of the founding rule, in the way the sample
+/// size is one. The record states the constraint and not the value.[^1]
+///
+/// The floor is not a knob. Two foundings closer than twice the survey radius
+/// settle their groups over one piece of ground, so the distance must exceed
+/// that. The assertion below fails to compile when the two disagree, so the
+/// floor is checked and not commented.[^2]
+///
+/// # References
+///
+/// [^1]: ADR-0076, a founding keeps a fixed distance from the foundings before it, decision D1. `docs/adrs/draft/adr-0076-a-founding-keeps-a-fixed-distance-from-the-foundings-before-it.md`
+/// [^2]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`
+pub const MINIMUM_FOUNDING_DISTANCE: u32 = 16;
+
+const _: () = assert!(
+    MINIMUM_FOUNDING_DISTANCE > 2 * SURVEY_RADIUS,
+    "two foundings at the minimum distance would settle over one disc"
+);
 
 /// The weight of the food a place can reach.
 const WEIGHT_FOOD: Fix32 = Fix32::from_int(4);
@@ -192,6 +229,7 @@ pub struct Candidate {
     tile: TileIdx,
     provision: Provision,
     score: Accum,
+    separated: bool,
     eligible: bool,
 }
 
@@ -220,10 +258,29 @@ impl Candidate {
         self.score
     }
 
+    /// Reports whether the place keeps its distance from the places taken.
+    ///
+    /// A watcher reads this to learn that a place was refused for the company
+    /// it keeps and not for what the ground holds.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0075, the founding choice reads a bounded sample of the world, decision D5. `docs/adrs/accepted/adr-0075-the-founding-choice-reads-a-bounded-sample-of-the-world.md`
+    #[must_use]
+    pub const fn is_separated(self) -> bool {
+        self.separated
+    }
+
     /// Reports whether the group could settle here.
     ///
-    /// A place is eligible when the ground at its centre admits a unit and
-    /// when the open tiles of its disc hold the whole group.
+    /// A place is eligible when the ground at its centre admits a unit, when
+    /// the open tiles of its disc hold the whole group, and when the place
+    /// keeps the minimum distance from every place a founding before it
+    /// took.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0076, a founding keeps a fixed distance from the foundings before it, decision D1. `docs/adrs/draft/adr-0076-a-founding-keeps-a-fixed-distance-from-the-foundings-before-it.md`
     #[must_use]
     pub const fn is_eligible(self) -> bool {
         self.eligible
@@ -350,6 +407,54 @@ impl Founding {
     #[must_use]
     pub const fn survey(&self) -> &Survey {
         &self.survey
+    }
+}
+
+/// What one faction got when a run founded.
+///
+/// A run of several foundings can seat some factions and refuse another. One
+/// result for the whole run would hide one or the other, so the run reports
+/// one outcome for each faction.[^1]
+///
+/// # References
+///
+/// [^1]: ADR-0076, a founding keeps a fixed distance from the foundings before it, decision D2. `docs/adrs/draft/adr-0076-a-founding-keeps-a-fixed-distance-from-the-foundings-before-it.md`
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct FoundingOutcome {
+    faction: FactionId,
+    result: Result<Founding, FoundingError>,
+}
+
+impl FoundingOutcome {
+    /// Builds one outcome. The world is the only caller.
+    pub(crate) const fn new(faction: FactionId, result: Result<Founding, FoundingError>) -> Self {
+        Self { faction, result }
+    }
+
+    /// Returns the faction this outcome belongs to.
+    #[must_use]
+    pub const fn faction(&self) -> FactionId {
+        self.faction
+    }
+
+    /// Returns the founding, or the reason the faction was refused.
+    pub const fn result(&self) -> &Result<Founding, FoundingError> {
+        &self.result
+    }
+
+    /// Returns the founding, or `None` when the faction was refused.
+    #[must_use]
+    pub const fn founding(&self) -> Option<&Founding> {
+        match &self.result {
+            Ok(founding) => Some(founding),
+            Err(_) => None,
+        }
+    }
+
+    /// Reports whether the faction was seated.
+    #[must_use]
+    pub const fn is_seated(&self) -> bool {
+        self.result.is_ok()
     }
 }
 
@@ -489,11 +594,11 @@ fn read_place(field: ResourceField, centre: Axial) -> Option<(Provision, u64)> {
 
 /// Returns the column of one candidate.
 #[cfg(not(feature = "probe-nondeterminism"))]
-fn candidate_column(seed: u64, ordinal: u32, width: u32) -> i32 {
+fn candidate_column(seed: u64, faction: FactionId, ordinal: u32, width: u32) -> i32 {
     rng::draw_below(
         seed,
         rng::SYSTEM_FOUNDING,
-        FOUNDING_FRAME,
+        founding_frame(faction),
         u64::from(ordinal),
         DRAW_COLUMN,
         u64::from(width),
@@ -505,11 +610,11 @@ fn candidate_column(seed: u64, ordinal: u32, width: u32) -> i32 {
 /// The draw index differs from the column draw index, so the two coordinates
 /// of one candidate are two draws.
 #[cfg(not(feature = "probe-nondeterminism"))]
-fn candidate_row(seed: u64, ordinal: u32, height: u32) -> i32 {
+fn candidate_row(seed: u64, faction: FactionId, ordinal: u32, height: u32) -> i32 {
     rng::draw_below(
         seed,
         rng::SYSTEM_FOUNDING,
-        FOUNDING_FRAME,
+        founding_frame(faction),
         u64::from(ordinal),
         DRAW_ROW,
         u64::from(height),
@@ -518,11 +623,11 @@ fn candidate_row(seed: u64, ordinal: u32, height: u32) -> i32 {
 
 /// The perturbed column. It is unchanged.
 #[cfg(feature = "probe-nondeterminism")]
-fn candidate_column(seed: u64, ordinal: u32, width: u32) -> i32 {
+fn candidate_column(seed: u64, faction: FactionId, ordinal: u32, width: u32) -> i32 {
     rng::draw_below(
         seed,
         rng::SYSTEM_FOUNDING,
-        FOUNDING_FRAME,
+        founding_frame(faction),
         u64::from(ordinal),
         DRAW_COLUMN,
         u64::from(width),
@@ -540,7 +645,7 @@ fn candidate_column(seed: u64, ordinal: u32, width: u32) -> i32 {
 ///
 /// [^1]: Testing rules, section 2. `.claude/rules/testing.md`
 #[cfg(feature = "probe-nondeterminism")]
-fn candidate_row(_seed: u64, _ordinal: u32, _height: u32) -> i32 {
+fn candidate_row(_seed: u64, _faction: FactionId, _ordinal: u32, _height: u32) -> i32 {
     0
 }
 
@@ -558,7 +663,12 @@ fn candidate_row(_seed: u64, _ordinal: u32, _height: u32) -> i32 {
 /// # References
 ///
 /// [^1]: ADR-0075, the founding choice reads a bounded sample of the world, decision D1. `docs/adrs/accepted/adr-0075-the-founding-choice-reads-a-bounded-sample-of-the-world.md`
-pub fn survey(field: ResourceField, group: u32) -> Result<Survey, FoundingError> {
+pub fn survey(
+    field: ResourceField,
+    group: u32,
+    faction: FactionId,
+    taken: &[Axial],
+) -> Result<Survey, FoundingError> {
     if group == 0 {
         return Err(FoundingError::EmptyGroup);
     }
@@ -567,11 +677,11 @@ pub fn survey(field: ResourceField, group: u32) -> Result<Survey, FoundingError>
     let mut addresses = Vec::with_capacity(SAMPLE_SIZE as usize);
     for ordinal in 0..SAMPLE_SIZE {
         addresses.push(Axial::new(
-            candidate_column(seed, ordinal, grid.width()),
-            candidate_row(seed, ordinal, grid.height()),
+            candidate_column(seed, faction, ordinal, grid.width()),
+            candidate_row(seed, faction, ordinal, grid.height()),
         ));
     }
-    let mut ordered = survey_addresses(field, &addresses, group)?;
+    let mut ordered = survey_addresses(field, &addresses, group, taken)?;
     ordered.drawn = SAMPLE_SIZE;
     Ok(ordered)
 }
@@ -589,6 +699,7 @@ pub fn survey_addresses(
     field: ResourceField,
     addresses: &[Axial],
     group: u32,
+    taken: &[Axial],
 ) -> Result<Survey, FoundingError> {
     if group == 0 {
         return Err(FoundingError::EmptyGroup);
@@ -616,12 +727,21 @@ pub fn survey_addresses(
             .terrain()
             .kind(*address)
             .is_some_and(TileKind::is_passable);
+        // The place keeps the minimum distance from every place a founding
+        // before it took. The comparison grows with the number of foundings
+        // and not with the world extent, so the cost constraint holds.[^2]
+        //
+        // [^2]: ADR-0075, the founding choice reads a bounded sample of the world, decision D1. `docs/adrs/accepted/adr-0075-the-founding-choice-reads-a-bounded-sample-of-the-world.md`
+        let separated = taken
+            .iter()
+            .all(|place| place.distance(*address) >= MINIMUM_FOUNDING_DISTANCE);
         candidates.push(Candidate {
             address: *address,
             tile,
             provision,
             score: provision.score(),
-            eligible: admits && provision.room >= group,
+            separated,
+            eligible: admits && separated && provision.room >= group,
         });
     }
 

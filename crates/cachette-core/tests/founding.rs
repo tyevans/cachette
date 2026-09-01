@@ -152,7 +152,9 @@ fn the_survey_cost_does_not_grow_with_the_world() {
             faction_count: 4,
         })
         .expect("the extent must describe a world");
-        let survey = world.survey_founding(GROUP).expect("the survey must run");
+        let survey = world
+            .survey_founding(GROUP, FactionId(0))
+            .expect("the survey must run");
         assert_eq!(
             survey.drawn(),
             SAMPLE_SIZE,
@@ -179,7 +181,9 @@ fn the_survey_cost_does_not_grow_with_the_world() {
 #[test]
 fn a_watcher_asks_why_the_place_was_chosen() {
     let world = world_of(0x0cac_4e77_0061);
-    let survey = world.survey_founding(GROUP).expect("the survey must run");
+    let survey = world
+        .survey_founding(GROUP, FactionId(0))
+        .expect("the survey must run");
     let chosen = survey.chosen().expect("a place exists");
 
     // The report is the output of the choice. Nothing recomputes a score to
@@ -264,8 +268,8 @@ fn two_places_that_score_the_same_resolve_by_the_tile_index() {
     'search: for q in 8..72i32 {
         for r in 8..72i32 {
             let here = Axial::new(q, r);
-            let survey =
-                founding::survey_addresses(field, &[here], GROUP).expect("one address must survey");
+            let survey = founding::survey_addresses(field, &[here], GROUP, &[])
+                .expect("one address must survey");
             let candidate = survey.candidates()[0];
             if !candidate.is_eligible() {
                 continue;
@@ -292,7 +296,8 @@ fn two_places_that_score_the_same_resolve_by_the_tile_index() {
     };
 
     for order in [[first, second], [second, first]] {
-        let survey = founding::survey_addresses(field, &order, GROUP).expect("the survey must run");
+        let survey =
+            founding::survey_addresses(field, &order, GROUP, &[]).expect("the survey must run");
         let chosen = survey.chosen().expect("both places admit the group");
         assert_eq!(
             chosen.address(),
@@ -306,7 +311,9 @@ fn two_places_that_score_the_same_resolve_by_the_tile_index() {
 #[test]
 fn a_group_founded_in_a_poor_place_does_worse_than_one_founded_in_a_good_place() {
     let world = world_of(0x0cac_4e77_0061);
-    let survey = world.survey_founding(GROUP).expect("the survey must run");
+    let survey = world
+        .survey_founding(GROUP, FactionId(0))
+        .expect("the survey must run");
     let good = survey.chosen().expect("a place exists").address();
     let poor = survey
         .candidates()
@@ -465,7 +472,9 @@ fn the_column_draw_and_the_row_draw_are_two_draws() {
     //
     // [^1]: Testing rules, section 2. `.claude/rules/testing.md`
     let world = world_of(0x0cac_4e77_0061);
-    let survey = world.survey_founding(GROUP).expect("the survey must run");
+    let survey = world
+        .survey_founding(GROUP, FactionId(0))
+        .expect("the survey must run");
 
     let mut columns: Vec<i32> = survey
         .candidates()
@@ -510,10 +519,10 @@ fn the_seed_reaches_the_sample() {
     // different sample. A key that dropped it would give one sample for every
     // world, and every determinism test would still pass.
     let first = world_of(0x0cac_4e77_0061)
-        .survey_founding(GROUP)
+        .survey_founding(GROUP, FactionId(0))
         .expect("the survey must run");
     let second = world_of(0x0cac_4e77_0062)
-        .survey_founding(GROUP)
+        .survey_founding(GROUP, FactionId(0))
         .expect("the survey must run");
     let places = |survey: &founding::Survey| {
         let mut out: Vec<(i32, i32)> = survey
@@ -588,7 +597,9 @@ fn a_run_never_names_a_place_the_ground_refuses() {
     //
     // [^1]: ADR-0075, the founding choice reads a bounded sample of the world, decision D1. `docs/adrs/accepted/adr-0075-the-founding-choice-reads-a-bounded-sample-of-the-world.md`
     let world = world_of(0x0cac_4e77_0092);
-    let survey = world.survey_founding(GROUP).expect("the survey must run");
+    let survey = world
+        .survey_founding(GROUP, FactionId(0))
+        .expect("the survey must run");
     assert_eq!(survey.drawn(), SAMPLE_SIZE);
     let chosen = survey.chosen().expect("a place exists");
     assert!(world.admits_a_unit(chosen.address()));

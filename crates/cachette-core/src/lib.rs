@@ -48,7 +48,7 @@ pub use cohort::{
     SiteRationed, UnitStarved, COHORTS_PER_SITE,
 };
 pub use event::{ResourceTaken, TileChanged};
-pub use founding::{Founding, FoundingError, Provision, Survey};
+pub use founding::{Founding, FoundingError, FoundingOutcome, Provision, Survey};
 pub use hash::StateHash;
 pub use hex::{Axial, Grid, GridError};
 pub use holding::{FactionMask, Holder, Holding};
