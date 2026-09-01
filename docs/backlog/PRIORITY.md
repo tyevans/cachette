@@ -36,9 +36,8 @@ These close a gap a review found, or they unblock the items above.
 
 | No. | Why it sits here |
 |---|---|
-| 0120 | The engine gains state the window never shows. The refinement is done, and the drawing is the work.[^8] |
 | 0059 | Housing. The population cannot be bounded by anything until a place has capacity. ADR-0081 holds the decisions and waits for review. |
-| 0060 | Population growth from the store and the housing. It waits on 0059, and DEC-044 decides whether a grown population can survive.[^9] |
+| 0060 | Population growth from the store and the housing. It waits on 0059, and DEC-044 decides whether a grown population can survive.[^8] |
 | 0103 | A household has no home. DEC-039 answers it: derive the household from the dwelling slot. |
 | 0104 | A ruler decides nothing that reaches anybody. DEC-040 carries the writ in the influence field. |
 | 0112 | Building a world passes over every tile. PRD-0003 states it must not, so the record is false of the code. |
@@ -64,7 +63,7 @@ These are real and none of them blocks anything today.
 | 0063 | Assigning a unit to a position. Waits on 0062. |
 | 0065 | Letting the job decide what a unit weighs. Waits on 0063 and 0064. |
 | 0058 | Improvements. Waits on a site that produces. |
-| 0123 | A deposit never comes back. Waits on 0057, because nothing drains the world until a shortage bites.[^9] |
+| 0123 | A deposit never comes back. Waits on 0057, because nothing drains the world until a shortage bites.[^8] |
 | 0124 | A fully recovered deposit still stores a take of zero. Follows 0123. |
 | 0125 | Show a watcher a deposit recovering. Follows 0123. |
 | 0067 | Descent. Waits on the character tier being used for something. |
@@ -101,5 +100,4 @@ These are real and none of them blocks anything today.
 [^5]: Decisions register, DEC-032. `docs/DECISIONS.md`
 [^6]: Findings register, FND-079. `docs/FINDINGS.md`
 [^7]: Findings register, FND-080. `docs/FINDINGS.md`
-[^8]: Findings register, FND-100. `docs/FINDINGS.md`
-[^9]: PRD-0018, a depleted deposit comes back. `docs/product/shaped/prd-0018-a-depleted-deposit-comes-back.md`
+[^8]: PRD-0018, a depleted deposit comes back. `docs/product/shaped/prd-0018-a-depleted-deposit-comes-back.md`

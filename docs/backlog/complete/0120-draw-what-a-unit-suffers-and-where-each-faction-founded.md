@@ -1,7 +1,7 @@
 ---
 id: 0120
 title: Draw what a unit suffers and where each faction founded
-status: refined
+status: complete
 created: 2026-08-31
 implements: [ADR-0067 D1, ADR-0067 D2, ADR-0067 D3, ADR-0070 D1, ADR-0070 D2, ADR-0063 D3, ADR-0076 D2]
 changes: []
@@ -95,15 +95,17 @@ The viewer therefore gains a pass and the engine gains no reader.
 A unit keeps the faction colour it already carries, from the one table the
 viewer owns.[^11] The condition is drawn over that disc in one mark colour.
 
-A unit that is short takes a dot at half the radius. A unit that a shortage
-has taken to the bound takes the whole disc. One colour, two areas: the viewer
-gains no second table, and a watcher still reads the faction of every unit
-that is not about to end.
+A unit that a shortage holds takes a dot at half the radius. One colour, one
+mark: the viewer gains no second table, and a watcher still reads the faction
+of every unit.
 
-At a tile size of a few pixels the two marks reach the same pixel, because
-half of a radius of one is one. The picture cannot separate the two conditions
-there. The panel counts them apart, and the item states this rather than
-leaving a watcher to find it.
+**The refinement asked for a second mark, and the work found it unreachable.**
+The engine scans the death plane inside the step that takes a unit to the
+bound, so a unit that a completed step left alive is fed or short and never
+starved. A second mark would be a capability that nothing invokes. The panel
+states how many units the last scan ended, and that count is the whole record
+of a death that a watcher can read. The findings register holds the evidence
+and what follows from it.[^22]
 
 ### What the founding marks cost after the founding frame
 
@@ -195,14 +197,15 @@ run beside any item that changes the frame call in this crate.
 
 ## Done when
 
-- A watcher who opens the window sees a unit that a shortage holds, and sees a
-  unit that the shortage has taken to the bound. The two marks differ. A
-  picture test reads the pixels of a named unit for each of the three
-  conditions.
+- A watcher who opens the window sees a unit that a shortage holds. A picture
+  test reads the pixels of a named unit that is short, and of a named unit
+  that is fed.
+- A test states why the window draws no second mark, by asserting that no
+  completed step leaves a unit at the bound.[^22]
 - A unit that is fed carries no mark, and its pixels hold the faction colour
   alone.
-- The panel says how many drawn units are short and how many are starved, and
-  both labels name the window.
+- The panel says how many drawn units a shortage holds, and the label names
+  the window.
 - The panel says how many units the last scan ended, and that label names the
   world.
 - The window marks each place a faction founded, in that faction's colour from
@@ -226,7 +229,51 @@ run beside any item that changes the frame call in this crate.
 
 ## Outcome
 
-Filled in when the item moves to `complete/`.
+The drawing pass reads the condition of every unit it paints, on the loop that
+already runs, and marks a unit that a shortage holds with a dot at half the
+radius of its disc. The unit keeps the colour of its faction, from the one
+table the viewer owns. A whole-tree search found one table and one reader.
+
+**The second mark the refinement asked for does not exist, because nothing can
+reach it.** The engine ends a unit inside the step that takes it to the bound,
+so a completed step leaves every live unit fed or short. A test asserts that,
+over more steps than the fixture needs to end a group. The findings register
+holds the evidence.[^22]
+
+The panel gained three rows. Two name the window: how many drawn units a
+shortage holds, and where the person is looking. One names the world: how many
+units the last scan ended. That row falls back to zero one step later, because
+the engine keeps the log of one scan, and a test asserts the fall.
+
+The frame marks each founded place with a ring in the colour of the faction
+that founded there. The ring surrounds the tile and does not cover it, so a
+watcher reads the ground and the units through the mark. The mark comes from
+the outcomes the caller kept when it founded the run. The engine gained no
+field, no method and no colour, and no file under the core crate changed.
+
+The panel names each faction that founded and each faction the run refused,
+with the reason for the refusal. The frame call now takes the outcomes of the
+run rather than a list of foundings, so a refused faction reaches the panel
+instead of being dropped at the call site.
+
+The two new sections sit high in the panel, above the view rows. The panel is
+longer than a short window holds, and the notice that says so is already
+there. A section near the foot is the first thing a cut removes, and a
+shortage is the first thing a watcher looks for.
+
+Seven defects went into the code, one at a time, and each was watched failing.
+A viewer that marked every unit failed the fed test. A viewer that counted and
+drew nothing failed the mark test. A count of deaths that never fell back
+failed two tests. A mark in one colour for every faction failed the colour
+test. A mark on a refused faction failed the count test. A panel that dropped
+the refusals failed the naming test. A pass that read more conditions than it
+painted units failed the cost test.
+
+The stored picture of the panel was written again, and the window of that
+fixture is taller, because the panel gained two sections.
+
+The two determinism tests are unaffected. The viewer is outside them, and no
+engine file changed.
 
 ## References
 
@@ -251,3 +298,4 @@ Filled in when the item moves to `complete/`.
 [^19]: Findings register, FND-051. `docs/FINDINGS.md`
 [^20]: Findings register, FND-061. `docs/FINDINGS.md`
 [^21]: Findings register, FND-093. `docs/FINDINGS.md`
+[^22]: Findings register, FND-119. `docs/FINDINGS.md`
