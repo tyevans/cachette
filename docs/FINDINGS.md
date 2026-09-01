@@ -1585,6 +1585,73 @@ tier, and the tier was never the subject.
 **Count the columns before you choose a layout.** The column count of the pass
 decides the answer. The name of the tier does not.
 
+### FND-070 — A restored defect must be affordable, or the proof cannot run
+
+**Believed.** Putting a defect back and running the suite is always cheap. The
+testing rule asks for it as a routine step, and the cost of the step is the
+cost of one test run.[^31]
+
+**True.** A defect in a cost constraint can make the suite unrunnable. The
+proof then produces no answer at all, which reads the same as a proof nobody
+ran.
+
+**Evidence.** The founding chooses a place from a bounded sample. The first
+attempt to restore the defect replaced the sample with a pass over every tile
+of the world, which is what the record forbids in its strongest form. The
+cost test builds four worlds, the largest of which holds over a million tiles,
+and the survey deduplicates its candidates by a linear search. The restored
+defect therefore ran a quadratic search over a million entries, in the debug
+profile. It was killed after twenty minutes without reaching the first
+assertion.
+
+The second attempt made the sample size a multiple of the world width. That
+is the same violation of the same claim, in its smallest form, and the test
+binary ran in the ordinary time.
+
+**Follows.** Two things.
+
+**Restore the smallest change that violates the claim, not the largest.** The
+claim is that the sample size is not a function of the world extent. A
+multiplier on the extent violates it exactly. A pass over every tile violates
+it and also changes the running time by six orders of magnitude, which the
+proof does not need.
+
+**A killed probe is not a green probe.** A restoration that was abandoned
+proves nothing, and the report must say so rather than counting the step as
+done.
+
+### FND-071 — The whole-world pass the pyramid gave up was still in the viewer
+
+**Believed.** The whole-world sweep before the first frame was a defect of the
+level 1 rebuild, and the project corrected it there.[^32]
+
+**True.** A second instance was live, in the demonstration binary, and it ran
+on every start.
+
+**Evidence.** The demonstration built a list of every open tile in its world,
+by asking the ground about each of its tiles in turn, before it spawned
+anything. The world is 640 by 440, so that is over two hundred and eighty
+thousand generator calls between the person starting the program and the
+first frame. Two test fixtures do the same, and one of them asserts a floor on
+the length of the list it built.
+
+The founding replaced the demonstration's list with a bounded sample, and the
+whole pass went with it.
+
+**Follows.** Three things.
+
+**A cost claim reaches the examples, not only the engine.** The record binds
+the founding choice.[^33] Nothing bound the demonstration, and the
+demonstration is what a watcher looks at.
+
+**A fixture may pay a cost that the engine may not.** The two fixtures that
+still walk every tile are correct. A test may spend the world to build the
+input an assertion needs, and the founding is the thing that may not.[^34]
+
+**Search the tree for a shape, not for a name.** The pass was found by reading
+the demonstration for another reason. Nothing failed, because a whole-world
+loop is ordinary code and no check can tell a fixture from an engine.
+
 ## References
 
 [^1]: Findings register, FND-038, in this document.
@@ -1617,3 +1684,7 @@ decides the answer. The name of the tier does not.
 [^28]: Blockers register, BLK-007. `docs/BLOCKERS.md`
 [^29]: Findings register, FND-056, in this document.
 [^30]: Findings register, FND-072, in this document.
+[^31]: Testing rules, section 2a. `.claude/rules/testing.md`
+[^32]: Findings register, FND-049, in this document.
+[^33]: ADR-0075, the founding choice reads a bounded sample of the world, a draft record. `docs/adrs/draft/adr-0075-the-founding-choice-reads-a-bounded-sample-of-the-world.md`
+[^34]: PRD-0012, a world starts small and grows. `docs/product/shaped/prd-0012-a-world-starts-small-and-grows.md`

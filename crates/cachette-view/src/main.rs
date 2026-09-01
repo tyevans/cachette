@@ -14,7 +14,7 @@
 
 use std::num::NonZeroUsize;
 
-use cachette_core::{Axial, FactionId, World, WorldConfig};
+use cachette_core::{FactionId, World, WorldConfig};
 use cachette_view::{Camera, Canvas, Lap, Metrics};
 use minifb::{Key, Window, WindowOptions};
 
@@ -38,15 +38,15 @@ const DEMO: WorldConfig = WorldConfig {
     faction_count: 4,
 };
 
-/// The number of soldiers the demonstration spawns.
-const SOLDIERS: u32 = 22_000;
-
-/// The stride that spreads the soldiers over the tiles.
+/// The number of people the demonstration founds its run with.
 ///
-/// The value is a prime that divides none of the factors of the tile count,
-/// so the placement visits a new tile each time until it has visited them
-/// all. The arithmetic is exact, so the same run reproduces.
-const SPREAD: u32 = 9973;
+/// The size is an input to a run. It is not the population the world is sized
+/// for, and it is not a value any record or register holds.[^1]
+///
+/// # References
+///
+/// [^1]: PRD-0012, a world starts small and grows. `docs/product/shaped/prd-0012-a-world-starts-small-and-grows.md`
+const GROUP: u32 = 30;
 
 /// The reason the demonstration stopped.
 #[derive(Debug)]
@@ -55,8 +55,8 @@ enum DemoError {
     World(cachette_core::WorldError),
     /// A step refused to run.
     Step(cachette_core::StepError),
-    /// A soldier could not be placed.
-    Soldier(cachette_core::SoldierError),
+    /// The run could not be founded.
+    Founding(cachette_core::FoundingError),
     /// The window could not open.
     Window(minifb::Error),
     /// The spatial structure no longer describes the world.
@@ -68,7 +68,7 @@ impl std::fmt::Display for DemoError {
         match self {
             Self::World(error) => write!(formatter, "the world refused to build: {error}"),
             Self::Step(error) => write!(formatter, "the step refused to run: {error}"),
-            Self::Soldier(error) => write!(formatter, "a soldier refused to spawn: {error}"),
+            Self::Founding(error) => write!(formatter, "the run refused to begin: {error}"),
             Self::Window(error) => write!(formatter, "the window refused to open: {error}"),
             Self::Bridge(error) => write!(
                 formatter,
@@ -80,37 +80,36 @@ impl std::fmt::Display for DemoError {
 
 impl std::error::Error for DemoError {}
 
-/// Fills the world with soldiers, spread over the tiles.
+/// Founds the run and says why the engine chose the place.
 ///
-/// The placement is arithmetic on the tile count, so it is the same on every
-/// run. The demonstration reproduces, which the product record requires.[^1]
+/// The demonstration begins as a group somebody could grow, not as a full
+/// world of units doing nothing in particular.[^1] The engine chooses the
+/// place from a bounded sample of the world, so the choice costs the same
+/// whatever the extent is.[^2]
 ///
 /// # References
 ///
-/// [^1]: PRD-0002, a developer watches the world run. `docs/product/shaped/prd-0002-a-developer-watches-the-world-run.md`
-fn populate(world: &mut World) -> Result<(), DemoError> {
-    let grid = world.grid();
-    let factions = world.config().faction_count.max(1);
-    // The ground refuses a soldier on water, so the demonstration places its
-    // soldiers on the open ground it finds and never on the whole grid.[^1]
-    // The list is built once, because the ground is computed on demand.
-    //
-    // [^1]: ADR-0068, terrain is generated from the seed and is never stored as a map, decision D4, a draft record. `docs/adrs/draft/adr-0068-terrain-is-generated-from-the-seed-and-is-never-stored-as-a-map.md`
-    let open: Vec<Axial> = (0..grid.tile_count())
-        .map(|index| Axial::new((index % grid.width()) as i32, (index / grid.width()) as i32))
-        .filter(|address| world.admits_a_unit(*address))
-        .collect();
-    if open.is_empty() {
-        return Ok(());
-    }
-    for index in 0..SOLDIERS {
-        let at = open[(index.wrapping_mul(SPREAD) as usize) % open.len()];
-        let faction = FactionId((index % u32::from(factions)) as u16);
-        world
-            .spawn_soldier(at, faction)
-            .map_err(DemoError::Soldier)?;
-    }
-    Ok(())
+/// [^1]: PRD-0012, a world starts small and grows. `docs/product/shaped/prd-0012-a-world-starts-small-and-grows.md`
+/// [^2]: ADR-0075, the founding choice reads a bounded sample of the world, decision D1, a draft record. `docs/adrs/draft/adr-0075-the-founding-choice-reads-a-bounded-sample-of-the-world.md`
+fn found(world: &mut World) -> Result<cachette_core::Founding, DemoError> {
+    let founded = world
+        .found_run(GROUP, FactionId(0))
+        .map_err(DemoError::Founding)?;
+    let chosen = founded.survey().chosen().expect("the founding chose");
+    let reached = chosen.provision();
+    println!(
+        "founded at ({}, {}) with {} people, chosen from {} places",
+        founded.place().q,
+        founded.place().r,
+        founded.people().len(),
+        founded.survey().considered()
+    );
+    println!(
+        "  it reaches {} food, {} wood and {} stone, over {} open tiles, \
+with {} of open water beside it",
+        reached.food.0, reached.wood.0, reached.stone.0, reached.open_ground, reached.water_edge
+    );
+    Ok(founded)
 }
 
 /// Reads the keyboard and returns the camera the person asked for.
@@ -157,13 +156,18 @@ fn main() -> Result<(), DemoError> {
         .min(12);
 
     let mut world = World::new(DEMO).map_err(DemoError::World)?;
-    populate(&mut world)?;
+    let founded = found(&mut world)?;
 
     let mut canvas = Canvas::new(WINDOW_WIDTH, WINDOW_HEIGHT);
     // The world is larger than the window, so the camera shows a part of it
     // at a legible tile size. The person scrolls to see the rest. The camera
     // is the viewer's own value and never reaches the engine.
-    let mut camera = Camera::opening().clamped(&world, &canvas);
+    // The group holds one small part of a large world, so a camera at the
+    // corner would show an empty map. The view opens on the place that was
+    // founded, and the person scrolls away from it.
+    let mut camera = Camera::opening()
+        .looking_at(founded.place(), &canvas)
+        .clamped(&world, &canvas);
 
     let mut window = Window::new(
         "cachette — watch the world run",
@@ -178,7 +182,7 @@ fn main() -> Result<(), DemoError> {
     window.set_target_fps(30);
 
     println!(
-        "cachette: {} by {} tiles, {} soldiers, {threads} threads",
+        "cachette: {} by {} tiles, {} people, {threads} threads",
         DEMO.width,
         DEMO.height,
         world.soldiers().len()

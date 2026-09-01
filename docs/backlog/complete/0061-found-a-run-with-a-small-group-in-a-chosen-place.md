@@ -1,7 +1,7 @@
 ---
 id: 0061
 title: Found a run with a small group in a chosen place
-status: refined
+status: complete
 created: 2026-08-31
 implements: [ADR-0003 D1, ADR-0004 D4, ADR-0002 D1, ADR-0068 D1]
 changes: []
@@ -129,7 +129,37 @@ amendment is needed and no record is wrong.
 
 ## Outcome
 
-Filled in when the item moves to `complete/`.
+**Done.** A run begins with a group of a size the caller gives, in a place the
+engine chose from a bounded sample. The demonstration binary founds a run of
+thirty people instead of spreading soldiers over the world.
+
+**What the founding does not do.** It gives the group nothing to do. The
+founded people walk at random, exactly as the spawned soldiers did, because
+behaviour is a separate item.[^13] That is the correct outcome for this item.
+
+**The three decisions.** ADR-0075 holds the bounded sample claim, as a draft.
+DEC-030 keeps the direct spawn beside the founding, so no existing fixture and
+no existing golden file changed. DEC-031 records the properties the score
+reads. A fourth decision was found during the work and opened as BLK-018: how
+many groups found a world, and whether every faction founds one. The engine is
+written parametrically under it.
+
+**What the tests cover.** Six defects were restored in the source and the
+suite was run against each. Five were caught at once. The sixth, a score that
+reads nothing the ground holds, was **not** caught, because the poor-place
+test compared one pair and the pair still ordered correctly by luck of the
+sample. That is the uniform-input shape.[^14] The test now ranks every
+eligible place by a stock the test computes for itself and requires the chosen
+place to sit in the best quarter, and it then catches the defect.
+
+**Two findings.** FND-070 records that a restored defect must be the smallest
+change that violates the claim, because the first attempt made the suite
+unrunnable. FND-071 records that the whole-world pass the pyramid gave up was
+still live in the demonstration binary.
+
+**Three items raised.** 0093 asks the panel to say what the founding chose.
+0094 asks how many groups found a world. 0095 asks the founding for a count of
+who already stands on a tile.
 
 ## References
 
@@ -145,3 +175,5 @@ Filled in when the item moves to `complete/`.
 [^10]: Open decisions register, DEC-030 and DEC-031. `docs/DECISIONS.md`
 [^11]: Findings register, FND-054. `docs/FINDINGS.md`
 [^12]: Product requirement records. `docs/product/shaped/`
+[^13]: Backlog item 0064. `docs/backlog/refined/0064-choose-an-action-by-scoring-a-fixed-option-set.md`
+[^14]: Testing rules, section 2a. `.claude/rules/testing.md`

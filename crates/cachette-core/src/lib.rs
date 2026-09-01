@@ -17,6 +17,7 @@
 pub mod bridge;
 pub mod character;
 pub mod event;
+pub mod founding;
 pub mod hash;
 pub mod hex;
 pub mod holding;
@@ -37,6 +38,7 @@ pub mod world;
 pub use bridge::{BlockLayout, BlockRange, BridgeError, UnitTileBridge};
 pub use character::{CharacterArena, CharacterError};
 pub use event::{ResourceTaken, TileChanged};
+pub use founding::{Founding, FoundingError, Provision, Survey};
 pub use hash::StateHash;
 pub use hex::{Axial, Grid, GridError};
 pub use holding::{FactionMask, Holder, Holding};

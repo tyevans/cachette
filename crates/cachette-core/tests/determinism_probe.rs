@@ -363,3 +363,55 @@ fn the_perturbed_admission_moves_the_same_number_of_units() {
         "the probe changed the population as well as the order"
     );
 }
+
+/// The extent of the world that the founding probe reads.
+///
+/// The extent is wider than the coarsest lattice spacing of the generator, so
+/// the world holds open ground as well as water.
+const FOUNDING_EXTENT: u32 = 192;
+
+#[test]
+fn the_candidate_key_test_fails_when_the_founding_key_drops_the_row() {
+    // The probe drops the row draw from the candidate key. Every candidate
+    // then sits on one row of the world.
+    //
+    // This defect is invisible to both determinism tests, because the sample
+    // it draws is identical on every run and at every thread count. Only a
+    // test of the key itself sees it, which is the case the testing rule
+    // names.[^1]
+    //
+    // [^1]: Testing rules, section 2. `.claude/rules/testing.md`
+    let world = World::new(WorldConfig {
+        width: FOUNDING_EXTENT,
+        height: FOUNDING_EXTENT,
+        seed: 0x0cac_4e77_0061,
+        faction_count: 4,
+    })
+    .expect("the extent must describe a world");
+    let survey = world.survey_founding(30).expect("the survey must run");
+
+    let mut rows: Vec<i32> = survey
+        .candidates()
+        .iter()
+        .map(|candidate| candidate.address().r)
+        .collect();
+    rows.sort_unstable();
+    rows.dedup();
+    assert_eq!(
+        rows.len(),
+        1,
+        "the probe did not drop the row draw, so the candidate key test has \
+         no proven failure mode"
+    );
+
+    // The perturbation is confined to one axis. A probe that changed both
+    // would prove less.
+    let mut columns: Vec<i32> = survey
+        .candidates()
+        .iter()
+        .map(|candidate| candidate.address().q)
+        .collect();
+    columns.sort_unstable();
+    columns.dedup();
+    assert!(columns.len() > 1, "the probe also removed the column");
+}

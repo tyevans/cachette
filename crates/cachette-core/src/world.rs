@@ -30,6 +30,7 @@
 use crate::bridge::{BlockLayout, BridgeError, UnitTileBridge, BLOCK_BITS_DEFAULT};
 use crate::character::{CharacterArena, CharacterError};
 use crate::event::{ResourceTaken, TileChanged, CHANGE_KIND_LOWERED, CHANGE_KIND_RAISED};
+use crate::founding::{self, Founding, FoundingError, Survey};
 use crate::hash::StateHash;
 use crate::hex::{Axial, Grid, GridError, NEIGHBOUR_COUNT};
 use crate::holding::{FactionMask, Holder, Holding};
@@ -567,6 +568,145 @@ impl World {
         // [^1]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`
         self.rates.open_to(self.settlements.slot_count());
         Ok(settlement)
+    }
+
+    /// Surveys a bounded sample of the world for a place to found a group.
+    ///
+    /// The call reads a fixed number of candidate places and a fixed number
+    /// of tiles around each one. Neither number is a function of the world
+    /// extent, so the cost of the call does not grow with the world.[^1] The
+    /// call writes nothing. A watcher asks it why a place is good and gets
+    /// the counts that made the score.[^2]
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the group holds nobody, or when the ordering of
+    /// the candidates refuses to run.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0075, the founding choice reads a bounded sample of the world, decision D1, a draft record. `docs/adrs/draft/adr-0075-the-founding-choice-reads-a-bounded-sample-of-the-world.md`
+    /// [^2]: ADR-0075, the founding choice reads a bounded sample of the world, decision D5, a draft record. `docs/adrs/draft/adr-0075-the-founding-choice-reads-a-bounded-sample-of-the-world.md`
+    pub fn survey_founding(&self, group: u32) -> Result<Survey, FoundingError> {
+        founding::survey(self.resources, group)
+    }
+
+    /// Founds a run: a group of people, in a place the engine chose.
+    ///
+    /// The size of the group is an input to the run. It is not the population
+    /// the world is sized for, and the world reserves the same storage
+    /// whatever it is.[^1]
+    ///
+    /// The founding is one of two ways to people a world. A caller that wants
+    /// a unit in a place of its own choosing spawns one directly, and this
+    /// call is built on that one.[^2]
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the group holds nobody, when no place in the
+    /// sample admits the whole group, when the ordering refuses to run, or
+    /// when a person or the settlement refuses to arrive.
+    ///
+    /// # References
+    ///
+    /// [^1]: PRD-0012, a world starts small and grows. `docs/product/shaped/prd-0012-a-world-starts-small-and-grows.md`
+    /// [^2]: Open decisions register, DEC-030. `docs/DECISIONS.md`
+    pub fn found_run(&mut self, group: u32, faction: FactionId) -> Result<Founding, FoundingError> {
+        let survey = self.survey_founding(group)?;
+        let chosen = survey
+            .chosen()
+            .ok_or(FoundingError::NoPlaceFound(survey.drawn()))?;
+        let place = chosen.address();
+        let (settlement, people) = self.settle_group(place, group, faction)?;
+        Ok(Founding::new(place, settlement, people, survey))
+    }
+
+    /// Founds a group at a place the caller names.
+    ///
+    /// The engine chooses the place of a run. This call exists so that a test
+    /// can compare a place the engine chose against a place it did not, on a
+    /// quantity the test computes for itself.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the group holds nobody, when the address lies
+    /// outside the world, when the place does not admit the whole group, or
+    /// when a person or the settlement refuses to arrive.
+    pub fn found_group_at(
+        &mut self,
+        address: Axial,
+        group: u32,
+        faction: FactionId,
+    ) -> Result<Founding, FoundingError> {
+        if !self.grid.contains(address) {
+            return Err(FoundingError::OutsideWorld(address));
+        }
+        let survey = founding::survey_addresses(self.resources, &[address], group)?;
+        let chosen = survey
+            .chosen()
+            .ok_or(FoundingError::NoPlaceFound(survey.drawn()))?;
+        let (settlement, people) = self.settle_group(address, group, faction)?;
+        Ok(Founding::new(chosen.address(), settlement, people, survey))
+    }
+
+    /// Seats a settlement at a place and spreads a group over its disc.
+    ///
+    /// The disc is walked in its fixed order, and each open tile takes up to
+    /// the number of units that its ground holds.[^1] The order is the same
+    /// on every run and at every thread count, because it is a function of
+    /// the address alone.[^2]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0056, movement is tile-discrete and admitted by sort-then-admit, decision D4. `docs/adrs/accepted/adr-0056-movement-is-tile-discrete-and-admitted-by-sort-then-admit.md`
+    /// [^2]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
+    fn settle_group(
+        &mut self,
+        place: Axial,
+        group: u32,
+        faction: FactionId,
+    ) -> Result<(Entity, Vec<Entity>), FoundingError> {
+        let settlement = self.found_settlement(place, faction)?;
+        let mut people = Vec::with_capacity(group as usize);
+        let mut remaining = group;
+        for address in founding::disc(self.grid, place, founding::SURVEY_RADIUS) {
+            if remaining == 0 {
+                break;
+            }
+            let Some(kind) = self.tile_kind(address) else {
+                continue;
+            };
+            if !kind.is_passable() {
+                continue;
+            }
+            // The founding fills each tile to the capacity of its ground and
+            // reads no occupancy count. A spawn does not read the capacity
+            // either, and the derived occupancy structure is stale between
+            // two frames, so a read of it here would be a third call site for
+            // a rebuild that the step already owns.[^3] [^4] A second
+            // founding over one disc may therefore over-fill a tile, which is
+            // the caller mistake that decision permits and that movement
+            // corrects, because admission never raises a tile above its
+            // capacity.
+            //
+            // [^3]: Open decisions register, DEC-020. `docs/DECISIONS.md`
+            // [^4]: Open decisions register, DEC-021. `docs/DECISIONS.md`
+            for _ in 0..kind.capacity().min(remaining) {
+                people.push(self.spawn_soldier(address, faction)?);
+                remaining -= 1;
+            }
+        }
+        if remaining > 0 {
+            // The eligibility rule says the disc holds the group, so this is
+            // a disagreement between the rule and the placement rather than a
+            // caller mistake. Report it and leave nothing half-founded.
+            for person in people {
+                self.despawn_soldier(person);
+            }
+            self.destroy_settlement(settlement);
+            return Err(FoundingError::NoPlaceFound(1));
+        }
+        Ok((settlement, people))
     }
 
     /// Destroys a settlement and reports whether it destroyed one.

@@ -88,3 +88,11 @@ const fn mix(value: u64) -> u64 {
     state = state.wrapping_mul(0x94d0_49bb_1331_11eb);
     state ^ (state >> 31)
 }
+
+/// The system identifier of the founding.
+///
+/// The founding owns this identifier alone. It does not share the identifier
+/// of the terrain generator or of the resource field, because two systems
+/// that share an identifier draw the same value from the same frame, entity
+/// and draw index. The sample would then sit on the lattice of the ground.
+pub const SYSTEM_FOUNDING: SystemId = 5;
