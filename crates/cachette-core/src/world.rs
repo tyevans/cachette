@@ -1660,6 +1660,7 @@ impl World {
         if !self.cohorts.rows().is_empty()
             && !self.cohorts.describes(
                 self.soldiers.home_column(),
+                self.soldiers.faction_column(),
                 self.soldiers.live_column(),
                 self.settlements.slot_count(),
             )
@@ -2210,6 +2211,7 @@ impl World {
         let sites = self.settlements.slot_count();
         self.cohorts.rebuild(
             self.soldiers.home_column(),
+            self.soldiers.faction_column(),
             self.soldiers.live_column(),
             sites,
         );

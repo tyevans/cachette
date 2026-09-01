@@ -111,6 +111,8 @@ pub struct NeedUpdate<'a> {
     pub live: &'a [u8],
     /// The site that each slot draws from, or `NO_HOME`.
     pub homes: &'a [u32],
+    /// The faction of each slot.
+    pub factions: &'a [FactionId],
 }
 
 /// Returns the gather order that a column value names.
@@ -782,6 +784,7 @@ impl SoldierArena {
             deficits: &mut self.deficits,
             live: &self.live,
             homes: &self.homes,
+            factions: &self.factions,
         }
     }
 

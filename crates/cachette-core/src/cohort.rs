@@ -47,15 +47,21 @@ use crate::sim_math;
 use crate::site::{CommodityId, Store, StoreUpdate, COMMODITY_COUNT};
 use crate::slots::Slots;
 use crate::soldier::{NeedUpdate, NO_HOME};
-use crate::types::{Accum, Entity, Fix32, Tick};
+use crate::types::{Accum, Entity, FactionId, Fix32, Tick, FACTION_CEILING};
 
-/// The number of strata that a site holds.
+/// The number of cohorts that one site holds.
 ///
-/// A stratum is one kind of unit at one place. The set holds one stratum. A
-/// second stratum raises this number and changes no code outside this
-/// module, because every read of the cohort array goes through the row
-/// index below.
-pub const STRATUM_COUNT: usize = 1;
+/// A cohort is the units of one faction at one site. Two factions at one
+/// place never pool their draw, because a pooled draw would feed a rival
+/// out of a store it does not hold.
+///
+/// The number is the faction ceiling, which is a property of the faction
+/// mask and not a budget.[^1]
+///
+/// # References
+///
+/// [^1]: ADR-0053, a faction is a bit in a mask, and a relation is a plane, decision D1. `docs/adrs/accepted/adr-0053-a-faction-is-a-bit-in-a-mask-and-a-relation-is-a-plane.md`
+pub const COHORTS_PER_SITE: usize = FACTION_CEILING as usize;
 
 /// The value of a need that is fully met.
 ///
@@ -67,7 +73,7 @@ pub const STRATUM_COUNT: usize = 1;
 /// [^1]: ADR-0002, simulated and aggregated state holds no floating point number, decision D1. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
 pub const NEED_FULL: Fix32 = Fix32::ONE;
 
-/// Returns the row of one stratum at one site.
+/// Returns the row of one faction at one site.
 ///
 /// The site is the high part of the key, so the array is sorted by site by
 /// construction and the segmented reduction needs no sort.[^1]
@@ -76,8 +82,8 @@ pub const NEED_FULL: Fix32 = Fix32::ONE;
 ///
 /// [^1]: Research report 15, needs, consumption and the input-output economy, section 5.3. `docs/research/reports/15-needs-consumption-and-economy.md`
 #[must_use]
-pub const fn row_index(site: u32, stratum: u16) -> usize {
-    (site as usize) * STRATUM_COUNT + (stratum as usize)
+pub const fn row_index(site: u32, faction: u16) -> usize {
+    (site as usize) * COHORTS_PER_SITE + (faction as usize)
 }
 
 /// The reason that this module refused a caller.
@@ -241,8 +247,8 @@ pub struct CohortRow {
     pub site: u32,
     /// The number of units that the row stands for.
     pub headcount: u32,
-    /// The kind of unit that the row stands for.
-    pub stratum: u16,
+    /// The faction of the units that the row stands for.
+    pub faction: u16,
     /// The declared padding. Always zero.
     pub padding: [u8; 2],
 }
@@ -285,7 +291,7 @@ impl CohortTable {
     /// Returns the number of sites that the table covers.
     #[must_use]
     pub fn site_count(&self) -> u32 {
-        (self.rows.len() / STRATUM_COUNT) as u32
+        (self.rows.len() / COHORTS_PER_SITE) as u32
     }
 
     /// Returns the number of live units that belong to no site.
@@ -296,9 +302,9 @@ impl CohortTable {
 
     /// Returns the headcount of one cohort.
     #[must_use]
-    pub fn headcount(&self, site: u32, stratum: u16) -> Option<u32> {
+    pub fn headcount(&self, site: u32, faction: FactionId) -> Option<u32> {
         self.rows
-            .get(row_index(site, stratum))
+            .get(row_index(site, faction.0))
             .map(|row| row.headcount)
     }
 
@@ -332,14 +338,14 @@ impl CohortTable {
     /// # References
     ///
     /// [^1]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
-    pub fn rebuild(&mut self, homes: &[u32], live: &[u8], sites: u32) {
+    pub fn rebuild(&mut self, homes: &[u32], factions: &[FactionId], live: &[u8], sites: u32) {
         self.rows.clear();
         self.rows
-            .resize(sites as usize * STRATUM_COUNT, CohortRow::default());
-        for (site, chunk) in self.rows.chunks_mut(STRATUM_COUNT).enumerate() {
+            .resize(sites as usize * COHORTS_PER_SITE, CohortRow::default());
+        for (site, chunk) in self.rows.chunks_mut(COHORTS_PER_SITE).enumerate() {
             for (stratum, row) in chunk.iter_mut().enumerate() {
                 row.site = site as u32;
-                row.stratum = stratum as u16;
+                row.faction = stratum as u16;
             }
         }
         self.unattached = 0;
@@ -347,10 +353,16 @@ impl CohortTable {
             if live.get(slot).copied() != Some(1) {
                 continue;
             }
-            // Every unit is of stratum zero until a second stratum exists.
-            match self.rows.get_mut(row_index(*home, 0)) {
-                Some(row) if *home != NO_HOME => row.headcount += 1,
-                _ => self.unattached += 1,
+            if *home == NO_HOME {
+                self.unattached += 1;
+                continue;
+            }
+            match self.rows.get_mut(row_index(*home, factions[slot].0)) {
+                Some(row) => row.headcount += 1,
+                // A home that names no live site, or a faction above the
+                // ceiling, counts as unattached here. The world refuses
+                // both, and its invariant check states so.
+                None => self.unattached += 1,
             }
         }
     }
@@ -373,9 +385,15 @@ impl CohortTable {
     ///
     /// [^1]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`
     #[must_use]
-    pub fn describes(&self, homes: &[u32], live: &[u8], sites: u32) -> bool {
+    pub fn describes(
+        &self,
+        homes: &[u32],
+        factions: &[FactionId],
+        live: &[u8],
+        sites: u32,
+    ) -> bool {
         let mut derived = Self::new();
-        derived.rebuild(homes, live, sites);
+        derived.rebuild(homes, factions, live, sites);
         derived == *self
     }
 
@@ -387,8 +405,8 @@ impl CohortTable {
         // well: a table that holds a part of a site fails on the last row.
         self.rows.iter().enumerate().all(|(index, row)| {
             row.padding == [0; 2]
-                && row_index(row.site, row.stratum) == index
-                && (row.stratum as usize) < STRATUM_COUNT
+                && row_index(row.site, row.faction) == index
+                && (row.faction as usize) < COHORTS_PER_SITE
         })
     }
 }
@@ -586,14 +604,14 @@ pub fn draw(
         let mut base = 0usize;
         for ((span, share_span), slot) in stores
             .chunks_mut(chunk_len)
-            .zip(shares.chunks_mut(chunk_len * STRATUM_COUNT))
+            .zip(shares.chunks_mut(chunk_len * COHORTS_PER_SITE))
             .zip(slots.entries_mut())
         {
             let start = base;
             base += span.len();
             let live_span = &live[start..base];
             let generation_span = &generations[start..base];
-            let row_span = &rows[start * STRATUM_COUNT..base * STRATUM_COUNT];
+            let row_span = &rows[start * COHORTS_PER_SITE..base * COHORTS_PER_SITE];
             scope.spawn(move || {
                 *slot = draw_span(
                     tick,
@@ -653,8 +671,8 @@ fn draw_span(
         if live[offset] != 1 {
             continue;
         }
-        let segment = &rows[offset * STRATUM_COUNT..(offset + 1) * STRATUM_COUNT];
-        let shares = &mut shares[offset * STRATUM_COUNT..(offset + 1) * STRATUM_COUNT];
+        let segment = &rows[offset * COHORTS_PER_SITE..(offset + 1) * COHORTS_PER_SITE];
+        let shares = &mut shares[offset * COHORTS_PER_SITE..(offset + 1) * COHORTS_PER_SITE];
 
         // The segmented reduction. The segment is contiguous and it never
         // crosses a thread, because the cohort array is indexed by the site
@@ -753,9 +771,14 @@ pub fn decay(rate: Fix32, update: NeedUpdate<'_>, threads: usize) -> Result<(), 
         deficits,
         live,
         homes,
+        factions,
     } = update;
     let count = needs.len();
-    if deficits.len() != count || live.len() != count || homes.len() != count {
+    if deficits.len() != count
+        || live.len() != count
+        || homes.len() != count
+        || factions.len() != count
+    {
         return Err(CohortError::ColumnsDisagree);
     }
     if count == 0 {
@@ -823,9 +846,14 @@ pub fn satisfy(
         deficits,
         live,
         homes,
+        factions,
     } = update;
     let count = needs.len();
-    if deficits.len() != count || live.len() != count || homes.len() != count {
+    if deficits.len() != count
+        || live.len() != count
+        || homes.len() != count
+        || factions.len() != count
+    {
         return Err(CohortError::ColumnsDisagree);
     }
     if count == 0 {
@@ -855,6 +883,7 @@ pub fn satisfy(
             base += need_span.len();
             let live_span = &live[start..base];
             let home_span = &homes[start..base];
+            let faction_span = &factions[start..base];
             scope.spawn(move || {
                 for offset in 0..need_span.len() {
                     if live_span[offset] != 1 {
@@ -862,7 +891,7 @@ pub fn satisfy(
                     }
                     let home = home_span[offset];
                     if home != NO_HOME {
-                        if let Some(gain) = gains.get(row_index(home, 0)) {
+                        if let Some(gain) = gains.get(row_index(home, faction_span[offset].0)) {
                             let fed = sim_math::add(need_span[offset], *gain);
                             need_span[offset] = if fed > NEED_FULL { NEED_FULL } else { fed };
                         }

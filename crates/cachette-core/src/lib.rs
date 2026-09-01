@@ -40,7 +40,7 @@ pub use bridge::{BlockLayout, BlockRange, BridgeError, UnitTileBridge};
 pub use character::{CharacterArena, CharacterError};
 pub use cohort::{
     CohortError, CohortRow, CohortTable, DrawLedger, DrawPass, NeedRule, SiteRationed,
-    STRATUM_COUNT,
+    COHORTS_PER_SITE,
 };
 pub use event::{ResourceTaken, TileChanged};
 pub use founding::{Founding, FoundingError, Provision, Survey};
