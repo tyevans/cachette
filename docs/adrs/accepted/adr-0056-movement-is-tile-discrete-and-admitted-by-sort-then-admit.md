@@ -1,7 +1,5 @@
 # ADR-0056: Movement is tile-discrete and admitted by sort-then-admit
 
-Status: Accepted
-
 ## Context
 
 The engine moves up to one million units on a hex world. A unit needs a

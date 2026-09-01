@@ -1,7 +1,5 @@
 # ADR-0004: Iteration order is explicit, and unordered reductions need slots
 
-Status: Accepted
-
 ## Context
 
 A parallel loop finishes in an unpredictable order. A hash map iterates in an

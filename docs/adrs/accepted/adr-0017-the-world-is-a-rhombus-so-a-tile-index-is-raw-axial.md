@@ -1,7 +1,5 @@
 # ADR-0017: The world is a rhombus, so a tile index is raw axial
 
-Status: Accepted
-
 ## Context
 
 Every system in this engine reaches a tile through an index. A tile index is

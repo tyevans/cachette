@@ -1,7 +1,5 @@
 # ADR-0018: The unit-to-tile bridge is derived, and it rebuilds at the barrier
 
-Status: Accepted
-
 ## Context
 
 A tile is addressed by an index, and a unit is named by an identity.[^1] The

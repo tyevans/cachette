@@ -1,7 +1,5 @@
 # ADR-0009: Parallel stages write disjoint outputs, because the memory model is weak
 
-Status: Accepted
-
 ## Context
 
 The engine runs its work across threads. It must give one answer at any thread

@@ -1,7 +1,5 @@
 # ADR-0012: Tiles are dense columns and units are a generational arena
 
-Status: Accepted
-
 ## Context
 
 The world holds two populations, and they have opposite shapes.

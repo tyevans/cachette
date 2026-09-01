@@ -113,6 +113,7 @@ records:
 
 # Prove that the record checks can fail. Each must reject its broken fixture.
 records-probe:
+    ! ./scripts/check-adrs.sh tests/fixtures/records-broken
     ! ./scripts/check-prds.sh tests/fixtures/prd-broken
     ! ./scripts/check-citations.sh tests/fixtures/citations-broken
 

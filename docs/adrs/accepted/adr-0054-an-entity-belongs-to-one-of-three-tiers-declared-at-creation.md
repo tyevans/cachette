@@ -1,7 +1,5 @@
 # ADR-0054: An entity belongs to one of three tiers, declared at creation
 
-Status: Accepted
-
 ## Context
 
 This project simulates a world of tiles and units. The target scale is large

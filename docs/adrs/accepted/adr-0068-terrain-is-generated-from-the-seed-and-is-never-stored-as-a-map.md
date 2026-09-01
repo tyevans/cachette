@@ -1,7 +1,5 @@
 # ADR-0068: Terrain is generated from the seed and is never stored as a map
 
-Status: Accepted
-
 ## Context
 
 The world needs ground. Every tile must have a kind and a height, and every

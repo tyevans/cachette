@@ -1,7 +1,5 @@
 # ADR-0003: Every random draw is keyed, never stateful
 
-Status: Accepted
-
 ## Context
 
 A generator that holds state produces its next value from its previous value.

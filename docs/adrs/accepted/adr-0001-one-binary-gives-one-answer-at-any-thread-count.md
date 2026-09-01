@@ -1,7 +1,5 @@
 # ADR-0001: One binary gives one answer at any thread count
 
-Status: Accepted
-
 ## Context
 
 This project simulates a world of many tiles and many units. It runs the

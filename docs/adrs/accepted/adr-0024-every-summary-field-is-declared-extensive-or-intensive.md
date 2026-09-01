@@ -1,7 +1,5 @@
 # ADR-0024: Every summary field is declared extensive or intensive
 
-Status: Accepted
-
 ## Context
 
 A summary field combines the values of the cells below it.[^1] Two kinds of

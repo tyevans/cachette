@@ -1,7 +1,5 @@
 # ADR-0070: The head-up display reports what the drawing pass read
 
-Status: Accepted
-
 ## Context
 
 The viewer draws a world. It draws a panel of numbers over that world. The

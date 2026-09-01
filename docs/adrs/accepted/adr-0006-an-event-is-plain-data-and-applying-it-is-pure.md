@@ -1,7 +1,5 @@
 # ADR-0006: An event is plain data and applying it is pure
 
-Status: Accepted
-
 ## Context
 
 The engine hashes the whole world each frame and compares the hash against a
