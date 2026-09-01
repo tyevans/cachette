@@ -255,7 +255,7 @@ without stating a constraint is worse than no record.
 | 0061 | Trade solves a flow, never a path for each cart | Proposed | 0049, 0058 | 11 |
 | 0062 | Production and upkeep are rates attached to a site | Accepted | 0055 | 12, `accepted/adr-0062-production-and-upkeep-are-rates-attached-to-a-site.md` |
 | 0063 | A need is a rate with a threshold, and crossing it is a fact | Accepted | 0032, 0062 | 15, `accepted/adr-0063-a-need-is-a-rate-with-a-threshold-and-crossing-it-is-a-fact.md` |
-| 0064 | A unit chooses by scoring a small fixed option set | Proposed | 0003, 0063 | 16 |
+| 0064 | A unit chooses by scoring a small fixed option set | Draft | 0003, 0063 | 16 |
 | 0065 | A group is a site membership, not a region | Proposed | 0038, 0054 | 17 |
 | 0067 | The viewer reads the world and never writes to it | Accepted | 0001, 0036 | — |
 | 0068 | Terrain is generated from the seed and is never stored as a map | Accepted | 0001, 0002, 0003, 0012 | — |

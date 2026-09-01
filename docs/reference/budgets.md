@@ -56,6 +56,30 @@ removes the coordinate conversion that an offset index pays on every tile
 access. The faction ceiling makes a relation one plane and a presence set one
 word.
 
+## The choice pass
+
+A unit scores a fixed option set and takes the highest score. Two parameters of
+that pass are budget parameters and not design knobs, so they live here.[^5]
+
+| Parameter | Value | Blocker | How reached |
+|---|---|---|---|
+| Score floor | 16,384 in the Q16.16 scale | BLK-007 | Report 16, section 3.7. One quarter of one unit of weighted need |
+| Choice interval | 32 ticks | BLK-007 | Report 16, section 3.5. A power of two, at the low end of the range the owner asked for |
+| Stagger key | The level 1 cell index, mixed | BLK-007 | Report 16, section 3.5, and FND-023 |
+
+**The floor decides the mover count.** A unit whose highest score is below the
+floor holds what it was doing and does not move. Without the floor, a world in
+which every option scores near zero gives every unit the same option, and the
+whole population walks one way.[^6] The movement stage is sized for a part of
+the population, so a change to the floor changes the frame budget.
+
+**The interval is a power of two**, so the phase test is a mask and not a
+division. The engine takes it as a parameter of the world, and the value above
+is the default.
+
+BLK-007 holds all three rows. The derivations come from a research report and
+nobody has measured them on the target platform.
+
 ## What belongs here
 
 - Per-tick and per-frame cost budgets.
@@ -101,3 +125,5 @@ a footnote.
 [^2]: ADR Registry. `docs/adrs/REGISTRY.md`
 [^3]: Blockers register. `docs/BLOCKERS.md`
 [^4]: The record check baseline. `scripts/adr-volatile-baseline.txt`
+[^5]: ADR-0064, a unit chooses by scoring a small fixed option set, decisions D3 and D4. `docs/adrs/draft/adr-0064-a-unit-chooses-by-scoring-a-small-fixed-option-set.md`
+[^6]: Findings register, FND-014. `docs/FINDINGS.md`

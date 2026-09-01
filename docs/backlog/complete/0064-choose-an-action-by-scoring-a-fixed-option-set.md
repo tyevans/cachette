@@ -1,7 +1,7 @@
 ---
 id: 0064
 title: Choose an action by scoring a fixed option set
-status: refined
+status: complete
 created: 2026-08-31
 implements: [ADR-0003 D1, ADR-0002 D1, ADR-0004 D1, ADR-0004 D4, ADR-0007 D3, ADR-0022 D1]
 changes: []
@@ -117,7 +117,34 @@ step stage that movement reads, so it does not run beside any movement work.
 
 ## Outcome
 
-Filled in when the item moves to `complete/`.
+The choice pass exists and the step runs it before movement. A unit scores a
+fixed set of four options against the level 1 cell it stands in, and it takes
+the highest. Each score is one product of what the unit wants by how much of
+that thing is near. The soldier arena gained a column that holds the option a
+unit chose, and movement reads it: a unit that holds no option does not move.
+
+ADR-0064 is written and sits at `Draft`. The registry row moved, and the record
+holds no option count, no floor value and no interval value. Those went to the
+reference table.[^11]
+
+The floor and the stagger landed as this item describes. The floor is a
+constant of the engine, and a test asserts that a world with nothing to respond
+to produces no movement. Removing the floor fails that test. The stagger keys
+on a mix of the level 1 cell index, and a test asserts that every unit of one
+cell chooses on the same frame. Keying the stagger on the unit identity fails
+that test.
+
+Six existing test fixtures now set the choice interval to every tick, because
+movement is not their subject and a unit does not move before it has chosen.
+The golden files were regenerated.
+
+The perturbed build reads the option set from the top, so a tie goes to the
+highest option index. The probe recipe runs the choice test binary and requires
+it to fail.
+
+Two things this item did not do. It states no cost figure, because BLK-007
+governs every one of them. It opened no finding and no blocker, because it
+corrected nothing the project believed and found no new gap.
 
 ## References
 
