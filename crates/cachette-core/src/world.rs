@@ -29,6 +29,7 @@
 
 use crate::bridge::{BlockLayout, BridgeError, UnitTileBridge, BLOCK_BITS_DEFAULT};
 use crate::character::{CharacterArena, CharacterError};
+use crate::choose::{self, ChoiceError, ChoiceExplanation, ChoiceSchedule, WeightProfile};
 use crate::cohort::{self, CohortError, CohortTable, DrawLedger, NeedRule, SiteRationed};
 use crate::event::{ResourceTaken, TileChanged, CHANGE_KIND_LOWERED, CHANGE_KIND_RAISED};
 use crate::founding::{self, Founding, FoundingError, Survey};
@@ -70,6 +71,14 @@ pub enum StepError {
     Rates(RateError),
     /// The consumption pass refused to run.
     Consumption(CohortError),
+    /// The choice pass refused to run.
+    Choice(ChoiceError),
+}
+
+impl From<ChoiceError> for StepError {
+    fn from(error: ChoiceError) -> Self {
+        Self::Choice(error)
+    }
 }
 
 impl From<CohortError> for StepError {
@@ -161,6 +170,7 @@ impl core::fmt::Display for StepError {
             Self::Consumption(error) => {
                 write!(formatter, "the consumption pass refused: {error}")
             }
+            Self::Choice(error) => write!(formatter, "the choice pass refused: {error}"),
         }
     }
 }
@@ -271,6 +281,22 @@ pub struct World {
     draw_ledger: DrawLedger,
     /// The sites that could not serve every cohort at the last draw.
     rationed_log: Vec<SiteRationed>,
+    /// When each unit re-reads the world and chooses again.
+    choice: ChoiceSchedule,
+    /// The weight that a unit puts on each option of the choice.
+    ///
+    /// The profile is content, and it is a table of values. The engine reads
+    /// it and never calls into it.[^1]
+    ///
+    /// It is an input to the world and not a fact the world holds, so it
+    /// does not reach the state hash. What it decides does: the intent
+    /// column carries the outcome, and that column is hashed.[^2]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0007, content supplies a key vector, never a comparator, decision D3. `docs/adrs/accepted/adr-0007-content-supplies-a-key-vector-never-a-comparator.md`
+    /// [^2]: ADR-0064, a unit chooses by scoring a small fixed option set, decision D2. `docs/adrs/draft/adr-0064-a-unit-chooses-by-scoring-a-small-fixed-option-set.md`
+    weights: WeightProfile,
     /// What the live stores hold, by the account of this world.
     ///
     /// The store column states the same total a second time, and the
@@ -343,6 +369,8 @@ impl World {
             cohorts: CohortTable::new(),
             draw_ledger: DrawLedger::ZERO,
             rationed_log: Vec::new(),
+            choice: ChoiceSchedule::DEFAULT,
+            weights: WeightProfile::EVEN,
             store_account: [Accum(0); COMMODITY_COUNT],
         };
         // A world that has never stepped still answers a question about a
@@ -1748,6 +1776,78 @@ impl World {
         true
     }
 
+    /// Writes the intent of every unit whose cell chooses on this frame.
+    ///
+    /// The pass is one operation over all units. Nothing loops over units
+    /// outside the engine.[^1]
+    ///
+    /// A unit whose cell does not choose on this frame keeps the intent it
+    /// held. A unit whose every option scores below the floor holds what it
+    /// was doing, which is the case the floor exists for.[^2]
+    ///
+    /// Each thread reads a span of the live set and writes its own output
+    /// slot. The join reads the slots in slot order, so the result never
+    /// takes its order from the thread that finished first.[^3]
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the caller asks for zero threads.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0010, Python is a control plane, and it never touches an entity one at a time. `docs/adrs/REGISTRY.md`
+    /// [^2]: Findings register, FND-014. `docs/FINDINGS.md`
+    /// [^3]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
+    fn choose(&mut self, threads: usize) -> Result<(), StepError> {
+        if threads == 0 {
+            return Err(StepError::ZeroThreads);
+        }
+        let live: Vec<Entity> = self.soldiers.iter().collect();
+        if live.is_empty() {
+            return Ok(());
+        }
+        let frame = self.tick.0;
+        let schedule = self.choice;
+        let weights = &self.weights;
+        let pyramid = &self.pyramid;
+        let layout = pyramid.layout();
+        let soldiers = &self.soldiers;
+        let chunk_len = live.len().div_ceil(threads).max(1);
+        let mut slots: Slots<Vec<(u32, u8)>> =
+            Slots::filled(threads, Vec::new()).map_err(|_| StepError::ZeroThreads)?;
+
+        std::thread::scope(|scope| {
+            for (chunk, slot) in live.chunks(chunk_len).zip(slots.entries_mut()) {
+                scope.spawn(move || {
+                    *slot = chunk
+                        .iter()
+                        .filter_map(|unit| {
+                            let tile = soldiers.tile(*unit)?;
+                            let cell = layout.block_of_key(layout.key_of(tile)?);
+                            // The stagger key is the level 1 cell. It is
+                            // never the identity of the unit.
+                            if !schedule.chooses_now(cell, frame) {
+                                return None;
+                            }
+                            let summary = pyramid.cell(cell)?;
+                            let need = soldiers.need_column()[unit.index() as usize];
+                            Some((unit.index(), choose::best_option(need, summary, weights)))
+                        })
+                        .collect();
+                });
+            }
+        });
+
+        let chosen = slots.combine(Vec::new(), |mut joined, slot| {
+            joined.extend_from_slice(slot);
+            joined
+        });
+        for (slot, intent) in chosen {
+            self.soldiers.set_intent_at(slot, intent);
+        }
+        Ok(())
+    }
+
     /// Runs one frame on the given number of threads.
     ///
     /// The result does not depend on the thread count. Every thread writes
@@ -1804,6 +1904,13 @@ impl World {
         // This is not a second barrier. The rebuild at the end of this
         // function is the barrier of this frame, and it stays last.
         self.refresh_bridge()?;
+
+        // The choice runs before movement, and it is what movement reads.
+        // It reads level 1 as the last barrier left it, and it writes
+        // nothing to any level above level 0.[^11]
+        //
+        // [^11]: ADR-0022, level 0 is the only truth, and every level above it is derived, decisions D1 and D3. `docs/adrs/accepted/adr-0022-level-0-is-the-only-truth-and-every-level-above-it-is-derived.md`
+        self.choose(threads)?;
 
         let intents = soldier_moves(tick, seed, self.terrain, &self.soldiers, threads)?;
 
@@ -1906,6 +2013,115 @@ impl World {
             threads,
         )?;
         Ok(&self.log)
+    }
+
+    /// Returns when each unit re-reads the world and chooses again.
+    #[must_use]
+    pub const fn choice_schedule(&self) -> ChoiceSchedule {
+        self.choice
+    }
+
+    /// Sets the interval between two choices, as a power of two.
+    ///
+    /// An exponent of zero makes every unit choose on every tick. The
+    /// interval is a parameter of the world. This function holds no
+    /// recommended value, and the reference table holds the derivation.[^1]
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the exponent is above the ceiling.
+    ///
+    /// # References
+    ///
+    /// [^1]: Budgets and costs, the choice pass. `docs/reference/budgets.md`
+    pub const fn set_choice_schedule(&mut self, period_log2: u32) -> Result<(), ChoiceError> {
+        match ChoiceSchedule::new(period_log2) {
+            Ok(schedule) => {
+                self.choice = schedule;
+                Ok(())
+            }
+            Err(error) => Err(error),
+        }
+    }
+
+    /// Returns the weight that a unit puts on one option.
+    ///
+    /// Returns `None` when the option index is outside the set.
+    #[must_use]
+    pub const fn option_weight(&self, option: u8) -> Option<Fix32> {
+        self.weights.weight(option)
+    }
+
+    /// Sets the weight that a unit puts on one option.
+    ///
+    /// The weight is content: a value in a table that the engine reads. The
+    /// engine never calls content code inside the choice.[^1]
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the option index is outside the set.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0007, content supplies a key vector, never a comparator, decision D3. `docs/adrs/accepted/adr-0007-content-supplies-a-key-vector-never-a-comparator.md`
+    pub const fn set_option_weight(
+        &mut self,
+        option: u8,
+        weight: Fix32,
+    ) -> Result<(), ChoiceError> {
+        self.weights.set(option, weight)
+    }
+
+    /// Returns the option that one soldier last chose.
+    ///
+    /// The outer option reports whether the identity is live. The inner one
+    /// reports whether the soldier holds an intent. A soldier that holds
+    /// none found nothing above the floor, and it does not move.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0064, a unit chooses by scoring a small fixed option set, decision D3. `docs/adrs/draft/adr-0064-a-unit-chooses-by-scoring-a-small-fixed-option-set.md`
+    #[must_use]
+    pub fn soldier_intent(&self, entity: Entity) -> Option<Option<u8>> {
+        self.soldiers.intent(entity)
+    }
+
+    /// Returns the level 1 cell that covers one tile.
+    #[must_use]
+    fn cell_of(&self, tile: TileIdx) -> Option<u32> {
+        let layout = self.pyramid.layout();
+        Some(layout.block_of_key(layout.key_of(tile)?))
+    }
+
+    /// Returns why one soldier chose what it chose.
+    ///
+    /// The answer holds every score, the value each option read from the
+    /// level 1 cell, the weight each option carried, and the floor that an
+    /// option had to clear. The engine recomputes it from the world as it
+    /// stands now, because it stores no score.[^1]
+    ///
+    /// Returns `None` when the identity is dead or names no tile of this
+    /// world.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0064, a unit chooses by scoring a small fixed option set, decision D2. `docs/adrs/draft/adr-0064-a-unit-chooses-by-scoring-a-small-fixed-option-set.md`
+    #[must_use]
+    pub fn explain_choice(&self, entity: Entity) -> Option<ChoiceExplanation> {
+        let slot = self.soldiers.slot_of(entity)?;
+        let tile = self.soldiers.tile(entity)?;
+        let cell = self.cell_of(tile)?;
+        let summary = self.pyramid.cell(cell)?;
+        let need = self.soldiers.need_column()[slot as usize];
+        let intent = self.soldiers.intent_column()[slot as usize];
+        Some(choose::explain(
+            cell,
+            need,
+            summary,
+            &self.weights,
+            intent,
+            self.choice.chooses_now(cell, self.tick.0.wrapping_add(1)),
+        ))
     }
 
     /// Returns the holding of the world.
@@ -2396,6 +2612,9 @@ const DRAW_MOVE_DIRECTION: u32 = 0;
 /// which pairs the slot index with the generation, and not the slot index
 /// alone.[^2]
 ///
+/// A soldier that holds no intent does not move at all. The choice pass
+/// writes the intent, and it runs before this one.[^7]
+///
 /// A soldier whose chosen neighbour falls outside the world stays put. The
 /// world is a rhombus and it does not wrap, so an address outside the
 /// extent names no tile.[^3]
@@ -2422,6 +2641,7 @@ const DRAW_MOVE_DIRECTION: u32 = 0;
 /// [^4]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
 /// [^5]: ADR-0056, movement is tile-discrete and admitted by sort-then-admit, decision D2. `docs/adrs/accepted/adr-0056-movement-is-tile-discrete-and-admitted-by-sort-then-admit.md`
 /// [^6]: ADR-0068, terrain is generated from the seed and is never stored as a map, decision D4. `docs/adrs/accepted/adr-0068-terrain-is-generated-from-the-seed-and-is-never-stored-as-a-map.md`
+/// [^7]: ADR-0064, a unit chooses by scoring a small fixed option set, decision D3. `docs/adrs/draft/adr-0064-a-unit-chooses-by-scoring-a-small-fixed-option-set.md`
 fn soldier_moves(
     tick: Tick,
     seed: u64,
@@ -2444,6 +2664,11 @@ fn soldier_moves(
                 *slot = chunk
                     .iter()
                     .filter_map(|soldier| {
+                        // A unit that holds no intent does not move. The
+                        // choice pass writes the intent, and a unit whose
+                        // every option scored below the floor holds what it
+                        // was doing.[^7]
+                        soldiers.intent(*soldier)??;
                         let here = soldiers.address(*soldier)?;
                         let direction = rng::draw_below(
                             seed,

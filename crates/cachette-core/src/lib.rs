@@ -16,6 +16,7 @@
 
 pub mod bridge;
 pub mod character;
+pub mod choose;
 pub mod cohort;
 pub mod event;
 pub mod founding;
@@ -38,6 +39,10 @@ pub mod world;
 
 pub use bridge::{BlockLayout, BlockRange, BridgeError, UnitTileBridge};
 pub use character::{CharacterArena, CharacterError};
+pub use choose::{
+    CellField, ChoiceError, ChoiceExplanation, ChoiceSchedule, Drive, OptionRow, WeightProfile,
+    NO_INTENT, OPTIONS, OPTION_COUNT,
+};
 pub use cohort::{
     CohortError, CohortRow, CohortTable, DrawLedger, DrawPass, NeedRule, SiteRationed,
     COHORTS_PER_SITE,
