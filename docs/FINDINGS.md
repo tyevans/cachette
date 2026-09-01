@@ -2721,11 +2721,11 @@ birth follows from that. The record said only that the new unit takes a slot.
 **A test cannot distinguish an order fixed by decision from an order fixed by
 accident.** Both produce the same bytes. Only a record separates them, which is
 what the counter-test in the scope rule means when it says a decision governing
-determinism always needs a record even when it looks obvious.[^64]
+determinism always needs a record even when it looks obvious.[^67]
 
 **Ask the question of the recurring defect rule against the record, not against
 the run.** The rule asks what fixes the order of every parallel result, and says
-that a change with no answer is a defect.[^65] A green suite is not an answer.
+that a change with no answer is a defect.[^68] A green suite is not an answer.
 The answer is a sentence in a record, and if no record holds one then the order
 is load-bearing and unrecorded, whatever the tests say today.
 
@@ -2798,5 +2798,5 @@ is load-bearing and unrecorded, whatever the tests say today.
 [^64]: Findings register, FND-093, in this document.
 [^65]: Recurring Defect Shapes, shape 3. `.claude/rules/recurring-defects.md`
 [^66]: ADR-0063, a need is a rate with a threshold, and crossing it is a fact, decision D3. `docs/adrs/accepted/adr-0063-a-need-is-a-rate-with-a-threshold-and-crossing-it-is-a-fact.md`
-[^64]: Decision Record Scope, section 1, the counter-test. `.claude/rules/adr-scope.md`
-[^65]: Recurring defect shapes, shape 4. `.claude/rules/recurring-defects.md`
+[^67]: Decision Record Scope, section 1, the counter-test. `.claude/rules/adr-scope.md`
+[^68]: Recurring defect shapes, shape 4. `.claude/rules/recurring-defects.md`
