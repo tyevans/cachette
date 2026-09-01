@@ -12,6 +12,13 @@ governs.[^2]
 benchmark has run. Mark each figure with how it was derived. When a measurement
 replaces a derivation, say so in the row and give the commit.
 
+**This register holds target platform figures only.** Every row below describes
+how the engine performs on the target, which is AWS Graviton. A second register
+holds the one local figure the project keeps: how long the gate suite takes on
+a development machine.[^7] The project owner decided to keep the two paths with
+different standing, and a figure from one is never evidence about the other.[^8]
+Do not add a development machine figure to this file.
+
 ## Status
 
 No measured figure is recorded. The foundation crate exists, and no benchmark
@@ -56,6 +63,29 @@ removes the coordinate conversion that an offset index pays on every tile
 access. The faction ceiling makes a relation one plane and a presence set one
 word.
 
+## Commodity constants
+
+A commodity is a kind of good that a settlement stores, that the transport
+solve moves, and that an individual carries. The project owner fixed three
+limits on 31 August 2026.[^8] The three limits bound different things, so they
+do not conflict.
+
+| Constant | Value | What it bounds | How reached |
+|---|---|---|---|
+| Commodities that may exist | 64 | Existence | Owner decision. A presence mask is one `u64`, and 64 `i64` values fill exactly 8 cache lines on the target |
+| Commodities in the transport solve | 16 | Participation | Owner decision, from the trade and flow report. Cache residency during the flow solve |
+| Commodities an individual carries | 8 | Carriage | Owner decision, at the top of the range the agency report gave |
+
+**Existence, participation and carriage are separate.** A commodity that exists
+does not have to enter the transport solve. The commodities outside the solve
+stay local to a settlement. A commodity an individual carries is a third,
+smaller set again.
+
+The cache line claim behind the first row is a property of the target platform,
+which uses a 64-byte cache line. It is not a measurement. BLK-007 holds every
+cost figure in this project, and these three values are decided, not derived
+from a measurement.
+
 ## The choice pass
 
 A unit scores a fixed option set and takes the highest score. Two parameters of
@@ -95,6 +125,7 @@ nobody has measured them on the target platform.
   That is a property of the platform the project chose. It belongs in the
   record that chose the platform.
 - A decision. A budget is an input to a decision, not a decision.
+- A figure taken on a development machine. The local register holds those.[^7]
 
 ## Figures still held in a record
 
@@ -127,3 +158,5 @@ a footnote.
 [^4]: The record check baseline. `scripts/adr-volatile-baseline.txt`
 [^5]: ADR-0064, a unit chooses by scoring a small fixed option set, decisions D3 and D4. `docs/adrs/draft/adr-0064-a-unit-chooses-by-scoring-a-small-fixed-option-set.md`
 [^6]: Findings register, FND-014. `docs/FINDINGS.md`
+[^7]: Development budgets, the local register. `docs/reference/development-budgets.md`
+[^8]: Decisions register, DEC-033 and DEC-001. `docs/DECISIONS.md`
