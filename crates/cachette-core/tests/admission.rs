@@ -45,13 +45,23 @@ const SEED: u64 = 0x0cac_4e77_0023;
 
 /// Builds a world of the fixture seed.
 fn world_of(seed: u64) -> World {
-    World::new(WorldConfig {
+    let mut world = World::new(WorldConfig {
         width: EXTENT,
         height: EXTENT,
         seed,
         faction_count: 2,
     })
-    .expect("the extent describes a world")
+    .expect("the extent describes a world");
+    // The choice interval is not the subject of this file. A unit takes an
+    // intent at the interval its level 1 cell schedules, and it does not move
+    // before it has one, so a test about movement sets the interval to every
+    // tick.[^C]
+    //
+    // [^C]: ADR-0064, a unit chooses by scoring a small fixed option set, decision D4. `docs/adrs/draft/adr-0064-a-unit-chooses-by-scoring-a-small-fixed-option-set.md`
+    world
+        .set_choice_schedule(0)
+        .expect("the exponent is inside the range");
+    world
 }
 
 /// Returns every address of a world that admits a unit, in index order.

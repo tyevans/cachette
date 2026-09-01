@@ -29,8 +29,11 @@ rule.
 
 ## Waiting for review
 
-None. Every written record now binds. A record that arrives here binds nothing
-until a reviewer moves it, and this section names the ones waiting.
+A record here binds nothing until a reviewer moves it.
+
+| No. | What it claims |
+|---|---|
+| 0064 | A unit chooses by scoring a small fixed option set. Backlog item 0064 wrote it, and the code it describes exists. |
 
 ## Reserved and not written
 
@@ -40,7 +43,6 @@ reserved until the code that needs them exists.[^6]
 
 | No. | Why it sits here |
 |---|---|
-| 0064 | A unit chooses by scoring an option set. The next item written will write it. |
 | 0021 | Layout follows the access pattern. Write it with the descent columns, not before.[^7] |
 | 0069 | Weather. Nothing needs it. |
 | 0055 | The modifier pipeline. One source modifies a rate, so the test fails today.[^8] |

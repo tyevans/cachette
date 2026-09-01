@@ -74,6 +74,15 @@ fn count_by_a_full_pass(world: &World) -> Vec<i64> {
 /// The patch starts at a corner of the world, so two callers can place two
 /// factions far apart or side by side. Returns the addresses it used.
 fn garrison(world: &mut World, faction: FactionId, first: Axial, edge: i32) -> Vec<Axial> {
+    // The choice interval is not the subject of this file. A unit takes an
+    // intent at the interval its level 1 cell schedules, and it does not move
+    // before it has one, so a test about movement sets the interval to every
+    // tick.[^C]
+    //
+    // [^C]: ADR-0064, a unit chooses by scoring a small fixed option set, decision D4. `docs/adrs/draft/adr-0064-a-unit-chooses-by-scoring-a-small-fixed-option-set.md`
+    world
+        .set_choice_schedule(0)
+        .expect("the exponent is inside the range");
     let mut placed = Vec::new();
     for row in 0..edge {
         for column in 0..edge {

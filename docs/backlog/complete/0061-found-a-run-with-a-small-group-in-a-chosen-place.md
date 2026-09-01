@@ -175,5 +175,5 @@ who already stands on a tile.
 [^10]: Open decisions register, DEC-030 and DEC-031. `docs/DECISIONS.md`
 [^11]: Findings register, FND-054. `docs/FINDINGS.md`
 [^12]: Product requirement records. `docs/product/shaped/`
-[^13]: Backlog item 0064. `docs/backlog/refined/0064-choose-an-action-by-scoring-a-fixed-option-set.md`
+[^13]: Backlog item 0064. `docs/backlog/complete/0064-choose-an-action-by-scoring-a-fixed-option-set.md`
 [^14]: Testing rules, section 2a. `.claude/rules/testing.md`

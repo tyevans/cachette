@@ -25,6 +25,7 @@
 
 use std::collections::VecDeque;
 
+use crate::choose::NO_INTENT;
 use crate::cohort::NEED_FULL;
 use crate::hash::StateHash;
 use crate::hex::{Axial, Grid};
@@ -265,6 +266,20 @@ pub struct SoldierArena {
     /// because the cohort array is indexed by that slot. A unit that names
     /// no site draws from nothing.
     homes: Vec<u32>,
+    /// The option that each slot last chose, or `NO_INTENT`.
+    ///
+    /// The column holds the choice and never the score. A score is
+    /// transient: the choice pass compares it and discards it, so no score
+    /// reaches this arena and no score reaches the state hash.[^1]
+    ///
+    /// The intent is sticky. A unit keeps it between two choices, because a
+    /// unit that re-decides on every tick oscillates between two options of
+    /// nearly equal score and arrives nowhere.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0064, a unit chooses by scoring a small fixed option set, decisions D1 and D2. `docs/adrs/draft/adr-0064-a-unit-chooses-by-scoring-a-small-fixed-option-set.md`
+    intents: Vec<u8>,
     /// The free slots, oldest first.
     free: VecDeque<u32>,
     /// The number of live soldiers.
@@ -317,6 +332,7 @@ impl SoldierArena {
             needs: Vec::new(),
             deficits: Vec::new(),
             homes: Vec::new(),
+            intents: Vec::new(),
             free: VecDeque::new(),
             live_count: 0,
             retired_count: 0,
@@ -443,6 +459,9 @@ impl SoldierArena {
         self.needs[index] = NEED_FULL;
         self.deficits[index] = Fix32::ZERO;
         self.homes[index] = NO_HOME;
+        // A unit arrives holding nothing. It takes an intent at the first
+        // choice its cell schedules, and it does not move before then.
+        self.intents[index] = NO_INTENT;
         self.live_count += 1;
         self.revision = self.revision.wrapping_add(1);
         Ok(Entity::new(slot, self.generations[index])
@@ -464,6 +483,7 @@ impl SoldierArena {
         self.needs.push(NEED_FULL);
         self.deficits.push(Fix32::ZERO);
         self.homes.push(NO_HOME);
+        self.intents.push(NO_INTENT);
         Ok(slot)
     }
 
@@ -503,6 +523,7 @@ impl SoldierArena {
         self.needs[index] = Fix32::ZERO;
         self.deficits[index] = Fix32::ZERO;
         self.homes[index] = NO_HOME;
+        self.intents[index] = NO_INTENT;
         self.live_count -= 1;
         self.revision = self.revision.wrapping_add(1);
         if self.generations[index] == LAST_GENERATION {
@@ -746,6 +767,50 @@ impl SoldierArena {
         true
     }
 
+    /// Returns the intent of a soldier.
+    ///
+    /// The outer option reports whether the identity is live. The inner one
+    /// reports whether the soldier holds an intent at all. A soldier that
+    /// holds none has found nothing above the floor, and it does not move.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0064, a unit chooses by scoring a small fixed option set, decision D3. `docs/adrs/draft/adr-0064-a-unit-chooses-by-scoring-a-small-fixed-option-set.md`
+    #[must_use]
+    pub fn intent(&self, entity: Entity) -> Option<Option<u8>> {
+        let slot = self.slot_of(entity)?;
+        let intent = self.intents[slot as usize];
+        Some(if intent == NO_INTENT {
+            None
+        } else {
+            Some(intent)
+        })
+    }
+
+    /// Returns the whole intent column.
+    #[must_use]
+    pub fn intent_column(&self) -> &[u8] {
+        &self.intents
+    }
+
+    /// Writes the intent of one slot.
+    ///
+    /// The choice pass is the only caller, so the visibility stays inside
+    /// the crate. An intent that a caller could write on its own would let
+    /// the control plane drive one unit at a time, which the project
+    /// forbids.[^1]
+    ///
+    /// An intent is not a structural fact, so it does not raise the
+    /// revision. The derived unit structure maps a tile to the units on it,
+    /// and an intent moves no unit.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0010, Python is a control plane, and it never touches an entity one at a time. `docs/adrs/REGISTRY.md`
+    pub(crate) fn set_intent_at(&mut self, slot: u32, intent: u8) {
+        self.intents[slot as usize] = intent;
+    }
+
     /// Returns the whole live column.
     ///
     /// The column holds one for a live slot and zero otherwise. A pass that
@@ -810,6 +875,7 @@ impl SoldierArena {
             .write(bytemuck::cast_slice(&self.needs))
             .write(bytemuck::cast_slice(&self.deficits))
             .write(bytemuck::cast_slice(&self.homes))
+            .write(&self.intents)
             .write(&self.live);
         for generation in &self.generations {
             hash = hash.write(&generation.to_le_bytes());
@@ -836,6 +902,24 @@ impl SoldierArena {
             return false;
         }
         if self.needs.len() != slots || self.deficits.len() != slots || self.homes.len() != slots {
+            return false;
+        }
+        if self.intents.len() != slots {
+            return false;
+        }
+        // An intent names an option the set holds, or it names nothing. A
+        // number outside the set would index past the option table.
+        if self
+            .intents
+            .iter()
+            .any(|intent| *intent != NO_INTENT && (*intent as usize) >= crate::choose::OPTION_COUNT)
+        {
+            return false;
+        }
+        // A dead slot holds no intent. A stale intent there would reach the
+        // state hash and would move the next unit in the slot before it had
+        // read anything.
+        if (0..slots).any(|slot| self.live[slot] == 0 && self.intents[slot] != NO_INTENT) {
             return false;
         }
         // A slot that is not live holds no need, no deficit and no site. A

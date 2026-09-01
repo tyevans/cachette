@@ -204,12 +204,19 @@ fn a_step_changes_what_is_drawn() {
     paint::draw(&world, camera, &mut canvas).expect("the bridge must describe the arena");
     let before = canvas.pixels().to_vec();
 
-    for _ in 0..4 {
+    // A unit takes an option at the interval its level 1 cell schedules, and
+    // it does not move before it has one. The run must therefore cover one
+    // whole interval, or the picture is still for a reason that is not the
+    // viewer.[^1]
+    //
+    // [^1]: ADR-0064, a unit chooses by scoring a small fixed option set, decision D4. `docs/adrs/draft/adr-0064-a-unit-chooses-by-scoring-a-small-fixed-option-set.md`
+    let frames = world.choice_schedule().period() + 4;
+    for _ in 0..frames {
         world.step(2).expect("the step must run");
     }
     paint::draw(&world, camera, &mut canvas).expect("the bridge must describe the arena");
 
-    assert_ne!(before, canvas.pixels(), "four steps changed no pixel");
+    assert_ne!(before, canvas.pixels(), "{frames} steps changed no pixel");
 }
 
 #[test]

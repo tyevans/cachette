@@ -73,6 +73,15 @@ fn peopled(seed: u64) -> (World, Vec<Entity>) {
         faction_count: 3,
     })
     .expect("the extent must describe a world");
+    // The choice interval is not the subject of this file. A unit takes an
+    // intent at the interval its level 1 cell schedules, and it does not move
+    // before it has one, so a test about movement sets the interval to every
+    // tick.[^C]
+    //
+    // [^C]: ADR-0064, a unit chooses by scoring a small fixed option set, decision D4. `docs/adrs/draft/adr-0064-a-unit-chooses-by-scoring-a-small-fixed-option-set.md`
+    world
+        .set_choice_schedule(0)
+        .expect("the exponent is inside the range");
     let open: Vec<Axial> = addresses_of(&world)
         .into_iter()
         .filter(|address| world.admits_a_unit(*address))
@@ -239,6 +248,9 @@ fn the_generation_of_an_identity_changes_the_direction() {
         };
 
         let mut first = World::new(config).expect("the extent must describe a world");
+        first
+            .set_choice_schedule(0)
+            .expect("the exponent is inside the range");
         // The start of this seed may hold water, and water admits no unit.
         if !first.admits_a_unit(start) {
             continue;
@@ -249,6 +261,9 @@ fn the_generation_of_an_identity_changes_the_direction() {
         first.step(1).expect("the step must run");
 
         let mut second = World::new(config).expect("the extent must describe a world");
+        second
+            .set_choice_schedule(0)
+            .expect("the exponent is inside the range");
         let doomed = second
             .spawn_soldier(start, FactionId(0))
             .expect("the address is inside the world and admits a unit");
