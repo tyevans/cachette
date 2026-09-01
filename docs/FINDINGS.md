@@ -2090,6 +2090,37 @@ now runs it.
 list of binaries is a declaration site, and it drifts from the rule it serves
 unless something compares the two.
 
+### FND-099 — The cost of the gate suite is not one number
+
+**Believed.** The gate suite has one wall clock cost on a named machine, and
+one measurement of it gives the project a budget.
+
+**True.** The cost depends on what else runs on the machine, and the spread is
+large enough to change what the figure means. Five workers ran the suite at
+once on one machine of sixteen hardware threads. One of those runs was killed
+after about forty minutes, at a load average near fifteen, with four other runs
+present. A run of the same suite on the same machine, with the load not
+controlled but with no other suite seen in the process list, took about nine
+minutes.
+
+**Evidence.** The forty-minute run and the load average are reported by the
+session that watched them, not measured by the work that wrote this entry. The
+nine-minute figure is one run on an Intel Core i7-1260P, x86_64, 16 hardware
+threads, debug profile, 31 August 2026. It is a development machine figure. It
+is not evidence about the target platform.[^48]
+
+**Follows.** Two things.
+
+**A budget row states the conditions it holds under.** A figure taken under
+contention and a figure taken alone are two quantities, and a table that holds
+one number for both is the shape this project already knows: one fact, two
+meanings, nothing that fails when they disagree. The local register now names
+the conditions in the row.[^47]
+
+**Serialise the suite before you compare two runs of it.** Two suites on one
+machine do not cost twice one suite, and neither figure is the cost of the
+suite.
+
 ### FND-100 — "A watcher can read it" was counted as "a watcher can see it"
 
 **Believed.** An item whose acceptance list says a watcher reads a value has
@@ -2174,3 +2205,4 @@ reversed: the specific thing that rots is the picture, not the prose.[^46]
 [^45]: Findings register, FND-078. `docs/FINDINGS.md`
 [^46]: Recurring defect shapes, shape 2. `.claude/rules/recurring-defects.md`
 [^47]: Development budgets, the gate suite budget. `docs/reference/development-budgets.md`
+[^48]: ADR-0008, the primary target is `aarch64-unknown-linux-gnu`, decision D2. `docs/adrs/accepted/adr-0008-the-primary-target-is-aarch64.md`

@@ -45,15 +45,27 @@ evidence about the target.
 The gate suite is the command that a commit must pass. It runs formatting,
 lint, tests and the record checks.[^5]
 
-| Figure | Value | Machine | Architecture | Profile | Date |
-|---|---|---|---|---|---|
-| Whole gate suite, wall clock | 544 s | Intel Core i7-1260P, 16 hardware threads | x86_64 | debug | 31 August 2026 |
-| Whole gate suite, budget | 660 s | Intel Core i7-1260P, 16 hardware threads | x86_64 | debug | 31 August 2026 |
-| Golden state hash test, wall clock | 36 s | Intel Core i7-1260P, 16 hardware threads | x86_64 | debug | 31 August 2026 |
+| Figure | Value | Machine | Architecture | Profile | Conditions | Date |
+|---|---|---|---|---|---|---|
+| Whole gate suite, wall clock | 544 s | Intel Core i7-1260P, 16 hardware threads | x86_64 | debug | One run. Contention not controlled | 31 August 2026 |
+| Whole gate suite, budget | 660 s | Intel Core i7-1260P, 16 hardware threads | x86_64 | debug | An isolated run | 31 August 2026 |
+| Golden state hash test, wall clock | 36 s | Intel Core i7-1260P, 16 hardware threads | x86_64 | debug | One run. Contention not controlled | 31 August 2026 |
 
 The budget is the measured figure plus an allowance of one fifth, rounded up
-to the nearest ten seconds. The allowance covers the load of the machine that
-runs the suite. A run over the budget is a signal to look, not a failure.
+to the nearest ten seconds. A run over the budget is a signal to look, not a
+failure.
+
+**A row states the conditions it holds under.** The cost of this suite depends
+on what else runs on the machine. The suite compiles and tests in parallel, so
+two suites on one machine do not cost twice one suite. A run of this suite was
+killed after about forty minutes with four other runs present, on the machine
+in the rows above.[^8] That figure is contended and reported, not measured
+here, and it is in this paragraph rather than in the table for that reason.
+
+**The rows above are one run each, and no run controlled the load.** Other work
+was in progress on the machine on the day they were taken. Read them as the
+first entries of this register, not as the settled cost of the suite. Replace
+them with an isolated run, and say in the commit that the run was isolated.
 
 **Every row above describes one development machine.** No row is evidence
 about the target platform, and the comparison a row supports is between two
@@ -121,3 +133,4 @@ command, and the date. Cite the source in a footnote.
 [^5]: The gate suite. `justfile`
 [^6]: ADR-0008, the primary target is `aarch64-unknown-linux-gnu`, decision D2. `docs/adrs/accepted/adr-0008-the-primary-target-is-aarch64.md`
 [^7]: Testing rules, section 3. `.claude/rules/testing.md`
+[^8]: Findings register, FND-099. `docs/FINDINGS.md`
