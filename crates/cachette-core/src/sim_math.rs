@@ -100,3 +100,67 @@ const fn saturate_i32(value: i64) -> i32 {
         value as i32
     }
 }
+
+/// Scales a per-unit rate by a whole headcount.
+///
+/// The product is exact in 64 bits and it saturates at the range limit. The
+/// multiply that scales a fixed-point rate takes a whole number of at most
+/// sixteen bits, and a headcount is wider than that, so a cohort demand
+/// cannot go through it.[^1]
+///
+/// # References
+///
+/// [^1]: ADR-0002, simulated and aggregated state holds no floating point number, decision D3. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
+#[must_use]
+pub const fn scale_by_count(rate: Fix32, count: u32) -> Accum {
+    Accum((rate.0 as i64).saturating_mul(count as i64))
+}
+
+/// Returns the part of a total that one share of a whole earns.
+///
+/// The result truncates `total * part / whole` towards zero. The intermediate
+/// product is 128 bits wide, so it is exact for every input that a 64-bit
+/// accumulator holds. The floor is what makes a split of a total sum to at
+/// most the total, so the caller hands out the remainder itself.
+///
+/// Returns `None` when the whole is zero. A division by zero is a caller
+/// error, and this module does not panic on it.
+#[must_use]
+pub const fn share(total: Accum, part: Accum, whole: Accum) -> Option<Accum> {
+    if whole.0 == 0 {
+        return None;
+    }
+    let wide = (total.0 as i128) * (part.0 as i128) / (whole.0 as i128);
+    Some(Accum(saturate_i64(wide)))
+}
+
+/// Divides an accumulator by a whole count.
+///
+/// The result truncates towards zero, narrowed into the fixed-point
+/// range. The remainder is not returned, because the caller of this
+/// operation spreads an intensive value over a headcount and an intensive
+/// value is not conserved.[^1]
+///
+/// Returns `None` when the count is zero.
+///
+/// # References
+///
+/// [^1]: Research report 15, needs, consumption and the input-output economy, section 6.3. `docs/research/reports/15-needs-consumption-and-economy.md`
+#[must_use]
+pub const fn divide_by_count(total: Accum, count: u32) -> Option<Fix32> {
+    if count == 0 {
+        return None;
+    }
+    Some(Fix32(saturate_i32(total.0 / (count as i64))))
+}
+
+/// Clamps a 128-bit value into the accumulator range.
+const fn saturate_i64(value: i128) -> i64 {
+    if value > i64::MAX as i128 {
+        i64::MAX
+    } else if value < i64::MIN as i128 {
+        i64::MIN
+    } else {
+        value as i64
+    }
+}

@@ -33,9 +33,10 @@
 #![cfg(feature = "probe-nondeterminism")]
 
 use cachette_core::resource::{Amount, ResourceKind};
+use cachette_core::site::CommodityId;
 use cachette_core::slots::{Candidate, Slots};
 use cachette_core::terrain::TileKind;
-use cachette_core::{Axial, CarryLoad, FactionId, Grid, Terrain, World, WorldConfig};
+use cachette_core::{Axial, CarryLoad, FactionId, Fix32, Grid, Terrain, World, WorldConfig};
 
 /// The scenario. It must hold more tiles than threads, so that a run at
 /// twelve threads fills more than one output slot.
@@ -414,4 +415,88 @@ fn the_candidate_key_test_fails_when_the_founding_key_drops_the_row() {
     columns.sort_unstable();
     columns.dedup();
     assert!(columns.len() > 1, "the probe also removed the column");
+}
+
+/// The extent that the consumption probe stands on.
+const CONSUMPTION_EXTENT: u32 = 48;
+
+/// The number of sites that the consumption probe founds.
+///
+/// The count is above the thread count, so a run at twelve threads fills
+/// more than one output slot and the join order can differ.
+const CONSUMPTION_SITES: usize = 24;
+
+/// Founds sites that cannot feed their people, and returns the rationed log.
+///
+/// A site that serves every cohort emits no event, so a world of rich sites
+/// would compare two empty logs. The fixture gives every site a store that
+/// its people empty, and the caller asserts that the log holds something.
+fn rationed_after_frames(threads: usize) -> Vec<u8> {
+    let mut world = World::new(WorldConfig {
+        width: CONSUMPTION_EXTENT,
+        height: CONSUMPTION_EXTENT,
+        seed: 42,
+        faction_count: 2,
+    })
+    .expect("the extent must describe a world");
+    world
+        .set_economy_schedule(2, 0)
+        .expect("the period is inside the range");
+    let grid = world.grid();
+    let ground: Vec<Axial> = (0..grid.tile_count())
+        .map(|index| Axial::new((index % grid.width()) as i32, (index / grid.width()) as i32))
+        .filter(|address| world.admits_a_unit(*address))
+        .collect();
+    assert!(ground.len() > CONSUMPTION_SITES * 3);
+    for index in 0..CONSUMPTION_SITES {
+        let site = world
+            .found_settlement(ground[index * 3], FactionId(0))
+            .expect("the tile is free");
+        for ordinal in 0..3 {
+            let unit = world
+                .spawn_soldier(ground[index * 3 + 1], FactionId((ordinal % 2) as u16))
+                .expect("the ground admits a unit");
+            assert!(world.set_home_site(unit, Some(site)));
+        }
+        world
+            .set_settlement_store(site, CommodityId(0), Fix32(1 << 15))
+            .expect("the commodity is in the set");
+    }
+
+    let mut bytes = Vec::new();
+    for _ in 0..8 {
+        world.step(threads).expect("the step must run");
+        bytes.extend_from_slice(world.rationed_log_bytes());
+    }
+    bytes
+}
+
+#[test]
+fn the_consumption_test_fails_when_the_join_order_breaks() {
+    // The probe reverses the join of the output slots, so the rationed log
+    // of the draw comes back in the reverse of the site order. The draw
+    // itself is unchanged: each thread owns a contiguous span of sites and
+    // the segments never cross a thread, so only the join moves.[^1]
+    //
+    // [^1]: ADR-0004, iteration order is explicit, decisions D1 and D3. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
+    let at_one = rationed_after_frames(1);
+    let at_twelve = rationed_after_frames(12);
+    assert!(!at_one.is_empty(), "the fixture must ration somebody");
+    assert_ne!(
+        at_one, at_twelve,
+        "the probe did not perturb the rationed log, so the consumption \
+         thread-count assertion has no proven failure mode"
+    );
+}
+
+#[test]
+fn the_perturbed_draw_holds_the_same_events_in_a_different_order() {
+    // The probe changes the order and nothing else. A probe that also
+    // changed what each site received would prove less.
+    let mut at_one = rationed_after_frames(1);
+    let mut at_twelve = rationed_after_frames(12);
+    assert_eq!(at_one.len(), at_twelve.len());
+    at_one.sort_unstable();
+    at_twelve.sort_unstable();
+    assert_eq!(at_one, at_twelve);
 }

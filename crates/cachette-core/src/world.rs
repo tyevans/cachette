@@ -29,6 +29,7 @@
 
 use crate::bridge::{BlockLayout, BridgeError, UnitTileBridge, BLOCK_BITS_DEFAULT};
 use crate::character::{CharacterArena, CharacterError};
+use crate::cohort::{self, CohortError, CohortTable, DrawLedger, NeedRule, SiteRationed};
 use crate::event::{ResourceTaken, TileChanged, CHANGE_KIND_LOWERED, CHANGE_KIND_RAISED};
 use crate::founding::{self, Founding, FoundingError, Survey};
 use crate::hash::StateHash;
@@ -67,6 +68,17 @@ pub enum StepError {
     TargetOutsideWorld,
     /// The site rate pass refused to run.
     Rates(RateError),
+    /// The consumption pass refused to run.
+    Consumption(CohortError),
+}
+
+impl From<CohortError> for StepError {
+    fn from(error: CohortError) -> Self {
+        match error {
+            CohortError::ZeroThreads => Self::ZeroThreads,
+            other => Self::Consumption(other),
+        }
+    }
 }
 
 impl From<RateError> for StepError {
@@ -146,6 +158,9 @@ impl core::fmt::Display for StepError {
                 write!(formatter, "an intent named a tile outside the world")
             }
             Self::Rates(error) => write!(formatter, "the site rate pass refused: {error}"),
+            Self::Consumption(error) => {
+                write!(formatter, "the consumption pass refused: {error}")
+            }
         }
     }
 }
@@ -248,6 +263,14 @@ pub struct World {
     rate_ledger: RateLedger,
     /// The sites that could not pay at the last application.
     shortfall_log: Vec<SiteShortfall>,
+    /// What a unit needs, and how fast it needs it.
+    need_rule: NeedRule,
+    /// The cohorts of every site, derived from the home column of the units.
+    cohorts: CohortTable,
+    /// Every draw that has run since the world was built.
+    draw_ledger: DrawLedger,
+    /// The sites that could not serve every cohort at the last draw.
+    rationed_log: Vec<SiteRationed>,
     /// What the live stores hold, by the account of this world.
     ///
     /// The store column states the same total a second time, and the
@@ -316,6 +339,10 @@ impl World {
             rates: RateTable::new(),
             rate_ledger: RateLedger::ZERO,
             shortfall_log: Vec::new(),
+            need_rule: NeedRule::DEFAULT,
+            cohorts: CohortTable::new(),
+            draw_ledger: DrawLedger::ZERO,
+            rationed_log: Vec::new(),
             store_account: [Accum(0); COMMODITY_COUNT],
         };
         // A world that has never stepped still answers a question about a
@@ -706,6 +733,14 @@ impl World {
             self.destroy_settlement(settlement);
             return Err(FoundingError::NoPlaceFound(1));
         }
+        // The group belongs to the settlement it founded. A unit draws from
+        // the store of the site it belongs to, and a founding is the one
+        // place today that puts a unit and a site together.[^5]
+        //
+        // [^5]: ADR-0063, a need is a rate with a threshold, and crossing it is a fact, decision D2. `docs/adrs/draft/adr-0063-a-need-is-a-rate-with-a-threshold-and-crossing-it-is-a-fact.md`
+        for person in &people {
+            self.set_home_site(*person, Some(settlement));
+        }
         Ok((settlement, people))
     }
 
@@ -741,6 +776,14 @@ impl World {
         // A rate belongs to the site that earned it. The site is gone, so the
         // rate goes with it and the slot does not pay its successor.
         self.rates.clear_slot(slot);
+        // A unit that drew from the lost site now belongs to no site. A home
+        // left behind would name the slot, and the settlement founded next
+        // in that slot would feed a population it never took.
+        for unit in self.soldiers.iter().collect::<Vec<_>>() {
+            if self.soldiers.home(unit) == Some(Some(slot)) {
+                self.soldiers.set_home(unit, None);
+            }
+        }
         for index in 0..COMMODITY_COUNT {
             let held = store
                 .quantity(CommodityId(index as u16))
@@ -749,6 +792,75 @@ impl World {
                 sim_math::combine(self.store_account[index], Accum(-i64::from(held.0)));
         }
         true
+    }
+
+    /// Returns the rule that says what a unit needs.
+    #[must_use]
+    pub const fn need_rule(&self) -> NeedRule {
+        self.need_rule
+    }
+
+    /// Returns the cohorts of the last consumption pass.
+    ///
+    /// The table is derived from the home column of the units, and the pass
+    /// derives it again on every application.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0063, a need is a rate with a threshold, and crossing it is a fact, decision D2. `docs/adrs/draft/adr-0063-a-need-is-a-rate-with-a-threshold-and-crossing-it-is-a-fact.md`
+    #[must_use]
+    pub const fn cohorts(&self) -> &CohortTable {
+        &self.cohorts
+    }
+
+    /// Returns every draw that has run since the world was built.
+    #[must_use]
+    pub const fn draw_ledger(&self) -> DrawLedger {
+        self.draw_ledger
+    }
+
+    /// Returns the sites that could not serve every cohort at the last
+    /// draw, in slot order.
+    #[must_use]
+    pub fn rationed_log(&self) -> &[SiteRationed] {
+        &self.rationed_log
+    }
+
+    /// Returns the rationed log as bytes.
+    ///
+    /// The thread-count equivalence test compares this slice byte for
+    /// byte.[^1] The cast is safe because the event type is plain data.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0001, one binary gives one answer at any thread count, decision D4. `docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
+    #[must_use]
+    pub fn rationed_log_bytes(&self) -> &[u8] {
+        bytemuck::cast_slice(&self.rationed_log)
+    }
+
+    /// Gives a unit the site that it draws from, and reports whether it
+    /// wrote.
+    ///
+    /// Returns `false` when either identity is dead. A unit that belongs to
+    /// no site draws from nothing, and `None` puts it in that state.
+    ///
+    /// The world holds this call rather than the arena, because the arena
+    /// holds no settlement column and cannot tell a live site from a dead
+    /// one.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0014, entity identity is an index plus a generation, decision D2. `docs/adrs/accepted/adr-0014-entity-identity-is-an-index-plus-a-generation.md`
+    pub fn set_home_site(&mut self, soldier: Entity, site: Option<Entity>) -> bool {
+        let home = match site {
+            Some(site) => match self.settlements.slot_of(site) {
+                Some(slot) => Some(slot),
+                None => return false,
+            },
+            None => None,
+        };
+        self.soldiers.set_home(soldier, home)
     }
 
     /// Returns the schedule that the site rates apply on.
@@ -1265,7 +1377,15 @@ impl World {
             .hash_into(hash)
             .write_u64(u64::from(self.schedule.period()))
             .write_u64(u64::from(self.schedule.phase()));
-        let mut hash = self.rate_ledger.hash_into(hash);
+        let hash = self.rate_ledger.hash_into(hash);
+        // The need of a unit and the deficit that follows it are simulated
+        // state, and the unit columns already carry them into the hash. The
+        // rule, the cohorts and the draw ledger are the rest of the pass:
+        // two worlds that hold the same needs and different rules must
+        // diverge on the next application.
+        let hash = self.need_rule.hash_into(hash);
+        let hash = self.cohorts.hash_into(hash);
+        let mut hash = self.draw_ledger.hash_into(hash);
         for total in &self.store_account {
             hash = hash.write_u64(total.0 as u64);
         }
@@ -1402,6 +1522,9 @@ impl World {
         {
             return false;
         }
+        if !self.check_cohorts() {
+            return false;
+        }
         // The bridge is a second declaration of where a soldier stands, and
         // the tile column is the first. The check fails when the two
         // disagree.[^1] A stale bridge cannot be compared against columns it
@@ -1507,6 +1630,66 @@ impl World {
             }
         }
         held == self.store_account
+    }
+
+    /// Reports whether the cohort table and the home column agree.
+    ///
+    /// The table is a summary of the home column of the units, and the pass
+    /// derives it again on every application. Between two applications a
+    /// spawn or a home write leaves it behind, in the same way that a
+    /// structural change leaves the derived unit structure stale.[^1] This
+    /// check therefore states what is true at every moment: the table holds
+    /// its own key, every home names a live site, and every reported event
+    /// says what it means.
+    ///
+    /// The equality between the headcounts and the population is true right
+    /// after an application, and a test asserts it there.[^2]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0018, the unit-to-tile bridge is derived, and it rebuilds at the barrier, decision D3. `docs/adrs/accepted/adr-0018-the-unit-to-tile-bridge-is-derived-and-rebuilds-at-the-barrier.md`
+    /// [^2]: Testing rules, section 5. `.claude/rules/testing.md`
+    #[must_use]
+    fn check_cohorts(&self) -> bool {
+        if !self.cohorts.check_invariants() {
+            return false;
+        }
+        // Every home names a live site. A home left on a lost site would
+        // feed the settlement founded next in that slot.
+        for (slot, home) in self.soldiers.home_column().iter().enumerate() {
+            if self.soldiers.live_column()[slot] != 1 || *home == crate::soldier::NO_HOME {
+                continue;
+            }
+            if self.settlements.live_column().get(*home as usize) != Some(&1) {
+                return false;
+            }
+        }
+        self.rationed_log
+            .iter()
+            .all(|event| event.padding == [0; 6] && event.granted.0 < event.demanded.0)
+    }
+
+    /// Reports whether the cohorts describe the unit columns.
+    ///
+    /// The check derives the table again from the home column and compares.
+    /// A summary that nothing compares against its source is a second
+    /// declaration site with nothing that fails on disagreement.[^1]
+    ///
+    /// The answer is true right after an application of the consumption
+    /// pass, and it is false after a spawn that no application has seen.
+    /// The caller states which moment it means.
+    ///
+    /// # References
+    ///
+    /// [^1]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`
+    #[must_use]
+    pub fn cohorts_describe_the_units(&self) -> bool {
+        self.cohorts.describes(
+            self.soldiers.home_column(),
+            self.soldiers.faction_column(),
+            self.soldiers.live_column(),
+            self.settlements.slot_count(),
+        )
     }
 
     /// Reports whether the world conserves every resource.
@@ -1689,6 +1872,19 @@ impl World {
         // [^8]: ADR-0022, level 0 is the only truth, and every level above it is derived, decision D2. `docs/adrs/accepted/adr-0022-level-0-is-the-only-truth-and-every-level-above-it-is-derived.md`
         // [^9]: ADR-0062, production and upkeep are rates attached to a site, decision D4. `docs/adrs/accepted/adr-0062-production-and-upkeep-are-rates-attached-to-a-site.md`
         self.apply_rates(threads)?;
+
+        // Consumption runs after the rates, on the same schedule. A unit
+        // draws from the store of the site it belongs to, and the rates are
+        // what filled that store this frame, so a draw before them would
+        // spend the store of the frame before.[^10]
+        //
+        // The pass reads no derived structure and changes no structure, so
+        // it is not a barrier. It reads the home column and the store
+        // column, and it writes the need column, the deficit column and the
+        // store column.
+        //
+        // [^10]: ADR-0063, a need is a rate with a threshold, and crossing it is a fact, decision D5. `docs/adrs/draft/adr-0063-a-need-is-a-rate-with-a-threshold-and-crossing-it-is-a-fact.md`
+        self.consume(threads)?;
 
         // Level 1 rebuilds after the structure it reads, and after every
         // change to level 0 that this frame made. It is derived, so it is
@@ -1968,6 +2164,85 @@ impl World {
         }
         self.rate_ledger = self.rate_ledger.combine(pass.ledger);
         self.shortfall_log = pass.shortfalls;
+        Ok(())
+    }
+
+    /// Runs the consumption pass of one frame.
+    ///
+    /// The pass runs when the schedule is due, and it does nothing
+    /// otherwise. It has four stages, and the order between them is the
+    /// order of the rule: the need falls, the cohorts draw, the draw feeds
+    /// the units, and the deficit follows the need.[^1]
+    ///
+    /// The cohort table is derived from the home column of the units. The
+    /// pass derives it again here rather than carrying it between frames,
+    /// so the table cannot disagree with the column it summarises.[^2]
+    ///
+    /// What leaves a store is what the cohorts received, so the account of
+    /// the stores falls by the same amount. A pass that moved a quantity and
+    /// forgot the account would fail the conservation check on every frame,
+    /// at every thread count.[^3]
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the caller asks for zero threads, and when the
+    /// columns disagree.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0063, a need is a rate with a threshold, and crossing it is a fact, decisions D1, D2 and D4. `docs/adrs/draft/adr-0063-a-need-is-a-rate-with-a-threshold-and-crossing-it-is-a-fact.md`
+    /// [^2]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`
+    /// [^3]: Findings register, FND-065. `docs/FINDINGS.md`
+    fn consume(&mut self, threads: usize) -> Result<(), StepError> {
+        self.rationed_log.clear();
+        if !self.schedule.due(self.tick) {
+            return Ok(());
+        }
+        let rule = self.need_rule;
+        let schedule = self.schedule;
+        let commodity = CommodityId(0);
+
+        // The need falls first. The subtract saturates at zero.
+        cohort::decay(
+            schedule.per_application(rule.decay()),
+            self.soldiers.need_update(),
+            threads,
+        )?;
+
+        // The cohorts are derived from the unit columns, in slot order.
+        let sites = self.settlements.slot_count();
+        self.cohorts.rebuild(
+            self.soldiers.home_column(),
+            self.soldiers.faction_column(),
+            self.soldiers.live_column(),
+            sites,
+        );
+
+        let pass = cohort::draw(
+            self.tick,
+            schedule.per_application(rule.ration()),
+            commodity,
+            &self.cohorts,
+            self.settlements.store_update(),
+            threads,
+        )?;
+
+        // What the cohorts received left the stores.
+        let index = commodity.0 as usize;
+        self.store_account[index] = sim_math::combine(
+            self.store_account[index],
+            Accum(-pass.ledger.granted[index].0),
+        );
+        self.draw_ledger = self.draw_ledger.combine(pass.ledger);
+        self.rationed_log = pass.rationed;
+
+        cohort::satisfy(
+            rule,
+            &pass.shares,
+            &self.cohorts,
+            self.soldiers.need_update(),
+            threads,
+        )?;
         Ok(())
     }
 

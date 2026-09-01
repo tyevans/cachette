@@ -23,7 +23,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^ALLOC]
 
-**Next number: DEC-034**
+**Next number: DEC-035**
 
 [^ALLOC]: Findings register, FND-038. `docs/FINDINGS.md`
 
@@ -477,6 +477,38 @@ and none exists.
 **Recommendation:** option A until a content pipeline exists, then option C.
 Option B is the better game and it makes the case this subsystem exists for
 rare, which is the wrong trade before the subsystem has a second reader.
+
+**Assumption in the meantime:** option A.
+
+### DEC-034 — What does a unit need, and how fast?
+
+A unit carries a need that falls at an interval, and it draws a ration against
+the store of the site it belongs to. Four values govern the rule: the decay of
+the need, the ration, the threshold below which a unit is in deficit, and the
+rate at which the deficit recovers. Every one of them is content.[^DEC7]
+
+The engine holds the four as one rule and refuses a rate below zero. The rule
+is a parameter, so a caller replaces it without touching a kernel.
+
+The values interact. The ration equals the decay today, so a unit that receives
+its whole ration holds its need level. Any other relation between the two makes
+a fully served population drift up or down, which is a design choice and not an
+engine constraint.
+
+**Option A. Keep the four values as one default rule in the engine.** The
+demonstration runs, and every test states the case it needs by choosing the
+production of a site rather than the rule. This is what the engine does today.
+
+**Option B. Give the rule to the caller.** The control plane sets it for each
+world. This needs no new machinery, and it prices the decision on whoever
+builds a world.
+
+**Option C. Give the rule to the unit type.** This is the shape the project
+will end at, because a unit type is data.[^DEC8] It needs a unit type table,
+and none exists.
+
+**Recommendation:** option A until a content pipeline exists, then option C.
+Option B alone moves the choice without settling it.
 
 **Assumption in the meantime:** option A.
 
