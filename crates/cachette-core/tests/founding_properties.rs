@@ -104,7 +104,7 @@ proptest! {
     #[test]
     fn every_chosen_place_answers_the_same_test(seed: u64) {
         let world = world_of(seed);
-        let survey = world.survey_founding(GROUP).expect("the survey must run");
+        let survey = world.survey_founding(GROUP, FactionId(0)).expect("the survey must run");
         prop_assert_eq!(survey.drawn(), SAMPLE_SIZE);
         prop_assert!(survey.tiles_read() <= SURVEY_CEILING);
         let Some(chosen) = survey.chosen() else {

@@ -27,7 +27,6 @@ engine gets wrong today.
 
 | No. | Why it sits here |
 |---|---|
-| 0094 | The owner has asked for multi-faction founding ahead of the rest of the queue. BLK-018 is answered and the engine still founds one.[^4] |
 | 0084 | Two values name a tile's owner, and the event log publishes the wrong one to Python.[^6] |
 | 0102 | A settlement reads its own ground rule, not the passability rule. Blocked by 0071 and 0092, in that order. |
 

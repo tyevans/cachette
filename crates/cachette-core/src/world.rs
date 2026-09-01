@@ -35,7 +35,7 @@ use crate::cohort::{
     UnitStarved,
 };
 use crate::event::{ResourceTaken, TileChanged, CHANGE_KIND_LOWERED, CHANGE_KIND_RAISED};
-use crate::founding::{self, Founding, FoundingError, Survey};
+use crate::founding::{self, Founding, FoundingError, FoundingOutcome, Survey};
 use crate::hash::StateHash;
 use crate::hex::{Axial, Grid, GridError, NEIGHBOUR_COUNT};
 use crate::holding::{FactionMask, Holder, Holding};
@@ -674,8 +674,51 @@ impl World {
     ///
     /// [^1]: ADR-0075, the founding choice reads a bounded sample of the world, decision D1. `docs/adrs/accepted/adr-0075-the-founding-choice-reads-a-bounded-sample-of-the-world.md`
     /// [^2]: ADR-0075, the founding choice reads a bounded sample of the world, decision D5. `docs/adrs/accepted/adr-0075-the-founding-choice-reads-a-bounded-sample-of-the-world.md`
-    pub fn survey_founding(&self, group: u32) -> Result<Survey, FoundingError> {
-        founding::survey(self.resources, group)
+    pub fn survey_founding(&self, group: u32, faction: FactionId) -> Result<Survey, FoundingError> {
+        founding::survey(self.resources, group, faction, &[])
+    }
+
+    /// Surveys a sample for a place that keeps its distance from the places
+    /// taken.
+    ///
+    /// The faction fills the frame slot of the draw key, so two factions read
+    /// two samples.[^1] A place closer than the minimum distance to a place in
+    /// the list is not eligible, whatever the ground there holds.[^2]
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the group holds nobody, or when the ordering of
+    /// the candidates refuses to run.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0076, a founding keeps a fixed distance from the foundings before it, decision D3. `docs/adrs/draft/adr-0076-a-founding-keeps-a-fixed-distance-from-the-foundings-before-it.md`
+    /// [^2]: ADR-0076, a founding keeps a fixed distance from the foundings before it, decision D1. `docs/adrs/draft/adr-0076-a-founding-keeps-a-fixed-distance-from-the-foundings-before-it.md`
+    pub fn survey_founding_apart(
+        &self,
+        group: u32,
+        faction: FactionId,
+        taken: &[Axial],
+    ) -> Result<Survey, FoundingError> {
+        founding::survey(self.resources, group, faction, taken)
+    }
+
+    /// Surveys the places a caller names, against the places taken.
+    ///
+    /// A caller that wants to compare two places of its own choosing calls
+    /// this. The call writes nothing.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the group holds nobody, or when the ordering of
+    /// the candidates refuses to run.
+    pub fn survey_places(
+        &self,
+        addresses: &[Axial],
+        group: u32,
+        taken: &[Axial],
+    ) -> Result<Survey, FoundingError> {
+        founding::survey_addresses(self.resources, addresses, group, taken)
     }
 
     /// Founds a run: a group of people, in a place the engine chose.
@@ -699,7 +742,51 @@ impl World {
     /// [^1]: PRD-0012, a world starts small and grows. `docs/product/accepted/prd-0012-a-world-starts-small-and-grows.md`
     /// [^2]: Open decisions register, DEC-030. `docs/DECISIONS.md`
     pub fn found_run(&mut self, group: u32, faction: FactionId) -> Result<Founding, FoundingError> {
-        let survey = self.survey_founding(group)?;
+        self.found_one(group, faction, &[])
+    }
+
+    /// Founds one group for each faction the world holds.
+    ///
+    /// The run founds in ascending faction index. The order is a property of
+    /// the run and not an input, so no caller can give one faction the better
+    /// place by listing it first.[^1] Founding N keeps the minimum distance
+    /// from every place a founding before it took, so the foundings are a
+    /// sequence and not a set.[^2]
+    ///
+    /// The run reports one outcome for each faction. A faction that finds no
+    /// admissible place is refused, and the foundings before it stand.[^3]
+    /// The faction set comes from the world, so the loop holds no second
+    /// count of its own.[^4]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0076, a founding keeps a fixed distance from the foundings before it, decision D2. `docs/adrs/draft/adr-0076-a-founding-keeps-a-fixed-distance-from-the-foundings-before-it.md`
+    /// [^2]: ADR-0076, a founding keeps a fixed distance from the foundings before it, decision D1. `docs/adrs/draft/adr-0076-a-founding-keeps-a-fixed-distance-from-the-foundings-before-it.md`
+    /// [^3]: PRD-0012, a world starts small and grows. `docs/product/accepted/prd-0012-a-world-starts-small-and-grows.md`
+    /// [^4]: ADR-0053, a faction is a bit in a mask, and a relation is a plane, decision D1. `docs/adrs/accepted/adr-0053-a-faction-is-a-bit-in-a-mask-and-a-relation-is-a-plane.md`
+    #[must_use]
+    pub fn found_run_for_every_faction(&mut self, group: u32) -> Vec<FoundingOutcome> {
+        let mut taken: Vec<Axial> = Vec::new();
+        let mut outcomes = Vec::new();
+        for index in 0..self.config.faction_count.max(1) {
+            let faction = FactionId(index);
+            let result = self.found_one(group, faction, &taken);
+            if let Ok(founding) = &result {
+                taken.push(founding.place());
+            }
+            outcomes.push(FoundingOutcome::new(faction, result));
+        }
+        outcomes
+    }
+
+    /// Founds one group, away from the places already taken.
+    fn found_one(
+        &mut self,
+        group: u32,
+        faction: FactionId,
+        taken: &[Axial],
+    ) -> Result<Founding, FoundingError> {
+        let survey = self.survey_founding_apart(group, faction, taken)?;
         let chosen = survey
             .chosen()
             .ok_or(FoundingError::NoPlaceFound(survey.drawn()))?;
@@ -728,7 +815,7 @@ impl World {
         if !self.grid.contains(address) {
             return Err(FoundingError::OutsideWorld(address));
         }
-        let survey = founding::survey_addresses(self.resources, &[address], group)?;
+        let survey = founding::survey_addresses(self.resources, &[address], group, &[])?;
         let chosen = survey
             .chosen()
             .ok_or(FoundingError::NoPlaceFound(survey.drawn()))?;

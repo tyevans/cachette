@@ -14,7 +14,7 @@
 
 use std::num::NonZeroUsize;
 
-use cachette_core::{FactionId, World, WorldConfig};
+use cachette_core::{World, WorldConfig};
 use cachette_view::{Camera, Canvas, Lap, Metrics};
 use minifb::{Key, Window, WindowOptions};
 
@@ -80,36 +80,64 @@ impl std::fmt::Display for DemoError {
 
 impl std::error::Error for DemoError {}
 
-/// Founds the run and says why the engine chose the place.
+/// Founds the run and says why the engine chose each place.
 ///
 /// The demonstration begins as a group somebody could grow, not as a full
-/// world of units doing nothing in particular.[^1] The engine chooses the
+/// world of units doing nothing in particular.[^1] The engine chooses each
 /// place from a bounded sample of the world, so the choice costs the same
 /// whatever the extent is.[^2]
+///
+/// The run founds one group for each faction, in ascending faction index, and
+/// each founding keeps a minimum distance from the foundings before it.[^3] A
+/// faction that finds no admissible place is refused, and the demonstration
+/// says so and runs on. It stops only when no faction was seated, because a
+/// world with nobody in it shows nothing.
 ///
 /// # References
 ///
 /// [^1]: PRD-0012, a world starts small and grows. `docs/product/accepted/prd-0012-a-world-starts-small-and-grows.md`
 /// [^2]: ADR-0075, the founding choice reads a bounded sample of the world, decision D1. `docs/adrs/accepted/adr-0075-the-founding-choice-reads-a-bounded-sample-of-the-world.md`
-fn found(world: &mut World) -> Result<cachette_core::Founding, DemoError> {
-    let founded = world
-        .found_run(GROUP, FactionId(0))
-        .map_err(DemoError::Founding)?;
-    let chosen = founded.survey().chosen().expect("the founding chose");
-    let reached = chosen.provision();
-    println!(
-        "founded at ({}, {}) with {} people, chosen from {} places",
-        founded.place().q,
-        founded.place().r,
-        founded.people().len(),
-        founded.survey().considered()
-    );
-    println!(
-        "  it reaches {} food, {} wood and {} stone, over {} open tiles, \
+/// [^3]: ADR-0076, a founding keeps a fixed distance from the foundings before it. `docs/adrs/draft/adr-0076-a-founding-keeps-a-fixed-distance-from-the-foundings-before-it.md`
+fn found(world: &mut World) -> Result<Vec<cachette_core::Founding>, DemoError> {
+    let mut seated = Vec::new();
+    let mut refusal = None;
+    for outcome in world.found_run_for_every_faction(GROUP) {
+        let faction = outcome.faction().0;
+        match outcome.result() {
+            Ok(founded) => {
+                let chosen = founded.survey().chosen().expect("the founding chose");
+                let reached = chosen.provision();
+                println!(
+                    "faction {faction} founded at ({}, {}) with {} people, \
+chosen from {} places",
+                    founded.place().q,
+                    founded.place().r,
+                    founded.people().len(),
+                    founded.survey().considered()
+                );
+                println!(
+                    "  it reaches {} food, {} wood and {} stone, over {} open tiles, \
 with {} of open water beside it",
-        reached.food.0, reached.wood.0, reached.stone.0, reached.open_ground, reached.water_edge
-    );
-    Ok(founded)
+                    reached.food.0,
+                    reached.wood.0,
+                    reached.stone.0,
+                    reached.open_ground,
+                    reached.water_edge
+                );
+                seated.push(founded.clone());
+            }
+            Err(error) => {
+                println!("faction {faction} found no place: {error}");
+                refusal = Some(*error);
+            }
+        }
+    }
+    match seated.is_empty() {
+        true => Err(DemoError::Founding(
+            refusal.unwrap_or(cachette_core::FoundingError::EmptyGroup),
+        )),
+        false => Ok(seated),
+    }
 }
 
 /// Reads the keyboard and returns the camera the person asked for.
@@ -156,7 +184,7 @@ fn main() -> Result<(), DemoError> {
         .min(12);
 
     let mut world = World::new(DEMO).map_err(DemoError::World)?;
-    let founded = found(&mut world)?;
+    let foundings = found(&mut world)?;
 
     let mut canvas = Canvas::new(WINDOW_WIDTH, WINDOW_HEIGHT);
     // The world is larger than the window, so the camera shows a part of it
@@ -166,15 +194,8 @@ fn main() -> Result<(), DemoError> {
     // corner would show an empty map. The view opens on the place that was
     // founded, and the person scrolls away from it.
     let mut camera = Camera::opening()
-        .looking_at(founded.place(), &canvas)
+        .looking_at(foundings[0].place(), &canvas)
         .clamped(&world, &canvas);
-
-    // The demonstration founds one group. The panel is written for a list,
-    // because a run may found more than one and a panel that assumed one
-    // would state a false thing the moment a second group founds.[^1]
-    //
-    // [^1]: Blockers register, BLK-018. `docs/BLOCKERS.md`
-    let foundings = [founded];
 
     let mut window = Window::new(
         "cachette — watch the world run",

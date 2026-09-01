@@ -198,23 +198,33 @@ enum Population {
     Founded,
 }
 
-/// Founds a run with a small group in a place the engine chose.
+/// Founds a run: one group for each faction, in a place the engine chose.
 ///
-/// The size of the group is an input to the run, and it is not the population
-/// the world is sized for.[^1]
+/// The size of each group is an input to the run, and it is not the
+/// population the world is sized for.[^1] The run founds one group for each
+/// faction the world holds, and each founding keeps a minimum distance from
+/// the foundings before it.[^2]
 ///
 /// # References
 ///
 /// [^1]: PRD-0012, a world starts small and grows. `docs/product/accepted/prd-0012-a-world-starts-small-and-grows.md`
+/// [^2]: ADR-0076, a founding keeps a fixed distance from the foundings before it. `docs/adrs/draft/adr-0076-a-founding-keeps-a-fixed-distance-from-the-foundings-before-it.md`
 fn found(world: &mut World) {
-    let founded = world
-        .found_run(30, FactionId(0))
-        .expect("the sample must hold a place that admits the group");
-    assert_eq!(
-        founded.people().len(),
-        30,
-        "the founding placed a group of another size"
+    let outcomes = world.found_run_for_every_faction(30);
+    assert!(
+        outcomes
+            .iter()
+            .all(cachette_core::FoundingOutcome::is_seated),
+        "the sample must hold a place that admits every group"
     );
+    for outcome in &outcomes {
+        let founding = outcome.founding().expect("the faction is seated");
+        assert_eq!(
+            founding.people().len(),
+            30,
+            "the founding placed a group of another size"
+        );
+    }
 }
 
 /// Founds settlements over a world, and destroys part of them.

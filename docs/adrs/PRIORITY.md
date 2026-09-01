@@ -35,8 +35,9 @@ rule.
 
 A record here binds nothing until a reviewer moves it.
 
-**No record is waiting for review.** Both drafts were reviewed and accepted on
-1 September 2026, each by an agent that did not write it.
+| No. | What it claims |
+|---|---|
+| 0076 | A founding keeps a fixed distance from the foundings before it, a run founds in ascending faction index, and the faction fills the frame slot of the draw key. Backlog item 0094 wrote it, and the code it describes exists. |
 
 ## Reserved and not written
 

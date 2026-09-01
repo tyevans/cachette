@@ -23,7 +23,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^ALLOC]
 
-**Next number: DEC-051**
+**Next number: DEC-052**
 
 ## Open
 
@@ -806,6 +806,25 @@ must all maintain, and nothing fails when it disagrees with the home column.
 
 **Revisit when** a rule destroys sites in bulk rather than one at a time.
 
+### DEC-051 — Which slot of the draw key holds the faction?
+
+**Outcome. The frame slot holds the faction.** The candidate ordinal keeps the
+entity slot, and the axis keeps the draw slot.[^ADR75D2] A record holds the
+decision.[^ADR76]
+
+A founding happens before the first frame, so the frame slot carried a
+constant. It now carries the faction, and two factions read two samples. The
+key keeps the shape the determinism record fixes, and no slot carries two
+meanings.[^KEYED]
+
+Two options were rejected. **An amendment to the founding record** would state
+the key for several foundings inside a record written for one. That record is
+accepted and it is still true, and an accepted record changes only by
+supersession. **A fold of the faction and the ordinal into the entity slot**
+puts two values in one slot, so a later change to either one can collide with
+the other, and nothing would fail when it did.[^SHAPE1]
+
+
 ### DEC-037 — How far apart are two foundings, and may a founding widen its sample?
 
 **Outcome. A fixed minimum separation, and a fixed sample.** A founding that
@@ -838,6 +857,8 @@ a failed founding is correct.[^PRD12]
 ## References
 
 [^ADR75D2]: ADR-0075, the founding choice reads a bounded sample of the world, decision D2. `docs/adrs/accepted/adr-0075-the-founding-choice-reads-a-bounded-sample-of-the-world.md`
+[^ADR76]: ADR-0076, a founding keeps a fixed distance from the foundings before it, decision D3. `docs/adrs/draft/adr-0076-a-founding-keeps-a-fixed-distance-from-the-foundings-before-it.md`
+[^KEYED]: ADR-0003, every random draw is keyed, never stateful, decision D1. `docs/adrs/accepted/adr-0003-every-random-draw-is-keyed-never-stateful.md`
 [^TESTKEY]: Testing rules, section 2. `.claude/rules/testing.md`
 [^LEVEL0]: ADR-0022, level 0 is the only truth and every level above it is derived. `docs/adrs/accepted/adr-0022-level-0-is-the-only-truth-and-every-level-above-it-is-derived.md`
 [^AGENCY]: Individual agency and occupations, the decision cost, and DEC-002 above. `docs/research/reports/16-individual-agency-and-occupations.md`
@@ -872,5 +893,5 @@ a failed founding is correct.[^PRD12]
 [^ITEM0092]: Backlog item 0092. `docs/backlog/complete/0092-refuse-a-settlement-on-the-ground-that-cannot-carry-one.md`
 [^ADR14D7]: ADR-0014, entity identity is an index plus a generation, decision D7. `docs/adrs/accepted/adr-0014-entity-identity-is-an-index-plus-a-generation.md`
 [^BLK18]: Blockers register, BLK-018. `docs/BLOCKERS.md`
-[^ITEM0094]: Backlog item 0094. `docs/backlog/refined/0094-decide-how-many-groups-found-a-world.md`
+[^ITEM0094]: Backlog item 0094. `docs/backlog/complete/0094-decide-how-many-groups-found-a-world.md`
 [^ADR75]: ADR-0075, the founding choice reads a bounded sample of the world. `docs/adrs/accepted/adr-0075-the-founding-choice-reads-a-bounded-sample-of-the-world.md`
