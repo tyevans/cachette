@@ -229,6 +229,11 @@ fn every_headcount_sums_to_the_live_population() {
     for _ in 0..4 {
         world.step(3).expect("the step must run");
     }
+    // The last step was an application, so the table describes the columns
+    // at this moment. A spawn between two applications leaves it behind, in
+    // the same way that a structural change leaves a derived structure
+    // stale, and the world states which moment it means.
+    assert!(world.cohorts_describe_the_units());
     let cohorts = world.cohorts();
     let counted = cohorts.headcount_total().0 + i64::from(cohorts.unattached());
     assert_eq!(
@@ -237,7 +242,28 @@ fn every_headcount_sums_to_the_live_population() {
         "the headcount of every cohort, plus the unattached, is the population"
     );
     assert!(counted > 0, "the fixture must hold units");
+    assert!(
+        cohorts.headcount_total().0 > 0,
+        "the cohorts must hold units"
+    );
     assert!(world.check_invariants());
+
+    // A spawn that no application has seen is exactly the case the table
+    // cannot describe. The world says so rather than failing its check.
+    let ground = open_ground(&world);
+    world
+        .spawn_soldier(ground[ground.len() - 1], FactionId(0))
+        .expect("the ground admits a unit");
+    assert!(!world.cohorts_describe_the_units());
+    assert!(world.check_invariants());
+    for _ in 0..PERIOD {
+        world.step(3).expect("the step must run");
+    }
+    assert!(world.cohorts_describe_the_units());
+    assert_eq!(
+        world.cohorts().headcount_total().0 + i64::from(world.cohorts().unattached()),
+        i64::from(world.soldiers().len())
+    );
 }
 
 #[test]

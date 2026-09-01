@@ -227,7 +227,7 @@ impl NeedRule {
     }
 }
 
-/// One cohort: the units of one stratum that belong to one site.
+/// One cohort: the units of one faction that belong to one site.
 ///
 /// The row holds a headcount and never a list of identities. An identity
 /// lives in the arena that minted it, and a second list of identities would
@@ -343,9 +343,9 @@ impl CohortTable {
         self.rows
             .resize(sites as usize * COHORTS_PER_SITE, CohortRow::default());
         for (site, chunk) in self.rows.chunks_mut(COHORTS_PER_SITE).enumerate() {
-            for (stratum, row) in chunk.iter_mut().enumerate() {
+            for (faction, row) in chunk.iter_mut().enumerate() {
                 row.site = site as u32;
-                row.faction = stratum as u16;
+                row.faction = faction as u16;
             }
         }
         self.unattached = 0;

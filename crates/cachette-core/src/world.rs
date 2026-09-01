@@ -1632,51 +1632,30 @@ impl World {
         held == self.store_account
     }
 
-    /// Reports whether the cohorts describe the units.
+    /// Reports whether the cohort table and the home column agree.
     ///
-    /// The cohort table is a summary of the home column of the units. The
-    /// check derives the table again from that column and compares. A
-    /// summary that nothing compares against its source is a second
-    /// declaration site with nothing that fails on disagreement.[^1]
+    /// The table is a summary of the home column of the units, and the pass
+    /// derives it again on every application. Between two applications a
+    /// spawn or a home write leaves it behind, in the same way that a
+    /// structural change leaves the derived unit structure stale.[^1] This
+    /// check therefore states what is true at every moment: the table holds
+    /// its own key, every home names a live site, and every reported event
+    /// says what it means.
     ///
-    /// The check also states the equality that the population must hold: the
-    /// headcount of every cohort, plus the units that belong to no site, is
-    /// the number of units that live.
-    ///
-    /// A home must name a live site. A home left on a lost site would feed
-    /// the settlement founded next in that slot.
+    /// The equality between the headcounts and the population is true right
+    /// after an application, and a test asserts it there.[^2]
     ///
     /// # References
     ///
-    /// [^1]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`
+    /// [^1]: ADR-0018, the unit-to-tile bridge is derived, and it rebuilds at the barrier, decision D3. `docs/adrs/accepted/adr-0018-the-unit-to-tile-bridge-is-derived-and-rebuilds-at-the-barrier.md`
+    /// [^2]: Testing rules, section 5. `.claude/rules/testing.md`
     #[must_use]
     fn check_cohorts(&self) -> bool {
         if !self.cohorts.check_invariants() {
             return false;
         }
-        // The table is rebuilt on each application, so it describes the
-        // columns of the last one. A world that has never applied the pass
-        // holds an empty table, and an empty table describes no column.
-        if !self.cohorts.rows().is_empty()
-            && !self.cohorts.describes(
-                self.soldiers.home_column(),
-                self.soldiers.faction_column(),
-                self.soldiers.live_column(),
-                self.settlements.slot_count(),
-            )
-        {
-            return false;
-        }
-        if !self.cohorts.rows().is_empty() {
-            let counted = sim_math::combine(
-                self.cohorts.headcount_total(),
-                Accum(i64::from(self.cohorts.unattached())),
-            );
-            if counted != Accum(i64::from(self.soldiers.len())) {
-                return false;
-            }
-        }
-        // Every home names a live site.
+        // Every home names a live site. A home left on a lost site would
+        // feed the settlement founded next in that slot.
         for (slot, home) in self.soldiers.home_column().iter().enumerate() {
             if self.soldiers.live_column()[slot] != 1 || *home == crate::soldier::NO_HOME {
                 continue;
@@ -1688,6 +1667,29 @@ impl World {
         self.rationed_log
             .iter()
             .all(|event| event.padding == [0; 6] && event.granted.0 < event.demanded.0)
+    }
+
+    /// Reports whether the cohorts describe the unit columns.
+    ///
+    /// The check derives the table again from the home column and compares.
+    /// A summary that nothing compares against its source is a second
+    /// declaration site with nothing that fails on disagreement.[^1]
+    ///
+    /// The answer is true right after an application of the consumption
+    /// pass, and it is false after a spawn that no application has seen.
+    /// The caller states which moment it means.
+    ///
+    /// # References
+    ///
+    /// [^1]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`
+    #[must_use]
+    pub fn cohorts_describe_the_units(&self) -> bool {
+        self.cohorts.describes(
+            self.soldiers.home_column(),
+            self.soldiers.faction_column(),
+            self.soldiers.live_column(),
+            self.settlements.slot_count(),
+        )
     }
 
     /// Reports whether the world conserves every resource.
