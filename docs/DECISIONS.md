@@ -23,7 +23,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^ALLOC]
 
-**Next number: DEC-033**
+**Next number: DEC-034**
 
 [^ALLOC]: Findings register, FND-038. `docs/FINDINGS.md`
 
@@ -363,6 +363,53 @@ demonstration is the wrong order, which the viewer record already argues.
 **What would settle it.** A person who must watch a world that steps faster
 than a screen refreshes.
 
+### DEC-033 — Does the project keep a performance path for the development machine?
+
+**The question.** Every cost figure in this project is derived and belongs to
+the target, and one open blocker states that no measurement exists there.[^DEC18]
+The rule that follows is that a measurement taken on a development machine
+proves nothing about the target, because the two differ in cache line size.
+
+That rule is correct and it is not the whole picture. Development happens on
+the development machine. The gate suite runs there many times a day, and its
+cost is paid there and nowhere else. Today no rule owns that cost, so it grows
+without anything noticing. The golden state hash test is the live instance: it
+grew as each subsystem entered the state hash, and it is now the slowest gate
+in a debug build.
+
+**The options.**
+
+1. **Keep one path.** Only the target matters. The development loop is slow and
+   the project accepts it. This is the position the rules state today, by
+   omission rather than by choice.
+2. **Keep two paths, with different standing.** The target owns every claim
+   about how the engine performs. The development machine owns a separate,
+   explicitly local budget: how long the gates take. A figure from one is never
+   evidence about the other, and the register says which is which.
+3. **Measure both and treat them alike.** Rejected. This is what the cache line
+   difference makes unsound, and it is the mistake the platform rule exists to
+   prevent.
+
+**The recommendation is option 2.**
+
+The two quantities are not the same kind of thing. How fast the engine runs at
+the target scale is a property of the engine, and the target owns it. How long
+a contributor waits for the gates is a property of the development loop, and
+the machine that runs it owns that. Confusing them is the error the platform
+rule guards against; refusing to measure either is not what that rule asks
+for.
+
+A development budget must state that it is local and must never be cited as
+evidence about the target. The blocker stays open either way, because it is
+about the target and this decision does not touch it.
+
+**What follows if the recommendation is taken.** The gate cost gets a stated
+budget and a home in the reference tables, and a change that exceeds it is
+visible rather than silent. The work is filed.[^DEC19]
+
+**Owner:** the project owner. This is a judgement about what the project
+values, not information the project lacks.
+
 ### DEC-013 — Which toolchain version does the project pin?
 
 **Open.** The pin is currently the version the development machine had. That
@@ -520,3 +567,5 @@ None yet.
 [^DEC15]: Decision Record Scope, section 1. `.claude/rules/adr-scope.md`
 [^DEC16]: ADR Registry, reserved row 0021. `docs/adrs/REGISTRY.md`
 [^DEC17]: Backlog item 0097. `docs/backlog/proposed/0097-write-the-layout-record-with-the-descent-columns.md`
+[^DEC18]: Blockers register, BLK-007. `docs/BLOCKERS.md`
+[^DEC19]: Backlog item 0098. `docs/backlog/proposed/0098-give-the-gate-suite-a-development-budget.md`
