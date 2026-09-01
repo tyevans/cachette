@@ -41,15 +41,22 @@ record smaller. The amount a deposit holds stays what the generator gave it,
 less what the ledger still says was taken, so a smaller stored take is a fuller
 deposit.
 
-Recovery therefore adds no storage. It creates no entry for a tile that nobody
-gathered from, and it never raises a stock above what the generator gave that
-tile. The bound follows from the arithmetic, not from a check that a later
+Recovery adds no storage for each tile. It creates no entry for a tile that
+nobody gathered from, and an entry that already exists carries one clock beside
+the take it already held. It never raises a stock above what the generator gave
+that tile. The bound follows from the arithmetic, not from a check that a later
 change could drop.
 
 ### D2. The cost of recovery follows the depleted set, and never the tile count
 
 The recovery pass reads the stored takes and nothing else. It takes no grid, no
 extent and no tile count, so it cannot read a tile that holds no stored take.
+
+**The guarantee rests on what the pass can reach, and not on what it does
+today.** A parameter carrying a grid, an extent or a tile count would make the
+forbidden pass expressible, and a later contributor could then write it without
+touching this decision. Adding such a parameter breaks this decision, and a
+reviewer sees that in the signature.
 
 A world in which nothing was gathered holds no stored take, so one pass over it
 does no work, at any tile count. Two worlds that differ only in extent, and
@@ -75,9 +82,16 @@ holds its entries in. The order never comes from a thread, and never from the
 order in which the entries arrived.[^10]
 
 The remainder of the division survives. The pass advances the clock of an entry
-by the whole periods it spent, and never to the tick it ran at. A pass that
-advanced the clock to the tick would recover nothing at all when it ran on
-every tick and the period was longer than one tick.
+by the whole periods it spent, and not to the tick it ran at. A pass that
+advanced the clock to the tick would recover nothing at all when it ran on every
+tick and the period was longer than one tick.
+
+**An entry that owes nothing restarts its clock at the tick.** This is the one
+case where the clock moves to the tick rather than by whole periods, and it is a
+decision rather than an accident. Such an entry describes a whole deposit. The
+ticks it did not need must not carry into the next take, because a deposit
+gathered from after a long undisturbed spell would otherwise give that take back
+at once.
 
 Recovery draws no random number. It reads the stored take, the tick and the
 period of the kind, and nothing else.
@@ -88,9 +102,15 @@ A unit takes what the deposit holds at the tick it gathers on. The step
 therefore ages the stored takes before it resolves the orders to gather, so the
 resolve reads the recovered amount and never a stale one.[^3]
 
-A read of the world moves nothing. The amount a deposit holds at a tick is a
-function of the stored take, the tick and the period, so two readers at one tick
-get one answer.
+A read of the world moves nothing, and the ordering is what makes a read
+current. Recovery runs before the resolve of the same step, so every clock is
+already at the tick when anything reads a stock. Two readers at one tick
+therefore get one answer.
+
+This decision claims no more than that. A pure function of the stored take, the
+tick and the period would give the same answer without depending on the order of
+the step, and the module holds one. Nothing calls it. The property therefore
+rests on the order of the step, and a change to that order breaks it.
 
 ### D5. The recovery period is a parameter of the resource kind, in one place
 
@@ -100,9 +120,11 @@ period and nothing can disagree with the first. A second declaration site with
 no check between the copies is the defect shape this project meets most
 often.[^11]
 
-The absent case is a real case. At least one kind states no period, so the
-engine carries the case that a deposit never recovers from the first day, rather
-than gaining it later and then discovering that the shape does not hold.[^6]
+The absent case is a real case. The rule set admits a kind that states no
+period, so the engine carries the case that a deposit never recovers from the
+first day, rather than gaining it later and then discovering that the shape does
+not hold. Which kinds state no period is a parameter, and an open register row
+holds it.[^6]
 
 A period is stated in simulated time and converted to ticks in one place. A
 period stated in ticks alone would state something false the moment the span of
@@ -134,6 +156,25 @@ check reads the returned total as a second term.
 
 A deposit that has recovered fully is not different from a deposit that nobody
 touched. A watcher cannot tell the two apart, and neither can a gatherer.
+
+## Alternatives rejected
+
+**A pass that steps every deposit on every tick.** This is the obvious shape and
+the product record refuses it by name: a world that steps every deposit pays the
+world for the deposits that nothing is touching.[^2] D2 forbids it.
+
+**A schedule keyed on the tick at which each entry next recovers.** Such a
+structure visits only the entries that recover on this tick, rather than the
+whole depleted set on every tick, and it satisfies the cost claim of D2 as
+stated. It is rejected for two reasons. It is a second ordered structure holding
+a fact that the entries already hold, so the two can disagree and nothing fails
+when they do. And the pass it would replace is a forward sweep over one sorted
+vector, which is the access pattern this project prefers on its target.
+
+**Storing the amount a deposit holds, rather than the take.** A stored amount
+would need a write for every deposit that recovers, and the generator would stop
+being the source of what a tile started with. The stored take exists so that an
+untouched tile stores nothing at all.
 
 ## References
 
