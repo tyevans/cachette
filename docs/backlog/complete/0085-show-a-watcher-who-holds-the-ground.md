@@ -220,7 +220,7 @@ engine file changed.
 [^2]: ADR-0067, the viewer reads the world and never writes to it, decision D5. `docs/adrs/accepted/adr-0067-the-viewer-reads-the-world-and-never-writes-to-it.md`
 [^3]: Recurring Defect Shapes, shape 1. `.claude/rules/recurring-defects.md`
 [^4]: ADR-0067, the viewer reads the world and never writes to it, decision D2. `docs/adrs/accepted/adr-0067-the-viewer-reads-the-world-and-never-writes-to-it.md`
-[^5]: Backlog item 0084. `docs/backlog/proposed/0084-give-a-tile-one-faction-column.md`
+[^5]: Backlog item 0084. `docs/backlog/refined/0084-give-a-tile-one-faction-column.md`
 [^6]: ADR-0070, the head-up display reports what the drawing pass read, decision D2. `docs/adrs/accepted/adr-0070-the-head-up-display-reports-what-the-drawing-pass-read.md`
 [^7]: ADR-0067, the viewer reads the world and never writes to it, decision D1. `docs/adrs/accepted/adr-0067-the-viewer-reads-the-world-and-never-writes-to-it.md`
 [^8]: ADR-0053, a faction is a bit in a mask, and a relation is a plane, decision D2. `docs/adrs/accepted/adr-0053-a-faction-is-a-bit-in-a-mask-and-a-relation-is-a-plane.md`
