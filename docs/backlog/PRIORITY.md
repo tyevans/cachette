@@ -73,6 +73,7 @@ These are real and none of them blocks anything today.
 | 0050 | Four product collisions still carried. |
 | 0099 | The faction mask union has no engine caller. |
 | 0072 | The panel fit check has no production caller. |
+| 0133 | The panel is longer than the window and cuts. A watcher cannot reach the rows below the notice. |
 | 0077 | The batched structural path, once its record exists. |
 | 0053 | Superseded in substance by the completed resource work. Close it or restate it. |
 | 0036 | How a watcher reads a count of the whole world. |
