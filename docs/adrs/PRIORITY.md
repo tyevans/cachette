@@ -35,8 +35,10 @@ rule.
 
 A record here binds nothing until a reviewer moves it.
 
-**No record is waiting for review.** Both drafts were reviewed and accepted on
-1 September 2026, each by an agent that did not write it.
+| No. | Why it sits here |
+|---|---|
+| 0081 | Housing. Nothing in the queue can bound a population until this is settled. Read it against ADR-0074 D3, which answers the tile case the other way. |
+| 0082 | Population growth. It depends on 0081, so review 0081 first. |
 
 ## Reserved and not written
 
