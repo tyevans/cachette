@@ -510,6 +510,24 @@ impl Camera {
         }
     }
 
+    /// Returns the camera moved so that an address sits at the middle of the
+    /// window.
+    ///
+    /// The camera is the viewer's own value. This call reads an address and
+    /// changes nothing in the world.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0067, the viewer reads the world and never writes to it, decision D2. `docs/adrs/accepted/adr-0067-the-viewer-reads-the-world-and-never-writes-to-it.md`
+    #[must_use]
+    pub fn looking_at(self, address: Axial, canvas: &Canvas) -> Self {
+        let (x, y) = self.centre_of(address);
+        self.panned(
+            x - canvas.width() as f32 * 0.5,
+            y - canvas.height() as f32 * 0.5,
+        )
+    }
+
     /// Returns the camera with the tile size multiplied, about the canvas centre.
     ///
     /// The tile under the middle of the window stays under the middle of the

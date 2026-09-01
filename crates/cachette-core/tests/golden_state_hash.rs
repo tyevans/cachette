@@ -110,6 +110,16 @@ const SCENARIOS: &[(&str, WorldConfig, Population)] = &[
         },
         Population::Settled,
     ),
+    (
+        "founding",
+        WorldConfig {
+            width: 192,
+            height: 192,
+            seed: 0x0cac_4e77_0061,
+            faction_count: 4,
+        },
+        Population::Founded,
+    ),
 ];
 
 /// How a scenario fills its world.
@@ -141,6 +151,41 @@ enum Population {
     ///
     /// [^1]: ADR-0066, entity storage holds four fixed shapes, decision D1. `docs/adrs/accepted/adr-0066-entity-storage-holds-four-fixed-shapes.md`
     Settled,
+    /// A run founded with a small group, in a place the engine chose.
+    ///
+    /// The founding is one of two ways to people a world, and this is the
+    /// scenario that covers it.[^1] The other scenarios spawn directly, and
+    /// they stay as they are, so a change to the founding moves this file and
+    /// leaves the others as the control.
+    ///
+    /// The extent is wider than the coarsest lattice spacing of the
+    /// generator, so the founding has both a good place and a poor one to
+    /// choose between.[^2]
+    ///
+    /// # References
+    ///
+    /// [^1]: Open decisions register, DEC-030. `docs/DECISIONS.md`
+    /// [^2]: Findings register, FND-054. `docs/FINDINGS.md`
+    Founded,
+}
+
+/// Founds a run with a small group in a place the engine chose.
+///
+/// The size of the group is an input to the run, and it is not the population
+/// the world is sized for.[^1]
+///
+/// # References
+///
+/// [^1]: PRD-0012, a world starts small and grows. `docs/product/shaped/prd-0012-a-world-starts-small-and-grows.md`
+fn found(world: &mut World) {
+    let founded = world
+        .found_run(30, FactionId(0))
+        .expect("the sample must hold a place that admits the group");
+    assert_eq!(
+        founded.people().len(),
+        30,
+        "the founding placed a group of another size"
+    );
 }
 
 /// Founds settlements over a world, and destroys part of them.
@@ -284,6 +329,7 @@ fn hash_sequence(config: WorldConfig, population: Population) -> String {
         Population::Spread => populate(&mut world),
         Population::Crowd => crowd(&mut world),
         Population::Settled => settle(&mut world),
+        Population::Founded => found(&mut world),
     }
     let mut lines = String::new();
     lines.push_str(&format!("0 {}\n", world.state_hash()));

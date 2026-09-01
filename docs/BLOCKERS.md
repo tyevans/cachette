@@ -25,7 +25,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^ALLOC]
 
-**Next number: BLK-015**
+**Next number: BLK-019**
 
 [^ALLOC]: Findings register, FND-038. `docs/FINDINGS.md`
 
@@ -41,6 +41,28 @@ names benchmarking on Graviton as blocking most of its own conclusions.
 
 This blocker cannot be resolved by a decision. It needs a benchmark harness
 and a machine.
+
+### BLK-018 — How many groups found a world, and does every faction found one?
+
+**Owner:** the project owner. **Blocks:** the shape of a run at tick zero, and
+every rule that acts on more than one faction.
+
+A run now begins with one group, in one place, of one faction. The world holds
+a faction count, and the other factions begin with nobody and nothing.
+
+The product record says that it does not decide how many groups found a world,
+and it names one group and one group for each faction as the two
+candidates.[^FOUND] The settlement count of the target world is answered, and
+it does not answer this, because it says how many settlements a full world
+holds and not how many a run starts with.[^SCALE]
+
+This needs information, not judgement. A rule that gives every faction a
+founding produces a different early run from a rule that gives one faction a
+founding and lets the others arrive later, and the two are different games.
+
+The engine is written parametrically in the meantime. The founding call takes
+the group size and the faction, so a caller founds one group or several
+without any change to the engine. The demonstration founds one.
 
 ## Resolved
 
@@ -143,3 +165,4 @@ normally.
 [^SHAPE]: ADR Registry, row 0017. `docs/adrs/REGISTRY.md`
 [^TILEIDX]: Findings register, FND-042. `docs/FINDINGS.md`
 [^TIMING]: Movement timing note. `docs/research/movement-timing.md`
+[^FOUND]: PRD-0012, a world starts small and grows. `docs/product/shaped/prd-0012-a-world-starts-small-and-grows.md`
