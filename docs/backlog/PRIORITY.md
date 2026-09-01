@@ -29,6 +29,7 @@ engine gets wrong today.
 |---|---|
 | 0064 | Units walk at random. This is the item that makes them act, and the owner has asked for it. |
 | 0057 | A shortage must end a unit, or consumption has no consequence either. |
+| 0084 | Two values name a tile's owner, and the event log publishes the wrong one to Python.[^7] |
 | 0092 | A settlement stands on water. The owner has stated this is not wanted. |
 | 0094 | One faction founds and three begin empty. This needs the owner's answer.[^4] |
 
@@ -43,10 +44,10 @@ These close a gap a review found, or they unblock the items above.
 | 0059 | Housing. The population cannot be bounded by anything until a place has capacity. |
 | 0060 | Population growth from the store and the housing. |
 | 0071 | Passability has two declaration sites. Item 0092 must not add a third. |
-| 0084 | A tile has two faction columns and one of them is not a holder. |
 | 0095 | Two foundings can over-fill a tile. |
 | 0080 | The settings struct prices every new parameter at twenty-five files. |
 | 0098 | The gate suite has no budget and the golden test grows unwatched.[^5] |
+| 0101 | A behavioural claim about terrain is defended by a test of constants.[^8] |
 
 ## Later
 
@@ -93,3 +94,5 @@ These are real and none of them blocks anything today.
 [^4]: Blockers register, BLK-018. `docs/BLOCKERS.md`
 [^5]: Decisions register, DEC-033. `docs/DECISIONS.md`
 [^6]: Decisions register, DEC-032. `docs/DECISIONS.md`
+[^7]: Findings register, FND-079. `docs/FINDINGS.md`
+[^8]: Findings register, FND-080. `docs/FINDINGS.md`

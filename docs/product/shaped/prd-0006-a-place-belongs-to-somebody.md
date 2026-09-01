@@ -49,13 +49,15 @@ Each statement below can be checked.
   fixed at generation does not satisfy this.
 - What a faction holds is a fact the world can report. A developer can ask
   what a faction holds without walking every tile.
-- Holding is exclusive. No tile is held by two factions at once, and a
-  watcher can see that this holds.
+- Holding is exclusive. No tile is held by two factions at once, and the
+  world's own invariant check re-derives the census, the held list and the
+  block masks from the holder column and refuses a disagreement.
 - Terrain influences holding. A holding does not spread the same way across
   every kind of ground.
 - The same seed gives the same holdings, at every thread count, on every run.
-- A unit's faction and a tile's holder are the same kind of thing, so a
-  comparison between them is meaningful.
+- Exactly one value names the faction that owns a tile, and every interface
+  that reports a tile's owner reports that value. A comparison between a
+  unit's faction and a tile's owner is then meaningful.
 
 ## What this does not do
 

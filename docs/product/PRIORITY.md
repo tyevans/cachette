@@ -23,7 +23,7 @@ A record here is a need, not a plan. The backlog says what work answers it.[^3]
 |---|---|
 | 0012 | A run now founds a small group. The need is partly met and the rest is close. |
 | 0007 | Tiles hold resources and units take them. Consumption is what completes it. |
-| 0006 | A faction holds ground. No watcher can see it, so the need is not met. |
+| 0006 | A watcher can see the ground now. One statement still fails: two values name a tile's owner. |
 | 0009 | A unit reads nothing. This is the record the project points at. |
 | 0011 | Nothing is born and nothing dies. The population is still a setting. |
 

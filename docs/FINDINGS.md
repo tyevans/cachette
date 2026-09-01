@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-079**
+**Next number: FND-081**
 
 ## A. Corrections to stated rules
 
@@ -1576,6 +1576,62 @@ transfer meant to give.** The store now falls by the sum of the shares, which
 makes the two copies one copy.[^38] A conservation check that reads only the
 source cannot see a quantity that left the source and reached nobody.
 
+### FND-079 — The event log publishes a stub as the owner of a tile
+
+**Believed.** The holder of a tile is the owner of that tile. An accepted
+record states it, the holding column carries it, and the viewer draws it.[^40]
+
+**True.** The engine ships two tile-owner facts, and the one it publishes as
+the owner is the one no rule ever writes. A second faction column is filled
+once at construction from the tile index and the faction count. It never
+changes, nothing writes it, and it covers open water as readily as open
+ground. It is private and has no public reader, so it looks contained.
+
+It escapes through the event log. The tile-changed event carries a faction
+field, and that field is documented as the faction that owns the tile. The
+event is public and it reaches the Python control plane, which has no other
+view of who holds anything.
+
+**Evidence.** The column is filled as the tile index modulo the faction count.
+The event's own documentation calls the field the owner. A developer who
+performs the comparison the product record asks for — a unit's faction against
+the owner the event reports — gets a confident wrong answer, and nothing
+fails. The comparison is type-correct and meaningless.[^41]
+
+**Follows.** **A private value with a public description is not private.** The
+doc comment is the interface. This is the second declaration site of shape 1,
+made worse: the two sites do not hold the same kind of fact, so they cannot be
+reconciled by choosing a winner. The stub goes, and the event carries the
+holder with a stated encoding for nobody.[^42]
+
+### FND-080 — A behavioural claim was defended by a test of constants
+
+**Believed.** Terrain influences where a holding spreads, and a test covers
+it. The test is named for the claim and it passes.
+
+**True.** The test asserts that water is never held, and that the claim
+threshold of plain is below hill and hill below mountain. The second assertion
+reads three constants and exercises no behaviour. The test also computes the
+held share for each terrain kind and then discards the result without
+asserting on it.
+
+Flatten the claim threshold to the same value for every passable kind and the
+test stays green. The gradient it is named for is not defended.
+
+**Evidence.** The behaviour is real and was observed over 40 ticks on a
+development machine, by recording the terrain of every unheld tile adjacent to
+a holding and whether the next tick took it. Plain converted every tile
+offered, hill about a third, mountain a small fraction, water none. The
+gradient exists in the system and no assertion holds it there.
+
+**Follows.** **Name a test for the claim and it will be read as covering the
+claim.** The testing rule already states that a determinism test cannot tell
+correct from consistently wrong; this is the same failure in an ordinary
+test.[^43] A test that reads a constant proves the constant was written down.
+Only a counted outcome proves the rule acts on it. This is the third instance
+in one session of one fact checked in a place that cannot see it go
+wrong.[^44] [^45]
+
 ### FND-078 — A differential test cannot see a defect that moves both worlds alike
 
 **Believed.** A test that compares a world holding ground against the same
@@ -1810,3 +1866,9 @@ it is not made here.
 [^37]: Recurring defect shapes, shape 3. `.claude/rules/recurring-defects.md`
 [^38]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`
 [^39]: Backlog item 0085. `docs/backlog/complete/0085-show-a-watcher-who-holds-the-ground.md`
+[^40]: ADR-0053, a faction is a bit in a mask, and a relation is a plane, decision D2. `docs/adrs/accepted/adr-0053-a-faction-is-a-bit-in-a-mask-and-a-relation-is-a-plane.md`
+[^41]: PRD-0006, a place belongs to somebody. `docs/product/shaped/prd-0006-a-place-belongs-to-somebody.md`
+[^42]: Backlog item 0084. `docs/backlog/proposed/0084-give-a-tile-one-faction-column.md`
+[^43]: Testing Rules, section 2. `.claude/rules/testing.md`
+[^44]: Findings register, FND-075. `docs/FINDINGS.md`
+[^45]: Findings register, FND-078. `docs/FINDINGS.md`
