@@ -13,8 +13,10 @@
 //!
 //! **The invariant is that no tile gains a unit beyond its capacity.** It is
 //! not that no tile is ever above its capacity. A spawn does not read the
-//! capacity, so a caller may over-fill a tile, and the register holds that
-//! open choice.[^4]
+//! capacity, so a caller may over-fill a tile, and an over-full tile is a
+//! state of the world rather than a fault.[^4] An over-full tile drains and
+//! never fills: admission computes the room by a subtraction that saturates,
+//! so such a tile offers no room while its units may still depart.
 //!
 //! The tests see only the public crate API.[^5]
 //!
@@ -23,7 +25,7 @@
 //! [^1]: ADR-0056, movement is tile-discrete and admitted by sort-then-admit, decision D3. `docs/adrs/accepted/adr-0056-movement-is-tile-discrete-and-admitted-by-sort-then-admit.md`
 //! [^2]: ADR-0056, movement is tile-discrete and admitted by sort-then-admit, decision D4. `docs/adrs/accepted/adr-0056-movement-is-tile-discrete-and-admitted-by-sort-then-admit.md`
 //! [^3]: ADR-0001, one binary gives one answer at any thread count, decision D4. `docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
-//! [^4]: Decisions register, DEC-020. `docs/DECISIONS.md`
+//! [^4]: ADR-0074, a spawn may over-fill a tile, and only admission enforces the capacity, decisions D1 and D2. `docs/adrs/accepted/adr-0074-a-spawn-may-over-fill-a-tile-and-only-admission-enforces-the-capacity.md`
 //! [^5]: Testing policy. `docs/TESTING.md`
 
 use std::collections::BTreeMap;

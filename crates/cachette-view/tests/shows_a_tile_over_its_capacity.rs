@@ -1,10 +1,11 @@
-//! A watcher can see that no tile holds more units than its ground admits.
+//! A watcher can see how full a tile is, and can see a tile over its capacity.
 //!
-//! The product record asks for two things about the capacity of a tile. No
-//! tile holds more units than its capacity allows, and a watcher can see that
-//! this holds.[^1] These tests cover the second thing only. They state no
-//! position on whether a spawn may over-fill a tile, which is an open
-//! choice.[^2]
+//! The product record asks that a viewer show how full each tile is, and that
+//! it mark a tile which holds more units than its capacity allows.[^1] These
+//! tests cover that. They do not assert that the world holds no such tile,
+//! because it may. A spawn places a unit without reading the capacity, so a
+//! caller may over-fill a tile, and an over-full tile is a state of the world
+//! rather than a fault.[^2]
 //!
 //! Every test drives the public interface of the viewer crate. The viewer
 //! reads the world and writes nothing to it.[^3]
@@ -30,7 +31,7 @@
 //! # References
 //!
 //! [^1]: PRD-0002, a developer watches the world run. `docs/product/shipped/prd-0002-a-developer-watches-the-world-run.md`
-//! [^2]: Decisions register, DEC-020. `docs/DECISIONS.md`
+//! [^2]: ADR-0074, a spawn may over-fill a tile, and only admission enforces the capacity, decisions D1 and D2. `docs/adrs/accepted/adr-0074-a-spawn-may-over-fill-a-tile-and-only-admission-enforces-the-capacity.md`
 //! [^3]: ADR-0067, the viewer reads the world and never writes to it, decision D1. `docs/adrs/accepted/adr-0067-the-viewer-reads-the-world-and-never-writes-to-it.md`
 //! [^4]: Findings register, FND-051. `docs/FINDINGS.md`
 //! [^5]: ADR-0056, movement is tile-discrete and admitted by sort-then-admit, decision D4. `docs/adrs/accepted/adr-0056-movement-is-tile-discrete-and-admitted-by-sort-then-admit.md`
