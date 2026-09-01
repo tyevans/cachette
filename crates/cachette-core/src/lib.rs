@@ -16,6 +16,7 @@
 
 pub mod bridge;
 pub mod character;
+pub mod cohort;
 pub mod event;
 pub mod founding;
 pub mod hash;
@@ -37,6 +38,10 @@ pub mod world;
 
 pub use bridge::{BlockLayout, BlockRange, BridgeError, UnitTileBridge};
 pub use character::{CharacterArena, CharacterError};
+pub use cohort::{
+    CohortError, CohortRow, CohortTable, DrawLedger, DrawPass, NeedRule, SiteRationed,
+    STRATUM_COUNT,
+};
 pub use event::{ResourceTaken, TileChanged};
 pub use founding::{Founding, FoundingError, Provision, Survey};
 pub use hash::StateHash;

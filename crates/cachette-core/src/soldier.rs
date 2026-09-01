@@ -25,10 +25,11 @@
 
 use std::collections::VecDeque;
 
+use crate::cohort::NEED_FULL;
 use crate::hash::StateHash;
 use crate::hex::{Axial, Grid};
 use crate::resource::{Amount, CarryLoad, ResourceKind};
-use crate::types::{Entity, FactionId, TileIdx, FACTION_CEILING};
+use crate::types::{Entity, FactionId, Fix32, TileIdx, FACTION_CEILING};
 
 /// The generation that means a slot carries no identity.
 ///
@@ -82,6 +83,35 @@ const FIRST_GENERATION: u32 = 1;
 ///
 /// [^1]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`
 const NO_ORDER: u8 = 0;
+
+/// The home value that means a unit belongs to no site.
+///
+/// The value is the top of the slot index range, which no arena reaches,
+/// because a slot index below it always exists first. It is a property of
+/// the index layout and not a budget.
+pub const NO_HOME: u32 = u32::MAX;
+
+/// The columns that a pass over the needs reads and writes.
+///
+/// The need column and the deficit column are mutable and the other two are
+/// not. A pass changes what a unit needs. It never changes which units
+/// exist, because that is a structural change and it belongs to the
+/// arena.[^1]
+///
+/// # References
+///
+/// [^1]: ADR-0066, entity storage holds four fixed shapes, decision D2. `docs/adrs/accepted/adr-0066-entity-storage-holds-four-fixed-shapes.md`
+#[derive(Debug)]
+pub struct NeedUpdate<'a> {
+    /// The need of each slot.
+    pub needs: &'a mut [Fix32],
+    /// The deficit accumulator of each slot.
+    pub deficits: &'a mut [Fix32],
+    /// One for a live slot, zero otherwise.
+    pub live: &'a [u8],
+    /// The site that each slot draws from, or `NO_HOME`.
+    pub homes: &'a [u32],
+}
 
 /// Returns the gather order that a column value names.
 const fn order_of(value: u8) -> Option<ResourceKind> {
@@ -203,6 +233,36 @@ pub struct SoldierArena {
     /// the kind number plus one. The column holds a small integer and not an
     /// option, because it is plain data that reaches the state hash.
     orders: Vec<u8>,
+    /// The need of each slot.
+    ///
+    /// A need runs from zero to full. It falls at an interval by a
+    /// saturating subtract, and a draw against the store of a site raises
+    /// it again.[^1]
+    ///
+    /// The need is a column of this arena, because a unit carries its own
+    /// need. The draw that fills it is pooled, and that is a property of the
+    /// draw and not of the need.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0063, a need is a rate with a threshold, and crossing it is a fact, decisions D1 and D2. `docs/adrs/draft/adr-0063-a-need-is-a-rate-with-a-threshold-and-crossing-it-is-a-fact.md`
+    needs: Vec<Fix32>,
+    /// The deficit accumulator of each slot.
+    ///
+    /// The accumulator rises while the need is below the threshold and
+    /// falls while it is at or above it. It is the input that a later rule
+    /// reads to end a unit.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0063, a need is a rate with a threshold, and crossing it is a fact, decision D4. `docs/adrs/draft/adr-0063-a-need-is-a-rate-with-a-threshold-and-crossing-it-is-a-fact.md`
+    deficits: Vec<Fix32>,
+    /// The site that each slot draws from, or `NO_HOME`.
+    ///
+    /// The column holds a slot of the settlement arena and not an identity,
+    /// because the cohort array is indexed by that slot. A unit that names
+    /// no site draws from nothing.
+    homes: Vec<u32>,
     /// The free slots, oldest first.
     free: VecDeque<u32>,
     /// The number of live soldiers.
@@ -252,6 +312,9 @@ impl SoldierArena {
             factions: Vec::new(),
             carries: Vec::new(),
             orders: Vec::new(),
+            needs: Vec::new(),
+            deficits: Vec::new(),
+            homes: Vec::new(),
             free: VecDeque::new(),
             live_count: 0,
             retired_count: 0,
@@ -373,6 +436,11 @@ impl SoldierArena {
         // [^3]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`
         debug_assert_eq!(self.carries[index], CarryLoad::EMPTY);
         debug_assert_eq!(self.orders[index], NO_ORDER);
+        // A unit arrives fed and out of deficit, and it belongs to no site
+        // until something gives it one.
+        self.needs[index] = NEED_FULL;
+        self.deficits[index] = Fix32::ZERO;
+        self.homes[index] = NO_HOME;
         self.live_count += 1;
         self.revision = self.revision.wrapping_add(1);
         Ok(Entity::new(slot, self.generations[index])
@@ -391,6 +459,9 @@ impl SoldierArena {
         self.factions.push(FactionId(0));
         self.carries.push(CarryLoad::EMPTY);
         self.orders.push(NO_ORDER);
+        self.needs.push(NEED_FULL);
+        self.deficits.push(Fix32::ZERO);
+        self.homes.push(NO_HOME);
         Ok(slot)
     }
 
@@ -427,6 +498,9 @@ impl SoldierArena {
         // [^3]: ADR-0072, a tile stock is generated, and only what was taken is stored, decision D5. `docs/adrs/accepted/adr-0072-a-tile-stock-is-generated-and-only-what-was-taken-is-stored.md`
         self.carries[index] = CarryLoad::EMPTY;
         self.orders[index] = NO_ORDER;
+        self.needs[index] = Fix32::ZERO;
+        self.deficits[index] = Fix32::ZERO;
+        self.homes[index] = NO_HOME;
         self.live_count -= 1;
         self.revision = self.revision.wrapping_add(1);
         if self.generations[index] == LAST_GENERATION {
@@ -623,6 +697,84 @@ impl SoldierArena {
         true
     }
 
+    /// Returns the need of a soldier, or `None` when the identity is dead.
+    #[must_use]
+    pub fn need(&self, entity: Entity) -> Option<Fix32> {
+        let slot = self.slot_of(entity)?;
+        Some(self.needs[slot as usize])
+    }
+
+    /// Returns the deficit of a soldier, or `None` when the identity is
+    /// dead.
+    #[must_use]
+    pub fn deficit(&self, entity: Entity) -> Option<Fix32> {
+        let slot = self.slot_of(entity)?;
+        Some(self.deficits[slot as usize])
+    }
+
+    /// Returns the site that a soldier draws from.
+    ///
+    /// Returns `None` when the identity is dead, and `Some(None)` when the
+    /// soldier belongs to no site.
+    #[must_use]
+    pub fn home(&self, entity: Entity) -> Option<Option<u32>> {
+        let slot = self.slot_of(entity)?;
+        let home = self.homes[slot as usize];
+        Some(if home == NO_HOME { None } else { Some(home) })
+    }
+
+    /// Writes the site that a soldier draws from, and reports whether it
+    /// wrote.
+    ///
+    /// Returns `false` when the identity is dead. The caller handles the
+    /// absent soldier or skips it.[^1]
+    ///
+    /// The arena takes a slot of the settlement arena and does not check it,
+    /// because this arena holds no settlement column. The world owns that
+    /// check, and its invariant check states it.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0014, entity identity is an index plus a generation, decision D2. `docs/adrs/accepted/adr-0014-entity-identity-is-an-index-plus-a-generation.md`
+    pub fn set_home(&mut self, entity: Entity, home: Option<u32>) -> bool {
+        let Some(slot) = self.slot_of(entity) else {
+            return false;
+        };
+        self.homes[slot as usize] = home.unwrap_or(NO_HOME);
+        true
+    }
+
+    /// Returns the whole need column.
+    #[must_use]
+    pub fn need_column(&self) -> &[Fix32] {
+        &self.needs
+    }
+
+    /// Returns the whole deficit column.
+    #[must_use]
+    pub fn deficit_column(&self) -> &[Fix32] {
+        &self.deficits
+    }
+
+    /// Returns the whole home column.
+    #[must_use]
+    pub fn home_column(&self) -> &[u32] {
+        &self.homes
+    }
+
+    /// Returns the columns that a pass over the needs needs.
+    ///
+    /// One call hands over all four, because four separate calls would
+    /// borrow the arena four times and two of those borrows are mutable.
+    pub fn need_update(&mut self) -> NeedUpdate<'_> {
+        NeedUpdate {
+            needs: &mut self.needs,
+            deficits: &mut self.deficits,
+            live: &self.live,
+            homes: &self.homes,
+        }
+    }
+
     /// Absorbs the soldier columns into the state hash.
     ///
     /// The hash covers every byte that decides a later frame. It therefore
@@ -642,6 +794,9 @@ impl SoldierArena {
             .write(bytemuck::cast_slice(&self.factions))
             .write(bytemuck::cast_slice(&self.carries))
             .write(&self.orders)
+            .write(bytemuck::cast_slice(&self.needs))
+            .write(bytemuck::cast_slice(&self.deficits))
+            .write(bytemuck::cast_slice(&self.homes))
             .write(&self.live);
         for generation in &self.generations {
             hash = hash.write(&generation.to_le_bytes());
@@ -665,6 +820,29 @@ impl SoldierArena {
     pub fn check_invariants(&self) -> bool {
         let slots = self.generations.len();
         if self.live.len() != slots || self.tiles.len() != slots || self.factions.len() != slots {
+            return false;
+        }
+        if self.needs.len() != slots || self.deficits.len() != slots || self.homes.len() != slots {
+            return false;
+        }
+        // A slot that is not live holds no need, no deficit and no site. A
+        // stale value there would reach the state hash and would feed the
+        // next unit in the slot.
+        if (0..slots).any(|slot| {
+            self.live[slot] == 0
+                && (self.needs[slot] != Fix32::ZERO
+                    || self.deficits[slot] != Fix32::ZERO
+                    || self.homes[slot] != NO_HOME)
+        }) {
+            return false;
+        }
+        // A need never leaves its range, and a deficit never falls below
+        // zero. Both are the floors and ceilings that the saturating
+        // arithmetic states.
+        if (0..slots).any(|slot| self.needs[slot] < Fix32::ZERO || self.needs[slot] > NEED_FULL) {
+            return false;
+        }
+        if (0..slots).any(|slot| self.deficits[slot] < Fix32::ZERO) {
             return false;
         }
         if self.carries.len() != slots || self.orders.len() != slots {
