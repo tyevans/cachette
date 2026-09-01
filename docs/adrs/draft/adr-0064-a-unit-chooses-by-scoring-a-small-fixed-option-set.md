@@ -67,29 +67,32 @@ count times the population, and nothing else.
 The engine calls no content code inside the choice. A content author supplies a
 weight, which is a value in a table and never a function.[^8]
 
-Every arithmetic operation goes through the arithmetic module, and every
-operation saturates rather than wraps.[^9]
+Every operation that computes a score goes through the arithmetic module, and
+every one of them saturates rather than wraps.[^9] The schedule is not part of
+the score. It mixes an index to obtain a phase, and it uses the wrapping and
+bitwise operators directly.
 
 ### D2. The score is transient, and only the choice reaches state
 
-Nothing stores a score. The pass compares the scores and discards them, so no
-score reaches simulated state and no score reaches the state hash.[^5]
+Nothing stores a score. The pass compares the scores and discards them. No
+score reaches simulated state. No score reaches the state hash.[^5]
 
 The unit stores the option it selected. That value decides a later frame, so it
 is state and the state hash covers it.[^10]
 
 The stored choice is sticky. A unit keeps it between two choices. A unit that
-re-decides on every tick swaps between two options of nearly equal score and
-arrives nowhere, so stickiness is what makes the behaviour legible.[^3]
+re-decides on every tick swaps between two options of nearly equal score. It
+arrives nowhere. Stickiness is what makes the behaviour legible.[^3]
 
 The engine answers a question about a choice by computing the scores again from
 the world as it stands. It does not answer from a stored score, because no
 stored score exists.
 
-### D3. An option below a floor holds the choice, and the floor is a frame-budget parameter
+### D3. An option at or below a floor holds the choice, and the floor is a frame-budget parameter
 
-A unit whose highest score is below a floor holds what it was doing and does
-not move.
+A unit whose highest score is at or below a floor holds what it was doing and
+does not move. The comparison is strict, so a score equal to the floor does not
+win.
 
 **The floor is a frame-budget parameter. It is not a design knob.** Without it,
 a world in which every option scores near zero lets the tie-break decide. Every
@@ -121,20 +124,20 @@ every identity that names a slot.[^18] A cell key therefore selects contiguous
 runs only where spawn order happens to follow tile order. State this as a
 condition, not as a property of the engine.
 
-This choice is neutral for determinism and large for cost, which is why this
+This choice is neutral for determinism and large for cost. That is why this
 record holds it rather than the code.
 
 The key mixes the cell index. A bare mask of the cell index selects a regular
-stripe of the map on each tick, which ties the phase of the decision to the
-geography.
+stripe of the map on each tick. Such a mask ties the phase of the decision to
+the geography.
 
 The schedule is a pure function of the cell and the frame. It reads no counter
 and no accumulator, so it gives one answer at any thread count.[^13]
 
 A unit that crosses a cell boundary can choose twice inside one interval, or
 skip one interval. **This is accepted behaviour and not a defect.** A unit that
-arrives in a new region must read it again, and a skipped interval delays a
-choice rather than losing it.
+arrives in a new region must read it again. A skipped interval delays a choice.
+It does not lose one.
 
 The interval is a parameter of the world, and the reference table holds the
 recommended value.[^11]
@@ -158,8 +161,8 @@ column, which is level 0. It writes nothing to any level above level 0.[^4]
 [^15]
 
 The level a unit read is part of the answer it gave.[^16] A unit therefore acts
-on the world as the last barrier left it, and not on a world that a later stage
-of the same frame has changed.
+on the world as the last barrier left it. It does not act on a world that a
+later stage of the same frame has changed.
 
 ## Consequences
 
@@ -186,7 +189,8 @@ author who needs a new behaviour needs a new option in the set, and the engine
 owns the set.
 
 The order of the option set is now behaviour. A change to the order changes
-which option wins a tie, so the order is not a listing that anyone may sort.
+which option wins a tie. The order is therefore not a listing that anyone may
+sort.
 
 ## Alternatives rejected
 
