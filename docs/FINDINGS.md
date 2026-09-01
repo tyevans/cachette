@@ -1476,6 +1476,14 @@ removes the site rather than reconciling it.
 shape's only local instance was a numbering collision in a register. This one
 is in the engine.
 
+**Closed.** The second site is gone. The passability reader now returns the
+capacity being greater than zero, and it matches no kind by name. The capacity
+table is the one declaration, and its match is exhaustive, so the compiler
+refuses a kind that states no capacity. A test asserts the two answers agree
+over every kind. The proof that the test can fail restored the name match and
+set the water capacity to the ordinary value; the test then reported that
+water answered the two questions differently.[^54]
+
 ### FND-061 — A fixture assertion stated over the inputs cannot see the case
 
 **Believed.** A fixture that must produce a contested case proves it by
@@ -2121,6 +2129,32 @@ the conditions in the row.[^47]
 machine do not cost twice one suite, and neither figure is the cost of the
 suite.
 
+### FND-093 — A rule behind an existing filter cannot be proved by the path that filters
+
+**Believed.** A new refusal is proved by a test that drives the whole engine
+path. Remove the refusal, and the test goes red.
+
+**True.** The test stays green when an earlier stage of the same path already
+refuses the case. The founding survey drops a candidate whose ground admits no
+unit, so the settlement refusal beneath it never receives a refused place. The
+run test removed the refusal and stayed green. It also stayed green when the
+survey filter itself was removed, because the score prefers good ground and
+chose a passable place anyway.
+
+**Evidence.** The settlement refusal on ground that carries no unit. Two tests
+that call the founding directly went red when the refusal was removed. The
+test that founds a whole run did not.
+
+**Follows.** Two things.
+
+**Name what each test proves.** A test that drives the layered path is a guard
+against a later change that removes an upper filter. It is not evidence that
+the lower rule works. Prove the lower rule at the call that reaches it.
+
+**A green test after a restored defect is a result, not a failure of the
+method.** It says the case does not reach the assertion. Report it rather than
+hiding it.[^55]
+
 ### FND-100 — "A watcher can read it" was counted as "a watcher can see it"
 
 **Believed.** An item whose acceptance list says a watcher reads a value has
@@ -2283,3 +2317,5 @@ a figure, and check it against the code before you rely on it.
 [^51]: ADR-0014, entity identity is an index plus a generation, decision D1. `docs/adrs/accepted/adr-0014-entity-identity-is-an-index-plus-a-generation.md`
 [^52]: Findings register, FND-023, in this document.
 [^53]: Decision Record Scope, section 4.3. `.claude/rules/adr-scope.md`
+[^54]: Backlog item 0071. `docs/backlog/complete/0071-derive-tile-passability-from-tile-capacity.md`
+[^55]: Testing rules, section 2a. `.claude/rules/testing.md`

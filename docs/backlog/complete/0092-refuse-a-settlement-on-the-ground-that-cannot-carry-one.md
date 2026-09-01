@@ -1,7 +1,7 @@
 ---
 id: 0092
 title: Refuse a settlement on the ground that cannot carry one
-status: refined
+status: complete
 created: 2026-08-31
 implements: [ADR-0053 D5, ADR-0056 D4, ADR-0066 D1, ADR-0068 D4, ADR-0075 D1]
 changes: []
@@ -170,14 +170,57 @@ it counts who already stands on a tile.
 
 ## Outcome
 
-Filled in when the item moves to `complete/`.
+**Done.** The world refuses a settlement on ground that carries no unit. The
+settlement error gained one variant for it, and the world returns that variant
+by name. The rule calls the reader that answers whether a tile admits a unit,
+and that reader derives its answer from the capacity of the ground. The rule
+holds no kind name and no capacity literal.
+
+**The refusal sits in the world, not in the arena.** The arena holds the grid
+and no terrain, so it cannot read the ground. The world holds the terrain. The
+extent refusal therefore keeps its own name, and a test asserts that an address
+outside the world still reports the extent and not the ground.
+
+**No record was written.** The reasoning is above and it is unchanged.
+
+**What each test proves.** Two tests call the founding directly. They founded a
+settlement on water, asserted the refusal by name, then founded on open ground
+in the same world. Both went red when the refusal was removed from the source.
+
+A third test founds a whole run in four worlds and asserts that every
+settlement stands on ground that carries a unit. **That test did not go red
+when the refusal was removed.** The survey already drops a candidate whose
+ground admits no unit, so the refused case never reaches the lower rule. The
+test stayed green when the survey filter itself was removed as well, because
+the score prefers good ground and chose a passable place anyway. The test is
+therefore a guard against a later change, and it is not evidence that the new
+rule works. The findings register holds this as precedent.[^20]
+
+**The fixture holds water, and it says so over the world.** The fixture builds
+a world three lattice cells wide along each axis, scans it, and keeps the first
+tile of zero capacity and the first tile of greater capacity. It asserts that
+it found both. It asserts nothing about the seed.
+
+**The sample did not widen.** The refusal reads the tile the caller named and
+reads no other tile. The bounded-sample test still holds: four worlds whose
+tile counts span a factor of sixty-four read the same order of tiles.
+
+**One fixture moved.** The thread-count fixture founded settlements on the
+first twenty-three tiles of each scenario world, and some of those are water.
+It now walks the tiles that admit a unit, in the same index order.
+
+**No golden state hash file moved.** The golden founding pattern already
+avoided water in every scenario it holds.
+
+**Item 0102 holds the wider settlement suitability rule.** It was already in
+the backlog, so this item created no follow-up.
 
 ## References
 
 [^1]: Backlog item 0052, the outcome. `docs/backlog/complete/0052-provide-the-settlement-column-set.md`
 [^2]: ADR-0053, a faction is a bit in a mask, and a relation is a plane, decision D5. `docs/adrs/accepted/adr-0053-a-faction-is-a-bit-in-a-mask-and-a-relation-is-a-plane.md`
 [^3]: Decision Record Scope, section 1. `.claude/rules/adr-scope.md`
-[^4]: Backlog item 0071. `docs/backlog/refined/0071-derive-tile-passability-from-tile-capacity.md`
+[^4]: Backlog item 0071. `docs/backlog/complete/0071-derive-tile-passability-from-tile-capacity.md`
 [^5]: Findings register, FND-060. `docs/FINDINGS.md`
 [^6]: Decisions register, DEC-035. `docs/DECISIONS.md`
 [^7]: Recurring Defect Shapes, shape 1. `.claude/rules/recurring-defects.md`
@@ -193,3 +236,4 @@ Filled in when the item moves to `complete/`.
 [^17]: PRD-0012, a world starts small and grows. `docs/product/accepted/prd-0012-a-world-starts-small-and-grows.md`
 [^18]: PRD-0006, a place belongs to somebody. `docs/product/accepted/prd-0006-a-place-belongs-to-somebody.md`
 [^19]: PRD-0014, everyone needs somewhere to live. `docs/product/accepted/prd-0014-everyone-needs-somewhere-to-live.md`
+[^20]: Findings register, FND-093. `docs/FINDINGS.md`

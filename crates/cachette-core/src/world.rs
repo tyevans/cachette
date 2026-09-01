@@ -596,7 +596,8 @@ impl World {
     ///
     /// Returns an error when the arena holds no free slot, when the address
     /// is outside the world, when the faction is at or above the ceiling,
-    /// or when another settlement already stands on the tile.
+    /// when the ground carries no unit, or when another settlement already
+    /// stands on the tile.
     pub fn found_settlement(
         &mut self,
         address: Axial,
@@ -608,6 +609,21 @@ impl World {
         // mistake rather than a storage one.
         if faction.0 >= self.config.faction_count.max(1) {
             return Err(SettlementError::FactionAboveCeiling(faction));
+        }
+        // Ground that admits no unit admits no holder, and a settlement is a
+        // holder of ground.[^2] The rule reads the passability of the tile
+        // and states nothing of its own about the ground, so the capacity
+        // table stays the one declaration of which ground carries
+        // anybody.[^3] [^4]
+        //
+        // The extent refusal stays with the arena, which owns the grid, so
+        // this test says nothing about an address outside the world.
+        //
+        // [^2]: ADR-0053, a faction is a bit in a mask, and a relation is a plane, decision D5. `docs/adrs/accepted/adr-0053-a-faction-is-a-bit-in-a-mask-and-a-relation-is-a-plane.md`
+        // [^3]: ADR-0056, movement is tile-discrete and admitted by sort-then-admit, decision D4. `docs/adrs/accepted/adr-0056-movement-is-tile-discrete-and-admitted-by-sort-then-admit.md`
+        // [^4]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`
+        if self.grid.contains(address) && !self.admits_a_unit(address) {
+            return Err(SettlementError::TileAdmitsNobody(address));
         }
         let settlement = self.settlements.found(address, faction)?;
         // The rate table follows the slot column of the arena, and a founding

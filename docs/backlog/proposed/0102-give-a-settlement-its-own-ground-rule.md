@@ -98,10 +98,10 @@ Filled in when the item moves to `complete/`.
 ## References
 
 [^1]: Decisions register, DEC-035. `docs/DECISIONS.md`
-[^2]: Backlog item 0092. `docs/backlog/refined/0092-refuse-a-settlement-on-the-ground-that-cannot-carry-one.md`
+[^2]: Backlog item 0092. `docs/backlog/complete/0092-refuse-a-settlement-on-the-ground-that-cannot-carry-one.md`
 [^3]: Backlog guide, the line between proposed and refined. `docs/backlog/README.md`
 [^4]: Recurring Defect Shapes, shape 1. `.claude/rules/recurring-defects.md`
-[^5]: Backlog item 0071. `docs/backlog/refined/0071-derive-tile-passability-from-tile-capacity.md`
+[^5]: Backlog item 0071. `docs/backlog/complete/0071-derive-tile-passability-from-tile-capacity.md`
 [^6]: Findings register, FND-060. `docs/FINDINGS.md`
 [^7]: Commit Message Rules, after a sweep. `.claude/rules/commits.md`
 [^8]: Findings register, FND-070. `docs/FINDINGS.md`

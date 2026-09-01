@@ -23,7 +23,7 @@
 use std::collections::BTreeMap;
 
 use cachette_core::rng;
-use cachette_core::terrain::{Terrain, TileKind, KIND_COUNT, TERRAIN_FRAME};
+use cachette_core::terrain::{admits_a_unit, Terrain, TileKind, KIND_COUNT, TERRAIN_FRAME};
 use cachette_core::types::Fix32;
 use cachette_core::{Axial, Grid, TileIdx, World, WorldConfig};
 
@@ -350,16 +350,27 @@ fn the_index_and_the_address_name_one_tile() {
 }
 
 #[test]
-fn only_water_refuses_a_unit() {
-    assert!(!TileKind::Water.is_passable());
-    for kind in [
-        TileKind::Plain,
-        TileKind::Forest,
-        TileKind::Hill,
-        TileKind::Mountain,
-    ] {
-        assert!(kind.is_passable());
+fn passability_is_the_capacity_of_the_ground() {
+    assert_eq!(TileKind::ALL.len(), KIND_COUNT);
+    for kind in TileKind::ALL {
+        assert_eq!(
+            kind.is_passable(),
+            kind.capacity() > 0,
+            "the kind {kind:?} answers passability and capacity differently"
+        );
     }
+}
+
+#[test]
+fn ground_that_holds_nobody_admits_nobody() {
+    assert!(!admits_a_unit(0));
+    assert!(admits_a_unit(1));
+}
+
+#[test]
+fn at_least_one_kind_refuses_a_unit_and_at_least_one_admits_one() {
+    assert!(TileKind::ALL.iter().any(|kind| !kind.is_passable()));
+    assert!(TileKind::ALL.iter().any(|kind| kind.is_passable()));
 }
 
 #[test]

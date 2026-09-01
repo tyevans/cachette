@@ -431,16 +431,29 @@ fn the_soldier_columns_reach_the_state_hash() {
 /// A settlement is fixed to a tile, and two settlements cannot stand on one
 /// tile, so the pattern walks distinct tiles.[^2]
 ///
+/// The ground carries the settlement, so the pattern walks the tiles that
+/// admit a unit.[^3] The walk keeps the index order of the grid, which is
+/// fixed and does not depend on how a thread visited the world.[^4]
+///
 /// # References
 ///
 /// [^1]: ADR-0014, entity identity is an index plus a generation, decisions D3 and D4. `docs/adrs/accepted/adr-0014-entity-identity-is-an-index-plus-a-generation.md`
 /// [^2]: ADR-0066, entity storage holds four fixed shapes, decision D1. `docs/adrs/accepted/adr-0066-entity-storage-holds-four-fixed-shapes.md`
+/// [^3]: ADR-0053, a faction is a bit in a mask, and a relation is a plane, decision D5. `docs/adrs/accepted/adr-0053-a-faction-is-a-bit-in-a-mask-and-a-relation-is-a-plane.md`
+/// [^4]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
 fn settle(world: &mut World) -> Vec<Entity> {
     let grid = world.grid();
     let tiles: Vec<Axial> = (0..grid.tile_count())
         .map(|index| Axial::new((index % grid.width()) as i32, (index / grid.width()) as i32))
+        .filter(|address| world.admits_a_unit(*address))
         .take(23)
         .collect();
+    // A scenario world can be smaller than the coarsest lattice of the
+    // generator, and such a world holds one kind of ground.[^5] The pattern
+    // therefore takes what the world offers. The caller asserts that each
+    // scenario founded at least one settlement.
+    //
+    // [^5]: Findings register, FND-054. `docs/FINDINGS.md`
     let ceiling = u32::from(world.config().faction_count.max(1));
     let mut kept = Vec::new();
     let mut lost = Vec::new();

@@ -30,7 +30,6 @@ engine gets wrong today.
 | 0094 | The owner has asked for multi-faction founding ahead of the rest of the queue. BLK-018 is answered and the engine still founds one.[^4] |
 | 0057 | A shortage must end a unit, or consumption has no consequence either. |
 | 0084 | Two values name a tile's owner, and the event log publishes the wrong one to Python.[^6] |
-| 0092 | A settlement stands on water. The owner has stated this is not wanted. |
 | 0102 | A settlement reads its own ground rule, not the passability rule. Blocked by 0071 and 0092, in that order. |
 
 ## Next
@@ -42,7 +41,6 @@ These close a gap a review found, or they unblock the items above.
 | 0120 | The engine gains state the window never shows. Refining it is the work.[^8] |
 | 0059 | Housing. The population cannot be bounded by anything until a place has capacity. |
 | 0060 | Population growth from the store and the housing. |
-| 0071 | Passability has two declaration sites. Item 0092 must not add a third. |
 | 0095 | Two foundings can over-fill a tile. |
 | 0103 | A household has no home. DEC-039 answers it: derive the household from the dwelling slot. |
 | 0104 | A ruler decides nothing that reaches anybody. DEC-040 carries the writ in the influence field. |

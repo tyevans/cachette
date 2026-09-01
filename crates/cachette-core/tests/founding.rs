@@ -530,3 +530,66 @@ fn the_seed_reaches_the_sample() {
         "two seeds drew one sample, so the seed is not in the key"
     );
 }
+
+#[test]
+fn every_settlement_a_run_founds_stands_on_ground_that_carries_a_unit() {
+    // Ground that admits no unit admits no holder, and a settlement is a
+    // holder of ground.[^1] The run chooses the place, so this test asks
+    // what the engine chose rather than what a caller named.[^2]
+    //
+    // [^1]: ADR-0053, a faction is a bit in a mask, and a relation is a plane, decision D5. `docs/adrs/accepted/adr-0053-a-faction-is-a-bit-in-a-mask-and-a-relation-is-a-plane.md`
+    // [^2]: Testing rules, section 5. `.claude/rules/testing.md`
+    for seed in [0x0cac_4e77_0061u64, 0x0cac_4e77_0092, 7, 0xfeed_face] {
+        let mut world = world_of(seed);
+
+        // The fixture must hold water, or the test measures the fixture.[^3]
+        // The assertion is over the world that was built, not over the seed
+        // that built it.[^4]
+        //
+        // [^3]: Findings register, FND-054. `docs/FINDINGS.md`
+        // [^4]: Findings register, FND-061. `docs/FINDINGS.md`
+        let grid = world.grid();
+        let refused = (0..grid.tile_count())
+            .map(|index| Axial::new((index % grid.width()) as i32, (index / grid.width()) as i32))
+            .filter(|address| !world.admits_a_unit(*address))
+            .count();
+        assert!(
+            refused > 0,
+            "the world of seed {seed} holds no ground that refuses a unit"
+        );
+
+        let founding = world
+            .found_run(GROUP, FactionId(0))
+            .expect("a place exists");
+        assert!(
+            world.admits_a_unit(founding.place()),
+            "the run founded a settlement on ground that carries no unit"
+        );
+        for slot in world.settlements().iter() {
+            let address = world
+                .settlements()
+                .address(slot)
+                .expect("a live settlement holds an address");
+            assert!(
+                world.admits_a_unit(address),
+                "a settlement stands at ({}, {}), which carries no unit",
+                address.q,
+                address.r
+            );
+        }
+        assert!(world.check_invariants());
+    }
+}
+
+#[test]
+fn a_run_never_names_a_place_the_ground_refuses() {
+    // The refusal must not widen the bounded sample.[^1] The survey reads the
+    // same number of candidate places whatever the ground gives back.
+    //
+    // [^1]: ADR-0075, the founding choice reads a bounded sample of the world, decision D1. `docs/adrs/accepted/adr-0075-the-founding-choice-reads-a-bounded-sample-of-the-world.md`
+    let world = world_of(0x0cac_4e77_0092);
+    let survey = world.survey_founding(GROUP).expect("the survey must run");
+    assert_eq!(survey.drawn(), SAMPLE_SIZE);
+    let chosen = survey.chosen().expect("a place exists");
+    assert!(world.admits_a_unit(chosen.address()));
+}

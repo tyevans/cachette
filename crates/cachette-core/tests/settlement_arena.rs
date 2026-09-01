@@ -34,6 +34,67 @@ fn world() -> World {
     World::new(CONFIG).expect("the extent must describe a world")
 }
 
+/// The extent of the world that holds water as well as open ground.
+///
+/// The coarsest lattice of the terrain generator spans sixty-four tiles. A
+/// world narrower than that spacing sits inside one lattice cell, so every
+/// tile of it falls on the same side of the water threshold and the world
+/// holds one kind of ground.[^1] This extent holds three lattice cells along
+/// each axis, so the ground varies.
+///
+/// # References
+///
+/// [^1]: Findings register, FND-054. `docs/FINDINGS.md`
+const MIXED_EXTENT: u32 = 192;
+
+/// The settings of the world that holds water.
+const MIXED: WorldConfig = WorldConfig {
+    width: MIXED_EXTENT,
+    height: MIXED_EXTENT,
+    seed: 0x0cac_4e77_0092,
+    faction_count: 3,
+};
+
+/// Builds a world that holds water and open ground, and returns one of each.
+///
+/// The fixture asserts over the world it built, not over the seed that made
+/// it.[^1] A seed is an input. What the ground turned out to be is the
+/// outcome, and the outcome is what these tests need.
+///
+/// The water tile carries a capacity of zero. That is the whole of what makes
+/// the ground refuse a holder, so the fixture states it.
+///
+/// # References
+///
+/// [^1]: Findings register, FND-061. `docs/FINDINGS.md`
+fn world_of_water_and_ground() -> (World, Axial, Axial) {
+    let world = World::new(MIXED).expect("the extent must describe a world");
+    let grid = world.grid();
+    let mut water = None;
+    let mut ground = None;
+    for index in 0..grid.tile_count() {
+        let address = Axial::new((index % grid.width()) as i32, (index / grid.width()) as i32);
+        let kind = world.tile_kind(address).expect("the address is inside");
+        if kind.capacity() == 0 && water.is_none() {
+            water = Some(address);
+        }
+        if kind.capacity() > 0 && ground.is_none() {
+            ground = Some(address);
+        }
+    }
+    let water = water.expect("the fixture world must hold ground of zero capacity");
+    let ground = ground.expect("the fixture world must hold ground that carries a unit");
+    assert!(
+        !world.admits_a_unit(water),
+        "the fixture water tile must refuse a unit"
+    );
+    assert!(
+        world.admits_a_unit(ground),
+        "the fixture ground tile must admit a unit"
+    );
+    (world, water, ground)
+}
+
 #[test]
 fn a_new_world_holds_no_settlement() {
     let world = world();
@@ -443,4 +504,44 @@ fn run_plan(
         tiles,
         world.settlements().slot_count(),
     )
+}
+
+#[test]
+fn a_settlement_on_ground_that_carries_no_unit_is_a_typed_error() {
+    // Ground that admits no unit admits no holder.[^1] A settlement is a
+    // holder of ground, so the ground that carries nobody carries no
+    // settlement. The refusal is a value, not a panic.
+    //
+    // [^1]: ADR-0053, a faction is a bit in a mask, and a relation is a plane, decision D5. `docs/adrs/accepted/adr-0053-a-faction-is-a-bit-in-a-mask-and-a-relation-is-a-plane.md`
+    let (mut world, water, ground) = world_of_water_and_ground();
+    assert_eq!(
+        world.found_settlement(water, FactionId(0)),
+        Err(SettlementError::TileAdmitsNobody(water))
+    );
+    assert_eq!(world.settlements().len(), 0);
+    assert_eq!(world.settlement_on(water), None);
+
+    // The same world takes a settlement on the ground that carries a unit,
+    // so the refusal is about the ground and not about the world.
+    world
+        .found_settlement(ground, FactionId(0))
+        .expect("open ground must take a settlement");
+    assert_eq!(world.settlements().len(), 1);
+    assert!(world.check_invariants());
+}
+
+#[test]
+fn the_refusal_names_the_ground_and_not_the_extent() {
+    // An address outside the world reads no ground at all. The arena owns
+    // the extent, so that refusal keeps its own name.
+    let (mut world, water, _) = world_of_water_and_ground();
+    let outside = Axial::new(MIXED_EXTENT as i32, 0);
+    assert_eq!(
+        world.found_settlement(outside, FactionId(0)),
+        Err(SettlementError::TileOutsideWorld(outside))
+    );
+    assert_eq!(
+        world.found_settlement(water, FactionId(0)),
+        Err(SettlementError::TileAdmitsNobody(water))
+    );
 }
