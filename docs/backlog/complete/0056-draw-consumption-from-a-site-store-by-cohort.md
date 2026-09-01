@@ -181,6 +181,6 @@ open choice of the four values of the need rule.
 [^11]: Findings register, FND-001. `docs/FINDINGS.md`
 [^12]: Findings register, FND-016. `docs/FINDINGS.md`
 [^13]: Findings register, FND-051. `docs/FINDINGS.md`
-[^14]: ADR-0063, a need is a rate with a threshold, and crossing it is a fact. `docs/adrs/draft/adr-0063-a-need-is-a-rate-with-a-threshold-and-crossing-it-is-a-fact.md`
+[^14]: ADR-0063, a need is a rate with a threshold, and crossing it is a fact. `docs/adrs/accepted/adr-0063-a-need-is-a-rate-with-a-threshold-and-crossing-it-is-a-fact.md`
 [^15]: Findings register, FND-074 and FND-075. `docs/FINDINGS.md`
 [^16]: Decisions register, DEC-034. `docs/DECISIONS.md`

@@ -29,11 +29,8 @@ rule.
 
 ## Waiting for review
 
-A record here is written and binds nothing until a reviewer moves it.
-
-| No. | Why it sits here |
-|---|---|
-| 0063 | A need is a rate with a threshold. The consumption pass implements it. |
+None. Every written record now binds. A record that arrives here binds nothing
+until a reviewer moves it, and this section names the ones waiting.
 
 ## Reserved and not written
 

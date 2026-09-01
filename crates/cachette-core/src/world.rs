@@ -737,7 +737,7 @@ impl World {
         // the store of the site it belongs to, and a founding is the one
         // place today that puts a unit and a site together.[^5]
         //
-        // [^5]: ADR-0063, a need is a rate with a threshold, and crossing it is a fact, decision D2. `docs/adrs/draft/adr-0063-a-need-is-a-rate-with-a-threshold-and-crossing-it-is-a-fact.md`
+        // [^5]: ADR-0063, a need is a rate with a threshold, and crossing it is a fact, decision D2. `docs/adrs/accepted/adr-0063-a-need-is-a-rate-with-a-threshold-and-crossing-it-is-a-fact.md`
         for person in &people {
             self.set_home_site(*person, Some(settlement));
         }
@@ -807,7 +807,7 @@ impl World {
     ///
     /// # References
     ///
-    /// [^1]: ADR-0063, a need is a rate with a threshold, and crossing it is a fact, decision D2. `docs/adrs/draft/adr-0063-a-need-is-a-rate-with-a-threshold-and-crossing-it-is-a-fact.md`
+    /// [^1]: ADR-0063, a need is a rate with a threshold, and crossing it is a fact, decision D2. `docs/adrs/accepted/adr-0063-a-need-is-a-rate-with-a-threshold-and-crossing-it-is-a-fact.md`
     #[must_use]
     pub const fn cohorts(&self) -> &CohortTable {
         &self.cohorts
@@ -1883,7 +1883,7 @@ impl World {
         // column, and it writes the need column, the deficit column and the
         // store column.
         //
-        // [^10]: ADR-0063, a need is a rate with a threshold, and crossing it is a fact, decision D5. `docs/adrs/draft/adr-0063-a-need-is-a-rate-with-a-threshold-and-crossing-it-is-a-fact.md`
+        // [^10]: ADR-0063, a need is a rate with a threshold, and crossing it is a fact, decision D5. `docs/adrs/accepted/adr-0063-a-need-is-a-rate-with-a-threshold-and-crossing-it-is-a-fact.md`
         self.consume(threads)?;
 
         // Level 1 rebuilds after the structure it reads, and after every
@@ -2190,7 +2190,7 @@ impl World {
     ///
     /// # References
     ///
-    /// [^1]: ADR-0063, a need is a rate with a threshold, and crossing it is a fact, decisions D1, D2 and D4. `docs/adrs/draft/adr-0063-a-need-is-a-rate-with-a-threshold-and-crossing-it-is-a-fact.md`
+    /// [^1]: ADR-0063, a need is a rate with a threshold, and crossing it is a fact, decisions D1, D2 and D4. `docs/adrs/accepted/adr-0063-a-need-is-a-rate-with-a-threshold-and-crossing-it-is-a-fact.md`
     /// [^2]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`
     /// [^3]: Findings register, FND-065. `docs/FINDINGS.md`
     fn consume(&mut self, threads: usize) -> Result<(), StepError> {

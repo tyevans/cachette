@@ -34,7 +34,7 @@
 //! # References
 //!
 //! [^1]: Research report 15, needs, consumption and the input-output economy, sections 4.2, 5.3, 6.3 and 6.4. `docs/research/reports/15-needs-consumption-and-economy.md`
-//! [^2]: ADR-0063, a need is a rate with a threshold, and crossing it is a fact, decision D2. `docs/adrs/draft/adr-0063-a-need-is-a-rate-with-a-threshold-and-crossing-it-is-a-fact.md`
+//! [^2]: ADR-0063, a need is a rate with a threshold, and crossing it is a fact, decision D2. `docs/adrs/accepted/adr-0063-a-need-is-a-rate-with-a-threshold-and-crossing-it-is-a-fact.md`
 //! [^3]: ADR-0009, parallel stages write disjoint outputs, decision D1. `docs/adrs/accepted/adr-0009-parallel-stages-write-disjoint-outputs.md`
 //! [^4]: Findings register, FND-016. `docs/FINDINGS.md`
 //! [^5]: ADR-0002, simulated and aggregated state holds no floating point number, decision D1. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
@@ -562,7 +562,7 @@ impl DrawPass {
 ///
 /// # References
 ///
-/// [^1]: ADR-0063, a need is a rate with a threshold, and crossing it is a fact, decision D3. `docs/adrs/draft/adr-0063-a-need-is-a-rate-with-a-threshold-and-crossing-it-is-a-fact.md`
+/// [^1]: ADR-0063, a need is a rate with a threshold, and crossing it is a fact, decision D3. `docs/adrs/accepted/adr-0063-a-need-is-a-rate-with-a-threshold-and-crossing-it-is-a-fact.md`
 pub fn draw(
     tick: Tick,
     ration: Fix32,

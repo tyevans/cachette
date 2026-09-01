@@ -247,7 +247,7 @@ pub struct SoldierArena {
     ///
     /// # References
     ///
-    /// [^1]: ADR-0063, a need is a rate with a threshold, and crossing it is a fact, decisions D1 and D2. `docs/adrs/draft/adr-0063-a-need-is-a-rate-with-a-threshold-and-crossing-it-is-a-fact.md`
+    /// [^1]: ADR-0063, a need is a rate with a threshold, and crossing it is a fact, decisions D1 and D2. `docs/adrs/accepted/adr-0063-a-need-is-a-rate-with-a-threshold-and-crossing-it-is-a-fact.md`
     needs: Vec<Fix32>,
     /// The deficit accumulator of each slot.
     ///
@@ -257,7 +257,7 @@ pub struct SoldierArena {
     ///
     /// # References
     ///
-    /// [^1]: ADR-0063, a need is a rate with a threshold, and crossing it is a fact, decision D4. `docs/adrs/draft/adr-0063-a-need-is-a-rate-with-a-threshold-and-crossing-it-is-a-fact.md`
+    /// [^1]: ADR-0063, a need is a rate with a threshold, and crossing it is a fact, decision D4. `docs/adrs/accepted/adr-0063-a-need-is-a-rate-with-a-threshold-and-crossing-it-is-a-fact.md`
     deficits: Vec<Fix32>,
     /// The site that each slot draws from, or `NO_HOME`.
     ///

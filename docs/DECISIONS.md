@@ -23,7 +23,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^ALLOC]
 
-**Next number: DEC-035**
+**Next number: DEC-037**
 
 [^ALLOC]: Findings register, FND-038. `docs/FINDINGS.md`
 
@@ -631,6 +631,51 @@ used 8-byte edges at mean degree 8, giving 33.6 MB at the ceiling. The real
 figure is 168 MB. The storage argument for vectors is stronger than the report
 concluded, and it called that argument its weakest.
 
+### DEC-035 — Does a settlement need a ground rule of its own?
+
+Item 0092 refuses a settlement the ground that cannot carry one, and it reads
+the passability of a tile to do it. Passability answers whether a unit may
+stand on a tile. It does not answer whether a place may be built there.
+
+The two questions come apart on ground a unit crosses and a settlement cannot
+occupy. A mountain is the obvious case. Today the project has one ground
+property, so the two answers are the same by accident rather than by decision.
+
+Item 0092 states this as out of scope and settles nothing, so the question
+would otherwise live only in an item body.[^DEC23]
+
+**Option A. One ground property.** A settlement stands wherever a unit stands.
+Cheapest, and it adds no second declaration site for the ground.[^DEC24]
+
+**Option B. A second suitability property on the tile kind.** A settlement
+reads its own rule. It answers the mountain case, and it prices every new
+ground kind at two values instead of one.
+
+**Assumption in the meantime:** option A. Item 0092 is written against the
+passability reader, so option B is a later widening and not a rewrite.
+
+### DEC-036 — How does a unit find the units of a lost site?
+
+A unit carries the slot of the site it belongs to. When a settlement is
+destroyed, every home naming that slot must be cleared, or the settlement
+founded next in that slot feeds a population it never took. The engine clears
+them by scanning every unit.[^DEC25]
+
+The scan is correct and it is the whole population for one destruction. No
+figure is stated here, because no measurement exists on the target
+platform.[^DEC18]
+
+**Option A. Keep the scan.** A destruction is rare, and the scan needs no
+second structure to maintain. It is one fact in one place.[^DEC24]
+
+**Option B. Carry a reverse index from a site to its units.** The clear
+touches only the units that named the site. It adds a structure that the spawn,
+the death and the home change must all maintain, and nothing fails when it
+disagrees with the home column.
+
+**Assumption in the meantime:** option A. Revisit when a rule destroys sites in
+bulk rather than one at a time.
+
 ## Closed
 
 None yet.
@@ -652,3 +697,6 @@ None yet.
 [^DEC20]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`
 [^DEC21]: Testing rules, section 2a. `.claude/rules/testing.md`
 [^DEC22]: PRD-0012, a world starts small and grows. `docs/product/shaped/prd-0012-a-world-starts-small-and-grows.md`
+[^DEC23]: Backlog item 0092. `docs/backlog/refined/0092-refuse-a-settlement-on-the-ground-that-cannot-carry-one.md`
+[^DEC24]: Recurring Defect Shapes, shape 1. `.claude/rules/recurring-defects.md`
+[^DEC25]: ADR-0014, entity identity is an index plus a generation, decision D7. `docs/adrs/accepted/adr-0014-entity-identity-is-an-index-plus-a-generation.md`
