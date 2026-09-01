@@ -27,11 +27,11 @@ engine gets wrong today.
 
 | No. | Why it sits here |
 |---|---|
+| 0094 | The owner has asked for multi-faction founding ahead of the rest of the queue. BLK-018 is answered and the engine still founds one.[^4] |
 | 0057 | A shortage must end a unit, or consumption has no consequence either. |
 | 0084 | Two values name a tile's owner, and the event log publishes the wrong one to Python.[^7] |
 | 0092 | A settlement stands on water. The owner has stated this is not wanted. |
 | 0102 | A settlement reads its own ground rule, not the passability rule. Blocked by 0071 and 0092, in that order. |
-| 0094 | BLK-018 is answered: every faction founds one group. The engine still founds one.[^4] |
 
 ## Next
 
