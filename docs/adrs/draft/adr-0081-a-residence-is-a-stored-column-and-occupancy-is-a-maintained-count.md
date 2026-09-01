@@ -66,12 +66,11 @@ The engine maintains a count of the residents of each site. The change that
 assigns a residence and the change that clears one both update it.
 
 **No pass over the units recomputes the count during a running frame.** That is
-the prohibition, and it is what makes the count worth storing. Two passes are
-permitted and neither is the maintenance path. A world that is restored rather
-than run has no history of changes to have maintained, so it derives the count
-from the residence column once, before the first frame. The check that guards
-the count also walks the units, because a check that read the same stored number
-it is checking would pass by construction.[^15]
+the prohibition, and it is what makes the count worth storing.
+
+One pass over the units is permitted, and it is not the maintenance path. The
+check that guards the count walks them, because a check that read the same
+stored number it is checking would pass by construction.[^15]
 
 This is a second declaration of a fact that the residence column already holds.
 The project accepts it here for two reasons that the tile case does not
@@ -103,6 +102,13 @@ the answer before a caller exists that pays for it.[^7] [^10]
 the candidate. That work states its own caller and writes its own record.
 
 ## Consequences
+
+**The count is reconstructible, and this record does not say when it would be.**
+The residence column determines the count, so nothing is lost by deriving it
+again. The engine holds no way to save or restore a world today, and this record
+therefore states no rule about one. A record that establishes persistence
+decides whether a derived value is stored or rebuilt, and it decides that for
+every derived value at once rather than for this one.
 
 **Losing a site costs a pass over the population.** Clearing every residence of
 a lost site reads every unit. A site is lost rarely, and the project takes that
