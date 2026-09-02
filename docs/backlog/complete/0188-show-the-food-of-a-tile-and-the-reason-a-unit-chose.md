@@ -145,10 +145,22 @@ engine closed and nothing could see.
 panel. The reasoning and the measurement are in the decisions register.[^10]
 The demonstration window is taller as well, which reaches further down.
 
+**One repair the work took on.** The over-full mark compared a tile against
+the capacity of the ground alone. A made way admits more units than any
+ground, so the mark appeared on a tile that admission had legitimately filled.
+The viewer now asks the engine's one reader of both tables, which is the
+reader admission composes from. The finding holds the fact, and it holds the
+repair.[^15]
+
 **What is not done.** The ground legend and the cost rows still fall below the
 edge of the demonstration window, as they did before this work. The panel
 needs a way to reach them, and the item that holds that work now sits in the
 Next block with a recommendation.[^14]
+
+**The stub value still has one reader.** The viewer no longer reads it. The
+level 1 cell summary still averages it and the `forage` option still scores
+that average, because items 0183 and 0184 are open. The retirement therefore
+stays with the item that follows them.[^13]
 
 **What the tests catch.** Each defect below was put back on its own, and the
 suite was run each time.
@@ -184,3 +196,4 @@ the height range within one kind is narrower than the food range.
 [^12]: Recurring Defect Shapes, shape 1. `.claude/rules/recurring-defects.md`
 [^13]: Backlog item 0194. `docs/backlog/proposed/0194-retire-the-tile-value-pass-when-nothing-reads-it.md`
 [^14]: Backlog item 0133. `docs/backlog/proposed/0133-let-a-watcher-reach-a-panel-longer-than-the-window.md`
+[^15]: Findings register, FND-193. `docs/FINDINGS.md`

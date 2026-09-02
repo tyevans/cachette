@@ -43,7 +43,7 @@ use cachette_core::cohort::NeedCondition;
 use cachette_core::founding::FoundingOutcome;
 use cachette_core::hex::NEIGHBOURS;
 use cachette_core::resource::ResourceKind;
-use cachette_core::terrain::{Terrain, TileKind, KIND_COUNT};
+use cachette_core::terrain::{TileKind, KIND_COUNT};
 use cachette_core::{Axial, BridgeError, Entity, FactionId, Holder, World};
 
 use crate::text;
@@ -1325,7 +1325,6 @@ fn draw_soldiers(
     last_row: u32,
 ) -> Result<(), BridgeError> {
     let arena = world.soldiers();
-    let terrain = world.terrain();
     let bridge = world.bridge();
     let layout = bridge.layout();
     let edge = layout.block_edge();
@@ -1443,12 +1442,12 @@ fn draw_soldiers(
                 match run {
                     Some((held, count)) if held == address => run = Some((held, count + 1)),
                     other => {
-                        close_run(canvas, terrain, camera, tile_side, other);
+                        close_run(canvas, world, camera, tile_side, other);
                         run = Some((address, 1));
                     }
                 }
             }
-            close_run(canvas, terrain, camera, tile_side, run);
+            close_run(canvas, world, camera, tile_side, run);
         }
     }
     Ok(())
@@ -1469,11 +1468,17 @@ fn reach_from_middle(canvas: &Canvas, x: f32, y: f32) -> i64 {
 }
 
 /// Records what one tile's run of painted units means, and marks the tile
-/// when the run is longer than the ground admits.
+/// when the run is longer than the tile admits.
 ///
-/// The capacity comes from the terrain reader. The viewer holds no capacity
-/// value, so the ground states the rule in one place and a change there
-/// reaches the picture with no edit here.[^1]
+/// **The capacity is the composition of the ground and the finished upgrade,
+/// not the ground alone.** A made way states a capacity above every value in
+/// the terrain table, so a tile that admission legitimately filled to that
+/// number would take an over-full mark from the ordinary capacity onward. The
+/// mark would then say that a correctly filled tile is broken.[^2]
+///
+/// The viewer asks the engine's one reader of the two tables, which is the
+/// reader admission itself composes from. The viewer holds no capacity value,
+/// so a change to either table reaches the picture with no edit here.[^1] [^3]
 ///
 /// A tile with no painted unit closes no run, so an empty tile is neither
 /// counted nor marked.
@@ -1481,9 +1486,11 @@ fn reach_from_middle(canvas: &Canvas, x: f32, y: f32) -> i64 {
 /// # References
 ///
 /// [^1]: ADR-0056, movement is tile-discrete and admitted by sort-then-admit, decision D4. `docs/adrs/accepted/adr-0056-movement-is-tile-discrete-and-admitted-by-sort-then-admit.md`
+/// [^2]: Findings register, FND-193. `docs/FINDINGS.md`
+/// [^3]: ADR-0090, a tile upgrade is stored sparsely, as the difference from the generated world, decision D3. `docs/adrs/draft/adr-0090-a-tile-upgrade-is-stored-sparsely.md`
 fn close_run(
     canvas: &mut Canvas,
-    terrain: Terrain,
+    world: &World,
     camera: Camera,
     tile_side: i32,
     run: Option<(Axial, u32)>,
@@ -1492,10 +1499,9 @@ fn close_run(
         return;
     };
     canvas.crowd_worst = canvas.crowd_worst.max(count);
-    let Some(ground) = terrain.tile(address) else {
+    let Some(capacity) = world.tile_capacity(address) else {
         return;
     };
-    let capacity = ground.kind.capacity();
     if count >= capacity {
         canvas.tiles_at_capacity += 1;
     }

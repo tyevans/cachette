@@ -4527,10 +4527,17 @@ a site should follow the composed capacity, and whether the fold should walk
 both tables, is a register row with a backlog item behind it.[^F193F]
 
 **A fourth caller was found later, and it is the one a person sees.** The
-drawing pass counts a painted tile as at its capacity against the ground alone,
-and paints an over-full marker above that number. A watcher would therefore
-read a correctly filled made way as over-full. It enforces nothing, because the
+drawing pass counted a painted tile as at its capacity against the ground
+alone, and painted an over-full marker above that number. A watcher therefore
+read a correctly filled made way as over-full. It enforced nothing, because the
 viewer never writes to the world.[^F193G] [^F193H]
+
+**That caller was not a judgement, and it is repaired.** The viewer asks the
+same question admission asks, so it now calls the same composition. Two tests
+hold it: one fills a roaded tile above the ground and below the road and
+asserts no mark, and one fills it above the road and asserts the mark. The
+first fails when the ground reader is put back. This changes nothing about the
+register row, which is about the three callers that ask a different question.
 
 ### FND-197 — Accepting a record breaks every citation of it
 
@@ -4566,6 +4573,7 @@ each. That is the opposite of the incentive the project wants.
 **The choice is a judgement and it is in the register.** Whether a citation
 should name the directory at all, and what a stable path would look like, is
 an open row.[^F197C]
+
 
 
 ### FND-194 — The record check reports no source citation inside a worktree

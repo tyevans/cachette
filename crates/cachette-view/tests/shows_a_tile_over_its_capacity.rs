@@ -40,6 +40,8 @@
 
 use std::time::Duration;
 
+use cachette_core::terrain::TileKind;
+use cachette_core::upgrade::UpgradeKind;
 use cachette_core::{Axial, FactionId, World, WorldConfig};
 use cachette_view::{draw_frame, paint, Camera, Canvas, Metrics};
 
@@ -118,14 +120,19 @@ fn crowded_world() -> (World, Crowd) {
     )
 }
 
-/// Returns the number of units the ground of one tile admits.
+/// Returns the number of units one tile admits.
+///
+/// The engine holds one reader of the ground table and the upgrade table
+/// together, and admission composes from the same one. The test asks that
+/// reader, so it cannot state a capacity the engine would not.[^1]
+///
+/// # References
+///
+/// [^1]: Findings register, FND-193. `docs/FINDINGS.md`
 fn capacity_of(world: &World, address: Axial) -> u32 {
     world
-        .terrain()
-        .tile(address)
+        .tile_capacity(address)
         .expect("the tile lies inside the world")
-        .kind
-        .capacity()
 }
 
 /// Returns every address of a world that admits a unit, in index order.
@@ -317,4 +324,154 @@ fn a_drawn_frame_leaves_the_crowded_world_where_it_found_it() {
     );
 
     assert_eq!(hash, world.state_hash(), "the drawing moved the world");
+}
+
+/// Returns the number of units the ground of one tile admits, before any
+/// upgrade.
+///
+/// The road test needs both answers, so that it can put a crowd between them.
+/// No other caller in this file wants the ground alone.[^1]
+///
+/// # References
+///
+/// [^1]: Findings register, FND-193. `docs/FINDINGS.md`
+fn ground_capacity_of(world: &World, address: Axial) -> u32 {
+    world
+        .terrain()
+        .tile(address)
+        .expect("the tile lies inside the world")
+        .kind
+        .capacity()
+}
+
+/// Builds a world in which one tile carries a finished made way.
+///
+/// The road comes from the engine's own build pass, driven by a unit that
+/// carries a build order. A test that wrote an upgrade into the world by hand
+/// would prove that the viewer reads a field, and not that the viewer agrees
+/// with the engine that raised it.[^1]
+///
+/// The builder is removed after the road finishes, so the crowd the caller
+/// spawns is the whole crowd on the tile.
+///
+/// # References
+///
+/// [^1]: Testing rules, section 5. `.claude/rules/testing.md`
+fn a_world_with_a_road() -> (World, Axial) {
+    let mut world = World::new(WorldConfig {
+        width: 24,
+        height: 24,
+        seed: 11,
+        faction_count: 1,
+        unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
+    })
+    .expect("the extent describes a world");
+
+    // Ordinary ground, away from the edge, so the mark of this tile cannot
+    // reach the edge of the canvas.
+    let place = *open_tiles(&world)
+        .iter()
+        .find(|address| {
+            world.tile_kind(**address) == Some(TileKind::Plain)
+                && address.q > 4
+                && address.r > 4
+                && address.q < 20
+                && address.r < 20
+        })
+        .expect("the fixture world holds open plain ground");
+
+    let builder = world
+        .spawn_soldier(place, FactionId(0))
+        .expect("the ground admits a unit");
+    world.rebuild_bridge(1).expect("the rebuild must succeed");
+    assert!(
+        world.order_build(builder, UpgradeKind::Road),
+        "the engine must accept the order"
+    );
+    for _ in 0..40 {
+        world.step(1).expect("the step must run");
+        // The builder may walk away, and a tile with no builder makes no
+        // progress. Put it back, so the road finishes.
+        world
+            .place_soldier(builder, place)
+            .expect("the tile admits the unit");
+    }
+    assert_eq!(
+        world.finished_upgrade(place),
+        Some(UpgradeKind::Road),
+        "the fixture must finish the road, or it tests nothing"
+    );
+    assert!(world.despawn_soldier(builder), "the builder must go");
+    world.rebuild_bridge(1).expect("the rebuild must succeed");
+
+    (world, place)
+}
+
+#[test]
+fn a_road_lets_a_tile_hold_more_before_the_mark_appears() {
+    // The mark must read the capacity that admission reads, which composes
+    // the ground with the finished upgrade. A viewer that read the ground
+    // alone would paint an over-full mark on a tile that admission
+    // legitimately filled, and a watcher would read a correct tile as
+    // broken.[^1]
+    //
+    // [^1]: Findings register, FND-193. `docs/FINDINGS.md`
+    let (mut world, place) = a_world_with_a_road();
+    let ground = ground_capacity_of(&world, place);
+    let admitted = capacity_of(&world, place);
+    // The fixture asserts its own outcome. A road that did not finish leaves
+    // the two capacities equal, and every assertion below then holds for a
+    // viewer that reads the ground alone.[^2]
+    //
+    // [^2]: Testing rules, section 2a. `.claude/rules/testing.md`
+    assert!(
+        admitted > ground,
+        "the road must raise what the tile admits: {admitted} against {ground}"
+    );
+
+    // More units than the ground admits, and fewer than the road admits.
+    let crowd = ground + 1;
+    assert!(crowd < admitted, "the fixture must sit between the two");
+    for _ in 0..crowd {
+        world
+            .spawn_soldier(place, FactionId(0))
+            .expect("the ground admits a unit");
+    }
+    world.rebuild_bridge(1).expect("the rebuild must succeed");
+
+    let (canvas, camera) = draw_all(&world);
+    assert_eq!(
+        canvas.crowd_worst(),
+        crowd,
+        "the frame must paint every unit of the crowd"
+    );
+    assert_eq!(
+        canvas.tiles_at_capacity(),
+        0,
+        "a roaded tile below what it admits is not at its capacity"
+    );
+    assert!(
+        !marked(&canvas, camera, place, paint::over_capacity_colour()),
+        "a roaded tile holding {crowd} of {admitted} must carry no over-full mark"
+    );
+}
+
+#[test]
+fn a_road_does_not_stop_the_mark_when_the_tile_is_truly_over_full() {
+    // The repair must not remove the mark. A roaded tile above what the road
+    // admits still carries it.
+    let (mut world, place) = a_world_with_a_road();
+    let admitted = capacity_of(&world, place);
+    for _ in 0..admitted + 2 {
+        world
+            .spawn_soldier(place, FactionId(0))
+            .expect("the ground admits a unit");
+    }
+    world.rebuild_bridge(1).expect("the rebuild must succeed");
+
+    let (canvas, camera) = draw_all(&world);
+    assert!(
+        marked(&canvas, camera, place, paint::over_capacity_colour()),
+        "a tile holding more than the road admits must carry the mark"
+    );
 }
