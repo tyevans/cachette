@@ -1033,11 +1033,11 @@ pub fn draw(world: &World, camera: Camera, canvas: &mut Canvas) -> Result<(), Br
             // painted, on the loop that already runs. The layer starts no
             // pass of its own.[^3]
             //
-            // This reads the holder of the world. It never reads the tile
-            // faction column of the stub system, which is written when the
-            // world is built, never changes, and is not a holder. A layer
-            // that drew that column would give a full, still map of holdings
-            // that no rule ever made.[^4]
+            // The holder is the one value that names the faction which owns
+            // a tile, and the layer reads it. A layer that derived a faction
+            // from the tile index instead would give a full, still map of
+            // holdings that no rule ever made, and it would tint open water,
+            // which no faction ever holds.[^4]
             let holder = world.tile_holder(address);
             canvas.holder_reads += 1;
             match holder.and_then(Holder::faction) {

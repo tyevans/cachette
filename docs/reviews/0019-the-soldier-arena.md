@@ -1,5 +1,13 @@
 # Review 0019: the soldier arena
 
+> **The tile faction column is gone.** Backlog item 0084 removed it, with the
+> construction loop that filled it and the clause of the world invariant check
+> that read it.[^12] Finding 1 below names that clause as the third
+> declaration site of the faction ceiling. Two sites remain, and they are the
+> project ceiling constant and the faction count of the world settings. The
+> review text is left as it was written, because it reports the commit it
+> read.
+
 ## What was reviewed
 
 Commit `2d119be`, "Implement the soldier arena, and give the golden test a
@@ -739,3 +747,4 @@ The verdict is ACCEPT WITH AMENDMENT. These are the changes.
 [^9]: Recurring defect shapes. `.claude/rules/recurring-defects.md`
 [^10]: Testing rules. `.claude/rules/testing.md`
 [^11]: Reviews index. `docs/reviews/README.md`
+[^12]: Backlog item 0084, give a tile one faction column. `docs/backlog/complete/0084-give-a-tile-one-faction-column.md`

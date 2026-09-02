@@ -18,7 +18,8 @@
 
 use bytemuck::{Pod, Zeroable};
 
-use crate::types::{FactionId, Fix32, Tick, TileIdx};
+use crate::holding::Holder;
+use crate::types::{Fix32, Tick, TileIdx};
 
 /// A unit took an amount from a tile.
 ///
@@ -99,8 +100,16 @@ pub struct TileChanged {
     pub tile: TileIdx,
     /// The value after the change.
     pub value: Fix32,
-    /// The faction that owns the tile.
-    pub faction: FactionId,
+    /// Who holds the tile, as the step left it.
+    ///
+    /// The value names a faction, or nobody. The holder type states the value
+    /// for nobody, and that value sits above the faction ceiling, so no
+    /// faction collides with it.[^2]
+    ///
+    /// # References
+    ///
+    /// [^2]: ADR-0053, a faction is a bit in a mask, and a relation is a plane, decision D2. `docs/adrs/accepted/adr-0053-a-faction-is-a-bit-in-a-mask-and-a-relation-is-a-plane.md`
+    pub holder: Holder,
     /// The kind of change.
     pub kind: ChangeKind,
     /// The declared padding. Always zero.
@@ -114,14 +123,14 @@ impl TileChanged {
         tick: Tick,
         tile: TileIdx,
         value: Fix32,
-        faction: FactionId,
+        holder: Holder,
         kind: ChangeKind,
     ) -> Self {
         Self {
             tick,
             tile,
             value,
-            faction,
+            holder,
             kind,
             padding: [0; 5],
         }
