@@ -3676,7 +3676,6 @@ fn update_range(
     let mut result = ChunkResult::default();
     let mut cursor = 0usize;
     for index in start..end {
-        let value = range.value(TileIdx(index), &mut cursor);
         let raw = rng::draw_below(seed, rng::SYSTEM_TILE_STUB, tick.0, u64::from(index), 0, 8);
         if raw >= 4 {
             continue;
@@ -3685,6 +3684,11 @@ fn update_range(
         if delta.0 == 0 {
             continue;
         }
+        // The value is read here and not at the top of the loop, because a
+        // tile the draw did not choose needs no value. The cursor only moves
+        // forward, and the loop visits the tiles in ascending order, so a
+        // skipped tile costs the cursor nothing.
+        let value = range.value(TileIdx(index), &mut cursor);
         let updated = sim_math::add(value, delta);
         result.changes.push((index, delta));
         let kind = if delta.0 > 0 {
