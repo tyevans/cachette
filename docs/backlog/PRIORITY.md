@@ -45,6 +45,7 @@ These close a gap a review found, or they unblock the items above.
 | 0080 | The settings struct prices every new parameter at twenty-five files. |
 | 0130 | Three registers state a next number that the rows already hold, and it went stale and conflicted four times in one night. |
 | 0101 | A behavioural claim about terrain is defended by a test of constants.[^7] |
+| 0155 | Every test fixture builds its own world by hand, and the rule that forbids the easy route has no shared answer. |
 
 ## Later
 
