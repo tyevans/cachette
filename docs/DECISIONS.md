@@ -23,9 +23,75 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^ALLOC]
 
-**Next number: DEC-056**
+**Next number: DEC-058**
 
 ## Open
+
+### DEC-057 — Does a site store its resident count, or read the one the engine keeps?
+
+**Open. The recommendation is to read the count the engine already keeps.**
+
+Housing needs the number of units that live at a site. A review of the housing
+draft found that the engine answers the question today.[^FND128] The cohort
+table holds one row for each faction at each site, and each row holds a
+headcount derived from the home column of the soldier arena. The residents of a
+site are the sum of its rows.
+
+**The options.**
+
+1. Read the resident count from the cohort table. Nothing new is stored. The
+   table is rebuilt inside the consumption pass, so a reader between frames sees
+   the count the frame settled on.
+2. Store a per-site occupancy count and maintain it by the change, with a check
+   that fails when it disagrees with the home column. This is what the housing
+   draft states.
+3. Store the count and retire the cohort headcount, so that one site holds the
+   fact.
+
+**The recommendation is option 1.** It adds no declaration site. Option 2 makes
+three sites hold one fact, and a check between two copies does not guard
+three.[^SHAPE1] Option 3 is coherent, but the cohort headcount is split by
+faction and the pooled draw needs that split, so retiring it moves the cost
+rather than removing it.
+
+**What holds it back.** The reader must be reached through the public interface,
+and the cohort table is not exposed for this purpose today. Option 1 therefore
+needs a reader, not a store.
+
+**What follows either way.** The housing draft states decision D3 as option 2,
+and it must be rewritten against whatever this row decides.[^ADR81]
+
+### DEC-056 — May a decision record cite a product requirement record?
+
+**Open. The recommendation is to drop the rule.**
+
+The product guide states that a decision record cites no product requirement
+record, and the project orientation repeats it. Nothing checks the rule, and
+four accepted records break it.[^FND129]
+
+**The options.**
+
+1. Drop the rule. A decision record may cite a product record for the need that
+   made a choice hard. The backlog item stays the place that names what work
+   serves what need.
+2. Keep the rule and enforce it. Repair the four accepted records, and add a
+   check that fails a decision record which names a product file.
+3. Keep the rule for the reasoning and admit the citation in a consequence. A
+   record may say that a decision falsifies a product statement, and it may not
+   rest a decision on one.
+
+**The recommendation is option 1.** The reason the rule gives is that a product
+direction changes more often than a constraint does. That reason is sound, and
+the records that break the rule do not show the harm it predicts: each cites a
+product record for a need that is stable, and none quotes a figure from one. A
+rule that nobody follows and nothing checks is worse than no rule, because it
+gives a reviewer an objection that the project will not support.
+
+Option 3 is the honest reading of what the records actually do, and it is the
+second choice. It costs a rule that a check cannot express.
+
+**What holds it back.** Nothing. Work continues under any option, and only the
+prose of the records moves.
 
 ### DEC-044 — Should the default ration be above the decay?
 
@@ -960,6 +1026,9 @@ a failed founding is correct.[^PRD12]
 [^ADR14D7]: ADR-0014, entity identity is an index plus a generation, decision D7. `docs/adrs/accepted/adr-0014-entity-identity-is-an-index-plus-a-generation.md`
 [^BLK18]: Blockers register, BLK-018. `docs/BLOCKERS.md`
 [^ITEM0094]: Backlog item 0094. `docs/backlog/complete/0094-decide-how-many-groups-found-a-world.md`
+[^FND128]: Findings register, FND-128. `docs/FINDINGS.md`
+[^FND129]: Findings register, FND-129. `docs/FINDINGS.md`
+[^ADR81]: ADR-0081, a residence is a stored column and occupancy is a maintained count, decision D3. `docs/adrs/draft/adr-0081-a-residence-is-a-stored-column-and-occupancy-is-a-maintained-count.md`
 [^ADR75]: ADR-0075, the founding choice reads a bounded sample of the world. `docs/adrs/accepted/adr-0075-the-founding-choice-reads-a-bounded-sample-of-the-world.md`
 <<<<<<< HEAD
 [^FND106]: Findings register, FND-106. `docs/FINDINGS.md`

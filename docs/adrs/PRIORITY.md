@@ -38,8 +38,8 @@ A record here binds nothing until a reviewer moves it.
 | No. | What it claims |
 |---|---|
 | 0076 | A founding keeps a fixed distance from the foundings before it, a run founds in ascending faction index, and the faction fills the frame slot of the draw key. Backlog item 0094 wrote it, and the code it describes exists. |
-| 0081 | Housing. Nothing in the queue can bound a population until this is settled. Read it against ADR-0074 D3, which answers the tile case the other way. |
-| 0082 | Population growth. It depends on 0081, so review 0081 first. |
+| 0081 | Housing. A review returned it: the engine already holds the per-site count that its decision D3 asks the project to store.[^12] An open row holds the choice that follows.[^13] It reads against ADR-0074 D3 correctly, and that objection failed. |
+| 0082 | Population growth. A review found its own decisions sound and returned it, because it rests on the free places of 0081.[^12] It moves when 0081 moves. |
 | 0080 | Recovery of a depleted deposit. The code exists and the record was written with it. A reviewer should read the cost claim first: the pass reads the depleted set and takes no tile count.[^11] |
 
 ## Reserved and not written
@@ -74,3 +74,5 @@ plainly that nothing implements it yet.[^1]
 [^9]: Decisions register, DEC-014. `docs/DECISIONS.md`
 [^10]: Backlog item 0123. `docs/backlog/refined/0123-recover-a-depleted-deposit-without-a-pass-over-the-world.md`
 [^11]: Backlog item 0123. `docs/backlog/complete/0123-recover-a-depleted-deposit-without-a-pass-over-the-world.md`
+[^12]: Review 0143, the housing, growth, founding and recovery records. `docs/reviews/0143-the-housing-growth-founding-and-recovery-records.md`
+[^13]: Decisions register, DEC-057. `docs/DECISIONS.md`

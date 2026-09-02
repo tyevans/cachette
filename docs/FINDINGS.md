@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-125**
+**Next number: FND-131**
 
 ## A. Corrections to stated rules
 
@@ -2769,6 +2769,101 @@ green suite. The test that closes it removes the rate and watches the population
 end, which is the only proof that the assertion reaches the case.[^71]
 
 
+### FND-128 — The engine already counts who lives at a site
+
+**Believed.** Nothing states how the engine answers how many units a site
+holds. A record therefore has to decide whether to store an occupancy count
+and maintain it by the change. Draft ADR-0081 states the belief in its context
+and builds decision D3 on it.
+
+**True.** The engine answers the question today. The cohort table holds one row
+for each faction at each site, and each row holds a headcount. The residents of
+one site are the sum of its rows. The table is derived from the home column of
+the soldier arena, which is the residence.[^72] Every unit that can hold a
+residence is a soldier, because the character arena holds no home column, so the
+headcount is the whole resident count and not a part of it.
+
+The prohibition of the draft therefore lands wrongly. It forbids a pass over the
+units that recomputes the count inside a running frame. The consumption pass
+does exactly that, twice in one frame: once before the pooled draw, and once
+after the scan that ends a starved unit. Each rebuild walks the whole home
+column.
+
+**Evidence.** `CohortTable::rebuild` takes the home column, the faction column,
+the live column and the site count, and it increments a headcount for each live
+unit that names a site. `World::consume` calls it twice. `CohortTable::headcount`
+returns the row of one faction at one site. The character arena holds no field
+named for a home or for a site.
+
+**Follows.** Three things.
+
+**A stored occupancy count would be the third declaration of one fact**, not the
+second. The home column holds it, the cohort table summarises it, and a
+maintained count would hold it again. The draft prices the cost as one extra
+site, and a check between two copies does not guard three.[^73]
+
+**The caller the draft names is already served.** A birth admission runs after
+the consumption pass, so the cohort table is settled where the admission reads
+it.
+
+**A record must be read against the code before it is accepted, and the reading
+must go past the module the record is about.** The residence work is in the
+settlement module and the soldier module. The count that falsifies the premise is
+in the consumption module, which the draft never names.
+
+### FND-129 — A stated rule bans a citation that four accepted records make
+
+**Believed.** A decision record cites no product requirement record. The rule is
+stated twice, in the project orientation and in the product guide, and it gives
+a reason: a product direction changes more often than a constraint does, so a
+decision record must not rest on one.[^74]
+
+**True.** No script checks the rule, and the project does not follow it.
+ADR-0064, ADR-0067, ADR-0074 and ADR-0075 are accepted and each cites a product
+record. Three of the four drafts under review cite one. In draft ADR-0081 the
+product record carries the whole justification of decision D1.
+
+**Evidence.** `scripts/check_prds.py` fails a product record that cites a
+decision record. Nothing checks the other direction. A search of the accepted
+records for the product file prefix returns four files.
+
+**Follows.** Two things.
+
+**A reviewer cannot reject a draft on this ground alone.** The accepted
+precedent runs the other way, and a rule applied to new work but not to the work
+already accepted is a rule that punishes whoever arrives last.
+
+**The project must choose.** Either the rule holds, and the four accepted
+records need repair under supersession or the retcon window, or the rule is
+wrong and the guide must drop it. An open row holds the choice.[^75]
+
+### FND-130 — Two footnote rules are stated, are broken, and are checked by nothing
+
+**Believed.** The record check catches the mechanical part of the documentation
+rule, so a record that passes the gate follows the footnote rules.
+
+**True.** The documentation rule states that footnotes are numbered in the order
+they occur in the body, and that a footnote is never repeated.[^76] The record
+check tests neither. Three of the four drafts reviewed break one or both, and
+the gate passed on all three.
+
+**Evidence.** In draft ADR-0081 footnote 15 names the source that footnote 7
+already names, and no footnote 14 exists. In draft ADR-0082 footnote 20 names the
+source that footnote 5 already names, and footnotes 19 and 20 occur before
+footnotes 12 to 18. In draft ADR-0076 footnote 8 first occurs after footnote 9.
+`just records` reported no failure for any of them.
+
+**Follows.** Two things.
+
+**A gate that passes is not evidence that a rule holds.** It is evidence that the
+rules the gate encodes hold. The gap between the two is where a written rule goes
+quiet.
+
+**The check is cheap and the repair is not.** A duplicate footnote is invisible
+to a reader, and it produces two labels that a later edit can move apart. A
+backlog item adds the check.
+
+
 ## References
 
 [^1]: Findings register, FND-038, in this document.
@@ -2842,3 +2937,8 @@ end, which is the only proof that the assertion reaches the case.[^71]
 [^69]: ADR-0073, gathering is admitted by sort-then-admit against the tile. `docs/adrs/accepted/adr-0073-gathering-is-admitted-by-sort-then-admit-against-the-tile.md`
 [^70]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`
 [^71]: Testing rules, section 2a. `.claude/rules/testing.md`
+[^72]: Findings register, FND-116, in this document.
+[^73]: Recurring Defect Shapes, shape 1. `.claude/rules/recurring-defects.md`
+[^74]: Product requirement records, what does not belong here. `docs/product/README.md`
+[^75]: Decisions register, DEC-056. `docs/DECISIONS.md`
+[^76]: Documentation Rules, section 3. `.claude/rules/documentation.md`
