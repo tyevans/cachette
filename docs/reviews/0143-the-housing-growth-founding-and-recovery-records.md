@@ -271,7 +271,12 @@ The repair keeps the constraint and drops the inventory:
 ## 5. Objections attempted
 
 A review that lists no attempted objection did not happen.[^6] These are the
-objections the reviewer raised, and what happened to each.
+objections the reviewer raised against the decisions, and what happened to each.
+
+The reviewer attempted twenty-four objections across the four records, and nine
+held. Sixteen are below. The other eight are in sections 1 to 4, because each
+one produced a rejection or an amendment: three against ADR-0081, two against
+ADR-0082, two against ADR-0080, and one against ADR-0076.
 
 ### Against ADR-0076
 
