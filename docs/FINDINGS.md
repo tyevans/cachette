@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-139**
+**Next number: FND-147**
 
 ## A. Corrections to stated rules
 
@@ -1161,6 +1161,49 @@ determinism test cannot tell correct from consistently wrong, and that a
 determinism test must be able to fail. Those are properties of the assertion.
 This is a property of the input. An assertion strong enough to catch the
 defect still catches nothing when the data never produces it.
+
+### FND-146 — A check across a boundary can be a tautology that reads as a cross-check
+
+**Believed.** A test that compares two views of one thing is a cross-check. If
+the engine hands a caller the same log twice, once as bytes and once as
+columns, then comparing the two proves the views agree, and the test fails when
+they stop agreeing.
+
+**True.** A comparison proves something only when both sides can be computed
+independently. A caller that holds one of the two views and no description of
+the other cannot compute the second side, so it compares a value against
+something derived from that same value. The comparison then holds for every
+input and fails for none.
+
+**Evidence.** A test of the new event columns compared the number of rows in a
+column against the length of the raw byte buffer, to prove the columns describe
+the same log the bytes do. Python holds no layout of an event, deliberately,
+because holding one is the defect the work removes. It therefore cannot know
+the width of an event. The assertion reduced to whether the byte length divides
+by the event count, which is whether a length divides itself. **No change to
+the layout, to the field order, or to the columns could have made it fail.**
+
+The shape is worse than an ordinary weak test, because the tautology was
+invisible. The test named two sources, read from both, and looked like the one
+check that guards a second declaration site.
+
+The same session produced a second instance in another subsystem: a terrain
+assertion that read two constants and never exercised the rule between them.
+
+**Follows.** Three things.
+
+**A test that cannot fail is worse than no test.** It occupies the place a real
+test would take and reports success forever. A missing test is visible to
+anyone who looks for it.
+
+**Before writing a comparison, name what computes each side.** If one side is
+derived from the other, the test measures nothing. If the caller cannot compute
+the second side at all, then the check belongs on the side of the boundary that
+can, or it does not belong.
+
+**A boundary drawn to remove a second declaration site removes the ability to
+check that site from outside.** That is the cost of the boundary and it is
+correct. Do not buy the check back by smuggling the layout into the test.
 
 ### FND-052 — A register was restored from a copy, and an entry left silently
 

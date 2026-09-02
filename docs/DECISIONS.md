@@ -30,21 +30,30 @@ precedent.[^ALLOC]
 ### DEC-063 — Which verb puts a unit in the world from the control plane?
 
 **Open. The recommendation is to expose the founding run as the verb a caller
-should reach for, and to keep the per-unit pair for the case founding cannot
-reach.**
+should reach for, to keep the per-unit pair for the case founding cannot reach,
+and to state in the package that the pair does not scale.**
 
-The bindings now spawn one soldier, order it to gather, and remove it. Each
-call names one unit. The work that added them needed a unit in the world,
-because the gather event names a unit and nothing on the Python side could
-make one. A column that nothing can fill is an inert capability.[^SHAPE3]
+**The tension, stated plainly.** The design principle says Python builds a
+selector and sends one command, that Rust resolves the selector and runs the
+verb, and that Python never loops over entities.[^ORIENT] The bindings now hold
+three verbs that each name one unit: spawn one soldier, order one soldier to
+gather, and remove one soldier.
 
-**Why this is a question.** The design principle says Python builds a selector
-and sends one command, and that Python never loops over entities.[^ORIENT] A
-per-unit spawn verb does not break that rule on its own. A caller that builds a
-population with it does, and nothing today refuses that caller. The verb is
-also lower than the engine's own path: a real run seats a group through the
-founding, which is one command for a set and is therefore the shape the rule
-asks for.[^DEC63A]
+**A soldier is the mass tier.** The shape declares it, and the reason it gives
+is that a soldier is one of a million, so no caller walks the
+population.[^DEC63E] The mass tier is the tier the no-loop rule exists to
+protect, and a reserved record says the API should refuse the loop for
+it.[^DEC63F] These three verbs are the loop, one call at a time.
+
+**The evidence is in this project's own test.** The test that proves a gather
+event names a unit spawns a unit on each open tile of a sixteen by sixteen
+world and calls the order verb once for each of them. That test is a Python
+loop over mass-tier entities. It was the only way to reach the case, which is
+the argument for the verbs and the argument against them at once.
+
+**Why the verbs exist.** The work that added them needed a unit in the world,
+because the gather event names a unit and nothing on the Python side could make
+one. A column that nothing can fill is an inert capability.[^SHAPE3]
 
 **The options.**
 
@@ -57,20 +66,27 @@ asks for.[^DEC63A]
 
 **The recommendation is option 2.** Option 1 was tried against the code and
 does not hold today. **A founding never frees a slot that a later founding
-reuses.** The only death path is starvation, and reaching it from the control
-plane needs a large world, a long run, and a verb that removes the production
-rate the founding set.[^DEC63B] The identity rule this work exists to protect
-is exactly the reuse case, so a boundary that cannot reach it cannot be tested
-at that boundary.[^DEC63C]
+reuses.** Its only despawn is the rollback of a founding that failed, which
+leaves nothing to observe. The one real death path is starvation, and reaching
+it from the control plane needs a large world, a long run, and a verb that
+removes the production rate the founding set.[^DEC63B] The identity rule this
+work exists to protect is exactly the reuse case, so a boundary that cannot
+reach it cannot be tested at that boundary.[^DEC63C]
 
 Option 3 leaves the engine's own population path unreachable from the control
-plane. Option 4 puts one verb in two places and states no rule a reader can
-check.
+plane, and it leaves the loop with no alternative to point a caller at. Option 4
+puts one verb in two places and states no rule a reader can check.
+
+**What the recommendation costs.** It ships a verb that the tier rule says the
+API should refuse. That is a real cost and not a rounding error: the rule is
+weakest at the moment a convenient verb exists and nothing refuses it. Option 2
+is worth taking only if the package says the pair does not scale and names the
+founding run as the verb for a population.
 
 **What holds it back.** Nothing technical. The verbs exist and work. The
-question is what the project promises about them, and that promise decides
-whether a later selector API has to take the per-unit verb back. A backlog item
-holds the work of exposing the founding run.[^DEC63D]
+question is what the project promises, and the answer decides whether a later
+selector API has to take the pair back after callers depend on it. A backlog
+item holds the work of exposing the founding run.[^DEC63D]
 
 ### DEC-057 — Does a site store its resident count, or read the one the engine keeps?
 
@@ -1153,6 +1169,8 @@ a failed founding is correct.[^PRD12]
 [^DEC63B]: The founded group tests. `crates/cachette-core/tests/founded_group_survives.rs`
 [^DEC63C]: ADR-0085, an entity crosses to Python as one opaque identity that the engine resolves, decision D3. `docs/adrs/draft/adr-0085-an-entity-crosses-to-python-as-one-opaque-identity.md`
 [^DEC63D]: Backlog item 0161. `docs/backlog/proposed/0161-let-the-control-plane-found-a-group.md`
+[^DEC63E]: ADR-0054, an entity belongs to one of three tiers, declared at creation, decision D1. `docs/adrs/accepted/adr-0054-an-entity-belongs-to-one-of-three-tiers-declared-at-creation.md`
+[^DEC63F]: ADR Registry, row 0043. `docs/adrs/REGISTRY.md`
 [^TEST2A]: Testing rules, section 2a. `.claude/rules/testing.md`
 [^PRD12]: PRD-0012, a world starts small and grows. `docs/product/accepted/prd-0012-a-world-starts-small-and-grows.md`
 [^FND022]: Findings register, FND-022. `docs/FINDINGS.md`
