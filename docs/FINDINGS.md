@@ -2808,6 +2808,15 @@ reads as success. This is the shape the testing rule states for a determinism
 probe, applied to an ordinary test: a probe must prove that the assertion can
 see the defect, and not only that something can go red.[^73]
 
+**Write the failure message so that it names which assertion failed, and on
+what numbers.** A red run says only that something went red. It does not say
+which rule caught the defect, and under a perturbation that moves two inputs
+at once the wrong assertion is the one that fires. This is what made the
+correction above findable: the replacement test prints the counts of the two
+kinds it compared, so a reader sees that the behaviour was measured. A bare
+assertion goes red under the flattened thresholds as well, and the run reads
+as a pass of the experiment.
+
 The item that carried this correction listed the flattening as its acceptance
 condition, and so did the brief that dispatched it. Neither would have been
 wrong about the outcome. Both would have been wrong about what the outcome
