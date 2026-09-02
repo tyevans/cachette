@@ -27,94 +27,6 @@ precedent.[^ALLOC]
 
 ## Open
 
-### DEC-059 — Does the world reserve unit storage, or grow it during a run?
-
-**Open. The recommendation is to reserve the storage at construction, and to
-refuse a spawn that would exceed it.**
-
-The accepted product record for a founding states that the storage the world
-reserves is sized for the target population, that it does not change during a
-run, and that a run does not stop to grow.[^PRD12] The engine does the
-opposite. The unit arena opens as many slots as the slot index holds, reserves
-no memory for them, and appends one entry to each of its columns at each
-spawn.[^FND135]
-
-The record and the code disagree, so one of them changes.[^DOD3]
-
-**The options.**
-
-1. The world reserves the unit columns at construction, from a population the
-   settings name. A spawn past the reservation gets a typed refusal. The record
-   then describes the code.
-2. The arena keeps growing, and the product record loses the statement. A run
-   then reallocates a column under a running simulation, at a moment nobody
-   chose.
-3. The world reserves at construction and grows past the reservation as a
-   fallback. This holds both behaviours, so it holds two answers to one
-   question.
-
-**The recommendation is option 1.** A reallocation of ten columns at one million
-units is a cost that arrives inside a step, and no measurement exists on the
-target platform to say what it costs.[^BLK7] A reservation moves that cost to
-construction, where a developer can see it. It also gives the refusal path a
-real case, rather than one somebody adds after the first stall.
-
-**What holds it back.** Nothing holds the choice. The value of the reservation
-is a separate matter, and the target population is already answered.[^BLK3]
-
-**How to state the reservation.** Take it from the world settings, in one
-place. A second copy in the arena and in the settings is the defect shape this
-project keeps meeting.[^SHAPE1]
-
-A proposed item carries the work.[^ITEM0150]
-### DEC-060 — How does Python read an event?
-
-**Open. The recommendation is a column for each field, returned from Rust.**
-
-The bindings return the event log as raw bytes. The layout of an event lives in
-the Rust source, which declares the field order, the field widths and the
-padding.[^DEC60A] Python holds no description of it, so a Python reader must
-repeat the layout. Two declaration sites hold one fact, and nothing fails when
-they disagree.[^DEC60B]
-
-The consequence is real today. The agent-facing protocol server returns the
-bytes and a digest of them, because it refuses to hold a second copy of the
-layout. An agent can prove that two runs emitted the same log. It cannot see
-which tile changed.[^DEC60C]
-
-**The options.**
-
-1. The bindings return a column for each field, in the way the tile column is
-   returned today. Python never sees a byte offset. This costs a copy for each
-   column.
-2. The bindings return a description of the layout, derived from the type.
-   Python decodes against the description. The description cannot disagree with
-   the type, because it comes from it.
-3. The log stays opaque, and the engine answers a question about it instead.
-   Python asks; Rust reads.
-
-**The recommendation is option 1.** It matches how the tile column already
-crosses the boundary, so it adds no new mechanism. It keeps Python out of the
-data plane, because Python receives an answer and does not walk a buffer. It
-costs a copy, and the log of one step is small next to the world.
-
-Option 3 fits the control plane rule best and costs the most, because each new
-question is a new verb. Option 2 is the cheapest and puts a decoder in Python,
-which is the shape the recommendation is trying to avoid.
-
-**What every option must satisfy.** An event names an entity. The identity
-packs an index and a generation, and the crate keeps its constructor private so
-that no caller can assemble one from an index it chose.[^DEC60E] Whatever
-crosses to Python must carry the generation and must round-trip back to the
-same entity or fail. A bare index is not an identity. An agent that holds one
-watches a unit, the unit dies, a new unit takes the slot, and the agent reports
-on the wrong one with nothing failing. A fixed-point field crosses as its raw
-integer, never as a float.[^DEC60F]
-
-**What holds it back.** Nothing. Work continues on the bytes, and only a reader
-is missing. A backlog item holds the work.[^DEC60D]
-
-
 ### DEC-057 — Does a site store its resident count, or read the one the engine keeps?
 
 **Open. The recommendation is to read the count the engine already keeps.**
@@ -307,6 +219,100 @@ figure is 168 MB. The storage argument for vectors is stronger than the report
 concluded, and it called that argument its weakest.
 
 ## Closed
+
+### DEC-059 — Does the world reserve unit storage, or grow it during a run?
+
+**Closed. The world reserves the unit columns at construction, and a spawn past
+the reservation gets a typed refusal.**
+
+The project owner decided this on 1 September 2026, taking option 1.
+
+The accepted product record for a founding states that the storage the world
+reserves is sized for the target population, that it does not change during a
+run, and that a run does not stop to grow.[^PRD12] The engine does the
+opposite. The unit arena opens as many slots as the slot index holds, reserves
+no memory for them, and appends one entry to each of its columns at each
+spawn.[^FND135]
+
+The record and the code disagree, so one of them changes.[^DOD3]
+
+**The options.**
+
+1. The world reserves the unit columns at construction, from a population the
+   settings name. A spawn past the reservation gets a typed refusal. The record
+   then describes the code.
+2. The arena keeps growing, and the product record loses the statement. A run
+   then reallocates a column under a running simulation, at a moment nobody
+   chose.
+3. The world reserves at construction and grows past the reservation as a
+   fallback. This holds both behaviours, so it holds two answers to one
+   question.
+
+**The recommendation is option 1.** A reallocation of ten columns at one million
+units is a cost that arrives inside a step, and no measurement exists on the
+target platform to say what it costs.[^BLK7] A reservation moves that cost to
+construction, where a developer can see it. It also gives the refusal path a
+real case, rather than one somebody adds after the first stall.
+
+**What holds it back.** Nothing holds the choice. The value of the reservation
+is a separate matter, and the target population is already answered.[^BLK3]
+
+**How to state the reservation.** Take it from the world settings, in one
+place. A second copy in the arena and in the settings is the defect shape this
+project keeps meeting.[^SHAPE1]
+
+A proposed item carries the work.[^ITEM0150]
+
+### DEC-060 — How does Python read an event?
+
+**Closed. The bindings return a column for each field.**
+
+The project owner decided this on 1 September 2026, taking option 1. Option 3,
+which keeps the log opaque and answers a question in Rust, was put to him as the
+stricter reading of the control plane rule and he did not take it.
+
+The bindings return the event log as raw bytes. The layout of an event lives in
+the Rust source, which declares the field order, the field widths and the
+padding.[^DEC60A] Python holds no description of it, so a Python reader must
+repeat the layout. Two declaration sites hold one fact, and nothing fails when
+they disagree.[^DEC60B]
+
+The consequence is real today. The agent-facing protocol server returns the
+bytes and a digest of them, because it refuses to hold a second copy of the
+layout. An agent can prove that two runs emitted the same log. It cannot see
+which tile changed.[^DEC60C]
+
+**The options.**
+
+1. The bindings return a column for each field, in the way the tile column is
+   returned today. Python never sees a byte offset. This costs a copy for each
+   column.
+2. The bindings return a description of the layout, derived from the type.
+   Python decodes against the description. The description cannot disagree with
+   the type, because it comes from it.
+3. The log stays opaque, and the engine answers a question about it instead.
+   Python asks; Rust reads.
+
+**The recommendation is option 1.** It matches how the tile column already
+crosses the boundary, so it adds no new mechanism. It keeps Python out of the
+data plane, because Python receives an answer and does not walk a buffer. It
+costs a copy, and the log of one step is small next to the world.
+
+Option 3 fits the control plane rule best and costs the most, because each new
+question is a new verb. Option 2 is the cheapest and puts a decoder in Python,
+which is the shape the recommendation is trying to avoid.
+
+**What every option must satisfy.** An event names an entity. The identity
+packs an index and a generation, and the crate keeps its constructor private so
+that no caller can assemble one from an index it chose.[^DEC60E] Whatever
+crosses to Python must carry the generation and must round-trip back to the
+same entity or fail. A bare index is not an identity. An agent that holds one
+watches a unit, the unit dies, a new unit takes the slot, and the agent reports
+on the wrong one with nothing failing. A fixed-point field crosses as its raw
+integer, never as a float.[^DEC60F]
+
+**What holds it back.** Nothing. Work continues on the bytes, and only a reader
+is missing. A backlog item holds the work.[^DEC60D]
 
 ### DEC-056 — May a decision record cite a product requirement record?
 
