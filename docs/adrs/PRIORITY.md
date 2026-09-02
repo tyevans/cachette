@@ -44,6 +44,7 @@ A record here binds nothing until a reviewer moves it.
 | 0060 | The storage shape of an influence field. It states that everything which does not depend on the faction is stored once, and that the cell is a narrow unsigned integer rather than the project-wide fixed-point scale. |
 | 0087 | An influence solve runs a fixed iteration count. It also names the boundary it draws against ADR-0022 D1, and a reviewer must settle that boundary before it moves. |
 | 0085 | The Python boundary. It states that an entity crosses as one opaque identity that the engine resolves. The code that implements it exists, and a test proves that the resolution refuses a stale identity. |
+| 0065 | A group is a site membership, not a region. The register already held the military half of this claim and the civilian half was written nowhere, so the project held one rule in two states. The code that implements it exists, and tests prove that a position never reports the unit that took the slot of a dead holder. |
 | 0088 | A tile field is a generated base and a stored change. Three tile fields now sit outside the dense column record, and nothing states the rule that picks between the two shapes. The code that implements it exists, and a visit census proves that building a world stores nothing for the field. |
 
 ## Reserved and not written

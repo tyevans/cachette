@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-169**
+**Next number: FND-180**
 
 ## A. Corrections to stated rules
 
@@ -4032,7 +4032,86 @@ nothing, and the comment inside it says what the founding actually leaves. A
 reader who lists the test names reads the claim the finding corrected.
 
 
+### FND-177 — The position pass reads the capacity table, and no world can tell
+
+**Believed.** A pass that sizes a per-site row from the terrain capacity table
+is guarded by the invariant check that compares the two. The check names the
+capacity, so a pass that stopped reading the capacity would fail it.
+
+**True.** It would not, and no test that drives a world can. Every ground a
+settlement may stand on carries the same capacity, and the row width is folded
+from the largest capacity in that table, so the two numbers are equal for every
+tile a site can occupy. A pass that used the row width in place of the capacity
+gives an identical answer everywhere the engine can reach.
+
+**Evidence.** The pass was changed to use the row width and nothing else was
+touched. Every test of the subsystem stayed green, including the invariant that
+names the capacity. The mechanism that excludes the case is the founding: it
+refuses a tile whose ground admits nobody, and the capacity table gives every
+other kind the same number.[^F177A] [^F177B]
+
+**Follows.** Two things.
+
+**The guard and the thing that makes it unnecessary must not be deleted in
+separate changes.** The guard is right, and it becomes load-bearing the moment
+one terrain kind carries a capacity between zero and the largest. A reader who
+finds it unreachable and removes it removes the only thing that would catch the
+pass then.
+
+**A test that the engine cannot reach is still worth writing, if it says so.**
+The subsystem holds one test that drives the pass directly over ground that
+admits nobody. It is the only test that can fail on this, and its comment says
+why nothing else can.
+
+### FND-178 — A holder field of zero hides a bare slot index at slot zero
+
+**Believed.** A test that seats a unit in a position, kills it, and lets the
+storage reuse the slot proves that the position stores a whole identity rather
+than a bare slot index.
+
+**True.** Only when the unit under test does not stand in slot zero. The holder
+field uses zero for nobody, so a bare slot index of zero reads back as a
+vacancy. The wrong implementation then answers `None`, which is what the test
+asserts, and the test passes for the wrong reason.
+
+**Evidence.** The bare index was put back on purpose. Every test stayed green.
+The fixture spawned one unit, which took slot zero. A filler unit was added to
+take slot zero and hold it, and the same defect then failed four tests,
+including the slot reuse test.
+
+**Follows.** **A sentinel value in a field under test is part of the fixture,
+not part of the assertion.** When a field carries an in-band value for nothing,
+ask whether the case under test can produce that value by accident. Here the
+first entity of a fresh arena always does.
+
+This is the fixture shape the testing rule already names, met at a new
+place.[^84] The defect was found by putting it back, and reading the test
+would not have found it.
+
+### FND-179 — A fixture that runs a pass on every tick cannot tell two cadences apart
+
+**Believed.** A test that kills the holder of a position and steps the world
+proves that the engine releases a dead holder on every frame, rather than only
+on the interval that resizes the row.
+
+**True.** Not when the fixture set that interval to one tick. Every tick is then
+an interval tick, so the two cadences give the same answer and the test measures
+neither.
+
+**Evidence.** The release was moved behind the interval test on purpose. Every
+test stayed green. A test was added that sets a long interval, kills the holder,
+asserts that the next tick is not one the interval names, and then steps. That
+test failed under the same defect and passes without it.
+
+**Follows.** **A fixture that makes a schedule trivial removes the schedule from
+the test.** When two passes run at different cadences, at least one test must
+use a fixture where the cadences differ, and it must assert that the tick it
+steps onto is the one it means.
+
 ## References
+
+[^F177A]: The founding refuses ground that admits nobody. `crates/cachette-core/src/world.rs`
+[^F177B]: The terrain capacity table. `crates/cachette-core/src/terrain.rs`
 
 [^F168A]: ADR-0084, the world reserves the unit columns at construction, decision D3. `docs/adrs/draft/adr-0084-the-world-reserves-the-unit-columns-at-construction.md`
 [^F168B]: Review 0175, the unit reservation record. `docs/reviews/0175-the-unit-reservation-record.md`

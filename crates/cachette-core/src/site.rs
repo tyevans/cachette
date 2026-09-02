@@ -505,6 +505,23 @@ impl SettlementArena {
         self.slot_of(entity).is_some()
     }
 
+    /// Returns the generation that one slot holds.
+    ///
+    /// A slot outside the arena carries no identity, and this returns the
+    /// generation that says so. A caller that must report why an identity
+    /// refused reads this.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0014, entity identity is an index plus a generation, decision D6. `docs/adrs/accepted/adr-0014-entity-identity-is-an-index-plus-a-generation.md`
+    #[must_use]
+    pub fn generation_of(&self, slot: u32) -> u32 {
+        self.generations
+            .get(slot as usize)
+            .copied()
+            .unwrap_or(NO_GENERATION)
+    }
+
     /// Returns the identity that one slot carries, or `None` when the slot
     /// holds no live settlement.
     ///

@@ -23,9 +23,45 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^ALLOC]
 
-**Next number: DEC-070**
+**Next number: DEC-074**
 
 ## Open
+
+### DEC-073 — What does a kind of work fill, and what does a site want of it?
+
+**Open. The engine holds a placeholder table, and content replaces it.**
+
+A site opens a number of positions of each kind of work, and it decides that
+number from what it wants of each kind less what it holds.[^DEC73A] Two values
+feed that rule, and neither is an engineering choice.
+
+The first is the map from a kind of work to the commodity that the work fills.
+A kind of work is the resource kind that the work gathers, because the engine
+already enumerates those and a second enumeration of one set is one fact in two
+places.[^DEC73B] The store of a site holds commodities, and the commodity set
+holds one entry today, so every kind of work maps onto that one entry. The map
+is therefore correct and it carries no information.
+
+The second is what a site wants of each kind before anybody tells it
+otherwise. The engine declares a value so that a founded site opens positions
+without a command, and the control plane replaces it with one command over a
+set of sites.[^DEC73C]
+
+**The options.**
+
+1. Leave both in the engine as a table, and grow the commodity set when the
+   economy needs one. The table is data the engine reads, never a function it
+   calls, so this stays inside the rule that content supplies values and not
+   comparators.[^DEC73D]
+2. Move both into a content pipeline when one exists. The kernel reads the
+   table either way, so the move costs no change to the pass.
+
+**The recommendation is option 1 until a content pipeline lands, then option
+2.** The values are content and the engine must not own them for ever. Nothing
+is gained by inventing a pipeline for two tables.
+
+**What settles it.** The economy needs more than one commodity. Until then the
+map has one destination and any value in it is the same value.
 
 ### DEC-069 — Which representation does the result of a selector take?
 
@@ -1351,6 +1387,11 @@ The chosen option adds no mechanism, and the product record already states that
 a failed founding is correct.[^PRD12]
 
 ## References
+
+[^DEC73A]: ADR-0065, a group is a site membership, not a region, decision D3. `docs/adrs/draft/adr-0065-a-group-is-a-site-membership-not-a-region.md`
+[^DEC73B]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`
+[^DEC73C]: ADR-0040, Python is a control plane, not a data plane, decision D1. `docs/adrs/draft/adr-0040-python-is-a-control-plane-not-a-data-plane.md`
+[^DEC73D]: ADR-0007, content supplies a key vector, never a comparator, decision D3. `docs/adrs/accepted/adr-0007-content-supplies-a-key-vector-never-a-comparator.md`
 
 [^ADR75D2]: ADR-0075, the founding choice reads a bounded sample of the world, decision D2. `docs/adrs/accepted/adr-0075-the-founding-choice-reads-a-bounded-sample-of-the-world.md`
 [^ADR76]: ADR-0076, a founding keeps a fixed distance from the foundings before it, decision D3. `docs/adrs/accepted/adr-0076-a-founding-keeps-a-fixed-distance-from-the-foundings-before-it.md`
