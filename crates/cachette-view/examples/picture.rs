@@ -7,7 +7,11 @@
 //! The file format is binary PPM, which every image tool reads and which
 //! needs no dependency.
 //!
-//! Usage: `cargo run --example picture -- <seed> <extent> <out.ppm>`
+//! Usage: `cargo run --example picture -- <seed> <extent> <out.ppm> <soldiers>`
+//!
+//! The soldier count is optional. A run with no soldier shows the ground
+//! alone, which is how a person reads what the ground carries: a disc over a
+//! tile hides the colour of that tile.
 //!
 //! The viewer reads the world and writes nothing to it.[^1]
 //!
@@ -22,7 +26,7 @@ use cachette_view::{draw_frame, Camera, Canvas, Lap, Metrics};
 /// The side of the picture in pixels.
 const SIDE: usize = 900;
 
-/// The soldiers the picture holds.
+/// The soldiers the picture holds when the caller names no number.
 const SOLDIERS: u32 = 600;
 
 /// The stride that spreads the soldiers over the open ground.
@@ -37,6 +41,9 @@ fn main() {
         .next()
         .map_or(128, |value| value.parse().unwrap_or(128));
     let path = arguments.next().unwrap_or_else(|| "world.ppm".to_string());
+    let soldiers: u32 = arguments
+        .next()
+        .map_or(SOLDIERS, |value| value.parse().unwrap_or(SOLDIERS));
 
     let mut world = World::new(WorldConfig {
         width: extent,
@@ -55,7 +62,7 @@ fn main() {
         .filter(|address| world.admits_a_unit(*address))
         .collect();
     assert!(!open.is_empty(), "the world holds no open ground");
-    for index in 0..SOLDIERS {
+    for index in 0..soldiers {
         world
             .spawn_soldier(
                 open[(index.wrapping_mul(SPREAD) as usize) % open.len()],

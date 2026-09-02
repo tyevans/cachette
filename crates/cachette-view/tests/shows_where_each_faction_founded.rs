@@ -281,9 +281,14 @@ fn the_panel_names_each_faction_that_founded_and_each_that_did_not() {
 fn the_panel_grows_when_the_caller_holds_the_outcomes() {
     // The section must reach the panel. A readout that held the outcomes and
     // drew none of them would pass every assertion above.
+    // The canvas holds the whole panel. The founding sections sit last, so a
+    // window that cut them would give one height with the outcomes and
+    // without them, and this assertion would compare two cuts.[^1]
+    //
+    // [^1]: Backlog item 0188. `docs/backlog/complete/0188-show-the-food-of-a-tile-and-the-reason-a-unit-chose.md`
     let (world, outcomes) = crowded_world();
-    let mut with = Canvas::new(760, 900);
-    let mut without = Canvas::new(760, 900);
+    let mut with = Canvas::new(760, 1500);
+    let mut without = Canvas::new(760, 1500);
     let camera = Camera::fitting(&world, &with);
 
     let stated =

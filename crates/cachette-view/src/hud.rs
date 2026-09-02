@@ -32,11 +32,15 @@
 
 use cachette_core::founding::{Founding, FoundingError, FoundingOutcome, Provision};
 use cachette_core::pyramid::CellSummary;
+use cachette_core::resource::{ResourceKind, RESOURCE_KIND_COUNT};
 use cachette_core::terrain::{TileKind, KIND_COUNT};
-use cachette_core::{Axial, FactionId, Fix32, World};
+use cachette_core::{
+    Axial, ChoiceExplanation, CommodityId, FactionId, Fix32, NeedCondition, World, NO_INTENT,
+    OPTIONS, OPTION_COUNT,
+};
 
 use crate::metrics::Metrics;
-use crate::paint::{faction_colour, kind_colour, Camera, Canvas, COLOURED_FACTIONS};
+use crate::paint::{faction_colour, kind_colour, Camera, Canvas, Focus, COLOURED_FACTIONS};
 use crate::text;
 
 /// The gap between the window edge and the panel, in pixels.
@@ -179,6 +183,292 @@ impl FoundingReport {
     }
 }
 
+/// What the tile under the middle of the window holds.
+///
+/// The middle of the window is the crosshair. The viewer has no cursor, so
+/// the panel reports the tile a watcher scrolled to rather than one they
+/// pointed at.[^1]
+///
+/// Every quantity is one the engine already holds, read at one address. The
+/// section starts no pass over the world.[^2]
+///
+/// # References
+///
+/// [^1]: Decisions register, DEC-077. `docs/DECISIONS.md`
+/// [^2]: ADR-0070, the head-up display reports what the drawing pass read, decision D1. `docs/adrs/accepted/adr-0070-the-head-up-display-reports-what-the-drawing-pass-read.md`
+#[derive(Clone, Copy, Debug)]
+pub struct TileReadout {
+    address: Axial,
+    kind: TileKind,
+    capacity: u32,
+    holder: Option<FactionId>,
+    /// What the tile still holds, in resource kind order.
+    stock: [u32; RESOURCE_KIND_COUNT],
+    /// What the ground generated for the tile, in resource kind order.
+    generated: [u32; RESOURCE_KIND_COUNT],
+    /// The units on the tile, or `None` when the engine could not say.
+    units: Option<u32>,
+}
+
+impl TileReadout {
+    /// Reads the tile at one address.
+    ///
+    /// Returns `None` when the address lies outside the world.
+    ///
+    /// The unit count comes from the spatial structure at one tile. A
+    /// structure that no longer describes the world gives no count, and the
+    /// panel then states none rather than a zero a reader cannot tell from a
+    /// true one.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0070, the head-up display reports what the drawing pass read, decision D2. `docs/adrs/accepted/adr-0070-the-head-up-display-reports-what-the-drawing-pass-read.md`
+    #[must_use]
+    pub fn of(world: &World, address: Axial) -> Option<Self> {
+        let kind = world.tile_kind(address)?;
+        let mut stock = [0u32; RESOURCE_KIND_COUNT];
+        let mut generated = [0u32; RESOURCE_KIND_COUNT];
+        for resource in ResourceKind::ALL {
+            stock[resource.index()] = world.tile_stock(address, resource)?.0;
+            generated[resource.index()] = world.original_stock(address, resource)?.0;
+        }
+        Some(Self {
+            address,
+            kind,
+            capacity: world.tile_capacity(address)?,
+            holder: world
+                .tile_holder(address)
+                .and_then(cachette_core::Holder::faction),
+            stock,
+            generated,
+            units: world
+                .soldier_count_on(address)
+                .ok()
+                .and_then(|count| u32::try_from(count).ok()),
+        })
+    }
+
+    /// Returns the address of the tile.
+    #[must_use]
+    pub const fn address(&self) -> Axial {
+        self.address
+    }
+
+    /// Returns the ground of the tile.
+    #[must_use]
+    pub const fn kind(&self) -> TileKind {
+        self.kind
+    }
+
+    /// Returns what the tile still holds of one resource.
+    #[must_use]
+    pub fn stock(&self, kind: ResourceKind) -> u32 {
+        self.stock[kind.index()]
+    }
+
+    /// Returns what the ground generated for the tile, of one resource.
+    ///
+    /// A stock below this and a generated value above zero mean that
+    /// somebody gathered here and that the deposit has not fully
+    /// recovered.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0072, a tile stock is generated, and only what was taken is stored, decision D4. `docs/adrs/accepted/adr-0072-a-tile-stock-is-generated-and-only-what-was-taken-is-stored.md`
+    #[must_use]
+    pub fn generated(&self, kind: ResourceKind) -> u32 {
+        self.generated[kind.index()]
+    }
+
+    /// Returns the units the engine says stand on the tile.
+    #[must_use]
+    pub const fn units(&self) -> Option<u32> {
+        self.units
+    }
+}
+
+/// Why one unit chose what it chose.
+///
+/// The engine holds a verb that reports every score, the value each option
+/// read from the level 1 cell, the weight each option carried, and the floor
+/// an option had to clear. It recomputes the answer from the world as it
+/// stands, because it stores no score.[^1]
+///
+/// The panel names the unit nearest the middle of the window, which the
+/// drawing pass fixed while it painted.[^2]
+///
+/// # References
+///
+/// [^1]: ADR-0064, a unit chooses by scoring a small fixed option set, decision D2. `docs/adrs/accepted/adr-0064-a-unit-chooses-by-scoring-a-small-fixed-option-set.md`
+/// [^2]: Decisions register, DEC-077. `docs/DECISIONS.md`
+#[derive(Clone, Copy, Debug)]
+pub struct ChoiceReadout {
+    focus: Focus,
+    explanation: Option<ChoiceExplanation>,
+}
+
+impl ChoiceReadout {
+    /// Asks the engine why the focused unit chose what it chose.
+    ///
+    /// The call names one unit. It reads that unit, the level 1 cell that
+    /// covers its tile, and the weight table. It starts no pass over the
+    /// world.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0070, the head-up display reports what the drawing pass read, decision D1. `docs/adrs/accepted/adr-0070-the-head-up-display-reports-what-the-drawing-pass-read.md`
+    #[must_use]
+    pub fn of(world: &World, focus: Focus) -> Self {
+        Self {
+            focus,
+            explanation: world.explain_choice(focus.entity()),
+        }
+    }
+
+    /// Returns the unit the panel names.
+    #[must_use]
+    pub const fn focus(&self) -> Focus {
+        self.focus
+    }
+
+    /// Returns the answer the engine gave.
+    ///
+    /// Returns `None` when the engine would say nothing about the unit. The
+    /// panel then says that, rather than printing four zeroes a reader would
+    /// take for real scores.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0070, the head-up display reports what the drawing pass read, decision D2. `docs/adrs/accepted/adr-0070-the-head-up-display-reports-what-the-drawing-pass-read.md`
+    #[must_use]
+    pub const fn explanation(&self) -> Option<ChoiceExplanation> {
+        self.explanation
+    }
+}
+
+/// What one site produces, holds and owes.
+///
+/// This is the loop the engine closed and nothing could see: the survey reads
+/// the ground, the founding sets a production rate from it, the rate fills a
+/// store, the store feeds the units of that site, and a unit that is not fed
+/// gains a deficit and ends.[^1]
+///
+/// The list is as long as the settlement arena, which the founding sized by
+/// the faction count. It is not a pass over the world.[^2]
+///
+/// # References
+///
+/// [^1]: What a unit does in a tick, section 1. `docs/research/what-a-unit-does-in-a-tick.md`
+/// [^2]: ADR-0070, the head-up display reports what the drawing pass read, decision D1. `docs/adrs/accepted/adr-0070-the-head-up-display-reports-what-the-drawing-pass-read.md`
+#[derive(Clone, Copy, Debug)]
+pub struct SiteReadout {
+    faction: FactionId,
+    place: Axial,
+    store: Fix32,
+    production: Fix32,
+    upkeep: Fix32,
+    /// What the cohorts of this site asked for and what the store gave, on
+    /// the last tick that could not serve them in full.
+    rationed: Option<(i64, i64)>,
+}
+
+impl SiteReadout {
+    /// Returns the faction that holds the site.
+    #[must_use]
+    pub const fn faction(&self) -> FactionId {
+        self.faction
+    }
+
+    /// Returns the tile the site stands on.
+    #[must_use]
+    pub const fn place(&self) -> Axial {
+        self.place
+    }
+
+    /// Returns what the store holds of the ration commodity.
+    #[must_use]
+    pub const fn store(&self) -> Fix32 {
+        self.store
+    }
+
+    /// Returns what the site adds each time the rate pass runs.
+    #[must_use]
+    pub const fn production(&self) -> Fix32 {
+        self.production
+    }
+
+    /// Returns what the site owes each time the rate pass runs.
+    #[must_use]
+    pub const fn upkeep(&self) -> Fix32 {
+        self.upkeep
+    }
+
+    /// Returns what the cohorts asked for and what they got, when the last
+    /// draw could not serve them in full.
+    ///
+    /// Returns `None` when the last draw served every cohort of this site.
+    #[must_use]
+    pub const fn rationed(&self) -> Option<(i64, i64)> {
+        self.rationed
+    }
+}
+
+/// The number of sites the panel reads.
+///
+/// The panel reads this many and no more, whatever the world holds. A world
+/// of a thousand sites would otherwise cost the panel a loop over all of
+/// them, which is the growth the panel record forbids.[^1]
+///
+/// The panel states how many sites the world holds beside the rows, so a
+/// reader knows the list is the first few and not all of them.[^2]
+///
+/// # References
+///
+/// [^1]: ADR-0070, the head-up display reports what the drawing pass read, decision D1. `docs/adrs/accepted/adr-0070-the-head-up-display-reports-what-the-drawing-pass-read.md`
+/// [^2]: ADR-0070, the head-up display reports what the drawing pass read, decision D2. `docs/adrs/accepted/adr-0070-the-head-up-display-reports-what-the-drawing-pass-read.md`
+const SITE_ROWS: usize = 6;
+
+/// Reads the first few sites of the world for the panel.
+///
+/// The walk stops at a fixed number of sites, so the cost does not follow the
+/// world.[^1] The arena reports how many it holds without a walk, and the
+/// panel states that number.
+///
+/// The ration rows come from the log of the draw that just ran. The engine
+/// keeps that log for one tick, so a site that was served in full states no
+/// shortfall.[^2]
+///
+/// # References
+///
+/// [^1]: ADR-0070, the head-up display reports what the drawing pass read, decision D1. `docs/adrs/accepted/adr-0070-the-head-up-display-reports-what-the-drawing-pass-read.md`
+/// [^2]: ADR-0063, a need is a rate with a threshold, and crossing it is a fact, decision D3. `docs/adrs/accepted/adr-0063-a-need-is-a-rate-with-a-threshold-and-crossing-it-is-a-fact.md`
+fn read_sites(world: &World) -> Vec<SiteReadout> {
+    // The engine holds one commodity, and it is the one the cohorts draw.
+    // The identifier is the engine's, not a second name for it here.
+    let commodity = CommodityId(0);
+    let arena = world.settlements();
+    arena
+        .iter()
+        .take(SITE_ROWS)
+        .filter_map(|site| {
+            let place = arena.address(site)?;
+            let identity = site.to_bits();
+            Some(SiteReadout {
+                faction: arena.faction(site)?,
+                place,
+                store: arena.store(site)?.quantity(commodity)?,
+                production: world.production_rate(site, commodity)?,
+                upkeep: world.upkeep_rate(site, commodity)?,
+                rationed: world
+                    .rationed_log()
+                    .iter()
+                    .find(|event| event.site == identity)
+                    .map(|event| (event.demanded.0, event.granted.0)),
+            })
+        })
+        .collect()
+}
+
 /// Reports whether the window covers one tile.
 ///
 /// The camera gives the row range of the window, and the column range of one
@@ -226,6 +516,10 @@ pub struct Readout {
     by_faction: [u32; COLOURED_FACTIONS],
     by_kind: [u32; KIND_COUNT],
     region: Option<CellSummary>,
+    tile: Option<TileReadout>,
+    choice: Option<ChoiceReadout>,
+    sites: Vec<SiteReadout>,
+    sites_held: u32,
     foundings: Vec<FoundingReport>,
     refusals: Vec<(FactionId, FoundingError)>,
     units_short: u32,
@@ -293,6 +587,26 @@ impl Readout {
             region: world.summary_covering(
                 camera.tile_at(canvas.width() as f32 / 2.0, canvas.height() as f32 / 2.0),
             ),
+            // The tile under the middle of the window, read at one address.
+            // Every quantity is one the engine holds.[^6]
+            //
+            // [^6]: ADR-0070, the head-up display reports what the drawing pass read, decision D1. `docs/adrs/accepted/adr-0070-the-head-up-display-reports-what-the-drawing-pass-read.md`
+            tile: TileReadout::of(
+                world,
+                camera.tile_at(canvas.width() as f32 / 2.0, canvas.height() as f32 / 2.0),
+            ),
+            // The drawing pass fixed which unit this is while it painted, so
+            // finding it costs nothing here. The engine then answers for that
+            // one unit.[^6]
+            choice: canvas.focus().map(|focus| ChoiceReadout::of(world, focus)),
+            // One row for each site the world holds. The founding seats one
+            // for each faction, so the list is bounded by the faction
+            // count.[^6]
+            sites: read_sites(world),
+            // The arena reports how many sites it holds without a walk over
+            // them, so the panel states the whole count beside the few rows
+            // it read.[^6]
+            sites_held: world.settlements().len(),
             // The caller founded the run and kept what the founding
             // returned. The panel borrows that value and recomputes no part
             // of it, so the list is as long as the caller made it and the
@@ -438,6 +752,49 @@ impl Readout {
     #[must_use]
     pub const fn region(&self) -> Option<CellSummary> {
         self.region
+    }
+
+    /// Returns what the tile under the middle of the window holds.
+    ///
+    /// Returns `None` when the middle of the window lies outside the world.
+    #[must_use]
+    pub const fn tile(&self) -> Option<TileReadout> {
+        self.tile
+    }
+
+    /// Returns why the unit nearest the middle of the window chose what it
+    /// chose.
+    ///
+    /// Returns `None` when the drawing pass painted no unit.
+    #[must_use]
+    pub const fn choice(&self) -> Option<ChoiceReadout> {
+        self.choice
+    }
+
+    /// Returns what each of the first few sites produces, holds and owes.
+    ///
+    /// The list stops at a fixed number of rows, so a large world costs the
+    /// panel no more than a small one.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0070, the head-up display reports what the drawing pass read, decision D1. `docs/adrs/accepted/adr-0070-the-head-up-display-reports-what-the-drawing-pass-read.md`
+    #[must_use]
+    pub fn sites(&self) -> &[SiteReadout] {
+        &self.sites
+    }
+
+    /// Returns the number of sites the world holds.
+    ///
+    /// This is a count of the world, and the panel labels it so. The arena
+    /// gives it at once, so it costs no walk.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0070, the head-up display reports what the drawing pass read, decision D1. `docs/adrs/accepted/adr-0070-the-head-up-display-reports-what-the-drawing-pass-read.md`
+    #[must_use]
+    pub const fn sites_held(&self) -> u32 {
+        self.sites_held
     }
 
     /// Returns what each founding chose.
@@ -608,6 +965,15 @@ impl Readout {
             Line::Row("ended in world", grouped(self.units_ended as u64)),
         ];
 
+        // The tile a watcher scrolled to, the unit nearest it, and the sites
+        // that feed the world. All three sit above the view rows, because a
+        // section near the foot is the first thing a short window cuts.[^4]
+        //
+        // [^4]: Backlog item 0188. `docs/backlog/complete/0188-show-the-food-of-a-tile-and-the-reason-a-unit-chose.md`
+        lines.extend(tile_lines(self.tile.as_ref()));
+        lines.extend(choice_lines(self.choice.as_ref()));
+        lines.extend(site_lines(&self.sites, self.sites_held));
+
         // One row for each faction the run answered, seated or refused. A
         // panel that listed the foundings alone would say nothing about a
         // faction that found no place, and a watcher would read three rows
@@ -666,51 +1032,6 @@ impl Readout {
         }
         lines.push(Line::Bar);
 
-        // One section for each founding the caller holds. The panel never
-        // says "the founding", because a run may found more than one group.
-        // A row that named one founding would state a false thing the moment
-        // a second group founds.[^1]
-        //
-        // [^1]: Blockers register, BLK-018. `docs/BLOCKERS.md`
-        for (ordinal, founding) in self.foundings.iter().enumerate() {
-            lines.extend([
-                Line::Rule,
-                Line::Heading("FOUNDING"),
-                Line::Row(
-                    "number",
-                    format!("{} of {}", ordinal + 1, self.foundings.len()),
-                ),
-                Line::Row("places compared", grouped(founding.considered as u64)),
-                Line::Row(
-                    "it took",
-                    format!("q {}  r {}", founding.place.q, founding.place.r),
-                ),
-                Line::Row(
-                    "in the window",
-                    String::from(if founding.shown { "yes" } else { "no" }),
-                ),
-            ]);
-            match founding.other {
-                // A survey of one place has nothing to compare. The panel
-                // says so and states the quantities of the chosen place
-                // alone, rather than printing a second column of zeroes that
-                // a reader would take for a real place.
-                None => {
-                    lines.push(Line::Note("it compared no other place."));
-                    lines.push(Line::Heading("WHAT IT TOOK"));
-                    lines.extend(provision_rows(founding.chosen, None));
-                }
-                Some((address, provision)) => {
-                    lines.push(Line::Row(
-                        "it left",
-                        format!("q {}  r {}", address.q, address.r),
-                    ));
-                    lines.push(Line::Heading("TOOK / LEFT"));
-                    lines.extend(provision_rows(founding.chosen, Some(provision)));
-                }
-            }
-        }
-
         // The region rows sit under their own heading, because a count of a
         // region is a third kind of count beside a count of the world and a
         // count of the window. A reader must tell them apart by the label.
@@ -758,6 +1079,59 @@ impl Readout {
             Line::Note("mean and worst, one run, one"),
             Line::Note("machine. not the target."),
         ]);
+
+        // One section for each founding the caller holds. The panel never
+        // says "the founding", because a run may found more than one group.
+        // A row that named one founding would state a false thing the moment
+        // a second group founds.[^1]
+        //
+        // [^1]: Blockers register, BLK-018. `docs/BLOCKERS.md`
+        //
+        // These sections sit last. They describe a choice the engine made
+        // once, before the first frame, and they cost twelve rows for each
+        // faction. Every section that reports the world as it stands now
+        // therefore comes first, and the cut takes the history rather than
+        // the present.[^5]
+        //
+        // [^5]: Backlog item 0188. `docs/backlog/complete/0188-show-the-food-of-a-tile-and-the-reason-a-unit-chose.md`
+        for (ordinal, founding) in self.foundings.iter().enumerate() {
+            lines.extend([
+                Line::Rule,
+                Line::Heading("FOUNDING"),
+                Line::Row(
+                    "number",
+                    format!("{} of {}", ordinal + 1, self.foundings.len()),
+                ),
+                Line::Row("places compared", grouped(founding.considered as u64)),
+                Line::Row(
+                    "it took",
+                    format!("q {}  r {}", founding.place.q, founding.place.r),
+                ),
+                Line::Row(
+                    "in the window",
+                    String::from(if founding.shown { "yes" } else { "no" }),
+                ),
+            ]);
+            match founding.other {
+                // A survey of one place has nothing to compare. The panel
+                // says so and states the quantities of the chosen place
+                // alone, rather than printing a second column of zeroes that
+                // a reader would take for a real place.
+                None => {
+                    lines.push(Line::Note("it compared no other place."));
+                    lines.push(Line::Heading("WHAT IT TOOK"));
+                    lines.extend(provision_rows(founding.chosen, None));
+                }
+                Some((address, provision)) => {
+                    lines.push(Line::Row(
+                        "it left",
+                        format!("q {}  r {}", address.q, address.r),
+                    ));
+                    lines.push(Line::Heading("TOOK / LEFT"));
+                    lines.extend(provision_rows(founding.chosen, Some(provision)));
+                }
+            }
+        }
 
         cut_to_fit(lines, self.canvas_height)
     }
@@ -829,6 +1203,233 @@ fn provision_rows(took: Provision, left: Option<Provision>) -> Vec<Line> {
             pair(took.water_edge, |place| place.water_edge),
         ),
     ]
+}
+
+/// Returns the rows that say what the tile under the crosshair holds.
+///
+/// The food row is the one this section exists for. A watcher reads the
+/// colour of the ground to find the food, and reads this row to learn how
+/// much of it is left and how much the ground put there.[^1]
+///
+/// A tile the ground gave nothing of says so, rather than printing "0 of 0",
+/// which a reader would take for a drained deposit.
+///
+/// # References
+///
+/// [^1]: ADR-0072, a tile stock is generated, and only what was taken is stored, decision D4. `docs/adrs/accepted/adr-0072-a-tile-stock-is-generated-and-only-what-was-taken-is-stored.md`
+fn tile_lines(tile: Option<&TileReadout>) -> Vec<Line> {
+    let mut lines = vec![Line::Rule, Line::Heading("TILE UNDER THE CROSSHAIR")];
+    let Some(tile) = tile else {
+        lines.push(Line::Note("the middle of the window is"));
+        lines.push(Line::Note("outside the world."));
+        return lines;
+    };
+    lines.push(Line::Row(
+        "tile",
+        format!("q {}  r {}", tile.address.q, tile.address.r),
+    ));
+    lines.push(Line::Row("ground", name_of(tile.kind).to_string()));
+    for (label, kind) in [
+        ("food left", ResourceKind::Food),
+        ("wood left", ResourceKind::Wood),
+        ("stone left", ResourceKind::Stone),
+    ] {
+        lines.push(Line::Row(label, deposit(tile, kind)));
+    }
+    lines.push(Line::Note("left of what the ground gave."));
+    lines.push(Line::Row(
+        "units here",
+        match tile.units {
+            None => "-".to_string(),
+            Some(count) => grouped(u64::from(count)),
+        },
+    ));
+    lines.push(Line::Row("it admits", grouped(u64::from(tile.capacity))));
+    lines.push(Line::Row(
+        "held by",
+        match tile.holder {
+            None => "nobody".to_string(),
+            Some(faction) => format!("faction {}", faction.0),
+        },
+    ));
+    lines
+}
+
+/// Returns one deposit as text: what is left, of what the ground gave.
+///
+/// A tile the ground gave nothing of returns a word and not a pair of
+/// zeroes.[^1]
+///
+/// # References
+///
+/// [^1]: ADR-0070, the head-up display reports what the drawing pass read, decision D2. `docs/adrs/accepted/adr-0070-the-head-up-display-reports-what-the-drawing-pass-read.md`
+fn deposit(tile: &TileReadout, kind: ResourceKind) -> String {
+    let gave = tile.generated(kind);
+    if gave == 0 {
+        return "none here".to_string();
+    }
+    format!("{} of {}", tile.stock(kind), gave)
+}
+
+/// Returns the rows that say why one unit chose what it chose.
+///
+/// The engine answers. The viewer states the answer and derives no part of
+/// it, so no row here can disagree with the choice that was made.[^1]
+///
+/// Each option gets one row: the score it reached, and the value it read from
+/// the level 1 cell. A mark names the option the scores select. A reader who
+/// wants to know why a unit did not forage reads the forage row and sees
+/// either a low field or a low weight.
+///
+/// # References
+///
+/// [^1]: ADR-0064, a unit chooses by scoring a small fixed option set, decision D2. `docs/adrs/accepted/adr-0064-a-unit-chooses-by-scoring-a-small-fixed-option-set.md`
+fn choice_lines(choice: Option<&ChoiceReadout>) -> Vec<Line> {
+    let mut lines = vec![Line::Rule, Line::Heading("WHY THE NEAREST UNIT CHOSE")];
+    let Some(choice) = choice else {
+        lines.push(Line::Note("the window holds no unit."));
+        return lines;
+    };
+    let focus = choice.focus();
+    lines.push(Line::Note("the unit nearest the middle."));
+    lines.push(Line::Founded(
+        focus.faction(),
+        format!("q {}  r {}", focus.address().q, focus.address().r),
+    ));
+    lines.push(Line::Row(
+        "state",
+        match focus.condition() {
+            None => "-".to_string(),
+            Some(NeedCondition::Fed) => "fed".to_string(),
+            Some(NeedCondition::Short) => "short".to_string(),
+            Some(NeedCondition::Starved) => "starved".to_string(),
+        },
+    ));
+
+    let Some(answer) = choice.explanation() else {
+        lines.push(Line::Note("the engine explains nothing"));
+        lines.push(Line::Note("about this unit."));
+        return lines;
+    };
+    lines.push(Line::Row("its cell", grouped(u64::from(answer.cell))));
+    lines.push(Line::Row("what it needs", fraction(Some(answer.need))));
+    lines.push(Line::Row("a score must beat", fraction(Some(answer.floor))));
+    lines.push(Line::Row(
+        "it carries",
+        option_name(answer.intent).to_string(),
+    ));
+    lines.push(Line::Row(
+        "it would take",
+        option_name(answer.best).to_string(),
+    ));
+    lines.push(Line::Row(
+        "it chooses again",
+        String::from(if answer.chooses_next_frame {
+            "next tick"
+        } else {
+            "not yet"
+        }),
+    ));
+    lines.push(Line::Heading("SCORE / WHAT IT READ"));
+    for (index, option) in OPTIONS.iter().enumerate().take(OPTION_COUNT) {
+        let mark = if index as u8 == answer.best { " <" } else { "" };
+        lines.push(Line::Row(
+            option.name,
+            format!(
+                "{} / {}{mark}",
+                fraction(Some(answer.scores[index])),
+                fraction(Some(answer.fields[index]))
+            ),
+        ));
+    }
+    lines
+}
+
+/// Returns the name of one option, or a word for no option at all.
+///
+/// The names come from the engine's table. The viewer holds no second table
+/// of them, so an option the engine adds reaches this row with no edit
+/// here.[^1]
+///
+/// # References
+///
+/// [^1]: Recurring Defect Shapes, shape 1. `.claude/rules/recurring-defects.md`
+fn option_name(option: u8) -> &'static str {
+    if option == NO_INTENT {
+        return "nothing";
+    }
+    match OPTIONS.get(option as usize) {
+        None => "-",
+        Some(row) => row.name,
+    }
+}
+
+/// Returns the rows that say what each site produces, holds and owes.
+///
+/// This is the loop that closed and that nothing could see. A watcher reads
+/// the store fall when the rate is below the upkeep, and reads the ration row
+/// when the store could not serve the units of that site.[^1]
+///
+/// A world with no site states that it has none, rather than showing an empty
+/// heading a reader would take for a broken panel.
+///
+/// # References
+///
+/// [^1]: What a unit does in a tick, section 1. `docs/research/what-a-unit-does-in-a-tick.md`
+fn site_lines(sites: &[SiteReadout], held: u32) -> Vec<Line> {
+    let mut lines = vec![Line::Rule, Line::Heading("THE SITES")];
+    lines.push(Line::Row("sites in world", grouped(u64::from(held))));
+    if sites.is_empty() {
+        lines.push(Line::Note("the world holds no site."));
+        return lines;
+    }
+    if sites.len() < held as usize {
+        lines.push(Line::Note("the first few only."));
+    }
+    lines.push(Line::Note("store, then rate less upkeep."));
+    for site in sites {
+        // The place alone, because a longer value runs into the faction
+        // name on the left of the same row.
+        lines.push(Line::Founded(
+            site.faction,
+            format!("q {}  r {}", site.place.q, site.place.r),
+        ));
+        lines.push(Line::Row(
+            "  store",
+            format!(
+                "{} {}{}",
+                fraction(Some(site.store)),
+                if site.production.0 >= site.upkeep.0 {
+                    "+"
+                } else {
+                    "-"
+                },
+                fraction(Some(
+                    Fix32(site.production.0.abs_diff(site.upkeep.0) as i32)
+                ))
+            ),
+        ));
+        if let Some((asked, got)) = site.rationed {
+            lines.push(Line::Row(
+                "  it rationed",
+                format!("{} of {}", accumulated(got), accumulated(asked)),
+            ));
+        }
+    }
+    lines
+}
+
+/// Returns an accumulated fixed-point total as text.
+///
+/// The accumulator is 64 bits wide and the reading is a decimal. The
+/// conversion happens here, and nothing formatted is handed back to the
+/// engine.[^1]
+///
+/// # References
+///
+/// [^1]: ADR-0067, the viewer reads the world and never writes to it, decision D3. `docs/adrs/accepted/adr-0067-the-viewer-reads-the-world-and-never-writes-to-it.md`
+fn accumulated(total: i64) -> String {
+    format!("{:.1}", total as f64 / 65536.0)
 }
 
 /// Returns as much of the list as the window has room for.

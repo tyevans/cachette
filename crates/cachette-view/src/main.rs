@@ -20,8 +20,17 @@ use minifb::{Key, Window, WindowOptions};
 
 /// The size of the window in pixels.
 const WINDOW_WIDTH: usize = 960;
+
 /// The size of the window in pixels.
-const WINDOW_HEIGHT: usize = 720;
+///
+/// The panel is taller than this and it says so on its last line.[^1] The
+/// height is therefore a compromise: tall enough to reach the rows a watcher
+/// needs, and short enough to open on a common display.
+///
+/// # References
+///
+/// [^1]: Backlog item 0133, the panel is longer than the window. `docs/backlog/proposed/0133-let-a-watcher-reach-a-panel-longer-than-the-window.md`
+const WINDOW_HEIGHT: usize = 1000;
 
 /// The world the demonstration builds.
 ///

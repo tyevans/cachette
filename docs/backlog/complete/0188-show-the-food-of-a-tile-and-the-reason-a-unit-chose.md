@@ -1,7 +1,7 @@
 ---
 id: 0188
 title: Show the food of a tile and the reason a unit chose
-status: refined
+status: complete
 created: 2026-09-02
 implements: [ADR-0067 D1, ADR-0067 D2, ADR-0067 D3, ADR-0070 D1, ADR-0070 D2, ADR-0064 D2, ADR-0072 D4]
 changes: []
@@ -123,7 +123,51 @@ also taller, which reaches further down the panel.
 
 ## Outcome
 
-Filled in when the item moves to `complete/`.
+Done. The colour of a tile reads the food it still holds, and the panel asks
+the engine why one unit chose what it chose.
+
+**The colour.** The ground brightens with the food on it, over a ramp that
+saturates at a display bound below the largest stock the ground generates.
+That bound is a property of the picture and not a copy of the engine's
+ceiling, so it stays true when the ceiling moves.[^12] The stub tile value
+reaches the picture no more, so a tile whose stock nobody touched now draws
+the same on every tick.
+
+**The panel.** Three sections are new. One states what the tile under the
+middle of the window holds, as what is left of what the ground gave, for each
+of the three resources. One states why the unit nearest the middle chose what
+it chose, with one row for each option giving the score it reached and the
+value it read, and a mark on the option the scores select. One states what
+each of the first few sites produces, holds and owes, which is the loop the
+engine closed and nothing could see.
+
+**The order.** The sections that report the founding moved to the foot of the
+panel. The reasoning and the measurement are in the decisions register.[^10]
+The demonstration window is taller as well, which reaches further down.
+
+**What is not done.** The ground legend and the cost rows still fall below the
+edge of the demonstration window, as they did before this work. The panel
+needs a way to reach them, and the item that holds that work now sits in the
+Next block with a recommendation.[^14]
+
+**What the tests catch.** Each defect below was put back on its own, and the
+suite was run each time.
+
+- The colour ignores the food: two tests fail, and the test that the picture
+  holds still passes, because a constant holds still too.
+- The colour reads the stub value again: three tests fail.
+- The panel names the first painted unit rather than the nearest: two tests
+  fail.
+- The panel derives a score instead of restating the engine's: one test fails.
+- The panel reads the generated stock into the row for the stock left: this
+  **passed** at first, and FND-186 records why. A test that gathers first was
+  written, and the substitution then fails.
+- The site row states the rate where the store belongs: one test fails.
+
+Two findings came out of the work. FND-186 holds the fixture hole above.
+FND-187 holds the shading trade: the food of a tile now decides the order of
+two tiles of one kind of ground more strongly than the height does, because
+the height range within one kind is narrower than the food range.
 
 ## References
 

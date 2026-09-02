@@ -459,6 +459,63 @@ Had the decision landed without that reading, the two documents would have
 disagreed quietly, which is the shape that costs every future decision made
 from either.
 
+### FND-186 — A panel test could not tell the stock left from the stock the ground gave
+
+**Believed.** A test that read the panel's two stock numbers back against the
+engine proved that the panel states what a tile still holds. The panel prints
+"what is left, of what the ground gave", and the test compared both numbers
+against the engine's own readers.
+
+**True.** The test could not tell the two apart. Its fixture was a world in
+which nobody had gathered, and in such a world the stock left equals the stock
+the ground gave, for every tile. A panel that read the generated stock into
+both rows passed it.
+
+**Evidence.** The defect was put back: the panel's reader for the stock left
+was changed to call the reader for the generated stock. Every test in the file
+stayed green.[^F186A] A second test was written that gathers first and then
+asserts that the two numbers differ. With that test present, the same
+substitution fails.
+
+**Follows.** This is the shape the testing rule already names: a fixture that
+models the typical case supplies no extreme, so the assertion never receives
+the input that would fail it.[^23] The rule needed no change. What it
+needed was the falsification, and the falsification found the hole in one run.
+
+The general form is worth stating. **When a panel prints two numbers that are
+usually equal, a fixture in which they are equal tests neither.** The engine
+holds several such pairs: the stock and the generated stock, the demand and
+the grant of a ration, the production and the upkeep of a site. A test of any
+of them needs a world in which the pair has come apart.
+
+### FND-187 — The food of a tile shades it more than the height does, within one kind of ground
+
+**Believed.** The viewer shades a tile by its height, and a second, smaller
+term rides on top. The second term was the tile stub value, and it was chosen
+to be small against the height range so that the ripple never hid the ground.
+
+**True.** The height range of one kind of ground in one world is far narrower
+than the full height range. In a 128 by 128 world at one seed, the tallest
+plain tile and the shortest plain tile were 26249 and 40476 in the fixed-point
+range, which is about twelve of the fifty-six brightness steps the height is
+given. Any second term wider than twelve steps therefore decides the order of
+two tiles of one kind.
+
+**Evidence.** The colour now reads the food stock, over thirty-four steps. A
+test that compared the tallest and the shortest plain tile then failed: the
+shorter tile carried food and drew brighter.[^F187A] The test was repaired by
+holding the food at zero, which is the isolation it always needed and did not
+have.
+
+**Follows.** A watcher reads the food of a tile more strongly than its relief,
+within one kind of ground. That is the trade this project chose, because the
+food is what the product record asks a watcher to see and the relief is
+readable across kinds by hue.[^F187B] Any later shading term must state which
+of the two it is willing to dominate.
+
+A test that compares two tiles on one property must hold the others fixed. The
+height test did not, and it passed only because the term it ignored was small.
+
 ## D. Cost estimates that were wrong
 
 ### FND-017 — A decision costs 4.1 nanoseconds, not 400
@@ -4768,3 +4825,6 @@ check asserts.
 [^F193H]: Review 0204, the two corrected records. `docs/reviews/0204-the-two-corrected-records.md`
 [^F197A]: The citation check script. `scripts/check_citations.py`
 [^F197C]: Decisions register, DEC-083. `docs/DECISIONS.md`
+[^F186A]: The viewer suite for the food and the reason. `crates/cachette-view/tests/shows_the_food_and_the_reason.rs`
+[^F187A]: The viewer suite for the ground. `crates/cachette-view/tests/draws_the_ground.rs`
+[^F187B]: PRD-0003, a developer sees a world worth looking at. `docs/product/accepted/prd-0003-a-developer-sees-a-world-worth-looking-at.md`

@@ -42,8 +42,9 @@
 use cachette_core::cohort::NeedCondition;
 use cachette_core::founding::FoundingOutcome;
 use cachette_core::hex::NEIGHBOURS;
+use cachette_core::resource::ResourceKind;
 use cachette_core::terrain::{Terrain, TileKind, KIND_COUNT};
-use cachette_core::{Axial, BridgeError, FactionId, Holder, World};
+use cachette_core::{Axial, BridgeError, Entity, FactionId, Holder, World};
 
 use crate::text;
 
@@ -87,17 +88,38 @@ const KIND_COLOURS: [u32; KIND_COUNT] = [
 /// tall tile of one kind is brighter than a short tile of the same kind.
 const HEIGHT_STEPS: i32 = 56;
 
-/// The number of brightness steps that the tile value gives a tile.
+/// The number of brightness steps that the food of a tile gives it.
 ///
-/// The ground is fixed for the life of a world, so a picture of the ground
-/// alone never moves. The simulated value ripples on top of it, so a person
-/// watching a still camera still sees the world step.[^1] The range is small
-/// against the height range, so the ripple never hides the ground.
+/// The ground is fixed for the life of a world. The food on it is not: the
+/// ground generates a stock, a gatherer takes from it, and the recovery pass
+/// gives part of it back.[^1] A watcher therefore reads a deposit drain and
+/// recover from the colour of the ground it sits on.
+///
+/// The range is smaller than the height range, so a full deposit brightens a
+/// tile without hiding the relief under it.
 ///
 /// # References
 ///
-/// [^1]: PRD-0002, a developer watches the world run. `docs/product/shipped/prd-0002-a-developer-watches-the-world-run.md`
-const VALUE_STEPS: i32 = 14;
+/// [^1]: ADR-0072, a tile stock is generated, and only what was taken is stored, decision D4. `docs/adrs/accepted/adr-0072-a-tile-stock-is-generated-and-only-what-was-taken-is-stored.md`
+const FOOD_STEPS: i32 = 34;
+
+/// The food at which a tile draws at its brightest.
+///
+/// This is a property of the picture and not of the world. It says where the
+/// ramp saturates, so a tile that carries more food than this draws the same
+/// as a tile that carries exactly this. It is deliberately below the largest
+/// stock the ground generates, because the ramp must separate an empty tile
+/// from a small deposit, and the deposits a watcher cares about are the ones
+/// a crowd can drain.
+///
+/// It is not a copy of the engine's ceiling. A ceiling that moves leaves this
+/// statement true, because the statement is about the colour and not about
+/// the stock.[^1]
+///
+/// # References
+///
+/// [^1]: Recurring Defect Shapes, shape 1. `.claude/rules/recurring-defects.md`
+const FOOD_AT_FULL_SHADE: u32 = 8;
 
 /// One colour for each faction, and one spare.
 ///
@@ -260,6 +282,81 @@ const FOUNDING_CORE: u32 = 0x0014_0b04;
 const FOUNDING_LEAST_SIDE: i32 = 7;
 
 /// A pixel buffer that the viewer paints and the window shows.
+/// The drawn unit nearest the middle of the window.
+///
+/// The panel reports why one unit chose what it chose, and it must name a
+/// unit to do that. The viewer has no cursor, so the middle of the window is
+/// the pointer: a watcher who wants a different unit scrolls until that unit
+/// is in the middle.[^1]
+///
+/// The drawing pass fixes this while it paints. It compares the position it
+/// already computed for a unit against the middle of the canvas, which costs
+/// one comparison for each unit the pass was already painting. The panel
+/// therefore starts no pass over the world to find a unit.[^2]
+///
+/// The comparison is strict, so the first unit at a distance keeps it. The
+/// drawing pass visits the blocks in ascending block order and the units of a
+/// block in tile order, so the same world and the same camera name the same
+/// unit.[^3]
+///
+/// # References
+///
+/// [^1]: Decisions register, DEC-077. `docs/DECISIONS.md`
+/// [^2]: ADR-0070, the head-up display reports what the drawing pass read, decision D1. `docs/adrs/accepted/adr-0070-the-head-up-display-reports-what-the-drawing-pass-read.md`
+/// [^3]: ADR-0018, the unit-to-tile bridge is derived, and it rebuilds at the barrier, decision D2. `docs/adrs/accepted/adr-0018-the-unit-to-tile-bridge-is-derived-and-rebuilds-at-the-barrier.md`
+#[derive(Clone, Copy, Debug)]
+pub struct Focus {
+    entity: Entity,
+    address: Axial,
+    faction: FactionId,
+    condition: Option<NeedCondition>,
+    reach: i64,
+}
+
+impl Focus {
+    /// Returns the identity of the unit.
+    #[must_use]
+    pub const fn entity(&self) -> Entity {
+        self.entity
+    }
+
+    /// Returns the tile the unit stands on.
+    #[must_use]
+    pub const fn address(&self) -> Axial {
+        self.address
+    }
+
+    /// Returns the faction of the unit.
+    #[must_use]
+    pub const fn faction(&self) -> FactionId {
+        self.faction
+    }
+
+    /// Returns the condition the engine gives the unit.
+    ///
+    /// Returns `None` when the engine names no condition for it. The viewer
+    /// invents none, because the rule that decides a condition lives in the
+    /// engine and a second copy of it here would be one rule in two
+    /// places.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: Recurring Defect Shapes, shape 1. `.claude/rules/recurring-defects.md`
+    #[must_use]
+    pub const fn condition(&self) -> Option<NeedCondition> {
+        self.condition
+    }
+
+    /// Returns the squared distance in pixels from the middle of the window.
+    ///
+    /// The square is kept rather than the root, because the comparison needs
+    /// no root and the viewer states what it measured.
+    #[must_use]
+    pub const fn reach(&self) -> i64 {
+        self.reach
+    }
+}
+
 pub struct Canvas {
     width: usize,
     height: usize,
@@ -277,6 +374,7 @@ pub struct Canvas {
     condition_reads: u32,
     units_short: u32,
     foundings_marked: u32,
+    focus: Option<Focus>,
 }
 
 impl Canvas {
@@ -306,6 +404,7 @@ impl Canvas {
             condition_reads: 0,
             units_short: 0,
             foundings_marked: 0,
+            focus: None,
         }
     }
 
@@ -513,6 +612,20 @@ impl Canvas {
         self.foundings_marked
     }
 
+    /// Returns the drawn unit nearest the middle of the window.
+    ///
+    /// Returns `None` when the pass painted no unit. The panel then says that
+    /// the window holds nobody, rather than naming a unit it did not
+    /// draw.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0070, the head-up display reports what the drawing pass read, decision D2. `docs/adrs/accepted/adr-0070-the-head-up-display-reports-what-the-drawing-pass-read.md`
+    #[must_use]
+    pub const fn focus(&self) -> Option<Focus> {
+        self.focus
+    }
+
     pub fn block(&mut self, x: i32, y: i32, width: i32, height: i32, colour: u32) {
         self.fill_rect(x, y, width, height, colour);
     }
@@ -598,6 +711,7 @@ impl Canvas {
         self.condition_reads = 0;
         self.units_short = 0;
         self.foundings_marked = 0;
+        self.focus = None;
     }
 
     /// Sets one pixel, and ignores a position outside the canvas.
@@ -951,11 +1065,12 @@ fn span(first: f32, last: f32, limit: u32) -> (u32, u32) {
 /// Returns the colour of one tile.
 ///
 /// The kind chooses the colour and the height brightens it, so a person reads
-/// the relief of the ground as well as its kind.[^1] The simulated value
-/// ripples on top, so a still camera over a stepping world still moves.
+/// the relief of the ground as well as its kind.[^1] The food the tile still
+/// holds brightens it further, so a person reads where the food is and
+/// watches a deposit drain and recover.[^3]
 ///
-/// Both the height and the value are fixed-point numbers in the engine. The
-/// viewer reads their raw bits and turns them into a brightness. That is a
+/// The height is a fixed-point number in the engine and the food is a whole
+/// number of units. The viewer turns both into a brightness. That is a
 /// conversion out of exact arithmetic, and nothing here goes back into
 /// it.[^2]
 ///
@@ -963,13 +1078,17 @@ fn span(first: f32, last: f32, limit: u32) -> (u32, u32) {
 ///
 /// [^1]: PRD-0003, a developer sees a world worth looking at. `docs/product/accepted/prd-0003-a-developer-sees-a-world-worth-looking-at.md`
 /// [^2]: ADR-0067, the viewer reads the world and never writes to it, decision D3. `docs/adrs/accepted/adr-0067-the-viewer-reads-the-world-and-never-writes-to-it.md`
-fn tile_colour(kind: TileKind, height: i32, value: i32) -> u32 {
+/// [^3]: ADR-0072, a tile stock is generated, and only what was taken is stored, decision D4. `docs/adrs/accepted/adr-0072-a-tile-stock-is-generated-and-only-what-was-taken-is-stored.md`
+fn tile_colour(kind: TileKind, height: i32, food: u32) -> u32 {
     let base = KIND_COLOURS[kind.to_u8() as usize];
     // The height is a fraction of the full range in Q16.16, so the unit is
     // 65536. The shift maps the fraction onto the brightness steps.
     let relief = (height.clamp(0, 0x0001_0000) * HEIGHT_STEPS) >> 16;
-    let ripple = (((value >> 10) & 0xff) * VALUE_STEPS) >> 8;
-    let shade = relief + ripple;
+    // The food is a whole number of units. The ramp saturates at the shade
+    // bound, so a tile above it draws the same as a tile at it.
+    let stock = food.min(FOOD_AT_FULL_SHADE) as i32;
+    let larder = (stock * FOOD_STEPS) / FOOD_AT_FULL_SHADE as i32;
+    let shade = relief + larder;
     let channel = |offset: u32| (((base >> offset) & 0xff) as i32 + shade).clamp(0, 0xff) as u32;
     (channel(16) << 16) | (channel(8) << 8) | channel(0)
 }
@@ -1001,6 +1120,7 @@ pub fn kind_colour(kind: TileKind) -> u32 {
 /// [^2]: ADR-0068, terrain is generated from the seed and is never stored as a map, decision D1. `docs/adrs/accepted/adr-0068-terrain-is-generated-from-the-seed-and-is-never-stored-as-a-map.md`
 /// [^3]: ADR-0070, the head-up display reports what the drawing pass read, decision D1. `docs/adrs/accepted/adr-0070-the-head-up-display-reports-what-the-drawing-pass-read.md`
 /// [^4]: ADR-0053, a faction is a bit in a mask, and a relation is a plane, decision D2. `docs/adrs/accepted/adr-0053-a-faction-is-a-bit-in-a-mask-and-a-relation-is-a-plane.md`
+/// [^5]: ADR-0072, a tile stock is generated, and only what was taken is stored, decision D4. `docs/adrs/accepted/adr-0072-a-tile-stock-is-generated-and-only-what-was-taken-is-stored.md`
 pub fn draw(world: &World, camera: Camera, canvas: &mut Canvas) -> Result<(), BridgeError> {
     canvas.clear();
     let grid = world.grid();
@@ -1016,22 +1136,22 @@ pub fn draw(world: &World, camera: Camera, canvas: &mut Canvas) -> Result<(), Br
         let (first_column, last_column) = camera.visible_columns(row, world, canvas);
         for column in first_column..last_column {
             let address = Axial::new(column as i32, row as i32);
-            let Some(index) = grid.index_of(address) else {
+            if grid.index_of(address).is_none() {
+                continue;
+            }
+            // The stock of a tile is the stock the ground generated, less
+            // what somebody took from it. The engine stores the second term
+            // only, so the viewer asks for the tiles the window covers and
+            // for no other, and a tile nobody touched costs a generation and
+            // a search that finds nothing.[^5]
+            let Some(food) = world.tile_stock(address, ResourceKind::Food) else {
                 continue;
             };
-            // The world generates a tile value when a reader asks for
-            // one, so the viewer asks for the tiles the window covers and
-            // for no other. A sweep of the whole world every frame is what
-            // the ground record calls a design mistake.[^2]
-            let Some(value) = world.tile_value_at(index) else {
-                continue;
-            };
-            let value = value.0;
             let Some(ground) = terrain.tile(address) else {
                 continue;
             };
             let (x, y) = camera.centre_of(address);
-            let ground_colour = tile_colour(ground.kind, ground.height.0, value);
+            let ground_colour = tile_colour(ground.kind, ground.height.0, food.0);
             let left = x as i32 - tile_side / 2;
             let top = y as i32 - tile_side / 2;
 
@@ -1293,12 +1413,28 @@ fn draw_soldiers(
                 //
                 // [^9]: Findings register, FND-119. `docs/FINDINGS.md`
                 canvas.condition_reads += 1;
-                match world.unit_condition(*soldier) {
+                let condition = world.unit_condition(*soldier);
+                match condition {
                     None | Some(NeedCondition::Fed) => {}
                     Some(NeedCondition::Short | NeedCondition::Starved) => {
                         canvas.units_short += 1;
                         canvas.fill_disc(x as i32, y as i32, (radius / 2).max(1), SHORTAGE);
                     }
+                }
+                // The unit nearest the middle of the window, fixed on the
+                // loop that already paints. The panel names this unit when it
+                // reports a choice, and it starts no pass to find it.[^10]
+                //
+                // [^10]: ADR-0070, the head-up display reports what the drawing pass read, decision D1. `docs/adrs/accepted/adr-0070-the-head-up-display-reports-what-the-drawing-pass-read.md`
+                let reach = reach_from_middle(canvas, x, y);
+                if canvas.focus.is_none_or(|held| reach < held.reach) {
+                    canvas.focus = Some(Focus {
+                        entity: *soldier,
+                        address,
+                        faction,
+                        condition,
+                        reach,
+                    });
                 }
                 // The census is a by-product of the pass that paints. A
                 // separate pass over the soldiers would give the same numbers
@@ -1316,6 +1452,20 @@ fn draw_soldiers(
         }
     }
     Ok(())
+}
+
+/// Returns the squared distance in pixels from the middle of the canvas.
+///
+/// The arithmetic is the viewer's own and nothing formed here reaches the
+/// engine.[^1]
+///
+/// # References
+///
+/// [^1]: ADR-0067, the viewer reads the world and never writes to it, decision D3. `docs/adrs/accepted/adr-0067-the-viewer-reads-the-world-and-never-writes-to-it.md`
+fn reach_from_middle(canvas: &Canvas, x: f32, y: f32) -> i64 {
+    let across = i64::from(x as i32 - (canvas.width() / 2) as i32);
+    let down = i64::from(y as i32 - (canvas.height() / 2) as i32);
+    across * across + down * down
 }
 
 /// Records what one tile's run of painted units means, and marks the tile

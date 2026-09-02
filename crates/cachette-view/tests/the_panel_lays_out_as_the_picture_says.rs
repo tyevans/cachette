@@ -89,7 +89,7 @@ const SPREAD: u32 = 9973;
 /// The height grows when the panel gains a section. A window that cut the
 /// panel would store a picture of the cut rather than a picture of the
 /// layout, and the ground rows would fall off the bottom first.
-const WINDOW: (usize, usize) = (340, 860);
+const WINDOW: (usize, usize) = (340, 1300);
 
 /// The steps the fixed measurements report.
 const TICKS: u64 = 40;

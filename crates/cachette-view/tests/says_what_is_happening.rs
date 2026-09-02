@@ -41,12 +41,24 @@ const FACTIONS: u16 = 4;
 
 /// The size of the window these tests draw into.
 ///
-/// The height matches the window the demonstration binary opens, so these
-/// tests measure the panel a person sees. A shorter canvas now cuts the panel
-/// and says that it did, and two tests below read that case on purpose.[^1]
+/// The height is shorter than the panel, so these tests measure a panel that
+/// the window cuts, and two tests below read that case on purpose.[^1] It is
+/// not the height of the demonstration window: a second copy of that number
+/// here would say something false the next time the binary changes.[^2]
 ///
 /// [^1]: Backlog item 0045. `docs/backlog/complete/0045-the-panel-has-no-answer-for-a-short-window.md`
+/// [^2]: Recurring Defect Shapes, shape 1. `.claude/rules/recurring-defects.md`
 const WINDOW: (usize, usize) = (640, 720);
+
+/// A window tall enough to hold the whole panel, whatever it holds.
+///
+/// The demonstration window is shorter than the panel and cuts it, which the
+/// panel says on its last line.[^1] A test that asks whether a section
+/// reaches a line at all must not measure the cut instead, so it draws into
+/// this height.
+///
+/// [^1]: Backlog item 0133. `docs/backlog/proposed/0133-let-a-watcher-reach-a-panel-longer-than-the-window.md`
+const WHOLE_PANEL: usize = 1600;
 
 /// Builds a world far larger than the window, with soldiers spread over it.
 fn world() -> World {
@@ -1236,10 +1248,18 @@ fn the_founding_rows_fit_their_column() {
 fn the_panel_grows_when_the_caller_holds_a_founding() {
     // The founding section must reach the panel. A readout that held the
     // report and drew none of it would pass every assertion above.
+    //
+    // The canvas is taller than the demonstration window. The founding
+    // sections sit last, so the demonstration window cuts them, and a cut
+    // panel is the same height whatever it holds.[^2] This test asks whether
+    // the section reaches a line at all, so it needs a window that holds the
+    // whole panel.
+    //
+    // [^2]: Backlog item 0188. `docs/backlog/complete/0188-show-the-food-of-a-tile-and-the-reason-a-unit-chose.md`
     let (world, foundings) = founded_world();
     let metrics = Metrics::start();
-    let mut with_founding = canvas();
-    let mut without = canvas();
+    let mut with_founding = Canvas::new(WINDOW.0, WHOLE_PANEL);
+    let mut without = Canvas::new(WINDOW.0, WHOLE_PANEL);
     let camera = looking_at(&world, &with_founding, first_place(&foundings));
 
     let stated = draw_frame(&world, camera, &metrics, &foundings, &mut with_founding)

@@ -17,7 +17,15 @@ use cachette_view::picture::write_ppm;
 use cachette_view::{draw_frame, Camera, Canvas, Metrics};
 
 /// The size of the picture in pixels.
-const WINDOW: (usize, usize) = (420, 760);
+///
+/// The picture exists so that a person reads the whole panel without a
+/// display, so it is taller than the panel. A shorter picture would record
+/// the cut rather than the panel.[^1]
+///
+/// # References
+///
+/// [^1]: Backlog item 0133, the panel is longer than the window. `docs/backlog/proposed/0133-let-a-watcher-reach-a-panel-longer-than-the-window.md`
+const WINDOW: (usize, usize) = (420, 1340);
 
 fn main() {
     let path = std::env::args()

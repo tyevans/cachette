@@ -25,6 +25,7 @@
 
 use std::collections::BTreeSet;
 
+use cachette_core::resource::ResourceKind;
 use cachette_core::terrain::{TileKind, KIND_COUNT};
 use cachette_core::{Axial, World, WorldConfig};
 use cachette_view::paint::kind_colour;
@@ -226,6 +227,13 @@ fn a_taller_tile_of_one_kind_is_painted_brighter() {
 
     // One kind, two tiles, the tallest and the shortest of that kind inside
     // the canvas. The pair must exist, or the test measures the fixture.
+    //
+    // The food on a tile brightens it too, and the food range is wider than
+    // the height range of one kind in one world. The search therefore holds
+    // the food at zero, so the only thing that separates the two tiles is
+    // the height.[^1]
+    //
+    // [^1]: Backlog item 0188. `docs/backlog/complete/0188-show-the-food-of-a-tile-and-the-reason-a-unit-chose.md`
     let mut lowest: Option<(i32, u32)> = None;
     let mut highest: Option<(i32, u32)> = None;
     for address in addresses_of(&world) {
@@ -233,6 +241,12 @@ fn a_taller_tile_of_one_kind_is_painted_brighter() {
             .tile_terrain(address)
             .expect("the address names a tile");
         if ground.kind != TileKind::Plain {
+            continue;
+        }
+        if world
+            .tile_stock(address, ResourceKind::Food)
+            .is_none_or(|amount| amount.0 != 0)
+        {
             continue;
         }
         let (x, y) = camera.centre_of(address);

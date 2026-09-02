@@ -759,6 +759,79 @@ paying for it now against no reader is the larger cost.
 **What would reverse this.** An option row, a viewer panel, or a control-plane
 verb that scores wood or stone. Add the total in the same change as the reader,
 and not before it.
+### DEC-077 — Which unit does the panel explain, when the viewer has no cursor?
+
+**Closed. The unit nearest the middle of the window.**
+
+The engine holds a verb that reports every option score, the value each option
+read from the level 1 cell, the weight each option carried, and the option the
+scores select.[^DEC77A] The panel must name one unit to ask it. The viewer has
+no cursor and no selection, so nothing said which unit.
+
+**The middle of the window is the pointer.** A watcher who wants another unit
+scrolls until that unit is in the middle. This costs no new input handling, it
+reuses the reading the panel already makes for the region under the crosshair,
+and it needs no state that lives between frames.
+
+**The drawing pass fixes it while it paints.** The pass already computes the
+screen position of every unit it draws. It compares that position against the
+middle of the canvas, which costs one comparison for each unit the pass was
+already painting, so the panel starts no pass to find the unit.[^DEC77B] The
+comparison is strict and the drawing order is fixed, so the same world and the
+same camera name the same unit.
+
+**The options rejected.**
+
+1. **A cursor.** The viewer takes no pointer input today. A cursor is a real
+   feature and it belongs to a watcher who wants to inspect rather than watch.
+   It is not free, and this work needed a unit today.
+2. **A fixed identity, chosen at the founding.** A watcher who scrolls away
+   then reads a panel about a unit off the screen, and the panel says nothing
+   about what is in front of them.
+3. **The first unit the drawing pass paints.** Cheapest, and useless: it names
+   a unit at the top corner of the window, which is not where a watcher is
+   looking.
+
+**Why this is not a record.** A later contributor could reasonably choose a
+cursor, so the first test for a record passes. The second fails: changing this
+costs one function in the viewer and no caller outside it. The third fails
+too, because the reasoning fits in a doc comment beside the code.[^SCOPE1]
+
+### DEC-078 — How does a panel longer than the window make room for a new section?
+
+**Closed for this work. By the order of the sections. The reach mechanism
+stays open.**
+
+The panel is longer than the window and cuts at the foot, with a notice on the
+last line. A separate item holds the reach problem, and it lists three
+candidate mechanisms: a fold, a scroll, and a second column. It also asks
+whether the order of the sections is the cheaper answer, and says that
+question should be measured against the others.[^DEC78A]
+
+**This work is that measurement.** Three sections were added to a panel that
+already cut. The order was changed instead of adding a mechanism: every
+section that reports the world as it stands now comes first, and the sections
+that report the founding go last. The founding is history. It cost twelve rows
+for each faction, and it filled the panel from the middle down.
+
+**What the measurement showed.** Before the change, in the demonstration
+window, the cut fell inside the second founding section. The region rows, the
+ground legend and the cost rows were already below the edge, which is the loss
+the reach item names. After the change the three new sections are above the
+cut and the founding detail is below it. The demonstration window is also
+taller, which reaches further down.
+
+**The order is not a full answer, and the reach item is not closed by it.**
+The ground legend and the cost rows are still below the edge. The order buys
+one placement and it cannot buy a second: the next section forces the same
+choice again, which the reach item already predicted. The order should now be
+read as evidence in that item rather than as a solution.
+
+**The recommendation for the reach item is the scroll.** The fold needs a name
+and a state for each section, the second column needs a width the
+demonstration window does not have, and the scroll needs one number that the
+viewer already has a place for beside the camera.
+
 
 ### DEC-063 — Which verb puts a unit in the world from the control plane?
 
@@ -1799,3 +1872,6 @@ a failed founding is correct.[^PRD12]
 [^DEC83B]: Findings register, FND-197. `docs/FINDINGS.md`
 [^DEC83C]: ADR Registry, the status vocabulary. `docs/adrs/REGISTRY.md`
 [^DEC83D]: Review 0204, the two corrected records. `docs/reviews/0204-the-two-corrected-records.md`
+[^DEC77A]: ADR-0064, a unit chooses by scoring a small fixed option set, decision D2. `docs/adrs/accepted/adr-0064-a-unit-chooses-by-scoring-a-small-fixed-option-set.md`
+[^DEC77B]: ADR-0070, the head-up display reports what the drawing pass read, decision D1. `docs/adrs/accepted/adr-0070-the-head-up-display-reports-what-the-drawing-pass-read.md`
+[^DEC78A]: Backlog item 0133. `docs/backlog/proposed/0133-let-a-watcher-reach-a-panel-longer-than-the-window.md`
