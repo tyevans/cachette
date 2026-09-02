@@ -23,9 +23,51 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^ALLOC]
 
-**Next number: DEC-064**
+**Next number: DEC-070**
 
 ## Open
+
+### DEC-069 — Which representation does the result of a selector take?
+
+**Open. The recommendation is a two-level form built for this storage, and the
+choice waits for a measurement that does not exist.**
+
+A selector describes a set and the engine evaluates it.[^DEC69A] The evaluation
+produces a result, and the record that governs the result requires one property
+of it: a block that a predicate satisfies as a whole costs one entry, whatever
+the block holds.[^DEC69B] That record states the property and names no form,
+because no measurement exists on the target platform.[^BLK7]
+
+**The options.**
+
+1. A form built for this storage, in two levels. The upper level names a block
+   of the storage, and the lower level is either a statement that the whole
+   block matches or a bitmask over the block. The blocks are the blocks the
+   storage and the summary pyramid already use, so a descent writes its answer
+   in the shape a verb consumes and nothing converts.
+2. A general compressed bitmap library. It arrives tested and needs no work. It
+   splits the key space at a fixed width that has no relation to the storage, so
+   a conversion sits between the descent and the verb.
+3. A sorted list of indices, with a bitmask above a density threshold. This is
+   the smallest amount of new code. The threshold is a value a measurement
+   decides, and no measurement exists.
+
+**The recommendation is option 1.** The key space here is not arbitrary, and
+option 2 treats it as if it were. The gain the record claims comes from the
+agreement between the result and the storage, and only option 1 has that
+agreement by construction.
+
+**What holds it back.** Nothing holds the decision, and the work it governs is
+not started. The research states plainly that the claim is a design argument
+and not a measurement, and it names the benchmark that would settle it: an
+intersection of two sparse sets, an intersection of two dense sets, a union of
+many sets, and a full iteration with a column read.[^DEC69C]
+
+**What is not open.** The property in the record is not one of the options. Any
+form the project takes must state a whole block in one entry, must follow the
+storage layout, and must yield one fixed order.[^DEC69B] A form that fails those
+supersedes the record rather than choosing inside it. The interface never names
+the form, so this choice does not reach a caller.
 
 ### DEC-062 — Do the settlement arena and the character arena reserve their storage too?
 
@@ -1255,3 +1297,6 @@ a failed founding is correct.[^PRD12]
 [^FND015]: Findings register, FND-015. `docs/FINDINGS.md`
 [^FND089]: Findings register, FND-089. `docs/FINDINGS.md`
 [^ADR80]: ADR-0080, a depleted deposit recovers by ageing the stored take. `docs/adrs/accepted/adr-0080-a-depleted-deposit-recovers-by-ageing-the-stored-take.md`
+[^DEC69A]: ADR-0051, a selector is a lazy expression tree that Rust evaluates, decision D1. `docs/adrs/draft/adr-0051-a-selector-is-a-lazy-expression-tree.md`
+[^DEC69B]: ADR-0052, a selector result may be a range, not only an enumerated set, decision D2. `docs/adrs/draft/adr-0052-a-selector-result-may-be-a-range.md`
+[^DEC69C]: Selector engine and verbs, section 3.2. `docs/research/reports/04-selector-engine-and-verbs.md`

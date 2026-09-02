@@ -86,6 +86,6 @@ Filled in when the item moves to `complete/`.
 [^3]: Backlog item 0101. `docs/backlog/complete/0101-assert-the-terrain-gradient-of-a-holding.md`
 [^4]: Testing Rules, a fixture supplies the input. `.claude/rules/testing.md`
 [^5]: Findings register, FND-051 and FND-048. `docs/FINDINGS.md`
-[^6]: ADR-0040, Python is a control plane, not a data plane. `docs/adrs/REGISTRY.md`
+[^6]: ADR-0040, Python is a control plane, not a data plane. `docs/adrs/draft/adr-0040-python-is-a-control-plane-not-a-data-plane.md`
 [^7]: Decision Record Scope, section 1. `.claude/rules/adr-scope.md`
 [^8]: Recurring defect shapes, shape 3. `.claude/rules/recurring-defects.md`
