@@ -193,8 +193,8 @@ Filled in when the item moves to `complete/`.
 [^2]: PRD-0009, a unit acts on the world it can see. `docs/product/accepted/prd-0009-a-unit-acts-on-the-world-it-can-see.md`
 [^3]: Backlog item 0186, let the engine order a gather. `docs/backlog/refined/0186-let-the-engine-order-a-gather.md`
 [^4]: Backlog item 0187, give a carried load somewhere to go. `docs/backlog/refined/0187-give-a-carried-load-somewhere-to-go.md`
-[^5]: Backlog item 0183, carry the food of a cell into the level 1 summary. `docs/backlog/proposed/0183-carry-the-food-of-a-cell-into-the-level-1-summary.md`
-[^6]: Backlog item 0184, score the forage option against food. `docs/backlog/proposed/0184-score-the-forage-option-against-food.md`
+[^5]: Backlog item 0183, carry the food of a cell into the level 1 summary. `docs/backlog/complete/0183-carry-the-food-of-a-cell-into-the-level-1-summary.md`
+[^6]: Backlog item 0184, score the forage option against food. `docs/backlog/complete/0184-score-the-forage-option-against-food.md`
 [^7]: Decisions register, DEC-067. `docs/DECISIONS.md`
 [^8]: Findings register, FND-029. `docs/FINDINGS.md`
 [^9]: ADR-0024, every summary field is declared extensive or intensive, decision D2. `docs/adrs/accepted/adr-0024-every-summary-field-is-declared-extensive-or-intensive.md`
