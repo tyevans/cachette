@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-133**
+**Next number: FND-137**
 
 ## A. Corrections to stated rules
 
@@ -2967,6 +2967,93 @@ and only the second one catches a rename.[^80]
 entry in the same commit as the work that cites it, or do not cite it yet.
 
 
+### FND-134 — A product record can state a structure, and the check cannot see it
+
+**Believed.** The product record check defends the rule that a product record
+states a need and never a structure.[^81] It fails when a record body cites a
+decision record, because a citation shows that the record states a structure.
+
+**True.** The check sees the citation and nothing else. It reads each body line
+for a decision record number and for the record directory path.[^82] A record
+that states the same structure in prose, and names no record, passes.
+
+**Evidence.** The product record for a deposit that comes back states the
+storage the engine uses and the algorithm that recovers a deposit. It says that
+the world stores only what units took, that recovery removes a stored record,
+and that the world answers the amount when a caller asks. A decision record
+holds all three claims, and the project has accepted it.[^83] The product record names
+no decision record, so the check passes it. A review found it by reading.[^88]
+
+**Follows.** Two things.
+
+**The gate between `shaped/` and `accepted/` is a human review, and the check
+does not stand in for it.** The check stops a citation. It cannot stop a
+structure. A reviewer reads the cost section against the decision records that
+cover the same subject, and treats an overlap as a defect.
+
+**The structure reached the product record through the cost section.** The gate
+asks what a need costs at the target scale. A writer that cannot state a cost
+without a measurement reaches for the mechanism instead, because the mechanism
+is the only concrete thing available.[^85] A cost section states what the cost
+must grow with. It does not state what the engine stores.
+
+### FND-135 — The world reserves no storage for the target population
+
+**Believed.** The world reserves storage sized for the target population, and
+that storage does not change during a run. A run does not stop to grow. The
+accepted product record for a founding states this as a property that follows
+from its cost.[^84]
+
+**True.** The world reserves nothing. The unit arena opens as many slots as the
+slot index holds, and its own comment says that the limit is the range of the
+index and not a cost budget. It reserves no memory for those slots. Each spawn
+appends one entry to each of its ten columns, so the storage grows with the
+population under a running simulation.
+
+**Evidence.** A driver founded 120 people in a 640 by 440 world through the
+public interface, and read the arena capacity back as 4294967295. That is the
+range of the slot index. The arena construction takes that limit as its
+capacity, and the spawn path appends to each column.
+
+**Follows.** Three things.
+
+**A record the code contradicts is worse than no record.**[^86] The product
+record states a property that a reader would design against, and the engine
+does not hold it.
+
+**The disagreement is architectural, and a product record cannot settle it.**
+Whether the world reserves unit storage at construction, or grows it, is a
+constraint. A row in the decisions register holds the question.[^87]
+
+**A cost statement of a product record is a claim about the engine, and nobody
+checks it.** The checkable statements of a record get a test. The cost section
+gets none. This claim survived acceptance and every gate.
+
+### FND-136 — A merge committed conflict markers into a register, and every gate passed
+
+**Believed.** The gate suite defends the three registers. It checks the
+numbering, the priority indexes, the citations and the records.[^89]
+
+**True.** No check reads a register for a conflict marker. A merge left the
+three markers of an unresolved conflict in the decisions register, the commit
+went to the main branch, and the whole gate suite stayed green.
+
+**Evidence.** The register held the marker lines at its footnote list. The two
+sides of the conflict differed by one footnote definition, so a reader skimming
+the file would see two nearly identical lines and no error. A product review
+found it while reading the footnotes for another purpose, four commits later.
+
+**Follows.** Two things.
+
+**A marker is invisible to a checker that parses structure.** Each check reads
+the register for the shape it cares about: a heading, a number, a footnote
+label. A marker line is none of those, so every check walks past it. A grep for
+the three markers over the whole tree costs nothing and catches this class.
+
+**A register merges more often than any other file, because every worker
+updates one.** The registers are where this failure lands, and parallel work
+makes it more likely, not less.
+
 ## References
 
 [^1]: Findings register, FND-038, in this document.
@@ -3049,3 +3136,13 @@ entry in the same commit as the work that cites it, or do not cite it yet.
 [^78]: Findings register, FND-128, in this document.
 [^79]: Review 0143, the housing, growth, founding and recovery records. `docs/reviews/0143-the-housing-growth-founding-and-recovery-records.md`
 [^80]: Commit Message Rules, after a sweep. `.claude/rules/commits.md`
+
+[^81]: Product requirement records, what does not belong here. `docs/product/README.md`
+[^82]: The product record check. `scripts/check_prds.py`
+[^83]: ADR-0080, a depleted deposit recovers by ageing the stored take. `docs/adrs/accepted/adr-0080-a-depleted-deposit-recovers-by-ageing-the-stored-take.md`
+[^84]: PRD-0012, a world starts small and grows. `docs/product/accepted/prd-0012-a-world-starts-small-and-grows.md`
+[^85]: Blockers register, BLK-007. `docs/BLOCKERS.md`
+[^86]: Definition of Done, section 3. `.claude/rules/definition-of-done.md`
+[^87]: Decisions register, DEC-059. `docs/DECISIONS.md`
+[^88]: Reviews, the founding and deposit product records. `docs/reviews/0149-the-founding-and-deposit-product-records.md`
+[^89]: The record and register checks. `justfile`

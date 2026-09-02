@@ -21,7 +21,7 @@ A record here is a need, not a plan. The backlog says what work answers it.[^3]
 
 | No. | Why it sits here |
 |---|---|
-| 0012 | A run now founds a small group. The need is partly met and the rest is close. |
+| 0012 | Eight of nine statements are met in a run. Nothing is born, so the end population is still the starting number.[^6] |
 | 0007 | Tiles hold resources and units take them. Consumption is what completes it. |
 | 0006 | A watcher can see the ground now. One statement still fails: two values name a tile's owner. |
 | 0009 | A unit reads nothing. This is the record the project points at. |
@@ -55,3 +55,4 @@ A record here is a need, not a plan. The backlog says what work answers it.[^3]
 [^3]: Backlog priority. `docs/backlog/PRIORITY.md`
 [^4]: The priority check script. `scripts/check_priority.py`
 [^5]: Reviews, the second review of the renderable example. `docs/reviews/`
+[^6]: Reviews, the founding and deposit product records. `docs/reviews/0149-the-founding-and-deposit-product-records.md`

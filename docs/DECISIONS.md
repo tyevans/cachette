@@ -23,9 +23,50 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^ALLOC]
 
-**Next number: DEC-058**
+**Next number: DEC-060**
 
 ## Open
+
+### DEC-059 — Does the world reserve unit storage, or grow it during a run?
+
+**Open. The recommendation is to reserve the storage at construction, and to
+refuse a spawn that would exceed it.**
+
+The accepted product record for a founding states that the storage the world
+reserves is sized for the target population, that it does not change during a
+run, and that a run does not stop to grow.[^PRD12] The engine does the
+opposite. The unit arena opens as many slots as the slot index holds, reserves
+no memory for them, and appends one entry to each of its columns at each
+spawn.[^FND135]
+
+The record and the code disagree, so one of them changes.[^DOD3]
+
+**The options.**
+
+1. The world reserves the unit columns at construction, from a population the
+   settings name. A spawn past the reservation gets a typed refusal. The record
+   then describes the code.
+2. The arena keeps growing, and the product record loses the statement. A run
+   then reallocates a column under a running simulation, at a moment nobody
+   chose.
+3. The world reserves at construction and grows past the reservation as a
+   fallback. This holds both behaviours, so it holds two answers to one
+   question.
+
+**The recommendation is option 1.** A reallocation of ten columns at one million
+units is a cost that arrives inside a step, and no measurement exists on the
+target platform to say what it costs.[^BLK7] A reservation moves that cost to
+construction, where a developer can see it. It also gives the refusal path a
+real case, rather than one somebody adds after the first stall.
+
+**What holds it back.** Nothing holds the choice. The value of the reservation
+is a separate matter, and the target population is already answered.[^BLK3]
+
+**How to state the reservation.** Take it from the world settings, in one
+place. A second copy in the arena and in the settings is the defect shape this
+project keeps meeting.[^SHAPE1]
+
+A proposed item carries the work.[^ITEM0150]
 
 ### DEC-057 — Does a site store its resident count, or read the one the engine keeps?
 
@@ -1027,9 +1068,10 @@ a failed founding is correct.[^PRD12]
 [^FND129]: Findings register, FND-129. `docs/FINDINGS.md`
 [^ADR81]: ADR-0081, a residence is a stored column and occupancy is a maintained count, decision D3. `docs/adrs/draft/adr-0081-a-residence-is-a-stored-column-and-occupancy-is-a-maintained-count.md`
 [^ADR75]: ADR-0075, the founding choice reads a bounded sample of the world. `docs/adrs/accepted/adr-0075-the-founding-choice-reads-a-bounded-sample-of-the-world.md`
-<<<<<<< HEAD
 [^FND106]: Findings register, FND-106. `docs/FINDINGS.md`
 [^DEC44ITEM]: Backlog item 0060. `docs/backlog/proposed/0060-grow-the-population-from-the-store-and-the-housing.md`
-=======
->>>>>>> worktree-agent-a4ea51fa97c6b231a
 [^SCOPE]: Decision Record Scope, section 4.1. `.claude/rules/adr-scope.md`
+[^FND135]: Findings register, FND-135. `docs/FINDINGS.md`
+[^DOD3]: Definition of Done, section 3. `.claude/rules/definition-of-done.md`
+[^BLK3]: Blockers register, BLK-003. `docs/BLOCKERS.md`
+[^ITEM0150]: Backlog item 0150. `docs/backlog/proposed/0150-decide-how-the-world-reserves-unit-storage.md`
