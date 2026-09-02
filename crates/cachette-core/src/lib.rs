@@ -23,6 +23,7 @@ pub mod founding;
 pub mod hash;
 pub mod hex;
 pub mod holding;
+pub mod influence;
 pub mod pyramid;
 pub mod rates;
 pub mod resource;
@@ -52,6 +53,7 @@ pub use founding::{Founding, FoundingError, FoundingOutcome, Provision, Survey};
 pub use hash::StateHash;
 pub use hex::{Axial, Grid, GridError};
 pub use holding::{FactionMask, Holder, Holding};
+pub use influence::{Conductance, Influence, InfluenceError, InfluenceField};
 pub use rates::{
     RateError, RateLedger, RatePass, RateSchedule, RateTable, SiteRate, SiteShortfall,
 };

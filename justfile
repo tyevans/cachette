@@ -88,6 +88,7 @@ probe:
     ! cargo test --package cachette-core --features probe-nondeterminism --test consumption
     ! cargo test --package cachette-core --features probe-nondeterminism --test choice
     ! cargo test --package cachette-core --features probe-nondeterminism --test starvation
+    ! cargo test --package cachette-core --features probe-nondeterminism --test influence
     cargo test --package cachette-core --features probe-nondeterminism --test determinism_probe
 
 # Record the golden state hash files. Read the difference before you commit.
