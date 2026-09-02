@@ -200,7 +200,50 @@ and it decodes no field.
 
 ## Outcome
 
-Filled in when the item moves to `complete/`.
+**Done.** A tile carries one value that names a faction, and that value is the
+holder. The world lost the tile faction column, the construction loop that
+filled it, the state hash write that read it, and the clause of the invariant
+check that refused a value above the faction count. Two unit tests of that
+clause went with it. No code derives a faction from a tile index.
+
+**The tile event carries the holder.** The field changed type and kept its
+width, so the event keeps its size of 24 bytes, its alignment of 8, and its
+five declared padding bytes. The layout test asserts all three against the new
+field. An unheld tile carries the value the holder type states for nobody. The
+work invented no encoding and added no flag byte.
+
+**The stamp runs after the holding spreads.** The value pass runs at the top
+of the step and writes the value for nobody. The spread is the last thing in
+the step that writes the holder column, and the stamp follows it. The pass
+costs one write for each event, and not one for each tile.
+
+**The proof that the tests can fail.** Two defects went in, one at a time.
+
+A stamp taken before the spread failed three tests: the agreement test, the
+test of a tile that changed holder, and the test of a held tile. The test of an
+unheld tile stayed green, because a stale read reports the same nobody.
+
+A holder derived from the tile index failed four tests, the agreement test
+among them.
+
+The fixture test stayed green under both defects. That is correct: it reads
+the holder column back and never the events, so it measures the fixture and
+not the stamp.
+
+**The fixture reaches all three cases, and the smallest is very small.** The
+tick under test reported 3471 events. Of those, 3353 named a tile nobody held,
+118 named a held tile, and 22 named a tile that took a new holder on that
+tick. The counts are read back from the holder column after the step. FND-125
+records what the last number means for a fixture.
+
+**The golden files moved.** Every recorded hash in all eight scenario files
+changed, because the removed column was hashed on every tick. No file changed
+its line count. The thread-count equivalence test passes at 1, 2 and 12
+threads, and the event logs match byte for byte.
+
+**No record changed and no record was created.** The impact review made that
+judgement against the three conditions of the scope rule, and the work found
+no reason to revisit it.
 
 ## References
 

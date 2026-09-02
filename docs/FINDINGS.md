@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-125**
+**Next number: FND-126**
 
 ## A. Corrections to stated rules
 
@@ -2768,6 +2768,39 @@ side drove the founding into the run, so the gap between them was invisible to a
 green suite. The test that closes it removes the rate and watches the population
 end, which is the only proof that the assertion reaches the case.[^71]
 
+### FND-125 — The case a test was written for was one event in every 158
+
+**Believed.** A fixture that produces all three cases a test needs covers
+them. The tile event test needs an unheld tile, a held tile, and a tile that
+took a new holder on the tick under test. The fixture produces all three, so
+the assertions reach all three.
+
+**True.** The three cases are not the same size, and the one the item exists
+for is the smallest by two orders of magnitude. The tick under test reported
+3471 events. Of those, 3353 named a tile that nobody held, 118 named a held
+tile, and 22 named a tile whose holder changed on that tick. The case that
+distinguishes a fresh read from a stale one is 0.6 percent of the log.
+
+An assertion that held over most of the log would therefore say almost
+nothing. The stale read reports the correct answer for 3449 of the 3471
+events, because a tile whose holder did not change reports the same holder
+either way.
+
+**Evidence.** The stamp was put back to a read before the holding spread. The
+agreement test failed on tile 105, one of the 22. The test of an unheld tile
+stayed green, and so did the fixture test. The counts come from a run on the
+development machine, and they are a property of that fixture and that seed,
+not a measurement of the engine.
+
+**Follows.** **Count the case, do not only reach it.** A fixture check that
+asks whether a case occurred passes on one occurrence, and one occurrence in
+3471 is indistinguishable from luck when the seed or the rule moves. State the
+size of the case the test depends on, so that a later reader sees when the
+fixture has stopped supplying it. This is the fixture shape of the testing
+rule, seen from the other side: the rule says a uniform input hides a defect,
+and here the input is not uniform but the interesting part of it is
+rare.[^72] [^73]
+
 
 ## References
 
@@ -2812,7 +2845,7 @@ end, which is the only proof that the assertion reaches the case.[^71]
 [^39]: Backlog item 0085. `docs/backlog/complete/0085-show-a-watcher-who-holds-the-ground.md`
 [^40]: ADR-0053, a faction is a bit in a mask, and a relation is a plane, decision D2. `docs/adrs/accepted/adr-0053-a-faction-is-a-bit-in-a-mask-and-a-relation-is-a-plane.md`
 [^41]: PRD-0006, a place belongs to somebody. `docs/product/accepted/prd-0006-a-place-belongs-to-somebody.md`
-[^42]: Backlog item 0084. `docs/backlog/refined/0084-give-a-tile-one-faction-column.md`
+[^42]: Backlog item 0084. `docs/backlog/complete/0084-give-a-tile-one-faction-column.md`
 [^43]: Testing Rules, section 2. `.claude/rules/testing.md`
 [^44]: Findings register, FND-075. `docs/FINDINGS.md`
 [^45]: Findings register, FND-078. `docs/FINDINGS.md`
@@ -2842,3 +2875,5 @@ end, which is the only proof that the assertion reaches the case.[^71]
 [^69]: ADR-0073, gathering is admitted by sort-then-admit against the tile. `docs/adrs/accepted/adr-0073-gathering-is-admitted-by-sort-then-admit-against-the-tile.md`
 [^70]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`
 [^71]: Testing rules, section 2a. `.claude/rules/testing.md`
+[^72]: Testing Rules, section 2a. `.claude/rules/testing.md`
+[^73]: Backlog item 0084, give a tile one faction column. `docs/backlog/complete/0084-give-a-tile-one-faction-column.md`

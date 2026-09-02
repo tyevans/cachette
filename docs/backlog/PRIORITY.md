@@ -27,7 +27,6 @@ engine gets wrong today.
 
 | No. | Why it sits here |
 |---|---|
-| 0084 | Two values name a tile's owner, and the event log publishes the wrong one to Python.[^6] |
 | 0102 | A settlement reads its own ground rule, not the passability rule. Blocked by 0071 and 0092, in that order. |
 
 ## Next
@@ -99,7 +98,6 @@ These are real and none of them blocks anything today.
 [^3]: The priority check script. `scripts/check_priority.py`
 [^4]: Blockers register, BLK-018. `docs/BLOCKERS.md`
 [^5]: Decisions register, DEC-032. `docs/DECISIONS.md`
-[^6]: Findings register, FND-079. `docs/FINDINGS.md`
 [^7]: Findings register, FND-080. `docs/FINDINGS.md`
 [^8]: Findings register, FND-100. `docs/FINDINGS.md`
 [^9]: PRD-0018, a depleted deposit comes back. `docs/product/shaped/prd-0018-a-depleted-deposit-comes-back.md`
