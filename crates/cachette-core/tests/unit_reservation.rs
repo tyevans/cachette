@@ -202,6 +202,11 @@ fn a_founding_past_the_reservation_is_refused_and_leaves_nothing() {
         unit_capacity: GROUP / 2,
     })
     .expect("a small extent describes a world");
+    // A refused founding does not restore the state hash, and it must not be
+    // asked to. The arena never compacts the slot index space and a
+    // generation never rewinds, so the slots the founding opened stay open
+    // and their generations stay advanced. That is the arena rule. What the
+    // undo owes is that nothing lives and nothing stands.
     let outcome = world.found_run(GROUP, FactionId(0));
     assert_eq!(
         outcome.err(),
@@ -213,4 +218,35 @@ fn a_founding_past_the_reservation_is_refused_and_leaves_nothing() {
         0,
         "a refused founding left a settlement standing"
     );
+    assert!(
+        world.check_invariants(),
+        "a refused founding left the world outside its invariants"
+    );
+}
+
+#[test]
+fn a_refused_founding_frees_the_slots_it_opened() {
+    // The undo despawns the people it seated, and a despawn frees a slot
+    // rather than closing it. The world therefore keeps the slots the refused
+    // founding opened, and the next founding reuses them. This is the arena
+    // rule and not a defect: the arena never compacts the slot index space.
+    // The test states it, so that a later reader does not read the open slots
+    // as wreckage.
+    let mut world = World::new(WorldConfig {
+        width: 32,
+        height: 32,
+        seed: 0x5eed_0000_0000_0084,
+        faction_count: 1,
+        unit_capacity: GROUP / 2,
+    })
+    .expect("a small extent describes a world");
+    assert!(world.found_run(GROUP, FactionId(0)).is_err());
+    assert_eq!(world.soldiers().len(), 0);
+    assert_eq!(
+        world.soldiers().slot_count(),
+        GROUP / 2,
+        "the refused founding opened the whole reservation before it stopped"
+    );
+    // Every slot it opened is free, so the arena is empty and not full.
+    assert!(world.soldiers().check_invariants());
 }

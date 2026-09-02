@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-145**
+**Next number: FND-146**
 
 ## A. Corrections to stated rules
 
@@ -3231,12 +3231,20 @@ holds, not for what it reserved. A copy of a world part way through a run
 therefore holds a column sized to the live population, and it grows on the
 next spawn where the original does not.
 
-**Evidence.** The copy was written before it was tested, so no failure was
-observed. The property is stated by the standard library: a copy of a growable
-array allocates for its length. A test copies a world holding one unit, fills
-the copy to the reservation, and asserts that the address of the first entry
-of every column did not move. That test fails against a derived copy and
-passes against a written one.
+**Evidence.** The method found it, not a failure. The question asked of every
+new guarantee was: **which code paths could drop this without failing?** A
+copy is one, because the copy was derived rather than written, and a derived
+copy carries each field by copying it. The standard library states the rest: a
+copy of a growable array allocates for its length. A test copies a world
+holding one unit, fills the copy to the reservation, and asserts that the
+address of the first entry of every column did not move. That test fails
+against a derived copy and passes against a written one.
+
+The method transfers. When a change adds a guarantee that lives in a capacity,
+an ordering, or a reservation rather than in a value, list the operations that
+rebuild the structure — copy, serialise, merge, resize — and ask of each one
+whether it carries the guarantee or only the value. A derived implementation
+carries the value.
 
 **Follows.** Three things.
 
@@ -3284,6 +3292,51 @@ the same change.
 through one function, and every refusal after the settlement stands goes
 through it. A second undo written at the second return would have been a
 second copy of the same fact.
+
+### FND-145 — The world settings priced one new field at 82 struct literals, not 25
+
+**Believed.** The settings struct that builds a world prices a new parameter
+at about twenty-five files. The backlog item that exists to fix this states
+that figure, and it comes from the site rate work, which met the cost, counted
+the files and moved its parameter elsewhere rather than pay it.[^141] [^142]
+
+**True.** The price is 82 struct literals. The reservation work added one
+field, `unit_capacity`, and the compiler refused every exhaustive literal in
+the workspace. The figure is three times the one the item states, and it has
+grown because the tree has grown: every test written since the site rate work
+added literals of its own.
+
+**Evidence.** The whole-tree search that found them:
+
+```
+grep -rn "WorldConfig {" crates
+```
+
+It reports 94 occurrences. Three are not literals: the struct definition, a
+return type, and one in the Python binding. Nine literals already used struct
+update syntax or a base value and needed nothing. The remaining 82 took the
+field. The sweep was mechanical and was scripted rather than done by hand,
+because a sweep done by hand is done when the files look right rather than
+when a search comes back clean.[^143]
+
+**Follows.** Three things.
+
+**The cost is not fixed. It grows with the tree.** An item that states a cost
+as a number states it as of the day it was written. The right shape for this
+one is that the cost grows with the number of places that build a world, and
+that nothing bounds that number, so the cost only ever rises. Whoever refines
+the item should say it that way and cite this row for the two measurements.
+
+**The second measurement is what makes it a trend.** One figure is an
+anecdote. Two figures, taken by two pieces of work that each paid the price,
+say that the item is getting more expensive to defer, not less.
+
+**A mechanical price is not a small price.** Every one of the 82 edits was
+correct, none needed judgement, and the whole sweep was one script. It still
+put a one-field change into 41 files, across three crates, two of which
+belonged to other workers at the time. The cost that matters is the merge
+surface, not the typing.
+
 
 ## References
 
@@ -3389,3 +3442,6 @@ second copy of the same fact.
 [^F137D]: Backlog item 0153. `docs/backlog/proposed/0153-let-python-read-an-event-without-repeating-its-layout.md`
 [^139]: ADR-0084, the world reserves the unit columns at construction. `docs/adrs/draft/adr-0084-the-world-reserves-the-unit-columns-at-construction.md`
 [^140]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`
+[^141]: Backlog item 0080. `docs/backlog/proposed/0080-give-the-world-settings-a-constructor.md`
+[^142]: Findings register, FND-064, in this document.
+[^143]: Recurring defect shapes, shape 2. `.claude/rules/recurring-defects.md`
