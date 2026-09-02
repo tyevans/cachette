@@ -3806,41 +3806,53 @@ than restating its command.
 the footnote check reports its ordering rule instead of failing on it, decided
 independently on the same day.[^151]
 
-### FND-162 — One pass was named, and the build made three
+### FND-162 — The build made three passes, and the repair removed one of them
 
 **Believed.** Building a world cost one pass over every tile, and the tile
 stub value column made it. The product record for the ground states that the
-build must not make such a pass, and a finding recorded that the engine made
-one.[^F162A] The item that repaired it named the same one column.[^F162B]
+build must not make such a pass, and an earlier finding recorded that the
+engine made one.[^F162A] The item that repaired it named the same one
+column.[^F162B]
 
-**True.** The build made three passes over every tile and one proportional
-allocation, and the column made one of the three. The other two both belong to
-the first level of the pyramid. Building the level reads the ground of every
-tile of every block. The build then closes by rebuilding the moving part of
-every cell, and that sums the tile value of every tile. The holder column is
-the proportional allocation, and it is a dense column by decision rather than
-a defect.[^40]
+**True.** The build made three passes over every tile, and the column made one
+of them. The other two belong to the first level of the pyramid. Building the
+level reads the ground of every tile of every block. The build then closes by
+rebuilding the moving part of every cell, and that sums the tile value of
+every tile. A fourth cost is a proportional allocation rather than a pass: the
+holder column holds one entry for each tile, and that column is a dense column
+by decision rather than a defect.[^40]
+
+**The premise of the item was wrong, not merely incomplete.** Its title says
+that a world is built without a pass over every tile. **A world is still not
+built without a pass over every tile.** The repair removed the column and the
+pass that filled it, and two passes remain. A reader who takes the title for
+the state of the engine will be wrong.
 
 **Evidence.** A visit counter behind a test-only switch. The tile value field
 counts the tiles it generates, and the build test reads the count. After the
-column became generated, the count was still one for each tile, and the
-remaining count was the pyramid rebuild. The counter found it directly. No
-reading of the build had found it, over two items and one finding.
+column became generated, the build still visited each tile once, and the
+remaining visit was the pyramid rebuild. The counter reported it on its first
+run. Nobody had found it by reading the build, over two items and one finding.
 
-**Follows.** Three things.
+**Follows.** Four things.
 
 **A repair scoped to the thing that was named repairs what was named.** The
 earlier finding described the defect through the column that made it, and
-every reader after that read the column as the defect. The statement in the
-record is about the build, and nobody counted what the build did.
+every reader after it took the column for the defect. The statement in the
+product record is about the build, and nobody counted what the build did.
 
 **A cost claim needs an instrument before it needs a repair.** The counter was
 written to prove the repair. It found the larger defect in its first run, and
 it would have found it before the repair as well.
 
-**The product record stays `Accepted` and stays false.** Accepting a need the
-engine does not meet is correct. An item holds the remaining
-work.[^F162D]
+**A test asserts what the work removed, not what the item hoped for.** The
+build test asserts that the build visits each tile once and that the value
+field adds none of those visits. It does not assert that the build visits no
+tile, because that is not true.
+
+**The product record stays `Accepted` and it stays false of the engine.**
+Accepting a need the engine does not meet is correct. Nothing about this work
+makes the need met, and an item holds what remains.[^F162D]
 
 ### FND-164 — The branch tip did not compile, and every gate would have said so
 
