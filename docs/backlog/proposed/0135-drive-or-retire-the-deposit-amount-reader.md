@@ -67,5 +67,5 @@ Filled in when the item moves to `complete/`.
 
 ## References
 
-[^1]: ADR-0080, a depleted deposit recovers by ageing the stored take, decision D4. `docs/adrs/draft/adr-0080-a-depleted-deposit-recovers-by-ageing-the-stored-take.md`
+[^1]: ADR-0080, a depleted deposit recovers by ageing the stored take, decision D4. `docs/adrs/accepted/adr-0080-a-depleted-deposit-recovers-by-ageing-the-stored-take.md`
 [^2]: Recurring defect shapes, shape 3. `.claude/rules/recurring-defects.md`

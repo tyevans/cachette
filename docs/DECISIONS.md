@@ -990,7 +990,7 @@ a failed founding is correct.[^PRD12]
 ## References
 
 [^ADR75D2]: ADR-0075, the founding choice reads a bounded sample of the world, decision D2. `docs/adrs/accepted/adr-0075-the-founding-choice-reads-a-bounded-sample-of-the-world.md`
-[^ADR76]: ADR-0076, a founding keeps a fixed distance from the foundings before it, decision D3. `docs/adrs/draft/adr-0076-a-founding-keeps-a-fixed-distance-from-the-foundings-before-it.md`
+[^ADR76]: ADR-0076, a founding keeps a fixed distance from the foundings before it, decision D3. `docs/adrs/accepted/adr-0076-a-founding-keeps-a-fixed-distance-from-the-foundings-before-it.md`
 [^KEYED]: ADR-0003, every random draw is keyed, never stateful, decision D1. `docs/adrs/accepted/adr-0003-every-random-draw-is-keyed-never-stateful.md`
 [^TESTKEY]: Testing rules, section 2. `.claude/rules/testing.md`
 [^LEVEL0]: ADR-0022, level 0 is the only truth and every level above it is derived. `docs/adrs/accepted/adr-0022-level-0-is-the-only-truth-and-every-level-above-it-is-derived.md`

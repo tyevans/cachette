@@ -174,4 +174,4 @@ normally.
 [^TIMING]: Movement timing note. `docs/research/movement-timing.md`
 [^FOUND]: PRD-0012, a world starts small and grows. `docs/product/accepted/prd-0012-a-world-starts-small-and-grows.md`
 [^SEP]: Decisions register, DEC-037. `docs/DECISIONS.md`
-[^FOUNDDIST]: ADR-0076, a founding keeps a fixed distance from the foundings before it. `docs/adrs/draft/adr-0076-a-founding-keeps-a-fixed-distance-from-the-foundings-before-it.md`
+[^FOUNDDIST]: ADR-0076, a founding keeps a fixed distance from the foundings before it. `docs/adrs/accepted/adr-0076-a-founding-keeps-a-fixed-distance-from-the-foundings-before-it.md`

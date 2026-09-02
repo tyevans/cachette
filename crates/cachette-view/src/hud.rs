@@ -309,7 +309,7 @@ impl Readout {
             // states three foundings tells a watcher nothing about the
             // fourth.[^3]
             //
-            // [^3]: ADR-0076, a founding keeps a fixed distance from the foundings before it, decision D2. `docs/adrs/draft/adr-0076-a-founding-keeps-a-fixed-distance-from-the-foundings-before-it.md`
+            // [^3]: ADR-0076, a founding keeps a fixed distance from the foundings before it, decision D2. `docs/adrs/accepted/adr-0076-a-founding-keeps-a-fixed-distance-from-the-foundings-before-it.md`
             refusals: outcomes
                 .iter()
                 .filter_map(|outcome| match outcome.result() {
@@ -613,7 +613,7 @@ impl Readout {
         // faction that found no place, and a watcher would read three rows
         // in a world of four factions and learn nothing from the gap.[^3]
         //
-        // [^3]: ADR-0076, a founding keeps a fixed distance from the foundings before it, decision D2. `docs/adrs/draft/adr-0076-a-founding-keeps-a-fixed-distance-from-the-foundings-before-it.md`
+        // [^3]: ADR-0076, a founding keeps a fixed distance from the foundings before it, decision D2. `docs/adrs/accepted/adr-0076-a-founding-keeps-a-fixed-distance-from-the-foundings-before-it.md`
         if !self.foundings.is_empty() || !self.refusals.is_empty() {
             lines.push(Line::Rule);
             lines.push(Line::Heading("WHO FOUNDED"));

@@ -268,7 +268,7 @@ and the command that recorded it.
 [^12]: ADR-0004, iteration order is explicit, decision D4. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
 [^13]: The founding error type. `crates/cachette-core/src/founding.rs`
 [^14]: Testing rules, section 2. `.claude/rules/testing.md`
-[^15]: ADR-0076, a founding keeps a fixed distance from the foundings before it. `docs/adrs/draft/adr-0076-a-founding-keeps-a-fixed-distance-from-the-foundings-before-it.md`
+[^15]: ADR-0076, a founding keeps a fixed distance from the foundings before it. `docs/adrs/accepted/adr-0076-a-founding-keeps-a-fixed-distance-from-the-foundings-before-it.md`
 [^16]: Findings register, FND-106. `docs/FINDINGS.md`
 [^17]: Findings register, FND-107. `docs/FINDINGS.md`
 [^18]: Decisions register, DEC-051. `docs/DECISIONS.md`

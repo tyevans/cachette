@@ -4,8 +4,8 @@
 
 | Item | Value |
 |---|---|
-| `docs/adrs/draft/adr-0076-a-founding-keeps-a-fixed-distance-from-the-foundings-before-it.md` | Status `Draft` at review |
-| `docs/adrs/draft/adr-0080-a-depleted-deposit-recovers-by-ageing-the-stored-take.md` | Status `Draft` at review |
+| `docs/adrs/accepted/adr-0076-a-founding-keeps-a-fixed-distance-from-the-foundings-before-it.md` | Status `Draft` at review, `Accepted` after it |
+| `docs/adrs/accepted/adr-0080-a-depleted-deposit-recovers-by-ageing-the-stored-take.md` | Status `Draft` at review, `Accepted` after it |
 | `docs/adrs/draft/adr-0081-a-residence-is-a-stored-column-and-occupancy-is-a-maintained-count.md` | Status `Draft` at review |
 | `docs/adrs/draft/adr-0082-the-store-sets-the-rate-of-a-birth-and-the-housing-admits-it.md` | Status `Draft` at review |
 | Commit | `910dec0` |
@@ -387,11 +387,10 @@ of these four drafts break one or both.[^19] A backlog item now adds the check.[
 reviewer took no measurement. The blocker governs every cost figure in this
 project.[^12]
 
-**No file moved.** ADR-0076 and ADR-0080 are accepted by this review, and their
-files are still in the draft directory. Both are cited by source files under
-`crates/`, and the citation check fails when a citation calls an accepted record
-a draft. The reviewer holds no write rights over that directory in this run, so
-the move waits on the dispatcher.
+**Nothing under `crates/` was read for anything but a citation.** The reviewer
+edited eight source files, and every edit replaced the draft path of a record
+with its accepted path. No code, no comment prose and no test changed. The
+citation check derives the truth from the tree and is what proves the sweep.
 
 **Nothing was checked against a second reader.** The delegation stands, and a
 review by a second person supersedes this one.[^6]
@@ -403,10 +402,10 @@ files in this run, and reports the need instead.
 
 ## 8. For the registers
 
-- ADR-0076 moves from `Draft` to `Accepted`, after the footnote labels swap and
-  after the citations under `crates/` name the accepted path.
-- ADR-0080 moves from `Draft` to `Accepted`, after the two amendments and after
-  the same citation repair.
+- ADR-0076 moves from `Draft` to `Accepted`. The footnote labels moved first,
+  and every citation of the draft path moved with the file.
+- ADR-0080 moves from `Draft` to `Accepted`. The two amendments went in first,
+  and its citations moved the same way.
 - ADR-0081 stays a `Draft`. Section 1 states what must change.
 - ADR-0082 stays a `Draft`. It moves when ADR-0081 moves.
 - Three findings are recorded.[^1] [^17] [^19]

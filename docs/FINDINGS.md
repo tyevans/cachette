@@ -2933,7 +2933,7 @@ backlog item adds the check.
 [^57]: Commit Message Rules, after a sweep. `.claude/rules/commits.md`
 [^58]: Backlog item 0094. `docs/backlog/complete/0094-decide-how-many-groups-found-a-world.md`
 [^59]: Findings register, FND-093, in this document.
-[^60]: ADR-0076, a founding keeps a fixed distance from the foundings before it, decision D1. `docs/adrs/draft/adr-0076-a-founding-keeps-a-fixed-distance-from-the-foundings-before-it.md`
+[^60]: ADR-0076, a founding keeps a fixed distance from the foundings before it, decision D1. `docs/adrs/accepted/adr-0076-a-founding-keeps-a-fixed-distance-from-the-foundings-before-it.md`
 [^61]: PRD-0014, everyone needs somewhere to live. `docs/product/accepted/prd-0014-everyone-needs-somewhere-to-live.md`
 [^62]: ADR-0066, entity storage holds four fixed shapes, decision D1. `docs/adrs/accepted/adr-0066-entity-storage-holds-four-fixed-shapes.md`
 [^63]: Recurring Defect Shapes, shape 1. `.claude/rules/recurring-defects.md`
