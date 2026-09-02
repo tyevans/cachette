@@ -142,11 +142,22 @@ the ground record accepted the same growth for the stored take.[^3]
 **Nothing states the cost.** No measurement exists on the target platform, so
 this record states the shape of the growth and no figure.[^15]
 
-**This record narrows the dense column record without superseding it.** Three
-tile fields now sit outside it, and the earlier record still describes every
-field that this one excludes. Whether that record should be superseded to say
-so is an open choice, and a register row holds it.[^16] A reader who meets the
-disagreement is served by this record, which resolves it.
+**This record leaves the dense column record standing, and states what it
+leaves.** The dense column record says that a tile field is one contiguous
+array with one element for each tile.[^1] The three generated fields are not
+that. The record carries an exception clause, which gives the width of a
+column, the encoding of a boolean field and the form of a rare field to
+another record, and that record holds a narrow column with bitplanes and
+sparse side tables.[^16] The clause therefore delegates the shape a column
+takes. It does not delegate the case where no column exists, and this record
+is that case.
+
+The earlier record still describes every tile field that this one excludes,
+and the ground record already chose against it once and coexists with it.[^2]
+Whether a record whose first sentence is false of three fields should be
+superseded is a reviewer's choice, and a register row holds it with the
+argument on both sides.[^17] A reader who meets the disagreement is served by
+this record, which resolves it for a generated field.
 
 ## References
 
@@ -165,4 +176,5 @@ disagreement is served by this record, which resolves it.
 [^13]: ADR Registry, row 0044. `docs/adrs/REGISTRY.md`
 [^14]: Backlog item 0171. `docs/backlog/proposed/0171-build-the-first-level-without-a-pass-over-every-tile.md`
 [^15]: Blockers register, BLK-007. `docs/BLOCKERS.md`
-[^16]: Decisions register, DEC-068. `docs/DECISIONS.md`
+[^16]: ADR Registry, row 0015. `docs/adrs/REGISTRY.md`
+[^17]: Decisions register, DEC-068. `docs/DECISIONS.md`

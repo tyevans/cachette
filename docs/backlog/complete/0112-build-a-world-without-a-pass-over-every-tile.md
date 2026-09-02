@@ -51,10 +51,16 @@ merged run and of the sum. ADR-0006 D1 governs the purity of the frame
 update. ADR-0009 governs what a parallel worker may write. ADR-0022 D1 states
 that level 0 is the only truth, and the field is level 0.
 
-**Changes.** No record changes. ADR-0012 D2 is narrowed and not superseded,
-because two accepted records already sit outside it and neither superseded
-it.[^5] [^6] Whether it should be superseded is an open choice, and a
-register row holds it.[^7]
+**Changes.** No record changes. ADR-0012 D2 carries an exception clause, and
+the review checked it: the clause delegates the width of a column, the
+encoding of a boolean field and the form of a rare field, and it names the
+record that holds a narrow column with bitplanes and sparse side tables. It
+delegates the shape a column takes, not the case where no column exists. So
+the clause does not cover this work. D2 is nevertheless left standing rather
+than superseded, because two accepted records already sit outside it and
+neither superseded it.[^5] [^6] Whether it should be superseded is a
+reviewer's choice, and a register row holds it with the argument on both
+sides.[^7]
 
 **Creates.** ADR-0088, a tile field is a generated base and a stored
 change.[^8] The registry row was allocated before the record was written. The
