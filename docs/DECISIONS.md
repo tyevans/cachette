@@ -27,81 +27,6 @@ precedent.[^ALLOC]
 
 ## Open
 
-### DEC-063 — Which verb puts a unit in the world from the control plane?
-
-**Open. The recommendation is to expose the founding run as the verb a caller
-should reach for, to keep the per-unit pair for the case founding cannot reach,
-and to state in the package that the pair does not scale.**
-
-**The tension, stated plainly.** The design principle says Python builds a
-selector and sends one command, that Rust resolves the selector and runs the
-verb, and that Python never loops over entities.[^ORIENT] The bindings now hold
-three verbs that each name one unit: spawn one soldier, order one soldier to
-gather, and remove one soldier.
-
-**A soldier is the mass tier.** The shape declares it, and the reason it gives
-is that a soldier is one of a million, so no caller walks the
-population.[^DEC63E] The mass tier is the tier the no-loop rule exists to
-protect, and a reserved record says the API should refuse the loop for
-it.[^DEC63F] These three verbs are the loop, one call at a time.
-
-**The evidence is in this project's own test.** The test that proves a gather
-event names a unit spawns a unit on each open tile of a sixteen by sixteen
-world and calls the order verb once for each of them. That test is a Python
-loop over mass-tier entities. It was the only way to reach the case, which is
-the argument for the verbs and the argument against them at once.
-
-**Why the verbs exist.** The work that added them needed a unit in the world,
-because the gather event names a unit and nothing on the Python side could make
-one. A column that nothing can fill is an inert capability.[^SHAPE3]
-
-**The options.**
-
-1. Expose the founding run, and withdraw the per-unit pair.
-2. Expose the founding run as the verb a caller should reach for, and keep the
-   per-unit pair.
-3. Keep the per-unit pair alone, and add a set-valued verb when a caller wants
-   many units.
-4. Mark the per-unit pair as a test fixture and keep it out of the package.
-
-**The recommendation is option 2.** Option 1 was tried against the code and
-does not hold today. **A founding never frees a slot that a later founding
-reuses.** Its only despawn is the rollback of a founding that failed, which
-leaves nothing to observe. The one real death path is starvation, and reaching
-it from the control plane needs a large world, a long run, and a verb that
-removes the production rate the founding set.[^DEC63B] The identity rule this
-work exists to protect is exactly the reuse case, so a boundary that cannot
-reach it cannot be tested at that boundary.[^DEC63C]
-
-Option 3 leaves the engine's own population path unreachable from the control
-plane, and it leaves the loop with no alternative to point a caller at. Option 4
-puts one verb in two places and states no rule a reader can check.
-
-**What the recommendation costs.** It ships a verb that the tier rule says the
-API should refuse. That is a real cost and not a rounding error: the rule is
-weakest at the moment a convenient verb exists and nothing refuses it. Option 2
-is worth taking only if the package says the pair does not scale and names the
-founding run as the verb for a population.
-
-**The mechanism that would make option 2 safe does not exist.** A reserved row
-holds the claim that the API refuses the loop for a declared tier.[^DEC63F] No
-record is written and nothing enforces it, so today the only thing standing
-between a caller and a population built one call at a time is prose. Writing
-that record, or whatever replaces it, is what turns option 2 from a promise
-into a rule.
-
-**A second cost, and it decides how much the rule is worth.** The control plane
-cannot see where a resource is, so a caller that wants a gather event has no way
-to choose a tile and sweeps instead. An API that cannot say where to act invites
-the sweep whatever the rule says, and the findings register holds that with its
-evidence.[^F147] Until a caller can ask the engine for a place, option 2 buys a
-rule that a caller cannot follow.
-
-**What holds it back.** Nothing technical. The verbs exist and work. The
-question is what the project promises, and the answer decides whether a later
-selector API has to take the pair back after callers depend on it. A backlog
-item holds the work of exposing the founding run.[^DEC63D]
-
 ### DEC-057 — Does a site store its resident count, or read the one the engine keeps?
 
 **Open. The recommendation is to read the count the engine already keeps.**
@@ -294,6 +219,73 @@ figure is 168 MB. The storage argument for vectors is stronger than the report
 concluded, and it called that argument its weakest.
 
 ## Closed
+
+### DEC-063 — Which verb puts a unit in the world from the control plane?
+
+**Closed. Spawn is set-valued. The selector tree is the destination, and it is
+not built now.**
+
+The project owner decided this on 1 September 2026. He took none of the four
+options below. He took a fifth path, which removes the question instead of
+answering it: a verb that takes a set has no per-unit form for a caller to
+repeat, so the rule about looping stops being a rule a caller can break.
+
+**What the project already reserved is the answer, and nobody wrote it.** Four
+registry rows sit reserved with no file: Python is a control plane, a declared
+tier enforces the no-loop rule and the API refuses the loop, a selector is a
+lazy expression tree that Rust evaluates, and a selector result may be a range
+rather than an enumerated set.[^DEC63G] Under a selector, the control plane
+never asks where to act. It says where to act as part of the command, a
+predicate crosses once, and the engine evaluates it over the columns. That is
+why a per-tile read was the wrong repair for the finding below: it answers the
+question instead of removing it.[^F147]
+
+**What changed now.** The spawn verb takes a collection of addresses and
+returns an identity column in one crossing. The remove verb and the gather
+order verb take a collection of identities. Each set is all or nothing, so a
+caller never receives half a population and an error. The identity column is
+the read side that DEC-060 already built, so the change adds no new mechanism.
+
+**What did not change.** The read that resolves one identity stays singular. A
+set form would have to choose between failing the whole call for one dead
+identity and returning a value that stands for nothing, and that value is the
+false answer the identity record forbids.[^DEC63C]
+
+**The selector tree is not built.** Nothing needs it today, and building it
+before a caller exists is the inert capability shape. A separate item holds the
+work, and the records that govern it want an author who is not their
+reviewer.[^DEC63D]
+
+**Honesty about what the change buys.** The verb is set-valued at the boundary
+and is still a loop inside the engine. Spawning has no cheaper whole-set
+algorithm today. What the change removes is the crossing and the worked example,
+not the per-unit cost. The principle that a set-valued command permits a cheaper
+algorithm is satisfied in form here and not yet in substance.
+
+**The options that were weighed, and the recommendation that was not taken.**
+
+1. Expose the founding run, and withdraw the per-unit pair.
+2. Expose the founding run as the verb a caller should reach for, and keep the
+   per-unit pair.
+3. Keep the per-unit pair alone, and add a set-valued verb when a caller wants
+   many units.
+4. Mark the per-unit pair as a test fixture and keep it out of the package.
+
+The recommendation was option 2. Option 1 does not hold today, because a
+founding never frees a slot that a later founding reuses: its only despawn is
+the rollback of a founding that failed, and the one real death path is
+starvation, which needs a large world, a long run and a verb that removes the
+production rate the founding set.[^DEC63B] Option 3 left the engine's own
+population path unreachable. Option 4 put one verb in two places.
+
+**Why the tension was real.** A soldier is the mass tier, and the shape says
+why: a soldier is one of a million, so no caller walks the population.[^DEC63E]
+The per-unit verbs took a mass-tier entity one at a time, which is the case the
+rule exists to protect. The evidence was in this work's own test, which spawned
+a unit on every open tile and ordered each one. Reserved row 0043 holds the
+claim that the API refuses the loop for a declared tier, and nothing implements
+it, so prose was the only thing between a caller and a population built one
+call at a time.[^DEC63F]
 
 ### DEC-059 — Does the world reserve unit storage, or grow it during a run?
 
@@ -1182,9 +1174,10 @@ a failed founding is correct.[^PRD12]
 [^DEC63A]: PRD-0012, a world starts small and grows. `docs/product/accepted/prd-0012-a-world-starts-small-and-grows.md`
 [^DEC63B]: The founded group tests. `crates/cachette-core/tests/founded_group_survives.rs`
 [^DEC63C]: ADR-0085, an entity crosses to Python as one opaque identity that the engine resolves, decision D3. `docs/adrs/draft/adr-0085-an-entity-crosses-to-python-as-one-opaque-identity.md`
-[^DEC63D]: Backlog item 0161. `docs/backlog/proposed/0161-let-the-control-plane-found-a-group.md`
+[^DEC63D]: Backlog item 0161. `docs/backlog/proposed/0161-let-a-selector-say-where-to-act.md`
 [^DEC63E]: ADR-0054, an entity belongs to one of three tiers, declared at creation, decision D1. `docs/adrs/accepted/adr-0054-an-entity-belongs-to-one-of-three-tiers-declared-at-creation.md`
 [^DEC63F]: ADR Registry, row 0043. `docs/adrs/REGISTRY.md`
+[^DEC63G]: ADR Registry, rows 0040, 0043, 0051 and 0052. `docs/adrs/REGISTRY.md`
 [^F147]: Findings register, FND-147. `docs/FINDINGS.md`
 [^TEST2A]: Testing rules, section 2a. `.claude/rules/testing.md`
 [^PRD12]: PRD-0012, a world starts small and grows. `docs/product/accepted/prd-0012-a-world-starts-small-and-grows.md`

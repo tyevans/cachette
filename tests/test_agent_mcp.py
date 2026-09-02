@@ -35,10 +35,11 @@ SERVER = StdioServerParameters(command=sys.executable, args=["-m", "cachette.age
 
 # The tiles the gather test puts units on.
 #
-# The count is the assertion's, not the world's. A unit is the mass tier, and
-# the design principle says Python never loops over entities. A test that
-# spawned one unit per open tile would be a worked example of the thing the
-# rule forbids, and it is the example the next person would copy.
+# The count is the assertion's, not the world's. Four units prove that a
+# gather event carries a resolvable identity.
+#
+# They cross in one call. DEC-063 made the spawn verb set-valued, so no test
+# here shows a client repeating a verb over the mass tier.
 GATHER_ADDRESSES = ((0, 0), (1, 0), (0, 1), (1, 1))
 
 
@@ -82,11 +83,11 @@ def test_a_client_reaches_every_tool() -> None:
     assert _drive(body) == [
         "build_world",
         "check_invariants",
-        "despawn_unit",
+        "despawn_units",
         "event_log",
         "gather_events",
         "order_gather",
-        "spawn_unit",
+        "spawn_units",
         "step_world",
         "tile_changes",
         "unit_tile",
@@ -222,12 +223,14 @@ def test_a_client_follows_the_unit_that_took_a_resource() -> None:
     async def body(session: ClientSession) -> tuple[dict[str, Any], dict[str, Any]]:
         built = await _call(session, "build_world", width=16, height=16, seed=7)
         name = built["world"]
-        units: list[int] = []
-        for q, r in GATHER_ADDRESSES:
-            spawned = await _call(session, "spawn_unit", world=name, q=q, r=r)
-            units.append(int(spawned["unit"]))
-        for unit in units:
-            await _call(session, "order_gather", world=name, unit=unit, kind=0)
+        spawned = await _call(
+            session,
+            "spawn_units",
+            world=name,
+            addresses=[list(address) for address in GATHER_ADDRESSES],
+        )
+        units = [int(unit) for unit in spawned["units"]]
+        await _call(session, "order_gather", world=name, units=units, kind=0)
 
         grants: dict[str, Any] = {}
         for _ in range(8):
@@ -254,9 +257,11 @@ def test_the_identity_of_a_removed_unit_is_a_tool_error() -> None:
     async def body(session: ClientSession) -> tuple[bool, dict[str, Any]]:
         built = await _call(session, "build_world", width=8, height=8, seed=7)
         name = built["world"]
-        dead = (await _call(session, "spawn_unit", world=name, q=0, r=0))["unit"]
-        await _call(session, "despawn_unit", world=name, unit=dead)
-        living = (await _call(session, "spawn_unit", world=name, q=0, r=0))["unit"]
+        first = await _call(session, "spawn_units", world=name, addresses=[[0, 0]])
+        dead = int(first["units"][0])
+        await _call(session, "despawn_units", world=name, units=[dead])
+        second = await _call(session, "spawn_units", world=name, addresses=[[0, 0]])
+        living = int(second["units"][0])
         assert living != dead
         stale = await session.call_tool("unit_tile", {"world": name, "unit": dead})
         return bool(getattr(stale, "is_error", False)), await _call(

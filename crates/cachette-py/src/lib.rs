@@ -247,67 +247,125 @@ impl PyWorld {
         self.lock().gather_log().len()
     }
 
-    /// Adds a soldier at an address and returns its identity.
+    /// Returns the number of soldiers alive in the world.
     ///
-    /// The identity is one opaque value. Give it back to another method to
-    /// name this soldier. Do not build one, and do not take it apart.[^1]
+    /// The engine counts them. A caller never counts a population by
+    /// walking it, because a soldier is the mass tier.[^1]
     ///
     /// # References
     ///
-    /// [^1]: ADR-0085, an entity crosses to Python as one opaque identity that the engine resolves, decisions D1 and D2. `docs/adrs/draft/adr-0085-an-entity-crosses-to-python-as-one-opaque-identity.md`
-    ///
-    /// # Errors
-    ///
-    /// Raises `VerbError` when the arena is full, when the address is
-    /// outside the world, when the ground admits no unit, or when the world
-    /// has no such faction.
-    fn spawn_soldier(&self, q: i32, r: i32, faction: u16) -> PyResult<u64> {
-        let mut world = self.lock();
-        world
-            .spawn_soldier(Axial::new(q, r), FactionId(faction))
-            .map(Entity::to_bits)
-            .map_err(|error| VerbError::new_err(error.to_string()))
+    /// [^1]: ADR-0054, an entity belongs to one of three tiers, declared at creation, decision D1. `docs/adrs/accepted/adr-0054-an-entity-belongs-to-one-of-three-tiers-declared-at-creation.md`
+    #[getter]
+    fn soldier_count(&self) -> u32 {
+        self.lock().soldiers().len()
     }
 
-    /// Removes a soldier.
+    /// Adds a soldier at each address and returns the identity column.
     ///
-    /// The method resolves the identity first, so it never returns a false
-    /// answer for a soldier that has died. A dead identity raises.
+    /// The call takes a set and answers once. It is not a per-unit verb that
+    /// a caller repeats, because a soldier is the mass tier and no caller
+    /// walks that population.[^1] The identities come back as one column, in
+    /// the order of the addresses.
+    ///
+    /// **The set is all or nothing.** An address the world refuses removes
+    /// every soldier this call made and raises. A caller that got half a
+    /// population and an error would have to work out which half, and the
+    /// engine already knows.
+    ///
+    /// The verb is set-valued at the boundary. It is still a loop inside, and
+    /// spawning has no cheaper whole-set algorithm today.[^2]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0054, an entity belongs to one of three tiers, declared at creation, decision D1. `docs/adrs/accepted/adr-0054-an-entity-belongs-to-one-of-three-tiers-declared-at-creation.md`
+    /// [^2]: Decisions register, DEC-063. `docs/DECISIONS.md`
     ///
     /// # Errors
     ///
-    /// Raises `ViewError` when the identity names no live soldier.
-    fn despawn_soldier(&self, unit: u64) -> PyResult<()> {
+    /// Raises `VerbError` when the arena is full, when an address is outside
+    /// the world, when the ground admits no unit, or when the world has no
+    /// such faction. The error names the address that refused.
+    fn spawn_soldiers<'py>(
+        &self,
+        python: Python<'py>,
+        addresses: Vec<(i32, i32)>,
+        faction: u16,
+    ) -> PyResult<Bound<'py, PyArray1<u64>>> {
         let mut world = self.lock();
-        let entity = resolve(&world, unit)?;
-        // The identity resolved a line above, so the arena holds the
-        // soldier and the removal cannot refuse. The assertion states that,
-        // rather than returning a value that is always the same.
-        assert!(
-            world.despawn_soldier(entity),
-            "a resolved identity must name a soldier the arena can remove"
-        );
+        let mut made: Vec<u64> = Vec::with_capacity(addresses.len());
+        for (q, r) in addresses {
+            match world.spawn_soldier(Axial::new(q, r), FactionId(faction)) {
+                Ok(unit) => made.push(unit.to_bits()),
+                Err(error) => {
+                    // Leave nothing half-made. The founding takes the same
+                    // path when a group will not fit the place it chose.
+                    for unit in &made {
+                        let entity = world
+                            .resolve_soldier(*unit)
+                            .expect("this call made the identity a moment ago");
+                        world.despawn_soldier(entity);
+                    }
+                    return Err(VerbError::new_err(format!(
+                        "the address ({q}, {r}) refused a soldier: {error}"
+                    )));
+                }
+            }
+        }
+        Ok(made.to_pyarray(python))
+    }
+
+    /// Removes every soldier the identities name.
+    ///
+    /// **The set is all or nothing.** Every identity resolves before anything
+    /// is removed, so one dead identity removes nothing and raises.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0085, an entity crosses to Python as one opaque identity that the engine resolves, decision D3. `docs/adrs/draft/adr-0085-an-entity-crosses-to-python-as-one-opaque-identity.md`
+    ///
+    /// # Errors
+    ///
+    /// Raises `ViewError` when an identity names no live soldier.
+    fn despawn_soldiers(&self, units: Vec<u64>) -> PyResult<()> {
+        let mut world = self.lock();
+        let mut resolved = Vec::with_capacity(units.len());
+        for unit in &units {
+            resolved.push(resolve(&world, *unit)?);
+        }
+        for entity in resolved {
+            assert!(
+                world.despawn_soldier(entity),
+                "a resolved identity must name a soldier the arena can remove"
+            );
+        }
         Ok(())
     }
 
-    /// Tells one soldier to gather a kind of resource.
+    /// Tells every soldier the identities name to gather a kind of resource.
     ///
-    /// The kind is the number the gather event carries in its `kind`
-    /// column.
+    /// The kind is the number the gather event carries in its `kind` column.
+    ///
+    /// **The set is all or nothing.** Every identity resolves, and the kind is
+    /// checked, before any order is given.
     ///
     /// # Errors
     ///
-    /// Raises `ViewError` when the identity is dead. Raises `VerbError`
-    /// when the number names no kind.
-    fn order_gather(&self, unit: u64, kind: u8) -> PyResult<()> {
+    /// Raises `ViewError` when an identity names no live soldier. Raises
+    /// `VerbError` when the number names no kind.
+    fn order_gather(&self, units: Vec<u64>, kind: u8) -> PyResult<()> {
         let mut world = self.lock();
-        let entity = resolve(&world, unit)?;
         let kind = ResourceKind::from_u8(kind)
             .ok_or_else(|| VerbError::new_err(format!("{kind} names no resource kind")))?;
-        assert!(
-            world.order_gather(entity, kind),
-            "a resolved identity must name a soldier the arena can order"
-        );
+        let mut resolved = Vec::with_capacity(units.len());
+        for unit in &units {
+            resolved.push(resolve(&world, *unit)?);
+        }
+        for entity in resolved {
+            assert!(
+                world.order_gather(entity, kind),
+                "a resolved identity must name a soldier the arena can order"
+            );
+        }
         Ok(())
     }
 
@@ -316,6 +374,12 @@ impl PyWorld {
     /// The engine resolves the identity against the arena. A soldier that
     /// died leaves its slot to another soldier, and this method refuses the
     /// dead identity rather than report on the new occupant.[^1]
+    ///
+    /// **This read stays singular while the write verbs take a set.** A set
+    /// form would have to choose between failing the whole call for one dead
+    /// identity and returning a value that stands for nothing. That value is
+    /// the false answer the record forbids, so the read answers for one
+    /// identity and says which one failed.[^1]
     ///
     /// # References
     ///

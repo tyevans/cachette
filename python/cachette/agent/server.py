@@ -56,6 +56,7 @@ __all__ = [
     "GatherEvent",
     "GatherReport",
     "RemovalReport",
+    "SpawnReport",
     "InvariantReport",
     "TileChange",
     "TileChangeReport",
@@ -77,13 +78,16 @@ same hash at any thread count.
 
 The engine holds the entities. No tool returns a list of them.
 
-Read what a step changed with tile_changes. Put a unit in the world with
-spawn_unit, tell it to gather with order_gather, step, then read
+Read what a step changed with tile_changes. Put units in the world with
+spawn_units, tell them to gather with order_gather, step, then read
 gather_events.
+
+Every verb that acts on units takes a set and answers once. There is no
+per-unit verb to call in a loop, because a unit is one of a million.
 
 A gather event names a unit by its identity. That identity is one opaque
 number. Do not build one and do not take one apart. Pass it back to unit_tile
-or to despawn_unit. The engine refuses the identity of a unit that has died,
+or to despawn_units. The engine refuses the identity of a unit that has died,
 so a stale identity is an error and never a report about another unit.
 """.strip()
 
@@ -212,17 +216,31 @@ class UnitReport:
 
 
 @dataclass(frozen=True)
-class RemovalReport:
-    """The unit that the engine removed.
+class SpawnReport:
+    """The units a set-valued call names.
 
-    There is no field for whether it removed one. The engine resolves the
+    The identities are opaque. Pass them back; do not take one apart.
+    """
+
+    world: str
+    tick: int
+    units: list[int]
+    soldier_count: int
+
+
+@dataclass(frozen=True)
+class RemovalReport:
+    """The units that the engine removed.
+
+    There is no field for whether it removed them. The engine resolves every
     identity first and refuses a dead one, so a report that exists is a
     report of a removal.
     """
 
     world: str
     tick: int
-    unit: int
+    units: list[int]
+    soldier_count: int
 
 
 def _report(session: WorldSession) -> WorldReport:
@@ -430,25 +448,34 @@ def build_server(store: SessionStore | None = None) -> MCPServer:
         )
 
     @server.tool(
-        title="Put a unit in the world",
+        title="Put units in the world",
         description=(
-            "Adds one unit at an address and returns the identity the engine "
-            "gave it. Every other unit tool takes that identity."
+            "Adds a unit at each address and returns the identities the "
+            "engine gave them. Every other unit tool takes an identity."
         ),
     )
-    def spawn_unit(world: str, q: int, r: int, faction: int = 0) -> UnitReport:
-        """Add one unit of a faction at an axial address.
+    def spawn_units(
+        world: str, addresses: list[list[int]], faction: int = 0
+    ) -> SpawnReport:
+        """Add one unit of a faction at each axial address.
 
-        The engine refuses an address outside the world, ground that admits
-        no unit, and a faction the world does not hold.
+        Give a list of two-number addresses. The set is all or nothing: an
+        address the engine refuses leaves no unit behind, and the error names
+        the address. The engine refuses an address outside the world, ground
+        that admits no unit, and a faction the world does not hold.
         """
+        pairs = []
+        for address in addresses:
+            if len(address) != 2:
+                raise ValueError(f"the address {address} is not a q and an r")
+            pairs.append((address[0], address[1]))
         session = sessions.get(world)
-        unit = session.world.spawn_soldier(q, r, faction)
-        return UnitReport(
+        units = session.world.spawn_soldiers(pairs, faction)
+        return SpawnReport(
             world=session.name,
             tick=session.world.tick,
-            unit=unit,
-            tile=session.world.soldier_tile(unit),
+            units=[int(unit) for unit in units],
+            soldier_count=session.world.soldier_count,
         )
 
     @server.tool(
@@ -479,31 +506,38 @@ def build_server(store: SessionStore | None = None) -> MCPServer:
             "number that the gather event carries."
         ),
     )
-    def order_gather(world: str, unit: int, kind: int = 0) -> UnitReport:
-        """Tell one unit to gather until it is told to stop."""
+    def order_gather(world: str, units: list[int], kind: int = 0) -> SpawnReport:
+        """Tell every named unit to gather until it is told to stop.
+
+        The set is all or nothing. One dead identity leaves the whole set
+        without an order.
+        """
         session = sessions.get(world)
-        session.world.order_gather(unit, kind)
-        return UnitReport(
+        session.world.order_gather(units, kind)
+        return SpawnReport(
             world=session.name,
             tick=session.world.tick,
-            unit=unit,
-            tile=session.world.soldier_tile(unit),
+            units=list(units),
+            soldier_count=session.world.soldier_count,
         )
 
     @server.tool(
         title="Remove a unit",
         description="Removes one unit and reports whether it removed one.",
     )
-    def despawn_unit(world: str, unit: int) -> RemovalReport:
-        """Remove one unit by its identity.
+    def despawn_units(world: str, units: list[int]) -> RemovalReport:
+        """Remove every unit the identities name.
 
-        The engine resolves the identity first, so a stale identity is an
-        error and never a false answer about a unit that has died.
+        Every identity resolves before anything is removed, so one dead
+        identity removes nothing and is an error rather than a false answer.
         """
         session = sessions.get(world)
-        session.world.despawn_soldier(unit)
+        session.world.despawn_soldiers(units)
         return RemovalReport(
-            world=session.name, tick=session.world.tick, unit=unit
+            world=session.name,
+            tick=session.world.tick,
+            units=list(units),
+            soldier_count=session.world.soldier_count,
         )
 
     return server

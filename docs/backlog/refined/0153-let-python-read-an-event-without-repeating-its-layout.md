@@ -62,18 +62,16 @@ soldier that died there.[^11]
 **What this work adds beyond a reader.** Nothing in Python puts a unit in the
 world today, so the gather log is always empty on this side of the boundary. A
 column that nothing can fill is an inert capability.[^12] The work therefore
-adds the smallest set of verbs that fills it: spawn a soldier, tell it to
-gather, and remove it. Those verbs open a question about the control plane,
-which the decisions register holds.[^13]
+adds the verbs that fill it: put units in the world, tell them to gather, and
+remove them.
 
-**Why the founding run does not replace them.** The founding is the engine's
-own way to put units in a world, and it is one command for a set.[^14] It
-cannot serve here. A founding never frees a slot that a later founding reuses,
-so it cannot produce the case this work exists to refuse: an identity whose
-slot has passed to another unit. The only death path is starvation, and
-reaching it from the control plane needs a large world, a long run and a verb
-that removes the rate the founding set.[^15] A separate item holds the work of
-exposing the founding run.[^16]
+**Those verbs take a set.** The project owner closed the question they opened,
+and he closed it by removing it: a verb that takes a collection has no per-unit
+form for a caller to repeat.[^13] The founding run was weighed and does not
+replace them, because a founding never frees a slot that a later founding
+reuses, so it cannot produce the case this work exists to refuse.[^15] The
+destination is a selector that says where to act, and a separate item holds
+it.[^16]
 
 ## What it must not do
 
@@ -100,6 +98,9 @@ same defect one layer further out.[^6]
   event. A whole-tree search proves it.
 - The bindings resolve an identity that Python hands back. A live identity
   gives the soldier. A stale identity raises a typed error.
+- Every verb that acts on units takes a set and answers once. No test in the
+  repository shows a caller repeating a verb over the mass tier.
+- A set that the engine refuses leaves the world as it found it.
 - A test hands back an identity for a slot whose generation has moved on, and
   asserts the failure. Removing the generation check makes that test fail.
 - The agent protocol server answers which tile changed, and by how much,
@@ -127,6 +128,5 @@ Filled in when the item moves to `complete/`.
 [^11]: Testing Rules, section 2. `.claude/rules/testing.md`
 [^12]: Recurring Defect Shapes, shape 3. `.claude/rules/recurring-defects.md`
 [^13]: Decisions register, DEC-063. `docs/DECISIONS.md`
-[^14]: PRD-0012, a world starts small and grows. `docs/product/accepted/prd-0012-a-world-starts-small-and-grows.md`
 [^15]: The founded group tests. `crates/cachette-core/tests/founded_group_survives.rs`
-[^16]: Backlog item 0161. `docs/backlog/proposed/0161-let-the-control-plane-found-a-group.md`
+[^16]: Backlog item 0161. `docs/backlog/proposed/0161-let-a-selector-say-where-to-act.md`

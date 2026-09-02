@@ -146,8 +146,8 @@ def test_a_unit_identity_survives_the_round_trip(seed: int) -> None:
     # ADR-0085 D1 and D3: Python holds the whole identity and gives it
     # back, and the engine resolves it.
     world = cachette.World(width=8, height=8, seed=seed, faction_count=2)
-    unit = world.spawn_soldier(0, 0, 1)
-    assert world.soldier_tile(unit) == 0
+    (unit,) = world.spawn_soldiers([(0, 0)], 1)
+    assert world.soldier_tile(int(unit)) == 0
 
 
 def test_the_identity_of_a_dead_unit_refuses(seed: int) -> None:
@@ -161,9 +161,9 @@ def test_the_identity_of_a_dead_unit_refuses(seed: int) -> None:
     # may do that. The Rust test of the same fixture makes that check, in
     # crates/cachette-core/tests/identity_resolution.rs.
     world = cachette.World(width=8, height=8, seed=seed, faction_count=2)
-    dead = world.spawn_soldier(0, 0, 1)
-    world.despawn_soldier(dead)
-    living = world.spawn_soldier(0, 0, 1)
+    (dead,) = (int(unit) for unit in world.spawn_soldiers([(0, 0)], 1))
+    world.despawn_soldiers([dead])
+    (living,) = (int(unit) for unit in world.spawn_soldiers([(0, 0)], 1))
 
     assert living != dead, "the arena must mint a new identity"
 
@@ -172,7 +172,7 @@ def test_the_identity_of_a_dead_unit_refuses(seed: int) -> None:
     with pytest.raises(cachette.ViewError):
         world.soldier_tile(dead)
     with pytest.raises(cachette.ViewError):
-        world.despawn_soldier(dead)
+        world.despawn_soldiers([dead])
     assert world.soldier_tile(living) == 0
 
 
@@ -180,7 +180,7 @@ def test_python_cannot_compose_an_identity(seed: int) -> None:
     # ADR-0085 D2: the bindings expose no way to build an identity. A
     # caller that assembles one from an index it chose gets a refusal.
     world = cachette.World(width=8, height=8, seed=seed, faction_count=2)
-    world.spawn_soldier(0, 0, 1)
+    world.spawn_soldiers([(0, 0)], 1)
     with pytest.raises(cachette.ViewError):
         world.soldier_tile(0)
     with pytest.raises(cachette.ViewError):
@@ -191,12 +191,12 @@ def test_python_cannot_compose_an_identity(seed: int) -> None:
 
 # The tiles the gather test puts units on.
 #
-# The count is the assertion's, not the world's. A soldier is the mass tier,
-# and the design principle says Python never loops over entities, so a test
-# that spawned one unit per open tile would be a worked example of the thing
-# the rule forbids, sitting in the repository for the next person to copy.
-# Four units prove that a gather event carries a resolvable identity. More
-# prove it again and buy only the appearance of a data plane.
+# The count is the assertion's, not the world's. Four units prove that a
+# gather event carries a resolvable identity. More prove it again and buy
+# nothing.
+#
+# They cross in one call. DEC-063 made the spawn verb set-valued, so no test
+# here shows a caller repeating a verb over the mass tier.
 GATHER_ADDRESSES = ((0, 0), (1, 0), (0, 1), (1, 1))
 
 
@@ -204,9 +204,8 @@ def test_a_gather_event_names_a_unit_that_resolves(seed: int) -> None:
     # ADR-0085 D1: the unit column holds the whole identity, so a reader
     # can follow the unit that took the amount.
     world = cachette.World(width=16, height=16, seed=seed, faction_count=2)
-    units = [world.spawn_soldier(q, r, 1) for q, r in GATHER_ADDRESSES]
-    for unit in units:
-        world.order_gather(unit, 0)
+    units = world.spawn_soldiers(GATHER_ADDRESSES, 1)
+    world.order_gather(units, 0)
 
     for _ in range(8):
         world.step(threads=1)
@@ -228,3 +227,35 @@ def test_the_bindings_expose_no_slot_index(seed: int) -> None:
     for name in dir(cachette.World):
         assert "slot" not in name, name
         assert "generation" not in name, name
+
+
+def test_a_refused_spawn_set_leaves_no_soldier_behind(seed: int) -> None:
+    # The set is all or nothing. A caller that got half a population and an
+    # error would have to work out which half, and the engine knows.
+    #
+    # The count is what makes this test able to fail. Without it the test
+    # would assert only that the call raised, which it would do whether or
+    # not the rollback ran.
+    world = cachette.World(width=8, height=8, seed=seed, faction_count=2)
+    before = world.soldier_count
+
+    with pytest.raises(cachette.VerbError) as refused:
+        world.spawn_soldiers([(0, 0), (1, 0), (99, 99)], 1)
+
+    assert "(99, 99)" in str(refused.value), "the error names the address"
+    assert world.soldier_count == before
+
+
+def test_a_refused_order_set_gives_no_order(seed: int) -> None:
+    # Every identity resolves before any order is given, so one dead
+    # identity leaves the whole set untouched.
+    world = cachette.World(width=8, height=8, seed=seed, faction_count=2)
+    units = [int(unit) for unit in world.spawn_soldiers([(0, 0), (1, 0)], 1)]
+    world.despawn_soldiers([units[1]])
+
+    with pytest.raises(cachette.ViewError):
+        world.order_gather(units, 0)
+
+    # The living unit took no order, so the world grants nothing.
+    world.step(threads=1)
+    assert world.gather_count == 0
