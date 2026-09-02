@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-154**
+**Next number: FND-155**
 
 ## A. Corrections to stated rules
 
@@ -3382,6 +3382,37 @@ running the new check against the real tree before wiring it into the gate,
 which is why the item asked for that run.[^102]
 
 
+### FND-154 — Completing an item is not idempotent, and it leaves two of everything
+
+**Believed.** An item is completed once. The guide gives four steps: fill in
+the outcome, update the registers, move the file, and set the status.[^105]
+Nothing says what to do when the step runs twice, because nothing expects it
+to.
+
+**True.** It runs twice. Four completed items each hold two `## Outcome`
+sections and two `## References` sections, one appended after the other. The
+second completion did not read the first. In two of the four the two reference
+sections are identical, in one the later section is a superset, and in one the
+same label names two different sources, so a marker in the body resolves to
+whichever definition a reader reaches first.
+
+**Evidence.** The footnote check found all four, because a second reference
+section defines a label the first already defines. Nothing else in the tree
+saw them. The commit that added the check names the four items. A parallel run
+produces this directly: two workers complete one item, or one worker completes
+it twice across a rebase.
+
+**Follows.** **The completion step must read the item before it writes.** An
+item that already holds an outcome is an item somebody already completed, and
+the second writer is either repeating work or contradicting it.
+
+This is adjacent to the item that fails when a merged item still reads as
+open.[^106] That item checks the status against what merged. The shape here is
+the other direction: the status is right and the document holds the work
+twice. A check that reads one item and finds one outcome section would catch
+it, and the footnote check catches it today only as a side effect.
+
+
 ## References
 
 [^1]: Findings register, FND-038, in this document.
@@ -3492,3 +3523,5 @@ which is why the item asked for that run.[^102]
 [^102]: Backlog item 0144. `docs/backlog/complete/0144-check-the-footnotes-of-a-record.md`
 [^103]: Definition of Done, pass the gates. `.claude/rules/definition-of-done.md`
 [^104]: The citation check. `scripts/check_citations.py`
+[^105]: Backlog guide, completing an item. `docs/backlog/README.md`
+[^106]: Backlog item 0163. `docs/backlog/proposed/0163-fail-when-a-merged-item-still-reads-as-open.md`
