@@ -1870,6 +1870,16 @@ impl World {
         if self.grid.width() != self.config.width || self.grid.height() != self.config.height {
             return false;
         }
+        // The influence lattice and the block layout state the shape of
+        // level 1, and they state it in two places. This is what fails when
+        // the two disagree.[^1]
+        //
+        // [^1]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`
+        if self.influence.cells().tile_count() != self.pyramid.layout().block_count()
+            || self.influence.faction_count() != self.config.faction_count
+        {
+            return false;
+        }
         let ceiling = self.config.faction_count.max(1);
         // The soldier faction column is a second population under the same
         // ceiling. Checking one and not the other let the test suite spawn

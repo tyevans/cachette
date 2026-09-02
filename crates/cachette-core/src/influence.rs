@@ -183,10 +183,10 @@ pub const PASSES_FOR_EACH_SOLVE: u32 = 8;
 
 /// The weight that a pass leaves on the cell itself.
 ///
-/// The unit of the weight is the range of the byte, so the three constants
-/// below are read against 256. The self weight and the six neighbour weights
-/// sum to less than that range, and the difference is what a cell loses on
-/// every pass. A field with no source therefore falls to nothing, and it
+/// The unit of the weight is the range of a byte, so this weight and the
+/// neighbour weight below are both read against that range. The self weight
+/// and the six neighbour weights sum to less than the range, and the
+/// difference is what a cell loses on every pass. A field with no source therefore falls to nothing, and it
 /// falls at the edge first, because the edge is the part that the interior
 /// was holding up.
 const SELF_WEIGHT: i16 = 80;
@@ -215,7 +215,8 @@ pub struct InfluenceField {
     /// The cell lattice. It is a hex grid at the pitch of one level 1 cell.
     cells: Grid,
     faction_count: u16,
-    /// How freely influence crosses each cell. One plane for every faction.
+    /// How freely influence crosses each cell. One plane, shared by every
+    /// faction, because the ground does not depend on who crosses it.
     conductance: Vec<Conductance>,
     /// What each faction holds at each cell. The plane of a faction is one
     /// contiguous run, and the faction is the major index.
@@ -429,10 +430,10 @@ impl InfluenceField {
     /// in direction order. Both orders are fixed, and a cell is named by its
     /// index rather than by the thread that filled it.[^1]
     ///
-    /// **A plane with fewer cells than the caller has threads is filled on
-    /// one thread.** Starting a thread for one cell costs more than the cell
-    /// does. The rule reads the two numbers the caller already supplied and
-    /// holds no constant of its own.
+    /// **A field with fewer slots than the caller has threads is filled on
+    /// one thread.** A slot is one cell of one plane. Starting a thread for
+    /// one slot costs more than the slot does. The rule reads the two numbers
+    /// the caller already supplied and holds no constant of its own.
     ///
     /// # References
     ///

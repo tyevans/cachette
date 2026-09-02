@@ -15,7 +15,9 @@
 //! [^2]: Testing rules, section 2a. `.claude/rules/testing.md`
 
 use cachette_core::influence::PASSES_FOR_EACH_SOLVE;
-use cachette_core::{Axial, Conductance, FactionId, Grid, Influence, InfluenceField, InfluenceError};
+use cachette_core::{
+    Axial, Conductance, FactionId, Grid, Influence, InfluenceError, InfluenceField,
+};
 use cachette_core::{World, WorldConfig};
 use proptest::prelude::*;
 
@@ -240,10 +242,7 @@ fn the_solve_runs_the_fixed_pass_count_whatever_the_input() {
 
     let mut stopped = InfluenceField::new(lattice(), 1).expect("one faction is inside the ceiling");
     stopped
-        .set_conductance(vec![
-            Conductance::BLOCKED;
-            lattice().tile_count() as usize
-        ])
+        .set_conductance(vec![Conductance::BLOCKED; lattice().tile_count() as usize])
         .expect("the plane covers the lattice");
 
     for mut field in [empty, fixture(), saturated, stopped] {
@@ -419,11 +418,7 @@ fn the_step_solves_the_field_and_a_watcher_reads_a_cell() {
 fn a_world_refuses_a_source_it_does_not_hold() {
     let mut world = world();
     assert!(!world.set_influence_source(FactionId(9), Axial::new(0, 0), Influence::UNIT));
-    assert!(!world.set_influence_source(
-        FactionId(0),
-        Axial::new(-1, 0),
-        Influence::UNIT
-    ));
+    assert!(!world.set_influence_source(FactionId(0), Axial::new(-1, 0), Influence::UNIT));
     assert_eq!(world.influence(FactionId(9), Axial::new(0, 0)), None);
     assert_eq!(world.influence(FactionId(0), Axial::new(0, -1)), None);
 }

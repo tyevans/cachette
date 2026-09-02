@@ -84,8 +84,16 @@ compares a run against itself always passes. The core crate carries a
 test-only feature, `probe-nondeterminism`. It makes every slot reduction
 read its slots in reverse index order, which breaks the ordering rule on
 purpose.[^5] It reaches the event log join and every minimum, maximum and
-first-wins. Under that feature the thread-count test and the slot reduction
-test must fail, and `determinism_probe.rs` must pass.
+first-wins. It also perturbs several keys and several solvers directly. The
+`probe` recipe of the justfile names each perturbation and names each test
+binary that must fail. Under that feature every named binary must fail, and
+`determinism_probe.rs` must pass.
+
+**One perturbation is not enough for one rule.** The influence solve carries
+two, because the two defects it must not have are not visible to one test. A
+convergence test gives the same answer at every thread count, so the
+thread-count assertion passes over it and only a test of the pass count sees
+it.[^11] Ask which test would fail before you claim a rule is protected.
 
 ```
 just probe
@@ -235,3 +243,4 @@ real. The subjects are not.
 [^8]: ADR-0041, a crate split enforces the boundary at compile time. `docs/adrs/REGISTRY.md`
 [^9]: ADR-0010, the cache line size is a compile-time constant. `docs/adrs/REGISTRY.md`
 [^10]: The contributing guide, the packaging and stub checks. `CONTRIBUTING.md`
+[^11]: Findings register, FND-160. `docs/FINDINGS.md`

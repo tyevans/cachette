@@ -3,7 +3,7 @@ id: 0104
 title: Carry the writ of a ruler in the influence field
 status: refined
 created: 2026-08-31
-implements: [ADR-0022 D1, ADR-0004 D1, ADR-0009 D1, ADR-0002 D1, ADR-0002 D2]
+implements: [ADR-0002 D1, ADR-0002 D2, ADR-0004 D1, ADR-0009 D1, ADR-0009 D3, ADR-0023 D1, ADR-0023 D2, ADR-0053 D3]
 changes: []
 creates: [ADR-0060, ADR-0087]
 serves: [PRD-0016]
