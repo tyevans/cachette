@@ -103,4 +103,4 @@ waits on housing.[^5]
 [^2]: Decision Record Scope, section 1. `.claude/rules/adr-scope.md`
 [^3]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`
 [^4]: Testing rules, section 2a. `.claude/rules/testing.md`
-[^5]: Backlog item 0060, grow the population from the store and the housing. `docs/backlog/refined/0060-grow-the-population-from-the-store-and-the-housing.md`
+[^5]: Backlog item 0060, grow the population from the store and the housing. `docs/backlog/proposed/0060-grow-the-population-from-the-store-and-the-housing.md`

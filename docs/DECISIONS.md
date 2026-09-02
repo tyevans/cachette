@@ -1033,7 +1033,6 @@ a failed founding is correct.[^PRD12]
 [^ADR75]: ADR-0075, the founding choice reads a bounded sample of the world. `docs/adrs/accepted/adr-0075-the-founding-choice-reads-a-bounded-sample-of-the-world.md`
 <<<<<<< HEAD
 [^FND106]: Findings register, FND-106. `docs/FINDINGS.md`
-[^DEC44ITEM]: Backlog item 0060. `docs/backlog/refined/0060-grow-the-population-from-the-store-and-the-housing.md`
+[^DEC44ITEM]: Backlog item 0060. `docs/backlog/proposed/0060-grow-the-population-from-the-store-and-the-housing.md`
 =======
-[^DEC44ITEM]: Backlog item 0060. `docs/backlog/refined/0060-grow-the-population-from-the-store-and-the-housing.md`
 >>>>>>> worktree-agent-a4ea51fa97c6b231a

@@ -81,7 +81,7 @@ Filled in when the item moves to `complete/`.
 
 ## References
 
-[^1]: Backlog item 0059. `docs/backlog/refined/0059-give-a-site-a-capacity-and-a-resident-roll.md`
+[^1]: Backlog item 0059. `docs/backlog/proposed/0059-give-a-site-a-capacity-and-a-resident-roll.md`
 [^2]: Backlog item 0084. `docs/backlog/refined/0084-give-a-tile-one-faction-column.md`
 [^3]: Backlog item 0101. `docs/backlog/proposed/0101-assert-the-terrain-gradient-of-a-holding.md`
 [^4]: Testing Rules, a fixture supplies the input. `.claude/rules/testing.md`
