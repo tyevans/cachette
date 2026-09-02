@@ -62,38 +62,6 @@ by faction. It needs no new store and no new check.
 **What follows either way.** The housing draft states decision D3 as option 2,
 and it must be rewritten against whatever this row decides.[^ADR81]
 
-### DEC-056 — May a decision record cite a product requirement record?
-
-**Open. The recommendation is to drop the rule.**
-
-The product guide states that a decision record cites no product requirement
-record, and the project orientation repeats it. Nothing checks the rule, and
-four accepted records break it.[^FND129]
-
-**The options.**
-
-1. Drop the rule. A decision record may cite a product record for the need that
-   made a choice hard. The backlog item stays the place that names what work
-   serves what need.
-2. Keep the rule and enforce it. Repair the four accepted records, and add a
-   check that fails a decision record which names a product file.
-3. Keep the rule for the reasoning and admit the citation in a consequence. A
-   record may say that a decision falsifies a product statement, and it may not
-   rest a decision on one.
-
-**The recommendation is option 1.** The reason the rule gives is that a product
-direction changes more often than a constraint does. That reason is sound, and
-the records that break the rule do not show the harm it predicts: each cites a
-product record for a need that is stable, and none quotes a figure from one. A
-rule that nobody follows and nothing checks is worse than no rule, because it
-gives a reviewer an objection that the project will not support.
-
-Option 3 is the honest reading of what the records actually do, and it is the
-second choice. It costs a rule that a check cannot express.
-
-**What holds it back.** Nothing. Work continues under any option, and only the
-prose of the records moves.
-
 ### DEC-044 — Should the default ration be above the decay?
 
 **Open. The recommendation is to raise the default ration above the decay.**
@@ -251,6 +219,34 @@ figure is 168 MB. The storage argument for vectors is stronger than the report
 concluded, and it called that argument its weakest.
 
 ## Closed
+
+### DEC-056 — May a decision record cite a product requirement record?
+
+**Closed. The rule is dropped.** A decision record may cite a product
+requirement record for the need that made a choice hard. It must not take a
+figure, a budget or a date from one.
+
+The project owner decided this on 1 September 2026.
+
+**What was believed.** A decision record cites no product requirement record.
+The product guide stated it and the project orientation repeated it.[^FND129]
+
+**Why it is dropped.** Nothing checked the rule and the project did not follow
+it. ADR-0064, ADR-0067, ADR-0074 and ADR-0075 are accepted and each cites a
+product record. The reason the rule gave is sound: a product direction changes
+more often than a constraint does. The records that broke it do not show that
+harm, because each cites a need that is stable and none quotes a figure from
+one. A rule that nobody follows and nothing checks is worse than no rule,
+because it hands a reviewer an objection the project will not support.
+
+**What survives.** The part of the reason that has teeth. A decision must not
+rest on a value that moves, and that is already the record scope rule, which
+bans a budget, a figure and a date wherever they come from.[^SCOPE]
+
+**What follows.** The two statements of the rule are removed, in the project
+orientation and in the product guide. No record is repaired, because none was
+in breach of a rule that no longer exists. No check is added. A refined backlog
+item still cites both the records that govern it and the need it serves.
 
 ### DEC-055 — Does a period return one unit or the whole deposit?
 
@@ -1036,3 +1032,4 @@ a failed founding is correct.[^PRD12]
 [^DEC44ITEM]: Backlog item 0060. `docs/backlog/proposed/0060-grow-the-population-from-the-store-and-the-housing.md`
 =======
 >>>>>>> worktree-agent-a4ea51fa97c6b231a
+[^SCOPE]: Decision Record Scope, section 4.1. `.claude/rules/adr-scope.md`

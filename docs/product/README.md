@@ -90,14 +90,17 @@ implements: [ADR-0001 D4]
 serves:     [PRD-0001]
 ```
 
-**A decision record cites no product requirement record.** A decision
-record answers to a constraint, not to a feature. A product direction
-changes more often than a constraint does, and a decision record must not
-hold material that changes.[^4]
+**A decision record may cite a product requirement record for the need that
+made a choice hard.** It must not take a figure, a budget or a date from
+one. A product direction changes more often than a constraint does, so a
+decision that rests on a moving value inherits the movement.[^4]
 
-The backlog item is therefore the only join between the product need and
-the architecture. This keeps the decision records stable while the product
-moves.
+This project banned the citation outright until 1 September 2026. Four
+accepted records broke the ban, nothing checked it, and none of them showed
+the harm the ban predicted. The register holds the reasoning.[^5]
+
+The backlog item stays the place that names what work serves what need. A
+refined item cites the records that govern it and the need it serves.
 
 ## What does not belong here
 

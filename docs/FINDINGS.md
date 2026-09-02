@@ -2841,9 +2841,16 @@ records for the product file prefix returns four files.
 precedent runs the other way, and a rule applied to new work but not to the work
 already accepted is a rule that punishes whoever arrives last.
 
-**The project must choose.** Either the rule holds, and the four accepted
-records need repair under supersession or the retcon window, or the rule is
-wrong and the guide must drop it. An open row holds the choice.[^75]
+**The project chose, on 1 September 2026: the rule is dropped.** A decision
+record may now cite a product requirement record for the need that made a choice
+hard, and it must not take a figure, a budget or a date from one. The two
+statements of the ban are removed. No accepted record was repaired, because none
+was in breach of a rule that no longer exists. The closed row holds the
+reasoning.[^75]
+
+**What this finding cost, and what it bought.** The rule stood for the whole
+research phase and bound nobody. It was found by a review that read a record
+against the code rather than against the guide.
 
 ### FND-130 — Two footnote rules are stated, are broken, and are checked by nothing
 

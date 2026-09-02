@@ -104,7 +104,9 @@ blockers govern it.
 that names a data structure holds an architectural decision, and that
 decision belongs in a decision record. A check enforces this.
 
-A decision record cites no product record. A refined backlog item cites both.
+A decision record may cite a product record for the need that made a choice
+hard. It must not take a figure from one. A refined backlog item cites both the
+records that govern it and the need it serves.
 
 ## Task management
 
