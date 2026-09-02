@@ -31,9 +31,10 @@
 //! when it is released.
 //!
 //! The product record asks that the window name every colour it draws.[^6] A
-//! legend on a key is the window naming its colours. The record does not ask
-//! that the naming is always on screen, and the register holds that
-//! reading.[^7]
+//! legend on a key is the window naming its colours, so the record holds. The
+//! reason to put it on a key is that a hidden layer takes no space from the
+//! map. The record was amended to describe the window as it now is, and the
+//! register holds the reasoning.[^7]
 //!
 //! The key holds no state between frames. The caller passes what the keyboard
 //! says, in the same way it passes the camera, and nothing reaches the
@@ -232,10 +233,7 @@ enum Anchor {
 ///
 /// [^1]: Recurring Defect Shapes, shape 1. `.claude/rules/recurring-defects.md`
 fn cards(readout: &Readout, reference: bool) -> Vec<(Anchor, Card)> {
-    let mut cards = vec![(Anchor::TopLeft, run_card(readout))];
-    if let Some(tile) = readout.tile() {
-        cards.push((Anchor::TopLeft, crosshair_card(&tile)));
-    }
+    let mut cards = vec![(Anchor::TopLeft, world_card(readout))];
     if let Some(choice) = readout.choice() {
         cards.push((Anchor::BottomRight, unit_card(&choice)));
     }
@@ -383,69 +381,56 @@ fn outline(canvas: &mut Canvas, x: i32, y: i32, width: i32, height: i32) {
     canvas.block(x + width - 1, y, 1, height, EDGE);
 }
 
-/// Returns the card that says how the run is going.
+/// Returns the card that says how the world is going.
 ///
-/// Every row moves. The tick moves each frame, and the other four move as
-/// units are born, walk into the window and die.
+/// Five rows, and every one of them moves. The tick moves each frame. The
+/// population moves as units are born and die. The two shortage rows move as a
+/// store empties. The food moves as a crowd works a deposit, as the deposit
+/// recovers, and as the watcher scrolls.
 ///
-/// **The two population rows are both here, and both are labelled.** One
-/// counts the world and one counts the window. A card that stated only the
-/// world would leave a reader unable to check the number against the picture,
-/// which the product record asks for.[^1]
+/// **The rows a watcher checks rather than watches are not here.** The tile
+/// address, the ground, the count of units in the window and the count of
+/// tiles drawn all sit behind the key. Each is a number a person reads once to
+/// orient themselves, and none of them tells a watcher that something is
+/// happening.[^1]
 ///
 /// # References
 ///
-/// [^1]: PRD-0005, a watcher can tell what is happening and why. `docs/product/shipped/prd-0005-a-watcher-can-tell-what-is-happening-and-why.md`
-fn run_card(readout: &Readout) -> Card {
+/// [^1]: Decisions register, DEC-084. `docs/DECISIONS.md`
+fn world_card(readout: &Readout) -> Card {
+    let mut rows = vec![
+        Row::new("tick", grouped(readout.tick())),
+        Row::new(
+            "people in world",
+            grouped(u64::from(readout.soldiers_live())),
+        ),
+        Row::new("ended", grouped(readout.units_ended() as u64)),
+        Row::new("short", grouped(u64::from(readout.units_short()))),
+    ];
+    if let Some(tile) = readout.tile() {
+        rows.push(Row::new("food here", food_of(&tile)));
+    }
     Card {
-        heading: "THE RUN",
-        rows: vec![
-            Row::new("tick", grouped(readout.tick())),
-            Row::new(
-                "units in world",
-                grouped(u64::from(readout.soldiers_live())),
-            ),
-            Row::new(
-                "units in window",
-                grouped(u64::from(readout.soldiers_painted())),
-            ),
-            Row::new("short in window", grouped(u64::from(readout.units_short()))),
-            Row::new("ended in world", grouped(readout.units_ended() as u64)),
-        ],
+        heading: "THE WORLD",
+        rows,
     }
 }
 
-/// Returns the card that says what the ground under the crosshair holds.
+/// Returns what is left of the food a tile carries, of what the ground gave.
 ///
-/// The food is the number the colour of the map encodes, so a watcher reads it
-/// here and calibrates their eye against the picture. It moves when a crowd
-/// works a deposit, when the deposit recovers, and when the watcher
-/// scrolls.[^1]
-///
-/// The wood and the stone do not appear. Nothing takes them yet, so they move
-/// only when the watcher scrolls, and the panel holds them.
+/// A tile the ground gave nothing of returns a word and not a pair of zeroes.
+/// A reader cannot tell a drained deposit from ground that never carried
+/// one.[^1]
 ///
 /// # References
 ///
-/// [^1]: ADR-0072, a tile stock is generated, and only what was taken is stored, decision D4. `docs/adrs/accepted/adr-0072-a-tile-stock-is-generated-and-only-what-was-taken-is-stored.md`
-fn crosshair_card(tile: &TileReadout) -> Card {
+/// [^1]: ADR-0070, the head-up display reports what the drawing pass read, decision D2. `docs/adrs/accepted/adr-0070-the-head-up-display-reports-what-the-drawing-pass-read.md`
+fn food_of(tile: &TileReadout) -> String {
     let gave = tile.generated(ResourceKind::Food);
-    let food = if gave == 0 {
-        "none here".to_string()
-    } else {
-        format!("{} of {}", tile.stock(ResourceKind::Food), gave)
-    };
-    Card {
-        heading: "UNDER THE CROSSHAIR",
-        rows: vec![
-            Row::new(
-                "tile",
-                format!("q {}  r {}", tile.address().q, tile.address().r),
-            ),
-            Row::new("ground", name_of(tile.kind()).to_string()),
-            Row::new("food left", food),
-        ],
+    if gave == 0 {
+        return "none".to_string();
     }
+    format!("{} of {}", tile.stock(ResourceKind::Food), gave)
 }
 
 /// Returns the card that says why the nearest unit chose what it chose.
@@ -460,30 +445,26 @@ fn crosshair_card(tile: &TileReadout) -> Card {
 /// [^1]: ADR-0064, a unit chooses by scoring a small fixed option set, decision D2. `docs/adrs/accepted/adr-0064-a-unit-chooses-by-scoring-a-small-fixed-option-set.md`
 fn unit_card(choice: &ChoiceReadout) -> Card {
     let focus = choice.focus();
-    let mut rows = vec![
-        Row::coloured(
-            faction_colour(focus.faction()),
-            format!("faction {}", focus.faction().0),
-            format!("q {}  r {}", focus.address().q, focus.address().r),
-        ),
-        Row::new(
-            "state",
-            match focus.condition() {
-                None => "-".to_string(),
-                Some(NeedCondition::Fed) => "fed".to_string(),
-                Some(NeedCondition::Short) => "short".to_string(),
-                Some(NeedCondition::Starved) => "starved".to_string(),
-            },
-        ),
-    ];
+    let mut rows = vec![Row::coloured(
+        faction_colour(focus.faction()),
+        format!("faction {}", focus.faction().0),
+        match focus.condition() {
+            None => "-".to_string(),
+            Some(NeedCondition::Fed) => "fed".to_string(),
+            Some(NeedCondition::Short) => "short".to_string(),
+            Some(NeedCondition::Starved) => "starved".to_string(),
+        },
+    )];
     match choice.explanation() {
         // The engine says nothing about this unit. The card says that, rather
         // than printing a zero a reader cannot tell from a real score.
-        None => rows.push(Row::new("it chose", "-".to_string())),
+        None => rows.push(Row::new("chose", "-".to_string())),
         Some(answer) => {
-            rows.push(Row::new("it chose", option_name(answer.best).to_string()));
-            rows.push(Row::new("that scored", best_score(&answer)));
-            rows.push(Row::new("what it needs", fraction(Some(answer.need))));
+            rows.push(Row::new(
+                "chose",
+                format!("{} {}", option_name(answer.best), best_score(&answer)),
+            ));
+            rows.push(Row::new("needs", fraction(Some(answer.need))));
         }
     }
     Card {
@@ -572,16 +553,30 @@ fn legend_rows(readout: &Readout) -> usize {
 /// [^1]: PRD-0005, a watcher can tell what is happening and why. `docs/product/shipped/prd-0005-a-watcher-can-tell-what-is-happening-and-why.md`
 fn view_card(readout: &Readout) -> Card {
     let (across, down) = readout.extent_shown();
+    let mut rows = vec![
+        Row::new(
+            "centre tile",
+            format!("q {}  r {}", readout.centre().q, readout.centre().r),
+        ),
+        Row::new("showing", format!("{across} x {down} tiles")),
+        Row::new("tiles drawn", grouped(u64::from(readout.tiles_painted()))),
+        // The scope is in the label of both rows, not only of this one. The
+        // product record asks that a reader cannot mistake one count for the
+        // other, and the two now sit on different layers, so the label is the
+        // only thing that separates them.[^2]
+        //
+        // [^2]: PRD-0005, a watcher can tell what is happening and why. `docs/product/shipped/prd-0005-a-watcher-can-tell-what-is-happening-and-why.md`
+        Row::new(
+            "people in window",
+            grouped(u64::from(readout.soldiers_painted())),
+        ),
+    ];
+    if let Some(tile) = readout.tile() {
+        rows.push(Row::new("ground here", name_of(tile.kind()).to_string()));
+    }
     Card {
         heading: "WHERE YOU ARE LOOKING",
-        rows: vec![
-            Row::new(
-                "centre tile",
-                format!("q {}  r {}", readout.centre().q, readout.centre().r),
-            ),
-            Row::new("showing", format!("{across} x {down} tiles")),
-            Row::new("tiles drawn", grouped(u64::from(readout.tiles_painted()))),
-        ],
+        rows,
     }
 }
 
@@ -600,18 +595,18 @@ fn cost_card(readout: &Readout) -> Card {
     Card {
         heading: "COST ON THIS MACHINE",
         rows: vec![
-            Row::new("step", format!("{:.0} us", readout.step_mean())),
-            Row::new("draw", format!("{:.0} us", readout.draw_mean())),
+            Row::new("step", format!("{:.1} ms", readout.step_mean() / 1000.0)),
+            Row::new("draw", format!("{:.1} ms", readout.draw_mean() / 1000.0)),
             Row::new("rate", format!("{:.1} a second", readout.rate())),
         ],
     }
 }
 
 /// What the window says while the reference layer is hidden.
-const CLOSED_HINT: &str = "hold TAB to name the colours    full detail: just inspect";
+const CLOSED_HINT: &str = "hold tab for more    just inspect writes the rest";
 
 /// What the window says while the reference layer is shown.
-const OPEN_HINT: &str = "release TAB to hide    full detail: just inspect";
+const OPEN_HINT: &str = "release tab    just inspect writes the rest";
 
 /// Returns the line that says where the rest of the numbers are.
 ///

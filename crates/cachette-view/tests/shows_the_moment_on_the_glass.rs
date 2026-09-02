@@ -118,15 +118,17 @@ fn value_of(said: &[String], label: &str) -> Option<String> {
 #[test]
 fn the_glass_states_both_population_counts_and_labels_them() {
     // The product record asks for both numbers, labelled, so that a reader
-    // cannot mistake one for the other.[^1] A card that stated only the world
-    // would leave a reader unable to check the number against the picture.
+    // cannot mistake one for the other.[^1] The world count is always on the
+    // glass and the window count sits behind the key, so the label is the only
+    // thing that separates them and both must name their scope.
     //
     // [^1]: PRD-0005, a watcher can tell what is happening and why. `docs/product/shipped/prd-0005-a-watcher-can-tell-what-is-happening-and-why.md`
     let (_, readout, _) = drawn(false);
     let said = glass::says(&readout, false);
 
-    let world = value_of(&said, "units in world").expect("the glass counts the world");
-    let window = value_of(&said, "units in window").expect("the glass counts the window");
+    let world = value_of(&said, "people in world").expect("the glass counts the world");
+    let window = value_of(&glass::says(&readout, true), "people in window")
+        .expect("the key counts the window");
     assert_eq!(
         world,
         cachette_view::hud::grouped(u64::from(readout.soldiers_live()))
@@ -220,7 +222,7 @@ fn the_glass_states_what_is_left_of_the_food_the_ground_gave() {
         "the gather must separate the two numbers: {left} of {gave}"
     );
     assert_eq!(
-        value_of(&glass::says(&readout, false), "food left"),
+        value_of(&glass::says(&readout, false), "food here"),
         Some(format!("{left} of {gave}")),
         "the glass must state what the engine holds"
     );
@@ -235,16 +237,18 @@ fn the_glass_states_the_option_the_engine_selected() {
         .explain_choice(choice.focus().entity())
         .expect("the engine explains a live unit");
 
-    assert_eq!(
-        value_of(&said, "it chose").as_deref(),
-        answer.best_name(),
-        "the glass must name the option the engine selected"
-    );
-    // The fixture asserts its own outcome. A unit that chose nothing would let
-    // a card that printed a dash pass.
+    let chose = value_of(&said, "chose").expect("the glass names what the unit chose");
+    let named = answer.best_name().expect("the engine selected an option");
     assert!(
-        answer.best_name().is_some(),
-        "the fixture must supply a unit that chose an option"
+        chose.starts_with(named),
+        "the glass says {chose:?} and the engine selected {named:?}"
+    );
+    // The score rides in the same row, so the row must hold it too. A card
+    // that named the option and dropped the score would pass a test that only
+    // compared the name.
+    assert!(
+        chose.len() > named.len(),
+        "the glass names the option and not its score: {chose:?}"
     );
 }
 
@@ -268,7 +272,7 @@ fn the_glass_names_no_colour_while_the_key_is_up() {
     );
     // The key up must still leave the cards that hold what changes.
     assert!(
-        said.iter().any(|line| line == "THE RUN"),
+        said.iter().any(|line| line == "THE WORLD"),
         "the key hid a card that holds what changes: {said:?}"
     );
 }
@@ -333,7 +337,14 @@ fn the_key_states_where_you_are_looking_and_what_the_frame_cost() {
     // than continuously.
     let (_, readout, _) = drawn(true);
     let said = glass::says(&readout, true);
-    for label in ["centre tile", "showing", "step", "draw"] {
+    for label in [
+        "centre tile",
+        "showing",
+        "step",
+        "draw",
+        "people in window",
+        "ground here",
+    ] {
         assert!(
             value_of(&said, label).is_some(),
             "the key does not state {label}: {said:?}"

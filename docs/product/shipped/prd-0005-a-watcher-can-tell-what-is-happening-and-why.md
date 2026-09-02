@@ -60,6 +60,34 @@ Each statement below can be checked.
 - A number the viewer cannot know is absent. The window never estimates.
 - The panel does not hide the world. A developer can read the numbers and
   watch the units at the same time.
+- **One command writes every number the window does not show, and the window
+  names that command.** A developer who wants the whole record runs it and
+  reads an image, without a display and without stopping the run.
+
+### The window shows the moment, and a command writes the record
+
+**This section is an amendment.** The record was written when the window held
+one panel and the panel held everything. The window now shows what changes
+moment to moment, drawn over the map, and one command writes the rest.
+
+The statements above still hold. Four of them are met on demand rather than
+continuously: the window names its colours, states where the person is
+looking, and states the two cost numbers while a developer holds one key, and
+it states the count of units in the window on the same key. The window naming
+its colours on request is the window naming its colours. Nothing was dropped.
+
+**The reason is the demonstration.** The panel grew past the height of the
+window and cut, so the numbers below the cut were not reachable at all. The
+project owner chose a heads-up display over a scrollable panel, and ruled that
+the demonstration should look its best and that this record should be amended
+where the product outgrows it.[^5] A product record is expected to change as
+the product grows.
+
+**What this costs a developer.** A number behind a key is a keystroke away
+rather than in view. That is a real loss for diagnosis and a real gain for
+watching, and the owner chose watching. A developer who diagnoses reads the
+image the command writes, which holds every section at a height that never
+cuts.
 
 ## What this does not do
 
@@ -123,3 +151,4 @@ parametrically.[^2]
 
 [^1]: Blockers register, BLK-007. `docs/BLOCKERS.md`
 [^2]: Blockers register, BLK-013 and BLK-014. `docs/BLOCKERS.md`
+[^5]: Decisions register, DEC-084. `docs/DECISIONS.md`

@@ -23,7 +23,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^ALLOC]
 
-**Next number: DEC-085**
+**Next number: DEC-086**
 
 ## Open
 
@@ -732,6 +732,35 @@ concluded, and it called that argument its weakest.
 
 ## Closed
 
+### DEC-085 — Does a shipped product record constrain a design, or follow it?
+
+**Closed. It follows. The project owner ruled it.**
+
+The window outgrew a shipped product record. The record lists what the window
+states, and a new design met four of those statements on demand rather than
+continuously. The question was whether to bend the design to keep the record
+literally true, or to change the design and amend the record.
+
+**The ruling is to design for the best result and amend the record.** The owner
+gave two reasons. The first is that the demonstration should look its best. The
+second is general: a product record falls out of date as the product grows, and
+amending it is the expected maintenance, not a failure.
+
+**This does not make a record advisory.** The project already holds that a
+record the code contradicts is worse than no record, because it lies.[^DEC85DOD]
+The ruling says which of the two things changes when they disagree. It does not
+say that they may disagree. A design that outgrows a record carries the
+amendment as a deliverable of the same work.
+
+**The scope is product records.** An architecture decision record is a
+different instrument: it states a binding constraint and it is superseded by a
+new record rather than amended.[^DEC68F] Nothing here changes that.
+
+**Amend, or supersede.** Amend when the statements move and the need holds.
+Supersede with a new number when the audience or the need itself changes. The
+first case is a product that grew. The second is a different product.
+
+
 ### DEC-084 — Does a legend on a key satisfy a record that asks the window to name its colours?
 
 **Closed. It does. The record asks that the window names its colours. It does
@@ -765,11 +794,23 @@ mechanism serves all three.
 3. **A thin strip of swatches, always on.** Names the colours permanently in
    about twelve pixels, and states no count.
 
-**Option one, and the reason is that it needs no product decision at all.** A
-legend that appears on a key is the window naming its colours. Reading the
-record as "always visible" is a reading and not a requirement. Option two
-spends a record to buy what option one gives free. Option three was kept as the
-fallback if a held key proved unworkable in the window, and it did not.
+**Option one, on looks.** A legend that appears on a key is the window naming
+its colours, so the record holds either way. The reason to take option one is
+that it costs nothing on the glass: a layer that is hidden by default takes no
+space from the map. Option three spends twelve pixels permanently to say what
+the key says for free.
+
+**The first version of this row gave a different reason, and it was wrong.**
+It said option one was right because it needed no product decision. The project
+owner then ruled the other way round: design for the best-looking
+demonstration, and amend the product record where the design outgrows it. Their
+words were "rule of cool", and they added that product records fall out of date
+with growth and must be amended as necessary.[^DEC85REF]
+
+That ruling reverses the order of the argument. Compliance is not the reason to
+choose a layout. Looks are, and the record follows. Option one still wins,
+because it also looks better, and the record was amended anyway to describe the
+product as it now is.[^DEC84B]
 
 **What would reverse this.** A watcher who cannot find the key. The window says
 what the key does on a line that is always visible, so the test is whether a
@@ -1933,3 +1974,5 @@ a failed founding is correct.[^PRD12]
 [^DEC78A]: Backlog item 0133. `docs/backlog/complete/0133-let-a-watcher-reach-a-panel-longer-than-the-window.md`
 [^DEC78B]: Decisions register, DEC-084, in this document.
 [^DEC84B]: PRD-0005, a watcher can tell what is happening and why. `docs/product/shipped/prd-0005-a-watcher-can-tell-what-is-happening-and-why.md`
+[^DEC85REF]: Decisions register, DEC-085, in this document.
+[^DEC85DOD]: Definition of Done. `.claude/rules/definition-of-done.md`
