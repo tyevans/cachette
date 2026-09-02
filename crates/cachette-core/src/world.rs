@@ -55,6 +55,7 @@ use crate::soldier::{SoldierArena, SoldierError};
 use crate::sort;
 use crate::sort::{BoundedKey, SortError};
 use crate::terrain::{Terrain, TerrainTile, TileKind};
+use crate::tile_value::{TileValueRange, TileValues};
 use crate::types::{Accum, Entity, FactionId, Fix32, Tick, TileIdx, FACTION_CEILING};
 
 /// The reason that a value did not name a live entity.
@@ -328,7 +329,17 @@ pub struct World {
     config: WorldConfig,
     grid: Grid,
     tick: Tick,
-    values: Vec<Fix32>,
+    /// The tile stub value of every tile.
+    ///
+    /// The field generates the value of a tile from the seed and stores only
+    /// what the frames changed, so building a world visits no tile and
+    /// allocates nothing that grows with the tile count.[^1] [^2]
+    ///
+    /// # References
+    ///
+    /// [^1]: PRD-0003, a developer sees a world worth looking at, what it costs at the target scale. `docs/product/accepted/prd-0003-a-developer-sees-a-world-worth-looking-at.md`
+    /// [^2]: ADR-0072, a tile stock is generated, and only what was taken is stored, decision D4. `docs/adrs/accepted/adr-0072-a-tile-stock-is-generated-and-only-what-was-taken-is-stored.md`
+    values: TileValues,
     log: Vec<TileChanged>,
     /// The events of the last step, from the gather resolve.
     gather_log: Vec<ResourceTaken>,
@@ -431,12 +442,13 @@ impl World {
             return Err(WorldError::FactionCountAboveCeiling(config.faction_count));
         }
         let grid = Grid::new(config.width, config.height)?;
-        let count = grid.tile_count() as usize;
-        let mut values = Vec::with_capacity(count);
-        for index in 0..count {
-            let raw = rng::draw(config.seed, rng::SYSTEM_TILE_STUB, 0, index as u64, 0);
-            values.push(Fix32((raw >> 40) as i32));
-        }
+        // The tile value field stores nothing here. It holds the seed and
+        // the extent, and it generates a tile when a reader asks for one, so
+        // the cost is paid per reader and never once for every tile before
+        // the first frame.[^2]
+        //
+        // [^2]: PRD-0003, a developer sees a world worth looking at, what it costs at the target scale. `docs/product/accepted/prd-0003-a-developer-sees-a-world-worth-looking-at.md`
+        let values = TileValues::new(config.seed, grid);
         let layout = BlockLayout::new(grid, BLOCK_BITS_DEFAULT)?;
         let soldiers = SoldierArena::new(grid, config.unit_capacity);
         let settlements = SettlementArena::new(grid);
@@ -1749,7 +1761,16 @@ impl World {
     #[must_use]
     pub fn tile_value(&self, address: Axial) -> Option<Fix32> {
         let index = self.grid.index_of(address)?;
-        self.values.get(index.0 as usize).copied()
+        self.values.at(index)
+    }
+
+    /// Returns the value of the tile at an index.
+    ///
+    /// Returns `None` when the index names no tile. A caller that already
+    /// holds an index uses this and converts no coordinate.
+    #[must_use]
+    pub fn tile_value_at(&self, index: TileIdx) -> Option<Fix32> {
+        self.values.at(index)
     }
 
     /// Returns the settings that built the world.
@@ -1767,19 +1788,39 @@ impl World {
     /// Returns the number of tiles.
     #[must_use]
     pub fn tile_count(&self) -> usize {
-        self.values.len()
+        self.grid.tile_count() as usize
     }
 
-    /// Returns the whole tile value column.
+    /// Returns a copy of the whole tile value column.
     ///
-    /// The column is one flat array, so the view costs no copy.[^1]
+    /// **The call visits every tile and allocates one value for each.** The
+    /// world holds no array of tile values, so there is no view to hand out
+    /// and the copy is the whole cost. The name says so, because what copies
+    /// is declared at the call site.[^1]
+    ///
+    /// A caller that wants one tile calls the single-tile read instead.
     ///
     /// # References
     ///
     /// [^1]: ADR-0044, what copies and what does not is declared at the call site. `docs/adrs/REGISTRY.md`
     #[must_use]
-    pub fn tile_values(&self) -> &[Fix32] {
-        &self.values
+    pub fn copy_tile_values(&self) -> Vec<Fix32> {
+        self.values.copy_all()
+    }
+
+    /// Returns the number of tiles that hold a stored change.
+    ///
+    /// A world that has never stepped holds none, at any tile count. The
+    /// count grows with what the frames have changed and never with the size
+    /// of the world alone, which is what the product record asks of the
+    /// build.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: PRD-0003, a developer sees a world worth looking at, what it costs at the target scale. `docs/product/accepted/prd-0003-a-developer-sees-a-world-worth-looking-at.md`
+    #[must_use]
+    pub fn stored_tile_changes(&self) -> usize {
+        self.values.stored_changes()
     }
 
     /// Returns the events of the last step.
@@ -1811,11 +1852,7 @@ impl World {
     /// [^1]: ADR-0002, simulated and aggregated state holds no floating point number, decision D1. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`, and ADR-0004, iteration order is explicit, decision D2. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
     #[must_use]
     pub fn tile_total(&self) -> Accum {
-        let mut total = Accum(0);
-        for value in &self.values {
-            total = sim_math::accumulate(total, *value);
-        }
-        total
+        self.values.total()
     }
 
     /// Returns the hash of the whole state.
@@ -1832,8 +1869,15 @@ impl World {
             .write_u64(self.config.seed)
             .write_u64(u64::from(self.config.width))
             .write_u64(u64::from(self.config.height))
-            .write_u64(u64::from(self.config.faction_count))
-            .write(bytemuck::cast_slice(&self.values));
+            .write_u64(u64::from(self.config.faction_count));
+        // The tile value field is generated from the seed and stores only
+        // what the frames changed. The hash writes the value of every tile
+        // and not the stored part alone: the seed and the extent above are
+        // the inputs of the generator, and a change to the generator moves
+        // every tile of every world while leaving both untouched.[^3]
+        //
+        // [^3]: ADR-0068, terrain is generated from the seed and is never stored as a map, the consequences. `docs/adrs/accepted/adr-0068-terrain-is-generated-from-the-seed-and-is-never-stored-as-a-map.md`
+        let hash = self.values.hash_into(hash);
         // The ground is part of the world, so the whole-world hash covers
         // it. The seed and the extent are already above, but they are the
         // inputs of the generator, not its output. A change to the generator
@@ -1888,7 +1932,13 @@ impl World {
     /// [^1]: The testing rule, drive the real caller. `.claude/rules/testing.md`
     #[must_use]
     pub fn check_invariants(&self) -> bool {
-        if self.values.len() != self.grid.tile_count() as usize {
+        // The field holds one entry for each tile a frame changed, in
+        // ascending tile order. A lookup is a binary search, so an entry out
+        // of order does not fail. It returns the wrong tile.
+        if !self.values.check_invariants() {
+            return false;
+        }
+        if self.values.grid() != self.grid {
             return false;
         }
         if self.grid.width() != self.config.width || self.grid.height() != self.config.height {
@@ -2056,13 +2106,13 @@ impl World {
         if !self
             .gather_log
             .iter()
-            .all(|event| event.padding == [0; 7] && (event.tile.0 as usize) < self.values.len())
+            .all(|event| event.padding == [0; 7] && (event.tile.0 as usize) < self.tile_count())
         {
             return false;
         }
         self.log
             .iter()
-            .all(|event| event.padding == [0; 5] && (event.tile.0 as usize) < self.values.len())
+            .all(|event| event.padding == [0; 5] && (event.tile.0 as usize) < self.tile_count())
     }
 
     /// Reports whether the store column agrees with the account of it.
@@ -2336,30 +2386,54 @@ impl World {
 
         let tick = self.tick;
         let seed = self.config.seed;
-        let values = &mut self.values;
-        let count = values.len();
-        let chunk_len = count.div_ceil(threads).max(1);
+        let count = self.grid.tile_count();
+        let chunk_len = (count as usize).div_ceil(threads).max(1) as u32;
 
-        let mut slots: Slots<Vec<TileChanged>> =
-            Slots::filled(threads, Vec::new()).map_err(|_| StepError::ZeroThreads)?;
+        let mut slots: Slots<ChunkResult> =
+            Slots::filled(threads, ChunkResult::default()).map_err(|_| StepError::ZeroThreads)?;
 
-        std::thread::scope(|scope| {
-            let mut base = 0usize;
-            for (chunk, slot) in values.chunks_mut(chunk_len).zip(slots.entries_mut()) {
-                let start = base;
-                base += chunk.len();
-                scope.spawn(move || {
-                    *slot = update_chunk(tick, seed, start, chunk);
-                });
-            }
-        });
+        // Each worker reads one contiguous range of tiles and writes to its
+        // own slot. No worker writes to the field, because the merge that
+        // follows the join is the one place that fixes the order.[^12]
+        //
+        // [^12]: ADR-0009, parallel stages write disjoint outputs. `docs/adrs/REGISTRY.md`
+        {
+            let values = &self.values;
+            std::thread::scope(|scope| {
+                let mut start = 0u32;
+                for slot in slots.entries_mut() {
+                    if start >= count {
+                        break;
+                    }
+                    let end = start.saturating_add(chunk_len).min(count);
+                    let range = values.range(start, end);
+                    scope.spawn(move || {
+                        *slot = update_range(tick, seed, start, end, range);
+                    });
+                    start = end;
+                }
+            });
+        }
 
         let mut log = core::mem::take(&mut self.log);
         log.clear();
         self.log = slots.combine(log, |mut joined, slot| {
-            joined.extend_from_slice(slot);
+            joined.extend_from_slice(&slot.events);
             joined
         });
+
+        // The ranges are disjoint, so each tile appears in one run at most.
+        // The merge needs one ascending run, and the sort by tile index is
+        // what gives it one. Nothing here reads the order the slots joined
+        // in, so the field is the same at any thread count.[^13]
+        //
+        // [^13]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
+        let mut run: Vec<(u32, Fix32)> = slots.combine(Vec::new(), |mut joined, slot| {
+            joined.extend_from_slice(&slot.changes);
+            joined
+        });
+        run.sort_unstable_by_key(|pair| pair.0);
+        self.values.merge_ascending(&run);
 
         // Every soldier chooses a neighbour, then the step applies the
         // choices. The choice is a pure read of the world, so the two halves
@@ -3651,19 +3725,40 @@ fn admit(
     Ok(admitted)
 }
 
-/// Updates one contiguous chunk of tiles and returns the events it emitted.
+/// What one worker produces from one range of tiles.
+///
+/// The worker writes the events it emitted and the changes it made. It
+/// writes nothing to the world, so two workers on two ranges cannot race.
+#[derive(Clone, Debug, Default)]
+struct ChunkResult {
+    /// The events of the range, in ascending tile order.
+    events: Vec<TileChanged>,
+    /// The change made to each tile of the range, in ascending tile order.
+    changes: Vec<(u32, Fix32)>,
+}
+
+/// Updates one contiguous range of tiles and returns what it changed.
 ///
 /// The function is pure in the sense that the record requires: the same
 /// prior values and the same key give the same result.[^1]
 ///
+/// The range is read through a view of the field rather than through a
+/// mutable slice, because the field stores no array of values to slice.
+///
 /// # References
 ///
 /// [^1]: ADR-0006, an event is plain data and applying it is pure, decision D1. `docs/adrs/accepted/adr-0006-an-event-is-plain-data-and-applying-it-is-pure.md`
-fn update_chunk(tick: Tick, seed: u64, start: usize, values: &mut [Fix32]) -> Vec<TileChanged> {
-    let mut events = Vec::new();
-    for (offset, value) in values.iter_mut().enumerate() {
-        let index = start + offset;
-        let raw = rng::draw_below(seed, rng::SYSTEM_TILE_STUB, tick.0, index as u64, 0, 8);
+fn update_range(
+    tick: Tick,
+    seed: u64,
+    start: u32,
+    end: u32,
+    range: TileValueRange<'_>,
+) -> ChunkResult {
+    let mut result = ChunkResult::default();
+    let mut cursor = 0usize;
+    for index in start..end {
+        let raw = rng::draw_below(seed, rng::SYSTEM_TILE_STUB, tick.0, u64::from(index), 0, 8);
         if raw >= 4 {
             continue;
         }
@@ -3671,8 +3766,13 @@ fn update_chunk(tick: Tick, seed: u64, start: usize, values: &mut [Fix32]) -> Ve
         if delta.0 == 0 {
             continue;
         }
-        let updated = sim_math::add(*value, delta);
-        *value = updated;
+        // The value is read here and not at the top of the loop, because a
+        // tile the draw did not choose needs no value. The cursor only moves
+        // forward, and the loop visits the tiles in ascending order, so a
+        // skipped tile costs the cursor nothing.
+        let value = range.value(TileIdx(index), &mut cursor);
+        let updated = sim_math::add(value, delta);
+        result.changes.push((index, delta));
         let kind = if delta.0 > 0 {
             CHANGE_KIND_RAISED
         } else {
@@ -3683,15 +3783,15 @@ fn update_chunk(tick: Tick, seed: u64, start: usize, values: &mut [Fix32]) -> Ve
         // here would be the holder of the frame before.[^2]
         //
         // [^2]: Findings register, FND-029. `docs/FINDINGS.md`
-        events.push(TileChanged::new(
+        result.events.push(TileChanged::new(
             tick,
-            TileIdx(index as u32),
+            TileIdx(index),
             updated,
             Holder::NOBODY,
             kind,
         ));
     }
-    events
+    result
 }
 
 #[cfg(test)]
@@ -3709,7 +3809,7 @@ mod tests {
 
     use super::*;
 
-    /// Builds a world with a mismatched column length.
+    /// Builds a world with a broken part.
     fn broken(change: impl FnOnce(&mut World)) -> World {
         let mut world = World::new(WorldConfig {
             width: 4,
@@ -3729,9 +3829,9 @@ mod tests {
     }
 
     #[test]
-    fn a_short_value_column_fails_the_check() {
+    fn a_stored_change_outside_the_extent_fails_the_check() {
         assert!(!broken(|world| {
-            world.values.pop();
+            world.values.merge_ascending(&[(64, Fix32(1))]);
         })
         .check_invariants());
     }

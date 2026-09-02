@@ -1004,7 +1004,6 @@ pub fn kind_colour(kind: TileKind) -> u32 {
 pub fn draw(world: &World, camera: Camera, canvas: &mut Canvas) -> Result<(), BridgeError> {
     canvas.clear();
     let grid = world.grid();
-    let values = world.tile_values();
     // The ground is a pure function of the seed and the address, so the
     // viewer computes it for the tiles the window covers and for no other.
     // A sweep of the whole world every frame is what the record calls a
@@ -1020,7 +1019,14 @@ pub fn draw(world: &World, camera: Camera, canvas: &mut Canvas) -> Result<(), Br
             let Some(index) = grid.index_of(address) else {
                 continue;
             };
-            let value = values[index.0 as usize].0;
+            // The world generates a tile value when a reader asks for
+            // one, so the viewer asks for the tiles the window covers and
+            // for no other. A sweep of the whole world every frame is what
+            // the ground record calls a design mistake.[^2]
+            let Some(value) = world.tile_value_at(index) else {
+                continue;
+            };
+            let value = value.0;
             let Some(ground) = terrain.tile(address) else {
                 continue;
             };

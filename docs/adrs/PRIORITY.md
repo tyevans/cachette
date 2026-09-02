@@ -41,6 +41,8 @@ A record here binds nothing until a reviewer moves it.
 | 0082 | Population growth. A review found its own decisions sound and returned it, because it rests on the free places of 0081.[^12] It moves when 0081 moves. |
 | 0083 | The gate build profile. A review returned it: both decisions hold against the code, and three sentences do not.[^15] It moves when those three are corrected. |
 | 0084 | The world reserves the unit columns at construction. The reservation is what a later contributor would trade away for a spawn that never refuses, and the code cannot say why it must not.[^14] A review returned it: all four decisions hold against the code, and two sentences do not.[^16] It moves when those two are corrected. |
+| 0085 | The Python boundary. It states that an entity crosses as one opaque identity that the engine resolves. The code that implements it exists, and a test proves that the resolution refuses a stale identity. |
+| 0088 | A tile field is a generated base and a stored change. Three tile fields now sit outside the dense column record, and nothing states the rule that picks between the two shapes. The code that implements it exists, and a visit census proves that building a world stores nothing for the field. |
 
 ## Reserved and not written
 

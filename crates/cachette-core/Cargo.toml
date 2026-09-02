@@ -17,8 +17,15 @@ bytemuck.workspace = true
 # order changes. That covers the event log join and every minimum, maximum
 # and first-wins. The probe tests then assert that the determinism tests
 # fail. A determinism test with no proven failure mode is decoration.
+#
+# `census-generated-tiles` is a test-only switch as well. It counts the tiles
+# that the tile value field has generated on the calling thread. The build
+# test then asserts that building a world generates none, and that a copy of
+# the whole column generates one for each tile, so the same test proves that
+# the counter counts.
 [features]
 probe-nondeterminism = []
+census-generated-tiles = []
 
 [dev-dependencies]
 bytemuck.workspace = true

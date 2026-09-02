@@ -39,11 +39,20 @@ invariants:
     ./scripts/check-crate-split.sh
 
 # Run the fast tests on both sides.
-test: test-rust probe test-python smoke
+test: test-rust census probe test-python smoke
 
 # Run the Rust tests. They go through the public crate API.
 test-rust:
     cargo test --workspace
+
+# Prove that building a world visits no tile of the value field.
+#
+# The switch makes the tile value field count the tiles it generates. The
+# test asserts that a build generates none, and that a copy of the whole
+# column generates one for each tile, so the same test proves the counter
+# counts. A counter wired to nothing would read zero for ever.
+census:
+    cargo test --package cachette-core --features census-generated-tiles --test build_visits_no_tile -- --test-threads=1
 
 # Run the Python tests. They import the installed package.
 test-python:

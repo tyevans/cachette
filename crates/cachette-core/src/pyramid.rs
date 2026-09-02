@@ -59,7 +59,8 @@ use crate::holding::Holder;
 use crate::sim_math;
 use crate::soldier::SoldierArena;
 use crate::terrain::Terrain;
-use crate::types::{Accum, Fix32};
+use crate::tile_value::TileValues;
+use crate::types::{Accum, Fix32, TileIdx};
 
 /// The summary of one block of tiles.
 ///
@@ -474,7 +475,7 @@ impl Pyramid {
     /// [^4]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`
     pub fn rebuild(
         &mut self,
-        values: &[Fix32],
+        values: &TileValues,
         holders: &[Holder],
         arena: &SoldierArena,
         bridge: &UnitTileBridge,
@@ -583,7 +584,7 @@ fn ground_of_block(layout: BlockLayout, terrain: Terrain, block: u32) -> CellSum
 /// [^1]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`
 fn moving_part(
     layout: BlockLayout,
-    values: &[Fix32],
+    values: &TileValues,
     holders: &[Holder],
     arena: &SoldierArena,
     bridge: &UnitTileBridge,
@@ -602,11 +603,17 @@ fn moving_part(
     for row in first_row..(first_row + edge).min(grid.height()) {
         let start = (row * grid.width() + first_column) as usize;
         let end = (row * grid.width() + (first_column + edge).min(grid.width())) as usize;
-        if start >= end || end > values.len() || end > holders.len() {
+        if start >= end || end > values.tile_count() || end > holders.len() {
             continue;
         }
-        for value in &values[start..end] {
-            value_total = sim_math::accumulate(value_total, *value);
+        // The field holds no array of values, so the run is read one tile at
+        // a time. The tiles of the run are contiguous, so the read converts
+        // no coordinate.
+        for index in start..end {
+            let Some(value) = values.at(TileIdx(index as u32)) else {
+                continue;
+            };
+            value_total = sim_math::accumulate(value_total, value);
         }
         // The holder column is indexed the same way as the value column, so
         // one row of a block is one contiguous run of it too.
