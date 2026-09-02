@@ -28,3 +28,14 @@ debug = "line-tables-only"
 lto = true
 panic = "unwind"
 codegen-units = 1
+
+# ADR-0083: the gate compiles the tests in this profile. The optimisation
+# level is here because the engine steps a large world and an unoptimised
+# build spends nearly all of the suite in code the optimiser removes. The
+# overflow check is here because it is the net that catches an accumulator
+# too narrow for the level it sums, and because raising the level next to it
+# is the moment somebody would take it away. The test profile inherits both.
+[profile.dev]
+opt-level = 1
+overflow-checks = true
+debug-assertions = true

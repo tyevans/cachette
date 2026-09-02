@@ -64,7 +64,9 @@ Do not violate them for convenience.
 8. **Order every parallel result deterministically.** Sort by a stable
    key. Never use thread completion order. Never use work-stealing order.
 9. **Widen pyramid accumulators at level 1.** A `u8` tile field summed
-   over 16.7 million tiles overflows a `u32`. Use `i64`.
+   over 16.7 million tiles reaches 4,258,500,000. That is inside a `u32`
+   by 0.85 percent, and it passes the ceiling above 16,843,009 tiles. An
+   accumulator must not depend on that margin. Use `i64`.
 
 Two tests protect these rules. The first runs one tick at 1 thread, at
 2 threads, and at 12 threads, then compares the event log byte for byte.

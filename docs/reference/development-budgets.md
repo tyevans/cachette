@@ -47,9 +47,10 @@ lint, tests and the record checks.[^5]
 
 | Figure | Value | Machine | Architecture | Profile | Conditions | Date |
 |---|---|---|---|---|---|---|
-| Whole gate suite, wall clock | 544 s | Intel Core i7-1260P, 16 hardware threads | x86_64 | debug | One run. Contention not controlled | 31 August 2026 |
-| Whole gate suite, budget | 660 s | Intel Core i7-1260P, 16 hardware threads | x86_64 | debug | An isolated run | 31 August 2026 |
-| Golden state hash test, wall clock | 36 s | Intel Core i7-1260P, 16 hardware threads | x86_64 | debug | One run. Contention not controlled | 31 August 2026 |
+| Whole gate suite, wall clock | 153 s | Intel Core i7-1260P, 16 hardware threads | x86_64 | dev, opt-level 1 | An isolated run. Nothing to rebuild | 1 September 2026 |
+| Whole gate suite, budget | 190 s | Intel Core i7-1260P, 16 hardware threads | x86_64 | dev, opt-level 1 | An isolated run. Nothing to rebuild | 1 September 2026 |
+| Golden state hash test, wall clock | 16 s | Intel Core i7-1260P, 16 hardware threads | x86_64 | dev, opt-level 1 | An isolated run. Nothing to rebuild | 1 September 2026 |
+| Whole gate suite, wall clock | 435 s | Intel Core i7-1260P, 16 hardware threads | x86_64 | dev, no optimisation | An isolated run. Nothing to rebuild. The profile the project used before | 1 September 2026 |
 
 The budget is the measured figure plus an allowance of one fifth, rounded up
 to the nearest ten seconds. A run over the budget is a signal to look, not a
@@ -62,10 +63,20 @@ killed after about forty minutes with four other runs present, on the machine
 in the rows above.[^8] That figure is contended and reported, not measured
 here, and it is in this paragraph rather than in the table for that reason.
 
-**The rows above are one run each, and no run controlled the load.** Other work
-was in progress on the machine on the day they were taken. Read them as the
-first entries of this register, not as the settled cost of the suite. Replace
-them with an isolated run, and say in the commit that the run was isolated.
+**The rows above are one run each, on a machine with no other work on it.**
+The last row holds the profile the project used before the optimisation level
+was raised, and it is there so that a reader sees the step the register
+recorded.[^9] A row that carries no profile carries no meaning, because the
+profile is the largest thing that moves this figure.
+
+**A row is a snapshot, and it does not support a comparison against a row
+taken hours earlier.** This machine slows down under sustained load. The same
+suite, unchanged, measured about four and a half minutes early in a session
+and about seven minutes after two hours of continuous running, on an idle
+machine that reported a low temperature throughout. The effect is large enough
+to invert a result.[^10] To compare two versions of the code, alternate them
+back to back and report the pair. Do not compare a run today against a row
+from last week.
 
 **Every row above describes one development machine.** No row is evidence
 about the target platform, and the comparison a row supports is between two
@@ -134,3 +145,5 @@ command, and the date. Cite the source in a footnote.
 [^6]: ADR-0008, the primary target is `aarch64-unknown-linux-gnu`, decision D2. `docs/adrs/accepted/adr-0008-the-primary-target-is-aarch64.md`
 [^7]: Testing rules, section 3. `.claude/rules/testing.md`
 [^8]: Findings register, FND-099. `docs/FINDINGS.md`
+[^9]: ADR-0083, the gate build checks every integer overflow. `docs/adrs/draft/adr-0083-the-gate-build-checks-every-integer-overflow.md`
+[^10]: Findings register, FND-142. `docs/FINDINGS.md`
