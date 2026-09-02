@@ -43,11 +43,9 @@ These close a gap a review found, or they unblock the items above.
 | 0130 | Three registers state a next number that the rows already hold, and it went stale and conflicted four times in one night. |
 | 0153 | Python holds no way to read an event, so an agent gets bytes and a digest. Any decoder in Python is a second copy of the layout. |
 | 0161 | The control plane cannot say where to act, so a caller sweeps. Four reserved rows hold the answer and none is written. DEC-063 names it the destination. |
-| 0154 | A merge conflict marker reached a register on the main branch and no gate saw it. A parallel run merges registers often. |
 | 0155 | Every test fixture builds its own world by hand, and the rule that forbids the easy route has no shared answer. |
 | 0163 | An item can be finished and still read as open, and no check compares what merged against the item that asked for it. |
 | 0165 | A register states the rule for reading its rows and holds a comparison the rule forbids. The example FND-141 proved false is still alive across the tree. |
-| 0144 | Two footnote rules are stated and nothing checks them. Three of four drafts broke one or both, and the gate passed.[^10] |
 | 0149 | The cost section of PRD-0018 states the mechanism of ADR-0080. A review holds the record at `Shaped` until it states cost alone.[^11] |
 | 0059 | Housing. A review rejected ADR-0081, so this cannot be taken until a record replaces it. It sits here, not above, because nobody can start it. |
 | 0060 | Population growth. It waits on 0059, which is itself stopped. |
@@ -98,6 +96,7 @@ These are real and none of them blocks anything today.
 | 0007 | The storage claims. |
 | 0009 | The log claims. |
 | 0010 | The Python boundary claims. |
+| 0166 | The footnote baseline holds every document the new check would fail. It can only shrink, and it does not shrink by itself.[^10] |
 
 ## References
 

@@ -48,7 +48,3 @@ keeps its number and its status, and it already named its own successor: an
 engine that runs on its own thread and publishes a frame the viewer reads.
 That successor needs a snapshot record, which does not exist, and no caller
 needs the two rates apart yet.
-
-## References
-
-[^2]: Decisions register, DEC-022. `docs/DECISIONS.md`

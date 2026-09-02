@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-151**
+**Next number: FND-155**
 
 ## A. Corrections to stated rules
 
@@ -3511,7 +3511,7 @@ carries the value.
 serves it.** The field says how much, and each column either holds that much
 or does not. A derived copy carries the field and drops what it means, so the
 capacity of the copy reads back correctly and states something false. This is
-the shape the recurring defect rule names first.[^140]
+the shape the recurring defect rule names first.[^22]
 
 **A capacity assertion cannot see this.** The copy reports the same capacity
 number, because the number lives in a field the copy carried. Only the address
@@ -3609,7 +3609,7 @@ return type, and one in the Python binding. Nine literals already used struct
 update syntax or a base value and needed nothing. The remaining 82 took the
 field. The sweep was mechanical and was scripted rather than done by hand,
 because a sweep done by hand is done when the files look right rather than
-when a search comes back clean.[^143]
+when a search comes back clean.[^46]
 
 **Follows.** Three things.
 
@@ -3707,6 +3707,98 @@ it.
 repair.** Two of the six sites are accepted. The retcon window does not cover
 them, so the repair needs an owner.
 
+
+
+### FND-152 — Two footnote rules are stated, and only one of them can be a gate
+
+**Believed.** The two footnote rules of the documentation rule are mechanical,
+so one check enforces both.[^76] A previous finding says the check is cheap and
+opens an item for it.[^145]
+
+**True.** One of the two rules cannot be a gate today. A check written against
+both rules and run over every Markdown document in the tree found the ordering
+rule broken in a large minority of the documents, in every directory. Three of
+those documents are the project orientation and two rules under `.claude/`,
+which a worker may not edit. The repair for one document is a renumbering
+sweep across the whole file, which is the operation this project gets wrong
+most often.[^17]
+
+The other rule holds. A marker with no definition, a label defined twice, one
+source under two labels, and a definition nothing cites are all checkable, and
+each names a document a reader can repair one line at a time.
+
+**Evidence.** The commit that added the check holds the counts by test and by
+directory, and the survey command that produced them. The check runs the
+ordering test and reports it without failing. The four other tests fail the
+gate, and the documents that already break them are in a falsifiable
+baseline.[^146]
+
+**Follows.** **A rule is not one gate because it is one sentence.** Split a
+written rule by what a check can drive to zero. The part that can be driven to
+zero fails the gate. The part that cannot is reported, and the reason it is
+reported is written down where the check is read.
+
+A gate nobody can turn green is a gate everybody learns to skip, which costs
+more than the defect it catches.[^147]
+
+
+### FND-153 — A footnote names its source in a code span, so its prose is not its identity
+
+**Believed.** Two footnotes hold the same source when their definition lines
+read the same after the code is removed. The citation check removes a code span
+before it reads a line, because the documentation rule exempts an identifier in
+code, and a new check copied that step.[^148]
+
+**True.** A footnote is the one place where the documentation rule puts the
+path inside the code span. Removing the span removes the only part that
+distinguishes two footnotes whose prose lead is the same. The decision record
+priority index holds two footnotes that both read "Backlog item 0123" and name
+two different paths, and the check called them one source.
+
+**Evidence.** The check reported the pair as a repeat before it read the
+definition from the raw line, and reported nothing after. No other document in
+the tree held the shape, so a survey of the tree found one instance and the
+check would have produced a false failure on it.
+
+**Follows.** **Read a footnote definition from the raw line.** The exemption
+that a rule gives to code in prose does not extend to the reference section,
+because that is where the rule puts the reference. A check that copies a step
+from another check must ask what the step was for.
+
+A false failure trains everybody to ignore a red gate. This one was found by
+running the new check against the real tree before wiring it into the gate,
+which is why the item asked for that run.[^146]
+
+
+### FND-154 — Completing an item is not idempotent, and it leaves two of everything
+
+**Believed.** An item is completed once. The guide gives four steps: fill in
+the outcome, update the registers, move the file, and set the status.[^149]
+Nothing says what to do when the step runs twice, because nothing expects it
+to.
+
+**True.** It runs twice. Four completed items each hold two `## Outcome`
+sections and two `## References` sections, one appended after the other. The
+second completion did not read the first. In two of the four the two reference
+sections are identical, in one the later section is a superset, and in one the
+same label names two different sources, so a marker in the body resolves to
+whichever definition a reader reaches first.
+
+**Evidence.** The footnote check found all four, because a second reference
+section defines a label the first already defines. Nothing else in the tree
+saw them. The commit that added the check names the four items. A parallel run
+produces this directly: two workers complete one item, or one worker completes
+it twice across a rebase.
+
+**Follows.** **The completion step must read the item before it writes.** An
+item that already holds an outcome is an item somebody already completed, and
+the second writer is either repeating work or contradicting it.
+
+This is adjacent to the item that fails when a merged item still reads as
+open.[^150] That item checks the status against what merged. The shape here is
+the other direction: the status is right and the document holds the work
+twice. A check that reads one item and finds one outcome section would catch
+it, and the footnote check catches it today only as a side effect.
 
 
 ## References
@@ -3818,10 +3910,14 @@ them, so the repair needs an owner.
 [^F147A]: ADR Registry, row 0043. `docs/adrs/REGISTRY.md`
 [^ORIENT2]: Project orientation, the design principles. `CLAUDE.md`
 [^139]: ADR-0084, the world reserves the unit columns at construction. `docs/adrs/draft/adr-0084-the-world-reserves-the-unit-columns-at-construction.md`
-[^140]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`
 [^141]: Backlog item 0080. `docs/backlog/proposed/0080-give-the-world-settings-a-constructor.md`
 [^142]: Findings register, FND-064, in this document.
-[^143]: Recurring defect shapes, shape 2. `.claude/rules/recurring-defects.md`
 [^144]: ADR-0014, entity identity is an index plus a generation, decisions D1 and D3. `docs/adrs/accepted/adr-0014-entity-identity-is-an-index-plus-a-generation.md`
 [^101]: Findings register, FND-142, in this document.
 [^102]: Review 0164, the gate build profile record. `docs/reviews/0164-the-gate-build-profile-record.md`
+[^145]: Findings register, FND-130, in this document.
+[^146]: Backlog item 0144. `docs/backlog/complete/0144-check-the-footnotes-of-a-record.md`
+[^147]: Definition of Done, pass the gates. `.claude/rules/definition-of-done.md`
+[^148]: The citation check. `scripts/check_citations.py`
+[^149]: Backlog guide, completing an item. `docs/backlog/README.md`
+[^150]: Backlog item 0163. `docs/backlog/proposed/0163-fail-when-a-merged-item-still-reads-as-open.md`

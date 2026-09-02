@@ -1,0 +1,2 @@
+# A baseline entry that matches nothing.
+tests/fixtures/footnotes-stale/correct.md	uncited	9

@@ -23,11 +23,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^ALLOC]
 
-<<<<<<< HEAD
 **Next number: DEC-064**
-=======
-**Next number: DEC-063**
->>>>>>> w7-reserve-unit-storage
 
 ## Open
 
@@ -386,7 +382,7 @@ The bindings return the event log as raw bytes. The layout of an event lives in
 the Rust source, which declares the field order, the field widths and the
 padding.[^DEC60A] Python holds no description of it, so a Python reader must
 repeat the layout. Two declaration sites hold one fact, and nothing fails when
-they disagree.[^DEC60B]
+they disagree.[^SHAPE1]
 
 The consequence is real today. The agent-facing protocol server returns the
 bytes and a digest of them, because it refuses to hold a second copy of the
@@ -1214,8 +1210,6 @@ a failed founding is correct.[^PRD12]
 [^ADR73D1]: ADR-0073, gathering is admitted by sort-then-admit against the tile, decision D1. `docs/adrs/accepted/adr-0073-gathering-is-admitted-by-sort-then-admit-against-the-tile.md`
 [^ORIENT]: Project orientation, the design principles. `CLAUDE.md`
 [^SHAPE1]: Recurring Defect Shapes, shape 1. `.claude/rules/recurring-defects.md`
-[^SHAPE3]: Recurring Defect Shapes, shape 3. `.claude/rules/recurring-defects.md`
-[^DEC63A]: PRD-0012, a world starts small and grows. `docs/product/accepted/prd-0012-a-world-starts-small-and-grows.md`
 [^DEC63B]: The founded group tests. `crates/cachette-core/tests/founded_group_survives.rs`
 [^DEC63C]: ADR-0085, an entity crosses to Python as one opaque identity that the engine resolves, decision D3. `docs/adrs/draft/adr-0085-an-entity-crosses-to-python-as-one-opaque-identity.md`
 [^DEC63D]: Backlog item 0161. `docs/backlog/proposed/0161-let-a-selector-say-where-to-act.md`
@@ -1249,11 +1243,15 @@ a failed founding is correct.[^PRD12]
 [^BLK3]: Blockers register, BLK-003. `docs/BLOCKERS.md`
 [^ITEM0150]: Backlog item 0150. `docs/backlog/complete/0150-reserve-the-unit-columns-at-construction.md`
 [^DEC60A]: The event types. `crates/cachette-core/src/event.rs`
-[^DEC60B]: Recurring Defect Shapes, shape 1. `.claude/rules/recurring-defects.md`
 [^DEC60C]: Findings register, FND-137. `docs/FINDINGS.md`
 [^DEC60D]: Backlog item 0153. `docs/backlog/refined/0153-let-python-read-an-event-without-repeating-its-layout.md`
 [^DEC60E]: The identity type. `crates/cachette-core/src/types.rs`
 [^DEC60F]: ADR-0002, simulated and aggregated state holds no floating point number, decision D1. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
 [^BLK4]: Blockers register, BLK-004. `docs/BLOCKERS.md`
 [^BLK5]: Blockers register, BLK-005. `docs/BLOCKERS.md`
-[^PRD12]: PRD-0012, a world starts small and grows. `docs/product/accepted/prd-0012-a-world-starts-small-and-grows.md`
+[^DEC59]: Decisions register, DEC-059, in this document.
+[^DEC34REF]: Decisions register, DEC-034, in this document.
+[^DEC49REF]: Decisions register, DEC-049, in this document.
+[^FND015]: Findings register, FND-015. `docs/FINDINGS.md`
+[^FND089]: Findings register, FND-089. `docs/FINDINGS.md`
+[^ADR80]: ADR-0080, a depleted deposit recovers by ageing the stored take. `docs/adrs/accepted/adr-0080-a-depleted-deposit-recovers-by-ageing-the-stored-take.md`

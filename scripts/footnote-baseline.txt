@@ -1,0 +1,134 @@
+# Footnote failures that already exist in the tree.
+#
+# Each line is a path, a tab, the name of the test, a tab, and the label. A
+# line here suppresses one failure from check_footnotes.py. This list may only
+# shrink.
+#
+# The check fails when a line here matches nothing, so this list cannot go
+# stale. Do not add to it. Repair the document instead.
+#
+# Why each group is here.
+#
+# uncited, in the seven records numbered 0001 to 0007: those records write a
+# reference section that the body never cites. They predate the documentation
+# rule, and the project orientation says so. Rewriting an accepted record is
+# not the work of the item that added this check.
+#
+# uncited, in the reviews and in the completed items: the same shape in
+# documents that record a moment. Repairing one means writing markers into
+# prose that describes work already finished, which changes the record of what
+# was written at the time.
+#
+# uncited, in the two index documents and in the two registers: a definition
+# left behind when the row that cited it moved or was removed. These are the
+# cheapest to clear, and clearing one is a line out of this file.
+#
+# repeated, in the findings register: the register gives one source a new label
+# in each entry it writes. Reusing one marker across a document of this size is
+# a change to how the register is written, and it belongs to whoever decides
+# that, not to the check.
+#
+# undefined, in the two reviews: a review quotes a record, and the quoted text
+# carries the markers of the record it quotes. The definitions belong to the
+# source document. Repairing this means editing a quotation.
+docs/DECISIONS.md	uncited	ADR56D4
+docs/FINDINGS.md	repeated	33
+docs/FINDINGS.md	repeated	38
+docs/FINDINGS.md	repeated	41
+docs/FINDINGS.md	repeated	55
+docs/FINDINGS.md	repeated	63
+docs/FINDINGS.md	repeated	64
+docs/FINDINGS.md	repeated	70
+docs/FINDINGS.md	repeated	71
+docs/FINDINGS.md	repeated	73
+docs/FINDINGS.md	repeated	77
+docs/FINDINGS.md	repeated	80
+docs/FINDINGS.md	repeated	86
+docs/FINDINGS.md	repeated	89
+docs/FINDINGS.md	repeated	90
+docs/FINDINGS.md	repeated	97
+docs/FINDINGS.md	repeated	98
+docs/FINDINGS.md	repeated	F137C
+docs/FINDINGS.md	uncited	30
+docs/adrs/PRIORITY.md	uncited	10
+docs/adrs/PRIORITY.md	uncited	11
+docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md	uncited	1
+docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md	uncited	2
+docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md	uncited	3
+docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md	uncited	4
+docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md	uncited	1
+docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md	uncited	2
+docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md	uncited	3
+docs/adrs/accepted/adr-0003-every-random-draw-is-keyed-never-stateful.md	uncited	1
+docs/adrs/accepted/adr-0003-every-random-draw-is-keyed-never-stateful.md	uncited	2
+docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md	uncited	1
+docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md	uncited	2
+docs/adrs/accepted/adr-0005-a-solver-runs-a-fixed-iteration-count.md	uncited	1
+docs/adrs/accepted/adr-0005-a-solver-runs-a-fixed-iteration-count.md	uncited	2
+docs/adrs/accepted/adr-0005-a-solver-runs-a-fixed-iteration-count.md	uncited	3
+docs/adrs/accepted/adr-0006-an-event-is-plain-data-and-applying-it-is-pure.md	uncited	1
+docs/adrs/accepted/adr-0006-an-event-is-plain-data-and-applying-it-is-pure.md	uncited	2
+docs/adrs/accepted/adr-0007-content-supplies-a-key-vector-never-a-comparator.md	uncited	1
+docs/adrs/accepted/adr-0007-content-supplies-a-key-vector-never-a-comparator.md	uncited	2
+docs/adrs/accepted/adr-0056-movement-is-tile-discrete-and-admitted-by-sort-then-admit.md	repeated	13
+docs/backlog/PRIORITY.md	uncited	4
+docs/backlog/PRIORITY.md	uncited	7
+docs/backlog/PRIORITY.md	uncited	8
+docs/backlog/PRIORITY.md	uncited	9
+docs/backlog/README.md	uncited	1
+docs/backlog/README.md	uncited	2
+docs/backlog/README.md	uncited	3
+docs/backlog/complete/0019-implement-the-soldier-column-set.md	uncited	1
+docs/backlog/complete/0019-implement-the-soldier-column-set.md	uncited	2
+docs/backlog/complete/0019-implement-the-soldier-column-set.md	uncited	3
+docs/backlog/complete/0019-implement-the-soldier-column-set.md	uncited	4
+docs/backlog/complete/0019-implement-the-soldier-column-set.md	uncited	5
+docs/backlog/complete/0019-implement-the-soldier-column-set.md	uncited	6
+docs/backlog/complete/0020-implement-the-unit-to-tile-bridge.md	uncited	1
+docs/backlog/complete/0020-implement-the-unit-to-tile-bridge.md	uncited	2
+docs/backlog/complete/0020-implement-the-unit-to-tile-bridge.md	uncited	3
+docs/backlog/complete/0020-implement-the-unit-to-tile-bridge.md	uncited	4
+docs/backlog/complete/0020-implement-the-unit-to-tile-bridge.md	uncited	5
+docs/backlog/complete/0020-implement-the-unit-to-tile-bridge.md	uncited	6
+docs/backlog/complete/0073-review-the-first-renderable-example-again.md	uncited	2
+docs/product/PRIORITY.md	uncited	5
+docs/research/reports/17-group-spatial-dynamics.md	uncited	10
+docs/research/reports/17-group-spatial-dynamics.md	uncited	11
+docs/research/reports/17-group-spatial-dynamics.md	uncited	9
+docs/reviews/0017-the-tile-index-record.md	uncited	1
+docs/reviews/0017-the-tile-index-record.md	uncited	2
+docs/reviews/0019-the-soldier-arena.md	uncited	1
+docs/reviews/0019-the-soldier-arena.md	uncited	10
+docs/reviews/0019-the-soldier-arena.md	uncited	11
+docs/reviews/0019-the-soldier-arena.md	uncited	2
+docs/reviews/0019-the-soldier-arena.md	uncited	3
+docs/reviews/0019-the-soldier-arena.md	uncited	4
+docs/reviews/0019-the-soldier-arena.md	uncited	5
+docs/reviews/0019-the-soldier-arena.md	uncited	6
+docs/reviews/0019-the-soldier-arena.md	uncited	7
+docs/reviews/0019-the-soldier-arena.md	uncited	8
+docs/reviews/0019-the-soldier-arena.md	uncited	9
+docs/reviews/0020-the-unit-tile-bridge.md	uncited	1
+docs/reviews/0020-the-unit-tile-bridge.md	uncited	10
+docs/reviews/0020-the-unit-tile-bridge.md	uncited	11
+docs/reviews/0020-the-unit-tile-bridge.md	uncited	12
+docs/reviews/0020-the-unit-tile-bridge.md	uncited	13
+docs/reviews/0020-the-unit-tile-bridge.md	uncited	2
+docs/reviews/0020-the-unit-tile-bridge.md	uncited	3
+docs/reviews/0020-the-unit-tile-bridge.md	uncited	4
+docs/reviews/0020-the-unit-tile-bridge.md	uncited	5
+docs/reviews/0020-the-unit-tile-bridge.md	uncited	6
+docs/reviews/0020-the-unit-tile-bridge.md	uncited	7
+docs/reviews/0020-the-unit-tile-bridge.md	uncited	8
+docs/reviews/0020-the-unit-tile-bridge.md	uncited	9
+docs/reviews/0021-the-movement-records.md	undefined	A
+docs/reviews/0021-the-movement-records.md	undefined	B
+docs/reviews/0021-the-movement-records.md	undefined	C
+docs/reviews/0029-storage-and-tile-index-records.md	uncited	1
+docs/reviews/0029-storage-and-tile-index-records.md	uncited	8
+docs/reviews/0029-storage-and-tile-index-records.md	undefined	10
+docs/reviews/0029-storage-and-tile-index-records.md	undefined	11
+docs/reviews/0029-storage-and-tile-index-records.md	undefined	9
+docs/reviews/0029-the-storage-records.md	uncited	1
+docs/reviews/0029-the-storage-records.md	uncited	2
+docs/reviews/0029-the-storage-records.md	uncited	3

@@ -75,11 +75,6 @@ here would be the shape the rule names first.[^1]
 A capability nothing invokes ships inert, so the engine must drive the
 rebuild and a test must start at the engine.[^2]
 
-## References
-
-[^1]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`
-[^2]: Recurring defect shapes, shape 3. `.claude/rules/recurring-defects.md`
-
 ## Outcome
 
 Level 1 exists, the engine maintains it at the barrier, and twelve tests hold

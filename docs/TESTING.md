@@ -116,7 +116,7 @@ The project uses `hypothesis`. The harness is
 
 The record names this the highest-value harness for a stateful engine, and
 it puts the harness on the Python side, because the properties that matter
-are properties of the boundary.[^7]
+are properties of the boundary.[^2]
 
 The machine generates a sequence of commands, applies them, and calls the
 invariant check after every rule.
@@ -232,7 +232,6 @@ real. The subjects are not.
 [^4]: ADR-0001, one binary gives one answer at any thread count, decision D4. `docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
 [^5]: Testing rules, section 1. `.claude/rules/testing.md`
 [^6]: ADR-0004, iteration order is explicit, decisions D2 and D3. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
-[^7]: The testing rule, drive the real caller. `.claude/rules/testing.md`
 [^8]: ADR-0041, a crate split enforces the boundary at compile time. `docs/adrs/REGISTRY.md`
 [^9]: ADR-0010, the cache line size is a compile-time constant. `docs/adrs/REGISTRY.md`
 [^10]: The contributing guide, the packaging and stub checks. `CONTRIBUTING.md`

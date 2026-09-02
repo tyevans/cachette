@@ -49,10 +49,6 @@ Both are why the original record was split.
 
 Filled in on completion.
 
-## References
-
-[^1]: The removed drafts, at commit `4937cd2`. Read with `git show 4937cd2:docs/adrs/draft/`.
-
 ## Outcome
 
 Three of the eight rows are written. Five stay reserved, and that is the
@@ -92,5 +88,5 @@ and an item is fixed to one moment in the way a record is not.
 
 ## References
 
-[^1]: The commit that removed the drafts. `git log`
+[^1]: The removed drafts, at commit `4937cd2`. Read with `git show 4937cd2:docs/adrs/draft/`.
 [^2]: Decision Record Scope, sections 1 and 4.6. `.claude/rules/adr-scope.md`

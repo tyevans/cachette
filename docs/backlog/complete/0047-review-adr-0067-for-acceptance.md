@@ -57,10 +57,6 @@ from the other side or say why not.
 - The registry row holds the outcome, and ADR-0070 is accepted in the same
   change if ADR-0067 is.
 
-## References
-
-[^1]: Review 0035, the head-up display record. `docs/reviews/0035-the-head-up-display-record.md`
-
 ## Outcome
 
 ADR-0067 is accepted with D1 amended, and ADR-0070 is accepted unchanged in
