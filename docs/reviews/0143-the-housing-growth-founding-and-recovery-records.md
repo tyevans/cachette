@@ -406,7 +406,7 @@ third is half built. The occupancy count exists, split by faction, and a caller
 reads it through the public interface. The invariant check exists, and the test
 that proves the check can fail exists. Only the housing capacity is wholly new.
 A separate finding holds the evidence, because a re-refinement that starts from
-a new record rather than from the code repeats the defect.[^22]
+a new record rather than from the code repeats the defect.[^21]
 
 ## 8. For the registers
 
@@ -416,12 +416,12 @@ a new record rather than from the code repeats the defect.[^22]
   and its citations moved the same way.
 - ADR-0081 stays a `Draft`. Section 1 states what must change.
 - ADR-0082 stays a `Draft`. It moves when ADR-0081 moves.
-- Four findings are recorded.[^1] [^17] [^19] [^22]
+- Four findings are recorded.[^1] [^17] [^19] [^21]
 - Two open choices are recorded: whether a decision record may cite a product
   record, and how a site answers its resident count.[^7] [^18]
 - **No blocker opens, and the number reserved for one is unused.** The housing
   items are stopped by a choice, not by missing information, and the blockers
-  register says that a choice belongs in the decisions register.[^21] The open
+  register says that a choice belongs in the decisions register.[^22] The open
   row holds it.[^7]
 - No blocker closes.
 
@@ -447,5 +447,5 @@ a new record rather than from the code repeats the defect.[^22]
 [^18]: Decisions register, DEC-056. `docs/DECISIONS.md`
 [^19]: Findings register, FND-130. `docs/FINDINGS.md`
 [^20]: Backlog item 0144. `docs/backlog/proposed/0144-check-the-footnotes-of-a-record.md`
-[^21]: Blockers register, what a blocker is. `docs/BLOCKERS.md`
-[^22]: Findings register, FND-131. `docs/FINDINGS.md`
+[^21]: Findings register, FND-131. `docs/FINDINGS.md`
+[^22]: Blockers register, what a blocker is. `docs/BLOCKERS.md`
