@@ -33,6 +33,31 @@ T = TypeVar("T")
 
 SERVER = StdioServerParameters(command=sys.executable, args=["-m", "cachette.agent"])
 
+# The world the gather tests build, and the tiles they use.
+#
+# The seed is part of the fixture, not a detail. The terrain is generated
+# from it, and a resource sits on the ground that carries it, so the seed
+# decides whether these four tiles hold anything to gather.
+#
+# Measured at 16 by 16 with the engine's own deposit read. Seed 1 holds food
+# at (0, 0), (1, 0) and (1, 1), and wood at all four. Seed 7 holds no food at
+# any of them, only stone at two. Seed 42 admits no unit at any of them. The
+# first version of this test used seed 7 and asked for food, and it failed for
+# that reason.
+#
+# **The control plane cannot check this.** No read tells Python where a
+# resource is, so the seed was chosen against the engine's read from Rust and
+# recorded here. That gap is the finding, not an accident of this test.
+GATHER_SEED = 1
+GATHER_KIND = 0
+
+# The count is the assertion's, not the world's. Four units prove that a
+# gather event carries a resolvable identity.
+#
+# They cross in one call. DEC-063 made the spawn verb set-valued, so nothing
+# here shows a client repeating a verb over the mass tier.
+GATHER_ADDRESSES = ((0, 0), (1, 0), (0, 1), (1, 1))
+
 
 @asynccontextmanager
 async def _client() -> AsyncIterator[ClientSession]:
@@ -74,8 +99,14 @@ def test_a_client_reaches_every_tool() -> None:
     assert _drive(body) == [
         "build_world",
         "check_invariants",
+        "despawn_units",
         "event_log",
+        "gather_events",
+        "order_gather",
+        "spawn_units",
         "step_world",
+        "tile_changes",
+        "unit_tile",
         "world_report",
     ]
 
@@ -181,3 +212,88 @@ def test_transcript() -> None:
             print(f"<- {json.dumps(await _call(session, name, **arguments))}")
 
     _drive(body)
+
+
+def test_a_client_reads_which_tile_changed() -> None:
+    # FND-137 recorded what the server could not do: an agent could prove
+    # two runs emitted the same log and could not see which tile changed.
+    # This is the test of the answer, driven through a real client.
+    async def body(session: ClientSession) -> dict[str, Any]:
+        built = await _call(session, "build_world", width=8, height=8, seed=7)
+        await _call(session, "step_world", world=built["world"], ticks=1)
+        return await _call(session, "tile_changes", world=built["world"], limit=4)
+
+    report = _drive(body)
+    assert report["event_count"] > 0
+    assert report["rows_returned"] == min(4, report["event_count"])
+    assert len(report["changes"]) == report["rows_returned"]
+    for row in report["changes"]:
+        assert set(row) == {"tile", "value", "holder", "kind"}
+        assert isinstance(row["value"], int)
+        assert 0 <= row["tile"] < 64
+
+
+def test_a_client_follows_the_unit_that_took_a_resource() -> None:
+    # The gather event names a unit. The identity crosses whole, and the
+    # client gives it back without taking it apart.
+    async def body(session: ClientSession) -> tuple[dict[str, Any], dict[str, Any]]:
+        built = await _call(
+            session, "build_world", width=16, height=16, seed=GATHER_SEED
+        )
+        name = built["world"]
+        spawned = await _call(
+            session,
+            "spawn_units",
+            world=name,
+            addresses=[list(address) for address in GATHER_ADDRESSES],
+        )
+        units = [int(unit) for unit in spawned["units"]]
+        await _call(session, "order_gather", world=name, units=units, kind=GATHER_KIND)
+
+        grants: dict[str, Any] = {}
+        for _ in range(8):
+            await _call(session, "step_world", world=name, ticks=1)
+            grants = await _call(session, "gather_events", world=name, limit=4)
+            if grants["event_count"]:
+                break
+        assert grants["event_count"], "the fixture must produce a gather event"
+        followed = await _call(
+            session, "unit_tile", world=name, unit=grants["grants"][0]["unit"]
+        )
+        return grants, followed
+
+    grants, followed = _drive(body)
+    first = grants["grants"][0]
+    assert first["amount"] > 0
+    assert followed["tile"] == first["tile"]
+
+
+def test_the_identity_of_a_removed_unit_is_a_tool_error() -> None:
+    # ADR-0085 D3: the engine refuses a stale identity. It never reports on
+    # the unit that now holds the slot. The refusal must reach the client
+    # as an error and not as a plausible answer.
+    #
+    # **This test proves the refusal reaches the client. It does not cover
+    # the resolution.** Deleting the generation comparison in
+    # resolve_soldier leaves this test green, because the arena compares the
+    # generation again when it reads a tile. The package test of the write
+    # verbs is what catches that.[^1]
+    #
+    # [^1]: Findings register, FND-148. `docs/FINDINGS.md`
+    async def body(session: ClientSession) -> tuple[bool, dict[str, Any]]:
+        built = await _call(session, "build_world", width=8, height=8, seed=7)
+        name = built["world"]
+        first = await _call(session, "spawn_units", world=name, addresses=[[0, 0]])
+        dead = int(first["units"][0])
+        await _call(session, "despawn_units", world=name, units=[dead])
+        second = await _call(session, "spawn_units", world=name, addresses=[[0, 0]])
+        living = int(second["units"][0])
+        assert living != dead
+        stale = await session.call_tool("unit_tile", {"world": name, "unit": dead})
+        return bool(getattr(stale, "is_error", False)), await _call(
+            session, "unit_tile", world=name, unit=living
+        )
+
+    refused, alive = _drive(body)
+    assert refused, "the dead identity must refuse"
+    assert alive["tile"] == 0

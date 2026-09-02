@@ -42,6 +42,7 @@ These close a gap a review found, or they unblock the items above.
 | 0080 | The settings struct prices every new parameter at twenty-five files. |
 | 0130 | Three registers state a next number that the rows already hold, and it went stale and conflicted four times in one night. |
 | 0153 | Python holds no way to read an event, so an agent gets bytes and a digest. Any decoder in Python is a second copy of the layout. |
+| 0161 | The control plane cannot say where to act, so a caller sweeps. Four reserved rows hold the answer and none is written. DEC-063 names it the destination. |
 | 0154 | A merge conflict marker reached a register on the main branch and no gate saw it. A parallel run merges registers often. |
 | 0155 | Every test fixture builds its own world by hand, and the rule that forbids the easy route has no shared answer. |
 | 0163 | An item can be finished and still read as open, and no check compares what merged against the item that asked for it. |

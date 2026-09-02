@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-143**
+**Next number: FND-149**
 
 ## A. Corrections to stated rules
 
@@ -1161,6 +1161,159 @@ determinism test cannot tell correct from consistently wrong, and that a
 determinism test must be able to fail. Those are properties of the assertion.
 This is a property of the input. An assertion strong enough to catch the
 defect still catches nothing when the data never produces it.
+
+### FND-146 — A check across a boundary can be a tautology that reads as a cross-check
+
+**Believed.** A test that compares two views of one thing is a cross-check. If
+the engine hands a caller the same log twice, once as bytes and once as
+columns, then comparing the two proves the views agree, and the test fails when
+they stop agreeing.
+
+**True.** A comparison proves something only when both sides can be computed
+independently. A caller that holds one of the two views and no description of
+the other cannot compute the second side, so it compares a value against
+something derived from that same value. The comparison then holds for every
+input and fails for none.
+
+**Evidence.** A test of the new event columns compared the number of rows in a
+column against the length of the raw byte buffer, to prove the columns describe
+the same log the bytes do. Python holds no layout of an event, deliberately,
+because holding one is the defect the work removes. It therefore cannot know
+the width of an event. The assertion reduced to whether the byte length divides
+by the event count, which is whether a length divides itself. **No change to
+the layout, to the field order, or to the columns could have made it fail.**
+
+The shape is worse than an ordinary weak test, because the tautology was
+invisible. The test named two sources, read from both, and looked like the one
+check that guards a second declaration site.
+
+The same session produced a second instance in another subsystem: a terrain
+assertion that read two constants and never exercised the rule between them.
+
+**Follows.** Three things.
+
+**A test that cannot fail is worse than no test.** It occupies the place a real
+test would take and reports success forever. A missing test is visible to
+anyone who looks for it.
+
+**Before writing a comparison, name what computes each side.** If one side is
+derived from the other, the test measures nothing. If the caller cannot compute
+the second side at all, then the check belongs on the side of the boundary that
+can, or it does not belong.
+
+**A boundary drawn to remove a second declaration site removes the ability to
+check that site from outside.** That is the cost of the boundary and it is
+correct. Do not buy the check back by smuggling the layout into the test.
+
+### FND-147 — An API that cannot say where to act invites the caller to sweep
+
+**Believed.** The control plane rule is a matter of discipline. Python must not
+loop over entities, so a caller that sweeps the world has ignored the rule, and
+the repair is to write the caller properly.[^ORIENT2]
+
+**True.** A caller sweeps when it has no other way to find the thing it must
+act on. A rule that forbids a shape and offers no alternative is a wish. The
+rule loses to the absence of a read every time, because the read is what the
+caller needed and the rule is only prose.
+
+**Evidence.** A test had to produce one gather event. The gather resolve grants
+from the tile a unit stands on, and only when that tile holds the resource. The
+control plane has no read that answers which tile holds a resource. The test
+therefore put a unit on every open tile of a sixteen by sixteen world, ordered
+each one to gather, and let the engine find the ground.
+
+**The person who wrote that sweep had recorded the rule against sweeping in the
+same change.** Discipline was not the missing part. The read was.
+
+**The obvious repair is the same defect one layer out.** A per-tile call that
+answers whether a tile holds a resource moves the sweep from units to tiles,
+and the tile population is larger than the unit population. A caller that walks
+the world asking a question one tile at a time is the data plane, whatever the
+question is.
+
+**A second instance, through the type system rather than through a missing
+read.** The spawn verb returns the identities of the units it made, as one
+column. The type stub for the verbs that take units declared a sequence of
+integers, and a column is not a sequence of integers. A caller passing the
+column straight to the next verb would have been told to convert it, and every
+conversion of a mass-tier column is a loop.
+
+**Make the boundary accept what the boundary produces.** If a verb returns a
+column and the next verb refuses one, the API has instructed the caller to
+sweep. The instruction arrives as a type error rather than as missing
+functionality, which is why it is easy to satisfy in the wrong way.
+
+**A red gate does not point at the right repair.** The type check would have
+failed on the signature. A contributor could have satisfied it by writing a
+list around the column at the call site, which passes the gate and puts the
+loop back. The gate sees the narrow fault. It cannot see the consequence.
+
+**Follows.** Four things.
+
+**When a rule forbids a shape, check that the API offers the shape it wants
+instead.** The design says the caller builds a selector and the engine resolves
+it. A selector that names a place by a property is the missing piece here.
+Until something like it exists, every caller that needs a place will sweep, and
+each one will look like a discipline failure.
+
+**When you find yourself sweeping, do not add discipline. Ask which read is
+missing.** The sweep is a symptom and it names its own cause.
+
+**Check that a verb accepts what the verb before it returns.** Two instances
+here came from different mechanisms, one a missing read and one a type. Both
+made the honest call site impossible, and a caller that cannot write the honest
+call writes the sweep.
+
+**A rule with no mechanism is worth recording as unenforced.** A reserved
+registry row holds the claim that the API refuses the loop for a declared
+tier.[^F147A] Nothing implements it. A reader who meets the rule and not the
+gap concludes the project enforces something it does not.
+
+### FND-148 — A second check downstream can make an upstream check untestable
+
+**Believed.** A test that drives the public interface, watches a stale identity
+refuse, and sees a typed error covers the resolution that refused it. If
+resolution broke, the test would go red.
+
+**True.** It goes red only when nothing else refuses first. Two independent
+checks on one condition each stop the same defect, so removing either one
+leaves the other to answer, and every test above them stays green. The tests
+then measure the pair and cannot name which member did the work.
+
+**Evidence.** The engine resolves an identity a caller hands back by comparing
+the generation in the identity against the generation the arena holds. The
+comparison was deleted and the suites were run.
+
+Two Rust tests went red, and they are the two that assert on the refusal
+itself. Four stayed green, correctly: two exercise conditions the deletion did
+not touch, one resolves a live identity, and one reads the gather log.
+
+**On the Python side the read stayed green and only the write verbs went red.**
+Reading the tile of a dead unit still refused with the same typed error and the
+same message, because the arena compares the generation a second time when it
+reads a tile. The read is protected twice, so it cannot fail when one of the
+two is removed.
+
+The protocol client test stayed green for the same reason, and it asserts only
+that the tool reported an error. It would have stayed green even without the
+second check, because a refusal by any cause is still an error.
+
+**Follows.** Three things.
+
+**Defence in depth costs the ability to test each layer through the front
+door.** The second check is right and stays. What must change is the claim: a
+test above both checks demonstrates the behaviour and does not cover either
+check on its own.
+
+**Say which assertion caught the defect, in the test.** Both tests above now
+record what the experiment measured, so a later reader does not take the read
+as the coverage. A comment that names the measured result is worth more than
+one that restates the intent.
+
+**A test that asserts only that an error happened cannot tell one cause from
+another.** That is enough for an integration test whose claim is that the
+refusal reaches the caller. It is not enough for a test whose claim is that a
+particular check refused, and the two read alike.
 
 ### FND-052 — A register was restored from a copy, and an entry left silently
 
@@ -3422,8 +3575,10 @@ the claim that a change made the suite faster.
 [^F137A]: The bindings and the event log method. `crates/cachette-py/src/lib.rs`
 [^F137B]: The event types. `crates/cachette-core/src/event.rs`
 [^F137C]: Recurring Defect Shapes, shape 1. `.claude/rules/recurring-defects.md`
-[^F137D]: Backlog item 0153. `docs/backlog/proposed/0153-let-python-read-an-event-without-repeating-its-layout.md`
+[^F137D]: Backlog item 0153. `docs/backlog/refined/0153-let-python-read-an-event-without-repeating-its-layout.md`
 [^97]: Development budgets, the gate suite budget. `docs/reference/development-budgets.md`
 [^98]: Testing rules, section 2a. `.claude/rules/testing.md`
 [^99]: Budgets and costs, the scale constants. `docs/reference/budgets.md`
 [^100]: ADR-0083, the gate build checks every integer overflow, decision D2. `docs/adrs/draft/adr-0083-the-gate-build-checks-every-integer-overflow.md`
+[^F147A]: ADR Registry, row 0043. `docs/adrs/REGISTRY.md`
+[^ORIENT2]: Project orientation, the design principles. `CLAUDE.md`

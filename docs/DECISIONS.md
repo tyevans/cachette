@@ -23,7 +23,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^ALLOC]
 
-**Next number: DEC-061**
+**Next number: DEC-064**
 
 ## Open
 
@@ -219,6 +219,73 @@ figure is 168 MB. The storage argument for vectors is stronger than the report
 concluded, and it called that argument its weakest.
 
 ## Closed
+
+### DEC-063 — Which verb puts a unit in the world from the control plane?
+
+**Closed. Spawn is set-valued. The selector tree is the destination, and it is
+not built now.**
+
+The project owner decided this on 1 September 2026. He took none of the four
+options below. He took a fifth path, which removes the question instead of
+answering it: a verb that takes a set has no per-unit form for a caller to
+repeat, so the rule about looping stops being a rule a caller can break.
+
+**What the project already reserved is the answer, and nobody wrote it.** Four
+registry rows sit reserved with no file: Python is a control plane, a declared
+tier enforces the no-loop rule and the API refuses the loop, a selector is a
+lazy expression tree that Rust evaluates, and a selector result may be a range
+rather than an enumerated set.[^DEC63G] Under a selector, the control plane
+never asks where to act. It says where to act as part of the command, a
+predicate crosses once, and the engine evaluates it over the columns. That is
+why a per-tile read was the wrong repair for the finding below: it answers the
+question instead of removing it.[^F147]
+
+**What changed now.** The spawn verb takes a collection of addresses and
+returns an identity column in one crossing. The remove verb and the gather
+order verb take a collection of identities. Each set is all or nothing, so a
+caller never receives half a population and an error. The identity column is
+the read side that DEC-060 already built, so the change adds no new mechanism.
+
+**What did not change.** The read that resolves one identity stays singular. A
+set form would have to choose between failing the whole call for one dead
+identity and returning a value that stands for nothing, and that value is the
+false answer the identity record forbids.[^DEC63C]
+
+**The selector tree is not built.** Nothing needs it today, and building it
+before a caller exists is the inert capability shape. A separate item holds the
+work, and the records that govern it want an author who is not their
+reviewer.[^DEC63D]
+
+**Honesty about what the change buys.** The verb is set-valued at the boundary
+and is still a loop inside the engine. Spawning has no cheaper whole-set
+algorithm today. What the change removes is the crossing and the worked example,
+not the per-unit cost. The principle that a set-valued command permits a cheaper
+algorithm is satisfied in form here and not yet in substance.
+
+**The options that were weighed, and the recommendation that was not taken.**
+
+1. Expose the founding run, and withdraw the per-unit pair.
+2. Expose the founding run as the verb a caller should reach for, and keep the
+   per-unit pair.
+3. Keep the per-unit pair alone, and add a set-valued verb when a caller wants
+   many units.
+4. Mark the per-unit pair as a test fixture and keep it out of the package.
+
+The recommendation was option 2. Option 1 does not hold today, because a
+founding never frees a slot that a later founding reuses: its only despawn is
+the rollback of a founding that failed, and the one real death path is
+starvation, which needs a large world, a long run and a verb that removes the
+production rate the founding set.[^DEC63B] Option 3 left the engine's own
+population path unreachable. Option 4 put one verb in two places.
+
+**Why the tension was real.** A soldier is the mass tier, and the shape says
+why: a soldier is one of a million, so no caller walks the population.[^DEC63E]
+The per-unit verbs took a mass-tier entity one at a time, which is the case the
+rule exists to protect. The evidence was in this work's own test, which spawned
+a unit on every open tile and ordered each one. Reserved row 0043 holds the
+claim that the API refuses the loop for a declared tier, and nothing implements
+it, so prose was the only thing between a caller and a population built one
+call at a time.[^DEC63F]
 
 ### DEC-059 — Does the world reserve unit storage, or grow it during a run?
 
@@ -1103,6 +1170,15 @@ a failed founding is correct.[^PRD12]
 [^ADR73D1]: ADR-0073, gathering is admitted by sort-then-admit against the tile, decision D1. `docs/adrs/accepted/adr-0073-gathering-is-admitted-by-sort-then-admit-against-the-tile.md`
 [^ORIENT]: Project orientation, the design principles. `CLAUDE.md`
 [^SHAPE1]: Recurring Defect Shapes, shape 1. `.claude/rules/recurring-defects.md`
+[^SHAPE3]: Recurring Defect Shapes, shape 3. `.claude/rules/recurring-defects.md`
+[^DEC63A]: PRD-0012, a world starts small and grows. `docs/product/accepted/prd-0012-a-world-starts-small-and-grows.md`
+[^DEC63B]: The founded group tests. `crates/cachette-core/tests/founded_group_survives.rs`
+[^DEC63C]: ADR-0085, an entity crosses to Python as one opaque identity that the engine resolves, decision D3. `docs/adrs/draft/adr-0085-an-entity-crosses-to-python-as-one-opaque-identity.md`
+[^DEC63D]: Backlog item 0161. `docs/backlog/proposed/0161-let-a-selector-say-where-to-act.md`
+[^DEC63E]: ADR-0054, an entity belongs to one of three tiers, declared at creation, decision D1. `docs/adrs/accepted/adr-0054-an-entity-belongs-to-one-of-three-tiers-declared-at-creation.md`
+[^DEC63F]: ADR Registry, row 0043. `docs/adrs/REGISTRY.md`
+[^DEC63G]: ADR Registry, rows 0040, 0043, 0051 and 0052. `docs/adrs/REGISTRY.md`
+[^F147]: Findings register, FND-147. `docs/FINDINGS.md`
 [^TEST2A]: Testing rules, section 2a. `.claude/rules/testing.md`
 [^PRD12]: PRD-0012, a world starts small and grows. `docs/product/accepted/prd-0012-a-world-starts-small-and-grows.md`
 [^FND022]: Findings register, FND-022. `docs/FINDINGS.md`
@@ -1131,6 +1207,6 @@ a failed founding is correct.[^PRD12]
 [^DEC60A]: The event types. `crates/cachette-core/src/event.rs`
 [^DEC60B]: Recurring Defect Shapes, shape 1. `.claude/rules/recurring-defects.md`
 [^DEC60C]: Findings register, FND-137. `docs/FINDINGS.md`
-[^DEC60D]: Backlog item 0153. `docs/backlog/proposed/0153-let-python-read-an-event-without-repeating-its-layout.md`
+[^DEC60D]: Backlog item 0153. `docs/backlog/refined/0153-let-python-read-an-event-without-repeating-its-layout.md`
 [^DEC60E]: The identity type. `crates/cachette-core/src/types.rs`
 [^DEC60F]: ADR-0002, simulated and aggregated state holds no floating point number, decision D1. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`

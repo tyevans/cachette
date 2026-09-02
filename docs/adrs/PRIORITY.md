@@ -40,6 +40,7 @@ A record here binds nothing until a reviewer moves it.
 | 0081 | Housing. A review returned it: the engine already holds the per-site count that its decision D3 asks the project to store.[^12] An open row holds the choice that follows.[^13] It reads against ADR-0074 D3 correctly, and that objection failed. |
 | 0082 | Population growth. A review found its own decisions sound and returned it, because it rests on the free places of 0081.[^12] It moves when 0081 moves. |
 | 0083 | The gate build profile. The code it describes is in the tree, and a test drives it. It states one constraint on the workspace manifest and no more. |
+| 0085 | The Python boundary. It states that an entity crosses as one opaque identity that the engine resolves. The code that implements it exists, and a test proves that the resolution refuses a stale identity. |
 
 ## Reserved and not written
 
