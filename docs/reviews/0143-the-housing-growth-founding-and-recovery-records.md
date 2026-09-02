@@ -80,7 +80,15 @@ reads the same number."
 The cohort table already serves both. It is settled at the end of the
 consumption pass, and the growth pass of ADR-0082 D4 runs after that pass. The
 number a birth admission needs is therefore current where the admission wants
-it, without a new store.
+it, without a new store. `World::cohorts` and `CohortTable::headcount` are
+public, so a watcher reaches the number through the public interface today. What
+is missing is a reader that sums the rows of one site, because the table splits
+the count by faction.
+
+**The check that D3 asks for also exists.** D3 says the price of the second
+declaration site is a check that fails when the two disagree.
+`World::cohorts_describe_the_units` derives the table again from the home column
+and compares. Its own documentation gives the reason D3 gives.
 
 The record's comparison against the tile case is sound and is worth keeping. A
 residence has a lifetime and a tile occupancy does not. That reasoning survives

@@ -54,9 +54,10 @@ three.[^SHAPE1] Option 3 is coherent, but the cohort headcount is split by
 faction and the pooled draw needs that split, so retiring it moves the cost
 rather than removing it.
 
-**What holds it back.** The reader must be reached through the public interface,
-and the cohort table is not exposed for this purpose today. Option 1 therefore
-needs a reader, not a store.
+**What holds it back.** Very little. The table is already public, and the check
+that compares it against the home column is already public. What option 1 needs
+is a reader that sums the rows of one site, because the table splits the count
+by faction. It needs no new store and no new check.
 
 **What follows either way.** The housing draft states decision D3 as option 2,
 and it must be rewritten against whatever this row decides.[^ADR81]

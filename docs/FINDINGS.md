@@ -2791,9 +2791,16 @@ column.
 
 **Evidence.** `CohortTable::rebuild` takes the home column, the faction column,
 the live column and the site count, and it increments a headcount for each live
-unit that names a site. `World::consume` calls it twice. `CohortTable::headcount`
-returns the row of one faction at one site. The character arena holds no field
-named for a home or for a site.
+unit that names a site. `World::consume` calls it twice. `World::cohorts` and
+`CohortTable::headcount` are public, so a caller reads the row of one faction at
+one site through the public interface. The character arena holds no field named
+for a home or for a site.
+
+The check the draft asks for also exists. `World::cohorts_describe_the_units`
+derives the table again from the home column and compares, and its own
+documentation gives the reason the draft gives: a summary that nothing compares
+against its source is a second declaration site with nothing that fails on
+disagreement.
 
 **Follows.** Three things.
 
@@ -2804,7 +2811,8 @@ site, and a check between two copies does not guard three.[^73]
 
 **The caller the draft names is already served.** A birth admission runs after
 the consumption pass, so the cohort table is settled where the admission reads
-it.
+it. What is missing is a reader that sums the rows of one site, because the
+table splits the count by faction.
 
 **A record must be read against the code before it is accepted, and the reading
 must go past the module the record is about.** The residence work is in the
