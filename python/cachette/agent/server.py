@@ -37,7 +37,7 @@ References
 [^4]: Decisions register, DEC-060. ``docs/DECISIONS.md``
 [^5]: ADR-0085, an entity crosses to Python as one opaque identity that the
     engine resolves.
-    ``docs/adrs/draft/adr-0085-an-entity-crosses-to-python-as-one-opaque-identity.md``
+    ``docs/adrs/accepted/adr-0085-an-entity-crosses-to-python-as-one-opaque-identity.md``
 """
 
 from __future__ import annotations

@@ -16,7 +16,7 @@
 //!
 //! [^1]: ADR-0014, entity identity is an index plus a generation, decision D1. `docs/adrs/accepted/adr-0014-entity-identity-is-an-index-plus-a-generation.md`
 //! [^2]: ADR-0014, entity identity is an index plus a generation, decision D2. `docs/adrs/accepted/adr-0014-entity-identity-is-an-index-plus-a-generation.md`
-//! [^3]: ADR-0085, an entity crosses to Python as one opaque identity that the engine resolves, decision D3. `docs/adrs/draft/adr-0085-an-entity-crosses-to-python-as-one-opaque-identity.md`
+//! [^3]: ADR-0085, an entity crosses to Python as one opaque identity that the engine resolves, decision D3. `docs/adrs/accepted/adr-0085-an-entity-crosses-to-python-as-one-opaque-identity.md`
 //! [^4]: Testing policy. `docs/TESTING.md`
 
 use cachette_core::{Amount, Axial, FactionId, IdentityError, ResourceKind, World, WorldConfig};
@@ -156,7 +156,7 @@ fn the_gather_log_names_a_unit_that_resolves() {
     // stone. The test failed for the right reason, and the repair is to read
     // the ground rather than to assume it.[^2]
     //
-    // [^1]: ADR-0085, an entity crosses to Python as one opaque identity that the engine resolves, decision D1. `docs/adrs/draft/adr-0085-an-entity-crosses-to-python-as-one-opaque-identity.md`
+    // [^1]: ADR-0085, an entity crosses to Python as one opaque identity that the engine resolves, decision D1. `docs/adrs/accepted/adr-0085-an-entity-crosses-to-python-as-one-opaque-identity.md`
     // [^2]: Findings register, FND-054. `docs/FINDINGS.md`
     let mut world = world();
     let (kind, places) = deposits(&world);
