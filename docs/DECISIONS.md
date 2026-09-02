@@ -693,6 +693,34 @@ concluded, and it called that argument its weakest.
 
 ## Closed
 
+### DEC-075 — Does the cell summary carry one resource total, or one for each kind?
+
+**Closed. Food alone. The summary carries one resource total.**
+
+The engine holds three resource kinds: food, wood and stone.[^DEC75KIND] The
+level 1 summary carried none of them, so a unit could not see any of them. The
+question was whether to add one total or three.
+
+**Three is the shape the rest of the engine uses.** The founding survey reads
+all three. The ledger holds an entry for each kind. A summary that carried one
+kind is the odd one out, and a later item that wants wood must widen the type
+rather than fill a field.
+
+**One is what a reader exists for.** The `forage` option reads food. Nothing
+scores wood and nothing scores stone. A wood total and a stone total would be
+written on every rebuild, hashed, and read by nobody, which is the shape the
+project keeps meeting and has no rule that catches.[^DEC74SHAPE] [^DEC75SHAPE]
+Each extra total also costs eight bytes on every cell of the level.
+
+**The outcome.** The summary carries a food total. The type is a struct with
+named fields, not an array indexed by the kind, so adding a wood total later is
+one field and one line of the combine operation. That is a small change, and
+paying for it now against no reader is the larger cost.
+
+**What would reverse this.** An option row, a viewer panel, or a control-plane
+verb that scores wood or stone. Add the total in the same change as the reader,
+and not before it.
+
 ### DEC-063 — Which verb puts a unit in the world from the control plane?
 
 **Closed. Spawn is set-valued. The selector tree is the destination, and it is
@@ -1726,3 +1754,5 @@ a failed founding is correct.[^PRD12]
 [^DEC80B]: Backlog item 0187, give a carried load somewhere to go. `docs/backlog/refined/0187-give-a-carried-load-somewhere-to-go.md`
 [^DEC81A]: Findings register, FND-193. `docs/FINDINGS.md`
 [^DEC81B]: ADR-0074, a spawn may over-fill a tile, and only admission enforces the capacity, decision D1. `docs/adrs/accepted/adr-0074-a-spawn-may-over-fill-a-tile-and-only-admission-enforces-the-capacity.md`
+[^DEC75KIND]: ADR-0072, a tile stock is generated, and only what was taken is stored, decision D3. `docs/adrs/accepted/adr-0072-a-tile-stock-is-generated-and-only-what-was-taken-is-stored.md`
+[^DEC75SHAPE]: Recurring defect shapes, shape 3. `.claude/rules/recurring-defects.md`

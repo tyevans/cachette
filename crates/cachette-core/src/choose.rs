@@ -66,9 +66,30 @@ pub enum CellField {
     /// The mean height of the tiles of the cell.
     MeanHeight,
     /// The mean stub value of the tiles of the cell.
+    ///
+    /// **No option row reads this.** The tile value is a random walk that no
+    /// other system reads or writes, and the `forage` row read it until the
+    /// summary carried a resource.[^1] The viewer still paints the tile value
+    /// at level 0, and the item that repairs the viewer holds the question of
+    /// whether the pass that computes it should stay at all.[^2]
+    ///
+    /// # References
+    ///
+    /// [^1]: Findings register, FND-181. `docs/FINDINGS.md`
+    /// [^2]: Backlog item 0188, show the food of a tile and the reason a unit chose. `docs/backlog/proposed/0188-show-the-food-of-a-tile-and-the-reason-a-unit-chose.md`
     MeanValue,
     /// The number of units for each open tile of the cell.
     UnitsForEachOpenTile,
+    /// The food that each tile of the cell still holds.
+    ///
+    /// The ground generates the stock, the gather resolve takes from it, and
+    /// the recovery pass gives part of it back. A unit that scores this reads
+    /// a quantity that another system writes.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0072, a tile stock is generated, and only what was taken is stored, decisions D1 and D4. `docs/adrs/accepted/adr-0072-a-tile-stock-is-generated-and-only-what-was-taken-is-stored.md`
+    MeanFood,
 }
 
 /// What the unit brings to an option.
@@ -106,6 +127,9 @@ pub struct OptionRow {
 /// The order is the tie-break order. A change to it changes which option
 /// wins a tie, so the order is part of the behaviour and not a listing.[^1]
 ///
+/// A change to the field that one row reads is not a change to the order.
+/// The `forage` row keeps its index, so the tie-break is what it was.
+///
 /// # References
 ///
 /// [^1]: ADR-0004, iteration order is explicit, decisions D1 and D3. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
@@ -118,7 +142,7 @@ pub const OPTIONS: [OptionRow; OPTION_COUNT] = [
     OptionRow {
         name: "forage",
         drive: Drive::Unmet,
-        field: CellField::MeanValue,
+        field: CellField::MeanFood,
     },
     OptionRow {
         name: "climb",
@@ -354,6 +378,7 @@ pub fn field_value(summary: CellSummary, field: CellField) -> Fix32 {
         CellField::MeanHeight => summary.mean_height(),
         CellField::MeanValue => summary.mean_value(),
         CellField::UnitsForEachOpenTile => summary.units_for_each_open_tile(),
+        CellField::MeanFood => summary.mean_food(),
     }
     .unwrap_or(Fix32::ZERO)
 }

@@ -23,6 +23,7 @@
 //! [^5]: Testing policy. `docs/TESTING.md`
 
 use cachette_core::pyramid::CellSummary;
+use cachette_core::resource::ResourceKind;
 use cachette_core::{Axial, FactionId, Fix32, World, WorldConfig};
 use proptest::prelude::*;
 use proptest::test_runner::FileFailurePersistence;
@@ -76,6 +77,7 @@ fn assert_cell_matches(world: &World, block: u32) {
 
     let (mut tiles, mut open, mut units) = (0i64, 0i64, 0i64);
     let (mut value_total, mut height_total) = (0i64, 0i64);
+    let mut food_total = 0i64;
     for row in first_row..first_row + edge {
         for column in first_column..first_column + edge {
             let address = Axial::new(column as i32, row as i32);
@@ -92,6 +94,16 @@ fn assert_cell_matches(world: &World, block: u32) {
                 .expect("the structure answers") as i64;
             value_total += i64::from(world.tile_value(address).expect("the tile has a value").0);
             height_total += i64::from(ground.height.0);
+            // The recomputation reads what the tile still holds, which is
+            // what the generator gave it less what the ledger says was taken.
+            // A summary that held the original stock instead would agree with
+            // this until somebody gathered.
+            food_total += i64::from(
+                world
+                    .tile_stock(address, ResourceKind::Food)
+                    .expect("the tile is inside the world")
+                    .0,
+            );
         }
     }
 
@@ -112,6 +124,11 @@ fn assert_cell_matches(world: &World, block: u32) {
         cell.height_total().0,
         height_total,
         "block {block}: the height total differs"
+    );
+    assert_eq!(
+        cell.food_total().0,
+        food_total,
+        "block {block}: the food total differs"
     );
 }
 
@@ -238,6 +255,224 @@ fn an_intensive_reading_is_weighted_by_the_ground_it_covers() {
     );
 }
 
+/// The seed of the world that the food tests read.
+///
+/// The seed was chosen by a scan, because the food total needs a spread that
+/// the general fixture does not hold. Its world holds a cell that covers a
+/// whole block and carries no food at all, and a cell that covers a whole
+/// block and carries the most food in the world. A fixture whose cells all
+/// carry a middling amount would let a food total that read the wrong tiles
+/// pass.[^1]
+///
+/// # References
+///
+/// [^1]: Testing rules, section 2a. `.claude/rules/testing.md`
+const FOOD_SEED: u64 = 23;
+
+/// Returns an open address whose tile still holds food.
+fn a_food_deposit(world: &World) -> Axial {
+    let grid = world.grid();
+    (0..grid.tile_count())
+        .map(|index| Axial::new((index % grid.width()) as i32, (index / grid.width()) as i32))
+        .find(|address| {
+            world.admits_a_unit(*address)
+                && world
+                    .tile_stock(*address, ResourceKind::Food)
+                    .is_some_and(|stock| stock.0 > 0)
+        })
+        .expect("the fixture world holds a food deposit under open ground")
+}
+
+#[test]
+fn the_food_fixture_holds_a_cell_with_no_food_and_a_cell_with_the_most() {
+    // A defect lives at an extreme of the distribution. A world whose cells
+    // all carry a middling amount of food supplies no extreme, so the
+    // recomputation below would never meet an empty cell or a full one.[^1]
+    //
+    // [^1]: Testing rules, section 2a. `.claude/rules/testing.md`
+    let world = peopled(FOOD_SEED);
+    let full = i64::from(world.pyramid().layout().block_edge())
+        * i64::from(world.pyramid().layout().block_edge());
+    let whole: Vec<&CellSummary> = world
+        .pyramid()
+        .cells()
+        .iter()
+        .filter(|cell| cell.tiles() == full)
+        .collect();
+    let lowest = whole
+        .iter()
+        .map(|cell| cell.food_total().0)
+        .min()
+        .expect("the world holds a cell that covers a whole block");
+    let highest = whole
+        .iter()
+        .map(|cell| cell.food_total().0)
+        .max()
+        .expect("the world holds a cell that covers a whole block");
+    assert_eq!(
+        lowest, 0,
+        "no whole cell of the fixture is empty of food, so the low end is untested"
+    );
+    assert!(
+        highest > 512,
+        "the fixture holds no food contrast: the fullest cell carries {highest}"
+    );
+}
+
+#[test]
+fn every_cell_of_the_food_fixture_equals_the_tiles_it_covers() {
+    // The recomputation reads the remaining stock of each tile through the
+    // public interface and never asks the pyramid, so the two answers are
+    // independent.[^1]
+    //
+    // [^1]: ADR-0022, level 0 is the only truth, and every level above it is derived, decision D2. `docs/adrs/accepted/adr-0022-level-0-is-the-only-truth-and-every-level-above-it-is-derived.md`
+    let world = peopled(FOOD_SEED);
+    for block in 0..world.pyramid().len() as u32 {
+        assert_cell_matches(&world, block);
+    }
+}
+
+#[test]
+fn a_gather_lowers_the_food_of_the_cell_it_took_from() {
+    // The food total is the stock the tiles still hold, and not the stock the
+    // ground generated. A summary that held the original stock agrees with a
+    // tile reader until somebody gathers, and this is the case that tells the
+    // two apart.[^1]
+    //
+    // The test drives the engine. A rebuild that no step reaches would leave
+    // the summary correct and unreachable.[^2]
+    //
+    // [^1]: ADR-0072, a tile stock is generated, and only what was taken is stored, decision D4. `docs/adrs/accepted/adr-0072-a-tile-stock-is-generated-and-only-what-was-taken-is-stored.md`
+    // [^2]: Testing rules, section 5. `.claude/rules/testing.md`
+    let mut world = peopled(FOOD_SEED);
+    let address = a_food_deposit(&world);
+    let before = world
+        .summary_covering(address)
+        .expect("the address is inside the world")
+        .food_total()
+        .0;
+
+    let unit = world
+        .spawn_soldier(address, FactionId(0))
+        .expect("the ground admits a unit");
+    assert!(world.order_gather(unit, ResourceKind::Food));
+    world.step(2).expect("the step must run");
+
+    let taken: i64 = world
+        .gather_log()
+        .iter()
+        .map(|event| i64::from(event.amount))
+        .sum();
+    assert!(
+        taken > 0,
+        "the unit took nothing, so the test proves nothing"
+    );
+
+    // The unit may have moved after it gathered, so the cell that lost the
+    // food is the cell that covers the tile the unit took from.
+    let after = world
+        .summary_covering(address)
+        .expect("the address is inside the world")
+        .food_total()
+        .0;
+    assert_eq!(
+        after,
+        before - taken,
+        "the cell kept the food that a unit carried away"
+    );
+    assert!(world.check_invariants(), "the world broke an invariant");
+}
+
+/// Returns an open address whose tile still holds a stock of one kind.
+fn a_deposit_of(world: &World, kind: ResourceKind) -> Axial {
+    let grid = world.grid();
+    (0..grid.tile_count())
+        .map(|index| Axial::new((index % grid.width()) as i32, (index / grid.width()) as i32))
+        .find(|address| {
+            world.admits_a_unit(*address)
+                && world
+                    .tile_stock(*address, kind)
+                    .is_some_and(|stock| stock.0 > 0)
+        })
+        .expect("the fixture world holds a deposit of that kind under open ground")
+}
+
+#[test]
+fn a_gather_of_another_kind_leaves_the_food_of_the_cell_alone() {
+    // The ledger holds one entry for each tile and each kind, and the food
+    // total reads the food entries alone. A total that summed every entry of
+    // the run would fall when a unit took wood, and the food test above
+    // cannot see that, because it gathers food.
+    let mut world = peopled(FOOD_SEED);
+    let address = a_deposit_of(&world, ResourceKind::Wood);
+    let before = world
+        .summary_covering(address)
+        .expect("the address is inside the world")
+        .food_total()
+        .0;
+
+    let unit = world
+        .spawn_soldier(address, FactionId(0))
+        .expect("the ground admits a unit");
+    assert!(world.order_gather(unit, ResourceKind::Wood));
+    world.step(2).expect("the step must run");
+
+    let taken: i64 = world
+        .gather_log()
+        .iter()
+        .map(|event| i64::from(event.amount))
+        .sum();
+    assert!(
+        taken > 0,
+        "the unit took nothing, so the test proves nothing"
+    );
+    assert_eq!(
+        world
+            .summary_covering(address)
+            .expect("the address is inside the world")
+            .food_total()
+            .0,
+        before,
+        "the wood a unit took came off the food of the cell"
+    );
+}
+
+#[test]
+fn the_mean_food_divides_by_every_tile_and_not_by_the_open_ground() {
+    // The ground gives every tile a food stock, and water holds a stock of
+    // zero. The denominator is therefore the tile count. A mean that borrowed
+    // the open tile count would report a richer cell than the ground carries,
+    // and it would report a number of the right type in a plausible
+    // range.[^1]
+    //
+    // [^1]: ADR-0024, every summary field is declared extensive or intensive, decision D4. `docs/adrs/accepted/adr-0024-every-summary-field-is-declared-extensive-or-intensive.md`
+    let world = peopled(FOOD_SEED);
+    let mixed = *world
+        .pyramid()
+        .cells()
+        .iter()
+        .filter(|cell| cell.open_tiles() > 0 && cell.open_tiles() < cell.tiles())
+        .max_by_key(|cell| cell.food_total().0)
+        .expect("the fixture holds a cell that covers water and dry ground");
+    assert!(
+        mixed.food_total().0 > 0,
+        "the cell carries no food, so both denominators give zero"
+    );
+
+    let over_every_tile = (mixed.food_total().0 << 16) / mixed.tiles();
+    let over_the_open_ground = (mixed.food_total().0 << 16) / mixed.open_tiles();
+    assert_ne!(
+        over_every_tile, over_the_open_ground,
+        "the cell holds no water, so the two denominators agree and this \
+         pair cannot tell them apart"
+    );
+    assert_eq!(
+        i64::from(mixed.mean_food().expect("the cell covers tiles").0),
+        over_every_tile,
+        "the mean food divided by the wrong extent"
+    );
+}
+
 #[test]
 fn a_summary_over_no_tile_reports_no_reading() {
     // A mean over nothing is not zero. Reporting it as zero gives a caller an
@@ -245,6 +480,7 @@ fn a_summary_over_no_tile_reports_no_reading() {
     let empty = CellSummary::IDENTITY;
     assert_eq!(empty.tiles(), 0);
     assert_eq!(empty.mean_value(), None);
+    assert_eq!(empty.mean_food(), None);
     assert_eq!(empty.mean_height(), None);
     assert_eq!(empty.open_share(), None);
     assert_eq!(empty.units_for_each_open_tile(), None);
