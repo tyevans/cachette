@@ -6,7 +6,7 @@ created: 2026-08-31
 implements: [ADR-0082 D1, ADR-0082 D2, ADR-0082 D3, ADR-0082 D4, ADR-0003 D1, ADR-0014 D3, ADR-0004 D1]
 changes: []
 creates: [ADR-0082]
-serves: [PRD-0011, PRD-0014]
+serves: [PRD-0011, PRD-0014, PRD-0012]
 blocked-by: [0059, DEC-044]
 ---
 
