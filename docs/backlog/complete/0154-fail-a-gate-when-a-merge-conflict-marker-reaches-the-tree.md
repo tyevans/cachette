@@ -1,7 +1,7 @@
 ---
 id: 0154
 title: Fail a gate when a merge conflict marker reaches the tree
-status: refined
+status: complete
 created: 2026-09-01
 implements: []
 changes: []
@@ -100,7 +100,31 @@ false failure is the only reason to prefer a report.[^6]
 
 ## Outcome
 
-Filled in when the item moves to `complete/`.
+Done as planned, with one addition the review made and one thing the check
+deliberately leaves out.
+
+The check reads every file in the tree, not a suffix list. It skips a build
+directory, a virtual environment and the worktrees, because a worktree holds
+another checkout of this repository and a worker mid-rebase legitimately holds
+a marker there. It skips the broken fixture by name during a repository scan,
+and reads it during an explicit scan of it, which is the convention the
+citation check already uses.
+
+The check fails the gate. The review said why: a conflict marker is never
+intentional and never ambiguous, so the check has no judgement to make and
+cannot cry wolf.
+
+The broken fixture holds all four markers across two files, one Markdown and
+one Rust, and a third file holds the shapes the check must leave alone: a
+heading underline, a rule of eight characters, and a run of seven inside a
+sentence. The probe recipe requires the check to reject the fixture, and a run
+against the fixture reports the two broken files and not the third.
+
+The check found no marker on the real tree. The markers that opened the item
+had already been repaired by hand.
+
+No register entry opened or closed. The finding that opened the item already
+records the failure and its cost.
 
 ## References
 

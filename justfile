@@ -119,12 +119,14 @@ records:
     ./scripts/check-registers.sh
     ./scripts/check-priority.sh
     ./scripts/check-citations.sh
+    ./scripts/check-conflict-markers.sh
 
 # Prove that the record checks can fail. Each must reject its broken fixture.
 records-probe:
     ! ./scripts/check-adrs.sh tests/fixtures/records-broken
     ! ./scripts/check-prds.sh tests/fixtures/prd-broken
     ! ./scripts/check-citations.sh tests/fixtures/citations-broken
+    ! ./scripts/check-conflict-markers.sh tests/fixtures/conflict-broken
 
 # Everything a commit must pass. The wrapper times the run and reports the
 # cost against the local budget for this architecture. It reports; it does
