@@ -1802,8 +1802,15 @@ reads three constants and exercises no behaviour. The test also computes the
 held share for each terrain kind and then discards the result without
 asserting on it.
 
-Flatten the claim threshold to the same value for every passable kind and the
-test stays green. The gradient it is named for is not defended.
+The gradient it is named for is not defended.
+
+**This entry first named the wrong experiment, and the correction is a
+separate finding.**[^74] It said that flattening the claim threshold to the
+same value for every passable kind leaves the test green. It does not. The
+test reads the thresholds, so flattening them fails it on a comparison of two
+constants, without running the rule at all. The experiment that shows the test
+blind is to leave the thresholds ordered and stop the decision function from
+reading them. The conclusion above stands; only this line was wrong.
 
 **Evidence.** The behaviour is real and was observed over 40 ticks on a
 development machine, by recording the terrain of every unheld tile adjacent to
@@ -2882,3 +2889,4 @@ proved.
 [^71]: Testing rules, section 2a. `.claude/rules/testing.md`
 [^72]: Findings register, FND-080, in this document.
 [^73]: Testing rules, section 1. `.claude/rules/testing.md`
+[^74]: Findings register, FND-133, in this document.
