@@ -23,9 +23,45 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^ALLOC]
 
-**Next number: DEC-082**
+**Next number: DEC-084**
 
 ## Open
+
+### DEC-083 — Should a citation of a record name the directory the record sits in?
+
+**Open. Engineering owns it. The recommendation is Option A.**
+
+A record moves from one directory to another when a reviewer accepts it, and a
+citation of that record names its path. Every citation written while the record
+was a draft then names a path that does not resolve, and the citation check
+fails on each one.[^DEC83A] Accepting a record is therefore a whole-tree sweep,
+and the sweep grows with how well the record is cited. A finding holds the
+evidence.[^DEC83B]
+
+**Option A. Hold every record in one directory and let the registry hold the
+status.** A path then never changes, and a citation never decays. The registry
+already claims to be the only document that holds a status, and a directory
+that also holds it is a second site for the same fact.[^DEC83C] What is lost is
+the reading of a directory listing: a browser of the tree can no longer see
+which records bind. The registry answers that, and the priority index answers
+which drafts wait.
+
+**Option B. Cite a record by number and let a check resolve the path.** The
+body then names no directory. It needs a resolver in every check that reads a
+citation, and it makes a path unreadable to a person who greps.
+
+**Option C. Keep the move and pay the sweep.** It costs one sweep for each
+acceptance, and the sweep touches source comments, so a worker who may not edit
+source cannot accept a well-cited record.
+
+**Recommendation: A.** It removes the sweep rather than automating it, and it
+takes one declaration site away from the status of a record, which is the shape
+this project meets most often. Option B pays a resolver in five checks. Option
+C prices acceptance by how well a record is cited, which is the opposite of the
+incentive the project wants.
+
+**What follows either way.** Two records are ready and neither status has
+moved, because a reviewer that may not edit source could not sweep them.[^DEC83D]
 
 ### DEC-081 — Does a caller that bounds a site read the composed capacity or the ground?
 
@@ -35,23 +71,26 @@ One function composes the capacity of the ground with the capacity a finished
 upgrade gives, and returns the larger. Admission calls it, and so does the
 public reader that reports what a tile holds.
 
-Three callers do not. The position table bounds the positions of a site by the
+Four callers do not. The position table bounds the positions of a site by the
 ground alone. The founding seats a group over a disc by the ground alone. The
-founding survey estimates the room of a place by the ground alone. A finding
-holds the evidence.[^DEC81A]
+founding survey estimates the room of a place by the ground alone. The drawing
+pass counts a tile as at its capacity by the ground alone, and paints an
+over-full marker above that number, so a watcher reads a correctly filled made
+way as over-full. A finding holds the evidence.[^DEC81A]
 
 **The width is the reason it matters.** The row width of the position table is
 a fold over the terrain capacity table. A made way states a capacity above
 every value in that table, so a position table that followed the composition
 would be asked to hold more positions than its row carries.
 
-**Option A. Say that the three callers ask a different question, and fold both
+**Option A. Say that the four callers ask a different question, and fold both
 tables into the width.** The positions of a site are the work it opens, and the
 ground is the right bound for that. The founding seats conservatively, and
 seating fewer than a tile holds is safe under the record that lets only
 admission enforce a capacity.[^DEC81B] What must change is the fold: it claims
 to report the largest number of units that can stand on a tile, and it walks
-one of the two tables that state one.
+one of the two tables that state one. The drawing pass is the exception the
+option must still answer, because a false marker is what a watcher sees.
 
 **Option B. Make every caller compose.** One question then has one answer
 everywhere. It widens the position row to the largest capacity any tile can
@@ -1726,3 +1765,7 @@ a failed founding is correct.[^PRD12]
 [^DEC80B]: Backlog item 0187, give a carried load somewhere to go. `docs/backlog/refined/0187-give-a-carried-load-somewhere-to-go.md`
 [^DEC81A]: Findings register, FND-193. `docs/FINDINGS.md`
 [^DEC81B]: ADR-0074, a spawn may over-fill a tile, and only admission enforces the capacity, decision D1. `docs/adrs/accepted/adr-0074-a-spawn-may-over-fill-a-tile-and-only-admission-enforces-the-capacity.md`
+[^DEC83A]: The citation check script. `scripts/check_citations.py`
+[^DEC83B]: Findings register, FND-197. `docs/FINDINGS.md`
+[^DEC83C]: ADR Registry, the status vocabulary. `docs/adrs/REGISTRY.md`
+[^DEC83D]: Review 0204, the two corrected records. `docs/reviews/0204-the-two-corrected-records.md`

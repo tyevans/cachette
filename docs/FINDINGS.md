@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-194**
+**Next number: FND-198**
 
 ## A. Corrections to stated rules
 
@@ -4420,6 +4420,47 @@ the correction.[^F193D]
 a site should follow the composed capacity, and whether the fold should walk
 both tables, is a register row with a backlog item behind it.[^F193F]
 
+**A fourth caller was found later, and it is the one a person sees.** The
+drawing pass counts a painted tile as at its capacity against the ground alone,
+and paints an over-full marker above that number. A watcher would therefore
+read a correctly filled made way as over-full. It enforces nothing, because the
+viewer never writes to the world.[^F193G] [^F193H]
+
+### FND-197 — Accepting a record breaks every citation of it
+
+**Believed.** A record is accepted by a reviewer, and the acceptance is an edit
+to the registry row. The registry says the file moves between directories as
+the status changes, and that reads as a second mechanical step of the same
+size.
+
+**True.** A citation of a record names its path, and the path holds the
+directory. So a citation written while a record is a draft states the
+directory a draft lives in, and the acceptance makes every one of them name a
+path that does not resolve. The citation check reads source comments as well
+as documents and fails on such a path.[^F197A] The acceptance is therefore a
+whole-tree sweep, and it grows with how well the record is cited.
+
+**Evidence.** A review reached the point of accepting two records and could
+make neither status change. One of the two carries nineteen citations in
+source comments under one crate, and one carries a single citation.[^F193H]
+The sweep is invisible until the check runs, and it lands on the tree that a
+documents-only worker may not touch. This was found by counting the citations
+of both records. Nothing was run beyond the document checks.
+
+**Follows.** Three things.
+
+**A reviewer that may not edit source cannot accept a well-cited record.** The
+verdict and the status change have different blast radii, and only the verdict
+is the reviewer's work.
+
+**The cost falls hardest on the records that earned it.** A record nothing
+cites moves for free. A record that reaches nineteen call sites pays for
+each. That is the opposite of the incentive the project wants.
+
+**The choice is a judgement and it is in the register.** Whether a citation
+should name the directory at all, and what a stable path would look like, is
+an open row.[^F197C]
+
 
 ## References
 
@@ -4580,3 +4621,7 @@ both tables, is a register row with a backlog item behind it.[^F193F]
 [^F193C]: The capacity that bounds the positions of a site. `crates/cachette-core/src/position.rs`
 [^F193D]: Review 0199, the influence, tile field, upgrade and housing records. `docs/reviews/0199-the-influence-tile-field-upgrade-and-housing-records.md`
 [^F193F]: Decisions register, DEC-081. `docs/DECISIONS.md`
+[^F193G]: The drawing pass counts a tile at its capacity. `crates/cachette-view/src/paint.rs`
+[^F193H]: Review 0204, the two corrected records. `docs/reviews/0204-the-two-corrected-records.md`
+[^F197A]: The citation check script. `scripts/check_citations.py`
+[^F197C]: Decisions register, DEC-083. `docs/DECISIONS.md`

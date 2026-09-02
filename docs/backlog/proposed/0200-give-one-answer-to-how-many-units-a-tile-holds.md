@@ -19,9 +19,14 @@ a tile holds. Three other callers read the ground alone: the bound on the
 positions of a site, the seating of a founded group, and the room that the
 founding survey estimates.
 
+A fourth caller is the one a person sees. The drawing pass counts a painted
+tile as at its capacity against the ground alone, and paints an over-full
+marker above that number.
+
 A finished made way states a capacity above every value in the terrain
 table. On such a tile, admission admits more units than the position table
-believes the tile holds. Nothing fails when the two disagree.
+believes the tile holds, and a watcher reads a correctly filled tile as
+over-full. Nothing fails when the two disagree.
 
 The fold that reports the largest capacity is the sharp end. It says in its own
 words that a caller which must hold one entry for each unit that can stand on a
@@ -44,11 +49,13 @@ demonstration.
   a different question or the same one, and it recommends that they ask a
   different one.[^3] The work follows the answer and must not invent it.
 - Which caller, if any, changes. The recommendation changes the fold and no
-  caller.
+  caller, and it must still answer the drawing pass, because a false marker is
+  what a watcher sees.
 - What a test asserts. A test that builds a road, admits units onto the tile,
   and reads the position bound would show the two answers in one run.
 - Whether the record that governs the composition needs its own change. A
-  review already removes the sentence that claims every caller composes.[^4]
+  review already removes the sentence that claims every caller composes, and a
+  second confirms the correction.[^4] [^5]
 
 ## Done when
 
@@ -64,3 +71,4 @@ Filled in when the item moves to `complete/`.
 [^2]: Backlog item 0180, let a unit choose to build. `docs/backlog/proposed/0180-let-a-unit-choose-to-build.md`
 [^3]: Decisions register, DEC-081. `docs/DECISIONS.md`
 [^4]: Review 0199, the influence, tile field, upgrade and housing records. `docs/reviews/0199-the-influence-tile-field-upgrade-and-housing-records.md`
+[^5]: Review 0204, the two corrected records. `docs/reviews/0204-the-two-corrected-records.md`
