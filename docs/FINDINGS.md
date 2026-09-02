@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-172**
+**Next number: FND-182**
 
 ## A. Corrections to stated rules
 
@@ -4072,7 +4072,88 @@ fails if a later change to the fixture stops reaching the case, and nothing
 else would report that.
 
 
+### FND-180 — Movement reads whether a unit chose, not what it chose
+
+**Believed.** The choice pass decides what a unit does, and movement acts on
+that decision. The item that built the pass states in its outcome that
+movement reads the option column. The record it wrote states that a unit which
+holds no intent does not move.[^F180A] Both statements are read as saying that
+the option steers the step.
+
+**True.** The movement pass reads the option column, tests that it holds a
+value, and discards the value. It then draws a uniform direction from the
+counter-based generator, keyed on the system, the frame, the entity and the
+draw index. A unit that chooses to forage takes the same distribution of steps
+as a unit that chooses to climb. The option column decides one bit: whether the
+unit moves at all.
+
+**Evidence.** The intent half of movement discards the option at the first
+line of its filter and never reads it again.[^F180B] No other stage of the step
+reads the column. No test asserts a consequence of which option a unit chose.
+This was found by reading the source. It was not run, so the count of tests
+that would survive a pinned column is unverified.
+
+**Follows.** Three things.
+
+**The product record this project points at is unmet at the action.** It asks
+that a unit acts on the world it can see, and that a watcher who changes the
+world sees the behaviour change.[^F180C] The choice changes. The behaviour
+does not.
+
+**Every pass upstream of the column is paid for and unused.** The level 1
+rebuild, the cell summary, the need column, the option weights and the stagger
+schedule all feed one bit.
+
+**The item was correct about its caller and still shipped this.** It named
+movement as the reader, and movement is the reader. Naming the caller is not
+enough when the caller discards the payload.[^F180D]
+
+### FND-181 — The rules against inert work look for an absent caller, and this defect has one
+
+**Believed.** Two rules cover work that nothing uses. One says not to declare a
+capability before something calls it.[^37] One says that when the engine is
+obligated to invoke a thing, the test must start at the engine.[^F181B]
+Together they were read as covering the case where the project builds
+something and nothing uses it.
+
+**True.** Both rules look for an absent caller. They find inert code. They do
+not find inert data: a value that the engine computes, stores, hashes and
+tests, where the caller exists and discards the payload. The option column is
+that case.[^F181C] The influence field is a second: a solve runs its full pass
+count on every tick over a field that no source raises and no consumer
+reads.[^F181D] The tile stub value is a third: a full pass over every tile on
+every tick writes a random walk that only the viewer and the summary read, and
+neither of them decides anything with it.
+
+**Evidence.** Three candidate repairs were tested against the option column,
+and all three pass it. A rule that a person must be able to run the feature
+passes, because the demonstration runs the choice pass on every tick. A check
+that reports a public verb with no caller passes, because both the pass and the
+column have callers. A rule that a backlog item names its caller before it is
+refined passes, because the item named the right caller.[^F181E]
+
+**Follows.** The test must be about the value, not about the caller. For each
+value the work writes into state, name the stage that reads it to decide
+something, and write a test that changes the value and asserts that the
+decision changes. The falsification is the one the testing rule already
+trusts: pin the value to a constant and watch the suite stay green.[^84]
+
+This is the discipline the testing rule already states for a keyed draw, turned
+round. That rule says to test what the value depends on.[^43] This says to
+test what depends on the value.
+
+
+
 ## References
+
+[^F180A]: ADR-0064, a unit chooses by scoring a small fixed option set, decision D3. `docs/adrs/accepted/adr-0064-a-unit-chooses-by-scoring-a-small-fixed-option-set.md`
+[^F180B]: What a unit does in a tick, section 3.1. `docs/research/what-a-unit-does-in-a-tick.md`
+[^F180C]: PRD-0009, a unit acts on the world it can see. `docs/product/accepted/prd-0009-a-unit-acts-on-the-world-it-can-see.md`
+[^F180D]: Backlog item 0064, choose an action by scoring a fixed option set. `docs/backlog/complete/0064-choose-an-action-by-scoring-a-fixed-option-set.md`
+[^F181B]: Testing Rules, section 5. `.claude/rules/testing.md`
+[^F181C]: Findings register, FND-180, in this document.
+[^F181D]: What a unit does in a tick, section 3.4. `docs/research/what-a-unit-does-in-a-tick.md`
+[^F181E]: What a unit does in a tick, section 6.1. `docs/research/what-a-unit-does-in-a-tick.md`
 
 [^F168A]: ADR-0084, the world reserves the unit columns at construction, decision D3. `docs/adrs/draft/adr-0084-the-world-reserves-the-unit-columns-at-construction.md`
 [^F168B]: Review 0175, the unit reservation record. `docs/reviews/0175-the-unit-reservation-record.md`
