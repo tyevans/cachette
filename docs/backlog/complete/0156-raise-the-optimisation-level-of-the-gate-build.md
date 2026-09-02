@@ -79,16 +79,16 @@ run the other way.
 **Optimising the dependencies alone does nothing, and measuring it was worth
 the time.** The reasoning said it would do nothing, because the simulation is
 first-party code. The first measurement appeared to say it made the suite half
-again as slow, which was false and led to FND-136.
+again as slow, which was false and led to FND-142.
 
 **The work found a false example in a hard invariant of the project.** A
 one-byte tile field at its largest value, summed over the target scale, does
 not overflow a `u32`. It fits with under one part in a hundred to spare. The
-rule that the accumulator widens is right and is untouched. FND-135 holds the
+rule that the accumulator widens is right and is untouched. FND-141 holds the
 arithmetic. The document that states the example belongs to the project owner,
 so this item does not edit it.
 
-Register entries that moved: FND-134, FND-135 and FND-136 opened. ADR-0083 was
+Register entries that moved: FND-140, FND-141 and FND-142 opened. ADR-0083 was
 written and sits at `Draft`. No blocker opened or closed, and BLK-007 is
 untouched. No decision row was needed, because the choice is made and the
 record holds it.

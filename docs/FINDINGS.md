@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-137**
+**Next number: FND-143**
 
 ## A. Corrections to stated rules
 
@@ -3052,7 +3052,7 @@ wrong about the outcome. Both would have been wrong about what the outcome
 proved.
 
 
-### FND-134 — The gate suite is slow because the gate build does not optimise
+### FND-140 — The gate suite is slow because the gate build does not optimise
 
 **Believed.** The gate suite costs what it costs because of how much it tests.
 The register holds a wall clock figure for the suite and a budget above it,
@@ -3092,7 +3092,7 @@ ground, because a smaller world measures its own fixture.[^87] Cutting the
 work they do would have bought time by testing less. The profile bought more
 time and changed no test.
 
-### FND-135 — A one-byte tile field over the target scale does not overflow a `u32`
+### FND-141 — A one-byte tile field over the target scale does not overflow a `u32`
 
 **Believed.** A one-byte tile field summed over the whole world overflows a
 `u32`, and that is why a level 1 accumulator widens.
@@ -3122,7 +3122,7 @@ The rule is stated as a hard invariant of the project, and the example sits
 beside it. The invariant needs a correction, and the owner of that document
 makes it. This entry is the evidence.
 
-### FND-136 — Two runs of this suite hours apart are not comparable
+### FND-142 — Two runs of this suite hours apart are not comparable
 
 **Believed.** A run of this suite on an idle machine gives the cost of the
 suite, so a run before a change and a run after it measure the change. The

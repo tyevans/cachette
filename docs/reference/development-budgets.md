@@ -146,4 +146,4 @@ command, and the date. Cite the source in a footnote.
 [^7]: Testing rules, section 3. `.claude/rules/testing.md`
 [^8]: Findings register, FND-099. `docs/FINDINGS.md`
 [^9]: ADR-0083, the gate build checks every integer overflow. `docs/adrs/draft/adr-0083-the-gate-build-checks-every-integer-overflow.md`
-[^10]: Findings register, FND-136. `docs/FINDINGS.md`
+[^10]: Findings register, FND-142. `docs/FINDINGS.md`
