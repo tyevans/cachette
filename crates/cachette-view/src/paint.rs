@@ -552,12 +552,13 @@ impl Canvas {
         self.crowd_worst
     }
 
-    /// Returns the painted tiles that hold at least as many units as their
-    /// ground admits.
+    /// Returns the painted tiles that hold at least as many units as they
+    /// admit.
     ///
-    /// The capacity comes from the terrain, which is where the engine reads
-    /// it too. The viewer holds no capacity value of its own, so a change to
-    /// the terrain table reaches the picture with no edit here.[^1]
+    /// The capacity is the composition of the ground and the finished
+    /// upgrade, which is what admission reads. The viewer holds no capacity
+    /// value of its own and reads neither table directly, so a change to
+    /// either one reaches the picture with no edit here.[^1] [^3]
     ///
     /// The count is of the window, in the same way every other count of the
     /// drawing pass is.[^2]
@@ -566,6 +567,7 @@ impl Canvas {
     ///
     /// [^1]: ADR-0056, movement is tile-discrete and admitted by sort-then-admit, decision D4. `docs/adrs/accepted/adr-0056-movement-is-tile-discrete-and-admitted-by-sort-then-admit.md`
     /// [^2]: ADR-0070, the head-up display reports what the drawing pass read, decision D2. `docs/adrs/accepted/adr-0070-the-head-up-display-reports-what-the-drawing-pass-read.md`
+    /// [^3]: Findings register, FND-193. `docs/FINDINGS.md`
     #[must_use]
     pub const fn tiles_at_capacity(&self) -> u32 {
         self.tiles_at_capacity

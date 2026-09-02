@@ -702,16 +702,18 @@ impl Readout {
         self.crowd_worst
     }
 
-    /// Returns the painted tiles that hold at least as many units as their
-    /// ground admits.
+    /// Returns the painted tiles that hold at least as many units as they
+    /// admit.
     ///
-    /// The capacity is a property of the terrain, and the viewer reads it
-    /// from there.[^1] The number counts the window.[^2]
+    /// The capacity composes the ground with the finished upgrade, which is
+    /// what admission reads. The viewer asks the engine and holds neither
+    /// table.[^1] [^3] The number counts the window.[^2]
     ///
     /// # References
     ///
     /// [^1]: ADR-0056, movement is tile-discrete and admitted by sort-then-admit, decision D4. `docs/adrs/accepted/adr-0056-movement-is-tile-discrete-and-admitted-by-sort-then-admit.md`
     /// [^2]: ADR-0070, the head-up display reports what the drawing pass read, decision D2. `docs/adrs/accepted/adr-0070-the-head-up-display-reports-what-the-drawing-pass-read.md`
+    /// [^3]: Findings register, FND-193. `docs/FINDINGS.md`
     #[must_use]
     pub const fn tiles_at_capacity(&self) -> u32 {
         self.tiles_at_capacity

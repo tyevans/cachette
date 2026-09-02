@@ -140,4 +140,4 @@ when it reaches the consumer.
 [^10]: Decision Record Scope, section 1. `.claude/rules/adr-scope.md`
 [^11]: Findings register, FND-180. `docs/FINDINGS.md`
 [^12]: Findings register, FND-181. `docs/FINDINGS.md`
-[^13]: Backlog item 0188, show the food of a tile and the reason a unit chose. `docs/backlog/proposed/0188-show-the-food-of-a-tile-and-the-reason-a-unit-chose.md`
+[^13]: Backlog item 0188, show the food of a tile and the reason a unit chose. `docs/backlog/complete/0188-show-the-food-of-a-tile-and-the-reason-a-unit-chose.md`

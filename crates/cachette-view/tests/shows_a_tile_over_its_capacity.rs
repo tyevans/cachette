@@ -18,8 +18,10 @@
 //!
 //! The fixture holds four tiles that matter: an empty tile, a tile under its
 //! capacity, a tile at exactly its capacity, and a tile over its capacity.
-//! The capacity comes from the terrain, so the fixture asks the ground how
-//! many units a tile admits and never writes a number of its own.[^5]
+//! The capacity composes the ground with the finished upgrade, so the fixture
+//! asks the engine's one reader of both tables and never writes a number of
+//! its own.[^5] [^8] One fixture builds a road, because a world with no
+//! upgrade holds the two answers equal and tests neither.[^4]
 //!
 //! Each test asserts what the frame reported. None asserts what the spawn
 //! asked for.[^6]
@@ -37,6 +39,7 @@
 //! [^5]: ADR-0056, movement is tile-discrete and admitted by sort-then-admit, decision D4. `docs/adrs/accepted/adr-0056-movement-is-tile-discrete-and-admitted-by-sort-then-admit.md`
 //! [^6]: Findings register, FND-061. `docs/FINDINGS.md`
 //! [^7]: Findings register, FND-078. `docs/FINDINGS.md`
+//! [^8]: Findings register, FND-193. `docs/FINDINGS.md`
 
 use std::time::Duration;
 

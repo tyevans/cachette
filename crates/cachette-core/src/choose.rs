@@ -76,7 +76,7 @@ pub enum CellField {
     /// # References
     ///
     /// [^1]: Findings register, FND-181. `docs/FINDINGS.md`
-    /// [^2]: Backlog item 0188, show the food of a tile and the reason a unit chose. `docs/backlog/proposed/0188-show-the-food-of-a-tile-and-the-reason-a-unit-chose.md`
+    /// [^2]: Backlog item 0188, show the food of a tile and the reason a unit chose. `docs/backlog/complete/0188-show-the-food-of-a-tile-and-the-reason-a-unit-chose.md`
     MeanValue,
     /// The number of units for each open tile of the cell.
     UnitsForEachOpenTile,

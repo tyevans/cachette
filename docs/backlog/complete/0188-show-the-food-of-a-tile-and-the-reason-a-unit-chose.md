@@ -157,10 +157,16 @@ edge of the demonstration window, as they did before this work. The panel
 needs a way to reach them, and the item that holds that work now sits in the
 Next block with a recommendation.[^14]
 
-**The stub value still has one reader.** The viewer no longer reads it. The
-level 1 cell summary still averages it and the `forage` option still scores
-that average, because items 0183 and 0184 are open. The retirement therefore
-stays with the item that follows them.[^13]
+**Nothing decides anything from the stub value now.** This work removed the
+viewer as a reader. Items 0183 and 0184 landed while this work was in hand,
+and the `forage` option scores the mean food of the cell instead of the mean
+of the stub value. No option row reads the stub field, so the only reader that
+decided anything is gone.
+
+What is left is not a reader. The level 1 summary still accumulates the field
+and folds it into the state hash, the world still holds the column and exposes
+it, and the control plane still receives it as an array. The item that retires
+all of that is now unblocked.[^13]
 
 **What the tests catch.** Each defect below was put back on its own, and the
 suite was run each time.
