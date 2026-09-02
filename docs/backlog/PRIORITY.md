@@ -48,6 +48,7 @@ These close a gap a review found, or they unblock the items above.
 | 0130 | Three registers state a next number that the rows already hold, and it went stale and conflicted four times in one night. |
 | 0208 | The holding border draws on every held tile, so at tile-scale interleaving every tile is a border and the ground is lost. FND-201 holds the measurement and records a repair that was tried and removed for keying on the wrong variable. |
 | 0206 | Superseded. Another worker closed every gap this item names, in the same round it was written. It stays open only until somebody confirms that and closes it against the item that did the work. Do not take it. |
+| 0198 | The record check reads any mention of a record number as a citation, so a record cannot name a number the registry retired. FND-192 records it. It moved up from `Later` on 2 September 2026, when a review of the reserved log and Python boundary rows retired nine more numbers. The cost it names grows with each one, and a record that must explain why a claim was dropped is the record that most needs to name the number. |
 | 0153 | Python holds no way to read an event, so an agent gets bytes and a digest. Any decoder in Python is a second copy of the layout. |
 | 0161 | The control plane cannot say where to act, so a caller sweeps. Four reserved rows hold the answer and none is written. DEC-063 names it the destination. |
 | 0155 | Every test fixture builds its own world by hand, and the rule that forbids the easy route has no shared answer. |
@@ -101,15 +102,14 @@ These are real and none of them blocks anything today.
 | 0004 | Reconcile the public API examples. |
 | 0005 | The cross-cutting records. |
 | 0007 | The storage claims. |
-| 0009 | The log claims. |
-| 0010 | The Python boundary claims. |
 | 0168 | The control plane cannot name a dwelling, so a household binding would be inert. Waits on 0161. |
 | 0167 | A reverse index from a dwelling to its units. Take it when a measurement asks for it, and BLK-007 says none exists. |
 | 0200 | Admission admits more units onto a roaded tile than the position table believes it holds, and the fold that reports the largest capacity walks one of the two tables that state one. FND-193 records it. DEC-081 must close first, and no run reaches it until something makes a unit build. |
 | 0201 | The record check drops every source file when it runs inside a worktree, so it reports records as uncited that source files cite. FND-194 records it. The same function also builds a corpus of every source file and never reads it, which FND-195 records and this item carries. It sits above 0198 because every worker runs in a worktree and reads the wrong count, and below 0200 because the check reports the note rather than failing on it. |
 | 0205 | Accepting a record moves its file, and every citation of the old path then names nothing. Two records are at verdict Accept with a file move between them and binding, and the cost of a move scales with how well a record is cited. FND-197 records it, DEC-083 must close first, and 0198 is the same problem seen from the other side. |
-| 0198 | The record check reads any mention of a record number as a citation, so a record cannot name the one number the registry retired. FND-192 records it. It sits here because one number is retired and the cost grows only as more are. |
 | 0166 | The footnote baseline holds every document the new check would fail. It can only shrink, and it does not shrink by itself.[^10] |
+| 0221 | Source footnotes name the registry for six records that now have files. FND-214 found it. Nothing fails and nothing will, so it sits here, and it is worth a check rather than a sweep because the next reserved number a source file cites will do the same. |
+| 0222 | The error hierarchy declares three exception types that nothing raises. ADR-0046 states the gap in its own consequences rather than claiming the capability, so a reader is not misled today. It waits on the selector for one of the three. |
 
 ## References
 

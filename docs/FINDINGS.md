@@ -24,6 +24,9 @@ precedent.[^1]
 
 **Next number: FND-202**
 
+FND-214 is taken. It was allocated out of a reserved range so that several
+workers could file in parallel without reading this line at the same moment.
+
 ## A. Corrections to stated rules
 
 ### FND-001 — A monoid needs EXACT associativity
@@ -4825,6 +4828,59 @@ integration and a reader waits for it. The reason is that the script states one
 thing and does another, in the place a contributor looks to learn what the
 check asserts.
 
+### FND-214 — A reserved row is a guess that a constraint exists, and half of them were wrong
+
+**Believed.** Eighteen registry rows reserved for the log and for the Python
+boundary described eighteen constraints waiting to be written down. Two refined
+backlog items said so: each named its range of rows and listed the whole range
+under what it creates. The rows were derived from two long drafts by giving each
+decision of a draft its own number, so a reader could reasonably read the count
+of rows as a count of claims.
+
+**True.** Nine of the eighteen stated no constraint that this project can hold.
+Seven were written, and two already had files. The nine that went failed in four
+distinct ways, and the pattern is worth more than the count.
+
+- **One stated the alternative that another row refuses.** The rejection of
+  classic event sourcing is what the arena record rejects, and the scope rule
+  puts a rejected alternative inside the record that rejects it.[^F214A]
+- **Two restated a constraint an accepted record already holds.** The barrier
+  concatenation is two decisions of the record on parallel stages, and the
+  region aggregate is the same record seen through a vocabulary this project
+  does not use.[^F214B]
+- **Four described a mechanism for which nothing had chosen anything.** No
+  command queue, no rejection summary, no snapshot and no save format exists,
+  and no product record asks for one. This is the failure that retired the
+  first number the project ever retired, and the row for it already names the
+  shape.[^F192A]
+- **One guarded a hazard the project does not have.** Three layers of view
+  safety defend a borrow of engine memory. Every read across the boundary
+  copies, so no borrow is handed out and nothing was being defended.[^F214D]
+
+**Evidence.** Each row was read against the three-condition test of the record
+scope rule, with the removed draft that the row came from open beside it, and
+with the code the row would govern. The tree was searched for every citation of
+each of the eighteen numbers: six numbers are cited by a source file, a build
+manifest, a gate script or a Python test, and every one of those six was
+written. Of the nine retired, one was cited, by an accepted record that cited it
+for its absence and said so in its own text.
+
+**Follows.** **A reserved row reserves a number and asserts nothing.** The
+registry already says this and the record priority index already says it twice.
+This entry is the measurement that says how often it matters: for one block of
+rows derived from drafts rather than from code, the yield was half.
+
+**Derive a row from a claim and it can still be a topic.** The registry was
+re-derived from claims specifically to avoid topic titles, and it worked: none
+of the eighteen was a topic. Seven of them were nonetheless not constraints. A
+claim title bounds a record. It does not prove that the record should exist.
+
+**A citation from a source file was the strongest single signal.** Every row a
+source file, a manifest, a gate or a test cited passed the test, and every row
+nothing cited outside the registry failed it or was one of two written for a
+reason the code cannot yet show. That is one block of rows and not a law, and it
+is worth testing against the next block.
+
 ## References
 
 [^F177A]: The founding refuses ground that admits nobody. `crates/cachette-core/src/world.rs`
@@ -5005,3 +5061,6 @@ check asserts.
 [^F201A]: Findings register, FND-193, in this document.
 [^F201B]: Backlog item 0208. `docs/backlog/proposed/0208-draw-the-boundary-of-a-holding-and-not-of-every-tile.md`
 [^F194REF]: Findings register, FND-194, in this document.
+[^F214A]: Decision Record Scope, section 5. `.claude/rules/adr-scope.md`
+[^F214B]: ADR-0009, parallel stages write disjoint outputs, decisions D1 and D2. `docs/adrs/accepted/adr-0009-parallel-stages-write-disjoint-outputs.md`
+[^F214D]: ADR-0044, what copies and what does not is declared at the call site. `docs/adrs/draft/adr-0044-what-copies-and-what-does-not-is-declared-at-the-call-site.md`

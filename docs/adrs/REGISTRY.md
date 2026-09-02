@@ -213,29 +213,20 @@ without stating a constraint is worse than no record.
 
 | No. | Claim | Status | Depends on | Source |
 |---|---|---|---|---|
-| 0030 | Classic event sourcing is rejected | Proposed | 0001 | 03 |
-| 0031 | Events live in type-segregated arenas of plain data | Proposed | 0006, 0030 | 03 |
-| 0032 | The log holds commands and discontinuous facts, never derived state | Proposed | 0030 | 03 |
-| 0033 | Threads write local buffers and the barrier concatenates them in a fixed order | Proposed | 0001, 0031 | 03 |
-| 0034 | A command queues during the Python phase and seals at the barrier | Proposed | 0032 | 03, 05 |
-| 0035 | Rejection is reported through a closed enumeration | Proposed | 0032 | 03 |
-| 0036 | A snapshot copies dirty chunks, not the world | Proposed | 0019, 0032 | 03 |
-| 0037 | The log is transient, and retention is additive | Proposed | 0032 | 03 |
-| 0038 | The aggregate is the region, never the entity | Proposed | 0030 | 03 |
-| 0039 | The save format is hand-written | Proposed | 0032 | 03 |
+| 0031 | Events live in type-segregated arenas of plain data | Draft | 0001, 0004, 0006 | 03, `draft/adr-0031-events-live-in-type-segregated-arenas.md` |
+| 0032 | The log holds a fact no solver reproduces, never derived state | Draft | 0001, 0003, 0005, 0006 | 03, `draft/adr-0032-the-log-holds-a-fact-no-solver-reproduces.md` |
 
 ### The Python boundary
 
 | No. | Claim | Status | Depends on | Source |
 |---|---|---|---|---|
 | 0040 | Python is a control plane, not a data plane | Draft | 0001 | `draft/adr-0040-python-is-a-control-plane-not-a-data-plane.md` |
-| 0041 | A crate split enforces the boundary at compile time | Proposed | 0040 | 05 |
-| 0042 | The interpreter is released for the whole step | Proposed | 0040 | 05 |
+| 0041 | A crate split enforces the boundary at compile time | Draft | 0001, 0040 | 05, `draft/adr-0041-a-crate-split-enforces-the-boundary-at-compile-time.md` |
+| 0042 | The interpreter is released for the whole step | Draft | 0001, 0040, 0041 | 05, `draft/adr-0042-the-interpreter-is-released-for-the-whole-step.md` |
 | 0043 | A declared tier enforces the no-loop rule, and the API refuses the loop | Draft | 0040 | `draft/adr-0043-a-declared-tier-enforces-the-no-loop-rule.md` |
-| 0044 | What copies and what does not is declared at the call site | Proposed | 0040, 0015 | 05 |
-| 0045 | View safety needs three layers | Proposed | 0044 | 05 |
-| 0046 | Every error is typed | Proposed | 0040 | 05 |
-| 0047 | Many worlds live in one interpreter | Proposed | 0040 | 05 |
+| 0044 | What copies and what does not is declared at the call site | Draft | 0012, 0040 | 05, `draft/adr-0044-what-copies-and-what-does-not-is-declared-at-the-call-site.md` |
+| 0046 | Every error is typed | Draft | 0040, 0085 | 05, `draft/adr-0046-every-error-is-typed.md` |
+| 0047 | Many worlds live in one interpreter | Draft | 0040, 0042 | 05, `draft/adr-0047-many-worlds-live-in-one-interpreter.md` |
 | 0085 | An entity crosses to Python as one opaque identity that the engine resolves | Accepted | 0006, 0011, 0014, 0040, 0044 | `accepted/adr-0085-an-entity-crosses-to-python-as-one-opaque-identity.md` |
 
 ### Subsystems
@@ -244,7 +235,7 @@ without stating a constraint is worse than no record.
 |---|---|---|---|---|
 | 0048 | A verb declares a pipeline of kernels | Proposed | 0001 | 06, 13 |
 | 0049 | A quantity is a rate, a constraint or a set, and each composes by one law | Proposed | 0023 | 13 |
-| 0050 | The frame schedule is static and known before the frame runs | Proposed | 0001, 0033 | 06 |
+| 0050 | The frame schedule is static and known before the frame runs | Proposed | 0001, 0009 | 06 |
 | 0051 | A selector is a lazy expression tree that Rust evaluates | Draft | 0040, 0043 | `draft/adr-0051-a-selector-is-a-lazy-expression-tree.md` |
 | 0052 | A selector result may be a range, not only an enumerated set | Draft | 0051, 0028 | `draft/adr-0052-a-selector-result-may-be-a-range.md` |
 | 0053 | A faction is a bit in a mask, and a relation is a plane | Accepted | 0011, 0012, 0023, 0024 | 08 |
@@ -258,8 +249,8 @@ without stating a constraint is worse than no record.
 | 0062 | Production and upkeep are rates attached to a site | Accepted | 0055 | 12, `accepted/adr-0062-production-and-upkeep-are-rates-attached-to-a-site.md` |
 | 0063 | A need is a rate with a threshold, and crossing it is a fact | Accepted | 0032, 0062 | 15, `accepted/adr-0063-a-need-is-a-rate-with-a-threshold-and-crossing-it-is-a-fact.md` |
 | 0064 | A unit chooses by scoring a small fixed option set | Accepted | 0001, 0002, 0003, 0004, 0007, 0022, 0063 | 16, `accepted/adr-0064-a-unit-chooses-by-scoring-a-small-fixed-option-set.md` |
-| 0065 | A group is a site membership, not a region | Draft | 0004, 0009, 0014, 0038, 0040, 0054, 0056, 0066 | 17, `draft/adr-0065-a-group-is-a-site-membership-not-a-region.md` |
-| 0067 | The viewer reads the world and never writes to it | Accepted | 0001, 0036 | — |
+| 0065 | A group is a site membership, not a region | Draft | 0004, 0009, 0014, 0040, 0054, 0056, 0066 | 17, `draft/adr-0065-a-group-is-a-site-membership-not-a-region.md` |
+| 0067 | The viewer reads the world and never writes to it | Accepted | 0001 | — |
 | 0068 | Terrain is generated from the seed and is never stored as a map | Accepted | 0001, 0002, 0003, 0012 | — |
 | 0069 | Weather is a field the world integrates, never a table it reads | Reserved | 0058, 0068 | — |
 | 0070 | The head-up display reports what the drawing pass read | Accepted | 0067, 0018 | `accepted/adr-0070-the-head-up-display-reports-what-the-drawing-pass-read.md` |
@@ -290,11 +281,32 @@ the project stopped holding it.
 | No. | Held | Retired because |
 |---|---|---|
 | 0057 | A long path follows a portal graph and a flow tile | It described a subsystem nobody had built, for a need nobody had stated |
+| 0030 | Classic event sourcing is rejected | It stated the alternative that ADR-0031 refuses, and a rejected alternative belongs in the record that refuses it |
+| 0033 | Threads write local buffers and the barrier concatenates them in a fixed order | ADR-0009 D1 already forbids a shared output and ADR-0009 D2 already fixes the combine order, so it added no constraint |
+| 0034 | A command queues during the Python phase and seals at the barrier | No command queue exists and nothing has chosen one, and ADR-0042 D3 holds the durable part |
+| 0035 | Rejection is reported through a closed enumeration | It described a set-valued command layer that does not exist, and it disagreed with how the bindings refuse today |
+| 0036 | A snapshot copies dirty chunks, not the world | Nothing snapshots the world and no product record asks for one, so there was no decision to preserve |
+| 0037 | The log is transient, and retention is additive | Its own argument was that adding retention later is cheap, which fails the second condition of the scope test |
+| 0038 | The aggregate is the region, never the entity | It named a structure this project does not have, and ADR-0009 holds the parallel rule it was carrying |
+| 0039 | The save format is hand-written | No save format exists and no serialisation library was ever adopted, so nothing had chosen anything |
+| 0045 | View safety needs three layers | Every read across the boundary copies, so the record guarded a hazard the project does not have |
 
 **A retired number is mentioned, never cited.** Write it in a code span. A
 citation says "follow this for the claim", and a retired record holds no
 claim to follow. The citation check enforces this, and it caught the first
 attempt.
+
+**Nine of these rows went in one review, and that is the expected yield.** Rows
+0030 to 0039 and 0040 to 0047 were reserved together, by deriving a row for each
+claim of two long drafts. A row that reserves a number is a guess that a
+constraint exists, and eighteen guesses made at once are not eighteen
+constraints. Seven of the eighteen were written, two already had files, and the
+rest are above. The finding holds what the review believed at the start and what
+it found.[^YIELD]
+
+The research that supports the retired rows is not lost. Reports 03 and 05 hold
+the reasoning, and a future record that needs one of these claims starts from the
+report and takes a fresh number, as the row for `ADR-0057` already says.
 
 **ADR-0057 was never accepted and nothing cited it.** It specified a portal
 graph, a flow tile cache and a coarse biasing field, in detail, before any
@@ -358,3 +370,4 @@ Then the cross-cutting models, 0007 to 0013. Then the subsystems.
 [^PRI]: Decision record priority index. `docs/adrs/PRIORITY.md`
 [^MEASURE]: Findings, the scope of a decision record. `docs/research/adr-scope-findings.md`
 [^SCOPE]: Decision Record Scope, the test for whether a decision needs a record. `.claude/rules/adr-scope.md`
+[^YIELD]: Findings register, FND-214. `docs/FINDINGS.md`
