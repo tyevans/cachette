@@ -94,6 +94,26 @@ budget, carries no cadence chosen against a figure, and holds no cost
 comment in the code. The cadence that the research recommends is a separate
 item.[^8] [^10]
 
+**Storage, and what it does not add.** The field allocates nothing for each
+tile. Every array it holds is indexed by a level 1 cell: one conductance
+plane, and one plane of what a faction holds and one of what it injects, for
+each faction. The write half of a pass is one plane that every faction
+reuses, so it does not grow with the faction count either.[^11]
+
+Building a world already passes over every tile twice: the level 1 build reads
+the ground of every tile, and the rebuild that follows it sums a tile column.
+**This work adds nothing to that pass.** The conductance plane is read from the
+level 1 summaries that the rebuild has already produced, once, because the
+ground does not change for the life of a world. A conductance rule that needed
+a tile of its own would be a third whole-world pass, and that is the reason
+this one reads the level above instead.
+
+**No accumulator here is narrow.** The kernel widens every cell into the
+project-wide fixed-point scale, accumulates there, and narrows once at the
+end. A cell is never summed over the world: the field is a relaxation and not
+an aggregate, so the invariant that widens a level 1 accumulator has no sum
+here to govern.
+
 **Precedent.** FND-141 records that a one-byte tile field over the target
 scale does not overflow a 32-bit accumulator, and that the margin is small
 rather than absent. Nothing here depends on that margin: every accumulator in
@@ -144,3 +164,4 @@ Filled in when the item moves to `complete/`.
 [^8]: Backlog item 0169. `docs/backlog/proposed/0169-choose-the-cadence-of-the-influence-solve.md`
 [^9]: Testing Rules, sections 1 and 2a. `.claude/rules/testing.md`
 [^10]: Influence maps, section 7. `docs/research/reports/09-influence-maps.md`
+[^11]: ADR-0060, an influence map is stored as a shared basis, decision D4. `docs/adrs/draft/adr-0060-an-influence-map-is-stored-as-a-shared-basis.md`

@@ -97,12 +97,26 @@ It has no inverse above the saturation point, so a cell cannot be repaired by
 removing a contribution.[^10] The repair path is the solve itself, which runs
 on a schedule rather than on demand.
 
-### D4. The write half of the solve belongs to the field, not to a faction
+### D4. The write half of a pass holds one plane, and every faction reuses it
 
-A relaxation pass reads one plane and writes another. The second plane is one
-scratch buffer that the field owns and reuses, not a private second plane for
-each faction. The storage of the scratch therefore does not grow with the
+A relaxation pass reads one plane and writes another. The plane it writes is
+one scratch buffer that the field owns and reuses for every faction. A pass
+relaxes one plane into the scratch and copies the scratch back, then takes the
+next faction. The storage of the write half therefore does not grow with the
 faction count.
+
+**The copy is the price, and it is the trade this decision makes.** A private
+second plane for each faction would remove the copy and would make the write
+half as large as the field itself. The write half would then be a share of the
+whole system that no consumer ever reads. Nothing has priced the copy against
+that storage, because no measurement exists on the target platform, so the
+decision takes the smaller storage and says which figure would reopen it.[^11]
+
+**A plane of one faction is read only by that faction.** That is what makes
+one scratch enough: relaxing one plane before another changes neither of them,
+so the order over the factions cannot change the result. The order is fixed
+anyway, in ascending faction identifier, because a reader should not have to
+prove that to know what a pass returns.[^12]
 
 ## Consequences
 
@@ -140,3 +154,5 @@ reference units hold values that must not be compared.
 [^8]: Decisions register, DEC-017. `docs/DECISIONS.md`
 [^9]: ADR-0023, an aggregate combines exactly, in any order, decisions D1 and D2. `docs/adrs/accepted/adr-0023-an-aggregate-combines-exactly-in-any-order.md`
 [^10]: ADR-0023, an aggregate combines exactly, in any order, decision D4. `docs/adrs/accepted/adr-0023-an-aggregate-combines-exactly-in-any-order.md`
+[^11]: Blockers register, BLK-007. `docs/BLOCKERS.md`
+[^12]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`

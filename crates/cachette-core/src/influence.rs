@@ -224,8 +224,13 @@ pub struct InfluenceField {
     /// What is injected at each cell on every pass. Same layout as the
     /// planes.
     sources: Vec<Influence>,
-    /// The write half of the ping-pong. It belongs to the field rather than
-    /// to a faction, so the plane count does not multiply it.
+    /// The write half of one pass. It holds one plane and it is reused for
+    /// every faction, so its storage does not grow with the faction
+    /// count.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0060, an influence map is stored as a shared basis, decision D4. `docs/adrs/draft/adr-0060-an-influence-map-is-stored-as-a-shared-basis.md`
     scratch: Vec<Influence>,
     /// The relaxation passes that have run since the field was built.
     ///
@@ -253,7 +258,7 @@ impl InfluenceField {
             conductance: vec![Conductance::FREE; cell_count],
             planes: vec![Influence::ZERO; plane_len],
             sources: vec![Influence::ZERO; plane_len],
-            scratch: vec![Influence::ZERO; plane_len],
+            scratch: vec![Influence::ZERO; cell_count],
             passes: 0,
         })
     }
@@ -410,59 +415,83 @@ impl InfluenceField {
             return Err(InfluenceError::ZeroThreads);
         }
         for _ in 0..PASSES_FOR_EACH_SOLVE {
-            self.relax(threads);
-            core::mem::swap(&mut self.planes, &mut self.scratch);
+            let moved = self.relax(threads);
             self.passes = self.passes.saturating_add(1);
             // The perturbed build reads a residual here and stops the solve
-            // when the last pass changed nothing. The ordinary build has no
-            // residual to read, which is the point: a convergence test cannot
-            // be added by accident to a loop that computes nothing to test.
-            if the_solve_stops_early(&self.scratch, &self.planes) {
+            // when the last pass changed nothing. The ordinary build computes
+            // no residual, which is the point: a convergence test cannot be
+            // added by accident to a loop that has nothing to test.
+            if the_solve_stops_early(moved) {
                 break;
             }
         }
         Ok(())
     }
 
-    /// Runs one relaxation pass into the scratch plane.
+    /// Runs one relaxation pass over every plane.
     ///
-    /// The cells are visited in ascending index and the neighbours of a cell
-    /// in direction order. Both orders are fixed, and a cell is named by its
-    /// index rather than by the thread that filled it.[^1]
+    /// The factions are visited in ascending identifier, the cells of a plane
+    /// in ascending index, and the neighbours of a cell in direction order.
+    /// All three orders are fixed, and a cell is named by its index rather
+    /// than by the thread that filled it.[^1] [^2]
     ///
-    /// **A field with fewer slots than the caller has threads is filled on
-    /// one thread.** A slot is one cell of one plane. Starting a thread for
-    /// one slot costs more than the slot does. The rule reads the two numbers
-    /// the caller already supplied and holds no constant of its own.
+    /// **One scratch plane serves every faction.** A plane is relaxed into the
+    /// scratch and then copied back, so the write half of the pass holds one
+    /// plane rather than one for each faction.[^3] The copy is the price of
+    /// that, and no measurement has priced it, because none exists on the
+    /// target platform.[^4]
+    ///
+    /// A plane of one faction is read only by that faction, so relaxing one
+    /// plane before another does not change either of them.
+    ///
+    /// **A plane with fewer cells than the caller has threads is filled on
+    /// one thread.** Starting a thread for one cell costs more than the cell
+    /// does. The rule reads the two numbers the caller already supplied and
+    /// holds no constant of its own.
+    ///
+    /// Returns whether the pass changed anything. The ordinary build ignores
+    /// the answer and the perturbed build stops on it.
     ///
     /// # References
     ///
     /// [^1]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
-    fn relax(&mut self, threads: usize) {
-        let pass = Pass {
-            cells: self.cells,
-            cell_count: self.cells.tile_count() as usize,
-            conductance: &self.conductance,
-            planes: &self.planes,
-            sources: &self.sources,
-        };
-        let total = self.scratch.len();
+    /// [^2]: Influence maps, section 6.5. `docs/research/reports/09-influence-maps.md`
+    /// [^3]: ADR-0060, an influence map is stored as a shared basis, decision D4. `docs/adrs/draft/adr-0060-an-influence-map-is-stored-as-a-shared-basis.md`
+    /// [^4]: Blockers register, BLK-007. `docs/BLOCKERS.md`
+    fn relax(&mut self, threads: usize) -> bool {
+        let cells = self.cells;
+        let cell_count = cells.tile_count() as usize;
+        let mut moved = false;
 
-        if total <= threads {
-            pass.fill(0, total, &mut self.scratch);
-            return;
-        }
+        for faction in 0..self.faction_count as usize {
+            let first = faction * cell_count;
+            let last = first + cell_count;
+            let pass = Pass {
+                cells,
+                conductance: &self.conductance,
+                plane: &self.planes[first..last],
+                sources: &self.sources[first..last],
+            };
 
-        let chunk_len = total.div_ceil(threads).max(1);
-        std::thread::scope(|scope| {
-            let mut first = 0usize;
-            for chunk in self.scratch.chunks_mut(chunk_len) {
-                let start = first;
-                let end = first + chunk.len();
-                first = end;
-                scope.spawn(move || pass.fill(start, end, chunk));
+            if cell_count <= threads {
+                pass.fill(0, cell_count, &mut self.scratch);
+            } else {
+                let chunk_len = cell_count.div_ceil(threads).max(1);
+                std::thread::scope(|scope| {
+                    let mut start = 0usize;
+                    for chunk in self.scratch.chunks_mut(chunk_len) {
+                        let low = start;
+                        let high = start + chunk.len();
+                        start = high;
+                        scope.spawn(move || pass.fill(low, high, chunk));
+                    }
+                });
             }
-        });
+
+            moved |= the_pass_moved(&self.planes[first..last], &self.scratch);
+            self.planes[first..last].copy_from_slice(&self.scratch);
+        }
+        moved
     }
 
     /// Folds the field into a state hash.
@@ -507,27 +536,25 @@ fn narrow_to_conductance(share: Fix32) -> u8 {
 #[derive(Clone, Copy)]
 struct Pass<'a> {
     cells: Grid,
-    cell_count: usize,
     conductance: &'a [Conductance],
-    planes: &'a [Influence],
+    /// The plane of the one faction that this pass relaxes.
+    plane: &'a [Influence],
+    /// What that faction injects, at the same cell order as the plane.
     sources: &'a [Influence],
 }
 
 impl Pass<'_> {
     /// Fills one run of the scratch plane.
     ///
-    /// The run is named by its position in the planes, and the position
-    /// decides both the faction and the cell. Nothing in the body reads which
-    /// thread called it.[^1]
+    /// The run is named by its position in the plane. Nothing in the body
+    /// reads which thread called it.[^1]
     ///
     /// # References
     ///
     /// [^1]: ADR-0009, parallel stages write disjoint outputs, because the memory model is weak. `docs/adrs/accepted/adr-0009-parallel-stages-write-disjoint-outputs.md`
     fn fill(&self, start: usize, end: usize, out: &mut [Influence]) {
         for (offset, cell) in out.iter_mut().enumerate() {
-            let slot = start + offset;
-            let index = slot % self.cell_count;
-            let base = slot - index;
+            let index = start + offset;
             let Some(address) = self.cells.address_of(TileIdx(index as u32)) else {
                 continue;
             };
@@ -535,7 +562,7 @@ impl Pass<'_> {
 
             // The self term. A pass leaves less on a cell than it found, and
             // the difference is what makes an unforced field fall.
-            let mut total = sim_math::mul(weight(SELF_WEIGHT), self.planes[slot].to_fix());
+            let mut total = sim_math::mul(weight(SELF_WEIGHT), self.plane[index].to_fix());
 
             // The neighbour terms. A neighbour outside the lattice
             // contributes nothing, and so does a neighbour that the perturbed
@@ -545,35 +572,53 @@ impl Pass<'_> {
                 let Some(at) = self.cells.index_of(neighbour) else {
                     continue;
                 };
-                let reached = base + at.0 as usize;
+                let reached = at.0 as usize;
                 if !the_neighbour_is_visible(reached, start, end) {
                     continue;
                 }
-                let coupling = here.coupling(self.conductance[at.0 as usize]).to_fraction();
+                let coupling = here.coupling(self.conductance[reached]).to_fraction();
                 let share = sim_math::mul(weight(NEIGHBOUR_WEIGHT), coupling);
-                total = sim_math::add(total, sim_math::mul(share, self.planes[reached].to_fix()));
+                total = sim_math::add(total, sim_math::mul(share, self.plane[reached].to_fix()));
             }
 
             // The source is injected on every pass, and no branch asks
             // whether it is there. The combine saturates at the ceiling.[^1]
             //
             // [^1]: ADR-0023, an aggregate combines exactly, in any order, decision D1. `docs/adrs/accepted/adr-0023-an-aggregate-combines-exactly-in-any-order.md`
-            *cell = Influence::from_fix(total).combine(self.sources[slot]);
+            *cell = Influence::from_fix(total).combine(self.sources[index]);
         }
     }
 }
 
-/// Reports whether the solve stops before its fixed pass count.
+/// Reports whether one plane moved in a pass.
 ///
-/// It never does. The parameters are the field before the pass and the field
-/// after it, which is the residual a convergence test would read, and the
-/// ordinary build reads neither.[^1]
+/// It never asks. The ordinary build computes no residual at all, so there is
+/// nothing for a convergence test to read.[^1]
 ///
 /// # References
 ///
 /// [^1]: ADR-0087, an influence solve runs a fixed iteration count over the whole plane, decision D1. `docs/adrs/draft/adr-0087-an-influence-solve-runs-a-fixed-iteration-count.md`
 #[cfg(not(feature = "probe-nondeterminism"))]
-const fn the_solve_stops_early(_before: &[Influence], _after: &[Influence]) -> bool {
+const fn the_pass_moved(_before: &[Influence], _after: &[Influence]) -> bool {
+    false
+}
+
+/// The perturbed residual. It reports whether the plane changed.
+#[cfg(feature = "probe-nondeterminism")]
+fn the_pass_moved(before: &[Influence], after: &[Influence]) -> bool {
+    before != after
+}
+
+/// Reports whether the solve stops before its fixed pass count.
+///
+/// It never does. The parameter is the residual that a convergence test would
+/// read, and the ordinary build never computes one.[^1]
+///
+/// # References
+///
+/// [^1]: ADR-0087, an influence solve runs a fixed iteration count over the whole plane, decision D1. `docs/adrs/draft/adr-0087-an-influence-solve-runs-a-fixed-iteration-count.md`
+#[cfg(not(feature = "probe-nondeterminism"))]
+const fn the_solve_stops_early(_moved: bool) -> bool {
     false
 }
 
@@ -588,8 +633,8 @@ const fn the_solve_stops_early(_before: &[Influence], _after: &[Influence]) -> b
 ///
 /// [^1]: Testing rules, section 2. `.claude/rules/testing.md`
 #[cfg(feature = "probe-nondeterminism")]
-fn the_solve_stops_early(before: &[Influence], after: &[Influence]) -> bool {
-    before == after
+const fn the_solve_stops_early(moved: bool) -> bool {
+    !moved
 }
 
 /// Reports whether a pass may read a neighbour.
