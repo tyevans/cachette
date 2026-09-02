@@ -35,6 +35,12 @@ use cachette_core::{Axial, FactionId, FoundingError, SoldierError, World, WorldC
 /// [^1]: Testing Rules, section 2a. `.claude/rules/testing.md`
 const RESERVATION: u32 = 64;
 
+/// The size of the group that the refused founding tries to seat.
+///
+/// The world that founds it reserves half of this, so the arena runs out of
+/// slots part way through the group.
+const GROUP: u32 = 8;
+
 /// Builds a world that reserves `RESERVATION` unit slots.
 fn world() -> World {
     World::new(WorldConfig {
@@ -88,7 +94,7 @@ fn column_addresses(world: &World) -> Vec<*const u8> {
     ]
 }
 
-/// Spawns `count` units on one tile and reports the last outcome.
+/// Spawns `count` units on one tile.
 ///
 /// A spawn does not read the capacity of the ground, so one tile takes the
 /// whole reservation.[^1] The test therefore measures the storage and not the
@@ -185,8 +191,6 @@ fn a_copy_of_a_world_keeps_the_reservation() {
 
 #[test]
 fn a_founding_past_the_reservation_is_refused_and_leaves_nothing() {
-    /// The size of the group that the founding seats.
-    const GROUP: u32 = 8;
     // The founding group is larger than the reservation, so the arena runs
     // out of slots part way through the group. The founding must report the
     // refusal and undo what it did.
