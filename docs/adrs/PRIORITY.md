@@ -50,10 +50,20 @@ reserved until the code that needs them exists.[^6]
 
 | No. | Why it sits here |
 |---|---|
+| 0051 | The selector as a lazy expression tree. The owner decided that a set-valued command is how the control plane reaches a set, so this governs every verb written after it. Write it before the next verb.[^12] |
+| 0052 | A selector result may be a range. It carries the cost argument that makes 0051 affordable at the target scale, so the two are reviewed together.[^12] |
+| 0040 | Python is a control plane. The orientation states it and nothing enforces it. It is the rule 0043 and 0051 rest on.[^12] |
+| 0043 | A declared tier refuses the loop. Today the rule is prose, and prose lost to a missing read once already.[^13] |
 | 0021 | Layout follows the access pattern. Write it with the descent columns, not before.[^7] |
 | 0069 | Weather. Nothing needs it. |
 | 0077 | The golden state hash. Write it when the first real golden file is committed, not before.[^9] |
 | 0055 | The modifier pipeline. One source modifies a rate, so the test fails today.[^8] |
+
+The four rows above moved here on 1 September 2026, when the project owner
+decided that a set-valued command is how the control plane reaches a set and
+that the selector tree is the destination the verbs are written toward.[^12]
+They are written before the tree is built, because they govern the verbs
+rather than describe them. **The author of these four must not review them.**
 
 Every other reserved row in the registry is left alone on purpose. The scope
 rule asks whether a constraint exists, not whether the code exists, and most
