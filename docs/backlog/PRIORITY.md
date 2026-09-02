@@ -28,6 +28,7 @@ engine gets wrong today.
 | No. | Why it sits here |
 |---|---|
 | 0102 | A settlement reads its own ground rule, not the passability rule. Blocked by 0071 and 0092, in that order. |
+| 0152 | The project owner asked that an agent be able to drive the engine. The first slice runs; the open part is what the server still cannot answer. |
 
 ## Next
 
@@ -41,6 +42,8 @@ These close a gap a review found, or they unblock the items above.
 | 0113 | Admission enforces the capacity from a bridge count that no test compares against a scan. |
 | 0080 | The settings struct prices every new parameter at twenty-five files. |
 | 0130 | Three registers state a next number that the rows already hold, and it went stale and conflicted four times in one night. |
+| 0153 | Python holds no way to read an event, so an agent gets bytes and a digest. Any decoder in Python is a second copy of the layout. |
+| 0154 | A merge conflict marker reached a register on the main branch and no gate saw it. A parallel run merges registers often. |
 | 0155 | Every test fixture builds its own world by hand, and the rule that forbids the easy route has no shared answer. |
 | 0144 | Two footnote rules are stated and nothing checks them. Three of four drafts broke one or both, and the gate passed.[^10] |
 | 0149 | The cost section of PRD-0018 states the mechanism of ADR-0080. A review holds the record at `Shaped` until it states cost alone.[^11] |
