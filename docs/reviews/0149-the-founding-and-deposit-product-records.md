@@ -56,7 +56,7 @@ recovers a deposit. Three passages do this.
 Two decision records already hold all three claims. One says that a tile stock
 is generated and that only what was taken is stored, and the project accepted
 it.[^15] The other ages the stored take, makes its cost follow the depleted
-set, and is under review now.[^2] The product record therefore holds a second
+set, and the project accepted it too.[^2] The product record therefore holds a second
 copy of two decisions. One fact in two places, with nothing that fails when
 the copies disagree, is the defect shape this project keeps meeting.[^3]
 
@@ -261,7 +261,7 @@ review changed nothing in that area.
 [^7]: Blockers register, BLK-007. `docs/BLOCKERS.md`
 [^8]: PRD-0012, a world starts small and grows. `docs/product/accepted/prd-0012-a-world-starts-small-and-grows.md`
 [^9]: Backlog item 0149. `docs/backlog/proposed/0149-state-the-cost-of-recovery-without-the-mechanism.md`
-[^10]: Backlog item 0060. `docs/backlog/refined/0060-grow-the-population-from-the-store-and-the-housing.md`
+[^10]: Backlog item 0060. `docs/backlog/proposed/0060-grow-the-population-from-the-store-and-the-housing.md`
 [^11]: Definition of Done, section 3. `.claude/rules/definition-of-done.md`
 [^12]: Decisions register, DEC-059. `docs/DECISIONS.md`
 [^13]: Backlog item 0150. `docs/backlog/proposed/0150-decide-how-the-world-reserves-unit-storage.md`

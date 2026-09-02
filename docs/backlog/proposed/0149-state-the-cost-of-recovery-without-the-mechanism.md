@@ -17,7 +17,7 @@ A product record states a need. It never states a structure.[^1]
 The product record for a deposit that comes back states a structure. Its cost
 section says what the world stores, says that recovery removes a stored record,
 and says that the world answers the amount when a caller asks. A decision
-record already holds all three claims, and that record is under review now.[^2]
+record already holds all three claims, and the project has accepted it.[^2]
 The product record therefore holds a second copy of a decision. One fact in two
 places, with nothing that fails when the copies disagree, is the shape this
 project keeps meeting.[^3]
@@ -68,7 +68,7 @@ Filled in when the item moves to `complete/`.
 ## References
 
 [^1]: Product requirement records, what does not belong here. `docs/product/README.md`
-[^2]: ADR-0080, a depleted deposit recovers by ageing the stored take, decisions D1 and D2. `docs/adrs/draft/adr-0080-a-depleted-deposit-recovers-by-ageing-the-stored-take.md`
+[^2]: ADR-0080, a depleted deposit recovers by ageing the stored take, decisions D1 and D2. `docs/adrs/accepted/adr-0080-a-depleted-deposit-recovers-by-ageing-the-stored-take.md`
 [^3]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`
 [^4]: The product record check. `scripts/check_prds.py`
 [^5]: Findings register, FND-134. `docs/FINDINGS.md`
