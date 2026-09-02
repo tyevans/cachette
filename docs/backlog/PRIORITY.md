@@ -46,7 +46,7 @@ These close a gap a review found, or they unblock the items above.
 | 0113 | Admission enforces the capacity from a bridge count that no test compares against a scan. |
 | 0080 | The settings struct prices every new parameter at twenty-five files. |
 | 0130 | Three registers state a next number that the rows already hold, and it went stale and conflicted four times in one night. |
-| 0206 | The agent tool cannot read what the panel reads. Item 0133 moved the panel out of the window into a picture, which a person reads and an agent cannot. FND-199 holds the count of what the tool lacks. |
+| 0206 | Superseded. Another worker closed every gap this item names, in the same round it was written. It stays open only until somebody confirms that and closes it against the item that did the work. Do not take it. |
 | 0153 | Python holds no way to read an event, so an agent gets bytes and a digest. Any decoder in Python is a second copy of the layout. |
 | 0161 | The control plane cannot say where to act, so a caller sweeps. Four reserved rows hold the answer and none is written. DEC-063 names it the destination. |
 | 0155 | Every test fixture builds its own world by hand, and the rule that forbids the easy route has no shared answer. |

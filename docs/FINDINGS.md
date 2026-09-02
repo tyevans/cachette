@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-200**
+**Next number: FND-201**
 
 ## A. Corrections to stated rules
 
@@ -4603,6 +4603,53 @@ a mockup in a design conversation and not from the build file. It exists now,
 and a test compares the name the window prints against the recipes the build
 file defines, so the two cannot drift apart in silence.
 
+**Closed in the same round it was opened.** Another worker took the seven gaps
+this entry names and closed every one of them. The server now carries the
+founding survey, the level 1 summary of a region, the store and the rate and
+the ration of a site, the choice explanation of a unit, the stock and the
+holder of a tile, and the ground and crowding counts of a window. The entry
+stays because it is why the detail went to a rendered picture rather than to
+the tool: the picture needed no new work and the tool needed seven readers, and
+that ordering was correct at the time it was chosen.
+
+**What the closure does not change.** The picture is still where a person reads
+the record, because a person reads an image and an agent does not. The two
+paths answer different readers, and the tool did not replace the picture.
+
+### FND-200 — A predicate that accepts a prefix accepts every rename that keeps it
+
+**Believed.** A check that compares a name in one place against a name in
+another closes the gap between them. The window prints a command name and the
+build file defines the recipe, which is one fact in two places, so a test that
+looks for the name in the build file fails when the two drift apart.[^22]
+
+**True.** The test looked for a line that **starts with** the name. A recipe
+renamed from `inspect` to `inspect-the-panel` still starts with `inspect`, so
+the check passed and the window still told a person to run a command that no
+longer existed. The check closed nothing. It only appeared to.
+
+**Evidence.** The recipe was renamed and the suite stayed green. The predicate
+now asks for the name followed by an argument or by the colon that ends a
+recipe line, and the same rename then fails it. Nothing but the falsification
+would have found this: the test read correctly, it named the right two places,
+and it passed for the right reason on the unmodified tree.[^F200A]
+
+**Follows.** **A test that compares two names must compare whole names.** A
+prefix match, a substring match and a `starts_with` all accept a family of
+wrong answers, and the wrong answers are exactly the ones a rename produces. A
+rename that extends a name is the most common rename there is.
+
+The general form is wider than a name. **An assertion that accepts a range
+where the truth is a point is not an assertion.** It fails only for inputs
+nobody was going to write. The project already holds that a fixture must supply
+the extreme that would fail an assertion.[^23] This is the same defect on the
+other side: the assertion itself was too loose to receive the failing case the
+fixture would have supplied.
+
+**Where else this shape sits.** Any check that matches a name against a file:
+a citation path, a record number, a registry row, a recipe. A record number
+check that accepts a prefix passes `ADR-0007` for `ADR-00071`.
+
 ### FND-197 — Accepting a record breaks every citation of it
 
 **Believed.** A record is accepted by a reviewer, and the acceptance is an edit
@@ -4903,3 +4950,4 @@ check asserts.
 [^F198A]: The panel and the cards. `crates/cachette-view/src/`
 [^F199A]: The agent protocol server. `python/cachette/agent/server.py`
 [^F199B]: Backlog item 0206. `docs/backlog/proposed/0206-let-the-agent-tool-read-what-the-panel-reads.md`
+[^F200A]: The viewer suite for the glass. `crates/cachette-view/tests/shows_the_moment_on_the_glass.rs`

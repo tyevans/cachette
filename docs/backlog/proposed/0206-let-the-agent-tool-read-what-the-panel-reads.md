@@ -10,6 +10,25 @@ serves: []
 blocked-by: []
 ---
 
+## This item is superseded, and it stays open until somebody confirms that
+
+**Another worker took this work in the same round this item was written.** The
+finding that opened the item is closed: the server now carries the founding
+survey, the level 1 summary of a region, the store and the rate and the ration
+of a site, the choice explanation of a unit, the stock and the holder of a
+tile, and the ground and crowding counts of a window.[^2] That is the whole
+list below.
+
+**Close this item against that work rather than doing it again.** Two items
+that name one job are two declaration sites, and nothing fails when they
+disagree about whether the job is done.[^7]
+
+The author of this item could not read the superseding work, because it sat on
+another branch at the time. So this item states the overlap rather than citing
+a file it could not open. Whoever merges the two should replace this section
+with the number of the item that did the work, or move this file to `complete/`
+with that number in its outcome.
+
 ## Why
 
 An agent that works on this repository drives the engine through a protocol
@@ -31,6 +50,10 @@ cannot read an image. An agent that wants to know why a unit chose what it
 chose must still write a throwaway test.
 
 ## What the work might do
+
+**Read the section at the top first.** The rest of this item describes work
+that another worker has done, and it is kept as the record of what was missing
+and why it mattered.
 
 The engine already exposes every one of these through the public crate
 interface. The work is a reader in the binding and a tool in the server, and no
@@ -63,4 +86,5 @@ Filled in when the item moves to `complete/`.
 [^3]: Backlog item 0133. `docs/backlog/complete/0133-let-a-watcher-reach-a-panel-longer-than-the-window.md`
 [^4]: Project orientation, the design principles. `CLAUDE.md`
 [^5]: Decisions register, DEC-063. `docs/DECISIONS.md`
+[^7]: Recurring Defect Shapes, shape 1. `.claude/rules/recurring-defects.md`
 [^6]: Backlog item 0153. `docs/backlog/refined/0153-let-python-read-an-event-without-repeating-its-layout.md`
