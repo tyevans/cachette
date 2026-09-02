@@ -96,6 +96,8 @@ These are real and none of them blocks anything today.
 | 0007 | The storage claims. |
 | 0009 | The log claims. |
 | 0010 | The Python boundary claims. |
+| 0168 | The control plane cannot name a dwelling, so a household binding would be inert. Waits on 0161. |
+| 0167 | A reverse index from a dwelling to its units. Take it when a measurement asks for it, and BLK-007 says none exists. |
 | 0166 | The footnote baseline holds every document the new check would fail. It can only shrink, and it does not shrink by itself.[^10] |
 
 ## References
