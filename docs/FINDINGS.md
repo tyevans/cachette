@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-133**
+**Next number: FND-134**
 
 ## A. Corrections to stated rules
 
@@ -1802,8 +1802,15 @@ reads three constants and exercises no behaviour. The test also computes the
 held share for each terrain kind and then discards the result without
 asserting on it.
 
-Flatten the claim threshold to the same value for every passable kind and the
-test stays green. The gradient it is named for is not defended.
+The gradient it is named for is not defended.
+
+**This entry first named the wrong experiment, and the correction is a
+separate finding.**[^83] It said that flattening the claim threshold to the
+same value for every passable kind leaves the test green. It does not. The
+test reads the thresholds, so flattening them fails it on a comparison of two
+constants, without running the rule at all. The experiment that shows the test
+blind is to leave the thresholds ordered and stop the decision function from
+reading them. The conclusion above stands; only this line was wrong.
 
 **Evidence.** The behaviour is real and was observed over 40 ticks on a
 development machine, by recording the terrain of every unheld tile adjacent to
@@ -2965,6 +2972,51 @@ and only the second one catches a rename.[^80]
 
 **Knowing that a citation is forward does not soften it.** Write the register
 entry in the same commit as the work that cites it, or do not cite it yet.
+### FND-133 — The experiment that was named to prove a test blind would have failed it
+
+**Believed.** The terrain test of the holding does not defend the gradient it
+is named for, and the experiment that proves it is to flatten the claim
+threshold to one value for every passable kind. The register states that the
+test then stays green.[^81]
+
+**True.** The conclusion holds. The experiment does not. The test read the
+thresholds directly and asserted that the threshold of level ground was below
+the threshold of a hill. Flattening the thresholds makes that comparison
+false, so the test fails, and it fails without running the rule at all.
+
+The experiment that separates the two is to leave the thresholds ordered and
+stop the rule from reading them. The constants a reader checks are then
+correct, the behaviour they describe is gone, and only a counted outcome can
+see the difference.
+
+**Evidence.** Both experiments were run against the test as it stood. With
+every passable threshold set to one, the old test failed on the line that
+compares two constants. With the thresholds untouched and the decision
+function given a fixed threshold of one, the constant comparison passed and
+the holding spread over mountain as readily as over level ground. The
+replacement test fails in both cases, and it names the counts when it does.
+
+**Follows.** **An experiment that proves a test blind must leave every input
+the test reads unchanged, except the behaviour.** A perturbation that also
+moves a constant fails the test through the constant and reports nothing about
+the behaviour. The green run is the signal, so a red run for the wrong reason
+reads as success. This is the shape the testing rule states for a determinism
+probe, applied to an ordinary test: a probe must prove that the assertion can
+see the defect, and not only that something can go red.[^82]
+
+**Write the failure message so that it names which assertion failed, and on
+what numbers.** A red run says only that something went red. It does not say
+which rule caught the defect, and under a perturbation that moves two inputs
+at once the wrong assertion is the one that fires. This is what made the
+correction above findable: the replacement test prints the counts of the two
+kinds it compared, so a reader sees that the behaviour was measured. A bare
+assertion goes red under the flattened thresholds as well, and the run reads
+as a pass of the experiment.
+
+The item that carried this correction listed the flattening as its acceptance
+condition, and so did the brief that dispatched it. Neither would have been
+wrong about the outcome. Both would have been wrong about what the outcome
+proved.
 
 
 ## References
@@ -3049,3 +3101,6 @@ entry in the same commit as the work that cites it, or do not cite it yet.
 [^78]: Findings register, FND-128, in this document.
 [^79]: Review 0143, the housing, growth, founding and recovery records. `docs/reviews/0143-the-housing-growth-founding-and-recovery-records.md`
 [^80]: Commit Message Rules, after a sweep. `.claude/rules/commits.md`
+[^81]: Findings register, FND-080, in this document.
+[^82]: Testing rules, section 1. `.claude/rules/testing.md`
+[^83]: Findings register, FND-133, in this document.

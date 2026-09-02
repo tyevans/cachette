@@ -83,7 +83,7 @@ Filled in when the item moves to `complete/`.
 
 [^1]: Backlog item 0059. `docs/backlog/proposed/0059-give-a-site-a-capacity-and-a-resident-roll.md`
 [^2]: Backlog item 0084. `docs/backlog/refined/0084-give-a-tile-one-faction-column.md`
-[^3]: Backlog item 0101. `docs/backlog/proposed/0101-assert-the-terrain-gradient-of-a-holding.md`
+[^3]: Backlog item 0101. `docs/backlog/complete/0101-assert-the-terrain-gradient-of-a-holding.md`
 [^4]: Testing Rules, a fixture supplies the input. `.claude/rules/testing.md`
 [^5]: Findings register, FND-051 and FND-048. `docs/FINDINGS.md`
 [^6]: ADR-0040, Python is a control plane, not a data plane. `docs/adrs/REGISTRY.md`
