@@ -166,7 +166,7 @@ and every cost figure in this project is derived rather than measured.[^11]
 [^5]: Recurring Defect Shapes, shape 1. `.claude/rules/recurring-defects.md`
 [^6]: Selector engine and verbs, section 1.4. `docs/research/reports/04-selector-engine-and-verbs.md`
 [^7]: ADR-0054, an entity belongs to one of three tiers, declared at creation, decision D2. `docs/adrs/accepted/adr-0054-an-entity-belongs-to-one-of-three-tiers-declared-at-creation.md`
-[^8]: ADR-0085, an entity crosses to Python as one opaque identity that the engine resolves, decision D2. `docs/adrs/draft/adr-0085-an-entity-crosses-to-python-as-one-opaque-identity.md`
+[^8]: ADR-0085, an entity crosses to Python as one opaque identity that the engine resolves, decision D2. `docs/adrs/accepted/adr-0085-an-entity-crosses-to-python-as-one-opaque-identity.md`
 [^9]: Recurring Defect Shapes, shape 3. `.claude/rules/recurring-defects.md`
 [^10]: ADR-0051, a selector is a lazy expression tree that Rust evaluates. `docs/adrs/draft/adr-0051-a-selector-is-a-lazy-expression-tree.md`
 [^11]: Blockers register, BLK-007. `docs/BLOCKERS.md`

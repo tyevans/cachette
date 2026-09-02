@@ -220,7 +220,17 @@ def main(argv: list[str]) -> int:
         )
 
     # uncited: a note, never a failure (rule section 6)
-    code = [p for ext in ("*.rs", "*.py") for p in ROOT.rglob(ext) if ".git" not in p.parts]
+    # A worktree holds another checkout of this repository. Its files belong to
+    # the run that owns them, they change under this one, and a file deleted
+    # mid-scan raises rather than reporting. The citation check skips them for
+    # the same reason.
+    skip = {".git", "target", "worktrees"}
+    code = [
+        p
+        for ext in ("*.rs", "*.py")
+        for p in ROOT.rglob(ext)
+        if not skip & set(p.parts)
+    ]
     corpus = "\n".join(bodies[n] for n in files) + registry + "\n".join(
         p.read_text(encoding="utf-8", errors="ignore") for p in code
     )
