@@ -201,5 +201,5 @@ the height range within one kind is narrower than the food range.
 [^11]: Findings register, FND-119. `docs/FINDINGS.md`
 [^12]: Recurring Defect Shapes, shape 1. `.claude/rules/recurring-defects.md`
 [^13]: Backlog item 0194. `docs/backlog/proposed/0194-retire-the-tile-value-pass-when-nothing-reads-it.md`
-[^14]: Backlog item 0133. `docs/backlog/proposed/0133-let-a-watcher-reach-a-panel-longer-than-the-window.md`
+[^14]: Backlog item 0133. `docs/backlog/complete/0133-let-a-watcher-reach-a-panel-longer-than-the-window.md`
 [^15]: Findings register, FND-193. `docs/FINDINGS.md`

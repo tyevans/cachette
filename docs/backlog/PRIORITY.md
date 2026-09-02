@@ -40,13 +40,13 @@ These close a gap a review found, or they unblock the items above.
 | 0187 | Nothing moves a carried load into a store, so gathering cannot feed anybody. It ships a verb with nothing to move until 0186 makes a unit carry something, so it follows 0186. |
 | 0189 | The rules against inert work look for an absent caller, and this defect has one. DEC-074 holds the options and recommends this. |
 | 0190 | The pyramid folds level 1 into a state hash and nothing calls the fold. It is a small instance of what 0189 is about, and it sits below 0189 because the rule should come before the sweep. |
-| 0133 | The panel is longer than the window and cuts, and item 0188 added three sections to it. The order of the sections bought one placement and cannot buy a second. DEC-078 holds the measurement and recommends the scroll. |
 | 0194 | The tile value pass writes a random walk over every tile on every tick, and no reader decides anything from it. Items 0183, 0184 and 0188 removed the last three. What is left is storage, a hash contribution and a public reader. Nothing blocks it. |
 | 0104 | A ruler decides nothing that reaches anybody. DEC-040 carries the writ in the influence field. |
 | 0171 | Building a world still passes over every tile, twice, through the first pyramid level. PRD-0003 states it must not, so the record is still false of the code. Item 0112 removed the third pass and FND-162 records what it left. |
 | 0113 | Admission enforces the capacity from a bridge count that no test compares against a scan. |
 | 0080 | The settings struct prices every new parameter at twenty-five files. |
 | 0130 | Three registers state a next number that the rows already hold, and it went stale and conflicted four times in one night. |
+| 0206 | The agent tool cannot read what the panel reads. Item 0133 moved the panel out of the window into a picture, which a person reads and an agent cannot. FND-199 holds the count of what the tool lacks. |
 | 0153 | Python holds no way to read an event, so an agent gets bytes and a digest. Any decoder in Python is a second copy of the layout. |
 | 0161 | The control plane cannot say where to act, so a caller sweeps. Four reserved rows hold the answer and none is written. DEC-063 names it the destination. |
 | 0155 | Every test fixture builds its own world by hand, and the rule that forbids the easy route has no shared answer. |

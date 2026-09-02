@@ -46,7 +46,7 @@ use std::time::Duration;
 use cachette_core::terrain::TileKind;
 use cachette_core::upgrade::UpgradeKind;
 use cachette_core::{Axial, FactionId, World, WorldConfig};
-use cachette_view::{draw_frame, paint, Camera, Canvas, Metrics};
+use cachette_view::{draw_frame, paint, Camera, Canvas, Metrics, Overlay};
 
 /// The tiles the fixture uses, and how full each one is.
 struct Crowd {
@@ -303,7 +303,8 @@ fn the_panel_states_both_numbers() {
         Duration::from_micros(10),
         Duration::from_millis(1),
     );
-    let readout = draw_frame(&world, camera, &metrics, &[], &mut canvas).expect("the frame draws");
+    let readout = draw_frame(&world, camera, &metrics, &[], Overlay::Panel, &mut canvas)
+        .expect("the frame draws");
 
     assert_eq!(readout.crowd_worst(), crowd.over_units);
     assert_eq!(readout.tiles_at_capacity(), 2);

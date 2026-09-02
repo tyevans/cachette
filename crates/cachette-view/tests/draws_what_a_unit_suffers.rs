@@ -34,7 +34,7 @@ use std::time::Duration;
 use cachette_core::cohort::{NeedCondition, NeedRule, NEED_FULL};
 use cachette_core::site::CommodityId;
 use cachette_core::{Axial, Entity, FactionId, Fix32, World, WorldConfig};
-use cachette_view::{draw_frame, paint, Camera, Canvas, Metrics};
+use cachette_view::{draw_frame, paint, Camera, Canvas, Metrics, Overlay};
 
 /// The commodity that a unit eats. The set holds one.
 const FOOD: CommodityId = CommodityId(0);
@@ -342,8 +342,15 @@ fn the_panel_states_the_shortage() {
         .looking_at(address_of(&world, hungry), &canvas)
         .clamped(&world, &canvas);
 
-    let readout =
-        draw_frame(&world, camera, &measurements(), &[], &mut canvas).expect("the world draws");
+    let readout = draw_frame(
+        &world,
+        camera,
+        &measurements(),
+        &[],
+        Overlay::Panel,
+        &mut canvas,
+    )
+    .expect("the world draws");
 
     assert!(
         readout.units_short() > 0,
@@ -405,8 +412,15 @@ fn a_drawn_frame_leaves_the_hungry_world_where_it_found_it() {
     let camera = Camera::at_tile_size(24.0)
         .looking_at(address_of(&world, hungry), &canvas)
         .clamped(&world, &canvas);
-    let readout =
-        draw_frame(&world, camera, &measurements(), &[], &mut canvas).expect("the world draws");
+    let readout = draw_frame(
+        &world,
+        camera,
+        &measurements(),
+        &[],
+        Overlay::Panel,
+        &mut canvas,
+    )
+    .expect("the world draws");
     assert!(
         readout.units_short() > 0,
         "the frame marked nothing, so the comparison proves nothing",
@@ -453,8 +467,15 @@ fn the_panel_states_how_many_units_the_last_scan_ended() {
         .looking_at(Axial::new(6, 6), &canvas)
         .clamped(&world, &canvas);
 
-    let readout =
-        draw_frame(&world, camera, &measurements(), &[], &mut canvas).expect("the world draws");
+    let readout = draw_frame(
+        &world,
+        camera,
+        &measurements(),
+        &[],
+        Overlay::Panel,
+        &mut canvas,
+    )
+    .expect("the world draws");
 
     assert_eq!(
         readout.units_ended(),
@@ -476,13 +497,27 @@ fn the_count_of_deaths_falls_back_when_a_step_ends_nobody() {
     let camera = Camera::at_tile_size(24.0)
         .looking_at(Axial::new(6, 6), &canvas)
         .clamped(&world, &canvas);
-    let at_the_scan =
-        draw_frame(&world, camera, &measurements(), &[], &mut canvas).expect("the world draws");
+    let at_the_scan = draw_frame(
+        &world,
+        camera,
+        &measurements(),
+        &[],
+        Overlay::Panel,
+        &mut canvas,
+    )
+    .expect("the world draws");
     assert!(at_the_scan.units_ended() > 0);
 
     world.step(THREADS).expect("the step must run");
-    let after =
-        draw_frame(&world, camera, &measurements(), &[], &mut canvas).expect("the world draws");
+    let after = draw_frame(
+        &world,
+        camera,
+        &measurements(),
+        &[],
+        Overlay::Panel,
+        &mut canvas,
+    )
+    .expect("the world draws");
 
     assert_eq!(
         after.units_ended(),

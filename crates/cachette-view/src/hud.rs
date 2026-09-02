@@ -845,6 +845,45 @@ impl Readout {
         self.units_ended
     }
 
+    /// Returns the number of factions the world holds.
+    ///
+    /// The colour table is larger than most worlds need, so a legend sized by
+    /// the table names a colour that no faction uses. A reader would then look
+    /// for a faction that is not there.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0053, a faction is a bit in a mask, and a relation is a plane, decision D2. `docs/adrs/accepted/adr-0053-a-faction-is-a-bit-in-a-mask-and-a-relation-is-a-plane.md`
+    #[must_use]
+    pub const fn factions(&self) -> u16 {
+        self.factions
+    }
+
+    /// Returns the mean cost of a step on this machine, in microseconds.
+    ///
+    /// The figure describes a development machine. It is not evidence about
+    /// the target platform, and the row that states it says so.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: Project orientation, the target platform. `CLAUDE.md`
+    #[must_use]
+    pub const fn step_mean(&self) -> f64 {
+        self.step_mean
+    }
+
+    /// Returns the mean cost of a drawing on this machine, in microseconds.
+    #[must_use]
+    pub const fn draw_mean(&self) -> f64 {
+        self.draw_mean
+    }
+
+    /// Returns the number of ticks the run reached in one second.
+    #[must_use]
+    pub const fn rate(&self) -> f64 {
+        self.rate
+    }
+
     /// Returns the tiles the window shows, across and down.
     #[must_use]
     pub const fn extent_shown(&self) -> (u32, u32) {
@@ -870,7 +909,7 @@ impl Readout {
 /// # References
 ///
 /// [^1]: Recurring Defect Shapes, shape 1. `.claude/rules/recurring-defects.md`
-const KINDS: [TileKind; KIND_COUNT] = [
+pub(crate) const KINDS: [TileKind; KIND_COUNT] = [
     TileKind::Water,
     TileKind::Plain,
     TileKind::Forest,
@@ -1356,7 +1395,7 @@ fn choice_lines(choice: Option<&ChoiceReadout>) -> Vec<Line> {
 /// # References
 ///
 /// [^1]: Recurring Defect Shapes, shape 1. `.claude/rules/recurring-defects.md`
-fn option_name(option: u8) -> &'static str {
+pub(crate) fn option_name(option: u8) -> &'static str {
     if option == NO_INTENT {
         return "nothing";
     }
@@ -1494,7 +1533,7 @@ const CUT_NOTICE: &str = "window too short. panel cut.";
 ///
 /// [^1]: ADR-0024, every summary field is declared extensive or intensive, decision D5. `docs/adrs/accepted/adr-0024-every-summary-field-is-declared-extensive-or-intensive.md`
 /// [^2]: ADR-0067, the viewer reads the world and never writes to it, decision D3. `docs/adrs/accepted/adr-0067-the-viewer-reads-the-world-and-never-writes-to-it.md`
-fn fraction(reading: Option<Fix32>) -> String {
+pub(crate) fn fraction(reading: Option<Fix32>) -> String {
     match reading {
         None => "-".to_string(),
         Some(value) => format!("{:.2}", f64::from(value.0) / 65536.0),
@@ -1699,7 +1738,8 @@ fn ground_row(canvas: &mut Canvas, left: i32, right: i32, pen: i32, kind: TileKi
 /// # References
 ///
 /// [^1]: PRD-0003, a developer sees a world worth looking at. `docs/product/accepted/prd-0003-a-developer-sees-a-world-worth-looking-at.md`
-const fn name_of(kind: TileKind) -> &'static str {
+#[must_use]
+pub const fn name_of(kind: TileKind) -> &'static str {
     match kind {
         TileKind::Water => "water",
         TileKind::Plain => "plain",
@@ -1734,7 +1774,8 @@ fn bar(canvas: &mut Canvas, left: i32, right: i32, pen: i32, readout: &Readout) 
 ///
 /// A tick count and a soldier count both reach six digits. A run of six
 /// digits is hard to read at eight pixels a glyph.
-fn grouped(value: u64) -> String {
+#[must_use]
+pub fn grouped(value: u64) -> String {
     let digits = value.to_string();
     let mut out = String::with_capacity(digits.len() + digits.len() / 3);
     for (index, digit) in digits.chars().enumerate() {

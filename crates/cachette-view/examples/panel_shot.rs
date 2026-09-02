@@ -1,4 +1,9 @@
-//! Writes one frame of a founded run to an image file.
+//! Writes the whole panel of a founded run to an image file.
+//!
+//! **This is where every number lives that the window does not show.** The
+//! window draws cards, which hold what changes moment to moment. This picture
+//! draws the panel, which holds every section, and no window height cuts
+//! it.[^2]
 //!
 //! A person reads the panel from this picture without a display. The
 //! demonstration binary needs a window, and a machine in continuous
@@ -11,10 +16,11 @@
 //! # References
 //!
 //! [^1]: ADR-0067, the viewer reads the world and never writes to it, decision D1. `docs/adrs/accepted/adr-0067-the-viewer-reads-the-world-and-never-writes-to-it.md`
+//! [^2]: Decisions register, DEC-084. `docs/DECISIONS.md`
 
 use cachette_core::{World, WorldConfig};
 use cachette_view::picture::write_ppm;
-use cachette_view::{draw_frame, Camera, Canvas, Metrics};
+use cachette_view::{draw_frame, Camera, Canvas, Metrics, Overlay};
 
 /// The size of the picture in pixels.
 ///
@@ -24,7 +30,7 @@ use cachette_view::{draw_frame, Camera, Canvas, Metrics};
 ///
 /// # References
 ///
-/// [^1]: Backlog item 0133, the panel is longer than the window. `docs/backlog/proposed/0133-let-a-watcher-reach-a-panel-longer-than-the-window.md`
+/// [^1]: Backlog item 0133, the panel is longer than the window. `docs/backlog/complete/0133-let-a-watcher-reach-a-panel-longer-than-the-window.md`
 const WINDOW: (usize, usize) = (420, 1340);
 
 fn main() {
@@ -50,8 +56,15 @@ fn main() {
     let camera = Camera::opening()
         .looking_at(place, &canvas)
         .clamped(&world, &canvas);
-    draw_frame(&world, camera, &Metrics::start(), &foundings, &mut canvas)
-        .expect("the world draws");
+    draw_frame(
+        &world,
+        camera,
+        &Metrics::start(),
+        &foundings,
+        Overlay::Panel,
+        &mut canvas,
+    )
+    .expect("the world draws");
 
     let mut file =
         std::io::BufWriter::new(std::fs::File::create(&path).expect("the file must open"));

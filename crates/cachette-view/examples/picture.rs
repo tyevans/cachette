@@ -21,7 +21,7 @@
 
 use cachette_core::{Axial, FactionId, World, WorldConfig};
 use cachette_view::picture::write_ppm;
-use cachette_view::{draw_frame, Camera, Canvas, Lap, Metrics};
+use cachette_view::{draw_frame, Camera, Canvas, Lap, Metrics, Overlay};
 
 /// The side of the picture in pixels.
 const SIDE: usize = 900;
@@ -80,7 +80,17 @@ fn main() {
 
     let mut canvas = Canvas::new(SIDE, SIDE);
     let camera = Camera::fitting(&world, &canvas);
-    let readout = draw_frame(&world, camera, &metrics, &[], &mut canvas).expect("the world draws");
+    let readout = draw_frame(
+        &world,
+        camera,
+        &metrics,
+        &[],
+        // The reference layer is on, so the picture names every colour it
+        // draws without a person holding a key.
+        Overlay::Glass { reference: true },
+        &mut canvas,
+    )
+    .expect("the world draws");
 
     let mut file =
         std::io::BufWriter::new(std::fs::File::create(&path).expect("the output file must open"));

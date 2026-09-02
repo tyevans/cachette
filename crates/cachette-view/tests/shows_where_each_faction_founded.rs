@@ -33,7 +33,7 @@ use std::time::Duration;
 
 use cachette_core::founding::FoundingOutcome;
 use cachette_core::{Axial, World, WorldConfig};
-use cachette_view::{draw_frame, paint, Camera, Canvas, Metrics};
+use cachette_view::{draw_frame, paint, Camera, Canvas, Metrics, Overlay};
 
 /// The number of people each founding starts with.
 const GROUP: u32 = 12;
@@ -91,7 +91,15 @@ fn measurements() -> Metrics {
 fn frame(world: &World, outcomes: &[FoundingOutcome]) -> (Canvas, Camera) {
     let mut canvas = Canvas::new(760, 760);
     let camera = Camera::fitting(world, &canvas);
-    draw_frame(world, camera, &measurements(), outcomes, &mut canvas).expect("the world draws");
+    draw_frame(
+        world,
+        camera,
+        &measurements(),
+        outcomes,
+        Overlay::Panel,
+        &mut canvas,
+    )
+    .expect("the world draws");
     (canvas, camera)
 }
 
@@ -111,7 +119,15 @@ fn frame(world: &World, outcomes: &[FoundingOutcome]) -> (Canvas, Camera) {
 fn frame_at(world: &World, outcomes: &[FoundingOutcome], place: Axial) -> (Canvas, Camera) {
     let mut canvas = Canvas::new(760, 900);
     let camera = Camera::at_tile_size(20.0).looking_at(place, &canvas);
-    draw_frame(world, camera, &measurements(), outcomes, &mut canvas).expect("the world draws");
+    draw_frame(
+        world,
+        camera,
+        &measurements(),
+        outcomes,
+        Overlay::Panel,
+        &mut canvas,
+    )
+    .expect("the world draws");
     (canvas, camera)
 }
 
@@ -227,7 +243,15 @@ fn the_mark_leaves_the_window_when_the_person_scrolls_away() {
     let camera = Camera::at_tile_size(20.0)
         .looking_at(Axial::new(EXTENT as i32 - 2, EXTENT as i32 - 2), &canvas)
         .clamped(&world, &canvas);
-    draw_frame(&world, camera, &measurements(), &outcomes, &mut canvas).expect("the world draws");
+    draw_frame(
+        &world,
+        camera,
+        &measurements(),
+        &outcomes,
+        Overlay::Panel,
+        &mut canvas,
+    )
+    .expect("the world draws");
 
     assert!(
         canvas.foundings_marked() < whole.foundings_marked(),
@@ -245,8 +269,15 @@ fn the_panel_names_each_faction_that_founded_and_each_that_did_not() {
     let mut canvas = Canvas::new(760, 760);
     let camera = Camera::fitting(&world, &canvas);
 
-    let readout = draw_frame(&world, camera, &measurements(), &outcomes, &mut canvas)
-        .expect("the world draws");
+    let readout = draw_frame(
+        &world,
+        camera,
+        &measurements(),
+        &outcomes,
+        Overlay::Panel,
+        &mut canvas,
+    )
+    .expect("the world draws");
 
     let seated: Vec<_> = outcomes.iter().filter(|out| out.is_seated()).collect();
     let refused: Vec<_> = outcomes.iter().filter(|out| !out.is_seated()).collect();
@@ -291,10 +322,24 @@ fn the_panel_grows_when_the_caller_holds_the_outcomes() {
     let mut without = Canvas::new(760, 1500);
     let camera = Camera::fitting(&world, &with);
 
-    let stated =
-        draw_frame(&world, camera, &measurements(), &outcomes, &mut with).expect("the world draws");
-    let silent =
-        draw_frame(&world, camera, &measurements(), &[], &mut without).expect("the world draws");
+    let stated = draw_frame(
+        &world,
+        camera,
+        &measurements(),
+        &outcomes,
+        Overlay::Panel,
+        &mut with,
+    )
+    .expect("the world draws");
+    let silent = draw_frame(
+        &world,
+        camera,
+        &measurements(),
+        &[],
+        Overlay::Panel,
+        &mut without,
+    )
+    .expect("the world draws");
 
     let (_, _, _, tall) = cachette_view::hud::bounds(&stated);
     let (_, _, _, short) = cachette_view::hud::bounds(&silent);

@@ -51,7 +51,7 @@ use cachette_core::hex::NEIGHBOURS;
 use cachette_core::terrain::TileKind;
 use cachette_core::{Axial, FactionId, Holder, World, WorldConfig};
 use cachette_view::paint::{faction_colour, Camera, Canvas, COLOURED_FACTIONS};
-use cachette_view::{draw_frame, paint, Metrics};
+use cachette_view::{draw_frame, paint, Metrics, Overlay};
 
 /// The extent of the fixture world.
 ///
@@ -585,8 +585,15 @@ fn the_panel_names_every_holder_colour_the_frame_drew() {
     let world = two_holdings_that_meet();
     let mut canvas = Canvas::new(WINDOW.0, WINDOW.1);
     let camera = close_camera(&world, &canvas);
-    let readout =
-        draw_frame(&world, camera, &Metrics::start(), &[], &mut canvas).expect("the world draws");
+    let readout = draw_frame(
+        &world,
+        camera,
+        &Metrics::start(),
+        &[],
+        Overlay::Panel,
+        &mut canvas,
+    )
+    .expect("the world draws");
 
     // The legend gives one row for each colour the viewer can tell apart,
     // and it stops at the faction count of the world.

@@ -15,7 +15,7 @@
 use std::num::NonZeroUsize;
 
 use cachette_core::{World, WorldConfig};
-use cachette_view::{Camera, Canvas, Lap, Metrics};
+use cachette_view::{Camera, Canvas, Lap, Metrics, Overlay};
 use minifb::{Key, Window, WindowOptions};
 
 /// The size of the window in pixels.
@@ -23,14 +23,14 @@ const WINDOW_WIDTH: usize = 960;
 
 /// The size of the window in pixels.
 ///
-/// The panel is taller than this and it says so on its last line.[^1] The
-/// height is therefore a compromise: tall enough to reach the rows a watcher
-/// needs, and short enough to open on a common display.
+/// The window holds cards and not a panel, and the cards fit any window a
+/// person opens. The height is therefore free again, and the map takes what
+/// the cards do not.[^1]
 ///
 /// # References
 ///
-/// [^1]: Backlog item 0133, the panel is longer than the window. `docs/backlog/proposed/0133-let-a-watcher-reach-a-panel-longer-than-the-window.md`
-const WINDOW_HEIGHT: usize = 1000;
+/// [^1]: Decisions register, DEC-084. `docs/DECISIONS.md`
+const WINDOW_HEIGHT: usize = 720;
 
 /// The world the demonstration builds.
 ///
@@ -243,6 +243,8 @@ fn main() -> Result<(), DemoError> {
         world.soldiers().len()
     );
     println!("arrow keys or WASD scroll, minus and equals zoom");
+    println!("hold tab to name the colours");
+    println!("run `just inspect` for every number the window does not show");
     println!("close the window or press escape to stop");
 
     // The clock is read here and nowhere that decides anything. The engine
@@ -266,7 +268,17 @@ fn main() -> Result<(), DemoError> {
         // in one call and the tests drive that call.
         // The binary owns the founding report and lends it to the panel. The
         // world keeps no copy of it.
-        cachette_view::draw_frame(&world, camera, &metrics, &outcomes, &mut canvas)
+        // The window draws the cards. The whole panel goes to a rendered
+        // picture, which one command produces and which no window height
+        // cuts.[^3] The key holds no state: the keyboard says whether the
+        // watcher wants the reference layer, and the answer lives for one
+        // frame.
+        //
+        // [^3]: Decisions register, DEC-084. `docs/DECISIONS.md`
+        let overlay = Overlay::Glass {
+            reference: window.is_key_down(Key::Tab),
+        };
+        cachette_view::draw_frame(&world, camera, &metrics, &outcomes, overlay, &mut canvas)
             .map_err(DemoError::Bridge)?;
         metrics.draw(at.elapsed());
 

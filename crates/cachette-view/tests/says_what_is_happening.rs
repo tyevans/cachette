@@ -28,7 +28,7 @@ use cachette_core::founding::FoundingOutcome;
 use cachette_core::terrain::KIND_COUNT;
 use cachette_core::{Axial, FactionId, World, WorldConfig};
 use cachette_view::paint::COLOURED_FACTIONS;
-use cachette_view::{draw_frame, paint, Camera, Canvas, Lap, Metrics};
+use cachette_view::{draw_frame, paint, Camera, Canvas, Lap, Metrics, Overlay};
 
 /// The width of the world these tests scroll around.
 const WIDE: u32 = 200;
@@ -57,7 +57,7 @@ const WINDOW: (usize, usize) = (640, 720);
 /// reaches a line at all must not measure the cut instead, so it draws into
 /// this height.
 ///
-/// [^1]: Backlog item 0133. `docs/backlog/proposed/0133-let-a-watcher-reach-a-panel-longer-than-the-window.md`
+/// [^1]: Backlog item 0133. `docs/backlog/complete/0133-let-a-watcher-reach-a-panel-longer-than-the-window.md`
 const WHOLE_PANEL: usize = 1600;
 
 /// Builds a world far larger than the window, with soldiers spread over it.
@@ -156,7 +156,15 @@ fn the_frame_draws_the_panel_over_the_world() {
     let mut bare = canvas();
     let camera = at_the_middle(&world, &with_panel);
 
-    draw_frame(&world, camera, &metrics, &[], &mut with_panel).expect("the world draws");
+    draw_frame(
+        &world,
+        camera,
+        &metrics,
+        &[],
+        Overlay::Panel,
+        &mut with_panel,
+    )
+    .expect("the world draws");
     paint::draw(&world, camera, &mut bare).expect("the world draws");
 
     assert_ne!(
@@ -186,8 +194,8 @@ fn the_panel_lets_the_world_show_through() {
     let camera = at_the_middle(&world, &here);
     let moved = camera.panned(37.0, 23.0).clamped(&world, &there);
 
-    draw_frame(&world, camera, &metrics, &[], &mut here).expect("the world draws");
-    draw_frame(&world, moved, &metrics, &[], &mut there).expect("the world draws");
+    draw_frame(&world, camera, &metrics, &[], Overlay::Panel, &mut here).expect("the world draws");
+    draw_frame(&world, moved, &metrics, &[], Overlay::Panel, &mut there).expect("the world draws");
 
     // The panel says almost the same thing in both frames, so a difference
     // under it must come from the world beneath it.
@@ -213,7 +221,8 @@ fn the_panel_states_the_tick_the_engine_reached() {
     let mut canvas = canvas();
     let camera = at_the_middle(&world, &canvas);
 
-    let readout = draw_frame(&world, camera, &metrics, &[], &mut canvas).expect("the world draws");
+    let readout = draw_frame(&world, camera, &metrics, &[], Overlay::Panel, &mut canvas)
+        .expect("the world draws");
 
     assert_eq!(readout.tick(), world.tick().0);
     assert_eq!(readout.tick(), 7, "the world did not reach the tick it ran");
@@ -229,12 +238,14 @@ fn a_step_changes_what_the_panel_says() {
     let mut after = canvas();
     let camera = at_the_middle(&world, &before);
 
-    let early = draw_frame(&world, camera, &metrics, &[], &mut before).expect("the world draws");
+    let early = draw_frame(&world, camera, &metrics, &[], Overlay::Panel, &mut before)
+        .expect("the world draws");
 
     for _ in 0..5 {
         world.step(2).expect("the step must run");
     }
-    let late = draw_frame(&world, camera, &metrics, &[], &mut after).expect("the world draws");
+    let late = draw_frame(&world, camera, &metrics, &[], Overlay::Panel, &mut after)
+        .expect("the world draws");
 
     assert_ne!(early.tick(), late.tick());
     assert_ne!(
@@ -255,13 +266,13 @@ fn the_panel_states_where_the_person_is_looking() {
     let middle = at_the_middle(&world, &canvas);
     let corner = Camera::opening().clamped(&world, &canvas);
 
-    let looking_in =
-        draw_frame(&world, middle, &metrics, &[], &mut canvas).expect("the world draws");
+    let looking_in = draw_frame(&world, middle, &metrics, &[], Overlay::Panel, &mut canvas)
+        .expect("the world draws");
     let inward = looking_in.centre();
     let extent_in = looking_in.extent_shown();
 
-    let looking_out =
-        draw_frame(&world, corner, &metrics, &[], &mut canvas).expect("the world draws");
+    let looking_out = draw_frame(&world, corner, &metrics, &[], Overlay::Panel, &mut canvas)
+        .expect("the world draws");
 
     assert_ne!(
         inward,
@@ -294,9 +305,11 @@ fn a_zoom_changes_the_extent_the_panel_states() {
     let camera = at_the_middle(&world, &canvas);
     let closer = camera.zoomed(2.0, &canvas).clamped(&world, &canvas);
 
-    let wide = draw_frame(&world, camera, &metrics, &[], &mut canvas).expect("the world draws");
+    let wide = draw_frame(&world, camera, &metrics, &[], Overlay::Panel, &mut canvas)
+        .expect("the world draws");
     let wide_extent = wide.extent_shown();
-    let near = draw_frame(&world, closer, &metrics, &[], &mut canvas).expect("the world draws");
+    let near = draw_frame(&world, closer, &metrics, &[], Overlay::Panel, &mut canvas)
+        .expect("the world draws");
 
     assert!(
         near.extent_shown().1 < wide_extent.1,
@@ -316,7 +329,8 @@ fn the_legend_counts_the_window_and_not_the_world() {
     let mut canvas = canvas();
     let camera = at_the_middle(&world, &canvas);
 
-    let readout = draw_frame(&world, camera, &metrics, &[], &mut canvas).expect("the world draws");
+    let readout = draw_frame(&world, camera, &metrics, &[], Overlay::Panel, &mut canvas)
+        .expect("the world draws");
 
     let counted: u32 = readout.by_faction().iter().sum();
     assert_eq!(
@@ -358,9 +372,11 @@ fn the_legend_follows_the_window_when_the_person_scrolls() {
     let middle = at_the_middle(&world, &canvas);
     let corner = Camera::opening().clamped(&world, &canvas);
 
-    let inward = draw_frame(&world, middle, &metrics, &[], &mut canvas).expect("the world draws");
+    let inward = draw_frame(&world, middle, &metrics, &[], Overlay::Panel, &mut canvas)
+        .expect("the world draws");
     let inward_counts = *inward.by_faction();
-    let outward = draw_frame(&world, corner, &metrics, &[], &mut canvas).expect("the world draws");
+    let outward = draw_frame(&world, corner, &metrics, &[], Overlay::Panel, &mut canvas)
+        .expect("the world draws");
 
     assert_ne!(
         inward_counts,
@@ -392,7 +408,8 @@ fn a_world_of_one_faction_counts_only_that_faction() {
 
     let mut canvas = canvas();
     let camera = Camera::fitting(&world, &canvas);
-    let readout = draw_frame(&world, camera, &metrics, &[], &mut canvas).expect("the world draws");
+    let readout = draw_frame(&world, camera, &metrics, &[], Overlay::Panel, &mut canvas)
+        .expect("the world draws");
 
     assert_eq!(
         readout.by_faction()[0],
@@ -435,7 +452,8 @@ fn the_panel_still_draws_when_the_window_holds_no_unit() {
     let away = Camera::opening()
         .panned(80.0 * 12.0, 80.0 * 12.0)
         .clamped(&world, &canvas);
-    let readout = draw_frame(&world, away, &metrics, &[], &mut canvas).expect("the world draws");
+    let readout = draw_frame(&world, away, &metrics, &[], Overlay::Panel, &mut canvas)
+        .expect("the world draws");
 
     assert_eq!(readout.soldiers_painted(), 0, "the far corner held a unit");
     assert!(
@@ -463,7 +481,8 @@ fn one_readout_gives_one_picture() {
     let metrics = stepped(&mut world, 4);
     let mut first = canvas();
     let camera = at_the_middle(&world, &first);
-    let readout = draw_frame(&world, camera, &metrics, &[], &mut first).expect("the world draws");
+    let readout = draw_frame(&world, camera, &metrics, &[], Overlay::Panel, &mut first)
+        .expect("the world draws");
 
     let mut second = canvas();
     paint::draw(&world, camera, &mut second).expect("the world draws");
@@ -493,8 +512,10 @@ fn the_frame_leaves_the_world_unchanged() {
 
     let mut canvas = canvas();
     let camera = at_the_middle(&world, &canvas);
-    draw_frame(&world, camera, &metrics, &[], &mut canvas).expect("the world draws");
-    draw_frame(&world, camera, &metrics, &[], &mut canvas).expect("the world draws");
+    draw_frame(&world, camera, &metrics, &[], Overlay::Panel, &mut canvas)
+        .expect("the world draws");
+    draw_frame(&world, camera, &metrics, &[], Overlay::Panel, &mut canvas)
+        .expect("the world draws");
 
     assert_eq!(hash, world.state_hash());
     assert_eq!(tick, world.tick());
@@ -511,7 +532,8 @@ fn a_stale_world_is_refused_before_the_panel_is_drawn() {
     let metrics = stepped(&mut world, 1);
     let mut canvas = canvas();
     let camera = at_the_middle(&world, &canvas);
-    draw_frame(&world, camera, &metrics, &[], &mut canvas).expect("a fresh world draws");
+    draw_frame(&world, camera, &metrics, &[], Overlay::Panel, &mut canvas)
+        .expect("a fresh world draws");
 
     let open = nearest_open(&open_tiles(&world), Axial::new(3, 3));
     world
@@ -519,7 +541,7 @@ fn a_stale_world_is_refused_before_the_panel_is_drawn() {
         .expect("the address is valid");
 
     assert!(
-        draw_frame(&world, camera, &metrics, &[], &mut canvas).is_err(),
+        draw_frame(&world, camera, &metrics, &[], Overlay::Panel, &mut canvas).is_err(),
         "a stale world drew a frame instead of refusing",
     );
 }
@@ -534,8 +556,15 @@ fn the_panel_stays_inside_its_own_edge() {
     let mut bare = canvas();
     let camera = at_the_middle(&world, &with_panel);
 
-    let readout =
-        draw_frame(&world, camera, &metrics, &[], &mut with_panel).expect("the world draws");
+    let readout = draw_frame(
+        &world,
+        camera,
+        &metrics,
+        &[],
+        Overlay::Panel,
+        &mut with_panel,
+    )
+    .expect("the world draws");
     paint::draw(&world, camera, &mut bare).expect("the world draws");
 
     // The panel states its own rectangle. Anything it changed must sit inside
@@ -580,7 +609,8 @@ fn the_cost_rows_state_what_the_report_states() {
     let camera = at_the_middle(&world, &canvas);
 
     let at = Lap::start();
-    draw_frame(&world, camera, &metrics, &[], &mut canvas).expect("the world draws");
+    draw_frame(&world, camera, &metrics, &[], Overlay::Panel, &mut canvas)
+        .expect("the world draws");
     let mut metrics = metrics;
     metrics.draw(at.elapsed());
 
@@ -655,7 +685,7 @@ fn no_value_is_cut_to_fit_its_column() {
     // Walk from the closest zoom to the widest. Every step must fit, and the
     // widest is where the counts are largest.
     let mut camera = Camera::opening().clamped(&world, &canvas);
-    let opening = draw_frame(&world, camera, &metrics, &[], &mut canvas)
+    let opening = draw_frame(&world, camera, &metrics, &[], Overlay::Panel, &mut canvas)
         .expect("the world draws")
         .extent_shown();
     let mut widest = opening;
@@ -664,8 +694,8 @@ fn no_value_is_cut_to_fit_its_column() {
     // to the smallest the viewer allows.
     for _ in 0..24 {
         camera = camera.zoomed_out(&canvas).clamped(&world, &canvas);
-        let readout =
-            draw_frame(&world, camera, &metrics, &[], &mut canvas).expect("the world draws");
+        let readout = draw_frame(&world, camera, &metrics, &[], Overlay::Panel, &mut canvas)
+            .expect("the world draws");
         let cut = cachette_view::hud::values_that_do_not_fit(&readout);
         assert!(
             cut.is_empty(),
@@ -710,8 +740,15 @@ fn the_panel_fills_the_rectangle_it_states() {
     let mut bare = canvas();
     let camera = at_the_middle(&world, &with_panel);
 
-    let readout =
-        draw_frame(&world, camera, &metrics, &[], &mut with_panel).expect("the world draws");
+    let readout = draw_frame(
+        &world,
+        camera,
+        &metrics,
+        &[],
+        Overlay::Panel,
+        &mut with_panel,
+    )
+    .expect("the world draws");
     paint::draw(&world, camera, &mut bare).expect("the world draws");
 
     let (_, top, _, height) = cachette_view::hud::bounds(&readout);
@@ -747,7 +784,8 @@ fn the_panel_names_the_ground_in_the_window() {
     let mut canvas = canvas();
     let camera = Camera::fitting(&world, &canvas);
 
-    let readout = draw_frame(&world, camera, &metrics, &[], &mut canvas).expect("the world draws");
+    let readout = draw_frame(&world, camera, &metrics, &[], Overlay::Panel, &mut canvas)
+        .expect("the world draws");
 
     let counted: u32 = readout.by_kind().iter().sum();
     assert_eq!(
@@ -775,14 +813,16 @@ fn the_ground_legend_follows_the_window_when_the_person_scrolls() {
     let mut canvas = canvas();
 
     let here = Camera::fitting(&world, &canvas);
-    let first = draw_frame(&world, here, &metrics, &[], &mut canvas).expect("the world draws");
+    let first = draw_frame(&world, here, &metrics, &[], Overlay::Panel, &mut canvas)
+        .expect("the world draws");
     let before = *first.by_kind();
 
     let there = here
         .zoomed_in(&canvas)
         .zoomed_in(&canvas)
         .zoomed_in(&canvas);
-    let second = draw_frame(&world, there, &metrics, &[], &mut canvas).expect("the world draws");
+    let second = draw_frame(&world, there, &metrics, &[], Overlay::Panel, &mut canvas)
+        .expect("the world draws");
 
     assert_ne!(
         before,
@@ -801,7 +841,8 @@ fn the_panel_states_the_region_under_the_crosshair() {
     let mut canvas = canvas();
     let camera = at_the_middle(&world, &canvas);
 
-    let readout = draw_frame(&world, camera, &metrics, &[], &mut canvas).expect("the world draws");
+    let readout = draw_frame(&world, camera, &metrics, &[], Overlay::Panel, &mut canvas)
+        .expect("the world draws");
     let region = readout
         .region()
         .expect("the middle of the world names a cell");
@@ -838,8 +879,8 @@ fn the_panel_reports_a_region_that_holds_units() {
     let mut with_units = 0;
     for step in 0..8 {
         let camera = at_the_middle(&world, &canvas).stepped(step as f32 * 40.0, 0.0);
-        let readout =
-            draw_frame(&world, camera, &metrics, &[], &mut canvas).expect("the world draws");
+        let readout = draw_frame(&world, camera, &metrics, &[], Overlay::Panel, &mut canvas)
+            .expect("the world draws");
         if let Some(region) = readout.region() {
             if region.units() > 0 {
                 with_units += 1;
@@ -873,7 +914,8 @@ fn a_short_window_cuts_the_panel_and_the_panel_says_so() {
 
     let mut tall = Canvas::new(WINDOW.0, WINDOW.1);
     let camera = at_the_middle(&world, &tall);
-    let full = draw_frame(&world, camera, &metrics, &[], &mut tall).expect("the world draws");
+    let full = draw_frame(&world, camera, &metrics, &[], Overlay::Panel, &mut tall)
+        .expect("the world draws");
     let (_, top, _, full_height) = cachette_view::hud::bounds(&full);
 
     // A window that cannot hold the whole panel. The fixture must actually be
@@ -885,7 +927,8 @@ fn a_short_window_cuts_the_panel_and_the_panel_says_so() {
     );
     let mut short = Canvas::new(WINDOW.0, short_height);
     let camera = at_the_middle(&world, &short);
-    let cut = draw_frame(&world, camera, &metrics, &[], &mut short).expect("the world draws");
+    let cut = draw_frame(&world, camera, &metrics, &[], Overlay::Panel, &mut short)
+        .expect("the world draws");
     let (_, top, _, cut_height) = cachette_view::hud::bounds(&cut);
 
     assert!(
@@ -911,8 +954,15 @@ fn a_cut_panel_paints_the_rectangle_it_states() {
     paint::draw(&world, camera, &mut bare).expect("the world draws");
 
     let mut with_panel = Canvas::new(WINDOW.0, 320);
-    let readout =
-        draw_frame(&world, camera, &metrics, &[], &mut with_panel).expect("the world draws");
+    let readout = draw_frame(
+        &world,
+        camera,
+        &metrics,
+        &[],
+        Overlay::Panel,
+        &mut with_panel,
+    )
+    .expect("the world draws");
     let (_, top, _, height) = cachette_view::hud::bounds(&readout);
 
     let width = with_panel.width();
@@ -1025,8 +1075,15 @@ fn the_panel_states_the_place_the_founding_chose() {
     let mut canvas = canvas();
     let camera = looking_at(&world, &canvas, first_place(&foundings));
 
-    let readout =
-        draw_frame(&world, camera, &metrics, &foundings, &mut canvas).expect("the world draws");
+    let readout = draw_frame(
+        &world,
+        camera,
+        &metrics,
+        &foundings,
+        Overlay::Panel,
+        &mut canvas,
+    )
+    .expect("the world draws");
 
     let report = readout.foundings().first().expect("the panel read one");
     assert_eq!(
@@ -1045,8 +1102,15 @@ fn the_panel_states_the_quantities_the_founding_reported() {
     let mut canvas = canvas();
     let camera = looking_at(&world, &canvas, first_place(&foundings));
 
-    let readout =
-        draw_frame(&world, camera, &metrics, &foundings, &mut canvas).expect("the world draws");
+    let readout = draw_frame(
+        &world,
+        camera,
+        &metrics,
+        &foundings,
+        Overlay::Panel,
+        &mut canvas,
+    )
+    .expect("the world draws");
 
     let survey = first_survey(&foundings);
     let chosen = survey.chosen().expect("the founding chose a place");
@@ -1075,8 +1139,15 @@ fn the_panel_states_how_many_places_the_founding_compared() {
     let mut canvas = canvas();
     let camera = looking_at(&world, &canvas, first_place(&foundings));
 
-    let readout =
-        draw_frame(&world, camera, &metrics, &foundings, &mut canvas).expect("the world draws");
+    let readout = draw_frame(
+        &world,
+        camera,
+        &metrics,
+        &foundings,
+        Overlay::Panel,
+        &mut canvas,
+    )
+    .expect("the world draws");
 
     let report = readout.foundings().first().expect("the panel read one");
     assert_eq!(report.considered(), first_survey(&foundings).considered());
@@ -1097,8 +1168,15 @@ fn the_panel_states_a_place_the_founding_did_not_choose() {
     let mut canvas = canvas();
     let camera = looking_at(&world, &canvas, first_place(&foundings));
 
-    let readout =
-        draw_frame(&world, camera, &metrics, &foundings, &mut canvas).expect("the world draws");
+    let readout = draw_frame(
+        &world,
+        camera,
+        &metrics,
+        &foundings,
+        Overlay::Panel,
+        &mut canvas,
+    )
+    .expect("the world draws");
 
     let best_rejected = *first_survey(&foundings)
         .rejected()
@@ -1132,8 +1210,15 @@ fn the_panel_says_whether_the_window_shows_the_founded_place() {
     let place = first_place(&foundings);
 
     let at_the_place = looking_at(&world, &canvas, place);
-    let near = draw_frame(&world, at_the_place, &metrics, &foundings, &mut canvas)
-        .expect("the world draws");
+    let near = draw_frame(
+        &world,
+        at_the_place,
+        &metrics,
+        &foundings,
+        Overlay::Panel,
+        &mut canvas,
+    )
+    .expect("the world draws");
     assert!(
         near.foundings()[0].shown(),
         "the camera looks at {place:?} and the panel says the window does not show it",
@@ -1147,8 +1232,15 @@ fn the_panel_says_whether_the_window_shows_the_founded_place() {
         Axial::new(0, 0)
     };
     let away = looking_at(&world, &canvas, far);
-    let distant =
-        draw_frame(&world, away, &metrics, &foundings, &mut canvas).expect("the world draws");
+    let distant = draw_frame(
+        &world,
+        away,
+        &metrics,
+        &foundings,
+        Overlay::Panel,
+        &mut canvas,
+    )
+    .expect("the world draws");
     assert!(
         !distant.foundings()[0].shown(),
         "the camera looks at {far:?} and the panel says the window shows {place:?}",
@@ -1188,8 +1280,15 @@ fn the_panel_describes_every_founding_the_caller_holds() {
     let mut canvas = canvas();
     let camera = at_the_middle(&world, &canvas);
 
-    let readout =
-        draw_frame(&world, camera, &metrics, &foundings, &mut canvas).expect("the world draws");
+    let readout = draw_frame(
+        &world,
+        camera,
+        &metrics,
+        &foundings,
+        Overlay::Panel,
+        &mut canvas,
+    )
+    .expect("the world draws");
 
     assert_eq!(
         readout.foundings().len(),
@@ -1219,7 +1318,8 @@ fn the_panel_states_no_founding_when_the_caller_holds_none() {
     let mut canvas = canvas();
     let camera = at_the_middle(&world, &canvas);
 
-    let readout = draw_frame(&world, camera, &metrics, &[], &mut canvas).expect("the world draws");
+    let readout = draw_frame(&world, camera, &metrics, &[], Overlay::Panel, &mut canvas)
+        .expect("the world draws");
 
     assert!(readout.foundings().is_empty());
 }
@@ -1234,8 +1334,15 @@ fn the_founding_rows_fit_their_column() {
     let mut canvas = canvas();
     let camera = looking_at(&world, &canvas, first_place(&foundings));
 
-    let readout =
-        draw_frame(&world, camera, &metrics, &foundings, &mut canvas).expect("the world draws");
+    let readout = draw_frame(
+        &world,
+        camera,
+        &metrics,
+        &foundings,
+        Overlay::Panel,
+        &mut canvas,
+    )
+    .expect("the world draws");
 
     let cut = cachette_view::hud::values_that_do_not_fit(&readout);
     assert!(
@@ -1262,9 +1369,17 @@ fn the_panel_grows_when_the_caller_holds_a_founding() {
     let mut without = Canvas::new(WINDOW.0, WHOLE_PANEL);
     let camera = looking_at(&world, &with_founding, first_place(&foundings));
 
-    let stated = draw_frame(&world, camera, &metrics, &foundings, &mut with_founding)
+    let stated = draw_frame(
+        &world,
+        camera,
+        &metrics,
+        &foundings,
+        Overlay::Panel,
+        &mut with_founding,
+    )
+    .expect("the world draws");
+    let silent = draw_frame(&world, camera, &metrics, &[], Overlay::Panel, &mut without)
         .expect("the world draws");
-    let silent = draw_frame(&world, camera, &metrics, &[], &mut without).expect("the world draws");
 
     let (_, _, _, tall) = cachette_view::hud::bounds(&stated);
     let (_, _, _, short) = cachette_view::hud::bounds(&silent);

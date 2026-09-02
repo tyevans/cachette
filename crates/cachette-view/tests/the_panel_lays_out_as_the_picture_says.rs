@@ -59,7 +59,7 @@ use std::time::Duration;
 use cachette_core::founding::FoundingOutcome;
 use cachette_core::{Axial, FactionId, World, WorldConfig};
 use cachette_view::picture::write_ppm;
-use cachette_view::{draw_frame, hud, paint, Camera, Canvas, Metrics};
+use cachette_view::{draw_frame, hud, paint, Camera, Canvas, Metrics, Overlay};
 
 /// The width of the world the picture is taken of.
 const WIDE: u32 = 200;
@@ -219,8 +219,15 @@ fn taken(factions: u16) -> (String, Canvas) {
     let mut bare = Canvas::new(WINDOW.0, WINDOW.1);
     let camera = at_the_middle(&world, &panelled);
 
-    let readout =
-        draw_frame(&world, camera, &metrics, &foundings, &mut panelled).expect("the world draws");
+    let readout = draw_frame(
+        &world,
+        camera,
+        &metrics,
+        &foundings,
+        Overlay::Panel,
+        &mut panelled,
+    )
+    .expect("the world draws");
     assert_eq!(
         readout.foundings().len(),
         1,

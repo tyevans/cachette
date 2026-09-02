@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-198**
+**Next number: FND-200**
 
 ## A. Corrections to stated rules
 
@@ -4539,6 +4539,70 @@ asserts no mark, and one fills it above the road and asserts the mark. The
 first fails when the ground reader is put back. This changes nothing about the
 register row, which is about the three callers that ask a different question.
 
+### FND-198 — A second layout of one reading loses the corrections the first one earned
+
+**Believed.** The panel and the cards read one readout, so they cannot
+disagree about a number. The readout is the single statement of what the view
+knows, and two layouts of it are two arrangements of the same facts.
+
+**True.** They cannot disagree about a number. They can disagree about which
+numbers to draw, and that is where a correction lives. The panel sizes its
+faction legend by the faction count of the world, because the colour table is
+larger than most worlds need and a legend sized by the table names a colour
+that no faction uses. The cards were written fresh and sized the legend by the
+table. In a world of four factions the cards named six, and two of them stood
+for nobody.
+
+**Evidence.** The defect was visible in the first render of the reference layer
+and in no test, because no test existed yet. The panel had the same defect once
+and its own helper carries the repair. The repair did not travel, because the
+new layout called no part of the old one.[^F198A]
+
+**Follows.** **When you write a second view of one model, list what the first
+view decided and not only what it read.** The readout carried the faction count
+and the new layout did not ask for it. A shared reading is not a shared
+judgement.
+
+The general form is the redundant declaration shape, one level up.[^22] Two
+layouts are two declaration sites for the question "which rows does a reader
+need", and nothing fails when they answer it differently. The repair here was
+to give the readout an accessor for the faction count, so both layouts ask the
+engine rather than guessing from a table.
+
+### FND-199 — The inspection tool cannot carry what the window stopped showing
+
+**Believed.** The window can drop a section because an agent inspection tool
+holds the same numbers. The tool speaks a protocol, holds a world between
+calls, and reports what the engine knows, so it is the natural home for detail
+that a window cannot afford.
+
+**True.** It reports the tick, the extent, the seed, the faction count, the
+tile count, the state hash and the event count. It reads the event log, the
+tile changes and the gather events. It spawns, despawns, orders a gather and
+names the tile of one unit. It has no reader for the founding survey, the level
+1 summary of a region, the store or the rate or the ration of a site, the
+choice explanation of a unit, the stock or the holder of a tile, the census of
+the ground, or the crowding counts. Those are most of what the panel
+holds.[^F199A]
+
+**Evidence.** The tools were counted while designing the overlay. Moving the
+panel's detail to that tool would have been about six new readers of work, and
+it would have blocked the overlay behind them.
+
+**Follows.** **The detail went to a rendered picture instead, which needed no
+new work.** One example already drew the whole panel to an image file at any
+height, with no display. A build recipe now names it, so the answer to "where
+did the detail go" is a command a person can run.
+
+The order of the work changed because of this. The agent tool still cannot show
+a watcher what the panel shows, and that is a separate item rather than a
+condition of the overlay.[^F199B]
+
+**A command name was shown to a person before it existed.** The name came from
+a mockup in a design conversation and not from the build file. It exists now,
+and a test compares the name the window prints against the recipes the build
+file defines, so the two cannot drift apart in silence.
+
 ### FND-197 — Accepting a record breaks every citation of it
 
 **Believed.** A record is accepted by a reviewer, and the acceptance is an edit
@@ -4836,3 +4900,6 @@ check asserts.
 [^F186A]: The viewer suite for the food and the reason. `crates/cachette-view/tests/shows_the_food_and_the_reason.rs`
 [^F187A]: The viewer suite for the ground. `crates/cachette-view/tests/draws_the_ground.rs`
 [^F187B]: PRD-0003, a developer sees a world worth looking at. `docs/product/accepted/prd-0003-a-developer-sees-a-world-worth-looking-at.md`
+[^F198A]: The panel and the cards. `crates/cachette-view/src/`
+[^F199A]: The agent protocol server. `python/cachette/agent/server.py`
+[^F199B]: Backlog item 0206. `docs/backlog/proposed/0206-let-the-agent-tool-read-what-the-panel-reads.md`

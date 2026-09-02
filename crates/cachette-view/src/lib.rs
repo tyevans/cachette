@@ -37,12 +37,14 @@
 // and that scope is correct.
 #![allow(clippy::disallowed_types)]
 
+pub mod glass;
 pub mod hud;
 pub mod metrics;
 pub mod paint;
 pub mod picture;
 pub mod text;
 
+pub use glass::Overlay;
 pub use hud::{FoundingReport, Readout};
 pub use metrics::{Lap, Metrics};
 pub use paint::{Camera, Canvas};
@@ -57,8 +59,14 @@ use cachette_core::{BridgeError, World};
 /// something reaches it.[^1]
 ///
 /// The order matters. The world pass clears the canvas and counts what it
-/// paints, so the panel must read the canvas after that pass and draw over
+/// paints, so the overlay must read the canvas after that pass and draw over
 /// it.
+///
+/// **The overlay chooses between two layouts of one reading.** The window
+/// draws the cards, which hold what changes moment to moment. A rendered
+/// picture draws the whole panel, which holds every section. Both are a
+/// function of the same readout, so no number in one can disagree with the
+/// same number in the other.[^5]
 ///
 /// The outcomes are what the caller kept when it founded the run: one for
 /// each faction, whether that faction was seated or refused. The caller owns
@@ -81,16 +89,21 @@ use cachette_core::{BridgeError, World};
 ///
 /// [^1]: Testing Rules, drive the real caller. `.claude/rules/testing.md`
 /// [^2]: ADR-0067, the viewer reads the world and never writes to it, decision D2. `docs/adrs/accepted/adr-0067-the-viewer-reads-the-world-and-never-writes-to-it.md`
+/// [^5]: Decisions register, DEC-084. `docs/DECISIONS.md`
 pub fn draw_frame(
     world: &World,
     camera: Camera,
     metrics: &Metrics,
     outcomes: &[FoundingOutcome],
+    overlay: Overlay,
     canvas: &mut Canvas,
 ) -> Result<Readout, BridgeError> {
     paint::draw(world, camera, canvas)?;
     paint::mark_foundings(camera, canvas, outcomes);
     let readout = Readout::of(world, camera, canvas, metrics, outcomes);
-    hud::draw(&readout, canvas);
+    match overlay {
+        Overlay::Glass { reference } => glass::draw(&readout, canvas, reference),
+        Overlay::Panel => hud::draw(&readout, canvas),
+    }
     Ok(readout)
 }

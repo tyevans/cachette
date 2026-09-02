@@ -36,7 +36,7 @@ use std::collections::BTreeMap;
 
 use cachette_core::resource::ResourceKind;
 use cachette_core::{Axial, Entity, FactionId, World, WorldConfig};
-use cachette_view::{draw_frame, paint, Camera, Canvas, Metrics};
+use cachette_view::{draw_frame, paint, Camera, Canvas, Metrics, Overlay};
 
 /// The extent of the fixture world.
 ///
@@ -335,8 +335,15 @@ fn nearest_by_a_full_scan(world: &World, camera: Camera, canvas: &Canvas) -> Opt
 #[test]
 fn the_panel_names_the_unit_nearest_the_middle_of_the_window() {
     let (world, mut canvas, camera, outcomes) = founded(0x0cac_f00d);
-    let readout = draw_frame(&world, camera, &Metrics::start(), &outcomes, &mut canvas)
-        .expect("the world draws");
+    let readout = draw_frame(
+        &world,
+        camera,
+        &Metrics::start(),
+        &outcomes,
+        Overlay::Panel,
+        &mut canvas,
+    )
+    .expect("the world draws");
 
     let choice = readout
         .choice()
@@ -357,8 +364,15 @@ fn the_panel_names_the_unit_nearest_the_middle_of_the_window() {
 #[test]
 fn the_panel_states_the_answer_the_engine_gave_and_derives_no_part_of_it() {
     let (world, mut canvas, camera, outcomes) = founded(0x0cac_f00d);
-    let readout = draw_frame(&world, camera, &Metrics::start(), &outcomes, &mut canvas)
-        .expect("the world draws");
+    let readout = draw_frame(
+        &world,
+        camera,
+        &Metrics::start(),
+        &outcomes,
+        Overlay::Panel,
+        &mut canvas,
+    )
+    .expect("the world draws");
 
     let choice = readout.choice().expect("the window holds units");
     let answer = choice
@@ -383,8 +397,15 @@ fn the_unit_the_panel_names_follows_the_window() {
     // A watcher has no cursor, so the middle of the window is the pointer.
     // Scrolling must therefore change the unit the panel reports on.
     let (world, mut canvas, camera, outcomes) = founded(0x0cac_f00d);
-    let readout = draw_frame(&world, camera, &Metrics::start(), &outcomes, &mut canvas)
-        .expect("the world draws");
+    let readout = draw_frame(
+        &world,
+        camera,
+        &Metrics::start(),
+        &outcomes,
+        Overlay::Panel,
+        &mut canvas,
+    )
+    .expect("the world draws");
     let first = readout.choice().expect("the window holds units");
 
     let moved = camera.stepped(6.0, 6.0).clamped(&world, &canvas);
@@ -392,8 +413,15 @@ fn the_unit_the_panel_names_follows_the_window() {
         (moved.tile_width - camera.tile_width).abs() < f32::EPSILON,
         "the scroll must not change the zoom"
     );
-    let readout = draw_frame(&world, moved, &Metrics::start(), &outcomes, &mut canvas)
-        .expect("the world draws");
+    let readout = draw_frame(
+        &world,
+        moved,
+        &Metrics::start(),
+        &outcomes,
+        Overlay::Panel,
+        &mut canvas,
+    )
+    .expect("the world draws");
     let second = readout.choice().expect("the window holds units");
     assert_ne!(
         first.focus().entity(),
@@ -405,8 +433,15 @@ fn the_unit_the_panel_names_follows_the_window() {
 #[test]
 fn the_panel_states_the_stock_of_the_tile_under_the_crosshair() {
     let (world, mut canvas, camera, outcomes) = founded(0x0cac_f00d);
-    let readout = draw_frame(&world, camera, &Metrics::start(), &outcomes, &mut canvas)
-        .expect("the world draws");
+    let readout = draw_frame(
+        &world,
+        camera,
+        &Metrics::start(),
+        &outcomes,
+        Overlay::Panel,
+        &mut canvas,
+    )
+    .expect("the world draws");
 
     let tile = readout.tile().expect("the middle of the window is a tile");
     let mut carried = 0u32;
@@ -463,8 +498,15 @@ fn the_panel_tells_what_is_left_from_what_the_ground_gave() {
     let camera = Camera::opening()
         .looking_at(deposit, &canvas)
         .clamped(&world, &canvas);
-    let readout =
-        draw_frame(&world, camera, &Metrics::start(), &[], &mut canvas).expect("the world draws");
+    let readout = draw_frame(
+        &world,
+        camera,
+        &Metrics::start(),
+        &[],
+        Overlay::Panel,
+        &mut canvas,
+    )
+    .expect("the world draws");
 
     let tile = readout.tile().expect("the middle of the window is a tile");
     assert_eq!(
@@ -494,8 +536,15 @@ fn the_panel_tells_what_is_left_from_what_the_ground_gave() {
 #[test]
 fn the_panel_states_the_store_and_the_rate_of_every_site() {
     let (world, mut canvas, camera, outcomes) = founded(0x0cac_f00d);
-    let readout = draw_frame(&world, camera, &Metrics::start(), &outcomes, &mut canvas)
-        .expect("the world draws");
+    let readout = draw_frame(
+        &world,
+        camera,
+        &Metrics::start(),
+        &outcomes,
+        Overlay::Panel,
+        &mut canvas,
+    )
+    .expect("the world draws");
 
     let arena = world.settlements();
     let commodity = cachette_core::CommodityId(0);

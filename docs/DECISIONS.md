@@ -23,7 +23,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^ALLOC]
 
-**Next number: DEC-084**
+**Next number: DEC-085**
 
 ## Open
 
@@ -732,6 +732,50 @@ concluded, and it called that argument its weakest.
 
 ## Closed
 
+### DEC-084 — Does a legend on a key satisfy a record that asks the window to name its colours?
+
+**Closed. It does. The record asks that the window names its colours. It does
+not ask that the naming is always on the glass.**
+
+The window now draws cards and not a panel. The cards hold what changes moment
+to moment, and every other number goes to a rendered picture and to the
+terminal.[^DEC78A] Four statements of a shipped product record were at
+risk.[^DEC84B] The record asks that the window name every colour it draws, that
+it state where the person is looking, that it state the cost of the step and of
+the drawing as two numbers while the run continues, and that it state how many
+units the world holds beside how many it shows.
+
+**The population pair stays on the glass.** Both numbers, both labelled. That
+statement asks for something a watcher reads continuously, and it costs two
+rows.
+
+**The other three appear while a watcher holds a key.** One key reveals the
+faction legend, the ground legend, the camera position and the cost. They are
+the quantities a watcher checks occasionally rather than continuously, and one
+mechanism serves all three.
+
+**The options.**
+
+1. **A legend on a key.** Keeps every statement true. Adds no state that lives
+   between frames: the caller passes what the keyboard says, in the same way it
+   passes the camera.
+2. **Supersede the product record.** Write a record saying the window shows the
+   moment and the inspection path holds the record. Honest, and it spends a
+   shipped product record.
+3. **A thin strip of swatches, always on.** Names the colours permanently in
+   about twelve pixels, and states no count.
+
+**Option one, and the reason is that it needs no product decision at all.** A
+legend that appears on a key is the window naming its colours. Reading the
+record as "always visible" is a reading and not a requirement. Option two
+spends a record to buy what option one gives free. Option three was kept as the
+fallback if a held key proved unworkable in the window, and it did not.
+
+**What would reverse this.** A watcher who cannot find the key. The window says
+what the key does on a line that is always visible, so the test is whether a
+person reads that line.
+
+
 ### DEC-075 — Does the cell summary carry one resource total, or one for each kind?
 
 **Closed. Food alone. The summary carries one resource total.**
@@ -827,10 +871,22 @@ one placement and it cannot buy a second: the next section forces the same
 choice again, which the reach item already predicted. The order should now be
 read as evidence in that item rather than as a solution.
 
-**The recommendation for the reach item is the scroll.** The fold needs a name
+**The recommendation for the reach item was the scroll.** The fold needs a name
 and a state for each section, the second column needs a width the
 demonstration window does not have, and the scroll needs one number that the
 viewer already has a place for beside the camera.
+
+**The project owner chose otherwise, and the recommendation is superseded.**
+They asked for a heads-up overlay: the window shows only what changes moment to
+moment, drawn over the map, and every other number moves to a rendered picture
+and to the terminal. They accepted the trade that goes with it, which is the
+best-looking demonstration and a worse window for diagnosis.
+
+A scroll would have made thirteen sections reachable. The owner did not want
+thirteen sections in the window at all, which is a different answer to a
+different question, and it is theirs to give. The register row stays, because a
+later contributor who reaches for a scroll should find the reasoning and the
+outcome together rather than the reasoning alone.[^DEC78B]
 
 
 ### DEC-063 — Which verb puts a unit in the world from the control plane?
@@ -1874,4 +1930,6 @@ a failed founding is correct.[^PRD12]
 [^DEC83D]: Review 0204, the two corrected records. `docs/reviews/0204-the-two-corrected-records.md`
 [^DEC77A]: ADR-0064, a unit chooses by scoring a small fixed option set, decision D2. `docs/adrs/accepted/adr-0064-a-unit-chooses-by-scoring-a-small-fixed-option-set.md`
 [^DEC77B]: ADR-0070, the head-up display reports what the drawing pass read, decision D1. `docs/adrs/accepted/adr-0070-the-head-up-display-reports-what-the-drawing-pass-read.md`
-[^DEC78A]: Backlog item 0133. `docs/backlog/proposed/0133-let-a-watcher-reach-a-panel-longer-than-the-window.md`
+[^DEC78A]: Backlog item 0133. `docs/backlog/complete/0133-let-a-watcher-reach-a-panel-longer-than-the-window.md`
+[^DEC78B]: Decisions register, DEC-084, in this document.
+[^DEC84B]: PRD-0005, a watcher can tell what is happening and why. `docs/product/shipped/prd-0005-a-watcher-can-tell-what-is-happening-and-why.md`
