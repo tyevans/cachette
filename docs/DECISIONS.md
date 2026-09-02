@@ -27,36 +27,50 @@ precedent.[^ALLOC]
 
 ## Open
 
-### DEC-063 — Does the control plane put one unit in the world at a time?
+### DEC-063 — Which verb puts a unit in the world from the control plane?
 
-**Open. The recommendation is to keep the per-unit verb and to add a set-valued
-verb before any caller loops.**
+**Open. The recommendation is to expose the founding run as the verb a caller
+should reach for, and to keep the per-unit pair for the case founding cannot
+reach.**
 
 The bindings now spawn one soldier, order it to gather, and remove it. Each
 call names one unit. The work that added them needed a unit in the world,
-because the gather event names a unit and nothing on the Python side could make
-one. A column that nothing can fill is an inert capability.[^SHAPE3]
+because the gather event names a unit and nothing on the Python side could
+make one. A column that nothing can fill is an inert capability.[^SHAPE3]
 
 **Why this is a question.** The design principle says Python builds a selector
 and sends one command, and that Python never loops over entities.[^ORIENT] A
-per-unit spawn verb does not break that rule on its own. A caller that spawns a
-population with it does. Nothing today refuses that caller.
+per-unit spawn verb does not break that rule on its own. A caller that builds a
+population with it does, and nothing today refuses that caller. The verb is
+also lower than the engine's own path: a real run seats a group through the
+founding, which is one command for a set and is therefore the shape the rule
+asks for.[^DEC63A]
 
 **The options.**
 
-1. Keep the per-unit verb. Add a set-valued spawn verb when a caller wants many
-   units, and refuse the loop at that point.
-2. Withdraw the per-unit verb and ship only a set-valued spawn verb now.
-3. Mark the per-unit verb as a test fixture and keep it out of the public
-   package.
+1. Expose the founding run, and withdraw the per-unit pair.
+2. Expose the founding run as the verb a caller should reach for, and keep the
+   per-unit pair.
+3. Keep the per-unit pair alone, and add a set-valued verb when a caller wants
+   many units.
+4. Mark the per-unit pair as a test fixture and keep it out of the package.
 
-**The recommendation is option 1.** A world is built once and stepped many
-times, so the spawn path is not the hot path the rule protects. Option 2 costs
-a selector API that nothing has designed. Option 3 puts one verb in two places
-and states no rule that a reader can check.
+**The recommendation is option 2.** Option 1 was tried against the code and
+does not hold today. **A founding never frees a slot that a later founding
+reuses.** The only death path is starvation, and reaching it from the control
+plane needs a large world, a long run, and a verb that removes the production
+rate the founding set.[^DEC63B] The identity rule this work exists to protect
+is exactly the reuse case, so a boundary that cannot reach it cannot be tested
+at that boundary.[^DEC63C]
 
-**What holds it back.** Nothing. The verb exists and works. The question is
-what the project promises about it.
+Option 3 leaves the engine's own population path unreachable from the control
+plane. Option 4 puts one verb in two places and states no rule a reader can
+check.
+
+**What holds it back.** Nothing technical. The verbs exist and work. The
+question is what the project promises about them, and that promise decides
+whether a later selector API has to take the per-unit verb back. A backlog item
+holds the work of exposing the founding run.[^DEC63D]
 
 ### DEC-057 — Does a site store its resident count, or read the one the engine keeps?
 
@@ -1135,6 +1149,10 @@ a failed founding is correct.[^PRD12]
 [^ORIENT]: Project orientation, the design principles. `CLAUDE.md`
 [^SHAPE1]: Recurring Defect Shapes, shape 1. `.claude/rules/recurring-defects.md`
 [^SHAPE3]: Recurring Defect Shapes, shape 3. `.claude/rules/recurring-defects.md`
+[^DEC63A]: PRD-0012, a world starts small and grows. `docs/product/accepted/prd-0012-a-world-starts-small-and-grows.md`
+[^DEC63B]: The founded group tests. `crates/cachette-core/tests/founded_group_survives.rs`
+[^DEC63C]: ADR-0085, an entity crosses to Python as one opaque identity that the engine resolves, decision D3. `docs/adrs/draft/adr-0085-an-entity-crosses-to-python-as-one-opaque-identity.md`
+[^DEC63D]: Backlog item 0161. `docs/backlog/proposed/0161-let-the-control-plane-found-a-group.md`
 [^TEST2A]: Testing rules, section 2a. `.claude/rules/testing.md`
 [^PRD12]: PRD-0012, a world starts small and grows. `docs/product/accepted/prd-0012-a-world-starts-small-and-grows.md`
 [^FND022]: Findings register, FND-022. `docs/FINDINGS.md`

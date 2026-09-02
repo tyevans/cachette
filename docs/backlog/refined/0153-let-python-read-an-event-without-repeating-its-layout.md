@@ -66,6 +66,15 @@ adds the smallest set of verbs that fills it: spawn a soldier, tell it to
 gather, and remove it. Those verbs open a question about the control plane,
 which the decisions register holds.[^13]
 
+**Why the founding run does not replace them.** The founding is the engine's
+own way to put units in a world, and it is one command for a set.[^14] It
+cannot serve here. A founding never frees a slot that a later founding reuses,
+so it cannot produce the case this work exists to refuse: an identity whose
+slot has passed to another unit. The only death path is starvation, and
+reaching it from the control plane needs a large world, a long run and a verb
+that removes the rate the founding set.[^15] A separate item holds the work of
+exposing the founding run.[^16]
+
 ## What it must not do
 
 It must not add a `struct` format string to Python. That is the defect.
@@ -118,3 +127,6 @@ Filled in when the item moves to `complete/`.
 [^11]: Testing Rules, section 2. `.claude/rules/testing.md`
 [^12]: Recurring Defect Shapes, shape 3. `.claude/rules/recurring-defects.md`
 [^13]: Decisions register, DEC-063. `docs/DECISIONS.md`
+[^14]: PRD-0012, a world starts small and grows. `docs/product/accepted/prd-0012-a-world-starts-small-and-grows.md`
+[^15]: The founded group tests. `crates/cachette-core/tests/founded_group_survives.rs`
+[^16]: Backlog item 0161. `docs/backlog/proposed/0161-let-the-control-plane-found-a-group.md`
