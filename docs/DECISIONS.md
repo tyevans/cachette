@@ -113,6 +113,56 @@ contributor who adds a tile field.
 
 **Who decides.** A reviewer. The author of ADR-0088 is not one.
 
+## Open
+
+### DEC-067 — Does a plane that carries the state of a solver belong above level 0?
+
+**Open. Engineering owns it. It blocks the acceptance of ADR-0087.**
+
+ADR-0022 D1 states that level 0 is the only source of truth, that every fact
+about the world is stored once at level 0, and that a value which appears only
+at level 1 is a defect.[^DEC67LEVEL] D2 states that a level 1 cell equals the
+exact combination of the level 0 tiles it covers.
+
+The influence field breaks the first sentence and makes no claim under the
+second. It is a plane over the level 1 cell lattice. Its value at a cell is the
+result of a relaxation that reads the neighbours of that cell, so it is not the
+combination of the tiles the cell covers and it never claims to be. It also
+carries from one tick to the next: a solve applies a fixed number of relaxation
+passes to the field the last solve left, and that is what makes the writ of a
+ruler reach further than the passes of one tick.[^DEC67ADR] Remove the source
+and the field falls from the edge inward, which is the behaviour the project
+already chose for a faction with no ruler.[^DEC67041]
+
+**Why a solve from zero does not answer it.** A solve that starts at zero on
+every tick is a pure function of level 0 and satisfies D1. It also reaches only
+as far as its pass count, so a field with a small fixed pass count would cover
+a few cells and no more. Raising the pass count until the field spans the world
+puts the whole propagation into one tick, which is the cost the research
+removes by keeping the plane.[^DEC67REPORT] A solve from zero also erases the
+decay behaviour, because a field with no source is zero at once rather than
+falling from the edge.
+
+**Option A. Amend ADR-0022 D1 to name the case.** A record that supersedes it
+says that a plane which is not a summary may hold solver state above level 0,
+and states what such a plane must not do: it must not be read as a summary, and
+no consumer may treat it as the exact combination of anything.
+
+**Option B. Give the plane a level 0 home.** Store the field at level 0 and
+summarise it into level 1. That restores D1 by making the level 1 value a
+combination, and it multiplies the storage by the tiles that a cell covers.
+
+**Option C. Leave D1 as it is and read it narrowly.** D1 governs the summary
+pyramid, and an influence plane is not part of it. Nothing changes except the
+reading.
+
+**Recommendation: A.** Option B pays the tile count for a quantity the research
+shows is correctly sampled at level 1, and it stores a field at a resolution no
+consumer reads.[^DEC67REPORT] Option C leaves the reading in the head of a
+reviewer, which is the failure this project has already recorded: a decision
+that nobody wrote down becomes an assumption, and a later contributor trades it
+away.[^DEC67DOD]
+
 ### DEC-062 — Do the settlement arena and the character arena reserve their storage too?
 
 **Open. The recommendation is that both reserve, and that the character arena
@@ -1350,3 +1400,8 @@ a failed founding is correct.[^PRD12]
 [^DEC68D]: ADR-0088, a tile field is a generated base and a stored change, decision D1. `docs/adrs/draft/adr-0088-a-tile-field-is-a-generated-base-and-a-stored-change.md`
 [^DEC68E]: Findings register, FND-081. `docs/FINDINGS.md`
 [^DEC68F]: Decision Record Scope, section 7. `.claude/rules/adr-scope.md`
+[^DEC67LEVEL]: ADR-0022, level 0 is the only truth, and every level above it is derived, decisions D1 and D2. `docs/adrs/accepted/adr-0022-level-0-is-the-only-truth-and-every-level-above-it-is-derived.md`
+[^DEC67ADR]: ADR-0087, an influence solve runs a fixed iteration count over the whole plane. `docs/adrs/draft/adr-0087-an-influence-solve-runs-a-fixed-iteration-count.md`
+[^DEC67041]: Decisions register, DEC-041, in this document.
+[^DEC67REPORT]: Influence maps, sections 4 and 6. `docs/research/reports/09-influence-maps.md`
+[^DEC67DOD]: Definition of Done, section 2. `.claude/rules/definition-of-done.md`

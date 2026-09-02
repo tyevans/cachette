@@ -40,6 +40,7 @@ use crate::hash::StateHash;
 use crate::hex::{Axial, Grid, GridError, NEIGHBOUR_COUNT};
 use crate::holding::{FactionMask, Holder, Holding};
 use crate::household;
+use crate::influence::{Influence, InfluenceError, InfluenceField};
 use crate::pyramid::{CellSummary, Pyramid};
 use crate::rates::{RateError, RateLedger, RateSchedule, RateTable, SiteShortfall};
 use crate::resource::{
@@ -133,6 +134,17 @@ pub enum StepError {
     Consumption(CohortError),
     /// The choice pass refused to run.
     Choice(ChoiceError),
+    /// The influence solve refused to run.
+    Influence(InfluenceError),
+}
+
+impl From<InfluenceError> for StepError {
+    fn from(error: InfluenceError) -> Self {
+        match error {
+            InfluenceError::ZeroThreads => Self::ZeroThreads,
+            other => Self::Influence(other),
+        }
+    }
 }
 
 impl From<ChoiceError> for StepError {
@@ -188,6 +200,14 @@ pub enum WorldError {
     ///
     /// [^1]: Budgets and costs, the scale constants. `docs/reference/budgets.md`
     FactionCountAboveCeiling(u16),
+    /// The influence field refused to build.
+    Influence(InfluenceError),
+}
+
+impl From<InfluenceError> for WorldError {
+    fn from(error: InfluenceError) -> Self {
+        Self::Influence(error)
+    }
 }
 
 impl From<BridgeError> for WorldError {
@@ -205,6 +225,9 @@ impl core::fmt::Display for WorldError {
                 formatter,
                 "the world asks for {count} factions, and the ceiling is {FACTION_CEILING}"
             ),
+            Self::Influence(error) => {
+                write!(formatter, "the world has no influence field: {error:?}")
+            }
         }
     }
 }
@@ -231,6 +254,9 @@ impl core::fmt::Display for StepError {
                 write!(formatter, "the consumption pass refused: {error}")
             }
             Self::Choice(error) => write!(formatter, "the choice pass refused: {error}"),
+            Self::Influence(error) => {
+                write!(formatter, "the influence solve refused: {error:?}")
+            }
         }
     }
 }
@@ -374,6 +400,19 @@ pub struct World {
     ///
     /// [^1]: ADR-0053, a faction is a bit in a mask, and a relation is a plane, decision D2. `docs/adrs/accepted/adr-0053-a-faction-is-a-bit-in-a-mask-and-a-relation-is-a-plane.md`
     holding: Holding,
+    /// What each faction reaches, over the level 1 cell lattice.
+    ///
+    /// The field is a plane over the level 1 cells and it is not a summary:
+    /// a cell of it is the result of a relaxation that reads the neighbours
+    /// of the cell, and it carries what the last solve left. The record
+    /// states the boundary that draws against the record which owns level 0,
+    /// and an open choice asks a reviewer to settle it.[^1] [^2]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0087, an influence solve runs a fixed iteration count over the whole plane. `docs/adrs/draft/adr-0087-an-influence-solve-runs-a-fixed-iteration-count.md`
+    /// [^2]: Decisions register, DEC-067. `docs/DECISIONS.md`
+    influence: InfluenceField,
     /// When the site rates apply.
     schedule: RateSchedule,
     /// The production rate and the upkeep rate of each site.
@@ -450,6 +489,13 @@ impl World {
         // [^2]: PRD-0003, a developer sees a world worth looking at, what it costs at the target scale. `docs/product/accepted/prd-0003-a-developer-sees-a-world-worth-looking-at.md`
         let values = TileValues::new(config.seed, grid);
         let layout = BlockLayout::new(grid, BLOCK_BITS_DEFAULT)?;
+        // The influence field is a plane over the level 1 cells, so its
+        // lattice is the block lattice at the pitch of one block. It is a hex
+        // grid for the same reason level 0 is one, and building it here means
+        // the field states no geometry of its own.[^1]
+        //
+        // [^1]: ADR-0017, the world is a rhombus, so a tile index is raw axial, decision D4. `docs/adrs/accepted/adr-0017-the-world-is-a-rhombus-so-a-tile-index-is-raw-axial.md`
+        let cell_lattice = Grid::new(layout.blocks_wide(), layout.blocks_high())?;
         let soldiers = SoldierArena::new(grid, config.unit_capacity);
         let settlements = SettlementArena::new(grid);
         // The character tier states its own ceiling, and the arena checks
@@ -478,6 +524,7 @@ impl World {
             departed: [0; RESOURCE_KIND_COUNT],
             pyramid: Pyramid::new(layout, terrain)?,
             holding: Holding::new(layout),
+            influence: InfluenceField::new(cell_lattice, config.faction_count)?,
             schedule: RateSchedule::DEFAULT,
             rates: RateTable::new(),
             rate_ledger: RateLedger::ZERO,
@@ -502,6 +549,13 @@ impl World {
             &world.bridge,
             1,
         )?;
+        // The conductance of a cell follows the ground it covers, and the
+        // ground does not change for the life of a world, so this runs once
+        // and never again. It reads the level that the rebuild above just
+        // filled rather than sweeping the tiles a second time.[^1]
+        //
+        // [^1]: ADR-0022, level 0 is the only truth, and every level above it is derived, decision D2. `docs/adrs/accepted/adr-0022-level-0-is-the-only-truth-and-every-level-above-it-is-derived.md`
+        world.influence.read_the_ground(world.pyramid.cells())?;
         Ok(world)
     }
 
@@ -1916,6 +1970,10 @@ impl World {
         // diverge on the next application.
         let hash = self.need_rule.hash_into(hash);
         let hash = self.cohorts.hash_into(hash);
+        // What each faction reaches is state that a later frame reads: the
+        // next solve starts from the field this one left. Two worlds that
+        // hold the same tiles and different fields must diverge.
+        let hash = self.influence.hash_into(hash);
         let mut hash = self.draw_ledger.hash_into(hash);
         for total in &self.store_account {
             hash = hash.write_u64(total.0 as u64);
@@ -1942,6 +2000,16 @@ impl World {
             return false;
         }
         if self.grid.width() != self.config.width || self.grid.height() != self.config.height {
+            return false;
+        }
+        // The influence lattice and the block layout state the shape of
+        // level 1, and they state it in two places. This is what fails when
+        // the two disagree.[^1]
+        //
+        // [^1]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`
+        if self.influence.cells().tile_count() != self.pyramid.layout().block_count()
+            || self.influence.faction_count() != self.config.faction_count
+        {
             return false;
         }
         let ceiling = self.config.faction_count.max(1);
@@ -2598,6 +2666,15 @@ impl World {
             &self.bridge,
             threads,
         )?;
+
+        // The influence solve runs last, after every change this frame made
+        // and after the derived level it reads was rebuilt. It runs the same
+        // fixed number of passes whatever the field holds and whatever the
+        // sources hold, and it takes no branch on whether a source
+        // exists.[^16]
+        //
+        // [^16]: ADR-0087, an influence solve runs a fixed iteration count over the whole plane, decision D1. `docs/adrs/draft/adr-0087-an-influence-solve-runs-a-fixed-iteration-count.md`
+        self.influence.solve(threads)?;
         Ok(&self.log)
     }
 
@@ -2778,6 +2855,73 @@ impl World {
     #[must_use]
     pub fn summary_covering(&self, address: Axial) -> Option<CellSummary> {
         self.pyramid.cell_covering(address)
+    }
+
+    /// Returns what one faction reaches at the cell that covers one tile.
+    ///
+    /// This is the whole of the read side, and it is one gather from the
+    /// level the caller already reads. Nothing walks from a unit to its
+    /// faction and nothing asks who rules a tile.[^1]
+    ///
+    /// Returns `None` when the faction is outside the set the world holds, or
+    /// when the address lies outside the world.
+    ///
+    /// # References
+    ///
+    /// [^1]: Decisions register, DEC-040. `docs/DECISIONS.md`
+    #[must_use]
+    pub fn influence(&self, faction: FactionId, address: Axial) -> Option<Influence> {
+        self.influence.at(faction, self.influence_cell(address)?)
+    }
+
+    /// Returns the influence field of the world.
+    ///
+    /// A caller that reads more than one cell reads the field rather than
+    /// calling the point query in a loop.
+    #[must_use]
+    pub const fn influence_field(&self) -> &InfluenceField {
+        &self.influence
+    }
+
+    /// Sets what one faction injects at the cell that covers one tile.
+    ///
+    /// The world holds no rule that decides this value. A rule that writes a
+    /// source term lives above the engine, and its absence is not a case: a
+    /// source of zero is the ordinary value and no pass branches on it.[^1]
+    ///
+    /// Returns `false` when the faction or the address is outside the world.
+    ///
+    /// # References
+    ///
+    /// [^1]: Decisions register, DEC-041. `docs/DECISIONS.md`
+    pub fn set_influence_source(
+        &mut self,
+        faction: FactionId,
+        address: Axial,
+        source: Influence,
+    ) -> bool {
+        let Some(cell) = self.influence_cell(address) else {
+            return false;
+        };
+        self.influence.set_source(faction, cell, source)
+    }
+
+    /// Returns the address, on the level 1 cell lattice, of the cell that
+    /// covers one tile.
+    ///
+    /// The lattice is the block lattice at the pitch of one block, so the
+    /// conversion is the block of the tile read as an address. It goes
+    /// through the reader that already names the cell of a tile, so the world
+    /// states that conversion once.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`
+    #[must_use]
+    fn influence_cell(&self, address: Axial) -> Option<Axial> {
+        let tile = self.grid.index_of(address)?;
+        let block = self.cell_of(tile)?;
+        self.influence.cells().address_of(TileIdx(block))
     }
 
     /// Rebuilds level 1 from level 0.

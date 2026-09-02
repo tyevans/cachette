@@ -26,18 +26,35 @@
 //! on it. With the sort removed, who enters a full tile follows the join
 //! order, and the join order follows the thread count.[^2]
 //!
+//! The feature also perturbs the influence solve, in two ways, because the
+//! two defects the solve must not carry are not visible to one test.
+//!
+//! The first stops the solve when a pass changed nothing, which is the
+//! convergence test that the record forbids.[^3] It is deterministic across
+//! thread counts, so the thread-count test passes over it and only a test of
+//! the pass count sees it. That is the case the testing rule names: a defect
+//! that repeats gives one answer at every thread count.[^4]
+//!
+//! The second makes a pass read a neighbour outside the run it is filling as
+//! nothing, which is a stencil that lost its halo. The run boundary follows
+//! the thread count, so the field follows it too.[^1]
+//!
 //! # References
 //!
+//! [^3]: ADR-0087, an influence solve runs a fixed iteration count over the whole plane, decision D1. `docs/adrs/draft/adr-0087-an-influence-solve-runs-a-fixed-iteration-count.md`
+//! [^4]: Testing rules, section 2. `.claude/rules/testing.md`
 //! [^1]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`, and ADR-0001, one binary gives one answer at any thread count, decision D5. `docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
 //! [^2]: ADR-0056, movement is tile-discrete and admitted by sort-then-admit, decision D3. `docs/adrs/accepted/adr-0056-movement-is-tile-discrete-and-admitted-by-sort-then-admit.md`
 #![cfg(feature = "probe-nondeterminism")]
 
 use cachette_core::cohort::{NeedRule, NEED_FULL};
+use cachette_core::influence::PASSES_FOR_EACH_SOLVE;
 use cachette_core::resource::{Amount, ResourceKind};
 use cachette_core::site::CommodityId;
 use cachette_core::slots::{Candidate, Slots};
 use cachette_core::terrain::TileKind;
 use cachette_core::{Axial, CarryLoad, FactionId, Fix32, Grid, Terrain, World, WorldConfig};
+use cachette_core::{Conductance, Influence, InfluenceField, TileIdx};
 
 /// The scenario. It must hold more tiles than threads, so that a run at
 /// twelve threads fills more than one output slot.
@@ -706,4 +723,144 @@ fn the_perturbed_scan_ends_the_same_units_in_a_different_order() {
     at_one.sort_unstable();
     at_twelve.sort_unstable();
     assert_eq!(at_one, at_twelve);
+}
+
+/// The edge of the cell lattice that the influence probe reads.
+///
+/// The lattice holds more slots than the highest thread count below, so a run
+/// at twelve threads fills more than one run and the run boundaries are real.
+const INFLUENCE_EDGE: u32 = 24;
+
+/// The cell that the influence probe injects at.
+const INFLUENCE_SEAT: Axial = Axial::new(6, 8);
+
+/// The solves that bring the influence probe to rest.
+const INFLUENCE_SOLVES: usize = 30;
+
+/// Builds a field with one source, and returns every cell after a run at one
+/// thread count.
+fn influence_after_a_run(threads: usize) -> Vec<u16> {
+    let cells = Grid::new(INFLUENCE_EDGE, INFLUENCE_EDGE).expect("the extent describes a grid");
+    let mut field = InfluenceField::new(cells, 2).expect("two factions are inside the ceiling");
+    let mut plane = vec![Conductance::FREE; cells.tile_count() as usize];
+    for row in 0..16 {
+        let index = cells
+            .index_of(Axial::new(12, row))
+            .expect("the address is inside the lattice");
+        plane[index.0 as usize] = Conductance(128);
+    }
+    field
+        .set_conductance(plane)
+        .expect("the plane covers the lattice");
+    assert!(field.set_source(FactionId(0), INFLUENCE_SEAT, Influence::UNIT));
+    for _ in 0..INFLUENCE_SOLVES {
+        field.solve(threads).expect("the thread count is not zero");
+    }
+
+    let mut out = Vec::new();
+    for faction in 0..field.faction_count() {
+        for index in 0..cells.tile_count() {
+            let address = cells
+                .address_of(TileIdx(index))
+                .expect("the index is inside the lattice");
+            out.push(
+                field
+                    .at(FactionId(faction), address)
+                    .expect("the faction and the cell are inside the field")
+                    .0,
+            );
+        }
+    }
+    out
+}
+
+#[test]
+fn the_influence_thread_count_test_fails_when_a_pass_loses_its_halo() {
+    // The probe makes a pass read a neighbour outside the run it is filling
+    // as nothing. At one thread the run is the whole plane, so the field is
+    // unchanged. At twelve threads the run boundaries cut the stencil, and
+    // the field follows the thread count.
+    //
+    // This is the defect ADR-0009 forbids, and it is invisible to a reviewer:
+    // every cell still holds a plausible value, the solve still runs its
+    // passes, and one machine at one thread count still gives one answer.
+    let at_one = influence_after_a_run(1);
+    let at_twelve = influence_after_a_run(12);
+    assert!(
+        at_one.iter().any(|value| *value > 0),
+        "the probe fixture produced an empty field"
+    );
+    assert_ne!(
+        at_one, at_twelve,
+        "the probe did not perturb the field, so the influence thread-count \
+         assertion has no proven failure mode"
+    );
+}
+
+#[test]
+fn the_perturbed_pass_leaves_the_source_cell_alone() {
+    // The probe changes what a cell reads and nothing else. A probe that also
+    // moved the source would prove less.
+    let at_one = influence_after_a_run(1);
+    let at_twelve = influence_after_a_run(12);
+    assert_eq!(at_one.len(), at_twelve.len());
+    let seat = (INFLUENCE_SEAT.r * INFLUENCE_EDGE as i32 + INFLUENCE_SEAT.q) as usize;
+    assert_eq!(at_one[seat], Influence::UNIT.0);
+    assert_eq!(at_twelve[seat], Influence::UNIT.0);
+}
+
+#[test]
+fn the_pass_count_test_fails_when_the_solve_stops_on_a_convergence_test() {
+    // The probe stops the solve when a pass changed nothing. A field that
+    // holds nothing converges on its first pass, so the solve runs one pass
+    // instead of the constant.
+    //
+    // This defect is invisible to the thread-count test, because the
+    // comparison it reads is exact and its result does not depend on how the
+    // work was split. Only a test of the pass count sees it, which is the
+    // case the testing rule names.[^1]
+    //
+    // [^1]: Testing rules, section 2. `.claude/rules/testing.md`
+    let cells = Grid::new(INFLUENCE_EDGE, INFLUENCE_EDGE).expect("the extent describes a grid");
+    let mut field = InfluenceField::new(cells, 1).expect("one faction is inside the ceiling");
+    field.solve(1).expect("the thread count is not zero");
+    assert!(
+        field.passes() < u64::from(PASSES_FOR_EACH_SOLVE),
+        "the probe did not stop the solve, so the pass-count test has no \
+         proven failure mode"
+    );
+
+    // The stop reads the field and not the clock, so it fires only when the
+    // field is at rest. A field that is still moving runs every pass.
+    let mut moving = InfluenceField::new(cells, 1).expect("one faction is inside the ceiling");
+    assert!(moving.set_source(FactionId(0), INFLUENCE_SEAT, Influence::UNIT));
+    moving.solve(1).expect("the thread count is not zero");
+    assert_eq!(moving.passes(), u64::from(PASSES_FOR_EACH_SOLVE));
+}
+
+#[test]
+fn the_influence_thread_count_test_survives_the_convergence_stop_alone() {
+    // The convergence stop on its own does not move the field between thread
+    // counts: a field that is at rest is at rest at every thread count, and
+    // the stop reads an exact comparison. The assertion below records that
+    // the thread-count test is not the test which guards the pass count.[^1]
+    //
+    // [^1]: Findings register, FND-159. `docs/FINDINGS.md`
+    let cells = Grid::new(INFLUENCE_EDGE, INFLUENCE_EDGE).expect("the extent describes a grid");
+    let mut at_one = InfluenceField::new(cells, 1).expect("one faction is inside the ceiling");
+    let mut at_twelve = InfluenceField::new(cells, 1).expect("one faction is inside the ceiling");
+    for _ in 0..INFLUENCE_SOLVES {
+        at_one.solve(1).expect("the thread count is not zero");
+        at_twelve.solve(12).expect("the thread count is not zero");
+    }
+    assert_eq!(at_one.passes(), at_twelve.passes());
+    for index in 0..cells.tile_count() {
+        let address = cells
+            .address_of(TileIdx(index))
+            .expect("the index is inside the lattice");
+        assert_eq!(
+            at_one.at(FactionId(0), address),
+            at_twelve.at(FactionId(0), address)
+        );
+    }
 }

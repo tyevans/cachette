@@ -213,6 +213,61 @@ grounds.
 
 **Follows:** formation membership is an ownership column with a reverse index.
 
+### FND-159 — A one-byte influence cell loses the field to truncation when the solve iterates
+
+**Believed.** An influence cell is one byte against a fixed reference. The
+research measured the usable gradient of that cell at about 4.4 octaves, which
+it states covers the decision range of every consumer, and it gives a reach of
+about 35 cells.[^F159A]
+
+**True.** The measurement holds for a plane that is computed once. It does not
+hold for a plane that an iterated relaxation writes back into itself. Each
+pass narrows the accumulator to the cell, and the narrowing truncates, so a
+small value loses a whole step on every pass. The tail does not decay at the
+rate the stencil sets; it decays to zero.
+
+**Evidence.** One fixture, one stencil, one source at the ceiling, run to rest
+at one thread on the development machine. With a one-byte cell the field
+reached four cells and every cell beyond that held zero. With a two-byte cell,
+and nothing else changed, the field reached thirteen cells and fell smoothly
+over all of them. The reach is a property of the arithmetic, so it does not
+depend on the machine.
+
+**Follows.** The cell is two bytes wide, and the record states the reason
+beside the decision.[^F159B] The research finding is right about the gradient a
+consumer reads and wrong about the gradient the solve can carry, and the two
+are different quantities.
+
+**The general shape.** A width argument made for a value that is written once
+does not carry to a value that is written repeatedly into itself. Ask how many
+times the narrowing happens before anybody reads it.
+
+### FND-160 — The thread-count test does not guard a fixed iteration count
+
+**Believed.** The two determinism tests catch a solver that stops on a
+convergence test, because a convergence test is the defect the record names
+and the thread-count test is the highest-value test in the project.[^F160A]
+
+**True.** They do not. A convergence test that reads an exact integer
+comparison gives the same answer at every thread count, because the comparison
+does not depend on how the work was split. Both runs stop after the same pass,
+both produce the same field, and the thread-count test compares them and finds
+them equal.
+
+**Evidence.** The perturbed build stops the influence solve when a pass changed
+nothing. Under it the influence thread-count assertion passes, at one thread
+against twelve, over a field solved to rest. The assertion that fails is the
+one that reads the pass count. A second perturbation was needed to give the
+thread-count assertion a failure mode, and it is a different defect: a pass
+that reads a neighbour outside the run it is filling as nothing.[^F160B]
+
+**Follows.** **A fixed iteration count needs its own test, and that test reads
+the count.** This is the case the testing rule states in the general: a defect
+that repeats gives one answer on every thread and on every run, and a test
+which compares two runs cannot see it.[^F160C] The rule named a draw keyed on
+the wrong field. A solver that stops early is the same shape.
+
+
 ## C. Defects found in specified rules
 
 ### FND-011 — The progress accumulator overflows
@@ -4104,3 +4159,8 @@ reader who lists the test names reads the claim the finding corrected.
 [^F162A]: Findings register, FND-086, in this document.
 [^F162B]: Backlog item 0112. `docs/backlog/complete/0112-build-a-world-without-a-pass-over-every-tile.md`
 [^F162D]: Backlog item 0171. `docs/backlog/proposed/0171-build-the-first-level-without-a-pass-over-every-tile.md`
+[^F159A]: Influence maps, section 5.1. `docs/research/reports/09-influence-maps.md`
+[^F159B]: ADR-0060, an influence map is stored as a shared basis, decision D2. `docs/adrs/draft/adr-0060-an-influence-map-is-stored-as-a-shared-basis.md`
+[^F160A]: ADR-0001, one binary gives one answer at any thread count, decision D4. `docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
+[^F160B]: ADR-0009, parallel stages write disjoint outputs, because the memory model is weak. `docs/adrs/accepted/adr-0009-parallel-stages-write-disjoint-outputs.md`
+[^F160C]: Testing rules, section 2. `.claude/rules/testing.md`

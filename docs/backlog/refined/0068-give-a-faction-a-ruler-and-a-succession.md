@@ -221,5 +221,5 @@ Filled in when the item moves to `complete/`.
 [^13]: Decisions register, DEC-040. `docs/DECISIONS.md`
 [^14]: Decisions register, DEC-005. `docs/DECISIONS.md`
 [^15]: ADR Registry, row 0060. `docs/adrs/REGISTRY.md`
-[^16]: Backlog item 0104. `docs/backlog/proposed/0104-carry-the-writ-of-a-ruler-in-the-influence-field.md`
+[^16]: Backlog item 0104. `docs/backlog/refined/0104-carry-the-writ-of-a-ruler-in-the-influence-field.md`
 [^17]: Decisions register, DEC-041. `docs/DECISIONS.md`
