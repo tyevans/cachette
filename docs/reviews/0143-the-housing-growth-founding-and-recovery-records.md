@@ -100,12 +100,12 @@ the way to hold it.
 The record says: "**No code implements this record.** The engine holds the
 residence column. It holds neither a capacity nor an occupancy count."
 
-The first sentence is false and the third is false.
+The first sentence is false. The third is half false: no site holds a housing
+capacity, and the engine does hold a per-site count of residents.
 
 D2 is implemented. The soldier arena holds the home column, the founding writes
 it, and the destroy path clears it.[^2] D4 is honoured, because the destroy path
-reads every unit rather than a reverse index. D1 is not implemented, and no site
-holds a housing capacity.
+reads every unit rather than a reverse index. D1 is not implemented.
 
 The registry requires the acceptance of an unimplemented record to say plainly
 that nothing implements it.[^6] A record that says so wrongly is worse than a
