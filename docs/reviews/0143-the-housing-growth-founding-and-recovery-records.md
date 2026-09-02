@@ -395,6 +395,14 @@ citation check derives the truth from the tree and is what proves the sweep.
 **Nothing was checked against a second reader.** The delegation stands, and a
 review by a second person supersedes this one.[^6]
 
+**Four stale citations were repaired outside the reviewer's own work.** A
+dispatcher commit moved items 0059 and 0060 out of the refined directory and
+left four citations of the old paths behind, in the decisions register, in item
+0136 and in item 0155. The same commit cited a finding that only this branch
+holds. The citation check was red on the trunk for both reasons. The reviewer
+repaired the four paths rather than hand over a red gate, and recorded the
+shape.[^21]
+
 **Backlog items 0059 and 0060 were not repaired.** Both were refined against
 the decisions of ADR-0081, and item 0059 names all four of them. The rejection
 invalidates that impact review, and the dispatcher moved both items back to
@@ -406,7 +414,7 @@ third is half built. The occupancy count exists, split by faction, and a caller
 reads it through the public interface. The invariant check exists, and the test
 that proves the check can fail exists. Only the housing capacity is wholly new.
 A separate finding holds the evidence, because a re-refinement that starts from
-a new record rather than from the code repeats the defect.[^21]
+a new record rather than from the code repeats the defect.[^22]
 
 ## 8. For the registers
 
@@ -416,12 +424,12 @@ a new record rather than from the code repeats the defect.[^21]
   and its citations moved the same way.
 - ADR-0081 stays a `Draft`. Section 1 states what must change.
 - ADR-0082 stays a `Draft`. It moves when ADR-0081 moves.
-- Four findings are recorded.[^1] [^17] [^19] [^21]
+- Five findings are recorded.[^1] [^17] [^19] [^22] [^21]
 - Two open choices are recorded: whether a decision record may cite a product
   record, and how a site answers its resident count.[^7] [^18]
 - **No blocker opens, and the number reserved for one is unused.** The housing
   items are stopped by a choice, not by missing information, and the blockers
-  register says that a choice belongs in the decisions register.[^22] The open
+  register says that a choice belongs in the decisions register.[^23] The open
   row holds it.[^7]
 - No blocker closes.
 
@@ -447,5 +455,6 @@ a new record rather than from the code repeats the defect.[^21]
 [^18]: Decisions register, DEC-056. `docs/DECISIONS.md`
 [^19]: Findings register, FND-130. `docs/FINDINGS.md`
 [^20]: Backlog item 0144. `docs/backlog/proposed/0144-check-the-footnotes-of-a-record.md`
-[^21]: Findings register, FND-131. `docs/FINDINGS.md`
-[^22]: Blockers register, what a blocker is. `docs/BLOCKERS.md`
+[^21]: Findings register, FND-132. `docs/FINDINGS.md`
+[^22]: Findings register, FND-131. `docs/FINDINGS.md`
+[^23]: Blockers register, what a blocker is. `docs/BLOCKERS.md`

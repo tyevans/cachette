@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-132**
+**Next number: FND-133**
 
 ## A. Corrections to stated rules
 
@@ -2921,6 +2921,45 @@ finding names.
 honest about what remains.
 
 
+### FND-132 — A commit that cites a register entry on another branch makes the trunk red
+
+**Believed.** A citation of a register entry that another branch holds is a
+forward reference. The author knows the entry is coming, says so in the commit
+body, and the trunk repairs itself when the other branch lands. Stating the
+dependency in the body is enough.
+
+**True.** The citation check derives the truth from the tree it runs on, not
+from what an author knew. A commit that cites an entry no branch in the trunk
+holds fails the check from the moment it lands until the other branch merges.
+Every worker who runs the gate in between reads a red pipeline that their own
+work did not cause. A commit body cannot make a check pass.
+
+**Evidence.** A dispatcher commit withdrew two backlog items and cited FND-128
+as the reason. FND-128 existed only on the reviewing worker's branch. The
+citation check reported two failures on the trunk against items 0059 and 0060,
+and it kept reporting them until the review branch merged.
+
+The same commit left four citations of the two paths it had moved. It swept for
+citations **to** the rejected record and never searched for citations **of** the
+files it moved. Six failures stood on the trunk in total, from one commit.
+
+**Follows.** Three things.
+
+**Order the merge by what the gate needs, not by what the work needs.** A branch
+that holds a register entry another branch cites must land first. The dispatcher
+reversed the merge order for this reason once the failure was visible, and the
+order is derivable before the failure: whichever branch defines the entry goes
+first.
+
+**A sweep is done when a whole-tree search comes back clean, and the search must
+name the thing that moved.** A search for references to the subject of a change
+is not a search for references to the files the change moved. Both are needed,
+and only the second one catches a rename.[^80]
+
+**Knowing that a citation is forward does not soften it.** Write the register
+entry in the same commit as the work that cites it, or do not cite it yet.
+
+
 ## References
 
 [^1]: Findings register, FND-038, in this document.
@@ -3002,3 +3041,4 @@ honest about what remains.
 [^77]: Findings register, FND-116, in this document.
 [^78]: Findings register, FND-128, in this document.
 [^79]: Review 0143, the housing, growth, founding and recovery records. `docs/reviews/0143-the-housing-growth-founding-and-recovery-records.md`
+[^80]: Commit Message Rules, after a sweep. `.claude/rules/commits.md`
