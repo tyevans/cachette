@@ -147,4 +147,4 @@ and no record was written.
 [^4]: Findings register, FND-078. `docs/FINDINGS.md`
 [^5]: Decision Record Scope, section 1. `.claude/rules/adr-scope.md`
 [^6]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`
-[^7]: Findings register, FND-131. `docs/FINDINGS.md`
+[^7]: Findings register, FND-133. `docs/FINDINGS.md`
