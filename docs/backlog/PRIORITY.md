@@ -28,6 +28,9 @@ engine gets wrong today.
 | No. | Why it sits here |
 |---|---|
 | 0102 | A settlement reads its own ground rule, not the passability rule. Blocked by 0071 and 0092, in that order. |
+| 0185 | The engine computes an option for every unit on every tick and then discards it. Movement reads whether a unit chose, not what it chose, so every pass that feeds the choice feeds one bit. FND-180 records it. Take 0183 and 0184 first, so that the option scores something a system writes. |
+| 0183 | The cell summary carries no resource, no store and no need, so a unit cannot see food however well it chooses. One accumulator. It unblocks 0184. |
+| 0184 | The forage option scores the stub value, which is noise that no other system reads or writes. Follows 0183. |
 
 ## Next
 
@@ -35,6 +38,10 @@ These close a gap a review found, or they unblock the items above.
 
 | No. | Why it sits here |
 |---|---|
+| 0186 | No unit ever gathers, so the resource module, the ledger, the depletion set and the recovery pass are all idle. It also gives 0185 its negative feedback: without it the flow field produces one rush. |
+| 0187 | Nothing moves a carried load into a store, so gathering cannot feed anybody. Follows 0186. |
+| 0188 | The viewer paints noise, and the verb that explains a choice is called by nothing outside the core crate. PRD-0009 asks for that answer. Follows 0183. |
+| 0189 | The rules against inert work look for an absent caller, and this defect has one. DEC-074 holds the options and recommends this. |
 | 0104 | A ruler decides nothing that reaches anybody. DEC-040 carries the writ in the influence field. |
 | 0171 | Building a world still passes over every tile, twice, through the first pyramid level. PRD-0003 states it must not, so the record is still false of the code. Item 0112 removed the third pass and FND-162 records what it left. |
 | 0113 | Admission enforces the capacity from a bridge count that no test compares against a scan. |

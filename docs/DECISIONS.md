@@ -23,9 +23,58 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^ALLOC]
 
-**Next number: DEC-074**
+**Next number: DEC-075**
 
 ## Open
+
+### DEC-074 — How does the project find a value that nothing reads?
+
+**Open. Engineering owns it. The recommendation is Option A.**
+
+The engine writes a value into state, and no stage reads that value to decide
+anything. The option column is the instance: movement reads whether a unit
+chose and not what it chose.[^DEC74FND] The influence field and the tile stub
+value are two more.[^DEC74NOTE]
+
+**The rules the project already holds do not cover it.** Both look for an
+absent caller, and this defect has one.[^DEC74SHAPE] So do the three repairs
+that suggest themselves first. A rule that a person must be able to run the
+feature passes, because the demonstration runs the choice pass on every tick.
+A check that reports a public verb with no caller passes, because the pass and
+the column both have callers. A rule that a backlog item names its caller
+before it is refined passes, because the item named the right caller.
+
+**Option A. State the test against the value.** Add a section to the testing
+rule and one line to the impact review: for each value the work writes into
+state, name the stage that reads it to decide something, and write a test that
+changes the value and asserts that the decision changes. The falsification is
+the one the rule already trusts: pin the value to a constant and watch the
+suite stay green.[^DEC74TEST] The cost is one line in a review and one test for
+each new column.
+
+**Option B. Add a reachability check as a gate.** Derive the callers of every
+public verb from the tree and fail when one has none outside the tests. It
+needs a baseline, because a binding for a control plane nobody has written and
+a reader that a test needs are both legitimately inert. The project carries one
+baseline of this shape already, and its own text records what a baseline costs:
+it can only shrink, and it does not shrink by itself.[^DEC74BASE] It would also
+not catch the instance that opened this row.
+
+**Option C. Derive a register of what the demonstration reaches.** Write the
+set of verbs that the viewer and the bindings call to a reference table, derive
+it from the tree, and fail when the table and the tree disagree. It reports and
+does not judge, so it cries no wolf, and the number moves in the diff where a
+reviewer sees it. It catches nothing by itself.
+
+**Option D. File each instance as a backlog item.** The project does this
+today. Four rows of the priority index name a capability with no caller, and
+each sits under `Later`.[^DEC74PRI] A list of the instances is not a structural
+change.
+
+**Recommendation: A.** It is the only option that catches the instance that
+opened the row, and it costs least. C is cheap and may be taken beside A, but
+not instead of it. B buys a baseline that the project has already learned to
+carry rather than repair. D is what happens if nothing is chosen.
 
 ### DEC-071 — Does the world draw the sex of a character, or does content supply it?
 
@@ -1548,3 +1597,9 @@ a failed founding is correct.[^PRD12]
 
 [^DEC72A]: ADR-0090, a tile upgrade is stored sparsely, as the difference from the generated world, decision D2. `docs/adrs/draft/adr-0090-a-tile-upgrade-is-stored-sparsely.md`
 [^DEC72D]: Findings register, FND-174. `docs/FINDINGS.md`
+[^DEC74FND]: Findings register, FND-180. `docs/FINDINGS.md`
+[^DEC74NOTE]: What a unit does in a tick, sections 1 and 3.4. `docs/research/what-a-unit-does-in-a-tick.md`
+[^DEC74SHAPE]: Findings register, FND-181. `docs/FINDINGS.md`
+[^DEC74TEST]: Testing Rules, section 2a. `.claude/rules/testing.md`
+[^DEC74BASE]: Findings register, FND-130. `docs/FINDINGS.md`
+[^DEC74PRI]: Backlog priority index. `docs/backlog/PRIORITY.md`
