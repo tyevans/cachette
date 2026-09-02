@@ -86,7 +86,9 @@ mod tests {
     fn no_home_names_no_household() {
         let grid = Grid::new(8, 8).expect("the grid is inside the world");
         let mut units = SoldierArena::new(grid, 16);
-        let address = grid.address_of(crate::types::TileIdx(0)).expect("tile zero");
+        let address = grid
+            .address_of(crate::types::TileIdx(0))
+            .expect("tile zero");
         for _ in 0..3 {
             units
                 .spawn(address, FactionId(0))

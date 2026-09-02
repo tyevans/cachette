@@ -44,7 +44,7 @@ Filled in when the item is refined.
 
 ## References
 
-[^1]: Backlog item 0103. `docs/backlog/refined/0103-derive-a-household-from-the-dwelling-slot.md`
+[^1]: Backlog item 0103. `docs/backlog/complete/0103-derive-a-household-from-the-dwelling-slot.md`
 [^2]: ADR-0018, the unit-to-tile bridge is derived, and it rebuilds at the barrier, decisions D1, D3 and D4. `docs/adrs/accepted/adr-0018-the-unit-to-tile-bridge-is-derived-and-rebuilds-at-the-barrier.md`
 [^3]: Findings register, FND-116. `docs/FINDINGS.md`
 [^4]: Blockers register, BLK-007. `docs/BLOCKERS.md`

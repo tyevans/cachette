@@ -1,7 +1,7 @@
 ---
 id: 0103
 title: Derive a household from the dwelling slot
-status: refined
+status: complete
 created: 2026-08-31
 implements: [ADR-0022 D1, ADR-0022 D2, ADR-0004 D1, ADR-0004 D4, ADR-0014 D2]
 changes: []
@@ -115,7 +115,33 @@ should be taken when a measurement asks for it, not before.[^6]
 
 ## Outcome
 
-Filled in when the item moves to `complete/`.
+**Done.** Three readers reach the public interface: a watcher names a dwelling
+and gets its members, hands a buffer it owns and gets the same answer without
+a new allocation, or names a unit and gets the dwelling it lives in. Nothing
+stores a household. The settlement arena gained the reverse of its slot
+reader, so a column that names a settlement slot can give the identity back
+without a caller assembling one.
+
+**A unit leaves a household by moving.** One column holds one slot, so the
+write that puts a unit in a new dwelling is the same write that takes it out
+of the old one. A test asserts both sides.
+
+**The experiment.** Four perturbations went back one at a time. A comparison
+that let a moved unit stay in the dwelling it left, a reversed read order, and
+a removed guard against the value that means no home were each caught. A walk
+over every slot instead of over the live units changed no answer, because the
+arena clears the home of a slot it frees and its invariant states that a dead
+slot names no dwelling. FND-156 records that, and the code cites it.[^8]
+
+**One test passed for the wrong reason and was repaired.** The test that
+proves a household needs no barrier asserted that the roster grew by one, and
+it grew by one under the first perturbation as well. It now names the exact
+membership on both sides of the write.[^9]
+
+**Left undone, on purpose.** The control plane cannot read a household,
+because the binding exposes no settlement and a binding written today would be
+a capability nothing invokes. Item 0168 holds it. No reverse index was built.
+Item 0167 holds it and waits on a measurement.[^6] [^10]
 
 ## References
 
@@ -126,3 +152,6 @@ Filled in when the item moves to `complete/`.
 [^5]: Findings register, FND-131. `docs/FINDINGS.md`
 [^6]: Backlog item 0167. `docs/backlog/proposed/0167-index-the-units-of-one-dwelling.md`
 [^7]: Testing Rules, section 2a. `.claude/rules/testing.md`
+[^8]: Findings register, FND-156. `docs/FINDINGS.md`
+[^9]: Findings register, FND-143 and FND-148. `docs/FINDINGS.md`
+[^10]: Backlog item 0168. `docs/backlog/proposed/0168-let-the-control-plane-read-a-household.md`

@@ -139,7 +139,11 @@ fn build(world: &mut World) -> Fixture {
         empty,
         homeless,
     };
-    assert_eq!(fixture.crowd.len(), CROWD, "the crowded dwelling is crowded");
+    assert_eq!(
+        fixture.crowd.len(),
+        CROWD,
+        "the crowded dwelling is crowded"
+    );
     assert!(
         world
             .household_of(fixture.empty)
@@ -277,7 +281,10 @@ fn a_household_is_readable_before_any_barrier_runs() {
     let mut expected = fixture.crowd.clone();
     expected.push(fixture.lodger);
     expected.sort_by_key(|unit| unit.index());
-    assert_eq!(before, fixture.crowd, "the read before the write is the roster before the write");
+    assert_eq!(
+        before, fixture.crowd,
+        "the read before the write is the roster before the write"
+    );
     assert_eq!(
         after, expected,
         "the read answers the write that came before it, with no barrier between them"

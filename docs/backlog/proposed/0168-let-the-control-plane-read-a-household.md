@@ -44,7 +44,7 @@ Filled in when the item is refined.
 
 ## References
 
-[^1]: Backlog item 0103. `docs/backlog/refined/0103-derive-a-household-from-the-dwelling-slot.md`
+[^1]: Backlog item 0103. `docs/backlog/complete/0103-derive-a-household-from-the-dwelling-slot.md`
 [^2]: Recurring Defect Shapes, section 3. `.claude/rules/recurring-defects.md`
 [^3]: Project orientation, the design principles. `CLAUDE.md`
 [^4]: Backlog item 0161. `docs/backlog/proposed/0161-let-a-selector-say-where-to-act.md`
