@@ -74,8 +74,14 @@ def test_a_client_reaches_every_tool() -> None:
     assert _drive(body) == [
         "build_world",
         "check_invariants",
+        "despawn_unit",
         "event_log",
+        "gather_events",
+        "order_gather",
+        "spawn_unit",
         "step_world",
+        "tile_changes",
+        "unit_tile",
         "world_report",
     ]
 
@@ -181,3 +187,82 @@ def test_transcript() -> None:
             print(f"<- {json.dumps(await _call(session, name, **arguments))}")
 
     _drive(body)
+
+
+def test_a_client_reads_which_tile_changed() -> None:
+    # FND-137 recorded what the server could not do: an agent could prove
+    # two runs emitted the same log and could not see which tile changed.
+    # This is the test of the answer, driven through a real client.
+    async def body(session: ClientSession) -> dict[str, Any]:
+        built = await _call(session, "build_world", width=8, height=8, seed=7)
+        await _call(session, "step_world", world=built["world"], ticks=1)
+        return await _call(session, "tile_changes", world=built["world"], limit=4)
+
+    report = _drive(body)
+    assert report["event_count"] > 0
+    assert report["rows_returned"] == min(4, report["event_count"])
+    assert len(report["changes"]) == report["rows_returned"]
+    for row in report["changes"]:
+        assert set(row) == {"tile", "value", "holder", "kind"}
+        assert isinstance(row["value"], int)
+        assert 0 <= row["tile"] < 64
+
+
+def test_a_client_follows_the_unit_that_took_a_resource() -> None:
+    # The gather event names a unit. The identity crosses whole, and the
+    # client gives it back without taking it apart.
+    async def body(session: ClientSession) -> tuple[dict[str, Any], dict[str, Any]]:
+        built = await _call(session, "build_world", width=16, height=16, seed=7)
+        name = built["world"]
+        units: list[int] = []
+        for q in range(16):
+            for r in range(16):
+                result = await session.call_tool(
+                    "spawn_unit", {"world": name, "q": q, "r": r, "faction": 0}
+                )
+                if getattr(result, "is_error", False):
+                    continue
+                structured = getattr(result, "structured_content", None)
+                assert isinstance(structured, dict)
+                units.append(int(structured["unit"]))
+        assert units, "the world must admit a unit"
+        for unit in units:
+            await _call(session, "order_gather", world=name, unit=unit, kind=0)
+
+        grants: dict[str, Any] = {}
+        for _ in range(8):
+            await _call(session, "step_world", world=name, ticks=1)
+            grants = await _call(session, "gather_events", world=name, limit=4)
+            if grants["event_count"]:
+                break
+        assert grants["event_count"], "the fixture must produce a gather event"
+        followed = await _call(
+            session, "unit_tile", world=name, unit=grants["grants"][0]["unit"]
+        )
+        return grants, followed
+
+    grants, followed = _drive(body)
+    first = grants["grants"][0]
+    assert first["amount"] > 0
+    assert followed["tile"] == first["tile"]
+
+
+def test_the_identity_of_a_removed_unit_is_a_tool_error() -> None:
+    # ADR-0085 D3: the engine refuses a stale identity. It never reports on
+    # the unit that now holds the slot. The refusal must reach the client
+    # as an error and not as a plausible answer.
+    async def body(session: ClientSession) -> tuple[bool, dict[str, Any]]:
+        built = await _call(session, "build_world", width=8, height=8, seed=7)
+        name = built["world"]
+        dead = (await _call(session, "spawn_unit", world=name, q=0, r=0))["unit"]
+        await _call(session, "despawn_unit", world=name, unit=dead)
+        living = (await _call(session, "spawn_unit", world=name, q=0, r=0))["unit"]
+        assert living != dead
+        stale = await session.call_tool("unit_tile", {"world": name, "unit": dead})
+        return bool(getattr(stale, "is_error", False)), await _call(
+            session, "unit_tile", world=name, unit=living
+        )
+
+    refused, alive = _drive(body)
+    assert refused, "the dead identity must refuse"
+    assert alive["tile"] == 0

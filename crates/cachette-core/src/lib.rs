@@ -67,4 +67,4 @@ pub use sort::{SortError, SortKey};
 pub use terrain::{Terrain, TerrainTile, TileKind};
 pub use tier::{EntityTier, Shape, CHARACTER_CEILING};
 pub use types::{Accum, Entity, FactionId, Fix32, Tick, TileIdx};
-pub use world::{StepError, World, WorldConfig, WorldError};
+pub use world::{IdentityError, StepError, World, WorldConfig, WorldError};

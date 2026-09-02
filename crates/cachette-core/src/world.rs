@@ -56,6 +56,61 @@ use crate::sort::{BoundedKey, SortError};
 use crate::terrain::{Terrain, TerrainTile, TileKind};
 use crate::types::{Accum, Entity, FactionId, Fix32, Tick, TileIdx, FACTION_CEILING};
 
+/// The reason that a value did not name a live entity.
+///
+/// A caller outside this crate cannot build an identity, so it names one by
+/// the value the engine gave it. That value can be stale, and it can be
+/// nothing the engine ever gave. The variants below tell the two apart, so
+/// that a boundary can report which one happened.[^1]
+///
+/// # References
+///
+/// [^1]: ADR-0085, an entity crosses to Python as one opaque identity that the engine resolves, decision D3. `docs/adrs/draft/adr-0085-an-entity-crosses-to-python-as-one-opaque-identity.md`
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum IdentityError {
+    /// The value is not an identity at all. The engine never gives out zero.
+    NotAnIdentity,
+    /// The value names a slot that the arena does not hold.
+    NoSuchSlot {
+        /// The slot that the value named.
+        slot: u32,
+    },
+    /// The slot exists and holds a later generation, so the entity is dead.
+    ///
+    /// The arena may have given the slot to another entity. Resolution
+    /// refuses rather than return that entity.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0014, entity identity is an index plus a generation, decision D2. `docs/adrs/accepted/adr-0014-entity-identity-is-an-index-plus-a-generation.md`
+    Stale {
+        /// The slot that the value named.
+        slot: u32,
+        /// The generation that the value carried.
+        given: u32,
+        /// The generation that the arena holds for the slot.
+        held: u32,
+    },
+}
+
+impl core::fmt::Display for IdentityError {
+    fn fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            Self::NotAnIdentity => write!(formatter, "the value is not an identity"),
+            Self::NoSuchSlot { slot } => {
+                write!(formatter, "the arena holds no slot {slot}")
+            }
+            Self::Stale { slot, given, held } => write!(
+                formatter,
+                "the identity names slot {slot} at generation {given}, \
+                 and the arena holds generation {held} there"
+            ),
+        }
+    }
+}
+
+impl std::error::Error for IdentityError {}
+
 /// The reason that a step refused to run.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum StepError {
@@ -1375,6 +1430,42 @@ impl World {
             Some(kind) if !kind.is_passable() => Err(SoldierError::TileImpassable(address)),
             _ => Ok(()),
         }
+    }
+
+    /// Resolves the value of an identity back to the soldier it names.
+    ///
+    /// A caller outside this crate holds an identity as the value that
+    /// [`Entity::to_bits`] gave. It cannot build one, and this is the only
+    /// way back.[^1]
+    ///
+    /// The call compares the generation the value carries against the
+    /// generation the arena holds for the slot. It refuses a mismatch. It
+    /// never returns the soldier that now occupies the slot, because that
+    /// soldier is not the one the caller named.[^2]
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the value is not an identity, when the arena
+    /// holds no such slot, or when the slot holds a later generation.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0085, an entity crosses to Python as one opaque identity that the engine resolves, decisions D2 and D3. `docs/adrs/draft/adr-0085-an-entity-crosses-to-python-as-one-opaque-identity.md`
+    /// [^2]: ADR-0014, entity identity is an index plus a generation, decision D2. `docs/adrs/accepted/adr-0014-entity-identity-is-an-index-plus-a-generation.md`
+    pub fn resolve_soldier(&self, identity: u64) -> Result<Entity, IdentityError> {
+        let entity = Entity::from_bits(identity).ok_or(IdentityError::NotAnIdentity)?;
+        let slot = entity.index();
+        if slot >= self.soldiers.slot_count() {
+            return Err(IdentityError::NoSuchSlot { slot });
+        }
+        if self.soldiers.contains(entity) {
+            return Ok(entity);
+        }
+        Err(IdentityError::Stale {
+            slot,
+            given: entity.generation(),
+            held: self.soldiers.generation_of(slot),
+        })
     }
 
     /// Adds a soldier to the world and returns its identity.

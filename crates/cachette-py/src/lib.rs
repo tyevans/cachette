@@ -12,11 +12,12 @@
 //! [^1]: ADR-0041, a crate split enforces the boundary at compile time. `docs/adrs/REGISTRY.md`
 //! [^2]: ADR-0042, the interpreter is released for the whole step. `docs/adrs/REGISTRY.md`
 
-use cachette_core::{World as CoreWorld, WorldConfig};
+use cachette_core::{Axial, Entity, FactionId, ResourceKind, World as CoreWorld, WorldConfig};
 use numpy::{PyArray1, ToPyArray};
 use pyo3::create_exception;
 use pyo3::exceptions::PyException;
 use pyo3::prelude::*;
+use pyo3::types::PyDict;
 
 // ADR-0046: one root exception type holds the whole hierarchy. The
 // engine never raises a bare runtime error. The macro builds the types,
@@ -162,6 +163,165 @@ impl PyWorld {
         raw.to_pyarray(python)
     }
 
+    /// Returns the tile change log of the last step, one column for each
+    /// field.
+    ///
+    /// The keys are the field names of the event. The caller reads a field
+    /// by its name, so no caller holds a byte offset, a field width or a
+    /// field order. Those live in the Rust source and nowhere else.[^1]
+    ///
+    /// The value column carries the fixed-point value as its raw integer.
+    /// It is never a floating point number, because a float in simulated
+    /// state does not add associatively and this is that state leaving the
+    /// engine.[^2]
+    ///
+    /// This method copies each column. The log of one step is small next to
+    /// the world.[^3]
+    ///
+    /// # References
+    ///
+    /// [^1]: Decisions register, DEC-060. `docs/DECISIONS.md`
+    /// [^2]: ADR-0002, simulated and aggregated state holds no floating point number, decision D1. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
+    /// [^3]: ADR-0044, what copies and what does not is declared at the call site. `docs/adrs/REGISTRY.md`
+    ///
+    /// # Errors
+    ///
+    /// Raises `ViewError` when the dictionary cannot be built.
+    fn event_log_columns<'py>(&self, python: Python<'py>) -> PyResult<Bound<'py, PyDict>> {
+        let world = self.lock();
+        let log = world.event_log();
+        let columns = PyDict::new(python);
+        let tick: Vec<u64> = log.iter().map(|event| event.tick.0).collect();
+        let tile: Vec<u32> = log.iter().map(|event| event.tile.0).collect();
+        let value: Vec<i32> = log.iter().map(|event| event.value.0).collect();
+        let holder: Vec<u16> = log.iter().map(|event| event.holder.to_bits()).collect();
+        let kind: Vec<u8> = log.iter().map(|event| event.kind).collect();
+        columns.set_item("tick", tick.to_pyarray(python))?;
+        columns.set_item("tile", tile.to_pyarray(python))?;
+        columns.set_item("value", value.to_pyarray(python))?;
+        columns.set_item("holder", holder.to_pyarray(python))?;
+        columns.set_item("kind", kind.to_pyarray(python))?;
+        Ok(columns)
+    }
+
+    /// Returns the gather log of the last step, one column for each field.
+    ///
+    /// The unit column holds the whole identity of the unit that took the
+    /// amount. It is not a slot index. A slot index survives the death of
+    /// what it named, and a reader that held one would report on the next
+    /// occupant of the slot with nothing failing.[^1]
+    ///
+    /// Hand a value from this column back to `soldier_tile` to read the
+    /// unit. The engine resolves it, and it refuses a dead one.[^1]
+    ///
+    /// This method copies each column.[^2]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0085, an entity crosses to Python as one opaque identity that the engine resolves, decisions D1 and D3. `docs/adrs/draft/adr-0085-an-entity-crosses-to-python-as-one-opaque-identity.md`
+    /// [^2]: ADR-0044, what copies and what does not is declared at the call site. `docs/adrs/REGISTRY.md`
+    ///
+    /// # Errors
+    ///
+    /// Raises `ViewError` when the dictionary cannot be built.
+    fn gather_log_columns<'py>(&self, python: Python<'py>) -> PyResult<Bound<'py, PyDict>> {
+        let world = self.lock();
+        let log = world.gather_log();
+        let columns = PyDict::new(python);
+        let tick: Vec<u64> = log.iter().map(|event| event.tick.0).collect();
+        let unit: Vec<u64> = log.iter().map(|event| event.unit).collect();
+        let tile: Vec<u32> = log.iter().map(|event| event.tile.0).collect();
+        let amount: Vec<u32> = log.iter().map(|event| event.amount).collect();
+        let kind: Vec<u8> = log.iter().map(|event| event.kind).collect();
+        columns.set_item("tick", tick.to_pyarray(python))?;
+        columns.set_item("unit", unit.to_pyarray(python))?;
+        columns.set_item("tile", tile.to_pyarray(python))?;
+        columns.set_item("amount", amount.to_pyarray(python))?;
+        columns.set_item("kind", kind.to_pyarray(python))?;
+        Ok(columns)
+    }
+
+    /// Returns the number of gather events that the last step emitted.
+    #[getter]
+    fn gather_count(&self) -> usize {
+        self.lock().gather_log().len()
+    }
+
+    /// Adds a soldier at an address and returns its identity.
+    ///
+    /// The identity is one opaque value. Give it back to another method to
+    /// name this soldier. Do not build one, and do not take it apart.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0085, an entity crosses to Python as one opaque identity that the engine resolves, decisions D1 and D2. `docs/adrs/draft/adr-0085-an-entity-crosses-to-python-as-one-opaque-identity.md`
+    ///
+    /// # Errors
+    ///
+    /// Raises `VerbError` when the arena is full, when the address is
+    /// outside the world, when the ground admits no unit, or when the world
+    /// has no such faction.
+    fn spawn_soldier(&self, q: i32, r: i32, faction: u16) -> PyResult<u64> {
+        let mut world = self.lock();
+        world
+            .spawn_soldier(Axial::new(q, r), FactionId(faction))
+            .map(Entity::to_bits)
+            .map_err(|error| VerbError::new_err(error.to_string()))
+    }
+
+    /// Removes a soldier and reports whether it removed one.
+    ///
+    /// A dead identity removes nothing and returns `False`.
+    ///
+    /// # Errors
+    ///
+    /// Raises `ViewError` when the value is not an identity of this world.
+    fn despawn_soldier(&self, unit: u64) -> PyResult<bool> {
+        let mut world = self.lock();
+        let entity = resolve(&world, unit)?;
+        Ok(world.despawn_soldier(entity))
+    }
+
+    /// Tells one soldier to gather a kind of resource.
+    ///
+    /// The kind is the number the gather event carries in its `kind`
+    /// column.
+    ///
+    /// # Errors
+    ///
+    /// Raises `ViewError` when the identity is dead. Raises `VerbError`
+    /// when the number names no kind.
+    fn order_gather(&self, unit: u64, kind: u8) -> PyResult<bool> {
+        let mut world = self.lock();
+        let entity = resolve(&world, unit)?;
+        let kind = ResourceKind::from_u8(kind)
+            .ok_or_else(|| VerbError::new_err(format!("{kind} names no resource kind")))?;
+        Ok(world.order_gather(entity, kind))
+    }
+
+    /// Returns the tile that one soldier stands on.
+    ///
+    /// The engine resolves the identity against the arena. A soldier that
+    /// died leaves its slot to another soldier, and this method refuses the
+    /// dead identity rather than report on the new occupant.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0085, an entity crosses to Python as one opaque identity that the engine resolves, decision D3. `docs/adrs/draft/adr-0085-an-entity-crosses-to-python-as-one-opaque-identity.md`
+    ///
+    /// # Errors
+    ///
+    /// Raises `ViewError` when the identity names no live soldier.
+    fn soldier_tile(&self, unit: u64) -> PyResult<u32> {
+        let world = self.lock();
+        let entity = resolve(&world, unit)?;
+        world
+            .soldiers()
+            .tile(entity)
+            .map(|tile| tile.0)
+            .ok_or_else(|| ViewError::new_err(format!("the identity {unit} names no live soldier")))
+    }
+
     fn __repr__(&self) -> String {
         let world = self.lock();
         // The arguments name the constructor's own parameters, so that the
@@ -176,6 +336,22 @@ impl PyWorld {
             world.tick().0
         )
     }
+}
+
+/// Resolves an identity that Python handed back, or raises.
+///
+/// Python cannot build an identity, so the value it gives is one the engine
+/// gave it. That value can still be stale. The engine compares the
+/// generation, and this function turns a refusal into the typed error for a
+/// stale view.[^1]
+///
+/// # References
+///
+/// [^1]: ADR-0085, an entity crosses to Python as one opaque identity that the engine resolves, decision D3. `docs/adrs/draft/adr-0085-an-entity-crosses-to-python-as-one-opaque-identity.md`
+fn resolve(world: &CoreWorld, unit: u64) -> PyResult<Entity> {
+    world
+        .resolve_soldier(unit)
+        .map_err(|error| ViewError::new_err(error.to_string()))
 }
 
 impl PyWorld {

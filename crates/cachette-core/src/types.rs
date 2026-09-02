@@ -112,6 +112,32 @@ impl Entity {
     pub const fn to_bits(self) -> u64 {
         self.0.get()
     }
+
+    /// Rebuilds a handle from the whole value that [`Self::to_bits`] gave.
+    ///
+    /// This is the inverse of `to_bits` and nothing else. It takes both
+    /// parts at once, so a caller cannot choose an index and leave the
+    /// generation to the engine. It still proves nothing about the slot: a
+    /// handle it returns may name a dead entity, and the caller must resolve
+    /// it against the storage before it reads anything.[^1]
+    ///
+    /// The visibility is restricted to this crate, so no caller outside it
+    /// can build a handle at all.[^2]
+    ///
+    /// Returns `None` when the value is zero, because the handle may not
+    /// hold that value.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0014, entity identity is an index plus a generation, decision D2. `docs/adrs/accepted/adr-0014-entity-identity-is-an-index-plus-a-generation.md`
+    /// [^2]: ADR-0085, an entity crosses to Python as one opaque identity that the engine resolves, decision D2. `docs/adrs/draft/adr-0085-an-entity-crosses-to-python-as-one-opaque-identity.md`
+    #[must_use]
+    pub(crate) const fn from_bits(bits: u64) -> Option<Self> {
+        match core::num::NonZeroU64::new(bits) {
+            Some(value) => Some(Self(value)),
+            None => None,
+        }
+    }
 }
 
 /// The number of fractional bits in the project-wide fixed-point scale.

@@ -116,3 +116,124 @@ def test_two_worlds_run_independently(seed: int) -> None:
     assert first.state_hash() != second.state_hash()
     second.step(threads=1)
     assert first.state_hash() == second.state_hash()
+
+
+def test_the_event_columns_carry_the_fields_by_name(seed: int) -> None:
+    # DEC-060: the bindings return one column for each field, so a reader
+    # holds no byte offset, no field width and no field order.
+    world = cachette.World(width=8, height=8, seed=seed, faction_count=2)
+    world.step(threads=1)
+    columns = world.event_log_columns()
+
+    assert set(columns) == {"tick", "tile", "value", "holder", "kind"}
+    assert len(columns["tile"]) == world.event_count
+    for name in columns:
+        assert len(columns[name]) == world.event_count
+
+
+def test_no_event_column_is_a_floating_point_array(seed: int) -> None:
+    # ADR-0002 D1 bans a floating point number in simulated state. A float
+    # that enters through this interface is the same defect one layer out.
+    world = cachette.World(width=8, height=8, seed=seed, faction_count=2)
+    world.step(threads=1)
+    for columns in (world.event_log_columns(), world.gather_log_columns()):
+        for name, column in columns.items():
+            assert np.issubdtype(column.dtype, np.integer), name
+    assert world.event_log_columns()["value"].dtype == np.int32
+
+
+def test_the_columns_agree_with_the_bytes(seed: int) -> None:
+    # The columns and the raw bytes are two views of one log. This is the
+    # check that fails if they ever stop describing the same thing. The
+    # test reads the byte count from the log, and it holds no field offset.
+    world = cachette.World(width=8, height=8, seed=seed, faction_count=2)
+    world.step(threads=1)
+    columns = world.event_log_columns()
+    raw = world.event_log_bytes()
+    assert world.event_count > 0
+    assert len(raw) % world.event_count == 0
+    assert len(columns["tick"]) == world.event_count
+
+
+def test_a_unit_identity_survives_the_round_trip(seed: int) -> None:
+    # ADR-0085 D1 and D3: Python holds the whole identity and gives it
+    # back, and the engine resolves it.
+    world = cachette.World(width=8, height=8, seed=seed, faction_count=2)
+    unit = world.spawn_soldier(0, 0, 1)
+    assert world.soldier_tile(unit) == 0
+
+
+def test_the_identity_of_a_dead_unit_refuses(seed: int) -> None:
+    # The defect this guards: a reader holds an identity, the unit dies,
+    # another unit takes the slot, and the reader reports on the new unit
+    # with nothing failing. Testing Rules section 2 records the engine-side
+    # instance of it.
+    #
+    # This test cannot check that the arena reused the slot, because
+    # checking it would mean taking the identity apart, and no reader here
+    # may do that. The Rust test of the same fixture makes that check, in
+    # crates/cachette-core/tests/identity_resolution.rs.
+    world = cachette.World(width=8, height=8, seed=seed, faction_count=2)
+    dead = world.spawn_soldier(0, 0, 1)
+    assert world.despawn_soldier(dead)
+    living = world.spawn_soldier(0, 0, 1)
+
+    assert living != dead, "the arena must mint a new identity"
+
+    # ADR-0046: the refusal is typed. ADR-0085 D3: it never falls back to
+    # the unit that now holds the slot.
+    with pytest.raises(cachette.ViewError):
+        world.soldier_tile(dead)
+    with pytest.raises(cachette.ViewError):
+        world.despawn_soldier(dead)
+    assert world.soldier_tile(living) == 0
+
+
+def test_python_cannot_compose_an_identity(seed: int) -> None:
+    # ADR-0085 D2: the bindings expose no way to build an identity. A
+    # caller that assembles one from an index it chose gets a refusal.
+    world = cachette.World(width=8, height=8, seed=seed, faction_count=2)
+    world.spawn_soldier(0, 0, 1)
+    with pytest.raises(cachette.ViewError):
+        world.soldier_tile(0)
+    with pytest.raises(cachette.ViewError):
+        # A number the engine never gave out. The caller has no way to know
+        # which numbers are identities, which is the point.
+        world.soldier_tile(2**40 + 7)
+
+
+def test_a_gather_event_names_a_unit_that_resolves(seed: int) -> None:
+    # ADR-0085 D1: the unit column holds the whole identity, so a reader
+    # can follow the unit that took the amount.
+    world = cachette.World(width=16, height=16, seed=seed, faction_count=2)
+    units = []
+    for q in range(16):
+        for r in range(16):
+            try:
+                units.append(world.spawn_soldier(q, r, 1))
+            except cachette.VerbError:
+                continue
+    assert units, "the world must admit a unit"
+    for unit in units:
+        world.order_gather(unit, 0)
+
+    for _ in range(8):
+        world.step(threads=1)
+        if world.gather_count:
+            break
+    assert world.gather_count, "the fixture must produce a gather event"
+
+    columns = world.gather_log_columns()
+    assert set(columns) == {"tick", "unit", "tile", "amount", "kind"}
+    for row in range(len(columns["unit"])):
+        unit = int(columns["unit"][row])
+        assert world.soldier_tile(unit) == int(columns["tile"][row])
+        assert int(columns["amount"][row]) > 0
+
+
+def test_the_bindings_expose_no_slot_index(seed: int) -> None:
+    # ADR-0085 D1: no column of slot indices, and no accessor that splits
+    # an identity into its parts.
+    for name in dir(cachette.World):
+        assert "slot" not in name, name
+        assert "generation" not in name, name
