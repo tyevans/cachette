@@ -264,6 +264,6 @@ review changed nothing in that area.
 [^10]: Backlog item 0060. `docs/backlog/proposed/0060-grow-the-population-from-the-store-and-the-housing.md`
 [^11]: Definition of Done, section 3. `.claude/rules/definition-of-done.md`
 [^12]: Decisions register, DEC-059. `docs/DECISIONS.md`
-[^13]: Backlog item 0150. `docs/backlog/proposed/0150-decide-how-the-world-reserves-unit-storage.md`
+[^13]: Backlog item 0150. `docs/backlog/refined/0150-reserve-the-unit-columns-at-construction.md`
 [^14]: Findings register, FND-135. `docs/FINDINGS.md`
 [^15]: ADR-0072, a tile stock is generated, and only what was taken is stored. `docs/adrs/accepted/adr-0072-a-tile-stock-is-generated-and-only-what-was-taken-is-stored.md`

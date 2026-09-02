@@ -273,6 +273,7 @@ without stating a constraint is worse than no record.
 | 0080 | A depleted deposit recovers by ageing the stored take, never by a pass over the world | Accepted | 0002, 0003, 0004, 0072, 0073 | `accepted/adr-0080-a-depleted-deposit-recovers-by-ageing-the-stored-take.md` |
 | 0081 | A residence is a stored column and occupancy is a maintained count | Draft | 0004, 0014, 0018, 0063, 0066, 0074 | `draft/adr-0081-a-residence-is-a-stored-column-and-occupancy-is-a-maintained-count.md` |
 | 0082 | The store sets the rate of a birth and the housing admits it | Draft | 0003, 0014, 0056, 0062, 0063, 0074, 0081 | `draft/adr-0082-the-store-sets-the-rate-of-a-birth-and-the-housing-admits-it.md` |
+| 0084 | The world reserves the unit columns at construction, and a spawn past the reservation is refused | Draft | 0012, 0014, 0066 | `draft/adr-0084-the-world-reserves-the-unit-columns-at-construction.md` |
 
 ### Retired numbers
 
