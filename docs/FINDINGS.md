@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-169**
+**Next number: FND-172**
 
 ## A. Corrections to stated rules
 
@@ -4032,10 +4032,51 @@ nothing, and the comment inside it says what the founding actually leaves. A
 reader who lists the test names reads the claim the finding corrected.
 
 
+### FND-171 — A pedigree fixture that kills nobody never reaches a reused slot
+
+**Believed.** The property tests over a random pedigree covered the case where
+a character dies and the arena reuses its slot. Each of them calls the whole
+world invariant check, and that check compares the descent row of every live
+slot against the identity the arena minted for it. A defect that let a new
+character keep the descent row of the character before it would therefore fail
+the properties.
+
+**True.** The fixture built the pedigree from births alone. It never removed a
+character, so the arena never freed a slot, so no slot was ever reused, so the
+comparison the invariant makes was never asked a question it could answer
+wrongly. The properties measured the fixture.
+
+**Evidence.** The defect was put back and the tests were run twice. The
+injected defect kept the descent row of the previous character when the arena
+reused a slot. With the original fixture, one test failed: the one that kills a
+character on purpose and asserts the reuse before it asserts anything else.
+Fourteen tests passed, including both property tests and the whole-world
+invariant check inside them. A removal was then added to the fixture, and a
+test was added that asserts the fixture reuses a slot. The same defect then
+failed three tests. The commit body holds the two runs.
+
+**Follows.** Three things.
+
+**The thread-count property stayed green under the defect, and that is
+correct.** A defect that is itself deterministic gives the same wrong answer at
+every thread count. The determinism tests cannot tell correct from
+consistently wrong, and this is a local instance of that.[^F171A]
+
+**An invariant check inside a property proves nothing about a state the
+property never builds.** The check was right and it was never reached. Counting
+the tests that call it says nothing about the cases it saw.
+
+**A fixture needs a test of its own when the case it must reach is a state
+rather than a value.** The added test asserts that the plan reuses a slot. It
+fails if a later change to the fixture stops reaching the case, and nothing
+else would report that.
+
+
 ## References
 
 [^F168A]: ADR-0084, the world reserves the unit columns at construction, decision D3. `docs/adrs/draft/adr-0084-the-world-reserves-the-unit-columns-at-construction.md`
 [^F168B]: Review 0175, the unit reservation record. `docs/reviews/0175-the-unit-reservation-record.md`
+[^F171A]: Testing rules, sections 2 and 2a. `.claude/rules/testing.md`
 
 [^1]: Findings register, FND-038, in this document.
 [^2]: ADR-0066, entity storage holds four fixed shapes. `docs/adrs/accepted/adr-0066-entity-storage-holds-four-fixed-shapes.md`

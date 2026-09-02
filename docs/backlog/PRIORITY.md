@@ -70,8 +70,7 @@ These are real and none of them blocks anything today.
 | 0124 | A fully recovered deposit still stores a take of zero. The recovery pass now reads that entry on every tick, so the depleted set grows and never shrinks. |
 | 0125 | Show a watcher a deposit recovering. The engine recovers a deposit, and nothing shows it. |
 | 0133 | The panel is longer than the window and cuts. A watcher cannot reach the rows below the notice. |
-| 0067 | Descent. Waits on the character tier being used for something. |
-| 0068 | A ruler and a succession. Waits on 0067. |
+| 0068 | A ruler and a succession. Item 0067 is complete, so the descent it reads exists. |
 | 0088 | Promotion into the character tier. |
 | 0097 | The layout record. Write it with the descent columns, not before.[^5] |
 | 0050 | Four product collisions still carried. |

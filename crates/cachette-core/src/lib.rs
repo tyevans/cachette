@@ -18,6 +18,7 @@ pub mod bridge;
 pub mod character;
 pub mod choose;
 pub mod cohort;
+pub mod descent;
 pub mod event;
 pub mod founding;
 pub mod hash;
@@ -41,7 +42,7 @@ pub mod types;
 pub mod world;
 
 pub use bridge::{BlockLayout, BlockRange, BridgeError, UnitTileBridge};
-pub use character::{CharacterArena, CharacterError};
+pub use character::{CharacterArena, CharacterError, Sex};
 pub use choose::{
     CellField, ChoiceError, ChoiceExplanation, ChoiceSchedule, Drive, OptionRow, WeightProfile,
     NO_INTENT, OPTIONS, OPTION_COUNT,
@@ -50,6 +51,7 @@ pub use cohort::{
     CohortError, CohortRow, CohortTable, DeathPlane, DrawLedger, DrawPass, NeedCondition, NeedRule,
     SiteRationed, UnitStarved, COHORTS_PER_SITE,
 };
+pub use descent::{Descent, DescentError, DescentId, Parents, DESCENT_CEILING, RELATION_DEPTH};
 pub use event::{ResourceTaken, TileChanged};
 pub use founding::{Founding, FoundingError, FoundingOutcome, Provision, Survey};
 pub use hash::StateHash;

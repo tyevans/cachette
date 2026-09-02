@@ -51,12 +51,31 @@ that held it and says how the value was reached.
 | Character layer at the target | about 85 MB | BLK-004 | Linear scaling from the character report. Not measured |
 | Settlements | 5,000 | BLK-005 | Owner decision, confirming the report assumption |
 | Tiles carrying an upgrade | fewer than one in twenty | BLK-006 | Owner decision, agreeing with the report estimate |
+| Relation depth | 12 generations | BLK-004 | The depth at which the character report shows every step of the recursion is exact in Q16.16 |
+| Record of descent ceiling | 4,194,304 rows | BLK-004 | Sixteen times the character ceiling, above the dead-to-living ratio the character report derives at 500 simulated years |
 | World shape | Rhombus | BLK-014 | Owner decision. A tile index is a raw axial pair |
 | Maximum factions | 63 | BLK-013 | Owner decision. One bit for each faction in a 64-bit mask, with one value reserved for no faction |
 
 The tile upgrade fraction picks sparse storage over dense storage. The
 character layer figure is derived by scaling, not measured. BLK-007 still holds
 every cost figure in this project.
+
+The relation depth bounds the recursion that computes the relation between two
+characters. Each step of that recursion halves a value, so the smallest term
+the recursion reaches is two to the power of the negative depth. The Q16.16
+scale holds sixteen fractional bits, so a depth below sixteen keeps every value
+exact and no step rounds.[^9] The character report recommends a depth of six
+for a gameplay test and names twelve as the ceiling that keeps the arithmetic
+exact. The project takes the ceiling, because the cost at twelve is bounded by
+the pairs the memoised recursion visits and the report shows that bound is
+small.[^9]
+
+The record of descent holds one row for each character the world has ever
+created, so the living ceiling alone does not bound it. The character report
+derives a dead count of about eight times the living count over 500 simulated
+years at a mean lifespan of 60 years.[^9] Sixteen times the character ceiling
+is the next power of two above that, and it is the value the code states. The
+figure is derived by scaling, not measured.
 
 The world shape and the faction ceiling are decided, not derived. The rhombus
 removes the coordinate conversion that an offset index pays on every tile
@@ -160,3 +179,4 @@ a footnote.
 [^6]: Findings register, FND-014. `docs/FINDINGS.md`
 [^7]: Development budgets, the local register. `docs/reference/development-budgets.md`
 [^8]: Decisions register, DEC-033 and DEC-001. `docs/DECISIONS.md`
+[^9]: The character graph and inheritance, sections 2.3 and 3.6. `docs/research/reports/14-character-graph-and-inheritance.md`

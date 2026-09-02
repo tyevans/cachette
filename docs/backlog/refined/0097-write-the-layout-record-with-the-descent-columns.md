@@ -113,6 +113,6 @@ Filled in when the item moves to `complete/`.
 [^6]: Decision Record Scope, section 4.4. `.claude/rules/adr-scope.md`
 [^7]: Blockers register, BLK-007. `docs/BLOCKERS.md`
 [^8]: Decision Record Scope, section 4.6. `.claude/rules/adr-scope.md`
-[^9]: Backlog item 0067. `docs/backlog/refined/0067-record-a-parent-and-walk-a-line.md`
+[^9]: Backlog item 0067. `docs/backlog/complete/0067-record-a-parent-and-walk-a-line.md`
 [^10]: ADR-0066, entity storage holds four fixed shapes, decisions D1 and D3. `docs/adrs/accepted/adr-0066-entity-storage-holds-four-fixed-shapes.md`
 [^11]: ADR-0054, an entity belongs to one of three tiers, declared at creation. `docs/adrs/accepted/adr-0054-an-entity-belongs-to-one-of-three-tiers-declared-at-creation.md`
