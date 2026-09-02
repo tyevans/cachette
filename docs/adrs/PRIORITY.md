@@ -41,6 +41,7 @@ A record here binds nothing until a reviewer moves it.
 | 0082 | Population growth. A review found its own decisions sound and returned it, because it rests on the free places of 0081.[^12] It moves when 0081 moves. |
 | 0083 | The gate build profile. A review returned it: both decisions hold against the code, and three sentences do not.[^15] It moves when those three are corrected. |
 | 0084 | The world reserves the unit columns at construction. The reservation is what a later contributor would trade away for a spawn that never refuses, and the code cannot say why it must not.[^14] A review returned it: all four decisions hold against the code, and two sentences do not.[^16] It moves when those two are corrected. |
+| 0090 | A tile upgrade is stored sparsely. A dense array over the tiles is what a future contributor would reach for, and the code shows the sparse map without showing why the dense one was refused. The implementation exists and every decision was checked against it. |
 
 ## Reserved and not written
 

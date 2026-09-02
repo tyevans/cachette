@@ -35,6 +35,7 @@ pub mod sort;
 pub mod terrain;
 pub mod tier;
 pub mod types;
+pub mod upgrade;
 pub mod world;
 
 pub use bridge::{BlockLayout, BlockRange, BridgeError, UnitTileBridge};
@@ -67,4 +68,5 @@ pub use sort::{SortError, SortKey};
 pub use terrain::{Terrain, TerrainTile, TileKind};
 pub use tier::{EntityTier, Shape, CHARACTER_CEILING};
 pub use types::{Accum, Entity, FactionId, Fix32, Tick, TileIdx};
+pub use upgrade::{UpgradeKind, UpgradeMap, UpgradeSite, UPGRADE_KIND_COUNT};
 pub use world::{IdentityError, StepError, World, WorldConfig, WorldError};

@@ -25,7 +25,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^ALLOC]
 
-**Next number: BLK-019**
+**Next number: BLK-035**
 
 [^ALLOC]: Findings register, FND-038. `docs/FINDINGS.md`
 
@@ -41,6 +41,30 @@ names benchmarking on Graviton as blocking most of its own conclusions.
 
 This blocker cannot be resolved by a decision. It needs a benchmark harness
 and a machine.
+
+### BLK-034 — May a unit build on ground another faction holds, and who may destroy an upgrade?
+
+**Owner:** the project owner. **Blocks:** any rule that ties an upgrade to a
+faction, and the verb that removes one.
+
+The engine now stores an upgrade on a tile and lets a unit build it.[^BLK34A]
+It asks nothing about who holds the tile. Any live unit builds on any tile it
+stands on, and the control plane removes an upgrade from any tile by address.
+
+The project needs three answers before a faction rule can be written.
+
+1. **May a unit build on ground that another faction holds?** The holder
+   column already names who holds each tile.[^BLK34B]
+2. **May a unit destroy an upgrade that another faction built, and does it
+   take work, or is it instant?** Destruction is instant today, and it is a
+   control-plane call rather than something a unit does.
+3. **Does an upgrade change hands when the ground does?** The holder of a tile
+   moves as units move, and the upgrade does not move with it.
+
+Work continues without the answers. The engine states the storage and the
+arithmetic, and neither depends on a faction. A rule invented here would be a
+content decision made by the wrong person, and it would reach the state hash.
+
 
 ## Resolved
 
@@ -175,3 +199,5 @@ normally.
 [^FOUND]: PRD-0012, a world starts small and grows. `docs/product/accepted/prd-0012-a-world-starts-small-and-grows.md`
 [^SEP]: Decisions register, DEC-037. `docs/DECISIONS.md`
 [^FOUNDDIST]: ADR-0076, a founding keeps a fixed distance from the foundings before it. `docs/adrs/accepted/adr-0076-a-founding-keeps-a-fixed-distance-from-the-foundings-before-it.md`
+[^BLK34A]: ADR-0090, a tile upgrade is stored sparsely, as the difference from the generated world. `docs/adrs/draft/adr-0090-a-tile-upgrade-is-stored-sparsely.md`
+[^BLK34B]: ADR-0053, a faction is a bit in a mask, and a relation is a plane, decision D2. `docs/adrs/accepted/adr-0053-a-faction-is-a-bit-in-a-mask-and-a-relation-is-a-plane.md`

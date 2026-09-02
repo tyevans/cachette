@@ -197,6 +197,23 @@ impl TileKind {
 /// [^1]: Budgets and costs, the scale constants. `docs/reference/budgets.md`
 const ORDINARY_CAPACITY: u32 = 8;
 
+/// The number of units that stand on a tile that a unit crosses quickly.
+///
+/// The value is in the scale constants table, derived from the dwell and the
+/// approved crossing time.[^1] It sits here, beside the ordinary capacity,
+/// because this module holds the capacity table and a second declaration of a
+/// capacity would be one fact in two places.[^2]
+///
+/// No terrain kind carries it. A made way carries it, and the upgrade module
+/// reads it from here.[^3]
+///
+/// # References
+///
+/// [^1]: Budgets and costs, the scale constants. `docs/reference/budgets.md`
+/// [^2]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`
+/// [^3]: ADR-0090, a tile upgrade is stored sparsely, as the difference from the generated world, decision D3. `docs/adrs/draft/adr-0090-a-tile-upgrade-is-stored-sparsely.md`
+pub const CROSSING_CAPACITY: u32 = 16;
+
 /// Reports whether ground of a given capacity admits a unit.
 ///
 /// This is the whole of passability. Ground that holds nobody admits nobody.

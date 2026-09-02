@@ -55,6 +55,7 @@ use crate::sort;
 use crate::sort::{BoundedKey, SortError};
 use crate::terrain::{Terrain, TerrainTile, TileKind};
 use crate::types::{Accum, Entity, FactionId, Fix32, Tick, TileIdx, FACTION_CEILING};
+use crate::upgrade::{self, UpgradeKind, UpgradeMap, UpgradeSite};
 
 /// The reason that a value did not name a live entity.
 ///
@@ -350,6 +351,17 @@ pub struct World {
     ///
     /// [^1]: ADR-0072, a tile stock is generated, and only what was taken is stored, decision D5. `docs/adrs/accepted/adr-0072-a-tile-stock-is-generated-and-only-what-was-taken-is-stored.md`
     departed: [u64; RESOURCE_KIND_COUNT],
+    /// The upgrade that each improved tile carries.
+    ///
+    /// The map holds one entry for each tile that somebody built on, and it
+    /// holds nothing else. A world in which nobody built holds no entry, so
+    /// the memory cost follows the building and not the size of the
+    /// world.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0090, a tile upgrade is stored sparsely, as the difference from the generated world, decision D1. `docs/adrs/draft/adr-0090-a-tile-upgrade-is-stored-sparsely.md`
+    upgrades: UpgradeMap,
     /// Level 1 of the pyramid, derived from level 0 at the barrier.
     pyramid: Pyramid,
     /// Who holds each tile, and what each faction holds.
@@ -463,6 +475,7 @@ impl World {
             resources: ResourceField::new(terrain),
             depletion: DepletionLedger::new(),
             departed: [0; RESOURCE_KIND_COUNT],
+            upgrades: UpgradeMap::new(),
             pyramid: Pyramid::new(layout, terrain)?,
             holding: Holding::new(layout),
             schedule: RateSchedule::DEFAULT,
@@ -1767,6 +1780,13 @@ impl World {
         for amount in &self.departed {
             hash = hash.write_u64(*amount);
         }
+        // An upgrade is the difference between the world the generator made
+        // and the world the units made. It is simulated state, and an
+        // unfinished build is state that the next frame reads, so both the
+        // kind and the progress enter the hash.[^2]
+        //
+        // [^2]: ADR-0090, a tile upgrade is stored sparsely, as the difference from the generated world, decision D2. `docs/adrs/draft/adr-0090-a-tile-upgrade-is-stored-sparsely.md`
+        let hash = self.upgrades.hash_into(hash);
         // Who holds each tile is simulated state, so the whole-world hash
         // covers it.
         let hash = self.holding.hash_into(hash);
@@ -1810,6 +1830,14 @@ impl World {
             return false;
         }
         if self.grid.width() != self.config.width || self.grid.height() != self.config.height {
+            return false;
+        }
+        // The upgrade map rises, names each tile once, names a tile inside
+        // the world, and banks no progress beyond the work its kind asks
+        // for.[^2]
+        //
+        // [^2]: Findings register, FND-011. `docs/FINDINGS.md`
+        if !self.upgrades.check_invariants(self.grid.tile_count()) {
             return false;
         }
         let ceiling = self.config.faction_count.max(1);
@@ -2309,6 +2337,7 @@ impl World {
             &self.soldiers,
             &self.bridge,
             self.terrain,
+            &self.upgrades,
             self.grid,
             threads,
         )?;
@@ -2350,6 +2379,20 @@ impl World {
         self.depletion.recover(tick);
 
         self.gather(threads)?;
+
+        // The build advance runs after the barrier of this frame, for the
+        // same reason the gather resolve does: it reads where each unit
+        // stands, and the movement above has just moved them.[^16]
+        //
+        // The advance writes the upgrade map and nothing else. It moves no
+        // unit, so the barrier above stays the barrier of this frame.
+        //
+        // The pass reads the builders and the sites. It takes no grid and no
+        // tile count, so a world in which nobody built does no work here, at
+        // any tile count.[^16]
+        //
+        // [^16]: ADR-0090, a tile upgrade is stored sparsely, as the difference from the generated world, decisions D1 and D2. `docs/adrs/draft/adr-0090-a-tile-upgrade-is-stored-sparsely.md`
+        self.build(threads)?;
 
         // The holding spreads after the barrier of this frame, because it
         // reads where each unit stands and the movement above has just moved
@@ -2567,6 +2610,120 @@ impl World {
         &self.holding
     }
 
+    /// Returns every upgrade in the world, in ascending tile order.
+    ///
+    /// A world in which nobody built returns an empty slice. The map holds
+    /// one entry for each improved tile and none for any other, so the length
+    /// of this slice is the whole storage cost of the upgrades.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0090, a tile upgrade is stored sparsely, as the difference from the generated world, decision D1. `docs/adrs/draft/adr-0090-a-tile-upgrade-is-stored-sparsely.md`
+    #[must_use]
+    pub fn upgrade_sites(&self) -> &[UpgradeSite] {
+        self.upgrades.sites()
+    }
+
+    /// Returns the upgrade on one tile, finished or under construction.
+    ///
+    /// Returns `None` when the address lies outside the world, and when the
+    /// tile carries no upgrade.
+    #[must_use]
+    pub fn upgrade_at(&self, address: Axial) -> Option<UpgradeSite> {
+        self.upgrades.at(self.grid.index_of(address)?)
+    }
+
+    /// Returns the finished upgrade on one tile.
+    ///
+    /// Returns `None` when the tile carries none, and when the upgrade there
+    /// is still under construction. An unfinished build changes nothing about
+    /// the tile.
+    #[must_use]
+    pub fn finished_upgrade(&self, address: Axial) -> Option<UpgradeKind> {
+        self.upgrades.finished(self.grid.index_of(address)?)
+    }
+
+    /// Returns the number of units that may stand on one tile.
+    ///
+    /// This is the one reader of the ground table and the upgrade table
+    /// together. Admission calls the same function, so no caller can read one
+    /// table without the other.[^1]
+    ///
+    /// Returns `None` when the address lies outside the world.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0090, a tile upgrade is stored sparsely, as the difference from the generated world, decision D3. `docs/adrs/draft/adr-0090-a-tile-upgrade-is-stored-sparsely.md`
+    #[must_use]
+    pub fn tile_capacity(&self, address: Axial) -> Option<u32> {
+        let ground = self.terrain.kind(address)?.capacity();
+        Some(upgrade::capacity_with(
+            ground,
+            self.finished_upgrade(address),
+        ))
+    }
+
+    /// Returns the number of entries that the last build advance read.
+    ///
+    /// The advance reads the builders and the sites. It reads no tile, so
+    /// this number does not grow with the size of the world.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0090, a tile upgrade is stored sparsely, as the difference from the generated world, decision D1. `docs/adrs/draft/adr-0090-a-tile-upgrade-is-stored-sparsely.md`
+    #[must_use]
+    pub const fn last_build_visits(&self) -> u64 {
+        self.upgrades.last_advance_visits()
+    }
+
+    /// Tells one soldier to build, or to stop building.
+    ///
+    /// The soldier adds to the upgrade on the tile it stands on, on every
+    /// tick, until something stops it. It does not have to stay: a soldier
+    /// that walks away stops adding, and the work it did stays on the
+    /// tile.[^1]
+    ///
+    /// Returns `false` when the identity is dead.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0090, a tile upgrade is stored sparsely, as the difference from the generated world, decision D2. `docs/adrs/draft/adr-0090-a-tile-upgrade-is-stored-sparsely.md`
+    pub fn order_build(&mut self, entity: Entity, kind: UpgradeKind) -> bool {
+        self.soldiers.set_build_order(entity, Some(kind))
+    }
+
+    /// Tells one soldier to stop building.
+    ///
+    /// Returns `false` when the identity is dead.
+    pub fn stop_build(&mut self, entity: Entity) -> bool {
+        self.soldiers.set_build_order(entity, None)
+    }
+
+    /// Returns the build order of one soldier.
+    ///
+    /// The outer option reports whether the identity is live. The inner one
+    /// reports whether the soldier builds.
+    #[must_use]
+    pub fn build_order(&self, entity: Entity) -> Option<Option<UpgradeKind>> {
+        self.soldiers.build_order(entity)
+    }
+
+    /// Removes the upgrade from one tile and reports whether it removed one.
+    ///
+    /// The tile returns to the world the generator made. Nothing stores a
+    /// property of an improved tile except this map, so removing the entry is
+    /// the whole of the return and no second copy can survive it.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0090, a tile upgrade is stored sparsely, as the difference from the generated world, decision D4. `docs/adrs/draft/adr-0090-a-tile-upgrade-is-stored-sparsely.md`
+    pub fn destroy_upgrade(&mut self, address: Axial) -> bool {
+        let Some(tile) = self.grid.index_of(address) else {
+            return false;
+        };
+        self.upgrades.remove(tile).is_some()
+    }
+
     /// Returns who holds one tile.
     ///
     /// The answer names a faction, or nobody. It never names two factions,
@@ -2717,13 +2874,19 @@ impl World {
             let mut left = original
                 .0
                 .saturating_sub(self.depletion.taken(first.tile, first.kind).0);
+            // A finished upgrade raises what a unit takes in one tick. The
+            // rate is read once for the whole segment, beside the deposit
+            // that the segment draws from.[^1]
+            //
+            // [^1]: ADR-0090, a tile upgrade is stored sparsely, as the difference from the generated world, decision D3. `docs/adrs/draft/adr-0090-a-tile-upgrade-is-stored-sparsely.md`
+            let rate = upgrade::gather_rate_with(GATHER_RATE, self.upgrades.finished(first.tile));
             let mut granted = 0u32;
             for position in &order[at..end] {
                 if left == 0 {
                     break;
                 }
                 let intent = intents[*position as usize];
-                let amount = GATHER_RATE.min(left);
+                let amount = rate.min(left);
                 left -= amount;
                 granted += amount;
                 let added = self
@@ -2744,6 +2907,81 @@ impl World {
             at = end;
         }
         self.depletion.merge_ascending(&run, tick);
+        Ok(())
+    }
+
+
+    /// Advances every upgrade that a unit is building.
+    ///
+    /// The pass reads the builders and the upgrade map. It reads no tile
+    /// column and it takes no tile count, so a world of any size in which one
+    /// unit builds costs the same.[^1]
+    ///
+    /// The builders of one tile are gathered into one contribution and the
+    /// map is merged once, in ascending tile order. The contribution is a
+    /// count of builders times a whole-number rate, so it is the same
+    /// whatever order the threads produced the intents in.[^2] [^3]
+    ///
+    /// **A tile carries one upgrade.** When builders on one tile name
+    /// different kinds, the kind already standing there wins. A tile that
+    /// holds no site takes the lowest kind number present, which is the first
+    /// in the sorted order, so the answer does not depend on which unit
+    /// arrived first.[^4]
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the caller asks for zero threads, or when the
+    /// sort refuses the keys.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0090, a tile upgrade is stored sparsely, as the difference from the generated world, decision D1. `docs/adrs/draft/adr-0090-a-tile-upgrade-is-stored-sparsely.md`
+    /// [^2]: ADR-0023, an aggregate combines exactly, in any order, decision D1. `docs/adrs/accepted/adr-0023-an-aggregate-combines-exactly-in-any-order.md`
+    /// [^3]: ADR-0002, simulated and aggregated state holds no floating point number, decision D1. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
+    /// [^4]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
+    fn build(&mut self, threads: usize) -> Result<(), StepError> {
+        let intents = build_intents(&self.soldiers, threads)?;
+        if intents.is_empty() {
+            // The merge is still called, so the visit count describes this
+            // tick rather than the last one that built anything.
+            self.upgrades.merge_ascending(&[]);
+            return Ok(());
+        }
+
+        let keys: Vec<BoundedKey> = intents
+            .iter()
+            .map(|intent| {
+                BoundedKey::new(
+                    upgrade::site_key(intent.tile, intent.kind),
+                    intent.unit.to_bits(),
+                )
+            })
+            .collect();
+        let ceiling = upgrade::key_ceiling(self.grid.tile_count());
+        let order = build_order_of(&keys, ceiling)?;
+
+        // The key packs the tile above the kind, so the sorted order is tile
+        // major and every builder of one tile sits in one run.
+        let mut run: Vec<(TileIdx, UpgradeKind, i64)> = Vec::new();
+        let mut at = 0usize;
+        while at < order.len() {
+            let tile = intents[order[at] as usize].tile;
+            let mut end = at;
+            while end < order.len() && intents[order[end] as usize].tile == tile {
+                end += 1;
+            }
+            let held = self.upgrades.at(tile).map(|site| site.kind);
+            let winner = held.unwrap_or(intents[order[at] as usize].kind);
+            let builders = order[at..end]
+                .iter()
+                .filter(|position| intents[**position as usize].kind == winner)
+                .count() as i64;
+            if builders > 0 {
+                run.push((tile, winner, builders * upgrade::BUILD_RATE));
+            }
+            at = end;
+        }
+        self.upgrades.merge_ascending(&run);
         Ok(())
     }
 
@@ -3091,6 +3329,91 @@ fn gather_intents(soldiers: &SoldierArena, threads: usize) -> Result<Vec<GatherI
     }))
 }
 
+/// One unit that is building, and what it is building.
+#[derive(Clone, Copy, Debug)]
+struct BuildIntent {
+    /// The unit that builds.
+    unit: Entity,
+    /// The tile that the unit stands on.
+    tile: TileIdx,
+    /// The kind that the unit builds.
+    kind: UpgradeKind,
+}
+
+/// Returns the order in which the advance reads the build intents.
+///
+/// The order is the key vector sort: by the tile and the kind together, then
+/// by the identity of the unit.[^1] It depends on the key values alone, so it
+/// is the same at any thread count, and it does not follow the slot order of
+/// the arena.[^2]
+///
+/// # Errors
+///
+/// Returns an error when the sort refuses the keys.
+///
+/// # References
+///
+/// [^1]: ADR-0007, content supplies a key vector, never a comparator, decision D1. `docs/adrs/accepted/adr-0007-content-supplies-a-key-vector-never-a-comparator.md`
+/// [^2]: ADR-0001, one binary gives one answer at any thread count, decision D5. `docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
+/// The sound sort is used in the perturbed build as well. The advance sums a
+/// count of builders, and integer addition is order-free, so a perturbed order
+/// would change nothing and a probe over it would assert nothing.[^3]
+///
+/// [^3]: ADR-0004, iteration order is explicit, decision D2. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
+fn build_order_of(keys: &[BoundedKey], ceiling: u64) -> Result<Vec<u32>, SortError> {
+    crate::sort::order_bounded(keys, ceiling)
+}
+
+/// Returns the build intent of each live soldier that carries an order.
+///
+/// The soldiers are read in slot order, each thread writes its own output
+/// slot, and the join reads the slots in slot order. The result never depends
+/// on thread completion order.[^1]
+///
+/// A soldier with no order builds nothing and produces no intent, so a world
+/// in which nobody was told to build costs one pass over the live set.
+///
+/// # Errors
+///
+/// Returns an error when the caller asks for zero threads.
+///
+/// # References
+///
+/// [^1]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
+fn build_intents(soldiers: &SoldierArena, threads: usize) -> Result<Vec<BuildIntent>, StepError> {
+    let live: Vec<Entity> = soldiers.iter().collect();
+    if live.is_empty() {
+        return Ok(Vec::new());
+    }
+    let chunk_len = live.len().div_ceil(threads).max(1);
+    let mut slots: Slots<Vec<BuildIntent>> =
+        Slots::filled(threads, Vec::new()).map_err(|_| StepError::ZeroThreads)?;
+
+    std::thread::scope(|scope| {
+        for (chunk, slot) in live.chunks(chunk_len).zip(slots.entries_mut()) {
+            scope.spawn(move || {
+                *slot = chunk
+                    .iter()
+                    .filter_map(|unit| {
+                        let kind = soldiers.build_order(*unit)??;
+                        let tile = soldiers.tile(*unit)?;
+                        Some(BuildIntent {
+                            unit: *unit,
+                            tile,
+                            kind,
+                        })
+                    })
+                    .collect();
+            });
+        }
+    });
+
+    Ok(slots.combine(Vec::new(), |mut joined, slot| {
+        joined.extend_from_slice(slot);
+        joined
+    }))
+}
+
 /// The draw index of the movement direction.
 ///
 /// The movement system takes one draw for each soldier in each frame. A
@@ -3414,6 +3737,7 @@ fn admit(
     soldiers: &SoldierArena,
     bridge: &UnitTileBridge,
     terrain: Terrain,
+    upgrades: &UpgradeMap,
     grid: Grid,
     threads: usize,
 ) -> Result<Vec<(Entity, Axial)>, StepError> {
@@ -3487,9 +3811,17 @@ fn admit(
                         // whole step refuses below.
                         continue;
                     };
-                    segment.capacity = terrain
+                    // The ground states the capacity and a finished
+                    // upgrade adds to it. One function answers the whole
+                    // question, so admission cannot read the ground table
+                    // without the upgrade table.[^8]
+                    //
+                    // [^8]: ADR-0090, a tile upgrade is stored sparsely, as the difference from the generated world, decision D3. `docs/adrs/draft/adr-0090-a-tile-upgrade-is-stored-sparsely.md`
+                    let ground = terrain
                         .kind(address)
                         .map_or(0, crate::terrain::TileKind::capacity);
+                    segment.capacity =
+                        upgrade::capacity_with(ground, upgrades.finished(TileIdx(segment.tile)));
                     match bridge.count_on_tile(soldiers, address) {
                         Ok(standing) => segment.standing = standing as u32,
                         Err(error) => return Err(error),
