@@ -39,6 +39,12 @@ path names nothing, so each check reads the tree it was asked to read. The
 priority check walks no tree at all and reads named directories. The repair
 has a shape the project already holds in three places.
 
+**The same function holds a second defect.** The check joins the records, the
+registry and every source file into one corpus, and nothing reads it. The note
+re-reads each source file instead, once for each record it tests. A second
+finding holds the evidence.[^3] The two defects are independent. A repair to
+the skip makes the corpus full and leaves it unread, so this item carries both.
+
 **The note is the whole cost.** The source corpus reaches one assertion of the
 record check, and that assertion is the note. No failure depends on it, so no
 gate was weakened and no pass was meaningless. The work repairs a report and
@@ -51,6 +57,9 @@ not a gate.
   path under the root is what the other three checks use, and it works. It
   still states the boundary as a location. Ask whether the run should name the
   tree it owns instead.
+- **What the corpus was for.** It is dead in the commit that created the
+  script, so no earlier reader states the intent. Decide whether the note
+  reads it or whether it goes.
 - What the boundary is, if it is not a directory part. The scan must exclude a
   tree that the run does not own, and it must include the tree that the run
   does own, even when that tree sits inside another one.
@@ -70,3 +79,4 @@ Filled in when the item moves to `complete/`.
 
 [^1]: Findings register, FND-194. `docs/FINDINGS.md`
 [^2]: Decision Record Scope, section 6. `.claude/rules/adr-scope.md`
+[^3]: Findings register, FND-195. `docs/FINDINGS.md`

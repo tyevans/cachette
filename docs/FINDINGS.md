@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-195**
+**Next number: FND-196**
 
 ## A. Corrections to stated rules
 
@@ -4466,6 +4466,47 @@ records, the registry and the source files into one string beside it, and it
 never reads that string. No failure of this check depends on a source file. A
 pass in a worktree therefore means what a pass on the trunk means, and the
 whole cost of the defect is the note.
+
+### FND-195 — The record check builds a corpus of every source file and never reads it
+
+**Believed.** The record check reads the source files once, joins them into one
+corpus with the records and the registry, and asks that corpus which records a
+source file cites. A reader of the script sees the corpus built and infers that
+it feeds the check below it.
+
+**True.** Nothing reads the corpus. The script assigns it and never names it
+again. The note that asks which records are cited re-reads every source file
+instead, once for each record it tests, inside the loop over the records. The
+work the corpus did is thrown away, and the work it would have saved is done
+again.
+
+**The corpus was dead in the commit that created the script.** It is not a
+reader that a later change removed. It was never read.[^F192B]
+
+**Evidence.** A search of the history for the name returns one commit, the one
+that introduced the whole script. The collection was lifted out of the script
+and run against the trunk on a development machine. It joins 34 megabytes of
+source into one string, and the loop beside it makes 4644 file reads over 2162
+files. The reads stop early for a record that a source file cites, so the count
+follows how many records no source file cites.
+
+**Follows.** Three things.
+
+**This is a second defect in one function, and it is not the first one.** A
+separate finding records that the same collection drops every file when the
+check runs inside a worktree.[^F194C] The two are independent. Repairing the
+skip makes the corpus full and still unread.
+
+**A dead assignment reads as an assertion.** The corpus names the records, the
+registry and the source files together, which is the shape of a check. Nothing
+tells a reader that it holds no claim. This project already records that a
+value which is read back correctly and changes nothing is the failure that
+hides best.[^22]
+
+**Cost is not the reason to repair it.** The check runs in continuous
+integration and a reader waits for it. The reason is that the script states one
+thing and does another, in the place a contributor looks to learn what the
+check asserts.
 
 ## References
 
