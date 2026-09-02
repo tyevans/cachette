@@ -23,9 +23,44 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^ALLOC]
 
-**Next number: DEC-070**
+**Next number: DEC-072**
 
 ## Open
+
+### DEC-071 — Does the world draw the sex of a character, or does content supply it?
+
+**Open. The recommendation is that the world draws it, and the current code
+draws it.**
+
+The work that recorded descent needed a birth draw, because the item it
+implemented requires a keyed one and asks for a test on each field of the
+key.[^DEC71A] Nothing else in that item draws. The work therefore gave the
+birth one drawn value, and chose the sex of the child, because the character
+report carries the sex on the character row and the succession work reads
+it.[^DEC71B]
+
+**This is a concept that no product record asked for.** The product record for
+descent excludes a heritable trait and excludes resemblance between a parent
+and a child.[^DEC71C] The sex is neither of those, so the record does not
+forbid it. It also does not ask for it.
+
+The options are three.
+
+1. **The world draws the sex at the birth.** This is what the code does. The
+   draw keys on the mother and on the number of children she has borne on this
+   tick, because the child holds no identity when the draw happens.[^KEYED] A
+   character who founds a line already holds an identity, so that draw keys on
+   the character.
+2. **Content supplies the sex.** A caller that bears a child names it. The
+   birth then makes no draw, and the item that requires a keyed birth draw has
+   nothing to key.
+3. **The world holds no sex at all.** The succession work then needs another
+   filter, and the birth draw needs another subject.
+
+**The recommendation is option one.** It gives the birth draw a real subject,
+it matches the character report, and it costs one byte in the slot columns. A
+reviewer who rejects it should say what else the birth draws, because the item
+that governs this work requires that the birth draws something.
 
 ### DEC-069 — Which representation does the result of a selector take?
 
@@ -1300,3 +1335,7 @@ a failed founding is correct.[^PRD12]
 [^DEC69A]: ADR-0051, a selector is a lazy expression tree that Rust evaluates, decision D1. `docs/adrs/draft/adr-0051-a-selector-is-a-lazy-expression-tree.md`
 [^DEC69B]: ADR-0052, a selector result may be a range, not only an enumerated set, decision D2. `docs/adrs/draft/adr-0052-a-selector-result-may-be-a-range.md`
 [^DEC69C]: Selector engine and verbs, section 3.2. `docs/research/reports/04-selector-engine-and-verbs.md`
+[^DEC71A]: Backlog item 0067, record a parent and walk a line. `docs/backlog/complete/0067-record-a-parent-and-walk-a-line.md`
+[^DEC71B]: The character graph and inheritance, section 2.1. `docs/research/reports/14-character-graph-and-inheritance.md`
+[^DEC71C]: PRD-0015, a unit has parents and children. `docs/product/accepted/prd-0015-a-unit-has-parents-and-children.md`
+
