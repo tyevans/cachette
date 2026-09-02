@@ -194,7 +194,7 @@ without stating a constraint is worse than no record.
 | 0020 | Structural change batches at the barrier and applies by tombstone and compact | Proposed | 0001, 0012 | 01 |
 | 0021 | Layout follows the access pattern | Proposed | 0012 | 01 |
 | 0066 | Entity storage holds four fixed shapes | Accepted | 0012, 0020 | 01, 05 |
-| 0090 | A tile upgrade is stored sparsely, as the difference from the generated world | Draft | 0012, 0015, 0056, 0066, 0068, 0072 | `draft/adr-0090-a-tile-upgrade-is-stored-sparsely.md` |
+| 0090 | A tile upgrade is stored sparsely, as the difference from the generated world | Draft | 0012, 0015, 0056, 0066, 0068, 0072, 0074 | `draft/adr-0090-a-tile-upgrade-is-stored-sparsely.md` |
 
 ### The pyramid
 
