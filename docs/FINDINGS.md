@@ -2707,6 +2707,38 @@ guard, not evidence.[^64] Both rules stay in the code, because the second
 mechanism is an ordering that a later change can move, and neither costs
 anything. Neither is counted as covered.
 
+### FND-156 — The live filter of the household read cannot fail through the engine
+
+**Believed.** The household read must skip a dead unit, and a test can prove
+it by putting the defect back. A reader that walked every slot instead of
+every live unit would put a dead unit into a household.
+
+**True.** It would not. The unit arena clears the home of a slot when it frees
+it, and the arena invariant states that a slot which is not live holds no
+home. So a dead slot never names a dwelling, and the walk over every slot
+gives the same answer as the walk over the live units. The filter is a second
+guard against a case that a checked invariant already excludes.
+
+**Evidence.** The filter was replaced by a walk over the whole home column,
+rebuilding each identity from the slot and its generation. The whole household
+suite stayed green. Three other perturbations of the same function each failed
+at least two tests: a comparison that let a moved unit stay in the dwelling it
+left, a reversed read order, and a removed guard against the value that means
+no home.
+
+**Follows.** Two things.
+
+**The filter stays, and this row is why it has no test.** A reader that walked
+the whole column would be correct only for as long as the free path keeps
+clearing the home. That is a coupling to a distant mechanism, and nothing in
+the reader would say so. The live walk is the same walk the unit-to-tile
+bridge makes, and it is correct on its own terms.
+
+**A perturbation that changes no answer is a result, not a failed
+experiment.** It says the guard is redundant with something else. Record which
+mechanism already excludes the case, so that a later reader does not delete
+the guard and the mechanism in two separate changes.
+
 ### FND-115 — A fixture that asks for the first kind a tile carries selects one kind
 
 **Believed.** A fixture that walks the open tiles and takes, for each tile, the

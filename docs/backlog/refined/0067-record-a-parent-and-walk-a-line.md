@@ -156,4 +156,4 @@ Filled in when the item moves to `complete/`.
 [^12]: Testing Rules, section 2. `.claude/rules/testing.md`
 [^13]: The character graph and inheritance, section 2.2. `docs/research/reports/14-character-graph-and-inheritance.md`
 [^14]: Decisions register, DEC-039. `docs/DECISIONS.md`
-[^15]: Backlog item 0103. `docs/backlog/proposed/0103-derive-a-household-from-the-dwelling-slot.md`
+[^15]: Backlog item 0103. `docs/backlog/complete/0103-derive-a-household-from-the-dwelling-slot.md`

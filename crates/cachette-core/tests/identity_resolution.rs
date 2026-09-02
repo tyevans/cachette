@@ -28,7 +28,7 @@ fn world() -> World {
         height: 8,
         seed: 3,
         faction_count: 2,
-        unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
+        ..WorldConfig::default()
     })
     .expect("the extent must describe a world")
 }

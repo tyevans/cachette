@@ -505,6 +505,28 @@ impl SettlementArena {
         self.slot_of(entity).is_some()
     }
 
+    /// Returns the identity that one slot carries, or `None` when the slot
+    /// holds no live settlement.
+    ///
+    /// This is the reverse of [`Self::slot_of`]. A column that names a
+    /// settlement holds a slot, and a caller that reads such a column needs
+    /// the identity back. The arena rebuilds it from the generation the slot
+    /// holds, so the caller never assembles one.[^1]
+    ///
+    /// A slot outside the arena, a free slot and a retired slot each give
+    /// `None`.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0014, entity identity is an index plus a generation, decision D1. `docs/adrs/accepted/adr-0014-entity-identity-is-an-index-plus-a-generation.md`
+    #[must_use]
+    pub fn entity_at(&self, slot: u32) -> Option<Entity> {
+        if *self.live.get(slot as usize)? != 1 {
+            return None;
+        }
+        Entity::new(slot, self.generations[slot as usize])
+    }
+
     /// Returns the tile of a settlement, or `None` when the identity is
     /// dead.
     #[must_use]

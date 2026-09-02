@@ -35,7 +35,6 @@ These close a gap a review found, or they unblock the items above.
 
 | No. | Why it sits here |
 |---|---|
-| 0103 | A household has no home. DEC-039 answers it: derive the household from the dwelling slot. |
 | 0104 | A ruler decides nothing that reaches anybody. DEC-040 carries the writ in the influence field. |
 | 0112 | Building a world passes over every tile. PRD-0003 states it must not, so the record is false of the code. |
 | 0113 | Admission enforces the capacity from a bridge count that no test compares against a scan. |
@@ -96,6 +95,8 @@ These are real and none of them blocks anything today.
 | 0007 | The storage claims. |
 | 0009 | The log claims. |
 | 0010 | The Python boundary claims. |
+| 0168 | The control plane cannot name a dwelling, so a household binding would be inert. Waits on 0161. |
+| 0167 | A reverse index from a dwelling to its units. Take it when a measurement asks for it, and BLK-007 says none exists. |
 | 0166 | The footnote baseline holds every document the new check would fail. It can only shrink, and it does not shrink by itself.[^10] |
 
 ## References
