@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-137**
+**Next number: FND-139**
 
 ## A. Corrections to stated rules
 
@@ -3051,6 +3051,55 @@ condition, and so did the brief that dispatched it. Neither would have been
 wrong about the outcome. Both would have been wrong about what the outcome
 proved.
 
+### FND-138 — A gate result read through a pipe reports the exit code of the pipe
+
+**Believed.** A gate run reports whether the gate passed. The command
+`just check` exits zero when every gate passes, so a run that exits zero
+passed.
+
+**True.** A shell pipeline exits with the status of its last stage. A gate
+piped into `tail` therefore exits with the status of `tail`, which is zero
+whatever the gate did. The gate can fail, or be killed, and the run still
+reads as a pass.
+
+The failure is silent in the direction that matters. A pipeline hides a red
+gate and never hides a green one, so the mistake only ever reports success.
+
+**Evidence.** Two instances in one session, made independently by two agents.
+
+The first ran the gate in the background through a pipe into `tail`. The task
+reported exit code zero, and the captured output was empty. An empty capture
+from a gate that prints hundreds of lines is what said the gate had not
+finished. The run had been killed, and `tail` had reported its own success.
+
+The second ran the gate on the trunk through a pipeline and reported a pass.
+The gate had been terminated by a signal, which the shell reports as 143, and
+the pipeline still reported zero.
+
+Neither instance was found by reading the exit code. The first was found
+because the capture was empty, and the second because the termination was
+noticed by other means.
+
+**Follows.** **Read the exit status of the command under test, and never of a
+pipeline it sits inside.** Run the gate, capture its status directly, and read
+the log afterwards.
+
+```
+just check > /tmp/gate.log 2>&1; echo "EXIT=$?"
+```
+
+Do not pipe a gate into `tail`, `grep` or `head` when the exit code is the
+thing being reported. A filter is safe only after the status is captured.
+
+**A capture that is empty or short is evidence, and not a formatting
+problem.** A gate prints hundreds of lines. A run that reports a pass and
+shows almost nothing did not finish.
+
+**The shape is one outcome read from a place that cannot see it go wrong.**
+The register holds that shape twice already, in a conservation check that read
+only the source of a transfer, and in a differential test that could not see a
+defect which moved both sides alike.[^95] [^96]
+
 
 ### FND-134 — A product record can state a structure, and the check cannot see it
 
@@ -3235,3 +3284,5 @@ makes it more likely, not less.
 [^92]: Decisions register, DEC-059. `docs/DECISIONS.md`
 [^93]: Reviews, the founding and deposit product records. `docs/reviews/0149-the-founding-and-deposit-product-records.md`
 [^94]: The record and register checks. `justfile`
+[^95]: Findings register, FND-075, in this document.
+[^96]: Findings register, FND-078, in this document.
