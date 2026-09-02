@@ -105,6 +105,7 @@ These are real and none of them blocks anything today.
 | 0010 | The Python boundary claims. |
 | 0168 | The control plane cannot name a dwelling, so a household binding would be inert. Waits on 0161. |
 | 0167 | A reverse index from a dwelling to its units. Take it when a measurement asks for it, and BLK-007 says none exists. |
+| 0200 | Admission admits more units onto a roaded tile than the position table believes it holds, and the fold that reports the largest capacity walks one of the two tables that state one. FND-193 records it. DEC-081 must close first, and no run reaches it until something makes a unit build. |
 | 0198 | The record check reads any mention of a record number as a citation, so a record cannot name the one number the registry retired. FND-192 records it. It sits here because one number is retired and the cost grows only as more are. |
 | 0166 | The footnote baseline holds every document the new check would fail. It can only shrink, and it does not shrink by itself.[^10] |
 

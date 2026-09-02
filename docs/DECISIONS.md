@@ -23,9 +23,50 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^ALLOC]
 
-**Next number: DEC-081**
+**Next number: DEC-082**
 
 ## Open
+
+### DEC-081 — Does a caller that bounds a site read the composed capacity or the ground?
+
+**Open. Engineering owns it. The recommendation is Option A.**
+
+One function composes the capacity of the ground with the capacity a finished
+upgrade gives, and returns the larger. Admission calls it, and so does the
+public reader that reports what a tile holds.
+
+Three callers do not. The position table bounds the positions of a site by the
+ground alone. The founding seats a group over a disc by the ground alone. The
+founding survey estimates the room of a place by the ground alone. A finding
+holds the evidence.[^DEC81A]
+
+**The width is the reason it matters.** The row width of the position table is
+a fold over the terrain capacity table. A made way states a capacity above
+every value in that table, so a position table that followed the composition
+would be asked to hold more positions than its row carries.
+
+**Option A. Say that the three callers ask a different question, and fold both
+tables into the width.** The positions of a site are the work it opens, and the
+ground is the right bound for that. The founding seats conservatively, and
+seating fewer than a tile holds is safe under the record that lets only
+admission enforce a capacity.[^DEC81B] What must change is the fold: it claims
+to report the largest number of units that can stand on a tile, and it walks
+one of the two tables that state one.
+
+**Option B. Make every caller compose.** One question then has one answer
+everywhere. It widens the position row to the largest capacity any tile can
+reach, which multiplies the storage of every site by that ratio, and no
+measurement supports paying it.[^BLK7]
+
+**Option C. Leave it, and remove the claim from the record.** The review
+already removes the claim. Nothing else changes, and the fold keeps saying
+something that is false of a roaded tile.
+
+**Recommendation: A.** It costs one fold and one comment, it removes the false
+statement rather than the true behaviour, and it leaves the position bound
+where the movement record puts it. Option B pays the storage of every site for
+a case that no run reaches. Option C leaves a helper whose own words are wrong,
+and this project has recorded what that costs.
 
 ### DEC-079 — Does a whole cell that steps in one direction read as a crowd?
 
@@ -1683,3 +1724,5 @@ a failed founding is correct.[^PRD12]
 [^DEC79B]: ADR-0018, the unit-to-tile bridge is derived, and it rebuilds at the barrier, decision D2. `docs/adrs/accepted/adr-0018-the-unit-to-tile-bridge-is-derived-and-rebuilds-at-the-barrier.md`
 [^DEC79D]: Backlog item 0185, steer a step by the option the unit chose. `docs/backlog/refined/0185-steer-a-step-by-the-option-the-unit-chose.md`
 [^DEC80B]: Backlog item 0187, give a carried load somewhere to go. `docs/backlog/refined/0187-give-a-carried-load-somewhere-to-go.md`
+[^DEC81A]: Findings register, FND-193. `docs/FINDINGS.md`
+[^DEC81B]: ADR-0074, a spawn may over-fill a tile, and only admission enforces the capacity, decision D1. `docs/adrs/accepted/adr-0074-a-spawn-may-over-fill-a-tile-and-only-admission-enforces-the-capacity.md`
