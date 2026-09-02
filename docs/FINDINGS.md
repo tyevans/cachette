@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-182**
+**Next number: FND-184**
 
 ## A. Corrections to stated rules
 
@@ -4296,6 +4296,55 @@ This is the discipline the testing rule already states for a keyed draw, turned
 round. That rule says to test what the value depends on.[^43] This says to
 test what depends on the value.
 
+### FND-182 — A summary of a generated field splits the way the field splits
+
+**Believed.** The item that put food into the level 1 summary said that the
+rebuild takes the resource field as one more argument, and adds the stock of
+each tile as it walks the cell.[^F182A]
+
+**True.** That puts a read of a generated field over the whole world into every
+frame. A tile stock has two parts: the stock the ground generated, which is a
+pure function of the seed and the address, and the stored take, which a frame
+can change.[^F182B] [^F182C] The summary splits the same way. The original food
+joins the part of a cell that the build computes once, beside the height total.
+The rebuild subtracts the stored take alone, and the ledger holds one entry for
+each tile that somebody gathered from, so a world that gathered nothing costs
+one search for each row of a block and no per-tile read.
+
+**Evidence.** The level already split each cell into a part the ground fixes
+and a part a frame changes, and the record that generates the ground calls a
+sweep of the whole world every frame a design mistake.[^F182D] The split was
+applied to the food total, and the equality against level 0 holds in both the
+gathered case and the ungathered case. No figure here is measured, because no
+measurement exists on the target platform.[^F182E]
+
+**Follows.** A summary field over a field that is a generated base plus a
+stored change splits into a build part and a rebuild part. The build reads the
+generator once. The rebuild reads the stored change, whose cost follows the
+change and not the size of the world.
+
+### FND-183 — Pinning a reader is not pinning the value
+
+**Believed.** FND-181 says to pin a value to a constant and watch the suite
+stay green.[^F183A] That was read as pinning the accessor that reports the
+value.
+
+**True.** The accessor is often not the path the consumer takes. The food total
+of a cell was pinned to a constant in its accessor, and every choice test
+stayed green, because the mean that the option reads divides the private field
+and never calls the accessor. The same pin applied to the stored field failed
+two choice tests at once, and so did a pin on the mean.
+
+**Evidence.** Three pins were run separately on a development machine, each
+with the source restored afterwards. The accessor pin left the twelve choice
+tests green and failed six pyramid tests. The stored-field pin and the mean pin
+each failed the two choice tests that read the food.
+
+**Follows.** Name the site that is pinned, and pin the site the consumer reads.
+A suite that stays green under a pin is evidence only when the pin reaches the
+consumer. Where a reader and a stored field are two paths to one value, pin
+both, or pin the stored field alone.
+
 
 
 ## References
@@ -4310,6 +4359,12 @@ test what depends on the value.
 [^F181C]: Findings register, FND-180, in this document.
 [^F181D]: What a unit does in a tick, section 3.4. `docs/research/what-a-unit-does-in-a-tick.md`
 [^F181E]: What a unit does in a tick, section 6.1. `docs/research/what-a-unit-does-in-a-tick.md`
+[^F182A]: Backlog item 0183, carry the food of a cell into the level 1 summary. `docs/backlog/complete/0183-carry-the-food-of-a-cell-into-the-level-1-summary.md`
+[^F182B]: ADR-0072, a tile stock is generated, and only what was taken is stored, decision D1. `docs/adrs/accepted/adr-0072-a-tile-stock-is-generated-and-only-what-was-taken-is-stored.md`
+[^F182C]: ADR-0072, a tile stock is generated, and only what was taken is stored, decision D4. `docs/adrs/accepted/adr-0072-a-tile-stock-is-generated-and-only-what-was-taken-is-stored.md`
+[^F182D]: ADR-0068, terrain is generated from the seed and is never stored as a map, the consequences. `docs/adrs/accepted/adr-0068-terrain-is-generated-from-the-seed-and-is-never-stored-as-a-map.md`
+[^F182E]: Blockers register, BLK-007, in the blockers register. `docs/BLOCKERS.md`
+[^F183A]: Findings register, FND-181, in this document.
 
 [^F168A]: ADR-0084, the world reserves the unit columns at construction, decision D3. `docs/adrs/draft/adr-0084-the-world-reserves-the-unit-columns-at-construction.md`
 [^F168B]: Review 0175, the unit reservation record. `docs/reviews/0175-the-unit-reservation-record.md`

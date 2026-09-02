@@ -31,6 +31,13 @@
 //! tile count, the open ground and the height total are therefore computed
 //! when the level is built and combined into every rebuild after that.
 //!
+//! **A resource total is split across the two parts of a cell.** The stock a
+//! tile started with is a pure function of the seed and the address, so it
+//! joins the ground contribution and is read once.[^14] What a unit took from
+//! a tile is a fact of a frame, so the rebuild subtracts it from the
+//! ledger.[^15] The stored total is therefore what the tiles still hold, which
+//! is what a tile reader reports for one tile.
+//!
 //! **The geometry is the block layout, and this module declares none.** The
 //! derived unit structure partitions the world by the same block that the
 //! pyramid aggregates over, so neither subsystem chooses the block edge
@@ -51,14 +58,16 @@
 //! [^11]: ADR-0068, terrain is generated from the seed and is never stored as a map, decision D1. `docs/adrs/accepted/adr-0068-terrain-is-generated-from-the-seed-and-is-never-stored-as-a-map.md`
 //! [^12]: PRD-0003, a developer sees a world worth looking at. `docs/product/accepted/prd-0003-a-developer-sees-a-world-worth-looking-at.md`
 //! [^13]: ADR-0068, terrain is generated from the seed and is never stored as a map, the consequences. `docs/adrs/accepted/adr-0068-terrain-is-generated-from-the-seed-and-is-never-stored-as-a-map.md`
+//! [^14]: ADR-0072, a tile stock is generated, and only what was taken is stored, decision D1. `docs/adrs/accepted/adr-0072-a-tile-stock-is-generated-and-only-what-was-taken-is-stored.md`
+//! [^15]: ADR-0072, a tile stock is generated, and only what was taken is stored, decision D4. `docs/adrs/accepted/adr-0072-a-tile-stock-is-generated-and-only-what-was-taken-is-stored.md`
 
 use crate::bridge::{BlockLayout, BridgeError, UnitTileBridge};
 use crate::hash::StateHash;
 use crate::hex::Axial;
 use crate::holding::Holder;
+use crate::resource::{ledger_key, Amount, DepletionLedger, ResourceField, ResourceKind};
 use crate::sim_math;
 use crate::soldier::SoldierArena;
-use crate::terrain::Terrain;
 use crate::tile_value::TileValues;
 use crate::types::{Accum, Fix32, TileIdx};
 
@@ -83,6 +92,7 @@ pub struct CellSummary {
     held_tiles: i64,
     value_total: Accum,
     height_total: Accum,
+    food_total: Accum,
 }
 
 impl CellSummary {
@@ -102,6 +112,7 @@ impl CellSummary {
         held_tiles: 0,
         value_total: Accum(0),
         height_total: Accum(0),
+        food_total: Accum(0),
     };
 
     /// Combines two summaries.
@@ -128,6 +139,7 @@ impl CellSummary {
             held_tiles: self.held_tiles.saturating_add(other.held_tiles),
             value_total: sim_math::combine(self.value_total, other.value_total),
             height_total: sim_math::combine(self.height_total, other.height_total),
+            food_total: sim_math::combine(self.food_total, other.food_total),
         }
     }
 
@@ -150,6 +162,7 @@ impl CellSummary {
             held_tiles: self.held_tiles.saturating_sub(other.held_tiles),
             value_total: Accum(self.value_total.0.saturating_sub(other.value_total.0)),
             height_total: Accum(self.height_total.0.saturating_sub(other.height_total.0)),
+            food_total: Accum(self.food_total.0.saturating_sub(other.food_total.0)),
         }
     }
 
@@ -214,6 +227,52 @@ impl CellSummary {
         self.height_total
     }
 
+    /// Returns the food that the tiles of the cell still hold. Extensive.
+    ///
+    /// The total is the food the ground generated, less what the depletion
+    /// ledger says was taken from it. That is what a tile reader reports for
+    /// one tile, so the cell is the exact combination of its tiles.[^1] [^2]
+    ///
+    /// The accumulator holds whole units of stock, because a stock is a whole
+    /// number and never a fraction.[^3] It is 64 bits wide, because a
+    /// one-byte tile field summed over the tile count of the target world
+    /// overflows a 32-bit accumulator.[^4]
+    ///
+    /// The field covers the food kind alone. A total for each kind would
+    /// treble the width of the summary, and nothing reads a wood total or a
+    /// stone total.[^5]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0022, level 0 is the only truth, and every level above it is derived, decision D2. `docs/adrs/accepted/adr-0022-level-0-is-the-only-truth-and-every-level-above-it-is-derived.md`
+    /// [^2]: ADR-0072, a tile stock is generated, and only what was taken is stored, decision D4. `docs/adrs/accepted/adr-0072-a-tile-stock-is-generated-and-only-what-was-taken-is-stored.md`
+    /// [^3]: ADR-0002, simulated and aggregated state holds no floating point number, decision D1. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
+    /// [^4]: ADR-0023, an aggregate combines exactly, in any order, decision D3. `docs/adrs/accepted/adr-0023-an-aggregate-combines-exactly-in-any-order.md`
+    /// [^5]: Recurring defect shapes, shape 3. `.claude/rules/recurring-defects.md`
+    #[must_use]
+    pub const fn food_total(self) -> Accum {
+        self.food_total
+    }
+
+    /// Returns the food for each tile of the cell. Intensive.
+    ///
+    /// The denominator is the tile count, because the ground gives every tile
+    /// a food stock and water holds a stock of zero. A field defined over a
+    /// subset would divide by the count of that subset.[^1]
+    ///
+    /// The total holds whole units, so the division scales the total into the
+    /// fixed-point range before it divides. A summary that covers no tile
+    /// returns no value.[^2]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0024, every summary field is declared extensive or intensive, decision D4. `docs/adrs/accepted/adr-0024-every-summary-field-is-declared-extensive-or-intensive.md`
+    /// [^2]: ADR-0024, every summary field is declared extensive or intensive, decision D5. `docs/adrs/accepted/adr-0024-every-summary-field-is-declared-extensive-or-intensive.md`
+    #[must_use]
+    pub fn mean_food(self) -> Option<Fix32> {
+        ratio_of(self.food_total.0, self.tiles)
+    }
+
     /// Returns the mean tile value. Intensive.
     ///
     /// The value is not stored. It is the sum divided by the tile count, both
@@ -274,6 +333,7 @@ impl CellSummary {
             .write_u64(self.held_tiles as u64)
             .write_u64(self.value_total.0 as u64)
             .write_u64(self.height_total.0 as u64)
+            .write_u64(self.food_total.0 as u64)
     }
 }
 
@@ -293,7 +353,12 @@ fn mean_of(total: Accum, count: i64) -> Option<Fix32> {
     Some(Fix32(clamp_to_fix(total.0 / count)))
 }
 
-/// Returns one count divided by another, as a fixed-point fraction.
+/// Returns one whole-number total divided by another, as a fixed-point value.
+///
+/// The numerator scales into the fixed-point range before the division, so a
+/// total of whole numbers gives a mean with a fraction. Every caller here
+/// holds whole numbers in both terms: a count of tiles, a count of units, or a
+/// count of units of stock.
 fn ratio_of(part: i64, whole: i64) -> Option<Fix32> {
     if whole == 0 {
         return None;
@@ -340,6 +405,11 @@ impl Pyramid {
     /// because the ground does not change for the life of a world. A rebuild
     /// then reads only what a frame can change.[^1]
     ///
+    /// The contribution holds the food the tiles started with, as well as the
+    /// tile count, the open ground and the height total. The field reads the
+    /// ground to generate a stock, so this takes the resource field rather
+    /// than the ground alone.[^3]
+    ///
     /// **This runs on the calling thread.** It reads the ground of every tile
     /// of the world, which is one whole-world sweep and the only one the
     /// pyramid performs. It is the most expensive thing in building a world.
@@ -364,13 +434,14 @@ impl Pyramid {
     /// # References
     ///
     /// [^1]: ADR-0068, terrain is generated from the seed and is never stored as a map, decision D1. `docs/adrs/accepted/adr-0068-terrain-is-generated-from-the-seed-and-is-never-stored-as-a-map.md`
-    pub fn new(layout: BlockLayout, terrain: Terrain) -> Result<Self, BridgeError> {
-        if layout.grid() != terrain.grid() {
+    /// [^3]: ADR-0072, a tile stock is generated, and only what was taken is stored, decision D1. `docs/adrs/accepted/adr-0072-a-tile-stock-is-generated-and-only-what-was-taken-is-stored.md`
+    pub fn new(layout: BlockLayout, resources: ResourceField) -> Result<Self, BridgeError> {
+        if layout.grid() != resources.grid() {
             return Err(BridgeError::GridMismatch);
         }
         let count = layout.block_count() as usize;
         let ground: Vec<CellSummary> = (0..count as u32)
-            .map(|block| ground_of_block(layout, terrain, block))
+            .map(|block| ground_of_block(layout, resources, block))
             .collect();
         Ok(Self {
             layout,
@@ -441,8 +512,9 @@ impl Pyramid {
 
     /// Rebuilds every cell from level 0.
     ///
-    /// The rebuild reads the ground, the tile values, the tile holders and
-    /// the derived unit structure, and writes the summaries. It is the one mechanism that
+    /// The rebuild reads the ground, the tile values, the tile holders, the
+    /// depletion ledger and the derived unit structure, and writes the
+    /// summaries. It is the one mechanism that
     /// maintains this level: no simulation system writes here.[^1]
     ///
     /// Each thread fills its own run of cells, and a cell is named by its
@@ -479,6 +551,7 @@ impl Pyramid {
         holders: &[Holder],
         arena: &SoldierArena,
         bridge: &UnitTileBridge,
+        depletion: &DepletionLedger,
         threads: usize,
     ) -> Result<(), BridgeError> {
         if self.layout.grid() != arena.grid() {
@@ -496,7 +569,15 @@ impl Pyramid {
         // no constant of its own.
         if self.cells.len() <= threads {
             for (block, cell) in self.cells.iter_mut().enumerate() {
-                let moving = moving_part(layout, values, holders, arena, bridge, block as u32)?;
+                let moving = moving_part(
+                    layout,
+                    values,
+                    holders,
+                    arena,
+                    bridge,
+                    depletion,
+                    block as u32,
+                )?;
                 *cell = ground[block].combine(moving);
             }
             return Ok(());
@@ -513,7 +594,8 @@ impl Pyramid {
                 handles.push(scope.spawn(move || {
                     for (offset, cell) in chunk.iter_mut().enumerate() {
                         let block = first + offset as u32;
-                        let moving = moving_part(layout, values, holders, arena, bridge, block)?;
+                        let moving =
+                            moving_part(layout, values, holders, arena, bridge, depletion, block)?;
                         *cell = ground[block as usize].combine(moving);
                     }
                     Ok(())
@@ -555,12 +637,23 @@ impl Pyramid {
 /// # References
 ///
 /// [^1]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
-fn ground_of_block(layout: BlockLayout, terrain: Terrain, block: u32) -> CellSummary {
+fn ground_of_block(layout: BlockLayout, resources: ResourceField, block: u32) -> CellSummary {
+    let terrain = resources.terrain();
     let mut summary = CellSummary::IDENTITY;
     for address in addresses_of_block(layout, block) {
         let Some(ground) = terrain.tile(address) else {
             continue;
         };
+        // The food a tile started with is a pure function of the seed and the
+        // address, in the same way the height is, so it is read here and never
+        // again.[^1] What a unit took from it is a fact of a frame, and the
+        // moving part below subtracts that.[^2]
+        //
+        // [^1]: ADR-0072, a tile stock is generated, and only what was taken is stored, decision D1. `docs/adrs/accepted/adr-0072-a-tile-stock-is-generated-and-only-what-was-taken-is-stored.md`
+        // [^2]: ADR-0072, a tile stock is generated, and only what was taken is stored, decision D4. `docs/adrs/accepted/adr-0072-a-tile-stock-is-generated-and-only-what-was-taken-is-stored.md`
+        let food = resources
+            .original(address, ResourceKind::Food)
+            .unwrap_or(Amount::ZERO);
         summary = summary.combine(CellSummary {
             tiles: 1,
             open_tiles: i64::from(ground.kind.is_passable()),
@@ -568,6 +661,7 @@ fn ground_of_block(layout: BlockLayout, terrain: Terrain, block: u32) -> CellSum
             held_tiles: 0,
             value_total: Accum(0),
             height_total: sim_math::accumulate(Accum(0), ground.height),
+            food_total: food.to_accum(),
         });
     }
     summary
@@ -588,6 +682,7 @@ fn moving_part(
     holders: &[Holder],
     arena: &SoldierArena,
     bridge: &UnitTileBridge,
+    depletion: &DepletionLedger,
     block: u32,
 ) -> Result<CellSummary, BridgeError> {
     let grid = layout.grid();
@@ -600,6 +695,7 @@ fn moving_part(
     // difference between a coordinate conversion for each tile and none.
     let mut value_total = Accum(0);
     let mut held_tiles = 0i64;
+    let mut food_taken = 0i64;
     for row in first_row..(first_row + edge).min(grid.height()) {
         let start = (row * grid.width() + first_column) as usize;
         let end = (row * grid.width() + (first_column + edge).min(grid.width())) as usize;
@@ -620,6 +716,7 @@ fn moving_part(
         for holder in &holders[start..end] {
             held_tiles += i64::from(!holder.is_nobody());
         }
+        food_taken += food_taken_in_run(depletion, start as u32, end as u32);
     }
 
     Ok(CellSummary {
@@ -629,7 +726,56 @@ fn moving_part(
         held_tiles,
         value_total,
         height_total: Accum(0),
+        // The ground part holds the food the tiles started with, so the moving
+        // part holds what was taken, as a negative amount. Nothing takes more
+        // from a tile than the tile ever held, and the world invariant is what
+        // checks that, so the sum of the two parts is never below zero.[^1]
+        //
+        // [^1]: ADR-0072, a tile stock is generated, and only what was taken is stored, decision D5. `docs/adrs/accepted/adr-0072-a-tile-stock-is-generated-and-only-what-was-taken-is-stored.md`
+        food_total: Accum(-food_taken),
     })
+}
+
+/// Returns the food taken from one contiguous run of tiles.
+///
+/// The ledger holds one entry for each tile and kind that somebody gathered
+/// from, in ascending key order, and a world in which nothing was gathered
+/// holds no entry.[^1] [^2] The key of a tile rises with the tile index, so
+/// one run of tiles is one contiguous span of the ledger, and a search finds
+/// the start of that span.
+///
+/// **A run whose tiles hold no stored take costs one search and no per-tile
+/// read.** A search over an empty ledger returns at once, so a world that
+/// gathered nothing pays one search for each row of each block and nothing
+/// else. No cost figure here is measured, because no measurement exists on
+/// the target platform.[^3]
+///
+/// The scan visits the entries in key order, which is fixed.[^4]
+///
+/// # References
+///
+/// [^1]: ADR-0072, a tile stock is generated, and only what was taken is stored, decision D4. `docs/adrs/accepted/adr-0072-a-tile-stock-is-generated-and-only-what-was-taken-is-stored.md`
+/// [^2]: ADR-0022, level 0 is the only truth, and every level above it is derived, decision D2. `docs/adrs/accepted/adr-0022-level-0-is-the-only-truth-and-every-level-above-it-is-derived.md`
+/// [^3]: Blockers register, BLK-007. `docs/BLOCKERS.md`
+/// [^4]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
+fn food_taken_in_run(depletion: &DepletionLedger, first: u32, end: u32) -> i64 {
+    let entries = depletion.entries();
+    if entries.is_empty() || first >= end {
+        return 0;
+    }
+    let low = ledger_key(TileIdx(first), ResourceKind::Food);
+    let high = ledger_key(TileIdx(end), ResourceKind::Food);
+    let start = entries.partition_point(|entry| entry.key < low);
+    let mut taken = 0i64;
+    for entry in &entries[start..] {
+        if entry.key >= high {
+            break;
+        }
+        if ResourceKind::from_u8((entry.key & 0b11) as u8) == Some(ResourceKind::Food) {
+            taken += i64::from(entry.taken);
+        }
+    }
+    taken
 }
 
 /// Returns every address a block covers, in the row-major order of the block.

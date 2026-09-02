@@ -569,7 +569,7 @@ impl World {
             depletion: DepletionLedger::new(),
             departed: [0; RESOURCE_KIND_COUNT],
             upgrades: UpgradeMap::new(),
-            pyramid: Pyramid::new(layout, terrain)?,
+            pyramid: Pyramid::new(layout, ResourceField::new(terrain))?,
             holding: Holding::new(layout),
             influence: InfluenceField::new(cell_lattice, config.faction_count)?,
             schedule: RateSchedule::DEFAULT,
@@ -596,6 +596,7 @@ impl World {
             world.holding.holders(),
             &world.soldiers,
             &world.bridge,
+            &world.depletion,
             1,
         )?;
         // The conductance of a cell follows the ground it covers, and the
@@ -3078,6 +3079,7 @@ impl World {
             self.holding.holders(),
             &self.soldiers,
             &self.bridge,
+            &self.depletion,
             threads,
         )?;
 
@@ -3469,6 +3471,7 @@ impl World {
             self.holding.holders(),
             &self.soldiers,
             &self.bridge,
+            &self.depletion,
             threads,
         )?;
         Ok(())

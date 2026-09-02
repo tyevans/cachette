@@ -14,7 +14,8 @@
 //! [^2]: Testing rules, section 2a. `.claude/rules/testing.md`
 
 use cachette_core::choose::{self, ChoiceSchedule, SCORE_FLOOR};
-use cachette_core::cohort::NEED_FULL;
+use cachette_core::cohort::{NeedRule, NEED_FULL};
+use cachette_core::resource::ResourceKind;
 use cachette_core::terrain::TileKind;
 use cachette_core::{Axial, Entity, FactionId, Fix32, World, WorldConfig, NO_INTENT};
 
@@ -619,4 +620,186 @@ fn an_interval_above_the_ceiling_is_refused() {
         .is_err());
     assert_eq!(world.option_weight(choose::OPTION_COUNT as u8), None);
     assert!(NO_INTENT as usize > choose::OPTION_COUNT);
+}
+
+/// The option index of the row that scores the food of a cell.
+///
+/// The index is the tie-break position of the row, and it did not change when
+/// the row changed the field it reads.[^1]
+///
+/// # References
+///
+/// [^1]: ADR-0004, iteration order is explicit, decisions D1 and D3. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
+const FORAGE: u8 = 1;
+
+/// Drains the need of every unit in one tick, and lets nobody die of it.
+///
+/// The `forage` row is driven by what a unit lacks, so a unit at full need
+/// scores zero for it whatever the ground carries. A fixture that left the
+/// need alone would measure the drive and not the field.
+///
+/// The decay takes a whole need in one tick, and the bound sits at the top of
+/// the range, so the run is short and no unit reaches the death scan. The
+/// economy runs on every tick, because the need falls in the pass that the
+/// schedule gates.
+fn starve(world: &mut World) {
+    world
+        .set_economy_schedule(1, 0)
+        .expect("the period is inside the range");
+    let rule = NeedRule::new(
+        NEED_FULL,
+        NEED_FULL,
+        Fix32(NEED_FULL.0 / 2),
+        Fix32(NEED_FULL.0 / 16),
+        Fix32::MAX,
+    )
+    .expect("every rate is at or above zero");
+    world.set_need_rule(rule);
+}
+
+/// Returns the open address closest to the middle of each cell, with the mean
+/// food of that cell.
+///
+/// The address sits away from the edge of its block, so a unit that acts on
+/// its choice is still inside the cell it read a few frames later.
+fn middle_of_each_cell(world: &World) -> Vec<(u32, Axial, Fix32)> {
+    let layout = world.pyramid().layout();
+    let edge = i64::from(layout.block_edge());
+    let mut best: Vec<(u32, Axial, i64)> = Vec::new();
+    for address in addresses(world) {
+        if !world.admits_a_unit(address) {
+            continue;
+        }
+        let cell = cell_of(world, address);
+        let column = i64::from(address.q) % edge;
+        let row = i64::from(address.r) % edge;
+        let from_middle = (column * 2 - edge).abs() + (row * 2 - edge).abs();
+        match best.iter_mut().find(|(known, _, _)| *known == cell) {
+            Some(entry) if entry.2 > from_middle => *entry = (cell, address, from_middle),
+            Some(_) => {}
+            None => best.push((cell, address, from_middle)),
+        }
+    }
+    best.sort_unstable_by_key(|(cell, _, _)| *cell);
+    best.into_iter()
+        .filter_map(|(cell, address, _)| {
+            let food = world.pyramid().cell(cell)?.mean_food()?;
+            Some((cell, address, food))
+        })
+        .collect()
+}
+
+#[test]
+fn a_hungry_unit_forages_where_there_is_food_and_holds_where_there_is_none() {
+    // The fixture changes one value of the world: the food that the tiles of
+    // the cell hold. Nothing else differs between the two units. This is the
+    // test that a pinned food total must fail, and it is what tells a value
+    // that a stage reads from a value that a stage stores and discards.[^1]
+    //
+    // [^1]: Findings register, FND-181. `docs/FINDINGS.md`
+    let mut world = many_cell_world();
+    starve(&mut world);
+    let mut cells = middle_of_each_cell(&world);
+    cells.sort_unstable_by_key(|(_, _, food)| *food);
+    let (poor_cell, poor_address, poor_food) = cells[0];
+    let (rich_cell, rich_address, rich_food) = cells[cells.len() - 1];
+    assert!(
+        i64::from(rich_food.0) >= i64::from(poor_food.0) * 4,
+        "the fixture holds no food contrast: {poor_food:?} against {rich_food:?}"
+    );
+
+    // The weight puts the floor between the two cells, so the food alone
+    // decides which unit acts and which holds. The arithmetic is exact.
+    let middle = (i64::from(poor_food.0) + i64::from(rich_food.0)) / 2;
+    let weight = Fix32(((i64::from(SCORE_FLOOR.0) << 16) / middle) as i32);
+    only(&mut world, FORAGE, weight);
+
+    let hungry = world
+        .spawn_soldier(rich_address, FactionId(0))
+        .expect("the open tile admits a unit");
+    let idle = world
+        .spawn_soldier(poor_address, FactionId(0))
+        .expect("the open tile admits a unit");
+    for _ in 0..3 {
+        world.step(2).expect("the step must run");
+    }
+
+    // The fixture holds. Both units are hungry, and neither has left the cell
+    // it read, so the assertion below reads the ground it was aimed at.
+    for unit in [hungry, idle] {
+        assert_eq!(
+            world.soldiers().need(unit),
+            Some(Fix32::ZERO),
+            "a unit kept its need, so the forage option scores zero for it"
+        );
+    }
+    assert_eq!(
+        cell_of(&world, world.soldiers().address(hungry).expect("alive")),
+        rich_cell,
+        "the unit left the cell it read"
+    );
+    assert_eq!(
+        cell_of(&world, world.soldiers().address(idle).expect("alive")),
+        poor_cell,
+        "the unit left the cell it read"
+    );
+
+    assert_eq!(
+        world.soldier_intent(hungry).expect("alive"),
+        Some(FORAGE),
+        "the unit stood on food and did not forage"
+    );
+    assert_eq!(
+        world.soldier_intent(idle).expect("alive"),
+        None,
+        "the unit foraged ground that carries no food"
+    );
+}
+
+#[test]
+fn the_forage_option_reads_the_food_that_the_tiles_hold() {
+    // The explanation reports the value each option read. The recomputation
+    // sums the remaining stock of each tile of the cell through the public
+    // interface, so it never asks the summary and the two answers are
+    // independent.[^1]
+    //
+    // [^1]: ADR-0022, level 0 is the only truth, and every level above it is derived, decision D2. `docs/adrs/accepted/adr-0022-level-0-is-the-only-truth-and-every-level-above-it-is-derived.md`
+    let mut world = many_cell_world();
+    let cells = middle_of_each_cell(&world);
+    let (_, address, _) = cells[cells.len() - 1];
+    let unit = world
+        .spawn_soldier(address, FactionId(0))
+        .expect("the open tile admits a unit");
+    world.step(1).expect("the step must run");
+
+    let standing = world.soldiers().address(unit).expect("alive");
+    let cell = cell_of(&world, standing);
+    let layout = world.pyramid().layout();
+    let edge = layout.block_edge();
+    let first_column = (cell % layout.blocks_wide()) * edge;
+    let first_row = (cell / layout.blocks_wide()) * edge;
+    let (mut food, mut tiles) = (0i64, 0i64);
+    for row in first_row..first_row + edge {
+        for column in first_column..first_column + edge {
+            let at = Axial::new(column as i32, row as i32);
+            let Some(stock) = world.tile_stock(at, ResourceKind::Food) else {
+                continue;
+            };
+            tiles += 1;
+            food += i64::from(stock.0);
+        }
+    }
+    assert!(food > 0, "the cell carries no food, so the reading is zero");
+
+    let why = world.explain_choice(unit).expect("alive");
+    assert_eq!(
+        i64::from(why.fields[FORAGE as usize].0),
+        (food << 16) / tiles,
+        "the forage option read something other than the food of the cell"
+    );
+    assert_eq!(
+        choose::OPTIONS[FORAGE as usize].name,
+        "forage",
+        "the row that reads the food is not the forage row"
+    );
 }
