@@ -45,6 +45,7 @@ These close a gap a review found, or they unblock the items above.
 | 0161 | The control plane cannot say where to act, so a caller sweeps. Four reserved rows hold the answer and none is written. DEC-063 names it the destination. |
 | 0155 | Every test fixture builds its own world by hand, and the rule that forbids the easy route has no shared answer. |
 | 0163 | An item can be finished and still read as open, and no check compares what merged against the item that asked for it. |
+| 0179 | No golden scenario builds anything, so neither determinism test defends work that takes several ticks. FND-174 holds the experiment that proved it. |
 | 0165 | A register states the rule for reading its rows and holds a comparison the rule forbids. The example FND-141 proved false is still alive across the tree. |
 | 0149 | The cost section of PRD-0018 states the mechanism of ADR-0080. A review holds the record at `Shaped` until it states cost alone.[^11] |
 | 0059 | Housing. A review rejected ADR-0081, so this cannot be taken until a record replaces it. It sits here, not above, because nobody can start it. |
@@ -66,13 +67,13 @@ These are real and none of them blocks anything today.
 | 0111 | Let the weather change a unit and show it. Follows 0110. |
 | 0063 | Assigning a unit to a position. Waits on 0062. |
 | 0065 | Letting the job decide what a unit weighs. Waits on 0063 and 0064. |
-| 0058 | Improvements. Waits on a site that produces. |
 | 0124 | A fully recovered deposit still stores a take of zero. The recovery pass now reads that entry on every tick, so the depleted set grows and never shrinks. |
 | 0125 | Show a watcher a deposit recovering. The engine recovers a deposit, and nothing shows it. |
 | 0133 | The panel is longer than the window and cuts. A watcher cannot reach the rows below the notice. |
 | 0067 | Descent. Waits on the character tier being used for something. |
 | 0068 | A ruler and a succession. Waits on 0067. |
 | 0088 | Promotion into the character tier. |
+| 0180 | Nothing makes a unit choose to build, so a world left to run improves no tile. It waits on the faction rule of BLK-034. |
 | 0097 | The layout record. Write it with the descent columns, not before.[^5] |
 | 0050 | Four product collisions still carried. |
 | 0099 | The faction mask union has no engine caller. |

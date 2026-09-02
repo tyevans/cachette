@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-169**
+**Next number: FND-177**
 
 ## A. Corrections to stated rules
 
@@ -3868,10 +3868,93 @@ nothing, and the comment inside it says what the founding actually leaves. A
 reader who lists the test names reads the claim the finding corrected.
 
 
+### FND-174 — Neither determinism test defends work that takes several ticks
+
+**Believed.** The two determinism tests are the project's safety net. A change
+that broke the simulation would move the golden state hash, or would make two
+thread counts disagree.
+
+**True.** They defend neither the number of ticks a build takes nor the
+storage that carries it between them. The build was made to finish in the tick
+it started, and both determinism tests stayed green. So did the thread-count
+equivalence assertion inside the upgrade test file.
+
+**Evidence.** The work each upgrade kind asks for was set to one, which is
+what one builder adds in one tick. Seven tests of the upgrade file then
+failed, and among them were the two that carry the claim: the build finishes
+in one tick, and the work does not persist across an interruption. The two
+determinism tests passed unchanged, because no golden scenario builds
+anything, so the map is empty in every one of them and its bytes do not move.
+
+**Follows.** **A determinism test cannot tell a correct rule from a
+consistently wrong one, and this is the shape at the level of a whole
+feature.** The rule is already written for a draw key.[^F174A] The instance
+here is larger: a feature that no golden scenario exercises is outside both
+determinism tests, whatever the tests cover elsewhere.
+
+The cheap repair is a golden scenario that builds. It was not written here,
+because the golden file is shared and several workers were regenerating it in
+the same session. The follow-up item holds it.[^F174B]
+
+### FND-175 — A crowd of a hundred and twenty units never fills one tile
+
+**Believed.** A crowded world is enough to test admission. Spawn many units,
+let them wander, and some tile will reach its capacity.
+
+**True.** It does not. A test asserted that a tile with a finished road holds
+more units than its ground alone allows, over a world of 48 by 48 tiles with
+120 units. No tile ever went above the ground capacity, so the assertion could
+not distinguish admission that reads the upgrade table from admission that
+does not.
+
+**Evidence.** The test failed on the assertion that says the fixture must
+reach the case, which was written beside the claim for exactly this reason.
+The passing fixture crowds six neighbours of one tile with 24 units each and
+compares the paved world against the unimproved one, spawned in the same order
+from the same seed.
+
+**Follows.** **A fixture that models the typical case supplies no
+extreme.**[^23] Wandering units spread out; they do not crowd. A test about
+a full tile must build the crowd on purpose, and must compare against the
+world without the change, so that crowding alone cannot pass it.
+
+**Write the assertion that says the fixture reached the case.** It is what
+turned a test that would have passed for the wrong reason into a test that
+failed loudly.
+
+### FND-176 — An advance that sums a count is order-free, so a probe over its order asserts nothing
+
+**Believed.** Every parallel pass in this project needs a perturbed build that
+reverses its order, so that a determinism test over it can be proved able to
+fail.[^82]
+
+**True.** The build advance has no order to perturb. Each tile's contribution
+is a count of builders multiplied by a whole-number rate, and integer addition
+does not depend on order. Reversing the sorted order changes the result only
+where a tile carries no site and two builders name different kinds, which is
+the tie-break and not the sum.
+
+**Evidence.** The pass sorts by the key vector and then counts. The sound sort
+is therefore used in the perturbed build as well, and no probe entry was added
+for it. The stored result still reaches the state hash, so both determinism
+tests cover what the pass produced.
+
+**Follows.** **A probe is worth adding where the order decides the answer.** A
+probe over a pass whose answer is order-free would assert that a perturbation
+is visible, and it would fail, which trains a reader to weaken the probe. The
+absence is recorded here so that a later reader does not read it as an
+oversight.
+
+The order still matters for the tie-break, and it is the same key vector sort
+the gather resolve uses. That sort has a probe of its own.
+
+
 ## References
 
 [^F168A]: ADR-0084, the world reserves the unit columns at construction, decision D3. `docs/adrs/draft/adr-0084-the-world-reserves-the-unit-columns-at-construction.md`
 [^F168B]: Review 0175, the unit reservation record. `docs/reviews/0175-the-unit-reservation-record.md`
+[^F174A]: Testing rules, section 2. `.claude/rules/testing.md`
+[^F174B]: Backlog item 0179. `docs/backlog/proposed/0179-give-a-golden-scenario-a-build.md`
 
 [^1]: Findings register, FND-038, in this document.
 [^2]: ADR-0066, entity storage holds four fixed shapes. `docs/adrs/accepted/adr-0066-entity-storage-holds-four-fixed-shapes.md`
