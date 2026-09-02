@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-192**
+**Next number: FND-193**
 
 ## A. Corrections to stated rules
 
@@ -4348,6 +4348,37 @@ fail when the copies disagree.[^22] The map from a resource kind to a
 commodity is declared once, and the item that gives a kind of work its
 commodity absorbs it.[^F191A]
 
+### FND-192 — The record check reads a mention of a record number as a citation
+
+**Believed.** A document marks a mention of a record number by writing it in a
+code span, and a citation by writing it plain. The registry states that rule
+for a retired number, because a retired number holds no claim and a citation
+says "follow this for the claim". The registry also states that the citation
+check enforces the rule, and that it caught the first attempt to break
+it.[^F192A]
+
+**True.** The record check does not make that distinction at all. It runs its
+citation pattern over the whole text of a record, so a code span, a fenced
+block and plain prose give one result. It then fails when the number names no
+record and no registry row, which is exactly what a retired number does. The
+two checks therefore hold opposite rules: one outside the records requires the
+code span, and the one over the records ignores it.
+
+**Evidence.** The record check applies the citation pattern to the raw text
+and not to the text with the exempt material removed, although the same
+function strips that material for the check that looks for volatile
+figures.[^F192B] A draft record wrote `ADR-0057` in a code span, as the
+registry directs, and the check refused it. The record was rewritten to name
+the number nowhere.[^F192C]
+
+**Follows.** A record cannot say which retired number held a claim of its
+shape, so a reader of that record cannot look the number up. The registry
+keeps a retired row precisely so that a reader who meets the number learns
+where it went, and the check blocks the one document type that would send them
+there. A backlog item holds the repair, and it states the shape rather than a
+fix, because a check that skips a code span would also skip a real citation
+written inside one.[^F192D]
+
 
 ## References
 
@@ -4499,3 +4530,7 @@ commodity absorbs it.[^F191A]
 [^F190C]: ADR-0091, movement takes its direction from a per-cell field, never from a per-unit search, decision D4. `docs/adrs/draft/adr-0091-movement-takes-its-direction-from-a-per-cell-field.md`
 [^F191A]: Backlog item 0181, give a kind of work the commodity it fills. `docs/backlog/proposed/0181-give-a-kind-of-work-the-commodity-it-fills.md`
 [^F191B]: The founding provisions a site, and the consumption pass draws a ration. `crates/cachette-core/src/world.rs`
+[^F192A]: ADR Registry, the retired numbers. `docs/adrs/REGISTRY.md`
+[^F192B]: The record check script. `scripts/check_adrs.py`
+[^F192C]: ADR-0091, movement takes its direction from a per-cell field, never from a per-unit search. `docs/adrs/draft/adr-0091-movement-takes-its-direction-from-a-per-cell-field.md`
+[^F192D]: Backlog item 0198, tell a mention of a record number from a citation of it. `docs/backlog/proposed/0198-tell-a-mention-of-a-record-number-from-a-citation.md`
