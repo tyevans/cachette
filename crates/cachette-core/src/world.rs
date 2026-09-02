@@ -65,7 +65,7 @@ use crate::types::{Accum, Entity, FactionId, Fix32, Tick, TileIdx, FACTION_CEILI
 ///
 /// # References
 ///
-/// [^1]: ADR-0085, an entity crosses to Python as one opaque identity that the engine resolves, decision D3. `docs/adrs/draft/adr-0085-an-entity-crosses-to-python-as-one-opaque-identity.md`
+/// [^1]: ADR-0085, an entity crosses to Python as one opaque identity that the engine resolves, decision D3. `docs/adrs/accepted/adr-0085-an-entity-crosses-to-python-as-one-opaque-identity.md`
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum IdentityError {
     /// The value is not an identity at all. The engine never gives out zero.
@@ -1515,7 +1515,7 @@ impl World {
     ///
     /// # References
     ///
-    /// [^1]: ADR-0085, an entity crosses to Python as one opaque identity that the engine resolves, decisions D2 and D3. `docs/adrs/draft/adr-0085-an-entity-crosses-to-python-as-one-opaque-identity.md`
+    /// [^1]: ADR-0085, an entity crosses to Python as one opaque identity that the engine resolves, decisions D2 and D3. `docs/adrs/accepted/adr-0085-an-entity-crosses-to-python-as-one-opaque-identity.md`
     /// [^2]: ADR-0014, entity identity is an index plus a generation, decision D2. `docs/adrs/accepted/adr-0014-entity-identity-is-an-index-plus-a-generation.md`
     pub fn resolve_soldier(&self, identity: u64) -> Result<Entity, IdentityError> {
         let entity = Entity::from_bits(identity).ok_or(IdentityError::NotAnIdentity)?;

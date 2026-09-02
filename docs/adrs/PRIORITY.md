@@ -40,8 +40,7 @@ A record here binds nothing until a reviewer moves it.
 | 0081 | Housing. A review returned it: the engine already holds the per-site count that its decision D3 asks the project to store.[^12] An open row holds the choice that follows.[^13] It reads against ADR-0074 D3 correctly, and that objection failed. |
 | 0082 | Population growth. A review found its own decisions sound and returned it, because it rests on the free places of 0081.[^12] It moves when 0081 moves. |
 | 0083 | The gate build profile. A review returned it: both decisions hold against the code, and three sentences do not.[^15] It moves when those three are corrected. |
-| 0084 | The world reserves the unit columns at construction. The reservation is what a later contributor would trade away for a spawn that never refuses, and the code cannot say why it must not.[^14] |
-| 0085 | The Python boundary. It states that an entity crosses as one opaque identity that the engine resolves. The code that implements it exists, and a test proves that the resolution refuses a stale identity. |
+| 0084 | The world reserves the unit columns at construction. The reservation is what a later contributor would trade away for a spawn that never refuses, and the code cannot say why it must not.[^14] A review returned it: all four decisions hold against the code, and two sentences do not.[^16] It moves when those two are corrected. |
 
 ## Reserved and not written
 
@@ -89,3 +88,4 @@ plainly that nothing implements it yet.[^1]
 [^13]: Decisions register, DEC-057. `docs/DECISIONS.md`
 [^14]: Decisions register, DEC-059. `docs/DECISIONS.md`
 [^15]: Review 0164, the gate build profile record. `docs/reviews/0164-the-gate-build-profile-record.md`
+[^16]: Review 0175, the unit reservation record. `docs/reviews/0175-the-unit-reservation-record.md`

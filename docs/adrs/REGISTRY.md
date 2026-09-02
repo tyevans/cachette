@@ -235,7 +235,7 @@ without stating a constraint is worse than no record.
 | 0045 | View safety needs three layers | Proposed | 0044 | 05 |
 | 0046 | Every error is typed | Proposed | 0040 | 05 |
 | 0047 | Many worlds live in one interpreter | Proposed | 0040 | 05 |
-| 0085 | An entity crosses to Python as one opaque identity that the engine resolves | Draft | 0006, 0011, 0014, 0040, 0044 | `draft/adr-0085-an-entity-crosses-to-python-as-one-opaque-identity.md` |
+| 0085 | An entity crosses to Python as one opaque identity that the engine resolves | Accepted | 0006, 0011, 0014, 0040, 0044 | `accepted/adr-0085-an-entity-crosses-to-python-as-one-opaque-identity.md` |
 
 ### Subsystems
 

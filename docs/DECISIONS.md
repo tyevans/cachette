@@ -1211,7 +1211,7 @@ a failed founding is correct.[^PRD12]
 [^ORIENT]: Project orientation, the design principles. `CLAUDE.md`
 [^SHAPE1]: Recurring Defect Shapes, shape 1. `.claude/rules/recurring-defects.md`
 [^DEC63B]: The founded group tests. `crates/cachette-core/tests/founded_group_survives.rs`
-[^DEC63C]: ADR-0085, an entity crosses to Python as one opaque identity that the engine resolves, decision D3. `docs/adrs/draft/adr-0085-an-entity-crosses-to-python-as-one-opaque-identity.md`
+[^DEC63C]: ADR-0085, an entity crosses to Python as one opaque identity that the engine resolves, decision D3. `docs/adrs/accepted/adr-0085-an-entity-crosses-to-python-as-one-opaque-identity.md`
 [^DEC63D]: Backlog item 0161. `docs/backlog/proposed/0161-let-a-selector-say-where-to-act.md`
 [^DEC63E]: ADR-0054, an entity belongs to one of three tiers, declared at creation, decision D1. `docs/adrs/accepted/adr-0054-an-entity-belongs-to-one-of-three-tiers-declared-at-creation.md`
 [^DEC63F]: ADR Registry, row 0043. `docs/adrs/REGISTRY.md`

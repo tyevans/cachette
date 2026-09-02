@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-156**
+**Next number: FND-169**
 
 ## A. Corrections to stated rules
 
@@ -3836,8 +3836,42 @@ the other direction: the status is right and the document holds the work
 twice. A check that reads one item and finds one outcome section would catch
 it, and the footnote check catches it today only as a side effect.
 
+### FND-168 — The phrase that FND-144 corrected is still in the comment above the code it corrected
+
+**Believed.** FND-144 corrected the claim that a refused founding leaves no
+trace, and the correction reached the tests. The tests state that the arena
+never compacts the slot index space and that a generation never rewinds, so the
+phrasing is repaired.
+
+**True.** The claim is still alive in two places. The doc comment above the
+function that undoes a founding says that a refused founding changes nothing
+that a caller can observe. A caller can observe the state hash, and the hash
+function writes the slot count, every generation and the free queue. The draft
+record that governs the reservation says, in bold, that a founding a refusal
+stops leaves nothing behind.[^F168A]
+
+**Evidence.** A whole-tree read of the founding path, the hash function and the
+draft record, made during the review of that record.[^F168B] The test that
+exercises the refusal already states the true outcome in its own comment, two
+lines below a test name that repeats the false phrasing. The correct sentence
+and the incorrect one therefore sit in the same file.
+
+**Follows.** Two things.
+
+**A finding repairs the place it was written from, not the shape.** FND-144
+was written from the test, and the test is right. The comment above the
+function and the record above the comment were left, because nobody searched
+for the phrasing.
+
+**A test name is a claim too.** The name of the test says the founding leaves
+nothing, and the comment inside it says what the founding actually leaves. A
+reader who lists the test names reads the claim the finding corrected.
+
 
 ## References
+
+[^F168A]: ADR-0084, the world reserves the unit columns at construction, decision D3. `docs/adrs/draft/adr-0084-the-world-reserves-the-unit-columns-at-construction.md`
+[^F168B]: Review 0175, the unit reservation record. `docs/reviews/0175-the-unit-reservation-record.md`
 
 [^1]: Findings register, FND-038, in this document.
 [^2]: ADR-0066, entity storage holds four fixed shapes. `docs/adrs/accepted/adr-0066-entity-storage-holds-four-fixed-shapes.md`
