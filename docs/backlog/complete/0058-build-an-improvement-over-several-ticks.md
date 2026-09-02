@@ -1,11 +1,11 @@
 ---
 id: 0058
 title: Build an improvement over several ticks
-status: refined
+status: complete
 created: 2026-08-31
 implements: [ADR-0066 D1, ADR-0066 D2, ADR-0002 D1, ADR-0002 D3, ADR-0004 D2]
 changes: []
-creates: []
+creates: [ADR-0090]
 serves: [PRD-0008]
 blocked-by: [0053]
 ---
@@ -101,7 +101,40 @@ movement. No other item in this plan touches `upgrade.rs`.
 
 ## Outcome
 
-Filled in when the item moves to `complete/`.
+**What was done.** A sparse upgrade map holds one entry for each improved
+tile. A soldier carries a build order in a column of its arena, and a pass at
+the end of each step gathers the builders of one tile into one contribution
+and merges the map once, in ascending tile order. The progress is a 64-bit
+whole number, clamped at the work its kind asks for. Two kinds exist: a made
+way, which raises how many units the tile holds, and worked ground, which
+raises what a unit takes from the tile in one tick. Both are read through one
+function beside the table the ground already states, so no caller reads one
+table without the other.
+
+**What changed from the plan.** The plan said no record was needed, because
+the sparse storage decision was already made. That was wrong, and the record
+is the deliverable it says it would be if the work found a decision that
+neither the resolved blocker nor the reserved row holds. Three decisions
+needed one: what a partly built upgrade stores between ticks, how the ground
+table and the upgrade table meet, and what a destroyed upgrade returns the
+tile to. ADR-0090 holds them, at `Draft`, and the author is not the reviewer.
+
+The made way takes the crossing-terrain capacity that the scale constants
+table already holds, rather than an added bonus this work would have invented.
+The constant sits in the terrain module beside the ordinary capacity, because
+that module owns the capacity table.
+
+**What was not done.** No golden scenario builds anything, so the two
+determinism tests do not defend this feature. The upgrade test file covers it
+at 1, 2 and 12 threads. Item 0179 holds the golden scenario.
+
+Nothing decides that a unit should build. The control plane sets a build
+order, and no option in the choice set builds. Item 0180 holds it.
+
+**Registers.** FND-174, FND-175 and FND-176 opened. DEC-072 opened, holding
+the work each kind asks for and the rate one builder adds. BLK-034 opened,
+holding the faction rule the owner must answer. ADR-0090 added to the registry
+at `Draft` and to the record priority index.
 
 ## References
 

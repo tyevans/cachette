@@ -46,6 +46,7 @@ A record here binds nothing until a reviewer moves it.
 | 0087 | An influence solve runs a fixed iteration count. It also names the boundary it draws against ADR-0022 D1, and a reviewer must settle that boundary before it moves. |
 | 0085 | The Python boundary. It states that an entity crosses as one opaque identity that the engine resolves. The code that implements it exists, and a test proves that the resolution refuses a stale identity. |
 | 0088 | A tile field is a generated base and a stored change. Three tile fields now sit outside the dense column record, and nothing states the rule that picks between the two shapes. The code that implements it exists, and a visit census proves that building a world stores nothing for the field. |
+| 0090 | A tile upgrade is stored sparsely. A dense array over the tiles is what a future contributor would reach for, and the code shows the sparse map without showing why the dense one was refused. The implementation exists and every decision was checked against it. |
 
 ## Reserved and not written
 

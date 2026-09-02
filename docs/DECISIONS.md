@@ -23,7 +23,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^ALLOC]
 
-**Next number: DEC-072**
+**Next number: DEC-073**
 
 ## Open
 
@@ -434,6 +434,34 @@ from a solver the project already runs. A branch on the absence of a ruler
 would cost a check on every pass and would produce a worse result, because it
 would make the loss of a ruler instant everywhere rather than gradual from the
 edge.
+
+
+### DEC-072 — What does a build cost, and how fast does one unit build?
+
+**Open. Engineering recommends the values below and asks the owner to confirm
+them.**
+
+An upgrade asks for an amount of work before it is finished, and one builder
+adds a fixed amount of it in one tick. Both are content. Neither is a cost
+figure: they say what the world asks for, not what the engine spends.[^DEC72A]
+
+**The recommendation.** One builder adds one unit of work in one tick. A made
+way asks for eight, and worked ground asks for twenty-four. The two differ so
+that the catalogue does not read as one number with two names.
+
+**What the values must satisfy.** Every kind must ask for more work than one
+builder adds in one tick, or nothing takes several ticks and the storage that
+carries a build between ticks has no reason to exist. A test asserts this
+against the whole catalogue rather than against a named kind.
+
+**What is not decided.** The project has no measurement on the target
+platform, so no value here is derived from one.[^BLK7] One tick is a fixed
+span of simulated time, and the scale constants table holds it, so a content
+author who wants a build to take a stated span can convert.[^SCALE]
+
+**Why it is worth choosing.** A build that finishes in one tick is the defect
+that makes the whole feature pointless, and it is the one the determinism
+tests do not see.[^DEC72D]
 
 
 ## Decisions to apply at merge
@@ -1475,3 +1503,5 @@ a failed founding is correct.[^PRD12]
 [^DEC71B]: The character graph and inheritance, section 2.1. `docs/research/reports/14-character-graph-and-inheritance.md`
 [^DEC71C]: PRD-0015, a unit has parents and children. `docs/product/accepted/prd-0015-a-unit-has-parents-and-children.md`
 
+[^DEC72A]: ADR-0090, a tile upgrade is stored sparsely, as the difference from the generated world, decision D2. `docs/adrs/draft/adr-0090-a-tile-upgrade-is-stored-sparsely.md`
+[^DEC72D]: Findings register, FND-174. `docs/FINDINGS.md`

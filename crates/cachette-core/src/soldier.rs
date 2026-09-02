@@ -31,6 +31,7 @@ use crate::hash::StateHash;
 use crate::hex::{Axial, Grid};
 use crate::resource::{Amount, CarryLoad, ResourceKind};
 use crate::types::{Entity, FactionId, Fix32, TileIdx, FACTION_CEILING};
+use crate::upgrade::UpgradeKind;
 
 /// The generation that means a slot carries no identity.
 ///
@@ -122,6 +123,25 @@ const fn order_of(value: u8) -> Option<ResourceKind> {
         return None;
     }
     ResourceKind::from_u8(value - 1)
+}
+
+/// The build order value that means a soldier builds nothing.
+///
+/// The column holds the kind number plus one, in the same way the gather
+/// order column does, so one value says both whether the soldier builds and
+/// what it builds.[^1]
+///
+/// # References
+///
+/// [^1]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`
+const NO_BUILD: u8 = 0;
+
+/// Returns the build order that a column value names.
+const fn build_of(value: u8) -> Option<UpgradeKind> {
+    if value == NO_BUILD {
+        return None;
+    }
+    UpgradeKind::from_u8(value - 1)
 }
 
 /// The largest generation that a slot can hold.
@@ -230,6 +250,20 @@ pub struct SoldierArena {
     /// the kind number plus one. The column holds a small integer and not an
     /// option, because it is plain data that reaches the state hash.
     orders: Vec<u8>,
+    /// The build order of each slot.
+    ///
+    /// The value zero means the soldier builds nothing. Any other value is
+    /// the upgrade kind number plus one. The column holds a small integer and
+    /// not an option, because it is plain data that reaches the state hash.
+    ///
+    /// The order is a column of this arena, because a unit carries what it
+    /// was told to do. What it builds is a property of the tile, and that
+    /// lives in the sparse upgrade map.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0090, a tile upgrade is stored sparsely, as the difference from the generated world, decision D1. `docs/adrs/draft/adr-0090-a-tile-upgrade-is-stored-sparsely.md`
+    builds: Vec<u8>,
     /// The need of each slot.
     ///
     /// A need runs from zero to full. It falls at an interval by a
@@ -326,6 +360,7 @@ impl Clone for SoldierArena {
             factions: copy_column(&self.factions, capacity),
             carries: copy_column(&self.carries, capacity),
             orders: copy_column(&self.orders, capacity),
+            builds: copy_column(&self.builds, capacity),
             needs: copy_column(&self.needs, capacity),
             deficits: copy_column(&self.deficits, capacity),
             homes: copy_column(&self.homes, capacity),
@@ -369,6 +404,7 @@ impl SoldierArena {
             factions: Vec::with_capacity(slots),
             carries: Vec::with_capacity(slots),
             orders: Vec::with_capacity(slots),
+            builds: Vec::with_capacity(slots),
             needs: Vec::with_capacity(slots),
             deficits: Vec::with_capacity(slots),
             homes: Vec::with_capacity(slots),
@@ -514,6 +550,7 @@ impl SoldierArena {
         // [^3]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`
         debug_assert_eq!(self.carries[index], CarryLoad::EMPTY);
         debug_assert_eq!(self.orders[index], NO_ORDER);
+        debug_assert_eq!(self.builds[index], NO_BUILD);
         // A unit arrives fed and out of deficit, and it belongs to no site
         // until something gives it one.
         self.needs[index] = NEED_FULL;
@@ -540,6 +577,7 @@ impl SoldierArena {
         self.factions.push(FactionId(0));
         self.carries.push(CarryLoad::EMPTY);
         self.orders.push(NO_ORDER);
+        self.builds.push(NO_BUILD);
         self.needs.push(NEED_FULL);
         self.deficits.push(Fix32::ZERO);
         self.homes.push(NO_HOME);
@@ -580,6 +618,7 @@ impl SoldierArena {
         // [^3]: ADR-0072, a tile stock is generated, and only what was taken is stored, decision D5. `docs/adrs/accepted/adr-0072-a-tile-stock-is-generated-and-only-what-was-taken-is-stored.md`
         self.carries[index] = CarryLoad::EMPTY;
         self.orders[index] = NO_ORDER;
+        self.builds[index] = NO_BUILD;
         self.needs[index] = Fix32::ZERO;
         self.deficits[index] = Fix32::ZERO;
         self.homes[index] = NO_HOME;
@@ -780,6 +819,41 @@ impl SoldierArena {
         true
     }
 
+    /// Returns the whole build order column.
+    #[must_use]
+    pub fn build_column(&self) -> &[u8] {
+        &self.builds
+    }
+
+    /// Returns the build order of one soldier.
+    ///
+    /// The outer option reports whether the identity is live. The inner one
+    /// reports whether the soldier builds.
+    #[must_use]
+    pub fn build_order(&self, entity: Entity) -> Option<Option<UpgradeKind>> {
+        let slot = self.slot_of(entity)?;
+        Some(build_of(self.builds[slot as usize]))
+    }
+
+    /// Sets the build order of one soldier.
+    ///
+    /// Returns `false` when the identity is dead. An order of `None` stops
+    /// the soldier building.
+    ///
+    /// An order is not a structural fact, so it does not raise the revision.
+    /// The derived unit structure maps a tile to the units on it, and an
+    /// order moves no unit.
+    pub fn set_build_order(&mut self, entity: Entity, kind: Option<UpgradeKind>) -> bool {
+        let Some(slot) = self.slot_of(entity) else {
+            return false;
+        };
+        self.builds[slot as usize] = match kind {
+            Some(kind) => kind.to_u8() + 1,
+            None => NO_BUILD,
+        };
+        true
+    }
+
     /// Returns the need of a soldier, or `None` when the identity is dead.
     #[must_use]
     pub fn need(&self, entity: Entity) -> Option<Fix32> {
@@ -932,6 +1006,7 @@ impl SoldierArena {
             .write(bytemuck::cast_slice(&self.factions))
             .write(bytemuck::cast_slice(&self.carries))
             .write(&self.orders)
+            .write(&self.builds)
             .write(bytemuck::cast_slice(&self.needs))
             .write(bytemuck::cast_slice(&self.deficits))
             .write(bytemuck::cast_slice(&self.homes))
@@ -1003,6 +1078,25 @@ impl SoldierArena {
             return false;
         }
         if self.carries.len() != slots || self.orders.len() != slots {
+            return false;
+        }
+        if self.builds.len() != slots {
+            return false;
+        }
+        // A build order names a kind the catalogue holds, or it names
+        // nothing. A number outside the catalogue would read as a kind that
+        // the advance cannot build, and the soldier would then build nothing
+        // without any caller asking for that.
+        if self
+            .builds
+            .iter()
+            .any(|order| *order != NO_BUILD && UpgradeKind::from_u8(*order - 1).is_none())
+        {
+            return false;
+        }
+        // A dead slot holds no build order. A stale order there would reach
+        // the state hash and would set the next unit in the slot building.
+        if (0..slots).any(|slot| self.live[slot] == 0 && self.builds[slot] != NO_BUILD) {
             return false;
         }
         // An order names a kind the catalogue holds, or it names nothing. A
