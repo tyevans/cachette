@@ -464,7 +464,7 @@ def build_server(store: SessionStore | None = None) -> MCPServer:
         the address. The engine refuses an address outside the world, ground
         that admits no unit, and a faction the world does not hold.
         """
-        pairs = []
+        pairs: list[tuple[int, int]] = []
         for address in addresses:
             if len(address) != 2:
                 raise ValueError(f"the address {address} is not a q and an r")

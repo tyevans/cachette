@@ -11,6 +11,13 @@ from typing import TypedDict
 import numpy as np
 import numpy.typing as npt
 
+# What a verb accepts where it names units.
+#
+# The engine hands identities back as a column, and a caller passes that
+# column straight to the next verb. A caller that built its own list of
+# identities passes that. Both are one crossing, so both are allowed.
+Identities = Sequence[int] | npt.NDArray[np.uint64]
+
 class TileChangedColumns(TypedDict):
     """One column for each field of the tile change event.
 
@@ -99,8 +106,8 @@ class World:
     def spawn_soldiers(
         self, addresses: Sequence[tuple[int, int]], faction: int
     ) -> npt.NDArray[np.uint64]: ...
-    def despawn_soldiers(self, units: Sequence[int]) -> None: ...
-    def order_gather(self, units: Sequence[int], kind: int) -> None: ...
+    def despawn_soldiers(self, units: Identities) -> None: ...
+    def order_gather(self, units: Identities, kind: int) -> None: ...
     def soldier_tile(self, unit: int) -> int: ...
 
 def version() -> str: ...
