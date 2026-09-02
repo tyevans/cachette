@@ -28,7 +28,6 @@ engine gets wrong today.
 | No. | Why it sits here |
 |---|---|
 | 0102 | A settlement reads its own ground rule, not the passability rule. Blocked by 0071 and 0092, in that order. |
-| 0152 | The project owner asked that an agent be able to drive the engine. The first slice runs; the open part is what the server still cannot answer. |
 
 ## Next
 

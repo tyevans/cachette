@@ -56,7 +56,7 @@ Filled in when the item moves to `complete/`.
 
 [^1]: The event types. `crates/cachette-core/src/event.rs`
 [^2]: Recurring Defect Shapes, shape 1. `.claude/rules/recurring-defects.md`
-[^3]: Backlog item 0152. `docs/backlog/proposed/0152-let-an-agent-drive-the-engine-through-a-protocol-server.md`
+[^3]: Backlog item 0152. `docs/backlog/complete/0152-let-an-agent-drive-the-engine-through-a-protocol-server.md`
 [^4]: Decisions register, DEC-060. `docs/DECISIONS.md`
 [^5]: The identity type. `crates/cachette-core/src/types.rs`
 [^6]: ADR-0002, simulated and aggregated state holds no floating point number, decision D1. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`

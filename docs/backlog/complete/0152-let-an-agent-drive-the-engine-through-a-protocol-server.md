@@ -1,7 +1,7 @@
 ---
 id: 0152
 title: Let an agent drive the engine through a protocol server
-status: proposed
+status: complete
 implements: []
 changes: []
 creates: []
@@ -74,7 +74,38 @@ server belongs in the package at all, or in a separate contributor tool.
 
 ## Outcome
 
-Filled in when the item moves to `complete/`.
+Done. The server merged as part of the agent MCP work.
+
+An agent builds a world, steps it at a stated thread count, and reads the
+tick, the tile count, the event count, the state hash and the invariant
+result, without writing code. Five tools, each one call into the compiled
+module. Nothing loops over entities.
+
+The end-to-end test starts the server as a subprocess and speaks the protocol
+over stdio. Nine tests go through that client, and none constructs the server
+object and calls its method. A capability that passes its own test and ships
+inert is the shape this avoided.
+
+The thread-count test compares the state hash at 1, 2 and 12 threads, each run
+in its own server process, and it has a proven failure mode: seeding the second
+run with the thread count made both parametrised cases fail, and the source was
+restored. At 256 tiles and 12 threads the chunk length is 22, so the parallel
+path is exercised rather than skipped.
+
+Two shape decisions the work made and both hold. The state hash crosses as a
+hex string, because a 64-bit integer does not survive a JSON client that parses
+numbers as doubles. The server does not decode the event log; it returns the
+bytes and a digest, because a format string in Python would be a second
+declaration site of a layout the Rust source owns.
+
+**What the server still cannot answer stays open, and two items carry it.**
+An agent can prove two runs emitted the same log and cannot see which tile
+changed. The event reader holds that work, and the decision on how Python reads
+an event is recorded.[^6] [^7]
+
+The protocol library sits in the development dependency group, not the runtime
+dependencies, so an installed wheel does not carry it. Whether the server
+belongs in the package at all is not settled here.
 
 ## References
 
@@ -83,3 +114,5 @@ Filled in when the item moves to `complete/`.
 [^3]: ADR-0001, one binary gives one answer at any thread count, decision D4. `docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
 [^4]: Recurring Defect Shapes, shape 1. `.claude/rules/recurring-defects.md`
 [^5]: Backlog item 0153. `docs/backlog/proposed/0153-let-python-read-an-event-without-repeating-its-layout.md`
+[^6]: Backlog item 0153. `docs/backlog/proposed/0153-let-python-read-an-event-without-repeating-its-layout.md`
+[^7]: Decisions register, DEC-060. `docs/DECISIONS.md`
