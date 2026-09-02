@@ -41,6 +41,8 @@ These close a gap a review found, or they unblock the items above.
 | 0188 | The viewer paints noise, and the verb that explains a choice is called by nothing outside the core crate. PRD-0009 asks for that answer. Follows 0183. |
 | 0189 | The rules against inert work look for an absent caller, and this defect has one. DEC-074 holds the options and recommends this. |
 | 0190 | The pyramid folds level 1 into a state hash and nothing calls the fold. It is a small instance of what 0189 is about, and it sits below 0189 because the rule should come before the sweep. |
+| 0133 | The panel is longer than the window and cuts, and item 0188 added three sections to it. The order of the sections bought one placement and cannot buy a second. DEC-078 holds the measurement and recommends the scroll. |
+| 0194 | The tile value pass writes a random walk over every tile on every tick. Item 0188 removed the viewer as a reader. Items 0183 and 0184 remove the other two, and then nothing reads it. Follows both. |
 | 0104 | A ruler decides nothing that reaches anybody. DEC-040 carries the writ in the influence field. |
 | 0171 | Building a world still passes over every tile, twice, through the first pyramid level. PRD-0003 states it must not, so the record is still false of the code. Item 0112 removed the third pass and FND-162 records what it left. |
 | 0113 | Admission enforces the capacity from a bridge count that no test compares against a scan. |
@@ -75,7 +77,6 @@ These are real and none of them blocks anything today.
 | 0169 | The influence solve runs on every tick for every faction, and the research says that is the wrong cadence at the target scale. It waits on a measurement. |
 | 0124 | A fully recovered deposit still stores a take of zero. The recovery pass now reads that entry on every tick, so the depleted set grows and never shrinks. |
 | 0125 | Show a watcher a deposit recovering. The engine recovers a deposit, and nothing shows it. |
-| 0133 | The panel is longer than the window and cuts. A watcher cannot reach the rows below the notice. |
 | 0068 | A ruler and a succession. Item 0067 is complete, so the descent it reads exists. |
 | 0088 | Promotion into the character tier. |
 | 0180 | Nothing makes a unit choose to build, so a world left to run improves no tile. It waits on the faction rule of BLK-034. |
