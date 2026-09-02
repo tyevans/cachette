@@ -51,10 +51,23 @@ lint, tests and the record checks.[^5]
 | Whole gate suite, budget | 190 s | Intel Core i7-1260P, 16 hardware threads | x86_64 | dev, opt-level 1 | An isolated run. Nothing to rebuild | 1 September 2026 |
 | Golden state hash test, wall clock | 16 s | Intel Core i7-1260P, 16 hardware threads | x86_64 | dev, opt-level 1 | An isolated run. Nothing to rebuild | 1 September 2026 |
 | Whole gate suite, wall clock | 435 s | Intel Core i7-1260P, 16 hardware threads | x86_64 | dev, no optimisation | An isolated run. Nothing to rebuild. The profile the project used before | 1 September 2026 |
+| Whole gate suite, wall clock | 441 s | Intel Core i7-1260P, 16 hardware threads | x86_64 | dev, opt-level 1 | An isolated run. An empty target directory | 1 September 2026 |
+| Whole gate suite, wall clock | 746 s | Intel Core i7-1260P, 16 hardware threads | x86_64 | dev, no optimisation | An isolated run. An empty target directory. The profile the project used before | 1 September 2026 |
 
 The budget is the measured figure plus an allowance of one fifth, rounded up
 to the nearest ten seconds. A run over the budget is a signal to look, not a
 failure.
+
+**The budget describes a run with nothing to rebuild, and only such a run.**
+That is the run a contributor makes many times a day. A run that starts from
+an empty target directory compiles the whole workspace first, and it goes over
+this budget every time. The table holds a row for that run so that a reader
+who sees the report can tell the two apart. Do not read a cold run as a gate
+that grew, and do not raise the budget to cover one.
+
+Compilation is now the larger half of a cold run, and optimisation is why. The
+two cold rows and the two warm rows above give both halves for both profiles,
+so a reader can see what the optimisation level bought and what it cost.
 
 **A row states the conditions it holds under.** The cost of this suite depends
 on what else runs on the machine. The suite compiles and tests in parallel, so
