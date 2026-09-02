@@ -156,11 +156,16 @@ impl PyWorld {
 
     /// Copies the tile value column into a new array.
     ///
-    /// This method copies. A separate method returns the underlying array
-    /// without a copy, and the project does not claim zero copy here.
+    /// This method copies, and it also generates. The world holds no array
+    /// of tile values, so the call visits every tile. A caller that wants
+    /// one tile asks for one tile.
     fn tile_values<'py>(&self, python: Python<'py>) -> Bound<'py, PyArray1<i32>> {
         let world = self.lock();
-        let raw: Vec<i32> = world.tile_values().iter().map(|value| value.0).collect();
+        let raw: Vec<i32> = world
+            .copy_tile_values()
+            .iter()
+            .map(|value| value.0)
+            .collect();
         raw.to_pyarray(python)
     }
 

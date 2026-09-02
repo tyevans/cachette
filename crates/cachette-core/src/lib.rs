@@ -34,6 +34,7 @@ pub mod soldier;
 pub mod sort;
 pub mod terrain;
 pub mod tier;
+pub mod tile_value;
 pub mod types;
 pub mod world;
 
@@ -66,5 +67,6 @@ pub use soldier::{SoldierArena, SoldierError};
 pub use sort::{SortError, SortKey};
 pub use terrain::{Terrain, TerrainTile, TileKind};
 pub use tier::{EntityTier, Shape, CHARACTER_CEILING};
+pub use tile_value::{TileValueRange, TileValues};
 pub use types::{Accum, Entity, FactionId, Fix32, Tick, TileIdx};
 pub use world::{IdentityError, StepError, World, WorldConfig, WorldError};

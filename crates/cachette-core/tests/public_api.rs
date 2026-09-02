@@ -28,10 +28,12 @@ fn a_step_advances_the_tick_and_holds_the_invariants() {
 }
 
 #[test]
-fn the_whole_tile_column_is_one_flat_slice() {
-    // ADR-0044: a whole component column is one flat array.
+fn a_copy_of_the_tile_column_holds_one_value_for_each_tile() {
+    // ADR-0044: what copies and what does not is declared at the call site.
+    // The world holds no array of tile values, so the call that returns the
+    // whole column is named for the copy it makes.
     let world = World::new(WorldConfig::default()).expect("the extent must describe a world");
-    assert_eq!(world.tile_values().len(), world.tile_count());
+    assert_eq!(world.copy_tile_values().len(), world.tile_count());
 }
 
 #[test]
@@ -120,7 +122,7 @@ fn the_tile_total_is_the_sum_of_the_column() {
     })
     .expect("the extent must describe a world");
     let expected = world
-        .tile_values()
+        .copy_tile_values()
         .iter()
         .fold(Accum(0), |total, value| sim_math::accumulate(total, *value));
     assert_eq!(world.tile_total(), expected);
@@ -137,9 +139,9 @@ fn the_change_kind_matches_the_direction_of_the_change() {
         ..WorldConfig::default()
     })
     .expect("the extent must describe a world");
-    let before = world.tile_values().to_vec();
+    let before = world.copy_tile_values();
     world.step(2).expect("the step must run");
-    let after = world.tile_values().to_vec();
+    let after = world.copy_tile_values();
 
     let mut raised = 0;
     let mut lowered = 0;
