@@ -3293,6 +3293,21 @@ through one function, and every refusal after the settlement stands goes
 through it. A second undo written at the second return would have been a
 second copy of the same fact.
 
+**A refused founding is not hash-neutral, and a reader will assume it is.**
+The undo owes that nothing lives and nothing stands. It does not owe, and
+cannot give, the state hash the world held before. The arena never compacts
+the slot index space and a generation never rewinds, so the slots the founding
+opened stay open and their generations stay advanced.[^144] A founding that
+failed therefore moves the state hash, deterministically, and that is correct
+behaviour rather than a defect.
+
+A test was written asserting the opposite and was removed before it ran. A
+passing test that asks a failed operation to leave no trace would have
+recorded a rule nobody chose, and the next reader of the golden state test
+would have inherited it. The engine states the true outcome in a test of its
+own instead, so that a later reader does not read the open slots as
+wreckage.
+
 ### FND-145 — The world settings priced one new field at 82 struct literals, not 25
 
 **Believed.** The settings struct that builds a world prices a new parameter
@@ -3445,3 +3460,4 @@ surface, not the typing.
 [^141]: Backlog item 0080. `docs/backlog/proposed/0080-give-the-world-settings-a-constructor.md`
 [^142]: Findings register, FND-064, in this document.
 [^143]: Recurring defect shapes, shape 2. `.claude/rules/recurring-defects.md`
+[^144]: ADR-0014, entity identity is an index plus a generation, decisions D1 and D3. `docs/adrs/accepted/adr-0014-entity-identity-is-an-index-plus-a-generation.md`
