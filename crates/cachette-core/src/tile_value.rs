@@ -9,26 +9,28 @@
 //! Building a world therefore visits no tile and allocates nothing that
 //! grows with the tile count. The cost is paid by the reader that asks for a
 //! tile, and by the frame that changes one. This is the shape the product
-//! record asks of the world, and it is the shape two accepted records
-//! already give the ground and the tile stock.[^1] [^2] [^3]
+//! record asks of the world, and a record states it as a claim over any tile
+//! field.[^1] [^2] It is the shape two accepted records already give the
+//! ground and the tile stock.[^3] [^4]
 //!
 //! The stored changes are held sorted by tile index, so a lookup is a binary
-//! search and the order never depends on how the changes were gathered.[^4]
+//! search and the order never depends on how the changes were gathered.[^5]
 //! A run of changes is merged in ascending order, never inserted one at a
 //! time, because inserting into the middle of a vector moves every later
 //! entry.
 //!
 //! Every value here is an integer or a Q16.16 fixed-point value, and every
-//! arithmetic step goes through the arithmetic module.[^5] No item in this
+//! arithmetic step goes through the arithmetic module.[^6] No item in this
 //! module uses a floating-point type.
 //!
 //! # References
 //!
 //! [^1]: PRD-0003, a developer sees a world worth looking at, what it costs at the target scale. `docs/product/accepted/prd-0003-a-developer-sees-a-world-worth-looking-at.md`
-//! [^2]: ADR-0068, terrain is generated from the seed and is never stored as a map, decision D1. `docs/adrs/accepted/adr-0068-terrain-is-generated-from-the-seed-and-is-never-stored-as-a-map.md`
-//! [^3]: ADR-0072, a tile stock is generated, and only what was taken is stored, decision D4. `docs/adrs/accepted/adr-0072-a-tile-stock-is-generated-and-only-what-was-taken-is-stored.md`
-//! [^4]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
-//! [^5]: ADR-0002, simulated and aggregated state holds no floating point number, decisions D1 and D2. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
+//! [^2]: ADR-0088, a tile field is a generated base and a stored change, decision D1. `docs/adrs/draft/adr-0088-a-tile-field-is-a-generated-base-and-a-stored-change.md`
+//! [^3]: ADR-0068, terrain is generated from the seed and is never stored as a map, decision D1. `docs/adrs/accepted/adr-0068-terrain-is-generated-from-the-seed-and-is-never-stored-as-a-map.md`
+//! [^4]: ADR-0072, a tile stock is generated, and only what was taken is stored, decision D4. `docs/adrs/accepted/adr-0072-a-tile-stock-is-generated-and-only-what-was-taken-is-stored.md`
+//! [^5]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
+//! [^6]: ADR-0002, simulated and aggregated state holds no floating point number, decisions D1 and D2. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
 
 /// The census of generated tiles.
 ///

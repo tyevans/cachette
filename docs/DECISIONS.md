@@ -23,9 +23,51 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^ALLOC]
 
-**Next number: DEC-064**
+**Next number: DEC-069**
 
 ## Open
+
+### DEC-068 — Should the dense column record be superseded, now that three tile fields sit outside it?
+
+**Open. The recommendation is to supersede it, and to state the rule that
+picks the shape rather than to state one shape.**
+
+ADR-0012 D2 states that a tile field is one contiguous array with one element
+for each tile.[^DEC68A] Three accepted or drafted records now describe a tile
+field that is not one. The ground is generated and stored nowhere.[^DEC68B]
+The tile stock is generated, and only what was taken is stored.[^DEC68C] The
+tile value field is a generated base and a stored change.[^DEC68D]
+
+None of the three superseded ADR-0012, and none of them says whether it still
+holds for the fields they do not cover. A contributor who adds a tile field
+reads ADR-0012 first, because it is the general record, and writes a dense
+column.
+
+**The options.**
+
+1. Supersede ADR-0012 D2 with a record that states the rule. A tile field
+   whose base is a function of the seed and the tile index is generated. Every
+   other tile field is a dense column. The new record carries both branches,
+   and one record then answers the question a contributor asks.
+2. Leave ADR-0012 D2 and let ADR-0088 narrow it. A reader who meets the
+   disagreement is served by the later record, which resolves it. This is what
+   the project did for the earlier disagreement between ADR-0018 and ADR-0012,
+   where superseding over an aside was judged disproportionate.[^DEC68E]
+3. Amend ADR-0012 D2 in place. This is not available. ADR-0012 is accepted and
+   has dependents, and an accepted record changes by supersession.[^DEC68F]
+
+**The recommendation is option 1.** The precedent for option 2 was a record
+that named a mechanism in an aside. This is the general record for tile
+storage, stating the shape of every tile field, and three fields now
+contradict it. That is not an aside. ADR-0012 also holds a second decision
+about the unit arena, which the supersession must carry forward or leave
+where it is.
+
+**What is at stake.** ADR-0012 has dependents, and a supersession must name
+each of them. The cost of leaving it is one wrong first answer for every
+contributor who adds a tile field.
+
+**Who decides.** A reviewer. The author of ADR-0088 is not one.
 
 ### DEC-062 — Do the settlement arena and the character arena reserve their storage too?
 
@@ -1255,3 +1297,9 @@ a failed founding is correct.[^PRD12]
 [^FND015]: Findings register, FND-015. `docs/FINDINGS.md`
 [^FND089]: Findings register, FND-089. `docs/FINDINGS.md`
 [^ADR80]: ADR-0080, a depleted deposit recovers by ageing the stored take. `docs/adrs/accepted/adr-0080-a-depleted-deposit-recovers-by-ageing-the-stored-take.md`
+[^DEC68A]: ADR-0012, tiles are dense columns and units are a generational arena, decision D2. `docs/adrs/accepted/adr-0012-tiles-are-dense-columns-and-units-are-a-generational-arena.md`
+[^DEC68B]: ADR-0068, terrain is generated from the seed and is never stored as a map, decision D1. `docs/adrs/accepted/adr-0068-terrain-is-generated-from-the-seed-and-is-never-stored-as-a-map.md`
+[^DEC68C]: ADR-0072, a tile stock is generated, and only what was taken is stored, decision D4. `docs/adrs/accepted/adr-0072-a-tile-stock-is-generated-and-only-what-was-taken-is-stored.md`
+[^DEC68D]: ADR-0088, a tile field is a generated base and a stored change, decision D1. `docs/adrs/draft/adr-0088-a-tile-field-is-a-generated-base-and-a-stored-change.md`
+[^DEC68E]: Findings register, FND-081. `docs/FINDINGS.md`
+[^DEC68F]: Decision Record Scope, section 7. `.claude/rules/adr-scope.md`

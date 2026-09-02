@@ -276,6 +276,7 @@ without stating a constraint is worse than no record.
 | 0082 | The store sets the rate of a birth and the housing admits it | Draft | 0003, 0014, 0056, 0062, 0063, 0074, 0081 | `draft/adr-0082-the-store-sets-the-rate-of-a-birth-and-the-housing-admits-it.md` |
 | 0083 | The gate build checks every integer overflow | Draft | 0001, 0002 | `draft/adr-0083-the-gate-build-checks-every-integer-overflow.md` |
 | 0084 | The world reserves the unit columns at construction, and a spawn past the reservation is refused | Draft | 0012, 0014, 0066 | `draft/adr-0084-the-world-reserves-the-unit-columns-at-construction.md` |
+| 0088 | A tile field is a generated base and a stored change | Draft | 0002, 0003, 0004, 0009, 0012, 0068, 0072 | `draft/adr-0088-a-tile-field-is-a-generated-base-and-a-stored-change.md` |
 
 ### Retired numbers
 

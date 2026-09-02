@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-156**
+**Next number: FND-165**
 
 ## A. Corrections to stated rules
 
@@ -3806,6 +3806,71 @@ than restating its command.
 the footnote check reports its ordering rule instead of failing on it, decided
 independently on the same day.[^151]
 
+### FND-162 — One pass was named, and the build made three
+
+**Believed.** Building a world cost one pass over every tile, and the tile
+stub value column made it. The product record for the ground states that the
+build must not make such a pass, and a finding recorded that the engine made
+one.[^F162A] The item that repaired it named the same one column.[^F162B]
+
+**True.** The build made three passes over every tile and one proportional
+allocation, and the column made one of the three. The other two both belong to
+the first level of the pyramid. Building the level reads the ground of every
+tile of every block. The build then closes by rebuilding the moving part of
+every cell, and that sums the tile value of every tile. The holder column is
+the proportional allocation, and it is a dense column by decision rather than
+a defect.[^40]
+
+**Evidence.** A visit counter behind a test-only switch. The tile value field
+counts the tiles it generates, and the build test reads the count. After the
+column became generated, the count was still one for each tile, and the
+remaining count was the pyramid rebuild. The counter found it directly. No
+reading of the build had found it, over two items and one finding.
+
+**Follows.** Three things.
+
+**A repair scoped to the thing that was named repairs what was named.** The
+earlier finding described the defect through the column that made it, and
+every reader after that read the column as the defect. The statement in the
+record is about the build, and nobody counted what the build did.
+
+**A cost claim needs an instrument before it needs a repair.** The counter was
+written to prove the repair. It found the larger defect in its first run, and
+it would have found it before the repair as well.
+
+**The product record stays `Accepted` and stays false.** Accepting a need the
+engine does not meet is correct. An item holds the remaining
+work.[^F162D]
+
+### FND-164 — The branch tip did not compile, and every gate would have said so
+
+**Believed.** A merged change compiles. The gate command builds every target
+of every crate, so a change that broke a test fixture could not reach the
+trunk.
+
+**True.** The tip did not compile. One test fixture built a world from a
+settings literal that no longer had every field, and `cargo clippy --workspace
+--all-targets` failed on it alone. The field it lacked arrived with the
+reserved unit columns, and the sweep that added the field reached the source
+and not that fixture.
+
+**Evidence.** A worker started an item, ran the lint over the whole workspace,
+and got the failure before it had changed anything. It then stashed its own
+work and got the same failure, which is what proves the failure was already
+there.
+
+**Follows.** Two things.
+
+**Test code is a call site, and the rule already says so.**[^57] The sweep
+that added the field searched the source and stopped. A whole-tree search for
+the settings literal finds the fixture, and the commit body must hold that
+search.
+
+**A gate that nobody runs is not a gate.** Nothing about this defect is
+subtle. The gate command catches it in one run. It reached the trunk because
+the run did not happen, and the next worker paid for it by having to decide
+whether the failure was its own.
+
 ### FND-154 — Completing an item is not idempotent, and it leaves two of everything
 
 **Believed.** An item is completed once. The guide gives four steps: fill in
@@ -3958,3 +4023,6 @@ it, and the footnote check catches it today only as a side effect.
 [^149]: Backlog guide, completing an item. `docs/backlog/README.md`
 [^150]: Backlog item 0163. `docs/backlog/proposed/0163-fail-when-a-merged-item-still-reads-as-open.md`
 [^151]: Findings register, FND-152, in this document.
+[^F162A]: Findings register, FND-086, in this document.
+[^F162B]: Backlog item 0112. `docs/backlog/complete/0112-build-a-world-without-a-pass-over-every-tile.md`
+[^F162D]: Backlog item 0171. `docs/backlog/proposed/0171-build-the-first-level-without-a-pass-over-every-tile.md`

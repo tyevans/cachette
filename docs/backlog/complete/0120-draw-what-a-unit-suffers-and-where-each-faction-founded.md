@@ -278,7 +278,7 @@ engine file changed.
 ## References
 
 [^1]: Product priority index. `docs/product/PRIORITY.md`
-[^2]: Backlog item 0112. `docs/backlog/proposed/0112-build-a-world-without-a-pass-over-every-tile.md`
+[^2]: Backlog item 0112. `docs/backlog/complete/0112-build-a-world-without-a-pass-over-every-tile.md`
 [^3]: Backlog item 0034. `docs/backlog/proposed/0034-measure-the-generated-terrain-against-a-stored-one.md`
 [^4]: Findings register, FND-100. `docs/FINDINGS.md`
 [^5]: Backlog item 0106. `docs/backlog/proposed/0106-show-a-watcher-what-is-moving-and-where-it-goes.md`
