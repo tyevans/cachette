@@ -92,6 +92,7 @@ const fn settings() -> WorldConfig {
         height: EXTENT,
         seed: SEED,
         faction_count: FACTIONS,
+        unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
     }
 }
 
@@ -534,6 +535,7 @@ fn the_layer_touches_the_same_tiles_in_a_small_world_and_a_large_one() {
             height: extent,
             seed: SEED,
             faction_count: FACTIONS,
+            unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
         })
         .expect("the extent describes a world");
         // The same square of tiles is held in both worlds, so the two

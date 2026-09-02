@@ -128,6 +128,7 @@ fn world(factions: u16) -> (World, Vec<FoundingOutcome>) {
         height: TALL,
         seed: 11,
         faction_count: factions,
+        unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
     })
     .expect("the extent describes a world");
     // The run founds one group for each faction. The fixture keeps the

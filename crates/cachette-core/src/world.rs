@@ -261,6 +261,45 @@ pub struct WorldConfig {
     ///
     /// [^1]: Budgets and costs, the scale constants. `docs/reference/budgets.md`
     pub faction_count: u16,
+    /// The number of unit slots that the world reserves.
+    ///
+    /// The world reserves this many entries in each unit column when it is
+    /// built, and it opens no more. A spawn past the reservation gets a
+    /// typed refusal.[^1]
+    ///
+    /// **This is the one place that states the reservation.** The arena
+    /// takes the value from here and names no default of its own, so no
+    /// second site can disagree with this one.[^2]
+    ///
+    /// The reservation is paid once, at construction. The cost of a tick
+    /// grows with the number of units that live, not with the number the
+    /// world reserved.[^3]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0084, the world reserves the unit columns at construction, decisions D1 and D3. `docs/adrs/draft/adr-0084-the-world-reserves-the-unit-columns-at-construction.md`
+    /// [^2]: ADR-0084, the world reserves the unit columns at construction, decision D2. `docs/adrs/draft/adr-0084-the-world-reserves-the-unit-columns-at-construction.md`
+    /// [^3]: PRD-0012, a world starts small and grows. `docs/product/accepted/prd-0012-a-world-starts-small-and-grows.md`
+    pub unit_capacity: u32,
+}
+
+impl WorldConfig {
+    /// The population that the project targets, counted over everybody.
+    ///
+    /// One million is the whole population. Soldiers are a fraction of it,
+    /// and civilians are not separate entities on top of the million. The
+    /// project owner answered this, and the scale constants table holds the
+    /// row.[^1]
+    ///
+    /// This is the reservation that a world takes when the caller states no
+    /// other. It is a target the project chose, not a figure anybody
+    /// measured.[^2]
+    ///
+    /// # References
+    ///
+    /// [^1]: Budgets and costs, the scale constants. `docs/reference/budgets.md`
+    /// [^2]: Blockers register, BLK-007. `docs/BLOCKERS.md`
+    pub const TARGET_UNIT_POPULATION: u32 = 1_000_000;
 }
 
 impl Default for WorldConfig {
@@ -270,6 +309,7 @@ impl Default for WorldConfig {
             height: 64,
             seed: 0x0123_4567_89ab_cdef,
             faction_count: 4,
+            unit_capacity: Self::TARGET_UNIT_POPULATION,
         }
     }
 }
@@ -397,7 +437,7 @@ impl World {
             values.push(Fix32((raw >> 40) as i32));
         }
         let layout = BlockLayout::new(grid, BLOCK_BITS_DEFAULT)?;
-        let soldiers = SoldierArena::new(grid);
+        let soldiers = SoldierArena::new(grid, config.unit_capacity);
         let settlements = SettlementArena::new(grid);
         // The character tier states its own ceiling, and the arena checks
         // it here, once, when the world is built. Nothing checks a count on
@@ -974,7 +1014,21 @@ impl World {
             // [^3]: Open decisions register, DEC-020. `docs/DECISIONS.md`
             // [^4]: Open decisions register, DEC-021. `docs/DECISIONS.md`
             for _ in 0..kind.capacity().min(remaining) {
-                people.push(self.spawn_soldier(address, faction)?);
+                // A refusal here leaves a settlement standing and a part of
+                // the group alive. The reservation makes that refusal
+                // reachable, because a world whose unit reservation is below
+                // the group runs out of slots part way through this
+                // loop.[^6] Undo the founding rather than report a failure
+                // over a world that half changed.
+                //
+                // [^6]: ADR-0084, the world reserves the unit columns at construction, decision D3. `docs/adrs/draft/adr-0084-the-world-reserves-the-unit-columns-at-construction.md`
+                match self.spawn_soldier(address, faction) {
+                    Ok(person) => people.push(person),
+                    Err(error) => {
+                        self.abandon_founding(people, settlement);
+                        return Err(FoundingError::Person(error));
+                    }
+                }
                 remaining -= 1;
             }
         }
@@ -982,10 +1036,7 @@ impl World {
             // The eligibility rule says the disc holds the group, so this is
             // a disagreement between the rule and the placement rather than a
             // caller mistake. Report it and leave nothing half-founded.
-            for person in people {
-                self.despawn_soldier(person);
-            }
-            self.destroy_settlement(settlement);
+            self.abandon_founding(people, settlement);
             return Err(FoundingError::NoPlaceFound(1));
         }
         // The group belongs to the settlement it founded. A unit draws from
@@ -997,6 +1048,20 @@ impl World {
             self.set_home_site(*person, Some(settlement));
         }
         Ok((settlement, people))
+    }
+
+    /// Undoes a founding that could not finish.
+    ///
+    /// A founding that stops part way leaves a settlement standing and a
+    /// part of its group alive. Both are removed here, so a refused founding
+    /// changes nothing that a caller can observe. This is the one place that
+    /// undoes a founding, and every refusal after the settlement stands goes
+    /// through it.
+    fn abandon_founding(&mut self, people: Vec<Entity>, settlement: Entity) {
+        for person in people {
+            self.despawn_soldier(person);
+        }
+        self.destroy_settlement(settlement);
     }
 
     /// Destroys a settlement and reports whether it destroyed one.
@@ -3569,6 +3634,7 @@ mod tests {
             height: 2,
             seed: 1,
             faction_count: 2,
+            unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
         })
         .expect("the extent must describe a world");
         change(&mut world);

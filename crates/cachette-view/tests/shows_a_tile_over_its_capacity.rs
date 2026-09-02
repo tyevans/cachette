@@ -69,6 +69,7 @@ fn crowded_world() -> (World, Crowd) {
         height: 24,
         seed: 11,
         faction_count: 1,
+        unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
     })
     .expect("the extent describes a world");
 

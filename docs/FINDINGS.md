@@ -3341,6 +3341,12 @@ constraint. A row in the decisions register holds the question.[^92]
 checks it.** The checkable statements of a record get a test. The cost section
 gets none. This claim survived acceptance and every gate.
 
+**Repaired on 1 September 2026.** The world now reserves the unit columns from
+a number its settings name, and a spawn past the reservation gets a typed
+refusal.[^139] The two sentences above describe the engine before that change.
+The third consequence stays open: a cost statement of a product record is still
+a claim about the engine that no gate checks.
+
 ### FND-136 — A merge committed conflict markers into a register, and every gate passed
 
 **Believed.** The gate suite defends the three registers. It checks the
@@ -3473,6 +3479,156 @@ isolated one. Isolation is necessary and it is not sufficient. A row supports
 the claim that the suite cost this much at that moment. It does not support
 the claim that a change made the suite faster.
 
+### FND-143 — A derived copy of an arena drops its reservation, and nothing reports it
+
+**Believed.** A reservation is a property of the arena, so a copy of a world
+holds the reservation that the world holds. The arena derived its copy, and a
+derived copy copies every field.
+
+**True.** A derived copy of a growable column allocates for what the column
+holds, not for what it reserved. A copy of a world part way through a run
+therefore holds a column sized to the live population, and it grows on the
+next spawn where the original does not.
+
+**Evidence.** The method found it, not a failure. The question asked of every
+new guarantee was: **which code paths could drop this without failing?** A
+copy is one, because the copy was derived rather than written, and a derived
+copy carries each field by copying it. The standard library states the rest: a
+copy of a growable array allocates for its length. A test copies a world
+holding one unit, fills the copy to the reservation, and asserts that the
+address of the first entry of every column did not move. That test fails
+against a derived copy and passes against a written one.
+
+The method transfers. When a change adds a guarantee that lives in a capacity,
+an ordering, or a reservation rather than in a value, list the operations that
+rebuild the structure — copy, serialise, merge, resize — and ask of each one
+whether it carries the guarantee or only the value. A derived implementation
+carries the value.
+
+**Follows.** Three things.
+
+**A reservation is a fact that lives in one field and in every column that
+serves it.** The field says how much, and each column either holds that much
+or does not. A derived copy carries the field and drops what it means, so the
+capacity of the copy reads back correctly and states something false. This is
+the shape the recurring defect rule names first.[^140]
+
+**A capacity assertion cannot see this.** The copy reports the same capacity
+number, because the number lives in a field the copy carried. Only the address
+of the first entry moves, so the address is what a test must read.
+
+**A property that a derived implementation can drop needs the implementation
+written.** Nothing in the type system says that a copy must reserve, so
+nothing fails when it does not.
+
+**The general form: a test can pass for a reason unrelated to the thing it is
+named for, and only a reinserted defect reveals which reason.** The test that
+asserts a copy keeps its reservation stayed green when the reservation was
+removed from the constructor, because the copy called a reserving constructor
+of its own. It was named for the copy and it covered the copy, and it covered
+nothing else, but nobody could have known that from reading it.
+
+Three instances of this shape were found on one day, in three pieces of work.
+A test stayed green because a second check downstream protected the value the
+deleted check guarded, so the test covered neither check. A test stayed green
+because it asserted only that an error occurred, and a refusal by any cause is
+an error. This entry is the third.
+
+**Reinsert each defect separately.** A test that covers two guarantees at once
+cannot be told apart from a test that covers one, until the two are removed
+one at a time. The cost is one build for each guarantee, and the alternative
+is a suite whose coverage nobody can state.
+
+### FND-144 — A founding that a spawn refused left a settlement standing and a part of its group alive
+
+**Believed.** A founding leaves nothing half-founded. The engine says so in
+its own comment, and one path undoes the settlement and the people when the
+placement cannot seat the whole group.
+
+**True.** Only that one path undid anything. A refusal from the spawn itself
+returned immediately, and it left the settlement standing and the people
+already seated alive. The store arrives after the group is seated, so a
+founding stopped this way left a settlement with no production and no store.
+
+**Evidence.** The founding seats the settlement first and then seats the group
+one member at a time. The spawn returned its error through the question mark
+operator, which returns before the undo. Nothing found this, because the
+refusals a spawn could give were unreachable from a founding: the ground was
+filtered before the spawn, the faction came from the run, and the storage
+refusal needed a full arena, which no run could reach while the arena grew on
+demand.
+
+**Follows.** Two things.
+
+**An unreachable error path is untested code that looks tested.** The path
+compiled, it was covered by the type system, and a reader saw a refusal that
+was handled. Making the storage refusal reachable made the defect reachable in
+the same change.
+
+**Undoing belongs in one place, not at each return.** The founding now undoes
+through one function, and every refusal after the settlement stands goes
+through it. A second undo written at the second return would have been a
+second copy of the same fact.
+
+**A refused founding is not hash-neutral, and a reader will assume it is.**
+The undo owes that nothing lives and nothing stands. It does not owe, and
+cannot give, the state hash the world held before. The arena never compacts
+the slot index space and a generation never rewinds, so the slots the founding
+opened stay open and their generations stay advanced.[^144] A founding that
+failed therefore moves the state hash, deterministically, and that is correct
+behaviour rather than a defect.
+
+A test was written asserting the opposite and was removed before it ran. A
+passing test that asks a failed operation to leave no trace would have
+recorded a rule nobody chose, and the next reader of the golden state test
+would have inherited it. The engine states the true outcome in a test of its
+own instead, so that a later reader does not read the open slots as
+wreckage.
+
+### FND-145 — The world settings priced one new field at 82 struct literals, not 25
+
+**Believed.** The settings struct that builds a world prices a new parameter
+at about twenty-five files. The backlog item that exists to fix this states
+that figure, and it comes from the site rate work, which met the cost, counted
+the files and moved its parameter elsewhere rather than pay it.[^141] [^142]
+
+**True.** The price is 82 struct literals. The reservation work added one
+field, `unit_capacity`, and the compiler refused every exhaustive literal in
+the workspace. The figure is three times the one the item states, and it has
+grown because the tree has grown: every test written since the site rate work
+added literals of its own.
+
+**Evidence.** The whole-tree search that found them:
+
+```
+grep -rn "WorldConfig {" crates
+```
+
+It reports 94 occurrences. Three are not literals: the struct definition, a
+return type, and one in the Python binding. Nine literals already used struct
+update syntax or a base value and needed nothing. The remaining 82 took the
+field. The sweep was mechanical and was scripted rather than done by hand,
+because a sweep done by hand is done when the files look right rather than
+when a search comes back clean.[^143]
+
+**Follows.** Three things.
+
+**The cost is not fixed. It grows with the tree.** An item that states a cost
+as a number states it as of the day it was written. The right shape for this
+one is that the cost grows with the number of places that build a world, and
+that nothing bounds that number, so the cost only ever rises. Whoever refines
+the item should say it that way and cite this row for the two measurements.
+
+**The second measurement is what makes it a trend.** One figure is an
+anecdote. Two figures, taken by two pieces of work that each paid the price,
+say that the item is getting more expensive to defer, not less.
+
+**A mechanical price is not a small price.** Every one of the 82 edits was
+correct, none needed judgement, and the whole sweep was one script. It still
+put a one-field change into 41 files, across three crates, two of which
+belonged to other workers at the time. The cost that matters is the merge
+surface, not the typing.
+
 
 ## References
 
@@ -3582,3 +3738,9 @@ the claim that a change made the suite faster.
 [^100]: ADR-0083, the gate build checks every integer overflow, decision D2. `docs/adrs/draft/adr-0083-the-gate-build-checks-every-integer-overflow.md`
 [^F147A]: ADR Registry, row 0043. `docs/adrs/REGISTRY.md`
 [^ORIENT2]: Project orientation, the design principles. `CLAUDE.md`
+[^139]: ADR-0084, the world reserves the unit columns at construction. `docs/adrs/draft/adr-0084-the-world-reserves-the-unit-columns-at-construction.md`
+[^140]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`
+[^141]: Backlog item 0080. `docs/backlog/proposed/0080-give-the-world-settings-a-constructor.md`
+[^142]: Findings register, FND-064, in this document.
+[^143]: Recurring defect shapes, shape 2. `.claude/rules/recurring-defects.md`
+[^144]: ADR-0014, entity identity is an index plus a generation, decisions D1 and D3. `docs/adrs/accepted/adr-0014-entity-identity-is-an-index-plus-a-generation.md`

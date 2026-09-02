@@ -48,7 +48,6 @@ These close a gap a review found, or they unblock the items above.
 | 0163 | An item can be finished and still read as open, and no check compares what merged against the item that asked for it. |
 | 0144 | Two footnote rules are stated and nothing checks them. Three of four drafts broke one or both, and the gate passed.[^10] |
 | 0149 | The cost section of PRD-0018 states the mechanism of ADR-0080. A review holds the record at `Shaped` until it states cost alone.[^11] |
-| 0150 | PRD-0012 says the world reserves unit storage for the target population. The arena reserves none and grows at each spawn.[^12] |
 | 0059 | Housing. A review rejected ADR-0081, so this cannot be taken until a record replaces it. It sits here, not above, because nobody can start it. |
 | 0060 | Population growth. It waits on 0059, which is itself stopped. |
 
@@ -111,4 +110,3 @@ These are real and none of them blocks anything today.
 [^9]: PRD-0018, a depleted deposit comes back. `docs/product/shaped/prd-0018-a-depleted-deposit-comes-back.md`
 [^10]: Findings register, FND-130. `docs/FINDINGS.md`
 [^11]: Findings register, FND-134. `docs/FINDINGS.md`
-[^12]: Findings register, FND-135. `docs/FINDINGS.md`

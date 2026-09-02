@@ -52,6 +52,7 @@ fn world_of(seed: u64) -> World {
         height: EXTENT,
         seed,
         faction_count: 2,
+        unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
     })
     .expect("the extent describes a world");
     // A draw reads the derived structure, and a fresh one is stale.

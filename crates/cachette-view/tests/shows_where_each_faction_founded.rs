@@ -55,6 +55,7 @@ fn crowded_world() -> (World, Vec<FoundingOutcome>) {
         height: EXTENT,
         seed: 3,
         faction_count: FACTIONS,
+        unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
     })
     .expect("the extent describes a world");
     let outcomes = world.found_run_for_every_faction(GROUP);

@@ -31,6 +31,7 @@ const CONFIG: WorldConfig = WorldConfig {
     height: 9,
     seed: 0x00c0_ffee_0000_0001,
     faction_count: 3,
+    unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
 };
 
 /// Builds a world.

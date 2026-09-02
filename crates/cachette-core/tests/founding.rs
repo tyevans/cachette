@@ -50,6 +50,7 @@ fn world_of(seed: u64) -> World {
         height: EXTENT,
         seed,
         faction_count: 4,
+        unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
     })
     .expect("the extent must describe a world")
 }
@@ -150,6 +151,7 @@ fn the_survey_cost_does_not_grow_with_the_world() {
             height: extent,
             seed: 0x0cac_4e77_0061,
             faction_count: 4,
+            unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
         })
         .expect("the extent must describe a world");
         let survey = world

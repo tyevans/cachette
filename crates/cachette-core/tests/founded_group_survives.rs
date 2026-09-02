@@ -43,6 +43,7 @@ fn world() -> World {
         height: EXTENT,
         seed: 0x0cac_4e77_e5ee_d001,
         faction_count: FACTIONS,
+        unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
     })
     .expect("the settings describe a world")
 }

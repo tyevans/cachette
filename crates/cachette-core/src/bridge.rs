@@ -743,7 +743,7 @@ mod tests {
     /// Builds an arena and a fresh bridge over a small world.
     fn built() -> (SoldierArena, UnitTileBridge) {
         let grid = Grid::new(8, 8).expect("a small extent describes a grid");
-        let mut arena = SoldierArena::new(grid);
+        let mut arena = SoldierArena::new(grid, 64);
         arena
             .spawn(Axial::new(1, 1), FactionId(0))
             .expect("the spawn must succeed");

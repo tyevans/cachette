@@ -16,6 +16,14 @@ period and a phase. It put both in the settings struct, the compiler refused
 twenty-five files, and the work moved the schedule to a default on the world
 with a setter beside it. The finding holds the reasoning.[^1]
 
+**A second piece of work has since paid the price rather than avoided it, and
+it was three times higher.** The unit reservation work added one field and the
+compiler refused 82 struct literals across three crates. The register holds
+the figure and the search command that produced it.[^3] Two measurements make
+this a trend rather than an anecdote: the cost grows with the number of places
+that build a world, and nothing bounds that number, so deferring this item
+gets more expensive and never less.
+
 The move was right for a cadence, because a cadence has a recommended value
 and a caller may leave it. It is not right for every parameter. A parameter
 that a caller must state belongs in the settings, and the settings must be
@@ -42,3 +50,4 @@ chooses must leave something that fails when the two copies disagree.[^2]
 
 [^1]: Findings register, FND-064. `docs/FINDINGS.md`
 [^2]: Recurring Defect Shapes, shape 1. `.claude/rules/recurring-defects.md`
+[^3]: Findings register, FND-145. `docs/FINDINGS.md`

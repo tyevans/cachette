@@ -23,9 +23,53 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^ALLOC]
 
+<<<<<<< HEAD
 **Next number: DEC-064**
+=======
+**Next number: DEC-063**
+>>>>>>> w7-reserve-unit-storage
 
 ## Open
+
+### DEC-062 — Do the settlement arena and the character arena reserve their storage too?
+
+**Open. The recommendation is that both reserve, and that the character arena
+reserves its target rather than its ceiling.**
+
+The unit arena reserves its columns at construction, and a spawn past the
+reservation gets a typed refusal.[^DEC59] The settlement arena and the
+character arena hold the same shape and have not taken the same answer. Both
+carry a capacity that refuses, and neither reserves any memory for it, so both
+grow a column under a running simulation.
+
+The character arena adds a question the unit arena does not have. It carries a
+tier ceiling that is larger than the target the owner answered, so a
+reservation has two candidate values rather than one.[^BLK4] The settlement
+count is answered and has one candidate.[^BLK5]
+
+**The options.**
+
+1. Both arenas reserve at construction, in the way the unit arena does. The
+   character arena reserves its target and keeps its ceiling as the refusal
+   bound, so the ceiling stays the property of the identity layout and the
+   target stays the property of the settings.
+2. Both arenas reserve at construction, and the character arena reserves its
+   ceiling. A run then never refuses a character below the ceiling, at the
+   cost of reserving several times the target.
+3. Neither reserves. The unit arena is the only one that does, because it is
+   the only one whose population reaches a million.
+
+**The recommendation is option 1.** A reservation that a run cannot exceed is
+the property the product record states, and it states it of the storage the
+world reserves rather than of the units alone.[^PRD12] Option 2 spends the
+difference between the target and the ceiling on every world in the process,
+and no measurement on the target platform says what that costs.[^BLK7] Option
+3 leaves two arenas that reallocate inside a step, which is the shape the
+closed row rejected for the third.
+
+**What holds it back.** Nothing holds the choice. It was separated from the
+closed row because that row asks about the unit arena alone, and answering
+two arenas inside one row would put two claims in one place.
 
 ### DEC-057 — Does a site store its resident count, or read the one the engine keeps?
 
@@ -1203,10 +1247,13 @@ a failed founding is correct.[^PRD12]
 [^FND135]: Findings register, FND-135. `docs/FINDINGS.md`
 [^DOD3]: Definition of Done, section 3. `.claude/rules/definition-of-done.md`
 [^BLK3]: Blockers register, BLK-003. `docs/BLOCKERS.md`
-[^ITEM0150]: Backlog item 0150. `docs/backlog/proposed/0150-decide-how-the-world-reserves-unit-storage.md`
+[^ITEM0150]: Backlog item 0150. `docs/backlog/complete/0150-reserve-the-unit-columns-at-construction.md`
 [^DEC60A]: The event types. `crates/cachette-core/src/event.rs`
 [^DEC60B]: Recurring Defect Shapes, shape 1. `.claude/rules/recurring-defects.md`
 [^DEC60C]: Findings register, FND-137. `docs/FINDINGS.md`
 [^DEC60D]: Backlog item 0153. `docs/backlog/refined/0153-let-python-read-an-event-without-repeating-its-layout.md`
 [^DEC60E]: The identity type. `crates/cachette-core/src/types.rs`
 [^DEC60F]: ADR-0002, simulated and aggregated state holds no floating point number, decision D1. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
+[^BLK4]: Blockers register, BLK-004. `docs/BLOCKERS.md`
+[^BLK5]: Blockers register, BLK-005. `docs/BLOCKERS.md`
+[^PRD12]: PRD-0012, a world starts small and grows. `docs/product/accepted/prd-0012-a-world-starts-small-and-grows.md`

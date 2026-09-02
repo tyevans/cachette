@@ -43,6 +43,7 @@ fn main() {
         height: extent,
         seed,
         faction_count: 3,
+        unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
     })
     .expect("the extent describes a world");
 

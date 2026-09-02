@@ -85,6 +85,7 @@ impl PyWorld {
             height,
             seed,
             faction_count,
+            unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
         })
         .map_err(|error| ConfigError::new_err(error.to_string()))?;
         Ok(Self {
