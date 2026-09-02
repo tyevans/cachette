@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-182**
+**Next number: FND-192**
 
 ## A. Corrections to stated rules
 
@@ -4297,6 +4297,57 @@ round. That rule says to test what the value depends on.[^43] This says to
 test what depends on the value.
 
 
+### FND-190 — A per-cell field and a per-unit score search do not give the same answer
+
+**Believed.** A field that ranks the neighbours of a cell once gives the same
+answer as a search in which each unit scores its six neighbours. The analysis
+note states that the search "gives the same answer for every unit of one
+cell", and the backlog item repeats it.[^F190A] Both were read as saying that
+the two shapes are equivalent, so the field is only the cheaper way to compute
+one thing.
+
+**True.** The two agree when the field ranks the neighbours on the cell value
+that the option reads. They disagree when the rank reads the score. A score is
+the cell value multiplied by what the unit wants, and two properties break the
+equivalence. A want of zero makes every score equal, so the tie-break picks the
+direction and the ground does not. The multiplication saturates, so two
+different cell values can give one score, with the same result.
+
+**Evidence.** The score of an option is one saturating multiplication of the
+want by the cell value, and the want is itself the drive scaled by a
+content-supplied weight. A weight of zero, or a drive of zero, makes the want
+zero.[^F190B] This was found by reading the source. Nothing was run, so no
+case of saturation in a live world is verified.
+
+**Follows.** The record that governs the field ranks the neighbours on the
+cell value, and says so as a decision rather than as an implementation
+note.[^F190C] The equivalence that makes the cheap shape sound is narrower
+than the analysis note claimed, and it holds because the ranked quantity
+belongs to the cell, not because the score does.
+
+### FND-191 — The number of the food commodity is written wherever the engine needs it
+
+**Believed.** The map from a kind of work to a commodity is the one place the
+project holds a placeholder for the commodity set. A backlog item records that
+the map carries no information, because the store of a site holds one
+commodity.[^F191A]
+
+**True.** The engine does not read that map at all. It writes the commodity
+number literally at each site that needs one. The founding sets the production
+rate of a new site against commodity zero. The consumption pass draws the
+ration against commodity zero. Neither reads a table, and nothing fails when
+one is changed and the other is not.[^F191B]
+
+**Evidence.** Two passes of the world module name the commodity by its number
+and not through any map. This was found by reading the source while refining
+the item that moves a carried load into a store. Nothing was run.
+
+**Follows.** Work that moves a resource into a store must not add a third
+literal, because that is one value declared in three places with nothing to
+fail when the copies disagree.[^22] The map from a resource kind to a
+commodity is declared once, and the item that gives a kind of work its
+commodity absorbs it.[^F191A]
+
 
 ## References
 
@@ -4443,3 +4494,8 @@ test what depends on the value.
 [^F160A]: ADR-0001, one binary gives one answer at any thread count, decision D4. `docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
 [^F160B]: ADR-0009, parallel stages write disjoint outputs, because the memory model is weak. `docs/adrs/accepted/adr-0009-parallel-stages-write-disjoint-outputs.md`
 [^F174A]: Testing rules, section 2. `.claude/rules/testing.md`
+[^F190A]: What a unit does in a tick, section 5. `docs/research/what-a-unit-does-in-a-tick.md`
+[^F190B]: The option score. `crates/cachette-core/src/choose.rs`
+[^F190C]: ADR-0091, movement takes its direction from a per-cell field, never from a per-unit search, decision D4. `docs/adrs/draft/adr-0091-movement-takes-its-direction-from-a-per-cell-field.md`
+[^F191A]: Backlog item 0181, give a kind of work the commodity it fills. `docs/backlog/proposed/0181-give-a-kind-of-work-the-commodity-it-fills.md`
+[^F191B]: The founding provisions a site, and the consumption pass draws a ration. `crates/cachette-core/src/world.rs`
