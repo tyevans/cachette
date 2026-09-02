@@ -233,7 +233,6 @@ pub struct World {
     grid: Grid,
     tick: Tick,
     values: Vec<Fix32>,
-    factions: Vec<FactionId>,
     log: Vec<TileChanged>,
     /// The events of the last step, from the gather resolve.
     gather_log: Vec<ResourceTaken>,
@@ -260,9 +259,9 @@ pub struct World {
     pyramid: Pyramid,
     /// Who holds each tile, and what each faction holds.
     ///
-    /// The holder column is level 0 and it is the truth. The tile faction
-    /// column above it is the label that the tile stub writes into an event,
-    /// and it is not a holder: it never changes and it covers water.[^1]
+    /// The holder column is level 0 and it is the truth. It is the one value
+    /// that names the faction which owns a tile, and the tile event carries
+    /// it.[^1]
     ///
     /// # References
     ///
@@ -337,13 +336,10 @@ impl World {
         }
         let grid = Grid::new(config.width, config.height)?;
         let count = grid.tile_count() as usize;
-        let divisor = u64::from(config.faction_count.max(1));
         let mut values = Vec::with_capacity(count);
-        let mut factions = Vec::with_capacity(count);
         for index in 0..count {
             let raw = rng::draw(config.seed, rng::SYSTEM_TILE_STUB, 0, index as u64, 0);
             values.push(Fix32((raw >> 40) as i32));
-            factions.push(FactionId((index as u64 % divisor) as u16));
         }
         let layout = BlockLayout::new(grid, BLOCK_BITS_DEFAULT)?;
         let soldiers = SoldierArena::new(grid);
@@ -362,7 +358,6 @@ impl World {
             grid,
             tick: Tick(0),
             values,
-            factions,
             log: Vec::new(),
             gather_log: Vec::new(),
             soldiers,
@@ -1600,8 +1595,7 @@ impl World {
             .write_u64(u64::from(self.config.width))
             .write_u64(u64::from(self.config.height))
             .write_u64(u64::from(self.config.faction_count))
-            .write(bytemuck::cast_slice(&self.values))
-            .write(bytemuck::cast_slice(&self.factions));
+            .write(bytemuck::cast_slice(&self.values));
         // The ground is part of the world, so the whole-world hash covers
         // it. The seed and the extent are already above, but they are the
         // inputs of the generator, not its output. A change to the generator
@@ -1656,9 +1650,6 @@ impl World {
     /// [^1]: The testing rule, drive the real caller. `.claude/rules/testing.md`
     #[must_use]
     pub fn check_invariants(&self) -> bool {
-        if self.values.len() != self.factions.len() {
-            return false;
-        }
         if self.values.len() != self.grid.tile_count() as usize {
             return false;
         }
@@ -1666,9 +1657,6 @@ impl World {
             return false;
         }
         let ceiling = self.config.faction_count.max(1);
-        if self.factions.iter().any(|faction| faction.0 >= ceiling) {
-            return false;
-        }
         // The soldier faction column is a second population under the same
         // ceiling. Checking one and not the other let the test suite spawn
         // soldiers of factions the world did not have, and pass.
@@ -2111,7 +2099,6 @@ impl World {
         let tick = self.tick;
         let seed = self.config.seed;
         let values = &mut self.values;
-        let factions = &self.factions[..];
         let count = values.len();
         let chunk_len = count.div_ceil(threads).max(1);
 
@@ -2123,9 +2110,8 @@ impl World {
             for (chunk, slot) in values.chunks_mut(chunk_len).zip(slots.entries_mut()) {
                 let start = base;
                 base += chunk.len();
-                let owned_factions = &factions[start..base];
                 scope.spawn(move || {
-                    *slot = update_chunk(tick, seed, start, chunk, owned_factions);
+                    *slot = update_chunk(tick, seed, start, chunk);
                 });
             }
         });
@@ -2217,6 +2203,23 @@ impl World {
         // [^7]: ADR-0053, a faction is a bit in a mask, and a relation is a plane, decision D4. `docs/adrs/accepted/adr-0053-a-faction-is-a-bit-in-a-mask-and-a-relation-is-a-plane.md`
         self.holding
             .advance(self.terrain, &self.soldiers, &self.bridge, threads)?;
+
+        // The event reports the tile as this frame left it, so the holder is
+        // stamped here and not in the value pass above. The value pass runs
+        // at the top of the step and the spread above is the last thing in
+        // this step that writes the holder column, so a stamp taken any
+        // earlier would publish the holder of the frame before. A stale read
+        // is a confident wrong answer, and it is the defect this event
+        // carried.[^15]
+        //
+        // The pass costs one write for each event, and not one for each
+        // tile.
+        //
+        // [^15]: Findings register, FND-029 and FND-079. `docs/FINDINGS.md`
+        let holders = self.holding.holders();
+        for event in &mut self.log {
+            event.holder = holders[event.tile.0 as usize];
+        }
         // The site rates apply after the barrier of this frame and after the
         // gather resolve, and before level 1 rebuilds.
         //
@@ -3418,13 +3421,7 @@ fn admit(
 /// # References
 ///
 /// [^1]: ADR-0006, an event is plain data and applying it is pure, decision D1. `docs/adrs/accepted/adr-0006-an-event-is-plain-data-and-applying-it-is-pure.md`
-fn update_chunk(
-    tick: Tick,
-    seed: u64,
-    start: usize,
-    values: &mut [Fix32],
-    factions: &[FactionId],
-) -> Vec<TileChanged> {
+fn update_chunk(tick: Tick, seed: u64, start: usize, values: &mut [Fix32]) -> Vec<TileChanged> {
     let mut events = Vec::new();
     for (offset, value) in values.iter_mut().enumerate() {
         let index = start + offset;
@@ -3443,11 +3440,16 @@ fn update_chunk(
         } else {
             CHANGE_KIND_LOWERED
         };
+        // The holder is stamped after the holding spread, at the end of the
+        // step. This pass runs at the top of the step, so any holder it read
+        // here would be the holder of the frame before.[^2]
+        //
+        // [^2]: Findings register, FND-029. `docs/FINDINGS.md`
         events.push(TileChanged::new(
             tick,
             TileIdx(index as u32),
             updated,
-            factions[offset],
+            Holder::NOBODY,
             kind,
         ));
     }
@@ -3488,31 +3490,9 @@ mod tests {
     }
 
     #[test]
-    fn a_short_faction_column_fails_the_check() {
-        assert!(!broken(|world| {
-            world.factions.pop();
-        })
-        .check_invariants());
-    }
-
-    #[test]
     fn a_short_value_column_fails_the_check() {
         assert!(!broken(|world| {
             world.values.pop();
-            world.factions.pop();
-        })
-        .check_invariants());
-    }
-
-    #[test]
-    fn a_faction_above_the_ceiling_fails_the_check() {
-        assert!(!broken(|world| {
-            world.factions[0] = FactionId(2);
-        })
-        .check_invariants());
-        // The ceiling is exclusive. The highest valid identifier passes.
-        assert!(broken(|world| {
-            world.factions[0] = FactionId(1);
         })
         .check_invariants());
     }
@@ -3520,7 +3500,7 @@ mod tests {
     #[test]
     fn an_event_with_padding_fails_the_check() {
         assert!(!broken(|world| {
-            let mut event = TileChanged::new(Tick(1), TileIdx(0), Fix32::ZERO, FactionId(0), 1);
+            let mut event = TileChanged::new(Tick(1), TileIdx(0), Fix32::ZERO, Holder::NOBODY, 1);
             event.padding[0] = 1;
             world.log.push(event);
         })
@@ -3534,7 +3514,7 @@ mod tests {
                 Tick(1),
                 TileIdx(8),
                 Fix32::ZERO,
-                FactionId(0),
+                Holder::NOBODY,
                 1,
             ));
         })
@@ -3545,7 +3525,7 @@ mod tests {
                 Tick(1),
                 TileIdx(7),
                 Fix32::ZERO,
-                FactionId(0),
+                Holder::NOBODY,
                 1,
             ));
         })

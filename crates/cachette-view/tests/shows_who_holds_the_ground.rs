@@ -4,17 +4,15 @@
 //! world runs. A watcher who cannot see it cannot check it, and the product
 //! record asks for exactly this.[^1]
 //!
-//! # Which faction column the layer reads
+//! # Which value the layer reads
 //!
-//! A tile carries two values that name a faction. The first is the holder. It
-//! says who holds the ground, it changes while the world runs, and it names
-//! nobody where nobody holds.[^2] The second is the tile faction column of
-//! the stub system. It is written when the world is built, it never changes,
-//! and it covers open water as well as open ground.
+//! A tile carries one value that names a faction, and that value is the
+//! holder. It says who holds the ground, it changes while the world runs, and
+//! it names nobody where nobody holds.[^2]
 //!
-//! The layer reads the holder. A layer that drew the other column would paint
-//! a full, still map of holdings that no rule ever made, and the picture would
-//! be plausible and wrong.[^3]
+//! The layer reads the holder. A layer that derived a faction from the tile
+//! index would paint a full, still map of holdings that no rule ever made,
+//! and the picture would be plausible and wrong.[^3]
 //!
 //! Three assertions here catch that defect. The layer must report no held
 //! tile in a world that holds no soldier. The count of held tiles it reports
@@ -315,9 +313,9 @@ fn a_held_tile_takes_the_colour_of_its_holder() {
             "the tile {address:?} is held and draws as unheld ground",
         );
         // Each channel of the drawn colour lies between the ground and the
-        // colour of the faction that holds the tile. A layer that read
-        // another faction column would fail this on the tiles where the two
-        // columns disagree.
+        // colour of the faction that holds the tile. A layer that named the
+        // faction from anything but the holder would fail this on every tile
+        // where the two answers disagree.
         for offset in [0, 8, 16] {
             let (a, b) = (channel(ground, offset), channel(wanted, offset));
             let value = channel(drawn, offset);
@@ -338,9 +336,9 @@ fn a_held_tile_takes_the_colour_of_its_holder() {
 
 #[test]
 fn open_water_never_takes_a_holder_colour() {
-    // No faction ever holds open water. A layer that read the tile faction
-    // column of the stub system would tint water, because that column covers
-    // every tile.
+    // No faction ever holds open water. A layer that derived a faction from
+    // the tile index would tint water, because such a rule names a faction
+    // for every tile.
     let held = two_holdings_that_meet();
     let empty = the_same_world_with_nobody_in_it();
     let mut with_holdings = Canvas::new(WINDOW.0, WINDOW.1);
@@ -462,9 +460,9 @@ fn two_holdings_that_meet_are_drawn_in_two_colours() {
 #[test]
 fn the_layer_reads_the_holder_of_the_world() {
     // The count of held tiles the pass reports must equal the count this
-    // test reads back through the public holder reader. A layer that read
-    // another faction column would report a different count, because that
-    // column names a faction for every tile, water included.
+    // test reads back through the public holder reader. A layer that derived
+    // a faction from the tile index would report a different count, because
+    // such a rule names a faction for every tile, water included.
     let world = two_holdings_that_meet();
     let mut canvas = Canvas::new(WINDOW.0, WINDOW.1);
     let camera = close_camera(&world, &canvas);

@@ -10,7 +10,7 @@
 
 use cachette_core::event::CHANGE_KIND_RAISED;
 use cachette_core::types::{FactionId, TileIdx};
-use cachette_core::{Fix32, Tick, TileChanged};
+use cachette_core::{Fix32, Holder, Tick, TileChanged};
 
 #[test]
 fn the_event_declares_every_padding_byte() {
@@ -19,7 +19,7 @@ fn the_event_declares_every_padding_byte() {
     let declared = size_of::<Tick>()
         + size_of::<TileIdx>()
         + size_of::<Fix32>()
-        + size_of::<FactionId>()
+        + size_of::<Holder>()
         + size_of::<u8>()
         + size_of::<[u8; 5]>();
     assert_eq!(size_of::<TileChanged>(), declared);
@@ -38,7 +38,7 @@ fn a_new_event_holds_zero_padding() {
         Tick(3),
         TileIdx(9),
         Fix32::ONE,
-        FactionId(1),
+        Holder::of(FactionId(1)),
         CHANGE_KIND_RAISED,
     );
     assert_eq!(event.padding, [0; 5]);
@@ -47,8 +47,8 @@ fn a_new_event_holds_zero_padding() {
 #[test]
 fn the_event_round_trips_through_bytes() {
     let events = [
-        TileChanged::new(Tick(1), TileIdx(0), Fix32::ZERO, FactionId(0), 1),
-        TileChanged::new(Tick(1), TileIdx(1), Fix32::ONE, FactionId(2), 2),
+        TileChanged::new(Tick(1), TileIdx(0), Fix32::ZERO, Holder::NOBODY, 1),
+        TileChanged::new(Tick(1), TileIdx(1), Fix32::ONE, Holder::of(FactionId(2)), 2),
     ];
     let bytes: &[u8] = bytemuck::cast_slice(&events);
     assert_eq!(bytes.len(), 2 * size_of::<TileChanged>());
@@ -58,7 +58,7 @@ fn the_event_round_trips_through_bytes() {
 
 #[test]
 fn the_sort_key_orders_by_tick_then_tile() {
-    let first = TileChanged::new(Tick(1), TileIdx(9), Fix32::ZERO, FactionId(0), 1);
-    let second = TileChanged::new(Tick(2), TileIdx(0), Fix32::ZERO, FactionId(0), 1);
+    let first = TileChanged::new(Tick(1), TileIdx(9), Fix32::ZERO, Holder::NOBODY, 1);
+    let second = TileChanged::new(Tick(2), TileIdx(0), Fix32::ZERO, Holder::NOBODY, 1);
     assert!(first.sort_key() < second.sort_key());
 }
