@@ -18,7 +18,7 @@ this repository.
 
 | Record | Verdict |
 |---|---|
-| ADR-0076 | Accept, with two footnote labels reordered |
+| ADR-0076 | Accept, with three footnote labels reordered |
 | ADR-0080 | Accept, with two sentences amended |
 | ADR-0081 | Reject. The engine already holds the count that D3 asks the project to store |
 | ADR-0082 | Reject, because it rests on ADR-0081 |
@@ -185,10 +185,13 @@ the distance, or a run in another order, or a key without the faction.
 
 ### The one change
 
-Footnote 8 first occurs in the consequences. Footnote 9 first occurs in D3,
-which is earlier. The documentation rule asks the author to number the footnotes
-in the order that they occur.[^9] The two labels swap. No claim changes and no
-source changes.
+Footnote 8 first occurs in the consequences. Footnote 9 and footnote 10 first
+occur in D3, which is earlier. The documentation rule asks the author to number
+the footnotes in the order that they occur.[^9] Three labels therefore move, and
+the definition list moves with them. No claim changes and no source changes.
+
+**The change is applied.** A draft exists to be edited, and the edit is
+mechanical.[^6]
 
 ## 4. ADR-0080: the record against the code
 
@@ -265,8 +268,11 @@ The repair keeps the constraint and drops the inventory:
 
 > This decision claims no more than that. The property rests on the order of the
 > step, and a change to that order breaks it. A reader that took the stored take,
-> the tick and the period as arguments would not depend on the order, and no
+> the tick and the period as its arguments would not depend on the order, and no
 > caller reads a stock that way.
+
+**Both amendments are applied.** A draft exists to be edited, and neither
+amendment changes a decision.[^6]
 
 ## 5. Objections attempted
 
