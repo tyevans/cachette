@@ -192,8 +192,7 @@ impl TileValues {
 
     /// Returns the stored change of one tile, which is zero when none is
     /// stored.
-    #[must_use]
-    pub fn stored(&self, tile: TileIdx) -> Fix32 {
+    fn stored(&self, tile: TileIdx) -> Fix32 {
         match self
             .changes
             .binary_search_by_key(&tile.0, |entry| entry.tile)
@@ -364,17 +363,9 @@ pub struct TileValueRange<'a> {
     seed: u64,
     /// The stored changes of this range, in ascending tile order.
     changes: &'a [Change],
-    /// The first tile of the range.
-    start: u32,
 }
 
 impl<'a> TileValueRange<'a> {
-    /// Returns the first tile of the range.
-    #[must_use]
-    pub const fn start(&self) -> u32 {
-        self.start
-    }
-
     /// Returns the value of one tile of the range.
     ///
     /// The walk is linear in the stored changes of the range, because the
@@ -407,7 +398,6 @@ impl TileValues {
         TileValueRange {
             seed: self.seed,
             changes: &self.changes[first..last],
-            start,
         }
     }
 }

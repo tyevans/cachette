@@ -1691,16 +1691,6 @@ impl World {
         self.values.at(index)
     }
 
-    /// Returns the tile value field.
-    ///
-    /// The field answers one tile at a time. It holds no array of values,
-    /// so a caller that wants the whole column asks for a copy of it and
-    /// says so at the call site.
-    #[must_use]
-    pub const fn tile_value_field(&self) -> &TileValues {
-        &self.values
-    }
-
     /// Returns the settings that built the world.
     #[must_use]
     pub const fn config(&self) -> WorldConfig {
