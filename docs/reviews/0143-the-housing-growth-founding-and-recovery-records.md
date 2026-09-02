@@ -454,7 +454,7 @@ a new record rather than from the code repeats the defect.[^22]
 [^17]: Findings register, FND-129. `docs/FINDINGS.md`
 [^18]: Decisions register, DEC-056. `docs/DECISIONS.md`
 [^19]: Findings register, FND-130. `docs/FINDINGS.md`
-[^20]: Backlog item 0144. `docs/backlog/refined/0144-check-the-footnotes-of-a-record.md`
+[^20]: Backlog item 0144. `docs/backlog/complete/0144-check-the-footnotes-of-a-record.md`
 [^21]: Findings register, FND-132. `docs/FINDINGS.md`
 [^22]: Findings register, FND-131. `docs/FINDINGS.md`
 [^23]: Blockers register, what a blocker is. `docs/BLOCKERS.md`

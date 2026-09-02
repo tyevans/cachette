@@ -151,10 +151,10 @@ Every row states a **claim**, not a topic. A title that names a topic has no
 boundary, so any material about the topic can be added to the file. A claim
 title has a boundary, and material that does not support the claim has
 nowhere to go. In one reference corpus a topic-titled record churned 4.50
-times on average against 2.13 for a claim-titled one.[^4]
+times on average against 2.13 for a claim-titled one.[^MEASURE]
 
 **`Proposed` reserves the number. It does not promise the record.** Before you
-write the file, apply the three-condition test in the scope rule.[^5] If the
+write the file, apply the three-condition test in the scope rule.[^SCOPE] If the
 claim fails it, drop the row and retire the number. A record that binds work
 without stating a constraint is worse than no record.
 
@@ -349,3 +349,5 @@ is written.
 
 Then the cross-cutting models, 0007 to 0013. Then the subsystems.
 [^PRI]: Decision record priority index. `docs/adrs/PRIORITY.md`
+[^MEASURE]: Findings, the scope of a decision record. `docs/research/adr-scope-findings.md`
+[^SCOPE]: Decision Record Scope, the test for whether a decision needs a record. `.claude/rules/adr-scope.md`

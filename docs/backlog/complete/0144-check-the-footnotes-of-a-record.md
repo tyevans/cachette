@@ -1,7 +1,7 @@
 ---
 id: 0144
 title: Check the footnotes of a record
-status: refined
+status: complete
 created: 2026-09-01
 implements: []
 changes: []
@@ -128,7 +128,34 @@ disagree.[^8]
 
 ## Outcome
 
-Filled in when the item moves to `complete/`.
+Done as planned. Four tests fail the gate, the ordering test reports, and the
+debt is in a falsifiable baseline. Three things changed from the plan.
+
+**The check is its own script, not an extension of the record check.** The item
+said to extend the record check. The record check reads the records, and the
+failure that opened the sibling item happened in a register. A separate script
+reads every Markdown document, which is what the review decided the check must
+cover.
+
+**The check found a false failure in itself before it was wired in.** The first
+version read a footnote definition after blanking its code spans, which the
+citation check does for a different rule. A footnote names its source inside
+the code span, so two footnotes to two different files read as one source. The
+decision record priority index held the only instance. A finding records
+it.[^9]
+
+**A decision row was considered and not written.** The choice of mode for each
+test is recorded here and in the finding that states why the ordering rule
+cannot be a gate.[^10] A row in the decisions register would be a third copy of
+one reasoning, which is the shape the check itself exists to catch.
+
+**What the check found on the real tree.** Every failure it reported was real
+after the false one was removed. The commit body holds the counts by test and
+the survey command. The repairs were made where they were a line or two, and
+the rest went into the baseline with a reason for each group. A follow-up item
+takes the baseline down.[^11]
+
+**Registers.** Two findings opened. No blocker opened or closed.
 
 ## References
 
@@ -140,3 +167,6 @@ Filled in when the item moves to `complete/`.
 [^6]: Project orientation, the documentation rules. `CLAUDE.md`
 [^7]: Decision Record Scope, the test for whether a decision needs a record. `.claude/rules/adr-scope.md`
 [^8]: The register check. `scripts/check_registers.py`
+[^9]: Findings register, FND-153. `docs/FINDINGS.md`
+[^10]: Findings register, FND-152. `docs/FINDINGS.md`
+[^11]: Backlog item 0166. `docs/backlog/proposed/0166-clear-the-footnote-baseline.md`

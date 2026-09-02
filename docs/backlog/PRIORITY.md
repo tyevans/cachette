@@ -44,7 +44,6 @@ These close a gap a review found, or they unblock the items above.
 | 0153 | Python holds no way to read an event, so an agent gets bytes and a digest. Any decoder in Python is a second copy of the layout. |
 | 0155 | Every test fixture builds its own world by hand, and the rule that forbids the easy route has no shared answer. |
 | 0163 | An item can be finished and still read as open, and no check compares what merged against the item that asked for it. |
-| 0144 | Two footnote rules are stated and nothing checks them. Three of four drafts broke one or both, and the gate passed.[^10] |
 | 0149 | The cost section of PRD-0018 states the mechanism of ADR-0080. A review holds the record at `Shaped` until it states cost alone.[^11] |
 | 0150 | PRD-0012 says the world reserves unit storage for the target population. The arena reserves none and grows at each spawn.[^12] |
 | 0059 | Housing. A review rejected ADR-0081, so this cannot be taken until a record replaces it. It sits here, not above, because nobody can start it. |
@@ -96,6 +95,7 @@ These are real and none of them blocks anything today.
 | 0007 | The storage claims. |
 | 0009 | The log claims. |
 | 0010 | The Python boundary claims. |
+| 0166 | The footnote baseline holds every document the new check would fail. It can only shrink, and it does not shrink by itself.[^10] |
 
 ## References
 

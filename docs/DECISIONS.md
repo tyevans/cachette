@@ -275,7 +275,7 @@ The bindings return the event log as raw bytes. The layout of an event lives in
 the Rust source, which declares the field order, the field widths and the
 padding.[^DEC60A] Python holds no description of it, so a Python reader must
 repeat the layout. Two declaration sites hold one fact, and nothing fails when
-they disagree.[^DEC60B]
+they disagree.[^SHAPE1]
 
 The consequence is real today. The agent-facing protocol server returns the
 bytes and a digest of them, because it refuses to hold a second copy of the
@@ -1129,8 +1129,12 @@ a failed founding is correct.[^PRD12]
 [^BLK3]: Blockers register, BLK-003. `docs/BLOCKERS.md`
 [^ITEM0150]: Backlog item 0150. `docs/backlog/proposed/0150-decide-how-the-world-reserves-unit-storage.md`
 [^DEC60A]: The event types. `crates/cachette-core/src/event.rs`
-[^DEC60B]: Recurring Defect Shapes, shape 1. `.claude/rules/recurring-defects.md`
 [^DEC60C]: Findings register, FND-137. `docs/FINDINGS.md`
 [^DEC60D]: Backlog item 0153. `docs/backlog/proposed/0153-let-python-read-an-event-without-repeating-its-layout.md`
 [^DEC60E]: The identity type. `crates/cachette-core/src/types.rs`
 [^DEC60F]: ADR-0002, simulated and aggregated state holds no floating point number, decision D1. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
+[^DEC34REF]: Decisions register, DEC-034, in this document.
+[^DEC49REF]: Decisions register, DEC-049, in this document.
+[^FND015]: Findings register, FND-015. `docs/FINDINGS.md`
+[^FND089]: Findings register, FND-089. `docs/FINDINGS.md`
+[^ADR80]: ADR-0080, a depleted deposit recovers by ageing the stored take. `docs/adrs/accepted/adr-0080-a-depleted-deposit-recovers-by-ageing-the-stored-take.md`

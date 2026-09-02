@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-143**
+**Next number: FND-154**
 
 ## A. Corrections to stated rules
 
@@ -3321,6 +3321,67 @@ the claim that the suite cost this much at that moment. It does not support
 the claim that a change made the suite faster.
 
 
+### FND-152 — Two footnote rules are stated, and only one of them can be a gate
+
+**Believed.** The two footnote rules of the documentation rule are mechanical,
+so one check enforces both.[^76] A previous finding says the check is cheap and
+opens an item for it.[^101]
+
+**True.** One of the two rules cannot be a gate today. A check written against
+both rules and run over every Markdown document in the tree found the ordering
+rule broken in a large minority of the documents, in every directory. Three of
+those documents are the project orientation and two rules under `.claude/`,
+which a worker may not edit. The repair for one document is a renumbering
+sweep across the whole file, which is the operation this project gets wrong
+most often.[^17]
+
+The other rule holds. A marker with no definition, a label defined twice, one
+source under two labels, and a definition nothing cites are all checkable, and
+each names a document a reader can repair one line at a time.
+
+**Evidence.** The commit that added the check holds the counts by test and by
+directory, and the survey command that produced them. The check runs the
+ordering test and reports it without failing. The four other tests fail the
+gate, and the documents that already break them are in a falsifiable
+baseline.[^102]
+
+**Follows.** **A rule is not one gate because it is one sentence.** Split a
+written rule by what a check can drive to zero. The part that can be driven to
+zero fails the gate. The part that cannot is reported, and the reason it is
+reported is written down where the check is read.
+
+A gate nobody can turn green is a gate everybody learns to skip, which costs
+more than the defect it catches.[^103]
+
+
+### FND-153 — A footnote names its source in a code span, so its prose is not its identity
+
+**Believed.** Two footnotes hold the same source when their definition lines
+read the same after the code is removed. The citation check removes a code span
+before it reads a line, because the documentation rule exempts an identifier in
+code, and a new check copied that step.[^104]
+
+**True.** A footnote is the one place where the documentation rule puts the
+path inside the code span. Removing the span removes the only part that
+distinguishes two footnotes whose prose lead is the same. The decision record
+priority index holds two footnotes that both read "Backlog item 0123" and name
+two different paths, and the check called them one source.
+
+**Evidence.** The check reported the pair as a repeat before it read the
+definition from the raw line, and reported nothing after. No other document in
+the tree held the shape, so a survey of the tree found one instance and the
+check would have produced a false failure on it.
+
+**Follows.** **Read a footnote definition from the raw line.** The exemption
+that a rule gives to code in prose does not extend to the reference section,
+because that is where the rule puts the reference. A check that copies a step
+from another check must ask what the step was for.
+
+A false failure trains everybody to ignore a red gate. This one was found by
+running the new check against the real tree before wiring it into the gate,
+which is why the item asked for that run.[^102]
+
+
 ## References
 
 [^1]: Findings register, FND-038, in this document.
@@ -3427,3 +3488,7 @@ the claim that a change made the suite faster.
 [^98]: Testing rules, section 2a. `.claude/rules/testing.md`
 [^99]: Budgets and costs, the scale constants. `docs/reference/budgets.md`
 [^100]: ADR-0083, the gate build checks every integer overflow, decision D2. `docs/adrs/draft/adr-0083-the-gate-build-checks-every-integer-overflow.md`
+[^101]: Findings register, FND-130, in this document.
+[^102]: Backlog item 0144. `docs/backlog/complete/0144-check-the-footnotes-of-a-record.md`
+[^103]: Definition of Done, pass the gates. `.claude/rules/definition-of-done.md`
+[^104]: The citation check. `scripts/check_citations.py`

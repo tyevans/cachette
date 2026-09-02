@@ -96,7 +96,7 @@ nothing to say what the order had been.
 The key of D2 already orders every admitted birth totally, because a site is
 distinct from another site and an ordinal is distinct within a site. The end of
 a unit is applied the same way, in one ordered scan at the frame, so growth and
-death take the same shape.[^20]
+death take the same shape.[^5]
 
 ### D4. Growth runs after the pass that ends a unit, and its draw is keyed
 
@@ -173,4 +173,3 @@ itself. The spawn path gains no refusal.[^18]
 [^17]: Testing Rules, a fixture supplies the input. `.claude/rules/testing.md`
 [^18]: ADR-0074, a spawn may over-fill a tile, and only admission enforces the capacity, decision D4. `docs/adrs/accepted/adr-0074-a-spawn-may-over-fill-a-tile-and-only-admission-enforces-the-capacity.md`
 [^19]: Decisions register, DEC-038. `docs/DECISIONS.md`
-[^20]: ADR-0063, a need is a rate with a threshold, and crossing it is a fact, decision D4. `docs/adrs/accepted/adr-0063-a-need-is-a-rate-with-a-threshold-and-crossing-it-is-a-fact.md`

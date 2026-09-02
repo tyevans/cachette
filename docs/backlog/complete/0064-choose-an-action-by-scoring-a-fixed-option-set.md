@@ -125,7 +125,7 @@ unit chose, and movement reads it: a unit that holds no option does not move.
 
 ADR-0064 is written and sits at `Draft`. The registry row moved, and the record
 holds no option count, no floor value and no interval value. Those went to the
-reference table.[^11]
+reference table.[^10]
 
 The floor and the stagger landed as this item describes. The floor is a
 constant of the engine, and a test asserts that a world with nothing to respond

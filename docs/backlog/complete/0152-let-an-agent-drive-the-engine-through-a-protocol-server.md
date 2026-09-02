@@ -101,7 +101,7 @@ declaration site of a layout the Rust source owns.
 **What the server still cannot answer stays open, and two items carry it.**
 An agent can prove two runs emitted the same log and cannot see which tile
 changed. The event reader holds that work, and the decision on how Python reads
-an event is recorded.[^6] [^7]
+an event is recorded.[^5] [^7]
 
 The protocol library sits in the development dependency group, not the runtime
 dependencies, so an installed wheel does not carry it. Whether the server
@@ -114,5 +114,4 @@ belongs in the package at all is not settled here.
 [^3]: ADR-0001, one binary gives one answer at any thread count, decision D4. `docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
 [^4]: Recurring Defect Shapes, shape 1. `.claude/rules/recurring-defects.md`
 [^5]: Backlog item 0153. `docs/backlog/proposed/0153-let-python-read-an-event-without-repeating-its-layout.md`
-[^6]: Backlog item 0153. `docs/backlog/proposed/0153-let-python-read-an-event-without-repeating-its-layout.md`
 [^7]: Decisions register, DEC-060. `docs/DECISIONS.md`
