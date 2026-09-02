@@ -36,7 +36,8 @@ References
 [^3]: Findings register, FND-137. ``docs/FINDINGS.md``
 [^4]: Decisions register, DEC-060. ``docs/DECISIONS.md``
 [^5]: ADR-0085, an entity crosses to Python as one opaque identity that the
-    engine resolves. ``docs/adrs/draft/adr-0085-an-entity-crosses-to-python-as-one-opaque-identity.md``
+    engine resolves.
+    ``docs/adrs/draft/adr-0085-an-entity-crosses-to-python-as-one-opaque-identity.md``
 """
 
 from __future__ import annotations
@@ -208,12 +209,16 @@ class UnitReport:
 
 @dataclass(frozen=True)
 class RemovalReport:
-    """What the engine did with a request to remove a unit."""
+    """The unit that the engine removed.
+
+    There is no field for whether it removed one. The engine resolves the
+    identity first and refuses a dead one, so a report that exists is a
+    report of a removal.
+    """
 
     world: str
     tick: int
     unit: int
-    removed: bool
 
 
 def _report(session: WorldSession) -> WorldReport:
@@ -487,15 +492,13 @@ def build_server(store: SessionStore | None = None) -> MCPServer:
     def despawn_unit(world: str, unit: int) -> RemovalReport:
         """Remove one unit by its identity.
 
-        The report says whether the engine removed a unit. A stale identity
-        is an error, not a false answer.
+        The engine resolves the identity first, so a stale identity is an
+        error and never a false answer about a unit that has died.
         """
         session = sessions.get(world)
+        session.world.despawn_soldier(unit)
         return RemovalReport(
-            world=session.name,
-            tick=session.world.tick,
-            unit=unit,
-            removed=session.world.despawn_soldier(unit),
+            world=session.name, tick=session.world.tick, unit=unit
         )
 
     return server

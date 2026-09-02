@@ -175,7 +175,7 @@ def test_the_identity_of_a_dead_unit_refuses(seed: int) -> None:
     # crates/cachette-core/tests/identity_resolution.rs.
     world = cachette.World(width=8, height=8, seed=seed, faction_count=2)
     dead = world.spawn_soldier(0, 0, 1)
-    assert world.despawn_soldier(dead)
+    world.despawn_soldier(dead)
     living = world.spawn_soldier(0, 0, 1)
 
     assert living != dead, "the arena must mint a new identity"

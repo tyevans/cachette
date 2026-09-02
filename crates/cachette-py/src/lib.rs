@@ -269,17 +269,25 @@ impl PyWorld {
             .map_err(|error| VerbError::new_err(error.to_string()))
     }
 
-    /// Removes a soldier and reports whether it removed one.
+    /// Removes a soldier.
     ///
-    /// A dead identity removes nothing and returns `False`.
+    /// The method resolves the identity first, so it never returns a false
+    /// answer for a soldier that has died. A dead identity raises.
     ///
     /// # Errors
     ///
-    /// Raises `ViewError` when the value is not an identity of this world.
-    fn despawn_soldier(&self, unit: u64) -> PyResult<bool> {
+    /// Raises `ViewError` when the identity names no live soldier.
+    fn despawn_soldier(&self, unit: u64) -> PyResult<()> {
         let mut world = self.lock();
         let entity = resolve(&world, unit)?;
-        Ok(world.despawn_soldier(entity))
+        // The identity resolved a line above, so the arena holds the
+        // soldier and the removal cannot refuse. The assertion states that,
+        // rather than returning a value that is always the same.
+        assert!(
+            world.despawn_soldier(entity),
+            "a resolved identity must name a soldier the arena can remove"
+        );
+        Ok(())
     }
 
     /// Tells one soldier to gather a kind of resource.
@@ -291,12 +299,16 @@ impl PyWorld {
     ///
     /// Raises `ViewError` when the identity is dead. Raises `VerbError`
     /// when the number names no kind.
-    fn order_gather(&self, unit: u64, kind: u8) -> PyResult<bool> {
+    fn order_gather(&self, unit: u64, kind: u8) -> PyResult<()> {
         let mut world = self.lock();
         let entity = resolve(&world, unit)?;
         let kind = ResourceKind::from_u8(kind)
             .ok_or_else(|| VerbError::new_err(format!("{kind} names no resource kind")))?;
-        Ok(world.order_gather(entity, kind))
+        assert!(
+            world.order_gather(entity, kind),
+            "a resolved identity must name a soldier the arena can order"
+        );
+        Ok(())
     }
 
     /// Returns the tile that one soldier stands on.
