@@ -23,9 +23,48 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^ALLOC]
 
-**Next number: DEC-058**
+**Next number: DEC-061**
 
 ## Open
+
+### DEC-060 — How does Python read an event?
+
+**Open. The recommendation is a column for each field, returned from Rust.**
+
+The bindings return the event log as raw bytes. The layout of an event lives in
+the Rust source, which declares the field order, the field widths and the
+padding.[^DEC60A] Python holds no description of it, so a Python reader must
+repeat the layout. Two declaration sites hold one fact, and nothing fails when
+they disagree.[^DEC60B]
+
+The consequence is real today. The agent-facing protocol server returns the
+bytes and a digest of them, because it refuses to hold a second copy of the
+layout. An agent can prove that two runs emitted the same log. It cannot see
+which tile changed.[^DEC60C]
+
+**The options.**
+
+1. The bindings return a column for each field, in the way the tile column is
+   returned today. Python never sees a byte offset. This costs a copy for each
+   column.
+2. The bindings return a description of the layout, derived from the type.
+   Python decodes against the description. The description cannot disagree with
+   the type, because it comes from it.
+3. The log stays opaque, and the engine answers a question about it instead.
+   Python asks; Rust reads.
+
+**The recommendation is option 1.** It matches how the tile column already
+crosses the boundary, so it adds no new mechanism. It keeps Python out of the
+data plane, because Python receives an answer and does not walk a buffer. It
+costs a copy, and the log of one step is small next to the world.
+
+Option 3 fits the control plane rule best and costs the most, because each new
+question is a new verb. Option 2 is the cheapest and puts a decoder in Python,
+which is the shape the recommendation is trying to avoid.
+
+**What holds it back.** Nothing. Work continues on the bytes, and only a reader
+is missing. A backlog item holds the work.[^DEC60D]
+
 
 ### DEC-057 — Does a site store its resident count, or read the one the engine keeps?
 
@@ -1030,3 +1069,7 @@ a failed founding is correct.[^PRD12]
 [^FND106]: Findings register, FND-106. `docs/FINDINGS.md`
 [^DEC44ITEM]: Backlog item 0060. `docs/backlog/proposed/0060-grow-the-population-from-the-store-and-the-housing.md`
 [^SCOPE]: Decision Record Scope, section 4.1. `.claude/rules/adr-scope.md`
+[^DEC60A]: The event types. `crates/cachette-core/src/event.rs`
+[^DEC60B]: Recurring Defect Shapes, shape 1. `.claude/rules/recurring-defects.md`
+[^DEC60C]: Findings register, FND-137. `docs/FINDINGS.md`
+[^DEC60D]: Backlog item 0153. `docs/backlog/proposed/0153-let-python-read-an-event-without-repeating-its-layout.md`

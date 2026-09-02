@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-134**
+**Next number: FND-138**
 
 ## A. Corrections to stated rules
 
@@ -497,6 +497,31 @@ Hex path metric is **worse**: a six-connected lattice has 15.5 percent
 worst-case path error against 8.2 percent for an eight-connected square grid.
 
 Both are true. Diffusion likes hex; distance does not.
+
+### FND-137 — The event log crosses to Python as bytes with no layout
+
+**Believed:** the bindings publish the event log to Python, so a control plane
+reader can see what a step changed. The method returns the whole log as bytes,
+and the crate documents it as the log the determinism test compares.[^F137A]
+
+**True:** it publishes a buffer, not events. The field order, the field widths
+and the padding of an event live in the Rust source and nowhere else.[^F137B] A
+reader in Python must repeat that layout to get a field out of the buffer. The
+copy and the original then hold one fact in two places, and nothing fails when
+they disagree. The recurring defect rule names this pair as a place the shape
+will recur in this project.[^F137C]
+
+**Evidence:** the agent-facing protocol server was built over the existing
+bindings. Every other tool calls one method and returns what the engine said.
+The event log tool cannot, so it returns the bytes and a digest of them. An
+agent can prove that two runs emitted the same log and cannot see which tile
+changed.
+
+**Follows:** the bytes are enough to compare two runs and not enough to read
+one. Give Python the events from the place that declares them, by a column for
+each field, by a derived description of the layout, or by a query the engine
+answers. Do not add a format string to Python. A backlog item holds the
+choice.[^F137D]
 
 ## F. Sourcing
 
@@ -3139,3 +3164,7 @@ proved.
 [^83]: Findings register, FND-133, in this document.
 [^84]: Testing Rules, section 2a. `.claude/rules/testing.md`
 [^85]: Backlog item 0084, give a tile one faction column. `docs/backlog/complete/0084-give-a-tile-one-faction-column.md`
+[^F137A]: The bindings and the event log method. `crates/cachette-py/src/lib.rs`
+[^F137B]: The event types. `crates/cachette-core/src/event.rs`
+[^F137C]: Recurring Defect Shapes, shape 1. `.claude/rules/recurring-defects.md`
+[^F137D]: Backlog item 0153. `docs/backlog/proposed/0153-let-python-read-an-event-without-repeating-its-layout.md`
