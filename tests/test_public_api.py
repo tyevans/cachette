@@ -10,7 +10,11 @@ Testing policy. ``docs/TESTING.md``
 
 from __future__ import annotations
 
+from collections.abc import Mapping
+from typing import Any
+
 import numpy as np
+import numpy.typing as npt
 import pytest
 
 import cachette
@@ -118,6 +122,17 @@ def test_two_worlds_run_independently(seed: int) -> None:
     assert first.state_hash() == second.state_hash()
 
 
+def _named(columns: Mapping[str, Any]) -> dict[str, npt.NDArray[Any]]:
+    """Read the columns by name, for a test that walks every field.
+
+    The stub types each set of columns as a mapping with known keys, which
+    is what a reader wants: it names the fields and refuses a typo. A test
+    that walks the fields has no literal key to give, so it widens the type
+    here rather than at each call.
+    """
+    return dict(columns)
+
+
 def test_the_event_columns_carry_the_fields_by_name(seed: int) -> None:
     # DEC-060: the bindings return one column for each field, so a reader
     # holds no byte offset, no field width and no field order.
@@ -126,9 +141,8 @@ def test_the_event_columns_carry_the_fields_by_name(seed: int) -> None:
     columns = world.event_log_columns()
 
     assert set(columns) == {"tick", "tile", "value", "holder", "kind"}
-    assert len(columns["tile"]) == world.event_count
-    for name in columns:
-        assert len(columns[name]) == world.event_count
+    for name, column in _named(columns).items():
+        assert len(column) == world.event_count, name
 
 
 def test_no_event_column_is_a_floating_point_array(seed: int) -> None:
@@ -136,7 +150,10 @@ def test_no_event_column_is_a_floating_point_array(seed: int) -> None:
     # that enters through this interface is the same defect one layer out.
     world = cachette.World(width=8, height=8, seed=seed, faction_count=2)
     world.step(threads=1)
-    for columns in (world.event_log_columns(), world.gather_log_columns()):
+    for columns in (
+        _named(world.event_log_columns()),
+        _named(world.gather_log_columns()),
+    ):
         for name, column in columns.items():
             assert np.issubdtype(column.dtype, np.integer), name
     assert world.event_log_columns()["value"].dtype == np.int32
@@ -169,6 +186,15 @@ def test_the_identity_of_a_dead_unit_refuses(seed: int) -> None:
 
     # ADR-0046: the refusal is typed. ADR-0085 D3: it never falls back to
     # the unit that now holds the slot.
+    #
+    # **The write verb is what covers the resolution.** Deleting the
+    # generation comparison in resolve_soldier was measured against this
+    # test. The read below stayed green, because the arena compares the
+    # generation a second time when it reads a tile, so the read refuses
+    # whether or not resolution did. The despawn below went red. A reader
+    # who takes the read line as the coverage would be wrong.[^1]
+    #
+    # [^1]: Findings register, FND-148. `docs/FINDINGS.md`
     with pytest.raises(cachette.ViewError):
         world.soldier_tile(dead)
     with pytest.raises(cachette.ViewError):
@@ -189,23 +215,42 @@ def test_python_cannot_compose_an_identity(seed: int) -> None:
         world.soldier_tile(2**40 + 7)
 
 
-# The tiles the gather test puts units on.
+# The world the gather tests build, and the tiles they use.
 #
+# The seed is part of the fixture, not a detail. The terrain is generated
+# from it, and a resource sits on the ground that carries it, so the seed
+# decides whether these four tiles hold anything to gather.
+#
+# Measured at 16 by 16 with the engine's own deposit read. Seed 1 holds food
+# at (0, 0), (1, 0) and (1, 1), and wood at all four. Seed 7 holds no food at
+# any of them, only stone at two. Seed 42 admits no unit at any of them. The
+# first version of this test used seed 7 and asked for food, and it failed for
+# that reason.
+#
+# **The control plane cannot check this.** No read tells Python where a
+# resource is, so the seed was chosen against the engine's read from Rust and
+# recorded here. That gap is the finding, not an accident of this test.
+GATHER_SEED = 1
+GATHER_KIND = 0
+
 # The count is the assertion's, not the world's. Four units prove that a
-# gather event carries a resolvable identity. More prove it again and buy
-# nothing.
+# gather event carries a resolvable identity.
 #
-# They cross in one call. DEC-063 made the spawn verb set-valued, so no test
+# They cross in one call. DEC-063 made the spawn verb set-valued, so nothing
 # here shows a caller repeating a verb over the mass tier.
 GATHER_ADDRESSES = ((0, 0), (1, 0), (0, 1), (1, 1))
 
 
-def test_a_gather_event_names_a_unit_that_resolves(seed: int) -> None:
+def test_a_gather_event_names_a_unit_that_resolves() -> None:
     # ADR-0085 D1: the unit column holds the whole identity, so a reader
     # can follow the unit that took the amount.
-    world = cachette.World(width=16, height=16, seed=seed, faction_count=2)
+    #
+    # The seed is the fixture's own, not the shared one, because the ground
+    # under the four tiles is what the test needs and the shared seed does
+    # not promise it.
+    world = cachette.World(width=16, height=16, seed=GATHER_SEED, faction_count=2)
     units = world.spawn_soldiers(GATHER_ADDRESSES, 1)
-    world.order_gather(units, 0)
+    world.order_gather(units, GATHER_KIND)
 
     for _ in range(8):
         world.step(threads=1)

@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-148**
+**Next number: FND-149**
 
 ## A. Corrections to stated rules
 
@@ -1268,6 +1268,52 @@ call writes the sweep.
 registry row holds the claim that the API refuses the loop for a declared
 tier.[^F147A] Nothing implements it. A reader who meets the rule and not the
 gap concludes the project enforces something it does not.
+
+### FND-148 — A second check downstream can make an upstream check untestable
+
+**Believed.** A test that drives the public interface, watches a stale identity
+refuse, and sees a typed error covers the resolution that refused it. If
+resolution broke, the test would go red.
+
+**True.** It goes red only when nothing else refuses first. Two independent
+checks on one condition each stop the same defect, so removing either one
+leaves the other to answer, and every test above them stays green. The tests
+then measure the pair and cannot name which member did the work.
+
+**Evidence.** The engine resolves an identity a caller hands back by comparing
+the generation in the identity against the generation the arena holds. The
+comparison was deleted and the suites were run.
+
+Two Rust tests went red, and they are the two that assert on the refusal
+itself. Four stayed green, correctly: two exercise conditions the deletion did
+not touch, one resolves a live identity, and one reads the gather log.
+
+**On the Python side the read stayed green and only the write verbs went red.**
+Reading the tile of a dead unit still refused with the same typed error and the
+same message, because the arena compares the generation a second time when it
+reads a tile. The read is protected twice, so it cannot fail when one of the
+two is removed.
+
+The protocol client test stayed green for the same reason, and it asserts only
+that the tool reported an error. It would have stayed green even without the
+second check, because a refusal by any cause is still an error.
+
+**Follows.** Three things.
+
+**Defence in depth costs the ability to test each layer through the front
+door.** The second check is right and stays. What must change is the claim: a
+test above both checks demonstrates the behaviour and does not cover either
+check on its own.
+
+**Say which assertion caught the defect, in the test.** Both tests above now
+record what the experiment measured, so a later reader does not take the read
+as the coverage. A comment that names the measured result is worth more than
+one that restates the intent.
+
+**A test that asserts only that an error happened cannot tell one cause from
+another.** That is enough for an integration test whose claim is that the
+refusal reaches the caller. It is not enough for a test whose claim is that a
+particular check refused, and the two read alike.
 
 ### FND-052 — A register was restored from a copy, and an entry left silently
 

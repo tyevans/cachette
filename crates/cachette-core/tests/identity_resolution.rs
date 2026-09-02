@@ -19,7 +19,7 @@
 //! [^3]: ADR-0085, an entity crosses to Python as one opaque identity that the engine resolves, decision D3. `docs/adrs/draft/adr-0085-an-entity-crosses-to-python-as-one-opaque-identity.md`
 //! [^4]: Testing policy. `docs/TESTING.md`
 
-use cachette_core::{Axial, FactionId, IdentityError, ResourceKind, World, WorldConfig};
+use cachette_core::{Amount, Axial, FactionId, IdentityError, ResourceKind, World, WorldConfig};
 
 /// Builds a small world that admits a soldier at the origin.
 fn world() -> World {
@@ -149,37 +149,72 @@ fn the_gather_log_names_a_unit_that_resolves() {
     // the column at the boundary worth anything: a reader takes a value out
     // of the log and gives it back.[^1]
     //
+    // **The fixture asks the world where the deposits are.** The first
+    // version of this test ordered food on an eight by eight world at this
+    // seed, and that world holds no food at all: every deposit in it is
+    // stone. The test failed for the right reason, and the repair is to read
+    // the ground rather than to assume it.[^2]
+    //
     // [^1]: ADR-0085, an entity crosses to Python as one opaque identity that the engine resolves, decision D1. `docs/adrs/draft/adr-0085-an-entity-crosses-to-python-as-one-opaque-identity.md`
+    // [^2]: Findings register, FND-054. `docs/FINDINGS.md`
     let mut world = world();
+    let (kind, places) = deposits(&world);
+    assert!(
+        !places.is_empty(),
+        "the fixture must find a deposit, or it tests nothing"
+    );
+
     let mut spawned = Vec::new();
-    for row in 0..8 {
-        for column in 0..8 {
-            if let Ok(unit) = world.spawn_soldier(Axial::new(column, row), FactionId(1)) {
-                spawned.push(unit);
-            }
+    for address in &places {
+        if let Ok(unit) = world.spawn_soldier(*address, FactionId(1)) {
+            spawned.push(unit);
         }
     }
     assert!(!spawned.is_empty(), "the world must admit a soldier");
-    // Food is the kind that open ground carries the most of, so a world of
-    // gatherers on open ground produces a grant.
-    let food = ResourceKind::from_u8(0).expect("zero names a resource kind");
     for unit in &spawned {
-        world.order_gather(*unit, food);
+        assert!(world.order_gather(*unit, kind));
     }
 
-    let mut seen = false;
-    for _ in 0..8 {
+    let mut seen = 0usize;
+    for _ in 0..4 {
         world.step(1).expect("the step must run");
         for event in world.gather_log() {
-            seen = true;
+            seen += 1;
             let unit = world
                 .resolve_soldier(event.unit)
                 .expect("the log names a live unit");
             assert_eq!(unit.to_bits(), event.unit);
+            assert_eq!(event.kind, kind.to_u8());
+            assert!(event.amount > 0, "a grant is never zero");
         }
-        if seen {
+        if seen > 0 {
             break;
         }
     }
-    assert!(seen, "the fixture must produce a gather event");
+    assert!(seen > 0, "the fixture must produce a gather event");
+}
+
+/// Returns a kind the world actually holds, and the places that hold it.
+///
+/// A small world can hold one kind of ground and therefore one kind of
+/// deposit.[^1] A fixture that names a kind up front tests whatever the
+/// terrain happened to give it, so this asks instead.
+///
+/// # References
+///
+/// [^1]: Findings register, FND-054. `docs/FINDINGS.md`
+fn deposits(world: &World) -> (ResourceKind, Vec<Axial>) {
+    for kind in ResourceKind::ALL {
+        let places: Vec<Axial> = (0..8)
+            .flat_map(|r| (0..8).map(move |q| Axial::new(q, r)))
+            .filter(|address| {
+                world.admits_a_unit(*address)
+                    && world.original_stock(*address, kind) > Some(Amount(0))
+            })
+            .collect();
+        if !places.is_empty() {
+            return (kind, places);
+        }
+    }
+    (ResourceKind::Food, Vec::new())
 }
