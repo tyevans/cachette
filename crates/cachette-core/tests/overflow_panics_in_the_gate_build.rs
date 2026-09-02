@@ -22,6 +22,7 @@
 //! [^3]: ADR-0002, simulated and aggregated state holds no floating point number, decision D3. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
 
 use std::hint::black_box;
+#[cfg(debug_assertions)]
 use std::panic::{catch_unwind, set_hook, take_hook, AssertUnwindSafe};
 
 /// The number of tiles the project targets.
@@ -34,6 +35,7 @@ const WIDE_FIELD: u32 = u16::MAX as u32;
 ///
 /// The hook is replaced for the call, so a deliberate panic prints nothing
 /// and a reader of the test output sees only the result.
+#[cfg(debug_assertions)]
 fn panics(body: impl FnOnce()) -> bool {
     let previous = take_hook();
     set_hook(Box::new(|_| {}));
@@ -46,6 +48,7 @@ fn panics(body: impl FnOnce()) -> bool {
 ///
 /// Both operands pass through `black_box`, so the compiler cannot fold the
 /// sum and report the overflow at compile time instead.
+#[cfg(debug_assertions)]
 fn add_one_past_the_ceiling() {
     let ceiling = black_box(u32::MAX);
     let one = black_box(1u32);
@@ -56,6 +59,7 @@ fn add_one_past_the_ceiling() {
 ///
 /// The accumulator is too narrow for the sum. This is the shape the widening
 /// rule exists to stop.
+#[cfg(debug_assertions)]
 fn sum_a_wide_field_into_a_u32() {
     let mut total: u32 = 0;
     for _ in 0..black_box(TILES) {
