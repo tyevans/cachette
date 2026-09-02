@@ -1,7 +1,7 @@
 ---
 id: 0156
 title: Raise the optimisation level of the gate build and keep the overflow check
-status: refined
+status: complete
 created: 2026-09-01
 implements: []
 changes: []
@@ -64,4 +64,31 @@ owner, and the development budget register is what owns the cost.
 
 ## Outcome
 
-Filled in when the item moves to `complete/`.
+The development profile now states an optimisation level, an overflow check
+and the debug assertions. The gate suite runs several times faster, and the
+overflow check is unchanged. The figures are in the commit body and in the
+development budget register.
+
+Three things changed from the plan.
+
+**The optimisation level chosen is the lowest one, not the highest.** Every
+level above zero lands within a few seconds of the others on execution, and
+the lowest is the cheapest to compile. The plan had assumed the trade would
+run the other way.
+
+**Optimising the dependencies alone does nothing, and measuring it was worth
+the time.** The reasoning said it would do nothing, because the simulation is
+first-party code. The first measurement appeared to say it made the suite half
+again as slow, which was false and led to FND-136.
+
+**The work found a false example in a hard invariant of the project.** A
+one-byte tile field at its largest value, summed over the target scale, does
+not overflow a `u32`. It fits with under one part in a hundred to spare. The
+rule that the accumulator widens is right and is untouched. FND-135 holds the
+arithmetic. The document that states the example belongs to the project owner,
+so this item does not edit it.
+
+Register entries that moved: FND-134, FND-135 and FND-136 opened. ADR-0083 was
+written and sits at `Draft`. No blocker opened or closed, and BLK-007 is
+untouched. No decision row was needed, because the choice is made and the
+record holds it.

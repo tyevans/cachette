@@ -27,7 +27,6 @@ engine gets wrong today.
 
 | No. | Why it sits here |
 |---|---|
-| 0156 | The project owner says the gate suite is too slow. The gate build does not optimise, and that is nearly all of the cost. |
 | 0102 | A settlement reads its own ground rule, not the passability rule. Blocked by 0071 and 0092, in that order. |
 
 ## Next

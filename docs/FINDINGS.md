@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-134**
+**Next number: FND-137**
 
 ## A. Corrections to stated rules
 
@@ -3052,6 +3052,114 @@ wrong about the outcome. Both would have been wrong about what the outcome
 proved.
 
 
+### FND-134 — The gate suite is slow because the gate build does not optimise
+
+**Believed.** The gate suite costs what it costs because of how much it tests.
+The register holds a wall clock figure for the suite and a budget above it,
+and neither says where the time goes.[^86]
+
+**True.** Nearly all of the time is the execution of the Rust tests, and
+nearly all of that is the development profile. The workspace manifest declared
+a release profile and nothing else, so the tests ran unoptimised. The engine
+steps a world of hundreds of thousands of tiles, and unoptimised code on that
+work is several times slower than optimised code. Raising the optimisation
+level of the development profile cuts the execution of the Rust tests by a
+factor near five and leaves everything else alone.
+
+Compilation is not where the time goes. A run of the suite that changes no
+source file compiles nothing at all. A run after one edit to a core source
+file rebuilds in a few seconds at every optimisation level tested. The
+optimisation level costs a full rebuild once, when the profile changes, and
+does not touch the loop a contributor runs all day.
+
+**Evidence.** The suite was measured on an Intel Core i7-1260P, x86_64, 16
+hardware threads, with no other work on the machine, on 1 September 2026. The
+figures are in the commit that carried the change and in the register.[^86]
+Each gate of the suite was timed on its own. The Rust tests and the
+nondeterminism probe were the whole cost within a few seconds; the formatting
+gate, both lint gates, the invariant scripts, the Python tests, the smoke
+test, and both record gates cost seconds together.
+
+**Follows.** **A cost figure for this suite means nothing without the build
+profile beside it.** The register already asks a row to name the machine, the
+architecture and the profile. The profile column was carrying the answer to
+the question nobody had asked.
+
+**Look at the profile before you look at the tests.** The five slowest test
+binaries were the obvious place to start, and every one of them is slow for a
+sound reason: it builds a world large enough to hold more than one kind of
+ground, because a smaller world measures its own fixture.[^87] Cutting the
+work they do would have bought time by testing less. The profile bought more
+time and changed no test.
+
+### FND-135 — A one-byte tile field over the target scale does not overflow a `u32`
+
+**Believed.** A one-byte tile field summed over the whole world overflows a
+`u32`, and that is why a level 1 accumulator widens.
+
+**True.** It does not overflow. The largest value a one-byte field holds is
+255, the target scale is 16.7 million tiles, and the product is under the
+ceiling of a `u32` by less than one part in a hundred. The sum passes the
+ceiling above 16,843,009 tiles.
+
+The rule that the accumulator widens is right, and nothing here weakens it.
+The margin is under one per cent, so the sum overflows at a world one per cent
+larger, at any field wider than one byte, and at any accumulator that also
+carries a second field. What is wrong is the example, not the rule.
+
+**Evidence.** Arithmetic. The target scale is the figure the cost register
+holds.[^88] The check that this project runs against the claim is now a test:
+it sums a two-byte field over the target scale into a `u32` and asserts the
+panic, and it sums the same field into the widened accumulator and asserts the
+exact total.[^89]
+
+**Follows.** **State the rule, and check the example against it.** A record
+that argues from an example is only as good as the example, and this one was
+never checked. A reader who checks it and finds it false has no way to tell
+whether the rule is false too.
+
+The rule is stated as a hard invariant of the project, and the example sits
+beside it. The invariant needs a correction, and the owner of that document
+makes it. This entry is the evidence.
+
+### FND-136 — Two runs of this suite hours apart are not comparable
+
+**Believed.** A run of this suite on an idle machine gives the cost of the
+suite, so a run before a change and a run after it measure the change. The
+register says a row must name the conditions, and it names contention as the
+condition that matters.[^86]
+
+**True.** Contention is not the only condition. The same suite, on the same
+machine, with no other work on it and no source change between them, took
+about four and a half minutes early in a session and about seven minutes after
+two hours of continuous running. The later figure repeated three times within
+a few seconds of itself, so it is not noise. A laptop under sustained load
+settles at a lower sustained clock, and the machine reports a low temperature
+while it does, so a reader who checks for heat sees nothing wrong.
+
+The effect is large enough to invert a result. One option was measured against
+an early baseline and appeared to make the suite half again as slow. Measured
+against a baseline run immediately before it, the same option made no
+difference at all, which is what the reasoning had predicted.
+
+**Evidence.** An Intel Core i7-1260P, x86_64, 16 hardware threads, 1
+September 2026, one worker with exclusive use of the machine. The baseline
+measured 263 s, 283 s and 296 s in the first hour and 429 s, 432 s, 435 s and
+435 s in the third. The commit that carried this work holds every figure and
+the commands.
+
+**Follows.** **Compare two runs that are next to each other in time, never
+two runs from different hours.** Alternate the two configurations and report
+the pair. A figure taken an hour before its comparison is a figure about the
+machine.
+
+**A single row in the register is a snapshot, not a baseline for a
+comparison.** The register already says a row is one run and asks for an
+isolated one. Isolation is necessary and it is not sufficient. A row supports
+the claim that the suite cost this much at that moment. It does not support
+the claim that a change made the suite faster.
+
+
 ## References
 
 [^1]: Findings register, FND-038, in this document.
@@ -3139,3 +3247,7 @@ proved.
 [^83]: Findings register, FND-133, in this document.
 [^84]: Testing Rules, section 2a. `.claude/rules/testing.md`
 [^85]: Backlog item 0084, give a tile one faction column. `docs/backlog/complete/0084-give-a-tile-one-faction-column.md`
+[^86]: Development budgets, the gate suite budget. `docs/reference/development-budgets.md`
+[^87]: Testing rules, section 2a. `.claude/rules/testing.md`
+[^88]: Budgets and costs, the scale constants. `docs/reference/budgets.md`
+[^89]: ADR-0083, the gate build checks every integer overflow, decision D2. `docs/adrs/draft/adr-0083-the-gate-build-checks-every-integer-overflow.md`
