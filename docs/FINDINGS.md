@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-131**
+**Next number: FND-132**
 
 ## A. Corrections to stated rules
 
@@ -2872,6 +2872,55 @@ to a reader, and it produces two labels that a later edit can move apart. A
 backlog item adds the check.
 
 
+### FND-131 — Item 0059 plans three things the engine has already built
+
+**Believed.** Item 0059 gives a site a capacity and a resident roll. Its
+impact review already carries one correction: the residence column and the
+eviction path exist, so the item extends the column and adds none.[^77] With
+that correction absorbed, the four numbered work steps of the item are new
+work.
+
+**True.** Two of the four are built, and a third is half built. Only the
+housing capacity is wholly new.
+
+The item asks for an occupancy count. A per-site count exists, split by
+faction, and the item's own reader test is already satisfiable: a caller reads
+how many units live in a site through the public interface, without walking the
+units.[^78] What the item asks for beyond that is one property of the count,
+that a change maintains it rather than a sweep. The number is not new. Its
+maintenance is.
+
+The item asks for an invariant check that compares the count against the
+residence column, and for a test that proves the check can fail. Both exist.
+`World::cohorts_describe_the_units` derives the table again from the home
+column and compares. A test drives the world until the two disagree, asserts
+the refusal, steps until they agree again, and asserts the agreement.
+
+**Evidence.** `World::cohorts` and `CohortTable::headcount` are public.
+`World::cohorts_describe_the_units` is public. The test
+`every_headcount_sums_to_the_live_population` spawns a unit that no
+application has seen, asserts that the check then returns false, steps for one
+period, and asserts that it returns true again. That is the proof of failure
+the item asks a future author to write.
+
+**Follows.** Three things.
+
+**A withdrawn item must be re-refined against the code, not against the
+record.** Items 0059 and 0060 left `refined/` because the record they rest on
+was rejected.[^79] Rewriting them against a new record repeats this defect. The
+re-refinement starts by asking what the engine already does.
+
+**A correction absorbed once does not inoculate an item.** FND-116 corrected
+this same item about this same subsystem, and the item took the correction for
+the residence column alone. The correction had a wider reach than the sentence
+that carried it. When a finding says a subsystem is further along than the
+project believed, read the whole subsystem again rather than the one claim the
+finding names.
+
+**The capacity is the work.** An item that says so is smaller, and it is
+honest about what remains.
+
+
 ## References
 
 [^1]: Findings register, FND-038, in this document.
@@ -2950,3 +2999,6 @@ backlog item adds the check.
 [^74]: Product requirement records, what does not belong here. `docs/product/README.md`
 [^75]: Decisions register, DEC-056. `docs/DECISIONS.md`
 [^76]: Documentation Rules, section 3. `.claude/rules/documentation.md`
+[^77]: Findings register, FND-116, in this document.
+[^78]: Findings register, FND-128, in this document.
+[^79]: Review 0143, the housing, growth, founding and recovery records. `docs/reviews/0143-the-housing-growth-founding-and-recovery-records.md`
