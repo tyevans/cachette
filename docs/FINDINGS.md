@@ -4442,7 +4442,7 @@ here against 2 on the trunk. A search of this worktree for each of the 11
 numbers found 9 of them in source files, which leaves the 2 the trunk
 reports.
 
-**Follows.** Three things.
+**Follows.** Four things.
 
 **The trunk number is the true one, and a worktree number is a floor.** Every
 worker on this project runs in a worktree, so every worker reads the inflated
@@ -4459,6 +4459,13 @@ one real note is then invisible.
 keep one run out of another run's checkout. It cannot tell the tree it is
 scanning from a tree it should refuse, because both carry the same part. A
 backlog item holds the repair, and no fix belongs in this finding.[^F194C]
+
+**No gate was weakened, and no pass became meaningless.** The source corpus
+reaches one assertion, and that assertion is the note. The check joins the
+records, the registry and the source files into one string beside it, and it
+never reads that string. No failure of this check depends on a source file. A
+pass in a worktree therefore means what a pass on the trunk means, and the
+whole cost of the defect is the note.
 
 ## References
 

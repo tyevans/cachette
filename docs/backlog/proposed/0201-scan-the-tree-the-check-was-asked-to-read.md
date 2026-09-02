@@ -32,14 +32,25 @@ mid-scan raises rather than reporting. The filter names a directory part, and
 a part cannot tell the tree the check was asked to read from a tree it should
 refuse. Both carry the same part.
 
+**Three sibling checks solve the same problem correctly.** The footnote
+check, the citation check and the conflict marker check each skip a full path
+under the root of the run, rather than a directory part. In a worktree that
+path names nothing, so each check reads the tree it was asked to read. The
+priority check walks no tree at all and reads named directories. The repair
+has a shape the project already holds in three places.
+
+**The note is the whole cost.** The source corpus reaches one assertion of the
+record check, and that assertion is the note. No failure depends on it, so no
+gate was weakened and no pass was meaningless. The work repairs a report and
+not a gate.
+
 ## What is missing before this is refined
 
 - The impact review.
-- **Which other check holds the same shape.** The footnote check and the
-  conflict marker check walk the tree as well, and the citation check reads
-  the source files for a different rule. Each must be read before one is
-  changed, because a repair to one and not to the others is the sweep this
-  project gets wrong most often.[^3]
+- **Whether the repair adopts the sibling shape or a better one.** A full
+  path under the root is what the other three checks use, and it works. It
+  still states the boundary as a location. Ask whether the run should name the
+  tree it owns instead.
 - What the boundary is, if it is not a directory part. The scan must exclude a
   tree that the run does not own, and it must include the tree that the run
   does own, even when that tree sits inside another one.
@@ -59,4 +70,3 @@ Filled in when the item moves to `complete/`.
 
 [^1]: Findings register, FND-194. `docs/FINDINGS.md`
 [^2]: Decision Record Scope, section 6. `.claude/rules/adr-scope.md`
-[^3]: Recurring defect shapes, shape 2. `.claude/rules/recurring-defects.md`
