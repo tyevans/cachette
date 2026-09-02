@@ -1,7 +1,7 @@
 ---
 id: 0059
 title: Give a site a capacity and a resident roll
-status: refined
+status: proposed
 created: 2026-08-31
 implements: [ADR-0081 D1, ADR-0081 D2, ADR-0081 D3, ADR-0081 D4, ADR-0066 D1, ADR-0014 D1, ADR-0004 D4]
 changes: []
@@ -9,6 +9,21 @@ creates: [ADR-0081]
 serves: [PRD-0014]
 blocked-by: []
 ---
+
+## The impact review is withdrawn
+
+This item was refined against ADR-0081. A review rejected that record, so the
+impact review no longer names a governing decision that binds.[^R1]
+
+The rejection is not a detail of wording. ADR-0081 states that nothing in the
+engine answers how many units a site holds. The engine answers it today. A
+per-site headcount exists, it is derived from the unit home column, and the
+public check that compares the two already exists. So the decision this item
+implements either forbids code that ships, or it buys nothing.
+
+**Do not take this item until a record replaces ADR-0081.** Refining it again
+starts by reading what the engine already does, not by planning the count as new
+work.
 
 ## Why
 
@@ -145,3 +160,4 @@ Filled in when the item moves to `complete/`.
 [^12]: Findings register, FND-093. `docs/FINDINGS.md`
 [^13]: Decisions register, DEC-039. `docs/DECISIONS.md`
 [^14]: Testing Rules, a fixture supplies the input. `.claude/rules/testing.md`
+[^R1]: Findings register, FND-128. `docs/FINDINGS.md`

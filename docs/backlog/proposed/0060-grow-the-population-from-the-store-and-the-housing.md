@@ -1,7 +1,7 @@
 ---
 id: 0060
 title: Grow the population from the store and the housing
-status: refined
+status: proposed
 created: 2026-08-31
 implements: [ADR-0082 D1, ADR-0082 D2, ADR-0082 D3, ADR-0082 D4, ADR-0003 D1, ADR-0014 D3, ADR-0004 D1]
 changes: []
@@ -9,6 +9,21 @@ creates: [ADR-0082]
 serves: [PRD-0011, PRD-0014]
 blocked-by: [0059, DEC-044]
 ---
+
+## The impact review is withdrawn
+
+This item was refined against ADR-0081. A review rejected that record, so the
+impact review no longer names a governing decision that binds.[^R1]
+
+The rejection is not a detail of wording. ADR-0081 states that nothing in the
+engine answers how many units a site holds. The engine answers it today. A
+per-site headcount exists, it is derived from the unit home column, and the
+public check that compares the two already exists. So the decision this item
+implements either forbids code that ships, or it buys nothing.
+
+**Do not take this item until a record replaces ADR-0081.** Refining it again
+starts by reading what the engine already does, not by planning the count as new
+work.
 
 ## Why
 
@@ -170,3 +185,4 @@ Filled in when the item moves to `complete/`.
 [^16]: Findings register, FND-093. `docs/FINDINGS.md`
 [^17]: Testing Rules, a fixture supplies the input. `.claude/rules/testing.md`
 [^18]: Testing Rules, a determinism test cannot tell correct from consistently wrong. `.claude/rules/testing.md`
+[^R1]: Findings register, FND-128. `docs/FINDINGS.md`

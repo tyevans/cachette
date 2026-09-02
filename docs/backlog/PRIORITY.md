@@ -36,8 +36,6 @@ These close a gap a review found, or they unblock the items above.
 
 | No. | Why it sits here |
 |---|---|
-| 0059 | Housing. The population cannot be bounded by anything until a place has capacity. ADR-0081 holds the decisions and waits for review. |
-| 0060 | Population growth from the store and the housing. It waits on 0059, and DEC-044 decides whether a grown population can survive.[^9] |
 | 0103 | A household has no home. DEC-039 answers it: derive the household from the dwelling slot. |
 | 0104 | A ruler decides nothing that reaches anybody. DEC-040 carries the writ in the influence field. |
 | 0112 | Building a world passes over every tile. PRD-0003 states it must not, so the record is false of the code. |
@@ -46,6 +44,8 @@ These close a gap a review found, or they unblock the items above.
 | 0130 | Three registers state a next number that the rows already hold, and it went stale and conflicted four times in one night. |
 | 0101 | A behavioural claim about terrain is defended by a test of constants.[^7] |
 | 0155 | Every test fixture builds its own world by hand, and the rule that forbids the easy route has no shared answer. |
+| 0059 | Housing. A review rejected ADR-0081, so this cannot be taken until a record replaces it. It sits here, not above, because nobody can start it. |
+| 0060 | Population growth. It waits on 0059, which is itself stopped. |
 
 ## Later
 
