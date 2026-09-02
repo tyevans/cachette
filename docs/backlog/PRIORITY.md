@@ -56,7 +56,6 @@ These are real and none of them blocks anything today.
 
 | No. | Why it sits here |
 |---|---|
-| 0062 | Ranked positions at a site. Wanted by job assignment. |
 | 0105 | Goods over a network. Three reserved records are unwritten, and nothing holds a surplus yet. |
 | 0106 | Show a watcher what is moving. The display shape follows from 0105. |
 | 0107 | Decide how a faction stores what it observes. Nothing hides anything yet. |
@@ -64,7 +63,8 @@ These are real and none of them blocks anything today.
 | 0109 | Decide how the world holds a condition that moves. |
 | 0110 | Advance a weather condition each tick. Follows 0109. |
 | 0111 | Let the weather change a unit and show it. Follows 0110. |
-| 0063 | Assigning a unit to a position. Waits on 0062. |
+| 0063 | Assigning a unit to a position. The structure it writes into now exists. |
+| 0181 | A kind of work maps onto the one commodity that exists, so the map carries no information. It waits on an economy that holds more than one. |
 | 0065 | Letting the job decide what a unit weighs. Waits on 0063 and 0064. |
 | 0169 | The influence solve runs on every tick for every faction, and the research says that is the wrong cadence at the target scale. It waits on a measurement. |
 | 0124 | A fully recovered deposit still stores a take of zero. The recovery pass now reads that entry on every tick, so the depleted set grows and never shrinks. |

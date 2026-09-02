@@ -48,6 +48,21 @@ class ResourceTakenColumns(TypedDict):
     amount: npt.NDArray[np.uint32]
     kind: npt.NDArray[np.uint8]
 
+class PositionColumns(TypedDict):
+    """One column for each field of a position at a site.
+
+    The columns hold the positions of the site and nothing else. An entry of
+    the storage that is no position does not appear.
+
+    The kind column holds the number of the kind of work. The holder column
+    holds the whole identity of the unit that holds each position, and zero
+    where a position holds nobody. It is not a slot index.
+    """
+
+    kind: npt.NDArray[np.uint8]
+    rank: npt.NDArray[np.uint8]
+    holder: npt.NDArray[np.uint64]
+
 class CachetteError(Exception):
     """The root of every Cachette error."""
 
@@ -109,5 +124,14 @@ class World:
     def despawn_soldiers(self, units: Identities) -> None: ...
     def order_gather(self, units: Identities, kind: int) -> None: ...
     def soldier_tile(self, unit: int) -> int: ...
+    @property
+    def settlement_count(self) -> int: ...
+    def found_settlements(
+        self, addresses: Sequence[tuple[int, int]], faction: int
+    ) -> npt.NDArray[np.uint64]: ...
+    def prefer_at_sites(self, sites: Identities, kind: int, target: int) -> None: ...
+    def site_positions(self, site: int) -> PositionColumns: ...
+    def site_preference(self, site: int) -> npt.NDArray[np.int32]: ...
+    def set_position_schedule(self, period: int, phase: int) -> None: ...
 
 def version() -> str: ...

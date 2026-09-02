@@ -42,6 +42,7 @@ use crate::hex::{Axial, Grid, GridError, NEIGHBOUR_COUNT};
 use crate::holding::{FactionMask, Holder, Holding};
 use crate::household;
 use crate::influence::{Influence, InfluenceError, InfluenceField};
+use crate::position::{self, Position, PositionError, PositionTable, SitePreference};
 use crate::pyramid::{CellSummary, Pyramid};
 use crate::rates::{RateError, RateLedger, RateSchedule, RateTable, SiteShortfall};
 use crate::resource::{
@@ -138,6 +139,17 @@ pub enum StepError {
     Choice(ChoiceError),
     /// The influence solve refused to run.
     Influence(InfluenceError),
+    /// A pass over the positions of the sites refused to run.
+    Positions(PositionError),
+}
+
+impl From<PositionError> for StepError {
+    fn from(error: PositionError) -> Self {
+        match error {
+            PositionError::ZeroThreads => Self::ZeroThreads,
+            other => Self::Positions(other),
+        }
+    }
 }
 
 impl From<InfluenceError> for StepError {
@@ -258,6 +270,9 @@ impl core::fmt::Display for StepError {
             Self::Choice(error) => write!(formatter, "the choice pass refused: {error}"),
             Self::Influence(error) => {
                 write!(formatter, "the influence solve refused: {error:?}")
+            }
+            Self::Positions(error) => {
+                write!(formatter, "the position pass refused: {error}")
             }
         }
     }
@@ -469,6 +484,24 @@ pub struct World {
     /// [^1]: ADR-0007, content supplies a key vector, never a comparator, decision D3. `docs/adrs/accepted/adr-0007-content-supplies-a-key-vector-never-a-comparator.md`
     /// [^2]: ADR-0064, a unit chooses by scoring a small fixed option set, decision D2. `docs/adrs/accepted/adr-0064-a-unit-chooses-by-scoring-a-small-fixed-option-set.md`
     weights: WeightProfile,
+    /// The positions that each site holds, and what each site wants.
+    ///
+    /// The table follows the slot column of the settlement arena. It is
+    /// stored per site and never per tile.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0065, a group is a site membership, not a region, decision D1. `docs/adrs/draft/adr-0065-a-group-is-a-site-membership-not-a-region.md`
+    positions: PositionTable,
+    /// When the site positions are rebalanced.
+    ///
+    /// The interval is a parameter of the world. The pass that reads it
+    /// holds no period of its own.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0065, a group is a site membership, not a region, decision D3. `docs/adrs/draft/adr-0065-a-group-is-a-site-membership-not-a-region.md`
+    position_schedule: RateSchedule,
     /// What the live stores hold, by the account of this world.
     ///
     /// The store column states the same total a second time, and the
@@ -551,6 +584,8 @@ impl World {
             starved_log: Vec::new(),
             choice: ChoiceSchedule::DEFAULT,
             weights: WeightProfile::EVEN,
+            positions: PositionTable::new(),
+            position_schedule: RateSchedule::DEFAULT,
             store_account: [Accum(0); COMMODITY_COUNT],
         };
         // A world that has never stepped still answers a question about a
@@ -843,6 +878,10 @@ impl World {
         //
         // [^1]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`
         self.rates.open_to(self.settlements.slot_count());
+        // The position table follows the same slot column, for the same
+        // reason. A new slot holds no position and the preference that a
+        // site starts with.
+        self.positions.open_to(self.settlements.slot_count());
         Ok(settlement)
     }
 
@@ -1177,6 +1216,10 @@ impl World {
         // A rate belongs to the site that earned it. The site is gone, so the
         // rate goes with it and the slot does not pay its successor.
         self.rates.clear_slot(slot);
+        // A position belongs to the site that opened it. The site is gone,
+        // so its positions go with it and the settlement founded next in
+        // that slot does not inherit a staff it never hired.
+        self.positions.clear_slot(slot);
         // A unit that drew from the lost site now belongs to no site. A home
         // left behind would name the slot, and the settlement founded next
         // in that slot would feed a population it never took.
@@ -1193,6 +1236,179 @@ impl World {
                 sim_math::combine(self.store_account[index], Accum(-i64::from(held.0)));
         }
         true
+    }
+
+    /// Resolves the value of an identity back to the settlement it names.
+    ///
+    /// A caller outside this crate holds an identity as the value the engine
+    /// gave it. It cannot build one, and this is the only way back.[^1]
+    ///
+    /// The call compares the generation the value carries against the
+    /// generation the arena holds. It refuses a mismatch, and it never
+    /// returns the settlement that now stands in the slot.[^2]
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the value is not an identity, when the arena
+    /// holds no such slot, or when the slot holds a later generation.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0085, an entity crosses to Python as one opaque identity that the engine resolves, decisions D2 and D3. `docs/adrs/accepted/adr-0085-an-entity-crosses-to-python-as-one-opaque-identity.md`
+    /// [^2]: ADR-0014, entity identity is an index plus a generation, decision D2. `docs/adrs/accepted/adr-0014-entity-identity-is-an-index-plus-a-generation.md`
+    pub fn resolve_settlement(&self, identity: u64) -> Result<Entity, IdentityError> {
+        let entity = Entity::from_bits(identity).ok_or(IdentityError::NotAnIdentity)?;
+        let slot = entity.index();
+        if slot >= self.settlements.slot_count() {
+            return Err(IdentityError::NoSuchSlot { slot });
+        }
+        if self.settlements.contains(entity) {
+            return Ok(entity);
+        }
+        Err(IdentityError::Stale {
+            slot,
+            given: entity.generation(),
+            held: self.settlements.generation_of(slot),
+        })
+    }
+
+    /// Returns the positions of every site.
+    #[must_use]
+    pub const fn positions(&self) -> &PositionTable {
+        &self.positions
+    }
+
+    /// Returns the positions that one site holds.
+    ///
+    /// A dead identity gives `None` rather than the row of the settlement
+    /// that now stands in the slot.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0014, entity identity is an index plus a generation, decision D2. `docs/adrs/accepted/adr-0014-entity-identity-is-an-index-plus-a-generation.md`
+    #[must_use]
+    pub fn site_positions(&self, site: Entity) -> Option<&[Position]> {
+        let slot = self.settlements.slot_of(site)?;
+        self.positions.row(slot)
+    }
+
+    /// Returns what one site wants of each kind of work.
+    #[must_use]
+    pub fn site_preference(&self, site: Entity) -> Option<SitePreference> {
+        let slot = self.settlements.slot_of(site)?;
+        self.positions.preference(slot)
+    }
+
+    /// Returns the unit that holds one position of one site.
+    ///
+    /// The call resolves the stored identity against the unit arena. A unit
+    /// that died gives `None`, and the unit that took its slot is never the
+    /// answer.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0014, entity identity is an index plus a generation, decision D2. `docs/adrs/accepted/adr-0014-entity-identity-is-an-index-plus-a-generation.md`
+    #[must_use]
+    pub fn position_holder(&self, site: Entity, index: usize) -> Option<Entity> {
+        let slot = self.settlements.slot_of(site)?;
+        self.positions.occupant(slot, index, &self.soldiers)
+    }
+
+    /// Gives one position of one site to one unit.
+    ///
+    /// This is the setter. It states no rule about who should hold a
+    /// position, because the rule that chooses is separate work.[^1]
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the identity names no live settlement, when the
+    /// identity names no live unit, when the site holds no position at that
+    /// index, and when the unit already holds another position at that site.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0065, a group is a site membership, not a region, decision D1. `docs/adrs/draft/adr-0065-a-group-is-a-site-membership-not-a-region.md`
+    pub fn seat_in_position(
+        &mut self,
+        site: Entity,
+        index: usize,
+        unit: Entity,
+    ) -> Result<(), PositionError> {
+        let slot = self
+            .settlements
+            .slot_of(site)
+            .ok_or(PositionError::NoSuchSlot(site.index()))?;
+        if !self.soldiers.contains(unit) {
+            return Err(PositionError::NoSuchSlot(unit.index()));
+        }
+        self.positions.seat(slot, index, unit)
+    }
+
+    /// Changes what a set of sites wants of one kind of work.
+    ///
+    /// **The command names no unit.** It states what a place wants, and the
+    /// rebalance turns that into a number of positions of each kind. A
+    /// caller that wanted to name the workers would be looping over
+    /// entities, which the control plane never does.[^1]
+    ///
+    /// **The set is all or nothing.** Every identity resolves, and the
+    /// target is checked, before anything is written.[^2]
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when an identity names no live settlement, or when
+    /// the target is below zero.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0040, Python is a control plane, not a data plane, decision D1. `docs/adrs/draft/adr-0040-python-is-a-control-plane-not-a-data-plane.md`
+    /// [^2]: ADR-0085, an entity crosses to Python as one opaque identity that the engine resolves, decision D3. `docs/adrs/accepted/adr-0085-an-entity-crosses-to-python-as-one-opaque-identity.md`
+    pub fn prefer_at_sites(
+        &mut self,
+        sites: &[Entity],
+        kind: ResourceKind,
+        target: Fix32,
+    ) -> Result<(), PositionError> {
+        if target.0 < 0 {
+            return Err(PositionError::TargetBelowZero(target));
+        }
+        let mut slots = Vec::with_capacity(sites.len());
+        for site in sites {
+            slots.push(
+                self.settlements
+                    .slot_of(*site)
+                    .ok_or(PositionError::NoSuchSlot(site.index()))?,
+            );
+        }
+        for slot in slots {
+            self.positions.set_target(slot, kind, target)?;
+        }
+        Ok(())
+    }
+
+    /// Returns when the site positions are rebalanced.
+    #[must_use]
+    pub const fn position_schedule(&self) -> RateSchedule {
+        self.position_schedule
+    }
+
+    /// Sets when the site positions are rebalanced.
+    ///
+    /// The interval is a parameter of the world. This function holds no
+    /// recommended value.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0065, a group is a site membership, not a region, decision D3. `docs/adrs/draft/adr-0065-a-group-is-a-site-membership-not-a-region.md`
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the period is zero, and when the period is
+    /// above the range that the schedule takes.
+    pub fn set_position_schedule(&mut self, period: u32, phase: u32) -> Result<(), RateError> {
+        self.position_schedule =
+            RateSchedule::new(period, phase).ok_or(RateError::PeriodOutsideRange(period))?;
+        Ok(())
     }
 
     /// Returns the rule that says what a unit needs.
@@ -2093,6 +2309,15 @@ impl World {
         // next solve starts from the field this one left. Two worlds that
         // hold the same tiles and different fields must diverge.
         let hash = self.influence.hash_into(hash);
+        // A position is state that a later frame reads: a unit that holds
+        // one still holds it on the next frame, and the preference decides
+        // what the next rebalance opens. Two worlds that hold the same
+        // stores and different preferences must diverge.
+        let hash = self
+            .positions
+            .hash_into(hash)
+            .write_u64(u64::from(self.position_schedule.period()))
+            .write_u64(u64::from(self.position_schedule.phase()));
         let mut hash = self.draw_ledger.hash_into(hash);
         for total in &self.store_account {
             hash = hash.write_u64(total.0 as u64);
@@ -2252,6 +2477,9 @@ impl World {
         if !self.check_cohorts() {
             return false;
         }
+        if !self.check_positions() {
+            return false;
+        }
         // The bridge is a second declaration of where a soldier stands, and
         // the tile column is the first. The check fails when the two
         // disagree.[^1] A stale bridge cannot be compared against columns it
@@ -2357,6 +2585,42 @@ impl World {
             }
         }
         held == self.store_account
+    }
+
+    /// Reports whether the positions of every site hold their rules.
+    ///
+    /// Three statements must hold together, and each of them is a place
+    /// where one fact could be stored twice.[^1]
+    ///
+    /// The table and the settlement arena state the same slot count. Every
+    /// position names a unit that still exists, so a holder that died leaves
+    /// no stale identity behind.[^2] No site holds more positions than the
+    /// ground under it admits, and both bounds come from the terrain
+    /// capacity table.[^3]
+    ///
+    /// # References
+    ///
+    /// [^1]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`
+    /// [^2]: ADR-0014, entity identity is an index plus a generation, decision D2. `docs/adrs/accepted/adr-0014-entity-identity-is-an-index-plus-a-generation.md`
+    /// [^3]: ADR-0056, movement is tile-discrete and admitted by sort-then-admit, decision D4. `docs/adrs/accepted/adr-0056-movement-is-tile-discrete-and-admitted-by-sort-then-admit.md`
+    fn check_positions(&self) -> bool {
+        if self.positions.slot_count() != self.settlements.slot_count() {
+            return false;
+        }
+        if !self.positions.check_invariants() {
+            return false;
+        }
+        if !self.positions.check_holders(&self.soldiers) {
+            return false;
+        }
+        matches!(
+            self.positions.check_capacity(
+                self.settlements.tile_column(),
+                self.settlements.live_column(),
+                self.terrain,
+            ),
+            Ok(true)
+        )
     }
 
     /// Reports whether the cohort table and the home column agree.
@@ -2789,6 +3053,13 @@ impl World {
         // [^13]: ADR-0018, the unit-to-tile bridge is derived, and it rebuilds at the barrier, decision D3. `docs/adrs/accepted/adr-0018-the-unit-to-tile-bridge-is-derived-and-rebuilds-at-the-barrier.md`
         self.reap(threads)?;
         self.refresh_bridge()?;
+
+        // The positions of the sites settle after the deaths of this frame.
+        // A position that named a unit the scan above ended would hold a
+        // stale identity, and the invariant check refuses that state.[^17]
+        //
+        // [^17]: ADR-0065, a group is a site membership, not a region, decision D2. `docs/adrs/draft/adr-0065-a-group-is-a-site-membership-not-a-region.md`
+        self.settle_positions(threads)?;
 
         // Level 1 rebuilds after the structure it reads, and after every
         // change to level 0 that this frame made. It is derived, so it is
@@ -3426,6 +3697,36 @@ impl World {
     /// # References
     ///
     /// [^1]: ADR-0023, an aggregate combines exactly, in any order, decision D3. `docs/adrs/accepted/adr-0023-an-aggregate-combines-exactly-in-any-order.md`
+    /// Settles the positions of every site.
+    ///
+    /// The release runs on every frame, because a unit dies on any frame and
+    /// a position that named it would hold a stale identity until the next
+    /// rebalance.[^1]
+    ///
+    /// The rebalance runs on the interval that the schedule names. It reads
+    /// the store as this frame left it, so it runs after the rates and after
+    /// the consumption draw.[^2]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0065, a group is a site membership, not a region, decision D2. `docs/adrs/draft/adr-0065-a-group-is-a-site-membership-not-a-region.md`
+    /// [^2]: ADR-0065, a group is a site membership, not a region, decision D3. `docs/adrs/draft/adr-0065-a-group-is-a-site-membership-not-a-region.md`
+    fn settle_positions(&mut self, threads: usize) -> Result<(), StepError> {
+        position::release_the_dead(&mut self.positions, &self.soldiers, threads)?;
+        if !self.position_schedule.due(self.tick) {
+            return Ok(());
+        }
+        position::rebalance(
+            &mut self.positions,
+            self.settlements.live_column(),
+            self.settlements.tile_column(),
+            self.settlements.store_column(),
+            self.terrain,
+            threads,
+        )?;
+        Ok(())
+    }
+
     fn apply_rates(&mut self, threads: usize) -> Result<(), StepError> {
         self.shortfall_log.clear();
         self.rates.open_to(self.settlements.slot_count());

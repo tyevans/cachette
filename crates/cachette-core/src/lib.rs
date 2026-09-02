@@ -26,6 +26,7 @@ pub mod hex;
 pub mod holding;
 mod household;
 pub mod influence;
+pub mod position;
 pub mod pyramid;
 pub mod rates;
 pub mod resource;
@@ -59,6 +60,10 @@ pub use hash::StateHash;
 pub use hex::{Axial, Grid, GridError};
 pub use holding::{FactionMask, Holder, Holding};
 pub use influence::{Conductance, Influence, InfluenceError, InfluenceField};
+pub use position::{
+    release_the_dead, Position, PositionError, PositionTable, SitePreference, NO_WORK,
+    POSITIONS_PER_SITE, WORK_COMMODITY,
+};
 pub use rates::{
     RateError, RateLedger, RatePass, RateSchedule, RateTable, SiteRate, SiteShortfall,
 };
