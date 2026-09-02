@@ -30,7 +30,8 @@ precedent.[^ALLOC]
 ### DEC-068 — Should the dense column record be superseded, now that three tile fields sit outside it?
 
 **Open. The recommendation is to supersede it, and to state the rule that
-picks the shape rather than to state one shape.**
+picks the shape rather than to state one shape. The recommendation is a weak
+one, and the argument against it is below.**
 
 ADR-0012 D2 states that a tile field is one contiguous array with one element
 for each tile.[^DEC68A] Three accepted or drafted records now describe a tile
@@ -42,6 +43,29 @@ None of the three superseded ADR-0012, and none of them says whether it still
 holds for the fields they do not cover. A contributor who adds a tile field
 reads ADR-0012 first, because it is the general record, and writes a dense
 column.
+
+**D2 carries an exception clause, and it was checked.** The clause says that
+the record fixes that a tile field is a column, and that it does not fix the
+width of a column, the encoding of a boolean field, or the form a rare field
+takes. It gives those to a separate record, and its footnote names which
+one: the record that holds a narrow tile column, with bitplanes and sparse
+side tables.[^DEC68G]
+
+**The clause does not reach the three records.** It delegates the
+representation of a column. A bitplane is a column one bit wide. A sparse
+side table is a column for a field that most tiles lack. Each presupposes
+that a column exists and asks what shape it takes. None of the three fields
+has a column at all. The stored change of a tile value is a sparse side
+table, and the clause covers that half, but the clause offers nothing for the
+half that is generated and stored nowhere. The sentence the three records
+leave is the first one, which the clause does not qualify.
+
+**The strongest argument for leaving ADR-0012 alone is not the clause. It is
+ADR-0068.** That record met D2 directly. It names the dense column as the
+first of the two available shapes, states that the tile storage record
+provides for it, and rejects it. It was accepted, it depends on ADR-0012, and
+it superseded nothing. If a record may do that once, this one may do it
+again, and the question below is whether three times is still an aside.
 
 **The options.**
 
@@ -56,16 +80,22 @@ column.
 3. Amend ADR-0012 D2 in place. This is not available. ADR-0012 is accepted and
    has dependents, and an accepted record changes by supersession.[^DEC68F]
 
-**The recommendation is option 1.** The precedent for option 2 was a record
-that named a mechanism in an aside. This is the general record for tile
-storage, stating the shape of every tile field, and three fields now
-contradict it. That is not an aside. ADR-0012 also holds a second decision
-about the unit arena, which the supersession must carry forward or leave
-where it is.
+**The recommendation is option 1, and it is not a strong one.** The precedent
+for option 2 was a record that named a mechanism in an aside. D2 is not an
+aside. It is the general record for tile storage, it states the shape of
+every tile field in its first sentence, and three fields now contradict that
+sentence. One exception is an exception. Three is the rule, stated nowhere.
 
-**What is at stake.** ADR-0012 has dependents, and a supersession must name
-each of them. The cost of leaving it is one wrong first answer for every
-contributor who adds a tile field.
+**What is at stake, and it is not symmetric.** Superseding is expensive.
+ADR-0012 has dependents, an accepted record changes only by supersession, and
+every citing record must be re-read. ADR-0012 also holds a second decision
+about the unit arena, which a supersession must carry forward or leave where
+it is. The cost of option 2 is smaller and recurring: one wrong first answer
+for every contributor who adds a tile field, and a foundational record whose
+first sentence is false of three fields.
+
+A reviewer who takes option 2 is not making a mistake. The argument for it is
+in the paragraph above about ADR-0068, and it is a real one.
 
 **Who decides.** A reviewer. The author of ADR-0088 is not one.
 
@@ -1303,3 +1333,4 @@ a failed founding is correct.[^PRD12]
 [^DEC68D]: ADR-0088, a tile field is a generated base and a stored change, decision D1. `docs/adrs/draft/adr-0088-a-tile-field-is-a-generated-base-and-a-stored-change.md`
 [^DEC68E]: Findings register, FND-081. `docs/FINDINGS.md`
 [^DEC68F]: Decision Record Scope, section 7. `.claude/rules/adr-scope.md`
+[^DEC68G]: ADR Registry, row 0015. `docs/adrs/REGISTRY.md`
