@@ -1231,7 +1231,24 @@ and the tile population is larger than the unit population. A caller that walks
 the world asking a question one tile at a time is the data plane, whatever the
 question is.
 
-**Follows.** Three things.
+**A second instance, through the type system rather than through a missing
+read.** The spawn verb returns the identities of the units it made, as one
+column. The type stub for the verbs that take units declared a sequence of
+integers, and a column is not a sequence of integers. A caller passing the
+column straight to the next verb would have been told to convert it, and every
+conversion of a mass-tier column is a loop.
+
+**Make the boundary accept what the boundary produces.** If a verb returns a
+column and the next verb refuses one, the API has instructed the caller to
+sweep. The instruction arrives as a type error rather than as missing
+functionality, which is why it is easy to satisfy in the wrong way.
+
+**A red gate does not point at the right repair.** The type check would have
+failed on the signature. A contributor could have satisfied it by writing a
+list around the column at the call site, which passes the gate and puts the
+loop back. The gate sees the narrow fault. It cannot see the consequence.
+
+**Follows.** Four things.
 
 **When a rule forbids a shape, check that the API offers the shape it wants
 instead.** The design says the caller builds a selector and the engine resolves
@@ -1241,6 +1258,11 @@ each one will look like a discipline failure.
 
 **When you find yourself sweeping, do not add discipline. Ask which read is
 missing.** The sweep is a symptom and it names its own cause.
+
+**Check that a verb accepts what the verb before it returns.** Two instances
+here came from different mechanisms, one a missing read and one a type. Both
+made the honest call site impossible, and a caller that cannot write the honest
+call writes the sweep.
 
 **A rule with no mechanism is worth recording as unenforced.** A reserved
 registry row holds the claim that the API refuses the loop for a declared
