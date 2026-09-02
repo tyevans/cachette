@@ -32,8 +32,14 @@ today. On a roaded tile it does.
 
 The finding holds the evidence.[^1]
 
+**The composition says the same thing in its own words, and it is false there
+too.** The comment on the function states that the two tables meet in one
+place.[^2] It concludes that no caller can read one table without the other.
+Three callers do. The fold and this comment are two sites, and the work
+repairs both.
+
 **No run reaches this today.** No engine rule issues a build order, so an
-upgrade exists only when the control plane orders one.[^2] The divergence is
+upgrade exists only when the control plane orders one.[^3] The divergence is
 reachable through the public interface and is not reached by the
 demonstration.
 
@@ -42,13 +48,13 @@ demonstration.
 - The impact review.
 - **The register row must close first.** It holds whether the three callers ask
   a different question or the same one, and it recommends that they ask a
-  different one.[^3] The work follows the answer and must not invent it.
-- Which caller, if any, changes. The recommendation changes the fold and no
-  caller.
+  different one.[^4] The work follows the answer and must not invent it.
+- Which caller, if any, changes. The recommendation changes the fold and the
+  comment on the composition, and no caller.
 - What a test asserts. A test that builds a road, admits units onto the tile,
   and reads the position bound would show the two answers in one run.
 - Whether the record that governs the composition needs its own change. A
-  review already removes the sentence that claims every caller composes.[^4]
+  review already removes the sentence that claims every caller composes.[^5]
 
 ## Done when
 
@@ -61,6 +67,7 @@ Filled in when the item moves to `complete/`.
 ## References
 
 [^1]: Findings register, FND-193. `docs/FINDINGS.md`
-[^2]: Backlog item 0180, let a unit choose to build. `docs/backlog/proposed/0180-let-a-unit-choose-to-build.md`
-[^3]: Decisions register, DEC-081. `docs/DECISIONS.md`
-[^4]: Review 0199, the influence, tile field, upgrade and housing records. `docs/reviews/0199-the-influence-tile-field-upgrade-and-housing-records.md`
+[^2]: The composition of the ground capacity and the upgrade capacity. `crates/cachette-core/src/upgrade.rs`
+[^3]: Backlog item 0180, let a unit choose to build. `docs/backlog/proposed/0180-let-a-unit-choose-to-build.md`
+[^4]: Decisions register, DEC-081. `docs/DECISIONS.md`
+[^5]: Review 0199, the influence, tile field, upgrade and housing records. `docs/reviews/0199-the-influence-tile-field-upgrade-and-housing-records.md`

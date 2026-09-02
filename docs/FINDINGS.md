@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-194**
+**Next number: FND-196**
 
 ## A. Corrections to stated rules
 
@@ -4470,6 +4470,93 @@ a site should follow the composed capacity, and whether the fold should walk
 both tables, is a register row with a backlog item behind it.[^F193F]
 
 
+### FND-194 — The record check reports no source citation inside a worktree
+
+**Believed.** The record check gives one answer for one tree. A worker runs it
+in a worktree, reads the note count, and compares it against the count another
+worker reported. A note that appears is a note about the records.
+
+**True.** The check reports more notes in a worktree than on the trunk, and
+the extra notes are false. The uncited note asks whether any other record or
+any source file cites a record. The scan that gathers the source files skips
+every path that holds a directory part named `worktrees`, so that a run does
+not read a checkout another run is changing. A worktree of this project sits
+under that directory, so its own root carries the part, and the filter drops
+every file of the tree it was asked to read. The source corpus is then empty
+and no record can be cited by a source file.[^F192B]
+
+**Evidence.** The filter was applied to both roots directly. It returns 2162
+files for the trunk and none for this worktree. The check reported 11 notes
+here against 2 on the trunk. A search of this worktree for each of the 11
+numbers found 9 of them in source files, which leaves the 2 the trunk
+reports.
+
+**Follows.** Four things.
+
+**The trunk number is the true one, and a worktree number is a floor.** Every
+worker on this project runs in a worktree, so every worker reads the inflated
+count. The two records this session corrected were both named by a false note,
+and both are cited by source files.
+
+**A note that moves on its own is a note that gets ignored.** The check reports
+the uncited note rather than failing on it, because the rule treats low
+citation as a question and not a verdict. A question that eleven records raise
+in one run, nine of them wrongly, teaches a reader to skip the whole block. The
+one real note is then invisible.
+
+**The skip set names a directory part and not a boundary.** It was written to
+keep one run out of another run's checkout. It cannot tell the tree it is
+scanning from a tree it should refuse, because both carry the same part. A
+backlog item holds the repair, and no fix belongs in this finding.[^F194C]
+
+**No gate was weakened, and no pass became meaningless.** The source corpus
+reaches one assertion, and that assertion is the note. The check joins the
+records, the registry and the source files into one string beside it, and it
+never reads that string. No failure of this check depends on a source file. A
+pass in a worktree therefore means what a pass on the trunk means, and the
+whole cost of the defect is the note.
+
+### FND-195 — The record check builds a corpus of every source file and never reads it
+
+**Believed.** The record check reads the source files once, joins them into one
+corpus with the records and the registry, and asks that corpus which records a
+source file cites. A reader of the script sees the corpus built and infers that
+it feeds the check below it.
+
+**True.** Nothing reads the corpus. The script assigns it and never names it
+again. The note that asks which records are cited re-reads every source file
+instead, once for each record it tests, inside the loop over the records. The
+work the corpus did is thrown away, and the work it would have saved is done
+again.
+
+**The corpus was dead in the commit that created the script.** It is not a
+reader that a later change removed. It was never read.[^F192B]
+
+**Evidence.** A search of the history for the name returns one commit, the one
+that introduced the whole script. The collection was lifted out of the script
+and run against the trunk on a development machine. It joins 34 megabytes of
+source into one string, and the loop beside it makes 4644 file reads over 2162
+files. The reads stop early for a record that a source file cites, so the count
+follows how many records no source file cites.
+
+**Follows.** Three things.
+
+**This is a second defect in one function, and it is not the first one.** A
+separate finding records that the same collection drops every file when the
+check runs inside a worktree.[^F194C] The two are independent. Repairing the
+skip makes the corpus full and still unread.
+
+**A dead assignment reads as an assertion.** The corpus names the records, the
+registry and the source files together, which is the shape of a check. Nothing
+tells a reader that it holds no claim. This project already records that a
+value which is read back correctly and changes nothing is the failure that
+hides best.[^22]
+
+**Cost is not the reason to repair it.** The check runs in continuous
+integration and a reader waits for it. The reason is that the script states one
+thing and does another, in the place a contributor looks to learn what the
+check asserts.
+
 ## References
 
 [^F177A]: The founding refuses ground that admits nobody. `crates/cachette-core/src/world.rs`
@@ -4635,3 +4722,4 @@ both tables, is a register row with a backlog item behind it.[^F193F]
 [^F193C]: The capacity that bounds the positions of a site. `crates/cachette-core/src/position.rs`
 [^F193D]: Review 0199, the influence, tile field, upgrade and housing records. `docs/reviews/0199-the-influence-tile-field-upgrade-and-housing-records.md`
 [^F193F]: Decisions register, DEC-081. `docs/DECISIONS.md`
+[^F194C]: Backlog item 0201, scan the tree the check was asked to read. `docs/backlog/proposed/0201-scan-the-tree-the-check-was-asked-to-read.md`
