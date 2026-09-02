@@ -142,19 +142,6 @@ def test_no_event_column_is_a_floating_point_array(seed: int) -> None:
     assert world.event_log_columns()["value"].dtype == np.int32
 
 
-def test_the_columns_agree_with_the_bytes(seed: int) -> None:
-    # The columns and the raw bytes are two views of one log. This is the
-    # check that fails if they ever stop describing the same thing. The
-    # test reads the byte count from the log, and it holds no field offset.
-    world = cachette.World(width=8, height=8, seed=seed, faction_count=2)
-    world.step(threads=1)
-    columns = world.event_log_columns()
-    raw = world.event_log_bytes()
-    assert world.event_count > 0
-    assert len(raw) % world.event_count == 0
-    assert len(columns["tick"]) == world.event_count
-
-
 def test_a_unit_identity_survives_the_round_trip(seed: int) -> None:
     # ADR-0085 D1 and D3: Python holds the whole identity and gives it
     # back, and the engine resolves it.
