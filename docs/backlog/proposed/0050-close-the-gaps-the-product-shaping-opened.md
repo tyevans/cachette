@@ -109,4 +109,4 @@ Filled in when the item moves to `complete/`.
 [^2]: Backlog item 0056. `docs/backlog/complete/0056-draw-consumption-from-a-site-store-by-cohort.md`
 [^3]: ADR Registry, row 0063. `docs/adrs/REGISTRY.md`
 [^4]: Decisions register, DEC-039. `docs/DECISIONS.md`
-[^5]: Backlog item 0103. `docs/backlog/proposed/0103-derive-a-household-from-the-dwelling-slot.md`
+[^5]: Backlog item 0103. `docs/backlog/complete/0103-derive-a-household-from-the-dwelling-slot.md`
