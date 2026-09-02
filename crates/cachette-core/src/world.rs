@@ -2910,7 +2910,6 @@ impl World {
         Ok(())
     }
 
-
     /// Advances every upgrade that a unit is building.
     ///
     /// The pass reads the builders and the upgrade map. It reads no tile

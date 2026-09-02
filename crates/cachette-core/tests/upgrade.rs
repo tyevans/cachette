@@ -262,13 +262,19 @@ fn two_units_add_their_work_exactly_at_every_thread_count() {
         let address = island(&one, WIDTH, HEIGHT);
         builder(&mut one, address, UpgradeKind::Terrace);
         one.step(threads).expect("the step must run");
-        let single = one.upgrade_at(address).expect("one unit built here").progress;
+        let single = one
+            .upgrade_at(address)
+            .expect("one unit built here")
+            .progress;
 
         let mut two = world(SEED, WIDTH, HEIGHT);
         builder(&mut two, address, UpgradeKind::Terrace);
         builder(&mut two, address, UpgradeKind::Terrace);
         two.step(threads).expect("the step must run");
-        let pair = two.upgrade_at(address).expect("two units built here").progress;
+        let pair = two
+            .upgrade_at(address)
+            .expect("two units built here")
+            .progress;
 
         assert_eq!(
             pair.0,
@@ -307,7 +313,10 @@ fn unfinished_work_persists_when_a_unit_stops_and_starts_again() {
 
     field.step(1).expect("the step must run");
     field.step(1).expect("the step must run");
-    let partway = field.upgrade_at(address).expect("the unit built here").progress;
+    let partway = field
+        .upgrade_at(address)
+        .expect("the unit built here")
+        .progress;
     assert!(partway.0 > 0);
 
     // The unit stops. The work stays on the tile and nothing advances.
@@ -337,7 +346,10 @@ fn a_dead_builder_leaves_the_work_it_did() {
     let address = island(&field, WIDTH, HEIGHT);
     let unit = builder(&mut field, address, UpgradeKind::Terrace);
     field.step(1).expect("the step must run");
-    let partway = field.upgrade_at(address).expect("the unit built here").progress;
+    let partway = field
+        .upgrade_at(address)
+        .expect("the unit built here")
+        .progress;
 
     assert!(field.despawn_soldier(unit));
     field.step(1).expect("the step must run");
@@ -359,7 +371,11 @@ fn a_tile_carries_one_upgrade_and_the_first_kind_wins() {
     field.step(1).expect("the step must run");
 
     let site = field.upgrade_at(address).expect("the units built here");
-    assert_eq!(site.kind, UpgradeKind::Road, "the lowest kind takes the tile");
+    assert_eq!(
+        site.kind,
+        UpgradeKind::Road,
+        "the lowest kind takes the tile"
+    );
     assert_eq!(field.upgrade_sites().len(), 1);
     // Only the builder of the kind that took the tile contributed.
     assert_eq!(site.progress.0, 1);
@@ -385,8 +401,12 @@ fn the_catalogue_holds_more_than_one_kind_and_each_number_names_one() {
     assert!(UpgradeKind::ALL.iter().all(|kind| kind.work() > 1));
     // The two kinds change different properties of a tile. One kind would
     // read as a scalar on the tile rather than a row in a table.
-    assert!(UpgradeKind::ALL.iter().any(|kind| kind.capacity().is_none()));
-    assert!(UpgradeKind::ALL.iter().any(|kind| kind.capacity().is_some()));
+    assert!(UpgradeKind::ALL
+        .iter()
+        .any(|kind| kind.capacity().is_none()));
+    assert!(UpgradeKind::ALL
+        .iter()
+        .any(|kind| kind.capacity().is_some()));
     assert!(UpgradeKind::ALL.iter().any(|kind| kind.gather_bonus() > 0));
 }
 
@@ -572,7 +592,10 @@ fn the_bound_is_folded_from_the_catalogue() {
 fn the_composition_functions_add_the_row_of_the_finished_kind() {
     for kind in UpgradeKind::ALL {
         assert_eq!(capacity_with(8, None), 8);
-        assert_eq!(capacity_with(8, Some(kind)), kind.capacity().unwrap_or(8).max(8));
+        assert_eq!(
+            capacity_with(8, Some(kind)),
+            kind.capacity().unwrap_or(8).max(8)
+        );
         assert_eq!(gather_rate_with(4, None), 4);
         assert_eq!(gather_rate_with(4, Some(kind)), 4 + kind.gather_bonus());
     }
@@ -718,7 +741,10 @@ fn admission_reads_the_capacity_that_a_road_raised() {
         "the paved tile held {paved} units, which the ground alone already allows"
     );
     assert!(
-        paved <= UpgradeKind::Road.capacity().expect("a road raises the capacity") as usize
+        paved
+            <= UpgradeKind::Road
+                .capacity()
+                .expect("a road raises the capacity") as usize
     );
 }
 

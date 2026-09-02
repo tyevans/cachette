@@ -523,9 +523,7 @@ impl UpgradeMap {
             return false;
         }
         self.sites.iter().all(|site| {
-            site.tile.0 < tile_count
-                && site.progress.0 >= 0
-                && site.progress.0 <= site.kind.work()
+            site.tile.0 < tile_count && site.progress.0 >= 0 && site.progress.0 <= site.kind.work()
         })
     }
 }
