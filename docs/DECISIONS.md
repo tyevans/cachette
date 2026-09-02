@@ -1027,9 +1027,6 @@ a failed founding is correct.[^PRD12]
 [^FND129]: Findings register, FND-129. `docs/FINDINGS.md`
 [^ADR81]: ADR-0081, a residence is a stored column and occupancy is a maintained count, decision D3. `docs/adrs/draft/adr-0081-a-residence-is-a-stored-column-and-occupancy-is-a-maintained-count.md`
 [^ADR75]: ADR-0075, the founding choice reads a bounded sample of the world. `docs/adrs/accepted/adr-0075-the-founding-choice-reads-a-bounded-sample-of-the-world.md`
-<<<<<<< HEAD
 [^FND106]: Findings register, FND-106. `docs/FINDINGS.md`
 [^DEC44ITEM]: Backlog item 0060. `docs/backlog/proposed/0060-grow-the-population-from-the-store-and-the-housing.md`
-=======
->>>>>>> worktree-agent-a4ea51fa97c6b231a
 [^SCOPE]: Decision Record Scope, section 4.1. `.claude/rules/adr-scope.md`
