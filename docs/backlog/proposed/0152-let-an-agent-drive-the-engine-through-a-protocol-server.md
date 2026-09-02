@@ -82,4 +82,4 @@ Filled in when the item moves to `complete/`.
 [^2]: Testing Rules, section 5. `.claude/rules/testing.md`
 [^3]: ADR-0001, one binary gives one answer at any thread count, decision D4. `docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
 [^4]: Recurring Defect Shapes, shape 1. `.claude/rules/recurring-defects.md`
-[^5]: Backlog item 0153. `docs/backlog/proposed/0153-let-python-read-an-event-without-repeating-its-layout.md`
+[^5]: Backlog item 0153. `docs/backlog/refined/0153-let-python-read-an-event-without-repeating-its-layout.md`

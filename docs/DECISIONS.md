@@ -23,9 +23,40 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^ALLOC]
 
-**Next number: DEC-061**
+**Next number: DEC-064**
 
 ## Open
+
+### DEC-063 — Does the control plane put one unit in the world at a time?
+
+**Open. The recommendation is to keep the per-unit verb and to add a set-valued
+verb before any caller loops.**
+
+The bindings now spawn one soldier, order it to gather, and remove it. Each
+call names one unit. The work that added them needed a unit in the world,
+because the gather event names a unit and nothing on the Python side could make
+one. A column that nothing can fill is an inert capability.[^SHAPE3]
+
+**Why this is a question.** The design principle says Python builds a selector
+and sends one command, and that Python never loops over entities.[^ORIENT] A
+per-unit spawn verb does not break that rule on its own. A caller that spawns a
+population with it does. Nothing today refuses that caller.
+
+**The options.**
+
+1. Keep the per-unit verb. Add a set-valued spawn verb when a caller wants many
+   units, and refuse the loop at that point.
+2. Withdraw the per-unit verb and ship only a set-valued spawn verb now.
+3. Mark the per-unit verb as a test fixture and keep it out of the public
+   package.
+
+**The recommendation is option 1.** A world is built once and stepped many
+times, so the spawn path is not the hot path the rule protects. Option 2 costs
+a selector API that nothing has designed. Option 3 puts one verb in two places
+and states no rule that a reader can check.
+
+**What holds it back.** Nothing. The verb exists and works. The question is
+what the project promises about it.
 
 ### DEC-057 — Does a site store its resident count, or read the one the engine keeps?
 
@@ -1103,6 +1134,7 @@ a failed founding is correct.[^PRD12]
 [^ADR73D1]: ADR-0073, gathering is admitted by sort-then-admit against the tile, decision D1. `docs/adrs/accepted/adr-0073-gathering-is-admitted-by-sort-then-admit-against-the-tile.md`
 [^ORIENT]: Project orientation, the design principles. `CLAUDE.md`
 [^SHAPE1]: Recurring Defect Shapes, shape 1. `.claude/rules/recurring-defects.md`
+[^SHAPE3]: Recurring Defect Shapes, shape 3. `.claude/rules/recurring-defects.md`
 [^TEST2A]: Testing rules, section 2a. `.claude/rules/testing.md`
 [^PRD12]: PRD-0012, a world starts small and grows. `docs/product/accepted/prd-0012-a-world-starts-small-and-grows.md`
 [^FND022]: Findings register, FND-022. `docs/FINDINGS.md`
@@ -1131,6 +1163,6 @@ a failed founding is correct.[^PRD12]
 [^DEC60A]: The event types. `crates/cachette-core/src/event.rs`
 [^DEC60B]: Recurring Defect Shapes, shape 1. `.claude/rules/recurring-defects.md`
 [^DEC60C]: Findings register, FND-137. `docs/FINDINGS.md`
-[^DEC60D]: Backlog item 0153. `docs/backlog/proposed/0153-let-python-read-an-event-without-repeating-its-layout.md`
+[^DEC60D]: Backlog item 0153. `docs/backlog/refined/0153-let-python-read-an-event-without-repeating-its-layout.md`
 [^DEC60E]: The identity type. `crates/cachette-core/src/types.rs`
 [^DEC60F]: ADR-0002, simulated and aggregated state holds no floating point number, decision D1. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`

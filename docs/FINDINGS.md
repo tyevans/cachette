@@ -3314,4 +3314,4 @@ makes it more likely, not less.
 [^F137A]: The bindings and the event log method. `crates/cachette-py/src/lib.rs`
 [^F137B]: The event types. `crates/cachette-core/src/event.rs`
 [^F137C]: Recurring Defect Shapes, shape 1. `.claude/rules/recurring-defects.md`
-[^F137D]: Backlog item 0153. `docs/backlog/proposed/0153-let-python-read-an-event-without-repeating-its-layout.md`
+[^F137D]: Backlog item 0153. `docs/backlog/refined/0153-let-python-read-an-event-without-repeating-its-layout.md`
