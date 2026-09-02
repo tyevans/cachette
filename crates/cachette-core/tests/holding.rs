@@ -17,8 +17,8 @@
 
 use std::collections::BTreeSet;
 
-use cachette_core::holding::{claim_threshold, FactionMask, Holder};
-use cachette_core::terrain::TileKind;
+use cachette_core::holding::{FactionMask, Holder};
+use cachette_core::terrain::{TileKind, KIND_COUNT};
 use cachette_core::{Axial, FactionId, TileIdx, World, WorldConfig};
 
 /// The extent of a world that holds more than one kind of ground.
@@ -104,6 +104,160 @@ fn run(world: &mut World, frames: u64, threads: usize) {
         world.step(threads).expect("the step must run");
         assert!(world.check_invariants(), "the world broke an invariant");
     }
+}
+
+/// The corner of a garrison that starts on mixed ground.
+///
+/// A survey of this world counted the four passable kinds inside a radius of
+/// twelve tiles around every address that admits a unit, and took the address
+/// whose smallest count was the largest. That neighbourhood holds level
+/// ground, forest, hill and mountain together, which is the distribution the
+/// gradient test needs. A garrison placed by eye reaches the kind that
+/// surrounds it and no other, so it measures the fixture.[^1]
+///
+/// # References
+///
+/// [^1]: Testing rules, section 2a. `.claude/rules/testing.md`
+const MIXED_GROUND: Axial = Axial::new(12, 43);
+
+/// The corner of a garrison that starts inside high ground.
+///
+/// The same survey took the address with the most hill and mountain inside a
+/// radius of six tiles. Mixed ground alone reaches mountain late and offers
+/// few of them, because the mountains there stand behind the hills. This
+/// second garrison starts among them, so the count that mountain refuses is
+/// large enough to compare against.
+const HIGH_GROUND: Axial = Axial::new(6, 6);
+
+/// The number of ticks the gradient run takes.
+///
+/// The order of the four rates first holds at tick 5 of this fixture, and it
+/// held at every tick from there to tick 60 when it was measured. Twenty
+/// ticks sits inside that band and leaves each kind a count in the hundreds.
+/// The number is a parameter of the test. It is not a figure about the
+/// target, and no blocker governs it.[^1]
+///
+/// # References
+///
+/// [^1]: Blockers register, BLK-007. `docs/BLOCKERS.md`
+const GRADIENT_TICKS: u32 = 20;
+
+/// The passable kinds, from level ground upward.
+///
+/// One list serves both assertions below: that the run reached every kind,
+/// and that the share falls at each step upward. A second list would be the
+/// same fact in two places, and nothing would fail when the two disagreed.[^1]
+///
+/// # References
+///
+/// [^1]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`
+const RISING_GROUND: [TileKind; 4] = [
+    TileKind::Plain,
+    TileKind::Forest,
+    TileKind::Hill,
+    TileKind::Mountain,
+];
+
+/// What each kind of ground was offered, and what it took.
+///
+/// A tile is offered when it lies open beside a holding: it is passable, it
+/// is held by nobody, and at least one neighbour of it has a holder. It is
+/// taken when the step that follows gives it a holder.
+///
+/// A tile that a soldier stands on after the step is counted in neither
+/// column. A unit outweighs the six neighbours together, so presence takes
+/// such a tile whatever the ground is, and counting it would measure the
+/// garrison rather than the terrain.
+#[derive(Default)]
+struct Gradient {
+    offered: [i64; KIND_COUNT],
+    taken: [i64; KIND_COUNT],
+}
+
+impl Gradient {
+    /// Records one tile that was offered, and whether the step took it.
+    fn record(&mut self, kind: TileKind, taken: bool) {
+        self.offered[kind.to_u8() as usize] += 1;
+        if taken {
+            self.taken[kind.to_u8() as usize] += 1;
+        }
+    }
+
+    /// Returns the number of tiles of one kind that were offered.
+    fn offered(&self, kind: TileKind) -> i64 {
+        self.offered[kind.to_u8() as usize]
+    }
+
+    /// Returns the number of tiles of one kind that were taken.
+    fn taken(&self, kind: TileKind) -> i64 {
+        self.taken[kind.to_u8() as usize]
+    }
+
+    /// Reports whether the first kind gave up a larger share than the second.
+    ///
+    /// The comparison cross-multiplies the two counts, so it needs no
+    /// division and it holds no floating point number.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0002, state holds no floating point number, decision D1. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
+    fn takes_a_larger_share_than(&self, first: TileKind, second: TileKind) -> bool {
+        self.taken(first) * self.offered(second) > self.taken(second) * self.offered(first)
+    }
+}
+
+/// Runs the world and counts what each kind of ground was offered and took.
+///
+/// The offer is read before the step, because the rule decides every
+/// candidate against the holders of the previous tick. The outcome is read
+/// after it.
+fn measure_the_gradient(world: &mut World, ticks: u32, threads: usize) -> Gradient {
+    let all = addresses(world);
+    let mut gradient = Gradient::default();
+    for _ in 0..ticks {
+        let mut offered: Vec<(Axial, TileKind)> = Vec::new();
+        for address in &all {
+            let Some(kind) = world.tile_kind(*address) else {
+                continue;
+            };
+            if !kind.is_passable() {
+                continue;
+            }
+            if !world.tile_holder(*address).is_some_and(Holder::is_nobody) {
+                continue;
+            }
+            let beside_a_holding =
+                world
+                    .grid()
+                    .neighbours(*address)
+                    .into_iter()
+                    .flatten()
+                    .any(|neighbour| {
+                        world
+                            .tile_holder(neighbour)
+                            .is_some_and(|holder| !holder.is_nobody())
+                    });
+            if beside_a_holding {
+                offered.push((*address, kind));
+            }
+        }
+        world.step(threads).expect("the step must run");
+        assert!(world.check_invariants(), "the world broke an invariant");
+        for (address, kind) in offered {
+            let stood_on = !world
+                .soldiers_on(address)
+                .expect("the address is inside the world")
+                .is_empty();
+            if stood_on {
+                continue;
+            }
+            let held = world
+                .tile_holder(address)
+                .is_some_and(|holder| !holder.is_nobody());
+            gradient.record(kind, held);
+        }
+    }
+    gradient
 }
 
 #[test]
@@ -216,18 +370,15 @@ fn the_level_one_cell_reports_the_holding_exactly() {
 }
 
 #[test]
-fn the_terrain_changes_where_a_holding_goes() {
+fn a_holding_never_reaches_across_water() {
     let mut world = World::new(VARIED).expect("the extent must describe a world");
     let found = kinds(&world);
-    // The fixture must supply the input. A world of one kind of ground
-    // passes this test against a rule that reads no terrain at all.
-    assert!(
-        found.len() >= 3,
-        "the fixture holds only {found:?}, so it cannot show that the ground matters"
-    );
+    // The fixture must supply the input. A world with no water never reaches
+    // the refusal, and the test would pass against a rule that reads no
+    // terrain at all.
     assert!(
         found.contains(&TileKind::Water),
-        "the fixture holds no water, so the refusal is never reached"
+        "the fixture holds only {found:?}, so the refusal is never reached"
     );
 
     // The garrison starts beside water on purpose. A garrison placed at a
@@ -258,65 +409,78 @@ fn the_terrain_changes_where_a_holding_goes() {
 
     let mut water_beside_a_holding = 0;
     for address in addresses(&world) {
-        let Some(kind) = world.tile_kind(address) else {
+        if world.tile_kind(address) != Some(TileKind::Water) {
             continue;
-        };
+        }
         let holder = world
             .tile_holder(address)
             .expect("the address is inside the world");
-        if kind == TileKind::Water {
-            assert!(holder.is_nobody(), "a faction holds water at {address:?}");
-            if world
-                .grid()
-                .neighbours(address)
-                .into_iter()
-                .flatten()
-                .any(|neighbour| {
-                    world
-                        .tile_holder(neighbour)
-                        .is_some_and(|holder| !holder.is_nobody())
-                })
-            {
-                water_beside_a_holding += 1;
-            }
+        assert!(holder.is_nobody(), "a faction holds water at {address:?}");
+        if world
+            .grid()
+            .neighbours(address)
+            .into_iter()
+            .flatten()
+            .any(|neighbour| {
+                world
+                    .tile_holder(neighbour)
+                    .is_some_and(|holder| !holder.is_nobody())
+            })
+        {
+            water_beside_a_holding += 1;
         }
     }
     assert!(
         water_beside_a_holding > 0,
         "no holding ever reached water, so the refusal was never exercised"
     );
+}
 
-    // The ground asks for more support as it rises, and open water admits no
-    // holder at all. That order is what makes the spread read the terrain.
-    assert_eq!(claim_threshold(TileKind::Water), None);
-    assert!(claim_threshold(TileKind::Plain) < claim_threshold(TileKind::Hill));
-    assert!(claim_threshold(TileKind::Hill) < claim_threshold(TileKind::Mountain));
+#[test]
+fn the_terrain_changes_where_a_holding_goes() {
+    // The claim is that a holding spreads over level ground and stops
+    // against high ground. A test that read the claim thresholds and
+    // asserted their order would prove that three constants were written
+    // down, and it would stay green when the rule stopped reading them.
+    // Only a counted outcome proves that the rule acts on the ground.[^1]
+    //
+    // The assertion is on the order of the four shares and not on a bound
+    // for each one. The order is the weaker claim and it is what the rule
+    // states, so it survives a tuned threshold. A bound would fix the
+    // fixture as well as the rule.
+    //
+    // [^1]: Findings register, FND-080. `docs/FINDINGS.md`
+    let mut world = World::new(VARIED).expect("the extent must describe a world");
+    garrison(&mut world, FactionId(0), MIXED_GROUND, 3);
+    garrison(&mut world, FactionId(0), HIGH_GROUND, 3);
+    let gradient = measure_the_gradient(&mut world, GRADIENT_TICKS, 4);
 
-    // A holding that covered every kind of open ground equally would say
-    // nothing about the terrain. Count the share of each kind that is held.
-    let mut held = [0i64; 5];
-    let mut total = [0i64; 5];
-    for address in addresses(&world) {
-        let Some(kind) = world.tile_kind(address) else {
-            continue;
-        };
-        total[kind.to_u8() as usize] += 1;
-        if world
-            .tile_holder(address)
-            .is_some_and(|holder| !holder.is_nobody())
-        {
-            held[kind.to_u8() as usize] += 1;
-        }
+    // The fixture must supply the input. A run that offered no hill and no
+    // mountain says nothing about high ground, and the order below would
+    // then compare the two kinds that were reached and pass.[^1]
+    //
+    // [^1]: Testing rules, section 2a. `.claude/rules/testing.md`
+    for kind in RISING_GROUND {
+        assert!(
+            gradient.offered(kind) > 0,
+            "the run offered no {kind:?}, so the ground was never asked for it"
+        );
     }
-    assert_eq!(held[TileKind::Water.to_u8() as usize], 0);
-    assert!(
-        held.iter().sum::<i64>() > 0,
-        "the fixture holds nothing at all"
-    );
-    assert!(
-        total[TileKind::Water.to_u8() as usize] > 0,
-        "the fixture holds no water"
-    );
+
+    // The share falls at every step upward. Level ground gives up most of
+    // what it is offered, and mountain gives up least.
+    for pair in RISING_GROUND.windows(2) {
+        let (level, high) = (pair[0], pair[1]);
+        assert!(
+            gradient.takes_a_larger_share_than(level, high),
+            "{level:?} gave up {} of {} and {high:?} gave up {} of {}, \
+             so the ground did not change where the holding went",
+            gradient.taken(level),
+            gradient.offered(level),
+            gradient.taken(high),
+            gradient.offered(high),
+        );
+    }
 }
 
 #[test]

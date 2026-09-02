@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-125**
+**Next number: FND-132**
 
 ## A. Corrections to stated rules
 
@@ -2769,6 +2769,44 @@ green suite. The test that closes it removes the rate and watches the population
 end, which is the only proof that the assertion reaches the case.[^71]
 
 
+### FND-131 — The experiment that was named to prove a test blind would have failed it
+
+**Believed.** The terrain test of the holding does not defend the gradient it
+is named for, and the experiment that proves it is to flatten the claim
+threshold to one value for every passable kind. The register states that the
+test then stays green.[^72]
+
+**True.** The conclusion holds. The experiment does not. The test read the
+thresholds directly and asserted that the threshold of level ground was below
+the threshold of a hill. Flattening the thresholds makes that comparison
+false, so the test fails, and it fails without running the rule at all.
+
+The experiment that separates the two is to leave the thresholds ordered and
+stop the rule from reading them. The constants a reader checks are then
+correct, the behaviour they describe is gone, and only a counted outcome can
+see the difference.
+
+**Evidence.** Both experiments were run against the test as it stood. With
+every passable threshold set to one, the old test failed on the line that
+compares two constants. With the thresholds untouched and the decision
+function given a fixed threshold of one, the constant comparison passed and
+the holding spread over mountain as readily as over level ground. The
+replacement test fails in both cases, and it names the counts when it does.
+
+**Follows.** **An experiment that proves a test blind must leave every input
+the test reads unchanged, except the behaviour.** A perturbation that also
+moves a constant fails the test through the constant and reports nothing about
+the behaviour. The green run is the signal, so a red run for the wrong reason
+reads as success. This is the shape the testing rule states for a determinism
+probe, applied to an ordinary test: a probe must prove that the assertion can
+see the defect, and not only that something can go red.[^73]
+
+The item that carried this correction listed the flattening as its acceptance
+condition, and so did the brief that dispatched it. Neither would have been
+wrong about the outcome. Both would have been wrong about what the outcome
+proved.
+
+
 ## References
 
 [^1]: Findings register, FND-038, in this document.
@@ -2842,3 +2880,5 @@ end, which is the only proof that the assertion reaches the case.[^71]
 [^69]: ADR-0073, gathering is admitted by sort-then-admit against the tile. `docs/adrs/accepted/adr-0073-gathering-is-admitted-by-sort-then-admit-against-the-tile.md`
 [^70]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`
 [^71]: Testing rules, section 2a. `.claude/rules/testing.md`
+[^72]: Findings register, FND-080, in this document.
+[^73]: Testing rules, section 1. `.claude/rules/testing.md`
