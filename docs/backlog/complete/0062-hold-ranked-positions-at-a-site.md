@@ -1,7 +1,7 @@
 ---
 id: 0062
 title: Hold ranked positions at a site
-status: refined
+status: complete
 created: 2026-08-31
 implements: [ADR-0066 D1, ADR-0014 D1, ADR-0004 D1, ADR-0056 D4]
 changes: []
@@ -101,7 +101,61 @@ is in flight.
 
 ## Outcome
 
-Filled in when the item moves to `complete/`.
+A site now holds a fixed-width row of ranked positions. Each position names a
+kind of work and a rank, and it holds one unit or nobody. The engine releases a
+dead holder on every frame, and it resizes the row on an interval that the
+world carries as a parameter. One command from the control plane changes what a
+set of sites wants, and it names no unit.
+
+**The row width and the tile capacity are one number.** The width folds the
+terrain capacity table, so raising a capacity raises the width. A test asserts
+the equality against the table rather than against a literal.
+
+**The record was written and the registry row moved to `Draft`.** ADR-0065
+states the civilian and the military case as one claim, because the register
+already held the military half.[^9] The author did not review it.
+
+### Three defects were put back, one at a time
+
+**A bare slot index in place of the identity.** Four tests failed, including
+the one that reuses the slot of a dead holder. The thread-count test stayed
+green, and so did every test of the settlement arena and of identity
+resolution: the defect gives the same wrong answer at every thread count, which
+is the shape the register already names.[^10]
+
+The first attempt at this experiment reported a false green. The fixture put
+the unit under test in slot zero, and a holder field of zero means nobody, so
+the wrong implementation answered correctly. A filler unit now takes slot zero.
+The finding holds the detail.[^11]
+
+**The release of a dead holder moved behind the rebalance interval.** Every
+test stayed green, because the fixture rebalanced on every tick and could not
+tell the two cadences apart. A test with a long interval now covers it.[^12]
+
+**The pass sized the row from the width instead of the tile capacity.** Every
+test that drives a world stayed green, and none of them can fail on it. The
+founding refuses ground that admits nobody, and every other ground carries the
+same capacity as the width, so the two numbers are equal wherever a site can
+stand. One test drives the pass directly over ground that admits nobody, and it
+is the only thing that fails.[^13]
+
+### What was left undone
+
+No blocker was opened and none was closed. The work found no unanswered
+question that stops anything.
+
+The map from a kind of work to the commodity it fills is a placeholder, because
+the commodity set holds one entry. The register holds the open choice.[^14] A
+follow-up item asks for the real map when the economy holds more than one
+commodity.
+
+The rebalance is not driven by anything the simulation produces beyond the
+store. What a site wants comes from the control plane or from the value a
+founded site starts with.
+
+The golden state hash moved. The hash now covers the position table and the
+rebalance schedule, so it moves for every world including one that has never
+stepped.
 
 ## References
 
@@ -114,3 +168,8 @@ Filled in when the item moves to `complete/`.
 [^7]: Blockers register, BLK-005. `docs/BLOCKERS.md`
 [^8]: Blockers register, BLK-009. `docs/BLOCKERS.md`
 [^9]: Blockers register, BLK-010. `docs/BLOCKERS.md`
+[^10]: Findings register, FND-160. `docs/FINDINGS.md`
+[^11]: Findings register, FND-178. `docs/FINDINGS.md`
+[^12]: Findings register, FND-179. `docs/FINDINGS.md`
+[^13]: Findings register, FND-177. `docs/FINDINGS.md`
+[^14]: Decisions register, DEC-073. `docs/DECISIONS.md`
