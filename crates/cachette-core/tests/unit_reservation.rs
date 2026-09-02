@@ -153,7 +153,11 @@ fn a_death_lets_a_spawn_through_again() {
     // makes. A run that ends a unit and starts another stays inside it.
     let mut world = world();
     fill(&mut world, RESERVATION);
-    let first = world.soldiers().iter().next().expect("the world holds units");
+    let first = world
+        .soldiers()
+        .iter()
+        .next()
+        .expect("the world holds units");
     assert!(world.despawn_soldier(first));
     let address = passable(&world);
     assert!(world.spawn_soldier(address, FactionId(0)).is_ok());

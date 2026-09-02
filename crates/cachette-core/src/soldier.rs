@@ -135,7 +135,6 @@ const fn order_of(value: u8) -> Option<ResourceKind> {
 /// [^1]: ADR-0014, entity identity is an index plus a generation, decision D5. `docs/adrs/accepted/adr-0014-entity-identity-is-an-index-plus-a-generation.md`
 const LAST_GENERATION: u32 = u32::MAX;
 
-
 /// The reason that the arena refused a caller.
 ///
 /// Each variant is a mistake that a caller can make. The arena returns the
@@ -1082,7 +1081,10 @@ mod tests {
 
     /// Builds an arena over a small world.
     fn arena() -> SoldierArena {
-        SoldierArena::new(Grid::new(4, 4).expect("a small extent describes a grid"), 16)
+        SoldierArena::new(
+            Grid::new(4, 4).expect("a small extent describes a grid"),
+            16,
+        )
     }
 
     #[test]

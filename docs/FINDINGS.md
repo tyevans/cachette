@@ -3262,6 +3262,24 @@ of the first entry moves, so the address is what a test must read.
 written.** Nothing in the type system says that a copy must reserve, so
 nothing fails when it does not.
 
+**The general form: a test can pass for a reason unrelated to the thing it is
+named for, and only a reinserted defect reveals which reason.** The test that
+asserts a copy keeps its reservation stayed green when the reservation was
+removed from the constructor, because the copy called a reserving constructor
+of its own. It was named for the copy and it covered the copy, and it covered
+nothing else, but nobody could have known that from reading it.
+
+Three instances of this shape were found on one day, in three pieces of work.
+A test stayed green because a second check downstream protected the value the
+deleted check guarded, so the test covered neither check. A test stayed green
+because it asserted only that an error occurred, and a refusal by any cause is
+an error. This entry is the third.
+
+**Reinsert each defect separately.** A test that covers two guarantees at once
+cannot be told apart from a test that covers one, until the two are removed
+one at a time. The cost is one build for each guarantee, and the alternative
+is a suite whose coverage nobody can state.
+
 ### FND-144 — A founding that a spawn refused left a settlement standing and a part of its group alive
 
 **Believed.** A founding leaves nothing half-founded. The engine says so in

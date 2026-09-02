@@ -1167,7 +1167,7 @@ a failed founding is correct.[^PRD12]
 [^FND135]: Findings register, FND-135. `docs/FINDINGS.md`
 [^DOD3]: Definition of Done, section 3. `.claude/rules/definition-of-done.md`
 [^BLK3]: Blockers register, BLK-003. `docs/BLOCKERS.md`
-[^ITEM0150]: Backlog item 0150. `docs/backlog/refined/0150-reserve-the-unit-columns-at-construction.md`
+[^ITEM0150]: Backlog item 0150. `docs/backlog/complete/0150-reserve-the-unit-columns-at-construction.md`
 [^DEC60A]: The event types. `crates/cachette-core/src/event.rs`
 [^DEC60B]: Recurring Defect Shapes, shape 1. `.claude/rules/recurring-defects.md`
 [^DEC60C]: Findings register, FND-137. `docs/FINDINGS.md`

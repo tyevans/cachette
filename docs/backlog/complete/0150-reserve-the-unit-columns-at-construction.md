@@ -1,7 +1,7 @@
 ---
 id: 0150
 title: Reserve the unit columns at construction
-status: refined
+status: complete
 created: 2026-09-01
 implements: [ADR-0084 D1, ADR-0084 D2, ADR-0084 D3]
 changes: []
@@ -162,7 +162,37 @@ either assertion.[^10]
 
 ## Outcome
 
-Filled in when the item moves to `complete/`.
+Done. The world settings name the reservation, the arena takes it, and a spawn
+past it gets the typed refusal that already existed and that nothing could
+reach.
+
+**Each of the three defects was put back separately, and each was caught.**
+Removing the reservation from the constructor failed one test, the one that
+reads the address of every unit column before and after a run fills it.
+Removing the refusal failed three: the spawn test and both founding tests.
+Reverting the copy to a derived one failed one, the copy test.
+
+**Two tests stayed green under a defect, and both are worth naming.** The copy
+test stayed green when the constructor lost its reservation, because the copy
+reserved through a path of its own. The column-address test stayed green when
+the refusal was removed, because filling to the reservation never crosses it.
+Neither is a defect in the tests. Both say what the tests do not cover, and
+neither could be read off the test source.[^11]
+
+**One assertion was written and removed before it ran.** It asked that a
+refused founding restore the state hash. That is false: the arena never
+compacts the slot index space and a generation never rewinds, so a founding
+that failed moves the hash deterministically. A test states that outcome
+instead.[^12]
+
+**One prediction was wrong.** The founding fixture was expected to need
+widening, because the survey might refuse a group of eight before the arena
+refused it. The survey admitted the group and the arena refused the fifth
+member on the first run. Nothing was adjusted.
+
+The whole gate command ran green. The two determinism tests passed and the
+golden state hash did not move, which is what the impact review predicted from
+the hash covering column lengths and not capacities.
 
 ## References
 
@@ -176,3 +206,5 @@ Filled in when the item moves to `complete/`.
 [^8]: Decisions register, DEC-062. `docs/DECISIONS.md`
 [^9]: Findings register, FND-051. `docs/FINDINGS.md`
 [^10]: Testing Rules, section 2a. `.claude/rules/testing.md`
+[^11]: Findings register, FND-143. `docs/FINDINGS.md`
+[^12]: Findings register, FND-144. `docs/FINDINGS.md`
