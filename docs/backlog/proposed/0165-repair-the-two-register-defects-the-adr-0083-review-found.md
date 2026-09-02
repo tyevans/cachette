@@ -29,9 +29,12 @@ reach it. FND-149 holds this.[^4]
 **The sweep that corrected the accumulator example reached one document and
 left six.** FND-141 corrected the arithmetic in the project owner's document. A
 whole-tree search finds the old example in two accepted records, in three
-source comments and in one complete backlog item. The rule that an accumulator
-widens is right in all six places, and the example beside it is false. FND-150
-holds this.[^5]
+source comments, in one research report and in one complete backlog item. The
+rule that an accumulator widens is right in every one of those places, and the
+example beside it is false. One nearby claim in a second research report is
+true and is not an instance: a two-byte field over one million individuals does
+overflow a `u32`. A sweep that matches on the shape of the sentence rather than
+on the arithmetic would repair it by mistake. FND-150 holds this.[^5]
 
 ## Impact review
 

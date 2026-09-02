@@ -3352,32 +3352,48 @@ the table, or mark the row that no comparison may use.
 commit body never decays and a register is what a reader consults. A
 measurement that supports a decision belongs in both.
 
-### FND-150 — The sweep that corrected the accumulator example reached one document and left six
+### FND-150 — The sweep that corrected the accumulator example reached one document and left the tree
 
 **Believed.** FND-141 corrected a false example, and the correction reached
 the document that held it. The project owner's document now states the
 arithmetic correctly, so the example is repaired.
 
-**True.** Six further sites still state the false example. Two are accepted
-records. ADR-0002 D3 says a byte-wide field summed over millions of tiles
-overflows a 32-bit accumulator, and ADR-0053 says the same of the target tile
-count. Three are source comments, in the value types module and twice in the
-pyramid module; one of them says a one-byte field over 2^24 tiles reaches
-2^32, and the product is 4,278,190,080 against a ceiling of 4,294,967,296. One
-is a complete backlog item. FND-141 named the owner's document alone, so the
-sweep stopped where the finding pointed.
+**True.** The false example is still alive across the tree. Two accepted
+records hold it: ADR-0002 D3 says a byte-wide field summed over millions of
+tiles overflows a 32-bit accumulator, and ADR-0053 says the same of the target
+tile count. Three source comments hold it, in the value types module and twice
+in the pyramid module. One research report holds it in its strongest form,
+where it says the sum reaches 2^32 exactly. One complete backlog item holds it.
+FND-141 named the owner's document alone, so the sweep stopped where the
+finding pointed.
 
-The rule that an accumulator widens is right in every one of the six places.
+The rule that an accumulator widens is right in every one of those places.
 What is wrong is the example, in every one of them.
 
-**Evidence.** A whole-tree search for the phrasings of the example, run during
-the review of ADR-0083.[^102] The commit that carries this entry holds the
-command.
+**One nearby claim is not an instance, and a sweep must not take it.** A
+research report says a two-byte field summed over one million individuals
+reaches 6.5 times 10^10 and overflows a `u32` by a factor of fifteen. That is
+true, and it is a different claim. A sweep that matches on the shape of the
+sentence rather than on the arithmetic would repair a correct statement.
+
+**Evidence.** A whole-tree search for the phrasings of the example. The
+review of ADR-0083 ran it and reported a list.[^102] The list was short by
+one site, and a second search by a second reader found it. The commit that
+carries this entry holds both commands and the enumeration.
+
+**A count of the sites does not belong here, and the first version of this
+entry carried one.** It said six, and the true figure was seven. The entry
+that records this shape reproduced it within the hour.
 
 **Follows.** **A finding names the instance it found, and a sweep searches the
 tree.** The commit rule already says a sweep is done when a whole-tree search
 comes back clean, and a finding is where that rule is easiest to skip, because
 a finding reads as a note rather than as a change.
+
+**One search by one reader is not a clean search.** The review ran the search
+and believed it complete. A second reader ran it again and found a site the
+first pattern missed. Report the command, so that the second reader can widen
+it.
 
 **Correcting an example inside an accepted record is a decision, not a
 repair.** Two of the six sites are accepted. The retcon window does not cover
