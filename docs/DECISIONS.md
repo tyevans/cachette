@@ -90,13 +90,12 @@ between a caller and a population built one call at a time is prose. Writing
 that record, or whatever replaces it, is what turns option 2 from a promise
 into a rule.
 
-**A second cost, found in this work's own test.** The test that proves a gather
-event names a unit could not choose a tile that grants, because the control
-plane cannot see where a resource is. It therefore put a unit on every open
-tile and let the world decide. That loop was not a convenience; it was the
-absence of a read. An API that cannot answer where to act invites a caller to
-sweep, whatever the rule says. The test now spawns four units at named
-addresses.
+**A second cost, and it decides how much the rule is worth.** The control plane
+cannot see where a resource is, so a caller that wants a gather event has no way
+to choose a tile and sweeps instead. An API that cannot say where to act invites
+the sweep whatever the rule says, and the findings register holds that with its
+evidence.[^F147] Until a caller can ask the engine for a place, option 2 buys a
+rule that a caller cannot follow.
 
 **What holds it back.** Nothing technical. The verbs exist and work. The
 question is what the project promises, and the answer decides whether a later
@@ -1186,6 +1185,7 @@ a failed founding is correct.[^PRD12]
 [^DEC63D]: Backlog item 0161. `docs/backlog/proposed/0161-let-the-control-plane-found-a-group.md`
 [^DEC63E]: ADR-0054, an entity belongs to one of three tiers, declared at creation, decision D1. `docs/adrs/accepted/adr-0054-an-entity-belongs-to-one-of-three-tiers-declared-at-creation.md`
 [^DEC63F]: ADR Registry, row 0043. `docs/adrs/REGISTRY.md`
+[^F147]: Findings register, FND-147. `docs/FINDINGS.md`
 [^TEST2A]: Testing rules, section 2a. `.claude/rules/testing.md`
 [^PRD12]: PRD-0012, a world starts small and grows. `docs/product/accepted/prd-0012-a-world-starts-small-and-grows.md`
 [^FND022]: Findings register, FND-022. `docs/FINDINGS.md`

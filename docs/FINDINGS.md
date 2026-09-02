@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-147**
+**Next number: FND-148**
 
 ## A. Corrections to stated rules
 
@@ -1204,6 +1204,48 @@ can, or it does not belong.
 **A boundary drawn to remove a second declaration site removes the ability to
 check that site from outside.** That is the cost of the boundary and it is
 correct. Do not buy the check back by smuggling the layout into the test.
+
+### FND-147 — An API that cannot say where to act invites the caller to sweep
+
+**Believed.** The control plane rule is a matter of discipline. Python must not
+loop over entities, so a caller that sweeps the world has ignored the rule, and
+the repair is to write the caller properly.[^ORIENT2]
+
+**True.** A caller sweeps when it has no other way to find the thing it must
+act on. A rule that forbids a shape and offers no alternative is a wish. The
+rule loses to the absence of a read every time, because the read is what the
+caller needed and the rule is only prose.
+
+**Evidence.** A test had to produce one gather event. The gather resolve grants
+from the tile a unit stands on, and only when that tile holds the resource. The
+control plane has no read that answers which tile holds a resource. The test
+therefore put a unit on every open tile of a sixteen by sixteen world, ordered
+each one to gather, and let the engine find the ground.
+
+**The person who wrote that sweep had recorded the rule against sweeping in the
+same change.** Discipline was not the missing part. The read was.
+
+**The obvious repair is the same defect one layer out.** A per-tile call that
+answers whether a tile holds a resource moves the sweep from units to tiles,
+and the tile population is larger than the unit population. A caller that walks
+the world asking a question one tile at a time is the data plane, whatever the
+question is.
+
+**Follows.** Three things.
+
+**When a rule forbids a shape, check that the API offers the shape it wants
+instead.** The design says the caller builds a selector and the engine resolves
+it. A selector that names a place by a property is the missing piece here.
+Until something like it exists, every caller that needs a place will sweep, and
+each one will look like a discipline failure.
+
+**When you find yourself sweeping, do not add discipline. Ask which read is
+missing.** The sweep is a symptom and it names its own cause.
+
+**A rule with no mechanism is worth recording as unenforced.** A reserved
+registry row holds the claim that the API refuses the loop for a declared
+tier.[^F147A] Nothing implements it. A reader who meets the rule and not the
+gap concludes the project enforces something it does not.
 
 ### FND-052 — A register was restored from a copy, and an entry left silently
 
@@ -3358,3 +3400,5 @@ makes it more likely, not less.
 [^F137B]: The event types. `crates/cachette-core/src/event.rs`
 [^F137C]: Recurring Defect Shapes, shape 1. `.claude/rules/recurring-defects.md`
 [^F137D]: Backlog item 0153. `docs/backlog/refined/0153-let-python-read-an-event-without-repeating-its-layout.md`
+[^F147A]: ADR Registry, row 0043. `docs/adrs/REGISTRY.md`
+[^ORIENT2]: Project orientation, the design principles. `CLAUDE.md`
