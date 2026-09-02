@@ -12,7 +12,9 @@
 //! [^1]: ADR-0041, a crate split enforces the boundary at compile time. `docs/adrs/REGISTRY.md`
 //! [^2]: ADR-0042, the interpreter is released for the whole step. `docs/adrs/REGISTRY.md`
 
-use cachette_core::{Axial, Entity, FactionId, ResourceKind, World as CoreWorld, WorldConfig};
+use cachette_core::{
+    Axial, Entity, FactionId, Fix32, ResourceKind, World as CoreWorld, WorldConfig,
+};
 use numpy::{PyArray1, ToPyArray};
 use pyo3::create_exception;
 use pyo3::exceptions::PyException;
@@ -404,6 +406,170 @@ impl PyWorld {
             .ok_or_else(|| ViewError::new_err(format!("the identity {unit} names no live soldier")))
     }
 
+    /// Returns the number of settlements standing in the world.
+    #[getter]
+    fn settlement_count(&self) -> u32 {
+        self.lock().settlements().len()
+    }
+
+    /// Founds a settlement at each address and returns the identity column.
+    ///
+    /// The call takes a set and answers once. The identities come back as
+    /// one column, in the order of the addresses.
+    ///
+    /// **The set is all or nothing.** An address the world refuses destroys
+    /// every settlement this call made and raises.
+    ///
+    /// # Errors
+    ///
+    /// Raises `VerbError` when the arena is full, when an address is outside
+    /// the world, when the ground admits nobody, when the world has no such
+    /// faction, or when a settlement already stands on the tile. The error
+    /// names the address that refused.
+    fn found_settlements<'py>(
+        &self,
+        python: Python<'py>,
+        addresses: Vec<(i32, i32)>,
+        faction: u16,
+    ) -> PyResult<Bound<'py, PyArray1<u64>>> {
+        let mut world = self.lock();
+        let mut made: Vec<u64> = Vec::with_capacity(addresses.len());
+        for (q, r) in addresses {
+            match world.found_settlement(Axial::new(q, r), FactionId(faction)) {
+                Ok(site) => made.push(site.to_bits()),
+                Err(error) => {
+                    // Leave nothing half-made, in the same way the soldier
+                    // spawn does.
+                    for site in &made {
+                        let entity = world
+                            .resolve_settlement(*site)
+                            .expect("this call made the identity a moment ago");
+                        world.destroy_settlement(entity);
+                    }
+                    return Err(VerbError::new_err(format!(
+                        "the address ({q}, {r}) refused a settlement: {error}"
+                    )));
+                }
+            }
+        }
+        Ok(made.to_pyarray(python))
+    }
+
+    /// Changes what a set of sites wants of one kind of work.
+    ///
+    /// **The command names no unit.** It says what a place wants, and the
+    /// engine turns that into a number of positions of each kind at the next
+    /// rebalance. A caller that named the workers would be looping over
+    /// entities, and the control plane never does that.[^1]
+    ///
+    /// The kind is the number that the gather event carries in its `kind`
+    /// column. The target is a Q16.16 value as its raw integer, because a
+    /// float in simulated state does not add associatively.[^2]
+    ///
+    /// **The set is all or nothing.** Every identity resolves, and the target
+    /// is checked, before anything is written.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0040, Python is a control plane, not a data plane, decision D1. `docs/adrs/draft/adr-0040-python-is-a-control-plane-not-a-data-plane.md`
+    /// [^2]: ADR-0002, simulated and aggregated state holds no floating point number, decision D1. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
+    ///
+    /// # Errors
+    ///
+    /// Raises `ViewError` when an identity names no live settlement. Raises
+    /// `VerbError` when the number names no kind, or when the target is
+    /// below zero.
+    fn prefer_at_sites(&self, sites: Vec<u64>, kind: u8, target: i32) -> PyResult<()> {
+        let mut world = self.lock();
+        let kind = ResourceKind::from_u8(kind)
+            .ok_or_else(|| VerbError::new_err(format!("{kind} names no kind of work")))?;
+        let mut resolved = Vec::with_capacity(sites.len());
+        for site in &sites {
+            resolved.push(resolve_site(&world, *site)?);
+        }
+        world
+            .prefer_at_sites(&resolved, kind, Fix32(target))
+            .map_err(|error| VerbError::new_err(error.to_string()))
+    }
+
+    /// Returns the positions that one site holds, one column for each field.
+    ///
+    /// The columns hold the positions of the site and nothing else. An entry
+    /// of the storage that is no position does not appear.
+    ///
+    /// The holder column carries the whole identity of the unit that holds
+    /// each position, and zero where a position holds nobody. It is not a
+    /// slot index.[^1]
+    ///
+    /// **This read stays singular while the write verb takes a set**, for
+    /// the same reason the unit read does: a set form would have to answer
+    /// for a dead identity with a value that stands for nothing.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0085, an entity crosses to Python as one opaque identity that the engine resolves, decision D3. `docs/adrs/accepted/adr-0085-an-entity-crosses-to-python-as-one-opaque-identity.md`
+    ///
+    /// # Errors
+    ///
+    /// Raises `ViewError` when the identity names no live settlement, or
+    /// when the dictionary cannot be built.
+    fn site_positions<'py>(&self, python: Python<'py>, site: u64) -> PyResult<Bound<'py, PyDict>> {
+        let world = self.lock();
+        let entity = resolve_site(&world, site)?;
+        let row = world
+            .site_positions(entity)
+            .ok_or_else(|| ViewError::new_err(format!("the identity {site} names no live site")))?;
+        let held: Vec<_> = row.iter().filter(|entry| entry.exists()).collect();
+        let columns = PyDict::new(python);
+        let kind: Vec<u8> = held.iter().map(|entry| entry.kind_number()).collect();
+        let rank: Vec<u8> = held.iter().map(|entry| entry.rank()).collect();
+        let holder: Vec<u64> = held.iter().map(|entry| entry.holder_bits()).collect();
+        columns.set_item("kind", kind.to_pyarray(python))?;
+        columns.set_item("rank", rank.to_pyarray(python))?;
+        columns.set_item("holder", holder.to_pyarray(python))?;
+        Ok(columns)
+    }
+
+    /// Returns what one site wants of each kind of work.
+    ///
+    /// The column holds one Q16.16 value for each kind, as its raw integer,
+    /// in the order of the kind numbering.
+    ///
+    /// # Errors
+    ///
+    /// Raises `ViewError` when the identity names no live settlement.
+    fn site_preference<'py>(
+        &self,
+        python: Python<'py>,
+        site: u64,
+    ) -> PyResult<Bound<'py, PyArray1<i32>>> {
+        let world = self.lock();
+        let entity = resolve_site(&world, site)?;
+        let preference = world
+            .site_preference(entity)
+            .ok_or_else(|| ViewError::new_err(format!("the identity {site} names no live site")))?;
+        let raw: Vec<i32> = ResourceKind::ALL
+            .iter()
+            .map(|kind| preference.target(*kind).0)
+            .collect();
+        Ok(raw.to_pyarray(python))
+    }
+
+    /// Sets how often the engine rebalances the positions of every site.
+    ///
+    /// The period is in ticks, and the phase is the offset inside it. The
+    /// interval is a parameter of the world.
+    ///
+    /// # Errors
+    ///
+    /// Raises `VerbError` when the period is zero, or above the range that
+    /// the scaling multiply takes.
+    fn set_position_schedule(&self, period: u32, phase: u32) -> PyResult<()> {
+        self.lock()
+            .set_position_schedule(period, phase)
+            .map_err(|error| VerbError::new_err(error.to_string()))
+    }
+
     fn __repr__(&self) -> String {
         let world = self.lock();
         // The arguments name the constructor's own parameters, so that the
@@ -433,6 +599,20 @@ impl PyWorld {
 fn resolve(world: &CoreWorld, unit: u64) -> PyResult<Entity> {
     world
         .resolve_soldier(unit)
+        .map_err(|error| ViewError::new_err(error.to_string()))
+}
+
+/// Resolves a settlement identity that Python handed back, or raises.
+///
+/// The engine compares the generation, so a settlement that was lost never
+/// answers for the settlement founded next in its slot.[^1]
+///
+/// # References
+///
+/// [^1]: ADR-0085, an entity crosses to Python as one opaque identity that the engine resolves, decision D3. `docs/adrs/accepted/adr-0085-an-entity-crosses-to-python-as-one-opaque-identity.md`
+fn resolve_site(world: &CoreWorld, site: u64) -> PyResult<Entity> {
+    world
+        .resolve_settlement(site)
         .map_err(|error| ViewError::new_err(error.to_string()))
 }
 
