@@ -34,6 +34,7 @@ use crate::cohort::{
     self, CohortError, CohortTable, DeathPlane, DrawLedger, NeedCondition, NeedRule, SiteRationed,
     UnitStarved,
 };
+use crate::descent::{DescentId, Parents};
 use crate::event::{ResourceTaken, TileChanged, CHANGE_KIND_LOWERED, CHANGE_KIND_RAISED};
 use crate::founding::{self, Founding, FoundingError, FoundingOutcome, Survey};
 use crate::hash::StateHash;
@@ -1440,7 +1441,105 @@ impl World {
         if faction.0 >= self.config.faction_count.max(1) {
             return Err(CharacterError::FactionAboveCeiling(faction));
         }
-        self.characters.create(faction, self.tick)
+        self.characters.create(self.config.seed, faction, self.tick)
+    }
+
+    /// Bears a child of two characters and returns the identity of the
+    /// child.
+    ///
+    /// The child is born on the current tick of the world. It takes the
+    /// faction of its mother, and it records both parents. The record of
+    /// descent keeps those edges after either parent is gone, so a watcher
+    /// reads a dead parent through a living child.[^1]
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when either parent is gone, when the two parents
+    /// are one character, when the arena holds no free slot, or when the
+    /// record of descent is full.
+    ///
+    /// # References
+    ///
+    /// [^1]: Decisions register, DEC-003. `docs/DECISIONS.md`
+    pub fn bear_character(
+        &mut self,
+        mother: Entity,
+        father: Entity,
+    ) -> Result<Entity, CharacterError> {
+        self.characters
+            .bear(self.config.seed, mother, father, self.tick)
+    }
+
+    /// Returns the two parents of a living character.
+    ///
+    /// Returns `None` when the identity is dead. Returns a pair of absent
+    /// parents when the character founds a line. The world invents no
+    /// parent.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: Blockers register, BLK-011. `docs/BLOCKERS.md`
+    #[must_use]
+    pub fn character_parents(&self, entity: Entity) -> Option<Parents> {
+        self.characters.parents(entity)
+    }
+
+    /// Returns every ancestor of a living character, in ascending birth
+    /// order.
+    ///
+    /// Returns an empty list when the identity is dead and when the
+    /// character founds a line. The order is explicit and it is the same on
+    /// every run.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
+    #[must_use]
+    pub fn character_ancestors(&self, entity: Entity) -> Vec<DescentId> {
+        let Some(id) = self.characters.descent_id(entity) else {
+            return Vec::new();
+        };
+        self.characters.descent().ancestors(id)
+    }
+
+    /// Returns every descendant of a living character, in ascending birth
+    /// order.
+    ///
+    /// Returns an empty list when the identity is dead and when the
+    /// character has no child.
+    #[must_use]
+    pub fn character_descendants(&self, entity: Entity) -> Vec<DescentId> {
+        let Some(id) = self.characters.descent_id(entity) else {
+            return Vec::new();
+        };
+        self.characters.descent().descendants(id)
+    }
+
+    /// Returns the relation between two characters.
+    ///
+    /// The value is Wright's coefficient of relationship. A parent and a
+    /// child give one half. Two characters with no ancestor in common give
+    /// zero, and a character who founds a line therefore stands at zero to
+    /// everybody.[^1]
+    ///
+    /// The value is a Q16.16 fixed-point number and it is exact. Every step
+    /// of the recursion halves a value, so no step rounds.[^2]
+    ///
+    /// Returns zero when either identity is dead.
+    ///
+    /// # References
+    ///
+    /// [^1]: Blockers register, BLK-011. `docs/BLOCKERS.md`
+    /// [^2]: The character graph and inheritance, section 3.6. `docs/research/reports/14-character-graph-and-inheritance.md`
+    #[must_use]
+    pub fn character_relation(&self, left: Entity, right: Entity) -> Fix32 {
+        let (Some(left), Some(right)) = (
+            self.characters.descent_id(left),
+            self.characters.descent_id(right),
+        ) else {
+            return Fix32::ZERO;
+        };
+        self.characters.descent().relation(left, right)
     }
 
     /// Removes a character and reports whether it removed one.

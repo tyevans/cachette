@@ -89,6 +89,13 @@ const fn mix(value: u64) -> u64 {
     state ^ (state >> 31)
 }
 
+/// The system identifier of the character tier.
+///
+/// The character tier owns this identifier alone. Every character draw keys
+/// on it, and a birth draw keys on the mother because the child holds no
+/// identity when the draw happens.
+pub const SYSTEM_CHARACTER: SystemId = 6;
+
 /// The system identifier of the founding.
 ///
 /// The founding owns this identifier alone. It does not share the identifier

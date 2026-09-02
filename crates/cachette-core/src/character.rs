@@ -41,7 +41,9 @@
 
 use std::collections::VecDeque;
 
+use crate::descent::{Descent, DescentError, DescentId, Parents, DESCENT_CEILING};
 use crate::hash::StateHash;
+use crate::rng;
 use crate::tier::{EntityTier, Shape};
 use crate::types::{Entity, FactionId, Fix32, Tick, FACTION_CEILING};
 
@@ -103,6 +105,86 @@ pub enum CharacterError {
         /// The tier that the shape declares.
         tier: EntityTier,
     },
+    /// The identity of a parent no longer resolves.
+    ///
+    /// A birth reads the record of descent of each parent, so each parent
+    /// must be alive when the child is born. A caller that holds the
+    /// identity of a character who is gone receives this.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0014, entity identity is an index plus a generation, decision D2. `docs/adrs/accepted/adr-0014-entity-identity-is-an-index-plus-a-generation.md`
+    ParentIsGone(Entity),
+    /// The two parents of the birth are one character.
+    ParentsAreOneCharacter(Entity),
+    /// The record of descent refused the birth.
+    Descent(DescentError),
+}
+
+/// The sex of a character.
+///
+/// The world draws the sex when it creates the character. The value is a
+/// fact about the character and not a fact about its descent, so it lives
+/// in the slot columns and a death releases it.[^1]
+///
+/// # References
+///
+/// [^1]: Decisions register, DEC-003. `docs/DECISIONS.md`
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum Sex {
+    /// The character can be the mother of a child.
+    Female,
+    /// The character can be the father of a child.
+    Male,
+}
+
+impl Sex {
+    /// Returns the sex that a raw draw names.
+    const fn from_draw(draw: u64) -> Self {
+        if draw == 0 {
+            Self::Female
+        } else {
+            Self::Male
+        }
+    }
+
+    /// Returns the raw value that the column stores.
+    const fn to_column(self) -> u8 {
+        match self {
+            Self::Female => 0,
+            Self::Male => 1,
+        }
+    }
+}
+
+impl core::fmt::Display for Sex {
+    fn fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        let name = match self {
+            Self::Female => "female",
+            Self::Male => "male",
+        };
+        formatter.write_str(name)
+    }
+}
+
+/// The draw index of the sex of a character who founds a line.
+///
+/// A character who founds a line already holds an identity when the world
+/// draws, so the draw keys on that identity. A birth cannot do that,
+/// because the child holds no identity when the draw happens.[^1]
+///
+/// # References
+///
+/// [^1]: ADR-0003, every random draw is keyed, never stateful, decision D1. `docs/adrs/accepted/adr-0003-every-random-draw-is-keyed-never-stateful.md`
+const DRAW_FOUNDER_SEX: u32 = 0;
+
+/// The number of values that the sex draw chooses between.
+const SEX_OPTIONS: u64 = 2;
+
+impl From<DescentError> for CharacterError {
+    fn from(error: DescentError) -> Self {
+        Self::Descent(error)
+    }
 }
 
 impl core::fmt::Display for CharacterError {
@@ -122,6 +204,17 @@ impl core::fmt::Display for CharacterError {
                 formatter,
                 "a capacity of {asked} is above the {tier} tier ceiling of {ceiling}"
             ),
+            Self::ParentIsGone(parent) => write!(
+                formatter,
+                "the parent {} is gone and cannot bear a child",
+                parent.to_bits()
+            ),
+            Self::ParentsAreOneCharacter(parent) => write!(
+                formatter,
+                "the two parents are both the character {}",
+                parent.to_bits()
+            ),
+            Self::Descent(error) => write!(formatter, "{error}"),
         }
     }
 }
@@ -161,6 +254,28 @@ pub struct CharacterArena {
     births: Vec<Tick>,
     /// The renown of each slot, as a Q16.16 value.
     renown: Vec<Fix32>,
+    /// The sex of each slot. Zero is female and one is male.
+    sexes: Vec<u8>,
+    /// The row of the record of descent that each slot points at.
+    ///
+    /// The value names the character that holds the slot now. A creation
+    /// overwrites it, so the character created next in a slot never reads
+    /// the descent of the character who held it before.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0078, descent is a bounded record, and a relation is a bounded recursion, decision D1. `docs/adrs/draft/adr-0078-descent-is-a-bounded-record-and-a-relation-is-a-bounded-recursion.md`
+    descent_of_slot: Vec<u32>,
+    /// The record of descent.
+    ///
+    /// The record is append-only and it holds every character the arena has
+    /// ever created. A death releases the slot columns, which the next
+    /// character overwrites. It never releases this record.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: Decisions register, DEC-003. `docs/DECISIONS.md`
+    descent: Descent,
     /// The free slots, oldest first.
     free: VecDeque<u32>,
     /// The number of live characters.
@@ -242,6 +357,9 @@ impl CharacterArena {
             factions: Vec::new(),
             births: Vec::new(),
             renown: Vec::new(),
+            sexes: Vec::new(),
+            descent_of_slot: Vec::new(),
+            descent: Descent::new(),
             free: VecDeque::new(),
             live_count: 0,
             retired_count: 0,
@@ -302,9 +420,108 @@ impl CharacterArena {
     ///
     /// [^1]: Findings register, FND-043. `docs/FINDINGS.md`
     /// [^2]: ADR-0014, entity identity is an index plus a generation, decision D4. `docs/adrs/accepted/adr-0014-entity-identity-is-an-index-plus-a-generation.md`
-    pub fn create(&mut self, faction: FactionId, birth: Tick) -> Result<Entity, CharacterError> {
+    pub fn create(
+        &mut self,
+        seed: u64,
+        faction: FactionId,
+        birth: Tick,
+    ) -> Result<Entity, CharacterError> {
+        let entity = self.mint(faction, birth)?;
+        let id = self.descent.record(entity, Parents::NONE)?;
+        self.descent_of_slot[entity.index() as usize] = id.birth_order();
+        // The character already holds an identity, so the draw keys on it. A
+        // birth cannot key on the child, because the child holds no identity
+        // when the draw happens.[^1]
+        //
+        // [^1]: ADR-0003, every random draw is keyed, never stateful, decision D1. `docs/adrs/accepted/adr-0003-every-random-draw-is-keyed-never-stateful.md`
+        let draw = rng::draw_below(
+            seed,
+            rng::SYSTEM_CHARACTER,
+            birth.0,
+            entity.to_bits(),
+            DRAW_FOUNDER_SEX,
+            SEX_OPTIONS,
+        );
+        self.sexes[entity.index() as usize] = Sex::from_draw(draw).to_column();
+        Ok(entity)
+    }
+
+    /// Bears a child of two characters and returns the identity of the
+    /// child.
+    ///
+    /// The child takes the faction of its mother. It records both parents,
+    /// and the record of descent keeps those edges after either parent is
+    /// gone.[^1]
+    ///
+    /// Both parents must be alive. The record of descent outlives a
+    /// character, so a caller reads a dead parent through a living child.
+    /// It cannot name one as a parent of a new child.
+    ///
+    /// The sex draw keys on the mother and on the number of children she
+    /// has borne on this tick, because the child holds no identity when the
+    /// draw happens.[^2]
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when either parent is gone, when the two parents
+    /// are one character, when the arena holds no free slot, or when the
+    /// record of descent is full.
+    ///
+    /// # References
+    ///
+    /// [^1]: Decisions register, DEC-003. `docs/DECISIONS.md`
+    /// [^2]: ADR-0003, every random draw is keyed, never stateful, decision D1. `docs/adrs/accepted/adr-0003-every-random-draw-is-keyed-never-stateful.md`
+    pub fn bear(
+        &mut self,
+        seed: u64,
+        mother: Entity,
+        father: Entity,
+        birth: Tick,
+    ) -> Result<Entity, CharacterError> {
+        if mother == father {
+            return Err(CharacterError::ParentsAreOneCharacter(mother));
+        }
+        let mother_id = self
+            .descent_id(mother)
+            .ok_or(CharacterError::ParentIsGone(mother))?;
+        let father_id = self
+            .descent_id(father)
+            .ok_or(CharacterError::ParentIsGone(father))?;
+        let faction = self
+            .faction(mother)
+            .ok_or(CharacterError::ParentIsGone(mother))?;
+        let sequence = self.descent.take_birth_sequence(mother_id, birth);
+        let entity = self.mint(faction, birth)?;
+        let id = self.descent.record(
+            entity,
+            Parents {
+                mother: Some(mother_id),
+                father: Some(father_id),
+            },
+        )?;
+        self.descent_of_slot[entity.index() as usize] = id.birth_order();
+        let draw = rng::draw_below(
+            seed,
+            rng::SYSTEM_CHARACTER,
+            birth.0,
+            mother.to_bits(),
+            sequence,
+            SEX_OPTIONS,
+        );
+        self.sexes[entity.index() as usize] = Sex::from_draw(draw).to_column();
+        Ok(entity)
+    }
+
+    /// Takes a slot, writes the slot columns, and returns the identity.
+    ///
+    /// The record of descent is checked before the slot is taken, so a full
+    /// record refuses the creation and leaves no slot half written.
+    fn mint(&mut self, faction: FactionId, birth: Tick) -> Result<Entity, CharacterError> {
         if faction.0 >= FACTION_CEILING {
             return Err(CharacterError::FactionAboveCeiling(faction));
+        }
+        if self.descent.len() >= DESCENT_CEILING {
+            return Err(CharacterError::Descent(DescentError::RecordFull));
         }
         let slot = match self.free.pop_front() {
             Some(slot) => slot,
@@ -334,6 +551,8 @@ impl CharacterArena {
         self.factions.push(FactionId(0));
         self.births.push(Tick(0));
         self.renown.push(Fix32::ZERO);
+        self.sexes.push(Sex::Female.to_column());
+        self.descent_of_slot.push(0);
         Ok(slot)
     }
 
@@ -434,6 +653,105 @@ impl CharacterArena {
         Some(self.renown[slot as usize])
     }
 
+    /// Returns the sex of a character, or `None` when the identity is dead.
+    ///
+    /// The sex lives in the slot columns, so a death releases it.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: Decisions register, DEC-003. `docs/DECISIONS.md`
+    #[must_use]
+    pub fn sex(&self, entity: Entity) -> Option<Sex> {
+        let slot = self.slot_of(entity)?;
+        Some(if self.sexes[slot as usize] == 0 {
+            Sex::Female
+        } else {
+            Sex::Male
+        })
+    }
+
+    /// Returns the record of descent.
+    ///
+    /// The record is append-only and it holds every character the arena has
+    /// created. A caller reads a character that is gone through it.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: Decisions register, DEC-003. `docs/DECISIONS.md`
+    #[must_use]
+    pub const fn descent(&self) -> &Descent {
+        &self.descent
+    }
+
+    /// Returns the row of the record of descent that names a character.
+    ///
+    /// Returns `None` when the identity is dead. The resolution compares the
+    /// generation in the identity against the generation in the slot, so an
+    /// identity that names a character who is gone never reads the descent
+    /// of the character created next in that slot.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0014, entity identity is an index plus a generation, decision D2. `docs/adrs/accepted/adr-0014-entity-identity-is-an-index-plus-a-generation.md`
+    #[must_use]
+    pub fn descent_id(&self, entity: Entity) -> Option<DescentId> {
+        let slot = self.slot_of(entity)?;
+        self.descent
+            .id_at(self.descent_of_slot[slot as usize])
+            .filter(|id| self.descent.born_as(*id) == Some(entity))
+    }
+
+    /// Returns the two parents of a living character.
+    ///
+    /// Returns `None` when the identity is dead. Returns a pair of absent
+    /// parents when the character founds a line. The world invents no
+    /// parent.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: Blockers register, BLK-011. `docs/BLOCKERS.md`
+    #[must_use]
+    pub fn parents(&self, entity: Entity) -> Option<Parents> {
+        self.descent.parents(self.descent_id(entity)?)
+    }
+
+    /// Reports whether a line has ended.
+    ///
+    /// A line has ended when the character is gone and no descendant of the
+    /// character is alive. A line that holds one living member has not
+    /// ended.
+    ///
+    /// Returns `true` when the record holds no such row, because a line
+    /// that never started holds nobody.
+    #[must_use]
+    pub fn line_ended(&self, id: DescentId) -> bool {
+        if self.is_alive(id) {
+            return false;
+        }
+        !self
+            .descent
+            .descendants(id)
+            .iter()
+            .any(|heir| self.is_alive(*heir))
+    }
+
+    /// Reports whether the character that a row names is alive.
+    ///
+    /// The row holds the identity that the arena minted, and that identity
+    /// carries the generation of the slot at the birth. A slot that was
+    /// reused holds a later generation, so the identity of a character who
+    /// is gone never resolves to the character in the slot now.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0014, entity identity is an index plus a generation, decision D3. `docs/adrs/accepted/adr-0014-entity-identity-is-an-index-plus-a-generation.md`
+    #[must_use]
+    pub fn is_alive(&self, id: DescentId) -> bool {
+        self.descent
+            .born_as(id)
+            .is_some_and(|entity| self.contains(entity))
+    }
+
     /// Writes the renown of a character and reports whether it wrote.
     ///
     /// Returns `false` when the identity is dead. The caller handles the
@@ -512,6 +830,7 @@ impl CharacterArena {
             .write(bytemuck::cast_slice(&self.factions))
             .write(bytemuck::cast_slice(&self.births))
             .write(bytemuck::cast_slice(&self.renown))
+            .write(&self.sexes)
             .write(&self.live);
         for generation in &self.generations {
             hash = hash.write(&generation.to_le_bytes());
@@ -519,7 +838,10 @@ impl CharacterArena {
         for slot in &self.free {
             hash = hash.write(&slot.to_le_bytes());
         }
-        hash
+        for row in &self.descent_of_slot {
+            hash = hash.write(&row.to_le_bytes());
+        }
+        self.descent.hash_into(hash)
     }
 
     /// Reports whether the arena holds its invariants.
@@ -538,7 +860,12 @@ impl CharacterArena {
             || self.factions.len() != slots
             || self.births.len() != slots
             || self.renown.len() != slots
+            || self.sexes.len() != slots
+            || self.descent_of_slot.len() != slots
         {
+            return false;
+        }
+        if !self.descent.check_invariants() {
             return false;
         }
         // The capacity is the second declaration of the tier ceiling. The
@@ -561,6 +888,24 @@ impl CharacterArena {
                     return false;
                 }
                 if self.factions[slot].0 >= FACTION_CEILING {
+                    return false;
+                }
+                if self.sexes[slot] > 1 {
+                    return false;
+                }
+                // The slot column and the record of descent hold the same
+                // identity a second time. This check fails when the two
+                // copies disagree, which is what a creation that reused the
+                // descent row of the character before it would do.[^1]
+                //
+                // [^1]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`
+                let Some(entity) = Entity::new(slot as u32, self.generations[slot]) else {
+                    return false;
+                };
+                let Some(id) = self.descent.id_at(self.descent_of_slot[slot]) else {
+                    return false;
+                };
+                if self.descent.born_as(id) != Some(entity) {
                     return false;
                 }
             }
@@ -622,7 +967,7 @@ mod tests {
     fn a_slot_at_the_last_generation_retires_on_the_loss() {
         let mut arena = CharacterArena::new();
         let first = arena
-            .create(FactionId(0), Tick(0))
+            .create(0, FactionId(0), Tick(0))
             .expect("the creation must succeed");
         arena.generations[0] = LAST_GENERATION;
         let aged = Entity::new(0, LAST_GENERATION).expect("the identity is not zero");
@@ -637,14 +982,14 @@ mod tests {
     fn a_retired_slot_never_returns_to_use() {
         let mut arena = CharacterArena::new();
         arena
-            .create(FactionId(0), Tick(0))
+            .create(0, FactionId(0), Tick(0))
             .expect("the creation must succeed");
         arena.generations[0] = LAST_GENERATION;
         let aged = Entity::new(0, LAST_GENERATION).expect("the identity is not zero");
         assert!(arena.remove(aged));
 
         let next = arena
-            .create(FactionId(0), Tick(0))
+            .create(0, FactionId(0), Tick(0))
             .expect("the creation must succeed");
         assert_ne!(next.index(), 0, "a retired slot must never return");
         assert_eq!(arena.slot_count(), 2);
@@ -661,7 +1006,7 @@ mod tests {
         // panic.
         let mut arena = CharacterArena::new();
         let entity = arena
-            .create(FactionId(0), Tick(0))
+            .create(0, FactionId(0), Tick(0))
             .expect("the creation must succeed");
         arena.live[0] = 0;
         assert!(!arena.remove(entity));
@@ -672,7 +1017,7 @@ mod tests {
     fn a_free_queue_that_holds_one_slot_twice_fails_the_check() {
         let mut arena = CharacterArena::new();
         let entity = arena
-            .create(FactionId(0), Tick(0))
+            .create(0, FactionId(0), Tick(0))
             .expect("the creation must succeed");
         assert!(arena.remove(entity));
         assert!(arena.check_invariants());
@@ -694,7 +1039,7 @@ mod tests {
     fn a_short_column_fails_the_check() {
         let mut arena = CharacterArena::new();
         arena
-            .create(FactionId(0), Tick(0))
+            .create(0, FactionId(0), Tick(0))
             .expect("the creation must succeed");
         assert!(arena.check_invariants());
         arena.renown.pop();
@@ -706,7 +1051,7 @@ mod tests {
         let mut arena =
             CharacterArena::with_capacity(0).expect("a capacity of zero is below the ceiling");
         assert_eq!(
-            arena.create(FactionId(0), Tick(0)),
+            arena.create(0, FactionId(0), Tick(0)),
             Err(CharacterError::ArenaFull)
         );
         assert!(arena.check_invariants());

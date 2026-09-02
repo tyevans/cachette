@@ -289,7 +289,7 @@ fn a_character_carries_no_tile_position() {
     // [^1]: ADR-0066, entity storage holds four fixed shapes, decision D1. `docs/adrs/accepted/adr-0066-entity-storage-holds-four-fixed-shapes.md`
     let mut arena = CharacterArena::new();
     let character = arena
-        .create(FactionId(0), Tick(0))
+        .create(0, FactionId(0), Tick(0))
         .expect("the creation needs no tile and no world shape");
     assert!(arena.contains(character));
     assert!(arena.check_invariants());
@@ -426,18 +426,18 @@ fn an_arena_at_its_capacity_refuses_a_creation_and_keeps_its_invariants() {
     // call would be the failure the record forbids.
     let mut arena = CharacterArena::with_capacity(2).expect("two is below the ceiling");
     let first = arena
-        .create(FactionId(0), Tick(0))
+        .create(0, FactionId(0), Tick(0))
         .expect("the creation must succeed");
     arena
-        .create(FactionId(0), Tick(0))
+        .create(0, FactionId(0), Tick(0))
         .expect("the creation must succeed");
     assert_eq!(
-        arena.create(FactionId(0), Tick(0)).err(),
+        arena.create(0, FactionId(0), Tick(0)).err(),
         Some(CharacterError::ArenaFull)
     );
     // A removal frees a slot, so the next creation succeeds again.
     assert!(arena.remove(first));
-    assert!(arena.create(FactionId(0), Tick(0)).is_ok());
+    assert!(arena.create(0, FactionId(0), Tick(0)).is_ok());
     assert!(arena.check_invariants());
 }
 
