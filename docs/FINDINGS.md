@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-139**
+**Next number: FND-145**
 
 ## A. Corrections to stated rules
 
@@ -3188,6 +3188,12 @@ constraint. A row in the decisions register holds the question.[^92]
 checks it.** The checkable statements of a record get a test. The cost section
 gets none. This claim survived acceptance and every gate.
 
+**Repaired on 1 September 2026.** The world now reserves the unit columns from
+a number its settings name, and a spawn past the reservation gets a typed
+refusal.[^139] The two sentences above describe the engine before that change.
+The third consequence stays open: a cost statement of a product record is still
+a claim about the engine that no gate checks.
+
 ### FND-136 — A merge committed conflict markers into a register, and every gate passed
 
 **Believed.** The gate suite defends the three registers. It checks the
@@ -3212,6 +3218,72 @@ the three markers over the whole tree costs nothing and catches this class.
 **A register merges more often than any other file, because every worker
 updates one.** The registers are where this failure lands, and parallel work
 makes it more likely, not less.
+
+
+### FND-143 — A derived copy of an arena drops its reservation, and nothing reports it
+
+**Believed.** A reservation is a property of the arena, so a copy of a world
+holds the reservation that the world holds. The arena derived its copy, and a
+derived copy copies every field.
+
+**True.** A derived copy of a growable column allocates for what the column
+holds, not for what it reserved. A copy of a world part way through a run
+therefore holds a column sized to the live population, and it grows on the
+next spawn where the original does not.
+
+**Evidence.** The copy was written before it was tested, so no failure was
+observed. The property is stated by the standard library: a copy of a growable
+array allocates for its length. A test copies a world holding one unit, fills
+the copy to the reservation, and asserts that the address of the first entry
+of every column did not move. That test fails against a derived copy and
+passes against a written one.
+
+**Follows.** Three things.
+
+**A reservation is a fact that lives in one field and in every column that
+serves it.** The field says how much, and each column either holds that much
+or does not. A derived copy carries the field and drops what it means, so the
+capacity of the copy reads back correctly and states something false. This is
+the shape the recurring defect rule names first.[^140]
+
+**A capacity assertion cannot see this.** The copy reports the same capacity
+number, because the number lives in a field the copy carried. Only the address
+of the first entry moves, so the address is what a test must read.
+
+**A property that a derived implementation can drop needs the implementation
+written.** Nothing in the type system says that a copy must reserve, so
+nothing fails when it does not.
+
+### FND-144 — A founding that a spawn refused left a settlement standing and a part of its group alive
+
+**Believed.** A founding leaves nothing half-founded. The engine says so in
+its own comment, and one path undoes the settlement and the people when the
+placement cannot seat the whole group.
+
+**True.** Only that one path undid anything. A refusal from the spawn itself
+returned immediately, and it left the settlement standing and the people
+already seated alive. The store arrives after the group is seated, so a
+founding stopped this way left a settlement with no production and no store.
+
+**Evidence.** The founding seats the settlement first and then seats the group
+one member at a time. The spawn returned its error through the question mark
+operator, which returns before the undo. Nothing found this, because the
+refusals a spawn could give were unreachable from a founding: the ground was
+filtered before the spawn, the faction came from the run, and the storage
+refusal needed a full arena, which no run could reach while the arena grew on
+demand.
+
+**Follows.** Two things.
+
+**An unreachable error path is untested code that looks tested.** The path
+compiled, it was covered by the type system, and a reader saw a refusal that
+was handled. Making the storage refusal reachable made the defect reachable in
+the same change.
+
+**Undoing belongs in one place, not at each return.** The founding now undoes
+through one function, and every refusal after the settlement stands goes
+through it. A second undo written at the second return would have been a
+second copy of the same fact.
 
 ## References
 
@@ -3315,3 +3387,5 @@ makes it more likely, not less.
 [^F137B]: The event types. `crates/cachette-core/src/event.rs`
 [^F137C]: Recurring Defect Shapes, shape 1. `.claude/rules/recurring-defects.md`
 [^F137D]: Backlog item 0153. `docs/backlog/proposed/0153-let-python-read-an-event-without-repeating-its-layout.md`
+[^139]: ADR-0084, the world reserves the unit columns at construction. `docs/adrs/draft/adr-0084-the-world-reserves-the-unit-columns-at-construction.md`
+[^140]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`

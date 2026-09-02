@@ -44,6 +44,7 @@ fn one_cell_world() -> World {
         height: ONE_CELL_EXTENT,
         seed: SEED,
         faction_count: 2,
+        unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
     })
     .expect("the extent must describe a world");
     world
@@ -64,6 +65,7 @@ fn many_cell_world() -> World {
         height: MANY_CELL_EXTENT,
         seed: SEED,
         faction_count: 2,
+        unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
     })
     .expect("the extent must describe a world");
     world
@@ -480,6 +482,7 @@ fn intents_at(threads: usize, seed: u64) -> (Vec<Option<u8>>, u64) {
         height: ONE_CELL_EXTENT * 2,
         seed,
         faction_count: 2,
+        unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
     })
     .expect("the extent must describe a world");
     let units = populate(&mut world, 2);

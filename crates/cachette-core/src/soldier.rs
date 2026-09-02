@@ -135,11 +135,6 @@ const fn order_of(value: u8) -> Option<ResourceKind> {
 /// [^1]: ADR-0014, entity identity is an index plus a generation, decision D5. `docs/adrs/accepted/adr-0014-entity-identity-is-an-index-plus-a-generation.md`
 const LAST_GENERATION: u32 = u32::MAX;
 
-/// The number of slots that an arena opens when the caller states no limit.
-///
-/// The limit is the range of the slot index, which is a property of the
-/// identity layout and not a budget.
-const SLOT_INDEX_LIMIT: u32 = u32::MAX;
 
 /// The reason that the arena refused a caller.
 ///
@@ -207,7 +202,7 @@ impl std::error::Error for SoldierError {}
 ///
 /// [^1]: ADR-0014, entity identity is an index plus a generation, decision D1. `docs/adrs/accepted/adr-0014-entity-identity-is-an-index-plus-a-generation.md`
 /// [^2]: ADR-0014, entity identity is an index plus a generation, decision D7. `docs/adrs/accepted/adr-0014-entity-identity-is-an-index-plus-a-generation.md`
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct SoldierArena {
     /// The shape of the world that holds the soldiers.
     grid: Grid,
@@ -303,37 +298,86 @@ pub struct SoldierArena {
     identity: u64,
 }
 
-impl SoldierArena {
-    /// Builds an arena over a world shape.
-    ///
-    /// The arena opens as many slots as the slot index holds. That limit is
-    /// the range of the index, not a cost budget.
-    #[must_use]
-    pub fn new(grid: Grid) -> Self {
-        Self::with_capacity(grid, SLOT_INDEX_LIMIT)
-    }
+/// Copies a column and keeps the reservation of the original.
+///
+/// A derived copy of a column allocates for what the column holds, not for
+/// what it reserved. A copied arena would therefore grow where the original
+/// does not, and nothing would report it.[^1]
+///
+/// # References
+///
+/// [^1]: ADR-0084, the world reserves the unit columns at construction, decision D1. `docs/adrs/draft/adr-0084-the-world-reserves-the-unit-columns-at-construction.md`
+fn copy_column<T: Clone>(column: &[T], capacity: u32) -> Vec<T> {
+    let mut copy = Vec::with_capacity(capacity as usize);
+    copy.extend_from_slice(column);
+    copy
+}
 
-    /// Builds an arena that opens at most `capacity` slots.
+impl Clone for SoldierArena {
+    fn clone(&self) -> Self {
+        let capacity = self.capacity;
+        let mut free = VecDeque::with_capacity(capacity as usize);
+        free.extend(self.free.iter().copied());
+        Self {
+            grid: self.grid,
+            capacity,
+            generations: copy_column(&self.generations, capacity),
+            live: copy_column(&self.live, capacity),
+            tiles: copy_column(&self.tiles, capacity),
+            factions: copy_column(&self.factions, capacity),
+            carries: copy_column(&self.carries, capacity),
+            orders: copy_column(&self.orders, capacity),
+            needs: copy_column(&self.needs, capacity),
+            deficits: copy_column(&self.deficits, capacity),
+            homes: copy_column(&self.homes, capacity),
+            intents: copy_column(&self.intents, capacity),
+            free,
+            live_count: self.live_count,
+            retired_count: self.retired_count,
+            revision: self.revision,
+            identity: self.identity,
+        }
+    }
+}
+
+impl SoldierArena {
+    /// Builds an arena that reserves `capacity` slots and opens no more.
     ///
-    /// A caller that asks for more soldiers than the capacity gets a typed
-    /// refusal. The arena reserves no memory here, so a large capacity
-    /// costs nothing until a caller spawns.
+    /// The arena reserves every column here, and it reserves the free queue,
+    /// so no later spawn and no later death grows either one.[^1] A caller
+    /// that asks for a soldier past the reservation gets a typed refusal.
+    ///
+    /// This is the only constructor, and it names no capacity of its own.
+    /// The settings of the world state the reservation, in one place, so no
+    /// default here can disagree with them.[^2]
+    ///
+    /// The reservation is paid once, when the caller builds the arena. No
+    /// later call pays it.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0084, the world reserves the unit columns at construction, decision D1. `docs/adrs/draft/adr-0084-the-world-reserves-the-unit-columns-at-construction.md`
+    /// [^2]: ADR-0084, the world reserves the unit columns at construction, decision D2. `docs/adrs/draft/adr-0084-the-world-reserves-the-unit-columns-at-construction.md`
     #[must_use]
-    pub fn with_capacity(grid: Grid, capacity: u32) -> Self {
+    pub fn new(grid: Grid, capacity: u32) -> Self {
+        let slots = capacity as usize;
         Self {
             grid,
             capacity,
-            generations: Vec::new(),
-            live: Vec::new(),
-            tiles: Vec::new(),
-            factions: Vec::new(),
-            carries: Vec::new(),
-            orders: Vec::new(),
-            needs: Vec::new(),
-            deficits: Vec::new(),
-            homes: Vec::new(),
-            intents: Vec::new(),
-            free: VecDeque::new(),
+            generations: Vec::with_capacity(slots),
+            live: Vec::with_capacity(slots),
+            tiles: Vec::with_capacity(slots),
+            factions: Vec::with_capacity(slots),
+            carries: Vec::with_capacity(slots),
+            orders: Vec::with_capacity(slots),
+            needs: Vec::with_capacity(slots),
+            deficits: Vec::with_capacity(slots),
+            homes: Vec::with_capacity(slots),
+            intents: Vec::with_capacity(slots),
+            // Every opened slot can be free at once, because every soldier
+            // can die on one tick. A queue that grew on that tick would
+            // reallocate inside the step.
+            free: VecDeque::with_capacity(slots),
             live_count: 0,
             retired_count: 0,
             revision: 0,
@@ -1038,7 +1082,7 @@ mod tests {
 
     /// Builds an arena over a small world.
     fn arena() -> SoldierArena {
-        SoldierArena::new(Grid::new(4, 4).expect("a small extent describes a grid"))
+        SoldierArena::new(Grid::new(4, 4).expect("a small extent describes a grid"), 16)
     }
 
     #[test]

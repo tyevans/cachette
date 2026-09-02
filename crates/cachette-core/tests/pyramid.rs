@@ -48,6 +48,7 @@ fn peopled(seed: u64) -> World {
         height: EXTENT,
         seed,
         faction_count: 3,
+        unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
     })
     .expect("the extent describes a world");
     let grid = world.grid();

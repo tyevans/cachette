@@ -32,6 +32,7 @@ const CONFIG: WorldConfig = WorldConfig {
     height: 16,
     seed: 0x0123_4567_89ab_cdef,
     faction_count: 2,
+    unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
 };
 
 /// Builds a world and founds one settlement on the first tile.

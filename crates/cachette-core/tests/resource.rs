@@ -59,6 +59,7 @@ fn world(seed: u64) -> World {
         height: HEIGHT,
         seed,
         faction_count: 4,
+        unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
     })
     .expect("the extent must describe a world");
     // The choice interval is not the subject of this file. A unit takes an
@@ -1117,6 +1118,7 @@ fn the_recovery_work_does_not_grow_with_the_extent() {
             height,
             seed: SEED,
             faction_count: 4,
+            unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
         })
         .expect("the extent must describe a world");
         field

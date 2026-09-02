@@ -71,6 +71,7 @@ fn peopled(seed: u64) -> (World, Vec<Entity>) {
         height: 12,
         seed,
         faction_count: 3,
+        unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
     })
     .expect("the extent must describe a world");
     // The choice interval is not the subject of this file. A unit takes an
@@ -174,6 +175,7 @@ fn a_soldier_at_a_corner_stays_put_rather_than_wrapping() {
             height: 8,
             seed,
             faction_count: 1,
+            unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
         })
         .expect("the extent must describe a world");
         // The corner of this seed may hold water, and water admits no unit.
@@ -245,6 +247,7 @@ fn the_generation_of_an_identity_changes_the_direction() {
             height: 10,
             seed,
             faction_count: 1,
+            unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
         };
 
         let mut first = World::new(config).expect("the extent must describe a world");

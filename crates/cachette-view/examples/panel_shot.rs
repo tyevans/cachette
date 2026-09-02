@@ -28,6 +28,7 @@ fn main() {
         height: 140,
         seed: 11,
         faction_count: 4,
+        unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
     })
     .expect("the extent describes a world");
     let foundings = world.found_run_for_every_faction(24);

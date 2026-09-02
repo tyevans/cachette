@@ -20,6 +20,7 @@ fn world() -> World {
         height: 8,
         seed: 5,
         faction_count: 3,
+        unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
     })
     .expect("a small extent describes a world");
     let open = open_tiles(&world);
@@ -115,6 +116,7 @@ fn empty_world() -> World {
         height: 8,
         seed: 5,
         faction_count: 3,
+        unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
     })
     .expect("a small extent describes a world")
 }
@@ -353,6 +355,7 @@ fn large_world() -> World {
         height: TALL,
         seed: 11,
         faction_count: 4,
+        unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
     })
     .expect("a large extent describes a world");
     let open = open_tiles(&world);
@@ -610,6 +613,7 @@ fn the_viewer_reads_only_the_blocks_the_window_covers() {
         height: 96,
         seed: 11,
         faction_count: 2,
+        unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
     })
     .expect("the extent describes a world");
     let open = open_tiles(&world);
@@ -708,6 +712,7 @@ fn an_empty_region_is_skipped_on_the_bitplane() {
         height: 96,
         seed: 4,
         faction_count: 1,
+        unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
     })
     .expect("the extent describes a world");
     // Every soldier in one corner, so most blocks hold nothing.

@@ -42,6 +42,13 @@ const HEIGHT: u32 = 9;
 const BLOCK_BITS: u32 = 2;
 
 /// Builds the world shape that the tests use.
+/// The number of slots that the fixture arena reserves.
+///
+/// The number bounds the fixture and states nothing about the project. The
+/// widest test here spawns one soldier for each tile of the test world, so
+/// the reservation is above that.
+const FIXTURE_SLOTS: u32 = WIDTH * HEIGHT * 2;
+
 fn grid() -> Grid {
     Grid::new(WIDTH, HEIGHT).expect("a small extent describes a grid")
 }
@@ -87,7 +94,7 @@ fn by_scan(arena: &SoldierArena, place: Axial) -> Vec<Entity> {
 ///
 /// [^1]: ADR-0018, the unit-to-tile bridge is derived, and it rebuilds at the barrier, decision D3. `docs/adrs/accepted/adr-0018-the-unit-to-tile-bridge-is-derived-and-rebuilds-at-the-barrier.md`
 fn populate(count: u32) -> SoldierArena {
-    let mut arena = SoldierArena::new(grid());
+    let mut arena = SoldierArena::new(grid(), FIXTURE_SLOTS);
     let mut live: Vec<Entity> = Vec::new();
     for ordinal in 0..count {
         // The step of seven visits many tiles, and the remainder of three
@@ -117,8 +124,8 @@ fn a_bridge_refuses_an_arena_it_was_not_built_from() {
     // revision one. A guard that compared only the count would pass, and the
     // bridge would answer questions about an arena it never read.
     let grid = grid();
-    let mut first = SoldierArena::new(grid);
-    let mut second = SoldierArena::new(grid);
+    let mut first = SoldierArena::new(grid, FIXTURE_SLOTS);
+    let mut second = SoldierArena::new(grid, FIXTURE_SLOTS);
     first
         .spawn(Axial::new(0, 0), FactionId(0))
         .expect("the spawn must succeed");
@@ -144,7 +151,7 @@ fn a_bridge_refuses_an_arena_it_was_not_built_from() {
 
 #[test]
 fn a_bridge_that_was_never_built_refuses_every_read() {
-    let arena = SoldierArena::new(grid());
+    let arena = SoldierArena::new(grid(), FIXTURE_SLOTS);
     let bridge = bridge();
     assert_eq!(
         bridge.on_tile(&arena, Axial::new(0, 0)),
@@ -163,7 +170,7 @@ fn a_read_after_a_move_is_refused_rather_than_answered() {
     // records.[^1]
     //
     // [^1]: Findings register, FND-040. `docs/FINDINGS.md`
-    let mut arena = SoldierArena::new(grid());
+    let mut arena = SoldierArena::new(grid(), FIXTURE_SLOTS);
     let soldier = arena
         .spawn(Axial::new(1, 1), FactionId(0))
         .expect("the spawn must succeed");
@@ -193,7 +200,7 @@ fn a_read_after_a_move_is_refused_rather_than_answered() {
 
 #[test]
 fn a_spawn_and_a_despawn_each_make_the_bridge_stale() {
-    let mut arena = SoldierArena::new(grid());
+    let mut arena = SoldierArena::new(grid(), FIXTURE_SLOTS);
     let mut bridge = bridge();
     bridge.rebuild(&arena).expect("the rebuild must succeed");
     let soldier = arena
@@ -214,7 +221,10 @@ fn a_spawn_and_a_despawn_each_make_the_bridge_stale() {
 
 #[test]
 fn a_bridge_over_another_world_is_refused() {
-    let arena = SoldierArena::new(Grid::new(4, 4).expect("a small extent describes a grid"));
+    let arena = SoldierArena::new(
+        Grid::new(4, 4).expect("a small extent describes a grid"),
+        FIXTURE_SLOTS,
+    );
     let mut bridge = bridge();
     assert_eq!(bridge.rebuild(&arena), Err(BridgeError::GridMismatch));
     assert_eq!(
@@ -225,7 +235,7 @@ fn a_bridge_over_another_world_is_refused() {
 
 #[test]
 fn an_address_outside_the_world_is_refused() {
-    let arena = SoldierArena::new(grid());
+    let arena = SoldierArena::new(grid(), FIXTURE_SLOTS);
     let mut bridge = bridge();
     bridge.rebuild(&arena).expect("the rebuild must succeed");
     let outside = Axial::new(WIDTH as i32, 0);
@@ -330,7 +340,7 @@ fn a_block_aligned_world_reaches_its_key_ceiling_and_still_rebuilds() {
         .expect("the world holds a tile");
     assert_eq!(highest, layout.key_ceiling());
 
-    let mut arena = SoldierArena::new(world);
+    let mut arena = SoldierArena::new(world, FIXTURE_SLOTS);
     arena
         .spawn(Axial::new(7, 7), FactionId(0))
         .expect("the spawn must succeed");
@@ -365,7 +375,7 @@ fn a_world_rebuilds_at_every_block_edge() {
 
 #[test]
 fn an_empty_block_carries_a_clear_bit_and_an_empty_answer() {
-    let mut arena = SoldierArena::new(grid());
+    let mut arena = SoldierArena::new(grid(), FIXTURE_SLOTS);
     arena
         .spawn(Axial::new(0, 0), FactionId(0))
         .expect("the spawn must succeed");
@@ -398,6 +408,7 @@ fn the_world_answers_a_tile_after_the_step_rebuilds_the_bridge() {
         height: 40,
         seed: 11,
         faction_count: 3,
+        unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
     };
     let mut world = World::new(config).expect("the extent must describe a world");
     let mut expected = Vec::new();
@@ -448,6 +459,7 @@ fn a_world_that_rebuilds_outside_a_step_answers_again() {
         height: 16,
         seed: 3,
         faction_count: 2,
+        unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
     })
     .expect("the extent must describe a world");
     let soldier = world

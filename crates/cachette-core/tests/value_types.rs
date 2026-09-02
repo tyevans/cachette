@@ -20,7 +20,7 @@ fn an_entity_carries_an_index_and_a_generation() {
     //
     // [^1]: ADR-0014, entity identity is an index plus a generation,
     // decision D1. `docs/adrs/accepted/adr-0014-entity-identity-is-an-index-plus-a-generation.md`
-    let mut arena = SoldierArena::new(Grid::new(4, 4).expect("a small extent describes a grid"));
+    let mut arena = SoldierArena::new(Grid::new(4, 4).expect("a small extent describes a grid"), 16);
     let entity = arena
         .spawn(Axial::new(1, 2), FactionId(0))
         .expect("the spawn must succeed");
@@ -41,7 +41,7 @@ fn an_absent_entity_costs_no_extra_space() {
 
 #[test]
 fn an_entity_keeps_the_two_parts_apart() {
-    let mut arena = SoldierArena::new(Grid::new(4, 4).expect("a small extent describes a grid"));
+    let mut arena = SoldierArena::new(Grid::new(4, 4).expect("a small extent describes a grid"), 16);
     let first = arena
         .spawn(Axial::new(0, 0), FactionId(0))
         .expect("the spawn must succeed");

@@ -91,6 +91,7 @@ fn hungry_world() -> (World, Fixture) {
         height: 40,
         seed: 7,
         faction_count: 2,
+        unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
     })
     .expect("the extent describes a world");
     world

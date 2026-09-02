@@ -24,6 +24,7 @@ const CONFIG: WorldConfig = WorldConfig {
     height: 9,
     seed: 0x005e_771e_u64,
     faction_count: 3,
+    unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
 };
 
 /// The only commodity in the set.
@@ -53,6 +54,7 @@ const MIXED: WorldConfig = WorldConfig {
     height: MIXED_EXTENT,
     seed: 0x0cac_4e77_0092,
     faction_count: 3,
+    unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
 };
 
 /// Builds a world that holds water and open ground, and returns one of each.

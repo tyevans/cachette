@@ -30,9 +30,20 @@ const WIDTH: u32 = 8;
 /// The extent of the world that the tests place soldiers on.
 const HEIGHT: u32 = 8;
 
+/// The number of slots that the fixture arena reserves.
+///
+/// The number bounds the fixture and states nothing about the project. The
+/// tests below spawn far fewer than this, so no test here reaches the
+/// refusal by accident. One test reserves two slots on purpose, and it says
+/// so at the call.
+const FIXTURE_SLOTS: u32 = 256;
+
 /// Builds an arena over a small world.
 fn arena() -> SoldierArena {
-    SoldierArena::new(Grid::new(WIDTH, HEIGHT).expect("a small extent describes a grid"))
+    SoldierArena::new(
+        Grid::new(WIDTH, HEIGHT).expect("a small extent describes a grid"),
+        FIXTURE_SLOTS,
+    )
 }
 
 /// Returns the address of a tile index inside the test world.
@@ -53,6 +64,7 @@ fn the_world_refuses_a_faction_it_does_not_hold() {
         height: 8,
         seed: 3,
         faction_count: 2,
+        unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
     })
     .expect("the extent must describe a world");
 
@@ -74,6 +86,7 @@ fn a_world_refuses_a_faction_count_above_the_storage_ceiling() {
         height: 4,
         seed: 1,
         faction_count: FACTION_CEILING,
+        unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
     })
     .is_ok());
     assert!(World::new(WorldConfig {
@@ -81,6 +94,7 @@ fn a_world_refuses_a_faction_count_above_the_storage_ceiling() {
         height: 4,
         seed: 1,
         faction_count: FACTION_CEILING + 1,
+        unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
     })
     .is_err());
 }
@@ -205,7 +219,7 @@ fn a_freed_slot_returns_in_first_in_first_out_order() {
 #[test]
 fn the_arena_refuses_a_spawn_when_it_holds_no_free_slot() {
     let grid = Grid::new(WIDTH, HEIGHT).expect("a small extent describes a grid");
-    let mut arena = SoldierArena::with_capacity(grid, 2);
+    let mut arena = SoldierArena::new(grid, 2);
     let first = arena
         .spawn(Axial::new(0, 0), FactionId(0))
         .expect("the spawn must succeed");
