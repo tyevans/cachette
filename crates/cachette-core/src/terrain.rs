@@ -197,6 +197,33 @@ impl TileKind {
 /// [^1]: Budgets and costs, the scale constants. `docs/reference/budgets.md`
 const ORDINARY_CAPACITY: u32 = 8;
 
+/// Returns the largest number of units that any ground admits.
+///
+/// The value folds the capacity table over every kind. It is not a second
+/// copy of a number in that table: a kind whose capacity rises raises this
+/// answer, and a caller that sizes an array by it follows the table without
+/// anything having to be swept.[^1]
+///
+/// A caller that must hold one entry for each unit that can stand on a tile
+/// reads this rather than writing a literal of its own.
+///
+/// # References
+///
+/// [^1]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`
+#[must_use]
+pub const fn largest_capacity() -> u32 {
+    let mut largest = 0;
+    let mut index = 0;
+    while index < KIND_COUNT {
+        let capacity = TileKind::ALL[index].capacity();
+        if capacity > largest {
+            largest = capacity;
+        }
+        index += 1;
+    }
+    largest
+}
+
 /// Reports whether ground of a given capacity admits a unit.
 ///
 /// This is the whole of passability. Ground that holds nobody admits nobody.
