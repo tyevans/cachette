@@ -53,11 +53,12 @@ recovers a deposit. Three passages do this.
   the parameters of the kind, and that the world can therefore answer the
   question when it is asked.
 
-A decision record already holds all three claims. It ages the stored take, its
-cost follows the depleted set, and it is under review now.[^2] The product
-record therefore holds a second copy of a decision. One fact in two places,
-with nothing that fails when the copies disagree, is the defect shape this
-project keeps meeting.[^3]
+Two decision records already hold all three claims. One says that a tile stock
+is generated and that only what was taken is stored, and the project accepted
+it.[^15] The other ages the stored take, makes its cost follow the depleted
+set, and is under review now.[^2] The product record therefore holds a second
+copy of two decisions. One fact in two places, with nothing that fails when
+the copies disagree, is the defect shape this project keeps meeting.[^3]
 
 The mechanical check does not see this, because the record names no decision
 record by number. The check looks for that name only.[^4] A separate finding
@@ -265,3 +266,4 @@ review changed nothing in that area.
 [^12]: Decisions register, DEC-059. `docs/DECISIONS.md`
 [^13]: Backlog item 0150. `docs/backlog/proposed/0150-decide-how-the-world-reserves-unit-storage.md`
 [^14]: Findings register, FND-135. `docs/FINDINGS.md`
+[^15]: ADR-0072, a tile stock is generated, and only what was taken is stored. `docs/adrs/accepted/adr-0072-a-tile-stock-is-generated-and-only-what-was-taken-is-stored.md`
