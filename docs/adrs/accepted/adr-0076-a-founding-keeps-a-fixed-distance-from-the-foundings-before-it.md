@@ -88,7 +88,7 @@ undo them.
 ### D3. The faction fills the frame slot of the draw key
 
 Each candidate address stays a draw from the keyed generator, on the tuple of
-the system, the frame, the entity and the draw index.[^9] The candidate
+the system, the frame, the entity and the draw index.[^8] The candidate
 ordinal keeps the entity slot and the axis keeps the draw slot.[^1] The
 faction fills the frame slot.
 
@@ -103,7 +103,7 @@ what a run of several needs.
 
 **Without the faction in the key every founding reads one sample.** The defect
 is invisible to both determinism tests, because the sample repeats on every
-run, at every thread count and on every machine.[^10] A test that changes the
+run, at every thread count and on every machine.[^9] A test that changes the
 faction and asserts that the sample changes is the only test that sees it.
 
 ## Consequences
@@ -118,7 +118,7 @@ binary and every test.
 
 **The comparison grows with the faction count.** It does not grow with the
 world extent, so the bounded cost of the founding still holds.[^1] The faction
-count is bounded by the width of the faction mask.[^8]
+count is bounded by the width of the faction mask.[^10]
 
 **The first faction gets the best place in its sample.** The rule is
 positional, and the lowest faction index reads no taken place. This is a
@@ -140,7 +140,7 @@ evidence.[^11] The key test is therefore the only guard on D3.
 [^5]: PRD-0012, a world starts small and grows. `docs/product/accepted/prd-0012-a-world-starts-small-and-grows.md`
 [^6]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`
 [^7]: ADR-0004, iteration order is explicit, decision D4. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
-[^8]: ADR-0053, a faction is a bit in a mask, and a relation is a plane, decision D1. `docs/adrs/accepted/adr-0053-a-faction-is-a-bit-in-a-mask-and-a-relation-is-a-plane.md`
-[^9]: ADR-0003, every random draw is keyed, never stateful, decision D1. `docs/adrs/accepted/adr-0003-every-random-draw-is-keyed-never-stateful.md`
-[^10]: Testing rules, section 2. `.claude/rules/testing.md`
+[^8]: ADR-0003, every random draw is keyed, never stateful, decision D1. `docs/adrs/accepted/adr-0003-every-random-draw-is-keyed-never-stateful.md`
+[^9]: Testing rules, section 2. `.claude/rules/testing.md`
+[^10]: ADR-0053, a faction is a bit in a mask, and a relation is a plane, decision D1. `docs/adrs/accepted/adr-0053-a-faction-is-a-bit-in-a-mask-and-a-relation-is-a-plane.md`
 [^11]: Findings register, FND-106. `docs/FINDINGS.md`

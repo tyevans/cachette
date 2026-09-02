@@ -361,7 +361,7 @@ fn a_world_whose_units_gather_is_identical_at_every_thread_count() {
 ///
 /// # References
 ///
-/// [^1]: ADR-0080, a depleted deposit recovers by ageing the stored take, decision D3. `docs/adrs/draft/adr-0080-a-depleted-deposit-recovers-by-ageing-the-stored-take.md`
+/// [^1]: ADR-0080, a depleted deposit recovers by ageing the stored take, decision D3. `docs/adrs/accepted/adr-0080-a-depleted-deposit-recovers-by-ageing-the-stored-take.md`
 fn run_with_recovery(config: WorldConfig, frames: u64, threads: usize) -> (Vec<u8>, u64, i64) {
     let mut world = World::new(config).expect("the extent must describe a world");
     // The periods are short, so the frames of a scenario reach the case.

@@ -14,7 +14,7 @@
 //!
 //! # References
 //!
-//! [^1]: ADR-0076, a founding keeps a fixed distance from the foundings before it. `docs/adrs/draft/adr-0076-a-founding-keeps-a-fixed-distance-from-the-foundings-before-it.md`
+//! [^1]: ADR-0076, a founding keeps a fixed distance from the foundings before it. `docs/adrs/accepted/adr-0076-a-founding-keeps-a-fixed-distance-from-the-foundings-before-it.md`
 //! [^2]: Testing rules, section 6. `.claude/rules/testing.md`
 //! [^3]: Findings register, FND-054. `docs/FINDINGS.md`
 

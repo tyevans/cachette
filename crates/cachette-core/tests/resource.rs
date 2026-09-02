@@ -733,7 +733,7 @@ fn the_ledger_holds_one_entry_for_each_deposit_that_gave() {
 // a deposit that units emptied, a deposit they only reduced, a stone deposit
 // that must never recover, and deposits that nobody touched.[^R3]
 //
-// [^R1]: ADR-0080, a depleted deposit recovers by ageing the stored take. `docs/adrs/draft/adr-0080-a-depleted-deposit-recovers-by-ageing-the-stored-take.md`
+// [^R1]: ADR-0080, a depleted deposit recovers by ageing the stored take. `docs/adrs/accepted/adr-0080-a-depleted-deposit-recovers-by-ageing-the-stored-take.md`
 // [^R2]: Testing rules, sections 5 and 6. `.claude/rules/testing.md`
 // [^R3]: Testing rules, section 2a. `.claude/rules/testing.md`
 

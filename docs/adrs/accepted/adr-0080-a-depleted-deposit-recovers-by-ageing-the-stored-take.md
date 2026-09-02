@@ -107,10 +107,10 @@ current. Recovery runs before the resolve of the same step, so every clock is
 already at the tick when anything reads a stock. Two readers at one tick
 therefore get one answer.
 
-This decision claims no more than that. A pure function of the stored take, the
-tick and the period would give the same answer without depending on the order of
-the step, and the module holds one. Nothing calls it. The property therefore
-rests on the order of the step, and a change to that order breaks it.
+This decision claims no more than that. The property rests on the order of the
+step, and a change to that order breaks it. A reader that took the stored take,
+the tick and the period as its arguments would not depend on the order, and no
+caller reads a stock that way.
 
 ### D5. The recovery period is a parameter of the resource kind, in one place
 
@@ -159,9 +159,11 @@ touched. A watcher cannot tell the two apart, and neither can a gatherer.
 
 ## Alternatives rejected
 
-**A pass that steps every deposit on every tick.** This is the obvious shape and
-the product record refuses it by name: a world that steps every deposit pays the
-world for the deposits that nothing is touching.[^2] D2 forbids it.
+**A pass that steps every deposit on every tick.** This is the obvious shape,
+and it pays the world for every deposit that nothing is touching. The engine
+already stores nothing for a tile that nobody gathered from, so such a pass
+would read millions of tiles in order to change none of them.[^2] D2 forbids
+it.
 
 **A schedule keyed on the tick at which each entry next recovers.** Such a
 structure visits only the entries that recover on this tick, rather than the

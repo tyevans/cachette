@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-125**
+**Next number: FND-133**
 
 ## A. Corrections to stated rules
 
@@ -2769,6 +2769,197 @@ green suite. The test that closes it removes the rate and watches the population
 end, which is the only proof that the assertion reaches the case.[^71]
 
 
+### FND-128 — The engine already counts who lives at a site
+
+**Believed.** Nothing states how the engine answers how many units a site
+holds. A record therefore has to decide whether to store an occupancy count
+and maintain it by the change. Draft ADR-0081 states the belief in its context
+and builds decision D3 on it.
+
+**True.** The engine answers the question today. The cohort table holds one row
+for each faction at each site, and each row holds a headcount. The residents of
+one site are the sum of its rows. The table is derived from the home column of
+the soldier arena, which is the residence.[^72] Every unit that can hold a
+residence is a soldier, because the character arena holds no home column, so the
+headcount is the whole resident count and not a part of it.
+
+The prohibition of the draft therefore lands wrongly. It forbids a pass over the
+units that recomputes the count inside a running frame. The consumption pass
+does exactly that, twice in one frame: once before the pooled draw, and once
+after the scan that ends a starved unit. Each rebuild walks the whole home
+column.
+
+**Evidence.** `CohortTable::rebuild` takes the home column, the faction column,
+the live column and the site count, and it increments a headcount for each live
+unit that names a site. `World::consume` calls it twice. `World::cohorts` and
+`CohortTable::headcount` are public, so a caller reads the row of one faction at
+one site through the public interface. The character arena holds no field named
+for a home or for a site.
+
+The check the draft asks for also exists. `World::cohorts_describe_the_units`
+derives the table again from the home column and compares, and its own
+documentation gives the reason the draft gives: a summary that nothing compares
+against its source is a second declaration site with nothing that fails on
+disagreement.
+
+**Follows.** Three things.
+
+**A stored occupancy count would be the third declaration of one fact**, not the
+second. The home column holds it, the cohort table summarises it, and a
+maintained count would hold it again. The draft prices the cost as one extra
+site, and a check between two copies does not guard three.[^73]
+
+**The caller the draft names is already served.** A birth admission runs after
+the consumption pass, so the cohort table is settled where the admission reads
+it. What is missing is a reader that sums the rows of one site, because the
+table splits the count by faction.
+
+**A record must be read against the code before it is accepted, and the reading
+must go past the module the record is about.** The residence work is in the
+settlement module and the soldier module. The count that falsifies the premise is
+in the consumption module, which the draft never names.
+
+### FND-129 — A stated rule bans a citation that four accepted records make
+
+**Believed.** A decision record cites no product requirement record. The rule is
+stated twice, in the project orientation and in the product guide, and it gives
+a reason: a product direction changes more often than a constraint does, so a
+decision record must not rest on one.[^74]
+
+**True.** No script checks the rule, and the project does not follow it.
+ADR-0064, ADR-0067, ADR-0074 and ADR-0075 are accepted and each cites a product
+record. Three of the four drafts under review cite one. In draft ADR-0081 the
+product record carries the whole justification of decision D1.
+
+**Evidence.** `scripts/check_prds.py` fails a product record that cites a
+decision record. Nothing checks the other direction. A search of the accepted
+records for the product file prefix returns four files.
+
+**Follows.** Two things.
+
+**A reviewer cannot reject a draft on this ground alone.** The accepted
+precedent runs the other way, and a rule applied to new work but not to the work
+already accepted is a rule that punishes whoever arrives last.
+
+**The project must choose.** Either the rule holds, and the four accepted
+records need repair under supersession or the retcon window, or the rule is
+wrong and the guide must drop it. An open row holds the choice.[^75]
+
+### FND-130 — Two footnote rules are stated, are broken, and are checked by nothing
+
+**Believed.** The record check catches the mechanical part of the documentation
+rule, so a record that passes the gate follows the footnote rules.
+
+**True.** The documentation rule states that footnotes are numbered in the order
+they occur in the body, and that a footnote is never repeated.[^76] The record
+check tests neither. Three of the four drafts reviewed break one or both, and
+the gate passed on all three.
+
+**Evidence.** In draft ADR-0081 footnote 15 names the source that footnote 7
+already names, and no footnote 14 exists. In draft ADR-0082 footnote 20 names the
+source that footnote 5 already names, and footnotes 19 and 20 occur before
+footnotes 12 to 18. In draft ADR-0076 footnote 8 first occurs after footnote 9.
+`just records` reported no failure for any of them.
+
+**Follows.** Two things.
+
+**A gate that passes is not evidence that a rule holds.** It is evidence that the
+rules the gate encodes hold. The gap between the two is where a written rule goes
+quiet.
+
+**The check is cheap and the repair is not.** A duplicate footnote is invisible
+to a reader, and it produces two labels that a later edit can move apart. A
+backlog item adds the check.
+
+
+### FND-131 — Item 0059 plans three things the engine has already built
+
+**Believed.** Item 0059 gives a site a capacity and a resident roll. Its
+impact review already carries one correction: the residence column and the
+eviction path exist, so the item extends the column and adds none.[^77] With
+that correction absorbed, the four numbered work steps of the item are new
+work.
+
+**True.** Two of the four are built, and a third is half built. Only the
+housing capacity is wholly new.
+
+The item asks for an occupancy count. A per-site count exists, split by
+faction, and the item's own reader test is already satisfiable: a caller reads
+how many units live in a site through the public interface, without walking the
+units.[^78] What the item asks for beyond that is one property of the count,
+that a change maintains it rather than a sweep. The number is not new. Its
+maintenance is.
+
+The item asks for an invariant check that compares the count against the
+residence column, and for a test that proves the check can fail. Both exist.
+`World::cohorts_describe_the_units` derives the table again from the home
+column and compares. A test drives the world until the two disagree, asserts
+the refusal, steps until they agree again, and asserts the agreement.
+
+**Evidence.** `World::cohorts` and `CohortTable::headcount` are public.
+`World::cohorts_describe_the_units` is public. The test
+`every_headcount_sums_to_the_live_population` spawns a unit that no
+application has seen, asserts that the check then returns false, steps for one
+period, and asserts that it returns true again. That is the proof of failure
+the item asks a future author to write.
+
+**Follows.** Three things.
+
+**A withdrawn item must be re-refined against the code, not against the
+record.** Items 0059 and 0060 left `refined/` because the record they rest on
+was rejected.[^79] Rewriting them against a new record repeats this defect. The
+re-refinement starts by asking what the engine already does.
+
+**A correction absorbed once does not inoculate an item.** FND-116 corrected
+this same item about this same subsystem, and the item took the correction for
+the residence column alone. The correction had a wider reach than the sentence
+that carried it. When a finding says a subsystem is further along than the
+project believed, read the whole subsystem again rather than the one claim the
+finding names.
+
+**The capacity is the work.** An item that says so is smaller, and it is
+honest about what remains.
+
+
+### FND-132 — A commit that cites a register entry on another branch makes the trunk red
+
+**Believed.** A citation of a register entry that another branch holds is a
+forward reference. The author knows the entry is coming, says so in the commit
+body, and the trunk repairs itself when the other branch lands. Stating the
+dependency in the body is enough.
+
+**True.** The citation check derives the truth from the tree it runs on, not
+from what an author knew. A commit that cites an entry no branch in the trunk
+holds fails the check from the moment it lands until the other branch merges.
+Every worker who runs the gate in between reads a red pipeline that their own
+work did not cause. A commit body cannot make a check pass.
+
+**Evidence.** A dispatcher commit withdrew two backlog items and cited FND-128
+as the reason. FND-128 existed only on the reviewing worker's branch. The
+citation check reported two failures on the trunk against items 0059 and 0060,
+and it kept reporting them until the review branch merged.
+
+The same commit left four citations of the two paths it had moved. It swept for
+citations **to** the rejected record and never searched for citations **of** the
+files it moved. Six failures stood on the trunk in total, from one commit.
+
+**Follows.** Three things.
+
+**Order the merge by what the gate needs, not by what the work needs.** A branch
+that holds a register entry another branch cites must land first. The dispatcher
+reversed the merge order for this reason once the failure was visible, and the
+order is derivable before the failure: whichever branch defines the entry goes
+first.
+
+**A sweep is done when a whole-tree search comes back clean, and the search must
+name the thing that moved.** A search for references to the subject of a change
+is not a search for references to the files the change moved. Both are needed,
+and only the second one catches a rename.[^80]
+
+**Knowing that a citation is forward does not soften it.** Write the register
+entry in the same commit as the work that cites it, or do not cite it yet.
+
+
 ## References
 
 [^1]: Findings register, FND-038, in this document.
@@ -2830,7 +3021,7 @@ end, which is the only proof that the assertion reaches the case.[^71]
 [^57]: Commit Message Rules, after a sweep. `.claude/rules/commits.md`
 [^58]: Backlog item 0094. `docs/backlog/complete/0094-decide-how-many-groups-found-a-world.md`
 [^59]: Findings register, FND-093, in this document.
-[^60]: ADR-0076, a founding keeps a fixed distance from the foundings before it, decision D1. `docs/adrs/draft/adr-0076-a-founding-keeps-a-fixed-distance-from-the-foundings-before-it.md`
+[^60]: ADR-0076, a founding keeps a fixed distance from the foundings before it, decision D1. `docs/adrs/accepted/adr-0076-a-founding-keeps-a-fixed-distance-from-the-foundings-before-it.md`
 [^61]: PRD-0014, everyone needs somewhere to live. `docs/product/accepted/prd-0014-everyone-needs-somewhere-to-live.md`
 [^62]: ADR-0066, entity storage holds four fixed shapes, decision D1. `docs/adrs/accepted/adr-0066-entity-storage-holds-four-fixed-shapes.md`
 [^63]: Recurring Defect Shapes, shape 1. `.claude/rules/recurring-defects.md`
@@ -2842,3 +3033,12 @@ end, which is the only proof that the assertion reaches the case.[^71]
 [^69]: ADR-0073, gathering is admitted by sort-then-admit against the tile. `docs/adrs/accepted/adr-0073-gathering-is-admitted-by-sort-then-admit-against-the-tile.md`
 [^70]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`
 [^71]: Testing rules, section 2a. `.claude/rules/testing.md`
+[^72]: Findings register, FND-116, in this document.
+[^73]: Recurring Defect Shapes, shape 1. `.claude/rules/recurring-defects.md`
+[^74]: Product requirement records, what does not belong here. `docs/product/README.md`
+[^75]: Decisions register, DEC-056. `docs/DECISIONS.md`
+[^76]: Documentation Rules, section 3. `.claude/rules/documentation.md`
+[^77]: Findings register, FND-116, in this document.
+[^78]: Findings register, FND-128, in this document.
+[^79]: Review 0143, the housing, growth, founding and recovery records. `docs/reviews/0143-the-housing-growth-founding-and-recovery-records.md`
+[^80]: Commit Message Rules, after a sweep. `.claude/rules/commits.md`

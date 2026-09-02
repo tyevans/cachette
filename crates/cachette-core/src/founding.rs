@@ -38,7 +38,7 @@
 //! [^4]: ADR-0002, simulated and aggregated state holds no floating point number, decision D1. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
 //! [^5]: ADR-0002, simulated and aggregated state holds no floating point number, decision D2. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
 //! [^6]: ADR-0004, iteration order is explicit, decision D4. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
-//! [^7]: ADR-0076, a founding keeps a fixed distance from the foundings before it. `docs/adrs/draft/adr-0076-a-founding-keeps-a-fixed-distance-from-the-foundings-before-it.md`
+//! [^7]: ADR-0076, a founding keeps a fixed distance from the foundings before it. `docs/adrs/accepted/adr-0076-a-founding-keeps-a-fixed-distance-from-the-foundings-before-it.md`
 
 use crate::hex::{Axial, Grid};
 use crate::resource::{Amount, ResourceField, ResourceKind};
@@ -64,7 +64,7 @@ use crate::types::{Accum, Entity, FactionId, Fix32, TileIdx};
 ///
 /// # References
 ///
-/// [^1]: ADR-0076, a founding keeps a fixed distance from the foundings before it, decision D3. `docs/adrs/draft/adr-0076-a-founding-keeps-a-fixed-distance-from-the-foundings-before-it.md`
+/// [^1]: ADR-0076, a founding keeps a fixed distance from the foundings before it, decision D3. `docs/adrs/accepted/adr-0076-a-founding-keeps-a-fixed-distance-from-the-foundings-before-it.md`
 /// [^2]: Testing rules, section 2. `.claude/rules/testing.md`
 /// [^3]: ADR-0003, every random draw is keyed, never stateful, decision D1. `docs/adrs/accepted/adr-0003-every-random-draw-is-keyed-never-stateful.md`
 #[must_use]
@@ -141,7 +141,7 @@ pub const SURVEY_CEILING: u64 = SAMPLE_SIZE as u64 * SURVEY_TILES as u64;
 ///
 /// # References
 ///
-/// [^1]: ADR-0076, a founding keeps a fixed distance from the foundings before it, decision D1. `docs/adrs/draft/adr-0076-a-founding-keeps-a-fixed-distance-from-the-foundings-before-it.md`
+/// [^1]: ADR-0076, a founding keeps a fixed distance from the foundings before it, decision D1. `docs/adrs/accepted/adr-0076-a-founding-keeps-a-fixed-distance-from-the-foundings-before-it.md`
 /// [^2]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`
 pub const MINIMUM_FOUNDING_DISTANCE: u32 = 16;
 
@@ -287,7 +287,7 @@ impl Candidate {
     ///
     /// # References
     ///
-    /// [^1]: ADR-0076, a founding keeps a fixed distance from the foundings before it, decision D1. `docs/adrs/draft/adr-0076-a-founding-keeps-a-fixed-distance-from-the-foundings-before-it.md`
+    /// [^1]: ADR-0076, a founding keeps a fixed distance from the foundings before it, decision D1. `docs/adrs/accepted/adr-0076-a-founding-keeps-a-fixed-distance-from-the-foundings-before-it.md`
     #[must_use]
     pub const fn is_eligible(self) -> bool {
         self.eligible
@@ -425,7 +425,7 @@ impl Founding {
 ///
 /// # References
 ///
-/// [^1]: ADR-0076, a founding keeps a fixed distance from the foundings before it, decision D2. `docs/adrs/draft/adr-0076-a-founding-keeps-a-fixed-distance-from-the-foundings-before-it.md`
+/// [^1]: ADR-0076, a founding keeps a fixed distance from the foundings before it, decision D2. `docs/adrs/accepted/adr-0076-a-founding-keeps-a-fixed-distance-from-the-foundings-before-it.md`
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct FoundingOutcome {
     faction: FactionId,
