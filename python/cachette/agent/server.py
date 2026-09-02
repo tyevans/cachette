@@ -129,7 +129,11 @@ class EventLogReport:
 
     The bytes are the engine's own layout. This server does not decode them,
     because a decoder here would repeat a layout that the Rust source already
-    declares.
+    declares. Read the fields with tile_changes, which takes one column for
+    each field from the engine.
+
+    The bytes and the digest answer a different question: whether two runs
+    emitted the same log.
     """
 
     world: str
@@ -326,7 +330,8 @@ def build_server(store: SessionStore | None = None) -> MCPServer:
         title="Read the event log",
         description=(
             "Returns the event log of the last step as bytes in base64, with "
-            "a digest of the whole log. This server does not decode the bytes."
+            "a digest of the whole log, to compare two runs. To read what "
+            "changed, call tile_changes instead."
         ),
     )
     def event_log(world: str, max_bytes: int = DEFAULT_MAX_BYTES) -> EventLogReport:
