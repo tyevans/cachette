@@ -41,6 +41,8 @@ A record here binds nothing until a reviewer moves it.
 | 0082 | Population growth. A review found its own decisions sound and returned it, because it rests on the free places of 0081.[^12] It moves when 0081 moves. |
 | 0083 | The gate build profile. A review returned it: both decisions hold against the code, and three sentences do not.[^15] It moves when those three are corrected. |
 | 0084 | The world reserves the unit columns at construction. The reservation is what a later contributor would trade away for a spawn that never refuses, and the code cannot say why it must not.[^14] |
+| 0060 | The storage shape of an influence field. It states that everything which does not depend on the faction is stored once, and that the cell is a narrow unsigned integer rather than the project-wide fixed-point scale. |
+| 0087 | An influence solve runs a fixed iteration count. It also names the boundary it draws against ADR-0022 D1, and a reviewer must settle that boundary before it moves. |
 | 0085 | The Python boundary. It states that an entity crosses as one opaque identity that the engine resolves. The code that implements it exists, and a test proves that the resolution refuses a stale identity. |
 
 ## Reserved and not written
