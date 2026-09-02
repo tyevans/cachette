@@ -791,15 +791,9 @@ impl Camera {
     /// across plus the shear that the rows add.
     #[must_use]
     pub fn fitting(world: &World, canvas: &Canvas) -> Self {
-        let grid = world.grid();
-        let across = grid.width() as f32;
-        let down = grid.height() as f32;
-
-        // Each row shifts right by half a tile, so the parallelogram is wider
-        // than the grid by half its height.
-        let spans_across = across + down / 2.0;
-        let by_width = canvas.width() as f32 / (spans_across + 1.0);
-        let by_height = canvas.height() as f32 / (down + 1.0);
+        let (spans_across, spans_down) = drawn_extent(world);
+        let by_width = canvas.width() as f32 / spans_across;
+        let by_height = canvas.height() as f32 / spans_down;
         let size = by_width.min(by_height).max(2.0);
 
         Self {
@@ -1062,6 +1056,56 @@ fn span(first: f32, last: f32, limit: u32) -> (u32, u32) {
     let first = (first as i64).clamp(0, i64::from(limit)) as u32;
     let last = (last as i64).clamp(0, i64::from(limit)) as u32;
     (first, last.max(first))
+}
+
+/// Returns the extent of the shape a world draws as, in tiles.
+///
+/// The world is a rhombus in the index space, so it draws as a
+/// parallelogram.[^1] Each row shifts right by half a tile, so the shape is
+/// wider than the grid by half its height, and it is never as tall as it is
+/// wide unless the world is much taller than it is broad.
+///
+/// **This is the one statement of that shape.** The camera that fits a world
+/// into a canvas reads it, and so does the canvas that suits a world. Two
+/// statements of one shape would let a picture leave a void that the camera
+/// did not expect.[^2]
+///
+/// # References
+///
+/// [^1]: ADR-0017, the world is a rhombus, so a tile index is raw axial, decision D4. `docs/adrs/accepted/adr-0017-the-world-is-a-rhombus-so-a-tile-index-is-raw-axial.md`
+/// [^2]: Recurring Defect Shapes, shape 1. `.claude/rules/recurring-defects.md`
+fn drawn_extent(world: &World) -> (f32, f32) {
+    let grid = world.grid();
+    let across = grid.width() as f32;
+    let down = grid.height() as f32;
+    (across + down / 2.0 + 1.0, down + 1.0)
+}
+
+/// Returns the canvas size that a world fills with no empty band.
+///
+/// A world draws as a parallelogram, and a parallelogram does not fill a
+/// square. A caller that asks for a square canvas and then fits a world into
+/// it gets a picture whose bottom third is empty, because the width binds and
+/// the height does not.
+///
+/// This returns the size whose proportions match the shape, so that fitting
+/// the world into it leaves no band. The longer side is the size the caller
+/// asked for.
+///
+/// # Panics
+///
+/// Panics when the long side is zero. A picture of no size is a programming
+/// error in the caller.
+#[must_use]
+pub fn canvas_for(world: &World, long_side: usize) -> (usize, usize) {
+    assert!(long_side > 0, "a picture needs a positive size");
+    let (across, down) = drawn_extent(world);
+    let longest = across.max(down);
+    let scale = long_side as f32 / longest;
+    (
+        ((across * scale).round() as usize).max(1),
+        ((down * scale).round() as usize).max(1),
+    )
 }
 
 /// Returns the colour of one tile.

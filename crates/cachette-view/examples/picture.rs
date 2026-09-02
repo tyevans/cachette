@@ -21,9 +21,12 @@
 
 use cachette_core::{Axial, FactionId, World, WorldConfig};
 use cachette_view::picture::write_ppm;
-use cachette_view::{draw_frame, Camera, Canvas, Lap, Metrics, Overlay};
+use cachette_view::{draw_frame, paint, Camera, Canvas, Lap, Metrics, Overlay};
 
-/// The side of the picture in pixels.
+/// The longer side of the picture in pixels.
+///
+/// The other side follows the shape of the world, so the picture holds no
+/// empty band.
 const SIDE: usize = 900;
 
 /// The soldiers the picture holds when the caller names no number.
@@ -78,7 +81,11 @@ fn main() {
         metrics.step(lap.elapsed());
     }
 
-    let mut canvas = Canvas::new(SIDE, SIDE);
+    // The world draws as a parallelogram, which does not fill a square. A
+    // square picture of it leaves the bottom third empty and the cards then
+    // float in a void. The canvas takes the proportions of the shape instead.
+    let (width, height) = paint::canvas_for(&world, SIDE);
+    let mut canvas = Canvas::new(width, height);
     let camera = Camera::fitting(&world, &canvas);
     let readout = draw_frame(
         &world,

@@ -4616,40 +4616,41 @@ that ordering was correct at the time it was chosen.
 the record, because a person reads an image and an agent does not. The two
 paths answer different readers, and the tool did not replace the picture.
 
-### FND-201 — A guard written to skip other worktrees skips the caller as well
+### FND-201 — The holding edge carries no information when holdings interleave at tile scale
 
-**Believed.** The record check reports a record that no other record and no
-source file cites. It skips worktrees, because a worktree holds another
-checkout of this repository, its files belong to the run that owns them, and a
-file deleted mid-scan raises rather than reporting. The skip protects the run.
+**Believed.** A dense picture of a world was hard to read, and the units were
+the cause. A unit draws as a disc over its tile, so a crowded world buries the
+ground under discs.
 
-**True.** The skip matches on the parts of a path, and it matches the caller.
-Every worker on this project runs inside a worktree, so the root of the scan is
-itself under a directory the skip names. The scan then finds no source file at
-all, and the source half of the citation check reports nothing for any record.
+**True.** The discs cover about one part in fifty of the painted picture. The
+saturation comes from the holding layer: a held tile takes a mix of the
+holder's colour, and a held tile whose neighbour has another holder takes a
+border in nearly the pure colour. When three factions interleave at tile scale,
+almost every held tile borders a differently held one, so almost every tile
+draws its border. The border is then not a border. It is a second fill.
 
-**Evidence.** The scan was reproduced against the same root the check uses. It
-collected zero files. A record cited by two source comments in the same
-checkout was still reported as cited by no source file, and a record cited by
-another record was not reported, which is what hid the defect: the record half
-of the check still works, so most records are covered and the note looks
-plausible.[^F192B]
+**Evidence.** The picture was measured rather than judged. At six hundred units
+on three thousand six hundred tiles, pixels of a pure faction colour were two
+in a hundred of the painted picture. Drawing the same world with the holding
+border suppressed made the ground legible at once, with the holdings still
+readable as fields of colour.
 
-**Follows.** **A filter that names a directory matches that directory anywhere
-in the path, including above the root.** The intent was "skip a sibling
-checkout". The effect is "skip everything, whenever the caller is itself a
-checkout". A skip should be relative to the root of the scan, not absolute.
+**Follows.** **The border is keyed on the wrong variable, and so was the first
+repair.** A border of one pixel is a larger part of a small tile than of a
+large one, so scaling the border's weight with the tile size looks principled.
+It is not the cause. The demonstration window opens near the same tile size and
+does not have this problem, because its holdings are small clusters in a large
+world and its borders are rare and informative.
 
-The shape is the one the preceding entry names, one level up: a predicate that
-accepts a range where the truth is a point.[^F201B] "Skip a path under
-`worktrees`" and "skip a path whose absolute location happens to pass through
-`worktrees`" are different predicates, and the loose one silently swallowed the
-strict one.
+**The cause is the density of the holdings, not the zoom.** A repair keyed on
+tile size would have improved one picture and left the mechanism untouched,
+which is the shape this register already holds twice.[^F201A] [^22] The first
+repair was written, rendered, judged better, and then removed for that reason.
 
-**What it costs.** Nothing fails, because the result is a note and not a
-failure. The check keeps running and keeps printing a plausible list. A record
-that a source file cites reads as uncited to every worker, which is the signal
-the rule asks a reviewer to weigh.[^F201C]
+**The open question is what a border should mean when everything is a border.**
+Drawing the outer boundary of a contiguous holding rather than the boundary of
+every tile would carry information at any density. That is real work and it is
+a separate item.[^F201B]
 
 ### FND-200 — A predicate that accepts a prefix accepts every rename that keeps it
 
@@ -4684,6 +4685,21 @@ fixture would have supplied.
 **Where else this shape sits.** Any check that matches a name against a file:
 a citation path, a record number, a registry row, a recipe. A record number
 check that accepts a prefix passes `ADR-0007` for `ADR-00071`.
+
+**A second instance was found in the same session, in a filter rather than a
+match.** The record check skips a path that holds a directory part naming a
+worktree, so that one run does not read a checkout another run is changing.
+Every worker here runs inside such a directory, so the filter drops the tree it
+was asked to read.[^F194REF] The cause is recorded there; the shape is recorded
+here, because the two are the same shape and one row for one cause is
+enough.[^22]
+
+"Skip a sibling checkout" and "skip any path that passes through a worktree
+directory" are different predicates. The loose one swallowed the strict one, in
+the same way `starts_with` swallowed the whole-name match above. **A filter and
+a match fail alike when they accept a family where the truth is a member.** The
+direction differs and the defect does not: a loose match keeps what it should
+drop, and a loose filter drops what it should keep.
 
 ### FND-197 — Accepting a record breaks every citation of it
 
@@ -4986,5 +5002,6 @@ check asserts.
 [^F199A]: The agent protocol server. `python/cachette/agent/server.py`
 [^F199B]: Backlog item 0206. `docs/backlog/proposed/0206-let-the-agent-tool-read-what-the-panel-reads.md`
 [^F200A]: The viewer suite for the glass. `crates/cachette-view/tests/shows_the_moment_on_the_glass.rs`
-[^F201B]: Findings register, FND-200, in this document.
-[^F201C]: Decision Record Scope, section 6. `.claude/rules/adr-scope.md`
+[^F201A]: Findings register, FND-193, in this document.
+[^F201B]: Backlog item 0208. `docs/backlog/proposed/0208-draw-the-boundary-of-a-holding-and-not-of-every-tile.md`
+[^F194REF]: Findings register, FND-194, in this document.
