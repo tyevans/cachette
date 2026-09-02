@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-193**
+**Next number: FND-194**
 
 ## A. Corrections to stated rules
 
@@ -4379,6 +4379,47 @@ there. A backlog item holds the repair, and it states the shape rather than a
 fix, because a check that skips a code span would also skip a real citation
 written inside one.[^F192D]
 
+### FND-193 — The largest capacity the engine states is folded from one of two tables
+
+**Believed.** The terrain module owns the capacity of a tile, and one fold over
+that table reports the largest number of units that can stand on a tile. The
+fold says so in its own words: a caller that must hold one entry for each unit
+that can stand on a tile reads it rather than writing a literal.[^F193A] The
+crossing capacity of a made way sits in the same module for the stated reason
+that a second declaration of a capacity would be one fact in two places.
+
+**True.** The fold walks the terrain kinds only. It does not see the crossing
+capacity, which is larger than every terrain capacity, and which a finished
+road gives a tile. So the module holds two capacity constants and folds one of
+them. The width of the position table of a site is that fold, and the guard
+that clamps a site to it carries a comment saying the clamp takes no effect
+today. On a tile with a finished road it does.
+
+**Evidence.** The composition that admission uses reads both the ground and the
+finished upgrade and returns the larger.[^F193B] The position table reads the
+ground alone, and its own comment says the answer comes from the terrain
+capacity table and from nowhere else.[^F193C] The founding seats a group and
+estimates the room of a place from the ground alone. This was found by reading
+the source while reviewing the upgrade record.[^F193D] Nothing was run, and no
+run reaches it today, because no engine rule issues a build order.
+
+**Follows.** Three things.
+
+**One question has two answers.** Admission admits more units onto a roaded
+tile than the position table believes the tile holds, and than the founding
+believes when it seats a group. Nothing fails when the two disagree, which is
+the shape this project meets most often.[^22]
+
+**A record claimed the universal that would break it.** The upgrade record
+states that every caller which asks how many units a tile holds calls the
+composition. It is fortunate that this is false: a position table sized by the
+terrain fold cannot hold the count the composition would give. The review holds
+the correction.[^F193D]
+
+**The choice is a judgement, not a defect to sweep.** Whether the positions of
+a site should follow the composed capacity, and whether the fold should walk
+both tables, is a register row with a backlog item behind it.[^F193F]
+
 
 ## References
 
@@ -4534,3 +4575,8 @@ written inside one.[^F192D]
 [^F192B]: The record check script. `scripts/check_adrs.py`
 [^F192C]: ADR-0091, movement takes its direction from a per-cell field, never from a per-unit search. `docs/adrs/draft/adr-0091-movement-takes-its-direction-from-a-per-cell-field.md`
 [^F192D]: Backlog item 0198, tell a mention of a record number from a citation of it. `docs/backlog/proposed/0198-tell-a-mention-of-a-record-number-from-a-citation.md`
+[^F193A]: The terrain capacity table and its fold. `crates/cachette-core/src/terrain.rs`
+[^F193B]: The composition of the ground and a finished upgrade. `crates/cachette-core/src/upgrade.rs`
+[^F193C]: The capacity that bounds the positions of a site. `crates/cachette-core/src/position.rs`
+[^F193D]: Review 0199, the influence, tile field, upgrade and housing records. `docs/reviews/0199-the-influence-tile-field-upgrade-and-housing-records.md`
+[^F193F]: Decisions register, DEC-081. `docs/DECISIONS.md`
