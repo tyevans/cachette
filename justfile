@@ -98,7 +98,12 @@ golden:
 test-slow:
     cargo test --workspace --release
     cargo deny check
-    cargo check --workspace --target aarch64-unknown-linux-gnu
+    # The target check is the same one `target-check` runs, and it excludes the
+    # viewer for the same reason: the viewer links a window library that needs a
+    # cross-compiler, and ADR-0008 names the engine as what ships. Checking the
+    # whole workspace here asked for a toolchain the project says it does not
+    # need, so this recipe could not go green on a developer machine.
+    just target-check
 
 # Check that the code compiles for the primary target of ADR-0008.
 target-check:

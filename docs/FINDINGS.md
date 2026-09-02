@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-155**
+**Next number: FND-156**
 
 ## A. Corrections to stated rules
 
@@ -3770,6 +3770,42 @@ running the new check against the real tree before wiring it into the gate,
 which is why the item asked for that run.[^146]
 
 
+### FND-155 — Two recipes checked the target and only the narrower one could pass
+
+**Believed.** The gate suite verifies that the engine compiles for the target
+platform. Two recipes do it, so the property is covered twice.
+
+**True.** The two recipes checked different things and only one of them could
+pass. `target-check` checks the core and the bindings, and says in its own
+comment why it stops there: the viewer links a window library that needs a
+cross-compiler, and a window on a headless server means nothing. The slow gate
+checked the whole workspace for the same target, so it pulled the viewer in and
+demanded the cross-compiler the comment says the project does not need.
+
+**Evidence.** The slow gate had never run on the trunk for the profile change,
+so nobody had met it. On the first run the release tests passed, the licence
+audit passed, and the target check failed to build the window library because
+the cross-compiler is absent. The narrow recipe passes on the same machine in
+about fourteen seconds. The engine and the bindings do compile for the target;
+only the recipe was wrong.
+
+**Follows.** Three things.
+
+**A recipe nobody runs is not a gate.** This one was in the justfile, named in
+the definition of done, and had never been run to completion on the trunk. It
+failed the first time anybody tried it, on a machine the project expects a
+contributor to use.
+
+**Two recipes for one property is the same defect as two declaration sites for
+one value.** The narrow one carried the reasoning in a comment and the broad one
+carried none, so the broad one silently contradicted a decision the project had
+already taken and written down. The slow gate now calls the narrow recipe rather
+than restating its command.
+
+**A gate that cannot go green teaches a reader to skip it.** That is the reason
+the footnote check reports its ordering rule instead of failing on it, decided
+independently on the same day.[^151]
+
 ### FND-154 — Completing an item is not idempotent, and it leaves two of everything
 
 **Believed.** An item is completed once. The guide gives four steps: fill in
@@ -3921,3 +3957,4 @@ it, and the footnote check catches it today only as a side effect.
 [^148]: The citation check. `scripts/check_citations.py`
 [^149]: Backlog guide, completing an item. `docs/backlog/README.md`
 [^150]: Backlog item 0163. `docs/backlog/proposed/0163-fail-when-a-merged-item-still-reads-as-open.md`
+[^151]: Findings register, FND-152, in this document.
