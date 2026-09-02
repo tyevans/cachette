@@ -33,6 +33,14 @@ T = TypeVar("T")
 
 SERVER = StdioServerParameters(command=sys.executable, args=["-m", "cachette.agent"])
 
+# The tiles the gather test puts units on.
+#
+# The count is the assertion's, not the world's. A unit is the mass tier, and
+# the design principle says Python never loops over entities. A test that
+# spawned one unit per open tile would be a worked example of the thing the
+# rule forbids, and it is the example the next person would copy.
+GATHER_ADDRESSES = ((0, 0), (1, 0), (0, 1), (1, 1))
+
 
 @asynccontextmanager
 async def _client() -> AsyncIterator[ClientSession]:
@@ -215,17 +223,9 @@ def test_a_client_follows_the_unit_that_took_a_resource() -> None:
         built = await _call(session, "build_world", width=16, height=16, seed=7)
         name = built["world"]
         units: list[int] = []
-        for q in range(16):
-            for r in range(16):
-                result = await session.call_tool(
-                    "spawn_unit", {"world": name, "q": q, "r": r, "faction": 0}
-                )
-                if getattr(result, "is_error", False):
-                    continue
-                structured = getattr(result, "structured_content", None)
-                assert isinstance(structured, dict)
-                units.append(int(structured["unit"]))
-        assert units, "the world must admit a unit"
+        for q, r in GATHER_ADDRESSES:
+            spawned = await _call(session, "spawn_unit", world=name, q=q, r=r)
+            units.append(int(spawned["unit"]))
         for unit in units:
             await _call(session, "order_gather", world=name, unit=unit, kind=0)
 

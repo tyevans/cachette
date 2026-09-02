@@ -189,18 +189,22 @@ def test_python_cannot_compose_an_identity(seed: int) -> None:
         world.soldier_tile(2**40 + 7)
 
 
+# The tiles the gather test puts units on.
+#
+# The count is the assertion's, not the world's. A soldier is the mass tier,
+# and the design principle says Python never loops over entities, so a test
+# that spawned one unit per open tile would be a worked example of the thing
+# the rule forbids, sitting in the repository for the next person to copy.
+# Four units prove that a gather event carries a resolvable identity. More
+# prove it again and buy only the appearance of a data plane.
+GATHER_ADDRESSES = ((0, 0), (1, 0), (0, 1), (1, 1))
+
+
 def test_a_gather_event_names_a_unit_that_resolves(seed: int) -> None:
     # ADR-0085 D1: the unit column holds the whole identity, so a reader
     # can follow the unit that took the amount.
     world = cachette.World(width=16, height=16, seed=seed, faction_count=2)
-    units = []
-    for q in range(16):
-        for r in range(16):
-            try:
-                units.append(world.spawn_soldier(q, r, 1))
-            except cachette.VerbError:
-                continue
-    assert units, "the world must admit a unit"
+    units = [world.spawn_soldier(q, r, 1) for q, r in GATHER_ADDRESSES]
     for unit in units:
         world.order_gather(unit, 0)
 

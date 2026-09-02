@@ -83,6 +83,21 @@ weakest at the moment a convenient verb exists and nothing refuses it. Option 2
 is worth taking only if the package says the pair does not scale and names the
 founding run as the verb for a population.
 
+**The mechanism that would make option 2 safe does not exist.** A reserved row
+holds the claim that the API refuses the loop for a declared tier.[^DEC63F] No
+record is written and nothing enforces it, so today the only thing standing
+between a caller and a population built one call at a time is prose. Writing
+that record, or whatever replaces it, is what turns option 2 from a promise
+into a rule.
+
+**A second cost, found in this work's own test.** The test that proves a gather
+event names a unit could not choose a tile that grants, because the control
+plane cannot see where a resource is. It therefore put a unit on every open
+tile and let the world decide. That loop was not a convenience; it was the
+absence of a read. An API that cannot answer where to act invites a caller to
+sweep, whatever the rule says. The test now spawns four units at named
+addresses.
+
 **What holds it back.** Nothing technical. The verbs exist and work. The
 question is what the project promises, and the answer decides whether a later
 selector API has to take the pair back after callers depend on it. A backlog
