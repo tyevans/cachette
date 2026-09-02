@@ -35,6 +35,15 @@ repeat them.[^4]
 
 It must not add a `struct` format string to Python. That is the defect.
 
+It must not hand out a slot index as the name of an entity. An identity packs
+an index and a generation, and only both together name one entity over time.
+An index alone survives the death of what it named, so a reader that holds one
+reports on a later occupant of the slot and nothing fails.[^5]
+
+It must not convert a fixed-point field to a float on the way out. A float in
+simulated state is banned, and a float that enters through an interface is the
+same defect one layer further out.[^6]
+
 ## Done when
 
 Filled in when the item is refined.
@@ -49,3 +58,5 @@ Filled in when the item moves to `complete/`.
 [^2]: Recurring Defect Shapes, shape 1. `.claude/rules/recurring-defects.md`
 [^3]: Backlog item 0152. `docs/backlog/proposed/0152-let-an-agent-drive-the-engine-through-a-protocol-server.md`
 [^4]: Decisions register, DEC-060. `docs/DECISIONS.md`
+[^5]: The identity type. `crates/cachette-core/src/types.rs`
+[^6]: ADR-0002, simulated and aggregated state holds no floating point number, decision D1. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`

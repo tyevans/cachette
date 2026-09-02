@@ -62,6 +62,15 @@ Option 3 fits the control plane rule best and costs the most, because each new
 question is a new verb. Option 2 is the cheapest and puts a decoder in Python,
 which is the shape the recommendation is trying to avoid.
 
+**What every option must satisfy.** An event names an entity. The identity
+packs an index and a generation, and the crate keeps its constructor private so
+that no caller can assemble one from an index it chose.[^DEC60E] Whatever
+crosses to Python must carry the generation and must round-trip back to the
+same entity or fail. A bare index is not an identity. An agent that holds one
+watches a unit, the unit dies, a new unit takes the slot, and the agent reports
+on the wrong one with nothing failing. A fixed-point field crosses as its raw
+integer, never as a float.[^DEC60F]
+
 **What holds it back.** Nothing. Work continues on the bytes, and only a reader
 is missing. A backlog item holds the work.[^DEC60D]
 
@@ -1073,3 +1082,5 @@ a failed founding is correct.[^PRD12]
 [^DEC60B]: Recurring Defect Shapes, shape 1. `.claude/rules/recurring-defects.md`
 [^DEC60C]: Findings register, FND-137. `docs/FINDINGS.md`
 [^DEC60D]: Backlog item 0153. `docs/backlog/proposed/0153-let-python-read-an-event-without-repeating-its-layout.md`
+[^DEC60E]: The identity type. `crates/cachette-core/src/types.rs`
+[^DEC60F]: ADR-0002, simulated and aggregated state holds no floating point number, decision D1. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
