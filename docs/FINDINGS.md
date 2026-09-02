@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-149**
+**Next number: FND-151**
 
 ## A. Corrections to stated rules
 
@@ -3628,6 +3628,85 @@ correct, none needed judgement, and the whole sweep was one script. It still
 put a one-field change into 41 files, across three crates, two of which
 belonged to other workers at the time. The cost that matters is the merge
 surface, not the typing.
+### FND-149 — A register can hold the comparison its own text forbids
+
+**Believed.** A register that states the rule for reading its rows protects a
+reader from misreading them. The development budget register says a row is a
+snapshot and does not support a comparison against a row taken hours earlier,
+and it cites the finding that gives the reason.[^101] [^97]
+
+**True.** The register states that rule and then holds two rows that break it.
+The warm rows are 153 s at `opt-level 1` and 435 s with no optimisation. The
+commit that recorded them says plainly that the two runs are not next to each
+other in time: the fair pair is "the earlier warm baseline of 435 s". FND-142
+lists 429 s, 432 s, 435 s and 435 s as third-hour figures for the unchanged
+suite, and 263 s, 283 s and 296 s as first-hour figures for the same suite.
+The 435 s row is therefore a sample of a quantity that measured 263 s earlier
+in the same session, and the ratio a reader takes from the table is inflated.
+
+The conclusion the rows support is still sound, and it is sound for another
+reason. The commit alternated the two profiles back to back for the test
+execution and measured 429 s and 430 s against 84 s and 79 s. That pair is the
+evidence, and it is in a commit body where the register cannot reach it.
+
+**Evidence.** The register, the commit that added the rows, and FND-142 in
+this document. The review of ADR-0083 found it.[^102]
+
+**Follows.** **A rule in a register does not check the register.** A reader
+takes a table as evidence and a paragraph as advice. Put the paired figures in
+the table, or mark the row that no comparison may use.
+
+**Carry the paired figure into the register when the pair is what matters.** A
+commit body never decays and a register is what a reader consults. A
+measurement that supports a decision belongs in both.
+
+### FND-150 — The sweep that corrected the accumulator example reached one document and left the tree
+
+**Believed.** FND-141 corrected a false example, and the correction reached
+the document that held it. The project owner's document now states the
+arithmetic correctly, so the example is repaired.
+
+**True.** The false example is still alive across the tree. Two accepted
+records hold it: ADR-0002 D3 says a byte-wide field summed over millions of
+tiles overflows a 32-bit accumulator, and ADR-0053 says the same of the target
+tile count. Three source comments hold it, in the value types module and twice
+in the pyramid module. One research report holds it in its strongest form,
+where it says the sum reaches 2^32 exactly. One complete backlog item holds it.
+FND-141 named the owner's document alone, so the sweep stopped where the
+finding pointed.
+
+The rule that an accumulator widens is right in every one of those places.
+What is wrong is the example, in every one of them.
+
+**One nearby claim is not an instance, and a sweep must not take it.** A
+research report says a two-byte field summed over one million individuals
+reaches 6.5 times 10^10 and overflows a `u32` by a factor of fifteen. That is
+true, and it is a different claim. A sweep that matches on the shape of the
+sentence rather than on the arithmetic would repair a correct statement.
+
+**Evidence.** A whole-tree search for the phrasings of the example. The
+review of ADR-0083 ran it and reported a list.[^102] The list was short by
+one site, and a second search by a second reader found it. The commit that
+carries this entry holds both commands and the enumeration.
+
+**A count of the sites does not belong here, and the first version of this
+entry carried one.** It said six, and the true figure was seven. The entry
+that records this shape reproduced it within the hour.
+
+**Follows.** **A finding names the instance it found, and a sweep searches the
+tree.** The commit rule already says a sweep is done when a whole-tree search
+comes back clean, and a finding is where that rule is easiest to skip, because
+a finding reads as a note rather than as a change.
+
+**One search by one reader is not a clean search.** The review ran the search
+and believed it complete. A second reader ran it again and found a site the
+first pattern missed. Report the command, so that the second reader can widen
+it.
+
+**Correcting an example inside an accepted record is a decision, not a
+repair.** Two of the six sites are accepted. The retcon window does not cover
+them, so the repair needs an owner.
+
 
 
 ## References
@@ -3744,3 +3823,5 @@ surface, not the typing.
 [^142]: Findings register, FND-064, in this document.
 [^143]: Recurring defect shapes, shape 2. `.claude/rules/recurring-defects.md`
 [^144]: ADR-0014, entity identity is an index plus a generation, decisions D1 and D3. `docs/adrs/accepted/adr-0014-entity-identity-is-an-index-plus-a-generation.md`
+[^101]: Findings register, FND-142, in this document.
+[^102]: Review 0164, the gate build profile record. `docs/reviews/0164-the-gate-build-profile-record.md`
