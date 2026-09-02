@@ -37,6 +37,7 @@ A record here binds nothing until a reviewer moves it.
 
 | No. | What it claims |
 |---|---|
+| 0091 | Movement takes its direction from a per-cell field, and never from a per-unit search over the neighbouring cells. **It runs ahead of the code.** No engine pass derives the field yet, and the item that builds it is refined and not started.[^17] A reviewer must read it as an argument and not as a description. The search it forbids is the obvious implementation, and the reason the field gives the same answer is invisible inside that loop. It also fixes a tie-break order, which is a determinism property. |
 | 0081 | Housing. A review returned it: the engine already holds the per-site count that its decision D3 asks the project to store.[^12] An open row holds the choice that follows.[^13] It reads against ADR-0074 D3 correctly, and that objection failed. |
 | 0082 | Population growth. A review found its own decisions sound and returned it, because it rests on the free places of 0081.[^12] It moves when 0081 moves. |
 | 0083 | The gate build profile. A review returned it: both decisions hold against the code, and three sentences do not.[^15] It moves when those three are corrected. |
@@ -96,3 +97,4 @@ plainly that nothing implements it yet.[^1]
 [^14]: Decisions register, DEC-059. `docs/DECISIONS.md`
 [^15]: Review 0164, the gate build profile record. `docs/reviews/0164-the-gate-build-profile-record.md`
 [^16]: Review 0175, the unit reservation record. `docs/reviews/0175-the-unit-reservation-record.md`
+[^17]: Backlog item 0185, steer a step by the option the unit chose. `docs/backlog/refined/0185-steer-a-step-by-the-option-the-unit-chose.md`

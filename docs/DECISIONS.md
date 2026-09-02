@@ -23,9 +23,85 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^ALLOC]
 
-**Next number: DEC-075**
+**Next number: DEC-081**
 
 ## Open
+
+### DEC-079 — Does a whole cell that steps in one direction read as a crowd?
+
+**Open. Engineering owns it. The recommendation is Option A.**
+
+A record states that movement takes its direction from a per-cell field, and
+never from a per-unit search over the neighbouring cells.[^DEC79A] One
+consequence follows from the shape and not from a parameter. Every unit of one
+cell that holds one option takes one direction, so a cell moves as a block.
+
+The block edge is the level 1 block edge, which is a property of the partition
+that level 1 and the derived unit structure share.[^DEC79B] A watcher
+therefore sees a rectangle of ground step together, and the step of one
+rectangle does not agree with the step of the next.
+
+Nothing was run. Whether that reads as a migration or as a grid of marching
+squares is a question about a screen, and only a run answers it.
+
+**Option A. Accept the block, and settle the question with a run.** Build the
+field, run the demonstration, and look. If a block reads as a block, open a
+second choice against evidence rather than against argument.
+
+**Option B. Give a share of the units the uniform draw instead.** A share that
+deviates turns a hard edge into a soft one. The draw already exists, so the
+cost is one comparison. The share is a value, and no measurement and no run
+supports a value for it today.[^BLK7]
+
+**Option C. Rank the neighbours of a tile rather than of a cell.** A field at
+the tile pitch has no visible edge. It costs the tile count instead of the
+cell count, and the record rejects the shape that pays the world for a
+quantity that is correctly sampled at level 1.[^DEC79A]
+
+**Recommendation: A.** Option B invents a parameter to repair a defect that
+nobody has seen. Option C pays the tile count against the same defect. The
+cheap move is to look first, and the item that builds the field carries the
+question to whoever runs it.[^DEC79D]
+
+### DEC-080 — Does a founding keep its fixed production rate once a carried load can reach a store?
+
+**Open. Engineering owns it. The recommendation is Option A.**
+
+A founding surveys the ground, and it sets the production rate of the new site
+from the food that the survey found.[^ADR75] That rate is the only thing that
+fills a store today, so what a settlement holds does not depend on what its
+people do.
+
+A separate item lets a unit give its carried load to the store of its home
+site.[^DEC80B] After it, two mechanisms fill one store from one ground. The
+survey reads the deposits of the disc around the place. The units gather from
+those same deposits. The same food therefore reaches the store twice, once as
+a rate and once as a load.
+
+This is one quantity declared in two places, which is the shape this project
+records as a recurring defect.[^DEC73B] Nothing fails when the two disagree,
+because neither is wrong on its own.
+
+**Option A. Keep the rate, and restate what it means.** The rate is the yield
+of the ground that the site works without anybody walking to it. The carried
+load is what a unit fetched from further away. The two are then different
+quantities, and the survey stops being a promise about the deposits that units
+can also gather.
+
+**Option B. Drop the rate to zero once delivery exists.** The store then rises
+only by what units fetched, which is the strongest form of the chain from the
+ground to the store to the ration. It also starves a site whose people cannot
+reach food in time, and no run has shown whether they can.
+
+**Option C. Subtract the delivery from the rate.** The store then rises by a
+fixed total whatever the units do. It restores the double count as a rule
+instead of removing it, and it makes gathering pointless.
+
+**Recommendation: A.** Option B changes the survival of every site against no
+evidence, and this project has no run that says the units can feed themselves.
+Option C is the double count with a subtraction on top. Option A costs one
+sentence and leaves the choice open until a run shows what delivery alone
+does.
 
 ### DEC-074 — How does the project find a value that nothing reads?
 
@@ -1603,3 +1679,7 @@ a failed founding is correct.[^PRD12]
 [^DEC74TEST]: Testing Rules, section 2a. `.claude/rules/testing.md`
 [^DEC74BASE]: Findings register, FND-130. `docs/FINDINGS.md`
 [^DEC74PRI]: Backlog priority index. `docs/backlog/PRIORITY.md`
+[^DEC79A]: ADR-0091, movement takes its direction from a per-cell field, never from a per-unit search, decisions D1 and D4. `docs/adrs/draft/adr-0091-movement-takes-its-direction-from-a-per-cell-field.md`
+[^DEC79B]: ADR-0018, the unit-to-tile bridge is derived, and it rebuilds at the barrier, decision D2. `docs/adrs/accepted/adr-0018-the-unit-to-tile-bridge-is-derived-and-rebuilds-at-the-barrier.md`
+[^DEC79D]: Backlog item 0185, steer a step by the option the unit chose. `docs/backlog/refined/0185-steer-a-step-by-the-option-the-unit-chose.md`
+[^DEC80B]: Backlog item 0187, give a carried load somewhere to go. `docs/backlog/refined/0187-give-a-carried-load-somewhere-to-go.md`

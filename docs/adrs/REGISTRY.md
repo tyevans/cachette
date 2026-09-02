@@ -279,6 +279,7 @@ without stating a constraint is worse than no record.
 | 0084 | The world reserves the unit columns at construction, and a spawn past the reservation is refused | Draft | 0012, 0014, 0066 | `draft/adr-0084-the-world-reserves-the-unit-columns-at-construction.md` |
 | 0088 | A tile field is a generated base and a stored change | Draft | 0002, 0003, 0004, 0009, 0012, 0068, 0072 | `draft/adr-0088-a-tile-field-is-a-generated-base-and-a-stored-change.md` |
 | 0087 | An influence solve runs a fixed iteration count over the whole plane | Draft | 0001, 0002, 0004, 0009, 0022, 0060 | 09, `draft/adr-0087-an-influence-solve-runs-a-fixed-iteration-count.md` |
+| 0091 | Movement takes its direction from a per-cell field, never from a per-unit search | Draft | 0004, 0018, 0022, 0024, 0056, 0064 | `draft/adr-0091-movement-takes-its-direction-from-a-per-cell-field.md` |
 
 ### Retired numbers
 

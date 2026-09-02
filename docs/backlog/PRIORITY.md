@@ -28,9 +28,10 @@ engine gets wrong today.
 | No. | Why it sits here |
 |---|---|
 | 0102 | A settlement reads its own ground rule, not the passability rule. Blocked by 0071 and 0092, in that order. |
-| 0185 | The engine computes an option for every unit on every tick and then discards it. Movement reads whether a unit chose, not what it chose, so every pass that feeds the choice feeds one bit. FND-180 records it. Take 0183 and 0184 first, so that the option scores something a system writes. |
 | 0183 | The cell summary carries no resource, no store and no need, so a unit cannot see food however well it chooses. One accumulator. It unblocks 0184. |
 | 0184 | The forage option scores the stub value, which is noise that no other system reads or writes. Follows 0183. |
+| 0185 | The engine computes an option for every unit on every tick and then discards it. Movement reads whether a unit chose, not what it chose, so every pass that feeds the choice feeds one bit. FND-180 records it. It follows 0183 and 0184, so that the option scores something a system writes, and ADR-0091 governs it. |
+| 0186 | It moved here from `Next` because it is the negative feedback of 0185. Without it the exit field of 0185 produces one rush in one direction, and nothing in the world turns the crowd back. Take it with 0185, or immediately after. |
 
 ## Next
 
@@ -38,8 +39,7 @@ These close a gap a review found, or they unblock the items above.
 
 | No. | Why it sits here |
 |---|---|
-| 0186 | No unit ever gathers, so the resource module, the ledger, the depletion set and the recovery pass are all idle. It also gives 0185 its negative feedback: without it the flow field produces one rush. |
-| 0187 | Nothing moves a carried load into a store, so gathering cannot feed anybody. Follows 0186. |
+| 0187 | Nothing moves a carried load into a store, so gathering cannot feed anybody. It ships a verb with nothing to move until 0186 makes a unit carry something, so it follows 0186. |
 | 0188 | The viewer paints noise, and the verb that explains a choice is called by nothing outside the core crate. PRD-0009 asks for that answer. Follows 0183. |
 | 0189 | The rules against inert work look for an absent caller, and this defect has one. DEC-074 holds the options and recommends this. |
 | 0104 | A ruler decides nothing that reaches anybody. DEC-040 carries the writ in the influence field. |
