@@ -227,10 +227,10 @@ without stating a constraint is worse than no record.
 
 | No. | Claim | Status | Depends on | Source |
 |---|---|---|---|---|
-| 0040 | Python is a control plane, not a data plane | Proposed | 0001 | 05 |
+| 0040 | Python is a control plane, not a data plane | Draft | 0001 | `draft/adr-0040-python-is-a-control-plane-not-a-data-plane.md` |
 | 0041 | A crate split enforces the boundary at compile time | Proposed | 0040 | 05 |
 | 0042 | The interpreter is released for the whole step | Proposed | 0040 | 05 |
-| 0043 | A declared tier enforces the no-loop rule, and the API refuses the loop | Proposed | 0040 | 04, 05 |
+| 0043 | A declared tier enforces the no-loop rule, and the API refuses the loop | Draft | 0040 | `draft/adr-0043-a-declared-tier-enforces-the-no-loop-rule.md` |
 | 0044 | What copies and what does not is declared at the call site | Proposed | 0040, 0015 | 05 |
 | 0045 | View safety needs three layers | Proposed | 0044 | 05 |
 | 0046 | Every error is typed | Proposed | 0040 | 05 |
@@ -244,8 +244,8 @@ without stating a constraint is worse than no record.
 | 0048 | A verb declares a pipeline of kernels | Proposed | 0001 | 06, 13 |
 | 0049 | A quantity is a rate, a constraint or a set, and each composes by one law | Proposed | 0023 | 13 |
 | 0050 | The frame schedule is static and known before the frame runs | Proposed | 0001, 0033 | 06 |
-| 0051 | A selector is a lazy expression tree that Rust evaluates | Proposed | 0043 | 04 |
-| 0052 | A selector result may be a range, not only an enumerated set | Proposed | 0051, 0028 | 02, 04 |
+| 0051 | A selector is a lazy expression tree that Rust evaluates | Draft | 0040, 0043 | `draft/adr-0051-a-selector-is-a-lazy-expression-tree.md` |
+| 0052 | A selector result may be a range, not only an enumerated set | Draft | 0051, 0028 | `draft/adr-0052-a-selector-result-may-be-a-range.md` |
 | 0053 | A faction is a bit in a mask, and a relation is a plane | Accepted | 0011, 0012, 0023, 0024 | 08 |
 | 0054 | An entity belongs to one of three tiers, declared at creation | Accepted | 0012, 0043 | 14, 15, 16 |
 | 0055 | An effective stat comes from an ordered modifier pipeline | Proposed | 0002, 0054 | 12 |
