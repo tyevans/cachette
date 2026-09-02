@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-201**
+**Next number: FND-202**
 
 ## A. Corrections to stated rules
 
@@ -4616,6 +4616,41 @@ that ordering was correct at the time it was chosen.
 the record, because a person reads an image and an agent does not. The two
 paths answer different readers, and the tool did not replace the picture.
 
+### FND-201 — A guard written to skip other worktrees skips the caller as well
+
+**Believed.** The record check reports a record that no other record and no
+source file cites. It skips worktrees, because a worktree holds another
+checkout of this repository, its files belong to the run that owns them, and a
+file deleted mid-scan raises rather than reporting. The skip protects the run.
+
+**True.** The skip matches on the parts of a path, and it matches the caller.
+Every worker on this project runs inside a worktree, so the root of the scan is
+itself under a directory the skip names. The scan then finds no source file at
+all, and the source half of the citation check reports nothing for any record.
+
+**Evidence.** The scan was reproduced against the same root the check uses. It
+collected zero files. A record cited by two source comments in the same
+checkout was still reported as cited by no source file, and a record cited by
+another record was not reported, which is what hid the defect: the record half
+of the check still works, so most records are covered and the note looks
+plausible.[^F192B]
+
+**Follows.** **A filter that names a directory matches that directory anywhere
+in the path, including above the root.** The intent was "skip a sibling
+checkout". The effect is "skip everything, whenever the caller is itself a
+checkout". A skip should be relative to the root of the scan, not absolute.
+
+The shape is the one the preceding entry names, one level up: a predicate that
+accepts a range where the truth is a point.[^F201B] "Skip a path under
+`worktrees`" and "skip a path whose absolute location happens to pass through
+`worktrees`" are different predicates, and the loose one silently swallowed the
+strict one.
+
+**What it costs.** Nothing fails, because the result is a note and not a
+failure. The check keeps running and keeps printing a plausible list. A record
+that a source file cites reads as uncited to every worker, which is the signal
+the rule asks a reviewer to weigh.[^F201C]
+
 ### FND-200 — A predicate that accepts a prefix accepts every rename that keeps it
 
 **Believed.** A check that compares a name in one place against a name in
@@ -4951,3 +4986,5 @@ check asserts.
 [^F199A]: The agent protocol server. `python/cachette/agent/server.py`
 [^F199B]: Backlog item 0206. `docs/backlog/proposed/0206-let-the-agent-tool-read-what-the-panel-reads.md`
 [^F200A]: The viewer suite for the glass. `crates/cachette-view/tests/shows_the_moment_on_the_glass.rs`
+[^F201B]: Findings register, FND-200, in this document.
+[^F201C]: Decision Record Scope, section 6. `.claude/rules/adr-scope.md`

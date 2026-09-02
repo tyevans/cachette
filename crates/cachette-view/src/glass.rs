@@ -8,7 +8,7 @@
 //! sections bought one placement and could not buy a second.[^2]
 //!
 //! **The window shows what changes moment to moment. The record of a moment
-//! goes to the inspection path.** A quantity that a watcher reads once, or
+//! goes to the inspection path.**[^9] A quantity that a watcher reads once, or
 //! reads occasionally, does not earn a place on the glass. The panel still
 //! exists and still holds every section, and a person reaches it with one
 //! command that renders it to an image.[^3]
@@ -50,6 +50,7 @@
 //! [^6]: PRD-0005, a watcher can tell what is happening and why. `docs/product/shipped/prd-0005-a-watcher-can-tell-what-is-happening-and-why.md`
 //! [^7]: Decisions register, DEC-084. `docs/DECISIONS.md`
 //! [^8]: ADR-0067, the viewer reads the world and never writes to it, decision D2. `docs/adrs/accepted/adr-0067-the-viewer-reads-the-world-and-never-writes-to-it.md`
+//! [^9]: ADR-0093, the window shows what changes, and the record of a moment goes to the inspection path, decisions D1 to D5. `docs/adrs/draft/adr-0093-the-window-shows-what-changes.md`
 
 use cachette_core::resource::ResourceKind;
 use cachette_core::terrain::KIND_COUNT;
@@ -392,11 +393,12 @@ fn outline(canvas: &mut Canvas, x: i32, y: i32, width: i32, height: i32) {
 /// address, the ground, the count of units in the window and the count of
 /// tiles drawn all sit behind the key. Each is a number a person reads once to
 /// orient themselves, and none of them tells a watcher that something is
-/// happening.[^1]
+/// happening.[^1] [^2]
 ///
 /// # References
 ///
 /// [^1]: Decisions register, DEC-084. `docs/DECISIONS.md`
+/// [^2]: ADR-0093, the window shows what changes, decisions D1 and D2. `docs/adrs/draft/adr-0093-the-window-shows-what-changes.md`
 fn world_card(readout: &Readout) -> Card {
     let mut rows = vec![
         Row::new("tick", grouped(readout.tick())),
