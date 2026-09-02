@@ -46,7 +46,7 @@ These close a gap a review found, or they unblock the items above.
 | 0113 | Admission enforces the capacity from a bridge count that no test compares against a scan. |
 | 0080 | The settings struct prices every new parameter at twenty-five files. |
 | 0130 | Three registers state a next number that the rows already hold, and it went stale and conflicted four times in one night. |
-| 0208 | The holding border draws on every held tile, so at tile-scale interleaving every tile is a border and the ground is lost. FND-201 holds the measurement and records a repair that was tried and removed for keying on the wrong variable. |
+| 0209 | The holding border draws the same picture for a frontier with another faction and for the edge of the claimed ground. Between 6 and 13 held tiles in every 100 border only unclaimed ground, so the two cases are distinguishable. FND-206 holds the counts and warns against judging this layer from a render. |
 | 0206 | Superseded. Another worker closed every gap this item names, in the same round it was written. It stays open only until somebody confirms that and closes it against the item that did the work. Do not take it. |
 | 0153 | Python holds no way to read an event, so an agent gets bytes and a digest. Any decoder in Python is a second copy of the layout. |
 | 0161 | The control plane cannot say where to act, so a caller sweeps. Four reserved rows hold the answer and none is written. DEC-063 names it the destination. |

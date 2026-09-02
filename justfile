@@ -70,14 +70,16 @@ watch:
 # cuts, and a person reads it without opening a window.
 #
 # Write every number the window does not show, as an image. Needs no display.
-inspect out="panel.ppm":
+inspect out="target/panel.ppm":
+    @case "{{out}}" in *.ppm) ;; *) echo "the output path must end in .ppm, and '{{out}}' does not"; exit 1;; esac
     cargo run --release --package cachette-view --example panel_shot -- {{out}}
 
 # The seed and the extent choose the world. The soldier count may be zero,
 # which shows the ground with no disc over it.
 #
 # Write the map as the window draws it, as an image. Needs no display.
-map seed="0" extent="128" out="world.ppm" soldiers="600":
+map seed="0" extent="128" out="target/world.ppm" soldiers="600":
+    @case "{{out}}" in *.ppm) ;; *) echo "the output path must end in .ppm, and '{{out}}' does not"; exit 1;; esac
     cargo run --release --package cachette-view --example picture -- {{seed}} {{extent}} {{out}} {{soldiers}}
 
 # Exercise the installed package the way continuous integration does.

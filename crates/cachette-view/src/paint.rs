@@ -12,8 +12,12 @@
 //!
 //! A tile that a faction holds takes that faction's colour, mixed over the
 //! ground. A tile that nobody holds draws as the ground alone. A held tile
-//! whose neighbour has another holder takes a border in the same colour, so
-//! a watcher sees where one holding meets another.
+//! takes a border in the same colour when any of its six neighbours holds
+//! differently, so a watcher sees the outline of what a faction holds.
+//!
+//! **The border does not tell a frontier from a coastline.** Unclaimed ground
+//! beside a holding draws the same border as another faction beside it. The
+//! two are different facts and the picture states them alike.[^6]
 //!
 //! The colour comes from the one table this module holds. The engine holds no
 //! colour, and a second table would be one fact in two places.[^2] [^4]
@@ -38,6 +42,7 @@
 //! [^3]: ADR-0017, the world is a rhombus, so a tile index is raw axial, decision D4. `docs/adrs/accepted/adr-0017-the-world-is-a-rhombus-so-a-tile-index-is-raw-axial.md`
 //! [^4]: Recurring Defect Shapes, shape 1. `.claude/rules/recurring-defects.md`
 //! [^5]: Findings register, FND-119. `docs/FINDINGS.md`
+//! [^6]: Backlog item 0209. `docs/backlog/proposed/0209-tell-a-frontier-from-the-edge-of-the-claimed-ground.md`
 
 use cachette_core::cohort::NeedCondition;
 use cachette_core::founding::FoundingOutcome;
@@ -1320,6 +1325,12 @@ fn on_an_edge(world: &World, address: Axial, holder: Option<Holder>, canvas: &mu
         // The loop does not stop at the first difference. A short loop would
         // make the count of reads depend on where the neighbour sits, and the
         // cost of the layer would then follow the shape of the holdings.
+        //
+        // Unclaimed ground counts as a difference. A holding therefore shows
+        // its whole outline, and not only the part that meets another
+        // faction.[^2]
+        //
+        // [^2]: Backlog item 0209. `docs/backlog/proposed/0209-tell-a-frontier-from-the-edge-of-the-claimed-ground.md`
         edge = edge || beside.unwrap_or(Holder::NOBODY) != holder.unwrap_or(Holder::NOBODY);
     }
     edge

@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-202**
+**Next number: FND-207**
 
 ## A. Corrections to stated rules
 
@@ -4616,6 +4616,50 @@ that ordering was correct at the time it was chosen.
 the record, because a person reads an image and an agent does not. The two
 paths answer different readers, and the tool did not replace the picture.
 
+### FND-206 — The holding border already draws only on a boundary, and the busy picture was the fixture
+
+**Believed.** A dense picture of a world was hard to read because the holding
+border drew on every held tile. The repair was to draw the boundary of a
+holding instead: a tile whose neighbours all share its holder would draw
+nothing, and only a tile on the edge of a holding would draw a border. A
+register entry and a backlog item both stated it that way.[^F201B]
+
+**True.** The drawing already does that. The border test reads the six
+neighbours of a held tile and draws only when one of them has a different
+holder. A tile surrounded by its own faction draws no border and never did.
+The repair was already in the code, and the entry that proposed it described a
+defect that does not exist.
+
+**Evidence.** The world was counted rather than judged. Of the held tiles, 83
+in 100 sit on a boundary in the picture that looked bad, 89 in 100 in the
+picture that looks best, and 85 in 100 in a third. **The picture that reads
+best has the highest share.** That number therefore does not explain the
+difference and cannot be the mechanism.
+
+The number that does explain it is the share of the world that is held. It is
+74 in 100 in the picture that looked bad and 8 in 100 in the picture that reads
+best. A world where three quarters of the ground is claimed draws as a map of
+factions, because it is one.
+
+**Follows.** **The fixture made the defect.** The bad picture came from six
+hundred units on a world of thirty-six hundred tiles, which is one unit for
+every six. Nobody chose that density for a reason; it was carried from one
+command line to the next while reproducing a different problem. The
+demonstration seats thirty people for each faction in a world of a quarter of a
+million tiles, and the default picture command is a fortieth as dense.
+
+**A measurement before a repair would have cost one run.** The first repair for
+this was a border weight that fell with the tile size, and it was removed for
+keying on the wrong variable.[^F206B] The second repair was the boundary rule,
+and it was already implemented. Both were proposed from a rendered picture and
+neither was proposed from a count. The count took one throwaway example and it
+refuted both.
+
+**What is real.** The drawing borders a holding against unclaimed ground and
+against another faction alike, and its own comment says it marks "where one
+holding meets another". The code and the comment disagree, and the comment is
+the thing that is wrong.[^F206C]
+
 ### FND-201 — The holding edge carries no information when holdings interleave at tile scale
 
 **Believed.** A dense picture of a world was hard to read, and the units were
@@ -4651,6 +4695,13 @@ repair was written, rendered, judged better, and then removed for that reason.
 Drawing the outer boundary of a contiguous holding rather than the boundary of
 every tile would carry information at any density. That is real work and it is
 a separate item.[^F201B]
+
+**Corrected. The drawing already draws the boundary and not every tile, and
+this entry was wrong about the mechanism.** The share of held tiles that sit on
+a boundary is highest in the picture that reads best, so it cannot be the
+cause. The share of the world that is held is the difference, and the picture
+that looked bad came from a fixture nobody chose on purpose. The correction
+holds the counts.[^F201C]
 
 ### FND-200 — A predicate that accepts a prefix accepts every rename that keeps it
 
@@ -5003,5 +5054,8 @@ check asserts.
 [^F199B]: Backlog item 0206. `docs/backlog/proposed/0206-let-the-agent-tool-read-what-the-panel-reads.md`
 [^F200A]: The viewer suite for the glass. `crates/cachette-view/tests/shows_the_moment_on_the_glass.rs`
 [^F201A]: Findings register, FND-193, in this document.
-[^F201B]: Backlog item 0208. `docs/backlog/proposed/0208-draw-the-boundary-of-a-holding-and-not-of-every-tile.md`
+[^F201B]: Backlog item 0208. `docs/backlog/complete/0208-draw-the-boundary-of-a-holding-and-not-of-every-tile.md`
 [^F194REF]: Findings register, FND-194, in this document.
+[^F206B]: Findings register, FND-201, in this document.
+[^F201C]: Findings register, FND-206, in this document.
+[^F206C]: The holder layer of the drawing pass. `crates/cachette-view/src/paint.rs`
