@@ -23,6 +23,7 @@ pub mod founding;
 pub mod hash;
 pub mod hex;
 pub mod holding;
+mod household;
 pub mod pyramid;
 pub mod rates;
 pub mod resource;
