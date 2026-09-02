@@ -47,8 +47,11 @@ holds a change. A read combines the two.
 
 Three properties follow, and a reviewer can check each one.
 
-- Building a world visits no tile of the field and allocates nothing for it.
-  The seed and the extent are the whole of a new field.
+- Building the field visits no tile and allocates nothing for it. The seed
+  and the extent are the whole of a new field. Building a world still visits
+  each tile, because the first level of the pyramid sums the value of every
+  tile. The consequences below name that reader and the item that holds its
+  removal.
 - The stored part grows with what the systems have changed, never with the
   size of the world alone.
 - Two worlds built from one seed hold one field, without comparing anything.

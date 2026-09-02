@@ -73,9 +73,15 @@ the progress enter the whole-world hash.[^12]
 
 The ground states how many units a tile holds. A finished upgrade may state a
 larger number, and the larger of the two wins. **One function reads both
-tables**, and every caller that asks how many units a tile holds calls it. A
+tables, and every caller that enforces the capacity of a tile calls it.** A
 second rule beside it would be one fact in two places, and nothing would fail
 when the two disagreed.[^11]
+
+**A caller that asks a different question reads the table its question is
+about.** A bound on the work a site opens follows the ground alone. A founding
+that seats a group over new ground follows the ground alone as well. Neither
+enforces a capacity, because admission is the one rule that does.[^13] A
+register row holds whether such a caller should compose instead.[^14]
 
 **An upgrade states no capacity of its own.** A made way is ground that a unit
 crosses quickly, and the project already holds the capacity of such ground in
@@ -85,7 +91,7 @@ the upgrade row reads the value from there rather than restating it.
 **Ground that admits nobody stays closed.** An upgrade changes how many units a
 tile holds. It never changes whether the tile holds anybody. Every caller that
 asks only about passability therefore reads the ground and stays correct, and
-the derived levels above level 0 do not have to learn about upgrades.[^13]
+the derived levels above level 0 do not have to learn about upgrades.[^15]
 
 **A site under construction changes nothing.** Only a finished upgrade reaches
 the composition.
@@ -110,7 +116,7 @@ building, and it is bounded by the fraction the owner named.[^4]
 **A read of a tile property costs a binary search.** The ground answers in
 arithmetic and the upgrade answers in a search over the improved set. A caller
 that sweeps every tile pays that search on every tile, and the project has no
-measurement of what it costs on the target platform.[^14]
+measurement of what it costs on the target platform.[^16]
 
 **The engine cannot place an upgrade by hand into the generated world.** An
 upgrade exists because a unit built it, or because the control plane removed
@@ -118,11 +124,11 @@ one. There is no authored content path, and adding one is a new decision.
 
 **An upgrade does not decay.** Nothing takes progress away and nothing wears a
 finished upgrade out. Upkeep is a rate attached to a site, and a rule that
-spent one on an upgrade is a new decision.[^15]
+spent one on an upgrade is a new decision.[^17]
 
 **The advance pass cannot be told to skip a tick.** It runs on every tick, and
 its cost is the builders plus the entries. A schedule would be a new decision,
-and it would need the same shape the rate schedule has.[^15]
+and it would need the same shape the rate schedule has.[^17]
 
 **A builder on a finished upgrade wastes its work.** The clamp of D2 absorbs
 the contribution and nothing tells the builder to stop. A rule that stopped it
@@ -132,7 +138,7 @@ is a behaviour decision and this record does not make it.
 nothing.** The contribution of a tile is a count of builders times a whole
 number, and integer addition does not depend on order.[^6] The sorted order
 decides only which kind takes a tile that carries none, and the sort is the key
-vector sort that the project already uses.[^16] The two determinism tests still
+vector sort that the project already uses.[^18] The two determinism tests still
 cover the stored result, because the map reaches the state hash.
 
 ## Alternatives rejected
@@ -141,7 +147,7 @@ cover the stored result, because the map reaches the state hash.
 it is the shape the ground and the stock both already refused. It pays the
 whole world for the tiles nobody built on, and the fraction the owner named
 makes almost all of that payment waste. A record already rejected a dense
-per-tile count for the same reason.[^17]
+per-tile count for the same reason.[^19]
 
 **A dense array of one bit for each tile, beside the sparse entries.** The bit
 would say whether a tile carries an upgrade, so a read could skip the search.
@@ -178,8 +184,10 @@ single answer for what the tile becomes.
 [^10]: Findings register, FND-011. `docs/FINDINGS.md`
 [^11]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`
 [^12]: ADR-0001, one binary gives one answer at any thread count, decision D4. `docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
-[^13]: ADR-0022, level 0 is the only truth, and every level above it is derived, decision D1. `docs/adrs/accepted/adr-0022-level-0-is-the-only-truth-and-every-level-above-it-is-derived.md`
-[^14]: Blockers register, BLK-007. `docs/BLOCKERS.md`
-[^15]: ADR-0062, production and upkeep are rates attached to a site, decision D4. `docs/adrs/accepted/adr-0062-production-and-upkeep-are-rates-attached-to-a-site.md`
-[^16]: ADR-0007, content supplies a key vector, never a comparator, decision D1. `docs/adrs/accepted/adr-0007-content-supplies-a-key-vector-never-a-comparator.md`
-[^17]: ADR-0074, a spawn may over-fill a tile, and only admission enforces the capacity, decision D3. `docs/adrs/accepted/adr-0074-a-spawn-may-over-fill-a-tile-and-only-admission-enforces-the-capacity.md`
+[^13]: ADR-0074, a spawn may over-fill a tile, and only admission enforces the capacity, decision D2. `docs/adrs/accepted/adr-0074-a-spawn-may-over-fill-a-tile-and-only-admission-enforces-the-capacity.md`
+[^14]: Decisions register, DEC-081. `docs/DECISIONS.md`
+[^15]: ADR-0022, level 0 is the only truth, and every level above it is derived, decision D1. `docs/adrs/accepted/adr-0022-level-0-is-the-only-truth-and-every-level-above-it-is-derived.md`
+[^16]: Blockers register, BLK-007. `docs/BLOCKERS.md`
+[^17]: ADR-0062, production and upkeep are rates attached to a site, decision D4. `docs/adrs/accepted/adr-0062-production-and-upkeep-are-rates-attached-to-a-site.md`
+[^18]: ADR-0007, content supplies a key vector, never a comparator, decision D1. `docs/adrs/accepted/adr-0007-content-supplies-a-key-vector-never-a-comparator.md`
+[^19]: ADR-0074, a spawn may over-fill a tile, and only admission enforces the capacity, decision D3. `docs/adrs/accepted/adr-0074-a-spawn-may-over-fill-a-tile-and-only-admission-enforces-the-capacity.md`
