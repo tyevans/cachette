@@ -36,7 +36,7 @@ from dataclasses import dataclass
 
 from mcp.server.mcpserver import MCPServer
 
-from cachette._core import version
+from cachette import version
 from cachette.agent.session import SessionStore, WorldSession, WorldSettings
 
 __all__ = ["EventLogReport", "InvariantReport", "WorldReport", "build_server", "main"]

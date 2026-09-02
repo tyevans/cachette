@@ -8,19 +8,15 @@ The store holds a name for each world. The name is the only handle an agent
 needs, and every tool takes it.
 
 This module holds no simulation logic. It holds the engine's ``World`` and
-the settings that built it, because the settings are not readable back from
-the world.[^1]
-
-References
-----------
-[^1]: The compiled module. ``crates/cachette-py/src/lib.rs``
+the settings that built it, because the world does not report its own seed or
+faction count back.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
 
-from cachette._core import World
+from cachette import World
 
 __all__ = ["SessionStore", "UnknownWorldError", "WorldSession", "WorldSettings"]
 
