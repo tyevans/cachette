@@ -188,6 +188,35 @@ def run_row(row: Row, shell: list[str]) -> None:
     row.seconds = time.monotonic() - start
 
 
+def git(*args: str) -> str:
+    """Run git in the repository the harness reads, and return its output.
+
+    A non-zero exit gives an empty string. A directory that is not a
+    repository is not a failure here: the run still has a cost to report, and
+    it reports one commit fewer.
+    """
+    done = subprocess.run(
+        ("git", "-C", str(ROOT)) + args,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    return done.stdout if done.returncode == 0 else ""
+
+
+def tree_state() -> tuple[str, str]:
+    """Give the commit the run reads, and the tracked files that differ from it.
+
+    A per-recipe figure is a figure about one tree. A merge that lands while
+    the run is going gives every later recipe a different tree from every
+    earlier one, so the shares describe a tree that never existed. The run
+    cannot prevent that and it can say it happened.
+    """
+    head = git("rev-parse", "HEAD").strip()
+    dirty = git("status", "--porcelain").strip()
+    return head, dirty
+
+
 def load_average() -> str:
     try:
         one, five, fifteen = __import__("os").getloadavg()
@@ -207,7 +236,14 @@ def budget_seconds() -> int | None:
     return int(done.stdout.strip())
 
 
-def report(plan: Plan, before: str, after: str, started: str) -> None:
+def report(
+    plan: Plan,
+    before: str,
+    after: str,
+    started: str,
+    tree_before: tuple[str, str] = ("", ""),
+    tree_after: tuple[str, str] = ("", ""),
+) -> None:
     total = sum(row.seconds for row in plan.rows)
     for row in plan.rows:
         row.share = row.seconds / total if total else 0.0
@@ -228,6 +264,30 @@ def report(plan: Plan, before: str, after: str, started: str) -> None:
         )
     else:
         print("Nothing was rebuilt. This is the run the budget describes.")
+
+    # The commit is the subject of every figure below. If it moved, the rows
+    # describe more than one tree and none of them describes the run.
+    head_before, dirty_before = tree_before
+    head_after, dirty_after = tree_after
+    if head_before and head_after and head_before != head_after:
+        print()
+        print("THE REPOSITORY MOVED WHILE THIS RAN. THIS RUN IS NOT A MEASUREMENT.")
+        print(f"  it started at {head_before}")
+        print(f"  it ended at   {head_after}")
+        print("Every recipe after the move read a different tree from every")
+        print("recipe before it, so the shares describe no tree that existed.")
+        print("Run it again with nothing landing on the branch.")
+    elif dirty_before != dirty_after:
+        # A tracked file that changes is not always a defect: a recipe may
+        # write a lock file. Report it and let the reader judge, rather than
+        # failing a run and teaching everyone to ignore the warning.
+        moved = sorted(
+            set(dirty_after.splitlines()) ^ set(dirty_before.splitlines())
+        )
+        print()
+        print("note: tracked files changed while this ran. The tree was not still.")
+        for entry in moved[:10]:
+            print(f"  {entry}")
 
     # A recipe that stops early costs less than a recipe that runs, and its
     # row looks like a fast gate. The two are told apart only here, so this
@@ -289,6 +349,7 @@ def report(plan: Plan, before: str, after: str, started: str) -> None:
     print("work: the process start, the fingerprint check and the link.")
     print("The `bad` column counts the command lines that failed. Any figure in")
     print("a row with a failure describes a run that stopped, not a gate.")
+    print("The run also names the commit it read, and says so when that moved.")
     print("This figure describes a development machine. It is not evidence")
     print("about the target platform.")
 
@@ -328,6 +389,7 @@ def main() -> int:
 
     started = time.strftime("%Y-%m-%d %H:%M:%S")
     before = load_average()
+    tree_before = tree_state()
     failed = 0
     for row in plan.rows:
         print(f"\n=== {row.recipe}: {row.command}", flush=True)
@@ -335,8 +397,9 @@ def main() -> int:
         if row.status != 0:
             failed = row.status
     after = load_average()
+    tree_after = tree_state()
 
-    report(plan, before, after, started)
+    report(plan, before, after, started, tree_before, tree_after)
 
     if arguments.json:
         Path(arguments.json).write_text(
@@ -348,6 +411,8 @@ def main() -> int:
                     "started": started,
                     "load_before": before,
                     "load_after": after,
+                    "head_before": tree_before[0],
+                    "head_after": tree_after[0],
                     "rows": [row.as_dict() for row in plan.rows],
                 },
                 indent=2,
