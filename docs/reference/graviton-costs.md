@@ -998,6 +998,45 @@ was about 12 milliseconds in three runs earlier in the day, and the register
 concluded then that it followed an allocation the candidate pass makes on every
 frame. That pass still makes it. The conclusion was wrong, and a finding
 corrects it.[^RESID298]
+## Every stage of a frame, after the two branches merged
+
+**This section supersedes every stage table above it**, including the two that
+measured parallel branches. Those two are kept as history and each is sound for
+the tree it names, but neither described the trunk. This one does.
+
+Both rows below come from one instance type, one extent, one unit count, one
+placement and one thread count, taken minutes apart. The only difference between
+them is the change: the holding no longer repairs a block mask by rereading the
+block, because it counts the tiles each faction holds in each block.
+
+Machine F. 16,777,216 tiles, 1,000,000 units scattered, 12 threads, block edge
+32, `c7g.4xlarge` in `us-west-2`, `rustc 1.100.0-nightly`, crate features
+`stage-cost`, 3 September 2026. Nine frames after two warm-up frames.
+
+| Stage | Before, ns for each frame | After, ns for each frame | Change |
+|---|---|---|---|
+| `holding_spread` | 71,027,142 | 61,453,749 | −9,573,393 |
+| — of which `holding_decide` | 34,204,088 | 34,174,920 | −29,168 |
+| — of which `holding_apply` | 18,919,280 | 9,522,057 | −9,397,223 |
+| — of which `holding_candidates` | 16,968,433 | 16,904,774 | −63,659 |
+| `bridge_refresh_barrier` | 30,939,673 | 30,587,358 | −352,315 |
+| `admit` | 21,061,148 | 20,995,413 | −65,735 |
+| **The frame, timed from outside** | **176,739,062** | **167,172,950** | **−9,566,112** |
+
+**The apply costs 1.99 times less and the frame 9.6 milliseconds less.** The
+apply falls from 10.70 percent of the frame to 5.70 percent. Every other stage
+moves by less than half a millisecond, which is what a change confined to one
+pass should look like.
+
+**An earlier pair gave 2.18 times and 17.7 milliseconds for the same change, and
+that pair is superseded.** It measured against the serial apply, before another
+branch made both repairs after a write take a thread count. The work removed is
+the same 11,634,688 holder reads on each frame either way; what changed is what
+those reads cost at the moment they were deleted.[^DENSE5]
+
+**The frame is 1.67 times the hundred millisecond budget.**
+
+
 ## Huge pages
 
 **The engine asks for no huge page.** This measurement changes the kernel
