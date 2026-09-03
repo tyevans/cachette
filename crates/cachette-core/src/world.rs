@@ -44,7 +44,9 @@ use crate::hex::{Axial, Grid, GridError, NEIGHBOUR_COUNT};
 use crate::holding::{FactionMask, Holder, Holding};
 use crate::household;
 use crate::influence::{Influence, InfluenceError, InfluenceField};
-use crate::position::{self, Position, PositionError, PositionTable, SitePreference};
+use crate::position::{
+    self, Position, PositionError, PositionTable, SitePreference, WORK_COMMODITY,
+};
 use crate::promotion::{self, PromotionError, UnitPromoted};
 use crate::pyramid::{CellSummary, ExitField, Pyramid};
 use crate::rates::{RateError, RateLedger, RateSchedule, RateTable, SiteShortfall};
@@ -423,6 +425,19 @@ pub struct World {
     ///
     /// [^1]: ADR-0072, a tile stock is generated, and only what was taken is stored, decision D5. `docs/adrs/accepted/adr-0072-a-tile-stock-is-generated-and-only-what-was-taken-is-stored.md`
     departed: [u64; RESOURCE_KIND_COUNT],
+    /// What every delivery has moved out of a carry and into a store, for
+    /// each kind.
+    ///
+    /// A delivery takes a quantity out of the account that the conservation
+    /// check balances against the carries, and puts it into the account that
+    /// the store check balances against the stores. This total is the term
+    /// that links the two, and without it the first check fails on the frame
+    /// of the first delivery.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0072, a tile stock is generated, and only what was taken is stored, decision D5. `docs/adrs/accepted/adr-0072-a-tile-stock-is-generated-and-only-what-was-taken-is-stored.md`
+    delivered: [u64; RESOURCE_KIND_COUNT],
     /// The upgrade that each improved tile carries.
     ///
     /// The map holds one entry for each tile that somebody built on, and it
@@ -648,6 +663,7 @@ impl World {
             resources: ResourceField::new(terrain),
             depletion: DepletionLedger::new(),
             departed: [0; RESOURCE_KIND_COUNT],
+            delivered: [0; RESOURCE_KIND_COUNT],
             upgrades: UpgradeMap::new(),
             pyramid: Pyramid::new(layout, ResourceField::new(terrain))?,
             exits: ExitField::new(cell_lattice),
@@ -888,6 +904,12 @@ impl World {
     #[must_use]
     pub const fn departed_carry(&self) -> &[u64; RESOURCE_KIND_COUNT] {
         &self.departed
+    }
+
+    /// Returns what every delivery has moved into a store, for each kind.
+    #[must_use]
+    pub const fn delivered_carry(&self) -> &[u64; RESOURCE_KIND_COUNT] {
+        &self.delivered
     }
 
     /// Returns the soldiers of the world.
@@ -2949,7 +2971,13 @@ impl World {
             // returned total is the second term, and it is what makes the
             // equality hold across a recovery.
             let returned = self.depletion.returned(kind).0;
-            if left_the_tiles[index] + returned != arrived[index] + self.departed[index] as i64 {
+            // A delivered quantity has left the carries and reached a store,
+            // so it is neither held nor departed. It is the term that links
+            // this check to the store check.
+            let delivered = self.delivered[index] as i64;
+            if left_the_tiles[index] + returned
+                != arrived[index] + self.departed[index] as i64 + delivered
+            {
                 return false;
             }
         }
@@ -3329,6 +3357,17 @@ impl World {
                 event.holder = holders[event.tile.0 as usize];
             }
         }
+        // The delivery runs after the gather resolve and before the rate
+        // pass. It reads where each unit stands, so it runs after the barrier
+        // that the movement of this frame passed. It moves a quantity, and
+        // two records say that the rate pass and the consumption pass run
+        // after every stage that moves one.[^16] [^17] It changes no
+        // structure, so it is not a barrier and it needs none.
+        //
+        // [^16]: ADR-0062, production and upkeep are rates attached to a site, decision D5. `docs/adrs/accepted/adr-0062-production-and-upkeep-are-rates-attached-to-a-site.md`
+        // [^17]: ADR-0063, a need is a rate with a threshold, and crossing it is a fact, decision D5. `docs/adrs/accepted/adr-0063-a-need-is-a-rate-with-a-threshold-and-crossing-it-is-a-fact.md`
+        self.deliver(threads)?;
+
         // The site rates apply after the barrier of this frame and after the
         // gather resolve, and before level 1 rebuilds.
         //
@@ -3954,6 +3993,186 @@ impl World {
     /// [^2]: ADR-0007, content supplies a key vector, never a comparator, decision D2. `docs/adrs/accepted/adr-0007-content-supplies-a-key-vector-never-a-comparator.md`
     /// [^3]: ADR-0073, gathering is admitted by sort-then-admit against the tile, decision D1. `docs/adrs/accepted/adr-0073-gathering-is-admitted-by-sort-then-admit-against-the-tile.md`
     /// [^4]: ADR-0072, a tile stock is generated, and only what was taken is stored, decision D5. `docs/adrs/accepted/adr-0072-a-tile-stock-is-generated-and-only-what-was-taken-is-stored.md`
+    /// Moves the load of every unit that stands on the tile of its home site
+    /// into the store of that site.
+    ///
+    /// **The resource loop had no sink.** A unit gathered into a carry column
+    /// and no verb moved that load into a store, so the store of a site rose
+    /// only by the fixed rate the founding set from the survey, and the ground
+    /// the units stood on did not change it. The whole economy was a constant
+    /// decided before the first frame.[^1]
+    ///
+    /// **A delivery is admitted by sort, then by transfer.** Two units of one
+    /// site deliver into one store and the store saturates at its ceiling, so
+    /// a saturating add is not order-free.[^2] The pass therefore orders the
+    /// deliveries by the site and then by the identity of the unit, and it
+    /// transfers in that order. That is the shape the gather resolve already
+    /// uses against a deposit.[^3] [^4]
+    ///
+    /// **A load the store cannot hold stays in the carry.** A quantity that
+    /// vanished without a record would break the conservation equality, and
+    /// nothing would fail.[^2] The unit keeps the remainder and delivers it on
+    /// a later tick.
+    ///
+    /// **The transfer moves whole units only.** A carry holds a whole number
+    /// and a store holds a fixed-point quantity, so the room a store has may
+    /// end between two whole numbers. The pass takes the whole part of that
+    /// room, which converts exactly in both directions. A conversion that
+    /// rounded would create or destroy a quantity.[^5]
+    ///
+    /// **The commodity comes from the declared map and never from a literal.**
+    /// The engine already writes the number of a commodity at two sites, and a
+    /// third literal would be one value in three places with nothing to fail
+    /// when the copies disagree.[^6] [^7]
+    ///
+    /// The pass runs on the calling thread. It writes one store at a time in a
+    /// stated order, so it names no thread and depends on no thread count.[^4]
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the ordering refuses to run.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0062, production and upkeep are rates attached to a site, decision D2. `docs/adrs/accepted/adr-0062-production-and-upkeep-are-rates-attached-to-a-site.md`
+    /// [^2]: ADR-0062, production and upkeep are rates attached to a site, decision D3. `docs/adrs/accepted/adr-0062-production-and-upkeep-are-rates-attached-to-a-site.md`
+    /// [^3]: ADR-0073, gathering is admitted by sort-then-admit against the tile, decision D2. `docs/adrs/accepted/adr-0073-gathering-is-admitted-by-sort-then-admit-against-the-tile.md`
+    /// [^4]: ADR-0004, iteration order is explicit, decisions D1, D3 and D4. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
+    /// [^5]: ADR-0002, simulated and aggregated state holds no floating point number, decision D1. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
+    /// [^6]: Findings register, FND-191. `docs/FINDINGS.md`
+    /// [^7]: Decisions register, DEC-073. `docs/DECISIONS.md`
+    fn deliver(&mut self, threads: usize) -> Result<(), StepError> {
+        let carriers = self.carriers_at_home(threads);
+        if carriers.is_empty() {
+            return Ok(());
+        }
+        let keys: Vec<BoundedKey> = carriers
+            .iter()
+            .map(|(unit, site)| BoundedKey::new(u64::from(*site), unit.to_bits()))
+            .collect();
+        let ceiling = u64::from(self.settlements.slot_count().saturating_sub(1));
+        let order = gather_order_of(&keys, ceiling)?;
+
+        for index in order {
+            let (unit, site) = carriers[index as usize];
+            let Some(load) = self.soldiers.carry(unit) else {
+                continue;
+            };
+            for kind in ResourceKind::ALL {
+                let held_by_unit = load.of(kind);
+                if held_by_unit.0 == 0 {
+                    continue;
+                }
+                let commodity = WORK_COMMODITY[kind.index()];
+                let Some(held) = self
+                    .settlements
+                    .store_column()
+                    .get(site as usize)
+                    .and_then(|store| store.quantity(commodity))
+                else {
+                    continue;
+                };
+                // The room of the store, in whole units. The subtract cannot
+                // go below zero because the ceiling is the largest value the
+                // scale holds.
+                let room = sim_math::sub(Fix32::MAX, held).to_int_floor();
+                let moved = held_by_unit.0.min(u32::try_from(room).unwrap_or(0));
+                if moved == 0 {
+                    continue;
+                }
+                // The conversion is exact in both directions: a whole number
+                // that the room admits fits the scale, and the scale holds it
+                // with no fractional part.
+                let quantity = Fix32::from_int(i16::try_from(moved).unwrap_or(i16::MAX));
+                let moved = u32::try_from(quantity.to_int_floor()).unwrap_or(0);
+                if moved == 0 {
+                    continue;
+                }
+                let after = sim_math::add(held, quantity);
+                if !self.set_store_quantity(site, commodity, after) {
+                    continue;
+                }
+                self.soldiers.take_carry(unit, kind, Amount(moved));
+                self.delivered[kind.index()] += u64::from(moved);
+            }
+        }
+        Ok(())
+    }
+
+    /// Returns every live unit that stands on the tile of its home site, with
+    /// the slot of that site.
+    ///
+    /// The walk is over the unit slots and it reads no derived structure. A
+    /// unit with no home, a unit whose home is gone, and a unit that stands
+    /// somewhere else all give nothing.
+    ///
+    /// The order is the slot order, which does not depend on the thread
+    /// count. The caller sorts it on a total key before it transfers
+    /// anything, so nothing downstream reads this order.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
+    fn carriers_at_home(&self, threads: usize) -> Vec<(Entity, u32)> {
+        let _ = threads;
+        let mut found = Vec::new();
+        for unit in self.soldiers.iter() {
+            let Some(Some(home)) = self.soldiers.home(unit) else {
+                continue;
+            };
+            let Some(load) = self.soldiers.carry(unit) else {
+                continue;
+            };
+            if load == CarryLoad::EMPTY {
+                continue;
+            }
+            let Some(tile) = self.soldiers.tile(unit) else {
+                continue;
+            };
+            let stands_at_home = self
+                .settlements
+                .tile_column()
+                .get(home as usize)
+                .is_some_and(|site_tile| *site_tile == tile);
+            if stands_at_home {
+                found.push((unit, home));
+            }
+        }
+        found
+    }
+
+    /// Writes a quantity into the store of one site slot and keeps the
+    /// account.
+    ///
+    /// **The account and the store are written in one call.** They are two
+    /// copies of one total, and the conservation check is what fails when they
+    /// disagree, so a path that wrote one without the other would break that
+    /// check on every later frame.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`
+    fn set_store_quantity(&mut self, slot: u32, commodity: CommodityId, after: Fix32) -> bool {
+        let index = commodity.0 as usize;
+        let Some(store) = self
+            .settlements
+            .store_update()
+            .stores
+            .get_mut(slot as usize)
+        else {
+            return false;
+        };
+        let Some(before) = store.quantity(commodity) else {
+            return false;
+        };
+        if !store.set_quantity(commodity, after) {
+            return false;
+        }
+        let change = sim_math::sub(after, before);
+        self.store_account[index] = sim_math::accumulate(self.store_account[index], change);
+        true
+    }
+
     fn gather(&mut self, threads: usize) -> Result<(), StepError> {
         self.gather_log.clear();
         let intents = gather_intents(&self.soldiers, threads)?;

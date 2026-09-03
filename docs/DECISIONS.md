@@ -2742,7 +2742,7 @@ a failed founding is correct.[^PRD12]
 [^DEC79E]: Findings register, FND-226. `docs/FINDINGS.md`
 [^DEC79F]: Backlog item 0240, let the demonstration make a unit hungry. `docs/backlog/complete/0240-let-the-demonstration-make-a-unit-hungry.md`
 [^DEC74SEP]: Findings register, FND-227. `docs/FINDINGS.md`
-[^DEC80B]: Backlog item 0187, give a carried load somewhere to go. `docs/backlog/refined/0187-give-a-carried-load-somewhere-to-go.md`
+[^DEC80B]: Backlog item 0187, give a carried load somewhere to go. `docs/backlog/complete/0187-give-a-carried-load-somewhere-to-go.md`
 [^DEC81A]: Findings register, FND-193. `docs/FINDINGS.md`
 [^DEC81B]: ADR-0074, a spawn may over-fill a tile, and only admission enforces the capacity, decision D1. `docs/adrs/accepted/adr-0074-a-spawn-may-over-fill-a-tile-and-only-admission-enforces-the-capacity.md`
 [^DEC75KIND]: ADR-0072, a tile stock is generated, and only what was taken is stored, decision D3. `docs/adrs/accepted/adr-0072-a-tile-stock-is-generated-and-only-what-was-taken-is-stored.md`

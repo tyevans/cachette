@@ -290,15 +290,36 @@ fn gather(world: &mut World) {
         );
         deposits.extend(found);
     }
+    // **One deposit carries a site, and its gatherers call it home.** Without
+    // that pair no unit of this scenario ever stands on the tile of its own
+    // site holding a load, so the delivery writes nothing and the golden file
+    // cannot move when the delivery changes. A golden file that cannot move is
+    // a guard that has already stopped working, and the promotion pass closed
+    // the same gap the same way.[^2]
+    //
+    // [^2]: Backlog item 0279, let a golden scenario reach the position pass. `docs/backlog/proposed/0279-let-a-golden-scenario-reach-the-position-pass.md`
+    let mut home = None;
     for (address, kind) in deposits {
         let capacity = world.tile_kind(address).map_or(0, TileKind::capacity);
+        if home.is_none() && kind == ResourceKind::Food {
+            home = world.found_settlement(address, FactionId(0)).ok();
+        }
         for ordinal in 0..capacity {
             let unit = world
                 .spawn_soldier(address, FactionId((ordinal % 2) as u16))
                 .expect("the open tile admits a unit");
             assert!(world.order_gather(unit, kind));
+            if let Some(site) = home.filter(|_| ordinal % 2 == 0) {
+                if world.settlements().address(site) == Some(address) {
+                    assert!(world.set_home_site(unit, Some(site)));
+                }
+            }
         }
     }
+    assert!(
+        home.is_some(),
+        "the gathering scenario seated no site, so no unit stands at home"
+    );
 }
 
 /// Founds a run: one group for each faction, in a place the engine chose.

@@ -907,4 +907,24 @@ impl CarryLoad {
         amounts[kind.index()] = amounts[kind.index()].saturating_add(amount.0);
         Self { amounts }
     }
+
+    /// Returns the load with one kind reduced by an amount.
+    ///
+    /// The subtract saturates at zero. A load that wrapped would turn a small
+    /// delivery into a full one, and nothing would fail, which is the same
+    /// underflow shape that the consumption kernel refuses.[^1]
+    ///
+    /// **A caller takes what the load holds and never more.** The delivery
+    /// reads the amount out of the load before it calls this, so the
+    /// saturation is a guard rather than a case.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0002, simulated and aggregated state holds no floating point number, decision D3. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
+    #[must_use]
+    pub const fn less(self, kind: ResourceKind, amount: Amount) -> Self {
+        let mut amounts = self.amounts;
+        amounts[kind.index()] = amounts[kind.index()].saturating_sub(amount.0);
+        Self { amounts }
+    }
 }

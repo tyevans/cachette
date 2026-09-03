@@ -911,6 +911,36 @@ impl SoldierArena {
         true
     }
 
+    /// Takes an amount of one kind out of the load of a soldier.
+    ///
+    /// Returns `false` when the identity is dead.
+    ///
+    /// **The deed column does not follow the load.** A deed records what a
+    /// unit took from the ground, and a delivery does not undo that. The
+    /// column never falls, and the eligibility scan reads a level rather than
+    /// an edge, so a rule that lowered it would break the scan in
+    /// silence.[^1]
+    ///
+    /// A load is not a structural fact, so a delivery does not raise the
+    /// revision, for the same reason that a gather does not.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0104, a soldier is promoted from a level that never falls, decision D2. `docs/adrs/draft/adr-0104-a-soldier-is-promoted-from-a-level-that-never-falls.md`
+    pub(crate) fn take_carry(
+        &mut self,
+        entity: Entity,
+        kind: ResourceKind,
+        amount: Amount,
+    ) -> bool {
+        let Some(slot) = self.slot_of(entity) else {
+            return false;
+        };
+        let index = slot as usize;
+        self.carries[index] = self.carries[index].less(kind, amount);
+        true
+    }
+
     /// Returns what a soldier has ever gathered, summed over every kind.
     ///
     /// Returns `None` when the identity is dead.

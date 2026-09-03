@@ -92,7 +92,8 @@ const DRAW_MOVE_DIRECTION: u32 = 0;
 /// The engine answers a refused step with a second draw in the same system
 /// and the same frame, so the second draw takes the next index. A unit that
 /// only stayed put would stay put for ever, because every input to the
-/// refused direction holds from one frame to the next.[^8]
+/// refused direction holds from one frame to the next. The module note above
+/// cites the finding that measured it.
 ///
 /// This repeats a value the engine holds, and the suite checks the repetition
 /// against the engine on every frame.
