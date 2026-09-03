@@ -23,7 +23,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^ALLOC]
 
-**Next number: DEC-114**
+**Next number: DEC-115**
 
 ## Open
 
@@ -720,6 +720,52 @@ builder and still be honest about replaceability.
 **What closes this.** A documentation build exists, and the project either
 writes the portable file and states why, or meets a setting it cannot express
 and moves.
+
+### DEC-114 — How does a published page cite a repository document that the reader cannot open?
+
+**Open. Engineering owns it. It blocks the explanation quadrant of the
+documentation plan and nothing else.**[^DEC114A]
+
+**The documentation rule puts every external reference in a footnote, and a
+footnote gives the path of a file in this repository.**[^DEC114B] That works for
+a reader who has the tree. The product record requires the opposite reader: a
+person who reaches the documentation without cloning this repository, and who
+has never read the source.[^DEC114C]
+
+**The explanation quadrant is mostly footnotes.** The documentation plan
+concludes that this repository already holds its explanation in records,
+reports and registers, and that copying any of it into a site would create a
+second declaration site for a fact whose original lives elsewhere.[^DEC114A]
+[^DEC114D] So the pages state a conclusion and cite the source. A citation the
+reader cannot follow makes that conclusion unsupported for exactly the audience
+the plan serves.
+
+**Option A. Publish the documents the site cites, from the files that already
+hold them.** One file, two renderings. It creates no second declaration site,
+because nothing is copied. The price is that records, reports and registers
+reach an audience they were not written for, and a record written for a
+contributor reads oddly to a game developer.
+
+**Option B. Rewrite each footnote path as an address of the file in the source
+host.** The reader follows the link and reads the file where it lives. The price
+is a second form of every citation, which is the shape this project names as a
+defect, and an address that breaks on a rename or a branch change.
+
+**Option C. State the path and accept that the reader cannot follow it.** It
+costs nothing to build. A reader who wants the reasoning clones the tree. The
+price is that the product record's statement about reaching the documentation
+without cloning holds for the reader who only reads, and fails for the reader
+who follows a citation.
+
+**Recommendation: A, limited to the documents the site actually cites.** It is
+the only option that adds no second copy and no second citation form. Limit it,
+because publishing the whole documentation tree gives the site no bound, which
+is the reason the product record excludes the records and the reports from the
+need.[^DEC114C]
+
+**What closes this.** The explanation quadrant is refined, and the project
+either publishes the cited documents or states in the site which citations a
+reader cannot follow.
 
 ### DEC-095 — Is a strategy field derived from nothing each rebuild, or carried between frames?
 
@@ -2869,3 +2915,7 @@ a failed founding is correct.[^PRD12]
 [^DEC112D]: Decisions register, DEC-113, in this document.
 [^DEC113A]: ADR-0107, the Python reference is generated from the compiled module, the consequences. `docs/adrs/draft/adr-0107-the-python-reference-is-generated-from-the-compiled-module.md`
 [^DEC113B]: Research report 19, the documentation toolchain, section 3.2. `docs/research/reports/19-documentation-toolchain.md`
+[^DEC114A]: Backlog item 0308, the documentation plan. `docs/backlog/refined/0308-the-documentation-plan.md`
+[^DEC114B]: Documentation Rules, section 3. `.claude/rules/documentation.md`
+[^DEC114C]: Product requirement record 0021, a developer can use the control plane without reading its source. `docs/product/accepted/prd-0021-a-developer-can-use-the-control-plane-without-reading-its-source.md`
+[^DEC114D]: Recurring Defect Shapes, shape 1, redundant declaration sites. `.claude/rules/recurring-defects.md`
