@@ -68,11 +68,50 @@ pub mod census {
     /// The entries the held list was rebuilt with, since the last reset.
     static REBUILT: AtomicU64 = AtomicU64::new(0);
 
+    /// The candidate tiles the decide pass read, since the last reset.
+    static DECIDED: AtomicU64 = AtomicU64::new(0);
+    /// The supporters those tiles raised, counted with repetition.
+    static SUPPORTERS: AtomicU64 = AtomicU64::new(0);
+    /// The candidate tiles that raised more than one supporter.
+    static SORTED: AtomicU64 = AtomicU64::new(0);
+    /// The candidate tiles that had a challenger able to beat the holder.
+    static CHALLENGED: AtomicU64 = AtomicU64::new(0);
+
     /// Records one apply.
     pub fn record(moved: u64, dirty: u64, rebuilt: u64) {
         MOVED.fetch_add(moved, Ordering::Relaxed);
         DIRTY.fetch_add(dirty, Ordering::Relaxed);
         REBUILT.fetch_add(rebuilt, Ordering::Relaxed);
+    }
+
+    /// Records one candidate tile that the decide pass read.
+    ///
+    /// **The decide pass runs on several threads, so these counters are
+    /// shared.** They are relaxed atomics because nothing reads them during a
+    /// frame and no simulated value depends on one. A count that a thread
+    /// races on would be wrong by a few and would still answer the question
+    /// this switch exists for, which is what the pass does per candidate.
+    pub fn record_decide(supporters: u64, sorted: bool, challenged: bool) {
+        DECIDED.fetch_add(1, Ordering::Relaxed);
+        SUPPORTERS.fetch_add(supporters, Ordering::Relaxed);
+        if sorted {
+            SORTED.fetch_add(1, Ordering::Relaxed);
+        }
+        if challenged {
+            CHALLENGED.fetch_add(1, Ordering::Relaxed);
+        }
+    }
+
+    /// Returns the candidates read, the supporters raised, the candidates
+    /// that sorted, and the candidates that had a challenger.
+    #[must_use]
+    pub fn decide_totals() -> (u64, u64, u64, u64) {
+        (
+            DECIDED.load(Ordering::Relaxed),
+            SUPPORTERS.load(Ordering::Relaxed),
+            SORTED.load(Ordering::Relaxed),
+            CHALLENGED.load(Ordering::Relaxed),
+        )
     }
 
     /// Returns the moved tiles, the dirty blocks and the rebuilt entries.
@@ -90,6 +129,10 @@ pub mod census {
         MOVED.store(0, Ordering::Relaxed);
         DIRTY.store(0, Ordering::Relaxed);
         REBUILT.store(0, Ordering::Relaxed);
+        DECIDED.store(0, Ordering::Relaxed);
+        SUPPORTERS.store(0, Ordering::Relaxed);
+        SORTED.store(0, Ordering::Relaxed);
+        CHALLENGED.store(0, Ordering::Relaxed);
     }
 }
 
@@ -1115,12 +1158,22 @@ fn decide(
     };
 
     // The stable key is the support in descending order, then the faction
-    // identifier in ascending order. The supporters are visited in ascending
-    // identifier order and a later one must beat the leader strictly, which
-    // gives that key without a second sort.[^1]
+    // identifier in ascending order.[^1]
+    //
+    // **The key is stated in the comparison and never in an ordering of the
+    // supporters.** The list used to be sorted so that ascending identifier
+    // order plus a strict comparison would give the key. The comparison below
+    // gives the same key from any order, so the sort is gone and the result no
+    // longer depends on one.
+    //
+    // The pass read about five million candidates on each frame and sorted
+    // every one of them, while about a quarter raised more than one supporter
+    // and could have been decided by any of them.[^2]
     //
     // [^1]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
-    scratch.supporters.sort_unstable();
+    // [^2]: Findings register, FND-309. `docs/FINDINGS.md`
+    #[cfg(feature = "census-holding")]
+    let raised = scratch.supporters.len() as u64;
     let mut best: Option<(u32, u16)> = None;
     for faction in &scratch.supporters {
         if current.faction() == Some(FactionId(*faction)) {
@@ -1130,10 +1183,12 @@ fn decide(
         if support <= incumbent {
             continue;
         }
-        if best.is_none_or(|(top, _)| support > top) {
+        if best.is_none_or(|(top, leader)| support > top || (support == top && *faction < leader)) {
             best = Some((support, *faction));
         }
     }
+    #[cfg(feature = "census-holding")]
+    census::record_decide(raised, raised > 1, best.is_some());
     let (support, faction) = best?;
 
     // **The ground is read last, because it can only refuse.** It says how

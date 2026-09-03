@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-314**
+**Next number: FND-315**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -8824,6 +8824,64 @@ is stable, and the binary that changed is the one whose placement changed.
 **Every figure names its instance, its commit and its thread count, or it cannot
 be checked later.** A ratio that travels without its conditions cannot be
 distinguished from a relayout by anyone who reads it afterwards.
+### FND-314 — The decide pass sorted five million lists on each frame, three quarters of them held one entry or none, and removing the sort bought nothing
+
+**Believed.** The decide pass is the largest stage in the engine and it already
+takes a thread count, so it may simply be that expensive. Nothing had divided
+it.
+
+**True.** It reads about five million candidate tiles on each frame, and a
+quarter of them raise more than one supporter. **It sorted every one of them.**
+Three quarters of the sorts ordered a list of one entry or of none.
+
+**Evidence.** A counting switch on the pass, at 16,777,216 tiles with one
+million units. At frame 15 it read 4,965,973 candidates, raised 6,609,326
+supporters, and 1,245,193 candidates raised more than one. About 1.33
+supporters for each candidate, and 1,281,555 candidates had a challenger able
+to beat the holder, which is 26 percent. A candidate with no challenger does
+not read the ground, so that count is also the count of ground reads.
+
+**The sort was not needed at all.** It existed to put the supporters in
+ascending identifier order, so that a strict comparison would give the stable
+key of support descending and identifier ascending. **Stating the tie in the
+comparison gives the same key from any order**, so the sort is gone and the
+result no longer depends on one.
+
+The two are equivalent by construction rather than by measurement. The old form
+takes the first faction that reaches the highest support in ascending
+identifier order. The new form takes the highest support and, on a tie, the
+lower identifier. Both name the same faction for every input.
+
+**Follows.** Three things.
+
+**A sort that exists to produce an order for one comparison can usually move
+into the comparison.** The ordering was never wanted for itself. It was a way
+of expressing a tie-break, and a tie-break is two lines where a sort is a pass.
+
+**Removing it made the pass order-independent, which is worth more than the
+time.** The result used to depend on the sort putting the supporters in one
+order. It now depends on nothing but the set of supporters, so there is no
+order left for a defect to disturb.
+
+**The counting says what the pass does and not where its time goes, and the
+measurement then said the sort was not the cost.** Four runs on the target
+platform give the stage at 34,174,920, 34,134,468, 34,128,759 and 34,054,721
+nanoseconds. The first two are the tree with the sort and the last two are the
+tree without it. **The whole spread is 120 microseconds on 34 milliseconds, and
+the change sits inside it.** Removing five million sorts on each frame bought
+no time that this apparatus can see.
+
+So the stage costs what it costs for the other reason: every candidate pays for
+six neighbour reads and a walk of the units on its tile, and only a quarter of
+them produce anything. A quarter of five million is still more than a million
+tiles that change hands, so the work is not obviously wasted; it is the reading
+of the other three quarters that is.
+
+**The sort removal is kept anyway, and not for the time.** It removes work that
+provably does nothing, and it makes the result depend on the set of supporters
+rather than on an ordering of them. A change that buys no time and removes an
+ordering is still worth making, and saying that it bought no time is the
+honest way to keep it.
 
 ## References
 
@@ -9155,7 +9213,7 @@ distinguished from a relayout by anyone who reads it afterwards.
 [^F307B]: Findings register, FND-292, in this document.
 [^F307C]: The holding suite of the core. `crates/cachette-core/tests/holding.rs`
 [^F313B]: ADR-0103, the tile value field stores a dense delta, never a sparse change list, decision D4. `docs/adrs/draft/adr-0103-the-tile-value-field-stores-a-dense-delta.md`
-[^F309X]: Findings register, FND-297, in this document.
+[^F314X]: Findings register, FND-297, in this document.
 [^F306A]: Findings register, FND-295, in this document.
 [^F313A]: The workspace manifest, the release profile. `Cargo.toml`
 [^F306B]: Findings register, FND-313, in this document.

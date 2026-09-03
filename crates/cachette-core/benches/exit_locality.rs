@@ -168,6 +168,11 @@ fn main() {
         apply_rows(&arguments[1..]);
         return;
     }
+    #[cfg(feature = "census-holding")]
+    if arguments.first().map(String::as_str) == Some("decide") {
+        decide_rows(&arguments[1..]);
+        return;
+    }
     let (width, height) = extent_argument(&arguments);
     let units: u32 = arguments
         .get(1)
@@ -483,6 +488,66 @@ fn frame_rows(arguments: &[String]) {
         elapsed
     });
     report("frame", &samples);
+}
+
+/// Reports what the holding decide pass does on each candidate.
+///
+/// **The decide pass is the largest single stage and it already takes a thread
+/// count**, so it is a different shape from the passes this benchmark helped
+/// remove. It may simply be that expensive. This row exists to find out what
+/// it does before anyone assumes either way.
+///
+/// It counts the candidates read, the supporters they raise, how many raise
+/// more than one and therefore pay for a sort, and how many have a challenger
+/// able to beat the holder. A candidate with no challenger does not read the
+/// ground, so the challenger count is also the count of ground reads.
+///
+/// The row counts work and not nanoseconds.
+#[cfg(feature = "census-holding")]
+fn decide_rows(arguments: &[String]) {
+    use cachette_core::holding::census;
+
+    let (width, height) = extent_argument(arguments);
+    let units: u32 = arguments
+        .get(1)
+        .and_then(|word| word.parse().ok())
+        .unwrap_or(10_000);
+    let threads: usize = arguments
+        .get(2)
+        .and_then(|word| word.parse().ok())
+        .unwrap_or(1);
+    let frames: usize = arguments
+        .get(3)
+        .and_then(|word| word.parse().ok())
+        .unwrap_or(20);
+
+    let config = WorldConfig {
+        width,
+        height,
+        seed: SEED,
+        faction_count: FACTIONS,
+        unit_capacity: units.max(1024),
+    };
+    let mut world = World::new(config).expect("the extent must describe a world");
+    let placed = populate_scattered(&mut world, units);
+
+    println!("# what the holding decide pass does on each frame");
+    println!("# tiles\t{}", world.grid().tile_count());
+    println!("# units_placed\t{placed}");
+    println!("# faction_count\t{}", world.config().faction_count);
+    println!("frame\tcandidates\tsupporters\tsorted\tchallenged\tsupporters_per_mille");
+
+    for frame in 0..frames {
+        census::reset();
+        world.step(threads).expect("the step must run");
+        let (decided, supporters, sorted, challenged) = census::decide_totals();
+        let per_mille = if decided == 0 {
+            0
+        } else {
+            supporters * 1000 / decided
+        };
+        println!("{frame}\t{decided}\t{supporters}\t{sorted}\t{challenged}\t{per_mille}");
+    }
 }
 
 /// Reports what the holding apply does on each frame.
