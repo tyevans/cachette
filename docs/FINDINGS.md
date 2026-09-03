@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-257**
+**Next number: FND-258**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -1020,6 +1020,49 @@ because it is small, not because per-cell work cannot be large. A per-cell
 pass over 16,384 cells that did much more for each cell would want threads and
 would not have them, because the derivation takes no thread count and nothing
 would notice.
+
+### FND-257 — A check that searches for a moved path must first ask whether the path is a name
+
+**Believed:** the moved-path rule of the merge-defect check was ready for a
+merge. It reads the paths the change moved away from, searches the tree for
+each one, and reports every place that still names an old path. The rule is
+sound and the check passed every fixture and every real change until now.
+
+**True:** the rule searched for a path called `0` and reported 14571 failures,
+all of them false. The search is a fixed-string search. A path of one
+character is a substring of ordinary text, so the search matched every version
+field of a lock file. The check blocked a merge that held no moved-path defect
+at all.
+
+**The evidence is the run.** The merge of the benchmark branch deleted three
+files whose names are `0`, `40` and `600`. They are image dumps that a render
+script wrote to a numeric file name and that a commit then captured. The gate
+reported 14571 failures and named the lock file on every line.
+
+**What follows.** A search for a name needs two conditions that a fixed-string
+search does not carry. The name must be distinctive enough that a match means
+a reference, and the match must stand on its own rather than sit inside a
+longer name. The check now asks both. It searches for a path only when the
+path holds a directory separator or a file extension, and it accepts a match
+only when neither neighbouring character continues a path.
+
+**A skipped path is reported, not dropped.** A name with no directory and no
+extension is still a moved file, and the check prints a note for it. The note
+says why the search did not run, so a reader can search by hand. This leaves a
+real gap: a move of a file such as `justfile` goes unsearched. The gap is
+stated rather than hidden, because a check that silently declines to look is
+the worse failure.
+
+**The shape.** This is the inert-capability shape inverted. The rule was not
+inert; it ran, and it ran on the first input that was outside the distribution
+its fixtures held. A fixture built from citation-shaped paths supplies no
+one-character name, so the assertion never received the input that would fail
+it.[^84] The defect lived at an extreme of the distribution, and the
+fixture modelled the typical case.
+
+**The cost of finding it was one gate.** The check is nine hours old and this
+is its first live merge.[^F257B]
+
 
 ### FND-256 — The fixture of a benchmark is its least reviewed code and its most load-bearing
 
@@ -6686,3 +6729,4 @@ has the rule.
 [^F252D]: ADR-0064, a unit chooses by scoring a small fixed option set, decision D4. `docs/adrs/accepted/adr-0064-a-unit-chooses-by-scoring-a-small-fixed-option-set.md`
 [^239A]: The footnote check. `scripts/check_footnotes.py`
 [^239B]: The priority check. `scripts/check_priority.py`
+[^F257B]: The merge-defect check. `scripts/check_merge_defects.py`

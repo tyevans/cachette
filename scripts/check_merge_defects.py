@@ -72,6 +72,7 @@ beyond the standard library and git.
 [^5]: The priority check. `scripts/check_priority.py`
 """
 
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -170,16 +171,46 @@ def changed(since: str | None) -> tuple[list[str], list[str]]:
     return gone, [path for path in written if path.endswith(".md")]
 
 
+# A path is worth searching for only when a citation could hold it. A bare
+# name with no directory and no extension is a substring of ordinary text, so
+# a search for it reports every line that happens to contain it. One such name
+# reached this check: a file called `0`, whose search returned 14571 lines of a
+# lock file and no true finding.
+def citation_shaped(path: str) -> bool:
+    """Say whether a moved path is distinctive enough to search for."""
+    return "/" in path or "." in path
+
+
+# A path names a file when it stands on its own. These characters continue a
+# path or a word, so a match with one of them on either side is a longer name
+# that merely contains the moved one.
+CONTINUES = re.compile(r"[A-Za-z0-9_./-]")
+
+
+def names_path(text: str, path: str) -> bool:
+    """Say whether the text names the path, rather than containing it."""
+    start = text.find(path)
+    while start != -1:
+        end = start + len(path)
+        before = text[start - 1] if start else " "
+        after = text[end] if end < len(text) else " "
+        if not CONTINUES.match(before) and not CONTINUES.match(after):
+            return True
+        start = text.find(path, start + 1)
+    return False
+
+
 def stale_paths(gone: list[str], since: str | None) -> list[tuple[str, str, str]]:
     """Return every place that still names a path the change moved away from.
 
     One search covers every moved path, because a process for each path is the
     cost that would make this check too slow to keep.
     """
-    if not gone:
+    searched = [path for path in gone if citation_shaped(path)]
+    if not searched:
         return []
     patterns: list[str] = []
-    for path in gone:
+    for path in searched:
         patterns += ["-e", path]
     # The staged mode reads the index, because the index is what the commit
     # will hold. The range mode reads the working tree.
@@ -192,7 +223,7 @@ def stale_paths(gone: list[str], since: str | None) -> list[tuple[str, str, str]
         if len(parts) != 3:
             continue
         where_file, number, text = parts
-        named = next((path for path in gone if path in text), None)
+        named = next((path for path in searched if names_path(text, path)), None)
         if named is None:
             continue
         # A file that names its own path is naming itself, not a lost file.
@@ -291,9 +322,16 @@ def main() -> int:
         print(f"FAIL: {where}: {TESTS[test]}. {detail}", file=sys.stderr)
 
     scope = "the staged change" if since is None else f"the change since {since}"
+    skipped = [path for path in gone if not citation_shaped(path)]
+    for path in skipped:
+        print(
+            f"note: {path} moved, and the check did not search for it. "
+            "A name with no directory and no extension matches ordinary text",
+            file=sys.stderr,
+        )
     print(
-        f"\nchecked {scope}: {len(gone)} moved, {len(written)} documents written, "
-        f"{len(findings)} failures"
+        f"\nchecked {scope}: {len(gone)} moved, {len(skipped)} not searched, "
+        f"{len(written)} documents written, {len(findings)} failures"
     )
     return 1 if findings else 0
 
