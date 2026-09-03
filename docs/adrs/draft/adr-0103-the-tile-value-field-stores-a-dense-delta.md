@@ -110,11 +110,28 @@ disagree.[^9]
 one, so that a walk over a range cost one pass rather than a binary search for
 each tile. A dense slice needs neither.
 
-**The engine can now write the array from the pass that produces the changes.**
-The stage that produces them already partitions the world into contiguous tile
-ranges and gives each worker its own, so the workers write disjoint parts of
-one array and need no join.[^8] This record does not make that change. It makes
-it available.
+**The engine writes the array from the pass that produces the changes.** The
+tile scan already partitions the world into contiguous tile ranges and gives
+each worker its own, so each worker writes a disjoint part of one array and
+needs no atomic.[^8] The field hands out those parts as chunks, so a worker
+cannot reach a tile another worker holds, and the requirement on a parallel
+stage is met by the type rather than by a rule a reviewer has to check.
+
+**There is no longer a stage that merges the changes.** The run, the sort and
+the join that fed it are all gone with it, and so is the stage name.
+
+**The field no longer depends on the order of anything.** The merge took a run
+that had to be sorted, so the field depended on the sort. Each tile is now
+written by the one worker that owns it. The count of changed tiles is a sum
+over the workers, and addition of integers does not depend on the order of the
+terms.
+
+**One consequence of that is a loss.** The nondeterminism probe perturbs the
+engine by joining the output slots in reverse order. That perturbation used to
+reach the field through the sorted run. It no longer does, because the field
+does not read the join at all. The probe still catches the perturbation through
+the event log, and the field's guarantee is now structural rather than tested:
+the chunks are disjoint, so there is no order for a probe to perturb.
 
 ## Alternatives rejected
 

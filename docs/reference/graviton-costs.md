@@ -503,6 +503,13 @@ different machines, so the instrument costs nothing this apparatus can see.
 **Three stages are 85.3 percent of the frame.** They are the holding spread,
 the change merge and the level 1 rebuild.
 
+**The `change_merge` stage no longer exists.** The tile value field now stores a
+dense delta and the tile scan's workers write it directly, so there is no run to
+sort, no join to make and no merge to run.[^DENSE1] [^DENSE2] The rows above are
+kept because they name their own commit and they are what the project measured,
+and they are the reason the stage was removed. A later run measures the frame
+without it.
+
 **The holding spread alone is 61.5 percent, and no backlog item named it
 before this run.** The earlier split could not see it, because the spread has
 no switch and the split priced only what a switch could remove.
@@ -1144,3 +1151,6 @@ commit what changed. Do not edit a row to make a later run agree with it.
 [^ITEM291]: Backlog item 0291, stop the holding spread walking the population. `docs/backlog/complete/0291-stop-the-holding-spread-walking-the-population.md`
 [^BUDG291]: Budgets and costs, the scale constants. `docs/reference/budgets.md`
 [^RESID291]: Findings register, FND-286. `docs/FINDINGS.md`
+
+[^DENSE1]: ADR-0103, the tile value field stores a dense delta, never a sparse change list. `docs/adrs/draft/adr-0103-the-tile-value-field-stores-a-dense-delta.md`
+[^DENSE2]: Findings register, FND-292. `docs/FINDINGS.md`
