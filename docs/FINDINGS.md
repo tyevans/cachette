@@ -584,6 +584,34 @@ height test did not, and it passed only because the term it ignored was small.
 
 ## D. Cost estimates that were wrong
 
+### FND-222 — A frame at the target scale costs eleven times its budget
+
+**Believed:** nothing. No measurement existed on the target platform, so the
+project had no figure for the cost of a frame at the target scale. The frame
+budget of 100 milliseconds is derived from the tick rate and the tile edge,
+and nobody had checked the engine against it.
+
+**True:** one frame at 16,777,216 tiles and 1,000,000 units costs a median of
+1,135 milliseconds on two Graviton3 hardware threads. That is 11.4 times the
+budget. One thread costs 1,861 milliseconds, so a frame holds 1.86
+core-seconds of work.
+
+**The cost is two straight lines.** A tile costs 78 ns for each frame on one
+thread and a unit costs 557 ns. The two constants predict the target scale row
+to one part in two hundred. The unit count is therefore the larger half of the
+frame at the target scale, and it holds 1,000,000 units against 16,777,216
+tiles.
+
+**Evidence:** the target platform register holds the run, the machine, the
+commit and every row.[^F222]
+
+**Follows:** a frame of 100 milliseconds needs a speedup of at least 18.6
+against one core, so it needs at least 19 cores even when every core is used
+perfectly. This machine used 0.82 of the two cores it had. The tile pass ran
+1.81 times faster on two threads and the unit passes ran 1.35 times faster, so
+the half of the frame that is larger is also the half that scales worse. The
+measured world held no settlement, so every figure above is a lower bound.
+
 ### FND-017 — A decision costs 4.1 nanoseconds, not 400
 
 The needs report assumed random gathers. They are sequential, because units
@@ -924,6 +952,40 @@ deliberate switch. Record that as the test to apply next time, because it is
 cheaper than decoding the bytes.
 
 This finding proposes no fix. The shape is the finding.
+### FND-223 — A sentence about the missing measurement reached ninety documents
+
+**Believed:** no measurement exists on the target platform. About ninety
+documents in this tree state that sentence in their own words, in a product
+record, in an accepted decision record, in a review, in a completed backlog
+item, in two reference registers, in the project orientation and in a doc
+comment in the engine.
+
+**True:** the sentence was true when each document was written. It stopped
+being true on 3 September 2026, when a benchmark ran on a Graviton instance
+and measured four operations. The blocker narrowed on the same day and did not
+close, so the sentence is wrong in the general case and right about most
+individual figures.
+
+**Evidence:** the search that found the sites, and the register that holds the
+figures.[^F222] [^28]
+
+```
+grep -rniE "no (measurement|benchmark)|nobody has measured|not been measured" --include="*.md" --include="*.rs" .
+```
+
+**Follows:** the sweep was not made, and the reason is not neglect. An
+accepted record does not change except in status, so repairing one needs a
+record that supersedes it.[^F223C] A review and a completed backlog item are
+records of a moment and are correct as written. The three documents that guide
+work today were repaired: the project orientation, the target register and the
+local register. Everything else cites the blocker register, and that row is
+now the current statement.
+
+**This is the shape FND-042 names, at the largest scale the project has seen.**
+A blocker that narrows leaves a false sentence in every document that stated
+the blocker in its own words. Nothing fails, because a document is prose. The
+defence is not a sweep. The defence is that a document states the blocker by
+citation and never in its own words.
 
 
 ### FND-028 — Concurrent agents collide on shared numbering
@@ -5928,6 +5990,9 @@ has the rule.
 [^F226C]: ADR-0063, a need is a rate with a threshold, and crossing it is a fact, decision D2. `docs/adrs/accepted/adr-0063-a-need-is-a-rate-with-a-threshold-and-crossing-it-is-a-fact.md`
 [^F226E]: Backlog item 0216, let the demonstration make a unit hungry. `docs/backlog/proposed/0216-let-the-demonstration-make-a-unit-hungry.md`
 [^F227B]: Findings register, FND-183, in this document.
+[^F222]: Target platform costs. `docs/reference/graviton-costs.md`
+[^F223C]: ADR Registry, how a record changes. `docs/adrs/REGISTRY.md`
+
 [^F177A]: The founding refuses ground that admits nobody. `crates/cachette-core/src/world.rs`
 [^F177B]: The terrain capacity table. `crates/cachette-core/src/terrain.rs`
 [^F180A]: ADR-0064, a unit chooses by scoring a small fixed option set, decision D3. `docs/adrs/accepted/adr-0064-a-unit-chooses-by-scoring-a-small-fixed-option-set.md`
