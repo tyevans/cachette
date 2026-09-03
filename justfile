@@ -161,7 +161,12 @@ bench profile="quick":
 #
 # The script launches an instance, builds the benchmark on it, runs the sweep,
 # brings the rows back, and destroys everything it made. It needs the AWS
-# command line tool, authenticated. It costs a few cents.
+# command line tool, authenticated. It costs a few cents on the default
+# instance.
+#
+# Every axis is a parameter. Set CACHETTE_BENCH_INSTANCE for the machine,
+# and CACHETTE_BENCH_EXTENTS, CACHETTE_BENCH_THREADS and CACHETTE_BENCH_UNITS
+# for the sweep. The script header lists them all.
 graviton-bench profile="full":
     ./scripts/graviton-benchmark.sh {{profile}}
 

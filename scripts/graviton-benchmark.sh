@@ -22,6 +22,16 @@
 #   CACHETTE_BENCH_OUT        the output file. Default a file under /tmp
 #   CACHETTE_BENCH_KEEP       set to 1 to keep the instance. It then bills
 #                             until you terminate it yourself
+#   CACHETTE_BENCH_EXTENTS    the world sizes to sweep, as `WIDTHxHEIGHT`
+#                             words. Default: the profile
+#   CACHETTE_BENCH_THREADS    the thread counts to sweep. Default: the profile
+#   CACHETTE_BENCH_UNITS      the unit counts to sweep. Default: the profile
+#   CACHETTE_BENCH_MAX_MINUTES  the deadline after which the instance destroys
+#                             itself. Default 360
+#
+# Every axis is a parameter, so a run at another size, another thread count or
+# another instance is a setting and not a change to a file. A run at the full
+# target scale is the same command with a larger instance and a longer list.
 #
 # What it needs: the AWS command line tool, authenticated, with permission to
 # run an instance, and `ssh`, `scp`, `tar` and `git` on this machine.
@@ -150,6 +160,10 @@ say() { printf '=== %s\n' "$1" >&2; }
 # --------------------------------------------------------------------- launch
 
 say "Run $run_id, profile $PROFILE, $INSTANCE_TYPE in $REGION"
+say "Extents: ${CACHETTE_BENCH_EXTENTS:-the profile default}"
+say "Threads: ${CACHETTE_BENCH_THREADS:-the profile default}"
+say "Units:   ${CACHETTE_BENCH_UNITS:-the profile default}"
+say "The instance destroys itself after $SELF_DESTRUCT_MINUTES minutes"
 
 commit="$(git -C "$root" rev-parse HEAD)"
 dirty="clean"
@@ -277,6 +291,13 @@ cd cachette
 # The toolchain manifest at the root pins the channel, so rustup installs the
 # version the project states and this script names none.
 rustup show active-toolchain
+
+# Every axis of the sweep is a parameter. The caller sets these on the machine
+# that starts the run, and the launcher forwards them here, so a run at
+# another size or another thread count changes no file.
+export CACHETTE_BENCH_EXTENTS="${CACHETTE_BENCH_EXTENTS:-}"
+export CACHETTE_BENCH_THREADS="${CACHETTE_BENCH_THREADS:-}"
+export CACHETTE_BENCH_UNITS="${CACHETTE_BENCH_UNITS:-}"
 printf '# machine facts\n' > /tmp/facts.txt
 {
     printf '# uname\t%s\n' "$(uname -srm)"
@@ -291,7 +312,30 @@ printf '# machine facts\n' > /tmp/facts.txt
 cat /tmp/facts.txt
 cargo bench --bench target_cost --no-run 2>&1 | tail -3
 cargo bench --bench target_cost -- "$1" > /tmp/rows.txt
-cat /tmp/facts.txt /tmp/rows.txt > /tmp/result.txt
+
+# The memory sweep starts one process for each point, because a process that
+# has already built a large world does not give the allocator back and would
+# report the high mark of the run rather than the cost of the world it holds.
+cargo bench --bench target_cost -- memory > /tmp/memory.txt
+
+# The timing rows above come from the bench profile, which carries no overflow
+# check. Hard invariant 9 says a `u8` tile field summed over the target tile
+# count sits inside a `u32` by less than one percent, and that an accumulator
+# must not depend on that margin. Nothing above could see a wrap, because a
+# release build wraps in silence. This point is built with the check on, so a
+# wrap panics. It is a separate build on purpose: the check costs time, and a
+# timing row taken under it would measure the check.
+printf '# invariant 9, one frame at the target scale, overflow checks on\n' \
+    > /tmp/overflow.txt
+if RUSTFLAGS="-C overflow-checks=on" CACHETTE_BENCH_EXTENTS="4096x4096" \
+    CACHETTE_BENCH_THREADS="2" CACHETTE_BENCH_UNITS="1000000" \
+    cargo bench --bench target_cost -- memory >> /tmp/overflow.txt 2>&1; then
+    printf '# overflow_checked_target_scale\tpassed\n' >> /tmp/overflow.txt
+else
+    printf '# overflow_checked_target_scale\tFAILED\n' >> /tmp/overflow.txt
+fi
+
+cat /tmp/facts.txt /tmp/rows.txt /tmp/memory.txt /tmp/overflow.txt > /tmp/result.txt
 REMOTE
 
 # The run takes hours on a small machine, and a connection held open for
@@ -301,7 +345,10 @@ REMOTE
 say "Starting the benchmark on the instance. It runs detached"
 scp "${ssh_options[@]}" "$workdir/remote.sh" "$remote:remote.sh" >/dev/null
 ssh "${ssh_options[@]}" "$remote" \
-    "nohup setsid bash remote.sh $PROFILE > run.log 2>&1 < /dev/null & echo started"
+    "CACHETTE_BENCH_EXTENTS='${CACHETTE_BENCH_EXTENTS:-}' \
+     CACHETTE_BENCH_THREADS='${CACHETTE_BENCH_THREADS:-}' \
+     CACHETTE_BENCH_UNITS='${CACHETTE_BENCH_UNITS:-}' \
+     nohup setsid bash remote.sh $PROFILE > run.log 2>&1 < /dev/null & echo started"
 
 say "Waiting for the run to finish. Progress follows"
 finished=""

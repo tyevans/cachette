@@ -127,103 +127,153 @@ impl Extent {
 }
 
 /// The sweep that one run of the benchmark covers.
+///
+/// Every field is a parameter. A profile below states the default, and an
+/// environment variable replaces it, so a run at another size or another
+/// thread count is a setting rather than a change to this file.
 struct Profile {
     /// The name that the preamble reports.
-    name: &'static str,
+    name: String,
     /// The extents that the tile rows sweep.
-    extents: &'static [Extent],
+    extents: Vec<Extent>,
     /// The thread counts that every row sweeps.
-    threads: &'static [usize],
+    threads: Vec<usize>,
     /// The extent that the unit rows hold fixed.
     unit_extent: Extent,
     /// The unit counts that the unit rows sweep.
-    units: &'static [u32],
+    units: Vec<u32>,
     /// The extent and the unit count of the target scale row.
     target: (Extent, u32),
+}
+
+/// Reads a list of extents from the environment, as `WIDTHxHEIGHT` words.
+fn extents_from(name: &str, fallback: &[(u32, u32)]) -> Vec<Extent> {
+    if let Ok(text) = std::env::var(name) {
+        let parsed: Vec<Extent> = text
+            .split_whitespace()
+            .filter_map(|word| {
+                let (width, height) = word.split_once('x')?;
+                Some(Extent {
+                    width: width.parse().ok()?,
+                    height: height.parse().ok()?,
+                })
+            })
+            .collect();
+        if !parsed.is_empty() {
+            return parsed;
+        }
+    }
+    fallback
+        .iter()
+        .map(|(width, height)| Extent {
+            width: *width,
+            height: *height,
+        })
+        .collect()
+}
+
+/// Reads a list of numbers from the environment, as decimal words.
+fn numbers_from<T>(name: &str, fallback: &[T]) -> Vec<T>
+where
+    T: Copy + std::str::FromStr,
+{
+    if let Ok(text) = std::env::var(name) {
+        let parsed: Vec<T> = text
+            .split_whitespace()
+            .filter_map(|word| word.parse().ok())
+            .collect();
+        if !parsed.is_empty() {
+            return parsed;
+        }
+    }
+    fallback.to_vec()
 }
 
 /// The small sweep. It exists so that a person can check the apparatus on a
 /// development machine in under a minute, and it measures nothing that the
 /// project may cite.
-const QUICK: Profile = Profile {
-    name: "quick",
-    extents: &[
-        Extent {
-            width: 64,
-            height: 64,
-        },
-        Extent {
-            width: 256,
-            height: 256,
-        },
-        Extent {
+fn quick() -> Profile {
+    Profile {
+        name: "quick".to_owned(),
+        extents: extents_from(EXTENTS_VAR, &[(64, 64), (256, 256), (512, 512)]),
+        threads: numbers_from(THREADS_VAR, &[1, 2]),
+        unit_extent: Extent {
             width: 512,
             height: 512,
         },
-    ],
-    threads: &[1, 2],
-    unit_extent: Extent {
-        width: 512,
-        height: 512,
-    },
-    units: &[0, 1_000, 10_000],
-    target: (
-        Extent {
-            width: 512,
-            height: 512,
-        },
-        10_000,
-    ),
-};
+        units: numbers_from(UNITS_VAR, &[0, 1_000, 10_000]),
+        target: (
+            Extent {
+                width: 512,
+                height: 512,
+            },
+            10_000,
+        ),
+    }
+}
 
 /// The sweep that reaches the target scale of the project.
 ///
 /// The last extent holds 16777216 tiles, and the target row places one
 /// million units on it. Both are the figures the scale constants table
 /// states.
-const FULL: Profile = Profile {
-    name: "full",
-    extents: &[
-        Extent {
-            width: 64,
-            height: 64,
-        },
-        Extent {
-            width: 256,
-            height: 256,
-        },
-        Extent {
-            width: 1024,
-            height: 1024,
-        },
-        Extent {
+fn full() -> Profile {
+    Profile {
+        name: "full".to_owned(),
+        extents: extents_from(
+            EXTENTS_VAR,
+            &[
+                (64, 64),
+                (256, 256),
+                (1024, 1024),
+                (2048, 2048),
+                (4096, 4096),
+            ],
+        ),
+        threads: numbers_from(THREADS_VAR, &[1, 2, 4]),
+        unit_extent: Extent {
             width: 2048,
             height: 2048,
         },
-        Extent {
-            width: 4096,
-            height: 4096,
-        },
-    ],
-    threads: &[1, 2, 4],
-    unit_extent: Extent {
-        width: 2048,
-        height: 2048,
-    },
-    units: &[0, 10_000, 100_000, 1_000_000],
-    target: (
-        Extent {
-            width: 4096,
-            height: 4096,
-        },
-        1_000_000,
-    ),
-};
+        units: numbers_from(UNITS_VAR, &[0, 10_000, 100_000, 1_000_000]),
+        target: (
+            Extent {
+                width: 4096,
+                height: 4096,
+            },
+            1_000_000,
+        ),
+    }
+}
+
+/// The variable that replaces the extents of a sweep.
+const EXTENTS_VAR: &str = "CACHETTE_BENCH_EXTENTS";
+
+/// The variable that replaces the thread counts of a sweep.
+const THREADS_VAR: &str = "CACHETTE_BENCH_THREADS";
+
+/// The variable that replaces the unit counts of a sweep.
+const UNITS_VAR: &str = "CACHETTE_BENCH_UNITS";
 
 fn main() {
-    let argument = std::env::args().nth(1).unwrap_or_default();
-    let profile = if argument == "full" { &FULL } else { &QUICK };
+    let arguments: Vec<String> = std::env::args().skip(1).collect();
+    let first = arguments.first().map_or("", String::as_str);
 
+    match first {
+        // One measurement of resident memory, in a process of its own. The
+        // parent below starts one child for each point, because a process
+        // that has already built a large world does not give the allocator
+        // back and would report the high mark of the run rather than the
+        // cost of the world it holds.
+        "memory-point" => memory_point(&arguments),
+        "memory" => memory_sweep(&full()),
+        "full" => timing_sweep(&full()),
+        _ => timing_sweep(&quick()),
+    }
+}
+
+/// Runs the timing sweep and writes the table.
+fn timing_sweep(profile: &Profile) {
     preamble(profile);
     println!("bench\ttiles\tunits\tthreads\tsamples\tmin_ns\tmedian_ns\tmax_ns");
 
@@ -260,6 +310,105 @@ fn target_triple() -> String {
     )
 }
 
+/// Reads a size in kibibytes from the process status file.
+///
+/// The file is a Linux interface, and the target platform is Linux. A machine
+/// that does not publish it reports zero, and a zero row says the run took no
+/// memory figure rather than that the world took no memory.
+fn status_kib(field: &str) -> u64 {
+    let Ok(text) = std::fs::read_to_string("/proc/self/status") else {
+        return 0;
+    };
+    for line in text.lines() {
+        if let Some(rest) = line.strip_prefix(field) {
+            let digits: String = rest.chars().filter(char::is_ascii_digit).collect();
+            return digits.parse().unwrap_or(0);
+        }
+    }
+    0
+}
+
+/// Measures the resident memory of one world, and writes one row.
+///
+/// The process builds one world, places the units, runs two frames, and then
+/// reads its own resident size. It measures one point and exits, so the
+/// figure is the cost of this world and not the high mark of a sweep.
+fn memory_point(arguments: &[String]) {
+    let extent = arguments
+        .get(1)
+        .and_then(|word| word.split_once('x'))
+        .and_then(|(width, height)| {
+            Some(Extent {
+                width: width.parse().ok()?,
+                height: height.parse().ok()?,
+            })
+        })
+        .expect("the second argument must be an extent, as WIDTHxHEIGHT");
+    let units: u32 = arguments
+        .get(2)
+        .and_then(|word| word.parse().ok())
+        .expect("the third argument must be a unit count");
+    let threads: usize = arguments
+        .get(3)
+        .and_then(|word| word.parse().ok())
+        .unwrap_or(1);
+
+    let empty = status_kib("VmRSS:");
+    let capacity = units.max(1024);
+    let mut world = World::new(extent.config(capacity)).expect("the extent must describe a world");
+    let placed = populate(&mut world, units);
+    for _ in 0..WARMUP_FRAMES {
+        world.step(threads).expect("the step must run");
+    }
+    let resident = status_kib("VmRSS:");
+    let peak = status_kib("VmHWM:");
+    // The world is read after the sizes are taken, so nothing above can drop
+    // it early and report the memory of a world that no longer exists.
+    let tiles = world.tile_count() as u64;
+    println!(
+        "memory\t{}\t{placed}\t{threads}\t{}\t{}\t{}",
+        extent.tiles(),
+        empty * 1024,
+        resident * 1024,
+        peak * 1024
+    );
+    assert_eq!(tiles, extent.tiles(), "the world must hold the extent");
+    drop(world);
+}
+
+/// Starts one child for each point of the memory sweep and writes the table.
+fn memory_sweep(profile: &Profile) {
+    let binary = std::env::current_exe().expect("the benchmark must know its own path");
+    preamble(profile);
+    println!("bench\ttiles\tunits\tthreads\tempty_bytes\tresident_bytes\tpeak_bytes");
+
+    let threads = profile.threads.first().copied().unwrap_or(1);
+    for extent in &profile.extents {
+        for units in &profile.units {
+            // A world holds one unit for each open tile at most, so a point
+            // that asks for more units than the extent can hold is skipped
+            // rather than run against a smaller population under its label.
+            if u64::from(*units) > extent.tiles() / 2 {
+                continue;
+            }
+            let output = std::process::Command::new(&binary)
+                .arg("memory-point")
+                .arg(format!("{}x{}", extent.width, extent.height))
+                .arg(units.to_string())
+                .arg(threads.to_string())
+                .output()
+                .expect("the child must run");
+            print!("{}", String::from_utf8_lossy(&output.stdout));
+            if !output.status.success() {
+                println!(
+                    "# the point at {}x{} with {units} units failed",
+                    extent.width, extent.height
+                );
+            }
+        }
+    }
+}
+
 /// Takes the samples of one row and returns them in ascending order.
 fn samples_of(mut body: impl FnMut() -> u128) -> Vec<u128> {
     let mut samples = Vec::with_capacity(MAX_SAMPLES);
@@ -294,7 +443,7 @@ fn report(name: &str, tiles: u64, units: u32, threads: usize, samples: &[u128]) 
 /// these rows is the tile count. A flat column is what the generated tile
 /// value field claims.
 fn build_rows(profile: &Profile) {
-    for extent in profile.extents {
+    for extent in &profile.extents {
         let config = extent.config(1024);
         let samples = samples_of(|| {
             let start = now();
@@ -329,7 +478,7 @@ fn build_rows(profile: &Profile) {
 
 /// Measures the whole-world hash against the tile count.
 fn hash_rows(profile: &Profile) {
-    for extent in profile.extents {
+    for extent in &profile.extents {
         let mut world = World::new(extent.config(1024)).expect("the extent must describe a world");
         world.step(1).expect("the step must run");
         let samples = samples_of(|| {
@@ -347,8 +496,8 @@ fn hash_rows(profile: &Profile) {
 ///
 /// The world holds no unit, so this row is the tile pass alone.
 fn step_by_tiles(profile: &Profile) {
-    for extent in profile.extents {
-        for threads in profile.threads {
+    for extent in &profile.extents {
+        for threads in &profile.threads {
             let samples = step_samples(extent.config(1024), 0, *threads);
             report("step_by_tiles", extent.tiles(), 0, *threads, &samples);
         }
@@ -358,8 +507,8 @@ fn step_by_tiles(profile: &Profile) {
 /// Measures one frame against the unit count, at a fixed extent.
 fn step_by_units(profile: &Profile) {
     let extent = profile.unit_extent;
-    for units in profile.units {
-        for threads in profile.threads {
+    for units in &profile.units {
+        for threads in &profile.threads {
             let capacity = (*units).max(1024);
             let samples = step_samples(extent.config(capacity), *units, *threads);
             report("step_by_units", extent.tiles(), *units, *threads, &samples);
@@ -370,7 +519,7 @@ fn step_by_units(profile: &Profile) {
 /// Measures one frame at the tile count and the unit count of the target.
 fn target_row(profile: &Profile) {
     let (extent, units) = profile.target;
-    for threads in profile.threads {
+    for threads in &profile.threads {
         let capacity = units.max(1024);
         let samples = step_samples(extent.config(capacity), units, *threads);
         report(
