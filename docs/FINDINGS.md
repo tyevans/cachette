@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-315**
+**Next number: FND-316**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -8900,8 +8900,66 @@ That gives a protocol sharper than reading which stages moved. **Run each tree
 twice.** The spread inside one tree bounds the machine. A difference between
 trees that exceeds it is the layout and the change together, and a difference
 that does not exceed it is nothing at all.
+### FND-315 — A unit against a shoreline was told to walk into the water on every frame, and it stood there for ever
+
+**Believed.** Movement takes its direction from the per-cell exit field, and a
+cell that no neighbour beats holds no direction, so the field leaves no unit
+without a rule.[^F190C] A unit that the ground refuses stays put for that frame
+and moves on a later one.
+
+**True.** It stays put for ever. The exit of a cell, the option of a unit and
+the direction that pairs them are all inputs that hold from one frame to the
+next, so a refusal repeats exactly. The fall-back to a draw fired only when the
+cell held no direction at all. It did not fire when the cell held a direction
+that the ground refused, which is the case that repeats.
+
+**A cell covers a block of 32 tiles on a side, and the ground of one tile of
+that block is not a fact the block carries.** So the field can hold a direction
+that most of a block can take and that the tiles along one edge cannot. That
+edge is a shoreline.
+
+**Evidence.** The demonstration world, 256 by 256 at four factions. A unit was
+placed on the first tile whose cell exit the ground under it refuses, and the
+step was driven for 32 frames. The unit held its starting tile for all 32. With
+the fall-back in place it left on an early frame. The test is the record of it,
+and the commit body holds the command.[^F315B]
+
+**A second cause sat above it: the rank could name ground that admits nobody.**
+No summary field says whether a unit may stand in a cell, so a cell of open
+water competes on the same terms as dry ground. The mean height row is where it
+happens: the water of one cell may be shallower on average than the water of
+the cell beside it, so the closed cell reads higher and takes the direction.
+
+**That case is a tail of the generator and not the typical world.** A sweep of
+forty seeds at 256 by 256 found a cell ranking closed ground above itself in
+eleven of them, between one and three cells each. The seed this project uses
+for its other fixtures is one of the twenty-nine that miss it.
+
+**Follows.** Three things.
+
+**A fall-back that fires on one refusal and not on another is not a fall-back.**
+The record said the field leaves no unit without a rule, and it was true of the
+case the author had in mind. The rule it left the other unit was a direction
+that nothing could take, which is worse than no rule, because no rule reaches a
+draw and this reached a wall.
+
+**The fixture was the finding, and the first version of the test proved
+nothing.** Written against the ordinary seed, the closed-ground assertion passed
+with the defect put back, because no cell of that world ever ranked closed
+ground first. The rule that a fixture must be built for the distribution the
+test needs caught it, and only because the defect was put back and the test was
+watched.[^23] A green test on the ordinary world would have shipped an
+assertion that could not fail.
+
+**A field at block pitch cannot answer a tile.** D5 removes the cells that admit
+nobody and D6 stops the freeze, and neither makes a unit walk around a bay. The
+field holds one direction for a block, and routing around an obstacle needs a
+field that reaches further than one neighbour. That is a different claim and it
+has no record.
+
 ## References
 
+[^F315B]: The refused step test. `crates/cachette-core/tests/a_refused_step_does_not_freeze.rs`
 [^F261B]: The holder count test of the viewer. `crates/cachette-view/tests/shows_who_holds_the_ground.rs`
 [^F261C]: Backlog item 0271, count the ground generations that one frame runs. `docs/backlog/proposed/0271-count-the-ground-generations-that-one-frame-runs.md`
 

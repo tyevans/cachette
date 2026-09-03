@@ -60,6 +60,7 @@
 //! [^5]: Findings register, FND-093. `docs/FINDINGS.md`
 //! [^6]: Recurring Defect Shapes, shape 1. `.claude/rules/recurring-defects.md`
 //! [^7]: Findings register, FND-110. `docs/FINDINGS.md`
+//! [^8]: Findings register, FND-315. `docs/FINDINGS.md`
 
 use std::collections::BTreeMap;
 
@@ -85,6 +86,17 @@ const NEIGHBOUR_COUNT: u64 = 6;
 /// This repeats a value the engine holds. The suite checks the repetition
 /// against the engine on every frame.
 const DRAW_MOVE_DIRECTION: u32 = 0;
+
+/// The draw index that a soldier uses when the ground refuses its direction.
+///
+/// The engine answers a refused step with a second draw in the same system
+/// and the same frame, so the second draw takes the next index. A unit that
+/// only stayed put would stay put for ever, because every input to the
+/// refused direction holds from one frame to the next.[^8]
+///
+/// This repeats a value the engine holds, and the suite checks the repetition
+/// against the engine on every frame.
+const DRAW_MOVE_FALLBACK: u32 = 1;
 
 /// Builds the fixture world.
 fn world_of(seed: u64) -> World {
@@ -269,6 +281,7 @@ struct Frame {
 /// [^2]: ADR-0091, movement takes its direction from a per-cell field, never from a per-unit search, decision D2. `docs/adrs/draft/adr-0091-movement-takes-its-direction-from-a-per-cell-field.md`
 fn run_frame(world: &mut World, threads: usize, over: Axial) -> Frame {
     let grid = world.grid();
+    let terrain = world.terrain();
     let seed = world.config().seed;
     let before: Vec<(Entity, Axial)> = world
         .soldiers()
@@ -319,7 +332,30 @@ fn run_frame(world: &mut World, threads: usize, over: Axial) -> Frame {
                 NEIGHBOUR_COUNT,
             ) as usize,
         };
-        let target = grid.neighbour(was, direction);
+        // The engine refuses a step off the world and a step onto ground
+        // that admits no unit, and it answers either refusal with a second
+        // keyed draw rather than by holding the unit still.[^8] A unit whose
+        // second draw is refused as well does stay put for that frame, and
+        // the next frame keys a different draw. This file repeats that rule,
+        // because it repeats the key.[^6]
+        let step_target = |here: Axial, direction: usize| -> Option<Axial> {
+            let target = grid.neighbour(here, direction)?;
+            terrain.kind(target)?.is_passable().then_some(target)
+        };
+        let target = match step_target(was, direction) {
+            Some(target) => Some(target),
+            None => {
+                let again = rng::draw_below(
+                    seed,
+                    rng::SYSTEM_SOLDIER_MOVE,
+                    frame,
+                    soldier.to_bits(),
+                    DRAW_MOVE_FALLBACK,
+                    NEIGHBOUR_COUNT,
+                ) as usize;
+                step_target(was, again)
+            }
+        };
         if holds_an_intent && target == Some(over) && was != over {
             asked += 1;
         }
@@ -331,9 +367,10 @@ fn run_frame(world: &mut World, threads: usize, over: Axial) -> Frame {
         }
         if now != was {
             // The unit moved. It can only have moved to the target that the
-            // exit field of its cell named, or to the target of its draw where
-            // the cell named none, so the prediction above and the engine
-            // agree.
+            // exit field of its cell named, to the target of its draw where
+            // the cell named none, or to the target of its fall-back draw
+            // where the ground refused the first, so the prediction above and
+            // the engine agree.
             assert_eq!(
                 target,
                 Some(now),
