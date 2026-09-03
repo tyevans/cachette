@@ -128,14 +128,23 @@ fn now() -> Instant {
     Instant::now()
 }
 
-fn main() {
-    let arguments: Vec<String> = std::env::args().skip(1).collect();
-    let (width, height) = arguments
+/// Reads a `WIDTHxHEIGHT` word from the arguments.
+fn extent_argument(arguments: &[String]) -> (u32, u32) {
+    arguments
         .first()
         .and_then(|word| word.split_once('x'))
         .map_or((512, 512), |(width, height)| {
             (width.parse().unwrap_or(512), height.parse().unwrap_or(512))
-        });
+        })
+}
+
+fn main() {
+    let arguments: Vec<String> = std::env::args().skip(1).collect();
+    if arguments.first().map(String::as_str) == Some("frame") {
+        frame_rows(&arguments[1..]);
+        return;
+    }
+    let (width, height) = extent_argument(&arguments);
     let units: u32 = arguments
         .get(1)
         .and_then(|word| word.parse().ok())
@@ -403,6 +412,53 @@ fn main() {
     } else {
         println!("# the width is not a power of two, so the shift row is skipped");
     }
+}
+
+/// Times whole frames, so that a saving has a denominator.
+///
+/// The rows above hold one loop each and no frame. A share of a loop is not a
+/// share of a frame, and the shape of a frame in this engine changes as the
+/// stages are worked on. This row is the only figure here that a saving may be
+/// stated against.
+fn frame_rows(arguments: &[String]) {
+    let (width, height) = extent_argument(arguments);
+    let units: u32 = arguments
+        .get(1)
+        .and_then(|word| word.parse().ok())
+        .unwrap_or(10_000);
+    let threads: usize = arguments
+        .get(2)
+        .and_then(|word| word.parse().ok())
+        .unwrap_or(1);
+
+    let config = WorldConfig {
+        width,
+        height,
+        seed: SEED,
+        faction_count: FACTIONS,
+        unit_capacity: units.max(1024),
+    };
+    let mut world = World::new(config).expect("the extent must describe a world");
+    let placed = populate_scattered(&mut world, units);
+    for _ in 0..WARMUP_FRAMES {
+        world.step(threads).expect("the step must run");
+    }
+
+    println!("# whole frames, which is the denominator of every saving above");
+    println!("# target_triple\t{}", target_triple());
+    println!("# units_placed\t{placed}");
+    println!("# threads\t{threads}");
+    println!("# every duration is in nanoseconds");
+    println!("bench\tsamples\tmin_ns\tmedian_ns\tmax_ns");
+
+    let samples = samples_of(|| {
+        let start = now();
+        let log = world.step(threads).expect("the step must run");
+        let elapsed = start.elapsed().as_nanos();
+        std::hint::black_box(log.len());
+        elapsed
+    });
+    report("frame", &samples);
 }
 
 /// Returns the reciprocal that replaces a division by `divisor`.

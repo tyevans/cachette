@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-283**
+**Next number: FND-284**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -7061,6 +7061,51 @@ items came from one reading of one pass, and the reading counted lookups. The
 item that removes four steps loses. The item that removes two steps wins,
 because those two are a division and the other two are a cache hit.
 
+### FND-283 — Three items competed to optimise under one percent of a frame, and none of them had a denominator
+
+**Believed.** The cost of turning a tile into a cell is worth an item. Three
+shapes were proposed for it: a tile-indexed exit direction, a stored cell index
+on the unit, and an arithmetic replacement for the division.[^F281A] [^F282A]
+Two findings priced the shapes against one another, and both compared a loop to
+a loop.[^F283A] [^F283B]
+
+**True.** None of the three was ever measured against a frame. A frame at the
+target extent costs seconds on the machine that took these figures, and the
+whole conversion is a fraction of one percent of it. **The three shapes were
+ranked correctly against each other and none of them matters.**
+
+**Evidence.** A row that times a whole step was added to the same
+benchmark.[^F283C] At the target extent, with one million units at twelve
+threads, a frame costs a figure in the seconds. The conversion loop that all
+three items address costs a figure in the tens of milliseconds under the same
+load. The share is below one percent whichever end of either spread is taken.
+
+Two further rows say what the frame is made of. **Dropping the population by a
+factor of ten barely moves the frame cost**, so the frame follows the tile count
+and not the population, and every one of these three items is a unit-side
+change. **A frame at one thread costs about twice a frame at twelve**, on a
+machine with sixteen cores, which is the speedup a half-serial pass allows and
+matches the serial stage the stage split names.
+
+The machine carried a load average above thirty on sixteen cores throughout, so
+every absolute figure here is inflated. The share is a ratio of two figures taken
+under that same load, and the ratio is what the finding rests on.
+
+**Follows.** Three things.
+
+**A saving needs a denominator, and a loop is not one.** Both earlier findings
+compared one loop against another loop. That is the right way to rank two
+shapes and it says nothing about whether either is worth building. The ranking
+was sound and the question was not asked.
+
+**Measure the frame before ranking the parts of it.** The benchmark had rows for
+a derivation, a lookup and a write before it had a row for a step. The row that
+would have stopped all three items was the cheapest one to write.
+
+**An item that names a cost should name its share.** All three items opened by
+naming a mechanism and pricing it in bytes or in steps. None of them stated what
+fraction of a frame it stood to win, and none of the reviews of them asked.
+
 ## References
 
 [^F261B]: The holder count test of the viewer. `crates/cachette-view/tests/shows_who_holds_the_ground.rs`
@@ -7346,3 +7391,6 @@ because those two are a division and the other two are a cache hit.
 [^F282B]: Findings register, FND-252, in this document.
 [^F282C]: The grid address conversion. `crates/cachette-core/src/hex.rs`
 [^F282D]: Backlog priority index. `docs/backlog/PRIORITY.md`
+[^F283A]: Findings register, FND-281, in this document.
+[^F283B]: Findings register, FND-282, in this document.
+[^F283C]: The exit locality benchmark, the frame row. `crates/cachette-core/benches/exit_locality.rs`
