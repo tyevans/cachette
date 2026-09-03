@@ -1,7 +1,7 @@
 ---
 id: 0021
 title: A developer can use the control plane without reading its source
-status: Shaped
+status: Accepted
 created: 2026-09-03
 ---
 

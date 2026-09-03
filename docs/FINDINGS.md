@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-315**
+**Next number: FND-317**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -539,6 +539,40 @@ the count.** This is the case the testing rule states in the general: a defect
 that repeats gives one answer on every thread and on every run, and a test
 which compares two runs cannot see it.[^F174A] The rule named a draw keyed on
 the wrong field. A solver that stops early is the same shape.
+
+
+### FND-316 — The package says its verb interface is not written, and a verb ran
+
+**Believed.** The Python package states in its own top-level docstring that it
+is a stub, that it re-exports the compiled module, and that the selector
+interface, the verb interface and the view scope are not written yet.
+
+**True.** The selector interface is not written. The other two are. The
+compiled module carries set-valued verbs and columnar reads, and the worked
+example in the project orientation calls both.[^F316A]
+
+**Evidence.** The example in the orientation document was run unchanged
+against the installed package. It built a world, spawned a set of units, gave
+one gather order, stepped the world at four threads, checked the invariants,
+and read a state hash, two column dictionaries and a gather count. It printed
+a tick and a gather count and raised nothing.
+
+```
+grep -n "are not written yet" python/cachette/__init__.py
+grep -n "fn spawn_soldiers\|fn order_gather\|fn event_log_columns" crates/cachette-py/src/lib.rs
+```
+
+**Follows.** The one sentence the package writes about itself is wrong about
+two of the three things it names, and nothing fails, because a docstring is
+prose. This is the shape the recurring defect rule names last: a document that
+no longer describes the code.[^F316B] It is also the need that product record
+0021 states, and that record cites the same shape as the cost it must
+carry.[^F316C]
+
+**The repair is not made here.** The sentence and the documentation of this
+package are one statement, and correcting the sentence alone would create a
+second place that states what the package holds. The worker who chooses how
+this package is documented owns both.
 
 
 ## C. Defects found in specified rules
@@ -9234,3 +9268,6 @@ that does not exceed it is nothing at all.
 [^F313A]: The workspace manifest, the release profile. `Cargo.toml`
 [^F306B]: Findings register, FND-313, in this document.
 [^F311A]: Findings register, FND-304, in this document.
+[^F316A]: Project orientation, the Python example. `README.md`
+[^F316B]: Recurring defect shapes, shape 5. `.claude/rules/recurring-defects.md`
+[^F316C]: Product requirement record 0021, a developer can use the control plane without reading its source. `docs/product/accepted/prd-0021-a-developer-can-use-the-control-plane-without-reading-its-source.md`
