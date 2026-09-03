@@ -133,6 +133,28 @@ pub enum Overlay {
     },
     /// The whole panel, every section. What a rendered picture holds.
     Panel,
+    /// The cards, and the deck of panels the caller named.
+    ///
+    /// A panel of the deck is one file that registers with the panel
+    /// standard.[^2] The deck stacks down the far side of the frame, so it
+    /// stands beside the cards rather than over them.
+    ///
+    /// The pointer is the tile the watcher pointed at. The viewer has no
+    /// cursor of its own, so the caller that owns the window supplies it, and
+    /// a caller that has none passes nothing.[^3]
+    ///
+    /// # References
+    ///
+    /// [^2]: The panel standard. `crates/cachette-view/src/panel/mod.rs`
+    /// [^3]: ADR-0094, the caller owns the camera and the pixels, decision D1. `docs/adrs/draft/adr-0094-the-caller-owns-the-camera-and-the-pixels.md`
+    Deck {
+        /// Whether the watcher is asking for the reference layer.
+        reference: bool,
+        /// The panels the frame draws.
+        panels: crate::panel::Set,
+        /// The tile the watcher pointed at, when the watcher pointed at one.
+        pointer: Option<cachette_core::Axial>,
+    },
 }
 
 /// One row of a card.

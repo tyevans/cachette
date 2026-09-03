@@ -18,6 +18,7 @@ use cachette_core::{
     Axial, CommodityId, Entity, FactionId, Fix32, Holder, ResourceKind, World as CoreWorld,
     WorldConfig,
 };
+use cachette_view::panel::Set as PanelSet;
 use cachette_view::{fill_frame, Camera, FrameSize, Lap, Metrics, Overlay, Surface};
 use numpy::{PyArray1, PyReadwriteArray1, ToPyArray};
 use pyo3::create_exception;
@@ -299,6 +300,46 @@ impl PyWorld {
     #[getter]
     fn soldier_count(&self) -> u32 {
         self.lock().soldiers().len()
+    }
+
+    /// Returns the number of live units of each faction, by faction number.
+    ///
+    /// **This is one call and it names no unit.** The engine maintains the
+    /// count where a unit is created and where a unit ends, so this reads a
+    /// small array and starts no pass over the population.[^1] A caller that
+    /// counted the units of a faction in Python would cross the boundary once
+    /// for each unit, which the control plane rule forbids.[^2]
+    ///
+    /// The list holds one entry for each faction the world was built with. A
+    /// faction whose last unit ends reads zero, and nothing else the bindings
+    /// expose says so.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0070, the head-up display reports what the drawing pass read, decision D1. `docs/adrs/accepted/adr-0070-the-head-up-display-reports-what-the-drawing-pass-read.md`
+    /// [^2]: ADR-0040, Python is a control plane, not a data plane, decision D1. `docs/adrs/draft/adr-0040-python-is-a-control-plane-not-a-data-plane.md`
+    fn faction_population(&self) -> Vec<u32> {
+        let world = self.lock();
+        let counts = world.population_by_faction();
+        let factions = world.config().faction_count as usize;
+        counts.iter().copied().take(factions).collect()
+    }
+
+    /// Returns the name of every panel the viewer can draw.
+    ///
+    /// A caller passes one of these names to the drawing command. The list
+    /// comes from the viewer's own registration, so a panel that joins the
+    /// deck appears here with no edit to this file.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: Recurring Defect Shapes, shape 1. `.claude/rules/recurring-defects.md`
+    #[staticmethod]
+    fn panel_names() -> Vec<&'static str> {
+        cachette_view::panel::registered()
+            .iter()
+            .map(|panel| panel.name())
+            .collect()
     }
 
     /// Adds a soldier at each address and returns the identity column.
@@ -1183,7 +1224,7 @@ impl PyWorld {
     // The arguments are the interface a Python caller types by name, so
     // bundling them would hide the contract rather than simplify it.
     #[allow(clippy::too_many_arguments)]
-    #[pyo3(signature = (camera, width, height, pixels, reference = false, panel = false))]
+    #[pyo3(signature = (camera, width, height, pixels, reference = false, panel = false, panels = None, pointer = None))]
     fn draw<'py>(
         &self,
         python: Python<'py>,
@@ -1193,6 +1234,8 @@ impl PyWorld {
         pixels: PyReadwriteArray1<'py, u32>,
         reference: bool,
         panel: bool,
+        panels: Option<Vec<String>>,
+        pointer: Option<(i32, i32)>,
     ) -> PyResult<Bound<'py, PyDict>> {
         let mut pixels = pixels;
         let buffer = pixels.as_slice_mut().map_err(|_| {
@@ -1204,7 +1247,31 @@ impl PyWorld {
         let surface = Surface::new(width, height, buffer)
             .map_err(|error| FrameError::new_err(error.to_string()))?;
 
-        let overlay = if panel {
+        // The named panels win over the whole panel, because a caller that
+        // named a deck asked for the deck. A name that no panel carries is
+        // refused, and the message names the panels that exist: a frame with
+        // nothing on it looks the same as a frame the caller mistyped.
+        let mut deck = PanelSet::EMPTY;
+        for name in panels.unwrap_or_default() {
+            deck = deck.with(&name).ok_or_else(|| {
+                let known: Vec<&str> = cachette_view::panel::registered()
+                    .iter()
+                    .map(|panel| panel.name())
+                    .collect();
+                FrameError::new_err(format!(
+                    "no panel is called {name:?}; the panels are {}",
+                    known.join(", ")
+                ))
+            })?;
+        }
+
+        let overlay = if !deck.is_empty() {
+            Overlay::Deck {
+                reference,
+                panels: deck,
+                pointer: pointer.map(|(q, r)| Axial { q, r }),
+            }
+        } else if panel {
             Overlay::Panel
         } else {
             Overlay::Glass { reference }

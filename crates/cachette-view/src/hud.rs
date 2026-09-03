@@ -43,8 +43,16 @@ use crate::metrics::Metrics;
 use crate::paint::{faction_colour, kind_colour, Camera, Canvas, Focus, COLOURED_FACTIONS};
 use crate::text;
 
-/// The gap between the window edge and the panel, in pixels.
-const MARGIN: i32 = 14;
+// The panel geometry and the panel colours are declared once, in the panel
+// standard. This module reads them from there. A second copy of the width or
+// of the line height would be one fact in two places, with nothing to fail
+// when the copies drift.[^3]
+//
+// [^3]: Recurring Defect Shapes, shape 1. `.claude/rules/recurring-defects.md`
+use crate::panel::{
+    self, BAR_HEIGHT, EDGE, HEADING, LABEL, LINE, MARGIN, PAD, PANEL, PANEL_WEIGHT, SWATCH,
+    SWATCH_GAP, TITLE, VALUE, VALUE_COLUMN, WIDTH as PANEL_WIDTH,
+};
 
 /// What a cost row says when no measurement was taken.
 ///
@@ -67,42 +75,6 @@ fn pair_of_micros(mean: f64, worst: f64, count: u64) -> String {
         format!("{mean:.0} / {worst:.0} us")
     }
 }
-
-/// The width of the panel, in pixels.
-const PANEL_WIDTH: i32 = 268;
-
-/// The gap between the panel edge and its text, in pixels.
-const PAD: i32 = 13;
-
-/// The distance between one line of text and the next, in pixels.
-const LINE: i32 = 12;
-
-/// The offset of the value column from the panel text edge, in pixels.
-const VALUE_COLUMN: i32 = 96;
-
-/// The height of the bar that shows the faction shares, in pixels.
-const BAR_HEIGHT: i32 = 5;
-
-/// The colour of the panel, mixed over the world.
-const PANEL: u32 = 0x0009_0e12;
-
-/// How much of the panel colour covers the world under it.
-const PANEL_WEIGHT: u8 = 224;
-
-/// The colour of the panel edge and of the rules between sections.
-const EDGE: u32 = 0x0027_3a44;
-
-/// The colour of a section heading.
-const HEADING: u32 = 0x0074_a6ba;
-
-/// The colour of a label.
-const LABEL: u32 = 0x0069_7d87;
-
-/// The colour of a value.
-const VALUE: u32 = 0x00d6_e4ea;
-
-/// The colour of the title.
-const TITLE: u32 = 0x00e8_c84a;
 
 /// What one founding chose, as the panel states it.
 ///
@@ -1546,7 +1518,7 @@ impl Readout {
                 grouped(u64::from(self.tiles_at_capacity)),
             ),
             Line::Note("of the drawn tiles only. the"),
-            Line::Note("panel has no count of the world."),
+            Line::Note("panel counts no other tile."),
             Line::Rule,
             Line::Heading("FACTIONS IN THE WINDOW"),
         ]);
@@ -2108,8 +2080,62 @@ pub(crate) fn fraction(reading: Option<Fix32>) -> String {
 }
 
 /// Returns the width in pixels that the value column gives a value.
+///
+/// The standard states it. This module does not compute it a second time.[^1]
+///
+/// # References
+///
+/// [^1]: Recurring Defect Shapes, shape 1. `.claude/rules/recurring-defects.md`
 const fn value_span() -> i32 {
-    PANEL_WIDTH - PAD * 2 - VALUE_COLUMN
+    panel::value_room()
+}
+
+/// Returns every line of the panel that the drawing has to cut.
+///
+/// **This covers every line kind, and that is the point.** The drawing cuts
+/// each kind to the room it has, so no text can reach the map whatever an
+/// author writes. A cut is still a defect, because the panel then states
+/// something other than what it was given, and it does so in silence. This
+/// function is how a test sees one.[^1]
+///
+/// # References
+///
+/// [^1]: Backlog item 0300. `docs/backlog/complete/0300-cut-every-panel-line-to-the-width-of-the-panel.md`
+#[must_use]
+pub fn lines_that_do_not_fit(readout: &Readout) -> Vec<String> {
+    let label_room = panel::VALUE_COLUMN;
+    let swatch_room = label_room - SWATCH - SWATCH_GAP;
+    readout
+        .lines()
+        .iter()
+        .filter_map(|line| match line {
+            Line::Rule | Line::Bar => None,
+            Line::Title(text) if !panel::fits(text, panel::text_room(), 2) => {
+                Some((*text).to_owned())
+            }
+            Line::Note(text) | Line::Heading(text) if !panel::fits(text, panel::text_room(), 1) => {
+                Some((*text).to_owned())
+            }
+            Line::Row(label, value) if !panel::fits(label, label_room, 1) || !value_fits(value) => {
+                Some(format!("{label}: {value}"))
+            }
+            Line::Legend(slot, count)
+                if !panel::fits(&format!("faction {slot}"), swatch_room, 1) =>
+            {
+                Some(format!("faction {slot}: {count}"))
+            }
+            Line::Ground(kind, count) if !panel::fits(name_of(*kind), swatch_room, 1) => {
+                Some(format!("{}: {count}", name_of(*kind)))
+            }
+            Line::Founded(faction, value)
+                if !panel::fits(&format!("faction {}", faction.0), swatch_room, 1)
+                    || !value_fits(value) =>
+            {
+                Some(format!("faction {}: {value}", faction.0))
+            }
+            _ => None,
+        })
+        .collect()
 }
 
 /// Returns every value the panel would have to cut to fit its column.
@@ -2179,14 +2205,14 @@ fn paint_line(
 ) {
     match line {
         Line::Title(name) => {
-            canvas.write(left, pen, name, 2, TITLE);
+            panel::write_fitted(canvas, left, right, pen, name, 2, TITLE);
         }
         Line::Note(note) => {
-            canvas.write(left, pen, note, 1, LABEL);
+            panel::write_fitted(canvas, left, right, pen, note, 1, LABEL);
         }
         Line::Rule => canvas.block(left, pen + 3, right - left, 1, EDGE),
         Line::Heading(name) => {
-            canvas.write(left, pen, name, 1, HEADING);
+            panel::write_fitted(canvas, left, right, pen, name, 1, HEADING);
         }
         Line::Row(label, value) => row(canvas, left, right, pen, label, value),
         Line::Legend(slot, count) => legend_row(canvas, left, right, pen, *slot, *count),
@@ -2225,14 +2251,14 @@ fn outline(canvas: &mut Canvas, x: i32, y: i32, width: i32, height: i32) {
 /// other than the number it was given, and a test reads the same lines to
 /// find one.
 fn row(canvas: &mut Canvas, left: i32, right: i32, pen: i32, label: &str, value: &str) {
-    canvas.write(left, pen, label, 1, LABEL);
-
+    // The label is bounded by the panel edge and not by the value column. A
+    // label wider than the column is legible, because the value is written
+    // against the right edge and the two only meet when the pair is wider than
+    // the whole row. The bound that matters here is the one that stops text
+    // reaching the map.
     let column = left + VALUE_COLUMN;
-    let cells = ((right - column) / text::GLYPH_WIDTH).max(0) as usize;
-    let value: String = value.chars().take(cells).collect();
-
-    let start = column.max(right - text::width_of(&value, 1));
-    canvas.write(start, pen, &value, 1, VALUE);
+    panel::write_fitted(canvas, left, right, pen, label, 1, LABEL);
+    panel::write_against_right(canvas, column, right, pen, value, VALUE);
 }
 
 /// Draws one legend row: a colour swatch, the faction, and its count.
@@ -2241,10 +2267,26 @@ fn row(canvas: &mut Canvas, left: i32, right: i32, pen: i32, label: &str, value:
 /// world with more factions than colours reuses a colour.
 fn legend_row(canvas: &mut Canvas, left: i32, right: i32, pen: i32, slot: usize, count: u32) {
     let colour = faction_colour(cachette_core::FactionId(slot as u16));
-    canvas.block(left, pen, text::GLYPH_HEIGHT, text::GLYPH_HEIGHT, colour);
-    canvas.write(left + 14, pen, &format!("faction {slot}"), 1, LABEL);
-    let value = grouped(u64::from(count));
-    canvas.write(right - text::width_of(&value, 1), pen, &value, 1, VALUE);
+    canvas.block(left, pen, SWATCH, SWATCH, colour);
+    let column = left + VALUE_COLUMN;
+    let text_left = left + SWATCH + SWATCH_GAP;
+    panel::write_fitted(
+        canvas,
+        text_left,
+        right,
+        pen,
+        &format!("faction {slot}"),
+        1,
+        LABEL,
+    );
+    panel::write_against_right(
+        canvas,
+        column,
+        right,
+        pen,
+        &grouped(u64::from(count)),
+        VALUE,
+    );
 }
 
 /// Draws one founding row: a colour swatch, the faction, and what it got.
@@ -2264,15 +2306,19 @@ fn founded_row(
     faction: FactionId,
     value: &str,
 ) {
-    canvas.block(
-        left,
+    canvas.block(left, pen, SWATCH, SWATCH, faction_colour(faction));
+    let column = left + VALUE_COLUMN;
+    let text_left = left + SWATCH + SWATCH_GAP;
+    panel::write_fitted(
+        canvas,
+        text_left,
+        right,
         pen,
-        text::GLYPH_HEIGHT,
-        text::GLYPH_HEIGHT,
-        faction_colour(faction),
+        &format!("faction {}", faction.0),
+        1,
+        LABEL,
     );
-    canvas.write(left + 14, pen, &format!("faction {}", faction.0), 1, LABEL);
-    canvas.write(right - text::width_of(value, 1), pen, value, 1, VALUE);
+    panel::write_against_right(canvas, column, right, pen, value, VALUE);
 }
 
 /// Draws one ground row: a colour swatch, the kind, and how many tiles of it
@@ -2285,16 +2331,18 @@ fn founded_row(
 ///
 /// [^1]: ADR-0067, the viewer reads the world and never writes to it, decision D2. `docs/adrs/accepted/adr-0067-the-viewer-reads-the-world-and-never-writes-to-it.md`
 fn ground_row(canvas: &mut Canvas, left: i32, right: i32, pen: i32, kind: TileKind, count: u32) {
-    canvas.block(
-        left,
+    canvas.block(left, pen, SWATCH, SWATCH, kind_colour(kind));
+    let column = left + VALUE_COLUMN;
+    let text_left = left + SWATCH + SWATCH_GAP;
+    panel::write_fitted(canvas, text_left, right, pen, name_of(kind), 1, LABEL);
+    panel::write_against_right(
+        canvas,
+        column,
+        right,
         pen,
-        text::GLYPH_HEIGHT,
-        text::GLYPH_HEIGHT,
-        kind_colour(kind),
+        &grouped(u64::from(count)),
+        VALUE,
     );
-    canvas.write(left + 14, pen, name_of(kind), 1, LABEL);
-    let value = grouped(u64::from(count));
-    canvas.write(right - text::width_of(&value, 1), pen, &value, 1, VALUE);
 }
 
 /// Returns the name the panel gives one kind of ground.
