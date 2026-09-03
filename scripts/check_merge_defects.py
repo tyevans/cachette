@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
-"""Check a change for the four defects that a hand-resolved merge produces.
+"""Check a change for the defects that a hand-resolved merge produces.
 
 A merge conflict in a register is resolved by choosing between two sides. Each
 side is a correct file and the merged result is not, because the merged result
 answers a question neither side was asked. Four defects come out of that, and
-one dispatcher produced all four by hand in one day.
+one dispatcher produced four of these by hand in one day. The fifth was
+produced by the merge that brought this check onto its branch, which is the
+kind of confirmation nobody has to arrange.
 
   moved      the change moves or deletes a file and something still names the
              old path
@@ -14,6 +16,8 @@ one dispatcher produced all four by hand in one day.
              it
   pointer    a register's next-number line disagrees with its own entries,
              because both sides were behind and the resolution took a side
+  repeated   a priority index lists one number twice, because a merge kept
+             both sides of a conflicted table
 
 **The gate already catches all four.** It catches them in minutes, over the
 whole tree, after the commit exists.[^1] [^2] This check asks the same
@@ -21,12 +25,13 @@ questions of the staged change in about a second, so that the answer arrives
 before the commit rather than after it. The value here is latency, not
 coverage.
 
-**Three of the four rules are not restated here.** The duplicate label comes
-from the footnote check and the two register rules come from the register
-check, both imported and called directly.[^1] [^2] A second copy of a rule is
-the defect this project keeps recording: nothing fails when the copies
-disagree.[^3] Only the moved-path rule is new, because no existing check ties
-a move to the citations of the path it moved from.
+**Four of the five rules are not restated here.** The duplicate label comes
+from the footnote check, the two register rules come from the register check,
+and the repeated row comes from the priority check. All are imported and
+called.[^1] [^2] [^5] A second copy of a rule is the defect this project keeps
+recording: nothing fails when the copies disagree.[^3] Only the moved-path
+rule is new, because no existing check ties a move to the citations of the
+path it moved from.
 
 **The moved-path rule works during a merge, which is the case that bit.** The
 index compares against the first parent, so a file that the *other* branch
@@ -64,6 +69,7 @@ beyond the standard library and git.
 [^2]: The register check. `scripts/check_registers.py`
 [^3]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`
 [^4]: Recurring defect shapes, shape 3. `.claude/rules/recurring-defects.md`
+[^5]: The priority check. `scripts/check_priority.py`
 """
 
 import subprocess
@@ -74,6 +80,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import check_footnotes  # noqa: E402
+import check_priority  # noqa: E402
 import check_registers  # noqa: E402
 
 TESTS = {
@@ -81,7 +88,14 @@ TESTS = {
     "duplicate": "a document defines one footnote label twice",
     "collision": "a register names one number twice",
     "pointer": "a register's next number disagrees with its entries",
+    "repeated": "a priority index lists one number twice",
 }
+
+INDEXES = (
+    Path("docs") / "backlog" / "PRIORITY.md",
+    Path("docs") / "adrs" / "PRIORITY.md",
+    Path("docs") / "product" / "PRIORITY.md",
+)
 
 
 def git(*args: str) -> str:
@@ -226,6 +240,26 @@ def register_defects() -> list[tuple[str, str, str]]:
     return out
 
 
+def repeated_rows() -> list[tuple[str, str, str]]:
+    """Return every priority index row that names a number a second time.
+
+    A merge that keeps both sides of a conflicted index produces this, and it
+    is the same shape as a register that names one number twice. The rule is
+    the priority check's and this calls it.
+
+    The three indexes are three files, so this runs whether or not the change
+    touches them.
+    """
+    out: list[tuple[str, str, str]] = []
+    for name in INDEXES:
+        path = ROOT / name
+        if not path.is_file():
+            continue
+        for number in check_priority.repeated(check_priority.listed(path)):
+            out.append((str(name), "repeated", f"{number} is listed twice"))
+    return out
+
+
 def main() -> int:
     argv = sys.argv[1:]
     since: str | None = None
@@ -250,6 +284,7 @@ def main() -> int:
         stale_paths(gone, since)
         + duplicate_labels(written)
         + register_defects()
+        + repeated_rows()
     )
 
     for where, test, detail in findings:

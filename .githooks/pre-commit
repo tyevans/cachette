@@ -1,6 +1,6 @@
 #!/bin/sh
-# The pre-commit hook. It asks the four merge-defect questions of the staged
-# change, in about a second.
+# The pre-commit hook. It asks the merge-defect questions of the staged
+# change, in about a second. The script names them.
 #
 # **This is the project's first hook, and a hook nobody installs is worse than
 # no hook, because it reads as protection that is not there.** Install it once

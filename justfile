@@ -164,14 +164,14 @@ install-hooks:
 
 # A merge conflict in a register is resolved by choosing between two sides.
 # Each side is a correct file and the merged result is not. This asks what the
-# merged file says. The script holds the reasoning and the four rules.
+# merged file says. The script holds the reasoning and the rules.
 #
 # The same check runs as a pre-commit hook over the staged change, which is
 # where these defects are born. Install it with `just install-hooks`. The hook
 # is bypassable and git does not run it for a clean automatic merge, so this
 # recipe is the enforcement and the hook is the early warning.
 #
-# Check the branch for the four defects a hand-resolved merge produces.
+# Check the branch for the defects a hand-resolved merge produces.
 merge-defects:
     ./scripts/check-merge-defects.sh --branch
 
