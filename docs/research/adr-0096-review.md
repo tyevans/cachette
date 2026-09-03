@@ -270,7 +270,7 @@ another owner.[^21]
 [^9]: Target platform costs, the collapse of the choice pass. `docs/reference/graviton-costs.md`
 [^10]: Decision Record Scope, section 4.1. `.claude/rules/adr-scope.md`
 [^11]: Decision Record Scope, section 4.5. `.claude/rules/adr-scope.md`
-[^12]: Backlog item 0238. `docs/backlog/proposed/0238-decide-per-cell-and-need-rather-than-per-unit.md`
+[^12]: Backlog item 0238. `docs/backlog/complete/0238-decide-per-cell-and-need-rather-than-per-unit.md`
 [^13]: Recurring Defect Shapes, shape 3. `.claude/rules/recurring-defects.md`
 [^14]: Decision Record Scope, section 4.6. `.claude/rules/adr-scope.md`
 [^15]: Decisions register, DEC-096. `docs/DECISIONS.md`
@@ -279,4 +279,4 @@ another owner.[^21]
 [^18]: Findings register, FND-252. `docs/FINDINGS.md`
 [^19]: Recurring Defect Shapes, shape 1. `.claude/rules/recurring-defects.md`
 [^20]: Documentation Rules, section 3. `.claude/rules/documentation.md`
-[^21]: Backlog item 0236. `docs/backlog/proposed/0236-repair-every-record-that-calls-blk-007-open.md`
+[^21]: Backlog item 0236. `docs/backlog/complete/0236-repair-every-record-that-calls-blk-007-open.md`

@@ -36,13 +36,24 @@ use crate::types::Fix32;
 
 /// The number of options that a unit scores.
 ///
-/// The set is fixed at compile time. A unit scores every option in it and
-/// takes the highest, so the cost of the pass is the option count times the
-/// population and nothing else.[^1]
+/// The set is fixed at compile time, and a unit takes the highest option in
+/// it.[^1]
+///
+/// **The engine does not score the set once for each unit.** It scores it once
+/// for each level 1 cell and each bucket of need, and a unit reads the
+/// answer.[^2] [^3] The accepted record says in its own text that the cost of
+/// the pass is the option count times the population and nothing else. That
+/// sentence is a consequence the record derived rather than a decision it made,
+/// and it is false now. The record that makes it false says so, and a register
+/// holds how the project repairs a stale consequence inside an accepted
+/// record.[^4]
 ///
 /// # References
 ///
 /// [^1]: ADR-0064, a unit chooses by scoring a small fixed option set, decision D1. `docs/adrs/accepted/adr-0064-a-unit-chooses-by-scoring-a-small-fixed-option-set.md`
+/// [^2]: ADR-0096, cost follows the lattice, not the population, and a unit is a reader, decisions D1 and D4. `docs/adrs/draft/adr-0096-cost-follows-the-lattice-not-the-population.md`
+/// [^3]: ADR-0098, the choice is decided for each cell and each bucket of need, decision D1. `docs/adrs/draft/adr-0098-the-choice-is-decided-for-each-cell-and-each-bucket-of-need.md`
+/// [^4]: Decisions register, DEC-096. `docs/DECISIONS.md`
 pub const OPTION_COUNT: usize = 4;
 
 /// The intent value that means a unit holds what it was doing.
@@ -480,6 +491,17 @@ pub struct ChoiceExplanation {
     pub cell: u32,
     /// What the unit still needs.
     pub need: Fix32,
+    /// The need that the pass scored, which is the bucket of the need above.
+    ///
+    /// The pass computes one answer for each cell and each bucket of need,
+    /// so the score it compared was taken at the lower bound of the
+    /// bucket.[^1] An explanation that scored the exact need would report a
+    /// winner that the unit did not take.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0098, the choice is decided for each cell and each bucket of need. `docs/adrs/draft/adr-0098-the-choice-is-decided-for-each-cell-and-each-bucket-of-need.md`
+    pub scored_need: Fix32,
     /// The score of each option, in option index order.
     pub scores: [Fix32; OPTION_COUNT],
     /// The value each option read from the cell, in option index order.
@@ -536,6 +558,132 @@ pub fn best_option(need: Fix32, summary: CellSummary, profile: &WeightProfile) -
     best
 }
 
+/// The exponent that quantises a need into a bucket.
+///
+/// A need is a Q16.16 value between zero and the full need, so it holds
+/// 65,537 distinct values. The engine cannot hold one answer for each of
+/// them, so it holds one answer for each bucket of them.
+///
+/// The shift decides the resolution of the answer table. A coarse bucket
+/// makes two units with different needs act alike. A fine bucket approaches
+/// one answer for each unit and shares nothing. The value is a resolution
+/// parameter with a behavioural consequence, and the reference table holds
+/// its derivation.[^1]
+///
+/// # References
+///
+/// [^1]: Budgets and costs, the choice pass. `docs/reference/budgets.md`
+pub const NEED_BUCKET_SHIFT: u32 = 10;
+
+/// The number of buckets that the need range holds.
+///
+/// The count is derived from the shift and from the full need. It is not a
+/// second declaration of either.[^1]
+///
+/// # References
+///
+/// [^1]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`
+pub const NEED_BUCKET_COUNT: usize = ((NEED_FULL.0 >> NEED_BUCKET_SHIFT) + 1) as usize;
+
+/// Returns the bucket that holds one need.
+///
+/// The arena keeps every need between zero and the full need, and this call
+/// clamps rather than trusting that. A need outside the range gives the
+/// nearest bucket, so the answer is total.
+#[must_use]
+pub const fn need_bucket(need: Fix32) -> usize {
+    if need.0 <= 0 {
+        return 0;
+    }
+    let raw = (need.0 >> NEED_BUCKET_SHIFT) as usize;
+    if raw >= NEED_BUCKET_COUNT {
+        return NEED_BUCKET_COUNT - 1;
+    }
+    raw
+}
+
+/// Returns the need that stands for one bucket.
+///
+/// The value is the lower bound of the bucket. The last bucket holds the
+/// full need alone, so the unit that needs everything scores its exact
+/// need.
+#[must_use]
+pub const fn bucket_need(bucket: usize) -> Fix32 {
+    Fix32((bucket as i32) << NEED_BUCKET_SHIFT)
+}
+
+/// The answers that one level 1 cell holds, for each bucket of need.
+///
+/// **The engine computes one answer once for every unit that would compute
+/// the same answer.**[^1] The inputs to a choice are the cell of the unit
+/// and the need of the unit, and nothing else, because the engine holds one
+/// weight profile for every unit alive.[^2] Two units that share a cell and
+/// a bucket therefore share an answer, and the table holds it.
+///
+/// The table fills as a unit asks for a bucket. A cell that holds three
+/// units scores at most three buckets, so the table never costs more than
+/// the per-unit pass it replaces. A cell that holds a thousand units scores
+/// at most the bucket count, so the deciding work has a ceiling that the
+/// population cannot raise.[^3]
+///
+/// **The lazy fill changes no answer.** The answer of a bucket depends on
+/// the bucket, the cell and the profile. It does not depend on which unit
+/// asked first, or on how many asked. The table therefore gives one answer
+/// at any thread count.[^4]
+///
+/// # References
+///
+/// [^1]: ADR-0096, cost follows the lattice, not the population, and a unit is a reader, decision D4. `docs/adrs/draft/adr-0096-cost-follows-the-lattice-not-the-population.md`
+/// [^2]: Findings register, FND-251. `docs/FINDINGS.md`
+/// [^3]: ADR-0096, cost follows the lattice, not the population, and a unit is a reader, decision D1. `docs/adrs/draft/adr-0096-cost-follows-the-lattice-not-the-population.md`
+/// [^4]: ADR-0001, one binary gives one answer at any thread count, decision D1. `docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
+#[derive(Clone, Copy, Debug)]
+pub struct CellAnswers {
+    summary: CellSummary,
+    answers: [u8; NEED_BUCKET_COUNT],
+    scored: [bool; NEED_BUCKET_COUNT],
+}
+
+impl CellAnswers {
+    /// Builds an empty table over one cell summary.
+    #[must_use]
+    pub const fn new(summary: CellSummary) -> Self {
+        Self {
+            summary,
+            answers: [NO_INTENT; NEED_BUCKET_COUNT],
+            scored: [false; NEED_BUCKET_COUNT],
+        }
+    }
+
+    /// Returns the option that a unit of this need takes in this cell.
+    ///
+    /// The call scores the bucket the first time a unit asks for it, and
+    /// reads the stored answer every time after.
+    pub fn answer(&mut self, need: Fix32, profile: &WeightProfile) -> u8 {
+        let bucket = need_bucket(need);
+        if !self.scored[bucket] {
+            self.answers[bucket] = best_option(bucket_need(bucket), self.summary, profile);
+            self.scored[bucket] = true;
+        }
+        self.answers[bucket]
+    }
+
+    /// Returns the number of buckets that this table has scored.
+    ///
+    /// This is what makes the cost claim checkable. A reviewer reads the
+    /// claim that the deciding work follows the lattice; this count lets a
+    /// test read it as well. The record states that nothing enforces the
+    /// claim, and this is the part of it that a test can hold.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0096, cost follows the lattice, not the population, and a unit is a reader, decision D1. `docs/adrs/draft/adr-0096-cost-follows-the-lattice-not-the-population.md`
+    #[must_use]
+    pub fn scored_count(&self) -> usize {
+        self.scored.iter().filter(|scored| **scored).count()
+    }
+}
+
 /// Returns the scores of one unit and the option they select.
 #[must_use]
 pub fn explain(
@@ -546,20 +694,25 @@ pub fn explain(
     intent: u8,
     chooses_next_frame: bool,
 ) -> ChoiceExplanation {
+    // The pass scores the bucket of the need and not the need, so the
+    // explanation scores the same value. An explanation taken at the exact
+    // need would name a winner that the unit did not take.
+    let scored_need = bucket_need(need_bucket(need));
     let mut scores = [Fix32::ZERO; OPTION_COUNT];
     let mut fields = [Fix32::ZERO; OPTION_COUNT];
     for (index, option) in OPTIONS.iter().enumerate() {
         fields[index] = field_value(summary, option.field);
-        scores[index] = score(need, profile.weights[index], summary, *option);
+        scores[index] = score(scored_need, profile.weights[index], summary, *option);
     }
     ChoiceExplanation {
         cell,
         need,
+        scored_need,
         scores,
         fields,
         weights: profile.weights,
         floor: SCORE_FLOOR,
-        best: best_option(need, summary, profile),
+        best: best_option(scored_need, summary, profile),
         intent,
         chooses_next_frame,
     }

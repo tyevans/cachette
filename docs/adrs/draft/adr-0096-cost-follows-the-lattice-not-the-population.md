@@ -227,7 +227,7 @@ decision gets no failure. A reader must treat this as unenforced.[^21]
 [^11]: ADR-0095, a behavioural strategy arrives as a field over cells, never as a search from a unit, decision D1. `docs/adrs/draft/adr-0095-a-behavioural-strategy-arrives-as-a-field-over-cells.md`
 [^12]: ADR-0064, a unit chooses by scoring a small fixed option set, decision D1. `docs/adrs/accepted/adr-0064-a-unit-chooses-by-scoring-a-small-fixed-option-set.md`
 [^13]: Findings register, FND-251. `docs/FINDINGS.md`
-[^14]: Backlog item 0238. `docs/backlog/proposed/0238-decide-per-cell-and-need-rather-than-per-unit.md`
+[^14]: Backlog item 0238. `docs/backlog/complete/0238-decide-per-cell-and-need-rather-than-per-unit.md`
 [^15]: Decisions register, DEC-096. `docs/DECISIONS.md`
 [^16]: ADR Registry, repairing a derived consequence is not an amendment. `docs/adrs/REGISTRY.md`
 [^17]: ADR-0014, entity identity is an index plus a generation, decision D1. `docs/adrs/accepted/adr-0014-entity-identity-is-an-index-plus-a-generation.md`

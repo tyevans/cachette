@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-262**
+**Next number: FND-263**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -6633,6 +6633,56 @@ because each part sounds like it needs a record and the reviewer's instinct is
 to write three. The evidence that separates them is in the source and in the
 registry, not in the framing.
 
+### FND-262 — The choice quantised the need, and no golden scenario reaches the case it changes
+
+**Believed.** Deciding the choice for each cell and each bucket of need changes
+behaviour, so the golden state hash moves and the move has to be stated rather
+than discovered. The item that asked for the work said exactly that, and the
+record that decides it says so in its own text.[^F262A] [^F262B]
+
+**True.** The change moves no golden hash. All eight scenarios match their
+stored files, at the recording thread count, with the quantisation in place.
+
+**Evidence, and it is direct.** The bucketing was removed from the pass, so that
+the pass scored the exact need again, and the golden test was run against the
+unchanged files. It passed. **No golden scenario reaches a need where the bucket
+changes the answer.** The removal is the check, because a scenario that reached
+the case would fail with the quantisation and pass without it.
+
+The case exists and it is easy to reach. A purpose-built fixture searches the
+need range against the summary its own cell holds, finds a need whose bucket
+answers differently, and drives the engine to that need by naming the decay. The
+unit then takes the answer of the bucket. The search asserts that it found a
+divergent need before it asserts anything else, so a fixture that stopped
+reaching the case would fail rather than pass quietly.[^23]
+
+**Part of the reason is visible and part is not.** The default need rule takes a
+sixteenth of the need range off a unit on every tick, and the bucket is a
+sixty-fourth of that range, so a decay lands on a bucket bound exactly. A unit
+that is never partly fed therefore holds a need that the quantisation does not
+move. **Whether every unit of every golden scenario is in that condition is not
+verified**, because the store divides among a cohort and a share need not be a
+multiple of the bucket width. The removal experiment above proves the outcome
+without proving the mechanism.
+
+**Follows.** **A behavioural change can be real, checked and invisible to the
+whole gate at once.** The golden files are the project's answer to "did the
+simulation change", and here they answer no to a change that a record was
+written for. A reviewer reading a green gate would conclude the change is inert.
+It is not inert. It is unreached.
+
+**A green golden file is evidence about the scenarios, not about the engine.**
+This is the same shape the register already holds twice, where a fixture modelled
+the typical case and supplied no extreme.[^F262D] The new part is that the
+fixture here is the golden corpus itself, which the project treats as the
+authority on whether behaviour moved.
+
+**The remedy is not a new golden scenario.** A scenario built to sit on a bucket
+boundary would pin the boundary rather than the behaviour, and the record says
+that a test which wants the option set states a need in the middle of a
+bucket.[^F262E] The test that reaches the case belongs beside the decision, and
+it is written there.
+
 ### FND-251 — There are no unit types, and one weight profile serves every unit alive
 
 **Believed.** A unit type is an index into a shared table, and types
@@ -6768,7 +6818,7 @@ and the result here was the one the rule predicts.
 
 **Believed.** The project orientation was repaired when the blocker about the
 missing measurement narrowed. The finding that recorded the spread says so, and
-it names the orientation as one document.[^F258A]
+it names the orientation as one document.[^F262A]
 
 **True.** The orientation is two tracked files and a symlink. One carries the
 repaired sentence and the other still says that no measurement exists on the
@@ -6840,6 +6890,10 @@ distinguished the two.
 [^F261B]: The holder count test of the viewer. `crates/cachette-view/tests/shows_who_holds_the_ground.rs`
 [^F261C]: Backlog item 0271, count the ground generations that one frame runs. `docs/backlog/proposed/0271-count-the-ground-generations-that-one-frame-runs.md`
 
+[^F262A]: Backlog item 0238, decide per cell and need rather than per unit. `docs/backlog/complete/0238-decide-per-cell-and-need-rather-than-per-unit.md`
+[^F262B]: ADR-0098, the choice is decided for each cell and each bucket of need, decision D1. `docs/adrs/draft/adr-0098-the-choice-is-decided-for-each-cell-and-each-bucket-of-need.md`
+[^F262D]: Findings register, FND-051 and FND-048, in this document.
+[^F262E]: ADR-0098, the choice is decided for each cell and each bucket of need, the consequences. `docs/adrs/draft/adr-0098-the-choice-is-decided-for-each-cell-and-each-bucket-of-need.md`
 [^F226A]: Backlog item 0185, steer a step by the option the unit chose. `docs/backlog/complete/0185-steer-a-step-by-the-option-the-unit-chose.md`
 [^F226B]: Backlog item 0186, let the engine order a gather. `docs/backlog/complete/0186-let-the-engine-order-a-gather.md`
 [^F226C]: ADR-0063, a need is a rate with a threshold, and crossing it is a fact, decision D2. `docs/adrs/accepted/adr-0063-a-need-is-a-rate-with-a-threshold-and-crossing-it-is-a-fact.md`

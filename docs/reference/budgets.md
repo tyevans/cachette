@@ -171,6 +171,7 @@ that pass are budget parameters and not design knobs, so they live here.[^5]
 | Score floor | 16,384 in the Q16.16 scale | BLK-007 | Report 16, section 3.7. One quarter of one unit of weighted need |
 | Choice interval | 32 ticks | BLK-007 | Report 16, section 3.5. A power of two, at the low end of the range the owner asked for |
 | Stagger key | The level 1 cell index, mixed | BLK-007 | Report 16, section 3.5, and FND-023 |
+| Need bucket count | 65 buckets, from a shift of ten in the Q16.16 scale | BLK-007 | A quarter of one tick of need decay, see below |
 
 **The floor decides the mover count.** A unit whose highest score is below the
 floor holds what it was doing and does not move. Without the floor, a world in
@@ -181,6 +182,43 @@ the population, so a change to the floor changes the frame budget.
 **The interval is a power of two**, so the phase test is a mask and not a
 division. The engine takes it as a parameter of the world, and the value above
 is the default.
+
+**The bucket count decides how finely the engine tells two needs apart.** The
+choice is decided for each cell and each bucket of need, so two units whose
+needs share a bucket receive one answer.[^17] A coarse bucket makes two units
+with clearly different needs act alike. A fine bucket approaches one answer for
+each unit and shares nothing.
+
+**The count is chosen for behaviour, not for cost.** A cell scores a bucket the
+first time a unit asks for it, so a cell never scores more buckets than it holds
+units. The deciding work is therefore capped at the per-unit cost whatever the
+count is, and the count does not have to sit at a break-even point.
+
+**The derivation.** The default need rule takes a sixteenth of the need range off
+a unit on every tick. A bucket of a sixty-fourth of the range is a quarter of
+that step, so a unit crosses four buckets between two ticks. The quantisation is
+therefore finer than the resolution at which the need itself moves, and a unit
+never acts on a need it did not hold within one tick. The bucket width is a power
+of two in the fixed-point scale, so the bucket of a need is a shift and never a
+division.
+
+**A cost argument runs against this value, and the project accepts it for now.**
+The measurement register holds a table of the collapse a cell would show against
+the number of need buckets in play, and at the target density the median cell
+holds about as many units as this value holds buckets.[^18] So in the worst case,
+where every unit of a cell lands in its own bucket, the sharing saves nothing.
+
+**The lazy fill is why that is a weak loss and not a cost.** A cell scores a
+bucket the first time a unit asks for it, so the deciding work of a cell is the
+smaller of the units it holds and the bucket count. A fine bucket therefore risks
+buying nothing. It does not risk costing more than the per-unit pass it replaced.
+
+**The measurement that would settle the value does not exist.** Nobody has
+measured how many need values coexist in one cell in a world that consumes, and
+the measurement register says plainly that no fixture in this project produces
+one. An open decision holds the choice.[^19] **Nothing here was measured on the
+target platform**, and the blocker above covers this row in the same way it
+covers the other three.
 
 BLK-007 holds all three rows. The derivations come from a research report, and
 the run that narrowed that blocker measured none of the three.
@@ -253,3 +291,6 @@ a footnote.
 [^14]: Target platform costs, the measurement register. `docs/reference/graviton-costs.md`
 [^15]: Findings register, FND-242. `docs/FINDINGS.md`
 [^16]: Blockers register, BLK-012. `docs/BLOCKERS.md`
+[^17]: ADR-0098, the choice is decided for each cell and each bucket of need. `docs/adrs/draft/adr-0098-the-choice-is-decided-for-each-cell-and-each-bucket-of-need.md`
+[^18]: Target platform costs, would the choice pass collapse if it decided for each cell. `docs/reference/graviton-costs.md`
+[^19]: Decisions register, DEC-106. `docs/DECISIONS.md`

@@ -803,3 +803,183 @@ fn the_forage_option_reads_the_food_that_the_tiles_hold() {
         "the row that reads the food is not the forage row"
     );
 }
+
+/// Drives the fixture to a need whose bucket changes the answer.
+///
+/// The need decays by a stated amount on every tick and receives nothing, so
+/// the caller reaches an exact need by naming the decay. The call finds a need
+/// that the bucket answers differently, then sets the decay that reaches it.
+///
+/// Returns the unit and the need that the pass will score.
+fn drive_to_a_divergent_need(world: &mut World, unit: Entity) -> Fix32 {
+    // Hold the need still for one tick, so the pyramid counts the unit and the
+    // search reads the summary that the choice will read.
+    world.set_economy_schedule(1, 0).expect("the period is inside the range");
+    world.set_need_rule(
+        NeedRule::new(
+            Fix32::ZERO,
+            Fix32::ZERO,
+            Fix32(NEED_FULL.0 / 2),
+            Fix32::ZERO,
+            Fix32::MAX,
+        )
+        .expect("every rate is at or above zero"),
+    );
+    world.step(2).expect("the step must run");
+
+    let settled = world.explain_choice(unit).expect("nothing despawned it");
+    let summary = world
+        .pyramid()
+        .cell(settled.cell)
+        .expect("the unit stands in a cell of the pyramid");
+    let profile = choose::WeightProfile::EVEN;
+    let target = (0..NEED_FULL.0)
+        .map(Fix32)
+        .find(|need| {
+            let bucket = choose::bucket_need(choose::need_bucket(*need));
+            choose::best_option(*need, summary, &profile)
+                != choose::best_option(bucket, summary, &profile)
+        })
+        .expect("the fixture must reach a need whose bucket changes the answer");
+
+    world.set_need_rule(
+        NeedRule::new(
+            Fix32(NEED_FULL.0 - target.0),
+            Fix32::ZERO,
+            Fix32(NEED_FULL.0 / 2),
+            Fix32::ZERO,
+            Fix32::MAX,
+        )
+        .expect("every rate is at or above zero"),
+    );
+    world.step(2).expect("the step must run");
+    let reached = world.explain_choice(unit).expect("nothing despawned it");
+    assert_eq!(
+        reached.need, target,
+        "the fixture must reach the need it searched for"
+    );
+    target
+}
+
+/// The pass scores the bucket of a need, and not the need.
+///
+/// A record decides this, and it says in its own text that the change moves
+/// what a unit does.[^1] A test that only proved the answer repeats would pass
+/// with the quantisation removed, because an exact pass repeats as well.[^2]
+///
+/// The fixture searches for a need whose bucket answers differently, and it
+/// asserts that it found one before it asserts anything else. A need that
+/// answers the same either way would measure the fixture.[^3]
+///
+/// # References
+///
+/// [^1]: ADR-0098, the choice is decided for each cell and each bucket of need, decision D1. `docs/adrs/draft/adr-0098-the-choice-is-decided-for-each-cell-and-each-bucket-of-need.md`
+/// [^2]: Testing rules, section 2. `.claude/rules/testing.md`
+/// [^3]: Testing rules, section 2a. `.claude/rules/testing.md`
+#[test]
+fn a_unit_acts_on_the_bucket_of_its_need_and_not_on_its_need() {
+    let mut world = one_cell_world();
+    let home = first_open_address(&world);
+    let unit = world
+        .spawn_soldier(home, FactionId(0))
+        .expect("the open tile admits a unit");
+
+    let target = drive_to_a_divergent_need(&mut world, unit);
+
+    let before = world.explain_choice(unit).expect("nothing despawned it");
+    let summary = world
+        .pyramid()
+        .cell(before.cell)
+        .expect("the unit stands in a cell of the pyramid");
+    let profile = choose::WeightProfile::EVEN;
+    let exact = choose::best_option(target, summary, &profile);
+
+    assert_ne!(
+        before.need, before.scored_need,
+        "the fixture must reach a need that sits inside a bucket"
+    );
+    assert_ne!(
+        exact, before.best,
+        "the fixture must reach a need whose bucket changes the answer"
+    );
+    assert!(
+        before.chooses_next_frame,
+        "the fixture must choose on the frame it asserts"
+    );
+
+    world.step(2).expect("the step must run");
+
+    assert_eq!(
+        world.soldier_intent(unit),
+        Some(Some(before.best)),
+        "the unit took the answer of its bucket, and not the answer of its need"
+    );
+}
+
+/// One cell answers once for every unit that shares a bucket.
+///
+/// This is the cost claim made checkable. The record states that the deciding
+/// work follows the lattice and that the population cannot raise it, and it
+/// also states that nothing enforces the claim.[^1] [^2] The scored count is
+/// the part of it a test can hold.
+///
+/// # References
+///
+/// [^1]: ADR-0096, cost follows the lattice, not the population, and a unit is a reader, decisions D1 and D4. `docs/adrs/draft/adr-0096-cost-follows-the-lattice-not-the-population.md`
+/// [^2]: ADR-0098, the choice is decided for each cell and each bucket of need, decision D3. `docs/adrs/draft/adr-0098-the-choice-is-decided-for-each-cell-and-each-bucket-of-need.md`
+#[test]
+fn a_cell_answers_once_for_every_unit_that_shares_a_bucket() {
+    let world = one_cell_world();
+    let home = first_open_address(&world);
+    let summary = world.summary_covering(home).expect("the cell exists");
+    let profile = choose::WeightProfile::EVEN;
+
+    // Every bucket, read from the inside first and read many times over.
+    //
+    // **The first reader of a bucket must not stand at its lower bound.** A
+    // table that scored the exact need of the first reader, and then memoised
+    // that answer, would agree with a table that scored the bucket at every
+    // need the lower bound reaches. The expected answer is therefore computed
+    // beside the table and never read back out of it.[^1]
+    //
+    // [^1]: Testing rules, section 2a. `.claude/rules/testing.md`
+    let mut full = choose::CellAnswers::new(summary);
+    let inset = 1 << (choose::NEED_BUCKET_SHIFT - 1);
+    let mut divergent = 0;
+    for round in 0..8 {
+        for bucket in 0..choose::NEED_BUCKET_COUNT - 1 {
+            let lower = choose::bucket_need(bucket);
+            let inside = Fix32(lower.0 + inset + round);
+            let expected = choose::best_option(lower, summary, &profile);
+            if round == 0 && choose::best_option(inside, summary, &profile) != expected {
+                divergent += 1;
+            }
+            assert_eq!(
+                full.answer(inside, &profile),
+                expected,
+                "a need inside a bucket must read the answer of the lower bound of that bucket"
+            );
+        }
+    }
+    assert!(
+        divergent > 0,
+        "the fixture must reach a bucket whose inside answers differently from its lower bound"
+    );
+    assert_eq!(
+        full.scored_count(),
+        choose::NEED_BUCKET_COUNT - 1,
+        "the deciding work of a cell has a ceiling that the reader count cannot raise"
+    );
+
+    // Many readers, one bucket. The table scores once.
+    let mut shared = choose::CellAnswers::new(summary);
+    let step = 1 << (choose::NEED_BUCKET_SHIFT - 4);
+    for offset in 0..16 {
+        shared.answer(Fix32(offset * step), &profile);
+    }
+    assert_eq!(
+        shared.scored_count(),
+        1,
+        "sixteen units of one bucket must cost one answer"
+    );
+}
