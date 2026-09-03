@@ -264,6 +264,66 @@ the choice stagger all scale with the cell count. **A figure here that named no
 block edge would not be reproducible**, which is why this section exists. The
 sensitivity is not measured.
 
+## Would the choice pass collapse if it decided for each cell?
+
+One weight profile serves every unit alive, so two units in the same level 1
+cell with the same need score the same options and choose alike. A pass that
+decided once for each distinct pair of cell and need would do that much less
+work. The collapse factor is the live unit count divided by the number of
+distinct pairs.
+
+**Read the caution before the numbers.** The measurement below does not test
+the premise it was built to test.
+
+16,777,216 tiles, 1,000,000 units, block edge 32, so 16,384 level 1 cells
+exist. Machine A. Every figure comes through the public crate interface.
+
+| Placement | Cells occupied | Units for each cell | Median cell | Biggest cell | Distinct pairs | Collapse |
+|---|---|---|---|---|---|---|
+| Packed | 1,351 | 740.2 | 916 | 1,113 | 1,351 | 740.2 |
+| Scattered | 14,970 | 66.8 | 64 | 430 | 14,970 | 66.8 |
+
+**The distinct pair count equals the cell count exactly, at every bucket width
+including the exact need.** The reason is that the need column holds **one
+value**, 65536, which is one in the fixed point scale, for all 1,000,000
+units, under both placements.
+
+**So this measures the cell count and says nothing about the need.** The
+measured world holds no settlement, so no unit has a home to draw from and
+consumption never moves a need away from the value a unit spawns with. The
+figures above are the collapse a world would show **if every unit held the
+same need**, which is the best case and not a prediction.
+
+**What the numbers do establish.** The geometry gives 14,970 occupied cells
+for 1,000,000 units at the density the project states, so **66.8 is the
+ceiling on the collapse factor** and no need distribution can beat it. The
+packed figure of 740.2 is a property of a fixture that puts the whole
+population into 8 percent of the cells, and it is not a figure about the
+engine.
+
+**What decides where the real answer falls.** A cell holds 64 units at the
+median under the scattered pattern. The distinct pairs in a cell are the
+smaller of the units in it and the number of need values those units take, so
+the collapse in the median cell is about 64 divided by the number of need
+buckets in play.
+
+| Need buckets in a cell | Collapse at the median cell |
+|---|---|
+| 1 | 64 |
+| 4 | 16 |
+| 16 | 4 |
+| 64 | 1 |
+
+**The need is a Q16.16 quantity and takes about four thousand million
+values.** So the bucket width is not a detail of the rule. It is the
+mechanism. Unbucketed, the collapse is 1 and the rule buys nothing.
+
+**What nobody has measured.** How many need values coexist in one cell in a
+world that consumes. No fixture in this project produces one: it needs
+settlements, home sites and a running economy, and the benchmark world has
+none of the three. That measurement is the one the rule rests on, and this run
+did not take it.
+
 ## Where the unit cost goes
 
 The unit passes are 274 milliseconds of a 521 millisecond frame at the target

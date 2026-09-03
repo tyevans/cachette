@@ -859,6 +859,53 @@ value in two places with nothing failing when they disagree. Here the second
 place was a safeguard that did not cover the first, and the register asserted
 that it did.
 
+### FND-255 — The collapse measurement measured the cell count, because every unit holds the same need
+
+**Believed:** counting the distinct pairs of level 1 cell and need against the
+live unit count would say how far a choice pass collapses if it decided for
+each cell rather than for each unit.
+
+**True:** the count returned a pair count exactly equal to the cell count, at
+every bucket width including the exact need, under both placement patterns.
+**The need column holds one value for all 1,000,000 units.** It is 65536,
+which is one in the fixed point scale, and it is the value a unit spawns with.
+
+The measured world holds no settlement, so no unit has a home to draw from and
+consumption never moves a need. The measurement therefore reports the units
+for each cell and nothing about the need.
+
+**What it does establish.** The geometry gives 14,970 occupied cells of 16,384
+for 1,000,000 units at the density the project states, so **66.8 is a ceiling
+on the collapse factor** and no need distribution can beat it. The packed
+figure of 740.2 is a property of a fixture that puts the whole population into
+8 percent of the cells.
+
+**What decides the real answer.** A cell holds 64 units at the median under
+the scattered pattern. The distinct pairs in a cell are the smaller of the
+units in it and the need values they take, so the collapse in the median cell
+is about 64 divided by the number of need buckets. At 4 buckets it is 16, at
+16 buckets it is 4, and at 64 buckets it is 1. **The need is a Q16.16 quantity
+and takes about four thousand million values, so unbucketed the collapse is 1
+and the rule buys nothing.** The bucket width is the mechanism, not a detail.
+
+**Evidence:** the register holds every row, both placements and all six bucket
+widths.[^F222] The counts come through the public crate interface, and the
+engine gained no instrumentation: the live units, the tile of a unit, the need
+of a unit and the block layout are all public. The pairs pack into one word
+and the count is a sort and a scan, so no hash iteration order reaches the
+result.
+
+**Follows:** the record must not carry a collapse figure from this run. The
+number it needs is how many need values coexist in one cell in a world that
+consumes, and no fixture in this project produces one, because that needs
+settlements, home sites and a running economy. **A ceiling of 66.8 and an
+unmeasured floor of 1 is what this run supports.**
+
+**This is the third fixture defect this benchmark has produced in one
+session.** The first packed the population into a band, the second placed 76
+percent of the units it was asked for, and this one measured a column that
+never changes. Each was found by looking at a number that was too clean.
+
 ### FND-017 — A decision costs 4.1 nanoseconds, not 400
 
 The needs report assumed random gathers. They are sequential, because units
