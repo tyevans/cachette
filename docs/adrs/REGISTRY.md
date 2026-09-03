@@ -192,7 +192,7 @@ without stating a constraint is worse than no record.
 | 0018 | The unit-to-tile bridge is derived, and it rebuilds at the barrier | Accepted | 0012 | 01, 02 |
 | 0019 | Change detection is per chunk, never per entity | Proposed | 0012 | 01, 02 |
 | 0020 | Structural change batches at the barrier and applies by tombstone and compact | Proposed | 0001, 0012 | 01 |
-| 0021 | Layout follows the access pattern | Proposed | 0012 | 01 |
+| 0021 | A layout claim names one structure and one pass, and never a tier | Draft | 0012, 0054, 0066 | `draft/adr-0021-layout-follows-the-access-pattern.md` |
 | 0066 | Entity storage holds four fixed shapes | Accepted | 0012, 0020 | 01, 05 |
 | 0090 | A tile upgrade is stored sparsely, as the difference from the generated world | Draft | 0012, 0015, 0056, 0066, 0068, 0072, 0074 | `draft/adr-0090-a-tile-upgrade-is-stored-sparsely.md` |
 
