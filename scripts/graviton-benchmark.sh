@@ -2,10 +2,10 @@
 # Measures the cost of a frame on the target platform.
 #
 # The project targets AWS Graviton, and the primary target triple is
-# aarch64-unknown-linux-gnu. Every cost figure in this project is derived
-# rather than measured, because no measurement exists on the target. This
-# script takes one. It launches a Graviton instance, copies the working tree
-# to it, builds the benchmark, runs it, brings the output back, and destroys
+# aarch64-unknown-linux-gnu. Most cost figures in this project are derived
+# rather than measured. This script takes a measurement. It launches a
+# Graviton instance, copies the working tree to it, builds the benchmark,
+# runs it, brings the output back, and destroys
 # everything it made.
 #
 # Read `docs/reference/graviton-costs.md` for the figures a run produced, and

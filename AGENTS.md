@@ -6,7 +6,12 @@ plane is Python.
 The engine simulates a hex world at three levels of detail. Level 0 holds
 individual tiles and units. Level 1 summarises blocks of tiles at city
 scale. Level 2 summarises blocks of level 1 cells at region scale. Level 0
-is the only source of truth. Level 1 and level 2 are derived projections.
+is the only source of truth. A summarised level is a derived projection.
+
+**Level 2 does not exist. The pyramid holds one derived level.** Read the
+three levels as the target, and read the code for what is built. A reader
+who takes the paragraph above for the code plans against a level that
+nothing writes.
 
 The target scale is 16.7 million tiles and one million units.
 
@@ -173,10 +178,16 @@ links. Convert them before you extend them.
 the list. A register does not decay; a summary does. This section held a
 summary once, it went stale, and the finding records what that cost.[^3]
 
-Every question the project owner owned is answered. The scale constants
-table holds the values.[^13] One blocker stays open, and engineering owns
-it: no measurement exists on the target platform, so every cost figure in
-this project is derived.
+**One blocker the project owner owns is open, and it narrowed twice on 3
+September 2026.** A unit builds only on ground that its own faction holds.
+Anyone may destroy an upgrade, and destruction takes work, but an instant
+removal stays available to the control plane. One question stays open:
+whether an upgrade changes hands when the ground does. Every other owner
+question is answered, and the scale constants table holds the values.[^13]
+
+A benchmark now runs on the target platform, and a register holds what it
+measured.[^14] Most cost figures are still derived, and the blocker that
+says which stays open.
 
 ## References
 
@@ -193,3 +204,4 @@ this project is derived.
 [^11]: The record check. `scripts/check-adrs.sh`
 [^12]: Blockers register. `docs/BLOCKERS.md`
 [^13]: Budgets and costs, the scale constants. `docs/reference/budgets.md`
+[^14]: Target platform costs. `docs/reference/graviton-costs.md`
