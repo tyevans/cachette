@@ -177,6 +177,93 @@ threads and it was still improving at 12.
 statement about a smaller population, and the measured world held no
 settlement, so the unit half is a lower bound rather than the whole of it.
 
+## How the units are placed, and why it changes every unit figure
+
+**Every unit figure above and below was taken with the units packed.** The
+pattern walks the world from the first tile and puts one unit on each tile
+that admits one. At 1,000,000 units on a 4096-wide grid that fills a band
+across the top of the map at one unit for each tile, and leaves the rest of
+the world empty.
+
+**That is about seventeen times denser than the target scale describes.** One
+million units over 16,777,216 tiles is one unit for each seventeen tiles.
+
+A second pattern spreads the units over the whole world at a stride, at the
+density the scale constants imply. The table below runs the same frame under
+both, in one process, on one machine, from one build, so the difference
+between two rows is the placement and nothing else.
+
+16,777,216 tiles, 1,000,000 units, machine A.
+
+| Threads | Packed, ns | Scattered, ns | Scattered over packed |
+|---|---|---|---|
+| 1 | 1,882,832,969 | 2,667,755,464 | 1.42 |
+| 2 | 1,138,817,995 | 1,678,469,907 | 1.47 |
+| 4 | 773,662,530 | 1,190,655,363 | 1.54 |
+| 12 | 526,225,993 | 835,171,248 | 1.59 |
+
+Take the tile pass out and compare the unit cost alone.
+
+| Threads | Unit cost packed, ms | Unit cost scattered, ms | Ratio |
+|---|---|---|---|
+| 1 | 578.5 | 1,363.4 | 2.36 |
+| 2 | 422.5 | 962.2 | 2.28 |
+| 4 | 329.5 | 746.5 | 2.27 |
+| 12 | 278.5 | 587.5 | 2.11 |
+
+**A unit costs about twice as much when the population sits at the density the
+project describes.** At 12 threads it is 279 ns packed and 587 ns scattered.
+
+**Read every packed figure in this document as a lower bound on the unit
+cost.** A frame at the target scale costs 835 milliseconds at 12 threads under
+the scattered pattern, which is 8.4 times the budget, against 526 and 5.3
+times under the packed one.
+
+**The shape of the thread scaling survives the change.** The unit passes reach
+2.08 times on 12 threads under the packed pattern and 2.32 under the
+scattered one. Both scale badly, so the conclusion that the budget is out of
+reach does not depend on the placement. The level does.
+
+**The memory does not move.** At 12 threads a packed world holds 875,782,144
+bytes and a scattered one holds 875,999,232, which is one part in four
+thousand.
+
+## The thread count moves the memory
+
+Every memory row in this document was taken at one thread, and the thread
+count is not free.
+
+| Threads | Resident, bytes | Peak, bytes |
+|---|---|---|
+| 1 | 545,161,216 | 871,923,712 |
+| 2 | 571,658,240 | 898,244,608 |
+| 12 | 875,782,144 | 956,690,432 |
+
+**A world at the target scale holds 545 MB at one thread and 876 MB at 12.**
+The step gives each thread its own output slot, so the resident size grows
+with the thread count. A memory figure that does not name a thread count is
+not usable.
+
+**The peak moves much less**, from 872 MB to 957 MB. The peak is set by the
+build, which runs at one thread whatever the caller asks for. A machine needs
+about 960 MB free to build and step a world at the target scale.
+
+## The block edge
+
+**Every figure in this document was taken at a block edge of 32 tiles**, which
+gives 16,384 level 1 cells at the target extent. The benchmark passes no block
+edge, so a world takes the default that the bridge states.[^11]
+
+The value is a default rather than a decision, and the constant says so in its
+own documentation: the record that fixes the tile storage order is not
+written, so the layout takes the exponent as a parameter, and a research
+report recommends 32 tiles.[^11]
+
+The level 1 cell count moves with this value, and the rebuild, the summary and
+the choice stagger all scale with the cell count. **A figure here that named no
+block edge would not be reproducible**, which is why this section exists. The
+sensitivity is not measured.
+
 ## Where the unit cost goes
 
 The unit passes are 274 milliseconds of a 521 millisecond frame at the target
@@ -339,8 +426,9 @@ thread, two frames run before the reading.
 | 16,777,216 | 100,000 | 2,015,232 | 463,851,520 | 721,616,896 |
 | 16,777,216 | 1,000,000 | 2,121,728 | 545,161,216 | 871,923,712 |
 
-**A world at the target scale holds 545 MB.** That is 16,777,216 tiles and
-1,000,000 units, and no settlement and no character.
+**A world at the target scale holds 545 MB at one thread.** That is
+16,777,216 tiles and 1,000,000 units, and no settlement and no character. The
+same world holds 876 MB at 12 threads, and a section below holds the rows.
 
 **The tiles are the cost, and the units are not.** The same world with no unit
 holds 456 MB, so the whole population of one million adds 89 MB. A tile costs
@@ -348,10 +436,10 @@ holds 456 MB, so the whole population of one million adds 89 MB. A tile costs
 
 **A tile costs 27 bytes even though the ground is generated.** Two records
 state that a tile field is a generated base with only the change stored, and
-that a tile stock is generated with only what was taken stored.[^11] [^12]
+that a tile stock is generated with only what was taken stored.[^12] [^13]
 Both hold: nothing here stores a tile value or a stock. The 27 bytes are the
 columns the world does allocate for each tile, and one proposed item already
-names the holder column as one of them.[^13]
+names the holder column as one of them.[^14]
 
 **Building the world needs 872 MB, not 545 MB.** The peak is 60 percent above
 the resident size at every large row. A machine sized to hold the world will
@@ -369,7 +457,7 @@ time, built with the overflow check on, and it passed.
 
 The check is not on in the rows above. The bench profile inherits the release
 profile, which carries no overflow check, so a wrap in any row above would
-have wrapped in silence.[^14] The check costs time, so the checked run is a
+have wrapped in silence.[^15] The check costs time, so the checked run is a
 separate build and gives no timing row. A timing row taken under it would
 measure the check.
 
@@ -411,7 +499,7 @@ has explained why.** One thread costs 426 ns for each tile, two threads cost
 78 ns for each tile at every thread count. Nine samples produced a spread
 under one fifth in each row, and the pattern repeated on both machines, so it
 is not noise and it is not one instance. A backlog item holds the
-question.[^15] Do not cite the 4,096-tile rows.
+question.[^16] Do not cite the 4,096-tile rows.
 
 **The small extents lose from a high thread count, and that is ordinary.**
 At 65,536 tiles a frame costs more at 16 threads than at 2. The step starts
@@ -466,16 +554,16 @@ machine A. The constructor rebuilds the first pyramid level at one thread, so
 the build is serial and the size of the machine does not reach it.
 
 The tile value field generates a tile and stores nothing, so it visits no
-tile.[^11] The first level of the pyramid does visit every tile, and the
+tile.[^12] The first level of the pyramid does visit every tile, and the
 constructor rebuilds it. A proposed backlog item holds that pass and names the
-two shapes that would remove it.[^13]
+two shapes that would remove it.[^14]
 
 **Reserving a million unit slots costs nothing that this run could see.** A
 build at the target extent with the default reservation took a median of
 4,637,235,543 ns, against 4,636,309,563 ns with a reservation of 1024. The
 difference is one part in five thousand, and it is inside the spread of both
 rows. The reservation record states that the cost is paid once, at
-construction, and that the cost of a tick does not grow with it.[^16] This run
+construction, and that the cost of a tick does not grow with it.[^17] This run
 gives the first measured support for the first half of that claim.
 
 ## The hash of the whole world
@@ -553,9 +641,10 @@ commit what changed. Do not edit a row to make a later run agree with it.
 [^8]: ADR-0001, one binary gives one answer at any thread count, decision D5. `docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
 [^9]: ADR-0001, one binary gives one answer at any thread count, decision D4. `docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
 [^10]: Blockers register, BLK-012, the resolution. `docs/BLOCKERS.md`
-[^11]: ADR-0088, a tile field is a generated base and a stored change. `docs/adrs/draft/adr-0088-a-tile-field-is-a-generated-base-and-a-stored-change.md`
-[^12]: ADR-0072, a tile stock is generated, and only what was taken is stored. `docs/adrs/accepted/adr-0072-a-tile-stock-is-generated-and-only-what-was-taken-is-stored.md`
-[^13]: Backlog item 0171. `docs/backlog/proposed/0171-build-the-first-level-without-a-pass-over-every-tile.md`
-[^14]: ADR-0083, the gate build checks every integer overflow. `docs/adrs/draft/adr-0083-the-gate-build-checks-every-integer-overflow.md`
-[^15]: Backlog item 0229. `docs/backlog/proposed/0229-explain-the-frame-cost-at-the-smallest-extent.md`
-[^16]: ADR-0084, the world reserves the unit columns at construction, decision D3. `docs/adrs/draft/adr-0084-the-world-reserves-the-unit-columns-at-construction.md`
+[^11]: The block edge default. `crates/cachette-core/src/bridge.rs`
+[^12]: ADR-0088, a tile field is a generated base and a stored change. `docs/adrs/draft/adr-0088-a-tile-field-is-a-generated-base-and-a-stored-change.md`
+[^13]: ADR-0072, a tile stock is generated, and only what was taken is stored. `docs/adrs/accepted/adr-0072-a-tile-stock-is-generated-and-only-what-was-taken-is-stored.md`
+[^14]: Backlog item 0171. `docs/backlog/proposed/0171-build-the-first-level-without-a-pass-over-every-tile.md`
+[^15]: ADR-0083, the gate build checks every integer overflow. `docs/adrs/draft/adr-0083-the-gate-build-checks-every-integer-overflow.md`
+[^16]: Backlog item 0229. `docs/backlog/proposed/0229-explain-the-frame-cost-at-the-smallest-extent.md`
+[^17]: ADR-0084, the world reserves the unit columns at construction, decision D3. `docs/adrs/draft/adr-0084-the-world-reserves-the-unit-columns-at-construction.md`

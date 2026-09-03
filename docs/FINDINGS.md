@@ -638,6 +638,11 @@ has no floor in the range measured and reached 6.13 on 16 threads.
 milliseconds on this engine, whatever the core count.** The budget is 100
 milliseconds. No machine reaches it.
 
+**That floor is about twice as high as this entry says.** Every figure here
+was taken with the units packed into a band, and FND-245 shows a unit costs
+about twice as much at the density the project states. The conclusion holds
+under both patterns and the level does not.
+
 **Evidence:** the target platform register holds both runs, the machines, the
 commits and every row.[^F222] The unit half is the difference between a world
 of 1,000,000 units and a world of none, at 4,194,304 tiles, taken at five
@@ -663,7 +668,7 @@ only its change is stored. A derivation put the total at one to three
 gigabytes.
 
 **True:** a world of 16,777,216 tiles and 1,000,000 units holds **545 MB
-resident**. The same world with no unit holds 456 MB, so the whole population
+resident at one thread**, and 876 MB at 12. FND-246 holds the thread rows. The same world with no unit holds 456 MB, so the whole population
 of one million adds 89 MB. **A tile costs 27 bytes and a unit costs 89 bytes.**
 The tiles are five sixths of the total.
 
@@ -754,6 +759,70 @@ been optimised. Something must make the stages separable before the largest
 part of the unit cost can be worked on. Backlog item 0229 already asks for a
 stage measurement and names the constraint that a clock must not enter the
 engine.
+
+### FND-245 — The placement of the units doubles the cost of a frame
+
+**Believed:** the benchmark measured the engine at the target scale. The
+fixture placed the units by walking the world from the first tile and filling
+each tile that admits one.
+
+**True:** that pattern packs 1,000,000 units into a band across the top of the
+map at one unit for each tile, and leaves the rest of the world empty. It is
+about seventeen times denser than the target scale describes, because one
+million units over 16,777,216 tiles is one unit for each seventeen tiles.
+
+**A unit costs about twice as much at the density the project states.** The
+same frame, in one process on one machine from one build, under two placement
+patterns:
+
+| Threads | Unit cost packed, ms | Unit cost scattered, ms | Ratio |
+|---|---|---|---|
+| 1 | 578.5 | 1,363.4 | 2.36 |
+| 2 | 422.5 | 962.2 | 2.28 |
+| 4 | 329.5 | 746.5 | 2.27 |
+| 12 | 278.5 | 587.5 | 2.11 |
+
+**Evidence:** the register holds both patterns at every thread count.[^F222]
+
+**Follows:** every packed unit figure in the register is a lower bound. A frame
+at the target scale costs 835 milliseconds at 12 threads at the stated
+density, which is 8.4 times the budget, against 526 and 5.3 times packed.
+
+**The shape survives and the level does not.** The unit passes scale to 2.08
+on 12 threads packed and 2.32 scattered, so the conclusion in FND-224 that the
+budget is out of reach holds under both. The floor is about twice as high as
+that entry says.
+
+**The memory does not move**, at one part in four thousand between the two
+patterns.
+
+**This is the shape the testing rule names, found in a benchmark rather than
+in a test.** The rule says to ask what distribution the work needs rather than
+to copy a convenient world, and to put the defect back and watch the test stay
+green. Nobody asked it of this benchmark, and the fixture was chosen because
+it was easy to write.
+
+### FND-246 — A memory figure without a thread count is not usable
+
+**Believed:** a world at the target scale holds 545 MB. FND-225 states it and
+the register stated it without naming a thread count.
+
+**True:** 545 MB is the figure at one thread. The same world holds 572 MB at
+two threads and 876 MB at 12. The step gives each thread its own output slot,
+so the resident size grows with the thread count by about 30 MB for each
+thread.
+
+**The peak moves much less**, from 872 MB at one thread to 957 MB at 12,
+because the peak is set by the build and the build runs at one thread whatever
+the caller asks for.
+
+**Evidence:** the register holds the three rows.[^F222] Each was measured by a
+process that built one world and exited.
+
+**Follows:** a machine needs about 960 MB free to build and step a world at
+the target scale, not 545 MB. The conclusion of FND-225 does not change: the
+tiles still hold the memory and the units still do not, and both figures move
+together with the thread count.
 
 ### FND-017 — A decision costs 4.1 nanoseconds, not 400
 
