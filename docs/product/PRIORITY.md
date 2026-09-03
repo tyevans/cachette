@@ -50,6 +50,9 @@ A record here is a need, not a plan. The backlog says what work answers it.[^3]
 | 0010 | Goods moving. Nothing holds a surplus until production and consumption run. |
 | 0001 | A faction sees only what it observes. Wants a reason to hide anything. |
 | 0004 | Weather. Wants a world whose inhabitants care about it. |
+| 0024 | A run stays eventful. It sits here because it states an outcome that 0013, 0018 and 0020 produce between them, so it cannot be worked before they are. It is the record that says whether they were enough. |
+| 0022 | A caller can name the people the world holds. It sits here because it is small and blocks an audience the engine already claims: an agent cannot be attached to anybody the founding seated. |
+| 0023 | An observer reads what happened near a place. It sits below 0022 because a caller with no identities has nobody to read around, and because the whole log still answers the question at the scale anybody runs today. |
 
 ## References
 

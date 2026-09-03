@@ -55,6 +55,9 @@ documents cite it.
 | 0019 | An agent can ask the running engine what it holds | Shaped | Repository agent | `shaped/prd-0019-an-agent-can-ask-the-running-engine-what-it-holds.md` |
 | 0020 | A unit goes somewhere it cannot see | Shaped | Game developer | `shaped/prd-0020-a-unit-goes-somewhere-it-cannot-see.md` |
 | 0021 | A developer can use the control plane without reading its source | Accepted | Game developer | `accepted/prd-0021-a-developer-can-use-the-control-plane-without-reading-its-source.md` |
+| 0022 | A caller can name the people the world holds | Idea | AI researcher | `idea/prd-0022-a-caller-can-name-the-people-the-world-holds.md` |
+| 0023 | An observer reads what happened near a place | Idea | AI researcher | `idea/prd-0023-an-observer-reads-what-happened-near-a-place.md` |
+| 0024 | A run stays eventful for as long as it is watched | Idea | AI researcher | `idea/prd-0024-a-run-stays-eventful-for-as-long-as-it-is-watched.md` |
 
 ## What does not belong in a record
 
