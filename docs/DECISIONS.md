@@ -23,9 +23,61 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^ALLOC]
 
-**Next number: DEC-097**
+**Next number: DEC-106**
 
 ## Open
+
+### DEC-105 — Is the memory-for-speed trade now open, and does ADR-0088 still hold?
+
+**Open. A reviewer owns it, with the project owner. It governs the frame budget
+work.**
+
+**The premise under several accepted decisions is measured and it was wrong.**
+A world at the target scale holds 876 MB resident at 12 threads and peaks at
+957 MB. The measured machine holds 32 GB. The engine uses about three percent
+of the target machine and misses the frame budget by a factor of five.[^DEC105A]
+[^DEC105B]
+
+**The split says where the room is.** The same world with no unit holds 456 MB,
+so a population of one million adds 89 MB. A tile costs 27 bytes and a unit
+costs 89 bytes. Nothing the engine holds is close to the machine.
+
+**One accepted record spends time to save space, and says so.** It states that
+a tile field is a generated base and a stored change, and that building the
+field visits no tile and allocates nothing for it.[^DEC105C] That record is
+sound as written. It was written when every cost figure in this project was
+derived, and the derivation that made space the scarce quantity is the one the
+benchmark contradicts.
+
+**Option A. Open the trade, and treat the records one at a time.** State that
+space is not the scarce resource at the target scale, and let each field
+decide. This does not overturn any record by itself. It changes what a new
+record must argue: a choice that spends time to save space now needs a reason
+beyond the size of the tile count.
+
+**Option B. Supersede the generated-base record.** Decide that a tile field is
+stored, and keep generation only where a measurement shows it wins. This is the
+larger move and it discards a property that the record earns: a build that
+visits no tile. That property serves a product requirement that the build still
+fails for other reasons.
+
+**Option C. Leave it. Reduce memory first, then spend it.** Refuse the trade
+until the engine meets the frame budget by other means. This keeps every record
+as written and forgoes the cheapest measured wins.
+
+**Recommendation: A.** B decides a general question from four specific cases,
+and the four cases can be argued on their own merits under A. C is the option
+that costs something real, because three of the four candidate trades cost under
+70 MB each against 31 GB of unused memory.
+
+**What A does not decide.** It does not say any particular field changes shape.
+Each of those is a record or an item, and each must measure the trade rather
+than assume it. A change that spends 67 MB and saves nothing is worse than no
+change, because it also costs the reader an explanation.
+
+**Revisit when** a measurement shows a world at the target scale that holds
+settlements and characters, since every memory figure the project holds is a
+lower bound taken on a world that holds neither.[^DEC105B]
 
 ### DEC-088 — What share of its own cell must a tile keep before the window gives room to a gap?
 
@@ -2432,3 +2484,6 @@ a failed founding is correct.[^PRD12]
 [^DEC96A]: ADR Registry, the retcon window. `docs/adrs/REGISTRY.md`
 [^DEC96B]: Findings register, FND-218. `docs/FINDINGS.md`
 [^DEC96C]: ADR-0096, cost follows the lattice, not the population, and a unit is a reader, decision D4. `docs/adrs/draft/adr-0096-cost-follows-the-lattice-not-the-population.md`
+[^DEC105A]: Target platform costs, the resident memory rows. `docs/reference/graviton-costs.md`
+[^DEC105B]: Blockers register, BLK-007. `docs/BLOCKERS.md`
+[^DEC105C]: ADR-0088, a tile field is a generated base and a stored change, decision D1. `docs/adrs/draft/adr-0088-a-tile-field-is-a-generated-base-and-a-stored-change.md`
