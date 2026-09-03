@@ -44,6 +44,17 @@
 //! known when the crate is compiled. It says how much of the row above it that
 //! one step accounts for.
 //!
+//! **`cell_derived_by_a_multiply`** and `cell_derived_by_a_shift` reach the
+//! cell without a division and without storing anything. The first replaces
+//! the division by a reciprocal that the grid computes once, and it holds for
+//! any width. The second replaces it by a mask and a shift, and it holds only
+//! for a width that is a power of two, so the row is skipped for any other
+//! world. Both are checked against the division on every unit before they are
+//! timed, so a row that measured a wrong answer cannot be reported.
+//!
+//! Four routes to one cell are therefore priced against one another: a
+//! division, a multiply, a shift, and a stored column.
+//!
 //! # What it does not measure
 //!
 //! It does not run a frame. The lookup rows hold the lookup and nothing else,
@@ -117,14 +128,23 @@ fn now() -> Instant {
     Instant::now()
 }
 
-fn main() {
-    let arguments: Vec<String> = std::env::args().skip(1).collect();
-    let (width, height) = arguments
+/// Reads a `WIDTHxHEIGHT` word from the arguments.
+fn extent_argument(arguments: &[String]) -> (u32, u32) {
+    arguments
         .first()
         .and_then(|word| word.split_once('x'))
         .map_or((512, 512), |(width, height)| {
             (width.parse().unwrap_or(512), height.parse().unwrap_or(512))
-        });
+        })
+}
+
+fn main() {
+    let arguments: Vec<String> = std::env::args().skip(1).collect();
+    if arguments.first().map(String::as_str) == Some("frame") {
+        frame_rows(&arguments[1..]);
+        return;
+    }
+    let (width, height) = extent_argument(&arguments);
     let units: u32 = arguments
         .get(1)
         .and_then(|word| word.parse().ok())
@@ -324,6 +344,151 @@ fn main() {
         elapsed
     });
     report("address_of_the_tile_alone", &samples);
+
+    // The third option. The division is by the world width, which is fixed
+    // when the grid is built and read a million times in a frame. A
+    // reciprocal computed once turns each division into a multiply and a
+    // shift, and it needs no second copy of the cell of a unit.
+    //
+    // **The reciprocal is exact, and it is exact by construction rather than
+    // by test.** For `m = floor(2^64 / d) + 1` and `e = m * d - 2^64`, the
+    // identity `floor(n * m / 2^64) = floor(n / d)` holds for every `n` with
+    // `e * n < 2^64`. Here `e` is at most the width and `n` is below the tile
+    // count, and both are inside a `u32`, so the product is below `2^64` for
+    // every tile of every world this crate can build. The assertion below
+    // checks the identity on the real data as well.
+    let magic = reciprocal(width);
+    for (tile, _) in &work {
+        assert_eq!(
+            cell_by_a_multiply(*tile, magic, width, blocks_wide, bits),
+            layout
+                .key_of(TileIdx(*tile))
+                .map_or(0, |key| layout.block_of_key(key)),
+            "the reciprocal must name the cell the division names"
+        );
+    }
+
+    let samples = samples_of(|| {
+        let start = now();
+        let mut sum = 0u64;
+        for (tile, option) in &work {
+            let cell = cell_by_a_multiply(*tile, magic, width, blocks_wide, bits);
+            sum += u64::from(field.exit(cell, *option).flatten().unwrap_or(NO_EXIT));
+        }
+        let elapsed = start.elapsed().as_nanos();
+        std::hint::black_box(sum);
+        elapsed
+    });
+    report("cell_derived_by_a_multiply", &samples);
+
+    // The other route. A width that is a power of two makes the remainder a
+    // mask and the quotient a shift, with no reciprocal at all. It applies
+    // only to a world whose width is already a power of two, and the row is
+    // skipped otherwise, because a row that quietly measured something else
+    // would be worse than no row.
+    if width.is_power_of_two() {
+        let width_bits = width.trailing_zeros();
+        for (tile, _) in &work {
+            assert_eq!(
+                cell_by_a_shift(*tile, width_bits, blocks_wide, bits),
+                layout
+                    .key_of(TileIdx(*tile))
+                    .map_or(0, |key| layout.block_of_key(key)),
+                "the shift must name the cell the division names"
+            );
+        }
+        let samples = samples_of(|| {
+            let start = now();
+            let mut sum = 0u64;
+            for (tile, option) in &work {
+                let cell = cell_by_a_shift(*tile, width_bits, blocks_wide, bits);
+                sum += u64::from(field.exit(cell, *option).flatten().unwrap_or(NO_EXIT));
+            }
+            let elapsed = start.elapsed().as_nanos();
+            std::hint::black_box(sum);
+            elapsed
+        });
+        report("cell_derived_by_a_shift", &samples);
+    } else {
+        println!("# the width is not a power of two, so the shift row is skipped");
+    }
+}
+
+/// Times whole frames, so that a saving has a denominator.
+///
+/// The rows above hold one loop each and no frame. A share of a loop is not a
+/// share of a frame, and the shape of a frame in this engine changes as the
+/// stages are worked on. This row is the only figure here that a saving may be
+/// stated against.
+fn frame_rows(arguments: &[String]) {
+    let (width, height) = extent_argument(arguments);
+    let units: u32 = arguments
+        .get(1)
+        .and_then(|word| word.parse().ok())
+        .unwrap_or(10_000);
+    let threads: usize = arguments
+        .get(2)
+        .and_then(|word| word.parse().ok())
+        .unwrap_or(1);
+
+    let config = WorldConfig {
+        width,
+        height,
+        seed: SEED,
+        faction_count: FACTIONS,
+        unit_capacity: units.max(1024),
+    };
+    let mut world = World::new(config).expect("the extent must describe a world");
+    let placed = populate_scattered(&mut world, units);
+    for _ in 0..WARMUP_FRAMES {
+        world.step(threads).expect("the step must run");
+    }
+
+    println!("# whole frames, which is the denominator of every saving above");
+    println!("# target_triple\t{}", target_triple());
+    println!("# units_placed\t{placed}");
+    println!("# threads\t{threads}");
+    println!("# every duration is in nanoseconds");
+    println!("bench\tsamples\tmin_ns\tmedian_ns\tmax_ns");
+
+    let samples = samples_of(|| {
+        let start = now();
+        let log = world.step(threads).expect("the step must run");
+        let elapsed = start.elapsed().as_nanos();
+        std::hint::black_box(log.len());
+        elapsed
+    });
+    report("frame", &samples);
+}
+
+/// Returns the reciprocal that replaces a division by `divisor`.
+///
+/// The value is `floor(2^64 / divisor) + 1`. A divisor of one needs no
+/// division, and its reciprocal does not fit, so the caller special-cases it
+/// and this function returns zero for it.
+fn reciprocal(divisor: u32) -> u64 {
+    if divisor <= 1 {
+        return 0;
+    }
+    (((1u128 << 64) / divisor as u128) + 1) as u64
+}
+
+/// Returns the cell of a tile, with the division replaced by a multiply.
+fn cell_by_a_multiply(tile: u32, magic: u64, width: u32, blocks_wide: u32, bits: u32) -> u32 {
+    let row = if magic == 0 {
+        tile
+    } else {
+        ((u128::from(tile) * u128::from(magic)) >> 64) as u32
+    };
+    let column = tile - row * width;
+    (row >> bits) * blocks_wide + (column >> bits)
+}
+
+/// Returns the cell of a tile, for a width that is a power of two.
+fn cell_by_a_shift(tile: u32, width_bits: u32, blocks_wide: u32, bits: u32) -> u32 {
+    let row = tile >> width_bits;
+    let column = tile & ((1u32 << width_bits) - 1);
+    (row >> bits) * blocks_wide + (column >> bits)
 }
 
 /// Fills the tile-indexed array by walking the world one row at a time.

@@ -23,10 +23,10 @@ writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
 <<<<<<< HEAD
-**Next number: FND-287**
+**Next number: FND-288**
 =======
-**Next number: FND-275**
->>>>>>> feat-w39
+**Next number: FND-288**
+>>>>>>> feat-w41
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -7523,6 +7523,51 @@ pin can change the channel.** The reasoning that survives is the reasoning
 about what the test proves. The reasoning about what the toolchain permits is
 the part that decayed, and it decayed within one commit of the pin moving.
 
+### FND-287 — Three items competed to optimise under one percent of a frame, and none of them had a denominator
+
+**Believed.** The cost of turning a tile into a cell is worth an item. Three
+shapes were proposed for it: a tile-indexed exit direction, a stored cell index
+on the unit, and an arithmetic replacement for the division.[^F281A] [^F282A]
+Two findings priced the shapes against one another, and both compared a loop to
+a loop.[^F287A] [^F287B]
+
+**True.** None of the three was ever measured against a frame. A frame at the
+target extent costs seconds on the machine that took these figures, and the
+whole conversion is a fraction of one percent of it. **The three shapes were
+ranked correctly against each other and none of them matters.**
+
+**Evidence.** A row that times a whole step was added to the same
+benchmark.[^F287C] At the target extent, with one million units at twelve
+threads, a frame costs a figure in the seconds. The conversion loop that all
+three items address costs a figure in the tens of milliseconds under the same
+load. The share is below one percent whichever end of either spread is taken.
+
+Two further rows say what the frame is made of. **Dropping the population by a
+factor of ten barely moves the frame cost**, so the frame follows the tile count
+and not the population, and every one of these three items is a unit-side
+change. **A frame at one thread costs about twice a frame at twelve**, on a
+machine with sixteen cores, which is the speedup a half-serial pass allows and
+matches the serial stage the stage split names.
+
+The machine carried a load average above thirty on sixteen cores throughout, so
+every absolute figure here is inflated. The share is a ratio of two figures taken
+under that same load, and the ratio is what the finding rests on.
+
+**Follows.** Three things.
+
+**A saving needs a denominator, and a loop is not one.** Both earlier findings
+compared one loop against another loop. That is the right way to rank two
+shapes and it says nothing about whether either is worth building. The ranking
+was sound and the question was not asked.
+
+**Measure the frame before ranking the parts of it.** The benchmark had rows for
+a derivation, a lookup and a write before it had a row for a step. The row that
+would have stopped all three items was the cheapest one to write.
+
+**An item that names a cost should name its share.** All three items opened by
+naming a mechanism and pricing it in bytes or in steps. None of them stated what
+fraction of a frame it stood to win, and none of the reviews of them asked.
+
 ## References
 
 [^F261B]: The holder count test of the viewer. `crates/cachette-view/tests/shows_who_holds_the_ground.rs`
@@ -7532,7 +7577,6 @@ the part that decayed, and it decayed within one commit of the pin moving.
 [^F262B]: ADR-0098, the choice is decided for each cell and each bucket of need, decision D1. `docs/adrs/draft/adr-0098-the-choice-is-decided-for-each-cell-and-each-bucket-of-need.md`
 [^F262D]: Findings register, FND-051 and FND-048, in this document.
 [^F262E]: ADR-0098, the choice is decided for each cell and each bucket of need, the consequences. `docs/adrs/draft/adr-0098-the-choice-is-decided-for-each-cell-and-each-bucket-of-need.md`
-<<<<<<< HEAD
 [^F263A]: Review of ADR-0096, correction 1. The review artefact sits on the branch that holds it, so this branch cannot resolve its path and the citation names it instead.
 [^F263B]: Target platform costs, would the choice pass collapse if it decided for each cell. `docs/reference/graviton-costs.md`
 [^F263C]: The need spread measurement. `crates/cachette-core/tests/need_spread.rs`
@@ -7542,14 +7586,12 @@ the part that decayed, and it decayed within one commit of the pin moving.
 [^F263D]: Decisions register, DEC-097. `docs/DECISIONS.md`
 [^F263E]: Budgets and costs, what belongs here. `docs/reference/budgets.md`
 [^F263F]: Findings register, FND-258, in this document.
-=======
 [^F259A]: Review of ADR-0096, correction 1. The review artefact sits on the branch that holds it, so this branch cannot resolve its path and the citation names it instead.
 [^F259B]: Target platform costs, would the choice pass collapse if it decided for each cell. `docs/reference/graviton-costs.md`
 [^F259C]: The need spread measurement. `crates/cachette-core/tests/need_spread.rs`
 [^F259D]: Decisions register, DEC-097. `docs/DECISIONS.md`
 [^F259E]: Budgets and costs, what belongs here. `docs/reference/budgets.md`
 [^F259F]: Findings register, FND-258, in this document.
->>>>>>> feat-w39
 [^F226A]: Backlog item 0185, steer a step by the option the unit chose. `docs/backlog/complete/0185-steer-a-step-by-the-option-the-unit-chose.md`
 [^F226B]: Backlog item 0186, let the engine order a gather. `docs/backlog/complete/0186-let-the-engine-order-a-gather.md`
 [^F226C]: ADR-0063, a need is a rate with a threshold, and crossing it is a fact, decision D2. `docs/adrs/accepted/adr-0063-a-need-is-a-rate-with-a-threshold-and-crossing-it-is-a-fact.md`
@@ -7810,7 +7852,6 @@ the part that decayed, and it decayed within one commit of the pin moving.
 [^F231C]: The starvation suite of the core. `crates/cachette-core/tests/starvation.rs`
 [^F234A]: Findings register, FND-233, in this document.
 [^F201C]: Findings register, FND-206, in this document.
-<<<<<<< HEAD
 
 [^F281A]: Backlog item 0267, hold the exit direction on the tile. `docs/backlog/complete/0267-hold-the-exit-direction-on-the-tile.md`
 [^F281B]: The exit locality benchmark. `crates/cachette-core/benches/exit_locality.rs`
@@ -7819,6 +7860,7 @@ the part that decayed, and it decayed within one commit of the pin moving.
 [^F282B]: Findings register, FND-252, in this document.
 [^F282C]: The grid address conversion. `crates/cachette-core/src/hex.rs`
 [^F282D]: Backlog priority index. `docs/backlog/PRIORITY.md`
+<<<<<<< HEAD
 [^F262A]: Project orientation, hard invariants 2 and 4. `CLAUDE.md`
 [^F262B]: ADR-0041, a crate split enforces the boundary at compile time. `docs/adrs/draft/adr-0041-a-crate-split-enforces-the-boundary-at-compile-time.md`
 [^F262C]: The testing guide, section 3.5. `docs/TESTING.md`
@@ -7827,7 +7869,6 @@ the part that decayed, and it decayed within one commit of the pin moving.
 [^F262F]: The state-byte gate. `crates/cachette-core/tests/state_bytes_are_initialised.rs`
 [^F263A]: The float ban script. `scripts/check-float-ban.sh`
 [^F263B]: Backlog item 0272, name the reassociating methods in the lint. `docs/backlog/proposed/0293-name-the-reassociating-methods-in-the-lint.md`
-=======
 [^F273A]: Backlog item 0266, order the unit arena by cell. `docs/backlog/refined/0266-order-the-unit-arena-by-cell.md`
 [^F273B]: Target platform costs, the packed and scattered rows. `docs/reference/graviton-costs.md`
 [^F273C]: The cost benchmark, the arena order mode. `crates/cachette-core/benches/target_cost.rs`
@@ -7835,4 +7876,8 @@ the part that decayed, and it decayed within one commit of the pin moving.
 [^F274B]: ADR-0018, the unit-to-tile bridge is derived, and it rebuilds at the barrier, decision D1. `docs/adrs/accepted/adr-0018-the-unit-to-tile-bridge-is-derived-and-rebuilds-at-the-barrier.md`
 [^F274C]: The drifted arena suite of the core. `crates/cachette-core/tests/drifted_arena.rs`
 [^F274D]: ADR-0056, movement is tile-discrete and admitted by sort-then-admit, decision D3. `docs/adrs/accepted/adr-0056-movement-is-tile-discrete-and-admitted-by-sort-then-admit.md`
->>>>>>> feat-w39
+=======
+[^F287A]: Findings register, FND-281, in this document.
+[^F287B]: Findings register, FND-282, in this document.
+[^F287C]: The exit locality benchmark, the frame row. `crates/cachette-core/benches/exit_locality.rs`
+>>>>>>> feat-w41
