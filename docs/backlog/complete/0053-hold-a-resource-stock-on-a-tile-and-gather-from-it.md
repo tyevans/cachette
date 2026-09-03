@@ -1,7 +1,7 @@
 ---
 id: 0053
 title: Hold a resource stock on a tile and gather from it
-status: proposed
+status: complete
 created: 2026-08-31
 implements: [ADR-0002 D1, ADR-0004 D4, ADR-0007 D1]
 changes: []
@@ -97,7 +97,41 @@ Answer it in the impact review, not during the work.
 
 ## Outcome
 
-Filled in when the item moves to `complete/`.
+**Closed as done. The work landed under other numbers, and this item is the
+record of the need.** The priority index had already marked it superseded in
+substance and asked for a close or a restatement.
+
+**What landed, and where.** The resource module holds a stock that the seed
+and the ground decide, and stores no map of it. The gather pass builds one key
+for each intent, orders the whole set, and admits each segment in that order.
+The engine keeps a conservation account: what left the tiles equals what the
+live units carry, plus what left the world with a dead unit, plus what reached
+a store. The invariant check reads that account.
+
+**The registry row this item asked for exists and is accepted.** ADR-0073
+states that gathering is admitted by sort-then-admit against the tile, which is
+the constraint this item said no reserved row held.[^11]
+
+**The placement question is answered.** The stock is generated from the seed
+and the address, in the way the terrain record chose for the ground, and the
+engine stores only what units took.[^9]
+
+**Checked by running, not by reading.** The resource and gather suites were run
+and 35 tests passed, including the contested case at the boundary and the
+tie-break on the identity rather than on the slot. The thread-count test for a
+gathering world was run and passed, and it carries a witness that contention
+happened: it asserts that fewer gatherers took a share than asked for one, so
+the run cannot agree with itself by doing nothing.
+
+**What did not land as written.** Two lines of the list above ask for a
+*property* test. The conservation sum and the thread-count equality are both
+covered by example-based tests and by the engine invariant check, and neither
+is a generated property. That gap is small and it is real. Anybody who wants
+the property should open a new item rather than reopen this one.
+
+**One number in this item is stale and is left as written.** The commodity
+count follows a recommendation of one commodity, and the store still holds one.
+The resource kinds are three, which is a different set from the store.
 
 ## References
 
@@ -109,5 +143,6 @@ Filled in when the item moves to `complete/`.
 [^6]: Findings register, FND-043. `docs/FINDINGS.md`
 [^7]: Decision Record Scope, section 1. `.claude/rules/adr-scope.md`
 [^8]: ADR Registry. `docs/adrs/REGISTRY.md`
-[^9]: ADR-0068, terrain is generated from the seed and is never stored as a map. `docs/adrs/REGISTRY.md`
+[^9]: ADR-0068, terrain is generated from the seed and is never stored as a map. `docs/adrs/accepted/adr-0068-terrain-is-generated-from-the-seed-and-is-never-stored-as-a-map.md`
 [^10]: Findings register, FND-051. `docs/FINDINGS.md`
+[^11]: ADR-0073, gathering is admitted by sort-then-admit against the tile. `docs/adrs/accepted/adr-0073-gathering-is-admitted-by-sort-then-admit-against-the-tile.md`

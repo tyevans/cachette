@@ -9415,7 +9415,7 @@ every signature, which is the shape the recurring defect rule names.[^F320E]
 [^F187B]: PRD-0003, a developer sees a world worth looking at. `docs/product/accepted/prd-0003-a-developer-sees-a-world-worth-looking-at.md`
 [^F198A]: The panel and the cards. `crates/cachette-view/src/`
 [^F199A]: The agent protocol server. `python/cachette/agent/server.py`
-[^F199B]: Backlog item 0206. `docs/backlog/proposed/0206-let-the-agent-tool-read-what-the-panel-reads.md`
+[^F199B]: Backlog item 0206. `docs/backlog/complete/0206-let-the-agent-tool-read-what-the-panel-reads.md`
 [^F200A]: The viewer suite for the glass. `crates/cachette-view/tests/shows_the_moment_on_the_glass.rs`
 [^F201A]: Findings register, FND-193, in this document.
 [^F201B]: Backlog item 0208. `docs/backlog/complete/0208-draw-the-boundary-of-a-holding-and-not-of-every-tile.md`
