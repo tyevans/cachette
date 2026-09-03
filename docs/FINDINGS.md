@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-261**
+**Next number: FND-262**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -1020,6 +1020,52 @@ because it is small, not because per-cell work cannot be large. A per-cell
 pass over 16,384 cells that did much more for each cell would want threads and
 would not have them, because the derivation takes no thread count and nothing
 would notice.
+
+### FND-261 — A count of what one layer asked for cannot see a generation below it
+
+**Believed.** The drawing generated the ground of every visible tile twice,
+and one of the two answers was a value it already held.[^F209C] A count of the
+grounds the drawing asks for would say whether the repair worked.
+
+**True.** The count says half of it. The counter stands in the drawing, so it
+counts the calls that the drawing makes into the core. It cannot see a
+generation that a reader below the drawing runs, and the second generation was
+exactly that: a stock reader that started from the address and generated the
+ground again to answer.
+
+A contributor can therefore put the defect back and no test fails. The drawing
+would call the reader that starts from the address alone, the picture would
+not change, and the count of grounds the drawing asked for would still equal
+the count of painted tiles.
+
+**Evidence.** Two defects were put back, one at a time, against the tests that
+claim the rule. A second generation written into the drawing was caught,
+because both calls increment the counter. A second generation written into the
+reader below was caught only by a test in the core crate, which gives the
+reader a ground the address does not carry and asserts that the answer follows
+the argument. No test in the drawing saw it.
+
+A third defect was put back and caught nothing. A test named "the count
+follows the window and not the world" was written first as a sweep over the
+zoom steps. The drawing was then made to walk every column of every visible
+row. The count still equalled the count of painted tiles, and the count still
+fell at each step in, because the rows were still held to the window. **The
+test measured less than its name claimed.** The test that replaced it draws one
+window at one tile size over two worlds of different sizes and requires the
+same count, which is the shape an existing test of the holder count already
+uses.[^F261B]
+
+**Follows.** **Put the defect back at each layer, not at the layer you were
+thinking about.** A count is evidence about the layer that holds the counter,
+and about no layer below it.
+
+**Name a test for what it proves, not for the property you want.** The test
+above was correct in every assertion it made and wrong in its name, and a
+reader would have taken the name as the guarantee.
+
+**A count of the generations that one frame runs does not exist, and an item
+holds it.**[^F261C] Until it does, the claim that the ground is generated once
+rests on two tests in two crates and on reading the one call site.
 
 ### FND-257 — A check that searches for a moved path must first ask whether the path is a name
 
@@ -5451,11 +5497,11 @@ allows. The window polls the keyboard once for each drawn frame, so a held key
 crossed the window in about two seconds at the opening zoom and in about
 fourteen at the far zoom.
 
-**The cost figure is real and is not the cause.** The drawing does cost about a
+**The cost figure is real and is not the cause.** The drawing cost about a
 third of a second at the far zoom on a development machine, and the ground of
-every visible tile is generated twice to produce it.[^F209B] That is a separate
-defect with its own item.[^F209C] It made the frame rate low; it did not make
-the camera cover three pixels a press.
+every visible tile was generated twice to produce it.[^F209B] That was a
+separate defect with its own item, and the item is complete.[^F209C] It made
+the frame rate low; it did not make the camera cover three pixels a press.
 
 **Follows.** **A pan covers a share of what the window shows.** The step is now
 a share of the window and not a count of tiles, so a press moves the same part
@@ -6791,6 +6837,9 @@ distinguished the two.
 
 ## References
 
+[^F261B]: The holder count test of the viewer. `crates/cachette-view/tests/shows_who_holds_the_ground.rs`
+[^F261C]: Backlog item 0271, count the ground generations that one frame runs. `docs/backlog/proposed/0271-count-the-ground-generations-that-one-frame-runs.md`
+
 [^F226A]: Backlog item 0185, steer a step by the option the unit chose. `docs/backlog/complete/0185-steer-a-step-by-the-option-the-unit-chose.md`
 [^F226B]: Backlog item 0186, let the engine order a gather. `docs/backlog/complete/0186-let-the-engine-order-a-gather.md`
 [^F226C]: ADR-0063, a need is a rate with a threshold, and crossing it is a fact, decision D2. `docs/adrs/accepted/adr-0063-a-need-is-a-rate-with-a-threshold-and-crossing-it-is-a-fact.md`
@@ -6994,7 +7043,7 @@ distinguished the two.
 [^F207A]: The tile rectangle of the drawing pass. `crates/cachette-view/src/paint.rs`
 [^F209A]: Findings register, FND-208, in this document.
 [^F209B]: The drawing pass of the viewer. `crates/cachette-view/src/paint.rs`
-[^F209C]: Backlog item 0210, generate the ground of a drawn tile once. `docs/backlog/proposed/0210-generate-the-ground-of-a-drawn-tile-once.md`
+[^F209C]: Backlog item 0210, generate the ground of a drawn tile once. `docs/backlog/complete/0210-generate-the-ground-of-a-drawn-tile-once.md`
 [^F207B]: Decisions register, DEC-088. `docs/DECISIONS.md`
 [^F208A]: ADR-0070, the head-up display reports what the drawing pass read, decision D2. `docs/adrs/accepted/adr-0070-the-head-up-display-reports-what-the-drawing-pass-read.md`
 

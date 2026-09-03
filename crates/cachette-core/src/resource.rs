@@ -244,6 +244,42 @@ impl ResourceField {
         Some(generate(self.terrain.seed(), address, ground, kind))
     }
 
+    /// Returns the stock that one tile started with, from the ground the
+    /// caller already holds.
+    ///
+    /// The stock of a tile is a function of the seed, the address and the
+    /// ground.[^1] A caller that has already read the ground of the address
+    /// holds the third argument, and this reader takes it rather than
+    /// generating it a second time. The ground is generated from a noise
+    /// field, so the second generation is the expensive one.[^2]
+    ///
+    /// **The answer follows the ground the caller gives, and the reader
+    /// checks nothing.** A caller that gives the ground of a different
+    /// address gets the stock of a tile that does not exist. Give the ground
+    /// of this address, read from the same terrain.
+    ///
+    /// The address still names the tile, so two tiles of one ground hold
+    /// different stocks and the field keeps its texture.
+    ///
+    /// Returns `None` when the address lies outside the world.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0072, a tile stock is generated, and only what was taken is stored, decision D1. `docs/adrs/accepted/adr-0072-a-tile-stock-is-generated-and-only-what-was-taken-is-stored.md`
+    /// [^2]: ADR-0068, terrain is generated from the seed and is never stored as a map, decision D1. `docs/adrs/accepted/adr-0068-terrain-is-generated-from-the-seed-and-is-never-stored-as-a-map.md`
+    #[must_use]
+    pub fn original_of_ground(
+        self,
+        address: Axial,
+        ground: TileKind,
+        kind: ResourceKind,
+    ) -> Option<Amount> {
+        if !self.grid().contains(address) {
+            return None;
+        }
+        Some(generate(self.terrain.seed(), address, ground, kind))
+    }
+
     /// Returns the stock that one tile started with, by index.
     #[must_use]
     pub fn original_at(self, index: TileIdx, kind: ResourceKind) -> Option<Amount> {
