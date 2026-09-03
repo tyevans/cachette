@@ -31,6 +31,17 @@ amends it or rejects the amendment with a reason.
 failed. They are in section 3, because an objection that fails is evidence that
 the record is sound in that place.
 
+**Which questions this review put explicitly, and which it answered by
+inference.** Three questions decide whether a record should exist: could a
+contributor reasonably choose otherwise, does choosing otherwise cost more than
+changing it later, and is the reasoning invisible in the artefact. This review
+put the first and the third to the record, and it put the separate question of
+whether the record contradicts the code, which is what section 2 answers. **It
+did not put the second explicitly.** The reviewer judged that a boundary shape
+every verb is written against is expensive to reverse, and did not argue it on
+the page. A reader should treat that condition as unexamined rather than
+answered.
+
 ## 1. What the record claims, and what the code does
 
 **D1, the boundary carries an instruction and an answer.** The engine returns

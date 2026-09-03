@@ -29,6 +29,16 @@ The status stays `Draft`. It would have stayed there anyway: the record is
 cited by path ten times, in the world module and in a Python test, and document
 work may not move it.
 
+**Which questions this review put explicitly, and which it answered by
+inference.** The question of whether the record contradicts the code is sections
+1 and 2, and it held twice. Section 3 puts the first and the third conditions of
+the record scope test for D1: a contributor reaches for the region because it
+costs no storage, and nothing in the code says why it was refused. **The second
+condition was answered by inference**, and here that matters more than usual,
+because a membership shape is exactly the kind of thing a project can change
+while it has one caller. The reviewer did not test how expensive the reversal
+would be today.
+
 ## 1. The objection that held first: the two bounds are not one bound
 
 D3 says, in bold:

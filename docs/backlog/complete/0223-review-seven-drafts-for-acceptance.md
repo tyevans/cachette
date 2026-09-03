@@ -81,6 +81,17 @@ the registers before it was written.
 rows, one backlog item, and one registry row that now says what a layout is
 today rather than only what a record would claim.[^4] [^5] [^6] [^7]
 
+**Every review says which questions it put and which it answered by
+inference.** Three questions decide whether a record should exist, and a fourth
+asks whether it contradicts the code. Only the selector tree review put all
+four explicitly. Five of the seven answered the second condition, whether
+choosing otherwise costs more than changing it later, by inference rather than
+on the page, and the selector range review put none of the three conditions at
+all. Each review says so in its own verdict section. A reviewer that checks
+three of four questions and reports a verdict has done three quarters of a
+review and reported a whole one, and a later reader can now see the shape rather
+than assume it was uniform.
+
 **What this did not do.** It did not move three accepted or accept-verdict
 records whose citations reach source files. That work is one commit for whoever
 may edit `crates/`, and an item already carries the cost.[^3]

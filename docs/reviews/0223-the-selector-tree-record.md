@@ -35,6 +35,13 @@ apply here.[^2] Section 6 records the move.
 narrowly.** The narrow one is in section 3 with a clarification the author may
 take or leave; it blocks nothing.
 
+**Which questions this review put explicitly.** All three conditions of the
+record scope test are put in section 1, under their own sentences, together with
+the counter-test about a determinism decision. The question of whether the
+record contradicts the code is the fifth objection in section 3. **Nothing in
+this review was answered by inference**, which is why it is the only accept here
+that also moved the file.
+
 ## 1. Why this record earns acceptance before its code
 
 The scope rule asks three questions and this record answers all three.[^3]

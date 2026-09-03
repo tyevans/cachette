@@ -30,6 +30,16 @@ naming a path that does not resolve. The verdict above is the reviewer's
 judgement. The move and its sweep are one commit for whoever may edit `crates/`,
 and that is the same position two other records are already in.[^1] [^2]
 
+**Which questions this review put explicitly, and which it answered by
+inference.** Section 4 puts the first and the third conditions of the record
+scope test: a contributor writes the per-faction plane without thinking about
+it, and the module cannot say what was refused because the refusal is an
+absence. The question of whether the record contradicts the code is sections 1
+and 2. **The second condition was answered by inference.** The reviewer judged
+that a storage shape every consumer reads is expensive to reverse, and named
+D3's missing inverse as the thing a contributor would trade away, which is
+adjacent to that condition without being it.
+
 ## 1. The decisions against the code
 
 **D1, a value that does not depend on the faction is stored once.** Holds. The

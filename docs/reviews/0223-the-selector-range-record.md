@@ -27,6 +27,14 @@ Section 5 gives the exact text. The status stays `Draft`.
 **Four objections were attempted. One held, and it is the one that matters
 most, because D2 is the whole cost case.**
 
+**Which questions this review put explicitly, and which it answered by
+inference.** This review put one question and put it hard: does the record
+contradict the code. It held, and section 1 is the answer. **It did not put any
+of the three conditions of the record scope test.** The reviewer took them as
+settled by the sibling record, which this one exists to make affordable, and
+that is an inference rather than a check. A reader who wants to know whether
+this record should exist at all will not find the answer here.
+
 ## 1. The objection that held: the world is not stored in blocks
 
 The context says:

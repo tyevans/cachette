@@ -27,6 +27,14 @@ Section 5 gives the exact text for both. The status stays `Draft`.
 **Four objections were attempted against the decisions themselves and all four
 failed.** They are in section 3.
 
+**Which questions this review put explicitly, and which it answered by
+inference.** All three conditions of the record scope test are stated in section
+6, and the question of whether the record contradicts the code is sections 1 and
+2. **The second condition is stated in one clause rather than argued.** The
+reviewer holds that a rule which decides the shape of every mass-tier interface
+is expensive to reverse once scripts exist, and a reader who doubts that should
+read section 6 as an assertion rather than as a finding.
+
 ## 1. The first wrong statement: nothing checks the tier of a mass shape
 
 The context says:

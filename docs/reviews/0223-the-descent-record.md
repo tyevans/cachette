@@ -32,6 +32,15 @@ and one of them is held by another worker right now. The verdict is the
 reviewer's judgement; the move and its sweep are one commit for whoever may edit
 `crates/`.[^1]
 
+**Which questions this review put explicitly, and which it answered by
+inference.** Section 5 puts the first and the third conditions of the record
+scope test, naming the three implementations a contributor reaches for and what
+the module cannot say. Section 3 puts the question of whether the record
+contradicts the code, five times. **The second condition was answered by
+inference.** The reviewer judged that the exactness and ordering properties are
+protected by the counter-test about a determinism decision whatever the cost of
+reversal, and so did not weigh the reversal itself.
+
 ## 1. The decisions against the code
 
 **D1, descent is keyed on an identity the record never reissues.** Holds. The
