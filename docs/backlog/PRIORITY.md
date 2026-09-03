@@ -38,6 +38,7 @@ These close a gap a review found, or they unblock the items above.
 | No. | Why it sits here |
 |---|---|
 | 0223 | Seven records are written and none binds anything. Review is the bottleneck the record index names first, and two of the seven govern work that other items wait on. It sits at the top of `Next` because it unblocks rather than builds. |
+| 0224 | The control plane names one entity of a mass shape in four places, and a test pays four crossings for each site because of it. FND-215 holds the measurement. It sits below 0223 because the review that found it returned ADR-0040 for an amendment, and the amendment names this item. |
 | 0187 | Nothing moves a carried load into a store, so gathering cannot feed anybody. It ships a verb with nothing to move until 0186 makes a unit carry something, so it follows 0186. |
 | 0189 | The rules against inert work look for an absent caller, and this defect has one. DEC-074 holds the options and recommends this. |
 | 0190 | The pyramid folds level 1 into a state hash and nothing calls the fold. It is a small instance of what 0189 is about, and it sits below 0189 because the rule should come before the sweep. |

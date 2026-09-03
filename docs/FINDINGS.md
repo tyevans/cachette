@@ -4881,6 +4881,62 @@ nothing cited outside the registry failed it or was one of two written for a
 reason the code cannot yet show. That is one block of rows and not a law, and it
 is worth testing against the next block.
 
+### FND-215 — The control plane names one entity of a mass shape in four places
+
+**Believed.** The control plane rule was unenforced but not yet broken. The
+records say nothing at the Python boundary reads the tier, so the rule is prose,
+and the repair is the enforcement that ADR-0043 describes.[^F215A]
+
+**True.** The rule is already broken, by the interface itself, in four places.
+Enforcement would not have prevented three of them, because the engine offers
+them deliberately and a caller reaches them by calling a documented method once
+for each member of a set.
+
+**Evidence.** Both the soldier shape and the settlement shape declare the mass
+tier in the core crate, and the soldier's declaration carries its reason in the
+same comment: a soldier is one of a million, so no caller walks the
+population.[^F215B]
+
+The bindings answer the tile of one soldier, the positions of one site and the
+preference of one site. The agent server wraps the first as a tool that reads one
+unit.[^F215C] [^F215D] A caller that wants any of those answers for a set calls
+once for each member, so the crossing count is a function of the population,
+which is the case the control plane record refuses in its own checkable
+form.[^F215E]
+
+**The type stub directs a reader into the pattern.** The documentation of the
+gather event columns tells a reader to take a value from the unit column and hand
+it back to the per-unit read.
+
+**A test pays it four times for each site.** The thread count test for the site
+positions sets a preference one site at a time, then reads the positions of each
+site twice. Eight sites cost twenty-four crossings. It does that because the
+set-valued command takes one target for the whole set and the test wants a
+different target for each site, and because no read answers for a set.
+
+**Follows.** **A set-valued verb is not a set-valued interface.** The project
+took the owner's rule that a command takes a set and applied it to the commands.
+The reads kept the singular form, and a read is a crossing like any other. Half a
+rule applied is not a weaker version of the rule; it is a boundary that still
+grows with the population, through the half nobody looked at.
+
+**A command that takes a set and one value still forces a loop.** The preference
+command is set-valued and cannot say a different thing about each member, so a
+caller that needs per-member values sends one command for each member. The set
+form removed the loop from the signature and left it in the caller. This is the
+same shape the register already holds: a principle satisfied in form and not in
+substance.[^F215F]
+
+**This is FND-147 again, at the read rather than at the write.** That entry
+records that a rule which forbids a shape and offers no alternative loses to the
+absence of the read. The alternative is still absent, and the sweep it produces
+is still written by people who know the rule.[^F215G]
+
+**The enforcement record would not have caught it.** ADR-0043 describes a
+refusal raised at a caller's loop over a set. Three of these four are one call
+that the engine documents and answers. Nothing would refuse them, because the
+engine offers them.
+
 ## References
 
 [^F177A]: The founding refuses ground that admits nobody. `crates/cachette-core/src/world.rs`
@@ -5064,3 +5120,10 @@ is worth testing against the next block.
 [^F214A]: Decision Record Scope, section 5. `.claude/rules/adr-scope.md`
 [^F214B]: ADR-0009, parallel stages write disjoint outputs, decisions D1 and D2. `docs/adrs/accepted/adr-0009-parallel-stages-write-disjoint-outputs.md`
 [^F214D]: ADR-0044, what copies and what does not is declared at the call site. `docs/adrs/draft/adr-0044-what-copies-and-what-does-not-is-declared-at-the-call-site.md`
+[^F215A]: ADR-0043, a declared tier enforces the no-loop rule, and the API refuses the loop, decision D5. `docs/adrs/draft/adr-0043-a-declared-tier-enforces-the-no-loop-rule.md`
+[^F215B]: The shape tier declarations. `crates/cachette-core/src/tier.rs`
+[^F215C]: The bindings. `crates/cachette-py/src/lib.rs`
+[^F215D]: The agent protocol server, the one-unit tool. `python/cachette/agent/server.py`
+[^F215E]: ADR-0040, Python is a control plane, not a data plane, decision D2. `docs/adrs/draft/adr-0040-python-is-a-control-plane-not-a-data-plane.md`
+[^F215F]: Decisions register, DEC-063. `docs/DECISIONS.md`
+[^F215G]: Findings register, FND-147, in this document.
