@@ -23,7 +23,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^ALLOC]
 
-**Next number: DEC-097**
+**Next number: DEC-098**
 
 ## Open
 
@@ -1085,6 +1085,59 @@ figure is 168 MB. The storage argument for vectors is stronger than the report
 concluded, and it called that argument its weakest.
 
 ## Closed
+
+### DEC-097 — What does the project do with an accepted record whose imported fact a register made false?
+
+**Closed. Reword it in place. A reviewer closed it, beside DEC-096.**
+
+**The case.** A blocker narrowed, and seven accepted records still say that no
+measurement exists on the target platform and that every cost figure in this
+project is derived.[^BLK7] A benchmark now runs on the target platform and a
+reference table holds measured rows.[^DEC97B] A sweep repaired 49 documents and
+stopped at the seven, because the retcon window is shut on all of them and
+rewording a sentence reads as an amendment.[^DEC96A]
+
+**DEC-096 does not reach this case, and stretching it would cost more than it
+saves.** That decision covers a consequence a record derived from its own claim.
+These sentences derive from the condition of a register. If "derived" grows to
+mean "anything a later fact made false", nothing is left of the amendment rule.
+
+**The answer is a sibling rule and not a wider reading.** A record that states
+the condition of the project imported that condition. The register owns it, the
+register moved, and the record is false through no fault of its own. Reword the
+sentence in place and keep the citation. The registry holds the rule beside the
+other two.[^DEC96A]
+
+**The test is the one the citation finding gives.**[^DEC96B] A reader decides
+from the record's constraint. Every one of the seven states no figure, and the
+scope rule forbids the figure whether or not a measurement exists.[^SCOPE] So
+correcting the reason for an absence changes no decision that anybody makes from
+the record.
+
+**The boundary. A claim that rested on the condition is not an imported fact.**
+Ask whether the record would have decided the other way if the register had said
+the other thing. None of the seven would. Each one chose its option on
+determinism, on the shape of the traffic, or on the structure of the storage,
+and each says separately that it states no figure.
+
+**The seven are not false in the same way, and a single replacement would make
+some of them false again.** Every one holds a universal clause and a narrow one.
+The universal clause says that every cost figure in this project is derived, and
+it is now wrong in all seven. The narrow clause says that the quantity this
+record needs is unmeasured, and it is still right in all seven, because the
+blocker stayed open for a stage inside a step and for a world that holds
+settlements.[^BLK7] Strike the universal clause. Keep the narrow one. Reword
+each record against its own subject, which is the second recurring defect
+shape.[^SWEEP]
+
+**A record gains no figure in exchange.** The rule that keeps a measured figure
+out of a record body does not depend on whether the measurement exists.[^SCOPE]
+
+**What the repair costs.** One commit for each record, or one commit for the
+group, that says which sentence changed, which register row moved, and why the
+freeze did not apply. The footnote marker stays, because the blocker is narrowed
+and not closed.
+
 
 ### DEC-096 — How does the project repair a stale consequence inside an accepted record?
 
@@ -2418,3 +2471,5 @@ a failed founding is correct.[^PRD12]
 [^DEC96B]: Findings register, FND-218. `docs/FINDINGS.md`
 [^DEC96C]: ADR-0096, cost follows the lattice, not the population, and a unit is a reader, decision D4. `docs/adrs/draft/adr-0096-cost-follows-the-lattice-not-the-population.md`
 [^DEC96D]: ADR-0064, a unit chooses by scoring a small fixed option set, decision D1. `docs/adrs/accepted/adr-0064-a-unit-chooses-by-scoring-a-small-fixed-option-set.md`
+[^DEC97B]: Target platform costs. `docs/reference/graviton-costs.md`
+[^SWEEP]: Recurring Defect Shapes, shape 2. `.claude/rules/recurring-defects.md`
