@@ -5022,6 +5022,64 @@ row states the claim the record would make and says nothing about what the code
 does instead. A reader who wants to know how the tiles are stored has to read the
 grid.
 
+### FND-218 — The retcon window governs what a record claims, not where its pointers go
+
+**Believed.** An accepted record does not change except in status, and the
+retcon window is the only door. Any edit to an accepted record therefore has to
+pass all three of its conditions, and the first is that nothing depends on the
+record yet.[^8]
+
+**True.** The window governs an amendment, which is a change to what the record
+claims. A citation is not a claim. Repairing a pointer that became false through
+no fault of the record is not an amendment, and the three conditions do not
+apply to it.
+
+**Evidence.** A review retired nine reserved registry rows. One of them,
+`ADR-0036`, was cited once by ADR-0067, which is accepted, in a footnote, and
+cited for its absence: the record says an alternative design needs a snapshot
+mechanism that no record holds.[^F218B]
+
+The number is written in a code span above, because a retired number is
+mentioned and never cited, and the citation check enforces it. **This entry
+broke that rule on its first draft and the gate caught it.** That is a second
+instance of the cost the register already carries: a document that must explain
+why a number went cannot name the number the ordinary way.[^F218F]
+
+Retiring the row made that footnote name nothing. The record check fails on a
+citation of a number that no record file and no registry row has, so the
+citation was also a red gate.
+
+**The record's first condition could not be met and the other two could.**
+ADR-0067 has a dependent, so the window as written was shut. The edit was made
+anyway: the footnote now names the registry's retired numbers, and the body
+sentence it supports is unchanged and still true.
+
+**Three roads were open and two were worse.** Leaving the citation gives an
+accepted record that names a number holding nothing, which is a record that lies
+with the authority of an accepted one. Writing a superseding record whose entire
+content is a corrected file path is a record for a topic and not for a
+constraint, which is the failure the scope rule measures against.[^16] The
+third was to repair the pointer, which changes nothing a reader decides.
+
+**Follows.** **The registry now states the rule, and this entry holds the
+case.**[^F218D] The test is whether the edit changes what a reader would decide.
+Repointing a footnote at the row that now holds the material does not.
+Rewording the sentence that carries the marker does, and the window governs
+that.
+
+**The rule cannot be used to smuggle a change through.** Adding, removing or
+reversing a claim, a force, a rejected alternative or a consequence is an
+amendment however small the diff and whatever else the commit touches. A commit
+that repairs a citation and edits a sentence in the same breath is an amendment,
+and it is reviewed as one.
+
+**A retirement is a sweep, and the sweep reaches accepted records.** The rule
+that a closed blocker must be searched for across the tree already exists, and
+this is the same operation for a retired number.[^F218E] The difference is that
+a retired number fails a gate and a closed blocker does not, so this one cannot
+be forgotten. That is luck rather than design, and the register records which of
+the two it is.
+
 ## References
 
 [^F177A]: The founding refuses ground that admits nobody. `crates/cachette-core/src/world.rs`
@@ -5222,3 +5280,7 @@ grid.
 [^F217E]: ADR-0017, the world is a rhombus, so a tile index is raw axial, decision D1. `docs/adrs/accepted/adr-0017-the-world-is-a-rhombus-so-a-tile-index-is-raw-axial.md`
 [^F217F]: ADR-0018, the unit-to-tile bridge is derived, and it rebuilds at the barrier. `docs/adrs/accepted/adr-0018-the-unit-to-tile-bridge-is-derived-and-rebuilds-at-the-barrier.md`
 [^F217G]: Review 0223, the selector range record. `docs/reviews/0223-the-selector-range-record.md`
+[^F218B]: ADR-0067, the viewer reads the world and never writes to it, decision D4. `docs/adrs/accepted/adr-0067-the-viewer-reads-the-world-and-never-writes-to-it.md`
+[^F218D]: ADR Registry, repairing a citation is not an amendment. `docs/adrs/REGISTRY.md`
+[^F218E]: Definition of Done, section 4. `.claude/rules/definition-of-done.md`
+[^F218F]: Findings register, FND-192, in this document.

@@ -106,6 +106,31 @@ it, and do not revert its status to justify doing so.
 The window closes the moment someone builds on the record, which is usually
 the next commit. When in doubt, assume it closed.
 
+### Repairing a citation is not an amendment
+
+**The three conditions above govern a change to what a record claims. They do
+not govern a change to where a pointer goes.**
+
+A record cites a number that is later retired, or a path that later moves. The
+citation is then false, and it became false through no fault of the record. Fix
+it. Do not test it against the window, and do not write a superseding record
+whose whole content is a corrected pointer, which is a record for a topic and
+not for a constraint.[^SCOPE]
+
+The test is one question. **Does the edit change what a reader would decide?**
+
+- Repointing a footnote at the row that now holds the material is a repair.
+  Nothing a reader decides from the record changes.
+- Rewording the sentence that carries the footnote marker is an amendment, and
+  the window governs it.
+- Adding, removing or reversing a claim, a force, a rejected alternative or a
+  consequence is an amendment, whatever else the commit touches.
+
+The commit still says what changed and why, because that is the audit trail and
+a silent edit to an accepted record is the failure this whole section is about.
+
+This has happened once, and the finding holds the case and the reasoning.[^CITE]
+
 ## What does not belong in a record
 
 A record is a historical document. It must not hold material that changes.
@@ -371,3 +396,4 @@ Then the cross-cutting models, 0007 to 0013. Then the subsystems.
 [^MEASURE]: Findings, the scope of a decision record. `docs/research/adr-scope-findings.md`
 [^SCOPE]: Decision Record Scope, the test for whether a decision needs a record. `.claude/rules/adr-scope.md`
 [^YIELD]: Findings register, FND-214. `docs/FINDINGS.md`
+[^CITE]: Findings register, FND-218. `docs/FINDINGS.md`

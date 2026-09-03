@@ -5,7 +5,7 @@ status: proposed
 created: 2026-09-01
 implements: []
 changes: []
-creates: [ADR-0040, ADR-0043, ADR-0051, ADR-0052]
+creates: []
 serves: []
 blocked-by: []
 ---
@@ -29,14 +29,19 @@ part of the command. One predicate tree crosses the boundary, the engine
 evaluates it over the columns, and the answer may be a range or a mask rather
 than sixteen million enumerated indices.[^3]
 
+**All four records now exist, and this item no longer creates them.** One is
+accepted and three are drafts that a review returned for amendment. The reserved
+rows the paragraph above describes were written on 2 September 2026, so what is
+left of this item is the mechanism and not the records.
+
 The rules exist and the mechanism does not. That gap is what the finding
 records, and closing it is what turns a rule a caller cannot follow into one it
 can.[^1]
 
 ## What the work does
 
-Write the four records, then build what they state. The records come first,
-because each governs every verb the boundary will ever carry.
+Build what the four records state. The records came first, because each governs
+every verb the boundary will ever carry, and they are written.
 
 **The author of these records is not their reviewer.** The registry says an
 author may set `Draft` and only a reviewer may set anything beyond it.[^4]
