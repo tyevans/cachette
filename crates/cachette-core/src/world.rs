@@ -3015,11 +3015,18 @@ impl World {
         // [^11]: ADR-0022, level 0 is the only truth, and every level above it is derived, decisions D1 and D3. `docs/adrs/accepted/adr-0022-level-0-is-the-only-truth-and-every-level-above-it-is-derived.md`
         self.choose(threads)?;
 
+        // The walk order of the movement pass. The bridge holds every live
+        // unit in block-major tile order, and it sorted them at the barrier,
+        // so this order costs the frame nothing more than it already paid.
+        let live = self.bridge.units(&self.soldiers)?.to_vec();
         let intents = soldier_moves(
             tick,
             seed,
             self.terrain,
-            &self.soldiers,
+            &UnitWalk {
+                soldiers: &self.soldiers,
+                live: &live,
+            },
             self.pyramid.layout(),
             &self.exits,
             threads,
@@ -4364,16 +4371,53 @@ const DRAW_MOVE_DIRECTION: u32 = 0;
 /// [^8]: ADR-0091, movement takes its direction from a per-cell field, never from a per-unit search, decision D1. `docs/adrs/draft/adr-0091-movement-takes-its-direction-from-a-per-cell-field.md`
 /// [^9]: ADR-0017, the world is a rhombus, so a tile index is raw axial, decision D2. `docs/adrs/accepted/adr-0017-the-world-is-a-rhombus-so-a-tile-index-is-raw-axial.md`
 /// [^10]: ADR-0003, every random draw is keyed, never stateful, decision D1. `docs/adrs/accepted/adr-0003-every-random-draw-is-keyed-never-stateful.md`
+/// The live units of one frame, and the arena that holds their columns.
+///
+/// The two travel together. The order is a property of the walk and the
+/// columns are a property of the arena, and a caller that could pass one
+/// without the other could pass an order taken from a different arena.
+struct UnitWalk<'a> {
+    /// The arena that every identity below resolves against.
+    soldiers: &'a SoldierArena,
+    /// Every live unit, in the order the pass walks them.
+    live: &'a [Entity],
+}
+
 fn soldier_moves(
     tick: Tick,
     seed: u64,
     terrain: Terrain,
-    soldiers: &SoldierArena,
+    walk: &UnitWalk<'_>,
     layout: BlockLayout,
     exits: &ExitField,
     threads: usize,
 ) -> Result<Vec<(Entity, Axial)>, StepError> {
-    let live: Vec<Entity> = soldiers.iter().collect();
+    let UnitWalk { soldiers, live } = *walk;
+    // **The walk is in cell order, not in slot order.** The two hold the same
+    // units and differ only in the order. Every read below the filter is a
+    // read of the tile side of the world at the tile the unit stands on: the
+    // exit of its cell, the ground of its target, and the address of both.
+    // The tile side is the larger of the two footprints, so the order that
+    // makes it ascending is the order to walk.
+    //
+    // The arena cannot supply that order. A slot is half of an identity, so a
+    // slot never moves, and an arena filled in tile order drifts away from it
+    // as units die and slots return.[^13] The bridge already sorts every live
+    // unit on the tile key once for each frame, at the barrier, so this order
+    // costs the frame nothing more than it already paid.[^14]
+    //
+    // Nothing downstream reads this order. Admission sorts what it receives
+    // on a total key of the target tile and the whole identity, so the same
+    // set in another order gives the same result.[^15] The golden state hash
+    // is the check that this claim holds, and it was checked by reversing the
+    // walk rather than by asserting that reversing it would be safe.
+    //
+    // The caller passes the order in, and the caller is the one place that
+    // takes it from the bridge. This function never chooses it.
+    //
+    // [^13]: ADR-0014, entity identity is an index plus a generation, decision D1. `docs/adrs/accepted/adr-0014-entity-identity-is-an-index-plus-a-generation.md`
+    // [^14]: ADR-0018, the unit-to-tile bridge is derived, and it rebuilds at the barrier, decision D1. `docs/adrs/accepted/adr-0018-the-unit-to-tile-bridge-is-derived-and-rebuilds-at-the-barrier.md`
+    // [^15]: ADR-0056, movement is tile-discrete and admitted by sort-then-admit, decision D3. `docs/adrs/accepted/adr-0056-movement-is-tile-discrete-and-admitted-by-sort-then-admit.md`
     if live.is_empty() {
         return Ok(Vec::new());
     }

@@ -92,5 +92,5 @@ scattered value at a time is a scalar unit with extra steps.[^4]
 [^1]: ADR-0012, tiles are dense columns and units are a generational arena. `docs/adrs/accepted/adr-0012-tiles-are-dense-columns-and-units-are-a-generational-arena.md`
 [^2]: Target platform costs, the stage split. `docs/reference/graviton-costs.md`
 [^3]: ADR-0002, state holds no floating point number. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
-[^4]: Backlog item 0266, order the unit arena by cell. `docs/backlog/proposed/0266-order-the-unit-arena-by-cell.md`
+[^4]: Backlog item 0266, order the unit arena by cell. `docs/backlog/refined/0266-order-the-unit-arena-by-cell.md`
 [^5]: The pinned toolchain. `rust-toolchain.toml`
