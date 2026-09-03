@@ -1,7 +1,15 @@
 # ADR-0008 names aarch64-unknown-linux-gnu as the primary target.
 # The other targets are development targets only.
+#
+# ADR-0097 pins a dated nightly rather than the `nightly` channel. A floating
+# channel changes the compiler without a commit, and ADR-0001 requires that
+# one binary gives one answer. Change the date in a commit, and run the
+# golden state hash against the new compiler before you keep it.
+#
+# `miri` and `rust-src` are here because the Miri gate needs both. Miri needs
+# the standard library source to build its own standard library.
 [toolchain]
-channel = "1.91.1"
-components = ["rustfmt", "clippy"]
+channel = "nightly-2026-09-01"
+components = ["rustfmt", "clippy", "miri", "rust-src"]
 targets = ["aarch64-unknown-linux-gnu"]
 profile = "minimal"

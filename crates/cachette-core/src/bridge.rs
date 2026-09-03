@@ -445,9 +445,7 @@ impl UnitTileBridge {
         for range in &mut self.ranges {
             *range = BlockRange::default();
         }
-        for word in &mut self.occupancy {
-            *word = 0;
-        }
+        self.occupancy.fill(0);
         let mut position = 0usize;
         while position < self.keys.len() {
             let block = self.layout.block_of_key(self.keys[position]);
@@ -580,6 +578,34 @@ impl UnitTileBridge {
     /// from another arena, or when that arena has changed since.
     pub fn describes(&self, arena: &SoldierArena) -> Result<(), BridgeError> {
         self.check_fresh(arena)
+    }
+
+    /// Returns every live unit, in cell order.
+    ///
+    /// The order is the one the rebuild sorted on: the block-major tile key,
+    /// then the whole identity. It does not depend on the thread count, and
+    /// no thread completion order reaches it.[^1]
+    ///
+    /// **A pass that walks this order reads the tile side of the world in
+    /// ascending tile order.** A pass that walks the arena in slot order does
+    /// not, once the arena has drifted away from the tile order it was filled
+    /// in, because a slot never moves.[^2]
+    ///
+    /// This is a guarded read. It names the units, so it takes the arena and
+    /// refuses when the bridge no longer describes it.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the structure was never built, when it was built
+    /// from another arena, or when that arena has changed since.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
+    /// [^2]: ADR-0014, entity identity is an index plus a generation, decision D1. `docs/adrs/accepted/adr-0014-entity-identity-is-an-index-plus-a-generation.md`
+    pub fn units<'a>(&'a self, arena: &SoldierArena) -> Result<&'a [Entity], BridgeError> {
+        self.check_fresh(arena)?;
+        Ok(&self.units)
     }
 
     pub fn in_block<'a>(

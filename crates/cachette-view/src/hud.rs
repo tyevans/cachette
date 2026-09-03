@@ -35,8 +35,8 @@ use cachette_core::pyramid::CellSummary;
 use cachette_core::resource::{ResourceKind, RESOURCE_KIND_COUNT};
 use cachette_core::terrain::{TileKind, KIND_COUNT};
 use cachette_core::{
-    Axial, ChoiceExplanation, CommodityId, FactionId, Fix32, NeedCondition, World, NO_INTENT,
-    OPTIONS, OPTION_COUNT,
+    Axial, ChoiceExplanation, CommodityId, Entity, FactionId, Fix32, NeedCondition, World,
+    NO_INTENT, OPTIONS, OPTION_COUNT,
 };
 
 use crate::metrics::Metrics;
@@ -392,6 +392,10 @@ pub struct SiteReadout {
     /// What the cohorts of this site asked for and what the store gave, on
     /// the last tick that could not serve them in full.
     rationed: Option<(i64, i64)>,
+    /// How many positions this site declares.
+    seats: u32,
+    /// How many of those positions a live unit holds.
+    seats_held: u32,
 }
 
 impl SiteReadout {
@@ -411,6 +415,18 @@ impl SiteReadout {
     #[must_use]
     pub const fn store(&self) -> Fix32 {
         self.store
+    }
+
+    /// Returns how many positions the site declares.
+    #[must_use]
+    pub const fn seats(&self) -> u32 {
+        self.seats
+    }
+
+    /// Returns how many of those positions a live unit holds.
+    #[must_use]
+    pub const fn seats_held(&self) -> u32 {
+        self.seats_held
     }
 
     /// Returns what the site adds each time the rate pass runs.
@@ -464,6 +480,52 @@ const SITE_ROWS: usize = 6;
 ///
 /// [^1]: ADR-0070, the head-up display reports what the drawing pass read, decision D1. `docs/adrs/accepted/adr-0070-the-head-up-display-reports-what-the-drawing-pass-read.md`
 /// [^2]: ADR-0063, a need is a rate with a threshold, and crossing it is a fact, decision D3. `docs/adrs/accepted/adr-0063-a-need-is-a-rate-with-a-threshold-and-crossing-it-is-a-fact.md`
+/// Returns how many positions a site declares and how many a unit holds.
+///
+/// **A position is a seat at a site, not a thing on the map.** The engine
+/// holds a fixed-width row of them for each site, so this reads one row and
+/// counts it. It starts no pass over the units and no pass over the
+/// world.[^1]
+///
+/// A seat with no holder is counted in the first number and not the second,
+/// so a watcher sees the difference between a site with no seats and a site
+/// whose seats are empty. Those are different facts and a single number
+/// would hide one of them.
+///
+/// # References
+///
+/// [^2]: ADR-0014, entity identity is an index plus a generation, decision D2. `docs/adrs/accepted/adr-0014-entity-identity-is-an-index-plus-a-generation.md`
+///
+/// # References
+///
+/// [^1]: ADR-0070, the head-up display reports what the drawing pass read, decision D1. `docs/adrs/accepted/adr-0070-the-head-up-display-reports-what-the-drawing-pass-read.md`
+fn seats_of(world: &World, site: Entity) -> (u32, u32) {
+    let Some(rows) = world.site_positions(site) else {
+        return (0, 0);
+    };
+    // The row is read for its length and its kinds. The holder is asked for
+    // through the engine's resolving reader, one index at a time.
+    let existing: Vec<usize> = rows
+        .iter()
+        .enumerate()
+        .filter(|(_, position)| position.exists())
+        .map(|(index, _)| index)
+        .collect();
+    let seats = existing.len() as u32;
+    // **The stored identity is not the question. Whether it resolves is.**
+    // A position keeps the bits of its holder after that holder dies, until
+    // the pass that releases the dead runs. Counting a non-zero field as a
+    // holder would report a seat as filled by a unit that no longer exists,
+    // and a watcher would read a fully staffed site where one is short. The
+    // engine's reader compares the generation and answers nothing for a dead
+    // holder, so the viewer asks it rather than reading the field.[^2]
+    let held = existing
+        .iter()
+        .filter(|index| world.position_holder(site, **index).is_some())
+        .count() as u32;
+    (seats, held)
+}
+
 fn read_sites(world: &World) -> Vec<SiteReadout> {
     // The engine holds one commodity, and it is the one the cohorts draw.
     // The identifier is the engine's, not a second name for it here.
@@ -475,6 +537,7 @@ fn read_sites(world: &World) -> Vec<SiteReadout> {
         .filter_map(|site| {
             let place = arena.address(site)?;
             let identity = site.to_bits();
+            let (seats, seats_held) = seats_of(world, site);
             Some(SiteReadout {
                 faction: arena.faction(site)?,
                 place,
@@ -486,6 +549,12 @@ fn read_sites(world: &World) -> Vec<SiteReadout> {
                     .iter()
                     .find(|event| event.site == identity)
                     .map(|event| (event.demanded.0, event.granted.0)),
+                // The seats of this site, counted on the walk this function
+                // already makes. The walk stops at a fixed number of sites
+                // and a site declares a fixed number of seats, so the cost
+                // follows neither the world nor the population.[^1]
+                seats,
+                seats_held,
             })
         })
         .collect()
@@ -542,9 +611,16 @@ pub struct Readout {
     choice: Option<ChoiceReadout>,
     sites: Vec<SiteReadout>,
     sites_held: u32,
+    seats: u32,
+    seats_taken: u32,
     foundings: Vec<FoundingReport>,
     refusals: Vec<(FactionId, FoundingError)>,
     units_short: u32,
+    units_carrying: u32,
+    carried_by_kind: [u32; RESOURCE_KIND_COUNT],
+    units_housed: u32,
+    rationings: u32,
+    rationed_short: i64,
     units_ended: usize,
     canvas_height: usize,
     step_mean: f64,
@@ -582,6 +658,12 @@ impl Readout {
         let (first_row, last_row) = camera.visible_rows(world, canvas);
         let middle_row = (first_row + last_row) / 2;
         let (first_column, last_column) = camera.visible_columns(middle_row, world, canvas);
+        // The site list is read once, here, and both the rows and the seat
+        // totals below are derived from it. Reading it twice would walk the
+        // arena twice and could give two answers.
+        let sites = read_sites(world);
+        let seats: u32 = sites.iter().map(SiteReadout::seats).sum();
+        let seats_taken: u32 = sites.iter().map(SiteReadout::seats_held).sum();
 
         Self {
             // The tick is the engine's own counter. The viewer reads it and
@@ -626,11 +708,16 @@ impl Readout {
             // One row for each site the world holds. The founding seats one
             // for each faction, so the list is bounded by the faction
             // count.[^6]
-            sites: read_sites(world),
+            sites,
             // The arena reports how many sites it holds without a walk over
             // them, so the panel states the whole count beside the few rows
             // it read.[^6]
             sites_held: world.settlements().len(),
+            // The seats of the sites the panel read, summed over that same
+            // bounded walk. This is a count of the sites read and not of the
+            // world, and the row that shows it says so.[^4]
+            seats,
+            seats_taken,
             // The caller founded the run and kept what the founding
             // returned. The panel borrows that value and recomputes no part
             // of it, so the list is as long as the caller made it and the
@@ -660,6 +747,27 @@ impl Readout {
             //
             // [^4]: ADR-0070, the head-up display reports what the drawing pass read, decision D1. `docs/adrs/accepted/adr-0070-the-head-up-display-reports-what-the-drawing-pass-read.md`
             units_short: canvas.units_short(),
+            units_carrying: canvas.units_carrying(),
+            carried_by_kind: *canvas.carried_by_kind(),
+            units_housed: canvas.units_housed(),
+            // The store of a site rations when it cannot serve what its
+            // cohorts asked for. The engine holds the log of the step that
+            // just ran, so this is a count of the world and the label of its
+            // row says so.[^5] It happens twice in a tick in the
+            // demonstration world and no watcher could see it.[^6]
+            //
+            // [^6]: Backlog item 0274. `docs/backlog/complete/0274-show-the-load-a-unit-carries-and-the-home-it-keeps.md`
+            rationings: world.rationed_log().len() as u32,
+            rationed_short: world
+                .rationed_log()
+                .iter()
+                // The engine states that a rationed draw always granted less
+                // than it was asked for, so the difference is never negative.
+                // The floor is here because a shortfall that read as a large
+                // positive number would be a wrong answer presented as a
+                // right one, and this costs one comparison.
+                .map(|event| event.demanded.0.saturating_sub(event.granted.0).max(0))
+                .sum(),
             // The engine holds the log of the scan that just ran. This is a
             // count of the world, and the label of its row says so.[^5]
             //
@@ -870,6 +978,80 @@ impl Readout {
     /// # References
     ///
     /// [^1]: Findings register, FND-119. `docs/FINDINGS.md`
+    /// Returns how many positions the sites the panel read declare.
+    ///
+    /// A position is a seat at a site. This counts the sites the panel walked,
+    /// which is a fixed number, so it is neither a count of the world nor of
+    /// the window and the row that shows it says which.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0070, the head-up display reports what the drawing pass read, decision D2. `docs/adrs/accepted/adr-0070-the-head-up-display-reports-what-the-drawing-pass-read.md`
+    #[must_use]
+    pub const fn seats(&self) -> u32 {
+        self.seats
+    }
+
+    /// Returns how many of those positions a live unit holds.
+    #[must_use]
+    pub const fn seats_taken(&self) -> u32 {
+        self.seats_taken
+    }
+
+    /// Returns the number of painted units that carry something.
+    ///
+    /// This is a count of the window. The drawing asked at every unit it
+    /// painted, on the loop that already ran.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0070, the head-up display reports what the drawing pass read, decision D1. `docs/adrs/accepted/adr-0070-the-head-up-display-reports-what-the-drawing-pass-read.md`
+    #[must_use]
+    pub const fn units_carrying(&self) -> u32 {
+        self.units_carrying
+    }
+
+    /// Returns what the painted units carry, one total for each kind.
+    #[must_use]
+    pub const fn carried_by_kind(&self) -> &[u32; RESOURCE_KIND_COUNT] {
+        &self.carried_by_kind
+    }
+
+    /// Returns the number of painted units that hold a home site.
+    #[must_use]
+    pub const fn units_housed(&self) -> u32 {
+        self.units_housed
+    }
+
+    /// Returns the number of sites that rationed in the last step.
+    ///
+    /// This is a count of the world and not of the window, because the engine
+    /// holds the log of the step that just ran.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0070, the head-up display reports what the drawing pass read, decision D2. `docs/adrs/accepted/adr-0070-the-head-up-display-reports-what-the-drawing-pass-read.md`
+    #[must_use]
+    pub const fn rationings(&self) -> u32 {
+        self.rationings
+    }
+
+    /// Returns how much the rationed draws of the last step fell short by.
+    ///
+    /// **The value is in accumulator units, not in whole goods.** An
+    /// accumulator is fixed point at a scale of 65536, so a caller that
+    /// printed this number raw would state a quantity about sixty-five
+    /// thousand times the real one. The panel formats it, and a caller that
+    /// wants the quantity divides by the scale itself, exactly.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0002, simulated and aggregated state holds no floating point number. `docs/adrs/REGISTRY.md`
+    #[must_use]
+    pub const fn rationed_short(&self) -> i64 {
+        self.rationed_short
+    }
+
     #[must_use]
     pub const fn units_ended(&self) -> usize {
         self.units_ended
@@ -1051,6 +1233,20 @@ impl Readout {
     /// from a count of the window by the label alone, never by the section it
     /// sits under.
     fn lines(&self) -> Vec<Line> {
+        cut_to_fit(self.all_lines(), self.canvas_height)
+    }
+
+    /// Returns every line the panel holds, before any cut.
+    ///
+    /// **One list is the only statement of what the panel holds.** The cut,
+    /// the height and the painting are all derived from this, so a caller
+    /// that asks how tall the panel is and a caller that draws it cannot
+    /// disagree.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0070, the head-up display reports what the drawing pass read, decision D1. `docs/adrs/accepted/adr-0070-the-head-up-display-reports-what-the-drawing-pass-read.md`
+    fn all_lines(&self) -> Vec<Line> {
         let mut lines = vec![
             Line::Title("CACHETTE"),
             Line::Note("watching the world run"),
@@ -1075,6 +1271,63 @@ impl Readout {
             Line::Row("short in window", grouped(u64::from(self.units_short))),
             Line::Row("ended in world", grouped(self.units_ended as u64)),
         ];
+
+        // The store of a site rations when it cannot serve what its cohorts
+        // asked for. It happens more than once in a tick in the demonstration
+        // world, and until these rows the only way to see it was to read the
+        // log.[^11] This is a count of the world, and the label says so.[^2]
+        //
+        // **The rows appear only when a site rationed.** A row that reported
+        // a permanent zero would take a row from every panel of every run to
+        // say nothing, and it would still say nothing if the subsystem behind
+        // it broke.[^12] The count is what decides, so the rows cannot
+        // outlive the behaviour they report.
+        //
+        // [^11]: Backlog item 0274. `docs/backlog/complete/0274-show-the-load-a-unit-carries-and-the-home-it-keeps.md`
+        // [^12]: Testing Rules, section 2a. `.claude/rules/testing.md`
+        if self.rationings > 0 {
+            lines.push(Line::Row(
+                "sites rationed in world",
+                grouped(u64::from(self.rationings)),
+            ));
+            lines.push(Line::Row(
+                "  they fell short by",
+                accumulated(self.rationed_short),
+            ));
+        }
+
+        // What the drawn units are hauling and where they live. Both are
+        // counts of the window, taken on the loop that painted them.[^11]
+        //
+        // **The section appears only when something is being carried.** A
+        // section that reported a permanent zero would take a row from every
+        // panel of every run to say nothing, and it would still say nothing
+        // if the subsystem behind it broke.[^12]
+        //
+        // [^12]: Testing Rules, section 2a. `.claude/rules/testing.md`
+        if self.units_carrying > 0 {
+            lines.push(Line::Rule);
+            lines.push(Line::Heading("WHAT THEY CARRY"));
+            lines.push(Line::Row(
+                "carrying in window",
+                fraction_of(self.units_carrying, self.soldiers_painted),
+            ));
+            for (label, kind) in [
+                ("food carried", ResourceKind::Food),
+                ("wood carried", ResourceKind::Wood),
+                ("stone carried", ResourceKind::Stone),
+            ] {
+                lines.push(Line::Row(
+                    label,
+                    grouped(u64::from(self.carried_by_kind[kind as usize])),
+                ));
+            }
+            lines.push(Line::Row(
+                "with a home site",
+                fraction_of(self.units_housed, self.soldiers_painted),
+            ));
+            lines.push(Line::Note("counted at the units drawn."));
+        }
 
         // The tile a watcher scrolled to, the unit nearest it, and the sites
         // that feed the world. All three sit above the view rows, because a
@@ -1251,7 +1504,30 @@ impl Readout {
             }
         }
 
-        cut_to_fit(lines, self.canvas_height)
+        lines
+    }
+
+    /// Returns the height a picture needs to hold the whole panel.
+    ///
+    /// **A caller that writes the panel to a file uses this instead of
+    /// guessing a constant.** The panel grows with the faction count, with
+    /// the number of foundings, and with every section that a count switches
+    /// on, so a constant that fits today cuts tomorrow and says so only at
+    /// the foot of the picture, where nobody generating one reads it.[^1]
+    ///
+    /// The height is a function of the readout, and the readout is taken
+    /// against a canvas, so a caller that resizes may find the answer has
+    /// moved: a taller picture paints more units, and a section that a count
+    /// switches on adds lines. A caller that wants the whole panel asks
+    /// again after it resizes.
+    ///
+    /// # References
+    ///
+    /// [^1]: Backlog item 0275. `docs/backlog/complete/0275-size-the-panel-picture-to-the-panel.md`
+    #[must_use]
+    pub fn height_for_whole_panel(&self) -> usize {
+        let content: i32 = self.all_lines().iter().map(Line::height).sum();
+        (content + MARGIN * 2 + PAD * 2).max(1) as usize
     }
 
     /// Returns the height of the panel in pixels.
@@ -1347,6 +1623,9 @@ fn tile_lines(tile: Option<&TileReadout>) -> Vec<Line> {
         format!("q {}  r {}", tile.address.q, tile.address.r),
     ));
     lines.push(Line::Row("ground", name_of(tile.kind).to_string()));
+    // The label is a phrase and not the name of the kind, and the panel row
+    // takes a static string, so these stay written out. The name of a kind
+    // for new code is `resource_name` above.
     for (label, kind) in [
         ("food left", ResourceKind::Food),
         ("wood left", ResourceKind::Wood),
@@ -1381,6 +1660,29 @@ fn tile_lines(tile: Option<&TileReadout>) -> Vec<Line> {
 /// # References
 ///
 /// [^1]: ADR-0070, the head-up display reports what the drawing pass read, decision D2. `docs/adrs/accepted/adr-0070-the-head-up-display-reports-what-the-drawing-pass-read.md`
+/// Returns the name of a resource kind.
+///
+/// One name for one kind, in one place. A second table of these names would
+/// be one fact in two places, and nothing would fail when the copies
+/// disagreed.[^1]
+///
+/// # References
+///
+/// [^1]: Recurring Defect Shapes, shape 1. `.claude/rules/recurring-defects.md`
+#[must_use]
+pub const fn resource_name(kind: ResourceKind) -> &'static str {
+    match kind {
+        ResourceKind::Food => "food",
+        ResourceKind::Wood => "wood",
+        ResourceKind::Stone => "stone",
+    }
+}
+
+/// Returns "a of b", for a count against the number the pass painted.
+fn fraction_of(part: u32, whole: u32) -> String {
+    format!("{part} of {whole}")
+}
+
 fn deposit(tile: &TileReadout, kind: ResourceKind) -> String {
     let gave = tile.generated(kind);
     if gave == 0 {
@@ -1512,6 +1814,15 @@ fn site_lines(sites: &[SiteReadout], held: u32) -> Vec<Line> {
             site.faction,
             format!("q {}  r {}", site.place.q, site.place.r),
         ));
+        // **A seat with no holder is not the same fact as no seat.** The row
+        // states both numbers, so a watcher can tell a site that declares no
+        // position from one whose positions are empty.
+        if site.seats > 0 {
+            lines.push(Line::Row(
+                "  seats held",
+                format!("{} of {}", site.seats_held, site.seats),
+            ));
+        }
         lines.push(Line::Row(
             "  store",
             format!(
@@ -1546,7 +1857,7 @@ fn site_lines(sites: &[SiteReadout], held: u32) -> Vec<Line> {
 /// # References
 ///
 /// [^1]: ADR-0067, the viewer reads the world and never writes to it, decision D3. `docs/adrs/accepted/adr-0067-the-viewer-reads-the-world-and-never-writes-to-it.md`
-fn accumulated(total: i64) -> String {
+pub fn accumulated(total: i64) -> String {
     format!("{:.1}", total as f64 / 65536.0)
 }
 

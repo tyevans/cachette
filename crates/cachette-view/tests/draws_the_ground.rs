@@ -70,7 +70,7 @@ fn addresses_of(world: &World) -> Vec<Axial> {
 }
 
 /// Paints the whole world onto a canvas and returns both.
-fn painted(seed: u64) -> (World, Canvas) {
+fn painted(seed: u64) -> (World, Canvas<'static>) {
     let world = world_of(seed);
     let mut canvas = Canvas::new(512, 512);
     let camera = Camera::fitting(&world, &canvas);

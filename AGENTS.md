@@ -6,7 +6,12 @@ plane is Python.
 The engine simulates a hex world at three levels of detail. Level 0 holds
 individual tiles and units. Level 1 summarises blocks of tiles at city
 scale. Level 2 summarises blocks of level 1 cells at region scale. Level 0
-is the only source of truth. Level 1 and level 2 are derived projections.
+is the only source of truth. A summarised level is a derived projection.
+
+**Level 2 does not exist. The pyramid holds one derived level.** Read the
+three levels as the target, and read the code for what is built. A reader
+who takes the paragraph above for the code plans against a level that
+nothing writes.
 
 The target scale is 16.7 million tiles and one million units.
 
@@ -46,14 +51,15 @@ Do not violate them for convenience.
 2. **Route all simulation arithmetic through the `sim_math` module.** Two
    mechanisms enforce this boundary, because one is not enough. A lint bans
    the float types by name. A script catches what the lint cannot see: a
-   float literal whose type is inferred, and the reassociating methods, which
-   do not resolve on the pinned toolchain and so cannot be named in a lint.
+   float literal whose type is inferred. It also names the reassociating
+   methods, which the compiler rejected on the old stable pin and which now
+   compile. The lint can name them too, and does not yet.
 3. **Seed every random draw from a counter-based generator.** Key each
    draw on the tuple (system, frame, entity, draw). Do not use
    thread-local random state. Thread-local state destroys determinism.
 4. **Keep the `cachette-core` crate free of any PyO3 dependency.** This
-   makes a mid-step Python callback a compile error. It also allows Miri
-   to check the unsafe code.
+   makes a mid-step Python callback a compile error. It also lets Miri check the
+   unsafe code, and `just miri` runs it.
 5. **Make every event type `bytemuck::Pod`.** Use `repr(C)`. Declare the
    padding. Do not use `bool`. Use `u8` instead. Undeclared padding
    creates false nondeterminism in state hashes.
@@ -173,10 +179,16 @@ links. Convert them before you extend them.
 the list. A register does not decay; a summary does. This section held a
 summary once, it went stale, and the finding records what that cost.[^3]
 
-Every question the project owner owned is answered. The scale constants
-table holds the values.[^13] One blocker stays open, and engineering owns
-it: no measurement exists on the target platform, so every cost figure in
-this project is derived.
+**One blocker the project owner owns is open, and it narrowed twice on 3
+September 2026.** A unit builds only on ground that its own faction holds.
+Anyone may destroy an upgrade, and destruction takes work, but an instant
+removal stays available to the control plane. One question stays open:
+whether an upgrade changes hands when the ground does. Every other owner
+question is answered, and the scale constants table holds the values.[^13]
+
+A benchmark now runs on the target platform, and a register holds what it
+measured.[^14] Most cost figures are still derived, and the blocker that
+says which stays open.
 
 ## References
 
@@ -193,3 +205,4 @@ this project is derived.
 [^11]: The record check. `scripts/check-adrs.sh`
 [^12]: Blockers register. `docs/BLOCKERS.md`
 [^13]: Budgets and costs, the scale constants. `docs/reference/budgets.md`
+[^14]: Target platform costs. `docs/reference/graviton-costs.md`

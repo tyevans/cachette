@@ -45,6 +45,7 @@ use crate::hash::StateHash;
 use crate::hex::{Axial, Grid, NEIGHBOUR_COUNT};
 use crate::slots::Slots;
 use crate::soldier::SoldierArena;
+use crate::stage::{self, Stage};
 use crate::terrain::{Terrain, TileKind};
 use crate::types::{FactionId, TileIdx, FACTION_CEILING};
 
@@ -371,8 +372,13 @@ impl Holding {
     ///
     /// The rule visits the tiles that a change can reach: the tiles somebody
     /// already holds, the neighbours of those tiles, and the tiles a unit
-    /// stands on. Its cost therefore grows with the holding and with the
-    /// population, and not with the world.[^1]
+    /// stands on.[^1]
+    ///
+    /// **The holding is not small.** At one million units scattered over the
+    /// target world it reaches 39 percent of the tiles, so a cost that grows
+    /// with the holding grows with the world in practice.[^3] The pass that
+    /// chooses the tiles therefore holds a set of the world rather than a
+    /// list of what it touched, and it takes a thread count.
     ///
     /// Every candidate is decided against the holders of the previous tick,
     /// so the result does not depend on the visiting order and it does not
@@ -387,6 +393,7 @@ impl Holding {
     ///
     /// [^1]: ADR-0053, a faction is a bit in a mask, and a relation is a plane, decision D4. `docs/adrs/accepted/adr-0053-a-faction-is-a-bit-in-a-mask-and-a-relation-is-a-plane.md`
     /// [^2]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
+    /// [^3]: Findings register, FND-285. `docs/FINDINGS.md`
     pub fn advance(
         &mut self,
         terrain: Terrain,
@@ -401,7 +408,10 @@ impl Holding {
         bridge.describes(arena)?;
         let threads = threads.max(1);
 
-        let candidates = self.candidates(arena);
+        let candidates = {
+            let _span = stage::open(Stage::HoldingCandidates);
+            self.candidates(arena, threads)
+        };
         if candidates.is_empty() {
             return Ok(0);
         }
@@ -418,6 +428,7 @@ impl Holding {
             .expect("the candidate list is not empty, so it needs at least one slot");
         let holders = &self.holders[..];
         let mut refusal: Option<BridgeError> = None;
+        let decide_span = stage::open(Stage::HoldingDecide);
         std::thread::scope(|scope| {
             let mut handles = Vec::new();
             for (chunk, slot) in candidates.chunks(chunk_len).zip(slots.entries_mut()) {
@@ -441,10 +452,15 @@ impl Holding {
                 }
             }
         });
+        drop(decide_span);
         if let Some(error) = refusal {
             return Err(error);
         }
 
+        // The join and the write are one stage. The join is what fixes the
+        // order of the result, and the write is what the order is for, so a
+        // reader who wants to know what applying a decision costs wants both.
+        let _span = stage::open(Stage::HoldingApply);
         let changes = slots.combine(Vec::new(), |mut joined, slot| {
             joined.extend_from_slice(slot);
             joined
@@ -460,43 +476,138 @@ impl Holding {
     /// can raise more than that, so the list holds the edge of a holding and
     /// not its area.[^1]
     ///
+    /// **The answer is a set, so the pass builds a set and not a list.** One
+    /// bit for each tile of the world holds it. A tile that two sources reach
+    /// sets the same bit twice, and the scan that reads the bits back visits
+    /// the words in ascending order, so the result is in ascending tile order
+    /// with no sort. The earlier pass pushed one index for every tile the
+    /// sources touched and then ordered them, which cost a comparison sort
+    /// over a list several times longer than the answer.[^2]
+    ///
+    /// The bit plane covers the world, so its size follows the lattice and
+    /// not the population.[^3] The pass allocates it here rather than holding
+    /// it, because it carries nothing between frames and the holding would
+    /// then copy it on every clone.
+    ///
     /// # References
     ///
     /// [^1]: ADR-0053, a faction is a bit in a mask, and a relation is a plane, decision D4. `docs/adrs/accepted/adr-0053-a-faction-is-a-bit-in-a-mask-and-a-relation-is-a-plane.md`
-    fn candidates(&self, arena: &SoldierArena) -> Vec<TileIdx> {
+    /// [^2]: Findings register, FND-285. `docs/FINDINGS.md`
+    /// [^3]: ADR-0096, cost follows the lattice, not the population. `docs/adrs/draft/adr-0096-cost-follows-the-lattice-not-the-population.md`
+    fn candidates(&self, arena: &SoldierArena, threads: usize) -> Vec<TileIdx> {
         let grid = self.layout.grid();
-        let mut candidates: Vec<u32> = Vec::with_capacity(arena.len() as usize);
-        for tile in &self.held {
-            let Some(address) = grid.address_of(*tile) else {
-                continue;
-            };
-            let holder = self.holders[tile.0 as usize];
-            let neighbours = grid.neighbours(address);
-            let inside = neighbours.iter().all(|neighbour| {
-                neighbour
-                    .and_then(|address| grid.index_of(address))
-                    .is_some_and(|index| self.holders[index.0 as usize] == holder)
-            });
-            if inside {
-                continue;
+        let tile_count = grid.tile_count();
+        let words = (tile_count as usize).div_ceil(64);
+        let holders = &self.holders[..];
+
+        // The held list is divided into contiguous runs, one for each thread.
+        // The division is a function of the list and of the thread count, and
+        // of nothing else, so no thread claims the next piece.[^1]
+        //
+        // Each thread fills its own bit plane, and the join below reads the
+        // planes in slot order. No two threads write one word.[^1] The plane
+        // is the memory that this shape costs, and the record says so.[^1]
+        //
+        // A thread reports the words it touched. The held list is in
+        // ascending tile order, so a run of it reaches one window of the
+        // plane and the pages outside that window are never written and never
+        // read. The whole join therefore costs one plane and not one for each
+        // thread.
+        //
+        // [^1]: ADR-0009, parallel stages write disjoint outputs, decisions D1, D2 and D3. `docs/adrs/accepted/adr-0009-parallel-stages-write-disjoint-outputs.md`
+        // [^2]: Findings register, FND-286. `docs/FINDINGS.md`
+        let threads = threads.max(1);
+        let chunk_len = self.held.len().div_ceil(threads).max(1);
+        let slot_count = self.held.len().div_ceil(chunk_len).max(1);
+        // One allocation holds every plane, and a thread takes one chunk of
+        // it. A plane for each thread in its own allocation costs one mapping
+        // for each thread on every frame, and giving those mappings back
+        // reaches every core.[^2]
+        let mut planes: Vec<u64> = vec![0; slot_count * words];
+        let mut slots: Slots<(usize, usize)> = Slots::filled(slot_count, (words, 0))
+            .expect("a slot count of one or more names at least one slot");
+        std::thread::scope(|scope| {
+            let mut handles = Vec::new();
+            for ((chunk, plane), slot) in self
+                .held
+                .chunks(chunk_len)
+                .zip(planes.chunks_mut(words))
+                .zip(slots.entries_mut())
+            {
+                handles.push(scope.spawn(move || {
+                    let mut lowest = words;
+                    let mut highest = 0usize;
+                    for tile in chunk {
+                        let index = tile.0;
+                        if index >= tile_count {
+                            continue;
+                        }
+                        let holder = holders[index as usize];
+                        let (neighbours, found) = neighbour_indices(grid, index);
+                        // A tile at the edge of the world has fewer than six
+                        // neighbours, so it is never inside a holding. This is
+                        // what the earlier pass said by treating an absent
+                        // neighbour as a mismatch.
+                        let inside = found == NEIGHBOUR_COUNT
+                            && neighbours[..found]
+                                .iter()
+                                .all(|neighbour| holders[*neighbour as usize] == holder);
+                        if inside {
+                            continue;
+                        }
+                        mark(plane, index);
+                        lowest = lowest.min((index / 64) as usize);
+                        highest = highest.max((index / 64) as usize + 1);
+                        for neighbour in &neighbours[..found] {
+                            mark(plane, *neighbour);
+                            lowest = lowest.min((*neighbour / 64) as usize);
+                            highest = highest.max((*neighbour / 64) as usize + 1);
+                        }
+                    }
+                    *slot = (lowest, highest);
+                }));
             }
-            candidates.push(tile.0);
-            for neighbour in neighbours.into_iter().flatten() {
-                if let Some(index) = grid.index_of(neighbour) {
-                    candidates.push(index.0);
-                }
+            for handle in handles {
+                // A thread here reads shared memory and writes its own chunk,
+                // so it has no failure of its own. A panic inside one is a
+                // defect, and it travels rather than being swallowed.
+                handle.join().expect("a candidate thread cannot fail");
+            }
+        });
+
+        let mut marked: Vec<u64> = vec![0; words];
+        for (plane, (lowest, highest)) in planes.chunks(words).zip(slots.entries()) {
+            for position in *lowest..*highest {
+                marked[position] |= plane[position];
             }
         }
-        // The arena iterates in slot order, which is fixed. The sort below
-        // makes the candidate order independent of that anyway.
+
+        // The arena iterates in slot order, which is fixed. The bit plane
+        // makes the answer independent of that anyway, because a set does not
+        // record the order in which it was filled.
+        let column = arena.tile_column();
         for soldier in arena.iter() {
-            if let Some(tile) = arena.tile(soldier) {
-                candidates.push(tile.0);
+            let tile = column[soldier.index() as usize];
+            if tile.0 < tile_count {
+                mark(&mut marked, tile.0);
             }
         }
-        candidates.sort_unstable();
-        candidates.dedup();
-        candidates.into_iter().map(TileIdx).collect()
+
+        // The count is read first so that the list is allocated once. It
+        // costs one pass over the words, which is small against the tiles the
+        // scan below emits.
+        let held_count: u32 = marked.iter().map(|word| word.count_ones()).sum();
+        let mut candidates: Vec<TileIdx> = Vec::with_capacity(held_count as usize);
+        for (position, word) in marked.iter().enumerate() {
+            let mut rest = *word;
+            let base = (position as u32) * 64;
+            while rest != 0 {
+                let bit = rest.trailing_zeros();
+                candidates.push(TileIdx(base + bit));
+                rest &= rest - 1;
+            }
+        }
+        candidates
     }
 
     /// Writes the decided changes and repairs the three derived parts.
@@ -638,6 +749,73 @@ impl Holding {
     }
 }
 
+/// Sets the bit of one tile in a tile bit plane.
+#[inline]
+fn mark(marked: &mut [u64], tile: u32) {
+    let word = (tile / 64) as usize;
+    if let Some(entry) = marked.get_mut(word) {
+        *entry |= 1u64 << (tile % 64);
+    }
+}
+
+/// Returns the tile indices of the neighbours of one tile, and how many the
+/// world holds.
+///
+/// The grid is axial and the index of an address is the row times the width
+/// plus the column, so each of the six directions is one fixed offset from
+/// the index.[^1] The address arithmetic is therefore one division for the
+/// tile and a comparison for each direction, rather than a conversion to an
+/// address and back for every neighbour.
+///
+/// The order is the direction order that the grid gives, and the entries
+/// after `found` hold nothing. A caller that needs to know which direction is
+/// absent asks the grid instead.
+///
+/// **This is a second way to say what the grid already says.** The test
+/// `neighbour_indices_agree_with_the_grid` derives both answers for every
+/// tile of a small world, edges included, and compares them.[^2]
+///
+/// # References
+///
+/// [^1]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
+/// [^2]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`
+#[inline]
+fn neighbour_indices(grid: Grid, tile: u32) -> ([u32; NEIGHBOUR_COUNT], usize) {
+    let width = grid.width();
+    let height = grid.height();
+    let column = tile % width;
+    let row = tile / width;
+    let mut neighbours = [0u32; NEIGHBOUR_COUNT];
+    let mut found = 0usize;
+    let mut take = |index: u32| {
+        neighbours[found] = index;
+        found += 1;
+    };
+    let east = column + 1 < width;
+    let west = column >= 1;
+    let north = row >= 1;
+    let south = row + 1 < height;
+    if east {
+        take(tile + 1);
+    }
+    if east && north {
+        take(tile + 1 - width);
+    }
+    if north {
+        take(tile - width);
+    }
+    if west {
+        take(tile - 1);
+    }
+    if west && south {
+        take(tile - 1 + width);
+    }
+    if south {
+        take(tile + width);
+    }
+    (neighbours, found)
+}
+
 /// The working memory of one thread that decides candidate tiles.
 ///
 /// The tally is indexed by the faction bit, and the supporter list names the
@@ -766,4 +944,62 @@ fn decide(
     }
 
     Ok(best.map(|(_, faction)| Holder::of(FactionId(faction))))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The candidate pass derives a neighbour index from an offset. The grid
+    /// derives it from an address. Two sites state one fact, so this test
+    /// derives both for every tile of a small world and compares them.[^1]
+    ///
+    /// The world is deliberately small and not square, so that every edge,
+    /// every corner and the wrap between two rows is covered.
+    ///
+    /// # References
+    ///
+    /// [^1]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`
+    #[test]
+    fn neighbour_indices_agree_with_the_grid() {
+        let grid = Grid::new(7, 5).expect("the extent must describe a grid");
+        for tile in 0..grid.tile_count() {
+            let address = grid
+                .address_of(TileIdx(tile))
+                .expect("the index is inside the world");
+            let expected: Vec<u32> = grid
+                .neighbours(address)
+                .into_iter()
+                .flatten()
+                .filter_map(|neighbour| grid.index_of(neighbour))
+                .map(|index| index.0)
+                .collect();
+            let (found, count) = neighbour_indices(grid, tile);
+            assert_eq!(
+                &found[..count],
+                &expected[..],
+                "the two derivations disagree at tile {tile}"
+            );
+        }
+    }
+
+    /// A bit plane holds a set, and the scan reads it back in ascending
+    /// order. This proves the two halves of that against a small case.
+    #[test]
+    fn a_marked_bit_plane_reads_back_in_ascending_order() {
+        let mut marked = vec![0u64; 3];
+        for tile in [130u32, 0, 63, 64, 130] {
+            mark(&mut marked, tile);
+        }
+        mark(&mut marked, 500);
+        let mut read: Vec<u32> = Vec::new();
+        for (position, word) in marked.iter().enumerate() {
+            let mut rest = *word;
+            while rest != 0 {
+                read.push((position as u32) * 64 + rest.trailing_zeros());
+                rest &= rest - 1;
+            }
+        }
+        assert_eq!(read, vec![0, 63, 64, 130]);
+    }
 }

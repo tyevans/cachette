@@ -17,6 +17,9 @@ figures in this project are still derived, and one blocker states which.[^4]
 Measured figures exist. A benchmark lives in the repository and a script runs
 it on the target platform.[^5] [^6]
 
+A third run named every stage of a frame and measured what huge pages are
+worth. Two sections hold it, and it comes from one instance on one commit.
+
 The figures below come from two runs on one date, on two instances of
 different size. They cover five quantities of the public crate interface: the
 cost of a frame, the cost of building a world, the cost of the whole-world
@@ -39,6 +42,25 @@ everything it made.
 just graviton-bench full
 just graviton-orphans
 ```
+
+Two profiles take the figures the later sections hold. The first names every
+stage of a frame. The second runs the same point under each huge page setting,
+in a process for each.
+
+```
+CACHETTE_BENCH_INSTANCE=c7g.4xlarge CACHETTE_BENCH_FEATURES=stage-cost \
+  CACHETTE_BENCH_POINT="stage-cost 4096x4096 1000000 12 scattered" \
+  ./scripts/graviton-benchmark.sh stage-cost
+
+CACHETTE_BENCH_INSTANCE=c7g.4xlarge CACHETTE_BENCH_FEATURES=stage-cost \
+  CACHETTE_BENCH_THP="never madvise always" \
+  CACHETTE_BENCH_POINT="stage-cost 4096x4096 1000000 12 scattered" \
+  ./scripts/graviton-benchmark.sh hugepages
+```
+
+The stage table is behind a crate feature and it is off by default. A run
+without the feature reports zeros and says so in its own preamble, so a reader
+cannot mistake a build that does not measure for a frame that cost nothing.
 
 The script needs the AWS command line tool, authenticated. Every axis is a
 parameter: the instance type, the extents, the thread counts and the unit
@@ -232,6 +254,13 @@ reach does not depend on the placement. The level does.
 bytes and a scattered one holds 875,999,232, which is one part in four
 thousand.
 
+**The order of the unit arena does not move between these two rows, and a
+reader has taken it as though it did.** Both patterns spawn in ascending tile
+order, so the arena carries the units in cell order in both. The ratio above
+prices the density of the population. It does not price the arena order, and
+no row of this document does. A backlog item read it as an arena order figure
+and a finding records the correction.[^ARENAORDER]
+
 ## The thread count moves the memory
 
 Every memory row in this document was taken at one thread, and the thread
@@ -393,7 +422,322 @@ settlements, home sites and a running economy, and the benchmark world has
 none of the three. That measurement is the one the rule rests on, and this run
 did not take it.
 
+## Every stage of a frame, by name
+
+**This section supersedes the stage split below it.** That split had three
+switches and left 62 percent of the cost in one residual. This one names every
+pass, and the residual is 0.0025 percent.
+
+**A later section supersedes this one.** Backlog item 0291 changed the largest
+pass named here, and the section that measures the tree after it is above the
+huge page section.[^ITEM291] Read this table as the cost before that change.
+
+Machine C. 16,777,216 tiles, 1,000,000 units scattered, 12 threads, block edge
+32. The kernel gave transparent huge pages on the `madvise` setting, which is
+the default of the image and which this engine never asks for, so read this
+table as the cost without huge pages. The next section gives the same table
+with them.
+
+| Machine C | Value |
+|---|---|
+| Instance type | `c7g.4xlarge` |
+| Region | `us-west-2` |
+| Processor | Graviton3. Implementer `0x41`, part `0xd40` |
+| Hardware threads | 16 |
+| Cache line | 64 bytes |
+| Memory | 32,246,808 kB |
+| Kernel | `Linux 6.18.44-99.149.amzn2023.aarch64` |
+| Compiler | `rustc 1.91.1 (ed61e7d7e 2025-11-07)` |
+| Base commit | `79201addd452178480684d5c4c61777eb39d5b0b` |
+| Working tree | Modified. The script copies the tracked files with the content the tree holds |
+| Crate features | `stage-cost` |
+| Date | 3 September 2026 |
+
+Every row is the mean of nine frames after two warm-up frames.
+
+**An indented row comes from a second run**, at the same extent, thread count,
+placement, setting and base commit, from a tree that added three spans inside
+the largest stage. Its share is against the frame that second run measured, which is 816.1
+milliseconds. A share here is a proportion and not an amount, and the
+paragraph below the table gives the spread between the two runs.
+
+| Stage | ns for each frame | Share of the frame | Takes a thread count |
+|---|---|---|---|
+| `holding_spread` | 514,291,130 | 61.5 percent | yes |
+| — of which `holding_candidates` | 400,791,924 | 49.1 percent | **no** |
+| — of which `holding_decide` | 71,110,442 | 8.7 percent | yes |
+| — of which `holding_apply` | 32,707,035 | 4.0 percent | **no** |
+| `change_merge` | 120,529,050 | 14.4 percent | **no** |
+| `rebuild_level_1` | 77,987,770 | 9.3 percent | yes |
+| `bridge_refresh_barrier` | 41,829,834 | 5.0 percent | yes |
+| `admit` | 29,298,598 | 3.5 percent | yes |
+| `tile_scan` | 16,548,947 | 2.0 percent | yes |
+| `influence_solve` | 12,979,788 | 1.6 percent | yes |
+| `stamp_holders` | 6,850,640 | 0.8 percent | **no** |
+| `log_join` | 5,983,495 | 0.7 percent | **no** |
+| `movement_intents` | 4,698,552 | 0.6 percent | yes |
+| `gather` | 2,062,766 | 0.2 percent | yes |
+| `build` | 1,602,971 | 0.2 percent | yes |
+| `choose` | 570,560 | 0.07 percent | yes |
+| `place_granted` | 517,411 | 0.06 percent | **no** |
+| `consume` | 165,279 | 0.02 percent | yes |
+| `reap` | 38,817 | under 0.01 percent | yes |
+| `apply_rates` | 545 | under 0.01 percent | yes |
+| `settle_positions` | 400 | under 0.01 percent | yes |
+| `bridge_refresh_after_reap` | 260 | under 0.01 percent | yes |
+| `bridge_refresh_opening` | 174 | under 0.01 percent | yes |
+| `depletion_recover` | 87 | under 0.01 percent | no |
+| **Every stage** | **835,957,085** | | |
+| **The frame, timed from outside** | **835,978,143** | | |
+
+**The residual is 21,058 nanoseconds, which is 0.0025 percent of the frame.**
+That is the part of the step no stage covers, and it includes what the clock
+costs to read forty-two times. The frame is now attributed.
+
+**The apparatus agrees with the earlier run.** A scattered frame at this
+extent, this unit count and this thread count measured 835,171,248 ns on
+machine A at an earlier commit. This run measures 835,978,143 ns. The two
+differ by one part in a thousand, and they were taken by different code on
+different machines, so the instrument costs nothing this apparatus can see.
+
+**Three stages are 85.3 percent of the frame.** They are the holding spread,
+the change merge and the level 1 rebuild.
+
+**The holding spread alone is 61.5 percent, and no backlog item named it
+before this run.** The earlier split could not see it, because the spread has
+no switch and the split priced only what a switch could remove.
+
+**Inside it, one serial function is 49.1 percent of the whole frame.** The
+three indented rows come from a second run on the same machine type and the
+same base commit, and they divide the spread. The candidate list walks every held tile
+and every live unit on the calling thread, pushes an index for each, then
+sorts several million indices and removes the duplicates. The half that
+decides takes a thread count and costs 71.1 milliseconds. The half that
+chooses what to decide about takes none and costs five and a half times as
+much.
+
+Those three rows sum to 504.6 milliseconds against 507.9 for the spread, so
+3.3 milliseconds of the spread is the checking and the setting up around them.
+An indented row is inside the row above it, so it is not added to the frame
+twice.
+
+**The second run measured a frame at 816.1 milliseconds against 835.98 for the
+first, under the same setting.** The two runs differ by 2.4 percent, on one
+machine type, from one base commit, with three spans added between them. Treat
+2.4 percent as the spread between two runs of this apparatus, and read every
+share in this section as a proportion rather than as an amount.
+
+**The choice is no longer expensive.** The earlier split measured it at 71.4
+milliseconds, which was 26 percent of the cost of a unit. It is now 0.571
+milliseconds. The pass decides once for each pair of cell and need instead of
+once for each unit, and the two figures are the same pass before and after
+that change.
+
+**Five stages of the frame take no thread count**, and together they are 16.0
+percent of it. The change merge is nearly all of it. It sorts the tile changes
+of the frame by tile index on the calling thread, and then merges one ascending
+run. Its cost follows the number of changed tiles, which follows the tile
+count.
+
+**Two of the three rows inside the holding spread take no thread count as
+well**, and they are a further 53.1 percent of the frame. The spread itself
+takes one, so a reader who counts only the outer rows misses them.
+
+**The column that says whether a stage takes a thread count is a declaration
+in the source, not a measurement.** A stage declared `no` that improves with
+the thread count means the declaration is wrong, and this table is where the
+two can be compared.
+
+## Every stage of a frame, after the candidate pass became a bit plane
+
+**This section supersedes the section above it.** That one measured the tree
+before backlog item 0291, in which the candidate pass of the holding spread
+built a list of tile indices and ordered it with a comparison sort. The pass
+now sets one bit for each candidate in a plane over the tiles and reads the
+plane back in ascending order, and it takes a thread count.[^ITEM291]
+
+Machine C, the same instance type, the same region and the same base commit as
+the section above. The tree is modified against that commit, which is how the
+script carries a change that is not yet merged.
+
+| Machine C | Value |
+|---|---|
+| Instance type | `c7g.4xlarge` |
+| Region | `us-west-2` |
+| Processor | Graviton3. Implementer `0x41`, part `0xd40` |
+| Hardware threads | 16 |
+| Cache line | 64 bytes |
+| Kernel | `Linux 6.18.44-99.149.amzn2023.aarch64` |
+| Compiler | `rustc 1.91.1 (ed61e7d7e 2025-11-07)` |
+| Base commit | `14e311a1088825f32ee4c421827e87a286d4094d` |
+| Working tree | Modified. The script copies the tracked files with the content the tree holds |
+| Crate features | `stage-cost` |
+| Date | 3 September 2026 |
+
+16,777,216 tiles, 1,000,000 units scattered, 12 threads, block edge 32. The
+kernel gave transparent huge pages on the `madvise` setting, which the engine
+never asks for, so read this table as the cost without huge pages. Every row
+is the mean of nine frames after two warm-up frames.
+
+**Every row here comes from one run**, unlike the section above, so the three
+indented rows and the outer rows are the same nine frames and their shares are
+against the same frame.
+
+| Stage | ns for each frame | Share of the frame | Takes a thread count |
+|---|---|---|---|
+| `holding_spread` | 124,953,422 | 26.96 percent | yes |
+| — of which `holding_decide` | 71,397,398 | 15.41 percent | yes |
+| — of which `holding_apply` | 35,640,121 | 7.69 percent | **no** |
+| — of which `holding_candidates` | 16,732,018 | 3.61 percent | yes |
+| `change_merge` | 119,454,829 | 25.78 percent | **no** |
+| `rebuild_level_1` | 78,112,992 | 16.86 percent | yes |
+| `bridge_refresh_barrier` | 40,511,452 | 8.74 percent | yes |
+| `admit` | 30,605,355 | 6.60 percent | yes |
+| `tile_scan` | 22,871,237 | 4.94 percent | yes |
+| `influence_solve` | 12,846,131 | 2.77 percent | yes |
+| `stamp_holders` | 6,660,936 | 1.44 percent | **no** |
+| `log_join` | 5,924,590 | 1.28 percent | **no** |
+| `movement_intents` | 4,722,220 | 1.02 percent | yes |
+| `gather` | 2,155,229 | 0.47 percent | yes |
+| `build` | 1,591,385 | 0.34 percent | yes |
+| `choose` | 565,668 | 0.12 percent | yes |
+| `place_granted` | 517,194 | 0.11 percent | **no** |
+| `consume` | 166,714 | 0.04 percent | yes |
+| `reap` | 31,657 | under 0.01 percent | yes |
+| `apply_rates` | 633 | under 0.01 percent | yes |
+| `bridge_refresh_after_reap` | 346 | under 0.01 percent | yes |
+| `settle_positions` | 297 | under 0.01 percent | yes |
+| `bridge_refresh_opening` | 284 | under 0.01 percent | yes |
+| `depletion_recover` | 137 | under 0.01 percent | **no** |
+| **Every stage** | **451,692,718** | | |
+| **The frame, timed from outside** | **463,431,747** | | |
+
+**The frame costs 463.4 milliseconds against 825.4 for the same apparatus
+before the change.** That is 1.78 times less, and it is 4.6 times the 100
+millisecond budget instead of 8.3 times.[^BUDG291]
+
+**The candidate pass costs 16.7 milliseconds against 400.9.** That is 24.0
+times less. It was 49.1 percent of a frame and it is now 3.6 percent. The two
+figures come from two runs of this script on this instance type at this base
+commit, one before the change and one after it.
+
+**The measurement that gives the 825.4 milliseconds is a run of its own.** The
+section above quotes 836.0 from an earlier run of the same point, and the two
+differ by 1.3 percent. Read every comparison in this section against 825.4,
+because that run and this one are a pair.
+
+**The residual is 11,739,029 nanoseconds, which is 2.53 percent of the
+frame.** It was 22,202 nanoseconds before the change, and the finding holds
+what is known about the difference and what was ruled out.[^RESID291]
+
+**Three stages are 69.6 percent of the frame.** They are the holding spread,
+the change merge and the level 1 rebuild, which is the same three as before
+the change, in the same order. The spread fell from 61.5 percent of a larger
+frame to 27.0 percent of a smaller one.
+
+**The change merge is now the largest serial pass in the engine.** It is 119.5
+milliseconds and it takes no thread count, so it bounds every thread count
+above it. Five stages take no thread count and together they are 34.5 percent
+of the frame, and the merge is three quarters of that.
+
+**Two of the three rows inside the holding spread now take a thread count.**
+The one that does not is the apply, at 35.6 milliseconds. It sorts the changed
+tiles and merges one ascending run into the held list, which is the same shape
+as the change merge.
+
+## Huge pages
+
+**The engine asks for no huge page.** This measurement changes the kernel
+setting for the whole machine instead, which is the cheapest form of the
+experiment: the same binary, the same base commit, the same machine, three
+processes, and the kernel backing the large anonymous mappings either at 4 kB
+or at 2 MB.
+
+Machine C. 16,777,216 tiles, 1,000,000 units scattered, 12 threads. Each row
+is a process of its own, because a process keeps the mapping it was given.
+
+| Setting | Frame, ns | On huge pages, bytes | Resident, bytes |
+|---|---|---|---|
+| `never` | 841,364,267 | 0 | 1,051,910,144 |
+| `madvise` | 835,978,143 | 0 | 1,051,910,144 |
+| `always` | 803,042,781 | 719,323,136 | 1,079,799,808 |
+
+**A frame costs 3.9 percent less on huge pages.** That is 32.9 milliseconds of
+a 836 millisecond frame.
+
+**A second run repeated it and agreed.** The run that divided the holding
+spread measured the same two settings again, on the same machine type, from
+the same base commit, from a tree that added three spans.
+
+| Setting | Frame, ns | On huge pages, bytes | Resident, bytes |
+|---|---|---|---|
+| `madvise` | 816,126,687 | 0 | 1,051,869,184 |
+| `always` | 780,600,154 | 616,562,688 | 1,079,472,128 |
+
+That is 4.35 percent against 3.94 for the first run. **The two runs agree on
+the direction and roughly on the size, and they disagree with each other by
+more than the effect is quoted to.** Two figures near four percent is what
+this apparatus supports. One figure to two decimal places is not.
+
+**Which stages gained is the same answer in both runs.** In the second run the
+change merge gives 16.1 milliseconds, the candidate list 11.7 and the holding
+apply 0.9. The decide half is flat to one part in three thousand, at
+71,110,442 nanoseconds and 71,084,844. **The stage that gains nothing is the
+one that reads a compact list**, and the stages that gain are the ones that
+walk a large array.
+
+**The two settings the engine cannot tell apart differ by 0.64 percent.** The
+engine calls no advice, so `never` and `madvise` give it the same 4 kB pages,
+and the huge page column proves it: both landed nothing.
+
+That 0.64 percent is the spread between two rows taken minutes apart in one
+sweep. The spread between two sweeps is larger, at 2.4 percent. **Read the
+huge page effect as a comparison inside one sweep**, which is the comparison
+that was made: two rows from one machine, one binary, minutes apart, differing
+in one kernel setting. Both sweeps gave near four percent that way.
+
+**The setting reached the process.** 719,323,136 bytes of the resident set sat
+on huge pages under `always`, which is 66.6 percent of it. A row that reported
+a time and not this column would be a claim that the setting worked.
+
+**The saving is concentrated in three stages.** Every other stage moved by
+less than half a millisecond.
+
+| Stage | `madvise`, ns | `always`, ns | Difference |
+|---|---|---|---|
+| `change_merge` | 120,529,050 | 105,128,942 | −15,400,108 |
+| `holding_spread` | 514,291,130 | 499,920,726 | −14,370,404 |
+| `bridge_refresh_barrier` | 41,829,834 | 38,466,307 | −3,363,527 |
+| Everything else | 159,307,071 | 159,505,748 | +198,677 |
+
+**Those are the three passes that write scattered over a large array**, which
+is where item 0269 predicted a translation cost would appear. The prediction
+named the shape and the stage table found it in that shape.
+
+**The memory cost is five times what the item estimated.** The item put the
+waste at the end of an allocation under one part in two hundred. The resident
+set grew by 27,889,664 bytes, which is 2.65 percent.
+
+**This is one run for each condition, taken in two sweeps.** Nine frames for
+each row, one process for each row, one machine type, one base commit, two
+trees. It is enough to say
+the effect exists and that it is near four percent. It is not enough to quote
+it to two figures: the two runs differ by 2.4 percent under the same setting,
+and two conditions that should be identical differ by 0.64 percent.
+
+**Nothing here is a code change.** A machine setting is not something the
+engine controls where it runs. Capturing this saving portably means asking for
+the pages in the allocation, and that is a separate item.[^19]
+
 ## Where the unit cost goes
+
+**A later run supersedes this section, and the section above holds it.** The
+engine now records what every stage costs, so the residual this section could
+not divide is 0.0025 percent rather than 62 percent. Two figures here are also
+stale against the code: the choice cost 71.4 milliseconds when this was taken
+and costs 0.571 now, because the pass decides for each cell and need rather
+than for each unit. This section is kept because it is what the project
+believed and it names its own machine and commit.
 
 The unit passes are 274 milliseconds of a 521 millisecond frame at the target
 scale, at 12 threads. This section splits that as far as the public interface
@@ -795,3 +1139,8 @@ commit what changed. Do not edit a row to make a later run agree with it.
 [^16]: ADR-0083, the gate build checks every integer overflow. `docs/adrs/draft/adr-0083-the-gate-build-checks-every-integer-overflow.md`
 [^17]: Backlog item 0229. `docs/backlog/proposed/0229-explain-the-frame-cost-at-the-smallest-extent.md`
 [^18]: ADR-0084, the world reserves the unit columns at construction, decision D3. `docs/adrs/draft/adr-0084-the-world-reserves-the-unit-columns-at-construction.md`
+[^19]: Backlog item 0290, ask for a huge page in the allocation. `docs/backlog/proposed/0290-ask-for-a-huge-page-in-the-allocation.md`
+[^ARENAORDER]: Findings register, FND-273. `docs/FINDINGS.md`
+[^ITEM291]: Backlog item 0291, stop the holding spread walking the population. `docs/backlog/complete/0291-stop-the-holding-spread-walking-the-population.md`
+[^BUDG291]: Budgets and costs, the scale constants. `docs/reference/budgets.md`
+[^RESID291]: Findings register, FND-286. `docs/FINDINGS.md`

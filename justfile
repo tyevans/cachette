@@ -63,8 +63,11 @@ test-python:
 # to name the colours. Run `just inspect` for every number it does not show.
 #
 # Open the window and watch the world run. Needs a display.
+#
+# The window library is not a default feature, so this recipe names it. Every
+# other recipe here fills a frame into memory and needs no window at all.
 watch:
-    cargo run --release --package cachette-view
+    cargo run --release --package cachette-view --features window
 
 # This is where the panel went. It holds every section, at a height that never
 # cuts, and a person reads it without opening a window.
@@ -121,6 +124,30 @@ probe:
     ! cargo test --package cachette-core --features probe-nondeterminism --test starvation
     ! cargo test --package cachette-core --features probe-nondeterminism --test influence
     cargo test --package cachette-core --features probe-nondeterminism --test determinism_probe
+
+# Check the unsafe code with Miri. ADR-0097 D4.
+#
+# Miri interprets the program and reports an aliasing defect, a provenance
+# defect, or a read of an uninitialised byte. No other gate in this project
+# sees any of those. The state hash reads whole structures and whole columns
+# as raw bytes, and an undeclared padding byte puts an uninitialised byte into
+# the hash. Such a hash differs between two runs of one binary, and on a
+# development machine the byte is reliably zero, so nothing else catches it.
+#
+# The list is short on purpose and it is a floor, not a ceiling. Miri
+# interprets every instruction, so a world at the target unit population does
+# not finish. Each test below reaches a byte-level read at a size Miri can
+# reach. A subsystem that adds an unsafe operation adds a test here that
+# reaches it.
+#
+# Miri needs the nightly toolchain and the standard library source. Both are
+# in rust-toolchain.toml, so `rustup toolchain install` brings them.
+#
+# Not a fast gate. `just check` does not run it.
+miri:
+    cargo miri test --package cachette-core --test state_bytes_are_initialised
+    cargo miri test --package cachette-core --test event_layout
+    cargo miri test --package cachette-core --test value_types
 
 # Record the golden state hash files. Read the difference before you commit.
 golden:

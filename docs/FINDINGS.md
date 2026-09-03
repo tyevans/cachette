@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-286**
+**Next number: FND-293**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -1232,6 +1232,107 @@ that existed to make fog cheap was the most expensive thing in the frame.
 
 ## E. Layout and platform corrections
 
+### FND-277 — The residual was one pass nobody had named, and it was 61 percent of the frame
+
+**Believed.** The 170 milliseconds the stage split could not divide held
+several passes in roughly comparable parts. The register named six of them:
+the movement intents, admission, the holder spread, the death scan, the part
+of the level 1 rebuild that reads the units, and the walk over live units
+inside the choice pass.[^FND277A]
+
+**True.** It is one pass, and inside that pass it is one function. With every
+stage of a frame named and timed, the holding spread is 514.3 milliseconds of
+a 836 millisecond frame, which is 61.5 percent of the whole frame. The three
+largest stages together are 85.3 percent. The death scan is 0.04
+milliseconds, admission is 29.3, and the movement intents are 4.7.
+
+**Inside the spread, the candidate list is 49.1 percent of the whole frame**,
+and it runs on the calling thread. It walks every held tile and every live
+unit, pushes an index for each, then sorts several million indices and removes
+the duplicates. The half of the pass that decides takes a thread count and
+costs 71.1 milliseconds. The half that chooses what to decide about takes none
+and costs five and a half times as much.
+
+**Evidence.** Two runs on a Graviton3 instance at 16,777,216 tiles, 1,000,000
+units scattered, 12 threads. The first named every stage, and the second
+divided the largest one. Every stage is a row and the register holds
+them.[^FND277A] The sum of the stages is 835,957,085 nanoseconds against
+835,978,143 for the same frames timed from outside, so the part that is still
+unattributed is 0.0025 percent.
+
+The two runs measured the frame at 836.0 and 816.1 milliseconds under the same
+setting, so they differ by 2.4 percent. Read a share here as a proportion and
+not as an amount.
+
+**Follows.** Four things.
+
+**A split by subtraction finds only what has a switch.** The old method priced
+a pass by running a frame without it, and the holding spread has no switch, so
+the largest thing in the frame was invisible to the method that existed to
+find it. The residual was not a mixture. It was one pass that the instrument
+could not point at.
+
+**The next optimisation is not the one the backlog names.** Four items propose
+a change to the layout or the allocation, and the priority index put them
+above the item that made the frame measurable. The measurement moved the
+order: one pass is worth more than the four items together.
+
+**Prices go stale, and one in the register was stale by a factor of 125.** The
+same split measured the choice at 71.4 milliseconds and called it 26 percent
+of the cost of a unit. The choice now costs 0.571 milliseconds, because item
+0238 made the pass decide once for each pair of cell and need. Nothing failed
+when that figure went stale, and nothing would have.
+
+**One measurement is enough to name a pass and not enough to name the part of
+it that costs.** The first run said the spread was 61 percent. It took a
+second run, with three spans inside the spread, to say that one serial
+function is 49 percent of the frame. A stage is the unit that a reader can
+act on, and this one needed two.
+
+**This row is history, and the code no longer matches its present tense.**
+Backlog item 0291 replaced the list and the sort with a bit plane over the
+tiles, and gave the pass a thread count. The pass costs 16.7 milliseconds
+instead of 400.9, and a frame costs 463.4 milliseconds instead of
+825.4.[^FND277A] Two findings hold what that work corrected, and one of them
+shows that the figure this row rests on was read from the wrong
+world.[^F277B] [^F277C]
+
+### FND-278 — Huge pages are worth 3.9 percent, and they cost five times the memory the estimate gave
+
+**Believed.** Huge pages might explain part of the unattributed cost, and the
+memory they waste at the end of an allocation would be under one part in two
+hundred.[^FND278A]
+
+**True.** Both halves are answered, and the second was wrong. A frame at the
+target scale costs 3.9 percent less with the kernel giving 2 MB pages, and the
+resident set grows by 2.65 percent rather than by 0.5.
+
+**Evidence.** One run on a Graviton3 instance, one commit, one binary, three
+processes, one for each kernel setting. The register holds every row.[^FND277A]
+The frame fell from 835,978,143 nanoseconds under the default setting to
+803,042,781 under `always`. Of the resident set, 719,323,136 bytes sat on huge
+pages under `always` and none did under either other setting, so the setting
+demonstrably reached the process. The resident set grew by 27,889,664 bytes.
+
+**Follows.** Three things.
+
+**The prediction named the shape and the shape held.** The item said a
+translation cost would appear spread across every pass that touches a large
+array, and invisible to a split that measures stages. Three stages account for
+the whole 32.9 milliseconds and every other stage moved by less than half a
+millisecond. The three are the passes that write scattered over a large array.
+
+**A time row without an occupancy row is a claim rather than a
+measurement.** Two of the three settings gave this engine identical pages,
+because the engine calls no advice. Only the huge page column separates "the
+setting did nothing" from "huge pages do nothing", and they are different
+answers.
+
+**Two conditions that should be identical differed by 0.64 percent**, so that
+is the noise floor of this apparatus at one run for each condition. A result
+this size is worth quoting to one figure and not to two.
+
+
 ### FND-235 — A stored watermark read nothing, because a sentinel already said it
 
 **Believed.** The record of descent needed a stored count of how many rows the
@@ -1365,6 +1466,194 @@ one. Give Python the events from the place that declares them, by a column for
 each field, by a derived description of the layout, or by a query the engine
 answers. Do not add a format string to Python. A backlog item holds the
 choice.[^F137D]
+
+### FND-273 — The packed against scattered ratio measures the density, not the arena order
+
+**Believed.** The unit arena holds units in spawn order, nothing reorders it,
+and that is why a unit costs 2.11 times as much scattered as packed at 12
+threads. The backlog item took the ratio as the size of the prize for
+reordering the arena by cell.[^F273A] [^F273B]
+
+**True.** The ratio measures the placement of the units over the world. Both
+fixtures spawn in ascending tile order, so the arena is in cell order in both
+rows. One puts the units on consecutive tiles and the other puts them one in
+every seventeen. **A reorder of the arena cannot recover any part of that
+ratio, because the row that pays it already has the order the reorder would
+produce.**
+
+**Evidence.** A third fixture puts the units on the same tiles as the
+scattered row and spawns them in a permuted order, so the population is fixed
+and the arena order is the only thing that moves. The mean slot distance
+between two units next to each other in cell order is 108 in the ascending row
+and 83,269 in the permuted one, which is the decorrelation the item
+describes.[^F273C] The unit cost rises by 1.45 at one thread and 1.34 at four,
+not by 2.11. Both rows come from one process on one machine. The machine is a
+development x86-64 machine that other work shared, so the figures bound the
+shape of the effect and are not evidence about the target platform.[^28]
+
+**Follows.** Two things.
+
+**A benchmark that moves two variables together cannot price either.** The
+placement rows change the density and the arena order in one step, and the
+arena order happens not to move at all. The row that separates them is the one
+the decision needed.
+
+**The prize is real and it is smaller than the item claimed.** A drifted arena
+costs 1.24 to 1.45 on the unit half rather than 2.11, and only the part of
+that which survives the walk order is what a physical reorder would
+buy.[^F274A]
+
+### FND-274 — The unit pass is bound by the tile side, so the walk order costs more than the arena order
+
+**Believed.** A pass over the units of one cell is slow because the unit
+columns of those units sit far apart, and the fix is to move the units in the
+arena.[^F273A]
+
+**True.** The movement pass walks the live units and reads five things for
+each one. Four of them are on the tile side of the world: the exit of its
+cell, the address of its tile, the ground of its target, and the address of
+that target. One is on the unit side. **The tile side is the larger footprint
+by an order of magnitude, and the order that makes it ascending is the order
+of the walk, not the order of the arena.**
+
+Walking the arena in slot order reads the tile side at random once the arena
+has drifted. Walking in cell order reads it in ascending tile order whatever
+the arena holds. The bridge already sorts every live unit on the tile key once
+for each frame, at the barrier, so that order costs the frame nothing
+more.[^F274B]
+
+**Evidence, and what it does not cover.** The movement pass now walks the
+bridge order. The golden state hash did not move, at any scenario, and the
+whole suite stayed green.[^F274C]
+
+**The claim that no result reads the walk order was checked by perturbation
+and not by assertion.** The walk was reversed, and the golden hash still
+matched the stored file. Admission sorts what it receives on a total key of
+the target tile and the whole identity, so the same set in another order gives
+the same answer.[^F274D]
+
+**The size of the gain was not measured.** Four runs of the before and the
+after build, at four threads, gave ratios of the drifted unit cost to the
+packed one between 1.06 and 2.26, in both directions, with the two builds
+swapping places between runs. The development machine ran between eleven and
+fifty-seven runnable threads on sixteen cores while the runs took their
+samples, and the load moved by a factor of four inside one run. **The spread
+of the apparatus is larger than the effect it was measuring, so no figure here
+states what the change bought.** The measurement that would state it belongs
+on the target platform.[^28]
+
+**What the change rests on instead is structural and checked.** The pass reads
+four tile-side values for each unit. Walking in cell order makes those reads
+ascending in the tile index, and walking a drifted arena in slot order makes
+them random. That the penalty for a drifted arena exists at all is measured,
+in two independent runs of the before build: 1.24 and 1.34 at four threads,
+and 1.45 at one.
+
+**Follows.** Two things.
+
+**Ask what a pass reads before deciding where to move what it reads.** The
+item proposed moving the units. The larger of the two footprints was on the
+other side, and the order that fixes it was already built and thrown away
+every frame.
+
+**A change can be right and still unmeasured, and the report must say which.**
+The residual that only a physical reorder removes is now separable from the
+part the walk order removes, and both belong on a target-platform run before
+anyone spends a refactor on them.[^F274A]
+### FND-285 — The held ground of the demonstration world is 140 times smaller than the held ground of the benchmark world
+
+**Believed:** the holding covers a few tens of thousands of tiles. The register
+holds the figure. The demonstration world, founded for four factions with a
+group each, holds 7,866 tiles at tick 50 and 46,992 at tick 200.[^F285A] That
+figure was read as the size of a holding, and work on the candidate pass was
+planned from it: at 46,992 held tiles the pass would sort about 1.3 million
+indices, of which one million come from the units.
+
+**True:** the benchmark world holds 6,615,358 tiles after nine frames. That is
+39 percent of the world and 141 times the demonstration figure. The raw
+candidate list reaches 14,884,176 entries, of which 13.9 million come from the
+held tiles and one million from the units. **The units are 6.7 percent of the
+list, not 77 percent.**
+
+**The measurement.** A probe inside the candidate pass, printing the held
+count and the list length for each frame. Machine: the development machine,
+not the target platform, because the two counts are properties of the
+simulation and not of the processor. 16,777,216 tiles, 1,000,000 units
+scattered, 12 threads, ten frames.
+
+| Frame | Tiles held | Raw candidate entries | Distinct candidates |
+|---|---|---|---|
+| 1 | 0 | 1,000,000 | 998,551 |
+| 2 | 998,551 | 7,984,285 | 2,616,812 |
+| 5 | 3,218,758 | 12,724,736 | 4,355,868 |
+| 10 | 6,615,358 | 14,884,176 | 4,821,144 |
+
+**The cause is the population, and it is a fixture difference and not a
+defect.** The demonstration places 192 units on 16,777,216 tiles. The
+benchmark places 1,000,000 scattered. A unit takes the ground it stands on
+when nobody holds it, so the held ground grows with the units and then spreads
+from every seed at once. The two worlds are the same rule at two densities.
+
+**Follows.** Three things.
+
+**Do not carry a count from the demonstration world into a statement about the
+target scale.** The demonstration is built to look right, and the testing rule
+already says that a fixture chosen to look right supplies no extreme.[^84]
+The two worlds differ by four orders of magnitude in the population, and every
+derived quantity differs with it.
+
+**A figure in the register names the world it was measured in.** The row above
+does. The reading of it did not, and the reading is what reached a plan.
+
+**The unit walk was the wrong thing to remove.** The plan that came from the
+small figure proposed dropping the walk over the live units, because it looked
+like three quarters of the work. It is 6.7 percent. The sort was 68 percent
+and the walk over the held tiles was 31 percent, and both follow the held
+ground rather than the population.
+
+### FND-286 — A pass that allocates on every frame cost twelve milliseconds that no stage measures, and the mapping count is not the cause
+
+**Believed:** the cost of a buffer that a parallel stage allocates for each
+thread falls inside the stage that allocates it. The stage table would
+therefore see it.
+
+**True:** twelve milliseconds of it fall outside every stage. The candidate
+pass began allocating a bit plane of 2,097,152 bytes for each of twelve
+threads on every frame. The residual of the frame, which is the part no span
+measures, went from 22,202 nanoseconds to 12,196,680. Nothing else changed
+between the two runs.
+
+**Then the project believed the mapping count was the cause**, because giving
+back a mapping a thread has written reaches every core. **That is refuted.**
+Twelve mappings became one array of twelve chunks, which is one allocation
+instead of twelve, and the residual measured 11,739,029 nanoseconds. The two
+figures are the same to within the spread of this apparatus.
+
+**The measurement.** Machine C, `c7g.4xlarge`, Graviton3, 16,777,216 tiles,
+1,000,000 units scattered, 12 threads, nine frames, `stage-cost` feature.
+Three runs at one base commit, differing only in the tree.[^F286A]
+
+| The pass allocates | Residual, ns | Share of the frame |
+|---|---|---|
+| Nothing. It sorts a list | 22,202 | 0.0027 percent |
+| One plane for each thread | 12,196,680 | 2.74 percent |
+| One array of twelve chunks | 11,739,029 | 2.53 percent |
+
+**The cause is not identified, and this row says so rather than guessing
+again.** What is established is that the residual follows the allocation and
+not the number of mappings.
+
+**Follows.** Two things.
+
+**The plane should be held across frames rather than allocated in each one.**
+That is the change the evidence points at, and it is not made. It asks a
+design question the pass does not answer today: the holding is copied by a
+derive, and a buffer it holds would be copied with it, so the buffer needs a
+statement about what a copy of a holding means.
+
+**A saving of 384 milliseconds bought a cost of 12.** The trade is good and the
+cost is recorded so that it is not found again as a mystery.
+
 
 ## F. Sourcing
 
@@ -6633,16 +6922,128 @@ because each part sounds like it needs a record and the reviewer's instinct is
 to write three. The evidence that separates them is in the source and in the
 registry, not in the framing.
 
+### FND-270 — Slot order and identity order agree in an ordinary fixture, so a test cannot tell them apart
+
+**Believed.** A test that asserts which unit took the first position proves
+that the assignment follows the identity of the unit rather than the order the
+units were read in. The two are different rules, so a test that names one of
+them distinguishes them.
+
+**True only when the fixture separates the two orders, and an ordinary fixture
+does not.** A unit spawned earlier holds both a lower slot and a lower
+identity, because an identity is a slot index with a generation above it and a
+fresh arena hands out slots in ascending order. In such a fixture the two rules
+give exactly the same answer.
+
+**The evidence.** The assignment pass sorts its applicants by a key vector
+whose last field is the whole identity. The first version of the test spawned
+four units in order and asserted that the positions went to them in identity
+order. **The sort was then replaced with the identity permutation, so the pass
+seated in the order it read the units, and all eight tests passed.** The test
+that existed to name the order could not see the difference.
+
+**The repair is in the fixture and not in the assertion.** A slot that is freed
+and filled again carries a higher generation, so the unit in the lowest slot
+holds the highest identity. The fixture now spawns two units, despawns the
+first, and spawns a third into the freed slot. Read order then names the third
+unit first and identity order names the second, and the same mutation fails the
+test.
+
+**Follows.** Three things.
+
+**This is the fixture shape the register already holds, in a new place.**
+FND-051 and FND-048 in this register record a fixture that modelled the typical
+case and so never supplied the extreme. This one is narrower and worth naming on its own: **any test
+about entity order needs a fixture in which a slot has been reused**, because
+generation is the only thing that separates slot order from identity order.
+
+**A test about an order must be mutated, not read.** Nothing in the test looked
+wrong. It named the right rule, asserted the right sequence, and was green for
+the right-looking reason. Only putting the defect back showed that it was
+measuring the fixture.[^23]
+
+**The other three mutations were caught.** Removing the pass from the step
+failed seven of eight tests, storing a bare slot index instead of an identity
+failed the reuse test, and seating an already seated unit failed two. The suite
+was sound apart from this one case, which is why the case is worth recording
+rather than the suite.
+
+
+### FND-269 — Three completed subsystems produce nothing at all in the demonstration world
+
+**Believed.** The demonstration shows less than the engine holds because the
+drawing has not caught up. The repair for a feature a watcher cannot see is
+therefore drawing work, in the way that items 0216 and 0240 were fixture
+work.[^F269A]
+
+**True for some subsystems and false for three.** Positions, characters and
+improvements do not merely go undrawn in the demonstration. **They never
+happen.** A front end that drew them today would draw an empty set, and the
+test that proved the drawing correct would be measuring the fixture.[^23]
+
+**The measurement.** The world the demonstration builds, founded for four
+factions with a group each, stepped on four threads. The counts are read from
+the public readers of the engine at the tick named.
+
+| Quantity | Tick 50 | Tick 200 |
+|---|---|---|
+| Units alive | 192 | 192 |
+| Settlements | 4 | 4 |
+| Position seats that exist | 16 | 16 |
+| Position seats a unit holds | 0 | 0 |
+| Characters | 0 | 0 |
+| Upgrade sites | 0 | 0 |
+| Units the shortage ended | 0 | 0 |
+| Units carrying a load | 0 | 45 |
+| Units whose chosen option is forage | 0 | 44 |
+| Tiles held, summed over the factions | 7,866 | 46,992 |
+
+**Each zero has a cause, and every cause is an open item.** Nothing seats a
+unit in a position, which is what item 0063 does. Nothing promotes a unit into
+the character tier, which is what item 0088 does. No option in the option set
+orders a build, which is what item 0180 does. The subsystems are complete and
+correct; what is absent is the caller that makes one instance of each occur.
+
+**Every one of those three items sits in `Later`.** They sit there for reasons
+that are each defensible on their own, and the priority index states them. The
+consequence that no row states is the one the project owner names most often:
+the demonstration cannot show a feature that never occurs, so the work that
+makes the demonstration show its features is ordered below the work that makes
+it faster.
+
+**Follows.** Three things.
+
+**Ask whether a feature occurs before asking whether it is drawn.** An audit
+that reads the drawing finds the features the drawing omits. It cannot find a
+feature the world never produces, because both look identical from the front
+end: an empty set.
+
+**A zero is the cheapest evidence this project has, and nothing prints one.**
+Every figure above came from a throwaway probe that no test holds and no
+command runs. The demonstration prints whether a founded ground carries its
+group, and that line exists because a silent fixture cost the project a
+round.[^F269A] It prints nothing about a subsystem that produced no instance.
+Item 0278 asks for that.
+
+**The three items are not equivalent in cost.** Item 0063 writes into a
+structure that exists and holds sixteen empty seats already. Item 0088 has no
+stated blocker. Item 0180 adds an option to the pass that item 0238 is
+rewriting, and the index says it should read that pass afterwards. Moving the
+first two is cheap; moving the third against a stated sequencing reason is not.
+
+[^F269A]: Findings register, FND-232, in this document.
+
+
 ### FND-263 — The needs of one cell spread widest while a store empties, and they polarise afterwards
 
 **Believed.** Two things, and both were reasonable. The first is that a need is
 a fixed-point quantity, so two units in one cell almost never share one and a
-key on the exact need reduces nothing.[^F259A] The second is that no fixture in
+key on the exact need reduces nothing.[^F263A] The second is that no fixture in
 this project produces the distribution, because it needs settlements, home sites
-and a running economy and the benchmark world holds none of the three.[^F259B]
+and a running economy and the benchmark world holds none of the three.[^F263B]
 
 **True, with a correction to the first and a replacement for the second.** A
-fixture now exists and the distribution is measured.[^F259C]
+fixture now exists and the distribution is measured.[^F263C]
 
 **The measurement.** A world of 65,536 tiles, 64 level 1 cells, 64 settlements,
 about 4,000 units with a home each, and the economy running on every tick. The
@@ -6701,7 +7102,7 @@ width gives 41 distinct keys against 17 at the peak, and the collapse falls from
 **The decay is a parameter of the need rule, so the two are coupled.** A caller
 who changes the decay and leaves the width alone has unmatched them. That
 coupling is why the width is a parameter of the world and not a constant of a
-module. An open decision closed against this measurement.[^F259D]
+module. An open decision closed against this measurement.[^F263D]
 
 **The width changes where the population ends up, and the fixture showed it by
 accident.** The measurement was taken twice, once at each of two default widths,
@@ -6709,12 +7110,12 @@ because the fixture reads the width the world holds. The median cell held 71
 units at the finer width and 67 at the matched one, at the same frame of the same
 seed. A unit takes its option from its bucket and its step from its option, so a
 different width moves a different population. **No golden file sees any of
-this**, and a separate finding records why.[^F259F]
+this**, and a separate finding records why.[^F263F]
 
 **This is not a cost figure and no blocker governs it.** The simulation is
 deterministic integer arithmetic, so every number above is the same on every
 machine. The register that holds measured cost figures is for the target
-platform, and this belongs in neither that register nor the derived one.[^F259E]
+platform, and this belongs in neither that register nor the derived one.[^F263E]
 
 **What this does not measure.** Whether the matched width dithers a unit's
 behaviour, and what the real placement of homes in a played world looks like.
@@ -6770,7 +7171,7 @@ and every scenario matched its stored file each time. So the gate is blind not
 only to the quantisation but to the parameter that decides how much the
 quantisation does. **That parameter is the mechanism of the decision**, and a
 review of the governing record said so before any of this was measured. A
-register holds the value and the measurement it was chosen against.[^F259D]
+register holds the value and the measurement it was chosen against.[^F263D]
 
 **The remedy is not a new golden scenario.** A scenario built to sit on a bucket
 boundary would pin the boundary rather than the behaviour, and the record says
@@ -6930,7 +7331,7 @@ every other line agrees. The commit body holds both commands.
 **This is the redundant declaration site, with both copies in the tree and
 nothing that compares them.** The rule already states the defence: when a second
 site must exist, add a check that fails when the copies disagree.[^22] A
-backlog item holds the check.[^F259C]
+backlog item holds the check.[^F259CHECK]
 
 **A mirror that differs only by a rewrite is derivable, so the check is cheap.**
 The five rule files beside these two differ from their mirrors only in the
@@ -7060,6 +7461,164 @@ tile count. The index now carries the measured order.[^F282D]
 items came from one reading of one pass, and the reading counted lookups. The
 item that removes four steps loses. The item that removes two steps wins,
 because those two are a division and the other two are a cache hit.
+### FND-283 — The orientation claimed Miri checks the unsafe code, and no toolchain the project pinned could run Miri
+
+**Believed.** The project orientation states that keeping the core crate free
+of the interpreter binding "allows Miri to check the unsafe code".[^F262A] The
+crate split record calls Miri running over the storage code the benefit that no
+test gives.[^F262B] The testing guide said there was no Miri job because there
+was no unsafe code yet.[^F262C]
+
+**True.** Three things, and each is separately enough.
+
+Miri ships on the nightly channel and on no other. The project pinned a stable
+release, so no contributor and no continuous integration run could have run
+Miri at any moment since the claim was written. The claim was not merely
+unperformed. It was unperformable.
+
+Nothing in the tree ran it. There was no recipe, no workflow step and no
+script. A search for the name found six documents that discuss Miri and no
+invocation of it.
+
+The core crate does hold unsafe code. Two items assert that the settlement
+store is plain data.[^F262D] So the testing guide's stated reason for having no
+Miri job was false as well, and it was false for a different reason than the
+channel.
+
+**Evidence.** A whole-tree search for the name, excluding the build directory,
+returned prose only. The toolchain file named a stable release. A search for
+the `unsafe` keyword across the crates returned two items and one doc comment.
+The commit body holds both commands.
+
+**Follows.** Three things.
+
+**This is the inert capability, and the rule already names the shape.** A
+project declares a capability, documents it, and nothing calls it.[^F262E] The
+defence the rule gives is to ask who is obligated to invoke the thing. Here the
+answer was nobody, and the document that claimed the benefit was the same
+document that would have said so.
+
+**A benefit stated in a record must name what invokes it.** The crate split
+record gives up something real for this benefit, and the reader of that trade
+had no way to learn that the benefit was never collected.
+
+**The benefit was worth collecting, which is why this cost something.** The
+state hash reads whole structures and whole columns as raw bytes, and an
+undeclared padding byte would put an uninitialised byte into that read. Such a
+hash differs between two runs of one binary. No other gate in this project sees
+it, because a padding byte on a development machine is reliably zero. A gate
+now exists.[^F262F]
+
+### FND-284 — The reassociating float methods were blocked by the compiler, not by the lint, and clippy says nothing about a lint entry that reaches nothing
+
+**Believed.** The project orientation says the script catches "the
+reassociating methods, which do not resolve on the pinned toolchain and so
+cannot be named in a lint".[^F262A] The float ban script says the same in its
+own header.[^F263A]
+
+**True.** The obstacle on the pinned stable release was the compiler, not name
+resolution. A call to the reassociating add on that release is a hard error,
+because the library feature is gated and the gate cannot be opened on a stable
+channel. So on that channel the method could not be written at all, and the
+script's coverage of it guarded a door that the compiler had already locked.
+
+On the dated nightly the project now pins, the same call compiles with no
+feature attribute. The method is writable for the first time. In the same step,
+clippy resolves it and rejects it through its disallowed-method list.
+
+A third thing came out of the same probe, and it is the one that matters most.
+**Clippy silently ignores a disallowed-method path it cannot resolve.** It
+emits no warning and no note on either channel. A lint entry that names nothing
+is inert, it reads as a live rule, and nothing announces the difference.
+
+**Evidence.** A scratch crate outside the tree, built on both toolchains. On
+the stable release the call failed with the unstable-feature error and named
+the tracking issue. On the nightly the same file compiled with no attribute,
+and a feature gate was proved still to be enforced there by a second probe that
+the compiler rejected. With the method named in the disallowed list, clippy on
+the nightly rejected the call and quoted the reason. With a path that names no
+method at all, clippy on both toolchains finished clean. The commit body holds
+the probe.
+
+**Follows.** Three things, and none of them is that a mechanism should be
+removed.
+
+**The lint gains real work, and it did not have any before.** The entries
+should be added, because the method is now writable. Until they are, the
+script's name check is the only thing standing where the compiler used to
+stand. A backlog item holds the addition.[^F263B]
+
+**The script's second job became load-bearing at the moment it stopped being
+redundant.** Before the move it duplicated a compiler error. After the move it
+is the sole guard until the lint entries land. Reading the move as a reason to
+retire it would have been exactly backwards.
+
+**A lint entry can never be assumed live, and that is now measured rather than
+argued.** The rule that two mechanisms exist because one is not enough rested
+on judgement. It now rests on an observation: the first mechanism can be
+switched off by a typing mistake in a configuration file, and the tool that
+reads that file will not say so.
+
+### FND-288 — Miri cannot drive the engine at the fixture sizes the suite uses, because every world reserves the unit columns at the target population
+
+**Believed.** That a Miri gate would run over the tests the project already
+has, or over some subset chosen for relevance.
+
+**True.** Almost every engine test sets the unit capacity of its world to the
+target unit population, even where the world is sixteen tiles across. The world
+reserves those columns when it is built.[^139] Miri interprets each of those
+writes rather than executing it, so such a test does not finish.
+
+The relevance of a test is therefore not what decides whether Miri can run it.
+The reservation is.
+
+**Evidence.** Two runs on the development machine, on the dated nightly. The
+value-type test, which builds no world, finished under Miri in under two
+seconds of interpretation. A rate test, whose world is sixteen tiles by sixteen
+and which reserves the target population, had produced no result after nine
+minutes and was stopped. The two differ in the reservation and in little else.
+
+**Follows.** Two things.
+
+**A Miri gate needs a fixture of its own, and the fixture is the whole design
+of the gate.** The gate that now exists builds a world that reserves a few
+thousand slots, spawns soldiers into it, steps it, and hashes it. It reaches
+the byte-level read through the engine rather than around it.[^F262F]
+
+**This is the fixture rule again, from the other direction.** The rule says
+that a fixture modelled on the demonstration world supplies what looks right
+rather than what the test needs.[^23] Here the copied value made the test
+impossible rather than merely weak, which is the friendlier of the two
+failures, because it announced itself.
+
+### FND-289 — The overflow record's reason for preferring a test to a lint rests on a channel property, and the pin changed it
+
+**Believed.** The overflow record says that the switch naming the gate build
+"is not stable on the pinned toolchain, so a lint cannot see this and a test
+must".[^100]
+
+**True.** The switch is still unstable on the dated nightly. It is no longer
+unreachable: the compiler now names the feature attribute that would enable it,
+and a crate that declares that attribute can read the switch. So the sentence
+has gone from stating an impossibility to stating a cost.
+
+**Evidence.** The same scratch crate. On both toolchains the switch is
+rejected as an unstable feature and both errors name the tracking issue. Only
+the nightly error names the attribute that enables it, which is the compiler
+saying that the gate exists and can be opened there.
+
+**Follows.** Two things.
+
+**The test the record requires stays, and this finding does not amend the
+record.** The record gives a second and better reason for the test: it reads
+the outcome by catching a real panic rather than by reading a compiler switch,
+and a switch that is set says nothing about whether the panic happens. That
+reason is untouched.
+
+**A record should not rest a decision on a property of the channel, because a
+pin can change the channel.** The reasoning that survives is the reasoning
+about what the test proves. The reasoning about what the toolchain permits is
+the part that decayed, and it decayed within one commit of the pin moving.
 
 **Neither item was built.** This finding recommended the smaller one, and a
 later measurement removed the division outright, so the smaller item was
@@ -7068,13 +7627,13 @@ avoid. The grid now holds a reciprocal of its width, one value derived from one
 value at one site, and every caller of the conversion is cheaper rather than
 only the unit passes.
 
-### FND-283 — Three items competed to optimise under one percent of a frame, and none of them had a denominator
+### FND-290 — Three items competed to optimise under one percent of a frame, and none of them had a denominator
 
 **Believed.** The cost of turning a tile into a cell is worth an item. Three
 shapes were proposed for it: a tile-indexed exit direction, a stored cell index
 on the unit, and an arithmetic replacement for the division.[^F281A] [^F282A]
 Two findings priced the shapes against one another, and both compared a loop to
-a loop.[^F283A] [^F283B]
+a loop.[^F287A] [^F287B]
 
 **True.** None of the three was ever measured against a frame. A frame at the
 target extent costs seconds on the machine that took these figures, and the
@@ -7082,7 +7641,7 @@ whole conversion is a fraction of one percent of it. **The three shapes were
 ranked correctly against each other and none of them matters.**
 
 **Evidence.** A row that times a whole step was added to the same
-benchmark.[^F283C] At the target extent, with one million units at twelve
+benchmark.[^F287C] At the target extent, with one million units at twelve
 threads, a frame costs a figure in the seconds. The conversion loop that all
 three items address costs a figure in the tens of milliseconds under the same
 load. The share is below one percent whichever end of either spread is taken.
@@ -7113,7 +7672,7 @@ would have stopped all three items was the cheapest one to write.
 naming a mechanism and pricing it in bytes or in steps. None of them stated what
 fraction of a frame it stood to win, and none of the reviews of them asked.
 
-### FND-284 — A property test over the whole legal range passed against a broken reciprocal, and an exhaustive test over a narrow one caught it
+### FND-291 — A property test over the whole legal range passed against a broken reciprocal, and an exhaustive test over a narrow one caught it
 
 **Believed.** A property test that samples the whole legal range of a parameter
 covers that range better than a test that walks a small part of it
@@ -7159,12 +7718,12 @@ project already holds two instances of a fixture that hid a defect.[^F262D] This
 is the third, and it is the first where the fixture covered a wider range than
 the test that worked.
 
-### FND-285 — The sparse tile change list reaches every tile in ten frames, so the sparse form costs four times what a dense one would
+### FND-292 — The sparse tile change list reaches every tile in ten frames, so the sparse form costs four times what a dense one would
 
 **Believed.** The tile value field is a generated base and a stored list of
 changes, and the list holds what the frames have changed rather than the size
 of the world. The reader that returns the count says so in its own words, and a
-product record rests on it.[^F285A]
+product record rests on it.[^F292A]
 
 **True.** The list reaches 99.8 percent of the tiles within fourteen frames at
 the target extent, and it saturates in about ten. **The sparse form is sparse
@@ -7172,7 +7731,7 @@ for one second of simulated time.** After that it is a dense array with an
 index column attached, and it costs four times what a dense array would.
 
 **Evidence.** A row counts the entries after each frame at 16777216 tiles and
-one million units.[^F285B] The count is entries and not nanoseconds, so a
+one million units.[^F292B] The count is entries and not nanoseconds, so a
 loaded machine does not disturb it. Frame 0 stores 6291370 entries. Frame 5
 stores 15777624. Frame 13 stores 16753789, which is 998 parts in a thousand of
 the tiles, and it added 14016 that frame.
@@ -7182,7 +7741,7 @@ and the new run together and writes both into a second buffer, so its cost
 follows the length of the list and not the length of the run. At frame 13 it
 rewrites 16753789 entries to apply 14016. The stage table measured that pass at
 120,529,050 nanoseconds, which is 14.4 percent of a frame, and it takes no
-thread count.[^F285C]
+thread count.[^F292C]
 
 **The memory runs the same way.** An entry holds a tile index and a value, so
 it is eight bytes, and the second buffer holds as many. At saturation the two
@@ -7214,16 +7773,21 @@ changed reaches everything in ten frames.
 [^F262B]: ADR-0098, the choice is decided for each cell and each bucket of need, decision D1. `docs/adrs/draft/adr-0098-the-choice-is-decided-for-each-cell-and-each-bucket-of-need.md`
 [^F262D]: Findings register, FND-051 and FND-048, in this document.
 [^F262E]: ADR-0098, the choice is decided for each cell and each bucket of need, the consequences. `docs/adrs/draft/adr-0098-the-choice-is-decided-for-each-cell-and-each-bucket-of-need.md`
+[^F263A]: Review of ADR-0096, correction 1. The review artefact sits on the branch that holds it, so this branch cannot resolve its path and the citation names it instead.
+[^F263B]: Target platform costs, would the choice pass collapse if it decided for each cell. `docs/reference/graviton-costs.md`
+[^F263C]: The need spread measurement. `crates/cachette-core/tests/need_spread.rs`
+[^F263D]: Decisions register, DEC-106. `docs/DECISIONS.md`
+[^F263E]: Budgets and costs, what belongs here. `docs/reference/budgets.md`
+[^F263F]: Findings register, FND-262, in this document.
+[^F263D]: Decisions register, DEC-097. `docs/DECISIONS.md`
+[^F263E]: Budgets and costs, what belongs here. `docs/reference/budgets.md`
+[^F263F]: Findings register, FND-258, in this document.
 [^F259A]: Review of ADR-0096, correction 1. The review artefact sits on the branch that holds it, so this branch cannot resolve its path and the citation names it instead.
 [^F259B]: Target platform costs, would the choice pass collapse if it decided for each cell. `docs/reference/graviton-costs.md`
 [^F259C]: The need spread measurement. `crates/cachette-core/tests/need_spread.rs`
 [^F259D]: Decisions register, DEC-097. `docs/DECISIONS.md`
 [^F259E]: Budgets and costs, what belongs here. `docs/reference/budgets.md`
 [^F259F]: Findings register, FND-258, in this document.
-[^F258A]: Backlog item 0238, decide per cell and need rather than per unit. `docs/backlog/complete/0238-decide-per-cell-and-need-rather-than-per-unit.md`
-[^F258B]: ADR-0098, the choice is decided for each cell and each bucket of need, decision D1. `docs/adrs/draft/adr-0098-the-choice-is-decided-for-each-cell-and-each-bucket-of-need.md`
-[^F258D]: Findings register, FND-051 and FND-048, in this document.
-[^F258E]: ADR-0098, the choice is decided for each cell and each bucket of need, the consequences. `docs/adrs/draft/adr-0098-the-choice-is-decided-for-each-cell-and-each-bucket-of-need.md`
 [^F226A]: Backlog item 0185, steer a step by the option the unit chose. `docs/backlog/complete/0185-steer-a-step-by-the-option-the-unit-chose.md`
 [^F226B]: Backlog item 0186, let the engine order a gather. `docs/backlog/complete/0186-let-the-engine-order-a-gather.md`
 [^F226C]: ADR-0063, a need is a rate with a threshold, and crossing it is a fact, decision D2. `docs/adrs/accepted/adr-0063-a-need-is-a-rate-with-a-threshold-and-crossing-it-is-a-fact.md`
@@ -7232,7 +7796,7 @@ changed reaches everything in ten frames.
 [^F258A]: Findings register, FND-223, in this document.
 [^F258B]: The footnote baseline. `scripts/footnote-baseline.txt`
 [^F258C]: Backlog item 0242. `docs/backlog/refined/0242-fail-a-check-when-a-document-states-a-register-in-its-own-words.md`
-[^F259C]: Backlog item 0244. `docs/backlog/refined/0244-fail-a-check-when-the-two-project-orientations-disagree.md`
+[^F259CHECK]: Backlog item 0244. `docs/backlog/refined/0244-fail-a-check-when-the-two-project-orientations-disagree.md`
 [^F222]: Target platform costs. `docs/reference/graviton-costs.md`
 [^F223C]: ADR Registry, how a record changes. `docs/adrs/REGISTRY.md`
 
@@ -7461,6 +8025,8 @@ changed reaches everything in ten frames.
 [^238A]: The gate recipes. `justfile`
 [^238B]: Testing Rules, section 1. `.claude/rules/testing.md`
 [^238C]: Definition of Done, section 5. `.claude/rules/definition-of-done.md`
+[^FND277A]: Target platform costs, every stage of a frame by name, and huge pages. `docs/reference/graviton-costs.md`
+[^FND278A]: Backlog item 0269, map the large arrays with huge pages. `docs/backlog/complete/0269-map-the-large-arrays-with-huge-pages.md`
 [^235A]: The record of descent, the labelled row count. `crates/cachette-core/src/descent.rs`
 [^236A]: Backlog item 0097. `docs/backlog/complete/0097-write-the-layout-record-with-the-descent-columns.md`
 [^236B]: Backlog item 0067, record a parent and walk a line. `docs/backlog/complete/0067-record-a-parent-and-walk-a-line.md`
@@ -7490,9 +8056,28 @@ changed reaches everything in ten frames.
 [^F282B]: Findings register, FND-252, in this document.
 [^F282C]: The grid address conversion. `crates/cachette-core/src/hex.rs`
 [^F282D]: Backlog priority index. `docs/backlog/PRIORITY.md`
-[^F283A]: Findings register, FND-281, in this document.
-[^F283B]: Findings register, FND-282, in this document.
-[^F283C]: The exit locality benchmark, the frame row. `crates/cachette-core/benches/exit_locality.rs`
-[^F285A]: The world, the stored tile change count. `crates/cachette-core/src/world.rs`
-[^F285B]: The exit locality benchmark, the growth row. `crates/cachette-core/benches/exit_locality.rs`
-[^F285C]: Target platform costs, the stage table. `docs/reference/graviton-costs.md`
+[^F262A]: Project orientation, hard invariants 2 and 4. `CLAUDE.md`
+[^F262B]: ADR-0041, a crate split enforces the boundary at compile time. `docs/adrs/draft/adr-0041-a-crate-split-enforces-the-boundary-at-compile-time.md`
+[^F262C]: The testing guide, section 3.5. `docs/TESTING.md`
+[^F262D]: The settlement store asserts that it is plain data. `crates/cachette-core/src/site.rs`
+[^F262E]: Recurring defect shapes, inert code that nothing invokes. `.claude/rules/recurring-defects.md`
+[^F262F]: The state-byte gate. `crates/cachette-core/tests/state_bytes_are_initialised.rs`
+[^F263A]: The float ban script. `scripts/check-float-ban.sh`
+[^F263B]: Backlog item 0272, name the reassociating methods in the lint. `docs/backlog/proposed/0293-name-the-reassociating-methods-in-the-lint.md`
+[^F273A]: Backlog item 0266, order the unit arena by cell. `docs/backlog/refined/0266-order-the-unit-arena-by-cell.md`
+[^F273B]: Target platform costs, the packed and scattered rows. `docs/reference/graviton-costs.md`
+[^F273C]: The cost benchmark, the arena order mode. `crates/cachette-core/benches/target_cost.rs`
+[^F274A]: Decisions register, DEC-110. `docs/DECISIONS.md`
+[^F274B]: ADR-0018, the unit-to-tile bridge is derived, and it rebuilds at the barrier, decision D1. `docs/adrs/accepted/adr-0018-the-unit-to-tile-bridge-is-derived-and-rebuilds-at-the-barrier.md`
+[^F274C]: The drifted arena suite of the core. `crates/cachette-core/tests/drifted_arena.rs`
+[^F274D]: ADR-0056, movement is tile-discrete and admitted by sort-then-admit, decision D3. `docs/adrs/accepted/adr-0056-movement-is-tile-discrete-and-admitted-by-sort-then-admit.md`
+[^F287A]: Findings register, FND-281, in this document.
+[^F287B]: Findings register, FND-282, in this document.
+[^F287C]: The exit locality benchmark, the frame row. `crates/cachette-core/benches/exit_locality.rs`
+[^F285A]: Findings register, FND-269, in this document.
+[^F286A]: Target platform costs, every stage of a frame after the candidate pass became a bit plane. `docs/reference/graviton-costs.md`
+[^F277B]: Findings register, FND-285, in this document.
+[^F277C]: Findings register, FND-286, in this document.
+[^F292A]: The world, the stored tile change count. `crates/cachette-core/src/world.rs`
+[^F292B]: The exit locality benchmark, the growth row. `crates/cachette-core/benches/exit_locality.rs`
+[^F292C]: Target platform costs, the stage table. `docs/reference/graviton-costs.md`

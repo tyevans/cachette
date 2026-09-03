@@ -16,7 +16,30 @@ cachette-core = { path = "../cachette-core", version = "0.0.0" }
 # default features add a unicode index and the standard library, and the
 # viewer needs neither, so it takes the table alone.
 font8x8 = { version = "0.3", default-features = false }
-minifb = "0.28"
+# **The window library is the demonstration binary's, and it is optional.**
+# The code that fills a frame must depend on nothing that opens a window and
+# nothing that talks to a display server, because a caller that filled an
+# array in memory would otherwise carry the display protocols of one
+# operating system to every machine that installed it, including every
+# machine with no display at all. The binding crate takes this crate with
+# `default-features = false` and links no window library.
+minifb = { version = "0.28", optional = true }
+
+[features]
+# **Off by default, and that is the point.** A default feature is enabled by
+# feature unification whenever anything in the workspace builds this crate
+# with its defaults, and the binding crate then links a window library into a
+# module that only fills an array in memory. Turning it off by default makes
+# the record's constraint hold for every build and not only for the wheel.
+# The recipe that opens the window asks for it by name.
+default = []
+window = ["dep:minifb"]
+
+# The binary needs the window library, and nothing else in this crate does.
+[[bin]]
+name = "cachette-view"
+path = "src/main.rs"
+required-features = ["window"]
 
 [lints]
 workspace = true

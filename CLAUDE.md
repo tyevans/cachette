@@ -51,14 +51,15 @@ Do not violate them for convenience.
 2. **Route all simulation arithmetic through the `sim_math` module.** Two
    mechanisms enforce this boundary, because one is not enough. A lint bans
    the float types by name. A script catches what the lint cannot see: a
-   float literal whose type is inferred, and the reassociating methods, which
-   do not resolve on the pinned toolchain and so cannot be named in a lint.
+   float literal whose type is inferred. It also names the reassociating
+   methods, which the compiler rejected on the old stable pin and which now
+   compile. The lint can name them too, and does not yet.
 3. **Seed every random draw from a counter-based generator.** Key each
    draw on the tuple (system, frame, entity, draw). Do not use
    thread-local random state. Thread-local state destroys determinism.
 4. **Keep the `cachette-core` crate free of any PyO3 dependency.** This
-   makes a mid-step Python callback a compile error. It also allows Miri
-   to check the unsafe code.
+   makes a mid-step Python callback a compile error. It also lets Miri check the
+   unsafe code, and `just miri` runs it.
 5. **Make every event type `bytemuck::Pod`.** Use `repr(C)`. Declare the
    padding. Do not use `bool`. Use `u8` instead. Undeclared padding
    creates false nondeterminism in state hashes.

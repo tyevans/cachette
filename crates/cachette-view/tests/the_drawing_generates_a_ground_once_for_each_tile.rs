@@ -61,7 +61,7 @@ fn world_of(seed: u64) -> World {
 }
 
 /// Paints the whole world onto a canvas and returns both.
-fn painted(width: usize, height: usize) -> (World, Canvas) {
+fn painted(width: usize, height: usize) -> (World, Canvas<'static>) {
     let world = world_of(SEED);
     let mut canvas = Canvas::new(width, height);
     let camera = Camera::fitting(&world, &canvas);

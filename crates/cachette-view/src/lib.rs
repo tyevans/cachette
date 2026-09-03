@@ -37,6 +37,7 @@
 // and that scope is correct.
 #![allow(clippy::disallowed_types)]
 
+pub mod frame;
 pub mod glass;
 pub mod hud;
 pub mod metrics;
@@ -44,10 +45,11 @@ pub mod paint;
 pub mod picture;
 pub mod text;
 
+pub use frame::{fill_frame, FrameError, Surface, LATTICE_BOUND};
 pub use glass::Overlay;
 pub use hud::{FoundingReport, Readout};
 pub use metrics::{Lap, Metrics};
-pub use paint::{Camera, Canvas};
+pub use paint::{Camera, Canvas, Extent, FrameSize};
 
 use cachette_core::founding::FoundingOutcome;
 use cachette_core::{BridgeError, World};
@@ -96,7 +98,7 @@ pub fn draw_frame(
     metrics: &Metrics,
     outcomes: &[FoundingOutcome],
     overlay: Overlay,
-    canvas: &mut Canvas,
+    canvas: &mut Canvas<'_>,
 ) -> Result<Readout, BridgeError> {
     paint::draw(world, camera, canvas)?;
     paint::mark_foundings(camera, canvas, outcomes);

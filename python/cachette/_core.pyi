@@ -230,6 +230,49 @@ class WindowCensus(TypedDict):
     crowded_q: int | None
     crowded_r: int | None
 
+class FoundingReport(TypedDict, total=False):
+    """What one faction got when the run was founded."""
+
+    faction: int
+    seated: bool
+    q: int
+    r: int
+    people: int
+    considered: int
+    food: int
+    wood: int
+    stone: int
+    open_ground: int
+    water_edge: int
+    carries_its_group: bool
+    refusal: str
+
+class FrameReading(TypedDict):
+    """What the drawing pass read while it filled a frame."""
+
+    tick: int
+    tiles_painted: int
+    soldiers_painted: int
+    soldiers_live: int
+    sites_held: int
+    seats: int
+    seats_taken: int
+    panel_height: int
+    units_short: int
+    units_carrying: int
+    carried_by_kind: tuple[int, int, int]
+    units_housed: int
+    sites_rationed: int
+    # Fixed point at a scale of 65536, not a count of goods.
+    rationed_short_accum: int
+    tiles_at_capacity: int
+    crowd_worst: int
+    centre: tuple[int, int]
+    extent_shown: tuple[int, int]
+    step_mean_micros: float
+    draw_mean_micros: float
+    ticks_each_second: float
+
 class CachetteError(Exception):
     """The root of every Cachette error."""
 
@@ -251,8 +294,38 @@ class DeterminismError(CachetteError):
 class EnginePanic(CachetteError):
     """A Rust panic reached the boundary."""
 
+class FrameError(CachetteError):
+    """A frame refused to fill."""
+
 class ConfigError(CachetteError):
     """The world settings do not describe a world."""
+
+class Camera:
+    """A camera the control plane owns.
+
+    The engine holds no camera. It is given one for the length of a call and
+    keeps nothing of it afterwards, so a frame is a pure function of a world
+    and a camera.
+
+    Every verb takes the width and the height of the picture the camera aims
+    at. A camera verb reads no pixel, so a caller that has not drawn yet can
+    still steer.
+    """
+
+    def __init__(self, tile_size: float | None = ...) -> None: ...
+    @staticmethod
+    def fitting(world: World, width: int, height: int) -> Camera: ...
+    tile_width: float
+    tile_height: float
+    origin_x: float
+    origin_y: float
+    def nudge(self, across: float, down: float, width: int, height: int) -> None: ...
+    def pan(self, across: float, down: float) -> None: ...
+    def zoom_in(self, width: int, height: int) -> None: ...
+    def zoom_out(self, width: int, height: int) -> None: ...
+    def look_at(self, q: int, r: int, width: int, height: int) -> None: ...
+    def clamp(self, world: World, width: int, height: int) -> None: ...
+    def tile_at(self, x: float, y: float) -> tuple[int, int]: ...
 
 class World:
     """A simulated world."""
@@ -277,6 +350,16 @@ class World:
     def state_hash(self) -> int: ...
     def check_invariants(self) -> bool: ...
     def step(self, threads: int) -> int: ...
+    def found_run_for_every_faction(self, group: int = ...) -> list[FoundingReport]: ...
+    def draw(
+        self,
+        camera: Camera,
+        width: int,
+        height: int,
+        pixels: npt.NDArray[np.uint32],
+        reference: bool = ...,
+        panel: bool = ...,
+    ) -> FrameReading: ...
     @property
     def gather_count(self) -> int: ...
     @property

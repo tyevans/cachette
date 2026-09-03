@@ -23,9 +23,103 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^ALLOC]
 
-**Next number: DEC-107**
+**Next number: DEC-111**
 
 ## Open
+
+### DEC-108 — How often does the project move the nightly date, and who owns the move?
+
+**Open. Engineering owns it. It governs every commit that touches the toolchain
+file.**
+
+**The pin makes the compiler a versioned input, and a versioned input needs an
+upgrade policy.** The toolchain record fixes a date rather than a channel, so
+the compiler no longer changes on its own.[^DEC106A] Nothing else in that
+record says when it should change.
+
+**A date that never moves is not safe.** A nightly carries unstable features,
+and an unstable feature changes shape. The longer the gap between two dates,
+the more changes arrive at once and the harder the failure is to read. An old
+nightly also misses every soundness fix made since.
+
+**A date that moves often is not free either.** A new compiler may move the
+golden state hash, and the record requires the determinism gate to run before
+the date is kept.[^DEC106A] That is a real cost each time, paid by whoever
+moves it.
+
+**Option A. Move on demand only.** Move the date when a feature the project
+needs arrives, when a defect forces it, or when a soundness fix matters.
+Cheapest. It lets the gap grow without anybody deciding to let it grow, and the
+move that finally happens carries every change at once.
+
+**Option B. Move on a fixed cadence, and separately on demand.** Move it on a
+stated interval whatever else is happening, and move it out of turn when
+something forces it. Each move is small, so a build failure names a small set of
+changes. It costs the determinism gate on a schedule rather than on a need.
+
+**Option C. Track the stable release cycle.** Move the date whenever the stable
+channel releases, so the nightly stays a fixed distance ahead of stable and the
+return to stable stays a short move. It ties the project to a cycle it does not
+otherwise care about.
+
+**Recommendation: B.** A is how a pin rots, and the project has a rule about
+exactly this shape: a value nobody is obliged to maintain stops being
+maintained.[^DEC106B] C solves a problem the project does not have, because
+nothing is planning a return to stable. B costs a scheduled gate run, and the
+record already makes each move a commit of its own so that a bisect can separate
+a compiler change from a code change.
+
+**What this does not decide.** It does not decide the interval. That is a
+figure, it follows from what the gate costs, and a register owns it. Express the
+policy with the interval as a parameter until a measurement on a development
+machine gives one.
+
+### DEC-109 — Now that the lint can name the reassociating float methods, what does each mechanism cover?
+
+**Open. A reviewer owns it, with the project owner. It governs the arithmetic
+boundary.**
+
+**The orientation states that two mechanisms hold the boundary because one is
+not enough**, and it says the script exists partly because the reassociating
+methods cannot be named in a lint.[^DEC107A] The move to the dated nightly
+changed the premise of that second half, and the findings register holds the
+measurement.[^DEC107B]
+
+**What changed, precisely.** On the stable release the project pinned, a call
+to the reassociating add was a compile error, so the compiler held that ground
+and neither mechanism was doing anything there. On the dated nightly the call
+compiles, so the ground is now open, and clippy resolves and rejects the method
+when its list names it. The list does not name it yet.
+
+**A third measurement bears on the choice.** Clippy silently ignores a
+disallowed-method path it cannot resolve. No warning, no note, on either
+toolchain. So a lint entry may be inert and read as live.
+
+**Option A. Add the lint entries and change the script in no way.** Both
+mechanisms then cover the reassociating methods, which is what the orientation
+asks for. The cost is a second declaration site for one rule, which is the
+defect shape this project keeps meeting.[^DEC107C]
+
+**Option B. Add the lint entries and narrow the script to what the lint cannot
+see.** The script would then cover only the inferred float literal. One rule,
+one site. The cost is that the lint entry can be switched off silently, and
+nothing would then hold the ground.
+
+**Option C. Add nothing. The script already rejects the names.** No work, and
+the boundary is held today. The cost is that the mechanism the orientation names
+first is the one that does nothing, and a reader of the lint file would not
+learn that.
+
+**Recommendation: A.** The measurement about clippy's silence is what decides
+it. B puts one rule behind a mechanism that can fail without saying so, and the
+whole reason two mechanisms exist is that one can. The duplication A creates is
+the good kind: two independent checks of one rule, not two declarations of one
+value, and they disagree only by one of them failing to fire.
+
+**What this does not decide.** It does not decide whether the reassociating
+methods should ever be permitted anywhere. They are forbidden in simulated and
+aggregated state and that is not open.[^DEC107D] A backlog item holds the
+work.[^DEC107E]
 
 ### DEC-105 — Is the memory-for-speed trade now open, and does ADR-0088 still hold?
 
@@ -1121,6 +1215,50 @@ that makes the whole feature pointless, and it is the one the determinism
 tests do not see.[^DEC72D]
 
 
+### DEC-110 — Does the engine move a unit inside the arena, or only choose the order it walks?
+
+**Open. Engineering owns it. It waits on a measurement of the reorder on the
+target platform.**
+
+The movement pass now walks every live unit in the order the bridge holds,
+which is the block-major tile order, and no longer in the slot order of the
+arena.[^DEC109A] That removed about half of the cost of a drifted arena and
+cost the frame nothing, because the bridge already sorts on that key at the
+barrier.[^DEC109B]
+
+**A residual remains, and only moving a unit in the arena removes it.** The
+unit columns are indexed by the slot, a slot is half of an identity, and a slot
+never moves.[^DEC109C] A pass in cell order therefore reads the unit columns at
+scattered positions whatever it does.
+
+**Move the units.** The arena separates two spaces: the slot space, which holds
+the generation and never compacts, and a row space, which holds every payload
+column packed and in cell order. The identity resolves through one more dense
+array. A bulk pass then reads a contiguous run of live units and needs no live
+filter. This does not compact the slot index space, so it does not contradict
+the identity record; it does add an indirection to every read that starts from
+an identity, and that read is on the hot path.
+
+**Leave them.** The residual has no measured size. The development machine
+could not separate the two builds, because other work shared it and its load
+moved by a factor of four inside one run.[^DEC109B] The reorder, by contrast,
+is priced: moving every column of the soldier shape once, for one million
+units on one thread, took 64 milliseconds against a frame budget of one
+hundred.[^DEC109D] **One side of the comparison is measured and the other is
+not, and the unmeasured side is the one that would justify the work.**
+
+**What decides it.** A measurement on Graviton of the residual and of the
+reorder, taken in one process. Both modes exist in the benchmark and neither
+has been run there. **A figure from the development machine is not evidence
+about the target: it has a different cache line, and other work shared it for
+every figure above.**[^BLK7]
+
+**If the answer is to move them, the interval is a second question.** A reorder
+of a packed arena costs 26 milliseconds and saves nothing, so an unconditional
+reorder on every frame wastes the common case. A fixed interval keeps the
+schedule out of the data, which is the rule a solver already follows.[^FIXEDITER]
+
+
 ## Decisions to apply at merge
 
 These are mechanical. They do not need judgement, but they must not be
@@ -1145,6 +1283,38 @@ figure is 168 MB. The storage argument for vectors is stronger than the report
 concluded, and it called that argument its weakest.
 
 ## Closed
+
+### DEC-107 — Which window library does the Python demonstration use?
+
+**Closed. pyglet. The engineer who moved the demonstration to the control plane
+closed it.**
+
+**The question was raised because pyglet was thought to be dead.** It is not.
+The project published version 2.1.16 on 22 August 2026, eleven days before this
+was decided.[^DEC107A] The library that looks unmaintained is the original
+pygame, whose last release is from September 2024. Its community fork,
+pygame-ce, is current.[^DEC107B]
+
+**The choice is small, because the presenter draws nothing.** A presenter owns
+a buffer and a camera, asks for a frame, and puts the result on a screen.[^DEC107C]
+Every pixel comes from one renderer in the core, so swapping the window library
+changes how a frame reaches a screen and changes no picture. This is why the
+question needs no record: a future contributor could reasonably choose
+otherwise, but choosing otherwise later costs about as much as choosing it now,
+so the second condition of the scope test fails.[^SCOPE1]
+
+**pyglet wins on the size of the dependency.** It ships as a pure Python wheel
+and binds the system graphics through ctypes, so it adds no compiled artefact
+to a machine that installs the package. pygame-ce ships a bundled native
+library. Both present a raw buffer well, and both were maintained this month.
+The demonstration needs a window, a keyboard and a way to upload an array of
+pixels, and both give all three.
+
+**The dependency is optional, and that is the part that matters.** The package
+fills a frame into memory with no window library and no display connection at
+all.[^DEC107E] A caller that wants pixels rather than a screen installs neither
+pyglet nor a display server. If pyglet does die, the loss is one module.
+
 
 ### DEC-097 — What does the project do with an accepted record whose imported fact a register made false?
 
@@ -2431,6 +2601,14 @@ The chosen option adds no mechanism, and the product record already states that
 a failed founding is correct.[^PRD12]
 
 ## References
+[^DEC106A]: ADR-0097, the toolchain is a dated nightly, decisions D2 and D3. `docs/adrs/draft/adr-0097-the-toolchain-is-a-dated-nightly.md`
+[^DEC106B]: Recurring defect shapes, documents that rot when a sweep names specifics. `.claude/rules/recurring-defects.md`
+[^DEC107A]: Project orientation, hard invariant 2. `CLAUDE.md`
+[^DEC107B]: Findings register, FND-284. `docs/FINDINGS.md`
+[^DEC107C]: Recurring defect shapes, redundant declaration sites. `.claude/rules/recurring-defects.md`
+[^DEC107D]: ADR-0002, state holds no floating point number, decision D1. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
+[^DEC107E]: Backlog item 0293, name the reassociating methods in the lint. `docs/backlog/proposed/0293-name-the-reassociating-methods-in-the-lint.md`
+
 
 [^DEC73A]: ADR-0065, a group is a site membership, not a region, decision D3. `docs/adrs/draft/adr-0065-a-group-is-a-site-membership-not-a-region.md`
 [^DEC73B]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`
@@ -2448,9 +2626,6 @@ a failed founding is correct.[^PRD12]
 [^PRD18]: Product record PRD-0018, a depleted deposit comes back. `docs/product/shaped/prd-0018-a-depleted-deposit-comes-back.md`
 [^SCALE]: Budgets and costs, the scale constants. `docs/reference/budgets.md`
 
-[^D106A]: ADR-0098, the choice is decided for each cell and each bucket of need, decision D1. `docs/adrs/draft/adr-0098-the-choice-is-decided-for-each-cell-and-each-bucket-of-need.md`
-[^D106B]: Budgets and costs, the choice pass. `docs/reference/budgets.md`
-[^D106C]: Target platform costs, would the choice pass collapse if it decided for each cell. `docs/reference/graviton-costs.md`
 [^D106A]: ADR-0098, the choice is decided for each cell and each bucket of need, decision D1. `docs/adrs/draft/adr-0098-the-choice-is-decided-for-each-cell-and-each-bucket-of-need.md`
 [^D106B]: Budgets and costs, the choice pass. `docs/reference/budgets.md`
 [^D106C]: Target platform costs, would the choice pass collapse if it decided for each cell. `docs/reference/graviton-costs.md`
@@ -2594,3 +2769,11 @@ a failed founding is correct.[^PRD12]
 [^DEC96D]: ADR-0064, a unit chooses by scoring a small fixed option set, decision D1. `docs/adrs/accepted/adr-0064-a-unit-chooses-by-scoring-a-small-fixed-option-set.md`
 [^DEC97B]: Target platform costs. `docs/reference/graviton-costs.md`
 [^SWEEP]: Recurring Defect Shapes, shape 2. `.claude/rules/recurring-defects.md`
+[^DEC107A]: The pyglet package index entry, read 2 September 2026. https://pypi.org/pypi/pyglet/json
+[^DEC107B]: The pygame and pygame-ce package index entries, read 2 September 2026. https://pypi.org/pypi/pygame/json
+[^DEC107C]: ADR-0094, the caller owns the camera and the pixels, decision D5. `docs/adrs/draft/adr-0094-the-caller-owns-the-camera-and-the-pixels.md`
+[^DEC107E]: ADR-0094, the caller owns the camera and the pixels, decision D4. `docs/adrs/draft/adr-0094-the-caller-owns-the-camera-and-the-pixels.md`
+[^DEC109A]: ADR-0018, the unit-to-tile bridge is derived, and it rebuilds at the barrier, decision D1. `docs/adrs/accepted/adr-0018-the-unit-to-tile-bridge-is-derived-and-rebuilds-at-the-barrier.md`
+[^DEC109B]: Findings register, FND-274. `docs/FINDINGS.md`
+[^DEC109C]: ADR-0014, entity identity is an index plus a generation, decision D1. `docs/adrs/accepted/adr-0014-entity-identity-is-an-index-plus-a-generation.md`
+[^DEC109D]: The cost benchmark, the reorder cost mode. `crates/cachette-core/benches/target_cost.rs`

@@ -74,14 +74,42 @@ column, and it does not move the barrier.
 
 ## Impact review
 
-Not done. This item is `proposed` and needs one before anyone takes it. Three
+Not done. This item is `proposed` and needs one before anyone takes it. Two
 questions are open and this item cannot invent the answers.
 
 - Which decision records govern the promotion pass, by number and decision.
 - Whether the promotion needs a record of its own, or whether the tier record
   and the key vector record already bind it.[^3] [^5]
-- Which blocker gives the character ceiling that the budget in point five cuts
-  against. Read it; do not invent it.
+
+**The third question is answered.** BLK-004 gives the ceiling, at 50,000 living
+characters, and the register carries it as a resolved row.[^8] **The budget in
+point five is not new work.** The character arena is built at the ceiling of
+its declared tier and refuses a capacity above it, so the allocation already
+cuts against the bound. What point five must add is the cut at the rank, not
+the bound itself.
+
+**BLK-011 is also resolved**, and the item already states its content in the
+lineage paragraph above: a promoted soldier founds a new house, his kinship to
+everyone is zero, and he cannot inherit by blood.[^4] The paragraph and the
+register agree, so nothing here needs a decision.
+
+## What the audit found, and why it did not take this item
+
+An audit measured the demonstration world and found no character at any tick,
+which is what moved this item up the index.[^9] It did not take the item, for
+one reason that a later worker should read before planning.
+
+**Points one, two and six each add a column to the unit row.** An achievement
+value, an eligibility bit and a link to the character are three columns, and
+the unit arena is the storage that a separate item is reordering for
+locality.[^10] The two changes touch one file for opposite reasons. Sequence
+them rather than merging them.
+
+**Do not close the zero with a character that nothing reads.** A founding could
+name a leader in one call and the count would stop being zero. That would
+declare a capability nobody invokes, which the rules forbid, and it would
+remove the signal that says the tier is unused.[^11] The zero is honest until a
+character decides something, and item 0068 is what makes one decide.
 
 ## References
 
@@ -92,3 +120,7 @@ questions are open and this item cannot invent the answers.
 [^5]: ADR-0007, content supplies a key vector, never a comparator. `docs/adrs/accepted/adr-0007-content-supplies-a-key-vector-never-a-comparator.md`
 [^6]: Decisions register, DEC-002. `docs/DECISIONS.md`
 [^7]: Recurring Defect Shapes, shape 1. `.claude/rules/recurring-defects.md`
+[^8]: Blockers register, BLK-004. `docs/BLOCKERS.md`
+[^9]: Findings register, FND-269. `docs/FINDINGS.md`
+[^10]: Backlog item 0266, order the unit arena by cell. `docs/backlog/refined/0266-order-the-unit-arena-by-cell.md`
+[^11]: Recurring Defect Shapes, shape 3. `.claude/rules/recurring-defects.md`

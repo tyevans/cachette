@@ -2,10 +2,10 @@
 # Measures the cost of a frame on the target platform.
 #
 # The project targets AWS Graviton, and the primary target triple is
-# aarch64-unknown-linux-gnu. Every cost figure in this project is derived
-# rather than measured, because no measurement exists on the target. This
-# script takes one. It launches a Graviton instance, copies the working tree
-# to it, builds the benchmark, runs it, brings the output back, and destroys
+# aarch64-unknown-linux-gnu. Most cost figures in this project are derived
+# rather than measured. This script takes a measurement. It launches a
+# Graviton instance, copies the working tree to it, builds the benchmark,
+# runs it, brings the output back, and destroys
 # everything it made.
 #
 # Read `docs/reference/graviton-costs.md` for the figures a run produced, and
@@ -28,6 +28,13 @@
 #   CACHETTE_BENCH_UNITS      the unit counts to sweep. Default: the profile
 #   CACHETTE_BENCH_MAX_MINUTES  the deadline after which the instance destroys
 #                             itself. Default 360
+#   CACHETTE_BENCH_FEATURES   crate features the benchmark is built with.
+#                             Default: none. `stage-cost` names every stage of
+#                             a frame and records what each one costs
+#   CACHETTE_BENCH_THP        the huge page settings to sweep, as a list of
+#                             words from `never`, `madvise` and `always`. The
+#                             `hugepages` profile reads it. Default:
+#                             `never madvise always`
 #
 # Every axis is a parameter, so a run at another size, another thread count or
 # another instance is a setting and not a change to a file. A run at the full
@@ -99,7 +106,7 @@ fi
 readonly PROFILE="${1:-full}"
 case "$PROFILE" in
     full | quick) ;;
-    one | stages | placement | memory-placement | collapse | exitfield)
+    one | stages | stage-cost | hugepages | placement | memory-placement | collapse | exitfield | arena-order | reorder-cost)
         # These take one configuration rather than a sweep, and the caller
         # names it. `CACHETTE_BENCH_POINT` holds the whole argument list that
         # the benchmark receives, for example `stages 4096x4096 1000000 12`.
@@ -110,7 +117,7 @@ case "$PROFILE" in
         fi
         ;;
     *)
-        printf 'The profile must be `full`, `quick`, `one`, `stages` or `placement`. Got: %s\n' "$PROFILE" >&2
+        printf 'The profile must be `full`, `quick`, `one`, `stages`, `stage-cost`, `hugepages` or `placement`. Got: %s\n' "$PROFILE" >&2
         exit 2
         ;;
 esac
@@ -174,6 +181,7 @@ say() { printf '=== %s\n' "$1" >&2; }
 
 say "Run $run_id, profile $PROFILE, $INSTANCE_TYPE in $REGION"
 say "Extents: ${CACHETTE_BENCH_EXTENTS:-the profile default}"
+say "Features: ${CACHETTE_BENCH_FEATURES:-none}"
 say "Threads: ${CACHETTE_BENCH_THREADS:-the profile default}"
 say "Units:   ${CACHETTE_BENCH_UNITS:-the profile default}"
 say "The instance destroys itself after $SELF_DESTRUCT_MINUTES minutes"
@@ -312,6 +320,14 @@ export CACHETTE_BENCH_EXTENTS="${CACHETTE_BENCH_EXTENTS:-}"
 export CACHETTE_BENCH_THREADS="${CACHETTE_BENCH_THREADS:-}"
 export CACHETTE_BENCH_UNITS="${CACHETTE_BENCH_UNITS:-}"
 export CACHETTE_BENCH_POINT="${CACHETTE_BENCH_POINT:-}"
+export CACHETTE_BENCH_FEATURES="${CACHETTE_BENCH_FEATURES:-}"
+export CACHETTE_BENCH_THP="${CACHETTE_BENCH_THP:-never madvise always}"
+# The features reach every `cargo bench` below through one array, so a run
+# cannot build one point with a feature and another without it.
+features=()
+if [ -n "$CACHETTE_BENCH_FEATURES" ]; then
+    features=(--features "$CACHETTE_BENCH_FEATURES")
+fi
 printf '# machine facts\n' > /tmp/facts.txt
 {
     printf '# uname\t%s\n' "$(uname -srm)"
@@ -322,14 +338,52 @@ printf '# machine facts\n' > /tmp/facts.txt
     printf '# cache_line_bytes\t%s\n' "$(cat /sys/devices/system/cpu/cpu0/cache/index0/coherency_line_size)"
     printf '# memory_kb\t%s\n' "$(sed -n 's/^MemTotal: *\([0-9]*\).*/\1/p' /proc/meminfo)"
     printf '# rustc\t%s\n' "$(rustc --version)"
+    printf '# features\t%s\n' "${CACHETTE_BENCH_FEATURES:-none}"
+    printf '# thp_default\t%s\n' "$(cat /sys/kernel/mm/transparent_hugepage/enabled)"
 } >> /tmp/facts.txt
 cat /tmp/facts.txt
-cargo bench --bench target_cost --no-run 2>&1 | tail -3
+cargo bench --bench target_cost "${features[@]}" --no-run 2>&1 | tail -3
+
+# Sets how the kernel gives transparent huge pages, for the whole machine.
+#
+# The engine asks for no huge page of its own. This setting is the cheapest
+# form of the experiment: the same binary, on the same machine, from the same
+# commit, with the kernel backing its large anonymous mappings either at 4 kB
+# or at 2 MB. The benchmark reports how much of its own memory landed on a
+# huge page, so a row is evidence that the setting reached the process rather
+# than an assumption that it did.
+set_huge_pages() {
+    if printf '%s' "$1" | sudo tee /sys/kernel/mm/transparent_hugepage/enabled >/dev/null 2>&1; then
+        printf '# thp_requested\t%s\n' "$1"
+    else
+        # A kernel that refuses the write still produces a row, and the row
+        # says the setting did not change. A run that died here would cost an
+        # instance and report nothing.
+        printf '# thp_requested\t%s\tREFUSED\n' "$1"
+    fi
+    printf '# thp_enabled\t%s\n' "$(cat /sys/kernel/mm/transparent_hugepage/enabled 2>/dev/null || echo unreadable)"
+}
+
+if [ "$1" = "hugepages" ]; then
+    : > /tmp/rows.txt
+    for mode in $CACHETTE_BENCH_THP; do
+        {
+            printf '# --- huge page mode\t%s\n' "$mode"
+            set_huge_pages "$mode"
+        } >> /tmp/rows.txt
+        # Each point runs in a process of its own. A process that has already
+        # built a large world keeps the mapping it was given, so a second mode
+        # measured in the same process would measure the first.
+        cargo bench --bench target_cost "${features[@]}" -- $CACHETTE_BENCH_POINT >> /tmp/rows.txt
+    done
+    cat /tmp/facts.txt /tmp/rows.txt > /tmp/result.txt
+    exit 0
+fi
 
 # A caller may ask for one named point or for the stage split instead of a
 # sweep. The extra words are passed straight through to the benchmark.
-if [ "$1" = "one" ] || [ "$1" = "stages" ] || [ "$1" = "placement" ] || [ "$1" = "memory-placement" ] || [ "$1" = "collapse" ] || [ "$1" = "exitfield" ]; then
-    cargo bench --bench target_cost -- $CACHETTE_BENCH_POINT > /tmp/rows.txt
+if [ "$1" = "one" ] || [ "$1" = "stages" ] || [ "$1" = "stage-cost" ] || [ "$1" = "hugepages" ] || [ "$1" = "placement" ] || [ "$1" = "memory-placement" ] || [ "$1" = "collapse" ] || [ "$1" = "exitfield" ] || [ "$1" = "arena-order" ] || [ "$1" = "reorder-cost" ]; then
+    cargo bench --bench target_cost "${features[@]}" -- $CACHETTE_BENCH_POINT > /tmp/rows.txt
     cat /tmp/facts.txt /tmp/rows.txt > /tmp/result.txt
     exit 0
 fi
@@ -372,6 +426,8 @@ ssh "${ssh_options[@]}" "$remote" \
      CACHETTE_BENCH_THREADS='${CACHETTE_BENCH_THREADS:-}' \
      CACHETTE_BENCH_UNITS='${CACHETTE_BENCH_UNITS:-}' \
      CACHETTE_BENCH_POINT='${CACHETTE_BENCH_POINT:-}' \
+     CACHETTE_BENCH_FEATURES='${CACHETTE_BENCH_FEATURES:-}' \
+     CACHETTE_BENCH_THP='${CACHETTE_BENCH_THP:-}' \
      nohup setsid bash remote.sh $PROFILE > run.log 2>&1 < /dev/null & echo started"
 
 say "Waiting for the run to finish. Progress follows"

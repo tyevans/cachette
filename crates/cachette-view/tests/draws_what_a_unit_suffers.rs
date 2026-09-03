@@ -206,7 +206,7 @@ fn measurements() -> Metrics {
 }
 
 /// Draws the whole world at a tile size large enough to read one unit.
-fn drawn(world: &World, at: Axial) -> (Canvas, Camera) {
+fn drawn(world: &World, at: Axial) -> (Canvas<'static>, Camera) {
     let mut canvas = Canvas::new(700, 700);
     let camera = Camera::at_tile_size(24.0)
         .looking_at(at, &canvas)

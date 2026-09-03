@@ -105,6 +105,35 @@ jobs:
       - name: Test
         run: uv run pytest
 
+  # ADR-0097 D4. Miri interprets the program and reports an aliasing defect, a
+  # provenance defect, or a read of an uninitialised byte. No other job here
+  # sees any of those. The state hash reads whole structures as raw bytes, and
+  # an undeclared padding byte puts an uninitialised byte into that read. On a
+  # development machine such a byte is reliably zero, so only Miri catches it.
+  #
+  # This job runs beside the others rather than inside the fast gate, because
+  # Miri interprets every instruction and is slow. The test list is in the
+  # justfile, which is the single declaration site for it.
+  miri:
+    name: miri
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # rust-toolchain.toml pins the dated nightly of ADR-0097 D2 and names
+      # the miri and rust-src components that this job needs.
+      - name: Install the toolchain
+        run: rustup show active-toolchain || rustup toolchain install
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: miri
+
+      - uses: extractions/setup-just@v3
+
+      - name: Check the unsafe code
+        run: just miri
+
   audit:
     name: licences and advisories
     runs-on: ubuntu-latest

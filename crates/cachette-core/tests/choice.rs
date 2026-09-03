@@ -413,9 +413,9 @@ fn a_watcher_asks_why_a_unit_chose_what_it_chose() {
     );
     // The answer states what the unit read and what it weighed, so a reader
     // can repeat the arithmetic.
-    for index in 0..choose::OPTION_COUNT {
+    for (index, weight) in why.weights.iter().enumerate() {
         assert_eq!(
-            why.weights[index],
+            *weight,
             world
                 .option_weight(index as u8)
                 .expect("the index is inside the set")

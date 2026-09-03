@@ -63,6 +63,7 @@
 use std::time::Instant;
 
 use cachette_core::choose::PERIOD_LOG2_CEILING;
+use cachette_core::stage;
 use cachette_core::{Axial, Entity, ExitField, FactionId, Fix32, Grid, World, WorldConfig};
 
 /// The seed that every world in this benchmark takes.
@@ -269,7 +270,10 @@ fn main() {
         "memory-point" => memory_point(&arguments),
         "memory" => memory_sweep(&full()),
         "stages" => stage_rows(&arguments),
+        "stage-cost" => stage_cost_rows(&arguments),
         "placement" => placement_rows(&arguments),
+        "arena-order" => arena_order_rows(&arguments),
+        "reorder-cost" => reorder_cost_rows(&arguments),
         "collapse" => collapse_rows(&arguments),
         "exitfield" => exit_field_rows(&arguments),
         "memory-placement" => memory_placement(&arguments),
@@ -415,6 +419,160 @@ fn stage_rows(arguments: &[String]) {
         threads,
         &samples,
     );
+}
+
+/// Prices every stage of a frame by name.
+///
+/// # Why this mode exists
+///
+/// The `stages` mode above prices a pass by running a whole frame with the
+/// pass switched off and taking the difference. Three switches exist, so that
+/// method left 62 percent of the cost of a unit in one residual that nothing
+/// on the public interface could divide.[^1]
+///
+/// This mode reads a table that the step fills in as it runs. Every pass is
+/// named, so nothing is left in a residual except the glue between the
+/// passes, and this mode reports that glue as its own row.
+///
+/// # It needs a feature
+///
+/// The table is behind the `stage-cost` feature and is off by default. A run
+/// without the feature reports zeros and says so in the preamble, so a reader
+/// cannot mistake "this build does not measure" for "the frame cost nothing".
+///
+/// ```text
+/// cargo bench --bench target_cost --features stage-cost -- stage-cost 4096x4096 1000000 12
+/// ```
+///
+/// # What the columns mean
+///
+/// `frames` is how many frames the row averaged over. `entries` is how many
+/// times the step opened the stage across those frames, and it should be
+/// `frames` times what the stage declares. `total_ns` is the sum, and
+/// `ns_for_each_frame` is the figure a register quotes. `takes_threads` is a
+/// declaration in the source rather than a measurement: a stage declared
+/// `false` that improves with the thread count means the declaration is
+/// wrong.
+///
+/// `nested` says whether the row divides the row above it rather than adding
+/// to the frame. The sum skips a nested row, because its time is already in
+/// the stage it divides.
+///
+/// The last two rows are not stages. `all_stages` is the sum of the rows
+/// above it, with the nested rows left out. `frame_wall` is the wall time of the same frames measured from
+/// outside, and the difference between the two is the cost of the step that
+/// no span covers, plus what the clock costs to read.
+///
+/// # References
+///
+/// [^1]: Target platform costs, where the unit cost goes. `docs/reference/graviton-costs.md`
+fn stage_cost_rows(arguments: &[String]) {
+    let extent = extent_argument(arguments, 1);
+    let units: u32 = arguments
+        .get(2)
+        .and_then(|word| word.parse().ok())
+        .expect("the third argument must be a unit count");
+    let threads: usize = arguments
+        .get(3)
+        .and_then(|word| word.parse().ok())
+        .unwrap_or(1);
+    let scattered = arguments.get(4).map(String::as_str) == Some("scattered");
+
+    /// How many frames one row averages over.
+    ///
+    /// The table is a sum, so a row here is an average and not a median. A
+    /// single frame would carry whatever the operating system did during it.
+    const FRAMES: usize = 9;
+
+    println!("# stage cost rows. Each row is one named pass of a frame");
+    println!("# recording\t{}", stage::is_recording());
+    println!(
+        "# placement\t{}",
+        if scattered { "scattered" } else { "packed" }
+    );
+    println!("# frames\t{FRAMES}");
+    println!("# transparent_huge_pages\t{}", huge_page_setting());
+    println!(
+        "stage\ttiles\tunits\tthreads\tframes\tentries\ttotal_ns\tns_for_each_frame\ttakes_threads\tnested"
+    );
+
+    let capacity = units.max(1024);
+    let mut world = World::new(extent.config(capacity)).expect("the extent must describe a world");
+    let placed = if scattered {
+        populate_scattered(&mut world, units)
+    } else {
+        populate(&mut world, units)
+    };
+    for _ in 0..WARMUP_FRAMES {
+        world.step(threads).expect("the step must run");
+    }
+
+    stage::reset();
+    let start = now();
+    for _ in 0..FRAMES {
+        let log = world.step(threads).expect("the step must run");
+        std::hint::black_box(log.len());
+    }
+    let wall = start.elapsed().as_nanos();
+    let costs = stage::costs();
+
+    let tiles = extent.tiles();
+    let frames = FRAMES as u64;
+    for stage in cachette_core::STAGES {
+        let cost = costs.cost(*stage);
+        println!(
+            "{}\t{tiles}\t{placed}\t{threads}\t{FRAMES}\t{}\t{}\t{}\t{}\t{}",
+            stage.name(),
+            cost.entries,
+            cost.nanos,
+            cost.nanos / frames,
+            stage.takes_threads(),
+            stage.is_nested()
+        );
+    }
+    let total = costs.total_nanos();
+    println!(
+        "all_stages\t{tiles}\t{placed}\t{threads}\t{FRAMES}\t{FRAMES}\t{total}\t{}\ttrue\tfalse",
+        total / frames
+    );
+    let wall = u64::try_from(wall).unwrap_or(u64::MAX);
+    println!(
+        "frame_wall\t{tiles}\t{placed}\t{threads}\t{FRAMES}\t{FRAMES}\t{wall}\t{}\ttrue\tfalse",
+        wall / frames
+    );
+    println!(
+        "# anon_huge_pages_bytes\t{}",
+        smaps_rollup_kib("AnonHugePages:") * 1024
+    );
+    println!("# resident_bytes\t{}", status_kib("VmRSS:") * 1024);
+}
+
+/// Reads how the kernel is set to give transparent huge pages.
+///
+/// The value is the whole line, with the current setting in square brackets.
+/// A row that names a huge page setting is reproducible; a row that does not
+/// is a figure about a machine nobody can name.
+fn huge_page_setting() -> String {
+    std::fs::read_to_string("/sys/kernel/mm/transparent_hugepage/enabled")
+        .map_or_else(|_| "unreadable".to_owned(), |text| text.trim().to_owned())
+}
+
+/// Reads one field of the rolled up mapping summary of this process, in kB.
+///
+/// `AnonHugePages` is the part of the anonymous memory of the process that
+/// sits on huge pages. It is the direct evidence that a huge page setting
+/// reached this process, rather than the assumption that it did.
+fn smaps_rollup_kib(field: &str) -> u64 {
+    let Ok(text) = std::fs::read_to_string("/proc/self/smaps_rollup") else {
+        return 0;
+    };
+    for line in text.lines() {
+        if let Some(rest) = line.strip_prefix(field) {
+            let digits: String = rest.chars().filter(char::is_ascii_digit).collect();
+            return digits.parse().unwrap_or(0);
+        }
+    }
+    0
 }
 
 /// Reads an extent argument, as `WIDTHxHEIGHT`.
@@ -1068,4 +1226,318 @@ fn populate(world: &mut World, units: u32) -> u32 {
         }
     }
     placed
+}
+
+/// Returns the addresses that the scattered pattern places a unit on.
+///
+/// The walk is the one that `populate_scattered` runs, with the spawn taken
+/// out. A caller then spawns on these addresses in any order it likes, so
+/// that the population sits in one place and the arena order is the only
+/// thing that moves.
+fn scattered_addresses(world: &World, units: u32) -> Vec<Axial> {
+    let grid = world.grid();
+    let width = grid.width();
+    let count = grid.tile_count();
+    if units == 0 {
+        return Vec::new();
+    }
+    let stride = (count / units).max(1);
+    let mut addresses = Vec::with_capacity(units as usize);
+    let mut cursor = 0u32;
+    for step in 0..units {
+        cursor = cursor.max(step.saturating_mul(stride));
+        while cursor < count {
+            let address = Axial::new((cursor % width) as i32, (cursor / width) as i32);
+            cursor += 1;
+            if world.admits_a_unit(address) {
+                addresses.push(address);
+                break;
+            }
+        }
+        if cursor >= count {
+            break;
+        }
+    }
+    addresses
+}
+
+/// Permutes a list in place, from a fixed seed.
+///
+/// The draw is a linear congruential step, which is enough to decorrelate an
+/// order and is the same on every run and on every machine. It seeds no
+/// simulated state, so it is not a simulation draw and no record governs
+/// it.[^1]
+///
+/// # References
+///
+/// [^1]: ADR-0003, every random draw is keyed, never stateful. `docs/adrs/accepted/adr-0003-every-random-draw-is-keyed-never-stateful.md`
+fn shuffle<T>(items: &mut [T]) {
+    let mut state: u64 = 0x9e37_79b9_7f4a_7c15;
+    for index in (1..items.len()).rev() {
+        state = state
+            .wrapping_mul(6_364_136_223_846_793_005)
+            .wrapping_add(1_442_695_040_888_963_407);
+        let pick = (state >> 33) as usize % (index + 1);
+        items.swap(index, pick);
+    }
+}
+
+/// Spawns one unit on each address, in the order given, and returns the count.
+fn populate_at(world: &mut World, addresses: &[Axial]) -> u32 {
+    let ceiling = u32::from(world.config().faction_count.max(1));
+    let mut placed = 0u32;
+    for address in addresses {
+        let faction = FactionId((placed % ceiling) as u16);
+        if world.spawn_soldier(*address, faction).is_ok() {
+            placed += 1;
+        }
+    }
+    placed
+}
+
+/// Returns the mean distance in slots between two units next to each other in
+/// the order the bridge holds.
+///
+/// The bridge order is the cell order. A value near one says that the units of
+/// one cell sit together in the arena. A large value says that reading the
+/// units of one cell touches one cache line for each unit.
+fn mean_slot_step(world: &World) -> u64 {
+    let live: Vec<Entity> = world.soldiers().iter().collect();
+    let mut in_cell_order: Vec<(u64, u32)> = Vec::with_capacity(live.len());
+    let layout = world.bridge().layout();
+    for unit in &live {
+        let Some(tile) = world.soldiers().tile(*unit) else {
+            continue;
+        };
+        let Some(key) = layout.key_of(tile) else {
+            continue;
+        };
+        in_cell_order.push((key, unit.index()));
+    }
+    in_cell_order.sort_unstable();
+    if in_cell_order.len() < 2 {
+        return 0;
+    }
+    let mut total: u64 = 0;
+    for window in in_cell_order.windows(2) {
+        total += u64::from(window[0].1.abs_diff(window[1].1));
+    }
+    total / (in_cell_order.len() as u64 - 1)
+}
+
+/// Measures one frame under two arena orders, at one set of unit positions.
+///
+/// The two rows put the units on the same tiles. The only difference is the
+/// order in which the arena took them, which fixes where each unit sits in
+/// every column. This isolates the arena order from the spread of the
+/// population, which the placement rows change together.
+///
+/// The tie order of an admission is the identity, so a different arena order
+/// can resolve a contested tile in favour of another unit. At this density a
+/// contested tile is rare, and the two rows hold the same unit count on the
+/// same tiles.
+fn arena_order_rows(arguments: &[String]) {
+    let extent = extent_argument(arguments, 1);
+    let units: u32 = arguments
+        .get(2)
+        .and_then(|word| word.parse().ok())
+        .expect("the third argument must be a unit count");
+    let threads: usize = arguments
+        .get(3)
+        .and_then(|word| word.parse().ok())
+        .unwrap_or(1);
+
+    println!("# one frame under two arena orders, at one set of unit positions");
+    println!("# ascending: the arena took the units in tile order");
+    println!("# shuffled: the arena took the same units in a permuted order");
+    println!("# baseline: the same world with a population the frame can ignore");
+    println!("# mean_slot_step is the mean slot distance between two units in cell order");
+    println!("# the three rows take their samples in turn, one frame each, in one loop");
+
+    // The three worlds are built first and sampled in turn. A machine that
+    // other work shares does not hold one load for the length of a run, so a
+    // row that takes all of its samples before the next row starts measures
+    // the load as much as the placement. An earlier version did that, and it
+    // reported a world of one thousand units as slower than the same world
+    // with two hundred and fifty thousand.
+    let capacity = units.max(1024);
+    let mut worlds: Vec<(&str, u64, World)> = Vec::new();
+    for (name, shuffled, population) in [
+        ("baseline", false, 1024u32),
+        ("ascending", false, units),
+        ("shuffled", true, units),
+    ] {
+        let mut world =
+            World::new(extent.config(capacity)).expect("the extent must describe a world");
+        let mut addresses = scattered_addresses(&world, population);
+        if shuffled {
+            shuffle(&mut addresses);
+        }
+        let placed = populate_at(&mut world, &addresses);
+        for _ in 0..WARMUP_FRAMES {
+            world.step(threads).expect("the step must run");
+        }
+        let step = mean_slot_step(&world);
+        println!("# {name}\tplaced\t{placed}\tmean_slot_step\t{step}");
+        worlds.push((name, step, world));
+    }
+
+    let mut samples: Vec<Vec<u128>> = vec![Vec::new(); worlds.len()];
+    let mut spent: u128 = 0;
+    while samples[0].len() < MAX_SAMPLES {
+        for (index, (_, _, world)) in worlds.iter_mut().enumerate() {
+            let start = now();
+            let log = world.step(threads).expect("the step must run");
+            let elapsed = start.elapsed().as_nanos();
+            std::hint::black_box(log.len());
+            samples[index].push(elapsed);
+            spent += elapsed;
+        }
+        if samples[0].len() >= MIN_SAMPLES && spent >= ROW_BUDGET_NS {
+            break;
+        }
+    }
+
+    println!(
+        "bench\torder\ttiles\tunits\tthreads\tmean_slot_step\tsamples\tmin_ns\tmedian_ns\tmax_ns"
+    );
+    for (index, (name, step, _)) in worlds.iter().enumerate() {
+        let mut row = samples[index].clone();
+        row.sort_unstable();
+        println!(
+            "arena_order\t{name}\t{}\t{units}\t{threads}\t{step}\t{}\t{}\t{}\t{}",
+            extent.tiles(),
+            row.len(),
+            row[0],
+            row[row.len() / 2],
+            row[row.len() - 1]
+        );
+    }
+}
+
+/// The bytes that one soldier holds across every column of the arena.
+///
+/// A reorder moves each of them. The figure is the sum of the column widths
+/// of the soldier shape, and it is a property of the shape rather than a
+/// budget.
+const SOLDIER_COLUMN_BYTES: usize = 38;
+
+/// Prices the reorder that would put the arena in cell order.
+///
+/// The item that proposes the reorder must price it, because a reorder of one
+/// million units on every frame can cost more than it saves. This mode
+/// measures the two halves of the work. The first half derives the
+/// permutation from the order the bridge already holds. The second half
+/// applies the permutation to columns of the widths that the soldier shape
+/// holds.
+///
+/// The gather is the honest shape of the work: a reorder reads each column at
+/// a scattered position and writes it at the next position of a new column.
+/// The read side is the cost, and no arrangement of the write side removes
+/// it.
+fn reorder_cost_rows(arguments: &[String]) {
+    let extent = extent_argument(arguments, 1);
+    let units: u32 = arguments
+        .get(2)
+        .and_then(|word| word.parse().ok())
+        .expect("the third argument must be a unit count");
+
+    let capacity = units.max(1024);
+    let mut world = World::new(extent.config(capacity)).expect("the extent must describe a world");
+    let placed = populate_scattered(&mut world, units);
+    for _ in 0..WARMUP_FRAMES {
+        world.step(1).expect("the step must run");
+    }
+
+    println!("# the cost of one reorder of the unit arena, on one thread");
+    println!("# permutation: deriving the target order from the cell key");
+    println!("# gather_all: moving every column of the soldier shape");
+    println!("# soldier_column_bytes\t{SOLDIER_COLUMN_BYTES}");
+    println!("bench\tpart\ttiles\tunits\tsamples\tmin_ns\tmedian_ns\tmax_ns");
+
+    let soldiers = world.soldiers();
+    let layout = world.bridge().layout();
+    let live: Vec<Entity> = soldiers.iter().collect();
+
+    // The permutation. The bridge already sorts on this key once for each
+    // frame, so a reorder that rides on the rebuild pays this once and not
+    // twice. It is measured apart so that a reader can tell the two costs.
+    let samples = samples_of(|| {
+        let start = now();
+        let mut keyed: Vec<(u64, u32)> = Vec::with_capacity(live.len());
+        for unit in &live {
+            let tile = soldiers.tile(*unit).expect("a live unit stands somewhere");
+            let key = layout.key_of(tile).expect("a tile of this world has a key");
+            keyed.push((key, unit.index()));
+        }
+        keyed.sort_unstable();
+        let elapsed = start.elapsed().as_nanos();
+        std::hint::black_box(keyed.len());
+        elapsed
+    });
+    report_part("reorder", "permutation", extent.tiles(), placed, &samples);
+
+    // The move. Every column of the shape is packed into one byte array of
+    // the width the shape holds, so the gather reads the same bytes at the
+    // same scattered positions as a reorder of the real columns would.
+    let mut keyed: Vec<(u64, u32)> = live
+        .iter()
+        .map(|unit| {
+            let tile = soldiers.tile(*unit).expect("a live unit stands somewhere");
+            let key = layout.key_of(tile).expect("a tile of this world has a key");
+            (key, unit.index())
+        })
+        .collect();
+    keyed.sort_unstable();
+    let order: Vec<u32> = keyed.iter().map(|pair| pair.1).collect();
+    let slots = soldiers.slot_count() as usize;
+    let source: Vec<[u8; SOLDIER_COLUMN_BYTES]> = vec![[7u8; SOLDIER_COLUMN_BYTES]; slots];
+    let mut target: Vec<[u8; SOLDIER_COLUMN_BYTES]> = vec![[0u8; SOLDIER_COLUMN_BYTES]; slots];
+
+    let samples = samples_of(|| {
+        let start = now();
+        for (position, slot) in order.iter().enumerate() {
+            target[position] = source[*slot as usize];
+        }
+        let elapsed = start.elapsed().as_nanos();
+        std::hint::black_box(target[0][0]);
+        elapsed
+    });
+    report_part("reorder", "gather_all", extent.tiles(), placed, &samples);
+
+    // The row above measures a fixture and not the work. This world spawned
+    // its units in tile order, so the target order is nearly the order the
+    // arena already holds and the gather reads almost sequentially. A reorder
+    // is only worth running when the arena has drifted, and then every read
+    // lands on another page. This row supplies that case.
+    let mut scattered_order = order.clone();
+    shuffle(&mut scattered_order);
+    let samples = samples_of(|| {
+        let start = now();
+        for (position, slot) in scattered_order.iter().enumerate() {
+            target[position] = source[*slot as usize];
+        }
+        let elapsed = start.elapsed().as_nanos();
+        std::hint::black_box(target[0][0]);
+        elapsed
+    });
+    report_part(
+        "reorder",
+        "gather_all_drifted",
+        extent.tiles(),
+        placed,
+        &samples,
+    );
+}
+
+/// Writes one row that names a part of a measured cost.
+fn report_part(name: &str, part: &str, tiles: u64, units: u32, samples: &[u128]) {
+    let last = samples.len() - 1;
+    println!(
+        "{name}\t{part}\t{tiles}\t{units}\t{}\t{}\t{}\t{}",
+        samples.len(),
+        samples[0],
+        samples[samples.len() / 2],
+        samples[last]
+    );
 }

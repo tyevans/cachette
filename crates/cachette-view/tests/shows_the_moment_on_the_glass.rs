@@ -75,7 +75,7 @@ fn founded() -> (World, Vec<cachette_core::FoundingOutcome>, Axial) {
 }
 
 /// Draws one frame of the fixture and returns the readout and the canvas.
-fn drawn(reference: bool) -> (World, Readout, Canvas) {
+fn drawn(reference: bool) -> (World, Readout, Canvas<'static>) {
     let (world, outcomes, place) = founded();
     let mut canvas = Canvas::new(WINDOW.0, WINDOW.1);
     let camera = Camera::opening()

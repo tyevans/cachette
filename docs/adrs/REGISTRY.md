@@ -371,6 +371,8 @@ without stating a constraint is worse than no record.
 | 0095 | A behavioural strategy arrives as a field over cells, never as a search from a unit | Draft | 0004, 0022, 0064, 0091 | `draft/adr-0095-a-behavioural-strategy-arrives-as-a-field-over-cells.md` |
 | 0096 | Cost follows the lattice, not the population, and a unit is a reader | Draft | 0009, 0014, 0022, 0064, 0091, 0095 | `draft/adr-0096-cost-follows-the-lattice-not-the-population.md` |
 | 0098 | The choice is decided for each cell and each bucket of need | Draft | 0001, 0009, 0063, 0064, 0096 | `draft/adr-0098-the-choice-is-decided-for-each-cell-and-each-bucket-of-need.md` |
+| 0099 | A site fills its positions by one sort and one scan | Draft | 0004, 0007, 0014, 0065 | 16, `draft/adr-0099-a-site-fills-its-positions-by-one-sort-and-one-scan.md` |
+| 0097 | The toolchain is a dated nightly, pinned to a date and never to a channel | Draft | 0001, 0002, 0008, 0041 | `draft/adr-0097-the-toolchain-is-a-dated-nightly.md` |
 
 ### Retired numbers
 
