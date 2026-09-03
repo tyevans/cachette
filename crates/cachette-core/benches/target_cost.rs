@@ -270,6 +270,7 @@ fn main() {
         "memory" => memory_sweep(&full()),
         "stages" => stage_rows(&arguments),
         "placement" => placement_rows(&arguments),
+        "memory-placement" => memory_placement(&arguments),
         "one" => one_point(&arguments),
         "full" => timing_sweep(&full()),
         _ => timing_sweep(&quick()),
@@ -583,11 +584,16 @@ fn memory_point(arguments: &[String]) {
         .get(3)
         .and_then(|word| word.parse().ok())
         .unwrap_or(1);
+    let scattered = arguments.get(4).map(String::as_str) == Some("scattered");
 
     let empty = status_kib("VmRSS:");
     let capacity = units.max(1024);
     let mut world = World::new(extent.config(capacity)).expect("the extent must describe a world");
-    let placed = populate(&mut world, units);
+    let placed = if scattered {
+        populate_scattered(&mut world, units)
+    } else {
+        populate(&mut world, units)
+    };
     for _ in 0..WARMUP_FRAMES {
         world.step(threads).expect("the step must run");
     }
@@ -596,8 +602,13 @@ fn memory_point(arguments: &[String]) {
     // The world is read after the sizes are taken, so nothing above can drop
     // it early and report the memory of a world that no longer exists.
     let tiles = world.tile_count() as u64;
+    let label = if scattered {
+        "memory_scattered"
+    } else {
+        "memory_packed"
+    };
     println!(
-        "memory\t{}\t{placed}\t{threads}\t{}\t{}\t{}",
+        "{label}\t{}\t{placed}\t{threads}\t{}\t{}\t{}",
         extent.tiles(),
         empty * 1024,
         resident * 1024,
@@ -605,6 +616,34 @@ fn memory_point(arguments: &[String]) {
     );
     assert_eq!(tiles, extent.tiles(), "the world must hold the extent");
     drop(world);
+}
+
+/// Measures the resident memory of one world under both placement patterns.
+///
+/// Each point runs in a process of its own, so neither reading carries the
+/// other. That is the difference between this and the placement timing mode,
+/// which measures two worlds in one process and therefore reports no memory.
+fn memory_placement(arguments: &[String]) {
+    let binary = std::env::current_exe().expect("the benchmark must know its own path");
+    let extent = extent_argument(arguments, 1);
+    let units = arguments
+        .get(2)
+        .cloned()
+        .expect("the third argument must be a unit count");
+    let threads = arguments.get(3).cloned().unwrap_or_else(|| "1".to_owned());
+
+    println!("bench\ttiles\tunits\tthreads\tempty_bytes\tresident_bytes\tpeak_bytes");
+    for pattern in ["packed", "scattered"] {
+        let output = std::process::Command::new(&binary)
+            .arg("memory-point")
+            .arg(format!("{}x{}", extent.width, extent.height))
+            .arg(&units)
+            .arg(&threads)
+            .arg(pattern)
+            .output()
+            .expect("the child must run");
+        print!("{}", String::from_utf8_lossy(&output.stdout));
+    }
 }
 
 /// Starts one child for each point of the memory sweep and writes the table.
