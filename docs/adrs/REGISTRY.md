@@ -123,13 +123,40 @@ The test is one question. **Does the edit change what a reader would decide?**
   Nothing a reader decides from the record changes.
 - Rewording the sentence that carries the footnote marker is an amendment, and
   the window governs it.
-- Adding, removing or reversing a claim, a force, a rejected alternative or a
-  consequence is an amendment, whatever else the commit touches.
+- Adding, removing or reversing a claim, a force or a rejected alternative is
+  an amendment, whatever else the commit touches. A consequence the record
+  derived from its own claim is the one exception, and the next section states
+  it.
 
 The commit still says what changed and why, because that is the audit trail and
 a silent edit to an accepted record is the failure this whole section is about.
 
 This has happened once, and the finding holds the case and the reasoning.[^CITE]
+
+### Repairing a derived consequence is not an amendment
+
+**A record states what follows from its claim. What follows changes when the
+project learns, and the claim does not.**
+
+A consequence that a record derived from its own claim may be struck or
+corrected in place, in an accepted record, whatever depends on it. Do not test
+it against the window. Do not write a superseding record to change one derived
+clause, because that record's subject is a topic and not a constraint.[^SCOPE]
+
+The test is the same question. **Does the edit change what a reader would
+decide?** A reviewer refuses a change because of the claim. A reviewer does not
+refuse one because of a cost clause. Striking the cost clause therefore leaves
+every refusal the record supports.
+
+- A cost clause, a complexity claim, or a sentence that follows "therefore" and
+  restates the claim in another unit is derived. Strike it.
+- A sentence that a reader would cite on its own is a claim, however late in the
+  record it sits. The window governs it.
+- The record that stales the consequence binds first. A draft stales nothing, so
+  the strike waits for the acceptance.
+
+The commit says which sentence went, which record staled it, and why the edit is
+a repair. A register holds the reasoning and the case that raised it.[^DERIVED]
 
 ## What does not belong in a record
 
@@ -401,3 +428,4 @@ Then the cross-cutting models, 0007 to 0013. Then the subsystems.
 [^SCOPE]: Decision Record Scope, the test for whether a decision needs a record. `.claude/rules/adr-scope.md`
 [^YIELD]: Findings register, FND-214. `docs/FINDINGS.md`
 [^CITE]: Findings register, FND-218. `docs/FINDINGS.md`
+[^DERIVED]: Decisions register, DEC-096. `docs/DECISIONS.md`
