@@ -197,6 +197,37 @@ gives 573 ns for each unit at one thread, and at 10,000 units it gives 768 ns,
 so the line is straight over two orders of magnitude and bends upward slightly
 at the smallest count.
 
+## A prediction, written before the run that tests it
+
+**This section was committed before the measurement it names existed.** The
+commit that adds it holds no result, and the commit that follows holds the
+result. The order of the two commits is the evidence, and a reader who doubts
+it can read the history.
+
+The two constants above were computed after every row was in hand. That makes
+the agreement between them and the target scale row a consistency check and
+not a prediction, and a consistency check is the weaker of the two. This
+section removes the doubt for one point.
+
+**The prediction.** A world of 16,777,216 tiles and 500,000 units, stepped at
+12 threads, on a Graviton3 instance, costs a median of **396.6 milliseconds**
+for one frame.
+
+**How it is computed.** The tile pass at 16,777,216 tiles and 12 threads is a
+measured row, at 247,703,940 ns. The cost of one unit at 12 threads is a
+measured difference, at 297.878 ns. The prediction is the first plus 500,000
+times the second.
+
+**What counts as a hit.** A median within five percent, which is 376.8 to
+416.5 milliseconds. A median outside that band refutes the additive model, and
+this section stays in the register saying so.
+
+Nothing in the configuration was measured before. No row above holds 500,000
+units, and no row above holds a world of 16,777,216 tiles with any unit count
+between zero and one million.
+
+**Result: not yet run.**
+
 ## Resident memory
 
 Each row below comes from a process that measured one point and exited. A
