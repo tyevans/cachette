@@ -37,6 +37,7 @@ pub mod site;
 pub mod slots;
 pub mod soldier;
 pub mod sort;
+pub mod stage;
 mod stock;
 pub mod terrain;
 pub mod tier;
@@ -82,6 +83,7 @@ pub use site::{
 pub use slots::{Candidate, SlotError, Slots};
 pub use soldier::{SoldierArena, SoldierError};
 pub use sort::{SortError, SortKey};
+pub use stage::{FrameCosts, Stage, StageCost, STAGES, STAGE_COUNT};
 pub use terrain::{Terrain, TerrainTile, TileKind};
 pub use tier::{EntityTier, Shape, CHARACTER_CEILING};
 pub use tile_value::{TileValueRange, TileValues};

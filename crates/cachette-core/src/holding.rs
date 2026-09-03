@@ -45,6 +45,7 @@ use crate::hash::StateHash;
 use crate::hex::{Axial, Grid, NEIGHBOUR_COUNT};
 use crate::slots::Slots;
 use crate::soldier::SoldierArena;
+use crate::stage::{self, Stage};
 use crate::terrain::{Terrain, TileKind};
 use crate::types::{FactionId, TileIdx, FACTION_CEILING};
 
@@ -401,7 +402,10 @@ impl Holding {
         bridge.describes(arena)?;
         let threads = threads.max(1);
 
-        let candidates = self.candidates(arena);
+        let candidates = {
+            let _span = stage::open(Stage::HoldingCandidates);
+            self.candidates(arena)
+        };
         if candidates.is_empty() {
             return Ok(0);
         }
@@ -418,6 +422,7 @@ impl Holding {
             .expect("the candidate list is not empty, so it needs at least one slot");
         let holders = &self.holders[..];
         let mut refusal: Option<BridgeError> = None;
+        let decide_span = stage::open(Stage::HoldingDecide);
         std::thread::scope(|scope| {
             let mut handles = Vec::new();
             for (chunk, slot) in candidates.chunks(chunk_len).zip(slots.entries_mut()) {
@@ -441,10 +446,15 @@ impl Holding {
                 }
             }
         });
+        drop(decide_span);
         if let Some(error) = refusal {
             return Err(error);
         }
 
+        // The join and the write are one stage. The join is what fixes the
+        // order of the result, and the write is what the order is for, so a
+        // reader who wants to know what applying a decision costs wants both.
+        let _span = stage::open(Stage::HoldingApply);
         let changes = slots.combine(Vec::new(), |mut joined, slot| {
             joined.extend_from_slice(slot);
             joined

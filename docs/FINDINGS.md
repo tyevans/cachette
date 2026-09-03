@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-264**
+**Next number: FND-279**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -1231,6 +1231,99 @@ each faction each tick at late-game scale, roughly 87 core-ms. The mechanism
 that existed to make fog cheap was the most expensive thing in the frame.
 
 ## E. Layout and platform corrections
+
+### FND-277 — The residual was one pass nobody had named, and it was 61 percent of the frame
+
+**Believed.** The 170 milliseconds the stage split could not divide held
+several passes in roughly comparable parts. The register named six of them:
+the movement intents, admission, the holder spread, the death scan, the part
+of the level 1 rebuild that reads the units, and the walk over live units
+inside the choice pass.[^FND277A]
+
+**True.** It is one pass, and inside that pass it is one function. With every
+stage of a frame named and timed, the holding spread is 514.3 milliseconds of
+a 836 millisecond frame, which is 61.5 percent of the whole frame. The three
+largest stages together are 85.3 percent. The death scan is 0.04
+milliseconds, admission is 29.3, and the movement intents are 4.7.
+
+**Inside the spread, the candidate list is 49.1 percent of the whole frame**,
+and it runs on the calling thread. It walks every held tile and every live
+unit, pushes an index for each, then sorts several million indices and removes
+the duplicates. The half of the pass that decides takes a thread count and
+costs 71.1 milliseconds. The half that chooses what to decide about takes none
+and costs five and a half times as much.
+
+**Evidence.** Two runs on a Graviton3 instance at 16,777,216 tiles, 1,000,000
+units scattered, 12 threads. The first named every stage, and the second
+divided the largest one. Every stage is a row and the register holds
+them.[^FND277A] The sum of the stages is 835,957,085 nanoseconds against
+835,978,143 for the same frames timed from outside, so the part that is still
+unattributed is 0.0025 percent.
+
+The two runs measured the frame at 836.0 and 816.1 milliseconds under the same
+setting, so they differ by 2.4 percent. Read a share here as a proportion and
+not as an amount.
+
+**Follows.** Four things.
+
+**A split by subtraction finds only what has a switch.** The old method priced
+a pass by running a frame without it, and the holding spread has no switch, so
+the largest thing in the frame was invisible to the method that existed to
+find it. The residual was not a mixture. It was one pass that the instrument
+could not point at.
+
+**The next optimisation is not the one the backlog names.** Four items propose
+a change to the layout or the allocation, and the priority index put them
+above the item that made the frame measurable. The measurement moved the
+order: one pass is worth more than the four items together.
+
+**Prices go stale, and one in the register was stale by a factor of 125.** The
+same split measured the choice at 71.4 milliseconds and called it 26 percent
+of the cost of a unit. The choice now costs 0.571 milliseconds, because item
+0238 made the pass decide once for each pair of cell and need. Nothing failed
+when that figure went stale, and nothing would have.
+
+**One measurement is enough to name a pass and not enough to name the part of
+it that costs.** The first run said the spread was 61 percent. It took a
+second run, with three spans inside the spread, to say that one serial
+function is 49 percent of the frame. A stage is the unit that a reader can
+act on, and this one needed two.
+
+### FND-278 — Huge pages are worth 3.9 percent, and they cost five times the memory the estimate gave
+
+**Believed.** Huge pages might explain part of the unattributed cost, and the
+memory they waste at the end of an allocation would be under one part in two
+hundred.[^FND278A]
+
+**True.** Both halves are answered, and the second was wrong. A frame at the
+target scale costs 3.9 percent less with the kernel giving 2 MB pages, and the
+resident set grows by 2.65 percent rather than by 0.5.
+
+**Evidence.** One run on a Graviton3 instance, one commit, one binary, three
+processes, one for each kernel setting. The register holds every row.[^FND277A]
+The frame fell from 835,978,143 nanoseconds under the default setting to
+803,042,781 under `always`. Of the resident set, 719,323,136 bytes sat on huge
+pages under `always` and none did under either other setting, so the setting
+demonstrably reached the process. The resident set grew by 27,889,664 bytes.
+
+**Follows.** Three things.
+
+**The prediction named the shape and the shape held.** The item said a
+translation cost would appear spread across every pass that touches a large
+array, and invisible to a split that measures stages. Three stages account for
+the whole 32.9 milliseconds and every other stage moved by less than half a
+millisecond. The three are the passes that write scattered over a large array.
+
+**A time row without an occupancy row is a claim rather than a
+measurement.** Two of the three settings gave this engine identical pages,
+because the engine calls no advice. Only the huge page column separates "the
+setting did nothing" from "huge pages do nothing", and they are different
+answers.
+
+**Two conditions that should be identical differed by 0.64 percent**, so that
+is the noise floor of this apparatus at one run for each condition. A result
+this size is worth quoting to one figure and not to two.
+
 
 ### FND-235 — A stored watermark read nothing, because a sentinel already said it
 
@@ -6637,12 +6730,12 @@ registry, not in the framing.
 
 **Believed.** Two things, and both were reasonable. The first is that a need is
 a fixed-point quantity, so two units in one cell almost never share one and a
-key on the exact need reduces nothing.[^F259A] The second is that no fixture in
+key on the exact need reduces nothing.[^F263A] The second is that no fixture in
 this project produces the distribution, because it needs settlements, home sites
-and a running economy and the benchmark world holds none of the three.[^F259B]
+and a running economy and the benchmark world holds none of the three.[^F263B]
 
 **True, with a correction to the first and a replacement for the second.** A
-fixture now exists and the distribution is measured.[^F259C]
+fixture now exists and the distribution is measured.[^F263C]
 
 **The measurement.** A world of 65,536 tiles, 64 level 1 cells, 64 settlements,
 about 4,000 units with a home each, and the economy running on every tick. The
@@ -6701,7 +6794,7 @@ width gives 41 distinct keys against 17 at the peak, and the collapse falls from
 **The decay is a parameter of the need rule, so the two are coupled.** A caller
 who changes the decay and leaves the width alone has unmatched them. That
 coupling is why the width is a parameter of the world and not a constant of a
-module. An open decision closed against this measurement.[^F259D]
+module. An open decision closed against this measurement.[^F263D]
 
 **The width changes where the population ends up, and the fixture showed it by
 accident.** The measurement was taken twice, once at each of two default widths,
@@ -6709,12 +6802,12 @@ because the fixture reads the width the world holds. The median cell held 71
 units at the finer width and 67 at the matched one, at the same frame of the same
 seed. A unit takes its option from its bucket and its step from its option, so a
 different width moves a different population. **No golden file sees any of
-this**, and a separate finding records why.[^F259F]
+this**, and a separate finding records why.[^F263F]
 
 **This is not a cost figure and no blocker governs it.** The simulation is
 deterministic integer arithmetic, so every number above is the same on every
 machine. The register that holds measured cost figures is for the target
-platform, and this belongs in neither that register nor the derived one.[^F259E]
+platform, and this belongs in neither that register nor the derived one.[^F263E]
 
 **What this does not measure.** Whether the matched width dithers a unit's
 behaviour, and what the real placement of homes in a played world looks like.
@@ -6770,7 +6863,7 @@ and every scenario matched its stored file each time. So the gate is blind not
 only to the quantisation but to the parameter that decides how much the
 quantisation does. **That parameter is the mechanism of the decision**, and a
 review of the governing record said so before any of this was measured. A
-register holds the value and the measurement it was chosen against.[^F259D]
+register holds the value and the measurement it was chosen against.[^F263D]
 
 **The remedy is not a new golden scenario.** A scenario built to sit on a bucket
 boundary would pin the boundary rather than the behaviour, and the record says
@@ -6989,16 +7082,12 @@ distinguished the two.
 [^F262B]: ADR-0098, the choice is decided for each cell and each bucket of need, decision D1. `docs/adrs/draft/adr-0098-the-choice-is-decided-for-each-cell-and-each-bucket-of-need.md`
 [^F262D]: Findings register, FND-051 and FND-048, in this document.
 [^F262E]: ADR-0098, the choice is decided for each cell and each bucket of need, the consequences. `docs/adrs/draft/adr-0098-the-choice-is-decided-for-each-cell-and-each-bucket-of-need.md`
-[^F259A]: Review of ADR-0096, correction 1. The review artefact sits on the branch that holds it, so this branch cannot resolve its path and the citation names it instead.
-[^F259B]: Target platform costs, would the choice pass collapse if it decided for each cell. `docs/reference/graviton-costs.md`
-[^F259C]: The need spread measurement. `crates/cachette-core/tests/need_spread.rs`
-[^F259D]: Decisions register, DEC-097. `docs/DECISIONS.md`
-[^F259E]: Budgets and costs, what belongs here. `docs/reference/budgets.md`
-[^F259F]: Findings register, FND-258, in this document.
-[^F258A]: Backlog item 0238, decide per cell and need rather than per unit. `docs/backlog/complete/0238-decide-per-cell-and-need-rather-than-per-unit.md`
-[^F258B]: ADR-0098, the choice is decided for each cell and each bucket of need, decision D1. `docs/adrs/draft/adr-0098-the-choice-is-decided-for-each-cell-and-each-bucket-of-need.md`
-[^F258D]: Findings register, FND-051 and FND-048, in this document.
-[^F258E]: ADR-0098, the choice is decided for each cell and each bucket of need, the consequences. `docs/adrs/draft/adr-0098-the-choice-is-decided-for-each-cell-and-each-bucket-of-need.md`
+[^F263A]: Review of ADR-0096, correction 1. The review artefact sits on the branch that holds it, so this branch cannot resolve its path and the citation names it instead.
+[^F263B]: Target platform costs, would the choice pass collapse if it decided for each cell. `docs/reference/graviton-costs.md`
+[^F263C]: The need spread measurement. `crates/cachette-core/tests/need_spread.rs`
+[^F263D]: Decisions register, DEC-097. `docs/DECISIONS.md`
+[^F263E]: Budgets and costs, what belongs here. `docs/reference/budgets.md`
+[^F263F]: Findings register, FND-258, in this document.
 [^F226A]: Backlog item 0185, steer a step by the option the unit chose. `docs/backlog/complete/0185-steer-a-step-by-the-option-the-unit-chose.md`
 [^F226B]: Backlog item 0186, let the engine order a gather. `docs/backlog/complete/0186-let-the-engine-order-a-gather.md`
 [^F226C]: ADR-0063, a need is a rate with a threshold, and crossing it is a fact, decision D2. `docs/adrs/accepted/adr-0063-a-need-is-a-rate-with-a-threshold-and-crossing-it-is-a-fact.md`
@@ -7236,6 +7325,8 @@ distinguished the two.
 [^238A]: The gate recipes. `justfile`
 [^238B]: Testing Rules, section 1. `.claude/rules/testing.md`
 [^238C]: Definition of Done, section 5. `.claude/rules/definition-of-done.md`
+[^FND277A]: Target platform costs, every stage of a frame by name, and huge pages. `docs/reference/graviton-costs.md`
+[^FND278A]: Backlog item 0269, map the large arrays with huge pages. `docs/backlog/complete/0269-map-the-large-arrays-with-huge-pages.md`
 [^235A]: The record of descent, the labelled row count. `crates/cachette-core/src/descent.rs`
 [^236A]: Backlog item 0097. `docs/backlog/complete/0097-write-the-layout-record-with-the-descent-columns.md`
 [^236B]: Backlog item 0067, record a parent and walk a line. `docs/backlog/complete/0067-record-a-parent-and-walk-a-line.md`

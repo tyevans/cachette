@@ -18,6 +18,12 @@ bytemuck.workspace = true
 # and first-wins. The probe tests then assert that the determinism tests
 # fail. A determinism test with no proven failure mode is decoration.
 #
+# `stage-cost` is a measurement switch. It names every stage of a frame and
+# records what each one costs, so that a cost belongs to a stage rather than
+# to the frame. It reads a clock and writes two integers to a static, and no
+# pass reads either, so it cannot change a result. It is off by default, and
+# without it a span is an empty type and the step pays nothing.
+#
 # `census-generated-tiles` is a test-only switch as well. It counts the tiles
 # that the tile value field has generated on the calling thread. The build
 # test then asserts that building a world generates none, and that a copy of
@@ -26,6 +32,7 @@ bytemuck.workspace = true
 [features]
 probe-nondeterminism = []
 census-generated-tiles = []
+stage-cost = []
 
 [dev-dependencies]
 bytemuck.workspace = true
