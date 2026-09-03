@@ -14,10 +14,13 @@ References
 [^1]: Testing Rules, section 5. ``.claude/rules/testing.md``
 [^2]: ADR-0001, one binary gives one answer at any thread count, decision D4.
     ``docs/adrs/REGISTRY.md``
+[^3]: Testing Rules, section 4. ``.claude/rules/testing.md``
+[^4]: Testing Rules, section 2a. ``.claude/rules/testing.md``
 """
 
 from __future__ import annotations
 
+import itertools
 import json
 import sys
 from collections.abc import AsyncIterator, Awaitable, Callable
@@ -101,12 +104,19 @@ def test_a_client_reaches_every_tool() -> None:
         "check_invariants",
         "despawn_units",
         "event_log",
+        "found_group",
+        "founding_survey",
         "gather_events",
         "order_gather",
+        "region_summary",
+        "site_economy",
         "spawn_units",
         "step_world",
         "tile_changes",
+        "tile_report",
+        "unit_choice",
         "unit_tile",
+        "window_census",
         "world_report",
     ]
 
@@ -297,3 +307,392 @@ def test_the_identity_of_a_removed_unit_is_a_tool_error() -> None:
     refused, alive = _drive(body)
     assert refused, "the dead identity must refuse"
     assert alive["tile"] == 0
+
+
+# The world the reading tests build.
+#
+# The extent matters. The pyramid puts one level 1 cell over a world of this
+# size, so a test can compare the cell against every tile of the world in 64
+# calls. A larger world would need a second cell and the test would have to
+# know which tiles the cell covers, which is engine geometry the control
+# plane must not hold a copy of.
+READ_WIDTH = 8
+READ_HEIGHT = 8
+
+# **The seed is the assertion's, not the world's.** Seed 7 gives a world of
+# hill and mountain in which every tile admits a unit. In such a world the
+# open tiles equal the tiles, so a read that returned one where the other
+# belongs is invisible. The defect was put back and the suite stayed green.
+#
+# Seed 51 gives three tiles of water at (0, 6), (0, 7) and (1, 7), and forest
+# everywhere else. The open tiles are then fewer than the tiles, and two kinds
+# of ground occur, so a swap of either pair fails. Measured with the engine's
+# own census over the whole extent.[^4]
+READ_SEED = 51
+
+# The window the census test reads.
+#
+# It is placed over the water rather than in the middle of the world. A window
+# of one kind of ground measures the fixture and not the census.[^4]
+CENSUS_CENTRE = (1, 6)
+CENSUS_RADIUS = 2
+
+
+async def _every_tile(
+    session: ClientSession, world: str, first: tuple[int, int], last: tuple[int, int]
+) -> list[dict[str, Any]]:
+    """Read every tile of a rectangle of addresses, one call each.
+
+    **This loop belongs to the test, not to the control plane.** It exists to
+    check an aggregate the engine computed against the tiles it summed, and
+    the rule for an aggregate is that it equals that sum exactly.[^3]
+    """
+    rows: list[dict[str, Any]] = []
+    for r in range(first[1], last[1] + 1):
+        for q in range(first[0], last[0] + 1):
+            rows.append(await _call(session, "tile_report", world=world, q=q, r=r))
+    return rows
+
+
+def test_a_level_one_cell_equals_the_sum_of_its_tiles() -> None:
+    """The region summary is derived, so it must equal level 0 exactly.
+
+    This is the strongest thing any of the reading tools can claim. The
+    engine folded the tiles into the cell, and this test folds them again
+    from a different tool and compares. A summary that had drifted from the
+    tiles it summarises would fail here.
+    """
+
+    async def body(
+        session: ClientSession,
+    ) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+        built = await _call(
+            session,
+            "build_world",
+            width=READ_WIDTH,
+            height=READ_HEIGHT,
+            seed=READ_SEED,
+        )
+        name = built["world"]
+        cell = await _call(session, "region_summary", world=name, q=0, r=0)
+        tiles = await _every_tile(
+            session, name, (0, 0), (READ_WIDTH - 1, READ_HEIGHT - 1)
+        )
+        return cell, tiles
+
+    cell, tiles = _drive(body)
+    assert cell["tiles"] == len(tiles) == READ_WIDTH * READ_HEIGHT
+    assert cell["open_tiles"] == sum(1 for tile in tiles if tile["passable"])
+    # The fixture must reach the case. A world in which every tile admits a
+    # unit gives the same number for both, and the assertion above then holds
+    # whichever one the engine returned.[^4]
+    assert cell["open_tiles"] < cell["tiles"], "the fixture must hold closed ground"
+    assert cell["food_total"] == sum(tile["stock"][0] for tile in tiles)
+    assert cell["value_total"] == sum(tile["value"] for tile in tiles)
+
+
+def test_a_census_equals_the_tiles_it_counted() -> None:
+    """The census reports the window it read, so a reader can repeat it.
+
+    The corners come back in the report. The test reads every address between
+    them and adds the counts up itself.
+    """
+
+    async def body(
+        session: ClientSession,
+    ) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+        built = await _call(
+            session,
+            "build_world",
+            width=READ_WIDTH,
+            height=READ_HEIGHT,
+            seed=READ_SEED,
+        )
+        name = built["world"]
+        counted = await _call(
+            session,
+            "window_census",
+            world=name,
+            q=CENSUS_CENTRE[0],
+            r=CENSUS_CENTRE[1],
+            radius=CENSUS_RADIUS,
+        )
+        tiles = await _every_tile(
+            session,
+            name,
+            (counted["first_q"], counted["first_r"]),
+            (counted["last_q"], counted["last_r"]),
+        )
+        return counted, tiles
+
+    counted, tiles = _drive(body)
+    # The count is the assertion's. The report names its own corners, so a
+    # census that read the wrong window would still agree with a sum over the
+    # window it reported. This number is what refuses that.
+    assert counted["tiles"] == len(tiles) == 16
+    assert counted["open_tiles"] == sum(1 for tile in tiles if tile["passable"])
+    for kind, count in enumerate(counted["by_kind"]):
+        assert count == sum(1 for tile in tiles if tile["kind"] == kind)
+    # The window must hold both kinds of ground and some closed ground, or it
+    # measures the fixture rather than the census.[^4]
+    assert counted["open_tiles"] < counted["tiles"]
+    assert sum(1 for count in counted["by_kind"] if count) > 1
+
+
+def test_a_census_clips_a_window_to_the_world() -> None:
+    """A window at a corner reads the part of it that the world holds."""
+
+    async def body(session: ClientSession) -> dict[str, Any]:
+        built = await _call(
+            session,
+            "build_world",
+            width=READ_WIDTH,
+            height=READ_HEIGHT,
+            seed=READ_SEED,
+        )
+        return await _call(
+            session, "window_census", world=built["world"], q=0, r=0, radius=3
+        )
+
+    counted = _drive(body)
+    assert (counted["first_q"], counted["first_r"]) == (0, 0)
+    assert (counted["last_q"], counted["last_r"]) == (3, 3)
+    assert counted["tiles"] == 16
+
+
+def test_a_census_refuses_a_radius_above_the_ceiling() -> None:
+    """A call that could name the whole world is a pass over the world."""
+
+    async def body(session: ClientSession) -> bool:
+        built = await _call(session, "build_world", width=8, height=8, seed=READ_SEED)
+        refused = await session.call_tool(
+            "window_census", {"world": built["world"], "q": 0, "r": 0, "radius": 4096}
+        )
+        return bool(getattr(refused, "is_error", False))
+
+    assert _drive(body), "the ceiling must refuse"
+
+
+def test_a_census_counts_the_units_a_spawn_put_in_the_window() -> None:
+    """The crowding counts are of the window, and a spawn moves them.
+
+    The step is not decoration. The unit-to-tile bridge is derived and it
+    rebuilds at the barrier, so a census taken before the step reads a bridge
+    that predates the spawn and refuses.
+    """
+
+    async def body(session: ClientSession) -> tuple[bool, dict[str, Any]]:
+        built = await _call(
+            session, "build_world", width=16, height=16, seed=GATHER_SEED
+        )
+        name = built["world"]
+        await _call(
+            session,
+            "spawn_units",
+            world=name,
+            addresses=[list(address) for address in GATHER_ADDRESSES],
+        )
+        stale = await session.call_tool(
+            "window_census", {"world": name, "q": 0, "r": 0, "radius": 2}
+        )
+        await _call(session, "step_world", world=name, ticks=1)
+        return bool(getattr(stale, "is_error", False)), await _call(
+            session, "window_census", world=name, q=0, r=0, radius=2
+        )
+
+    refused, counted = _drive(body)
+    assert refused, "a census over a stale bridge must refuse"
+    assert counted["units"] == len(GATHER_ADDRESSES)
+    assert counted["crowd_worst"] == 1
+    assert (counted["crowded_q"], counted["crowded_r"]) != (None, None)
+
+
+def test_a_tile_reports_the_stock_as_what_was_given_less_what_was_taken() -> None:
+    """The stock of a tile is derived, and the report gives all three numbers.
+
+    This is the read the fixture comment above says the control plane did not
+    have. The seed was chosen against the engine's own read from Rust and
+    recorded in a comment, because nothing in Python could ask. This test
+    asks.
+    """
+
+    async def body(session: ClientSession) -> list[dict[str, Any]]:
+        built = await _call(
+            session, "build_world", width=16, height=16, seed=GATHER_SEED
+        )
+        return [
+            await _call(session, "tile_report", world=built["world"], q=q, r=r)
+            for q, r in GATHER_ADDRESSES
+        ]
+
+    tiles = _drive(body)
+    for tile in tiles:
+        assert tile["passable"], "the gather fixture needs ground that admits a unit"
+        for kind, stock in enumerate(tile["stock"]):
+            assert stock == tile["generated"][kind] - tile["taken"][kind]
+            assert tile["taken"][kind] == 0, "nothing has gathered yet"
+    # The comment on GATHER_SEED records that seed 1 holds food at three of
+    # these four addresses. It was measured from Rust, because nothing here
+    # could read it. Now something can, so the claim is a check.
+    holding_food = [tile for tile in tiles if tile["generated"][GATHER_KIND] > 0]
+    assert len(holding_food) == 3
+
+
+def test_a_gather_moves_the_stock_the_tile_reports() -> None:
+    """What a unit took leaves the tile, and the tile says so."""
+
+    async def body(session: ClientSession) -> tuple[dict[str, Any], dict[str, Any]]:
+        built = await _call(
+            session, "build_world", width=16, height=16, seed=GATHER_SEED
+        )
+        name = built["world"]
+        spawned = await _call(
+            session,
+            "spawn_units",
+            world=name,
+            addresses=[list(address) for address in GATHER_ADDRESSES],
+        )
+        units = [int(unit) for unit in spawned["units"]]
+        await _call(session, "order_gather", world=name, units=units, kind=GATHER_KIND)
+        grants: dict[str, Any] = {}
+        for _ in range(8):
+            await _call(session, "step_world", world=name, ticks=1)
+            grants = await _call(session, "gather_events", world=name, limit=4)
+            if grants["event_count"]:
+                break
+        assert grants["event_count"], "the fixture must produce a gather event"
+        first = grants["grants"][0]
+        # The engine turns the identity into an address. The test holds no
+        # rule of its own for reading a tile index, because the grid owns
+        # that rule and a copy here would be a second declaration of it.
+        where = await _call(session, "unit_choice", world=name, unit=first["unit"])
+        assert where["tile"] == first["tile"], "the taker must stand where it took"
+        tile = await _call(
+            session, "tile_report", world=name, q=where["q"], r=where["r"]
+        )
+        return first, tile
+
+    first, tile = _drive(body)
+    assert tile["taken"][first["kind"]] > 0
+    assert tile["stock"][first["kind"]] == (
+        tile["generated"][first["kind"]] - tile["taken"][first["kind"]]
+    )
+
+
+def test_the_chosen_option_follows_the_scores_the_engine_reported() -> None:
+    """The engine reports every score, and the option it names must follow.
+
+    The scan starts at the floor and uses a strict comparison, so the lowest
+    option index wins a tie and an option that only equals the floor never
+    wins. A unit whose every score is below the floor holds what it was
+    doing, and the engine names no option.
+    """
+
+    async def body(session: ClientSession) -> dict[str, Any]:
+        built = await _call(
+            session, "build_world", width=16, height=16, seed=GATHER_SEED
+        )
+        name = built["world"]
+        spawned = await _call(session, "spawn_units", world=name, addresses=[[0, 0]])
+        await _call(session, "step_world", world=name, ticks=1)
+        return await _call(
+            session, "unit_choice", world=name, unit=int(spawned["units"][0])
+        )
+
+    answer = _drive(body)
+    assert len(answer["scores"]) == len(answer["weights"]) == len(answer["fields"])
+    best = None
+    for option, score in enumerate(answer["scores"]):
+        if score > answer["floor"] and (best is None or score > answer["scores"][best]):
+            best = option
+    no_intent = 255
+    if best is None:
+        assert answer["best"] == no_intent
+        assert answer["best_name"] is None
+    else:
+        assert answer["best"] == best
+        assert answer["best_name"] is not None
+
+
+def test_a_founding_provisions_the_site_it_seated() -> None:
+    """The loop the panel shows must close through the server too.
+
+    The survey reads the ground, the founding sets the production rate from
+    what it read, and the store feeds the units of that site. A site founded
+    at an address of a caller's choosing earns nothing, so a report of zero
+    production here would mean the founding tool bypassed the survey.
+    """
+
+    async def body(session: ClientSession) -> tuple[dict[str, Any], dict[str, Any]]:
+        built = await _call(
+            session, "build_world", width=32, height=32, seed=GATHER_SEED
+        )
+        name = built["world"]
+        made = await _call(session, "found_group", world=name, group=8, faction=0)
+        return made, await _call(session, "site_economy", world=name, site=made["site"])
+
+    made, economy = _drive(body)
+    assert made["seated"] > 0
+    assert made["food"] > 0, "the fixture needs a place that reaches food"
+    assert (economy["q"], economy["r"]) == (made["q"], made["r"])
+    assert economy["faction"] == made["faction"]
+    assert economy["production"] > 0, "the founding must set the rate from the survey"
+    # The founding sets the production rate and never the upkeep. A report
+    # that gave one where the other belongs would pass every assertion above,
+    # and the defect was put back to prove it.
+    assert economy["upkeep"] == 0, "the founding writes no upkeep"
+    assert economy["production"] != economy["upkeep"]
+    assert economy["rationed"] is False
+    assert economy["demanded"] is None
+
+
+def test_a_survey_ranks_the_place_the_founding_takes_first() -> None:
+    """The survey answers why, and the founding acts on the same answer.
+
+    Two worlds, the same settings. One is surveyed and not founded. The other
+    is founded. The place the founding took must be the first row of the
+    survey, or the survey explains a choice that was not made.
+    """
+
+    async def body(session: ClientSession) -> tuple[dict[str, Any], dict[str, Any]]:
+        looked = await _call(
+            session, "build_world", width=32, height=32, seed=GATHER_SEED
+        )
+        survey = await _call(
+            session, "founding_survey", world=looked["world"], group=8, faction=0
+        )
+        acted = await _call(
+            session, "build_world", width=32, height=32, seed=GATHER_SEED
+        )
+        made = await _call(
+            session, "found_group", world=acted["world"], group=8, faction=0
+        )
+        return survey, made
+
+    survey, made = _drive(body)
+    assert survey["considered"] > 1
+    assert survey["tiles_read"] > survey["considered"]
+    first = survey["candidates"][0]
+    assert first["eligible"] is True
+    assert (first["q"], first["r"]) == (made["q"], made["r"])
+    assert first["score"] == made["score"]
+    assert first["food"] == made["food"]
+    # Every eligible place precedes every refused one, and the scores of the
+    # eligible places never rise.
+    eligible = [row for row in survey["candidates"] if row["eligible"]]
+    assert survey["candidates"][: len(eligible)] == eligible
+    for earlier, later in itertools.pairwise(eligible):
+        assert earlier["score"] >= later["score"]
+
+
+def test_a_dead_site_identity_is_a_tool_error() -> None:
+    """A site that no longer stands never answers for another one."""
+
+    async def body(session: ClientSession) -> bool:
+        built = await _call(session, "build_world", width=8, height=8, seed=READ_SEED)
+        refused = await session.call_tool(
+            "site_economy", {"world": built["world"], "site": 1}
+        )
+        return bool(getattr(refused, "is_error", False))
+
+    assert _drive(body), "an identity the engine never gave must refuse"
