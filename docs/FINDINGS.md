@@ -8883,6 +8883,23 @@ rather than on an ordering of them. A change that buys no time and removes an
 ordering is still worth making, and saying that it bought no time is the
 honest way to keep it.
 
+**Two runs of one tree separate the two kinds of noise, and this run pair did
+it by accident.** Another finding records that this project links with whole
+program optimisation and one code generation unit, so editing any file relays
+the whole binary and every figure carries a layout term.[^F306B] **A layout is a
+property of a binary.** Two runs of one tree run one binary, so their layout is
+identical and any difference between them is not layout.
+
+Runs 3 and 4 above are one tree. They gave the bridge refresh 39,742,813 and
+30,695,188 nanoseconds, which is 29 percent apart on a stage that neither run
+changed and whose layout was the same in both. **So that spread is the machine
+and not the code.** The decide stage meanwhile held to 120 microseconds across
+all four runs and two trees, so it carries little of either kind of noise.
+
+That gives a protocol sharper than reading which stages moved. **Run each tree
+twice.** The spread inside one tree bounds the machine. A difference between
+trees that exceeds it is the layout and the change together, and a difference
+that does not exceed it is nothing at all.
 ## References
 
 [^F261B]: The holder count test of the viewer. `crates/cachette-view/tests/shows_who_holds_the_ground.rs`

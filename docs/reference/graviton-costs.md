@@ -1153,8 +1153,17 @@ here.
 averaged away.** Run 3 gave `bridge_refresh_barrier` 39,742,813 against
 30,846,661 in run 2 and 30,695,188 in run 4, and its frame was 178,921,173
 against 167,142,223 and 168,352,493. Nothing in the change can reach the bridge
-refresh. A repeat on the same tree brought both back into line, so the spike is
-the instance and not the tree.
+refresh.
+
+**Runs 3 and 4 are one tree, so they are one binary and one layout.** A
+difference between them cannot be a layout effect, whatever the link settings do
+to a figure taken across two trees. That is what makes the spike the machine
+rather than the code, and it is a stronger statement than reading which stages
+moved.
+
+**So the protocol is to run each tree twice.** The spread inside one tree bounds
+the machine. A difference between trees larger than that spread is the layout
+and the change together. A difference smaller than it is nothing.
 
 **What this says about the stage.** Its cost is not the sort. Every candidate
 pays for six neighbour reads and a walk of the units on its tile, and about a
