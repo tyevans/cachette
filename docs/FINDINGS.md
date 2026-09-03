@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-310**
+**Next number: FND-314**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -8605,6 +8605,226 @@ tested the refusal.[^F308B]
 still 40 megabytes and it still drives the largest stage in the engine. The
 answer here is neither the dense array nor leaving it alone, and naming the
 ceiling is what makes that visible.
+### FND-310 — The sort's guard was tested only on pairs that tie nothing, so the property it protects had no test
+
+**Believed.** The key vector sort refuses a repeated identifier, and two tests
+prove it. The guard therefore protects the order from a tie, and the tests hold
+it to that.
+
+**True.** Both tests used keys that share an identifier and differ in an
+ordering field. Such a pair is separated by the field it differs in, so it ties
+nothing and the order is total without the identifier deciding anything. **A
+repeated key, meaning two keys that agree in every field including the
+identifier, appeared in no test in the repository.**
+
+The property that determinism actually needs was therefore untested, and the
+tests that looked like they tested it exercised only the case that does not
+matter.
+
+**The evidence is an experiment, not a reading.** The guard was narrowed to
+refuse a repeated key and nothing else, and the whole suite was run. Exactly
+two tests failed, and they were the two that assert the refusal. Every other
+test in the crate passed, so nothing else in the project depended on the wider
+refusal.
+
+Then the narrow guard was removed entirely and the suite was run again. Three
+tests failed, and all three were written in the same change. **Before that
+change, removing the guard altogether would have broken nothing.**
+
+**Follows.** Three things.
+
+**A test that asserts an error can still test the wrong case.** Both tests named
+the right thing, cited the right record, and constructed an input that the
+property does not care about. Reading them would not have found it. Running the
+suite against a narrowed guard did, in one command.
+
+**Narrow a check before you trust it.** The wide guard passing tells you nothing
+about the narrow property inside it. The way to find out which part is load
+bearing is to remove the rest and see what fails.
+
+**Put the defect back, and put it back in the new place too.** The check moved
+once more after this, into the pass that orders ties, and it was broken again
+there to prove that the three tests still reach it.
+
+### FND-311 — A sequential sort was replaced by a walk over a permutation, and the frame got nine percent worse
+
+**Believed.** Replacing a comparison sort of a whole key set with one pass over
+the finished order, and no allocation, is cheaper. The pass is linear and the
+sort is not.
+
+**True.** It was measurably worse. The first form of the narrowed guard walked
+the sorted order and read two keys through it for each neighbouring pair, which
+is two random gathers into a sixteen megabyte array, one million times. The
+comparison sort it replaced read one million identifiers sequentially into a
+fresh vector and sorted that vector, which is contiguous and vectorises.
+
+**The measurement.** Machine C, `c7g.4xlarge`, Graviton3, 16,777,216 tiles,
+1,000,000 units scattered, 12 threads, nine frames, `stage-cost` feature.
+
+| Stage | Before, ns | After the first form, ns |
+|---|---|---|
+| `bridge_refresh_barrier` | 31,394,191 | 42,867,673 |
+| `admit` | 21,274,145 | 19,895,342 |
+| **The frame, timed from outside** | **177,862,658** | **193,848,102** |
+
+The bridge rebuild rose 36.5 percent and the frame rose 9.0 percent. The stage
+that sorts the smaller set fell, which is what the change was supposed to do
+everywhere.
+
+**The repair puts the check where the ties already are.** The pass that orders
+tied entries already visits every run of one ordering field, and only a run
+holding more than one entry can hold a repeated key. Nearly every run holds one.
+The check therefore reads entries the tie sort has just touched, and a run of one
+entry costs nothing at all.
+
+**Follows.** Two things.
+
+**A pass over a permutation is not a linear pass.** The comment written for the
+first form said it cost one pass and no allocation. Both halves were true and
+the conclusion was wrong, because the unit of cost is the cache miss and not the
+element.
+
+**This project already held the same lesson in the other direction.** A bounded
+search was found not to be a small search, because each of its steps was a
+miss.[^F311A] The same arithmetic run backwards says a sequential sort can beat
+a random-access scan, and it was not applied.
+
+**This row rests on a single pair of runs, and a later finding puts a floor
+under what such a pair can claim.**[^F311B] The figure survives that floor
+rather than comfortably: 42,867,673 nanoseconds is above every later reading of
+the same stage, and the base it is compared against reproduces to 0.7 percent.
+But the repaired form of the same change measured 36,459,500 and 29,068,978 on
+two runs of one binary, so **the 36.5 percent in this row should be read as a
+regression that happened, not as its size.** Nobody re-ran the first form,
+because it was replaced rather than kept.
+
+### FND-312 — Two checks were blind in two different ways, and a pipeline hid the second
+
+**Believed, first.** The record check reports which records no source file cites,
+and a worker running it from a worktree gets that report about their own tree.
+
+**True.** It reported every record as cited by nothing. The check skipped any
+path whose parts include `worktrees`, so that one run does not read files another
+run owns. A worktree of this project lives under `.claude/worktrees`, so when the
+check ran from inside one, every file it would scan had `worktrees` among its
+parts and the skip removed all of them.
+
+**The measurement.** One commit, checked twice. From the repository root: two
+notes. From inside a worktree: fifteen. Thirteen records were reported as cited
+by no source file while their citations sat in files the run never opened. Three
+sibling checks name paths rather than components and none has the defect. The fix
+makes this one name paths too.
+
+**Believed, second.** The conflict marker check has the same defect, so running
+it from inside a worktree reports a clean sweep of files it never looked at.
+
+**False, and it was disproved by a probe rather than by reading.** That check
+skips a path built from the script's own location, so inside a worktree the skip
+names that worktree's own empty nested directory and removes nothing. A real
+marker planted in a worktree and the check run from that worktree, unpiped:
+three named failures and exit 1.
+
+**The blindness is real but it points the other way.** The same probe, with the
+root copy of the script run against the same planted marker: 864 files, no
+failure, exit 0. **A worker whose changes are in a worktree must run the check
+from the worktree.** Running it from the repository root is the blind
+configuration for exactly the files that changed.
+
+**Neither of those is how markers reached the trunk.** A pipeline exits with the
+status of its last command, and the failures go to standard error:
+
+```text
+python3 scripts/check_conflict_markers.py | tail -2 && git add -A
+```
+
+The `git add` runs whatever the check found, because the status belongs to
+`tail`. Verified in this worktree on a tree holding three markers: unpiped the
+script exits 1, and through `| tail -1` the shell reports 0.
+
+**Follows.** Three things.
+
+**A skip that names a component is a skip that matches its own root.** Name the
+path.
+
+**Read the count a check prints, not the status of the pipeline you put it in.**
+A check that scans nothing and a check whose failures were swallowed both look
+like success. The file count is the part a reader can compare against what they
+expected to change.
+
+**Two wrong diagnoses of the same script were corrected by the same method.** The
+first was corrected by planting a marker, the second by running the command
+unpiped. Neither was found by reading the script, and one of them was written
+into a probe that itself used the pipeline it was testing for.
+
+### FND-313 — Every figure from a single pair of runs carries an unmeasured layout term, and the discriminator is which stages moved
+
+**Believed.** A stage cost measured before a change and after it, on the target
+platform, at the same extent, unit count and thread count, gives what the change
+was worth. The apparatus is tight, so the difference is the change.
+
+**True for the first half and not for the second.** The apparatus is tight: two
+runs of one tree agree to 0.7 percent on the stage in question and to 0.8
+percent on the frame. What the difference holds is the change **plus the cost of
+relaying the binary**, and the second term is not small.
+
+**The project builds with full link-time optimisation and one code generation
+unit.**[^F313A] Editing one module therefore moves code everywhere, and the
+instruction cache and the branch predictor answer differently for loops that
+were not edited at all.
+
+**The measurement.** Machine C, `c7g.4xlarge`, Graviton3, `us-west-2`,
+16,777,216 tiles, 1,000,000 units scattered, 12 threads, nine frames after two
+warm-up frames, `stage-cost` feature. Two runs of the base tree at commit
+`79d851d`, two runs of a tree that differs from it only inside the key vector
+sort. Each run is its own instance.
+
+| Stage | Base A | Base B | Changed A | Changed B |
+|---|---|---|---|---|
+| `bridge_refresh_barrier` | 31,394,191 | 31,181,809 | 36,459,500 | 29,068,978 |
+| `holding_apply` | 19,048,855 | 18,762,498 | 20,686,347 | 20,353,567 |
+| `holding_spread` | 71,234,385 | 70,731,392 | 74,083,110 | 73,897,963 |
+| `holding_candidates` | 16,991,822 | 17,041,445 | 17,505,343 | 17,523,387 |
+| `tile_scan` | 14,224,080 | 14,213,068 | 14,379,662 | 14,390,942 |
+| `influence_solve` | 12,614,492 | 12,625,658 | 12,653,479 | 12,600,545 |
+| `admit` | 21,274,145 | 20,923,668 | 18,226,851 | 17,929,533 |
+| `frame_wall` | 177,862,658 | 176,501,059 | 184,219,536 | 175,551,738 |
+
+**Nothing in the changed tree touches the holding, and three of its stages moved
+together.** The apply is 8.5 percent higher in both runs, the spread 4.2 percent
+and the candidate pass 2.9 percent. Those three share no code with the sort. The
+two stages that are compute-bound and least sensitive to placement, the
+influence solve and the tile scan, moved by 0.1 and 1.2 percent.
+
+**One stage produced opposite answers from one binary.** The bridge rebuild
+measured 36,459,500 and 29,068,978 nanoseconds on two runs of the identical
+tree, a spread of 25 percent, and the lower of the two is below both base runs.
+A single pair would have supported "a 16.9 percent regression" or "a 7 percent
+improvement" with equal authority.
+
+**Follows.** Four things.
+
+**A single pair of runs bounds a claim at about eight percent, and no better.**
+That is the size of the layout term seen here on stages that were not touched. A
+claim below that floor from one pair is not evidence. Claims far above it are
+untouched: a pass that fell twenty-four times, a stage that no longer exists and
+a frame that fell more than four times are not layout.
+
+**The discriminator is not the size of the change. It is whether the stages that
+should not have moved did not.** A change is separable from a relayout when the
+passes sharing no code with it are flat. This is the same instrument that showed
+one repair to be the larger half of a pair, and another worker used it
+independently to defend a 5.4 percent fall by showing every untouched stage
+moving by less than half a millisecond. **A single pair is evidence only when
+the stages that should not have moved did not.**
+
+**Take a second run of the changed tree, not only of the base.** The base pair
+establishes the apparatus. It says nothing about whether this particular binary
+is stable, and the binary that changed is the one whose placement changed.
+
+**Every figure names its instance, its commit and its thread count, or it cannot
+be checked later.** A ratio that travels without its conditions cannot be
+distinguished from a relayout by anyone who reads it afterwards.
+
 ## References
 
 [^F261B]: The holder count test of the viewer. `crates/cachette-view/tests/shows_who_holds_the_ground.rs`
@@ -8934,5 +9154,8 @@ ceiling is what makes that visible.
 [^F307A]: Target platform costs, every stage of a frame after the block masks became counts. `docs/reference/graviton-costs.md`
 [^F307B]: Findings register, FND-292, in this document.
 [^F307C]: The holding suite of the core. `crates/cachette-core/tests/holding.rs`
-[^F308B]: ADR-0103, the tile value field stores a dense delta, never a sparse change list, decision D4. `docs/adrs/draft/adr-0103-the-tile-value-field-stores-a-dense-delta.md`
+[^F313B]: ADR-0103, the tile value field stores a dense delta, never a sparse change list, decision D4. `docs/adrs/draft/adr-0103-the-tile-value-field-stores-a-dense-delta.md`
 [^F309X]: Findings register, FND-297, in this document.
+[^F306A]: Findings register, FND-295, in this document.
+[^F313A]: The workspace manifest, the release profile. `Cargo.toml`
+[^F306B]: Findings register, FND-313, in this document.

@@ -38,14 +38,9 @@ fn main() {
     let units = world.soldiers().iter().count();
     let total = costs.total_nanos();
     println!("world {width} by {width} = {tiles} tiles, {units} units, {threads} threads");
-    // Integer throughout. Hard invariant 1 bans the float types, and the
-    // cost benchmark beside this one already prints nanoseconds and a share
-    // in thousandths without one.
-    let per_frame = total / frames;
     println!(
-        "frame total {}.{:03} ms",
-        per_frame / 1_000_000,
-        (per_frame % 1_000_000) / 1_000
+        "frame total {} ms",
+        thousandths_of_a_millisecond(total, frames)
     );
     // The hash is printed so that a sweep over thread counts is also a
     // determinism check. One binary must give one answer at any thread count.
@@ -64,18 +59,46 @@ fn main() {
         if cost.nanos == 0 {
             continue;
         }
-        let per_frame = cost.nanos / frames;
-        // A share in tenths of a percent, computed in integers.
-        let tenths = cost.nanos.saturating_mul(1_000) / total.max(1);
         let nested = if stage.is_nested() { "  nested" } else { "" };
         println!(
-            "{:<30} {:>7}.{:04} {:>5}.{}% {:>9}{nested}",
+            "{:<30} {:>11} {:>7}% {:>9}{nested}",
             stage.name(),
-            per_frame / 1_000_000,
-            (per_frame % 1_000_000) / 100,
-            tenths / 10,
-            tenths % 10,
+            thousandths_of_a_millisecond(cost.nanos, frames),
+            tenths_of_a_percent(cost.nanos, total),
             cost.entries
         );
     }
+}
+
+/// Returns a mean in milliseconds, to three decimal places, as text.
+///
+/// **The arithmetic is integer.** A float here would be a display convenience
+/// in a binary that also prints the state hash, and the lint that bans the
+/// float types does not distinguish a print from a sum. It should not: this
+/// project holds the boundary with a lint and a script because one is not
+/// enough, and an exception carved for a print is where the next sum
+/// hides.[^1]
+///
+/// # References
+///
+/// [^1]: ADR-0002, state holds no floating point number, decision D1. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
+fn thousandths_of_a_millisecond(nanos: u64, frames: u64) -> String {
+    let frames = frames.max(1);
+    let thousandths = nanos / frames / 1_000;
+    format!("{}.{:03}", thousandths / 1_000, thousandths % 1_000)
+}
+
+/// Returns a share of a total as a percentage, to one decimal place, as text.
+///
+/// The arithmetic is integer, for the reason the function above gives.[^1]
+///
+/// # References
+///
+/// [^1]: ADR-0002, state holds no floating point number, decision D1. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
+fn tenths_of_a_percent(part: u64, whole: u64) -> String {
+    // A total of zero means no stage recorded anything, so every share is
+    // zero. The division is guarded rather than special-cased in the text, so
+    // one format statement produces every row.
+    let tenths = part.saturating_mul(1_000).checked_div(whole).unwrap_or(0);
+    format!("{}.{}", tenths / 10, tenths % 10)
 }
