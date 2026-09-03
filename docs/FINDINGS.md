@@ -29,8 +29,6 @@ branch has taken and not merged.** A dispatcher issues ranges above it for that
 reason, and those ranges live in prompts that no register can read. Four
 collisions in one session came from the gap between the two, and a finding holds
 the case.[^ALLOC2]
-**Next number: FND-226**
-**Next number: FND-242**
 
 ## A. Corrections to stated rules
 
@@ -823,6 +821,43 @@ process that built one world and exited.
 the target scale, not 545 MB. The conclusion of FND-225 does not change: the
 tiles still hold the memory and the units still do not, and both figures move
 together with the thread count.
+
+### FND-242 — A list that could not go stale had gone stale
+
+**Believed:** the budgets register carried a table of the records that still
+hold a derived cost figure in their bodies, naming ADR-0003, ADR-0005 and
+ADR-0006. The register said the record check carries the list, and that the
+check fails when an entry matches nothing, so the list cannot go stale.
+
+**True:** all three records hold no figure of any kind. The work that cleared
+them did not clear the table, so the table named three records as carrying
+figures they do not carry.
+
+**The safeguard was not what the register said it was.** The check carries a
+baseline of tolerated figures, and it is the baseline that fails when an entry
+matches nothing. The baseline is empty. Nothing reads the table in the
+register, so the table is prose like any other and always was.
+
+**Evidence:**
+
+```
+grep -oE "[0-9]+(\.[0-9]+)? ?(percent|ms|ns|byte)" docs/adrs/*/adr-000[356]*.md
+grep -cv "^#|^$" scripts/adr-volatile-baseline.txt
+```
+
+The first command finds nothing in any of the three records. The second
+reports that the baseline holds no entry.
+
+**Follows:** the table now says that no record holds a figure, and it names
+this finding. **A claim that a list is checked is worth nothing unless the
+reader can see what checks it.** This one named the check in a footnote, and
+the footnote pointed at a file that holds a different list for a different
+purpose. That is close enough to be convincing and far enough to be false.
+
+**This is defect shape 1 with the roles reversed.** The usual shape is one
+value in two places with nothing failing when they disagree. Here the second
+place was a safeguard that did not cover the first, and the register asserted
+that it did.
 
 ### FND-017 — A decision costs 4.1 nanoseconds, not 400
 

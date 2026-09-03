@@ -187,16 +187,23 @@ the run that narrowed that blocker measured none of the three.
 
 ## Figures still held in a record
 
-Four draft records still hold derived cost figures in their bodies. They must
-move here when those records are next revised. The record check carries the
-list, and the check fails when an entry in that list matches nothing, so the
-list cannot go stale.[^4]
+A record that still holds a derived cost figure in its body must move it here
+when the record is next revised.
+
+**The claim that this list cannot go stale was wrong, and the list went
+stale.** The record check carries a baseline of figures it tolerates, and that
+baseline is what fails when an entry matches nothing.[^4] The baseline is
+empty, so nothing checks the table below, and the table is prose like any
+other.[^15]
+
+**No record holds one today.** The three records this table named, which were
+ADR-0003, ADR-0005 and ADR-0006, hold no figure of any kind. The work that
+cleared them did not clear this table, and the table then named three records
+as carrying figures they do not carry. A finding holds the case.[^15]
 
 | Record | Kind of figure |
 |---|---|
-| ADR-0003 | Two cache hit rate percentages |
-| ADR-0005 | Allocation and cache miss costs for each frame, and the frame budget |
-| ADR-0006 | Boundary call costs, and two percentage splits |
+| None | |
 
 Moving a figure here is not a free edit. An accepted record does not change
 except in status.[^2] Move a figure as part of the change that supersedes the
@@ -224,3 +231,4 @@ a footnote.
 [^12]: Decisions register, DEC-008. `docs/DECISIONS.md`
 [^13]: Decisions register, DEC-093. `docs/DECISIONS.md`
 [^14]: Target platform costs, the measurement register. `docs/reference/graviton-costs.md`
+[^15]: Findings register, FND-242. `docs/FINDINGS.md`
