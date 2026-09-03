@@ -6,10 +6,16 @@
 site_name: Cachette
 site_description: A deterministic world simulation engine.
 
-# The site address is not in this tree. BLK-035 holds it and the project owner
-# owns that row. Do not write a value here. The publishing job takes the
-# address from the host that answers on it.
-# site_url:
+# The site address. The project owner chose the host on 3 September 2026, and
+# DEC-117 holds the choice. The address follows from the host and the
+# repository name: a project site of the repository `tyevans/cachette` answers
+# on the owner name and the repository name. The builder writes this value into
+# the canonical link of every page and into the sitemap, and it writes neither
+# when the value is absent.
+#
+# The address ends in a path and not in a domain root, so every link the
+# builder writes stays relative to the page that holds it.
+site_url: https://tyevans.github.io/cachette/
 
 repo_url: https://github.com/tyevans/cachette
 docs_dir: docs/site

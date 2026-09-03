@@ -7,7 +7,7 @@ implements: [ADR-0107 D1, ADR-0107 D2, ADR-0107 D3, ADR-0107 D4]
 changes: []
 creates: []
 serves: [PRD-0021]
-blocked-by: [BLK-035]
+blocked-by: []
 ---
 
 ## Why
@@ -74,13 +74,13 @@ asks for none.
 with options and a recommendation, because a published page cannot follow a
 repository path and the plan must not invent the answer.[^8]
 
-**Blockers.** One is open and this plan opens it. Nobody in the tree can say
-where the site publishes or who turns the publishing on, and that is missing
-information rather than a judgement.[^9] Every item below states the site
-address as a parameter and never as a value. Two further blockers govern the
-prose. One holds every cost figure, so no page states a performance number
-without citing it.[^10] One asks whether an upgrade changes hands when the
-ground does, so no page answers that question.[^11]
+**Blockers.** This plan opened one and it is resolved. The site publishes to
+GitHub Pages, the site configuration states the address, and the workflow
+publishes from the main branch.[^9] The items below no longer state the site
+address as a parameter. Two further blockers govern the prose. One holds every
+cost figure, so no page states a performance number without citing it.[^10] One
+asks whether an upgrade changes hands when the ground does, so no page answers
+that question.[^11]
 
 **Precedent.** Three findings shape the plan. A statement that nothing executes
 and nothing derives costs the reader's trust the first time it is wrong, and the
@@ -206,9 +206,10 @@ The site is one static site built from this repository. The build is a compile
 step: it builds the extension, installs it, then builds the site.[^3] A
 continuous integration job runs it and publishes the output.
 
-**The address and the publishing switch are not in the tree, and this plan does
-not invent them.** A blocker holds them, and every item states the address as a
-parameter.[^9]
+**The address is in the site configuration, which is the one declaration site
+of it.** The blocker that held it is resolved, and the project owner chose the
+host on 3 September 2026.[^9] The publishing job carries no switch of its own,
+and one setting of the repository is what turns the publishing on.
 
 **The builder is not a constraint.** The record refuses to bind one, and the
 research report measured the swap as near free, because the site configuration
@@ -285,7 +286,7 @@ Filled in when the item moves to `complete/`.
 [^6]: Backlog item 0307, generate the type stub from the compiled module. `docs/backlog/proposed/0307-generate-the-type-stub-from-the-compiled-module.md`
 [^7]: Backlog priority index. `docs/backlog/PRIORITY.md`
 [^8]: Decisions register, DEC-114. `docs/DECISIONS.md`
-[^9]: Blockers register, BLK-035. `docs/BLOCKERS.md`
+[^9]: Blockers register, BLK-035, resolved. `docs/BLOCKERS.md`
 [^10]: Blockers register, BLK-007. `docs/BLOCKERS.md`
 [^11]: Blockers register, BLK-034. `docs/BLOCKERS.md`
 [^12]: Recurring Defect Shapes, shape 1, redundant declaration sites. `.claude/rules/recurring-defects.md`

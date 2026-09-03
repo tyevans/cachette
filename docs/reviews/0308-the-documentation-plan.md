@@ -174,9 +174,10 @@ Everything else is a footnote that names a record.
   the files that already hold them, limited to those documents. That is the only
   option that adds neither a second copy nor a second citation form. Item 0314
   waits on it. **No decision record was written, and none is asked for.**
-- **Blockers.** BLK-035 opened. Nobody in the tree can say where the site
-  publishes or who turns the publishing on. The owner is the project owner. Item
-  0309 states the address as a parameter and cites the row.
+- **Blockers.** BLK-035 opened. Nobody in the tree could say where the site
+  published or who turned the publishing on. The owner is the project owner. Item
+  0309 states the address as a parameter and cites the row. **The row is now
+  resolved**, and the site configuration states the address.
 - **Registry.** Untouched. No record was written and no number allocated.
 - **Priority index.** All eight items placed in the `Next` group, directly
   under 0307, in the order the plan states.
@@ -210,7 +211,9 @@ exercised. That is a skipped step and not a green claim.
 - **Six items are not refined.** Each says why, and in every case the reason is
   that the finish line depends on the site that 0309 builds.
 - **DEC-114 is open.** The recommendation is written and nobody has chosen.
-- **BLK-035 is open**, and only the project owner can close it.
+- **BLK-035 was open at the time of this review**, and only the project owner
+  could close it. He closed it on 3 September 2026, and item 0320 holds the
+  work that followed.
 - **FND-322 and FND-323 record two false claims and repair neither.** The
   orientation document still states them. Neither repair belongs to a planning
   item, and item 0244 already holds the wider problem that the two orientation

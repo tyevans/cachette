@@ -58,21 +58,26 @@ jobs:
         run: just docs-probe
 
       # The artefact is built on every run. Publishing it is a separate job,
-      # and BLK-035 holds the address it would publish to.
+      # because a pull request must build the site and must not publish it.
       - uses: actions/upload-pages-artifact@v3
         with:
           path: target/site
 
-  # BLK-035 is open. Nobody in this tree can say where the site publishes, or
-  # who turns the publishing on. This job therefore takes the switch as a
-  # repository variable and never as a value in a file. It does nothing until
-  # the project owner sets CACHETTE_DOCS_PUBLISH to `true` and sets the hosting
-  # source to GitHub Actions. The address comes back from the host, so no file
-  # in this repository states one.
+  # This job publishes the built site on every push to the main branch.
+  #
+  # It carries no switch of its own, and DEC-117 is why. The hosting source
+  # setting of the repository is the switch, the deploy step reads it, and a
+  # second switch in this file would be one fact in two places with nothing
+  # that fails when the copies disagree. A repository variable also makes a
+  # job that publishes nothing look the same as a job that is turned off.
+  #
+  # This job fails while the repository publishes its site from a branch
+  # rather than from a workflow. The failure names the setting, and only the
+  # project owner can change it.
   publish:
     name: publish
     needs: build
-    if: github.ref == 'refs/heads/main' && vars.CACHETTE_DOCS_PUBLISH == 'true'
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:
       pages: write

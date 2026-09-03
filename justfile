@@ -245,8 +245,9 @@ obs-check result:
 # found reached a page. A build that reaches the type stub instead publishes
 # signatures and no prose, and it reports no error on its own.
 #
-# BLK-035 holds the address the site publishes to. This recipe builds and
-# publishes nothing.
+# This recipe builds and publishes nothing. The workflow publishes, and it
+# publishes only from the main branch. The site configuration states the
+# address the published site answers on.
 docs:
     ./scripts/build-docs.sh
 

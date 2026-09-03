@@ -7,7 +7,7 @@ implements: [ADR-0107 D1, ADR-0107 D4]
 changes: []
 creates: []
 serves: [PRD-0021]
-blocked-by: [BLK-035]
+blocked-by: []
 ---
 
 ## Why
@@ -62,12 +62,12 @@ the site configuration stays in a portable format, and it recommends that it
 does.[^5] A second open choice asks how a published page cites a repository
 document that a reader cannot open, and this item is the first to meet it.[^6]
 
-**Blockers.** One governs this item. Nobody in the tree can say where the site
-publishes, or who turns the publishing on.[^7] Express the site address as a
-parameter of the job and cite the blocker. Do not invent an address. Two
-further blockers govern the prose rather than the build: one holds every cost
-figure, and one asks whether an upgrade changes hands when the ground does.[^8]
-[^9] No page this item publishes states a figure or answers that question, so
+**Blockers.** One governed this item while it ran, and it is resolved. Nobody
+in the tree could say where the site published, so this item expressed the site
+address as a parameter of the job. Item 0320 later closed the row and put the
+address in the site configuration.[^7] [^21] Two further blockers govern the
+prose rather than the build: one holds every cost figure, and one asks whether
+an upgrade changes hands when the ground does.[^8] [^9] No page this item publishes states a figure or answers that question, so
 neither stops the work.
 
 **Precedent.** Item 0307 must close first. The Python package declares its
@@ -90,7 +90,8 @@ Add the site configuration, the reference page and the publishing job.
   member filter that removes the members the import collects and a reader does
   not want. The research report measured which ones appear.[^3]
 - Add the job. It builds the extension, installs it, builds the site, and
-  publishes the output to the address the blocker holds.
+  publishes the output to the address the blocker held. **Item 0320 replaced
+  the parameter with the address.**[^21]
 - **Prove that the job fails when the import fails.** Turn module inspection off
   behind a temporary change, run the job, and confirm that it fails. A guard
   that has never been shown to fire has not been shown to exist.[^15]
@@ -126,13 +127,15 @@ Nothing at run time changes. No simulation code changes.
 - No page in the repository holds hand-written prose for a member the compiled
   module provides.
 - The site address is a parameter of the job, and the job cites the blocker
-  rather than a value.
+  rather than a value. **Item 0320 replaced this statement**: the address is now
+  in the site configuration and the blocker is resolved.[^21]
 - The whole check command runs green.
 
 ## Outcome
 
-**The site, the build job and the publishing job exist, and the publishing step
-is off.** The site configuration is in the portable format. The site holds one
+**The site, the build job and the publishing job exist. The publishing step
+was off when this item closed, and item 0320 turned it on.**[^21] The site
+configuration is in the portable format. The site holds one
 generated reference page and one index page that says what the site does not
 hold yet. The reference page holds one directive over the compiled module and
 no interface prose. The build job builds the extension, installs it, builds the
@@ -159,10 +162,11 @@ loses its first. A finding holds that as well.[^19] The plan also did not name a
 home page. The site now holds one, marked as an index, because a site with a
 reference and no root page answers nothing at its own address.
 
-**What stays blocked.** The address and the hosting switch.[^7] The publishing
-job takes the switch as a repository variable and takes the address from the
-host, so no file in this tree states either. Nothing publishes until the project
-owner sets the variable and sets the hosting source.
+**What stayed blocked, and no longer does.** The address and the hosting
+switch. The publishing job took the switch as a repository variable and took
+the address from the host, so no file in this tree stated either. Item 0320
+closed the row: the project owner named the host, the site configuration states
+the address, and the publishing job carries no switch of its own.[^7] [^21]
 
 **Registers.** One choice closed and one opened.[^5] [^20] Two findings were
 recorded.[^18] [^19] The blocker row gained the state of the job and stays
@@ -176,7 +180,7 @@ open.[^7]
 [^4]: Backlog item 0310, write the Rust doc comments for the Python reader. `docs/backlog/complete/0310-write-the-rust-doc-comments-for-the-python-reader.md`
 [^5]: Decisions register, DEC-113. `docs/DECISIONS.md`
 [^6]: Decisions register, DEC-114. `docs/DECISIONS.md`
-[^7]: Blockers register, BLK-035. `docs/BLOCKERS.md`
+[^7]: Blockers register, BLK-035, resolved. `docs/BLOCKERS.md`
 [^8]: Blockers register, BLK-007. `docs/BLOCKERS.md`
 [^9]: Blockers register, BLK-034. `docs/BLOCKERS.md`
 [^10]: Backlog item 0307, generate the type stub from the compiled module. `docs/backlog/proposed/0307-generate-the-type-stub-from-the-compiled-module.md`
@@ -190,3 +194,4 @@ open.[^7]
 [^18]: Findings register, FND-324. `docs/FINDINGS.md`
 [^19]: Findings register, FND-325. `docs/FINDINGS.md`
 [^20]: Decisions register, DEC-115. `docs/DECISIONS.md`
+[^21]: Backlog item 0320, publish the documentation site to GitHub Pages. `docs/backlog/complete/0320-publish-the-documentation-site-to-github-pages.md`
