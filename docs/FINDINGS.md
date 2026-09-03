@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-209**
+**Next number: FND-210**
 
 ## A. Corrections to stated rules
 
@@ -4616,6 +4616,57 @@ that ordering was correct at the time it was chosen.
 the record, because a person reads an image and an agent does not. The two
 paths answer different readers, and the tool did not replace the picture.
 
+### FND-209 — The camera was not slow at the far zoom. The pan step was the wrong size for the view
+
+**Believed.** A watcher reported that camera navigation is "incredibly sluggish"
+at the far zoom, and the reading taken from that was a cost problem. A drawing
+at the smallest tile the camera allows costs about a third of a second on a
+development machine, which supported the reading.[^F209A]
+
+**True.** **Nothing was slow.** The project owner corrected it from watching the
+window move: the step is the same size however far out the view is zoomed. One
+press moved a fixed count of tiles, and a tile is a fixed number of pixels only
+at one zoom. At the zoom the viewer opens on, a press moved eighteen pixels. At
+the smallest tile the camera allows, the same press moved three. The camera was
+covering a fortieth of the distance for the same effort, and a watcher reads
+that as slowness.
+
+**Evidence.** The step was one and a half tiles, multiplied by the tile width in
+pixels. The tile width runs from two pixels to sixty-four, so the pixel distance
+of one press varied by a factor of thirty-two across the range the camera
+allows. The window polls the keyboard once for each drawn frame, so a held key
+crossed the window in about two seconds at the opening zoom and in about
+fourteen at the far zoom.
+
+**The cost figure is real and is not the cause.** The drawing does cost about a
+third of a second at the far zoom on a development machine, and the ground of
+every visible tile is generated twice to produce it.[^F209B] That is a separate
+defect with its own item.[^F209C] It made the frame rate low; it did not make
+the camera cover three pixels a press.
+
+**Follows.** **A pan covers a share of what the window shows.** The step is now
+a share of the window and not a count of tiles, so a press moves the same part
+of the picture at every zoom.
+
+**The share preserves rather than improves.** It is the share the old step
+covered at the zoom the viewer opens on: eighteen pixels in a window seven
+hundred and twenty pixels on its shorter side, which is one in forty. The one
+zoom nobody reported is unchanged and every other zoom now matches it. No part
+of the value was read off a render, and one test asserts the opening zoom still
+moves what it moved before.
+
+**The zoom did not have the matching defect, and now a test says so.** A zoom
+press multiplies the tile size by a factor. A press therefore changes the view
+by the same proportion wherever it is taken, which is the property the pan
+lacked. A zoom that added a count of tiles would produce the same complaint in
+the other direction, so a test asserts the ratio is one number across the range.
+
+**A measurement can be right and still answer the wrong question.** The cost of
+a drawing was measured carefully, on the correct binary, and it supported a
+diagnosis that was wrong. The person watching the window had the answer, and
+nobody asked them until after the measurement was taken. **Ask the reporter what
+they saw before measuring what you think they meant.**
+
 ### FND-207 — The grid a watcher saw is the gap between the tiles, and the gap was neither whole nor bounded
 
 **Believed.** The window draws a black border around each tile, and the lattice
@@ -5162,5 +5213,8 @@ check asserts.
 [^F201C]: Findings register, FND-206, in this document.
 [^F206C]: The holder layer of the drawing pass. `crates/cachette-view/src/paint.rs`
 [^F207A]: The tile rectangle of the drawing pass. `crates/cachette-view/src/paint.rs`
+[^F209A]: Findings register, FND-208, in this document.
+[^F209B]: The drawing pass of the viewer. `crates/cachette-view/src/paint.rs`
+[^F209C]: Backlog item 0210, generate the ground of a drawn tile once. `docs/backlog/proposed/0210-generate-the-ground-of-a-drawn-tile-once.md`
 [^F207B]: Decisions register, DEC-088. `docs/DECISIONS.md`
 [^F208A]: ADR-0070, the head-up display reports what the drawing pass read, decision D2. `docs/adrs/accepted/adr-0070-the-head-up-display-reports-what-the-drawing-pass-read.md`

@@ -247,6 +247,29 @@ const MAX_TILE: f32 = 64.0;
 /// The tile size the viewer opens with, in pixels.
 const OPENING_TILE: f32 = 12.0;
 
+/// The share of the window that one press of a scroll key moves the view.
+///
+/// **A pan covers a share of what the window shows, not a count of tiles.** A
+/// step in tiles is the same number of tiles at every zoom, so it is a
+/// different number of pixels. At the smallest tile the camera allows it moved
+/// three pixels, and the camera felt stuck. Nothing was slow. The step was the
+/// wrong size for the view.[^1]
+///
+/// The share is the share the old step covered at the zoom the viewer opens
+/// on. That step was one and a half tiles of twelve pixels, which is eighteen
+/// pixels, and the window the demonstration opens is seven hundred and twenty
+/// pixels on its shorter side. Eighteen in seven hundred and twenty is one in
+/// forty.
+///
+/// **The one zoom nobody reported is therefore unchanged, and every other zoom
+/// now matches it.** The value preserves a behaviour rather than improving on
+/// it, so no part of it was read off a render.
+///
+/// # References
+///
+/// [^1]: Findings register, FND-209. `docs/FINDINGS.md`
+const PAN_SHARE: f32 = 1.0 / 40.0;
+
 /// The factor one zoom press applies to the tile size.
 const ZOOM_STEP: f32 = 1.1;
 
@@ -837,10 +860,34 @@ impl Camera {
         Self::at_tile_size(OPENING_TILE)
     }
 
+    /// Returns the camera moved by whole presses of a scroll key.
+    ///
+    /// **This is the call a person drives.** The step is a share of the
+    /// window, so one press moves the view by the same part of the picture at
+    /// every zoom.[^1] A caller that wants to move by a count of tiles uses
+    /// the tile form below, which is what a test wants and what a person does
+    /// not.
+    ///
+    /// The step is square in pixels, and it comes from the shorter side of the
+    /// window. A step taken from each side separately would move the view
+    /// further across than down, which is a second change that nobody asked
+    /// for.
+    ///
+    /// # References
+    ///
+    /// [^1]: Findings register, FND-209. `docs/FINDINGS.md`
+    #[must_use]
+    pub fn nudged(self, across: f32, down: f32, canvas: &Canvas) -> Self {
+        let shorter = canvas.width().min(canvas.height()) as f32;
+        let step = shorter * PAN_SHARE;
+        self.panned(across * step, down * step)
+    }
+
     /// Returns the camera moved by a whole number of tiles.
     ///
-    /// A caller that steers by keyboard thinks in tiles. A caller that
-    /// steers by pixels uses the pixel form.
+    /// A caller that steers by keyboard uses the press form above. This form
+    /// moves by a count of tiles, which changes its pixel distance with the
+    /// zoom.
     #[must_use]
     pub fn stepped(self, across: f32, down: f32) -> Self {
         self.panned(across * self.tile_width, down * self.tile_height)
