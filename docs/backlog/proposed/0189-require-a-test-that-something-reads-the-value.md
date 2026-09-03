@@ -13,9 +13,16 @@ blocked-by: [DEC-074]
 ## Why
 
 The engine writes a value into state, and no stage reads that value to decide
-anything. The option column is the instance: movement reads whether a unit
-chose and not what it chose.[^1] The influence field and the tile stub value
-are two more.
+anything. The influence field and the tile stub value are the instances that
+stand.
+
+**The instance this item was written from is closed, and the way it closed is
+the argument for the rule.** The option column used to be the example:
+movement read whether a unit chose and not what it chose.[^1] Movement now
+reads the exit of the unit's own cell for the option the unit chose, so the
+column decides the step. Nothing in the rules made that happen, and no check
+would have said the column was inert while it was. **The instance went away
+and the gap that let it exist did not.**
 
 **The rules the project holds do not catch this.** One says not to declare a
 capability before something calls it. One says that when the engine is
