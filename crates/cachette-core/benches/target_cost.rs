@@ -63,7 +63,7 @@
 use std::time::Instant;
 
 use cachette_core::choose::PERIOD_LOG2_CEILING;
-use cachette_core::{Axial, Entity, FactionId, Fix32, World, WorldConfig};
+use cachette_core::{Axial, Entity, ExitField, FactionId, Fix32, Grid, World, WorldConfig};
 
 /// The seed that every world in this benchmark takes.
 const SEED: u64 = 0x0123_4567_89ab_cdef;
@@ -271,6 +271,7 @@ fn main() {
         "stages" => stage_rows(&arguments),
         "placement" => placement_rows(&arguments),
         "collapse" => collapse_rows(&arguments),
+        "exitfield" => exit_field_rows(&arguments),
         "memory-placement" => memory_placement(&arguments),
         "one" => one_point(&arguments),
         "full" => timing_sweep(&full()),
@@ -686,6 +687,83 @@ fn collapse_rows(arguments: &[String]) {
                 pairs.len()
             );
         }
+    }
+}
+
+/// Measures the exit field derivation and the level 1 rebuild that feeds it.
+///
+/// The exit field is the first thing in this engine built on the claim that
+/// cost should follow the lattice rather than the population. So the question
+/// is whether it scales like the tile pass, which improves with threads, or
+/// floors like the unit passes, which stop.
+///
+/// **The derivation is measured directly rather than by a difference.** The
+/// field, its constructor and the level it reads are all public, so a caller
+/// outside the engine builds one and derives into it. Nothing is switched off
+/// and nothing is subtracted.
+///
+/// The level 1 rebuild is measured beside it, because the step runs the two
+/// together and the rebuild is the part that takes a thread count.
+fn exit_field_rows(arguments: &[String]) {
+    let extent = extent_argument(arguments, 1);
+    let units: u32 = arguments
+        .get(2)
+        .and_then(|word| word.parse().ok())
+        .expect("the third argument must be a unit count");
+    let default_threads: usize = arguments
+        .get(3)
+        .and_then(|word| word.parse().ok())
+        .unwrap_or(1);
+    let thread_counts = numbers_from(THREADS_VAR, &[default_threads]);
+
+    println!("# the exit field derivation, and the level 1 rebuild that feeds it");
+    println!("# the units are scattered, at the density the scale constants imply");
+    println!("bench\ttiles\tunits\tthreads\tsamples\tmin_ns\tmedian_ns\tmax_ns");
+
+    let capacity = units.max(1024);
+    let mut world = World::new(extent.config(capacity)).expect("the extent must describe a world");
+    let placed = populate_scattered(&mut world, units);
+    for _ in 0..WARMUP_FRAMES {
+        world
+            .step(*thread_counts.first().unwrap_or(&1))
+            .expect("the step must run");
+    }
+
+    let layout = world.bridge().layout();
+    let cells = Grid::new(layout.blocks_wide(), layout.blocks_high())
+        .expect("the block lattice must describe a grid");
+    println!("# level_1_cells\t{}", cells.tile_count());
+
+    for threads in thread_counts.iter().copied() {
+        // The level 1 rebuild takes a thread count, so it can scale.
+        let samples = samples_of(|| {
+            let start = now();
+            world
+                .rebuild_pyramid(threads)
+                .expect("the rebuild must run");
+            start.elapsed().as_nanos()
+        });
+        report("level_1_rebuild", extent.tiles(), placed, threads, &samples);
+
+        // The derivation takes no thread count. It cannot scale, and the
+        // thread column is here to show that it does not rather than to
+        // suggest that it might.
+        let mut field = ExitField::new(cells);
+        let pyramid = world.pyramid();
+        let samples = samples_of(|| {
+            let start = now();
+            field.derive(pyramid);
+            let elapsed = start.elapsed().as_nanos();
+            std::hint::black_box(field.exit(0, 0));
+            elapsed
+        });
+        report(
+            "exit_field_derive",
+            extent.tiles(),
+            placed,
+            threads,
+            &samples,
+        );
     }
 }
 

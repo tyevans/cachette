@@ -268,6 +268,39 @@ the choice stagger all scale with the cell count. **A figure here that named no
 block edge would not be reproducible**, which is why this section exists. The
 sensitivity is not measured.
 
+## A second prediction, written before the run that tests it
+
+**This section was committed before the measurement it names existed**, in the
+same way the 500,000-unit prediction was. The commit that adds it holds no
+result.
+
+The claim under test belongs to the record being written: cost should follow
+the lattice rather than the population. The exit field is that record's first
+instance, so the question is whether its derivation scales like the tile pass,
+which reached 6.13 on 12 threads, or floors like the unit passes, which stop
+near 1.85.
+
+**The prediction is that it does neither, and that the reason is structural
+rather than empirical.** The derivation takes no thread count. Its own
+documentation states that the pass runs on the calling thread and that the
+result depends on no thread count. So:
+
+1. **The derivation costs the same at 1 thread and at 12.** A speedup outside
+   0.9 to 1.1 refutes this.
+2. **The derivation costs under 10 milliseconds** at the target extent, which
+   holds 16,384 level 1 cells. The pass visits each cell once for each of six
+   options and looks at six neighbours, which is about 590,000 inner steps.
+3. **The level 1 rebuild beside it does scale**, because it takes a thread
+   count. It improves by more than 2 times from 1 thread to 12.
+
+**What each outcome means for the record.** If the derivation is small and
+flat, the lattice claim is supported in the way that matters: the work is
+proportional to the cells and there are few of them, so it does not need
+threads. If the derivation is large, a serial pass sits in every frame and the
+record has a problem its first instance created.
+
+**Result: not yet run.**
+
 ## Would the choice pass collapse if it decided for each cell?
 
 One weight profile serves every unit alive, so two units in the same level 1
