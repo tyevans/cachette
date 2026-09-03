@@ -8438,12 +8438,12 @@ caught it two hours earlier.
 [^F292A]: The world, the stored tile change count. `crates/cachette-core/src/world.rs`
 [^F292B]: The exit locality benchmark, the growth row. `crates/cachette-core/benches/exit_locality.rs`
 [^F292C]: Target platform costs, the stage table. `docs/reference/graviton-costs.md`
-[^F293A]: The cost benchmark, the memory point mode. `crates/cachette-core/benches/target_cost.rs`
-[^F293B]: Findings register, FND-246, in this document.
-[^F293A]: ADR-0068, terrain is generated from the seed and is never stored as a map, decision D1. `docs/adrs/accepted/adr-0068-terrain-is-generated-from-the-seed-and-is-never-stored-as-a-map.md`
+[^F298A]: The cost benchmark, the memory point mode. `crates/cachette-core/benches/target_cost.rs`
+[^F298B]: Findings register, FND-246, in this document.
+[^F299A]: ADR-0068, terrain is generated from the seed and is never stored as a map, decision D1. `docs/adrs/accepted/adr-0068-terrain-is-generated-from-the-seed-and-is-never-stored-as-a-map.md`
 [^F295A]: ADR-0018, the unit-to-tile bridge is derived, and it rebuilds at the barrier, decision D4. `docs/adrs/accepted/adr-0018-the-unit-to-tile-bridge-is-derived-and-rebuilds-at-the-barrier.md`
 [^F296B]: Target platform costs, every stage of a frame after the ground read moved last. `docs/reference/graviton-costs.md`
 [^F296C]: Findings register, FND-290, in this document.
 [^F297A]: The target platform benchmark script. `scripts/graviton-benchmark.sh`
-[^F294A]: Backlog item 0277, hold a thread back when the work will not pay for it. `docs/backlog/proposed/0277-hold-a-thread-back-when-the-work-will-not-pay-for-it.md`
-[^F294B]: The demonstration stage split. `crates/cachette-core/examples/demo_stage_split.rs`
+[^F300A]: Backlog item 0277, hold a thread back when the work will not pay for it. `docs/backlog/proposed/0277-hold-a-thread-back-when-the-work-will-not-pay-for-it.md`
+[^F300B]: The demonstration stage split. `crates/cachette-core/examples/demo_stage_split.rs`
