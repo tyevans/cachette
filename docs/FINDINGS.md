@@ -5156,6 +5156,93 @@ allocated by a line that cannot see uncommitted work. In each case the registry
 stores a piece of state somewhere that cannot be read atomically by everyone who
 needs it, and in each case nothing fails until two readers disagree.
 
+### FND-240 — A behavioural strategy is one constraint, not three
+
+**Believed.** A behavioural strategy decomposes into three parts that each need
+a record: a trigger, which is a condition on unit state; a field to follow,
+never a per-unit search; and an action on arrival, which is what happens when
+the field runs out.
+
+**True.** Only the middle part states a constraint this project does not
+already hold. The other two fail the scope test for different reasons, and one
+of them also misdescribes the engine.
+
+**Evidence, part one: the trigger is already recorded, and it is not a condition
+on unit state.** A unit takes an option by scoring a fixed set and taking the
+highest, and an accepted record governs that.[^F240A] The score is the unit's
+drive multiplied by a weight and then by the value the option reads from the
+level 1 cell.[^F240B] It reads unit state **and** world state, so a trigger
+described as a condition on unit state describes something the engine does not
+do. A record stating it would be a second declaration of the choice pass and a
+wrong one.
+
+**Evidence, part two: arrival is partly answered and partly unbuilt.** A unit
+holds its intent until it chooses again, and a cell that no neighbour beats
+strictly holds no exit direction, so a unit there keeps the behaviour it already
+had.[^F190C] That is what happens when a field runs out, and a draft record
+already says it. What is left is what a unit does at a destination, and the
+engine has no destination, no field and no concept of arrival, so nothing has
+chosen anything. That is the shape that retired the first number this project
+ever retired.[^F192A]
+
+**Follows.** **A three-part framing of a mechanism is not three claims.** The
+parts of a mechanism are how a builder thinks about it. A record binds a choice
+somebody could get wrong, and the three parts here have three different
+statuses: one settled, one open, one not yet a question.
+
+**The test that separated them is the ordinary one.** Ask of each part whether
+a contributor could reasonably choose otherwise, whether choosing otherwise
+costs more than changing it later, and whether the reasoning is invisible in the
+artefact.[^16] The trigger fails the first, because the choice is made and
+recorded. The arrival fails the first in the other direction, because nothing
+has been chosen at all.
+
+**A plausible decomposition is the most expensive kind of wrong framing**,
+because each part sounds like it needs a record and the reviewer's instinct is
+to write three. The evidence that separates them is in the source and in the
+registry, not in the framing.
+
+### FND-241 — There are no unit types, and one weight profile serves every unit alive
+
+**Believed.** A unit type is an index into a shared table, and types
+parameterise the verbs rather than multiplying them. This is one of the four
+design principles the project orientation states.
+
+**True.** No unit type exists. The soldier arena carries no type index and no
+weight column, and the engine holds exactly one weight profile, as a single
+field on the world, built with every option weighted equally.[^F241A]
+
+So every unit alive scores the options identically. **Two units standing in one
+cell with the same need always make the same choice**, and no mechanism can
+make them differ, because there is nothing to differ by.
+
+**Evidence.** The world holds one `WeightProfile` field, initialised to the even
+profile, and the explanation path passes that one profile for every unit it
+explains. A search of the soldier arena for a weight or a profile returns
+nothing.
+
+The option set compounds it. There are four options and every one of them reads
+a level 1 summary field, so a unit's behaviour is a function of its need, its
+cell, and nothing else. One of the five summary fields the option set can read
+is read by no option, and the field that the `roam` option reads is derived from
+terrain and never changes.[^F241B]
+
+**Follows.** **A principle with no instance is a principle nobody has tested.**
+The orientation states that types parameterise the verbs and that a type is an
+index into a shared table. Nothing in the engine is a type in that sense, so the
+principle has never had to hold, and the first thing that needs it will discover
+what it costs.
+
+**This is a different gap from the one about destinations, and it must not be
+folded into it.** A field over cells lets a unit go somewhere. It does not let
+two units want different things, and a record about fields does not touch this.
+The product record that states the destination need says so in its own scope.
+
+**Nothing is wrong today.** One profile is the correct amount of machinery for a
+world with one kind of unit. The finding records what is true so that the next
+person who reads the principle does not assume an implementation behind it,
+which is the mistake this register keeps recording.[^65]
+
 ## References
 
 [^F177A]: The founding refuses ground that admits nobody. `crates/cachette-core/src/world.rs`
@@ -5361,3 +5448,7 @@ needs it, and in each case nothing fails until two readers disagree.
 [^F218E]: Definition of Done, section 4. `.claude/rules/definition-of-done.md`
 [^F218F]: Findings register, FND-192, in this document.
 [^ALLOC2]: Findings register, FND-219, in this document.
+[^F240A]: ADR-0064, a unit chooses by scoring a small fixed option set, decision D1. `docs/adrs/accepted/adr-0064-a-unit-chooses-by-scoring-a-small-fixed-option-set.md`
+[^F240B]: The choice pass. `crates/cachette-core/src/choose.rs`
+[^F241A]: The world, the weight profile field. `crates/cachette-core/src/world.rs`
+[^F241B]: The choice pass, the cell fields and the option set. `crates/cachette-core/src/choose.rs`

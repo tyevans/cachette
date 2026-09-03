@@ -423,6 +423,63 @@ in the paragraph above about ADR-0068, and it is a real one.
 
 ## Open
 
+### DEC-095 — Is a strategy field derived from nothing each rebuild, or carried between frames?
+
+**Open. Engineering owns it. It waits on DEC-067 and does not decide before
+it.**
+
+A strategy that names a place takes its direction from a field over the block
+lattice, seeded at the destination.[^DEC95A] How far that field reaches depends
+on where it starts each time.
+
+**Derived from nothing.** The engine clears the field at every rebuild of level
+1 and spreads it a fixed number of passes. The field is then a pure function of
+level 0 and states no fact of its own, which is what the movement field
+does.[^DEC95B] It reaches as far as its passes and no further, so a unit more
+than that many blocks from its destination reads nothing and behaves as it does
+today.
+
+**Carried between frames.** A rebuild applies its passes to the field the last
+rebuild left, so the reach grows until the field spans the world. This is what
+the influence plane does, and it is why the writ of a ruler reaches further than
+one tick of passes.[^DEC67ADR] It also stores a value that appears nowhere at
+level 0.
+
+**The two are not equally available.** Carrying is exactly the case that DEC-067
+holds open: a plane above level 0 that is not a summary and never claims to
+be.[^DEC95D] That row already blocks one record, and a strategy field would be
+the second plane to raise it. **This row cannot close before that one**, and if
+DEC-067 refuses the carried plane, this row has one option and not two.
+
+**Option A. Derive from nothing, and accept the reach limit.** The field is a
+projection like every other derived structure, no record has to change, and a
+unit beyond the reach falls back to the behaviour it already has. The cost is
+that a destination further than the pass count is unreachable, so the pass count
+becomes the maximum useful world radius for a strategy.
+
+**Option B. Carry, and take whatever DEC-067 decides for the influence plane.**
+The reach grows to the whole world for a fixed cost per tick. The cost is a
+second plane holding solver state above level 0, and a second instance of the
+problem that has already stopped one record.
+
+**Option C. Derive from nothing, and seed densely enough that the reach does not
+matter.** A strategy that sends a unit to its nearest site seeds every site, and
+sites are spread across the world, so the distance from any cell to the nearest
+seed is bounded by how far apart sites are rather than by the size of the world.
+The reach limit then binds only a strategy with one distant seed.
+
+**Recommendation: C, falling back to A.** It needs no change to any record and
+no answer from DEC-067, and the multi-source seeding it relies on is already how
+the record states the mechanism.[^DEC95E] It does not serve a strategy with a
+single far destination, and that case can wait for somebody to ask for it.
+
+**No figure appears here.** The pass count, the reach it buys and the spacing of
+sites are all quantities no measurement supports on the target
+platform.[^BLK7]
+
+**Revisit when** DEC-067 closes, or when a strategy with one distant destination
+is asked for.
+
 ### DEC-092 — Can a caller ask anything about a character who has died?
 
 **Open. A reviewer owns it. The recommendation is Option A.**
@@ -2090,3 +2147,7 @@ a failed founding is correct.[^PRD12]
 [^DEC91D]: Decisions register, DEC-036, in this document.
 [^DEC92A]: ADR-0078, descent is a bounded record, and a relation is a bounded recursion, decision D1. `docs/adrs/draft/adr-0078-descent-is-a-bounded-record-and-a-relation-is-a-bounded-recursion.md`
 [^DEC92C]: Review 0223, the descent record. `docs/reviews/0223-the-descent-record.md`
+[^DEC95A]: ADR-0095, a behavioural strategy arrives as a field over cells, never as a search from a unit, decision D3. `docs/adrs/draft/adr-0095-a-behavioural-strategy-arrives-as-a-field-over-cells.md`
+[^DEC95B]: ADR-0091, movement takes its direction from a per-cell field, never from a per-unit search, decision D2. `docs/adrs/draft/adr-0091-movement-takes-its-direction-from-a-per-cell-field.md`
+[^DEC95D]: Decisions register, DEC-067, in this document.
+[^DEC95E]: ADR-0095, a behavioural strategy arrives as a field over cells, never as a search from a unit, decision D4. `docs/adrs/draft/adr-0095-a-behavioural-strategy-arrives-as-a-field-over-cells.md`
