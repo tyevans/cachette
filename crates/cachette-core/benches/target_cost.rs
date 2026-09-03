@@ -464,19 +464,16 @@ fn populate_scattered(world: &mut World, units: u32) -> u32 {
     let stride = (count / units).max(1);
     let ceiling = u32::from(world.config().faction_count.max(1));
     let mut placed = 0u32;
+    // The cursor never goes backwards, so no tile is offered twice, and it
+    // never stops early at water. An earlier version searched one stride and
+    // gave up, which placed 762599 of a requested 1000000 and made the
+    // comparison it existed for a comparison of two unit counts.
+    let mut cursor = 0u32;
     for step in 0..units {
-        let start = step.saturating_mul(stride);
-        if start >= count {
-            break;
-        }
-        // A tile that admits no unit is passed over, and the search stops at
-        // the next stride so that the spread stays even.
-        for offset in 0..stride {
-            let index = start + offset;
-            if index >= count {
-                break;
-            }
-            let address = Axial::new((index % width) as i32, (index / width) as i32);
+        cursor = cursor.max(step.saturating_mul(stride));
+        while cursor < count {
+            let address = Axial::new((cursor % width) as i32, (cursor / width) as i32);
+            cursor += 1;
             if !world.admits_a_unit(address) {
                 continue;
             }
@@ -485,6 +482,9 @@ fn populate_scattered(world: &mut World, units: u32) -> u32 {
                 placed += 1;
                 break;
             }
+        }
+        if cursor >= count {
+            break;
         }
     }
     placed
@@ -495,6 +495,11 @@ fn populate_scattered(world: &mut World, units: u32) -> u32 {
 /// The two rows come from one process, on one machine, from one build, so the
 /// difference between them is the placement and nothing else. A comparison
 /// across two runs would carry the machine and the build as well.
+///
+/// No memory figure comes from this mode. The second world is built in a
+/// process that has already built and dropped the first, so a resident size
+/// read here would carry the first world with it. The memory mode measures
+/// one point in a process of its own, and that is the figure to use.
 ///
 /// This exists because a benchmark measures its fixture as much as its
 /// subject. A population packed into a band gives every unit a neighbour,
@@ -529,7 +534,6 @@ fn placement_rows(arguments: &[String]) {
         for _ in 0..WARMUP_FRAMES {
             world.step(threads).expect("the step must run");
         }
-        let resident = status_kib("VmRSS:") * 1024;
         let samples = samples_of(move || {
             let start = now();
             let log = world.step(threads).expect("the step must run");
@@ -538,7 +542,6 @@ fn placement_rows(arguments: &[String]) {
             elapsed
         });
         report(name, extent.tiles(), placed, threads, &samples);
-        println!("# {name}_resident_bytes\t{resident}");
     }
 }
 
