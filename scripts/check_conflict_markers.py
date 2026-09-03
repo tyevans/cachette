@@ -125,6 +125,17 @@ def main() -> int:
     for failure in failures:
         print(f"FAIL: {failure}", file=sys.stderr)
 
+    # A clean report is not a clean tree unless the reader knows what the scan
+    # passed over. A scan from the repository root skips every worktree, so a
+    # worker whose files live in one gets a clean answer about files this run
+    # never opened. Naming the skipped roots makes that visible in the output
+    # rather than leaving it to be rediscovered.
+    skipped = sorted(
+        relative(p) for p in SKIP_PATHS if scan == ROOT and p.is_dir() and p.exists()
+    )
+    for name in skipped:
+        print(f"note: {name} was not read. Run the check there to cover it")
+
     print(f"\nchecked {read} files for a conflict marker: {len(failures)} failures")
     return 1 if failures else 0
 
