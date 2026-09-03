@@ -1021,6 +1021,47 @@ pass over 16,384 cells that did much more for each cell would want threads and
 would not have them, because the derivation takes no thread count and nothing
 would notice.
 
+### FND-250 — The fixture of a benchmark is its least reviewed code and its most load-bearing
+
+**Believed:** the benchmark measured the engine. Its figures were reviewed, its
+method was stated, and its rows carried the machine, the commit and the date.
+
+**True:** three of its figures described the fixture rather than the engine,
+and all three were found in one session. None was found by reading the
+benchmark. Each was found by distrusting a number that looked too clean.
+
+| The defect | What it made false | How it showed |
+|---|---|---|
+| The population filled the first open tiles, packing 1,000,000 units into a band at one unit for each tile | Every unit figure, by about a factor of two | A reviewer asked what density the pattern gave |
+| The scattered pattern gave up at water and placed 762,599 units of 1,000,000 | A comparison built to isolate the placement | The unit column in the output |
+| The need column held one value for every unit, because no unit had a home to draw from | The whole collapse measurement | A pair count exactly equal to a cell count |
+
+**The transferable claim.** A benchmark's fixture is the least reviewed code
+in a project and the most load-bearing for every figure the benchmark
+produces. The measurement code gets read, because a figure is what people
+argue about. The world the measurement runs on gets written once, early, by
+whoever wanted a number, and then every later figure inherits it.
+
+**Evidence:** the register holds all three, with the corrected figures beside
+the ones they replaced.[^F222] FND-245 holds the placement, FND-247 holds the
+discarded comparison, and FND-255 holds the constant need column.
+
+**Follows:** the register now names the fixture beside every table, and its
+format rule demands the fixture as well as the machine. **A figure whose
+fixture is not named is not reproducible**, and that is a stronger statement
+than the one this project already makes about the machine.
+
+**Three tests, in the order they cost.** Ask what distribution the measurement
+needs, before writing the world. Make the fixture report what it produced
+rather than what it was asked for, because that is what caught the second
+defect. Distrust a number that is too round, too flat or exactly equal to
+another number, because that is what caught the first and the third.
+
+**The testing rule already said the first of those**, and it says it about
+tests rather than about benchmarks.[^23] Nobody applied it here, because a
+benchmark is not a test and the rule did not say the word. The rule is right
+and its scope was too narrow.
+
 ### FND-017 — A decision costs 4.1 nanoseconds, not 400
 
 The needs report assumed random gathers. They are sequential, because units
