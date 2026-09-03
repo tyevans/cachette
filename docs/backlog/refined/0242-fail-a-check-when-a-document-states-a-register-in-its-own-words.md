@@ -30,16 +30,20 @@ passed.[^3]
    a named family. The first family is the state of measurement: the sentences
    that say no measurement exists, that nobody has measured, and that every
    figure in the project is derived.
-2. Let three kinds of file state the family. The blockers register, the
+2. **Join each paragraph into one line before matching.** Prose here wraps at
+   about 78 columns, so a phrase of five words is usually split and a line-based
+   search finds nothing. A sweep already failed this way, and the finding holds
+   the case.[^9]
+3. Let three kinds of file state the family. The blockers register, the
    measurement register and the findings register own the statement, so the
    check exempts them by path.
-3. Carry a baseline file for the sites a sweep may not repair. An accepted
+4. Carry a baseline file for the sites a sweep may not repair. An accepted
    decision record is frozen, a review is a record of a moment, and a completed
    backlog item is a record of a moment. The baseline lists them, and it may
    only shrink. This is the pattern the footnote check already uses.[^4]
-4. Give the check a broken fixture, so that the gate can prove the check
+5. Give the check a broken fixture, so that the gate can prove the check
    fails.[^5]
-5. Wire the check into the document gate and into the fixture gate beside the
+6. Wire the check into the document gate and into the fixture gate beside the
    other seven.
 
 ## Impact review
@@ -78,7 +82,8 @@ have never gone stale.
   left in place.
 - The baseline file states that it may only shrink.
 - The gate that proves each check can fail runs this one too.
-- The commit body holds the whole-tree search that produced the baseline.
+- The commit body holds the whole-tree search that produced the baseline, and
+  that search joins each paragraph before it matches.
 
 ## Outcome
 
@@ -94,3 +99,4 @@ Filled in when the item moves to `complete/`.
 [^6]: Documentation Rules, section 3. `.claude/rules/documentation.md`
 [^7]: Definition of Done, section 4. `.claude/rules/definition-of-done.md`
 [^8]: Decision Record Scope, section 1. `.claude/rules/adr-scope.md`
+[^9]: Findings register, FND-260. `docs/FINDINGS.md`

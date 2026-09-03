@@ -95,7 +95,8 @@ repaired before this item ran.
   in its own words.
 - A whole-tree search for the phrase family returns only the registers that own
   the statement, the frozen records, and the records of a moment.
-- The search command is in the commit body, with the count of each class.
+- The search command is in the commit body, with the count of each class, and it
+  joins each paragraph before it matches.
 - The absence of a mechanical guard is tested rather than assumed, and the
   result is in the findings register.[^10]
 
@@ -118,6 +119,14 @@ repaired sentence was put back in its stale form, and all eight document checks
 passed. A finding holds the case and a refined item holds the check that would
 catch it.[^10] [^11]
 
+**The first search was not enough, and the second one proves it.** A line-based
+search reported clean and had left sites in four decision records, because prose
+here wraps and a phrase of five words is usually split across the break. The
+same search could not reach a document that states the register's content and
+cites nothing, which is where the rule files and the project orientation hold
+it. A second search joined each paragraph before matching. A finding holds the
+lesson, and it is a requirement of the check.[^12] [^11]
+
 ## References
 
 [^1]: Blockers register, BLK-007. `docs/BLOCKERS.md`
@@ -131,3 +140,4 @@ catch it.[^10] [^11]
 [^9]: Backlog item 0243. `docs/backlog/proposed/0243-repair-the-accepted-records-that-state-the-missing-measurement.md`
 [^10]: Findings register, FND-258. `docs/FINDINGS.md`
 [^11]: Backlog item 0242. `docs/backlog/refined/0242-fail-a-check-when-a-document-states-a-register-in-its-own-words.md`
+[^12]: Findings register, FND-260. `docs/FINDINGS.md`

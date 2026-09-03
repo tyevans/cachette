@@ -25,8 +25,8 @@ than run the solver again. The field covers every cell of the world, so
 recording it records the largest thing in the simulation on every frame, and
 the log then grows with the world rather than with what happened.
 
-No measurement of that growth exists on the target platform, and every cost
-figure in this project is derived.[^3] The argument here does not need one: the
+No measurement of that growth exists on the target platform, and one blocker
+holds every cost figure this record would state.[^3] The argument here does not need one: the
 second kind is reproducible by construction, so recording it stores an answer
 the engine can compute.
 

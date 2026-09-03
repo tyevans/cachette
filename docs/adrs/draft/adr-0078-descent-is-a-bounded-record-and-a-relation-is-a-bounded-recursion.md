@@ -154,9 +154,8 @@ a row.
 child lists and the walk frontiers are all dense arrays and sorted vectors.
 Nothing in the record carries an iteration order that no key fixes.[^9]
 
-**A reader cannot tell from this record what a walk costs.** No measurement
-exists on the target platform, and every cost figure in this project is
-derived.[^11]
+**A reader cannot tell from this record what a walk costs.** No run has priced
+a walk, and one blocker holds every cost figure this record would state.[^11]
 
 ## References
 
