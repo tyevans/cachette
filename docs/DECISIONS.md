@@ -23,9 +23,50 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^ALLOC]
 
-**Next number: DEC-117**
+**Next number: DEC-118**
+**Next number: DEC-113**
 
 ## Open
+
+### DEC-117 — What does a laden unit do when the nearest site of its faction is not its own home?
+
+**Open. Engineering owns it. Nothing is blocked by it.**
+
+A unit that carries a full load takes an option that carries it home, and a
+field over the level 1 cells steers the step. The field holds one plane for
+each faction, seeded at every live site of that faction, so it carries the
+direction of the **nearest** site and not of the unit's own home.[^DEC117A]
+
+**The delivery still needs the tile of the unit's own home site.** So a unit
+steered to a sibling site arrives, stands there, and delivers nothing. It then
+holds its load and its option, and the field goes on pointing at the same
+place.
+
+**The demonstration world does not meet this**, because each faction holds one
+site, so the nearest site of a faction is every unit's home. A world with two
+sites of one faction meets it at once, and nothing in the engine refuses such
+a world.
+
+**Option A. Let a unit deliver to any site of its own faction.** The field then
+means exactly what the delivery does, and a unit that arrives always delivers.
+The cost is that the store a load reaches stops depending on the cohort a unit
+draws from, which is a claim about what a site is and needs its own reasoning.
+
+**Option B. Seed one plane for each site rather than one for each faction.**
+The unit reads its own home exactly. The cost is that the plane count follows
+the site count, which the content sets and which grows with the world, so the
+field stops following the lattice alone.
+
+**Option C. Leave it, and accept that a unit near a sibling site stalls.** It
+costs nothing and it is wrong in a way that a watcher sees.
+
+**Recommendation: A.** It removes the mismatch rather than paying for it, and
+the field it makes correct is the cheap one. It needs a record, because
+"a load goes to the store of the site a unit stands on" is a claim about the
+site and not about movement.
+
+**Revisit when** a world holds two sites of one faction, or when somebody asks
+why a unit stands at a settlement holding food.
 
 ### DEC-108 — How often does the project move the nightly date, and who owns the move?
 
@@ -2984,3 +3025,4 @@ a failed founding is correct.[^PRD12]
 [^DEC114B]: Documentation Rules, section 3. `.claude/rules/documentation.md`
 [^DEC114C]: Product requirement record 0021, a developer can use the control plane without reading its source. `docs/product/accepted/prd-0021-a-developer-can-use-the-control-plane-without-reading-its-source.md`
 [^DEC114D]: Recurring Defect Shapes, shape 1, redundant declaration sites. `.claude/rules/recurring-defects.md`
+[^DEC117A]: ADR-0110, a unit returns by climbing a reach field seeded at every site of its faction, decision D1. `docs/adrs/draft/adr-0110-a-unit-returns-by-climbing-a-reach-field.md`

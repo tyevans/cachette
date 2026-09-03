@@ -378,6 +378,8 @@ without stating a constraint is worse than no record.
 | 0105 | A total order needs no repeated identifier, only no repeated key | Draft | 0001, 0004, 0007 | `draft/adr-0105-a-total-order-needs-no-repeated-key.md` |
 | 0106 | A cohort serves whole rations to a keyed subset, never an equal share to everybody | Draft | 0002, 0003, 0004, 0009, 0023, 0063 | `draft/adr-0106-a-cohort-serves-whole-rations-to-a-keyed-subset.md` |
 | 0107 | The Python reference is generated from the compiled module, and its prose lives in the Rust doc comment | Draft | 0040, 0041, 0046 | `draft/adr-0107-the-python-reference-is-generated-from-the-compiled-module.md` |
+| 0109 | The choice key holds a bounded class of the unit's own state | Draft | 0004, 0064, 0096, 0098 | `draft/adr-0109-the-choice-key-holds-a-bounded-class-of-the-unit-state.md` |
+| 0110 | A unit returns by climbing a reach field seeded at every site of its faction | Draft | 0004, 0005, 0022, 0053, 0091, 0095 | `draft/adr-0110-a-unit-returns-by-climbing-a-reach-field.md` |
 
 ### Retired numbers
 

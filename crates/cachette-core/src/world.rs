@@ -30,7 +30,8 @@
 use crate::bridge::{BlockLayout, BridgeError, UnitTileBridge, BLOCK_BITS_DEFAULT};
 use crate::character::{CharacterArena, CharacterError};
 use crate::choose::{
-    self, ChoiceError, ChoiceExplanation, ChoiceSchedule, NeedBuckets, WeightProfile,
+    self, CarryClass, ChoiceError, ChoiceExplanation, ChoiceSchedule, NeedBuckets, Ranked,
+    WeightProfile, OPTIONS,
 };
 use crate::cohort::{
     self, CohortError, CohortTable, DeathPlane, DrawLedger, NeedCondition, NeedRule, SiteRationed,
@@ -48,7 +49,7 @@ use crate::position::{
     self, Position, PositionError, PositionTable, SitePreference, WORK_COMMODITY,
 };
 use crate::promotion::{self, PromotionError, UnitPromoted};
-use crate::pyramid::{CellSummary, ExitField, Pyramid};
+use crate::pyramid::{CellSummary, ExitField, Pyramid, ReturnField};
 use crate::rates::{RateError, RateLedger, RateSchedule, RateTable, SiteShortfall};
 use crate::resource::{
     ledger_key, Amount, CarryLoad, DepletionLedger, RecoveryRules, ResourceField, ResourceKind,
@@ -58,7 +59,7 @@ use crate::rng;
 use crate::sim_math;
 use crate::site::{CommodityId, SettlementArena, SettlementError, COMMODITY_COUNT};
 use crate::slots::Slots;
-use crate::soldier::{SoldierArena, SoldierError};
+use crate::soldier::{SoldierArena, SoldierError, NO_HOME};
 #[cfg(not(feature = "probe-nondeterminism"))]
 use crate::sort;
 use crate::sort::{BoundedKey, SortError};
@@ -462,6 +463,24 @@ pub struct World {
     /// [^1]: ADR-0091, movement takes its direction from a per-cell field, never from a per-unit search, decisions D2 and D3. `docs/adrs/draft/adr-0091-movement-takes-its-direction-from-a-per-cell-field.md`
     /// [^2]: ADR-0024, every summary field is declared extensive or intensive, decision D2. `docs/adrs/accepted/adr-0024-every-summary-field-is-declared-extensive-or-intensive.md`
     exits: ExitField,
+    /// The direction of the nearest site of a faction, for each level 1 cell.
+    ///
+    /// It steers a unit that carries a load home. The field is derived at
+    /// every rebuild of level 1, beside the exit field.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0110, a unit returns by climbing a reach field seeded at every site of its faction, decision D1. `docs/adrs/draft/adr-0110-a-unit-returns-by-climbing-a-reach-field.md`
+    returns: ReturnField,
+    /// The load at which a unit counts as laden.
+    ///
+    /// A laden unit takes the option that carries its load home, and a unit
+    /// below the mark does not.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0109, the choice key holds a bounded class of the unit's own state, decision D3. `docs/adrs/draft/adr-0109-the-choice-key-holds-a-bounded-class-of-the-unit-state.md`
+    carry_mark: Amount,
     /// Who holds each tile, and what each faction holds.
     ///
     /// The holder column is level 0 and it is the truth. It is the one value
@@ -667,6 +686,8 @@ impl World {
             upgrades: UpgradeMap::new(),
             pyramid: Pyramid::new(layout, ResourceField::new(terrain))?,
             exits: ExitField::new(cell_lattice),
+            returns: ReturnField::new(cell_lattice, config.faction_count),
+            carry_mark: CARRY_MARK_DEFAULT,
             holding: Holding::new(layout),
             influence: InfluenceField::new(cell_lattice, config.faction_count)?,
             schedule: RateSchedule::DEFAULT,
@@ -3089,6 +3110,7 @@ impl World {
         let schedule = self.choice;
         let weights = &self.weights;
         let buckets = self.buckets;
+        let mark = self.carry_mark;
         let pyramid = &self.pyramid;
         let bridge = &self.bridge;
         let soldiers = &self.soldiers;
@@ -3105,6 +3127,8 @@ impl World {
                 let end = start.saturating_add(chunk_len).min(cells);
                 scope.spawn(move || {
                     let needs = soldiers.need_column();
+                    let carries = soldiers.carry_column();
+                    let homes = soldiers.home_column();
                     let mut chosen: Vec<(Entity, u8)> = Vec::new();
                     for cell in start..end {
                         // The stagger key is the level 1 cell. It is never
@@ -3123,8 +3147,15 @@ impl World {
                             .expect("the caller checked that the bridge describes this arena");
                         let mut answers = choose::CellAnswers::new(summary, buckets);
                         for unit in units {
-                            let need = needs[unit.index() as usize];
-                            chosen.push((*unit, answers.answer(need, weights)));
+                            let slot = unit.index() as usize;
+                            let need = needs[slot];
+                            // The carry class is the third term of the key. It
+                            // is a bounded class of the state of the unit
+                            // itself, and it is not the load.[^17]
+                            //
+                            // [^17]: ADR-0109, the choice key holds a bounded class of the unit's own state, decision D1. `docs/adrs/draft/adr-0109-the-choice-key-holds-a-bounded-class-of-the-unit-state.md`
+                            let carry = carry_class_of(carries[slot], homes[slot], mark);
+                            chosen.push((*unit, answers.answer(need, carry, weights)));
                         }
                     }
                     *slot = chosen;
@@ -3261,8 +3292,11 @@ impl World {
                     soldiers: &self.soldiers,
                     live: &live,
                 },
-                self.pyramid.layout(),
-                &self.exits,
+                &Steering {
+                    layout: self.pyramid.layout(),
+                    exits: &self.exits,
+                    returns: &self.returns,
+                },
                 threads,
             )?
         };
@@ -3637,9 +3671,14 @@ impl World {
         let summary = self.pyramid.cell(cell)?;
         let need = self.soldiers.need_column()[slot as usize];
         let intent = self.soldiers.intent_column()[slot as usize];
+        let carry = carry_class_of(
+            self.soldiers.carry_column()[slot as usize],
+            self.soldiers.home_column()[slot as usize],
+            self.carry_mark,
+        );
         Some(choose::explain(
             cell,
-            need,
+            choose::UnitState { need, carry },
             summary,
             &self.weights,
             self.buckets,
@@ -3982,7 +4021,98 @@ impl World {
             threads,
         )?;
         self.exits.derive(&self.pyramid);
+        self.returns.derive(&self.pyramid, &self.site_seeds());
         Ok(())
+    }
+
+    /// Returns one seed for each live site, as a faction and the level 1 cell
+    /// that holds it.
+    ///
+    /// The walk is over the settlement slots in ascending order, so the set
+    /// does not depend on a thread count.[^1] The derivation reads the set as
+    /// a set: a seed gives a cell a reach of zero, and two seeds in one cell
+    /// give the same answer as one.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
+    fn site_seeds(&self) -> Vec<(FactionId, u32)> {
+        let live = self.settlements.live_column();
+        let tiles = self.settlements.tile_column();
+        let factions = self.settlements.faction_column();
+        let mut seeds = Vec::new();
+        for (slot, alive) in live.iter().enumerate() {
+            if *alive == 0 {
+                continue;
+            }
+            let Some(cell) = self.cell_of(tiles[slot]) else {
+                continue;
+            };
+            seeds.push((factions[slot], cell));
+        }
+        seeds
+    }
+
+    /// Returns the return field of the world.
+    ///
+    /// The field holds the direction of the nearest site of a faction, for
+    /// each level 1 cell.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0110, a unit returns by climbing a reach field seeded at every site of its faction, decision D1. `docs/adrs/draft/adr-0110-a-unit-returns-by-climbing-a-reach-field.md`
+    #[must_use]
+    pub const fn return_field(&self) -> &ReturnField {
+        &self.returns
+    }
+
+    /// Returns the direction that a unit of one faction takes to go home from
+    /// one tile.
+    ///
+    /// The outer option reports whether the address and the faction name an
+    /// entry. The inner one reports whether the cell holds a direction at
+    /// all.
+    #[must_use]
+    pub fn return_direction(&self, faction: FactionId, address: Axial) -> Option<Option<u8>> {
+        let tile = self.grid.index_of(address)?;
+        self.returns.direction(faction, self.cell_of(tile)?)
+    }
+
+    /// Returns the load at which a unit counts as laden.
+    #[must_use]
+    pub const fn carry_mark(&self) -> Amount {
+        self.carry_mark
+    }
+
+    /// Sets the load at which a unit counts as laden.
+    ///
+    /// A mark of zero makes every unit that holds a home laden, whatever it
+    /// carries.
+    pub const fn set_carry_mark(&mut self, mark: Amount) {
+        self.carry_mark = mark;
+    }
+
+    /// Returns the carry class of one unit.
+    ///
+    /// A unit is laden when it holds a home site and its load reaches the
+    /// carry mark. **A unit with no home is never laden**, because the
+    /// delivery moves a load into the store of a home site, and a unit that
+    /// has none can deliver to nothing.[^1]
+    ///
+    /// Returns `None` when the identity is dead or names no unit of this
+    /// world.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0109, the choice key holds a bounded class of the unit's own state, decision D3. `docs/adrs/draft/adr-0109-the-choice-key-holds-a-bounded-class-of-the-unit-state.md`
+    #[must_use]
+    pub fn carry_class(&self, entity: Entity) -> Option<CarryClass> {
+        let slot = self.soldiers.slot_of(entity)? as usize;
+        Some(carry_class_of(
+            self.soldiers.carry_column()[slot],
+            self.soldiers.home_column()[slot],
+            self.carry_mark,
+        ))
     }
 
     /// Resolves every gather order of the frame in one pass.
@@ -4870,6 +5000,47 @@ fn step_target(grid: Grid, terrain: Terrain, here: Axial, direction: usize) -> O
     }
 }
 
+/// The load at which a unit counts as laden, when the caller states none.
+///
+/// A unit that reaches the mark takes the option that carries its load home,
+/// and a unit below it does not. **The value is a parameter of the world, and
+/// no record sets it.** A low mark sends a unit home for almost nothing and
+/// spends its whole life walking. A high mark keeps a unit in the field until
+/// a deposit near it runs dry. The reference table holds the value and the
+/// derivation of it.[^1] [^2]
+///
+/// # References
+///
+/// [^1]: ADR-0109, the choice key holds a bounded class of the unit's own state, decision D3. `docs/adrs/draft/adr-0109-the-choice-key-holds-a-bounded-class-of-the-unit-state.md`
+/// [^2]: Budgets and costs, the choice pass. `docs/reference/budgets.md`
+pub const CARRY_MARK_DEFAULT: Amount = Amount(32);
+
+/// Returns the carry class of one unit, from its load, its home and the mark.
+///
+/// **This is the one place that states the rule.** The choice pass, the
+/// explanation and the public read all come through it, so no second site can
+/// hold a different rule.[^1]
+///
+/// A unit with no home is never laden. The delivery moves a load into the
+/// store of a home site, so an option that sent a homeless unit home would be
+/// a capability that nothing can act on.[^2] [^3]
+///
+/// # References
+///
+/// [^1]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`
+/// [^2]: ADR-0109, the choice key holds a bounded class of the unit's own state, decision D3. `docs/adrs/draft/adr-0109-the-choice-key-holds-a-bounded-class-of-the-unit-state.md`
+/// [^3]: Recurring defect shapes, shape 3. `.claude/rules/recurring-defects.md`
+#[must_use]
+fn carry_class_of(load: CarryLoad, home: u32, mark: Amount) -> CarryClass {
+    if home == NO_HOME {
+        return CarryClass::Free;
+    }
+    if load.total().0 < i64::from(mark.0) {
+        return CarryClass::Free;
+    }
+    CarryClass::Laden
+}
+
 /// The draw index of the movement direction.
 ///
 /// The movement system takes one draw for each soldier in each frame. A
@@ -4935,6 +5106,26 @@ const DRAW_MOVE_FALLBACK: u32 = 1;
 /// The two travel together. The order is a property of the walk and the
 /// columns are a property of the arena, and a caller that could pass one
 /// without the other could pass an order taken from a different arena.
+/// The per-cell fields that steer a step, and the lattice they are indexed by.
+///
+/// The three travel together. Every option takes its direction from one of the
+/// two fields, and both are indexed by the level 1 cell that the lattice
+/// names, so a caller that could pass one without the others could pass a
+/// field taken from a different lattice.[^1] [^2]
+///
+/// # References
+///
+/// [^1]: ADR-0091, movement takes its direction from a per-cell field, never from a per-unit search, decision D1. `docs/adrs/draft/adr-0091-movement-takes-its-direction-from-a-per-cell-field.md`
+/// [^2]: ADR-0110, a unit returns by climbing a reach field seeded at every site of its faction, decision D1. `docs/adrs/draft/adr-0110-a-unit-returns-by-climbing-a-reach-field.md`
+struct Steering<'a> {
+    /// The block lattice that both fields below are indexed by.
+    layout: BlockLayout,
+    /// One direction for each cell and each option that ranks a cell field.
+    exits: &'a ExitField,
+    /// One direction for each cell and each faction.
+    returns: &'a ReturnField,
+}
+
 struct UnitWalk<'a> {
     /// The arena that every identity below resolves against.
     soldiers: &'a SoldierArena,
@@ -4947,11 +5138,15 @@ fn soldier_moves(
     seed: u64,
     terrain: Terrain,
     walk: &UnitWalk<'_>,
-    layout: BlockLayout,
-    exits: &ExitField,
+    steering: &Steering<'_>,
     threads: usize,
 ) -> Result<Vec<(Entity, Axial)>, StepError> {
     let UnitWalk { soldiers, live } = *walk;
+    let Steering {
+        layout,
+        exits,
+        returns,
+    } = *steering;
     // **The walk is in cell order, not in slot order.** The two hold the same
     // units and differ only in the order. Every read below the filter is a
     // read of the tile side of the world at the tile the unit stands on: the
@@ -5012,7 +5207,25 @@ fn soldier_moves(
                         // and the draw index, so it never reads a
                         // thread-local state.[^10]
                         let cell = layout.block_of_key(layout.key_of(soldiers.tile(*soldier)?)?);
-                        let direction = match exits.exit(cell, option) {
+                        // **Which field steers the step comes from the option
+                        // row.** A row that ranks a summary field of the cell
+                        // is steered by the exit field. A row that ranks the
+                        // state of the unit is steered by the return field,
+                        // which holds one direction for each cell and each
+                        // faction.[^18]
+                        //
+                        // The unit still reads one entry. It reads no
+                        // neighbouring cell, it scores no neighbour, and it
+                        // computes nothing from its own address toward its own
+                        // site, so no unit searches anything.[^19]
+                        //
+                        // [^18]: ADR-0110, a unit returns by climbing a reach field seeded at every site of its faction, decision D1. `docs/adrs/draft/adr-0110-a-unit-returns-by-climbing-a-reach-field.md`
+                        // [^19]: ADR-0095, a behavioural strategy arrives as a field over cells, never as a search from a unit, decision D1. `docs/adrs/draft/adr-0095-a-behavioural-strategy-arrives-as-a-field-over-cells.md`
+                        let steer = match OPTIONS[option as usize].ranked {
+                            Ranked::Cell(_) => exits.exit(cell, option),
+                            Ranked::Carry => returns.direction(soldiers.faction(*soldier)?, cell),
+                        };
+                        let direction = match steer {
                             Some(Some(direction)) => direction as usize,
                             _ => rng::draw_below(
                                 seed,

@@ -40,6 +40,13 @@ are all defensible, and each gives a different answer at a boundary.
 The engine divides the need range into equal buckets. It computes one answer for
 each cell and each bucket, and a unit reads the answer of its own bucket.
 
+**The key gained a third term after this record was written.** An option may
+now rank a bounded class of the state of the unit itself, so the key is the
+cell, the bucket and the class. The claim of this decision is unchanged: the
+key holds a bounded number of terms, and each of them is bounded by the engine
+rather than by the content. A later record states the third term and the
+reasoning for it.[^17]
+
 **The width is the mechanism of this decision and not a detail of it.**
 Unbucketed, the key is the exact need, and the number of distinct keys in a cell
 is then bounded by the cohorts standing in that cell. A cohort is one site and
@@ -206,3 +213,4 @@ choice record still decides it.[^14]
 [^14]: ADR-0064, a unit chooses by scoring a small fixed option set, decision D4. `docs/adrs/accepted/adr-0064-a-unit-chooses-by-scoring-a-small-fixed-option-set.md`
 [^15]: Blockers register, BLK-007. `docs/BLOCKERS.md`
 [^16]: Findings register, FND-258. `docs/FINDINGS.md`
+[^17]: ADR-0109, the choice key holds a bounded class of the unit's own state, decisions D1 and D2. `docs/adrs/draft/adr-0109-the-choice-key-holds-a-bounded-class-of-the-unit-state.md`

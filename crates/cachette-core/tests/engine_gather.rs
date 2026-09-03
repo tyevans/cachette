@@ -43,7 +43,7 @@ const SEED: u64 = 7;
 /// # References
 ///
 /// [^1]: ADR-0004, iteration order is explicit, decisions D1 and D3. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
-const FORAGE: u8 = 1;
+const FORAGE: u8 = 2;
 
 /// The thread counts that the equivalence test runs at.
 const THREAD_COUNTS: [usize; 3] = [1, 2, 12];

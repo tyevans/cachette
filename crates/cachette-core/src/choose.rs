@@ -54,7 +54,7 @@ use crate::types::Fix32;
 /// [^2]: ADR-0096, cost follows the lattice, not the population, and a unit is a reader, decisions D1 and D4. `docs/adrs/draft/adr-0096-cost-follows-the-lattice-not-the-population.md`
 /// [^3]: ADR-0098, the choice is decided for each cell and each bucket of need, decision D1. `docs/adrs/draft/adr-0098-the-choice-is-decided-for-each-cell-and-each-bucket-of-need.md`
 /// [^4]: Decisions register, DEC-096. `docs/DECISIONS.md`
-pub const OPTION_COUNT: usize = 4;
+pub const OPTION_COUNT: usize = 5;
 
 /// The intent value that means a unit holds what it was doing.
 ///
@@ -123,6 +123,95 @@ pub enum Drive {
     Unmet,
 }
 
+/// What one option ranks.
+///
+/// An option that ranks a level 1 summary field is worth the same to every
+/// unit of a cell. An option that ranks the state of the unit itself is not,
+/// and the choice key holds that state so the answer is still shared.[^1]
+///
+/// The two arms also decide what steers the step. A cell field is ranked by
+/// the exit field, which holds one direction for each cell and each
+/// option.[^2] The carry class is ranked by the return field, which holds one
+/// direction for each cell and each faction.[^3]
+///
+/// # References
+///
+/// [^1]: ADR-0109, the choice key holds a bounded class of the unit's own state, decision D1. `docs/adrs/draft/adr-0109-the-choice-key-holds-a-bounded-class-of-the-unit-state.md`
+/// [^2]: ADR-0091, movement takes its direction from a per-cell field, never from a per-unit search, decision D1. `docs/adrs/draft/adr-0091-movement-takes-its-direction-from-a-per-cell-field.md`
+/// [^3]: ADR-0110, a unit returns by climbing a reach field seeded at every site of its faction, decision D1. `docs/adrs/draft/adr-0110-a-unit-returns-by-climbing-a-reach-field.md`
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Ranked {
+    /// The option ranks one summary field of the level 1 cell.
+    Cell(CellField),
+    /// The option ranks how much the unit itself carries.
+    Carry,
+}
+
+/// The number of carry classes.
+///
+/// The count is fixed at compile time, and it is what bounds the choice
+/// table. A class that a content author could add would put the bound in the
+/// content rather than in the engine, which is the shape the choice record
+/// refuses.[^1]
+///
+/// # References
+///
+/// [^1]: ADR-0109, the choice key holds a bounded class of the unit's own state, decision D2. `docs/adrs/draft/adr-0109-the-choice-key-holds-a-bounded-class-of-the-unit-state.md`
+pub const CARRY_CLASS_COUNT: usize = 2;
+
+/// What a unit carries, as a class rather than as a quantity.
+///
+/// **The class is not the load.** A load is a whole number for each resource
+/// kind, so two units of one cell almost never hold one load, and an option
+/// that read the load would give one answer for each unit. The class holds
+/// two values, so the choice still computes one answer for a whole group of
+/// units.[^1]
+///
+/// A unit is laden when it holds a home site and its load reaches the carry
+/// mark of the world. **A unit with no home is never laden**, because the
+/// delivery moves a load into the store of a home site and a unit without one
+/// has nothing to deliver to.[^2]
+///
+/// # References
+///
+/// [^1]: ADR-0109, the choice key holds a bounded class of the unit's own state, decisions D1 and D2. `docs/adrs/draft/adr-0109-the-choice-key-holds-a-bounded-class-of-the-unit-state.md`
+/// [^2]: ADR-0109, the choice key holds a bounded class of the unit's own state, decision D3. `docs/adrs/draft/adr-0109-the-choice-key-holds-a-bounded-class-of-the-unit-state.md`
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum CarryClass {
+    /// The unit carries less than the mark, or it holds no home site.
+    Free,
+    /// The unit holds a home site and carries at least the mark.
+    Laden,
+}
+
+impl CarryClass {
+    /// Returns the index of the class.
+    ///
+    /// The index is the second half of the choice key. It is stated once,
+    /// here, so no reader of the table declares the order a second time.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`
+    #[must_use]
+    pub const fn index(self) -> usize {
+        match self {
+            Self::Free => 0,
+            Self::Laden => 1,
+        }
+    }
+
+    /// Returns the class of one index, or `None` when the index names none.
+    #[must_use]
+    pub const fn of_index(index: usize) -> Option<Self> {
+        match index {
+            0 => Some(Self::Free),
+            1 => Some(Self::Laden),
+            _ => None,
+        }
+    }
+}
+
 /// One option of the fixed set.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct OptionRow {
@@ -130,8 +219,8 @@ pub struct OptionRow {
     pub name: &'static str,
     /// What the unit brings to the option.
     pub drive: Drive,
-    /// What the option reads from the level 1 cell.
-    pub field: CellField,
+    /// What the option ranks, and therefore what steers the step it takes.
+    pub ranked: Ranked,
     /// The resource that a unit gathers while it holds this option.
     ///
     /// **This row is the one declaration of the map from an option to a
@@ -152,22 +241,54 @@ pub struct OptionRow {
 /// wins a tie, so the order is part of the behaviour and not a listing.[^1]
 ///
 /// A change to the field that one row reads is not a change to the order.
-/// The `forage` row keeps its index, so the tie-break is what it was.
+///
+/// **The row that ranks the carry takes the lowest index, so it wins a
+/// tie.**[^2] The four rows that rank the ground keep the order they had
+/// between themselves, so every tie that they already decide keeps the winner
+/// it has.
 ///
 /// # References
 ///
 /// [^1]: ADR-0004, iteration order is explicit, decisions D1 and D3. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
+/// [^2]: ADR-0109, the choice key holds a bounded class of the unit's own state, decision D5. `docs/adrs/draft/adr-0109-the-choice-key-holds-a-bounded-class-of-the-unit-state.md`
 pub const OPTIONS: [OptionRow; OPTION_COUNT] = [
+    OptionRow {
+        // **The row takes the lowest option index, so it wins a tie.** The
+        // four rows below it rank the ground, and the open share of a cell
+        // reaches one whole unit wherever a whole block admits a unit, which
+        // ties the roam row with this one exactly. A tie decided by the ground
+        // would leave a laden unit walking in a world with no water in
+        // it.[^1] [^3]
+        //
+        // The four rows below keep the order they had between themselves, so
+        // every tie that they already decide keeps the winner it has.
+        //
+        // The row names no resource kind, so the choice pass clears the
+        // gather order of a unit that takes it. **A laden unit stops
+        // gathering**, and that rule lives in the row rather than in a second
+        // place that could disagree with it.[^2]
+        //
+        // The drive is what the unit still holds, so a starving unit forages
+        // rather than walks home. A unit that is fed and full goes home.
+        //
+        // [^1]: ADR-0064, a unit chooses by scoring a small fixed option set, decision D5. `docs/adrs/accepted/adr-0064-a-unit-chooses-by-scoring-a-small-fixed-option-set.md`
+        // [^2]: Findings register, FND-191. `docs/FINDINGS.md`
+        // [^3]: ADR-0109, the choice key holds a bounded class of the unit's own state, decision D5. `docs/adrs/draft/adr-0109-the-choice-key-holds-a-bounded-class-of-the-unit-state.md`
+        name: "deliver",
+        drive: Drive::Met,
+        ranked: Ranked::Carry,
+        gathers: None,
+    },
     OptionRow {
         name: "roam",
         drive: Drive::Met,
-        field: CellField::OpenShare,
+        ranked: Ranked::Cell(CellField::OpenShare),
         gathers: None,
     },
     OptionRow {
         name: "forage",
         drive: Drive::Unmet,
-        field: CellField::MeanFood,
+        ranked: Ranked::Cell(CellField::MeanFood),
         // The option is driven by what the unit lacks, and what a unit lacks
         // is the ration that the consumption pass draws. Food is the only
         // kind that answers it. Wood and stone answer no need today, and a
@@ -179,13 +300,13 @@ pub const OPTIONS: [OptionRow; OPTION_COUNT] = [
     OptionRow {
         name: "climb",
         drive: Drive::Met,
-        field: CellField::MeanHeight,
+        ranked: Ranked::Cell(CellField::MeanHeight),
         gathers: None,
     },
     OptionRow {
         name: "join",
         drive: Drive::Met,
-        field: CellField::UnitsForEachOpenTile,
+        ranked: Ranked::Cell(CellField::UnitsForEachOpenTile),
         gathers: None,
     },
 ];
@@ -424,6 +545,28 @@ pub fn field_value(summary: CellSummary, field: CellField) -> Fix32 {
     .unwrap_or(Fix32::ZERO)
 }
 
+/// Returns the value that one option ranks.
+///
+/// An option that ranks a cell field reads the summary. An option that ranks
+/// the carry reads the class, and it is worth one whole unit of value to a
+/// laden unit and nothing to any other. **A unit that carries nothing can
+/// therefore never take such an option**, because a score of zero is below
+/// the floor.[^1]
+///
+/// # References
+///
+/// [^1]: ADR-0109, the choice key holds a bounded class of the unit's own state, decision D1. `docs/adrs/draft/adr-0109-the-choice-key-holds-a-bounded-class-of-the-unit-state.md`
+#[must_use]
+pub fn ranked_value(summary: CellSummary, carry: CarryClass, ranked: Ranked) -> Fix32 {
+    match ranked {
+        Ranked::Cell(field) => field_value(summary, field),
+        Ranked::Carry => match carry {
+            CarryClass::Free => Fix32::ZERO,
+            CarryClass::Laden => Fix32::ONE,
+        },
+    }
+}
+
 /// Returns what a unit brings to one option.
 #[must_use]
 pub fn drive_value(need: Fix32, drive: Drive) -> Fix32 {
@@ -446,9 +589,15 @@ pub fn drive_value(need: Fix32, drive: Drive) -> Fix32 {
 ///
 /// [^1]: ADR-0002, simulated and aggregated state holds no floating point number, decision D2. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
 #[must_use]
-pub fn score(need: Fix32, weight: Fix32, summary: CellSummary, option: OptionRow) -> Fix32 {
+pub fn score(
+    need: Fix32,
+    carry: CarryClass,
+    weight: Fix32,
+    summary: CellSummary,
+    option: OptionRow,
+) -> Fix32 {
     let want = sim_math::mul(drive_value(need, option.drive), weight);
-    sim_math::mul(want, field_value(summary, option.field))
+    sim_math::mul(want, ranked_value(summary, carry, option.ranked))
 }
 
 /// Returns the order in which the choice scans the options.
@@ -463,7 +612,7 @@ pub fn score(need: Fix32, weight: Fix32, summary: CellSummary, option: OptionRow
 #[cfg(not(feature = "probe-nondeterminism"))]
 #[must_use]
 pub const fn option_order() -> [u8; OPTION_COUNT] {
-    [0, 1, 2, 3]
+    [0, 1, 2, 3, 4]
 }
 
 /// Returns the options in descending index order, which is a defect.
@@ -484,7 +633,7 @@ pub const fn option_order() -> [u8; OPTION_COUNT] {
 #[cfg(feature = "probe-nondeterminism")]
 #[must_use]
 pub const fn option_order() -> [u8; OPTION_COUNT] {
-    [3, 2, 1, 0]
+    [4, 3, 2, 1, 0]
 }
 
 /// The scores of one unit, and what it chose from them.
@@ -509,9 +658,19 @@ pub struct ChoiceExplanation {
     ///
     /// [^1]: ADR-0098, the choice is decided for each cell and each bucket of need. `docs/adrs/draft/adr-0098-the-choice-is-decided-for-each-cell-and-each-bucket-of-need.md`
     pub scored_need: Fix32,
+    /// The carry class that the pass scored.
+    ///
+    /// The pass computes one answer for each cell, each bucket of need and
+    /// each carry class, so an explanation that scored one class and reported
+    /// another would name a winner that the unit did not take.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0109, the choice key holds a bounded class of the unit's own state, decision D4. `docs/adrs/draft/adr-0109-the-choice-key-holds-a-bounded-class-of-the-unit-state.md`
+    pub carry: CarryClass,
     /// The score of each option, in option index order.
     pub scores: [Fix32; OPTION_COUNT],
-    /// The value each option read from the cell, in option index order.
+    /// The value each option ranked, in option index order.
     pub fields: [Fix32; OPTION_COUNT],
     /// The weight each option carried, in option index order.
     pub weights: [Fix32; OPTION_COUNT],
@@ -551,12 +710,17 @@ impl ChoiceExplanation {
 /// [^1]: ADR-0004, iteration order is explicit, decisions D1 and D3. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
 /// [^2]: Findings register, FND-014. `docs/FINDINGS.md`
 #[must_use]
-pub fn best_option(need: Fix32, summary: CellSummary, profile: &WeightProfile) -> u8 {
+pub fn best_option(
+    need: Fix32,
+    carry: CarryClass,
+    summary: CellSummary,
+    profile: &WeightProfile,
+) -> u8 {
     let mut best = NO_INTENT;
     let mut best_score = SCORE_FLOOR;
     for option in option_order() {
         let weight = profile.weights[option as usize];
-        let value = score(need, weight, summary, OPTIONS[option as usize]);
+        let value = score(need, carry, weight, summary, OPTIONS[option as usize]);
         if value > best_score {
             best_score = value;
             best = option;
@@ -594,6 +758,19 @@ pub const NEED_BUCKET_SHIFT_CEILING: u32 = 16;
 ///
 /// [^1]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`
 pub const NEED_BUCKET_CEILING: usize = ((NEED_FULL.0 >> NEED_BUCKET_SHIFT_FLOOR) + 1) as usize;
+
+/// The number of entries that the answer table holds.
+///
+/// The key of an answer is the bucket of the need and the class of the carry,
+/// so the entry count is the product of the two.[^1] Both terms are derived
+/// from the values that declare them, and neither is stated a second
+/// time.[^2]
+///
+/// # References
+///
+/// [^1]: ADR-0109, the choice key holds a bounded class of the unit's own state, decision D2. `docs/adrs/draft/adr-0109-the-choice-key-holds-a-bounded-class-of-the-unit-state.md`
+/// [^2]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`
+pub const ANSWER_CEILING: usize = NEED_BUCKET_CEILING * CARRY_CLASS_COUNT;
 
 /// How finely the choice tells two needs apart.
 ///
@@ -743,8 +920,8 @@ impl Default for NeedBuckets {
 pub struct CellAnswers {
     summary: CellSummary,
     buckets: NeedBuckets,
-    answers: [u8; NEED_BUCKET_CEILING],
-    scored: [bool; NEED_BUCKET_CEILING],
+    answers: [u8; ANSWER_CEILING],
+    scored: [bool; ANSWER_CEILING],
 }
 
 impl CellAnswers {
@@ -754,22 +931,34 @@ impl CellAnswers {
         Self {
             summary,
             buckets,
-            answers: [NO_INTENT; NEED_BUCKET_CEILING],
-            scored: [false; NEED_BUCKET_CEILING],
+            answers: [NO_INTENT; ANSWER_CEILING],
+            scored: [false; ANSWER_CEILING],
         }
     }
 
-    /// Returns the option that a unit of this need takes in this cell.
+    /// Returns the option that a unit of this need and this carry class takes
+    /// in this cell.
     ///
-    /// The call scores the bucket the first time a unit asks for it, and
-    /// reads the stored answer every time after.
-    pub fn answer(&mut self, need: Fix32, profile: &WeightProfile) -> u8 {
+    /// The call scores the entry the first time a unit asks for it, and reads
+    /// the stored answer every time after.
+    ///
+    /// **The key is the bucket of the need and the class of the carry.** Two
+    /// units that share both share an answer, and the engine computes it
+    /// once.[^1] The class holds a fixed number of values, so the entry count
+    /// has a ceiling that the population cannot raise.[^2]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0109, the choice key holds a bounded class of the unit's own state, decision D1. `docs/adrs/draft/adr-0109-the-choice-key-holds-a-bounded-class-of-the-unit-state.md`
+    /// [^2]: ADR-0096, cost follows the lattice, not the population, and a unit is a reader, decision D1. `docs/adrs/draft/adr-0096-cost-follows-the-lattice-not-the-population.md`
+    pub fn answer(&mut self, need: Fix32, carry: CarryClass, profile: &WeightProfile) -> u8 {
         let bucket = self.buckets.bucket(need);
-        if !self.scored[bucket] {
-            self.answers[bucket] = best_option(self.buckets.need(bucket), self.summary, profile);
-            self.scored[bucket] = true;
+        let at = entry_of(bucket, carry);
+        if !self.scored[at] {
+            self.answers[at] = best_option(self.buckets.need(bucket), carry, self.summary, profile);
+            self.scored[at] = true;
         }
-        self.answers[bucket]
+        self.answers[at]
     }
 
     /// Returns the number of buckets that this table has scored.
@@ -788,11 +977,43 @@ impl CellAnswers {
     }
 }
 
+/// Returns the entry of one bucket and one carry class.
+///
+/// The bucket is the major term, so the two entries of one bucket sit beside
+/// each other. The layout is stated once, here, and every reader of the table
+/// goes through it.[^1]
+///
+/// # References
+///
+/// [^1]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`
+#[must_use]
+pub const fn entry_of(bucket: usize, carry: CarryClass) -> usize {
+    bucket * CARRY_CLASS_COUNT + carry.index()
+}
+
+/// What one unit brings to a choice.
+///
+/// The two fields are the whole of it. The engine holds one weight profile for
+/// every unit alive, so the cell, the need and the carry class are the only
+/// inputs a choice has.[^1] [^2]
+///
+/// # References
+///
+/// [^1]: Findings register, FND-251. `docs/FINDINGS.md`
+/// [^2]: ADR-0109, the choice key holds a bounded class of the unit's own state, decision D1. `docs/adrs/draft/adr-0109-the-choice-key-holds-a-bounded-class-of-the-unit-state.md`
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct UnitState {
+    /// The need that the unit still holds.
+    pub need: Fix32,
+    /// The class of what the unit carries.
+    pub carry: CarryClass,
+}
+
 /// Returns the scores of one unit and the option they select.
 #[must_use]
 pub fn explain(
     cell: u32,
-    need: Fix32,
+    unit: UnitState,
     summary: CellSummary,
     profile: &WeightProfile,
     buckets: NeedBuckets,
@@ -802,22 +1023,24 @@ pub fn explain(
     // The pass scores the bucket of the need and not the need, so the
     // explanation scores the same value. An explanation taken at the exact
     // need would name a winner that the unit did not take.
+    let UnitState { need, carry } = unit;
     let scored_need = buckets.need(buckets.bucket(need));
     let mut scores = [Fix32::ZERO; OPTION_COUNT];
     let mut fields = [Fix32::ZERO; OPTION_COUNT];
     for (index, option) in OPTIONS.iter().enumerate() {
-        fields[index] = field_value(summary, option.field);
-        scores[index] = score(scored_need, profile.weights[index], summary, *option);
+        fields[index] = ranked_value(summary, carry, option.ranked);
+        scores[index] = score(scored_need, carry, profile.weights[index], summary, *option);
     }
     ChoiceExplanation {
         cell,
         need,
         scored_need,
+        carry,
         scores,
         fields,
         weights: profile.weights,
         floor: SCORE_FLOOR,
-        best: best_option(scored_need, summary, profile),
+        best: best_option(scored_need, carry, summary, profile),
         intent,
         chooses_next_frame,
     }

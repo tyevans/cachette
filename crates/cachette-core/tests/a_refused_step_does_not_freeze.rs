@@ -242,7 +242,13 @@ fn closed_neighbours_that_win(world: &World) -> u32 {
             continue;
         };
         for row in &choose::OPTIONS {
-            let mut best = choose::field_value(mine, row.field);
+            // A row that ranks no cell field takes its direction from the
+            // return field, not from the exit field, so it is not a candidate
+            // for this count.
+            let choose::Ranked::Cell(field) = row.ranked else {
+                continue;
+            };
+            let mut best = choose::field_value(mine, field);
             for direction in 0..NEIGHBOURS.len() {
                 let Some(there) = cells.neighbour(here, direction) else {
                     continue;
@@ -253,7 +259,7 @@ fn closed_neighbours_that_win(world: &World) -> u32 {
                 let Some(summary) = world.pyramid().cell(index.0) else {
                     continue;
                 };
-                let value = choose::field_value(summary, row.field);
+                let value = choose::field_value(summary, field);
                 if value > best {
                     best = value;
                     if summary.open_tiles() == 0 {
