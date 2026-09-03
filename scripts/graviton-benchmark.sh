@@ -97,10 +97,23 @@ if [ "${1:-}" = "--orphans" ]; then
 fi
 
 readonly PROFILE="${1:-full}"
-if [ "$PROFILE" != "full" ] && [ "$PROFILE" != "quick" ]; then
-    printf 'The profile must be `full` or `quick`. Got: %s\n' "$PROFILE" >&2
-    exit 2
-fi
+case "$PROFILE" in
+    full | quick) ;;
+    one | stages)
+        # These take one configuration rather than a sweep, and the caller
+        # names it. `CACHETTE_BENCH_POINT` holds the whole argument list that
+        # the benchmark receives, for example `stages 4096x4096 1000000 12`.
+        if [ -z "${CACHETTE_BENCH_POINT:-}" ]; then
+            printf 'The `%s` profile needs CACHETTE_BENCH_POINT.\n' "$PROFILE" >&2
+            printf 'For example: CACHETTE_BENCH_POINT="stages 4096x4096 1000000 12"\n' >&2
+            exit 2
+        fi
+        ;;
+    *)
+        printf 'The profile must be `full`, `quick`, `one` or `stages`. Got: %s\n' "$PROFILE" >&2
+        exit 2
+        ;;
+esac
 
 # ------------------------------------------------------------------- teardown
 
@@ -298,6 +311,7 @@ rustup show active-toolchain
 export CACHETTE_BENCH_EXTENTS="${CACHETTE_BENCH_EXTENTS:-}"
 export CACHETTE_BENCH_THREADS="${CACHETTE_BENCH_THREADS:-}"
 export CACHETTE_BENCH_UNITS="${CACHETTE_BENCH_UNITS:-}"
+export CACHETTE_BENCH_POINT="${CACHETTE_BENCH_POINT:-}"
 printf '# machine facts\n' > /tmp/facts.txt
 {
     printf '# uname\t%s\n' "$(uname -srm)"
@@ -311,6 +325,15 @@ printf '# machine facts\n' > /tmp/facts.txt
 } >> /tmp/facts.txt
 cat /tmp/facts.txt
 cargo bench --bench target_cost --no-run 2>&1 | tail -3
+
+# A caller may ask for one named point or for the stage split instead of a
+# sweep. The extra words are passed straight through to the benchmark.
+if [ "$1" = "one" ] || [ "$1" = "stages" ]; then
+    cargo bench --bench target_cost -- $CACHETTE_BENCH_POINT > /tmp/rows.txt
+    cat /tmp/facts.txt /tmp/rows.txt > /tmp/result.txt
+    exit 0
+fi
+
 cargo bench --bench target_cost -- "$1" > /tmp/rows.txt
 
 # The memory sweep starts one process for each point, because a process that
@@ -348,6 +371,7 @@ ssh "${ssh_options[@]}" "$remote" \
     "CACHETTE_BENCH_EXTENTS='${CACHETTE_BENCH_EXTENTS:-}' \
      CACHETTE_BENCH_THREADS='${CACHETTE_BENCH_THREADS:-}' \
      CACHETTE_BENCH_UNITS='${CACHETTE_BENCH_UNITS:-}' \
+     CACHETTE_BENCH_POINT='${CACHETTE_BENCH_POINT:-}' \
      nohup setsid bash remote.sh $PROFILE > run.log 2>&1 < /dev/null & echo started"
 
 say "Waiting for the run to finish. Progress follows"

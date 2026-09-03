@@ -62,6 +62,7 @@
 
 use std::time::Instant;
 
+use cachette_core::choose::PERIOD_LOG2_CEILING;
 use cachette_core::{Axial, FactionId, World, WorldConfig};
 
 /// The seed that every world in this benchmark takes.
@@ -267,6 +268,8 @@ fn main() {
         // cost of the world it holds.
         "memory-point" => memory_point(&arguments),
         "memory" => memory_sweep(&full()),
+        "stages" => stage_rows(&arguments),
+        "one" => one_point(&arguments),
         "full" => timing_sweep(&full()),
         _ => timing_sweep(&quick()),
     }
@@ -310,6 +313,136 @@ fn target_triple() -> String {
     )
 }
 
+/// Measures the parts of a frame that a caller can turn off from outside.
+///
+/// The engine holds no instrumentation, and this benchmark adds none. A stage
+/// inside a step is not callable on its own, so the only honest way to price
+/// one from outside is to run a frame with the stage switched off and take
+/// the difference. Three switches exist on the public interface, and the rest
+/// of the frame stays in one residual that this benchmark cannot divide.
+///
+/// The switches:
+///
+/// - **The bridge rebuild** is public, so it is measured directly rather than
+///   by a difference. The step calls it three times in each frame.
+/// - **The economy** is gated by a schedule. A period the frame never reaches
+///   turns off the rate pass and the consumption pass together.
+/// - **The choice** is gated by a second schedule, keyed on the level 1 cell.
+///   The longest interval leaves almost no cell choosing in a frame. It does
+///   not remove the walk over the live units, only the scoring inside it.
+///
+/// Each configuration builds its own world, because a schedule changes what a
+/// frame does to the world and two configurations must start from the same
+/// place.
+fn stage_rows(arguments: &[String]) {
+    let extent = extent_argument(arguments, 1);
+    let units: u32 = arguments
+        .get(2)
+        .and_then(|word| word.parse().ok())
+        .expect("the third argument must be a unit count");
+    let threads: usize = arguments
+        .get(3)
+        .and_then(|word| word.parse().ok())
+        .unwrap_or(1);
+
+    println!("# stage rows. Each row is a whole frame under one switch");
+    println!("# the difference between a row and `everything_on` is that stage");
+    println!("bench\ttiles\tunits\tthreads\tsamples\tmin_ns\tmedian_ns\tmax_ns");
+
+    // The switches. A period of 32767 is the largest the rate schedule takes,
+    // and a frame count below it never reaches the phase, so the economy
+    // never applies. The choice interval is the largest the schedule takes.
+    let configurations: [(&str, Option<u32>, Option<u32>); 4] = [
+        ("everything_on", None, None),
+        ("economy_off", Some(32767), None),
+        ("choice_off", None, Some(PERIOD_LOG2_CEILING)),
+        (
+            "economy_and_choice_off",
+            Some(32767),
+            Some(PERIOD_LOG2_CEILING),
+        ),
+    ];
+
+    for (name, economy, choice) in configurations {
+        let capacity = units.max(1024);
+        let mut world =
+            World::new(extent.config(capacity)).expect("the extent must describe a world");
+        if let Some(period) = economy {
+            world
+                .set_economy_schedule(period, 1)
+                .expect("the period must be inside the limit");
+        }
+        if let Some(period_log2) = choice {
+            world
+                .set_choice_schedule(period_log2)
+                .expect("the interval must be inside the ceiling");
+        }
+        let placed = populate(&mut world, units);
+        for _ in 0..WARMUP_FRAMES {
+            world.step(threads).expect("the step must run");
+        }
+        let samples = samples_of(move || {
+            let start = now();
+            let log = world.step(threads).expect("the step must run");
+            let elapsed = start.elapsed().as_nanos();
+            std::hint::black_box(log.len());
+            elapsed
+        });
+        report(name, extent.tiles(), placed, threads, &samples);
+    }
+
+    // The bridge rebuild is public, so it is priced directly. The step calls
+    // it three times in a frame, so a frame pays three of these.
+    let capacity = units.max(1024);
+    let mut world = World::new(extent.config(capacity)).expect("the extent must describe a world");
+    let placed = populate(&mut world, units);
+    for _ in 0..WARMUP_FRAMES {
+        world.step(threads).expect("the step must run");
+    }
+    let samples = samples_of(|| {
+        let start = now();
+        world.rebuild_bridge(threads).expect("the rebuild must run");
+        start.elapsed().as_nanos()
+    });
+    report(
+        "bridge_rebuild_once",
+        extent.tiles(),
+        placed,
+        threads,
+        &samples,
+    );
+}
+
+/// Reads an extent argument, as `WIDTHxHEIGHT`.
+fn extent_argument(arguments: &[String], index: usize) -> Extent {
+    arguments
+        .get(index)
+        .and_then(|word| word.split_once('x'))
+        .and_then(|(width, height)| {
+            Some(Extent {
+                width: width.parse().ok()?,
+                height: height.parse().ok()?,
+            })
+        })
+        .expect("the argument must be an extent, as WIDTHxHEIGHT")
+}
+
+/// Measures one timing point, so that a caller names the configuration.
+fn one_point(arguments: &[String]) {
+    let extent = extent_argument(arguments, 1);
+    let units: u32 = arguments
+        .get(2)
+        .and_then(|word| word.parse().ok())
+        .expect("the third argument must be a unit count");
+    let threads: usize = arguments
+        .get(3)
+        .and_then(|word| word.parse().ok())
+        .unwrap_or(1);
+    println!("bench\ttiles\tunits\tthreads\tsamples\tmin_ns\tmedian_ns\tmax_ns");
+    let samples = step_samples(extent.config(units.max(1024)), units, threads);
+    report("step_one_point", extent.tiles(), units, threads, &samples);
+}
+
 /// Reads a size in kibibytes from the process status file.
 ///
 /// The file is a Linux interface, and the target platform is Linux. A machine
@@ -334,16 +467,7 @@ fn status_kib(field: &str) -> u64 {
 /// reads its own resident size. It measures one point and exits, so the
 /// figure is the cost of this world and not the high mark of a sweep.
 fn memory_point(arguments: &[String]) {
-    let extent = arguments
-        .get(1)
-        .and_then(|word| word.split_once('x'))
-        .and_then(|(width, height)| {
-            Some(Extent {
-                width: width.parse().ok()?,
-                height: height.parse().ok()?,
-            })
-        })
-        .expect("the second argument must be an extent, as WIDTHxHEIGHT");
+    let extent = extent_argument(arguments, 1);
     let units: u32 = arguments
         .get(2)
         .and_then(|word| word.parse().ok())
