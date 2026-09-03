@@ -24,8 +24,11 @@ precedent.[^1]
 
 **Next number: FND-202**
 
-FND-214 is taken. It was allocated out of a reserved range so that several
-workers could file in parallel without reading this line at the same moment.
+**This line answers from merged history, so it cannot see a number that a
+branch has taken and not merged.** A dispatcher issues ranges above it for that
+reason, and those ranges live in prompts that no register can read. Four
+collisions in one session came from the gap between the two, and a finding holds
+the case.[^ALLOC2]
 
 ## A. Corrections to stated rules
 
@@ -5080,6 +5083,79 @@ a retired number fails a gate and a closed blocker does not, so this one cannot
 be forgotten. That is luck rather than design, and the register records which of
 the two it is.
 
+### FND-219 — The next-number line reflects merged state, so it cannot allocate across branches
+
+**Believed.** Each register carries an explicit next number, and a writer claims
+it before writing the row. That remedy was installed after two writers collided
+on FND-035 and DEC-013, and it was believed to close the class.[^1]
+
+**True.** The remedy holds for writers who commit between claims. It does not
+hold for writers on separate branches, and the project now works that way by
+default.
+
+**The line reflects merged state and nothing else.** A writer on a branch reads
+it, takes the number, and writes the row. The line does not change for anybody
+else until the branch merges. Six workers on six branches read the same number
+on the same day, and every one of them followed the documented procedure
+correctly.
+
+**A second authority exists and no register can see it.** The dispatcher holds
+ranges and issues them in prompts. A prompt is not a file. No writer can consult
+it, no check can read it, and it disagrees with the line by construction,
+because the line answers from merged history and the range answers from work in
+flight.
+
+So one question has two authorities, neither is observable to the other, and
+both give a correct answer to the question they were asked.
+
+**Evidence.** Four collisions in one session. Two workers filed FND-198 and
+FND-199 for different subjects. One worker took `FND-209` from the line while
+the dispatcher had reserved it. The same happened to FND-218. One worker
+renumbered its FND-198 and FND-199 to `FND-202` and `FND-203` to get out of the
+way.
+
+**Three of those numbers are written in code spans, and the reason is this
+entry's own subject.** The citation check resolves a register number against
+the rows this branch holds, and those rows live on branches this one cannot see.
+Citing them the ordinary way turned the gate red. So a finding about numbers
+being invisible across branches cannot cite its own evidence, for the same
+mechanical reason that a document explaining a retired number cannot name
+it.[^F218F] That is a third arrival of one cost, and it is the cheapest possible
+demonstration of the claim above.
+
+**This branch can verify one of the four.** FND-198 and FND-199 stand here under
+one worker's subjects, and this entry's own number was reported as reserved by
+somebody the register cannot name. The rest is the dispatcher's account, because
+no branch can see another branch. **That is not a weakness of the evidence. It is
+the finding.** A writer who wanted to check whether a number was taken has
+nowhere to look.
+
+**Follows.** Four things.
+
+**A remedy carries a scope that nobody states.** FND-038 fixed the allocator for
+serial writers, because serial writers were what the project had. The fix was
+correct and it is still correct. What went unrecorded is the condition it rests
+on: that a claim becomes visible to the next writer before the next writer
+claims. Parallel branches removed that condition without anybody deciding to.
+
+**The failure is invisible at the moment it happens.** A collision costs nothing
+when it occurs. Both writers are correct, both rows are good, and both branches
+are green. It surfaces at the merge, and by then two documents cite two
+different rows under one number.
+
+**The cost is the renumber, not the collision.** Moving a row means finding every
+citation of the old number across records, registers, reviews, backlog items and
+source comments. That is the sweep this project gets wrong most often, and one
+of the four collisions has already required it.
+
+**This is the third face of one shape.** A record's status is carried by the
+directory its file sits in, so accepting it breaks every citation of the
+path.[^F197C] A retired number is a row that the citation check cannot resolve,
+so a document explaining why a number went cannot name it.[^F218F] A number is
+allocated by a line that cannot see uncommitted work. In each case the registry
+stores a piece of state somewhere that cannot be read atomically by everyone who
+needs it, and in each case nothing fails until two readers disagree.
+
 ## References
 
 [^F177A]: The founding refuses ground that admits nobody. `crates/cachette-core/src/world.rs`
@@ -5284,3 +5360,4 @@ the two it is.
 [^F218D]: ADR Registry, repairing a citation is not an amendment. `docs/adrs/REGISTRY.md`
 [^F218E]: Definition of Done, section 4. `.claude/rules/definition-of-done.md`
 [^F218F]: Findings register, FND-192, in this document.
+[^ALLOC2]: Findings register, FND-219, in this document.
