@@ -27,15 +27,35 @@ Do not add a development machine figure to this file.
 ## Status
 
 No measured figure is recorded **in this document**. A benchmark harness now
-exists, and one run on a Graviton instance measured the cost of a frame, the
-cost of building a world and the cost of the whole-world hash.[^14] None of
-those figures replaces a row below.
 exists, and two runs on Graviton instances measured the cost of a frame, the
 cost of building a world, the cost of the whole-world hash and the resident
-memory of a world.[^10] None of those figures replaces a row below.
+memory of a world.[^14] None of those figures replaces a row below.
 
 The scale constants below are decided or derived, not measured. Each was held
 here because a blocker governed it. Those blockers are now closed.
+
+## The frame budget
+
+**One frame must cost 100 milliseconds or less at the target scale.** The
+target scale is 16,777,216 tiles and 1,000,000 units, on the target platform.
+
+| Figure | Value | Source | How reached |
+|---|---|---|---|
+| Frame budget | 100 ms | The project owner | Chosen, on 3 September 2026 |
+
+**This figure is chosen, not derived.** No blocker governs it and no
+derivation produces it. The project owner set it as a requirement. A reader
+must not treat it as a quantity that a better derivation can move, and must
+not adjust it to fit a measurement.
+
+**The row exists because the figure did not.** Every cost figure in this
+project was compared against 100 milliseconds, and the number appeared in no
+register. It was recoverable only as the reciprocal of one sentence about
+what a tick represents.[^16] A requirement that lives nowhere cannot be cited,
+and it cannot be argued with either.
+
+**The engine does not meet it.** The measurement register holds what one frame
+costs today on the target platform.[^14]
 
 ## Scale constants
 
@@ -232,3 +252,4 @@ a footnote.
 [^13]: Decisions register, DEC-093. `docs/DECISIONS.md`
 [^14]: Target platform costs, the measurement register. `docs/reference/graviton-costs.md`
 [^15]: Findings register, FND-242. `docs/FINDINGS.md`
+[^16]: Blockers register, BLK-012. `docs/BLOCKERS.md`
