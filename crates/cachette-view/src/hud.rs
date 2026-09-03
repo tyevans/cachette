@@ -545,6 +545,11 @@ pub struct Readout {
     foundings: Vec<FoundingReport>,
     refusals: Vec<(FactionId, FoundingError)>,
     units_short: u32,
+    units_carrying: u32,
+    carried_by_kind: [u32; RESOURCE_KIND_COUNT],
+    units_housed: u32,
+    rationings: u32,
+    rationed_short: i64,
     units_ended: usize,
     canvas_height: usize,
     step_mean: f64,
@@ -660,6 +665,27 @@ impl Readout {
             //
             // [^4]: ADR-0070, the head-up display reports what the drawing pass read, decision D1. `docs/adrs/accepted/adr-0070-the-head-up-display-reports-what-the-drawing-pass-read.md`
             units_short: canvas.units_short(),
+            units_carrying: canvas.units_carrying(),
+            carried_by_kind: *canvas.carried_by_kind(),
+            units_housed: canvas.units_housed(),
+            // The store of a site rations when it cannot serve what its
+            // cohorts asked for. The engine holds the log of the step that
+            // just ran, so this is a count of the world and the label of its
+            // row says so.[^5] It happens twice in a tick in the
+            // demonstration world and no watcher could see it.[^6]
+            //
+            // [^6]: Backlog item 0274. `docs/backlog/complete/0274-show-the-load-a-unit-carries-and-the-home-it-keeps.md`
+            rationings: world.rationed_log().len() as u32,
+            rationed_short: world
+                .rationed_log()
+                .iter()
+                // The engine states that a rationed draw always granted less
+                // than it was asked for, so the difference is never negative.
+                // The floor is here because a shortfall that read as a large
+                // positive number would be a wrong answer presented as a
+                // right one, and this costs one comparison.
+                .map(|event| event.demanded.0.saturating_sub(event.granted.0).max(0))
+                .sum(),
             // The engine holds the log of the scan that just ran. This is a
             // count of the world, and the label of its row says so.[^5]
             //
@@ -870,6 +896,60 @@ impl Readout {
     /// # References
     ///
     /// [^1]: Findings register, FND-119. `docs/FINDINGS.md`
+    /// Returns the number of painted units that carry something.
+    ///
+    /// This is a count of the window. The drawing asked at every unit it
+    /// painted, on the loop that already ran.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0070, the head-up display reports what the drawing pass read, decision D1. `docs/adrs/accepted/adr-0070-the-head-up-display-reports-what-the-drawing-pass-read.md`
+    #[must_use]
+    pub const fn units_carrying(&self) -> u32 {
+        self.units_carrying
+    }
+
+    /// Returns what the painted units carry, one total for each kind.
+    #[must_use]
+    pub const fn carried_by_kind(&self) -> &[u32; RESOURCE_KIND_COUNT] {
+        &self.carried_by_kind
+    }
+
+    /// Returns the number of painted units that hold a home site.
+    #[must_use]
+    pub const fn units_housed(&self) -> u32 {
+        self.units_housed
+    }
+
+    /// Returns the number of sites that rationed in the last step.
+    ///
+    /// This is a count of the world and not of the window, because the engine
+    /// holds the log of the step that just ran.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0070, the head-up display reports what the drawing pass read, decision D2. `docs/adrs/accepted/adr-0070-the-head-up-display-reports-what-the-drawing-pass-read.md`
+    #[must_use]
+    pub const fn rationings(&self) -> u32 {
+        self.rationings
+    }
+
+    /// Returns how much the rationed draws of the last step fell short by.
+    ///
+    /// **The value is in accumulator units, not in whole goods.** An
+    /// accumulator is fixed point at a scale of 65536, so a caller that
+    /// printed this number raw would state a quantity about sixty-five
+    /// thousand times the real one. The panel formats it, and a caller that
+    /// wants the quantity divides by the scale itself, exactly.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0002, simulated and aggregated state holds no floating point number. `docs/adrs/REGISTRY.md`
+    #[must_use]
+    pub const fn rationed_short(&self) -> i64 {
+        self.rationed_short
+    }
+
     #[must_use]
     pub const fn units_ended(&self) -> usize {
         self.units_ended
@@ -1075,6 +1155,63 @@ impl Readout {
             Line::Row("short in window", grouped(u64::from(self.units_short))),
             Line::Row("ended in world", grouped(self.units_ended as u64)),
         ];
+
+        // The store of a site rations when it cannot serve what its cohorts
+        // asked for. It happens more than once in a tick in the demonstration
+        // world, and until these rows the only way to see it was to read the
+        // log.[^11] This is a count of the world, and the label says so.[^2]
+        //
+        // **The rows appear only when a site rationed.** A row that reported
+        // a permanent zero would take a row from every panel of every run to
+        // say nothing, and it would still say nothing if the subsystem behind
+        // it broke.[^12] The count is what decides, so the rows cannot
+        // outlive the behaviour they report.
+        //
+        // [^11]: Backlog item 0274. `docs/backlog/complete/0274-show-the-load-a-unit-carries-and-the-home-it-keeps.md`
+        // [^12]: Testing Rules, section 2a. `.claude/rules/testing.md`
+        if self.rationings > 0 {
+            lines.push(Line::Row(
+                "sites rationed in world",
+                grouped(u64::from(self.rationings)),
+            ));
+            lines.push(Line::Row(
+                "  they fell short by",
+                accumulated(self.rationed_short),
+            ));
+        }
+
+        // What the drawn units are hauling and where they live. Both are
+        // counts of the window, taken on the loop that painted them.[^11]
+        //
+        // **The section appears only when something is being carried.** A
+        // section that reported a permanent zero would take a row from every
+        // panel of every run to say nothing, and it would still say nothing
+        // if the subsystem behind it broke.[^12]
+        //
+        // [^12]: Testing Rules, section 2a. `.claude/rules/testing.md`
+        if self.units_carrying > 0 {
+            lines.push(Line::Rule);
+            lines.push(Line::Heading("WHAT THEY CARRY"));
+            lines.push(Line::Row(
+                "carrying in window",
+                fraction_of(self.units_carrying, self.soldiers_painted),
+            ));
+            for (label, kind) in [
+                ("food carried", ResourceKind::Food),
+                ("wood carried", ResourceKind::Wood),
+                ("stone carried", ResourceKind::Stone),
+            ] {
+                lines.push(Line::Row(
+                    label,
+                    grouped(u64::from(self.carried_by_kind[kind as usize])),
+                ));
+            }
+            lines.push(Line::Row(
+                "with a home site",
+                fraction_of(self.units_housed, self.soldiers_painted),
+            ));
+            lines.push(Line::Note("counted at the units drawn."));
+        }
 
         // The tile a watcher scrolled to, the unit nearest it, and the sites
         // that feed the world. All three sit above the view rows, because a
@@ -1347,6 +1484,9 @@ fn tile_lines(tile: Option<&TileReadout>) -> Vec<Line> {
         format!("q {}  r {}", tile.address.q, tile.address.r),
     ));
     lines.push(Line::Row("ground", name_of(tile.kind).to_string()));
+    // The label is a phrase and not the name of the kind, and the panel row
+    // takes a static string, so these stay written out. The name of a kind
+    // for new code is `resource_name` above.
     for (label, kind) in [
         ("food left", ResourceKind::Food),
         ("wood left", ResourceKind::Wood),
@@ -1381,6 +1521,29 @@ fn tile_lines(tile: Option<&TileReadout>) -> Vec<Line> {
 /// # References
 ///
 /// [^1]: ADR-0070, the head-up display reports what the drawing pass read, decision D2. `docs/adrs/accepted/adr-0070-the-head-up-display-reports-what-the-drawing-pass-read.md`
+/// Returns the name of a resource kind.
+///
+/// One name for one kind, in one place. A second table of these names would
+/// be one fact in two places, and nothing would fail when the copies
+/// disagreed.[^1]
+///
+/// # References
+///
+/// [^1]: Recurring Defect Shapes, shape 1. `.claude/rules/recurring-defects.md`
+#[must_use]
+pub const fn resource_name(kind: ResourceKind) -> &'static str {
+    match kind {
+        ResourceKind::Food => "food",
+        ResourceKind::Wood => "wood",
+        ResourceKind::Stone => "stone",
+    }
+}
+
+/// Returns "a of b", for a count against the number the pass painted.
+fn fraction_of(part: u32, whole: u32) -> String {
+    format!("{part} of {whole}")
+}
+
 fn deposit(tile: &TileReadout, kind: ResourceKind) -> String {
     let gave = tile.generated(kind);
     if gave == 0 {
@@ -1546,7 +1709,7 @@ fn site_lines(sites: &[SiteReadout], held: u32) -> Vec<Line> {
 /// # References
 ///
 /// [^1]: ADR-0067, the viewer reads the world and never writes to it, decision D3. `docs/adrs/accepted/adr-0067-the-viewer-reads-the-world-and-never-writes-to-it.md`
-fn accumulated(total: i64) -> String {
+pub fn accumulated(total: i64) -> String {
     format!("{:.1}", total as f64 / 65536.0)
 }
 

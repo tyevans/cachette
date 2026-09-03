@@ -1233,6 +1233,21 @@ impl PyWorld {
         report.set_item("soldiers_live", readout.soldiers_live())?;
         report.set_item("sites_held", readout.sites_held())?;
         report.set_item("units_short", readout.units_short())?;
+        // What the drawn units are hauling and where they live. Both are
+        // counts of the window, taken on the loop that painted them, so a
+        // caller reports them without starting a pass of its own.
+        report.set_item("units_carrying", readout.units_carrying())?;
+        report.set_item("carried_by_kind", *readout.carried_by_kind())?;
+        report.set_item("units_housed", readout.units_housed())?;
+        // The store of a site rations when it cannot serve its cohorts.
+        // This is a count of the world, because the engine holds the log of
+        // the step that just ran.
+        report.set_item("sites_rationed", readout.rationings())?;
+        // The shortfall is in accumulator units, which are fixed point at a
+        // scale of 65536. The key names the unit, because a caller that read
+        // this as a count of goods would report a quantity sixty-five
+        // thousand times the real one.
+        report.set_item("rationed_short_accum", readout.rationed_short())?;
         report.set_item("tiles_at_capacity", readout.tiles_at_capacity())?;
         report.set_item("crowd_worst", readout.crowd_worst())?;
         let centre = readout.centre();
