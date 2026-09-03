@@ -33,3 +33,7 @@ python/cachette/*.dylib
 # Agent worktrees and scratch state. They are not project files.
 .claude/worktrees/
 .claude/tackline/
+.agents/worktrees/
+.agents/last-docs-run
+.claude/last-docs-run
+
