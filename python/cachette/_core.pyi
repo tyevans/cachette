@@ -256,6 +256,12 @@ class FrameReading(TypedDict):
     soldiers_live: int
     sites_held: int
     units_short: int
+    units_carrying: int
+    carried_by_kind: tuple[int, int, int]
+    units_housed: int
+    sites_rationed: int
+    # Fixed point at a scale of 65536, not a count of goods.
+    rationed_short_accum: int
     tiles_at_capacity: int
     crowd_worst: int
     centre: tuple[int, int]

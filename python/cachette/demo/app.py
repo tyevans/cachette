@@ -53,6 +53,14 @@ FACTION_COUNT = 4
 # The number of people each faction founds with.
 GROUP = 64
 
+# The height a picture of the whole panel needs.
+#
+# The panel holds every section, and a window a person opens is shorter than
+# that. The panel states that it was cut when it does not fit, so a short
+# picture is honest rather than wrong, but it is still less than was asked
+# for.
+PICTURE_HEIGHT = 1400
+
 # The engine steps once for each drawn frame.
 FRAMES_EACH_SECOND = 30
 
@@ -201,7 +209,12 @@ def main(argv: list[str] | None = None) -> int:
         description="Watch the world run, from the control plane.",
     )
     parser.add_argument("--width", type=int, default=WINDOW_WIDTH)
-    parser.add_argument("--height", type=int, default=WINDOW_HEIGHT)
+    parser.add_argument(
+        "--height",
+        type=int,
+        default=0,
+        help="the window height; the picture mode is taller by default",
+    )
     parser.add_argument("--threads", type=int, default=0)
     parser.add_argument(
         "--frames",
@@ -216,10 +229,14 @@ def main(argv: list[str] | None = None) -> int:
     )
     arguments = parser.parse_args(argv)
 
+    # The panel holds every section and is taller than a window a person
+    # opens. A picture that used the window height would cut the last
+    # sections and say so, which is honest and still less than was asked for.
+    default_height = PICTURE_HEIGHT if arguments.picture else WINDOW_HEIGHT
     demo = Demo(
         build_world(),
         width=arguments.width,
-        height=arguments.height,
+        height=arguments.height or default_height,
         threads=arguments.threads,
     )
     foundings = demo.found()

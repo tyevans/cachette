@@ -57,7 +57,10 @@ use cachette_core::terrain::KIND_COUNT;
 use cachette_core::NeedCondition;
 
 use crate::hud::KINDS;
-use crate::hud::{fraction, grouped, name_of, option_name, ChoiceReadout, Readout, TileReadout};
+use crate::hud::{
+    accumulated, fraction, grouped, name_of, option_name, resource_name, ChoiceReadout, Readout,
+    TileReadout,
+};
 use crate::paint::{faction_colour, kind_colour, Canvas, COLOURED_FACTIONS};
 use crate::text;
 
@@ -235,6 +238,16 @@ enum Anchor {
 /// [^1]: Recurring Defect Shapes, shape 1. `.claude/rules/recurring-defects.md`
 fn cards(readout: &Readout, reference: bool) -> Vec<(Anchor, Card)> {
     let mut cards = vec![(Anchor::TopLeft, world_card(readout))];
+    // **The card appears only when something is being carried.** A card that
+    // said "carrying 0" on every frame of every run would take space from the
+    // map to report nothing, and a watcher would learn to skip it. The count
+    // is what decides, so the card cannot outlive the behaviour it
+    // reports.[^10]
+    //
+    // [^10]: Testing Rules, section 2a. `.claude/rules/testing.md`
+    if readout.units_carrying() > 0 {
+        cards.push((Anchor::TopLeft, load_card(readout)));
+    }
     if let Some(choice) = readout.choice() {
         cards.push((Anchor::BottomRight, unit_card(&choice)));
     }
@@ -399,6 +412,54 @@ fn outline(canvas: &mut Canvas, x: i32, y: i32, width: i32, height: i32) {
 ///
 /// [^1]: Decisions register, DEC-084. `docs/DECISIONS.md`
 /// [^2]: ADR-0093, the window shows what changes, decisions D1 and D2. `docs/adrs/draft/adr-0093-the-window-shows-what-changes.md`
+/// The card that says what the drawn units are hauling and where they live.
+///
+/// **Both numbers are counts of the window.** The drawing asked at every unit
+/// it painted, on the loop that already ran, so neither starts a pass over the
+/// arena.[^1]
+///
+/// A kind that nobody is carrying gets no row. The demonstration world hauls
+/// food and nothing else, so two rows of a permanent zero would say that the
+/// card is broken rather than that the world carries no wood.
+///
+/// # References
+///
+/// [^1]: ADR-0070, the head-up display reports what the drawing pass read, decision D1. `docs/adrs/accepted/adr-0070-the-head-up-display-reports-what-the-drawing-pass-read.md`
+fn load_card(readout: &Readout) -> Card {
+    let drawn = readout.soldiers_painted();
+    let mut rows = vec![Row::new(
+        "carrying",
+        format!("{} of {}", readout.units_carrying(), drawn),
+    )];
+    for kind in ResourceKind::ALL {
+        let held = readout.carried_by_kind()[kind as usize];
+        if held > 0 {
+            rows.push(Row::new(resource_name(kind), grouped(u64::from(held))));
+        }
+    }
+    rows.push(Row::new(
+        "with a home",
+        format!("{} of {}", readout.units_housed(), drawn),
+    ));
+    if readout.rationings() > 0 {
+        rows.push(Row::new(
+            "sites rationed",
+            grouped(u64::from(readout.rationings())),
+        ));
+        // The shortfall is in accumulator units, so it is formatted and
+        // never shown raw. A raw one would state a quantity sixty-five
+        // thousand times the real one.
+        rows.push(Row::new(
+            "  short by",
+            accumulated(readout.rationed_short()),
+        ));
+    }
+    Card {
+        heading: "WHAT THEY CARRY",
+        rows,
+    }
+}
+
 fn world_card(readout: &Readout) -> Card {
     let mut rows = vec![
         Row::new("tick", grouped(readout.tick())),

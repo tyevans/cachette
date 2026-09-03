@@ -47,7 +47,7 @@
 use cachette_core::cohort::NeedCondition;
 use cachette_core::founding::FoundingOutcome;
 use cachette_core::hex::NEIGHBOURS;
-use cachette_core::resource::ResourceKind;
+use cachette_core::resource::{ResourceKind, RESOURCE_KIND_COUNT};
 use cachette_core::terrain::{TileKind, KIND_COUNT};
 use cachette_core::{Axial, BridgeError, Entity, FactionId, Holder, World};
 
@@ -444,6 +444,11 @@ pub struct Canvas<'a> {
     tiles_at_capacity: u32,
     condition_reads: u32,
     units_short: u32,
+    carry_reads: u32,
+    units_carrying: u32,
+    carried_by_kind: [u32; RESOURCE_KIND_COUNT],
+    home_reads: u32,
+    units_housed: u32,
     foundings_marked: u32,
     focus: Option<Focus>,
 }
@@ -475,6 +480,11 @@ impl<'a> Canvas<'a> {
             tiles_at_capacity: 0,
             condition_reads: 0,
             units_short: 0,
+            carry_reads: 0,
+            units_carrying: 0,
+            carried_by_kind: [0; RESOURCE_KIND_COUNT],
+            home_reads: 0,
+            units_housed: 0,
             foundings_marked: 0,
             focus: None,
         }
@@ -527,6 +537,11 @@ impl<'a> Canvas<'a> {
             tiles_at_capacity: 0,
             condition_reads: 0,
             units_short: 0,
+            carry_reads: 0,
+            units_carrying: 0,
+            carried_by_kind: [0; RESOURCE_KIND_COUNT],
+            home_reads: 0,
+            units_housed: 0,
             foundings_marked: 0,
             focus: None,
         }
@@ -565,6 +580,49 @@ impl<'a> Canvas<'a> {
     #[must_use]
     pub const fn holder_reads(&self) -> u32 {
         self.holder_reads
+    }
+
+    /// Returns the number of units the last draw asked for a load.
+    ///
+    /// The drawing asks at every unit it paints and nowhere else, so the
+    /// count is a function of the window and never of the world.[^1] A test
+    /// reads it, because a layer that swept the arena would report the same
+    /// totals and cost the population.[^2]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0070, the head-up display reports what the drawing pass read, decision D1. `docs/adrs/accepted/adr-0070-the-head-up-display-reports-what-the-drawing-pass-read.md`
+    /// [^2]: Findings register, FND-071. `docs/FINDINGS.md`
+    #[must_use]
+    pub const fn carry_reads(&self) -> u32 {
+        self.carry_reads
+    }
+
+    /// Returns the number of units the last draw asked for a home.
+    ///
+    /// The count is a function of the window, in the same way the load count
+    /// is.
+    #[must_use]
+    pub const fn home_reads(&self) -> u32 {
+        self.home_reads
+    }
+
+    /// Returns the number of painted units that carry something.
+    #[must_use]
+    pub const fn units_carrying(&self) -> u32 {
+        self.units_carrying
+    }
+
+    /// Returns what the painted units carry, one total for each kind.
+    #[must_use]
+    pub const fn carried_by_kind(&self) -> &[u32; RESOURCE_KIND_COUNT] {
+        &self.carried_by_kind
+    }
+
+    /// Returns the number of painted units that hold a home site.
+    #[must_use]
+    pub const fn units_housed(&self) -> u32 {
+        self.units_housed
     }
 
     /// Returns the number of times the last draw generated a ground.
@@ -862,6 +920,11 @@ impl<'a> Canvas<'a> {
         self.tiles_at_capacity = 0;
         self.condition_reads = 0;
         self.units_short = 0;
+        self.carry_reads = 0;
+        self.units_carrying = 0;
+        self.carried_by_kind = [0; RESOURCE_KIND_COUNT];
+        self.home_reads = 0;
+        self.units_housed = 0;
         self.foundings_marked = 0;
         self.focus = None;
     }
@@ -1789,6 +1852,38 @@ fn draw_soldiers(
                         canvas.units_short += 1;
                         canvas.fill_disc(x as i32, y as i32, (radius / 2).max(1), SHORTAGE);
                     }
+                }
+                // What this unit carries and where it lives, read at the
+                // unit that is being painted, on the loop that already runs.
+                // Both start a pass of nothing.[^11]
+                //
+                // **These are the two facts the engine already produced and
+                // no watcher could see.** Every unit holds a home site and a
+                // share of them haul a load, and until now the only way to
+                // learn either was to read the log.[^12]
+                //
+                // The count of reads is a function of the window, in the same
+                // way the holder count is, and a test reads it. A layer that
+                // swept the arena would report the same totals and cost the
+                // population.[^11]
+                //
+                // [^11]: ADR-0070, the head-up display reports what the drawing pass read, decision D1. `docs/adrs/accepted/adr-0070-the-head-up-display-reports-what-the-drawing-pass-read.md`
+                // [^12]: Backlog item 0274. `docs/backlog/complete/0274-show-the-load-a-unit-carries-and-the-home-it-keeps.md`
+                canvas.carry_reads += 1;
+                if let Some(load) = arena.carry(*soldier) {
+                    let mut any = false;
+                    for kind in ResourceKind::ALL {
+                        let held = load.of(kind).0;
+                        canvas.carried_by_kind[kind as usize] += held;
+                        any |= held > 0;
+                    }
+                    if any {
+                        canvas.units_carrying += 1;
+                    }
+                }
+                canvas.home_reads += 1;
+                if let Some(Some(_)) = arena.home(*soldier) {
+                    canvas.units_housed += 1;
                 }
                 // The unit nearest the middle of the window, fixed on the
                 // loop that already paints. The panel names this unit when it
