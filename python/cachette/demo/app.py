@@ -61,6 +61,19 @@ GROUP = 64
 # the engine how tall the panel needs to be and resizes to it.
 PICTURE_HEIGHT = 1400
 
+# How many frames a picture steps before it draws, when nobody says.
+#
+# **A picture at tick 2 shows a world in which nothing has happened.** No seat
+# is held, no unit carries a load, no store has rationed and no soldier has
+# been promoted, so a picture taken then reports every subsystem at zero and
+# each of those zeros is the fixture rather than the engine. The seats fill,
+# the carrying starts and the first promotion lands well inside this count,
+# so a reader sees the subsystems the panel reports.
+#
+# This is a default and not a bound. `--ticks` takes any count, including 0
+# for a picture of the world as it was founded.
+PICTURE_TICKS = 300
+
 # How many times the picture may resize before it gives up.
 #
 # Resizing changes what the window paints, and a section a count switches on
@@ -252,12 +265,25 @@ def main(argv: list[str] | None = None) -> int:
         "--frames",
         type=int,
         default=0,
-        help="stop after this many frames, for a run without a watcher",
+        help="stop the window after this many frames, for a run without a watcher",
     )
     parser.add_argument(
         "--picture",
         default="",
-        help="write one frame with the whole panel to this file, and open no window",
+        help=(
+            "write one frame with the whole panel to this file, and open no "
+            "window; the name must end in .png or .ppm"
+        ),
+    )
+    parser.add_argument(
+        "--ticks",
+        type=int,
+        default=PICTURE_TICKS,
+        help=(
+            "how many frames the picture mode steps before it draws; the "
+            "default runs far enough for the seats, the carrying and the "
+            "first promotions to appear"
+        ),
     )
     arguments = parser.parse_args(argv)
 
@@ -279,7 +305,7 @@ def main(argv: list[str] | None = None) -> int:
     demo.open_on(opening_place(foundings))
 
     if arguments.picture:
-        return _write_picture(demo, arguments.picture, arguments.frames or 1)
+        return _write_picture(demo, arguments.picture, arguments.ticks)
 
     print(
         f"cachette: {demo.world.width} by {demo.world.height} tiles, "
@@ -299,8 +325,23 @@ def _write_picture(demo: Demo, path: str, frames: int) -> int:
     frame command the window uses, so the picture holds what the window would
     have shown, with the sections the cards leave out.
     """
-    for _ in range(frames):
-        reading = demo.advance(panel=True)
+    # The world must run before it is worth drawing, and it must be drawn at
+    # least once whatever the count. The steps before the last one take the
+    # same path the window takes, so a promotion during the run is announced
+    # here as it would be on a screen, and the picture cannot be drawn by a
+    # path that the window never runs.
+    #
+    # **The run draws at the height of a window, not at the height of the
+    # panel.** The picture is one frame and the run is hundreds, and the whole
+    # panel is several times the height a watcher opens, so drawing every step
+    # at that height spends most of the run on pixels that nobody keeps. The
+    # surface grows for the frame that is written and for that frame only.
+    written = demo.surface
+    demo.surface = Surface(written.width, min(written.height, WINDOW_HEIGHT))
+    for _ in range(max(frames, 0)):
+        demo.advance()
+    demo.surface = written
+    reading = demo.advance(panel=True)
 
     # Ask the panel how tall it needed to be, and draw again at that height.
     # The loop ends when the picture is tall enough for the panel it drew.
@@ -317,7 +358,7 @@ def _write_picture(demo: Demo, path: str, frames: int) -> int:
         demo.surface = Surface(demo.surface.width, needed)
         reading = demo.advance(panel=True)
 
-    demo.surface.write_ppm(path)
+    demo.surface.write_image(path)
     print(
         f"wrote {path} at tick {reading['tick']}, "
         f"{demo.surface.width} by {demo.surface.height}, "
