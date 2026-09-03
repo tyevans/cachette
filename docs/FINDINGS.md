@@ -22,8 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-336**
-**Next number: FND-321**
+**Next number: FND-338**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -10157,3 +10156,69 @@ the nine classes as well, and it would have agreed with the site for ever.
 [^F334B]: ADR-0091, movement takes its direction from a per-cell field, never from a per-unit search, decision D6. `docs/adrs/draft/adr-0091-movement-takes-its-direction-from-a-per-cell-field.md`
 [^F335A]: Findings register, FND-316, in this document.
 [^F317E]: Findings register, FND-334, in this document.
+
+### FND-336 — The site address drives the page for an unknown address, and without it that page pointed at the root of the domain
+
+**Believed.** The site address of the configuration drives the canonical link
+of each page and the sitemap. A build that states no address loses those two
+things and nothing else. The item that built the site left the address unset
+under a blocker, and it stated that only the publishing step depends on
+it.[^F336A]
+
+**True.** The builder also writes the address into the page it generates for an
+address the host does not hold. That page cannot use a relative link, because
+the host serves it for any address. The builder therefore writes an absolute
+path into every link and every asset of it, and it derives that path from the
+site address. With no address, it wrote the root of the domain.
+
+**This site does not answer at the root.** The repository does not carry the
+name of its owner, so the site is a project site and it answers on a path below
+the host name of the owner. A page that points at the root points outside the
+site, and the host answers with its own page rather than with the one this
+build made.
+
+**Evidence.** Two builds of one tree, with the address set and with it removed.
+The two pages for an unknown address hold different links.
+
+```
+grep -o '\(href\|src\)="/[^"]*"' target/site/404.html | sort -u
+```
+
+With the address set, each link starts with the repository name. With the
+address removed, each link starts at the root. Every other page of both builds
+holds relative links only, and the two builds are identical in every other
+respect. The site build reported no issue in either case, and the reference
+check passed in both.
+
+**Follows.** A site that states no address is not a site that loses two
+features. It is a site with one broken page, and no check sees it. State the
+address in the configuration as soon as the host is known.
+
+### FND-337 — A blocker row asked for a fact and for an action, and only the fact was information
+
+**Believed.** The blocker on the documentation site closed when the project
+owner named the address of the site and confirmed that the hosting was turned
+on. The row said so in its own closing condition.[^F337A]
+
+**True.** The two halves are not the same kind of thing. The address is
+information the project did not have, and the register holds exactly that. The
+hosting source setting is an action that one person takes in the settings of
+the host. No contributor can take it, and no contributor can read it from the
+tree either, but a register of blockers is not where an action waits.
+
+**The register states the distinction itself.** It says that a blocker needs
+information the project does not have, and it compares the decisions register,
+which holds choices that need judgement.[^F337A] An action belongs in the
+backlog, where the priority index states when it is taken.[^F282D]
+
+**Evidence.** The owner answered the first half on 3 September 2026 and the
+second half stayed open, because he takes it in a browser rather than in this
+repository. The row would have stayed open with every fact in the tree.
+
+**Follows.** Write a closing condition that names a fact. When a row needs an
+action as well, open the backlog item for the action in the same change, and
+let the row close on the fact. A row that waits for an action reads as missing
+information, and it stops work that has everything it needs.
+
+[^F336A]: Backlog item 0309, publish the Python reference generated from the compiled module. `docs/backlog/complete/0309-publish-the-python-reference-generated-from-the-compiled-module.md`
+[^F337A]: Blockers register, BLK-035 and the opening statement. `docs/BLOCKERS.md`

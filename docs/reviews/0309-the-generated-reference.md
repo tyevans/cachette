@@ -115,6 +115,13 @@ provide them, so the stub is their one home.[^2]
 
 ## 4. What stays blocked
 
+**This section is out of date, and item 0320 is why.** It describes the tree on
+3 September 2026, before the project owner named the host. The blocker is
+resolved, the site configuration states the address, and the publishing job
+carries no repository variable. One setting of the repository is what is left,
+and one item holds it.[^21] Read the rest of this section as the state at the
+time of the review.
+
 **The address and the hosting switch.**[^5] Nobody in this tree can state
 either, and the work invented neither.
 
@@ -238,7 +245,7 @@ axis in each.
 [^2]: ADR-0107, the Python reference is generated from the compiled module, decisions D1, D2, D3 and D4. `docs/adrs/draft/adr-0107-the-python-reference-is-generated-from-the-compiled-module.md`
 [^3]: The project manifest, the documentation dependency group. `pyproject.toml`
 [^4]: The site configuration. `mkdocs.yml`
-[^5]: Blockers register, BLK-035. `docs/BLOCKERS.md`
+[^5]: Blockers register, BLK-035, resolved. `docs/BLOCKERS.md`
 [^6]: The reference page. `docs/site/reference.md`
 [^7]: The site index page. `docs/site/index.md`
 [^8]: The documentation build script. `scripts/build-docs.sh`
@@ -254,3 +261,4 @@ axis in each.
 [^18]: Backlog priority index. `docs/backlog/PRIORITY.md`
 [^19]: Decisions register, DEC-114. `docs/DECISIONS.md`
 [^20]: Findings register, FND-325. `docs/FINDINGS.md`
+[^21]: Backlog item 0320, publish the documentation site to GitHub Pages. `docs/backlog/complete/0320-publish-the-documentation-site-to-github-pages.md`

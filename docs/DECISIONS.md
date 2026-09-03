@@ -23,8 +23,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^ALLOC]
 
-**Next number: DEC-118**
-**Next number: DEC-113**
+**Next number: DEC-119**
 
 ## Open
 
@@ -35,7 +34,7 @@ precedent.[^ALLOC]
 A unit that carries a full load takes an option that carries it home, and a
 field over the level 1 cells steers the step. The field holds one plane for
 each faction, seeded at every live site of that faction, so it carries the
-direction of the **nearest** site and not of the unit's own home.[^DEC117A]
+direction of the **nearest** site and not of the unit's own home.[^DEC118A]
 
 **The delivery still needs the tile of the unit's own home site.** So a unit
 steered to a sibling site arrives, stands there, and delivers nothing. It then
@@ -760,8 +759,13 @@ and the prose check stay in the site job. The price is that the check that
 matters most, which reads the built site, is the one left out.
 
 **Recommendation: A, until the site publishes.** The site job is not a merge
-gate for anybody until somebody reads the site, and BLK-035 holds the address it
-would publish to.[^DEC115C] Reopen this when the address exists.
+gate for anybody until somebody reads the site.
+
+**The address now exists, so read this row again.** The blocker that held the
+address is resolved, and the job publishes from the main branch.[^DEC115C] The
+site answers on its address as soon as the project owner changes one setting of
+the repository, and one backlog item holds that action.[^DEC115D] Take this row
+when it does, and choose between the three options above.
 
 **What closes this.** The site publishes, and the project either moves the build
 into the gate command or states why the site job stays separate.
@@ -1407,6 +1411,39 @@ figure is 168 MB. The storage argument for vectors is stronger than the report
 concluded, and it called that argument its weakest.
 
 ## Closed
+
+### DEC-118 — Does the publishing job keep a switch of its own, now that the address is known?
+
+**Closed. The job keeps no switch. It publishes on every push to the main
+branch.**[^DEC118A]
+
+**The switch existed because two facts were missing.** A blocker held the
+address of the site and the hosting source setting of the repository. Neither
+was in the tree, so the job took a repository variable and did nothing while
+the variable was unset. The project owner has now named the host, and the
+blocker is resolved.[^DEC115C]
+
+**Option A. Keep the repository variable.** The main branch stays green until
+the owner turns the publishing on. The price is a second declaration site for
+one fact. The hosting source setting already says whether the repository
+publishes from a workflow, and the deploy step reads it. A variable beside it
+can disagree with it, and nothing fails when it does. This project names that
+shape as a recurring defect.[^DEC114D]
+
+**Option B. Publish on the main branch with no switch.** The hosting source
+setting becomes the one declaration site. The price is that the job fails on
+the main branch until the owner changes that setting.
+
+**Why B.** A variable that is never set makes a job that is turned off look
+exactly like a job that is broken, and neither state reports anything. The
+failure under option B names the setting and names the person who can change
+it, and it stops as soon as he does. The project rule on testing says that a
+guard nobody has seen fire has not been shown to exist, and the publishing
+path under option A is never taken by anybody.[^DEC117D]
+
+**What this did not decide.** It does not decide whether the documentation
+build joins the whole check command. A separate row holds that, and it now has
+the address it waited for.[^DEC117E]
 
 ### DEC-113 — Does the documentation site configuration stay in a portable format, or move to the builder's native one?
 
@@ -3018,11 +3055,15 @@ a failed founding is correct.[^PRD12]
 [^DEC113A]: ADR-0107, the Python reference is generated from the compiled module, the consequences. `docs/adrs/draft/adr-0107-the-python-reference-is-generated-from-the-compiled-module.md`
 [^DEC113B]: Research report 19, the documentation toolchain, section 3.2. `docs/research/reports/19-documentation-toolchain.md`
 [^DEC113C]: The site configuration. `mkdocs.yml`
+[^DEC118A]: The documentation site job. `.github/workflows/docs.yml`
+[^DEC117D]: Testing Rules, section 1. `.claude/rules/testing.md`
+[^DEC117E]: Decisions register, DEC-115, in this document.
 [^DEC115A]: ADR-0107, the Python reference is generated from the compiled module, decision D4. `docs/adrs/draft/adr-0107-the-python-reference-is-generated-from-the-compiled-module.md`
 [^DEC115B]: The gate budget wrapper. `scripts/gate-budget.sh`
-[^DEC115C]: Blockers register, BLK-035. `docs/BLOCKERS.md`
+[^DEC115C]: Blockers register, BLK-035, resolved. `docs/BLOCKERS.md`
+[^DEC115D]: Backlog item 0321, turn the documentation site publishing on. `docs/backlog/proposed/0321-turn-the-documentation-site-publishing-on.md`
 [^DEC114A]: Backlog item 0308, the documentation plan. `docs/backlog/refined/0308-the-documentation-plan.md`
 [^DEC114B]: Documentation Rules, section 3. `.claude/rules/documentation.md`
 [^DEC114C]: Product requirement record 0021, a developer can use the control plane without reading its source. `docs/product/accepted/prd-0021-a-developer-can-use-the-control-plane-without-reading-its-source.md`
 [^DEC114D]: Recurring Defect Shapes, shape 1, redundant declaration sites. `.claude/rules/recurring-defects.md`
-[^DEC117A]: ADR-0110, a unit returns by climbing a reach field seeded at every site of its faction, decision D1. `docs/adrs/draft/adr-0110-a-unit-returns-by-climbing-a-reach-field.md`
+[^DEC118A]: ADR-0110, a unit returns by climbing a reach field seeded at every site of its faction, decision D1. `docs/adrs/draft/adr-0110-a-unit-returns-by-climbing-a-reach-field.md`
