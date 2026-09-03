@@ -125,9 +125,9 @@ this decision buys nothing.
 
 **The width is a parameter, and this record does not set it.** No measurement
 exists of how many need values coexist in one cell in a world that consumes,
-and a blocker governs every cost figure this project holds.[^4] A wide bucket
-makes two units of different need act alike. A narrow one approaches one answer
-for each unit. The item that implements this decision carries that choice.[^14]
+and a blocker holds that measurement open.[^4] A wide bucket makes two units of
+different need act alike. A narrow one approaches one answer for each unit. The
+item that implements this decision carries that choice.[^14]
 
 A value computed for each distinct pair of a cell and a need bucket is computed
 once for every unit that shares it.
@@ -162,11 +162,13 @@ record does not reopen it.
 
 **Declare the read set and the write set of every stage, and check the ordering
 mechanically.** This is a good idea and it is not this record. It is a separate
-claim: it would make an existing accepted record checkable, where today that
-record says in its own consequences that a reviewer cannot see a violation.[^18]
-A record holds one claim, and mixing a claim about cost with a claim about
-observability produces a record that neither of them can be rejected from
-separately.[^19] An item carries it.[^20]
+claim: it would make part of an existing accepted record checkable. That record
+says in its own consequences that a reviewer can see an atomic and a lock, and
+that the compiler refuses the violation a reviewer cannot see. The part that
+neither the reviewer nor the compiler covers is the ordering.[^18] A record
+holds one claim, and mixing a claim about cost with a claim about observability
+produces a record that neither of them can be rejected from separately.[^19] An
+item carries it.[^20]
 
 ## Consequences
 
