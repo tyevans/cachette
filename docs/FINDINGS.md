@@ -7738,10 +7738,23 @@ the tiles, and it added 14016 that frame.
 
 **The merge rewrites the whole list on every frame.** It walks the stored list
 and the new run together and writes both into a second buffer, so its cost
-follows the length of the list and not the length of the run. At frame 13 it
-rewrites 16753789 entries to apply 14016. The stage table measured that pass at
-120,529,050 nanoseconds, which is 14.4 percent of a frame, and it takes no
-thread count.[^F292C]
+follows the length of the list and not the length of the run. The stage table
+measured that pass at 120,529,050 nanoseconds, which is 14.4 percent of a
+frame, and it takes no thread count.[^F292C]
+
+**The run itself is not small, and an earlier draft of this finding said it
+was.** The added column above counts the tiles that became changed for the
+first time, and that column falls to a few thousand. The run does not fall with
+it. The tile scan draws for every tile and keeps three cases in eight, so it
+offers about three eighths of the world on every frame, which is 6291456 tiles
+at this extent and matches the first frame of the table exactly. **Almost every
+tile in the run is a tile the list already holds.**
+
+So the merge walks about 23 million entries to apply about 6.3 million, and the
+dense form applies the same 6.3 million and walks nothing else. The saving is
+the walk and the second buffer, and it is a factor of about four in the work
+rather than the factor of a thousand that reading the added column alone would
+suggest.
 
 **The memory runs the same way.** An entry holds a tile index and a value, so
 it is eight bytes, and the second buffer holds as many. At saturation the two
