@@ -10,10 +10,24 @@ serves: []
 blocked-by: []
 ---
 
+## The skip is repaired. The dead corpus is not.
+
+**The first half of this item landed and this item was not narrowed.** The
+record check now names three paths rather than three path components, so a run
+inside a worktree reads that worktree. Item 0225 states the same repair from
+the other side, and the two items were one job stated twice.
+
+**What is left is the second defect alone: the corpus the check builds and
+never reads.** The note still re-reads every source file, once for each record
+it tests. Take this item for that.
+
+**Read this item against item 0225 before planning.** That item holds the two
+guards that would stop the skip being undone in silence, and neither exists.
+
 ## Why
 
-**The record check reports more notes in a worktree than on the trunk, and the
-extra notes are false.** One note asks whether any other record or any source
+**The record check reported more notes in a worktree than on the trunk, and the
+extra notes were false.** One note asks whether any other record or any source
 file cites a record. The scan that gathers the source files drops every path
 that holds a directory part named `worktrees`. A worktree of this project sits
 under that directory, so its own root carries the part, and the filter drops
@@ -39,11 +53,12 @@ path names nothing, so each check reads the tree it was asked to read. The
 priority check walks no tree at all and reads named directories. The repair
 has a shape the project already holds in three places.
 
-**The same function holds a second defect.** The check joins the records, the
-registry and every source file into one corpus, and nothing reads it. The note
-re-reads each source file instead, once for each record it tests. A second
-finding holds the evidence.[^3] The two defects are independent. A repair to
-the skip makes the corpus full and leaves it unread, so this item carries both.
+**The same function holds a second defect, and it is the one that is left.**
+The check joins the records, the registry and every source file into one
+corpus, and nothing reads it. The note re-reads each source file instead, once
+for each record it tests. A second finding holds the evidence.[^3] The two
+defects are independent, and the repair to the skip made the corpus full and
+left it unread, exactly as this item predicted.
 
 **The note is the whole cost.** The source corpus reaches one assertion of the
 record check, and that assertion is the note. No failure depends on it, so no
@@ -53,19 +68,12 @@ not a gate.
 ## What is missing before this is refined
 
 - The impact review.
-- **Whether the repair adopts the sibling shape or a better one.** A full
-  path under the root is what the other three checks use, and it works. It
-  still states the boundary as a location. Ask whether the run should name the
-  tree it owns instead.
 - **What the corpus was for.** It is dead in the commit that created the
   script, so no earlier reader states the intent. Decide whether the note
   reads it or whether it goes.
-- What the boundary is, if it is not a directory part. The scan must exclude a
-  tree that the run does not own, and it must include the tree that the run
-  does own, even when that tree sits inside another one.
-- What a test asserts. A test that runs the check from inside a worktree and
-  requires the same note count as a run on the trunk would show the two
-  answers in one run.
+- Whether reading the corpus once is faster than re-reading each file for each
+  record, and by how much. The answer decides whether the corpus is read or
+  removed.
 
 ## Done when
 

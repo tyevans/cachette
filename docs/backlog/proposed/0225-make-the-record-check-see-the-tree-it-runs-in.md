@@ -10,10 +10,27 @@ serves: []
 blocked-by: []
 ---
 
+## The wrong skip is repaired. The silence is not.
+
+**Point 1 below landed.** The record check now names three paths rather than
+three path components, so a run inside a worktree reads the sources of that
+worktree. Whoever made the repair left a comment beside it that states the
+reason. That comment cites the wrong finding, which is a separate defect and
+is reported with this audit.
+
+**Points 2 and 3 did not land, and they are the part this item called the
+defect.** The check states how many records it read and never how many source
+files. Nothing drives it from a path that holds a skipped part. So the repair
+rests on one line of code that a later edit can undo in silence, which is the
+state this item was written against.
+
+**Take this item for points 2 and 3 alone.** Point 1 is kept below as the
+record of what the defect was.
+
 ## Why
 
 The record check reports a record that no other record and no source file
-cites. It reads no source file when it runs inside a worktree, so the note is
+cites. It read no source file when it ran inside a worktree, so the note was
 a false signal there.
 
 The check walks the tree for Rust and Python files. It skips a path that holds
@@ -32,7 +49,7 @@ silence is the defect.
 ## What the work does
 
 1. Make the walk skip a worktree directory only when the walk did not start
-   inside one.
+   inside one. **Done.**
 2. Make the check report how many source files it read. A run that reads zero
    says so, and a reader can tell an empty tree from a broken filter.
 3. Add a test that drives the check from a path holding a skipped part and

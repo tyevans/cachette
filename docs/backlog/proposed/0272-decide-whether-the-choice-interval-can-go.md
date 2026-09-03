@@ -29,21 +29,24 @@ late is the behaviour this would remove.
 
 ## What is missing before this is refined
 
-- **A measurement on the target platform.** Every cost figure in this project is
-  derived, and no measurement exists on the target platform.[^4] An interval of
-  zero makes every cell score on every frame, and the deciding work then rises
-  by the interval. Whether the frame absorbs it is not knowable from here.
+- **The measurement this item waited for now exists, and it removes the cost
+  argument.** The choice costs 0.571 milliseconds of a frame of about 836 at the
+  target scale, which is 0.07 percent, measured on the target platform.[^4] An
+  interval of zero makes every cell score on every frame, so the deciding work
+  rises by the interval and still buys back almost nothing. **The question left
+  is behavioural, not a cost question.** Most cost figures in this project are
+  still derived, and the blocker that says which stays open.[^5]
 - **Whether the apply cost is the binding term.** The deciding work follows the
   lattice; applying an answer to a unit is per-unit by necessity. At an interval
   of zero the apply touches the whole population on every frame, and that term
   is the one the new shape does not remove.
 - **What the mover count does.** The score floor is a frame-budget parameter
-  because it decides how much of the population moves.[^5] A unit that re-reads
+  because it decides how much of the population moves.[^6] A unit that re-reads
   the world on every frame may cross the floor more often, and the movement
   stage is sized against that count.
 - **Whether stickiness survives.** The stored choice is sticky because a unit
   that re-decides on every tick swaps between two options of nearly equal score
-  and arrives nowhere.[^6] Removing the interval removes the mechanism that
+  and arrives nowhere.[^7] Removing the interval removes the mechanism that
   makes it sticky, so stickiness would need its own rule.
 
 ## Done when
@@ -59,6 +62,7 @@ Filled in when the item moves to `complete/`.
 [^1]: ADR-0064, a unit chooses by scoring a small fixed option set, decision D4. `docs/adrs/accepted/adr-0064-a-unit-chooses-by-scoring-a-small-fixed-option-set.md`
 [^2]: ADR-0098, the choice is decided for each cell and each bucket of need, decisions D1 and D3. `docs/adrs/draft/adr-0098-the-choice-is-decided-for-each-cell-and-each-bucket-of-need.md`
 [^3]: ADR-0096, cost follows the lattice, not the population, and a unit is a reader, the consequences. `docs/adrs/draft/adr-0096-cost-follows-the-lattice-not-the-population.md`
-[^4]: Blockers register, BLK-007. `docs/BLOCKERS.md`
-[^5]: ADR-0064, a unit chooses by scoring a small fixed option set, decision D3. `docs/adrs/accepted/adr-0064-a-unit-chooses-by-scoring-a-small-fixed-option-set.md`
-[^6]: ADR-0064, a unit chooses by scoring a small fixed option set, decision D2. `docs/adrs/accepted/adr-0064-a-unit-chooses-by-scoring-a-small-fixed-option-set.md`
+[^4]: Target platform costs, the stage split. `docs/reference/graviton-costs.md`
+[^5]: Blockers register, BLK-007. `docs/BLOCKERS.md`
+[^6]: ADR-0064, a unit chooses by scoring a small fixed option set, decision D3. `docs/adrs/accepted/adr-0064-a-unit-chooses-by-scoring-a-small-fixed-option-set.md`
+[^7]: ADR-0064, a unit chooses by scoring a small fixed option set, decision D2. `docs/adrs/accepted/adr-0064-a-unit-chooses-by-scoring-a-small-fixed-option-set.md`

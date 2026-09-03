@@ -16,8 +16,22 @@ blocked-by: []
 unit at a time.** It scores a fixed set of four options, reads one weight
 profile that every unit shares, multiplies a drive by a weight and a field
 value, and takes the highest score. The columns it reads are already a
-structure of arrays.[^1] The choice is 71 milliseconds of the unit cost at the
-target scale.[^2]
+structure of arrays.[^1]
+
+**The cost that made this item worth taking is gone, and the register says so
+in its own words.** This item was written against a choice pass that cost 71.4
+milliseconds at the target scale, which was 26 percent of the cost of a unit.
+The pass now decides once for each pair of cell and need instead of once for
+each unit, and it costs 0.571 milliseconds of a frame of about 836. That is
+0.07 percent of a frame. The register marks the older figure stale against the
+code and holds both.[^2]
+
+**So the case for this item is no longer the saving.** A pass worth 0.07
+percent of a frame cannot pay for unsafe code, for a second implementation, or
+for a target-specific path. Whoever refines this must either state a different
+reason to take it, or close it. Two reasons survive the fall and neither is a
+saving: shaping the loop costs nothing and removes branches, and the same
+measurement is what item 0272 rests on, so the two should be read together.
 
 **The invariant against floating point is what makes this safe.** Float
 addition is not associative, so a vector reduction over floats gives a
