@@ -54,6 +54,7 @@ documents cite it.
 | 0018 | A depleted deposit comes back | Shaped | Game developer | `shaped/prd-0018-a-depleted-deposit-comes-back.md` |
 | 0019 | An agent can ask the running engine what it holds | Shaped | Repository agent | `shaped/prd-0019-an-agent-can-ask-the-running-engine-what-it-holds.md` |
 | 0020 | A unit goes somewhere it cannot see | Shaped | Game developer | `shaped/prd-0020-a-unit-goes-somewhere-it-cannot-see.md` |
+| 0021 | A developer can use the control plane without reading its source | Accepted | Game developer | `accepted/prd-0021-a-developer-can-use-the-control-plane-without-reading-its-source.md` |
 
 ## What does not belong in a record
 
