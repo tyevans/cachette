@@ -14,11 +14,18 @@ blocked-by: []
 The world settings hold a faction count. A count of zero is accepted, and the
 engine then treats the world as holding one faction.
 
-That rule is written at six places in the world module, each as
-`faction_count.max(1)`. The world builder uses it to assign a faction to each
-unit. The settlement founding uses it to refuse a faction the world does not
-hold. The run founding uses it to bound its loop. Two more refusals use it, and
-the faction ceiling of the holding pass uses it.
+That rule is written at several places in the world module, each as
+`faction_count.max(1)`. The settlement founding uses it to refuse a faction the
+world does not hold. The run founding uses it to bound its loop. Two more
+refusals use it, and the faction ceiling of the holding pass uses it. Test code
+and the benchmarks repeat the same coercion again.
+
+**Do not trust a count of the sites, including one this item states.** This
+item first said six and an audit on 3 September 2026 found five in the module,
+with more outside it. Nobody restated it and nothing failed, which is the same
+defect the item is about: the number of declaration sites is itself a fact this
+document declares a second time. **Derive the count from the tree when you
+refine this**, and put the search command in the commit body.
 
 Nothing fails when the copies disagree. A contributor who changes one of them,
 or who adds a seventh site and forgets the coercion, gets a world whose parts

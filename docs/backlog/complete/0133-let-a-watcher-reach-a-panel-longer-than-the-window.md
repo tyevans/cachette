@@ -123,5 +123,5 @@ holds the work.[^5]
 [^2]: ADR-0067, the viewer reads the world and never writes to it. `docs/adrs/accepted/adr-0067-the-viewer-reads-the-world-and-never-writes-to-it.md`
 [^3]: ADR-0070, the head-up display reports what the drawing pass read. `docs/adrs/accepted/adr-0070-the-head-up-display-reports-what-the-drawing-pass-read.md`
 [^4]: Decisions register, DEC-084. `docs/DECISIONS.md`
-[^5]: Backlog item 0206. `docs/backlog/proposed/0206-let-the-agent-tool-read-what-the-panel-reads.md`
+[^5]: Backlog item 0206. `docs/backlog/complete/0206-let-the-agent-tool-read-what-the-panel-reads.md`
 [^6]: Decisions register, DEC-078. `docs/DECISIONS.md`

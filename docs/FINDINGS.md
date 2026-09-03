@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-329**
+**Next number: FND-330**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -605,7 +605,7 @@ this package is documented owns both.
 ### FND-326 — The panel cut one line kind of eight, and the other seven stayed inside it by luck
 
 **Believed.** The panel cuts a value that does not fit, so that text can never
-be written over the panel edge.[^F321A]
+be written over the panel edge.[^F326A]
 
 **True.** One line kind cut its value. The title, the note, the heading, the
 legend row, the ground row and the founding row all wrote from the left margin
@@ -9228,7 +9228,7 @@ commodity, and the ration a unit receives is not that account.
 
 ## References
 
-[^F321A]: The head-up display, the row drawing. `crates/cachette-view/src/hud.rs`
+[^F326A]: The head-up display, the row drawing. `crates/cachette-view/src/hud.rs`
 [^F218B]: ADR-0067, the viewer reads the world and never writes to it, decision D4. `docs/adrs/accepted/adr-0067-the-viewer-reads-the-world-and-never-writes-to-it.md`
 [^F322B]: ADR-0094, the caller owns the camera and the pixels, decision D1. `docs/adrs/draft/adr-0094-the-caller-owns-the-camera-and-the-pixels.md`
 [^F323A]: ADR-0070, the head-up display reports what the drawing pass read, decision D1. `docs/adrs/accepted/adr-0070-the-head-up-display-reports-what-the-drawing-pass-read.md`
@@ -9320,6 +9320,78 @@ file and gives a contributor no reason to look for the other site. The record on
 the provenance of the documentation prose forbids a docstring on a stub member
 that the compiled module provides, and it names this as a defect it does not
 fix.[^F321C] A backlog item holds the removal and the check.[^F321D]
+### FND-329 — A backlog item decays fastest at the sentence that tells a reader not to take it
+
+**Believed.** A backlog item in `proposed/` is an idea and costs nothing while
+it waits. The guide says an item there may be one sentence, so a stale item is
+a small loss and the priority index carries the judgement that matters.[^F329A]
+
+**True.** An item decays like any other document, and the sentence that decays
+first is the one a reader acts on. An audit of the 89 items in `proposed/` on
+3 September 2026 found the same shape in nine of them, and in three cases the
+stale sentence was the reason nobody had taken the item.
+
+**The worst case is a deferral whose reason is gone.** Item 0039 carried a
+section headed "Do not build this yet". Its reason was that a unit has no plan
+and draws a fresh direction on each frame, so a refused unit does not repeat the
+choice that failed. A unit now takes its direction from the exit of its cell for
+the option it chose, and every input to that holds from one frame to the
+next.[^F329B] The demonstration world was driven for 400 ticks: a unit held its
+tile against a target the ground admits 61 times, and one unit was refused on
+five consecutive frames. **The item said the condition could not arise, and the
+engine produced it 61 times in one run.**
+
+**Two other deferrals had the same shape.** Item 0272 says no measurement exists
+on the target platform. One does, and it names the pass this item is about: the
+choice costs 0.571 milliseconds of a frame of about 836.[^F329C] Item 0270 asks
+for a vector rewrite of that pass and quotes 71.4 milliseconds for it from the
+same register, which marks the figure stale in its own words on another
+page.[^F329C] **One register said both things at once, and two items read the
+half that suited them.**
+
+**A closed premise also makes an item invisible.** Item 0206 states in its own
+first section that another worker closed every gap it names, and asks whoever
+merges the two to close it. It stayed open. The priority index carried a row
+saying "Do not take it", so the index was paying to point at an item that should
+not have existed.
+
+**Four items carried a count that the tree had moved past.** Item 0278 said the
+demonstration world holds no character and that no unit holds a ranked position.
+Driven again, the same world seats 16 of 32 ranked positions and holds 26
+characters at tick 200. Item 0145 said the faction coercion is written at six
+places; there are five in the module and more outside it. Item 0222 said the
+error hierarchy holds seven leaves; it holds eight. Item 0072 said one test
+calls the panel fit check; two do.
+
+**Evidence.** The audit read every item in `proposed/`, then measured the three
+claims above by driving the engine rather than by reading it. The probe built
+the demonstration world, founded a run for every faction, stepped 400 frames and
+printed the counts. The commit body holds the command and the output.
+
+**Follows.** Four things.
+
+**A count in a backlog item rots exactly as a count in a decision record
+does.** The scope rule bans a count from a record and sends it to the commit
+message.[^53] The backlog has no such rule, and it does not need the same
+one, because a count is often the whole argument for an item. It needs the
+weaker rule: **a count in an item is dated evidence, not a current fact, and a
+reader who plans against it derives it again first.**
+
+**A "do not take this yet" section is the highest-value line in the backlog and
+nothing rechecks it.** It stops work. Its reason is a claim about the code, and
+the code moves. **State the reason as a condition that can be tested, not as a
+description of how things are**, so a later reader can run something and find
+out.
+
+**An item that says it is superseded is not closed by saying so.** Item 0206
+said it for a day and the index repeated it. The close is the work.
+
+**The priority index and the item can hold opposite claims and no check sees
+it.** The index said the project pins a stable toolchain, so the portable vector
+library is out of reach. Item 0270 says the project moved to a dated nightly and
+that the move was made for that item, and the toolchain file agrees with the
+item.[^F329E] Both documents were right when written. The checks compare an
+index against the set of open items and never against what an item says.
 
 
 ## References
@@ -9332,6 +9404,11 @@ fix.[^F321C] A backlog item holds the removal and the check.[^F321D]
 [^F321A]: Findings register, FND-320, in this document.
 [^F321C]: ADR-0107, the Python reference is generated from the compiled module, decision D3. `docs/adrs/draft/adr-0107-the-python-reference-is-generated-from-the-compiled-module.md`
 [^F321D]: Backlog item 0307, generate the type stub from the compiled module. `docs/backlog/proposed/0307-generate-the-type-stub-from-the-compiled-module.md`
+
+[^F329A]: Backlog guide, the line between proposed and refined. `docs/backlog/README.md`
+[^F329B]: Findings register, FND-315, in this document.
+[^F329C]: Target platform costs, the stage split and where the unit cost goes. `docs/reference/graviton-costs.md`
+[^F329E]: The pinned toolchain. `rust-toolchain.toml`
 
 [^F261B]: The holder count test of the viewer. `crates/cachette-view/tests/shows_who_holds_the_ground.rs`
 [^F261C]: Backlog item 0271, count the ground generations that one frame runs. `docs/backlog/proposed/0271-count-the-ground-generations-that-one-frame-runs.md`
@@ -9535,7 +9612,7 @@ fix.[^F321C] A backlog item holds the removal and the check.[^F321D]
 [^F187B]: PRD-0003, a developer sees a world worth looking at. `docs/product/accepted/prd-0003-a-developer-sees-a-world-worth-looking-at.md`
 [^F198A]: The panel and the cards. `crates/cachette-view/src/`
 [^F199A]: The agent protocol server. `python/cachette/agent/server.py`
-[^F199B]: Backlog item 0206. `docs/backlog/proposed/0206-let-the-agent-tool-read-what-the-panel-reads.md`
+[^F199B]: Backlog item 0206. `docs/backlog/complete/0206-let-the-agent-tool-read-what-the-panel-reads.md`
 [^F200A]: The viewer suite for the glass. `crates/cachette-view/tests/shows_the_moment_on_the_glass.rs`
 [^F201A]: Findings register, FND-193, in this document.
 [^F201B]: Backlog item 0208. `docs/backlog/complete/0208-draw-the-boundary-of-a-holding-and-not-of-every-tile.md`
