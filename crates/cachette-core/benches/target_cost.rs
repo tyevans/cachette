@@ -522,26 +522,31 @@ fn placement_rows(arguments: &[String]) {
     println!("# scattered: the units spread over the whole world at a stride");
     println!("bench\ttiles\tunits\tthreads\tsamples\tmin_ns\tmedian_ns\tmax_ns");
 
+    // The thread list is a parameter, so one run answers whether a result
+    // holds at every thread count under both patterns rather than at one.
+    let thread_counts = numbers_from(THREADS_VAR, &[threads]);
     for (name, scattered) in [("packed", false), ("scattered", true)] {
-        let capacity = units.max(1024);
-        let mut world =
-            World::new(extent.config(capacity)).expect("the extent must describe a world");
-        let placed = if scattered {
-            populate_scattered(&mut world, units)
-        } else {
-            populate(&mut world, units)
-        };
-        for _ in 0..WARMUP_FRAMES {
-            world.step(threads).expect("the step must run");
+        for threads in thread_counts.iter().copied() {
+            let capacity = units.max(1024);
+            let mut world =
+                World::new(extent.config(capacity)).expect("the extent must describe a world");
+            let placed = if scattered {
+                populate_scattered(&mut world, units)
+            } else {
+                populate(&mut world, units)
+            };
+            for _ in 0..WARMUP_FRAMES {
+                world.step(threads).expect("the step must run");
+            }
+            let samples = samples_of(move || {
+                let start = now();
+                let log = world.step(threads).expect("the step must run");
+                let elapsed = start.elapsed().as_nanos();
+                std::hint::black_box(log.len());
+                elapsed
+            });
+            report(name, extent.tiles(), placed, threads, &samples);
         }
-        let samples = samples_of(move || {
-            let start = now();
-            let log = world.step(threads).expect("the step must run");
-            let elapsed = start.elapsed().as_nanos();
-            std::hint::black_box(log.len());
-            elapsed
-        });
-        report(name, extent.tiles(), placed, threads, &samples);
     }
 }
 
