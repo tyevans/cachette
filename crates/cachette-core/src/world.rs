@@ -5086,7 +5086,7 @@ fn admit(
                 // segment. A reader is per-thread, because it carries the
                 // position of its own walk.[^9]
                 //
-                // [^9]: Findings register, FND-302. `docs/FINDINGS.md`
+                // [^9]: Findings register, FND-295. `docs/FINDINGS.md`
                 let mut cursor = bridge.tile_cursor();
                 for segment in chunk.iter_mut() {
                     let Some(address) = grid.address_of(TileIdx(segment.tile)) else {
@@ -5135,7 +5135,7 @@ fn admit(
         // too, and neither table changes while this loop runs. One forward
         // reader for each therefore replaces a search for each segment.[^10]
         //
-        // [^10]: Findings register, FND-305. `docs/FINDINGS.md`
+        // [^10]: Findings register, FND-300. `docs/FINDINGS.md`
         let mut standing_at = 0usize;
         let mut arrived_at = 0usize;
         for segment in &segments {

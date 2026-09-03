@@ -634,7 +634,7 @@ impl UnitTileBridge {
     ///
     /// # References
     ///
-    /// [^1]: Findings register, FND-302. `docs/FINDINGS.md`
+    /// [^1]: Findings register, FND-295. `docs/FINDINGS.md`
     pub fn units_on_tile(&self, cursor: &mut TileCursor, tile: TileIdx) -> &[Entity] {
         let Some(key) = self.layout.key_of(tile) else {
             return &[];
