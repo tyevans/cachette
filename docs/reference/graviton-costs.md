@@ -429,8 +429,9 @@ switches and left 62 percent of the cost in one residual. This one names every
 pass, and the residual is 0.0025 percent.
 
 **A later section supersedes this one.** Backlog item 0291 changed the largest
-pass named here, and the section that measures the tree after it is above the
-huge page section.[^ITEM291] Read this table as the cost before that change.
+pass named here, and item 0297 changed the two passes beside it. The section
+that measures the tree after both is above the huge page section.[^ITEM291]
+[^ITEM297] Read this table as the cost before those changes.
 
 Machine C. 16,777,216 tiles, 1,000,000 units scattered, 12 threads, block edge
 32. The kernel gave transparent huge pages on the `madvise` setting, which is
@@ -557,6 +558,9 @@ two can be compared.
 
 ## Every stage of a frame, after the candidate pass became a bit plane
 
+**A later section supersedes this one**, and it is above the huge page
+section.[^ITEM297]
+
 **This section supersedes the section above it.** That one measured the tree
 before backlog item 0291, in which the candidate pass of the holding spread
 built a list of tile indices and ordered it with a comparison sort. The pass
@@ -667,6 +671,19 @@ setting, which the engine never asks for, so read this table as the cost
 without huge pages.
 
 | Machine D | Value |
+## Every stage of a frame after the ground read moved last
+
+**This section supersedes every stage table above it.** Two of those tables
+measured trees that no longer exist, and the shares in them are against frames
+that no longer exist either. Read them as history.
+
+Backlog item 0297 changed three things inside the holding spread: the rule that
+decides a tile reads the ground last rather than first, the walk through the
+derived unit structure replaced a search for each tile, and the two repairs
+after a write took a thread count.[^ITEM297] Other work between the tables
+changed the tile value field and the change merge.
+
+| Machine C | Value |
 |---|---|
 | Instance type | `c7g.4xlarge` |
 | Region | `us-west-2` |
@@ -746,6 +763,89 @@ opened this work measured the write side, because the write side is what the
 stage table named. A structure is not priced by the pass that carries its
 name.[^DENSE2]
 
+| Kernel | `Linux 6.18.44-99.149.amzn2023.aarch64` |
+| Compiler | `rustc 1.91.1 (ed61e7d7e 2025-11-07)` |
+| Base commit before | `21a82f5f14e15b3fd129d881687d32a8ed41df67` |
+| Base commit after | `0f8d54b56ecee5b8bcb3bff62ecfe011583f5b29` |
+| Crate features | `stage-cost` |
+| Date | 3 September 2026 |
+
+16,777,216 tiles, 1,000,000 units scattered, 12 threads, block edge 32. The
+kernel gave transparent huge pages on the `madvise` setting, which the engine
+never asks for, so read this table as the cost without huge pages. Every row is
+the mean of nine frames after two warm-up frames, from one run.
+
+### What the three changes bought
+
+| Stage | Before, ns | After, ns | Change |
+|---|---|---|---|
+| `holding_spread` | 121,594,656 | 70,520,746 | 42.0 percent less |
+| — of which `holding_decide` | 69,666,121 | 33,468,314 | 52.0 percent less |
+| — of which `holding_apply` | 34,010,330 | 18,638,605 | 45.2 percent less |
+| — of which `holding_candidates` | 16,783,043 | 17,347,039 | 3.4 percent more |
+| **The frame, timed from outside** | **300,016,572** | **249,035,855** | **17.0 percent less** |
+
+**The frame is 2.49 times its budget of 100 milliseconds.**[^BUDG291] It was 8.3
+times that budget before the candidate pass changed, so the two items together
+took it from 8.3 to 2.5.
+
+**A third run divides the deciding change.** Reading the ground last, on its own,
+took the deciding pass from 69,666,121 to 41,580,885 nanoseconds. Walking the
+derived unit structure rather than searching it took the rest, to 33,468,314. The
+run between the two is not in this table because the tree it measured was a
+measurement point and not a commit anyone should return to.
+
+**The candidate pass reads 3.4 percent higher and nothing in it changed.** Treat
+that as the spread between two runs of this apparatus at this size, which an
+earlier section put at 2.4 percent.
+
+### The whole frame
+
+| Stage | ns for each frame | Share of the frame | Takes a thread count |
+|---|---|---|---|
+| `holding_spread` | 70,520,746 | 28.32 percent | yes |
+| — of which `holding_decide` | 33,468,314 | 13.44 percent | yes |
+| — of which `holding_apply` | 18,638,605 | 7.48 percent | yes |
+| — of which `holding_candidates` | 17,347,039 | 6.97 percent | yes |
+| `change_merge` | 43,591,292 | 17.50 percent | **no** |
+| `admit` | 32,461,246 | 13.03 percent | yes |
+| `bridge_refresh_barrier` | 31,474,424 | 12.64 percent | yes |
+| `tile_scan` | 20,317,530 | 8.16 percent | yes |
+| `influence_solve` | 13,343,828 | 5.36 percent | yes |
+| `rebuild_level_1` | 6,571,927 | 2.64 percent | yes |
+| `stamp_holders` | 6,249,835 | 2.51 percent | **no** |
+| `log_join` | 5,515,419 | 2.21 percent | **no** |
+| `movement_intents` | 3,150,753 | 1.27 percent | yes |
+| `gather` | 1,986,444 | 0.80 percent | yes |
+| `build` | 1,525,866 | 0.61 percent | yes |
+| `place_granted` | 698,822 | 0.28 percent | **no** |
+| `choose` | 546,063 | 0.22 percent | yes |
+| `consume` | 163,657 | 0.07 percent | yes |
+| `reap` | 30,716 | 0.01 percent | yes |
+| `apply_rates` | 616 | under 0.01 percent | yes |
+| `bridge_refresh_after_reap` | 377 | under 0.01 percent | yes |
+| `settle_positions` | 367 | under 0.01 percent | yes |
+| `depletion_recover` | 297 | under 0.01 percent | **no** |
+| `bridge_refresh_opening` | 208 | under 0.01 percent | yes |
+| **Every stage** | **238,150,441** | | |
+| **The frame, timed from outside** | **249,035,855** | | |
+
+**The frame no longer has one dominant stage.** The largest is 28.3 percent and
+the next four are between 8 and 18 percent. The holding spread was 61.5 percent
+when the stage table was first taken.
+
+**The change merge is the largest serial pass, at 17.5 percent.** Four stages
+take no thread count and together they are 22.5 percent of the frame. The merge
+is three quarters of that.
+
+**The level 1 rebuild is 2.64 percent.** A plan written from an earlier table
+called it 16.9 percent and put it second. Nothing in the rebuild changed between
+the two readings, and a finding holds what that cost.[^DENOM297]
+
+**The residual is 10,885,414 nanoseconds, which is 4.37 percent of the frame.**
+It has grown as a share because the frame shrank, and it is 12 milliseconds in
+absolute terms in every run since the candidate pass began allocating on each
+frame. The cause is still not identified.[^RESID291]
 
 ## Huge pages
 
@@ -1249,3 +1349,5 @@ commit what changed. Do not edit a row to make a later run agree with it.
 
 [^DENSE1]: ADR-0103, the tile value field stores a dense delta, never a sparse change list. `docs/adrs/draft/adr-0103-the-tile-value-field-stores-a-dense-delta.md`
 [^DENSE2]: Findings register, FND-292. `docs/FINDINGS.md`
+[^ITEM297]: Backlog item 0297, take the rest of the holding spread. `docs/backlog/complete/0297-take-the-rest-of-the-holding-spread.md`
+[^DENOM297]: Findings register, FND-296. `docs/FINDINGS.md`
