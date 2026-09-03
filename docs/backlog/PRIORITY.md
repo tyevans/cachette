@@ -122,6 +122,7 @@ These are real and none of them blocks anything today.
 | 0221 | Source footnotes name the registry for six records that now have files. FND-214 found it. Nothing fails and nothing will, so it sits here, and it is worth a check rather than a sweep because the next reserved number a source file cites will do the same. |
 | 0222 | The error hierarchy declares three exception types that nothing raises. ADR-0046 states the gap in its own consequences rather than claiming the capability, so a reader is not misled today. It waits on the selector for one of the three. |
 | 0229 | The first measurement on the target platform found a frame cost at 4,096 tiles that disagrees with every larger extent, and four threads beat one thread on a machine with two. It sits last because it explains a figure rather than repairing behaviour, and because 4,096 tiles is the size most tests use, so anything it finds is paid by the suite and not by a player. |
+| 0251 | The Python test recipe now costs about as much as the whole gate budget, and 22 tests each start the agent server as a fresh subprocess. It sits here rather than higher because no per-module figure exists yet: the cost is known for the whole Python run and not for this module, and a shared fixture that hides a state leak between tests would be worse than the wait. Measure first, then decide. |
 
 ## References
 
