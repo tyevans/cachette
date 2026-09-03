@@ -5587,7 +5587,7 @@ a unit changes neither by moving.
 against the deficit of a unit. If no movement can produce a deficit, then no
 movement can drive the option, and the option cannot close a loop with
 movement. Two open items exist to make a step read the option a unit chose and
-to let the engine order a gather.[^F231A] [^F231B] Neither can produce a unit
+to let the engine order a gather.[^F226A] [^F226B] Neither can produce a unit
 that grew hungry by travelling, because nothing does.
 
 **It also bears on a strategy that a unit would follow.** A record under
@@ -6059,6 +6059,4 @@ quietly: the value is read back correctly and it is the wrong value.
 [^236D]: ADR-0021, a layout claim names one structure and one pass, and never a tier, decision D1. `docs/adrs/draft/adr-0021-layout-follows-the-access-pattern.md`
 [^37HOME]: Decisions register, DEC-017. `docs/DECISIONS.md`
 [^37NEXT]: Decisions register, DEC-093. `docs/DECISIONS.md`
-[^F231A]: Backlog item 0185, steer a step by the option the unit chose. `docs/backlog/complete/0185-steer-a-step-by-the-option-the-unit-chose.md`
-[^F231B]: Backlog item 0186, let the engine order a gather. `docs/backlog/complete/0186-let-the-engine-order-a-gather.md`
 [^F231C]: The starvation suite of the core. `crates/cachette-core/tests/starvation.rs`
