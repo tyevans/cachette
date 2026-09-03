@@ -545,6 +545,41 @@ impl UnitTileBridge {
         Ok(&self.units[low..high])
     }
 
+    /// Returns the keys and the units of one block, in key order.
+    ///
+    /// A pass that answers many tiles of one block reads the block once and
+    /// walks through it, rather than searching the block for each tile. The
+    /// two slices are the same length, and entry `n` of one describes entry
+    /// `n` of the other.[^1]
+    ///
+    /// The keys of one block are in ascending order, and the low part of a key
+    /// is the row-major offset of the tile inside the block. A caller that
+    /// visits the tiles of a block in ascending tile order therefore asks for
+    /// ascending keys, and can keep one cursor rather than search.
+    ///
+    /// This read takes no arena and performs no freshness check. It reports
+    /// what the last rebuild found, which may no longer describe the world. A
+    /// caller establishes freshness once, before it starts to walk, and the
+    /// borrow of the arena is what stops the world changing under it.
+    ///
+    /// Returns two empty slices for a block that the world does not hold.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0018, the unit-to-tile bridge is derived, and it rebuilds at the barrier, decision D2. `docs/adrs/accepted/adr-0018-the-unit-to-tile-bridge-is-derived-and-rebuilds-at-the-barrier.md`
+    #[must_use]
+    pub fn block_window(&self, block: u32) -> (&[u64], &[Entity]) {
+        let Some(range) = self.ranges.get(block as usize) else {
+            return (&[], &[]);
+        };
+        let start = range.start as usize;
+        let end = start + range.length as usize;
+        if end > self.units.len() || end > self.keys.len() {
+            return (&[], &[]);
+        }
+        (&self.keys[start..end], &self.units[start..end])
+    }
+
     /// Returns the units that stand inside one block.
     ///
     /// A system that needs many per-tile answers within one block reads the
