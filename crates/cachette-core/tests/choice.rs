@@ -13,7 +13,7 @@
 //! [^1]: Testing rules, section 5. `.claude/rules/testing.md`
 //! [^2]: Testing rules, section 2a. `.claude/rules/testing.md`
 
-use cachette_core::choose::{self, ChoiceSchedule, SCORE_FLOOR};
+use cachette_core::choose::{self, ChoiceSchedule, NeedBuckets, SCORE_FLOOR};
 use cachette_core::cohort::{NeedRule, NEED_FULL};
 use cachette_core::resource::ResourceKind;
 use cachette_core::terrain::TileKind;
@@ -835,12 +835,13 @@ fn drive_to_a_divergent_need(world: &mut World, unit: Entity) -> Fix32 {
         .cell(settled.cell)
         .expect("the unit stands in a cell of the pyramid");
     let profile = choose::WeightProfile::EVEN;
+    let buckets = world.need_buckets();
     let target = (0..NEED_FULL.0)
         .map(Fix32)
         .find(|need| {
-            let bucket = choose::bucket_need(choose::need_bucket(*need));
+            let lower = buckets.need(buckets.bucket(*need));
             choose::best_option(*need, summary, &profile)
-                != choose::best_option(bucket, summary, &profile)
+                != choose::best_option(lower, summary, &profile)
         })
         .expect("the fixture must reach a need whose bucket changes the answer");
 
@@ -935,6 +936,7 @@ fn a_cell_answers_once_for_every_unit_that_shares_a_bucket() {
     let home = first_open_address(&world);
     let summary = world.summary_covering(home).expect("the cell exists");
     let profile = choose::WeightProfile::EVEN;
+    let buckets = world.need_buckets();
 
     // Every bucket, read from the inside first and read many times over.
     //
@@ -945,12 +947,12 @@ fn a_cell_answers_once_for_every_unit_that_shares_a_bucket() {
     // beside the table and never read back out of it.[^1]
     //
     // [^1]: Testing rules, section 2a. `.claude/rules/testing.md`
-    let mut full = choose::CellAnswers::new(summary);
-    let inset = 1 << (choose::NEED_BUCKET_SHIFT - 1);
+    let mut full = choose::CellAnswers::new(summary, buckets);
+    let inset = 1 << (buckets.shift() - 1);
     let mut divergent = 0;
     for round in 0..8 {
-        for bucket in 0..choose::NEED_BUCKET_COUNT - 1 {
-            let lower = choose::bucket_need(bucket);
+        for bucket in 0..buckets.count() - 1 {
+            let lower = buckets.need(bucket);
             let inside = Fix32(lower.0 + inset + round);
             let expected = choose::best_option(lower, summary, &profile);
             if round == 0 && choose::best_option(inside, summary, &profile) != expected {
@@ -969,13 +971,13 @@ fn a_cell_answers_once_for_every_unit_that_shares_a_bucket() {
     );
     assert_eq!(
         full.scored_count(),
-        choose::NEED_BUCKET_COUNT - 1,
+        buckets.count() - 1,
         "the deciding work of a cell has a ceiling that the reader count cannot raise"
     );
 
     // Many readers, one bucket. The table scores once.
-    let mut shared = choose::CellAnswers::new(summary);
-    let step = 1 << (choose::NEED_BUCKET_SHIFT - 4);
+    let mut shared = choose::CellAnswers::new(summary, buckets);
+    let step = 1 << (buckets.shift() - 4);
     for offset in 0..16 {
         shared.answer(Fix32(offset * step), &profile);
     }
@@ -983,5 +985,75 @@ fn a_cell_answers_once_for_every_unit_that_shares_a_bucket() {
         shared.scored_count(),
         1,
         "sixteen units of one bucket must cost one answer"
+    );
+}
+
+/// The width of a bucket is a parameter, and a caller may set it.
+///
+/// **The width is the mechanism of the decision and not a detail of it.** A
+/// need is a Q16.16 quantity, so unbucketed two units in one cell almost never
+/// share a need and the pass computes one answer for each unit.[^1] No record
+/// sets the width and no measurement chooses it, so the world takes it as a
+/// parameter and a register holds the open choice.[^2] [^3]
+///
+/// # References
+///
+/// [^1]: ADR-0098, the choice is decided for each cell and each bucket of need, decision D1. `docs/adrs/draft/adr-0098-the-choice-is-decided-for-each-cell-and-each-bucket-of-need.md`
+/// [^2]: Blockers register, BLK-007. `docs/BLOCKERS.md`
+/// [^3]: Decisions register, DEC-097. `docs/DECISIONS.md`
+#[test]
+fn the_width_of_a_bucket_is_a_parameter_and_it_decides_what_repeats() {
+    let mut world = one_cell_world();
+    assert!(
+        world
+            .set_need_buckets(choose::NEED_BUCKET_SHIFT_FLOOR - 1)
+            .is_err(),
+        "a bucket finer than the table holds must be refused"
+    );
+    assert!(
+        world
+            .set_need_buckets(choose::NEED_BUCKET_SHIFT_CEILING + 1)
+            .is_err(),
+        "a bucket coarser than the range holds must be refused"
+    );
+    assert!(world
+        .set_need_buckets(choose::NEED_BUCKET_SHIFT_CEILING)
+        .is_ok());
+    assert_eq!(
+        world.need_buckets().shift(),
+        choose::NEED_BUCKET_SHIFT_CEILING,
+        "the world must hold the width the caller set"
+    );
+
+    // A wide bucket and a narrow one over the same two needs. The narrow one
+    // tells them apart and the wide one does not.
+    let finest = NeedBuckets::new(choose::NEED_BUCKET_SHIFT_FLOOR).expect("the floor is in range");
+    let coarsest =
+        NeedBuckets::new(choose::NEED_BUCKET_SHIFT_CEILING).expect("the ceiling is in range");
+    let low = Fix32(NEED_FULL.0 / 4);
+    let high = Fix32(NEED_FULL.0 / 4 + (1 << choose::NEED_BUCKET_SHIFT_FLOOR));
+    assert_ne!(
+        finest.bucket(low),
+        finest.bucket(high),
+        "the finest width must tell these two needs apart"
+    );
+    assert_eq!(
+        coarsest.bucket(low),
+        coarsest.bucket(high),
+        "the coarsest width must not"
+    );
+
+    // The count follows the width, and it is never read from a second place.
+    assert!(coarsest.count() < finest.count());
+    assert!(finest.count() <= choose::NEED_BUCKET_CEILING);
+    assert_eq!(
+        finest.need(finest.count() - 1),
+        NEED_FULL,
+        "the last bucket holds the full need alone, so a unit that needs everything scores exactly"
+    );
+    assert_eq!(
+        coarsest.need(coarsest.count() - 1),
+        NEED_FULL,
+        "and the same holds at the other end of the range"
     );
 }

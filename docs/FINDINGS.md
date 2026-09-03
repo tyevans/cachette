@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-263**
+**Next number: FND-264**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -6633,6 +6633,93 @@ because each part sounds like it needs a record and the reviewer's instinct is
 to write three. The evidence that separates them is in the source and in the
 registry, not in the framing.
 
+### FND-263 — The needs of one cell spread widest while a store empties, and they polarise afterwards
+
+**Believed.** Two things, and both were reasonable. The first is that a need is
+a fixed-point quantity, so two units in one cell almost never share one and a
+key on the exact need reduces nothing.[^F259A] The second is that no fixture in
+this project produces the distribution, because it needs settlements, home sites
+and a running economy and the benchmark world holds none of the three.[^F259B]
+
+**True, with a correction to the first and a replacement for the second.** A
+fixture now exists and the distribution is measured.[^F259C]
+
+**The measurement.** A world of 65,536 tiles, 64 level 1 cells, 64 settlements,
+about 4,000 units with a home each, and the economy running on every tick. The
+median cell holds about 75 units, which is the density the project states for
+the target scale. Two placements bound the answer: **mixed** gives neighbouring
+units different homes, **clustered** gives a run of neighbouring units one home.
+The figures are the median cell. The collapse is the units of that cell divided
+by the distinct keys in it.
+
+| Frame | Distinct exact needs | Buckets at the matched width | Buckets four times finer |
+|---|---|---|---|
+| 4 | 14 | 5 | 14 |
+| 8 | 26 | 9 | 26 |
+| 16 | 41 | 17 | 41 |
+| 32 | 24 | 11 | 22 |
+| 64 | 12 | 4 | 9 |
+
+The clustered placement holds 7 to 9 distinct exact needs at every frame.
+
+**The first belief is false as stated, and its conclusion holds for another
+reason.** An exact key does not give one distinct value for each unit. It gives
+14 to 41 out of about 75, because a cohort is one site and one faction, and every
+unit of one cohort draws one ration and holds one need exactly. **The distinct
+keys of a cell are bounded by the cohorts standing in it**, and that is a
+structural fact rather than a figure of this fixture.
+
+**The bound belongs to the content, and that is what decides the question.** A
+world that gave every unit a site of its own would put one key on every unit, and
+nothing in the engine refuses such a world. **A bound a content author can remove
+cannot carry a claim that the population must not raise the work.** The bucket
+gives a bound the engine holds, so the conclusion that the key must be a bucket
+survives. What does not survive is the reason given for it.
+
+**The measured collapse says the same thing in the other direction.** At the
+moment the needs are most spread, the exact key collapses the median cell 1.8
+times. A pass that does half the per-unit work is not a pass whose cost follows
+the lattice. So the exact key fails the claim on the measurement as well as on
+the argument, and it fails it in a world whose cohorts are already sharing.
+
+**The spread is transient and the steady state is polarised.** The decay takes a
+fixed amount and the gain is a share of a store. A cohort whose share is below
+the decay falls to the floor and stays. One whose share is above it rises to the
+ceiling and stays. The values between the two are what a store produces while it
+empties, so the spread rises to a peak and then falls as each site settles on one
+side. **The peak is the case that decides the width**, and it is the case a run
+of a few frames misses.
+
+**Follows.** **The width is matched to the rate at which a need moves, and the
+measurement is why.** The default need rule takes a fixed amount off a unit on
+every tick. A bucket of that amount means a unit crosses one bucket in one tick.
+A finer bucket separates two needs that the rule cannot separate inside a tick,
+and the table above shows what that costs: four times finer than the matched
+width gives 41 distinct keys against 17 at the peak, and the collapse falls from
+4.4 to 1.8. **The finer bucket buys nothing and it is not free.**
+
+**The decay is a parameter of the need rule, so the two are coupled.** A caller
+who changes the decay and leaves the width alone has unmatched them. That
+coupling is why the width is a parameter of the world and not a constant of a
+module. An open decision closed against this measurement.[^F259D]
+
+**The width changes where the population ends up, and the fixture showed it by
+accident.** The measurement was taken twice, once at each of two default widths,
+because the fixture reads the width the world holds. The median cell held 71
+units at the finer width and 67 at the matched one, at the same frame of the same
+seed. A unit takes its option from its bucket and its step from its option, so a
+different width moves a different population. **No golden file sees any of
+this**, and a separate finding records why.[^F259F]
+
+**This is not a cost figure and no blocker governs it.** The simulation is
+deterministic integer arithmetic, so every number above is the same on every
+machine. The register that holds measured cost figures is for the target
+platform, and this belongs in neither that register nor the derived one.[^F259E]
+
+**What this does not measure.** Whether the matched width dithers a unit's
+behaviour, and what the real placement of homes in a played world looks like.
+The two placements bound the answer and neither predicts it.
+
 ### FND-262 — The choice quantised the need, and no golden scenario reaches the case it changes
 
 **Believed.** Deciding the choice for each cell and each bucket of need changes
@@ -6676,6 +6763,14 @@ This is the same shape the register already holds twice, where a fixture modelle
 the typical case and supplied no extreme.[^F262D] The new part is that the
 fixture here is the golden corpus itself, which the project treats as the
 authority on whether behaviour moved.
+
+**The width of the bucket can be varied over most of its range and no golden file
+moves.** The width was set to four different values spanning a factor of eight,
+and every scenario matched its stored file each time. So the gate is blind not
+only to the quantisation but to the parameter that decides how much the
+quantisation does. **That parameter is the mechanism of the decision**, and a
+review of the governing record said so before any of this was measured. A
+register holds the value and the measurement it was chosen against.[^F259D]
 
 **The remedy is not a new golden scenario.** A scenario built to sit on a bucket
 boundary would pin the boundary rather than the behaviour, and the record says
@@ -6894,6 +6989,16 @@ distinguished the two.
 [^F262B]: ADR-0098, the choice is decided for each cell and each bucket of need, decision D1. `docs/adrs/draft/adr-0098-the-choice-is-decided-for-each-cell-and-each-bucket-of-need.md`
 [^F262D]: Findings register, FND-051 and FND-048, in this document.
 [^F262E]: ADR-0098, the choice is decided for each cell and each bucket of need, the consequences. `docs/adrs/draft/adr-0098-the-choice-is-decided-for-each-cell-and-each-bucket-of-need.md`
+[^F259A]: Review of ADR-0096, correction 1. The review artefact sits on the branch that holds it, so this branch cannot resolve its path and the citation names it instead.
+[^F259B]: Target platform costs, would the choice pass collapse if it decided for each cell. `docs/reference/graviton-costs.md`
+[^F259C]: The need spread measurement. `crates/cachette-core/tests/need_spread.rs`
+[^F259D]: Decisions register, DEC-097. `docs/DECISIONS.md`
+[^F259E]: Budgets and costs, what belongs here. `docs/reference/budgets.md`
+[^F259F]: Findings register, FND-258, in this document.
+[^F258A]: Backlog item 0238, decide per cell and need rather than per unit. `docs/backlog/complete/0238-decide-per-cell-and-need-rather-than-per-unit.md`
+[^F258B]: ADR-0098, the choice is decided for each cell and each bucket of need, decision D1. `docs/adrs/draft/adr-0098-the-choice-is-decided-for-each-cell-and-each-bucket-of-need.md`
+[^F258D]: Findings register, FND-051 and FND-048, in this document.
+[^F258E]: ADR-0098, the choice is decided for each cell and each bucket of need, the consequences. `docs/adrs/draft/adr-0098-the-choice-is-decided-for-each-cell-and-each-bucket-of-need.md`
 [^F226A]: Backlog item 0185, steer a step by the option the unit chose. `docs/backlog/complete/0185-steer-a-step-by-the-option-the-unit-chose.md`
 [^F226B]: Backlog item 0186, let the engine order a gather. `docs/backlog/complete/0186-let-the-engine-order-a-gather.md`
 [^F226C]: ADR-0063, a need is a rate with a threshold, and crossing it is a fact, decision D2. `docs/adrs/accepted/adr-0063-a-need-is-a-rate-with-a-threshold-and-crossing-it-is-a-fact.md`

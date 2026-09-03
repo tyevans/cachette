@@ -37,19 +37,39 @@ are all defensible, and each gives a different answer at a boundary.
 
 ### D1. The choice quantises the need into buckets, and one answer serves a bucket
 
-The engine divides the need range into a fixed number of equal buckets. It
-computes one answer for each cell and each bucket, and a unit reads the answer of
-its own bucket.
+The engine divides the need range into equal buckets. It computes one answer for
+each cell and each bucket, and a unit reads the answer of its own bucket.
 
-The bucket count is a resolution parameter with a behavioural consequence, so the
-reference table holds it with its derivation and this record does not state
-it.[^4] The bucket width is a power of two in the fixed-point scale, so the
-bucket of a need is a shift and never a division.
+**The width is the mechanism of this decision and not a detail of it.**
+Unbucketed, the key is the exact need, and the number of distinct keys in a cell
+is then bounded by the cohorts standing in that cell. A cohort is one site and
+one faction, and its units draw one ration and hold one need exactly, so units of
+one cohort share a key and units of two cohorts almost never do.[^12]
+
+**That bound belongs to the content and not to the engine.** A world that gave
+every unit a site of its own would put one key on every unit, and nothing in the
+engine refuses such a world. A bound that a content author can remove cannot
+carry D1, which asks for work that the population does not raise. **The bucket
+gives a bound that the engine holds**, and that is why the key is a bucket rather
+than a need.
+
+**The width is a parameter of the world, and this record does not set it.** It
+has a behavioural consequence and a cost consequence, and both are measured
+rather than argued, so the reference table holds the value and its derivation
+and this record holds neither.[^4] The bucket width is a power of two in the
+fixed-point scale, so the bucket of a need is a shift and never a division.
 
 **This changes behaviour, and the project accepts the change.** Two units whose
 needs sit in one bucket now receive one answer where they could have received
-two. The golden state hash therefore moves, and the move is stated here rather
-than discovered by a reviewer.
+two, and a measured world puts a different population in a cell at one width than
+at another.[^12]
+
+**The golden state hash does not move, and that is a fact about the scenarios
+rather than about this decision.** No golden scenario reaches a need where the
+bucket changes the answer, and the width was varied over most of its range
+without moving a file. A finding holds the evidence and how it was
+taken.[^16] **A reader must not take a green gate as proof that this decision is
+inert.**
 
 ### D2. A bucket is scored at its lower bound
 
@@ -109,11 +129,19 @@ consumption pass fills and a decay empties.[^9] Rounding it in storage would
 round every arithmetic step that touches it, and the quantisation would leak out
 of the choice into a subsystem that never asked for it.
 
-**Give the bucket count a value that a measurement chooses.** The lazy fill of D3
-already caps the deciding work at the per-unit cost, so the count does not need
-to sit at a break-even point. Choosing it for behavioural fidelity rather than
-for cost is what D1 does, and a cost-chosen value would tie a behavioural
-parameter to a machine.
+**Fix the width in the module as a constant.** This is what the first
+implementation did, and it is rejected. The width that matches the dynamics
+depends on the rate at which a need moves, and that rate is a parameter of the
+need rule.[^9] A constant would hold one half of a coupled pair and give a caller
+no way to match the other. D1 therefore makes the width a parameter of the world,
+in the same way the interval is.[^14]
+
+**Choose the width from a cost figure.** The lazy fill of D3 caps the deciding
+work at the per-unit cost whatever the width, so a width chosen for cost alone
+would tie a behavioural parameter to a machine, and a blocker governs every cost
+figure this project holds.[^15] The width was instead chosen against a measured
+distribution of the needs of a cell, which is a property of the simulation rather
+than of a machine, and the register holds it.[^13]
 
 ## Consequences
 
@@ -127,10 +155,12 @@ fixture that sets a need near a bucket boundary asserts a property of the
 boundary and not of the option set. A test that wants the option set states a
 need in the middle of a bucket.
 
-**The bucket count is now behaviour.** A change to it changes what units do, so
-it is not a tuning knob that a contributor may move to make a benchmark look
-better. It moves against a stated behavioural argument, and the golden files move
-with it.
+**The width is now behaviour, and nothing fails when it moves.** A change to it
+changes what units do, so it is not a tuning knob that a contributor may move to
+make a benchmark look better. **No golden file moves with it**, and a finding
+records that the width was varied over most of its range without moving one.[^16]
+So the only thing that stops a contributor is a reviewer reading the argument for
+the value, and a register holds that argument.[^13]
 
 **Nothing enforces D1 against a new pass.** This record binds the choice pass. A
 later pass that decides per unit gets no failure, in the same way that the cost
@@ -143,16 +173,14 @@ This record does not change which fields an option reads or how they compare. It
 does move the field read from the unit to the cell, so a normalisation added
 later is computed once for each cell rather than once for each unit.
 
-**The sharing may buy nothing, and the record accepts that.** The measurement
-register holds a table of the collapse a cell would show against the number of
-need buckets in play, and at the target density a cell holds about as many units
-as the reference table gives buckets.[^12] So in the worst case, where every unit
-of a cell lands in its own bucket, D1 shares no answer. **D3 is what makes that a
-weak loss rather than a cost**, because a cell scores the smaller of the units it
-holds and the bucket count. The measurement that would settle the bucket count is
-how many need values coexist in one cell in a world that consumes, and the
-register states that no fixture in this project produces one. An open decision
-holds it.[^13]
+**How much D1 shares depends on the width, and the width is now measured rather
+than guessed.** In a world that consumes, at the density the project states, the
+needs of a cell spread widest while the stores empty and polarise afterwards. At
+the widest spread the matched width shares about four readers to one answer, and
+a width four times finer shares almost nothing.[^12] **D3 is what makes a badly
+chosen width a weak loss rather than a cost**, because a cell scores the smaller
+of the units it holds and the bucket count. A closed decision holds the
+reasoning and what it rests on.[^13]
 
 **The interval stays.** The cost record argues that the interval becomes a choice
 rather than a necessity once the deciding work follows the lattice, and it
@@ -173,6 +201,8 @@ choice record still decides it.[^14]
 [^9]: ADR-0063, a need is a rate with a threshold, and crossing it is a fact, decision D1. `docs/adrs/accepted/adr-0063-a-need-is-a-rate-with-a-threshold-and-crossing-it-is-a-fact.md`
 [^10]: ADR-0096, cost follows the lattice, not the population, and a unit is a reader, the consequences. `docs/adrs/draft/adr-0096-cost-follows-the-lattice-not-the-population.md`
 [^11]: Findings register, FND-233. `docs/FINDINGS.md`
-[^12]: Target platform costs, would the choice pass collapse if it decided for each cell. `docs/reference/graviton-costs.md`
+[^12]: Findings register, FND-259. `docs/FINDINGS.md`
 [^13]: Decisions register, DEC-097. `docs/DECISIONS.md`
 [^14]: ADR-0064, a unit chooses by scoring a small fixed option set, decision D4. `docs/adrs/accepted/adr-0064-a-unit-chooses-by-scoring-a-small-fixed-option-set.md`
+[^15]: Blockers register, BLK-007. `docs/BLOCKERS.md`
+[^16]: Findings register, FND-258. `docs/FINDINGS.md`

@@ -79,48 +79,6 @@ change, because it also costs the reader an explanation.
 settlements and characters, since every memory figure the project holds is a
 lower bound taken on a world that holds neither.[^BLK7]
 
-### DEC-106 — How many buckets should the choice divide the need range into?
-
-**Context.** The choice is decided for each cell and each bucket of need, and a
-unit reads the answer of its bucket.[^D106A] The bucket count decides how finely
-the engine tells two needs apart, and it decides how much sharing the pass buys.
-The reference table holds the value the engine uses and its derivation.[^D106B]
-
-**The value in the engine was chosen for behaviour.** A bucket is a quarter of
-one tick of the default need decay, so a unit never acts on a need it did not
-hold within one tick.
-
-**A cost argument runs the other way.** The measurement register holds a table of
-the collapse a cell would show against the number of need buckets in play. At the
-target density the median cell holds about as many units as the engine holds
-buckets, so in the worst case, where every unit of a cell lands in its own
-bucket, the sharing saves nothing.[^D106C]
-
-**The loss is weak rather than a cost.** A cell scores a bucket the first time a
-unit asks for it, so the deciding work of a cell is the smaller of the units it
-holds and the bucket count. A fine bucket risks buying nothing. It cannot cost
-more than the per-unit pass it replaced.
-
-**Options.**
-
-1. **Keep the value.** Behaviour stays as fine as the need itself moves, and the
-   sharing is whatever the need distribution gives.
-2. **Take a coarser bucket.** The collapse rises in proportion, and two units
-   whose needs differ by less than a bucket act alike. This is a behavioural
-   change and the record that decides the quantisation would have to move.
-3. **Choose the value from a measured need distribution.** This is the answer the
-   question actually wants.
-
-**Recommendation: option 1, until the measurement exists.** The measurement that
-settles it is how many need values coexist in one cell in a world that consumes.
-The measurement register states that no fixture in this project produces one,
-because it needs settlements, home sites and a running economy, and the benchmark
-world holds none of the three.[^D106C] **Do not move this value against an
-argument.** Move it against that measurement.
-
-**Status: open.** Engineering owns it. One blocker governs every cost figure in
-this project.[^BLK7]
-
 ### DEC-088 — What share of its own cell must a tile keep before the window gives room to a gap?
 
 **Open. The window ships one half, and one half is the only value a sentence
@@ -1273,6 +1231,57 @@ ADR-0096, and that commit says which sentence went and why the edit is a repair.
 pointer that decays, a consequence that decays, and a claim that is wrong. The
 first and the third were settled. This closes the gap between them.
 
+### DEC-106 — How wide is a need bucket in the choice?
+
+**Closed. The width matches the rate at which a need moves.** A measurement
+settled it.
+
+**Context.** The choice is decided for each cell and each bucket of need, and a
+unit reads the answer of its bucket.[^D106A] **The width is the mechanism of that
+decision and not a detail of it.** Unbucketed, the key is the exact need, and the
+distinct keys in a cell are bounded by the cohorts standing in it rather than by
+anything the engine holds. A review of the record that governs the pass returned
+this defect and placed the choice of the width on the item that implemented
+it.[^D106E] **The review gave a different reason, and the measurement refuted the
+reason and not the conclusion.**[^D097F]
+
+**What was missing.** No measurement existed of how many need values coexist in
+one cell in a world that consumes. The measurement register said so in its own
+words, and named the three things a fixture would need.[^D106C]
+
+**The measurement now exists.** A world of 64 level 1 cells, 64 settlements, a
+home for every unit, and about 75 units in the median cell, which is the density
+the project states for the target scale. The findings register holds the table
+and the fixture is in the tree.[^D097F]
+
+**The answer, and it is not the one the author first chose.** The spread rises
+to a peak while the stores empty and falls afterwards, because a cohort whose
+share is below the decay falls to the floor and one whose share is above it rises
+to the ceiling. At the peak, a width four times finer than the decay gives 41
+distinct keys in a cell of 75 units. The matched width gives 17. **The finer
+bucket separates two needs that the rule cannot separate inside a tick, so it
+buys nothing and it is not free.**
+
+**The outcome.** A bucket is the amount the default need rule takes off a unit in
+one tick, so a unit crosses one bucket in one tick. A finer bucket resolves a
+distinction the dynamics do not make. A coarser one lets a need change without
+the bucket changing, so the choice lags the need.
+
+**The decay is a parameter of the need rule, so the two are coupled.** A caller
+who changes the decay and leaves the width alone has unmatched them. **That is
+why the width is a parameter of the world and not a constant of a module**, and
+the reference table holds the value a world starts with.[^D106B]
+
+**What the outcome rests on, and what it does not.** It rests on a measured
+distribution and on an argument about the dynamics. It does not rest on a cost
+figure, and one blocker still governs every cost figure this project holds.[^BLK7]
+Nobody has measured what the choice pass costs under this width on the target
+platform.
+
+**No gate can see this value.** The width was varied over most of its range and
+no golden file moved, because no golden scenario reaches a case that the width
+changes. A finding holds that, and it is the reason this row states its evidence
+rather than pointing at a green pipeline.[^D097G]
 
 ### DEC-085 — Does a shipped product record constrain a design, or follow it?
 
@@ -2434,6 +2443,12 @@ a failed founding is correct.[^PRD12]
 [^D106A]: ADR-0098, the choice is decided for each cell and each bucket of need, decision D1. `docs/adrs/draft/adr-0098-the-choice-is-decided-for-each-cell-and-each-bucket-of-need.md`
 [^D106B]: Budgets and costs, the choice pass. `docs/reference/budgets.md`
 [^D106C]: Target platform costs, would the choice pass collapse if it decided for each cell. `docs/reference/graviton-costs.md`
+[^D106A]: ADR-0098, the choice is decided for each cell and each bucket of need, decision D1. `docs/adrs/draft/adr-0098-the-choice-is-decided-for-each-cell-and-each-bucket-of-need.md`
+[^D106B]: Budgets and costs, the choice pass. `docs/reference/budgets.md`
+[^D106C]: Target platform costs, would the choice pass collapse if it decided for each cell. `docs/reference/graviton-costs.md`
+[^D106E]: Review of ADR-0096, correction 1. The review artefact sits on the branch that holds it, so this branch cannot resolve its path and the citation names it instead.
+[^D097F]: Findings register, FND-259, and the need spread measurement. `crates/cachette-core/tests/need_spread.rs`
+[^D097G]: Findings register, FND-258, in this document.
 [^ALLOC]: Findings register, FND-038. `docs/FINDINGS.md`
 [^TARGET]: Blockers register, BLK-004, and the scale constants. `docs/reference/budgets.md`
 [^MOVETIME]: The movement timing note, and DEC-008 above. `docs/research/movement-timing.md`

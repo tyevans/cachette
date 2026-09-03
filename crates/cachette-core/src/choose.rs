@@ -223,6 +223,8 @@ pub enum ChoiceError {
     PeriodAboveCeiling(u32),
     /// The option index is at or above the option count.
     OptionOutsideSet(u8),
+    /// The bucket exponent is outside the range that the answer table holds.
+    BucketShiftOutsideRange(u32),
 }
 
 impl core::fmt::Display for ChoiceError {
@@ -235,6 +237,11 @@ impl core::fmt::Display for ChoiceError {
             Self::OptionOutsideSet(option) => write!(
                 formatter,
                 "the option {option} is at or above the option count {OPTION_COUNT}"
+            ),
+            Self::BucketShiftOutsideRange(shift) => write!(
+                formatter,
+                "the bucket exponent {shift} is outside the range \
+                 {NEED_BUCKET_SHIFT_FLOOR} to {NEED_BUCKET_SHIFT_CEILING}"
             ),
         }
     }
@@ -558,58 +565,153 @@ pub fn best_option(need: Fix32, summary: CellSummary, profile: &WeightProfile) -
     best
 }
 
-/// The exponent that quantises a need into a bucket.
+/// The finest bucket that the answer table holds.
 ///
-/// A need is a Q16.16 value between zero and the full need, so it holds
-/// 65,537 distinct values. The engine cannot hold one answer for each of
-/// them, so it holds one answer for each bucket of them.
+/// The table is a fixed array on the stack, so its length is a property of the
+/// layout and not a budget. This exponent sets that length.
 ///
-/// The shift decides the resolution of the answer table. A coarse bucket
-/// makes two units with different needs act alike. A fine bucket approaches
-/// one answer for each unit and shares nothing. The value is a resolution
-/// parameter with a behavioural consequence, and the reference table holds
-/// its derivation.[^1]
+/// A finer bucket than this buys nothing. It approaches one answer for each
+/// unit, which is the shape the cost record refuses.[^1]
 ///
 /// # References
 ///
-/// [^1]: Budgets and costs, the choice pass. `docs/reference/budgets.md`
-pub const NEED_BUCKET_SHIFT: u32 = 10;
+/// [^1]: ADR-0096, cost follows the lattice, not the population, and a unit is a reader, decisions D1 and D4. `docs/adrs/draft/adr-0096-cost-follows-the-lattice-not-the-population.md`
+pub const NEED_BUCKET_SHIFT_FLOOR: u32 = 8;
 
-/// The number of buckets that the need range holds.
+/// The coarsest bucket that a caller may state.
 ///
-/// The count is derived from the shift and from the full need. It is not a
-/// second declaration of either.[^1]
+/// At this exponent the range holds two buckets. A coarser one would hold one,
+/// and every unit of a cell would then take one answer whatever it needs. The
+/// limit is the width of the need and not a budget.
+pub const NEED_BUCKET_SHIFT_CEILING: u32 = 16;
+
+/// The number of entries that the answer table holds.
+///
+/// The value is derived from the finest bucket and from the full need. It is
+/// not a second declaration of either.[^1]
 ///
 /// # References
 ///
 /// [^1]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`
-pub const NEED_BUCKET_COUNT: usize = ((NEED_FULL.0 >> NEED_BUCKET_SHIFT) + 1) as usize;
+pub const NEED_BUCKET_CEILING: usize = ((NEED_FULL.0 >> NEED_BUCKET_SHIFT_FLOOR) + 1) as usize;
 
-/// Returns the bucket that holds one need.
+/// How finely the choice tells two needs apart.
 ///
-/// The arena keeps every need between zero and the full need, and this call
-/// clamps rather than trusting that. A need outside the range gives the
-/// nearest bucket, so the answer is total.
-#[must_use]
-pub const fn need_bucket(need: Fix32) -> usize {
-    if need.0 <= 0 {
-        return 0;
-    }
-    let raw = (need.0 >> NEED_BUCKET_SHIFT) as usize;
-    if raw >= NEED_BUCKET_COUNT {
-        return NEED_BUCKET_COUNT - 1;
-    }
-    raw
+/// **Unbucketed, the key is the exact need, and the distinct keys in a cell are
+/// bounded by the cohorts standing in it.** A cohort is one site and one
+/// faction, and its units draw one ration and hold one need exactly. So units
+/// of one cohort share a key, units of two cohorts almost never do, and the
+/// bound belongs to the content rather than to the engine: a world that gave
+/// every unit a site of its own would put one key on every unit. **The bucket
+/// is the bound the engine holds**, and that is why it is the mechanism of the
+/// decision and not a detail of it.[^1] [^4]
+///
+/// **The width is a parameter of the world, and no record sets it.** A wide
+/// bucket makes two units of different need act alike. A narrow one approaches
+/// one answer for each unit. One blocker governs every cost figure this
+/// project holds, and no measurement of what this pass costs exists on the
+/// target platform.[^2] The reference table holds the value this world starts
+/// with and the derivation of it.[^3]
+///
+/// The width is a power of two in the fixed-point scale, so the bucket of a
+/// need is a shift and never a division.
+///
+/// # References
+///
+/// [^1]: ADR-0098, the choice is decided for each cell and each bucket of need, decision D1. `docs/adrs/draft/adr-0098-the-choice-is-decided-for-each-cell-and-each-bucket-of-need.md`
+/// [^2]: Blockers register, BLK-007. `docs/BLOCKERS.md`
+/// [^3]: Budgets and costs, the choice pass. `docs/reference/budgets.md`
+/// [^4]: Findings register, FND-259. `docs/FINDINGS.md`
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct NeedBuckets {
+    shift: u32,
 }
 
-/// Returns the need that stands for one bucket.
-///
-/// The value is the lower bound of the bucket. The last bucket holds the
-/// full need alone, so the unit that needs everything scores its exact
-/// need.
-#[must_use]
-pub const fn bucket_need(bucket: usize) -> Fix32 {
-    Fix32((bucket as i32) << NEED_BUCKET_SHIFT)
+impl NeedBuckets {
+    /// The width that a world starts with.
+    ///
+    /// **The value matches the width of a bucket to the rate at which a need
+    /// moves.** The default need rule takes a fixed amount off a unit on every
+    /// tick, and this bucket is that amount, so a unit crosses one bucket in
+    /// one tick. A finer bucket tells apart two needs that the rule cannot
+    /// separate inside a tick. A coarser one lets a need change without the
+    /// bucket changing, so the choice lags the need.
+    ///
+    /// **The decay is itself a parameter of the need rule, and a caller who
+    /// changes it should reconsider this.** That coupling is why the width is
+    /// a parameter of the world rather than a constant of the module.
+    ///
+    /// The reference table states what it costs, what it changes, and the
+    /// measurement it was chosen against.[^1] [^2]
+    ///
+    /// # References
+    ///
+    /// [^1]: Budgets and costs, the choice pass. `docs/reference/budgets.md`
+    /// [^2]: Findings register, FND-259. `docs/FINDINGS.md`
+    pub const DEFAULT: Self = Self { shift: 12 };
+
+    /// Builds a width from the exponent of the bucket.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the exponent is outside the range the table
+    /// holds.
+    pub const fn new(shift: u32) -> Result<Self, ChoiceError> {
+        if shift < NEED_BUCKET_SHIFT_FLOOR || shift > NEED_BUCKET_SHIFT_CEILING {
+            return Err(ChoiceError::BucketShiftOutsideRange(shift));
+        }
+        Ok(Self { shift })
+    }
+
+    /// Returns the exponent of the bucket.
+    #[must_use]
+    pub const fn shift(self) -> u32 {
+        self.shift
+    }
+
+    /// Returns the number of buckets that the need range holds.
+    #[must_use]
+    pub const fn count(self) -> usize {
+        ((NEED_FULL.0 >> self.shift) + 1) as usize
+    }
+
+    /// Returns the bucket that holds one need.
+    ///
+    /// The arena keeps every need between zero and the full need, and this
+    /// call clamps rather than trusting that. A need outside the range gives
+    /// the nearest bucket, so the answer is total.
+    #[must_use]
+    pub const fn bucket(self, need: Fix32) -> usize {
+        if need.0 <= 0 {
+            return 0;
+        }
+        let raw = (need.0 >> self.shift) as usize;
+        let last = self.count() - 1;
+        if raw >= last {
+            return last;
+        }
+        raw
+    }
+
+    /// Returns the need that stands for one bucket.
+    ///
+    /// The value is the lower bound of the bucket. The last bucket holds the
+    /// full need alone, so the unit that needs everything scores its exact
+    /// need.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0098, the choice is decided for each cell and each bucket of need, decision D2. `docs/adrs/draft/adr-0098-the-choice-is-decided-for-each-cell-and-each-bucket-of-need.md`
+    #[must_use]
+    pub const fn need(self, bucket: usize) -> Fix32 {
+        Fix32((bucket as i32) << self.shift)
+    }
+}
+
+impl Default for NeedBuckets {
+    fn default() -> Self {
+        Self::DEFAULT
+    }
 }
 
 /// The answers that one level 1 cell holds, for each bucket of need.
@@ -640,18 +742,20 @@ pub const fn bucket_need(bucket: usize) -> Fix32 {
 #[derive(Clone, Copy, Debug)]
 pub struct CellAnswers {
     summary: CellSummary,
-    answers: [u8; NEED_BUCKET_COUNT],
-    scored: [bool; NEED_BUCKET_COUNT],
+    buckets: NeedBuckets,
+    answers: [u8; NEED_BUCKET_CEILING],
+    scored: [bool; NEED_BUCKET_CEILING],
 }
 
 impl CellAnswers {
-    /// Builds an empty table over one cell summary.
+    /// Builds an empty table over one cell summary, at one bucket width.
     #[must_use]
-    pub const fn new(summary: CellSummary) -> Self {
+    pub const fn new(summary: CellSummary, buckets: NeedBuckets) -> Self {
         Self {
             summary,
-            answers: [NO_INTENT; NEED_BUCKET_COUNT],
-            scored: [false; NEED_BUCKET_COUNT],
+            buckets,
+            answers: [NO_INTENT; NEED_BUCKET_CEILING],
+            scored: [false; NEED_BUCKET_CEILING],
         }
     }
 
@@ -660,9 +764,9 @@ impl CellAnswers {
     /// The call scores the bucket the first time a unit asks for it, and
     /// reads the stored answer every time after.
     pub fn answer(&mut self, need: Fix32, profile: &WeightProfile) -> u8 {
-        let bucket = need_bucket(need);
+        let bucket = self.buckets.bucket(need);
         if !self.scored[bucket] {
-            self.answers[bucket] = best_option(bucket_need(bucket), self.summary, profile);
+            self.answers[bucket] = best_option(self.buckets.need(bucket), self.summary, profile);
             self.scored[bucket] = true;
         }
         self.answers[bucket]
@@ -691,13 +795,14 @@ pub fn explain(
     need: Fix32,
     summary: CellSummary,
     profile: &WeightProfile,
+    buckets: NeedBuckets,
     intent: u8,
     chooses_next_frame: bool,
 ) -> ChoiceExplanation {
     // The pass scores the bucket of the need and not the need, so the
     // explanation scores the same value. An explanation taken at the exact
     // need would name a winner that the unit did not take.
-    let scored_need = bucket_need(need_bucket(need));
+    let scored_need = buckets.need(buckets.bucket(need));
     let mut scores = [Fix32::ZERO; OPTION_COUNT];
     let mut fields = [Fix32::ZERO; OPTION_COUNT];
     for (index, option) in OPTIONS.iter().enumerate() {

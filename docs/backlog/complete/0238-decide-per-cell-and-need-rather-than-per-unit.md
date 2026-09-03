@@ -80,8 +80,10 @@ it.[^9]
 - Each thread owns a contiguous range of cells, and the join reads the slots in
   slot order, so the result takes its order from the lattice.
 - A cell holds one answer for each bucket of need, and a unit reads it.
-- The bucket count sits in the reference table with its derivation, and not in
-  the record.
+- The width of a bucket is a parameter of the world, it sits in the reference
+  table with its derivation, and it sits in no record.
+- A measurement says how many needs coexist in one cell in a world that
+  consumes, and the width is chosen against it.
 - A test drives the engine to a need whose bucket changes the answer, and
   asserts that the unit took the answer of the bucket. The fixture asserts that
   it reached that need.
@@ -114,13 +116,27 @@ the bucket count. **No golden hash moved**, and a finding records that no golden
 scenario reaches the case the change alters.[^9] The interval stays, and item
 0242 holds the question of removing it.[^10]
 
-**One decision opened.** The measurement register holds a table of the collapse a
-cell would show against the number of need buckets in play, and at the target
-density the median cell holds about as many units as the engine holds
-buckets.[^13] So the sharing may buy nothing in the worst case. The lazy fill
-makes that a weak loss rather than a cost, because a cell scores the smaller of
-the units it holds and the bucket count. The measurement that settles the bucket
-count does not exist, and DEC-097 holds the choice.[^14]
+**A review of ADR-0096 returned during this work, and its blocking correction
+lands here.** The correction says that D4 as written names a key that reduces
+nothing, because a need is a fixed-point quantity and unbucketed the distinct
+pairs equal the population. **The bucket is therefore the mechanism and not a
+detail of it.** That is what this item built, and the correction places the choice
+of the width on this item.
+
+**The width is a parameter of the world, not a constant of a module.** The width
+that matches the dynamics depends on the rate at which a need moves, and that rate
+is itself a parameter of the need rule. A constant would hold one half of a
+coupled pair.
+
+**The measurement that nobody had now exists, and it changed the value.** The
+measurement register said no fixture in this project produces the distribution the
+choice rests on, because it needs settlements, home sites and a running economy.
+A fixture now does.[^13] The needs of a cell spread widest while the stores empty
+and polarise afterwards, and at the widest spread a width four times finer than
+the decay gives 41 distinct keys in a cell of 75 units against 17 at the matched
+width. **The first value this item chose was the finer one, and the measurement
+says it buys nothing.** The width is now one tick of the default decay. DEC-097
+closed against that measurement.[^14]
 
 **No figure in this item was measured.** The target platform run that motivated
 it is in the measurement register, and nothing here was re-run on that
@@ -140,5 +156,5 @@ platform.[^12]
 [^10]: Backlog item 0272, decide whether the choice interval can go. `docs/backlog/proposed/0272-decide-whether-the-choice-interval-can-go.md`
 [^11]: Findings register, FND-233. `docs/FINDINGS.md`
 [^12]: Target platform costs. `docs/reference/graviton-costs.md`
-[^13]: Target platform costs, would the choice pass collapse if it decided for each cell. `docs/reference/graviton-costs.md`
+[^13]: Findings register, FND-259, and the need spread measurement. `crates/cachette-core/tests/need_spread.rs`
 [^14]: Decisions register, DEC-097. `docs/DECISIONS.md`
