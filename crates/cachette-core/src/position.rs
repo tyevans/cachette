@@ -48,7 +48,8 @@ use crate::hash::StateHash;
 use crate::resource::{ResourceKind, RESOURCE_KIND_COUNT};
 use crate::sim_math;
 use crate::site::{CommodityId, Store, COMMODITY_COUNT};
-use crate::soldier::SoldierArena;
+use crate::soldier::{SoldierArena, NO_HOME};
+use crate::sort::{self, SortError, SortKey};
 use crate::terrain::{self, Terrain};
 use crate::types::{Accum, Entity, Fix32, TileIdx};
 
@@ -121,6 +122,15 @@ pub enum PositionError {
     ///
     /// [^1]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`
     ColumnsDisagree,
+    /// The applicant keys refused to sort.
+    ///
+    /// The assignment orders its applicants through the key vector
+    /// interface, so a refusal from that interface is a refusal here.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0007, content supplies a key vector, never a comparator, decision D1. `docs/adrs/accepted/adr-0007-content-supplies-a-key-vector-never-a-comparator.md`
+    Applicants(SortError),
 }
 
 impl core::fmt::Display for PositionError {
@@ -138,6 +148,7 @@ impl core::fmt::Display for PositionError {
                 write!(formatter, "the target {} is below zero", target.0)
             }
             Self::ColumnsDisagree => write!(formatter, "the columns hold different lengths"),
+            Self::Applicants(error) => write!(formatter, "the applicants did not sort: {error}"),
         }
     }
 }
@@ -916,3 +927,142 @@ const _: () = {
         index += 1;
     }
 };
+
+/// Seats the residents of each site in the open positions of that site.
+///
+/// A site opens positions in proportion to what it lacks, and until this pass
+/// runs nobody stands in them.[^1] This is the pass that fills them.
+///
+/// # What it does
+///
+/// The applicants of a site are the units that live there. The soldier arena
+/// already names the site a unit belongs to, and the founding already writes
+/// it, so the roll is read from that column and no second column states
+/// it.[^2]
+///
+/// The pass sorts the applicants once, by the site they live in and then by
+/// their identity, and it scans that order against the positions of each site
+/// in index order. **Nothing scores a pair.** One sort and one scan give the
+/// pairing, and no part of the work compares an applicant against a
+/// position.[^3]
+///
+/// # What holds a seat
+///
+/// **A unit that already holds a position keeps it.** The scan skips an
+/// applicant that is seated and a position that is held, so a unit that was
+/// seated on an earlier run is not moved and not seated twice. The resize
+/// pass carries a holder across a rebalance, and the release pass empties the
+/// seat of a unit that died, so the three passes agree on who sits where
+/// without any of them recomputing the others.[^1]
+///
+/// # The order
+///
+/// The applicant order is a key vector and never a comparison function.[^3]
+/// The first field is the site, so the applicants of one site form one run.
+/// The last field is the whole identity of the unit, which is unique across
+/// the set, so no two applicants tie and the order is total.[^4]
+///
+/// The pass reads the units in ascending slot order, sorts them on the given
+/// number of threads through an order that does not depend on that number,
+/// and then seats on one thread. The result is therefore the same at any
+/// thread count.[^5]
+///
+/// # What this pass does not do
+///
+/// **It applies no property of the unit that limits which position the unit
+/// can take.** Every applicant of a site is admissible for every open
+/// position of that site. The unit row carries no such property today, and
+/// choosing one is a decision that its own record must hold.[^6]
+///
+/// # Errors
+///
+/// Returns an error when the caller asks for zero threads, and when the
+/// applicants refuse to sort.
+///
+/// # References
+///
+/// [^1]: ADR-0065, a group is a site membership, not a region, decision D3. `docs/adrs/draft/adr-0065-a-group-is-a-site-membership-not-a-region.md`
+/// [^2]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`
+/// [^3]: ADR-0099, a site fills its positions by one sort and one scan, decision D1. `docs/adrs/draft/adr-0099-a-site-fills-its-positions-by-one-sort-and-one-scan.md`
+/// [^4]: ADR-0007, content supplies a key vector, never a comparator, decision D2. `docs/adrs/accepted/adr-0007-content-supplies-a-key-vector-never-a-comparator.md`
+/// [^5]: ADR-0004, iteration order is explicit, decisions D1 and D3. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
+/// [^6]: ADR-0099, a site fills its positions by one sort and one scan, decision D3. `docs/adrs/draft/adr-0099-a-site-fills-its-positions-by-one-sort-and-one-scan.md`
+pub fn assign(
+    table: &mut PositionTable,
+    units: &SoldierArena,
+    threads: usize,
+) -> Result<(), PositionError> {
+    if threads == 0 {
+        return Err(PositionError::ZeroThreads);
+    }
+    let sites = table.preferences.len();
+    if sites == 0 {
+        return Ok(());
+    }
+
+    // A unit holds at most one position, so the scan must know who is
+    // already seated. The answer is a bit for each unit slot rather than a
+    // hashed set, because nothing here may iterate a hash.[^1]
+    //
+    // [^1]: ADR-0004, iteration order is explicit, decision D2. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
+    let mut seated = vec![false; units.slot_count() as usize];
+    for entry in &table.rows {
+        if let Some(held) = entry.holder() {
+            if let Some(slot) = units.slot_of(held) {
+                seated[slot as usize] = true;
+            }
+        }
+    }
+
+    // The applicants are read in ascending slot order. That order does not
+    // decide the pairing, because the sort below is total, but it is fixed
+    // so that the input to the sort is the same on every run.
+    let homes = units.home_column();
+    let mut applicants: Vec<(u32, Entity)> = Vec::new();
+    for unit in units.iter() {
+        let Some(slot) = units.slot_of(unit) else {
+            continue;
+        };
+        if seated[slot as usize] {
+            continue;
+        }
+        let home = homes[slot as usize];
+        if home == NO_HOME || home as usize >= sites {
+            continue;
+        }
+        applicants.push((home, unit));
+    }
+    if applicants.is_empty() {
+        return Ok(());
+    }
+
+    let keys: Vec<SortKey<2>> = applicants
+        .iter()
+        .map(|(home, unit)| SortKey::new([u64::from(*home), unit.to_bits()]))
+        .collect();
+    let order = sort::order_on(&keys, threads).map_err(PositionError::Applicants)?;
+
+    // One scan. The order groups the applicants of one site together, so the
+    // scan keeps one cursor into the row of the site it is inside and moves
+    // it forward as it seats. It never returns to a site it has left.
+    let mut site = u32::MAX;
+    let mut next = 0usize;
+    for index in order {
+        let (home, unit) = applicants[index as usize];
+        if home != site {
+            site = home;
+            next = 0;
+        }
+        let start = (site as usize) * POSITIONS_PER_SITE;
+        let row = &mut table.rows[start..start + POSITIONS_PER_SITE];
+        while next < POSITIONS_PER_SITE && (!row[next].exists() || row[next].holder != 0) {
+            next += 1;
+        }
+        if next == POSITIONS_PER_SITE {
+            continue;
+        }
+        row[next].holder = unit.to_bits();
+        next += 1;
+    }
+    Ok(())
+}
