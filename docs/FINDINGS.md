@@ -4977,6 +4977,51 @@ site the boundary rule needs, and a second site at the boundary is the failure
 the tier record's D1 refuses. The repair is to make something read it, and the
 review that found this says so.[^F216D]
 
+### FND-217 — The tiles are stored row by row, and one record reads the reserved row as settled
+
+**Believed.** The tiles are stored in blocks at the aggregation block size, and
+the summary pyramid divides the world into the same blocks, so a structure that
+walks blocks walks the storage in memory order.
+
+**True.** The pyramid divides the world into blocks. The tile columns are stored
+row by row. The grid derives a tile index as the row times the width plus the
+column, and that is the only storage order the engine has.[^F217A]
+
+A block-major space does exist, and it is a different space. The block layout of
+the unit-to-tile bridge builds a key by interleaving the block of an address with
+the position inside that block, and the engine converts between that key and the
+tile index.[^F217B]
+
+**Evidence.** The pyramid's own fold says it, in its own comments. Summarising
+one block reads one contiguous run for each row of the block, not one run for the
+block, because a block is a rectangle over a row-major column.[^F217C] A block of
+edge `n` costs `n` runs.
+
+**Follows.** **The reserved row for a block-tiled layout has no record and no
+implementation, and the corpus is otherwise careful about it.** Three accepted
+records cite that row and every one of them speaks conditionally: the storage
+record says the derivation is arithmetic whichever order the tiles sit in, the
+tile index record says the record holding the memory order may choose a block
+order rather than a row order, and the bridge record cites it without asserting
+it.[^F217D] [^F217E] [^F217F]
+
+**One draft asserted it as present fact, and built a cost case on it.** The
+selector range record says tiles are stored in blocks at the aggregation block
+size, and its D3 concludes from that that a verb reads a run rather than
+gathering scattered values, and that the engine maps no space onto another. Both
+conclusions fail under the storage that exists.[^F217G]
+
+**A reserved row accumulates belief.** Nothing about the row changed. It was
+cited carefully three times, and the fourth citation read the careful ones as
+evidence that the thing was true. This is the same shape as a summary going
+stale, arriving from the other direction: the register did not decay, the reading
+of it did.
+
+**A row that governs a layout should say what the layout is today.** The registry
+row states the claim the record would make and says nothing about what the code
+does instead. A reader who wants to know how the tiles are stored has to read the
+grid.
+
 ## References
 
 [^F177A]: The founding refuses ground that admits nobody. `crates/cachette-core/src/world.rs`
@@ -5170,3 +5215,10 @@ review that found this says so.[^F216D]
 [^F216A]: ADR-0043, a declared tier enforces the no-loop rule, and the API refuses the loop. `docs/adrs/draft/adr-0043-a-declared-tier-enforces-the-no-loop-rule.md`
 [^F216B]: The character arena ceiling, and the shape tier declarations. `crates/cachette-core/src/tier.rs`
 [^F216D]: Review 0223, the tier record. `docs/reviews/0223-the-tier-record.md`
+[^F217A]: The grid index function. `crates/cachette-core/src/hex.rs`
+[^F217B]: The block layout key. `crates/cachette-core/src/bridge.rs`
+[^F217C]: The block fold of the pyramid. `crates/cachette-core/src/pyramid.rs`
+[^F217D]: ADR-0012, tiles are dense columns and units are a generational arena. `docs/adrs/accepted/adr-0012-tiles-are-dense-columns-and-units-are-a-generational-arena.md`
+[^F217E]: ADR-0017, the world is a rhombus, so a tile index is raw axial, decision D1. `docs/adrs/accepted/adr-0017-the-world-is-a-rhombus-so-a-tile-index-is-raw-axial.md`
+[^F217F]: ADR-0018, the unit-to-tile bridge is derived, and it rebuilds at the barrier. `docs/adrs/accepted/adr-0018-the-unit-to-tile-bridge-is-derived-and-rebuilds-at-the-barrier.md`
+[^F217G]: Review 0223, the selector range record. `docs/reviews/0223-the-selector-range-record.md`
