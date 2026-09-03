@@ -375,7 +375,7 @@ without stating a constraint is worse than no record.
 | 0097 | The toolchain is a dated nightly, pinned to a date and never to a channel | Draft | 0001, 0002, 0008, 0041 | `draft/adr-0097-the-toolchain-is-a-dated-nightly.md` |
 | 0103 | The tile value field stores a dense delta, never a sparse change list | Draft | 0001, 0002, 0009, 0022, 0088 | `draft/adr-0103-the-tile-value-field-stores-a-dense-delta.md` |
 | 0104 | A soldier is promoted from a level that never falls | Draft | 0004, 0007, 0014, 0054 | 14, `draft/adr-0104-a-soldier-is-promoted-from-a-level-that-never-falls.md` |
-| 0105 | A total order needs no repeated identifier, only no repeated key | Proposed | 0001, 0004, 0007 | |
+| 0105 | A total order needs no repeated identifier, only no repeated key | Draft | 0001, 0004, 0007 | `draft/adr-0105-a-total-order-needs-no-repeated-key.md` |
 
 ### Retired numbers
 

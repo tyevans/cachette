@@ -336,11 +336,13 @@ fn check_no_repeated_key<const N: usize>(
     order: &[u32],
     keys: &[SortKey<N>],
 ) -> Result<(), SortError> {
-    for pair in order.windows(2) {
-        let (here, next) = (keys[pair[0] as usize], keys[pair[1] as usize]);
-        if here == next {
-            return Err(SortError::RepeatedKey(here.identifier()));
+    let mut previous: Option<SortKey<N>> = None;
+    for index in order {
+        let key = keys[*index as usize];
+        if previous == Some(key) {
+            return Err(SortError::RepeatedKey(key.identifier()));
         }
+        previous = Some(key);
     }
     Ok(())
 }
@@ -488,12 +490,14 @@ pub fn order_bounded(keys: &[BoundedKey], ceiling: u64) -> Result<Vec<u32>, Sort
     }
 
     let mut order = radix_order(keys, digit_count(ceiling));
-    order_ties(&mut order, keys);
-    // The tie pass orders each run of one ordering field by the identifier,
-    // so two keys that agree in both fields are now neighbours.[^4]
+    // The tie pass is the only place a repeated key can be, so it is the place
+    // that looks. A run of one ordering field holding one entry cannot hold a
+    // repeated key, and that is nearly every run.[^4]
     //
     // [^4]: ADR-0105, a total order needs no repeated identifier, only no repeated key. `docs/adrs/draft/adr-0105-a-total-order-needs-no-repeated-key.md`
-    check_no_repeated_bounded_key(&order, keys)?;
+    if let Some(identifier) = order_ties(&mut order, keys) {
+        return Err(SortError::RepeatedKey(identifier));
+    }
     Ok(order)
 }
 
@@ -507,28 +511,6 @@ const fn digit_count(ceiling: u64) -> u32 {
     } else {
         bits.div_ceil(DIGIT_BITS)
     }
-}
-
-/// Fails when two keys agree in the ordering field and in the identifier.
-///
-/// **The check reads the sorted order, so it costs one pass and no
-/// allocation.** The earlier check answered a wider question and paid a
-/// comparison sort of the whole set to do it.[^1]
-///
-/// It reports the identifier of the lowest repeated key, so the report does
-/// not depend on the input order.
-///
-/// # References
-///
-/// [^1]: ADR-0105, a total order needs no repeated identifier, only no repeated key. `docs/adrs/draft/adr-0105-a-total-order-needs-no-repeated-key.md`
-fn check_no_repeated_bounded_key(order: &[u32], keys: &[BoundedKey]) -> Result<(), SortError> {
-    for pair in order.windows(2) {
-        let (here, next) = (keys[pair[0] as usize], keys[pair[1] as usize]);
-        if here.order == next.order && here.identifier == next.identifier {
-            return Err(SortError::RepeatedKey(here.identifier));
-        }
-    }
-    Ok(())
 }
 
 /// Orders the indices by the ordering field, least significant digit first.
@@ -578,8 +560,9 @@ const fn digit_of(order: u64, shift: u32) -> usize {
 /// # References
 ///
 /// [^1]: ADR-0007, content supplies a key vector, never a comparator, decision D2. `docs/adrs/accepted/adr-0007-content-supplies-a-key-vector-never-a-comparator.md`
-fn order_ties(order: &mut [u32], keys: &[BoundedKey]) {
+fn order_ties(order: &mut [u32], keys: &[BoundedKey]) -> Option<u64> {
     let mut start = 0usize;
+    let mut repeated: Option<u64> = None;
     while start < order.len() {
         let field = keys[order[start] as usize].order;
         let mut end = start + 1;
@@ -588,7 +571,21 @@ fn order_ties(order: &mut [u32], keys: &[BoundedKey]) {
         }
         if end - start > 1 {
             order[start..end].sort_unstable_by_key(|index| keys[*index as usize].identifier);
+            // Two keys that agree in both fields sit in this run, and the sort
+            // above has just put them next to each other. The entries are in
+            // the cache because the sort has just touched them, and a run of
+            // one entry never reaches here at all.
+            if repeated.is_none() {
+                for pair in order[start..end].windows(2) {
+                    let here = keys[pair[0] as usize].identifier;
+                    if here == keys[pair[1] as usize].identifier {
+                        repeated = Some(here);
+                        break;
+                    }
+                }
+            }
         }
         start = end;
     }
+    repeated
 }
