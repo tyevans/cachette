@@ -160,6 +160,24 @@ records:
     ./scripts/check-footnotes.sh
 
 # Prove that the record checks can fail. Each must reject its broken fixture.
+# Install the pre-commit hook, once per clone. The hooks are versioned.
+install-hooks:
+    git config core.hooksPath .githooks
+    @echo "the pre-commit hook is installed for this clone"
+
+# A merge conflict in a register is resolved by choosing between two sides.
+# Each side is a correct file and the merged result is not. This asks what the
+# merged file says. The script holds the reasoning and the rules.
+#
+# The same check runs as a pre-commit hook over the staged change, which is
+# where these defects are born. Install it with `just install-hooks`. The hook
+# is bypassable and git does not run it for a clean automatic merge, so this
+# recipe is the enforcement and the hook is the early warning.
+#
+# Check the branch for the defects a hand-resolved merge produces.
+merge-defects:
+    ./scripts/check-merge-defects.sh --branch
+
 records-probe:
     ! ./scripts/check-adrs.sh tests/fixtures/records-broken
     ! ./scripts/check-prds.sh tests/fixtures/prd-broken
@@ -175,7 +193,7 @@ check:
     ./scripts/gate-budget.sh just gates
 
 # The gates themselves. Run `just check` instead, to get the cost report.
-gates: fmt-check lint test records records-probe
+gates: fmt-check lint test records records-probe merge-defects
 
 # What continuous integration runs.
 ci: check test-slow

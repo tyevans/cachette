@@ -1,0 +1,19 @@
+#!/bin/sh
+# The pre-commit hook. It asks the merge-defect questions of the staged
+# change, in about a second. The script names them.
+#
+# **This is the project's first hook, and a hook nobody installs is worse than
+# no hook, because it reads as protection that is not there.** Install it once
+# per clone:
+#
+#     just install-hooks
+#
+# The hooks live in the repository rather than in `.git/hooks`, so they are
+# versioned and a change to one reaches everybody who runs that line.
+#
+# **The hook is not the enforcement.** It is bypassable with `--no-verify`, it
+# needs the line above in every clone, and git does not run it for a merge that
+# applies cleanly and commits itself. The gate runs the same check over the
+# whole branch and that is what a merge has to pass.
+set -e
+exec "$(git rev-parse --show-toplevel)/scripts/check-merge-defects.sh"

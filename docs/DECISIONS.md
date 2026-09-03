@@ -646,6 +646,45 @@ platform.[^BLK7]
 
 **Revisit when** DEC-067 closes, or when a strategy with one distant destination
 is asked for.
+### DEC-094 — How does a clone get the pre-commit hook installed?
+
+**Open. Engineering owns it. Nothing is blocked by it.**
+
+The project now has a hook, and it is the first one.[^DEC94HOOK] It lives in a
+checked-in directory rather than in `.git/hooks`, so it is versioned and a
+change to it reaches whoever has installed it. Installing it is one line, and
+a recipe runs that line.
+
+**A hook nobody installs is worse than no hook.** It reads as protection that
+is not there, and a reader who sees the directory reasonably assumes the
+commits were checked. Nothing today tells a clone that the hook exists.
+
+**The obvious remedy has a real cost, and it is not obvious which way it
+falls.** Worktrees share the repository config, so arming the hook arms it for
+every worktree of that clone at once. During a session with several workers in
+several worktrees, one worker installing the hook changes what happens when
+another worker commits. That is the reason this decision exists rather than
+being made in passing.
+
+**Option A. Leave it manual and documented.** The recipe exists and the
+orientation names it. A contributor who wants the early warning takes it. The
+gate is the enforcement either way, so nobody who skips it can merge a defect.
+
+**Option B. Install it from the setup recipe.** A clone that runs the setup
+step gets the hook. This is the smallest change that makes the hook real, and
+it is also the one that arms every sibling worktree without saying so.
+
+**Option C. Make the gate check that the hook is installed.** This turns a
+convenience into a requirement and fails a gate for a local config, which is
+the shape that trains people to disable a check.
+
+**Recommendation: A until a defect reaches the gate that the hook would have
+caught.** The hook saves minutes, and the gate loses nothing when the hook is
+absent. B becomes right if the count of hook-catchable defects reaching the
+gate stops being zero. C is the one to refuse.
+
+**Revisit when** a merge defect reaches the gate on a branch whose author had
+the recipe available and had not run it.
 
 ### DEC-092 — Can a caller ask anything about a character who has died?
 
@@ -2367,6 +2406,7 @@ a failed founding is correct.[^PRD12]
 [^DEC84B]: PRD-0005, a watcher can tell what is happening and why. `docs/product/shipped/prd-0005-a-watcher-can-tell-what-is-happening-and-why.md`
 [^DEC85REF]: Decisions register, DEC-085, in this document.
 [^DEC85DOD]: Definition of Done. `.claude/rules/definition-of-done.md`
+[^DEC94HOOK]: The pre-commit hook. `.githooks/pre-commit`
 [^DEC86A]: Backlog item 0152, what is still open. `docs/backlog/complete/0152-let-an-agent-drive-the-engine-through-a-protocol-server.md`
 [^DEC86B]: ADR-0092, the agent tool surface grows one tool at a time, against a stated need. `docs/adrs/draft/adr-0092-the-agent-tool-surface-grows-against-a-stated-need.md`
 [^DEC86C]: PRD-0019, an agent can ask the running engine what it holds. `docs/product/shaped/prd-0019-an-agent-can-ask-the-running-engine-what-it-holds.md`

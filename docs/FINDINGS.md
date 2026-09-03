@@ -832,6 +832,57 @@ the scope rule names as recording an intent as a fact.
 
 ## G. Process
 
+### FND-239 — All four merge defects were already checked. What was missing was the timing
+
+**Believed.** A dispatcher produced four defects by hand in one day and none
+was caught until the gate ran, so a check for them did not exist.
+
+**True.** Every one of the four was already checked. The register check fails
+both on a number that names two entries and on a next-number line that
+disagrees with its own entries, which is two of the four.[^32] The footnote
+check fails on a label a document defines twice, which is the third.[^239A]
+The citation check fails on a footnote naming a path that does not resolve,
+which is the fourth.[^148]
+
+The four were not undetected. They were detected minutes later, over the whole
+tree, after the commit existed.
+
+**Evidence.** Each rule was found by reading the three scripts before writing
+a new one, and each was confirmed by staging the defect and watching the
+existing check fail. The four checks cost 1.0, 3.7, 7.7 and 4.0 seconds on a
+development machine, which is why they run in the gate and not at the commit.
+
+**Follows.** Three things.
+
+**Before writing a check, ask whether the rule is already checked and only the
+timing is wrong.** A check written on the assumption of a gap would have
+restated three rules that already had a home. Two copies of a rule drift, and
+nothing fails when they disagree.[^22] The check that was written imports the
+other two and calls them.
+
+**A slow check and a missing check fail the same way from the outside.** Both
+let the defect reach the commit. Whoever watches four defects survive until
+the gate reasonably concludes that nothing is watching. The distinction
+matters because the remedies differ: one needs a rule, the other needs a place
+to run an existing one.
+
+**One rule was genuinely new, and it is the narrow one.** No existing check
+ties a move to the citations of the path it moved from. The citation check
+overlaps without covering it, because it reads footnote paths under `docs/`,
+so a moved crate file named in a comment passes it. Scoping the new rule to
+the paths the change moves is what makes it both new and cheap.
+
+**A fifth instance arrived while the work was in progress, and nobody arranged
+it.** Merging the trunk into the branch that carries this check left four rows
+of the records priority index listed twice: one side had rewritten the table
+and the auto-merge kept both. The priority check caught it.[^239B] That is the
+same shape as a register naming one number twice, in a file that is not a
+register, found by the same mechanism the finding describes. The count of
+these defects is not four and it is not five. **Do not write the count down.
+Write the shape: a merge that keeps both sides of a table that one side
+rewrote.**
+
+
 ### FND-238 — The gate prints ten screens of red when it passes
 
 **Believed.** A reader can tell a passing gate run from a failing one by
@@ -6118,3 +6169,5 @@ has the rule.
 [^F252B]: ADR-0009, parallel stages write disjoint outputs, decision D3. `docs/adrs/accepted/adr-0009-parallel-stages-write-disjoint-outputs.md`
 [^F252C]: The choice pass of the world. `crates/cachette-core/src/world.rs`
 [^F252D]: ADR-0064, a unit chooses by scoring a small fixed option set, decision D4. `docs/adrs/accepted/adr-0064-a-unit-chooses-by-scoring-a-small-fixed-option-set.md`
+[^239A]: The footnote check. `scripts/check_footnotes.py`
+[^239B]: The priority check. `scripts/check_priority.py`

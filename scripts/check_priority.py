@@ -19,6 +19,25 @@ def listed(path):
     return ROW.findall(path.read_text(encoding="utf-8"))
 
 
+def repeated(listed_ids):
+    """Return every number the index lists more than once, in order.
+
+    A merge that keeps both sides of a conflicted index produces exactly this,
+    and the merge check calls this function rather than restating the rule.[^1]
+
+    # References
+
+    [^1]: The merge defect check. `scripts/check_merge_defects.py`
+    """
+    seen = set()
+    out = []
+    for number in listed_ids:
+        if number in seen:
+            out.append(number)
+        seen.add(number)
+    return out
+
+
 def report(name, listed_ids, open_ids, failures, known=None):
     """Compares a listed set against the open set.
 
@@ -26,11 +45,9 @@ def report(name, listed_ids, open_ids, failures, known=None):
     records index, because that index also names a row the project has chosen
     to write next. Completeness is required of ``open_ids`` only.
     """
-    seen = set()
-    for number in listed_ids:
-        if number in seen:
-            failures.append(f"{name}: {number} is listed more than once")
-        seen.add(number)
+    for number in repeated(listed_ids):
+        failures.append(f"{name}: {number} is listed more than once")
+    seen = set(listed_ids)
     for number in sorted(seen - (known if known is not None else open_ids)):
         failures.append(f"{name}: {number} is listed but does not exist")
     for number in sorted(open_ids - seen):
