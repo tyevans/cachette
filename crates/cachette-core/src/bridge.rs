@@ -445,9 +445,7 @@ impl UnitTileBridge {
         for range in &mut self.ranges {
             *range = BlockRange::default();
         }
-        for word in &mut self.occupancy {
-            *word = 0;
-        }
+        self.occupancy.fill(0);
         let mut position = 0usize;
         while position < self.keys.len() {
             let block = self.layout.block_of_key(self.keys[position]);

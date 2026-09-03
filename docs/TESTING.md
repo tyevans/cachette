@@ -176,13 +176,34 @@ a `[tool.mutmut]` section with `source_paths`, and add a job to
 
 ### 3.5 Miri
 
-Miri finds aliasing and provenance defects in unsafe code. No test
-replaces it. Miri cannot run the Python interpreter, so it can only run
-over a crate that does not link the interpreter. The crate split is what
-makes this possible.[^8]
+Miri finds aliasing defects, provenance defects, and reads of an
+uninitialised byte. No test replaces it. Miri cannot run the Python
+interpreter, so it can only run over a crate that does not link the
+interpreter. The crate split is what makes this possible.[^8]
 
-Storage will hold unsafe code. Add the Miri job when that code arrives.
-There is no unsafe code today, so there is no Miri job today.
+Run it with `just miri`. It needs the dated nightly toolchain, and the
+toolchain file names the components it needs.[^14] The channel is why this
+gate did not exist before: Miri ships on nightly and on no other channel,
+and the project pinned a stable release until the toolchain record moved
+it.[^15]
+
+**The gate reaches the byte-level reads, and it drives the engine to get
+there.** The state hash reads whole structures and whole columns as raw
+bytes. That read is sound only while every type it reaches declares its
+padding. A structure that gains an undeclared padding byte compiles, passes
+every other test, and puts an uninitialised byte into the hash. That hash
+then differs between two runs of one binary, and no other gate here sees it,
+because a padding byte on a development machine is reliably zero.
+
+**The test list is short, and it is a floor rather than a ceiling.** Miri
+interprets every instruction, so a world that reserves its unit columns at
+the target population does not finish.[^16] The fixture reserves a few
+thousand slots instead, which is enough to hash a populated arena. A
+subsystem that adds an unsafe operation adds a test to the recipe that
+reaches it.
+
+The gate is not in `just check`. Interpretation is slow, and a gate slow
+enough to skip is a gate everyone skips.
 
 ## 4. How to add a test
 
@@ -248,3 +269,6 @@ real. The subjects are not.
 [^11]: Findings register, FND-160. `docs/FINDINGS.md`
 [^12]: Testing rules, section 3. `.claude/rules/testing.md`
 [^13]: Target platform costs. `docs/reference/graviton-costs.md`
+[^14]: The pinned toolchain. `rust-toolchain.toml`
+[^15]: ADR-0097, the toolchain is a dated nightly. `docs/adrs/draft/adr-0097-the-toolchain-is-a-dated-nightly.md`
+[^16]: ADR-0084, the world reserves the unit columns at construction. `docs/adrs/draft/adr-0084-the-world-reserves-the-unit-columns-at-construction.md`
