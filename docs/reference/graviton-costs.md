@@ -12,6 +12,20 @@ between the three. Each register states the machine that produced its rows.
 **A figure here is a measurement. Say so when you cite one.** Most cost
 figures in this project are still derived, and one blocker states which.[^4]
 
+**Two compilers produced the rows below, and a section states which produced
+its own.** The project pinned a stable release until 3 September 2026 and a
+dated nightly afterwards. Every section carries the compiler in its conditions,
+and **a row from one section is not comparable to a row from another unless
+both name the same one.** No column carries it, so a reader who takes a figure
+out of its section takes it out of its conditions.
+
+**A single pair of runs is evidence only when the stages that should not have
+moved did not.** This crate builds with link-time optimisation across one
+codegen unit, so an edit anywhere relays the whole binary, and a stage that
+shares no code with a change can move by several percent from instruction
+placement alone. One run measured the same tree twice and spanned 25 percent on
+one stage while the unchanged tree reproduced to under one percent.[^LAYOUT]
+
 ## Status
 
 Measured figures exist. A benchmark lives in the repository and a script runs
@@ -1547,3 +1561,4 @@ commit what changed. Do not edit a row to make a later run agree with it.
 [^DECL298]: Findings register, FND-301. `docs/FINDINGS.md`
 [^ADR71298]: ADR-0071, the bridge rebuild orders on one thread, decision D2. `docs/adrs/accepted/adr-0071-the-bridge-rebuild-orders-on-one-thread.md`
 [^RESID298]: Findings register, FND-303. `docs/FINDINGS.md`
+[^LAYOUT]: Findings register, FND-309. `docs/FINDINGS.md`
