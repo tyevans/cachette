@@ -326,13 +326,16 @@ impl InfluenceField {
     /// **This is the whole of the ground rule today, and it says so.** The
     /// project already chose that the influence plane carries terrain
     /// conductance, so that influence flows around ground which resists it
-    /// rather than through it.[^1] The ground that resists a unit is the only
-    /// ground the terrain table distinguishes today, because the multiplier
-    /// that separates a mountain from a plain has no recorded value yet.[^2]
-    /// A second conductance table beside the capacity table would be one fact
-    /// in two places, and nothing would fail when the two disagreed.[^3] The
-    /// solve reads a conductance of any value, so the rule that produces it
-    /// may be replaced without touching the solve.
+    /// rather than through it.[^1] This rule reads the capacity alone, so a
+    /// mountain conducts exactly as freely as a plain.
+    ///
+    /// **The terrain table now states a step multiplier, and this rule does
+    /// not read it.**[^2] That is a gap and not a decision: ground that costs
+    /// more to cross should plausibly carry a writ less freely, and nothing
+    /// here weighs it. A second conductance table beside the terrain table
+    /// would be one fact in two places, and nothing would fail when the two
+    /// disagreed.[^3] The solve reads a conductance of any value, so the rule
+    /// that produces it may be replaced without touching the solve.
     ///
     /// A cell that covers no ground conducts nothing.
     ///
@@ -343,7 +346,7 @@ impl InfluenceField {
     /// # References
     ///
     /// [^1]: Decisions register, DEC-005. `docs/DECISIONS.md`
-    /// [^2]: Decisions register, DEC-017. `docs/DECISIONS.md`
+    /// [^2]: The terrain module, the step multiplier table. `crates/cachette-core/src/terrain.rs`
     /// [^3]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`
     pub fn read_the_ground(&mut self, summaries: &[CellSummary]) -> Result<(), InfluenceError> {
         if summaries.len() != self.cells.tile_count() as usize {
