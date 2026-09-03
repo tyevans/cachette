@@ -118,16 +118,19 @@ type or a profile of its own, so today the inputs to a choice are the unit's
 cell and the unit's need and nothing else.[^13]
 
 **The need enters the key as a bucket, and the width of the bucket is the
-mechanism and not a detail of it.** A need is a fixed-point quantity, so it
-takes far more values than a world holds units. Unbucketed, two units in one
-cell almost never share a need, the distinct pairs equal the population, and
-this decision buys nothing.
+mechanism and not a detail of it.** A unit takes its ration with its cohort,
+and every unit of one cohort gains the same amount, so a need follows the
+cohort and not the unit. The distinct keys of a cell are therefore bounded by
+the cohorts that the cell holds. That bound is far above one, so the exact need
+does not collapse a cell to a single answer. It is also far below the units in
+the cell, so the population is not the bound either. The exact key collapses a
+little, and this decision needs a key that collapses to the lattice.
 
-**The width is a parameter, and this record does not set it.** No measurement
-exists of how many need values coexist in one cell in a world that consumes,
-and a blocker holds that measurement open.[^4] A wide bucket makes two units of
-different need act alike. A narrow one approaches one answer for each unit. The
-item that implements this decision carries that choice.[^14]
+**The width is a parameter, and this record does not set it.** A measurement
+now holds the spread of the needs of one cell in a world that consumes, and a
+register holds it with the fixture that produced it.[^3] A wide bucket makes
+two units of different need act alike. A narrow one approaches one answer for
+each unit. The item that implements this decision carries that choice.[^14]
 
 A value computed for each distinct pair of a cell and a need bucket is computed
 once for every unit that shares it.
