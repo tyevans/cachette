@@ -91,12 +91,18 @@ holds each tile, so the rule reads a value the engine stores.[^BLK34B]
 holder. The owner stated that the reasons to destroy one vary, so the engine
 permits the act and does not encode a motive.
 
-Two questions stay open.
+**Destruction takes work, and an instant path stays.** A unit that destroys an
+upgrade does work over several ticks, in the same way that a unit that builds
+one does. The instant removal that exists today is not deleted, because some
+needs ask for it. It stays as a control-plane call, and it is not what a unit
+does.
 
-1. **Does destruction take work, or is it instant?** It is instant today, and
-   it is a control-plane call rather than something a unit does. The answer
-   decides whether a unit needs a verb for it.
-2. **Does an upgrade change hands when the ground does?** The holder of a tile
+**A unit therefore needs a verb for destruction.** The engine has no such verb
+today. It has an instant removal by address and nothing else.
+
+One question stays open.
+
+1. **Does an upgrade change hands when the ground does?** The holder of a tile
    moves as units move, and the upgrade does not move with it.
 
 Work continues without the two answers. The engine states the storage and the
