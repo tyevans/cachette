@@ -1060,50 +1060,6 @@ those reads cost at the moment they were deleted.[^DENSE5]
 **The frame is 1.67 times the hundred millisecond budget.**
 
 
-## The decide pass against the sort it no longer runs
-
-**This is a measured refusal rather than a stage table.** The decide pass is the
-largest stage in the engine. A counting switch found it sorting the supporters
-of every candidate tile, about five million on each frame, while three quarters
-of those lists held one entry or none.[^DECIDE309] The sort was removed by
-stating the tie-break in the comparison instead. **It bought no time.**
-
-Machine G. 16,777,216 tiles, 1,000,000 units scattered, 12 threads, block edge
-32, `c7g.4xlarge` in `us-west-2`, `stage-cost`, 3 September 2026. Nine frames
-after two warm-up frames. Four runs, two trees.
-
-| Run | Tree | `holding_decide`, ns for each frame |
-|---|---|---|
-| 1 | with the sort | 34,174,920 |
-| 2 | with the sort | 34,134,468 |
-| 3 | without the sort | 34,128,759 |
-| 4 | without the sort | 34,054,721 |
-
-**The whole spread is 120,199 nanoseconds on 34 milliseconds, and the change
-sits inside it.** Removing five million sorts on each frame is not measurable
-here.
-
-**One run of the four carried an unrelated spike and it was chased rather than
-averaged away.** Run 3 gave `bridge_refresh_barrier` 39,742,813 against
-30,846,661 in run 2 and 30,695,188 in run 4, and its frame was 178,921,173
-against 167,142,223 and 168,352,493. Nothing in the change can reach the bridge
-refresh.
-
-**Runs 3 and 4 are one tree, so they are one binary and one layout.** A
-difference between them cannot be a layout effect, whatever the link settings
-do to a figure taken across two trees. That is what makes the spike the machine
-rather than the code, and it is a stronger statement than reading which stages
-moved.
-
-**So the protocol is to run each tree twice.** The spread inside one tree bounds
-the machine. A difference between trees larger than that spread is the layout
-and the change together. A difference smaller than it is nothing.
-
-**What this says about the stage.** Its cost is not the sort. Every candidate
-pays for six neighbour reads and a walk of the units on its tile, and about a
-quarter of them produce a change. The reading of the other three quarters is
-where the stage goes, and no change here touched it.
-
 ## The narrowed sort guard, measured across five runs
 
 **This section is a comparison and not a stage table.** It supersedes no table
@@ -1163,6 +1119,51 @@ rise across the holding stages, and the second is not caused by the change.
 changed tree.** A single pair taken at the first run would have reported a 9
 percent worse frame. A single pair taken at the second would have reported a 1
 percent better one. Both would have been honest, and both would have been wrong.
+## The decide pass against the sort it no longer runs
+
+**This is a measured refusal rather than a stage table.** The decide pass is the
+largest stage in the engine. A counting switch found it sorting the supporters
+of every candidate tile, about five million on each frame, while three quarters
+of those lists held one entry or none.[^DECIDE309] The sort was removed by
+stating the tie-break in the comparison instead. **It bought no time.**
+
+Machine G. 16,777,216 tiles, 1,000,000 units scattered, 12 threads, block edge
+32, `c7g.4xlarge` in `us-west-2`, `stage-cost`, 3 September 2026. Nine frames
+after two warm-up frames. Four runs, two trees.
+
+| Run | Tree | `holding_decide`, ns for each frame |
+|---|---|---|
+| 1 | with the sort | 34,174,920 |
+| 2 | with the sort | 34,134,468 |
+| 3 | without the sort | 34,128,759 |
+| 4 | without the sort | 34,054,721 |
+
+**The whole spread is 120,199 nanoseconds on 34 milliseconds, and the change
+sits inside it.** Removing five million sorts on each frame is not measurable
+here.
+
+**One run of the four carried an unrelated spike and it was chased rather than
+averaged away.** Run 3 gave `bridge_refresh_barrier` 39,742,813 against
+30,846,661 in run 2 and 30,695,188 in run 4, and its frame was 178,921,173
+against 167,142,223 and 168,352,493. Nothing in the change can reach the bridge
+refresh.
+
+**Runs 3 and 4 are one tree, so they are one binary and one layout.** A
+difference between them cannot be a layout effect, whatever the link settings do
+to a figure taken across two trees. That is what makes the spike the machine
+rather than the code, and it is a stronger statement than reading which stages
+moved.
+
+**So the protocol is to run each tree twice.** The spread inside one tree bounds
+the machine. A difference between trees larger than that spread is the layout
+and the change together. A difference smaller than it is nothing.
+
+**What this says about the stage.** Its cost is not the sort. Every candidate
+pays for six neighbour reads and a walk of the units on its tile, and about a
+quarter of them produce a change. The reading of the other three quarters is
+where the stage goes, and no change here touched it.
+
+
 ## Huge pages
 
 **The engine asks for no huge page.** This measurement changes the kernel
@@ -1674,6 +1675,8 @@ commit what changed. Do not edit a row to make a later run agree with it.
 [^ADR71298]: ADR-0071, the bridge rebuild orders on one thread, decision D2. `docs/adrs/accepted/adr-0071-the-bridge-rebuild-orders-on-one-thread.md`
 [^RESID298]: Findings register, FND-303. `docs/FINDINGS.md`
 [^LAYOUT]: Findings register, FND-309. `docs/FINDINGS.md`
+[^LAYOUT]: Findings register, FND-308. `docs/FINDINGS.md`
 [^ITEM301]: Backlog item 0301, narrow the sort guard to a repeated key. `docs/backlog/complete/0301-narrow-the-sort-guard-to-a-repeated-key.md`
 [^ADR105]: ADR-0105, a total order needs no repeated identifier, only no repeated key. `docs/adrs/draft/adr-0105-a-total-order-needs-no-repeated-key.md`
-[^DECIDE309]: Findings register, FND-314. `docs/FINDINGS.md`
+
+[^DECIDE309]: Findings register, FND-309. `docs/FINDINGS.md`

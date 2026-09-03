@@ -9230,7 +9230,7 @@ that does not exceed it is nothing at all.
 [^F307B]: Findings register, FND-292, in this document.
 [^F307C]: The holding suite of the core. `crates/cachette-core/tests/holding.rs`
 [^F313B]: ADR-0103, the tile value field stores a dense delta, never a sparse change list, decision D4. `docs/adrs/draft/adr-0103-the-tile-value-field-stores-a-dense-delta.md`
-[^F309X]: Findings register, FND-297, in this document.
+[^F314X]: Findings register, FND-297, in this document.
 [^F306A]: Findings register, FND-295, in this document.
 [^F313A]: The workspace manifest, the release profile. `Cargo.toml`
 [^F306B]: Findings register, FND-313, in this document.
