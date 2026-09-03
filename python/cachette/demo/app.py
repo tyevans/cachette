@@ -9,8 +9,13 @@ wheel with no bundled native library, and it binds the system graphics through
 ctypes, so it adds no compiled dependency to a machine that installs this
 package.[^2]
 
-The engine steps once for each frame it draws, so the drawing rate and the
-tick rate are one number.[^3]
+The engine tick and the wall clock are separate. The window draws at its own
+rate, and a clock says how many ticks the world runs between two drawings. A
+paused world runs none and still draws.
+
+Every draw still follows the steps of that frame, on one thread, which is what
+the viewer record fixes.[^3] The number of steps in a frame belongs to the
+caller, and this module is the caller.[^4]
 
 References
 ----------
@@ -22,6 +27,8 @@ Decisions register, the window library of the Python demonstration.
 
 ADR-0067, the viewer reads the world and never writes to it, decision D4.
 ``docs/adrs/accepted/adr-0067-the-viewer-reads-the-world-and-never-writes-to-it.md``
+
+Findings register, FND-322. ``docs/FINDINGS.md``
 """
 
 from __future__ import annotations
