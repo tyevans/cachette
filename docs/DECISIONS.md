@@ -2379,14 +2379,12 @@ a failed founding is correct.[^PRD12]
 [^DEC91D]: Decisions register, DEC-036, in this document.
 [^DEC92A]: ADR-0078, descent is a bounded record, and a relation is a bounded recursion, decision D1. `docs/adrs/draft/adr-0078-descent-is-a-bounded-record-and-a-relation-is-a-bounded-recursion.md`
 [^DEC92C]: Review 0223, the descent record. `docs/reviews/0223-the-descent-record.md`
-<<<<<<< HEAD
 
 [^DEC32ADR]: ADR-0021, a layout claim names one structure and one pass, and never a tier. `docs/adrs/draft/adr-0021-layout-follows-the-access-pattern.md`
 [^DEC32FND]: Findings register, FND-236. `docs/FINDINGS.md`
 [^DEC17NEXT]: Decisions register, DEC-093, in this document.
 [^DEC93TIMES]: Decisions register, DEC-008, in this document.
 [^DEC93HOME]: Decisions register, DEC-017, in this document.
-=======
 [^DEC95A]: ADR-0095, a behavioural strategy arrives as a field over cells, never as a search from a unit, decision D3. `docs/adrs/draft/adr-0095-a-behavioural-strategy-arrives-as-a-field-over-cells.md`
 [^DEC95B]: ADR-0091, movement takes its direction from a per-cell field, never from a per-unit search, decision D2. `docs/adrs/draft/adr-0091-movement-takes-its-direction-from-a-per-cell-field.md`
 [^DEC95D]: Decisions register, DEC-067, in this document.
@@ -2394,4 +2392,3 @@ a failed founding is correct.[^PRD12]
 [^DEC96A]: ADR Registry, the retcon window. `docs/adrs/REGISTRY.md`
 [^DEC96B]: Findings register, FND-218. `docs/FINDINGS.md`
 [^DEC96C]: ADR-0096, cost follows the lattice, not the population, and a unit is a reader, decision D4. `docs/adrs/draft/adr-0096-cost-follows-the-lattice-not-the-population.md`
->>>>>>> feat-w26

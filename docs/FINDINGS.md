@@ -5632,7 +5632,6 @@ allocated by a line that cannot see uncommitted work. In each case the registry
 stores a piece of state somewhere that cannot be read atomically by everyone who
 needs it, and in each case nothing fails until two readers disagree.
 
-<<<<<<< HEAD
 ### FND-226 — The demonstration feeds every unit, so it never forages
 
 **Believed.** The engine now steers a step by the option a unit chose, and it
@@ -5729,7 +5728,7 @@ wrote that column from outside is now a fixture about precedence.** Search for
 the callers of the setter, not only for the readers of the column. A fixture
 that sets a value and then runs a frame is the shape that breaks, and it breaks
 quietly: the value is read back correctly and it is the wrong value.
-=======
+
 ### FND-250 — A behavioural strategy is one constraint, not three
 
 **Believed.** A behavioural strategy decomposes into three parts that each need
@@ -5870,7 +5869,6 @@ and the ends are what a thread count cannot help.
 before reading what it contends on. Contention is the failure that a rule
 already prevents, so it is the least likely one to be present in a project that
 has the rule.
->>>>>>> feat-w26
 
 ## References
 
@@ -6100,7 +6098,6 @@ has the rule.
 [^F218E]: Definition of Done, section 4. `.claude/rules/definition-of-done.md`
 [^F218F]: Findings register, FND-192, in this document.
 [^ALLOC2]: Findings register, FND-219, in this document.
-<<<<<<< HEAD
 
 [^237B]: Decision Record Scope, section 6. `.claude/rules/adr-scope.md`
 [^238A]: The gate recipes. `justfile`
@@ -6112,7 +6109,7 @@ has the rule.
 [^236D]: ADR-0021, a layout claim names one structure and one pass, and never a tier, decision D1. `docs/adrs/draft/adr-0021-layout-follows-the-access-pattern.md`
 [^37HOME]: Decisions register, DEC-017. `docs/DECISIONS.md`
 [^37NEXT]: Decisions register, DEC-093. `docs/DECISIONS.md`
-=======
+
 [^F250A]: ADR-0064, a unit chooses by scoring a small fixed option set, decision D1. `docs/adrs/accepted/adr-0064-a-unit-chooses-by-scoring-a-small-fixed-option-set.md`
 [^F250B]: The choice pass. `crates/cachette-core/src/choose.rs`
 [^F251A]: The world, the weight profile field. `crates/cachette-core/src/world.rs`
@@ -6121,4 +6118,3 @@ has the rule.
 [^F252B]: ADR-0009, parallel stages write disjoint outputs, decision D3. `docs/adrs/accepted/adr-0009-parallel-stages-write-disjoint-outputs.md`
 [^F252C]: The choice pass of the world. `crates/cachette-core/src/world.rs`
 [^F252D]: ADR-0064, a unit chooses by scoring a small fixed option set, decision D4. `docs/adrs/accepted/adr-0064-a-unit-chooses-by-scoring-a-small-fixed-option-set.md`
->>>>>>> feat-w26
