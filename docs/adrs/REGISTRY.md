@@ -298,6 +298,7 @@ without stating a constraint is worse than no record.
 | 0087 | An influence solve runs a fixed iteration count over the whole plane | Draft | 0001, 0002, 0004, 0009, 0022, 0060 | 09, `draft/adr-0087-an-influence-solve-runs-a-fixed-iteration-count.md` |
 | 0091 | Movement takes its direction from a per-cell field, never from a per-unit search | Draft | 0004, 0018, 0022, 0024, 0056, 0064 | `draft/adr-0091-movement-takes-its-direction-from-a-per-cell-field.md` |
 | 0095 | A behavioural strategy arrives as a field over cells, never as a search from a unit | Draft | 0004, 0022, 0064, 0091 | `draft/adr-0095-a-behavioural-strategy-arrives-as-a-field-over-cells.md` |
+| 0096 | Cost follows the lattice, not the population, and a unit is a reader | Draft | 0009, 0022, 0064 | `draft/adr-0096-cost-follows-the-lattice-not-the-population.md` |
 
 ### Retired numbers
 

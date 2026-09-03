@@ -27,6 +27,9 @@ engine gets wrong today.
 
 | No. | Why it sits here |
 |---|---|
+| 0238 | Decide per cell and need rather than per unit. **The owner put the lattice approach above every other item**, and this is the first pass it applies to. ADR-0096 governs it. The prize is behavioural as well as cost: if the decision is cheap, the 32-tick interval that makes a unit act on a stale reading may go. |
+| 0237 | Declare what each stage reads and writes. It sits with 0238 because a stage nobody can time from outside cannot be shown to have improved, and because it makes ADR-0009 checkable, which that record says in its own consequences it is not. |
+| 0236 | Repair every record that calls BLK-007 open. A benchmark exists on a branch, and the moment it merges a large number of documents state something false and nothing fails. FND-042 records that this has already happened twice. It sits here so the sweep is ready before the merge rather than after it. |
 | 0102 | A settlement reads its own ground rule, not the passability rule. Blocked by 0071 and 0092, in that order. |
 | 0185 | The engine computes an option for every unit on every tick and then discards it. Movement reads whether a unit chose, not what it chose, so every pass that feeds the choice feeds one bit. FND-180 records it. The forage option now scores real food, so a step that reads the option steers toward something a system writes. ADR-0091 governs it. |
 | 0186 | It moved here from `Next` because it is the negative feedback of 0185. Without it the exit field of 0185 produces one rush in one direction, and nothing in the world turns the crowd back. Take it with 0185, or immediately after. |

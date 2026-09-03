@@ -423,6 +423,62 @@ in the paragraph above about ADR-0068, and it is a real one.
 
 ## Open
 
+### DEC-096 — How does the project repair a stale consequence inside an accepted record?
+
+**Open. A reviewer owns it. The recommendation is Option A.**
+
+An accepted record does not change except in status, and to change a decision
+the project writes a record that supersedes it.[^DEC96A] A finding settled the
+adjacent case this session: repairing a citation is not an amendment, because a
+citation is not a claim.[^DEC96B]
+
+**Neither answers the case in the middle.** ADR-0064 D1 ends with a sentence
+that says the cost of the choice pass is the option count times the population
+and nothing else. It is a consequence the record derived from its own decision,
+introduced by "therefore", and ADR-0096 makes it false.[^DEC96C] Nothing about
+the decision changes: a unit still takes the option that the fixed set and its
+own state select, and it still reads one cell.
+
+The record is accepted and it has many dependents, so the retcon window is
+shut.[^DEC96A]
+
+**A stale consequence is not rare and it is not this record's alone.** A
+consequence is where a record says what follows, and what follows changes when
+the project learns. The scope rule already forbids a record holding a value a
+measurement can change, and a cost clause is one.[^SCOPE] Every record with a
+consequence of that shape will reach this question.
+
+**Option A. Strike the stale sentence in place, and treat a consequence as
+repairable.** A consequence is derived, not decided. Correcting one changes
+nothing a reader would decide from the record's claim, which is the test the
+citation finding already gives.[^DEC96B] The commit says what changed and why,
+as that finding requires.
+
+**Option B. Supersede ADR-0064 in full.** One record replaces it and restates
+its other four decisions. This is what the current rule says. It costs a whole
+record to change one sentence, produces a record whose subject is a topic rather
+than a constraint, and every citation of the old number then needs review.
+
+**Option C. Leave the sentence and let ADR-0096 contradict it.** The newer
+record wins by date. It is rejected on sight: a record the code contradicts is
+worse than no record, and two accepted records disagreeing in the corpus is
+worse still.
+
+**Recommendation: A**, with the boundary stated so it cannot be stretched.
+Striking a derived consequence is a repair. Striking, adding or reversing a
+claim, a force or a rejected alternative is an amendment and the window governs
+it. The test is the one the citation finding already gives: does the edit change
+what a reader would decide?
+
+**Closing this settles more than one sentence.** It gives the third case in a
+series the project has now met three times: a pointer that decays, a consequence
+that decays, and a claim that is wrong. The first is settled, the third is
+settled, and this is the gap between them.
+
+**Whoever closes it should also decide whether the rule belongs in the registry
+beside the citation rule**, since a reader looking for one will look for the
+other in the same place.
+
 ### DEC-095 — Is a strategy field derived from nothing each rebuild, or carried between frames?
 
 **Open. Engineering owns it. It waits on DEC-067 and does not decide before
@@ -2151,3 +2207,6 @@ a failed founding is correct.[^PRD12]
 [^DEC95B]: ADR-0091, movement takes its direction from a per-cell field, never from a per-unit search, decision D2. `docs/adrs/draft/adr-0091-movement-takes-its-direction-from-a-per-cell-field.md`
 [^DEC95D]: Decisions register, DEC-067, in this document.
 [^DEC95E]: ADR-0095, a behavioural strategy arrives as a field over cells, never as a search from a unit, decision D4. `docs/adrs/draft/adr-0095-a-behavioural-strategy-arrives-as-a-field-over-cells.md`
+[^DEC96A]: ADR Registry, the retcon window. `docs/adrs/REGISTRY.md`
+[^DEC96B]: Findings register, FND-218. `docs/FINDINGS.md`
+[^DEC96C]: ADR-0096, cost follows the lattice, not the population, and a unit is a reader, decision D4. `docs/adrs/draft/adr-0096-cost-follows-the-lattice-not-the-population.md`

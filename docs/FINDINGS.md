@@ -5243,6 +5243,60 @@ world with one kind of unit. The finding records what is true so that the next
 person who reads the principle does not assume an implementation behind it,
 which is the mistake this register keeps recording.[^65]
 
+### FND-252 — The unit passes obey the rule about disjoint writes and still do not scale
+
+**Believed.** A parallel pass that does not scale is contending. The accepted
+record on parallel stages forbids two threads writing to one place and requires
+the partition to come from the data, so a pass that scales badly must be
+breaking it.[^F252A] [^F252B]
+
+**True.** The unit passes keep that record completely, and they scale badly for
+reasons the record does not govern. **Obeying it is necessary and it is not
+sufficient.**
+
+**Evidence, in the source rather than in a profile.** The choice pass gives each
+thread a contiguous chunk of the live units and one output slot of its own, and
+it joins the slots in index order.[^F252C] That is the required shape, and
+nothing in it contends.
+
+Three things cost it anyway.
+
+It collects every live unit into one list before any thread starts. That is
+serial and it grows with the population.
+
+It applies the results afterwards by walking the collected list and writing an
+intent for each entry. That is serial too, and it also grows with the
+population.
+
+Inside the parallel part, each unit reads its tile, converts the tile to a cell,
+reads that cell's summary and reads its own need from a column. The arena is in
+spawn order and never compacts, so consecutive units in a chunk touch scattered
+tiles, scattered cells and scattered needs. The choice record already states
+that condition and declines to claim the locality as a property of the
+engine.[^F252D]
+
+**Follows.** **The axis is the thing, and the record about writes does not
+choose the axis.** Partitioning by unit index satisfies every requirement of the
+parallel-stage record and destroys locality in the same move. Partitioning by
+cell satisfies the same requirements and keeps the reads contiguous, and it
+satisfies them as a side effect rather than as a constraint to be met.
+
+**A rule that is necessary invites the reading that it is sufficient.** The
+parallel-stage record is correct, it is well written, and it is about
+correctness under a weak memory model. Nothing in it claims to be about scaling,
+and nothing in it warned that a compliant pass could scale badly. A reviewer
+holding it would have passed the choice pass, because the choice pass passes.
+
+**Two serial phases were hiding in a pass everyone called parallel.** The
+collect and the apply are both O(population) and neither is threaded. A
+description of the pass as parallel is true of its middle and false of its ends,
+and the ends are what a thread count cannot help.
+
+**The general shape.** When a pass does not scale, read what it is indexed by
+before reading what it contends on. Contention is the failure that a rule
+already prevents, so it is the least likely one to be present in a project that
+has the rule.
+
 ## References
 
 [^F177A]: The founding refuses ground that admits nobody. `crates/cachette-core/src/world.rs`
@@ -5452,3 +5506,7 @@ which is the mistake this register keeps recording.[^65]
 [^F250B]: The choice pass. `crates/cachette-core/src/choose.rs`
 [^F251A]: The world, the weight profile field. `crates/cachette-core/src/world.rs`
 [^F251B]: The choice pass, the cell fields and the option set. `crates/cachette-core/src/choose.rs`
+[^F252A]: ADR-0009, parallel stages write disjoint outputs, decision D1. `docs/adrs/accepted/adr-0009-parallel-stages-write-disjoint-outputs.md`
+[^F252B]: ADR-0009, parallel stages write disjoint outputs, decision D3. `docs/adrs/accepted/adr-0009-parallel-stages-write-disjoint-outputs.md`
+[^F252C]: The choice pass of the world. `crates/cachette-core/src/world.rs`
+[^F252D]: ADR-0064, a unit chooses by scoring a small fixed option set, decision D4. `docs/adrs/accepted/adr-0064-a-unit-chooses-by-scoring-a-small-fixed-option-set.md`
