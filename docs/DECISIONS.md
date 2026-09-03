@@ -23,7 +23,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^ALLOC]
 
-**Next number: DEC-086**
+**Next number: DEC-094**
 
 ## Open
 
@@ -422,6 +422,45 @@ in the paragraph above about ADR-0068, and it is a real one.
 **Who decides.** A reviewer. The author of ADR-0088 is not one.
 
 ## Open
+
+### DEC-093 — Does the forest kind or the hill kind carry a step multiplier of its own?
+
+**Open. Engineering owns it. Nothing is blocked by it.**
+
+The terrain table states a step multiplier for every kind of ground. The
+mountain kind carries two and every other kind carries one. The mountain value
+follows from the ratio of the two accepted crossing times.[^DEC93TIMES] No
+accepted crossing time separates a forest tile or a hill tile from level
+ground, so both carry the baseline.
+
+**A value for either kind would be invented.** The project holds that a cost
+figure is derived and never invented, and one blocker states that no
+measurement exists on the target platform.[^BLK7] An intermediate
+multiplier chosen because it looks reasonable would be a figure with no
+derivation behind it, wearing the authority of the table.
+
+**Option A. Leave both at the baseline.** Ground is level or it is a mountain,
+and nothing between them costs more to cross.
+
+**Option B. Accept a crossing time for one of the two kinds, then derive the
+multiplier from it.** This is the route the mountain value took. It needs an
+owner decision about how long a formation should take to cross a wood or a
+ridge, and the multiplier follows.
+
+**Option C. Derive both from the height field.** The generator already gives a
+height, and the classifier already partitions it. A multiplier that rose with
+the height would need no separate figure. It would also make the multiplier a
+function rather than a table entry, which puts one crossing lever in code and
+the other in content, and the project already rejected that split for this
+value.
+
+**Recommendation: A until a watcher asks for B.** Option A states no figure
+that nobody derived, and it is honest about what the calibration covers. Option
+C is the one to refuse: it reintroduces the content-and-code split that this
+same question already settled.[^DEC93HOME]
+
+**Revisit when** the project accepts a crossing time for ground between level
+and mountain, or when a watcher reports that a wood reads as level ground.
 
 ### DEC-067 — Does a plane that carries the state of a solver belong above level 0?
 
@@ -1445,9 +1484,16 @@ multiplier describe the same tile. A split across content and code would put
 one crossing's two levers in two places. A validated range in content buys the
 same compile-time bound.
 
-**Related.** The mountain multiplier has no recorded value. The accepted
-50-second mountain crossing implies a multiplier of 2 against ordinary
-ground.[^MOVETIME] That value needs recording in the terrain table.
+**Related, and now closed.** The mountain multiplier had no recorded value.
+The accepted 50-second mountain crossing implies a multiplier of 2 against
+ordinary ground.[^MOVETIME] The terrain table now states that value, the scale
+constants table holds the row, and the row says the value is derived from the
+two accepted crossing times.[^SCALE] The value is derived, not measured, and
+nobody decided it directly.[^BLK7]
+
+**What the terrain table does not answer.** The forest kind and the hill kind
+carry the ordinary multiplier, because no accepted crossing time distinguishes
+them from level ground. A separate row holds that open choice.[^DEC17NEXT]
 
 ### DEC-018 — Where does movement sit in the frame schedule?
 
@@ -1700,12 +1746,23 @@ function of the column count, and the crossover sits well above the two columns
 that descent reads. The figures are in the commit body, because the machine is
 not the target and a measured figure decays.[^BLK7]
 
-**Do not write a decision record yet.** The scope rule needs all three
-conditions, and the second fails: the arena holds five columns and no parent
-edge, so a later change is cheap.[^SCOPE1] The registry reserves a row for the
-claim that layout follows the access pattern, and the work that adds the
-descent columns should write that row.[^REG21] The backlog holds the
-item.[^ITEM0097]
+**The record is written, and this row closes.** When this row was opened, the
+scope rule refused a record: the arena held five columns and no parent edge,
+so a later change was cheap and the record would have stated an intent as a
+fact.[^SCOPE1] The descent columns now exist and a pass reads them, so the
+claim points at something. ADR-0021 sits on the reserved row and holds the
+claim that a layout claim names one structure and one pass, and never a
+tier.[^REG21] [^DEC32ADR] Its status is `Draft`. A reviewer sets `Accepted`.
+
+The record states the claim in a stronger form than this row did. This row
+said layout follows the access pattern, which is true and which the misread
+register row also said.[^FND022] The record says what a layout claim must name
+in order to be checkable, because naming the tier is what caused the
+error.[^FND072]
+
+**The columns went to the record of descent and not to the character arena.**
+The backlog item said the arena. A separate finding records why the record is
+the right home and what to read into an item that names a structure.[^DEC32FND]
 
 ### DEC-033 — Does the project keep a performance path for the development machine?
 
@@ -1900,7 +1957,6 @@ a failed founding is correct.[^PRD12]
 [^REP14]: The character graph and inheritance, sections 2.1, 3.3 and 15.3. `docs/research/reports/14-character-graph-and-inheritance.md`
 [^SCOPE1]: Decision Record Scope, section 1. `.claude/rules/adr-scope.md`
 [^REG21]: ADR Registry, reserved row 0021. `docs/adrs/REGISTRY.md`
-[^ITEM0097]: Backlog item 0097. `docs/backlog/refined/0097-write-the-layout-record-with-the-descent-columns.md`
 [^ITEM0098]: Backlog item 0098. `docs/backlog/complete/0098-give-the-gate-suite-a-development-budget.md`
 [^ITEM0092]: Backlog item 0092. `docs/backlog/complete/0092-refuse-a-settlement-on-the-ground-that-cannot-carry-one.md`
 [^ADR14D7]: ADR-0014, entity identity is an index plus a generation, decision D7. `docs/adrs/accepted/adr-0014-entity-identity-is-an-index-plus-a-generation.md`
@@ -1976,3 +2032,8 @@ a failed founding is correct.[^PRD12]
 [^DEC84B]: PRD-0005, a watcher can tell what is happening and why. `docs/product/shipped/prd-0005-a-watcher-can-tell-what-is-happening-and-why.md`
 [^DEC85REF]: Decisions register, DEC-085, in this document.
 [^DEC85DOD]: Definition of Done. `.claude/rules/definition-of-done.md`
+[^DEC32ADR]: ADR-0021, a layout claim names one structure and one pass, and never a tier. `docs/adrs/draft/adr-0021-layout-follows-the-access-pattern.md`
+[^DEC32FND]: Findings register, FND-236. `docs/FINDINGS.md`
+[^DEC17NEXT]: Decisions register, DEC-093, in this document.
+[^DEC93TIMES]: Decisions register, DEC-008, in this document.
+[^DEC93HOME]: Decisions register, DEC-017, in this document.

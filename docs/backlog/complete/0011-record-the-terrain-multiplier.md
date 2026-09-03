@@ -1,7 +1,7 @@
 ---
 id: 0011
 title: Record the terrain multiplier and reconcile the crossing time
-status: refined
+status: complete
 created: 2026-08-30
 implements: [ADR-0056 D4]
 changes: []
@@ -102,7 +102,53 @@ behaviour.[^5]
 
 ## Outcome
 
-Filled in when the item moves to `complete/`.
+**Done on 2 September 2026.**
+
+The terrain table answers a step multiplier for every kind of ground, beside
+the capacity. The mountain kind carries two and every other kind carries one.
+The value is a Q16.16 fixed-point value, and no floating point enters it. The
+scale constants table holds the mountain row, the ordinary row and the
+50-second mountain crossing, and each row says how the value was reached.[^6]
+
+**The multiplier is derived, and nobody decided it directly.** It is the ratio
+of the two accepted crossing times. BLK-007 stays open, so no figure here was
+measured on the target platform.
+
+**The validated range is content, and it is the bound engine code would give.**
+The floor is the ordinary multiplier, because the dwell was derived over
+ordinary ground. The ceiling is the mountain multiplier, because the mountain
+crossing is the longest crossing the project has accepted. A kind that wants a
+larger multiplier needs an accepted crossing time first.
+
+**No step-cost literal was removed, because the movement kernel does not
+exist.** A whole-tree search over the Rust sources for a step cost and for the
+dwell found the two words only in this work and in the unrelated dwelling
+readers. The search command is in the commit body.
+
+**The forest kind and the hill kind carry the baseline.** No accepted crossing
+time separates them from level ground, and inventing an intermediate value
+would state a figure that nobody derived. DEC-093 holds that open choice.
+
+**The 4-tick difference has a candidate explanation, and it is unverified.**
+The closed-form law counts the steady state only. A formation pays one dwell
+for the leading rank to enter the chokepoint and one dwell for the last rank
+to clear the exit tile. Two dwells at the baseline dwell of 2 ticks is 4
+ticks, and 125 plus 4 is 129, which is the measured figure exactly. **The
+match is an arithmetic identity and not a measurement.** The movement kernel
+does not exist, so nothing counted the entry tick or the clearing tick. The
+finding names what would verify it.[^7]
+
+**Nothing in the engine reads the multiplier yet.** The movement kernel is the
+caller that will, and it is not built. The influence conductance rule is the
+one existing reader that could weigh it and does not; the rule now says so in
+its own comment rather than saying the value does not exist.
+
+**Six tests cover the work, and three restored defects proved they can fail.**
+A mountain multiplier lowered to one failed the ratio test and the crossing
+derivation. A mountain multiplier raised to three failed those two and the
+range test. A range validator wired to nothing failed only the test that hands
+it a value outside the range: the test that checks every kind stayed green,
+which is why both tests exist.
 
 ## References
 
@@ -111,3 +157,5 @@ Filled in when the item moves to `complete/`.
 [^3]: Movement timing note. `docs/research/movement-timing.md`
 [^4]: Decision Record Scope, section 4.1. `.claude/rules/adr-scope.md`
 [^5]: Testing Rules, section 2a. `.claude/rules/testing.md`
+[^6]: Budgets and costs, the scale constants. `docs/reference/budgets.md`
+[^7]: Findings register, FND-037. `docs/FINDINGS.md`

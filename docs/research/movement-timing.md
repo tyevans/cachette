@@ -53,12 +53,40 @@ enter the chokepoint and the ticks that the last rank spends to clear it.
 not change the choice of capacity 16. A later check must resolve it before any
 record states a crossing time as an exact figure.
 
-## The mountain multiplier is not recorded
+### The arithmetic that the cause predicts
 
-No record states the terrain multiplier for a mountain tile. The 50-second
-result implies a multiplier of 2 against ordinary ground, at capacity 8. That
-value is inferred from the result. It is not a decision that the project has
-made.
+Added 2 September 2026. The cause above predicts a number, and the number
+matches.
+
+A formation pays two stages that the steady state does not cover. The leading
+rank spends one dwell on the chokepoint before any unit leaves it. The last
+rank spends one dwell on the exit tile after the steady state ends. Each stage
+costs the baseline dwell of 2 ticks, so the two stages cost 4 ticks. The
+closed-form law gives 125 ticks, and 125 plus 4 is 129. That is the measured
+figure exactly.
+
+**This is an arithmetic identity and not a verification.** The movement kernel
+does not exist, so nothing re-ran the check and nothing counted the entry tick
+or the clearing tick. An identity that matches can still be a coincidence
+between two numbers of this size.
+
+**What would verify it.** Run the same formation through the movement kernel
+when it exists. Count the tick that the leading rank enters the chokepoint and
+the tick that the last rank leaves the exit tile. Confirm that each stage costs
+one dwell. Until that check runs, no record may state a crossing time as an
+exact figure.
+
+## The mountain multiplier is recorded
+
+Added 2 September 2026. When this note was written, no table stated the
+terrain multiplier for a mountain tile. The 50-second result implies a
+multiplier of 2 against ordinary ground, at capacity 8.
+
+The terrain table now states that value, beside the terrain capacity, and the
+scale constants table holds the row.[^6] [^7] **The value is still inferred
+from the result.** It is derived from the ratio of the two accepted crossing
+times, and nobody decided it directly. Every cost figure in this project is
+derived, not measured.[^2]
 
 ## What this note could not do
 
@@ -76,7 +104,8 @@ gap.[^2] Every cost figure in this project is derived, not measured.
 3. A 50-second mountain crossing is the accepted outcome. The register records
    the owner's acceptance.[^4]
 4. The terrain multiplier needs a recorded value, or a recorded rule that
-   supplies one.
+   supplies one. **This is now done.** The terrain table states one for every
+   kind of ground.[^6]
 
 ## The open question
 
@@ -87,9 +116,13 @@ The two options differ in where the multiplier lives. A content-configurable
 multiplier sits in the terrain table that content authors write. A fixed
 multiplier sits in engine code.
 
-This note leans toward content-configurable, because the terrain capacity
-table is already content and the two values describe the same tile. The
-question is genuinely open. The decisions register holds it.[^5]
+This note leaned toward content-configurable, because the terrain capacity
+table is already content and the two values describe the same tile.
+
+**The question is answered, and the answer is content.** The multiplier sits
+in the terrain table beside the terrain capacity. Content states a validated
+range, and that range gives the bound that engine code would otherwise
+give.[^5]
 
 ## References
 
@@ -98,3 +131,5 @@ question is genuinely open. The decisions register holds it.[^5]
 [^3]: Report 17, Group Spatial Dynamics, section 15.4. `docs/research/reports/17-group-spatial-dynamics.md`
 [^4]: Decisions register, DEC-008. `docs/DECISIONS.md`
 [^5]: Decisions register, DEC-017. `docs/DECISIONS.md`
+[^6]: The terrain module, the step multiplier table. `crates/cachette-core/src/terrain.rs`
+[^7]: Budgets and costs, the scale constants. `docs/reference/budgets.md`
