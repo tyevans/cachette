@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-253**
+**Next number: FND-257**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -1021,7 +1021,7 @@ pass over 16,384 cells that did much more for each cell would want threads and
 would not have them, because the derivation takes no thread count and nothing
 would notice.
 
-### FND-250 — The fixture of a benchmark is its least reviewed code and its most load-bearing
+### FND-256 — The fixture of a benchmark is its least reviewed code and its most load-bearing
 
 **Believed:** the benchmark measured the engine. Its figures were reviewed, its
 method was stated, and its rows carried the machine, the commit and the date.
