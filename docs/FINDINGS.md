@@ -60,6 +60,7 @@ terms on the small world than on the target one**, 55.5 milliseconds against
 **How to take the measurement again.** An example prices every stage on a
 world of a given extent, group and thread count, and prints the state hash
 beside the split so a sweep is also a determinism check.[^F300B]
+beside the split so a sweep is also a determinism check.[^F300B]
 
 **The cause is the shape of the parallel section, not the arithmetic in it.**
 One relaxation pass opens a thread scope for each faction, and a solve runs a

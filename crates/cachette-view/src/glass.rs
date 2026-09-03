@@ -248,14 +248,15 @@ fn cards(readout: &Readout, reference: bool) -> Vec<(Anchor, Card)> {
     if readout.units_carrying() > 0 {
         cards.push((Anchor::TopLeft, load_card(readout)));
     }
-    // **The card appears only when a seat exists.** A site that declares no
-    // position is a different fact from a site whose positions are empty, and
-    // a card that reported "0 of 0" on every frame would say neither.[^11]
+    // **The seats hold still, so they do not earn a place in the window.** A
+    // pass opens them once and fills them in the same tick, and the count
+    // reads the same on every frame after that. The test is what the quantity
+    // does and not how interesting it is, so this fails it.[^11] The seats are
+    // in the panel instead, which is the path that no window height
+    // bounds.[^12]
     //
-    // [^11]: Testing Rules, section 2a. `.claude/rules/testing.md`
-    if readout.seats() > 0 {
-        cards.push((Anchor::TopLeft, seat_card(readout)));
-    }
+    // [^11]: ADR-0093, the window shows what changes, decision D1. `docs/adrs/draft/adr-0093-the-window-shows-what-changes.md`
+    // [^12]: ADR-0093, the window shows what changes, decision D3. `docs/adrs/draft/adr-0093-the-window-shows-what-changes.md`
     // **The card appears only once somebody has been promoted.** Nothing
     // promoted anybody until this pass existed, and a card that reported
     // "characters 0" on every frame of every run would say nothing and go on
@@ -454,10 +455,9 @@ fn load_card(readout: &Readout) -> Card {
             rows.push(Row::new(resource_name(kind), grouped(u64::from(held))));
         }
     }
-    rows.push(Row::new(
-        "with a home",
-        format!("{} of {}", readout.units_housed(), drawn),
-    ));
+    // The home count holds still as well. Every live unit has one, so the row
+    // reads "n of n" on every frame, and it belongs in the panel rather than
+    // on the glass for the same reason the seats do.[^11]
     if readout.rationings() > 0 {
         rows.push(Row::new(
             "sites rationed",
@@ -474,25 +474,6 @@ fn load_card(readout: &Readout) -> Card {
     Card {
         heading: "WHAT THEY CARRY",
         rows,
-    }
-}
-
-/// The card that says how many positions the sites hold.
-///
-/// A position is a seat at a site: a named job that one unit holds. The count
-/// comes from the bounded walk the panel already makes over the sites, so the
-/// card starts no pass of its own.[^1]
-///
-/// # References
-///
-/// [^1]: ADR-0070, the head-up display reports what the drawing pass read, decision D2. `docs/adrs/accepted/adr-0070-the-head-up-display-reports-what-the-drawing-pass-read.md`
-fn seat_card(readout: &Readout) -> Card {
-    Card {
-        heading: "THE SEATS",
-        rows: vec![Row::new(
-            "held at the sites",
-            format!("{} of {}", readout.seats_taken(), readout.seats()),
-        )],
     }
 }
 

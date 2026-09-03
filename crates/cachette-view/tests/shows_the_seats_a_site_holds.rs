@@ -23,7 +23,7 @@
 
 use cachette_core::founding::FoundingOutcome;
 use cachette_core::{Axial, Entity, World, WorldConfig};
-use cachette_view::{draw_frame, glass, Camera, Canvas, Metrics, Overlay, Readout};
+use cachette_view::{draw_frame, glass, hud, Camera, Canvas, Metrics, Overlay, Readout};
 
 /// The size of the window the tests paint onto.
 const WINDOW: (usize, usize) = (512, 512);
@@ -177,24 +177,77 @@ fn the_readout_reports_nothing_before_the_pairing_pass_opens_a_seat() {
 }
 
 #[test]
-fn the_card_appears_only_when_a_seat_exists() {
+fn the_seats_do_not_take_a_place_in_the_window() {
+    // **The seats hold still.** A pass opens them once and fills them in the
+    // same tick, and the count reads the same on every frame after that. The
+    // record's test for a place in the window is what the quantity does, not
+    // how interesting it is, so the seats fail it and belong in the panel.[^1]
+    //
+    // The readout still carries them, because the panel draws from the same
+    // reading. This test is about where they are shown, not whether they are
+    // read.
+    //
+    // [^1]: ADR-0093, the window shows what changes, decision D1. `docs/adrs/draft/adr-0093-the-window-shows-what-changes.md`
     let (_, readout, _) = drawn(STEPS);
-    let heading = "THE SEATS";
-
     assert!(readout.seats() > 0, "the fixture declares no seat");
-    let said = glass::says(&readout, false);
+
+    for reference in [false, true] {
+        assert!(
+            !glass::says(&readout, reference)
+                .iter()
+                .any(|line| line == "THE SEATS"),
+            "the glass drew a card for a quantity that holds still",
+        );
+    }
+}
+
+#[test]
+fn the_panel_states_the_seats_the_glass_left_out() {
+    // The test above says where the seats are not. This one says where they
+    // are. A quantity that leaves the glass because it never moves must
+    // arrive in the panel, and a quantity on neither surface is a loss rather
+    // than restraint.
+    let (_, readout, _) = drawn(STEPS);
+    let expected = format!("{} of {}", readout.seats_taken(), readout.seats());
     assert!(
-        said.iter().any(|line| line == heading),
-        "the glass hid the seat card when a seat existed",
+        hud::says(&readout)
+            .iter()
+            .any(|line| line.contains(&expected)),
+        "the panel does not state the seats the readout holds: {expected}",
     );
-    let held = said
-        .iter()
-        .find_map(|line| line.strip_prefix("held at the sites: "))
-        .expect("the card states how many seats are held");
-    assert_eq!(
-        held,
-        format!("{} of {}", readout.seats_taken(), readout.seats()),
-        "the card and the readout disagree about the seats",
+}
+
+#[test]
+fn the_seat_count_holds_still_once_the_pass_has_run() {
+    // This is the evidence for the test above, and it is why that one is not
+    // just an assertion of taste. If the seats ever did move frame to frame,
+    // this would fail and the placement would have to be reconsidered.
+    let (world, outcomes, place) = founded(STEPS);
+    let mut canvas = Canvas::new(WINDOW.0, WINDOW.1);
+    let camera = Camera::opening()
+        .looking_at(place, &canvas)
+        .clamped(&world, &canvas);
+
+    let mut seen = Vec::new();
+    let mut world = world;
+    for _ in 0..5 {
+        let readout = draw_frame(
+            &world,
+            camera,
+            &Metrics::start(),
+            &outcomes,
+            Overlay::Glass { reference: false },
+            &mut canvas,
+        )
+        .expect("the world draws");
+        seen.push((readout.seats(), readout.seats_taken()));
+        world.step(1).expect("the step must run");
+    }
+    assert!(seen[0].0 > 0, "the fixture declares no seat");
+    assert!(
+        seen.iter().all(|held| *held == seen[0]),
+        "the seats moved over five frames, so they may earn a place in the \
+         window after all: {seen:?}",
     );
 }
 

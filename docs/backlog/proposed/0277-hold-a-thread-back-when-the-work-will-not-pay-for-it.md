@@ -92,6 +92,6 @@ platform.
 
 ## References
 
-[^1]: Findings register, FND-294. `docs/FINDINGS.md`
+[^1]: Findings register, FND-301. `docs/FINDINGS.md`
 [^2]: ADR-0060, an influence map is stored as a shared basis, decision D4. `docs/adrs/draft/adr-0060-an-influence-map-is-stored-as-a-shared-basis.md`
 [^3]: Decisions register, DEC-105. `docs/DECISIONS.md`

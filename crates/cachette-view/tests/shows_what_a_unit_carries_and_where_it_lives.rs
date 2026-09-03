@@ -32,7 +32,7 @@
 use cachette_core::founding::FoundingOutcome;
 use cachette_core::resource::ResourceKind;
 use cachette_core::{Axial, World, WorldConfig};
-use cachette_view::{draw_frame, glass, Camera, Canvas, Metrics, Overlay, Readout};
+use cachette_view::{draw_frame, glass, hud, Camera, Canvas, Metrics, Overlay, Readout};
 
 /// The size of the window the tests paint onto.
 const WINDOW: (usize, usize) = (512, 512);
@@ -266,19 +266,49 @@ fn the_card_states_the_load_the_readout_holds() {
         ),
         "the card and the readout disagree about how many units carry",
     );
+}
 
-    let home = said
-        .iter()
-        .find_map(|line| line.strip_prefix("with a home: "))
-        .expect("the card states how many hold a home");
-    assert_eq!(
-        home,
-        format!(
-            "{} of {}",
-            readout.units_housed(),
-            canvas.soldiers_painted()
-        ),
-        "the card and the readout disagree about how many units hold a home",
+#[test]
+fn the_home_count_does_not_take_a_place_in_the_window() {
+    // A quantity earns a place in the window only if it changes moment to
+    // moment, and the test is what the quantity does rather than how
+    // interesting it is.[^1] Every unit founds holding a home site and keeps
+    // it, so this count reads `n of n` from the first frame and stays there.
+    // It belongs in the panel, which a watcher opens when they want it.
+    //
+    // The panel still states it, and the next test checks that it does. A
+    // quantity that is on neither surface is not restraint, it is a loss.
+    //
+    // [^1]: ADR-0093, the window shows what changes, decision D1.
+    //       `docs/adrs/draft/adr-0093-the-window-shows-what-changes.md`
+    let (_, readout, _) = drawn(EXTENT, STEPS);
+    assert!(
+        readout.units_housed() > 0,
+        "the fixture houses nobody, so this test would pass on an empty set",
+    );
+    assert!(
+        !glass::says(&readout, false)
+            .iter()
+            .any(|line| line.starts_with("with a home")),
+        "the glass drew a count that never moves",
+    );
+}
+
+#[test]
+fn the_panel_states_the_home_count_the_readout_holds() {
+    // The card and the panel read one readout, so no number on one surface
+    // can disagree with the same number on the other.
+    let (_, readout, canvas) = drawn(EXTENT, STEPS);
+    let expected = format!(
+        "{} of {}",
+        readout.units_housed(),
+        canvas.soldiers_painted()
+    );
+    assert!(
+        hud::says(&readout)
+            .iter()
+            .any(|line| line.contains(&expected)),
+        "the panel does not state the home count the readout holds: {expected}",
     );
 }
 
