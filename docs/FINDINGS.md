@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-305**
+**Next number: FND-308**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -8293,6 +8293,128 @@ The remaining hypothesis inherited the confidence of the one that was tested.
 does.** Twelve milliseconds against a 463 millisecond frame and 0.31
 milliseconds against a 188 millisecond frame are not the same measurement twice.
 
+### FND-305 — The sort's guard was tested only on pairs that tie nothing, so the property it protects had no test
+
+**Believed.** The key vector sort refuses a repeated identifier, and two tests
+prove it. The guard therefore protects the order from a tie, and the tests hold
+it to that.
+
+**True.** Both tests used keys that share an identifier and differ in an
+ordering field. Such a pair is separated by the field it differs in, so it ties
+nothing and the order is total without the identifier deciding anything. **A
+repeated key, meaning two keys that agree in every field including the
+identifier, appeared in no test in the repository.**
+
+The property that determinism actually needs was therefore untested, and the
+tests that looked like they tested it exercised only the case that does not
+matter.
+
+**The evidence is an experiment, not a reading.** The guard was narrowed to
+refuse a repeated key and nothing else, and the whole suite was run. Exactly
+two tests failed, and they were the two that assert the refusal. Every other
+test in the crate passed, so nothing else in the project depended on the wider
+refusal.
+
+Then the narrow guard was removed entirely and the suite was run again. Three
+tests failed, and all three were written in the same change. **Before that
+change, removing the guard altogether would have broken nothing.**
+
+**Follows.** Three things.
+
+**A test that asserts an error can still test the wrong case.** Both tests named
+the right thing, cited the right record, and constructed an input that the
+property does not care about. Reading them would not have found it. Running the
+suite against a narrowed guard did, in one command.
+
+**Narrow a check before you trust it.** The wide guard passing tells you nothing
+about the narrow property inside it. The way to find out which part is load
+bearing is to remove the rest and see what fails.
+
+**Put the defect back, and put it back in the new place too.** The check moved
+once more after this, into the pass that orders ties, and it was broken again
+there to prove that the three tests still reach it.
+
+### FND-306 — A sequential sort was replaced by a walk over a permutation, and the frame got nine percent worse
+
+**Believed.** Replacing a comparison sort of a whole key set with one pass over
+the finished order, and no allocation, is cheaper. The pass is linear and the
+sort is not.
+
+**True.** It was measurably worse. The first form of the narrowed guard walked
+the sorted order and read two keys through it for each neighbouring pair, which
+is two random gathers into a sixteen megabyte array, one million times. The
+comparison sort it replaced read one million identifiers sequentially into a
+fresh vector and sorted that vector, which is contiguous and vectorises.
+
+**The measurement.** Machine C, `c7g.4xlarge`, Graviton3, 16,777,216 tiles,
+1,000,000 units scattered, 12 threads, nine frames, `stage-cost` feature.
+
+| Stage | Before, ns | After the first form, ns |
+|---|---|---|
+| `bridge_refresh_barrier` | 31,394,191 | 42,867,673 |
+| `admit` | 21,274,145 | 19,895,342 |
+| **The frame, timed from outside** | **177,862,658** | **193,848,102** |
+
+The bridge rebuild rose 36.5 percent and the frame rose 9.0 percent. The stage
+that sorts the smaller set fell, which is what the change was supposed to do
+everywhere.
+
+**The repair puts the check where the ties already are.** The pass that orders
+tied entries already visits every run of one ordering field, and only a run
+holding more than one entry can hold a repeated key. Nearly every run holds one.
+The check therefore reads entries the tie sort has just touched, and a run of one
+entry costs nothing at all.
+
+**Follows.** Two things.
+
+**A pass over a permutation is not a linear pass.** The comment written for the
+first form said it cost one pass and no allocation. Both halves were true and
+the conclusion was wrong, because the unit of cost is the cache miss and not the
+element.
+
+**This project already held the same lesson in the other direction.** A bounded
+search was found not to be a small search, because each of its steps was a
+miss.[^F306A] The same arithmetic run backwards says a sequential sort can beat
+a random-access scan, and it was not applied.
+
+### FND-307 — A check that skipped a path component named `worktrees` scanned nothing when it ran from a worktree
+
+**Believed.** The record check reports which records no source file cites, and a
+worker running it from a worktree gets that report about their own tree.
+
+**True.** It reported every record as cited by nothing. The check skips a path
+whose parts include `worktrees`, so that one run does not read files another run
+owns. A worktree of this project lives under `.claude/worktrees`, so when the
+check runs from inside one, every file it would scan has `worktrees` among its
+parts and the skip removes all of them. The corpus was empty and the note fired
+for every record.
+
+**The measurement.** The same commit, checked twice. From the repository root:
+two notes. From inside a worktree: fifteen. Thirteen records were reported as
+cited by no source file while their citations sat in files the run never opened.
+
+**Three sibling checks name paths and not components**, and none of them has the
+defect. The fix makes this one name paths too.
+
+**The same shape has a second half, and it points the other way.** The conflict
+marker check skips the worktree directory correctly, so a run from the
+repository root skips a worker's whole tree. Planting a marker in a worktree and
+running the check from the root reports 861 files and no failure. Running it
+from the worktree reports the marker. **A worker whose changes are in a worktree
+must run it from the worktree**, and guidance to run it from the root is the
+blind configuration for exactly the files that changed.
+
+**Follows.** Two things.
+
+**A skip that names a component is a skip that matches its own root.** Name the
+path.
+
+**A check that scans nothing reports success.** Both halves of this are silent:
+the record check printed a note about every record instead of none, which looks
+like a finding rather than an absence, and the marker check printed a file count
+that a reader has no reason to doubt. A check should say what it scanned, and a
+reader should compare that count against what they expected to change.
+
 ## References
 
 [^F261B]: The holder count test of the viewer. `crates/cachette-view/tests/shows_who_holds_the_ground.rs`
@@ -8613,3 +8735,4 @@ milliseconds against a 188 millisecond frame are not the same measurement twice.
 [^F304A]: Findings register, FND-299 and FND-295, in this document.
 [^F301A]: ADR-0071, the bridge rebuild orders on one thread, decision D2. `docs/adrs/accepted/adr-0071-the-bridge-rebuild-orders-on-one-thread.md`
 [^F302A]: Decisions register, DEC-111. `docs/DECISIONS.md`
+[^F306A]: Findings register, FND-295, in this document.

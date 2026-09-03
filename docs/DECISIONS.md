@@ -1259,52 +1259,6 @@ reorder on every frame wastes the common case. A fixed interval keeps the
 schedule out of the data, which is the rule a solver already follows.[^FIXEDITER]
 
 
-### DEC-111 — Should the key vector sort check that no identifier repeats, or only that no two keys tie?
-
-**Open. A reviewer owns it, with engineering. It governs every ordering pass in
-the engine.**
-
-**The sort checks the stronger property, and the check is a second full sort.**
-Before the radix runs, the sort allocates one 64-bit value for each key and
-comparison-sorts them to find a repeated identifier. Both ordering passes in a
-frame pay it: the admission sort over about 314 thousand intents and the bridge
-rebuild over one million units, on every frame.[^DEC111A]
-
-**The property the engine needs is narrower.** The identifier exists to break a
-tie in the ordering field. A result is total, and therefore deterministic, when
-no two keys share the pair of ordering field and identifier. Two keys that share
-an identifier and differ in the ordering field tie nothing.
-
-**The narrower property is free.** After the radix and the tie pass, the keys
-are in order of the pair, so a repeat of the pair is adjacent and one scan finds
-it. The stronger property is not adjacent in that order, which is why it needs
-its own sort.
-
-**Option A. Keep the stronger check.** It refuses a caller that reuses an
-identifier, which is a caller defect even when it does not tie. Costs a full
-comparison sort of the key set on every ordering pass, for ever.
-
-**Option B. Narrow the check to the pair.** Free, and it protects exactly the
-property that determinism needs. It stops refusing a class of caller defect that
-the engine currently catches, and no caller in the engine produces one.
-
-**Option C. Keep the stronger check behind the debug build.** Cheapest in
-release and it protects nothing there. **This project should not take it**: a
-guard that runs only in a build nobody ships is how a silent wrong answer
-reaches the target platform, and the release build is the one that runs at the
-target scale where a collision is most likely.
-
-**Recommendation: B, with a record.** The scope rule says a decision that
-governs determinism always gets a record, even when it looks obvious now, and
-this narrows the guarantee that every ordering pass rests on.[^DEC111B] The
-record should state the property, not the check, so that a later contributor
-cannot widen or narrow it without meeting the reasoning.
-
-**What decides it.** Whether any caller relies on the stronger refusal. The key
-vector sort is a shared utility, and its error type names the repeated
-identifier, so a test may assert it.
-
-
 ## Decisions to apply at merge
 
 These are mechanical. They do not need judgement, but they must not be
@@ -1329,6 +1283,26 @@ figure is 168 MB. The storage argument for vectors is stronger than the report
 concluded, and it called that argument its weakest.
 
 ## Closed
+
+### DEC-111 — Should the key vector sort check that no identifier repeats, or only that no two keys tie?
+
+**Closed. Option B, with a record. ADR-0105 holds it.**[^DEC111C]
+
+The sort now refuses a repeated key, meaning two keys that agree in every
+ordering field and in the identifier, and it accepts a repeated identifier that
+ties nothing. The record states the property rather than the check, so a later
+contributor cannot widen or narrow it without meeting the reasoning.
+
+**What decided it was not the cost.** The question asked whether any caller
+relies on the stronger refusal. The answer came from an experiment rather than
+a reading: the guard was narrowed and the whole suite was run, and exactly the
+two tests that assert the refusal failed. Both used keys that tie nothing, so
+the property the guard exists to protect had no test at all. That finding was
+worth more than the saving.[^DEC111D]
+
+**The saving was not what the register expected either**, and the first
+implementation made a frame nine percent worse. A second finding holds the
+case.[^DEC111E]
 
 ### DEC-107 — Which window library does the Python demonstration use?
 
@@ -2823,5 +2797,6 @@ a failed founding is correct.[^PRD12]
 [^DEC110B]: Findings register, FND-274. `docs/FINDINGS.md`
 [^DEC110C]: ADR-0014, entity identity is an index plus a generation, decision D1. `docs/adrs/accepted/adr-0014-entity-identity-is-an-index-plus-a-generation.md`
 [^DEC110D]: The cost benchmark, the reorder cost mode. `crates/cachette-core/benches/target_cost.rs`
-[^DEC111A]: Findings register, FND-302. `docs/FINDINGS.md`
-[^DEC111B]: Decision Record Scope, the counter-test in section 1. `.claude/rules/adr-scope.md`
+[^DEC111C]: ADR-0105, a total order needs no repeated identifier, only no repeated key. `docs/adrs/draft/adr-0105-a-total-order-needs-no-repeated-key.md`
+[^DEC111D]: Findings register, FND-305. `docs/FINDINGS.md`
+[^DEC111E]: Findings register, FND-306. `docs/FINDINGS.md`

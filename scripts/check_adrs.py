@@ -230,7 +230,7 @@ def main(argv: list[str]) -> int:
     # this script ran from a worktree, and reported every record as cited by no
     # source file.[^1] The three sibling checks already name paths.
     #
-    # [^1]: Findings register, FND-305. `docs/FINDINGS.md`
+    # [^1]: Findings register, FND-307. `docs/FINDINGS.md`
     skip = (ROOT / ".git", ROOT / "target", ROOT / ".claude" / "worktrees")
     code = [
         p

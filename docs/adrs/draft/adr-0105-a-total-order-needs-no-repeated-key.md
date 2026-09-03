@@ -107,7 +107,7 @@ refuses.
 [^1]: ADR-0007, content supplies a key vector, never a comparator, decision D1. `docs/adrs/accepted/adr-0007-content-supplies-a-key-vector-never-a-comparator.md`
 [^2]: ADR-0007, content supplies a key vector, never a comparator, decision D2. `docs/adrs/accepted/adr-0007-content-supplies-a-key-vector-never-a-comparator.md`
 [^3]: ADR-0001, one binary gives one answer at any thread count. `docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
-[^4]: Findings register, FND-304. `docs/FINDINGS.md`
+[^4]: Findings register, FND-305. `docs/FINDINGS.md`
 [^5]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
 [^6]: Target platform costs, every stage of a frame after the sort stopped sorting twice. `docs/reference/graviton-costs.md`
 [^7]: Testing Rules, section 1. `.claude/rules/testing.md`
