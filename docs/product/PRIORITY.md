@@ -41,6 +41,7 @@ A record here is a need, not a plan. The backlog says what work answers it.[^3]
 
 | No. | Why it sits here |
 |---|---|
+| 0019 | An agent can ask the running engine what it holds. It sits under `Later` because most of it is met: an agent builds a world, runs it, and reads what it holds through a protocol, and the derived answers can be checked against the parts they came from. What is not met is the last statement, that a gap reaches the next agent, and item 0211 holds that work. |
 | 0018 | A deposit never comes back. Wants 0013, because nothing drains the world until units consume. |
 | 0015 | Family and descent. Wants the character tier to be doing something first. |
 | 0016 | A ruler. Wants a family to succeed from. |

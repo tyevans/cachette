@@ -107,6 +107,13 @@ The protocol library sits in the development dependency group, not the runtime
 dependencies, so an installed wheel does not carry it. Whether the server
 belongs in the package at all is not settled here.
 
+**The growth rule above is now a record, and the record is where to read it.**
+The rule that a tool is added when an agent needs it, and not before, was
+written in this file and nowhere else. A worker who did not build the server
+could not find it. A decision record now holds the rule, and a product record
+holds the need behind it.[^8] [^9] The findings register holds what the gap
+cost.[^10]
+
 ## References
 
 [^1]: Project orientation, the design principles. `CLAUDE.md`
@@ -115,3 +122,6 @@ belongs in the package at all is not settled here.
 [^4]: Recurring Defect Shapes, shape 1. `.claude/rules/recurring-defects.md`
 [^5]: Backlog item 0153. `docs/backlog/refined/0153-let-python-read-an-event-without-repeating-its-layout.md`
 [^7]: Decisions register, DEC-060. `docs/DECISIONS.md`
+[^8]: ADR-0092, the agent tool surface grows one tool at a time, against a stated need, decision D1. `docs/adrs/draft/adr-0092-the-agent-tool-surface-grows-against-a-stated-need.md`
+[^9]: PRD-0019, an agent can ask the running engine what it holds. `docs/product/shaped/prd-0019-an-agent-can-ask-the-running-engine-what-it-holds.md`
+[^10]: Findings register, FND-202. `docs/FINDINGS.md`

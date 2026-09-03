@@ -15,6 +15,7 @@
 //! [^3]: ADR-0002, simulated and aggregated state holds no floating point number, decision D1. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
 
 pub mod bridge;
+pub mod census;
 pub mod character;
 pub mod choose;
 pub mod cohort;
@@ -44,6 +45,7 @@ pub mod upgrade;
 pub mod world;
 
 pub use bridge::{BlockLayout, BlockRange, BridgeError, UnitTileBridge};
+pub use census::{census, Census, CensusError};
 pub use character::{CharacterArena, CharacterError, Sex};
 pub use choose::{
     CellField, ChoiceError, ChoiceExplanation, ChoiceSchedule, Drive, OptionRow, WeightProfile,
