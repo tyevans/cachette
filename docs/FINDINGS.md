@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-260**
+**Next number: FND-266**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -6717,6 +6717,165 @@ earlier finding named three documents and repaired three. The tree held four,
 and nothing in the writing of that finding could have shown the fourth, because
 the count came from a reader rather than from a search.
 
+### FND-262 — The orientation claimed Miri checks the unsafe code, and no toolchain the project pinned could run Miri
+
+**Believed.** The project orientation states that keeping the core crate free
+of the interpreter binding "allows Miri to check the unsafe code".[^F262A] The
+crate split record calls Miri running over the storage code the benefit that no
+test gives.[^F262B] The testing guide said there was no Miri job because there
+was no unsafe code yet.[^F262C]
+
+**True.** Three things, and each is separately enough.
+
+Miri ships on the nightly channel and on no other. The project pinned a stable
+release, so no contributor and no continuous integration run could have run
+Miri at any moment since the claim was written. The claim was not merely
+unperformed. It was unperformable.
+
+Nothing in the tree ran it. There was no recipe, no workflow step and no
+script. A search for the name found six documents that discuss Miri and no
+invocation of it.
+
+The core crate does hold unsafe code. Two items assert that the settlement
+store is plain data.[^F262D] So the testing guide's stated reason for having no
+Miri job was false as well, and it was false for a different reason than the
+channel.
+
+**Evidence.** A whole-tree search for the name, excluding the build directory,
+returned prose only. The toolchain file named a stable release. A search for
+the `unsafe` keyword across the crates returned two items and one doc comment.
+The commit body holds both commands.
+
+**Follows.** Three things.
+
+**This is the inert capability, and the rule already names the shape.** A
+project declares a capability, documents it, and nothing calls it.[^F262E] The
+defence the rule gives is to ask who is obligated to invoke the thing. Here the
+answer was nobody, and the document that claimed the benefit was the same
+document that would have said so.
+
+**A benefit stated in a record must name what invokes it.** The crate split
+record gives up something real for this benefit, and the reader of that trade
+had no way to learn that the benefit was never collected.
+
+**The benefit was worth collecting, which is why this cost something.** The
+state hash reads whole structures and whole columns as raw bytes, and an
+undeclared padding byte would put an uninitialised byte into that read. Such a
+hash differs between two runs of one binary. No other gate in this project sees
+it, because a padding byte on a development machine is reliably zero. A gate
+now exists.[^F262F]
+
+### FND-263 — The reassociating float methods were blocked by the compiler, not by the lint, and clippy says nothing about a lint entry that reaches nothing
+
+**Believed.** The project orientation says the script catches "the
+reassociating methods, which do not resolve on the pinned toolchain and so
+cannot be named in a lint".[^F262A] The float ban script says the same in its
+own header.[^F263A]
+
+**True.** The obstacle on the pinned stable release was the compiler, not name
+resolution. A call to the reassociating add on that release is a hard error,
+because the library feature is gated and the gate cannot be opened on a stable
+channel. So on that channel the method could not be written at all, and the
+script's coverage of it guarded a door that the compiler had already locked.
+
+On the dated nightly the project now pins, the same call compiles with no
+feature attribute. The method is writable for the first time. In the same step,
+clippy resolves it and rejects it through its disallowed-method list.
+
+A third thing came out of the same probe, and it is the one that matters most.
+**Clippy silently ignores a disallowed-method path it cannot resolve.** It
+emits no warning and no note on either channel. A lint entry that names nothing
+is inert, it reads as a live rule, and nothing announces the difference.
+
+**Evidence.** A scratch crate outside the tree, built on both toolchains. On
+the stable release the call failed with the unstable-feature error and named
+the tracking issue. On the nightly the same file compiled with no attribute,
+and a feature gate was proved still to be enforced there by a second probe that
+the compiler rejected. With the method named in the disallowed list, clippy on
+the nightly rejected the call and quoted the reason. With a path that names no
+method at all, clippy on both toolchains finished clean. The commit body holds
+the probe.
+
+**Follows.** Three things, and none of them is that a mechanism should be
+removed.
+
+**The lint gains real work, and it did not have any before.** The entries
+should be added, because the method is now writable. Until they are, the
+script's name check is the only thing standing where the compiler used to
+stand. A backlog item holds the addition.[^F263B]
+
+**The script's second job became load-bearing at the moment it stopped being
+redundant.** Before the move it duplicated a compiler error. After the move it
+is the sole guard until the lint entries land. Reading the move as a reason to
+retire it would have been exactly backwards.
+
+**A lint entry can never be assumed live, and that is now measured rather than
+argued.** The rule that two mechanisms exist because one is not enough rested
+on judgement. It now rests on an observation: the first mechanism can be
+switched off by a typing mistake in a configuration file, and the tool that
+reads that file will not say so.
+
+### FND-264 — Miri cannot drive the engine at the fixture sizes the suite uses, because every world reserves the unit columns at the target population
+
+**Believed.** That a Miri gate would run over the tests the project already
+has, or over some subset chosen for relevance.
+
+**True.** Almost every engine test sets the unit capacity of its world to the
+target unit population, even where the world is sixteen tiles across. The world
+reserves those columns when it is built.[^139] Miri interprets each of those
+writes rather than executing it, so such a test does not finish.
+
+The relevance of a test is therefore not what decides whether Miri can run it.
+The reservation is.
+
+**Evidence.** Two runs on the development machine, on the dated nightly. The
+value-type test, which builds no world, finished under Miri in under two
+seconds of interpretation. A rate test, whose world is sixteen tiles by sixteen
+and which reserves the target population, had produced no result after nine
+minutes and was stopped. The two differ in the reservation and in little else.
+
+**Follows.** Two things.
+
+**A Miri gate needs a fixture of its own, and the fixture is the whole design
+of the gate.** The gate that now exists builds a world that reserves a few
+thousand slots, spawns soldiers into it, steps it, and hashes it. It reaches
+the byte-level read through the engine rather than around it.[^F262F]
+
+**This is the fixture rule again, from the other direction.** The rule says
+that a fixture modelled on the demonstration world supplies what looks right
+rather than what the test needs.[^23] Here the copied value made the test
+impossible rather than merely weak, which is the friendlier of the two
+failures, because it announced itself.
+
+### FND-265 — The overflow record's reason for preferring a test to a lint rests on a channel property, and the pin changed it
+
+**Believed.** The overflow record says that the switch naming the gate build
+"is not stable on the pinned toolchain, so a lint cannot see this and a test
+must".[^100]
+
+**True.** The switch is still unstable on the dated nightly. It is no longer
+unreachable: the compiler now names the feature attribute that would enable it,
+and a crate that declares that attribute can read the switch. So the sentence
+has gone from stating an impossibility to stating a cost.
+
+**Evidence.** The same scratch crate. On both toolchains the switch is
+rejected as an unstable feature and both errors name the tracking issue. Only
+the nightly error names the attribute that enables it, which is the compiler
+saying that the gate exists and can be opened there.
+
+**Follows.** Two things.
+
+**The test the record requires stays, and this finding does not amend the
+record.** The record gives a second and better reason for the test: it reads
+the outcome by catching a real panic rather than by reading a compiler switch,
+and a switch that is set says nothing about whether the panic happens. That
+reason is untouched.
+
+**A record should not rest a decision on a property of the channel, because a
+pin can change the channel.** The reasoning that survives is the reasoning
+about what the test proves. The reasoning about what the toolchain permits is
+the part that decayed, and it decayed within one commit of the pin moving.
+
 ## References
 
 [^F226A]: Backlog item 0185, steer a step by the option the unit chose. `docs/backlog/complete/0185-steer-a-step-by-the-option-the-unit-chose.md`
@@ -6977,3 +7136,11 @@ the count came from a reader rather than from a search.
 [^F231C]: The starvation suite of the core. `crates/cachette-core/tests/starvation.rs`
 [^F234A]: Findings register, FND-233, in this document.
 [^F201C]: Findings register, FND-206, in this document.
+[^F262A]: Project orientation, hard invariants 2 and 4. `CLAUDE.md`
+[^F262B]: ADR-0041, a crate split enforces the boundary at compile time. `docs/adrs/draft/adr-0041-a-crate-split-enforces-the-boundary-at-compile-time.md`
+[^F262C]: The testing guide, section 3.5. `docs/TESTING.md`
+[^F262D]: The settlement store asserts that it is plain data. `crates/cachette-core/src/site.rs`
+[^F262E]: Recurring defect shapes, inert code that nothing invokes. `.claude/rules/recurring-defects.md`
+[^F262F]: The state-byte gate. `crates/cachette-core/tests/state_bytes_are_initialised.rs`
+[^F263A]: The float ban script. `scripts/check-float-ban.sh`
+[^F263B]: Backlog item 0272, name the reassociating methods in the lint. `docs/backlog/proposed/0272-name-the-reassociating-methods-in-the-lint.md`

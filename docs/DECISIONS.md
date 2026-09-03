@@ -23,9 +23,103 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^ALLOC]
 
-**Next number: DEC-106**
+**Next number: DEC-108**
 
 ## Open
+
+### DEC-106 — How often does the project move the nightly date, and who owns the move?
+
+**Open. Engineering owns it. It governs every commit that touches the toolchain
+file.**
+
+**The pin makes the compiler a versioned input, and a versioned input needs an
+upgrade policy.** The toolchain record fixes a date rather than a channel, so
+the compiler no longer changes on its own.[^DEC106A] Nothing else in that
+record says when it should change.
+
+**A date that never moves is not safe.** A nightly carries unstable features,
+and an unstable feature changes shape. The longer the gap between two dates,
+the more changes arrive at once and the harder the failure is to read. An old
+nightly also misses every soundness fix made since.
+
+**A date that moves often is not free either.** A new compiler may move the
+golden state hash, and the record requires the determinism gate to run before
+the date is kept.[^DEC106A] That is a real cost each time, paid by whoever
+moves it.
+
+**Option A. Move on demand only.** Move the date when a feature the project
+needs arrives, when a defect forces it, or when a soundness fix matters.
+Cheapest. It lets the gap grow without anybody deciding to let it grow, and the
+move that finally happens carries every change at once.
+
+**Option B. Move on a fixed cadence, and separately on demand.** Move it on a
+stated interval whatever else is happening, and move it out of turn when
+something forces it. Each move is small, so a build failure names a small set of
+changes. It costs the determinism gate on a schedule rather than on a need.
+
+**Option C. Track the stable release cycle.** Move the date whenever the stable
+channel releases, so the nightly stays a fixed distance ahead of stable and the
+return to stable stays a short move. It ties the project to a cycle it does not
+otherwise care about.
+
+**Recommendation: B.** A is how a pin rots, and the project has a rule about
+exactly this shape: a value nobody is obliged to maintain stops being
+maintained.[^DEC106B] C solves a problem the project does not have, because
+nothing is planning a return to stable. B costs a scheduled gate run, and the
+record already makes each move a commit of its own so that a bisect can separate
+a compiler change from a code change.
+
+**What this does not decide.** It does not decide the interval. That is a
+figure, it follows from what the gate costs, and a register owns it. Express the
+policy with the interval as a parameter until a measurement on a development
+machine gives one.
+
+### DEC-107 — Now that the lint can name the reassociating float methods, what does each mechanism cover?
+
+**Open. A reviewer owns it, with the project owner. It governs the arithmetic
+boundary.**
+
+**The orientation states that two mechanisms hold the boundary because one is
+not enough**, and it says the script exists partly because the reassociating
+methods cannot be named in a lint.[^DEC107A] The move to the dated nightly
+changed the premise of that second half, and the findings register holds the
+measurement.[^DEC107B]
+
+**What changed, precisely.** On the stable release the project pinned, a call
+to the reassociating add was a compile error, so the compiler held that ground
+and neither mechanism was doing anything there. On the dated nightly the call
+compiles, so the ground is now open, and clippy resolves and rejects the method
+when its list names it. The list does not name it yet.
+
+**A third measurement bears on the choice.** Clippy silently ignores a
+disallowed-method path it cannot resolve. No warning, no note, on either
+toolchain. So a lint entry may be inert and read as live.
+
+**Option A. Add the lint entries and change the script in no way.** Both
+mechanisms then cover the reassociating methods, which is what the orientation
+asks for. The cost is a second declaration site for one rule, which is the
+defect shape this project keeps meeting.[^DEC107C]
+
+**Option B. Add the lint entries and narrow the script to what the lint cannot
+see.** The script would then cover only the inferred float literal. One rule,
+one site. The cost is that the lint entry can be switched off silently, and
+nothing would then hold the ground.
+
+**Option C. Add nothing. The script already rejects the names.** No work, and
+the boundary is held today. The cost is that the mechanism the orientation names
+first is the one that does nothing, and a reader of the lint file would not
+learn that.
+
+**Recommendation: A.** The measurement about clippy's silence is what decides
+it. B puts one rule behind a mechanism that can fail without saying so, and the
+whole reason two mechanisms exist is that one can. The duplication A creates is
+the good kind: two independent checks of one rule, not two declarations of one
+value, and they disagree only by one of them failing to fire.
+
+**What this does not decide.** It does not decide whether the reassociating
+methods should ever be permitted anywhere. They are forbidden in simulated and
+aggregated state and that is not open.[^DEC107D] A backlog item holds the
+work.[^DEC107E]
 
 ### DEC-105 — Is the memory-for-speed trade now open, and does ADR-0088 still hold?
 
@@ -2341,6 +2435,14 @@ The chosen option adds no mechanism, and the product record already states that
 a failed founding is correct.[^PRD12]
 
 ## References
+[^DEC106A]: ADR-0097, the toolchain is a dated nightly, decisions D2 and D3. `docs/adrs/draft/adr-0097-the-toolchain-is-a-dated-nightly.md`
+[^DEC106B]: Recurring defect shapes, documents that rot when a sweep names specifics. `.claude/rules/recurring-defects.md`
+[^DEC107A]: Project orientation, hard invariant 2. `CLAUDE.md`
+[^DEC107B]: Findings register, FND-263. `docs/FINDINGS.md`
+[^DEC107C]: Recurring defect shapes, redundant declaration sites. `.claude/rules/recurring-defects.md`
+[^DEC107D]: ADR-0002, state holds no floating point number, decision D1. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
+[^DEC107E]: Backlog item 0272, name the reassociating methods in the lint. `docs/backlog/proposed/0272-name-the-reassociating-methods-in-the-lint.md`
+
 
 [^DEC73A]: ADR-0065, a group is a site membership, not a region, decision D3. `docs/adrs/draft/adr-0065-a-group-is-a-site-membership-not-a-region.md`
 [^DEC73B]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`

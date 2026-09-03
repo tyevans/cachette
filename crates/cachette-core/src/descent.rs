@@ -995,9 +995,9 @@ impl Descent {
         // Every child list holds exactly the children that the parent edges
         // name, and it holds them in ascending order.
         let mut counted = vec![0u32; rows];
-        for row in 0..rows {
+        for parents in self.parents.iter().take(rows) {
             for role in [MOTHER, FATHER] {
-                let parent = self.parents[row][role];
+                let parent = parents[role];
                 if parent != NONE {
                     counted[parent as usize] += 1;
                 }

@@ -1242,12 +1242,11 @@ impl World {
                 self.soldiers.set_home(unit, None);
             }
         }
-        for index in 0..COMMODITY_COUNT {
+        for (index, account) in self.store_account.iter_mut().enumerate() {
             let held = store
                 .quantity(CommodityId(index as u16))
                 .expect("the index came from the commodity count");
-            self.store_account[index] =
-                sim_math::combine(self.store_account[index], Accum(-i64::from(held.0)));
+            *account = sim_math::combine(*account, Accum(-i64::from(held.0)));
         }
         true
     }
@@ -3839,12 +3838,12 @@ impl World {
             self.settlements.store_update(),
             threads,
         )?;
-        for index in 0..COMMODITY_COUNT {
+        for (index, account) in self.store_account.iter_mut().enumerate() {
             let net = pass
                 .ledger
                 .net(CommodityId(index as u16))
                 .expect("the index came from the commodity count");
-            self.store_account[index] = sim_math::combine(self.store_account[index], net);
+            *account = sim_math::combine(*account, net);
         }
         self.rate_ledger = self.rate_ledger.combine(pass.ledger);
         self.shortfall_log = pass.shortfalls;
