@@ -1,7 +1,7 @@
 ---
 id: 0300
 title: Cut every panel line to the width of the panel
-status: proposed
+status: complete
 created: 2026-09-03
 implements: []
 changes: []
@@ -63,7 +63,41 @@ code, so the cause is measured and not inferred. The note that overflowed was
 shortened as a local repair. That repair is why nothing is visibly wrong today
 and it is not a fix.
 
+## Outcome
+
+**The cut moved into one writer, and every line kind now goes through it.** The
+writer takes a left edge and a right edge, cuts the text to the room between
+them in whole glyphs, and returns whether it cut. A caller cannot ask it to
+write past the right edge. The bound follows from the panel width and the glyph
+table, so no author has to know a character count and no comment states one.
+
+**The question about wrapping a note was answered by not wrapping it.** A
+wrapped note changes the height of the line, and the height, the cut and the
+painting are all derived from one list.[^2] A cut note is reported rather than
+wrapped. The check that finds a line the panel must cut now covers every line
+kind, so a note that would be cut fails a test instead of reaching a reader.
+
+**One note was over the bound and nothing had failed.** It read "panel has no
+count of the world." at 32 characters against 30 characters of room, and the
+stored layout picture shows its ink two glyphs into the padding. It now reads
+"panel counts no other tile." That is the local repair the item said was not a
+fix, and it is correct here because the class closed first.
+
+**The panel geometry now has one declaration site.** The width, the padding,
+the line height, the value column and every colour moved into the panel
+standard. The head-up display reads them from there, so no second copy can
+drift.[^1]
+
+**Two tests hold it.** One draws every line kind with a text many times the
+panel width and asserts that no pixel outside the rectangle moved. The other
+writes the same text through the bare canvas, which is the uncut path the panel
+used to take, and asserts that the ink does escape. Without the second, a test
+that only looked outside the rectangle would pass on a panel that drew nothing.
+
+A finding records what the panel believed about its own cut.[^3]
+
 ## References
 
 [^1]: Recurring Defect Shapes, shape 1. `.claude/rules/recurring-defects.md`
 [^2]: ADR-0070, the head-up display reports what the drawing pass read, decision D1. `docs/adrs/accepted/adr-0070-the-head-up-display-reports-what-the-drawing-pass-read.md`
+[^3]: Findings register, FND-321. `docs/FINDINGS.md`
