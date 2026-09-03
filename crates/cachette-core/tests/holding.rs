@@ -756,3 +756,80 @@ fn a_holder_keeps_a_tile_against_an_equal_claim() {
         "an equal claim took the tile from its holder"
     );
 }
+
+/// Returns the mask of every block, derived from a full pass over the tiles.
+fn masks_by_a_full_pass(world: &World) -> Vec<FactionMask> {
+    let layout = world.holding().layout();
+    let mut masks = vec![FactionMask::EMPTY; layout.block_count() as usize];
+    for address in addresses(world) {
+        let Some(faction) = world.tile_holder(address).and_then(Holder::faction) else {
+            continue;
+        };
+        let tile = world.grid().index_of(address).expect("the tile is inside");
+        let key = layout.key_of(tile).expect("the tile has a key");
+        let block = layout.block_of_key(key) as usize;
+        masks[block] = masks[block].with(faction);
+    }
+    masks
+}
+
+/// A block loses a faction bit when that faction's last tile there goes.
+///
+/// **This is the transition, and the test beside it does not reach one.** That
+/// test compares every mask against a full pass after a run, so it proves the
+/// masks agree at one moment. A bit that is set and never cleared agrees at
+/// every moment in which nothing was vacated.
+///
+/// The engine keeps a count of the tiles each faction holds in each block, and
+/// clears the bit when a count reaches zero.[^1] Nothing rereads a block. A
+/// defect that never clears a bit is therefore invisible unless a fixture
+/// makes a faction give up the last of its ground somewhere.
+///
+/// **The assertion that the fixture reached the case is part of the test.**
+/// Without it this file would pass against a world in which no block is ever
+/// vacated, and it would report that as coverage.[^2]
+///
+/// # References
+///
+/// [^1]: Findings register, FND-294. `docs/FINDINGS.md`
+/// [^2]: Testing rules, section 2a. `.claude/rules/testing.md`
+#[test]
+fn a_block_mask_loses_a_faction_when_its_last_tile_there_goes() {
+    let mut world = World::new(VARIED).expect("the extent must describe a world");
+    // Two garrisons on one patch of ground, so that one gives way to the
+    // other rather than both settling into ground nobody wants.
+    garrison(&mut world, FactionId(0), Axial::new(20, 20), 6);
+    garrison(&mut world, FactionId(1), Axial::new(23, 23), 6);
+    garrison(&mut world, FactionId(2), Axial::new(26, 26), 6);
+
+    let mut previous = masks_by_a_full_pass(&world);
+    let mut cleared = 0usize;
+    for frame in 0..40 {
+        world.step(4).expect("the step must run");
+        assert!(
+            world.check_invariants(),
+            "the world broke an invariant at frame {frame}"
+        );
+        let now = masks_by_a_full_pass(&world);
+        for (block, (before, after)) in previous.iter().zip(now.iter()).enumerate() {
+            for faction in 0..world.config().faction_count {
+                let faction = FactionId(faction);
+                if before.contains(faction) && !after.contains(faction) {
+                    cleared += 1;
+                }
+            }
+            assert_eq!(
+                world.holding().block_mask(block as u32),
+                Some(*after),
+                "the mask of block {block} disagrees with its tiles at frame {frame}"
+            );
+        }
+        previous = now;
+    }
+
+    assert!(
+        cleared > 0,
+        "no block lost a faction in the whole run, so this test proves nothing \
+         about the transition it exists for"
+    );
+}

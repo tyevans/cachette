@@ -33,6 +33,9 @@ bytemuck.workspace = true
 probe-nondeterminism = []
 census-generated-tiles = []
 stage-cost = []
+# `census-holding` counts what the holding apply does on each frame. It is a
+# measurement switch and it compiles to nothing when it is off.
+census-holding = []
 
 [dev-dependencies]
 bytemuck.workspace = true
