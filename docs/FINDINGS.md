@@ -660,6 +660,12 @@ may be that cost rather than the work.
 
 ### FND-225 — The tiles hold the memory at the target scale, and the units do not
 
+**Read FND-246 before quoting a figure from this entry.** The 545 MB below is
+the figure at one thread. A machine needs about 960 MB.
+
+**Read FND-246 before quoting a figure from this entry.** The 545 MB below is
+the figure at one thread. A machine needs about 960 MB.
+
 **Believed:** memory at the target scale would be dominated by the entity
 tiers rather than by the tiles, on the reasoning that a tile is generated and
 only its change is stored. A derivation put the total at one to three
@@ -905,6 +911,70 @@ unmeasured floor of 1 is what this run supports.**
 session.** The first packed the population into a band, the second placed 76
 percent of the units it was asked for, and this one measured a column that
 never changes. Each was found by looking at a number that was too clean.
+
+### FND-247 — A comparison that isolated one variable had two, and it was discarded
+
+**Believed:** the first placement comparison answered whether the fixture
+biased every unit figure. It ran the same frame under a packed and a scattered
+population and reported that the scattered one cost 86 percent more.
+
+**True:** it placed 762,599 units under the scattered pattern against
+1,000,000 under the packed one. The two rows differed in their population as
+well as in their placement, so a comparison built to isolate one variable had
+two, and neither row explained the other. **The result was discarded rather
+than reported with a caveat.**
+
+The cause was in the fixture and not in the engine. The scattered pattern
+walks the world at a stride and searched one stride for a tile that admits a
+unit. A stride at the target scale is sixteen tiles, and a run of sixteen
+tiles of water ends that unit's search while every later unit keeps its own
+target, so the shortfall accumulates. The cursor now never goes backwards and
+never stops early, so water costs a longer walk rather than a lost unit.
+
+**Evidence:** the discarded run reported 762,599 in its unit column, which is
+where the defect showed. The repaired run reports 1,000,000 under both
+patterns, and the corrected result is a 60 percent difference rather than 86.
+
+**Follows:** a caveat is not a substitute for a second run when the second run
+costs three cents and four minutes. The discarded numbers were in the right
+direction and would have supported the same conclusion, which is exactly why
+reporting them would have been wrong: **a result that happens to point the
+right way is not evidence, and publishing it teaches the reader that the
+apparatus was sound when it was not.**
+
+**The unit column is what caught it**, and it was in the output only because
+the benchmark reports what it placed rather than what it was asked for. A
+fixture that reports its request rather than its result cannot show this
+class of defect at all.
+
+### FND-248 — A guard that fires correctly is not evidence that the thing it guarded against was acceptable
+
+**Believed:** the teardown trap makes a launch safe to attempt, because a run
+that goes wrong terminates itself.
+
+**True:** the trap works, and it is not a licence. One command chained a source
+edit and an instance launch. The edit failed its assertion and wrote nothing.
+The launch went ahead against a benchmark mode that did not exist, so the
+instance built the tree, ran a sweep nobody asked for, and billed for it.
+
+The trap did its job. An interrupt terminated the instance, deleted the key
+pair and the security group, and the region was verified empty afterwards.
+**That is the good news and it is not the finding.**
+
+**Evidence:** the launch and its teardown are in the run log, and the commit
+that repaired the sequencing describes it.
+
+**Follows:** **an edit and a launch do not belong in one command.** The launch
+must depend on the edit having succeeded, and a shell that runs the next
+command after a failed one gives no such dependency. Separate them, or make
+the launch conditional on the edit's exit status.
+
+**The general shape.** A guard exists because the guarded action can go wrong.
+Once the guard is trusted, the action gets attempted more casually, and the
+guard is then load-bearing for cases it was never designed to cover. The trap
+was written for a build that fails and a connection that drops. It was not
+written for a launch that should never have happened, and it happened to
+cover that too. **Next time it may not.**
 
 ### FND-017 — A decision costs 4.1 nanoseconds, not 400
 

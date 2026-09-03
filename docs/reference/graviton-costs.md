@@ -113,6 +113,10 @@ project rests on it.[^9]
 This is the row the project needs most. Machine A, 16 hardware threads. The
 world held 16,777,216 tiles and 1,000,000 units, and no settlement.
 
+**The units are packed.** A section below shows that a unit costs about twice
+as much at the density the project describes, so every row here is a lower
+bound.
+
 | Threads | Samples | Minimum, ns | Median, ns | Maximum, ns | Speedup |
 |---|---|---|---|---|---|
 | 1 | 6 | 1,827,238,759 | 1,848,231,346 | 1,945,931,865 | 1.00 |
@@ -335,7 +339,9 @@ inside a step is not callable on its own, so a stage is priced by running a
 whole frame with it switched off and taking the difference. Three switches
 exist. The rest of the frame stays in one residual.
 
-Machine A, 16,777,216 tiles, 1,000,000 units, 12 threads.
+Machine A, 16,777,216 tiles, 1,000,000 units, 12 threads, units packed. The
+shares below are of a packed unit cost, so read them as proportions rather
+than as amounts.
 
 | Row | Samples | Median, ns |
 |---|---|---|
@@ -463,7 +469,13 @@ rows. None of them is computed from a constant, so none of them moves.
 
 ## Resident memory
 
-Each row below comes from a process that measured one point and exited. A
+**Size a machine at about 960 MB, not 545.** The 545 MB below is the figure at
+one thread. The same world holds 876 MB at 12 threads and peaks at 957 MB
+while it builds. This paragraph exists because the one-thread figure is the
+one somebody sizing a machine would otherwise quote.[^12]
+
+**Units packed, one thread.** Each row below comes from a process that
+measured one point and exited. A
 process that has already built a large world does not return the memory to the
 operating system, so one process measuring every point would report the high
 mark of the run rather than the cost of the world it holds. Machine A, one
@@ -496,10 +508,10 @@ holds 456 MB, so the whole population of one million adds 89 MB. A tile costs
 
 **A tile costs 27 bytes even though the ground is generated.** Two records
 state that a tile field is a generated base with only the change stored, and
-that a tile stock is generated with only what was taken stored.[^12] [^13]
+that a tile stock is generated with only what was taken stored.[^13] [^14]
 Both hold: nothing here stores a tile value or a stock. The 27 bytes are the
 columns the world does allocate for each tile, and one proposed item already
-names the holder column as one of them.[^14]
+names the holder column as one of them.[^15]
 
 **Building the world needs 872 MB, not 545 MB.** The peak is 60 percent above
 the resident size at every large row. A machine sized to hold the world will
@@ -517,13 +529,14 @@ time, built with the overflow check on, and it passed.
 
 The check is not on in the rows above. The bench profile inherits the release
 profile, which carries no overflow check, so a wrap in any row above would
-have wrapped in silence.[^15] The check costs time, so the checked run is a
+have wrapped in silence.[^16] The check costs time, so the checked run is a
 separate build and gives no timing row. A timing row taken under it would
 measure the check.
 
 ## One frame against the tile count
 
-The world holds no unit in every row of this table. Machine A.
+The world holds no unit in every row of this table, so the placement pattern
+does not reach it. Machine A.
 
 | Tiles | Threads | Samples | Minimum, ns | Median, ns | Maximum, ns | Median, ns for each tile |
 |---|---|---|---|---|---|---|
@@ -559,7 +572,7 @@ has explained why.** One thread costs 426 ns for each tile, two threads cost
 78 ns for each tile at every thread count. Nine samples produced a spread
 under one fifth in each row, and the pattern repeated on both machines, so it
 is not noise and it is not one instance. A backlog item holds the
-question.[^16] Do not cite the 4,096-tile rows.
+question.[^17] Do not cite the 4,096-tile rows.
 
 **The small extents lose from a high thread count, and that is ordinary.**
 At 65,536 tiles a frame costs more at 16 threads than at 2. The step starts
@@ -569,7 +582,7 @@ because it rises with the thread count instead of falling.
 
 ## One frame against the unit count
 
-Every row below holds 4,194,304 tiles. Machine A.
+Every row below holds 4,194,304 tiles, and the units are packed. Machine A.
 
 | Units | Threads | Samples | Minimum, ns | Median, ns | Maximum, ns |
 |---|---|---|---|---|---|
@@ -595,7 +608,8 @@ Every row below holds 4,194,304 tiles. Machine A.
 | 1,000,000 | 16 | 9 | 327,615,102 | 363,437,973 | 376,565,148 |
 ## Building a world
 
-Machine A. The build takes no thread count from the caller.
+Machine A. The world holds no unit, so the placement does not reach these
+rows. The build takes no thread count from the caller.
 
 | Tiles | Samples | Minimum, ns | Median, ns | Maximum, ns | Median, ns for each tile |
 |---|---|---|---|---|---|
@@ -614,21 +628,22 @@ machine A. The constructor rebuilds the first pyramid level at one thread, so
 the build is serial and the size of the machine does not reach it.
 
 The tile value field generates a tile and stores nothing, so it visits no
-tile.[^12] The first level of the pyramid does visit every tile, and the
+tile.[^13] The first level of the pyramid does visit every tile, and the
 constructor rebuilds it. A proposed backlog item holds that pass and names the
-two shapes that would remove it.[^14]
+two shapes that would remove it.[^15]
 
 **Reserving a million unit slots costs nothing that this run could see.** A
 build at the target extent with the default reservation took a median of
 4,637,235,543 ns, against 4,636,309,563 ns with a reservation of 1024. The
 difference is one part in five thousand, and it is inside the spread of both
 rows. The reservation record states that the cost is paid once, at
-construction, and that the cost of a tick does not grow with it.[^17] This run
+construction, and that the cost of a tick does not grow with it.[^18] This run
 gives the first measured support for the first half of that claim.
 
 ## The hash of the whole world
 
-Machine A. The hash takes no thread count.
+Machine A. The world holds no unit, so the placement does not reach these
+rows. The hash takes no thread count.
 
 | Tiles | Samples | Minimum, ns | Median, ns | Maximum, ns | Median, ns for each tile |
 |---|---|---|---|---|---|
@@ -683,8 +698,14 @@ Read this section before you cite a figure above.
 
 Give the operation, the extent, the unit count, the thread count, the sample
 count, and the minimum, the median and the maximum in nanoseconds. Give the
-machine, the commit and the date beside the table. A figure without those
-three facts is not usable.
+machine, the commit and the date beside the table.
+
+**Name the fixture as well as the machine.** State how the units are placed
+and what block edge the world took. Two figures in this document turned out to
+describe the fixture rather than the engine: a packed population costs about
+half what the stated density costs, and a memory figure without a thread count
+is out by 60 percent. A number whose fixture is not named is not
+reproducible.
 
 Record a new table when a run changes a figure on purpose, and say in the
 commit what changed. Do not edit a row to make a later run agree with it.
@@ -702,9 +723,10 @@ commit what changed. Do not edit a row to make a later run agree with it.
 [^9]: ADR-0001, one binary gives one answer at any thread count, decision D4. `docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
 [^10]: Blockers register, BLK-012, the resolution. `docs/BLOCKERS.md`
 [^11]: The block edge default. `crates/cachette-core/src/bridge.rs`
-[^12]: ADR-0088, a tile field is a generated base and a stored change. `docs/adrs/draft/adr-0088-a-tile-field-is-a-generated-base-and-a-stored-change.md`
-[^13]: ADR-0072, a tile stock is generated, and only what was taken is stored. `docs/adrs/accepted/adr-0072-a-tile-stock-is-generated-and-only-what-was-taken-is-stored.md`
-[^14]: Backlog item 0171. `docs/backlog/proposed/0171-build-the-first-level-without-a-pass-over-every-tile.md`
-[^15]: ADR-0083, the gate build checks every integer overflow. `docs/adrs/draft/adr-0083-the-gate-build-checks-every-integer-overflow.md`
-[^16]: Backlog item 0229. `docs/backlog/proposed/0229-explain-the-frame-cost-at-the-smallest-extent.md`
-[^17]: ADR-0084, the world reserves the unit columns at construction, decision D3. `docs/adrs/draft/adr-0084-the-world-reserves-the-unit-columns-at-construction.md`
+[^12]: Findings register, FND-246. `docs/FINDINGS.md`
+[^13]: ADR-0088, a tile field is a generated base and a stored change. `docs/adrs/draft/adr-0088-a-tile-field-is-a-generated-base-and-a-stored-change.md`
+[^14]: ADR-0072, a tile stock is generated, and only what was taken is stored. `docs/adrs/accepted/adr-0072-a-tile-stock-is-generated-and-only-what-was-taken-is-stored.md`
+[^15]: Backlog item 0171. `docs/backlog/proposed/0171-build-the-first-level-without-a-pass-over-every-tile.md`
+[^16]: ADR-0083, the gate build checks every integer overflow. `docs/adrs/draft/adr-0083-the-gate-build-checks-every-integer-overflow.md`
+[^17]: Backlog item 0229. `docs/backlog/proposed/0229-explain-the-frame-cost-at-the-smallest-extent.md`
+[^18]: ADR-0084, the world reserves the unit columns at construction, decision D3. `docs/adrs/draft/adr-0084-the-world-reserves-the-unit-columns-at-construction.md`
