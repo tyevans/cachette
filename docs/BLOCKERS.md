@@ -31,16 +31,45 @@ precedent.[^ALLOC]
 
 ## Open
 
-### BLK-007 — No measurement exists on the target platform
+### BLK-007 — Most cost figures are still derived on the target platform
 
-**Owner:** engineering. **Blocks:** confidence in every cost figure in every
-report.
+**Owner:** engineering. **Blocks:** confidence in most cost figures in most
+reports.
 
-Every number in the research is derived, not measured. The research agenda
-names benchmarking on Graviton as blocking most of its own conclusions.
+**This row narrowed on 3 September 2026. It did not close.** A benchmark now
+lives in the repository, and a script runs it on a Graviton instance and
+destroys the instance afterwards. Every axis of the sweep is a parameter. Two
+runs measured five quantities, on two instances of different size. A register
+holds every row, both machines and both commits.[^MEASURED]
 
-This blocker cannot be resolved by a decision. It needs a benchmark harness
-and a machine.
+**What is now measured.** The cost of one frame against the tile count and
+against the unit count, up to 16,777,216 tiles and 1,000,000 units, at 1, 2,
+4, 12 and 16 threads. The cost of building a world. The cost of the hash of
+the whole world. The resident memory of a world. Whether one frame at the
+target scale trips an integer overflow check, which it does not. Every figure
+was taken on a world that holds no settlement and no character.
+
+**What keeps this row open.**
+
+1. **The figures in the research reports.** A cache hit rate, an allocation
+   count for each frame, and the cost of a call across the language boundary
+   are all derived, and the benchmark measures none of them.
+2. **Any figure for a world that holds settlements or characters.** The
+   measured world holds neither, so the rate pass, the consumption pass and
+   the position pass did no work and the character arena was empty. Every
+   measured frame figure and the memory figure are lower bounds.
+3. **Any figure for a stage inside a step.** The benchmark reaches the public
+   interface, and the passes inside a step do not.
+
+**The machine size no longer holds this row open, and the reason is a
+result.** A run on 16 hardware threads gives a frame of 500 milliseconds at
+the target scale against a budget of 100, and the unit passes stop gaining
+above 12 threads. A larger machine is not the missing measurement.[^FLOOR]
+
+**Do not read a document that says no measurement exists as current.** That
+sentence was true when it was written, and about ninety documents hold it.
+This row is the current statement. A finding records how far the sentence
+spread and why it was not swept.[^SPREAD]
 
 ### BLK-034 — May a unit build on ground another faction holds, and who may destroy an upgrade?
 
@@ -191,6 +220,9 @@ house, his kinship to everyone is zero, and he cannot inherit a title by
 blood. A title holder may **appoint** him. His children inherit from him
 normally.
 
+[^MEASURED]: Target platform costs. `docs/reference/graviton-costs.md`
+[^SPREAD]: Findings register, FND-223. `docs/FINDINGS.md`
+[^FLOOR]: Findings register, FND-224. `docs/FINDINGS.md`
 [^SCALE]: Budgets and costs, the scale constants. `docs/reference/budgets.md`
 [^SHAPES]: ADR-0066, entity storage holds four fixed shapes. `docs/adrs/accepted/adr-0066-entity-storage-holds-four-fixed-shapes.md`
 [^SHAPE]: ADR Registry, row 0017. `docs/adrs/REGISTRY.md`

@@ -144,6 +144,72 @@ target-check:
     # ADR-0008 names the primary target for the engine, which is what ships.
     cargo check --package cachette-core --package cachette-py --target aarch64-unknown-linux-gnu
 
+# Measure the cost of a frame. A benchmark does not gate a merge.
+#
+# The sweep runs the step against the tile count and against the unit count,
+# and it reaches the target scale of the project on the `full` profile. The
+# `quick` profile checks the apparatus in about a minute and measures nothing
+# that the project may cite.
+#
+# A figure taken here is a figure about this machine, and the target register
+# takes no such figure. Run `just graviton-bench` for a figure the project may
+# record.
+bench profile="quick":
+    cargo bench --bench target_cost -- {{profile}}
+
+# Measure the cost of a frame on the target platform, on a Graviton machine.
+#
+# The script launches an instance, builds the benchmark on it, runs the sweep,
+# brings the rows back, and destroys everything it made. It needs the AWS
+# command line tool, authenticated. It costs a few cents on the default
+# instance.
+#
+# Every axis is a parameter. Set CACHETTE_BENCH_INSTANCE for the machine,
+# and CACHETTE_BENCH_EXTENTS, CACHETTE_BENCH_THREADS and CACHETTE_BENCH_UNITS
+# for the sweep. The script header lists them all.
+graviton-bench profile="full":
+    ./scripts/graviton-benchmark.sh {{profile}}
+
+# List anything a Graviton benchmark run left behind. It should list nothing.
+graviton-orphans:
+    ./scripts/graviton-benchmark.sh --orphans
+
+# Start the local observability stack. Nothing here gates a commit.
+#
+# It runs ClickHouse for the benchmark rows, Loki for the run logs, an
+# OpenTelemetry collector, and Grafana over both. Every port binds to the
+# loopback address, so nothing is reachable from another machine. Grafana is
+# at http://127.0.0.1:3000 and it needs no password.
+obs-up:
+    docker compose up -d
+    # The Loki image carries no shell, so its readiness is checked from here
+    # rather than by a health check inside the container.
+    @printf 'Waiting for Loki '
+    @for _ in $(seq 1 60); do \
+        if curl -sf http://127.0.0.1:3100/ready > /dev/null; then break; fi; \
+        printf '.'; sleep 2; \
+    done; printf '\n'
+    @curl -sf http://127.0.0.1:3100/ready > /dev/null \
+        && echo "Loki is ready" \
+        || echo "Loki did not become ready. Run: docker logs cachette-loki"
+    @echo "Grafana: http://127.0.0.1:3000"
+
+# Stop the stack. The data stays in the volumes.
+obs-down:
+    docker compose down
+
+# Stop the stack and delete every stored row and log.
+obs-clean:
+    docker compose down --volumes
+
+# Load a benchmark result into the stack. Give the file a run produced.
+obs-load result log="":
+    ./scripts/ship_bench.py {{result}} {{ if log == "" { "" } else { "--log " + log } }}
+
+# Read a benchmark result and write the rows it would load. Sends nothing.
+obs-check result:
+    ./scripts/ship_bench.py {{result}} --print
+
 # Run mutation testing over the Rust core. Slow. Not a commit gate.
 mutants:
     cargo mutants --no-shuffle

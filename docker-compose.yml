@@ -1,0 +1,103 @@
+# The local observability stack.
+#
+# It exists so that a person can explore the benchmark results repeatedly and
+# in detail, rather than reading one table in one document.
+#
+# Nothing here is a dependency of any gate. `just check` does not need it, and
+# a contributor who never starts it loses nothing but the dashboards.
+#
+# Nothing here listens on a public interface. Every port is bound to the
+# loopback address, so the stack is reachable from this machine and from
+# nowhere else.
+#
+# Nothing here bills. Every service is a local container.
+#
+# Start it with `just obs-up`. Load a benchmark run with `just obs-load`.
+
+name: cachette-observability
+
+services:
+  # The store for the benchmark rows. A row is an experiment result, keyed by
+  # a commit, and SQL is what makes one explorable against another.
+  clickhouse:
+    image: clickhouse/clickhouse-server:25.8-alpine
+    container_name: cachette-clickhouse
+    environment:
+      CLICKHOUSE_DB: bench
+      CLICKHOUSE_USER: cachette
+      CLICKHOUSE_PASSWORD: cachette
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
+    ports:
+      - "127.0.0.1:8123:8123"
+    volumes:
+      - clickhouse-data:/var/lib/clickhouse
+      - ./observability/clickhouse:/docker-entrypoint-initdb.d:ro
+    ulimits:
+      nofile:
+        soft: 262144
+        hard: 262144
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:8123/ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
+  # The store for the run logs. A benchmark run writes a log, and the log is
+  # where the answer lives when a run fails rather than returns a figure.
+  loki:
+    image: grafana/loki:3.6.1
+    container_name: cachette-loki
+    command: ["-config.file=/etc/loki/loki.yaml"]
+    ports:
+      - "127.0.0.1:3100:3100"
+    volumes:
+      - ./observability/loki.yaml:/etc/loki/loki.yaml:ro
+      - loki-data:/loki
+    # There is no health check here, and that is not an oversight. The Loki
+    # image carries no shell and no fetch tool, so a check that runs inside
+    # the container cannot run at all. A check that can never pass holds every
+    # dependent back for ever, which is what it did. Readiness is checked from
+    # outside, by `just obs-up`.
+
+  # The OpenTelemetry collector. It reads the run logs and forwards them, and
+  # it holds an OTLP port so that anything else in this project can send
+  # telemetry to one address rather than to each store in turn.
+  collector:
+    image: otel/opentelemetry-collector-contrib:0.142.0
+    container_name: cachette-collector
+    command: ["--config=/etc/otel/collector.yaml"]
+    ports:
+      - "127.0.0.1:4317:4317"
+      - "127.0.0.1:4318:4318"
+    volumes:
+      - ./observability/collector.yaml:/etc/otel/collector.yaml:ro
+      - ./observability/runs:/runs:ro
+    depends_on:
+      loki:
+        condition: service_started
+
+  grafana:
+    image: grafana/grafana:12.3.1
+    container_name: cachette-grafana
+    environment:
+      GF_INSTALL_PLUGINS: grafana-clickhouse-datasource
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Admin
+      GF_AUTH_DISABLE_LOGIN_FORM: "true"
+      GF_USERS_DEFAULT_THEME: dark
+    ports:
+      - "127.0.0.1:3000:3000"
+    volumes:
+      - ./observability/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./observability/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+    depends_on:
+      clickhouse:
+        condition: service_healthy
+      loki:
+        condition: service_started
+
+volumes:
+  clickhouse-data:
+  loki-data:
+  grafana-data:

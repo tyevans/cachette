@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-253**
+**Next number: FND-257**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -584,6 +584,484 @@ height test did not, and it passed only because the term it ignored was small.
 
 ## D. Cost estimates that were wrong
 
+### FND-222 — A frame at the target scale costs eleven times its budget
+
+**Believed:** nothing. No measurement existed on the target platform, so the
+project had no figure for the cost of a frame at the target scale. The frame
+budget of 100 milliseconds is derived from the tick rate and the tile edge,
+and nobody had checked the engine against it.
+
+**True:** one frame at 16,777,216 tiles and 1,000,000 units costs a median of
+1,135 milliseconds on two Graviton3 hardware threads. That is 11.4 times the
+budget. One thread costs 1,861 milliseconds, so a frame holds 1.86
+core-seconds of work.
+
+**The cost is two straight lines.** A tile costs 78 ns for each frame on one
+thread and a unit costs 557 ns. The two constants predict the target scale row
+to one part in two hundred. The unit count is therefore the larger half of the
+frame at the target scale, and it holds 1,000,000 units against 16,777,216
+tiles.
+
+**Evidence:** the target platform register holds the run, the machine, the
+commit and every row.[^F222]
+
+**Follows:** the tile pass ran 1.81 times faster on two threads and the unit
+passes ran 1.35 times faster, so the half of the frame that is larger is also
+the half that scales worse.
+
+**The two constants in this entry are weaker than it says.** A pre-registered
+prediction later missed by 6.2 percent, and FND-240 holds it. Read them as an
+approximation good to about ten percent. The measured rows in this entry and
+in FND-224 do not move, because neither is computed from a constant. The measured world held no settlement, so every
+figure above is a lower bound.
+
+**This entry first said the budget needs at least 19 cores at perfect
+efficiency. A later run on 16 cores refuted the reasoning behind that
+sentence, and FND-224 holds the correction.** Perfect efficiency is not
+available: the unit passes reach a floor and stop.
+
+### FND-224 — The frame budget is out of reach on any core count
+
+**Believed:** FND-222 divided 1.86 core-seconds by a budget of 100
+milliseconds and concluded that 19 cores would reach it. That reasoning
+assumed the work divides.
+
+**True:** it does not all divide. A run on 16 Graviton3 hardware threads gives
+a frame of 500 milliseconds at the target scale, which is 5.0 times the
+budget, at a speedup of 3.69 on 16 cores. **The unit passes reach a floor near
+300 milliseconds and gain nothing between 12 threads and 16.** The tile pass
+has no floor in the range measured and reached 6.13 on 16 threads.
+
+**A frame at the target scale therefore cannot fall below about 300
+milliseconds on this engine, whatever the core count.** The budget is 100
+milliseconds. No machine reaches it.
+
+**That floor is about twice as high as this entry says.** Every figure here
+was taken with the units packed into a band, and FND-245 shows a unit costs
+about twice as much at the density the project states. The conclusion holds
+under both patterns and the level does not.
+
+**Evidence:** the target platform register holds both runs, the machines, the
+commits and every row.[^F222] The unit half is the difference between a world
+of 1,000,000 units and a world of none, at 4,194,304 tiles, taken at five
+thread counts.
+
+**Follows:** buying a larger machine does not deliver the tick rate. Either a
+unit must cost less in a frame, or fewer units must do work in a frame. The
+project already holds the second shape as a design principle, because a
+set-valued command permits a cheaper algorithm than a per-entity loop. This is
+the first measurement that says the principle is load-bearing rather than
+tidy.
+
+**Two cautions.** The measured world held no settlement and no character, so
+the unit half is a lower bound and the floor may be higher. The step starts
+threads for each parallel stage rather than using a pool, so part of the floor
+may be that cost rather than the work.
+
+### FND-225 — The tiles hold the memory at the target scale, and the units do not
+
+**Read FND-246 before quoting a figure from this entry.** The 545 MB below is
+the figure at one thread. A machine needs about 960 MB.
+
+**Read FND-246 before quoting a figure from this entry.** The 545 MB below is
+the figure at one thread. A machine needs about 960 MB.
+
+**Believed:** memory at the target scale would be dominated by the entity
+tiers rather than by the tiles, on the reasoning that a tile is generated and
+only its change is stored. A derivation put the total at one to three
+gigabytes.
+
+**True:** a world of 16,777,216 tiles and 1,000,000 units holds **545 MB
+resident at one thread**, and 876 MB at 12. FND-246 holds the thread rows. The same world with no unit holds 456 MB, so the whole population
+of one million adds 89 MB. **A tile costs 27 bytes and a unit costs 89 bytes.**
+The tiles are five sixths of the total.
+
+**The generated-tile records are not contradicted.** Nothing stores a tile
+value or a tile stock. The 27 bytes are the columns the world does allocate
+for each tile, and one proposed item already names the holder column as one of
+them.[^F162D]
+
+**Building the world needs more than holding it.** The high water mark at the
+target scale is 872 MB against 545 MB resident, and the gap holds at every
+large extent. A machine sized to hold the world will fail to build it.
+
+**Evidence:** the target platform register.[^F222] Each point was measured by
+a process that built one world and exited, because a process that has already
+built a large world does not return the memory and would report the high mark
+of the run.
+
+**Follows:** the derived figure was high by a factor of two to six, and it was
+wrong about which half dominates. The measured world holds no settlement and
+no character, and the scale constants table names 5,000 settlements and 50,000
+living characters, with the character layer derived at about 85 MB. Adding
+those to 545 MB does not reach one gigabyte, so the shape of the answer is
+unlikely to change.
+
+### FND-240 — A pre-registered prediction refuted the two-constant model
+
+**Believed:** the cost of a frame is the tile count times a constant plus the
+unit count times a second constant. The register said the two constants
+predict the target scale row to one part in two hundred, and called that the
+strongest evidence in the run.
+
+**True:** the agreement was one point. A prediction written into the register
+and committed **before** the run that tested it named 396.6 milliseconds for
+16,777,216 tiles and 500,000 units at 12 threads, with a hit defined as five
+percent. The measurement is 371.9 milliseconds, which is 6.2 percent low and
+outside the band.
+
+**The cost of a unit is not one constant.** At 16,777,216 tiles it is 248 ns
+at 500,000 units and 270 ns at 1,000,000, so it rises with the population. The
+constant the prediction used came from a world of 4,194,304 tiles, where it is
+298 ns, so it depends on the extent as well.
+
+**Evidence:** the register holds the prediction, the band, the result and both
+commits.[^F222] The commit that states the prediction holds no result, and the
+commit after it holds the result, so the order of the two is the evidence.
+
+**Follows:** the two constants are an approximation good to about ten percent,
+and the register now says so. **The headline result does not move**, because
+it never rested on the model: the frame at the target scale, the tile pass and
+the unit passes are each measured rows, and the floor in the unit passes is a
+difference between measured rows.
+
+**The method is the finding as much as the result is.** A consistency check
+computed after the data is in hand cannot fail, and this one would have stood
+in the register as strong evidence. It cost ten cents and one commit ordering
+to learn that it was worth about a tenth of what it claimed.
+
+### FND-241 — The unit cost of a frame is not one stage, and most of it cannot be measured from outside
+
+**Believed:** the unit passes are 298 milliseconds at 12 threads, and finding
+which stage holds them would give the project one optimisation target.
+
+**True:** no single stage holds them. At the target scale, of 274 milliseconds
+of unit cost in a 521 millisecond frame, the choice scoring is 71
+milliseconds, one bridge rebuild is 26, the economy is 6, and **170
+milliseconds is a residual that the public interface cannot divide.** The
+largest part is the part nobody can name.
+
+**The residual holds** the movement intents, admission, the holder spread, the
+death scan, the part of the level 1 rebuild that reads the units, and the walk
+over every live unit inside the choice pass that the interval does not remove.
+
+**Evidence:** the register holds the rows.[^F222] Each part was priced by
+running a whole frame with a switch off and taking the difference, because the
+engine holds no instrumentation and the benchmark added none. Three switches
+exist on the public interface: the economy schedule, the choice interval, and
+the bridge rebuild, which is public and was priced directly.
+
+**A correction inside this finding.** The step calls the bridge refresh three
+times in a frame, and a first reading of that put the bridge at three rebuilds
+and 79 milliseconds. The refresh compares a revision counter and returns when
+the bridge is still accurate, so the frame pays one rebuild and two constant
+checks. The figure is 26 milliseconds, not 79.
+
+**Follows:** a stage that cannot be measured from the public interface is a
+stage nobody can prove they improved, and that may be why none of this has
+been optimised. Something must make the stages separable before the largest
+part of the unit cost can be worked on. Backlog item 0229 already asks for a
+stage measurement and names the constraint that a clock must not enter the
+engine.
+
+### FND-245 — The placement of the units doubles the cost of a frame
+
+**Believed:** the benchmark measured the engine at the target scale. The
+fixture placed the units by walking the world from the first tile and filling
+each tile that admits one.
+
+**True:** that pattern packs 1,000,000 units into a band across the top of the
+map at one unit for each tile, and leaves the rest of the world empty. It is
+about seventeen times denser than the target scale describes, because one
+million units over 16,777,216 tiles is one unit for each seventeen tiles.
+
+**A unit costs about twice as much at the density the project states.** The
+same frame, in one process on one machine from one build, under two placement
+patterns:
+
+| Threads | Unit cost packed, ms | Unit cost scattered, ms | Ratio |
+|---|---|---|---|
+| 1 | 578.5 | 1,363.4 | 2.36 |
+| 2 | 422.5 | 962.2 | 2.28 |
+| 4 | 329.5 | 746.5 | 2.27 |
+| 12 | 278.5 | 587.5 | 2.11 |
+
+**Evidence:** the register holds both patterns at every thread count.[^F222]
+
+**Follows:** every packed unit figure in the register is a lower bound. A frame
+at the target scale costs 835 milliseconds at 12 threads at the stated
+density, which is 8.4 times the budget, against 526 and 5.3 times packed.
+
+**The shape survives and the level does not.** The unit passes scale to 2.08
+on 12 threads packed and 2.32 scattered, so the conclusion in FND-224 that the
+budget is out of reach holds under both. The floor is about twice as high as
+that entry says.
+
+**The memory does not move**, at one part in four thousand between the two
+patterns.
+
+**This is the shape the testing rule names, found in a benchmark rather than
+in a test.** The rule says to ask what distribution the work needs rather than
+to copy a convenient world, and to put the defect back and watch the test stay
+green. Nobody asked it of this benchmark, and the fixture was chosen because
+it was easy to write.
+
+### FND-246 — A memory figure without a thread count is not usable
+
+**Believed:** a world at the target scale holds 545 MB. FND-225 states it and
+the register stated it without naming a thread count.
+
+**True:** 545 MB is the figure at one thread. The same world holds 572 MB at
+two threads and 876 MB at 12. The step gives each thread its own output slot,
+so the resident size grows with the thread count by about 30 MB for each
+thread.
+
+**The peak moves much less**, from 872 MB at one thread to 957 MB at 12,
+because the peak is set by the build and the build runs at one thread whatever
+the caller asks for.
+
+**Evidence:** the register holds the three rows.[^F222] Each was measured by a
+process that built one world and exited.
+
+**Follows:** a machine needs about 960 MB free to build and step a world at
+the target scale, not 545 MB. The conclusion of FND-225 does not change: the
+tiles still hold the memory and the units still do not, and both figures move
+together with the thread count.
+
+### FND-242 — A list that could not go stale had gone stale
+
+**Believed:** the budgets register carried a table of the records that still
+hold a derived cost figure in their bodies, naming ADR-0003, ADR-0005 and
+ADR-0006. The register said the record check carries the list, and that the
+check fails when an entry matches nothing, so the list cannot go stale.
+
+**True:** all three records hold no figure of any kind. The work that cleared
+them did not clear the table, so the table named three records as carrying
+figures they do not carry.
+
+**The safeguard was not what the register said it was.** The check carries a
+baseline of tolerated figures, and it is the baseline that fails when an entry
+matches nothing. The baseline is empty. Nothing reads the table in the
+register, so the table is prose like any other and always was.
+
+**Evidence:**
+
+```
+grep -oE "[0-9]+(\.[0-9]+)? ?(percent|ms|ns|byte)" docs/adrs/*/adr-000[356]*.md
+grep -cv "^#|^$" scripts/adr-volatile-baseline.txt
+```
+
+The first command finds nothing in any of the three records. The second
+reports that the baseline holds no entry.
+
+**Follows:** the table now says that no record holds a figure, and it names
+this finding. **A claim that a list is checked is worth nothing unless the
+reader can see what checks it.** This one named the check in a footnote, and
+the footnote pointed at a file that holds a different list for a different
+purpose. That is close enough to be convincing and far enough to be false.
+
+**This is defect shape 1 with the roles reversed.** The usual shape is one
+value in two places with nothing failing when they disagree. Here the second
+place was a safeguard that did not cover the first, and the register asserted
+that it did.
+
+### FND-255 — The collapse measurement measured the cell count, because every unit holds the same need
+
+**Believed:** counting the distinct pairs of level 1 cell and need against the
+live unit count would say how far a choice pass collapses if it decided for
+each cell rather than for each unit.
+
+**True:** the count returned a pair count exactly equal to the cell count, at
+every bucket width including the exact need, under both placement patterns.
+**The need column holds one value for all 1,000,000 units.** It is 65536,
+which is one in the fixed point scale, and it is the value a unit spawns with.
+
+The measured world holds no settlement, so no unit has a home to draw from and
+consumption never moves a need. The measurement therefore reports the units
+for each cell and nothing about the need.
+
+**What it does establish.** The geometry gives 14,970 occupied cells of 16,384
+for 1,000,000 units at the density the project states, so **66.8 is a ceiling
+on the collapse factor** and no need distribution can beat it. The packed
+figure of 740.2 is a property of a fixture that puts the whole population into
+8 percent of the cells.
+
+**What decides the real answer.** A cell holds 64 units at the median under
+the scattered pattern. The distinct pairs in a cell are the smaller of the
+units in it and the need values they take, so the collapse in the median cell
+is about 64 divided by the number of need buckets. At 4 buckets it is 16, at
+16 buckets it is 4, and at 64 buckets it is 1. **The need is a Q16.16 quantity
+and takes about four thousand million values, so unbucketed the collapse is 1
+and the rule buys nothing.** The bucket width is the mechanism, not a detail.
+
+**Evidence:** the register holds every row, both placements and all six bucket
+widths.[^F222] The counts come through the public crate interface, and the
+engine gained no instrumentation: the live units, the tile of a unit, the need
+of a unit and the block layout are all public. The pairs pack into one word
+and the count is a sort and a scan, so no hash iteration order reaches the
+result.
+
+**Follows:** the record must not carry a collapse figure from this run. The
+number it needs is how many need values coexist in one cell in a world that
+consumes, and no fixture in this project produces one, because that needs
+settlements, home sites and a running economy. **A ceiling of 66.8 and an
+unmeasured floor of 1 is what this run supports.**
+
+**This is the third fixture defect this benchmark has produced in one
+session.** The first packed the population into a band, the second placed 76
+percent of the units it was asked for, and this one measured a column that
+never changes. Each was found by looking at a number that was too clean.
+
+### FND-247 — A comparison that isolated one variable had two, and it was discarded
+
+**Believed:** the first placement comparison answered whether the fixture
+biased every unit figure. It ran the same frame under a packed and a scattered
+population and reported that the scattered one cost 86 percent more.
+
+**True:** it placed 762,599 units under the scattered pattern against
+1,000,000 under the packed one. The two rows differed in their population as
+well as in their placement, so a comparison built to isolate one variable had
+two, and neither row explained the other. **The result was discarded rather
+than reported with a caveat.**
+
+The cause was in the fixture and not in the engine. The scattered pattern
+walks the world at a stride and searched one stride for a tile that admits a
+unit. A stride at the target scale is sixteen tiles, and a run of sixteen
+tiles of water ends that unit's search while every later unit keeps its own
+target, so the shortfall accumulates. The cursor now never goes backwards and
+never stops early, so water costs a longer walk rather than a lost unit.
+
+**Evidence:** the discarded run reported 762,599 in its unit column, which is
+where the defect showed. The repaired run reports 1,000,000 under both
+patterns, and the corrected result is a 60 percent difference rather than 86.
+
+**Follows:** a caveat is not a substitute for a second run when the second run
+costs three cents and four minutes. The discarded numbers were in the right
+direction and would have supported the same conclusion, which is exactly why
+reporting them would have been wrong: **a result that happens to point the
+right way is not evidence, and publishing it teaches the reader that the
+apparatus was sound when it was not.**
+
+**The unit column is what caught it**, and it was in the output only because
+the benchmark reports what it placed rather than what it was asked for. A
+fixture that reports its request rather than its result cannot show this
+class of defect at all.
+
+### FND-248 — A guard that fires correctly is not evidence that the thing it guarded against was acceptable
+
+**Believed:** the teardown trap makes a launch safe to attempt, because a run
+that goes wrong terminates itself.
+
+**True:** the trap works, and it is not a licence. One command chained a source
+edit and an instance launch. The edit failed its assertion and wrote nothing.
+The launch went ahead against a benchmark mode that did not exist, so the
+instance built the tree, ran a sweep nobody asked for, and billed for it.
+
+The trap did its job. An interrupt terminated the instance, deleted the key
+pair and the security group, and the region was verified empty afterwards.
+**That is the good news and it is not the finding.**
+
+**Evidence:** the launch and its teardown are in the run log, and the commit
+that repaired the sequencing describes it.
+
+**Follows:** **an edit and a launch do not belong in one command.** The launch
+must depend on the edit having succeeded, and a shell that runs the next
+command after a failed one gives no such dependency. Separate them, or make
+the launch conditional on the edit's exit status.
+
+**The general shape.** A guard exists because the guarded action can go wrong.
+Once the guard is trusted, the action gets attempted more casually, and the
+guard is then load-bearing for cases it was never designed to cover. The trap
+was written for a build that fails and a connection that drops. It was not
+written for a launch that should never have happened, and it happened to
+cover that too. **Next time it may not.**
+
+### FND-249 — Three kinds of work, three kinds of scaling, measured on one machine
+
+**Believed:** the exit field derivation would either scale like the tile pass
+or floor like the unit passes, and which one it did would say whether the
+lattice claim survives its first instance.
+
+**True:** it does neither, and the reason was structural and readable before
+the run. The derivation takes no thread count, and its own documentation says
+the pass runs on the calling thread. A prediction saying so was written into
+the register and committed before the run, with a hit defined as a speedup
+inside 0.9 to 1.1 and a cost under 10 milliseconds.
+
+**All three predictions hold.** The derivation costs 2.15 milliseconds at 1,
+2 and 12 threads, flat to three figures, which is 132 ns for each of 16,384
+cells. The level 1 rebuild beside it reaches 11.59 times on 12 threads, which
+is 0.97 of the machine and the best scaling measured anywhere in this project.
+
+**The result that matters is the comparison, not any one row.** Three kinds of
+work, on one machine at one extent:
+
+| Work follows | Speedup on 12 threads |
+|---|---|
+| The cells | 1.00, and it does not need threads |
+| The tiles | 11.59 |
+| The population | 2.08 packed, 2.32 scattered |
+
+**Evidence:** the register holds the prediction, the rows and both
+commits.[^F222] The derivation was measured directly rather than by a
+difference, because the field, its constructor and the level it reads are all
+public. The engine gained no instrumentation. The units were scattered,
+because a packed population would flatter a per-cell claim in the direction
+the record wants to hear.
+
+**Follows:** work that follows the lattice is small enough not to need
+threads, and work that follows the tiles takes them almost perfectly. **Work
+that follows the population barely takes them at all**, and that is the half
+of the frame the project cannot currently reduce. The lattice claim is
+supported by its first instance.
+
+**One caution against reading this as a general law.** The exit field is flat
+because it is small, not because per-cell work cannot be large. A per-cell
+pass over 16,384 cells that did much more for each cell would want threads and
+would not have them, because the derivation takes no thread count and nothing
+would notice.
+
+### FND-256 — The fixture of a benchmark is its least reviewed code and its most load-bearing
+
+**Believed:** the benchmark measured the engine. Its figures were reviewed, its
+method was stated, and its rows carried the machine, the commit and the date.
+
+**True:** three of its figures described the fixture rather than the engine,
+and all three were found in one session. None was found by reading the
+benchmark. Each was found by distrusting a number that looked too clean.
+
+| The defect | What it made false | How it showed |
+|---|---|---|
+| The population filled the first open tiles, packing 1,000,000 units into a band at one unit for each tile | Every unit figure, by about a factor of two | A reviewer asked what density the pattern gave |
+| The scattered pattern gave up at water and placed 762,599 units of 1,000,000 | A comparison built to isolate the placement | The unit column in the output |
+| The need column held one value for every unit, because no unit had a home to draw from | The whole collapse measurement | A pair count exactly equal to a cell count |
+
+**The transferable claim.** A benchmark's fixture is the least reviewed code
+in a project and the most load-bearing for every figure the benchmark
+produces. The measurement code gets read, because a figure is what people
+argue about. The world the measurement runs on gets written once, early, by
+whoever wanted a number, and then every later figure inherits it.
+
+**Evidence:** the register holds all three, with the corrected figures beside
+the ones they replaced.[^F222] FND-245 holds the placement, FND-247 holds the
+discarded comparison, and FND-255 holds the constant need column.
+
+**Follows:** the register now names the fixture beside every table, and its
+format rule demands the fixture as well as the machine. **A figure whose
+fixture is not named is not reproducible**, and that is a stronger statement
+than the one this project already makes about the machine.
+
+**Three tests, in the order they cost.** Ask what distribution the measurement
+needs, before writing the world. Make the fixture report what it produced
+rather than what it was asked for, because that is what caught the second
+defect. Distrust a number that is too round, too flat or exactly equal to
+another number, because that is what caught the first and the third.
+
+**The testing rule already said the first of those**, and it says it about
+tests rather than about benchmarks.[^23] Nobody applied it here, because a
+benchmark is not a test and the rule did not say the word. The rule is right
+and its scope was too narrow.
+
 ### FND-017 — A decision costs 4.1 nanoseconds, not 400
 
 The needs report assumed random gathers. They are sequential, because units
@@ -924,6 +1402,40 @@ deliberate switch. Record that as the test to apply next time, because it is
 cheaper than decoding the bytes.
 
 This finding proposes no fix. The shape is the finding.
+### FND-223 — A sentence about the missing measurement reached ninety documents
+
+**Believed:** no measurement exists on the target platform. About ninety
+documents in this tree state that sentence in their own words, in a product
+record, in an accepted decision record, in a review, in a completed backlog
+item, in two reference registers, in the project orientation and in a doc
+comment in the engine.
+
+**True:** the sentence was true when each document was written. It stopped
+being true on 3 September 2026, when a benchmark ran on a Graviton instance
+and measured four operations. The blocker narrowed on the same day and did not
+close, so the sentence is wrong in the general case and right about most
+individual figures.
+
+**Evidence:** the search that found the sites, and the register that holds the
+figures.[^F222] [^28]
+
+```
+grep -rniE "no (measurement|benchmark)|nobody has measured|not been measured" --include="*.md" --include="*.rs" .
+```
+
+**Follows:** the sweep was not made, and the reason is not neglect. An
+accepted record does not change except in status, so repairing one needs a
+record that supersedes it.[^F223C] A review and a completed backlog item are
+records of a moment and are correct as written. The three documents that guide
+work today were repaired: the project orientation, the target register and the
+local register. Everything else cites the blocker register, and that row is
+now the current statement.
+
+**This is the shape FND-042 names, at the largest scale the project has seen.**
+A blocker that narrows leaves a false sentence in every document that stated
+the blocker in its own words. Nothing fails, because a document is prose. The
+defence is not a sweep. The defence is that a document states the blocker by
+citation and never in its own words.
 
 
 ### FND-028 — Concurrent agents collide on shared numbering
@@ -5928,6 +6440,9 @@ has the rule.
 [^F226C]: ADR-0063, a need is a rate with a threshold, and crossing it is a fact, decision D2. `docs/adrs/accepted/adr-0063-a-need-is-a-rate-with-a-threshold-and-crossing-it-is-a-fact.md`
 [^F226E]: Backlog item 0216, let the demonstration make a unit hungry. `docs/backlog/proposed/0216-let-the-demonstration-make-a-unit-hungry.md`
 [^F227B]: Findings register, FND-183, in this document.
+[^F222]: Target platform costs. `docs/reference/graviton-costs.md`
+[^F223C]: ADR Registry, how a record changes. `docs/adrs/REGISTRY.md`
+
 [^F177A]: The founding refuses ground that admits nobody. `crates/cachette-core/src/world.rs`
 [^F177B]: The terrain capacity table. `crates/cachette-core/src/terrain.rs`
 [^F180A]: ADR-0064, a unit chooses by scoring a small fixed option set, decision D3. `docs/adrs/accepted/adr-0064-a-unit-chooses-by-scoring-a-small-fixed-option-set.md`

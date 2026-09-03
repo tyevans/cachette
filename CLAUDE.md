@@ -173,9 +173,9 @@ the list. A register does not decay; a summary does. This section held a
 summary once, it went stale, and the finding records what that cost.[^12]
 
 Every question the project owner owned is answered. The scale constants
-table holds the values.[^10] One blocker stays open, and engineering owns
-it: no measurement exists on the target platform, so every cost figure in
-this project is derived.
+table holds the values.[^10] A benchmark now runs on the target platform,
+and a register holds what it measured.[^14] Most cost figures are still
+derived, and the blocker that says which stays open.
 
 ## References
 
@@ -192,3 +192,4 @@ this project is derived.
 [^11]: ADR Registry. `docs/adrs/REGISTRY.md`
 [^12]: Findings register, FND-039. `docs/FINDINGS.md`
 [^13]: Backlog priority index. `docs/backlog/PRIORITY.md`
+[^14]: Target platform costs. `docs/reference/graviton-costs.md`

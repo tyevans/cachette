@@ -19,9 +19,9 @@ support for the other.
 The project owner decided that the project keeps two performance paths with
 different standing.[^3]
 
-- **The target platform owns every claim about how the engine performs.** One
-  open blocker states that no measurement exists there, and that blocker stays
-  open.[^4]
+- **The target platform owns every claim about how the engine performs.** A
+  third register holds every figure measured there.[^11] One blocker states
+  which figures are still derived, and that blocker stays open.[^4]
 - **The development machine owns one local budget: how long the gate suite
   takes.** A contributor runs the suite many times a day, and the cost is paid
   on that machine and nowhere else.
@@ -138,7 +138,8 @@ follows the suite records nothing.
 
 ## What does not belong here
 
-- Any figure about the target platform. That register is separate.[^2]
+- Any figure about the target platform. Two registers hold those, one for a
+  derivation and one for a measurement.[^2] [^11]
 - A per-tick or per-frame simulation cost, on any machine. The engine's
   performance belongs to the target.
 - A decision. A budget is an input to a decision, not a decision.
@@ -160,3 +161,4 @@ command, and the date. Cite the source in a footnote.
 [^8]: Findings register, FND-099. `docs/FINDINGS.md`
 [^9]: ADR-0083, the gate build checks every integer overflow. `docs/adrs/draft/adr-0083-the-gate-build-checks-every-integer-overflow.md`
 [^10]: Findings register, FND-142. `docs/FINDINGS.md`
+[^11]: Target platform costs, the measurement register. `docs/reference/graviton-costs.md`

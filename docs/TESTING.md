@@ -216,10 +216,12 @@ slow gate of the `justfile`.
 
 ## 6. What the tests do not cover
 
-**No measurement exists on the target platform.** Every cost figure in
-this project is derived, not measured. A performance conclusion taken on a
-development machine does not transfer, because the cache-line size and the
-memory model differ.[^9] There are no benchmarks in this repository yet.
+**The tests measure nothing, and no test reads a clock.** A benchmark
+measures the cost of a frame, and a benchmark is not a gate.[^12] One run of
+it on the target platform measured four operations, and a register holds the
+figures.[^13] Most cost figures in this project are still derived. A
+performance conclusion taken on a development machine does not transfer,
+because the cache-line size and the memory model differ.[^9]
 
 **The wheel matrix is minimal.** Continuous integration builds a wheel for
 Linux on x86-64 only. The record names five platforms. The rest are
@@ -244,3 +246,5 @@ real. The subjects are not.
 [^9]: ADR-0010, the cache line size is a compile-time constant. `docs/adrs/REGISTRY.md`
 [^10]: The contributing guide, the packaging and stub checks. `CONTRIBUTING.md`
 [^11]: Findings register, FND-160. `docs/FINDINGS.md`
+[^12]: Testing rules, section 3. `.claude/rules/testing.md`
+[^13]: Target platform costs. `docs/reference/graviton-costs.md`

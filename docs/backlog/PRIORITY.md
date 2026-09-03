@@ -112,7 +112,7 @@ These are real and none of them blocks anything today.
 | 0005 | The cross-cutting records. |
 | 0007 | The storage claims. |
 | 0168 | The control plane cannot name a dwelling, so a household binding would be inert. Waits on 0161. |
-| 0167 | A reverse index from a dwelling to its units. Take it when a measurement asks for it, and BLK-007 says none exists. |
+| 0167 | A reverse index from a dwelling to its units. Take it when a measurement asks for it, and the one run on the target platform measured nothing that does. |
 | 0200 | Admission admits more units onto a roaded tile than the position table believes it holds, and the fold that reports the largest capacity walks one of the two tables that state one. FND-193 records it. DEC-081 must close first, and no run reaches it until something makes a unit build. |
 | 0201 | The record check drops every source file when it runs inside a worktree, so it reports records as uncited that source files cite. FND-194 records it. The same function also builds a corpus of every source file and never reads it, which FND-195 records and this item carries. It sits above 0198 because every worker runs in a worktree and reads the wrong count, and below 0200 because the check reports the note rather than failing on it. |
 | 0205 | Accepting a record moves its file, and every citation of the old path then names nothing. Two records are at verdict Accept with a file move between them and binding, and the cost of a move scales with how well a record is cited. FND-197 records it, DEC-083 must close first, and 0198 is the same problem seen from the other side. |
@@ -121,6 +121,7 @@ These are real and none of them blocks anything today.
 | 0234 | BLK-010 and ADR-0065 state opposite directions for one question, and the code follows the record. DEC-091 must close first. It sits here because only the workforce case is built, so the cost falls on the first person who builds a formation from the register. |
 | 0221 | Source footnotes name the registry for six records that now have files. FND-214 found it. Nothing fails and nothing will, so it sits here, and it is worth a check rather than a sweep because the next reserved number a source file cites will do the same. |
 | 0222 | The error hierarchy declares three exception types that nothing raises. ADR-0046 states the gap in its own consequences rather than claiming the capability, so a reader is not misled today. It waits on the selector for one of the three. |
+| 0229 | The first measurement on the target platform found a frame cost at 4,096 tiles that disagrees with every larger extent, and four threads beat one thread on a machine with two. It sits last because it explains a figure rather than repairing behaviour, and because 4,096 tiles is the size most tests use, so anything it finds is paid by the suite and not by a player. |
 
 ## References
 

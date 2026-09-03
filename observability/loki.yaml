@@ -1,0 +1,42 @@
+# Loki, in the smallest configuration that stores and serves.
+#
+# It runs on one machine, for one person, over the logs of a benchmark run.
+# Nothing here is sized for a fleet.
+auth_enabled: false
+
+server:
+  http_listen_port: 3100
+  log_level: warn
+
+common:
+  instance_addr: 127.0.0.1
+  path_prefix: /loki
+  storage:
+    filesystem:
+      chunks_directory: /loki/chunks
+      rules_directory: /loki/rules
+  replication_factor: 1
+  ring:
+    kvstore:
+      store: inmemory
+
+schema_config:
+  configs:
+    - from: 2020-10-24
+      store: tsdb
+      object_store: filesystem
+      schema: v13
+      index:
+        prefix: index_
+        period: 24h
+
+limits_config:
+  # A benchmark log is written after the run, so its lines are older than the
+  # moment they arrive. Loki rejects an old line by default, and that default
+  # is written for a live stream rather than for a record of a run.
+  reject_old_samples: false
+  allow_structured_metadata: true
+  volume_enabled: true
+
+query_range:
+  align_queries_with_step: true

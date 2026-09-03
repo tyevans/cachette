@@ -8,9 +8,14 @@ The registry names this document as the place for the byte budget table, the
 per-tick cost budgets, and every constant that an unanswered question
 governs.[^2]
 
-**Every figure in this project is derived, not measured.** No code exists, so no
-benchmark has run. Mark each figure with how it was derived. When a measurement
-replaces a derivation, say so in the row and give the commit.
+**Every figure in this document is derived, not measured.** Mark each figure
+with how it was derived. When a measurement replaces a derivation, say so in
+the row and give the commit.
+
+**A measured figure does not live here.** A third register holds every figure
+this project has measured on the target platform, with the machine, the commit
+and the date that produced it.[^14] The two are separate files so that a reader
+cannot take a derivation for a measurement.
 
 **This register holds target platform figures only.** Every row below describes
 how the engine performs on the target, which is AWS Graviton. A second register
@@ -21,8 +26,13 @@ Do not add a development machine figure to this file.
 
 ## Status
 
-No measured figure is recorded. The foundation crate exists, and no benchmark
-harness runs on the target platform.
+No measured figure is recorded **in this document**. A benchmark harness now
+exists, and one run on a Graviton instance measured the cost of a frame, the
+cost of building a world and the cost of the whole-world hash.[^14] None of
+those figures replaces a row below.
+exists, and two runs on Graviton instances measured the cost of a frame, the
+cost of building a world, the cost of the whole-world hash and the resident
+memory of a world.[^10] None of those figures replaces a row below.
 
 The scale constants below are decided or derived, not measured. Each was held
 here because a blocker governed it. Those blockers are now closed.
@@ -60,8 +70,9 @@ that held it and says how the value was reached.
 | Maximum factions | 63 | BLK-013 | Owner decision. One bit for each faction in a 64-bit mask, with one value reserved for no faction |
 
 The tile upgrade fraction picks sparse storage over dense storage. The
-character layer figure is derived by scaling, not measured. BLK-007 still holds
-every cost figure in this project.
+character layer figure is derived by scaling, not measured. BLK-007 holds every
+figure in this document, and the run that narrowed it measured none of
+them.[^14]
 
 The step multiplier scales the step cost of a tile, and it is the third
 quantity that a crossing time depends on. Capacity and dwell are the other
@@ -125,8 +136,9 @@ stay local to a settlement. A commodity an individual carries is a third,
 smaller set again.
 
 The cache line claim behind the first row is a property of the target platform,
-which uses a 64-byte cache line. It is not a measurement. BLK-007 holds every
-cost figure in this project, and these three values are decided, not derived
+which uses a 64-byte cache line. It is not a measurement, and a run on the
+target has since read the same value from the machine.[^14] BLK-007 holds every
+cost figure in this document, and these three values are decided, not derived
 from a measurement.
 
 ## The choice pass
@@ -150,8 +162,8 @@ the population, so a change to the floor changes the frame budget.
 division. The engine takes it as a parameter of the world, and the value above
 is the default.
 
-BLK-007 holds all three rows. The derivations come from a research report and
-nobody has measured them on the target platform.
+BLK-007 holds all three rows. The derivations come from a research report, and
+the run that narrowed that blocker measured none of the three.
 
 ## What belongs here
 
@@ -159,7 +171,7 @@ nobody has measured them on the target platform.
 - The byte budget table, for each entity tier and each pyramid level.
 - Memory totals at the target scale of 16.7 million tiles and one million
   units.
-- Throughput figures and latency figures, once measured on the target platform.
+- A figure that a decision needs and that no measurement has replaced.
 - A constant that a blocker governs, held here until the blocker closes.[^3]
 
 ## What does not belong here
@@ -169,19 +181,29 @@ nobody has measured them on the target platform.
   record that chose the platform.
 - A decision. A budget is an input to a decision, not a decision.
 - A figure taken on a development machine. The local register holds those.[^7]
+- A figure measured on the target platform. The measurement register holds
+  those, because a row there carries a machine, a commit and a date that a row
+  here does not.[^14]
 
 ## Figures still held in a record
 
-Four draft records still hold derived cost figures in their bodies. They must
-move here when those records are next revised. The record check carries the
-list, and the check fails when an entry in that list matches nothing, so the
-list cannot go stale.[^4]
+A record that still holds a derived cost figure in its body must move it here
+when the record is next revised.
+
+**The claim that this list cannot go stale was wrong, and the list went
+stale.** The record check carries a baseline of figures it tolerates, and that
+baseline is what fails when an entry matches nothing.[^4] The baseline is
+empty, so nothing checks the table below, and the table is prose like any
+other.[^15]
+
+**No record holds one today.** The three records this table named, which were
+ADR-0003, ADR-0005 and ADR-0006, hold no figure of any kind. The work that
+cleared them did not clear this table, and the table then named three records
+as carrying figures they do not carry. A finding holds the case.[^15]
 
 | Record | Kind of figure |
 |---|---|
-| ADR-0003 | Two cache hit rate percentages |
-| ADR-0005 | Allocation and cache miss costs for each frame, and the frame budget |
-| ADR-0006 | Boundary call costs, and two percentage splits |
+| None | |
 
 Moving a figure here is not a free edit. An accepted record does not change
 except in status.[^2] Move a figure as part of the change that supersedes the
@@ -208,3 +230,5 @@ a footnote.
 [^11]: Decisions register, DEC-017. `docs/DECISIONS.md`
 [^12]: Decisions register, DEC-008. `docs/DECISIONS.md`
 [^13]: Decisions register, DEC-093. `docs/DECISIONS.md`
+[^14]: Target platform costs, the measurement register. `docs/reference/graviton-costs.md`
+[^15]: Findings register, FND-242. `docs/FINDINGS.md`
