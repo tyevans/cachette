@@ -5559,6 +5559,87 @@ a retired number fails a gate and a closed blocker does not, so this one cannot
 be forgotten. That is luck rather than design, and the register records which of
 the two it is.
 
+### FND-233 — Four cell fields with incompatible ranges go into one argmax, so a weight is a preference times an unwritten unit conversion
+
+**Believed.** A weight expresses how much a unit prefers an option. The default
+profile gives every option a weight of one, which was read as no preference.
+
+**True.** The score of an option is the drive times the weight times the field
+the option reads. With every weight at one, the score is the drive times the
+field. **The four fields do not share a range**, so the comparison is decided
+partly by which field carries the larger units.
+
+- The open share is a count over a count, bounded at one by construction.
+- The mean food is a stock over a tile count, and its ceiling is whatever a
+  tile can hold.
+- The units for each open tile is a count over a count, and its ceiling is the
+  capacity of a tile.
+- The mean height is a mean over the height range.
+
+**Evidence.** A short unit of the demonstration was seen to choose roam while
+standing on ground that carried food. Its need was 0.48, so roam took the met
+drive at 0.48 and forage took the unmet drive at 0.52. The open share of its
+cell was near one, giving roam a score near 0.48. The mean food of its cell was
+0.669, giving forage 0.348. **Nothing is broken. The unit preferred open ground
+to food, because a share of one outscores a mean stock of two thirds.**
+
+**The comparison works in this world by coincidence.** The food generator puts
+the mean stock near one, so a share and a stock happen to be comparable. Raise
+the ceiling of a tile and forage wins everywhere, whatever a unit needs,
+because the mean food climbs past one and a share cannot follow.
+
+**Follows.** **A weight is not a preference. It is a preference multiplied by a
+unit conversion, and nobody has written the conversion down.** A content author
+who sets a weight of two for forage cannot tell whether they doubled a
+preference or corrected half a scale error, and the two are not distinguishable
+from the value.
+
+**No fix is proposed.** Whether the fields are normalised, or a weight carries
+its scale explicitly, is a design decision and it needs a record. This entry
+records the fact.
+
+### FND-234 — The exit field does steer the crowd, and a prediction from one frame said it did not
+
+**Believed.** A pre-registered prediction, written before the run: hungry units
+would not stand on better ground than fed ones, most would choose roam over
+forage, and only a minority in food-rich cells would forage. The prediction
+came from one rendered frame in which one short unit chose roam, and from the
+scale defect that explains why it did.[^F234A]
+
+**True. The prediction is refuted on both counts.** Over eight hundred ticks of
+the demonstration, at three sampled ticks:
+
+- Hungry units stand on cells whose mean food is 1.041, 0.781 and 0.876.
+- Fed units stand on cells whose mean food is 0.243, 0.224 and 0.257.
+- The world mean over a spread sample of the same cells is near 0.61.
+
+**A hungry unit stands on three to four times the food that a fed unit stands
+on**, and well above the world mean, while a fed unit stands well below it. The
+share of hungry units choosing forage is 28 in 48, then 34 in 48, then 36 in
+48. **It rises with time rather than holding.**
+
+**Follows.** The field steers. A unit that needs food moves onto ground that
+carries it, and the population separates into two by where it stands.
+
+**What the measurement does not settle.** The hungry units belong to the two
+poorest sites and the fed units to the two richest, so a raw comparison between
+the two groups confounds steering with where their sites sit. The world mean is
+the baseline that survives that, and both groups sit far from it in opposite
+directions. The rising share of foragers is the second independent signal,
+because geography does not change with time and that share does.
+
+**The mean food under the hungry crowd falls and then recovers**, from 1.041 to
+0.781 and back to 0.876. That is consistent with a crowd that depletes where it
+stands and moves on while the ground behind it recovers, which is the negative
+feedback the work was built for. It is consistent, not proven.
+
+**The lesson is about the prediction, not the engine.** The frame that produced
+it was real and the unit in it was in the quarter that chose roam. **One frame
+generalised to a population is the same error as one render generalised to a
+world**, which this register already holds twice.[^F201C] The pre-registration
+is what makes this entry cheap: the prediction was written down before the run,
+so its refutation is a fact rather than a memory.
+
 ### FND-231 — A unit draws from its home site wherever it stands, so nothing it does can make it hungry
 
 **Believed.** A unit that walks away from the site it belongs to gets hungry,
@@ -6014,7 +6095,6 @@ quietly: the value is read back correctly and it is the wrong value.
 [^F202G]: PRD-0019, an agent can ask the running engine what it holds. `docs/product/shaped/prd-0019-an-agent-can-ask-the-running-engine-what-it-holds.md`
 [^F204C]: Findings register, FND-048, in this document.
 [^F206B]: Findings register, FND-201, in this document.
-[^F201C]: Findings register, FND-206, in this document.
 [^F206C]: The holder layer of the drawing pass. `crates/cachette-view/src/paint.rs`
 [^F207A]: The tile rectangle of the drawing pass. `crates/cachette-view/src/paint.rs`
 [^F209A]: Findings register, FND-208, in this document.
@@ -6060,3 +6140,5 @@ quietly: the value is read back correctly and it is the wrong value.
 [^37HOME]: Decisions register, DEC-017. `docs/DECISIONS.md`
 [^37NEXT]: Decisions register, DEC-093. `docs/DECISIONS.md`
 [^F231C]: The starvation suite of the core. `crates/cachette-core/tests/starvation.rs`
+[^F234A]: Findings register, FND-233, in this document.
+[^F201C]: Findings register, FND-206, in this document.
