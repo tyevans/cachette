@@ -48,6 +48,26 @@ class Surface:
         """Give back the array the engine writes into."""
         return self._pixels
 
+    def write_ppm(self, path: str) -> None:
+        """Write the frame to a file that any image tool reads.
+
+        A window is one presenter and a file is another. Both ask the engine
+        for a frame and put the result somewhere, and neither draws anything
+        itself, so a picture on a disk cannot disagree with a picture on a
+        screen.
+
+        The format is binary PPM. It needs no dependency and no display.
+        """
+        pixels = self._pixels
+        rgb = np.empty((pixels.size, 3), dtype=np.uint8)
+        rgb[:, 0] = (pixels >> 16) & 0xFF
+        rgb[:, 1] = (pixels >> 8) & 0xFF
+        rgb[:, 2] = pixels & 0xFF
+        header = f"P6\n{self.width} {self.height}\n255\n".encode("ascii")
+        with open(path, "wb") as out:
+            out.write(header)
+            out.write(rgb.tobytes())
+
     def to_bytes(self) -> bytes:
         """Give back the frame as bytes a window can upload.
 

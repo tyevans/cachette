@@ -119,7 +119,7 @@ class Demo:
             self.camera.nudge(across, down, width, height)
         self.camera.clamp(self.world, width, height)
 
-    def advance(self) -> FrameReading:
+    def advance(self, panel: bool = False) -> FrameReading:
         """Step the engine once and fill the surface with one frame.
 
         Returns what the drawing pass read. The caller reports those numbers
@@ -132,6 +132,7 @@ class Demo:
             self.surface.height,
             self.surface.pixels,
             reference=self.reference,
+            panel=panel,
         )
 
 
@@ -208,6 +209,11 @@ def main(argv: list[str] | None = None) -> int:
         default=0,
         help="stop after this many frames, for a run without a watcher",
     )
+    parser.add_argument(
+        "--picture",
+        default="",
+        help="write one frame with the whole panel to this file, and open no window",
+    )
     arguments = parser.parse_args(argv)
 
     demo = Demo(
@@ -223,6 +229,9 @@ def main(argv: list[str] | None = None) -> int:
         return 1
     demo.open_on(opening_place(foundings))
 
+    if arguments.picture:
+        return _write_picture(demo, arguments.picture, arguments.frames or 1)
+
     print(
         f"cachette: {demo.world.width} by {demo.world.height} tiles, "
         f"{demo.world.soldier_count} people, {demo.threads} threads"
@@ -232,6 +241,24 @@ def main(argv: list[str] | None = None) -> int:
     print("close the window or press escape to stop")
 
     return _run_window(demo, arguments.frames)
+
+
+def _write_picture(demo: Demo, path: str, frames: int) -> int:
+    """Step the world, then write one frame with the whole panel to a file.
+
+    This presenter needs no window library and no display. It is the same
+    frame command the window uses, so the picture holds what the window would
+    have shown, with the sections the cards leave out.
+    """
+    for _ in range(frames):
+        reading = demo.advance(panel=True)
+    demo.surface.write_ppm(path)
+    print(
+        f"wrote {path} at tick {reading['tick']}, "
+        f"{reading['tiles_painted']} tiles and "
+        f"{reading['soldiers_painted']} people painted"
+    )
+    return 0
 
 
 def _run_window(demo: Demo, frame_limit: int) -> int:
