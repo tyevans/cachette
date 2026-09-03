@@ -299,7 +299,39 @@ proportional to the cells and there are few of them, so it does not need
 threads. If the derivation is large, a serial pass sits in every frame and the
 record has a problem its first instance created.
 
-**Result: not yet run.**
+**Result: all three predictions hold.**
+
+Machine A, 16,777,216 tiles, 1,000,000 units scattered, 16,384 level 1 cells.
+
+| Threads | Exit field derive, ns | Speedup | Level 1 rebuild, ns | Speedup |
+|---|---|---|---|---|
+| 1 | 2,154,344 | 1.00 | 1,109,538,229 | 1.00 |
+| 2 | 2,155,192 | 1.00 | 557,850,461 | 1.99 |
+| 12 | 2,156,196 | 1.00 | 95,704,964 | 11.59 |
+
+**The derivation is flat to three figures**, at 2.15 milliseconds whatever the
+thread count. It was predicted flat within a tenth and it is flat within a
+thousandth. It costs 132 ns for each cell, and it is one quarter of one
+percent of a frame at the target scale.
+
+**The level 1 rebuild scales at 11.59 times on 12 threads**, which is 0.97 of
+the machine. That is the best scaling measured anywhere in this project. It is
+11.5 percent of a frame at the target scale.
+
+**The lattice claim is supported by its first instance, and the support is
+sharper than the claim.** Three kinds of work now have measured scaling on the
+same machine at the same extent:
+
+| Work follows | Example | Speedup on 12 threads |
+|---|---|---|
+| The cells | The exit field derivation | 1.00, and it does not need threads |
+| The tiles | The level 1 rebuild | 11.59 |
+| The population | The unit passes | 2.08 packed, 2.32 scattered |
+
+Work that follows the lattice is small enough not to need threads. Work that
+follows the tiles takes them almost perfectly. **Work that follows the
+population barely takes them at all**, and that is the half of the frame the
+project cannot currently reduce.
 
 ## Would the choice pass collapse if it decided for each cell?
 

@@ -976,6 +976,51 @@ was written for a build that fails and a connection that drops. It was not
 written for a launch that should never have happened, and it happened to
 cover that too. **Next time it may not.**
 
+### FND-249 — Three kinds of work, three kinds of scaling, measured on one machine
+
+**Believed:** the exit field derivation would either scale like the tile pass
+or floor like the unit passes, and which one it did would say whether the
+lattice claim survives its first instance.
+
+**True:** it does neither, and the reason was structural and readable before
+the run. The derivation takes no thread count, and its own documentation says
+the pass runs on the calling thread. A prediction saying so was written into
+the register and committed before the run, with a hit defined as a speedup
+inside 0.9 to 1.1 and a cost under 10 milliseconds.
+
+**All three predictions hold.** The derivation costs 2.15 milliseconds at 1,
+2 and 12 threads, flat to three figures, which is 132 ns for each of 16,384
+cells. The level 1 rebuild beside it reaches 11.59 times on 12 threads, which
+is 0.97 of the machine and the best scaling measured anywhere in this project.
+
+**The result that matters is the comparison, not any one row.** Three kinds of
+work, on one machine at one extent:
+
+| Work follows | Speedup on 12 threads |
+|---|---|
+| The cells | 1.00, and it does not need threads |
+| The tiles | 11.59 |
+| The population | 2.08 packed, 2.32 scattered |
+
+**Evidence:** the register holds the prediction, the rows and both
+commits.[^F222] The derivation was measured directly rather than by a
+difference, because the field, its constructor and the level it reads are all
+public. The engine gained no instrumentation. The units were scattered,
+because a packed population would flatter a per-cell claim in the direction
+the record wants to hear.
+
+**Follows:** work that follows the lattice is small enough not to need
+threads, and work that follows the tiles takes them almost perfectly. **Work
+that follows the population barely takes them at all**, and that is the half
+of the frame the project cannot currently reduce. The lattice claim is
+supported by its first instance.
+
+**One caution against reading this as a general law.** The exit field is flat
+because it is small, not because per-cell work cannot be large. A per-cell
+pass over 16,384 cells that did much more for each cell would want threads and
+would not have them, because the derivation takes no thread count and nothing
+would notice.
+
 ### FND-017 — A decision costs 4.1 nanoseconds, not 400
 
 The needs report assumed random gathers. They are sequential, because units
