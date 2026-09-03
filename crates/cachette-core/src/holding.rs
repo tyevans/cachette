@@ -1064,7 +1064,7 @@ fn decide(
     // is the one most likely to reach it. A challenger that the threshold
     // refuses is refused for every weaker challenger too.
     //
-    // [^1]: Findings register, FND-293. `docs/FINDINGS.md`
+    // [^1]: Findings register, FND-299. `docs/FINDINGS.md`
     let threshold = claim_threshold(terrain.kind(address)?)?;
     if support < threshold {
         // The ground either admits no holder at all, or asks for more support
