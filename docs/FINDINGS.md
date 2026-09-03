@@ -5559,6 +5559,97 @@ a retired number fails a gate and a closed blocker does not, so this one cannot
 be forgotten. That is luck rather than design, and the register records which of
 the two it is.
 
+### FND-231 — A unit draws from its home site wherever it stands, so nothing it does can make it hungry
+
+**Believed.** A unit that walks away from the site it belongs to gets hungry,
+so a demonstration in which units migrate would show hunger somewhere. The
+brief for the work that found this asked for a population fed near its site and
+hungry away from it, which assumes distance costs a unit something.
+
+**True.** **Feeding has no distance term anywhere.** The draw is keyed on the
+home site of a unit and on its faction, and on nothing else. A founding sets
+the home site of every person it seats, once. A unit seventy-three tiles from
+that site draws from its store exactly as one standing on the site does, and it
+keeps drawing for as long as the store pays.
+
+**Evidence.** The demonstration was run for twelve hundred ticks with four
+groups of thirty. Every unit was fed at every sampled tick, no unit was ever
+short or starved, the ration never failed, and not one tile of the world was
+ever gathered from. Over the same run the mean distance from a founding rose
+and the furthest unit reached seventy-three tiles. **The units migrated and
+stayed fed.**
+
+**Follows.** **A unit cannot be made hungry by going anywhere.** Hunger is a
+property of the site a unit belongs to and of the group that site carries, and
+a unit changes neither by moving.
+
+**The consequence reaches past the demonstration.** The forage option scores
+against the deficit of a unit. If no movement can produce a deficit, then no
+movement can drive the option, and the option cannot close a loop with
+movement. Two open items exist to make a step read the option a unit chose and
+to let the engine order a gather.[^F231A] [^F231B] Neither can produce a unit
+that grew hungry by travelling, because nothing does.
+
+**It also bears on a strategy that a unit would follow.** A record under
+consideration holds that a strategy is a field a unit follows. **"Return to my
+site" is the first strategy anybody will want, and today a unit has no reason
+to return**, because being away costs it nothing.
+
+**This is why the engine tests are built the opposite way from the
+demonstration.** The starvation fixture gives every second site a store that
+empties and no production, and says in its own comment that the demonstration
+world is chosen to look right and that every unit in it eats. That fixture
+reaches the hungry case by choosing the site, which is the only handle there
+is.[^F231C]
+
+**No fix is proposed here.** Whether feeding gains a distance term is a design
+decision and it needs a record, not a repair. This entry records the fact and
+what it forbids.
+
+### FND-232 — The demonstration fed every unit forever, so the food layer decided nothing a watcher could see
+
+**Believed.** The demonstration exercises the food loop. A watcher of the
+running window sees units that gather, ground that empties, and a choice that
+varies with what the ground carries.
+
+**True.** No unit of the demonstration was ever hungry, so the forage option
+scored zero on every unit on every frame whatever the ground held, and **not
+one tile of the world was ever gathered from.** The window showed a food layer
+that decided nothing. The panel stated it plainly and it was read as a healthy
+world: the nearest unit reported the food under it and a score of zero for the
+option that reads that food, because it was fed.
+
+**Evidence.** Twelve hundred ticks, four groups of thirty. Fed at every sampled
+tick, none short, none starved, no ration ever failed, and zero tiles of two
+hundred and eighty-one thousand six hundred showed any depletion. The site
+stores grew without interruption for the whole run.
+
+**Two candidate causes were eliminated by measurement before anything
+changed.** It is not the starting store: **at the first tick every store is
+zero and every unit is still fed**, so an empty store does not make a unit
+hungry, and the repair anyone would reach for first would have changed nothing.
+It is not the declared upkeep rate either, which is zero at every group size,
+because the founding never sets one. **A cohort does not draw the declared
+upkeep. It draws its own ration from the store.**
+
+**The relation that governs it is exact.** The founding sets the production
+rate of a site to a sixteenth of the food its survey reached, and the default
+need rule gives a person a ration of a sixteenth of a full need for each
+application. The two cancel. **A site feeds exactly as many people as the food
+its survey measured**, and that number is one the founding already prints.
+
+**Follows.** **A fixture that produces one condition everywhere measures
+itself.** The group size now falls inside the spread of what the founded sites
+reach, so some ground cannot carry its group and other ground can, and a
+watcher sees both conditions at once. The split follows the ground rather than
+the number.
+
+**A run that loses the split now says so.** The founding report states for each
+site whether its ground carries its group, and the run prints a note when every
+seated group came out the same way. The defect that this entry records is that
+nobody noticed for as long as the demonstration ran, and a silent fixture is
+what allowed that.
+
 ### FND-219 — The next-number line reflects merged state, so it cannot allocate across branches
 
 **Believed.** Each register carries an explicit next number, and a writer claims
@@ -5968,3 +6059,6 @@ quietly: the value is read back correctly and it is the wrong value.
 [^236D]: ADR-0021, a layout claim names one structure and one pass, and never a tier, decision D1. `docs/adrs/draft/adr-0021-layout-follows-the-access-pattern.md`
 [^37HOME]: Decisions register, DEC-017. `docs/DECISIONS.md`
 [^37NEXT]: Decisions register, DEC-093. `docs/DECISIONS.md`
+[^F231A]: Backlog item 0185, steer a step by the option the unit chose. `docs/backlog/complete/0185-steer-a-step-by-the-option-the-unit-chose.md`
+[^F231B]: Backlog item 0186, let the engine order a gather. `docs/backlog/complete/0186-let-the-engine-order-a-gather.md`
+[^F231C]: The starvation suite of the core. `crates/cachette-core/tests/starvation.rs`

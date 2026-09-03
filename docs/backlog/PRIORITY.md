@@ -27,6 +27,7 @@ engine gets wrong today.
 
 | No. | Why it sits here |
 |---|---|
+| 0240 | No unit of the demonstration is ever hungry, so the forage option scores zero on every unit on every frame and no tile is ever gathered from. It sits at the top because it costs one constant and it is the difference between the food loop existing and a watcher seeing it. The same work is filed as 0216 on an unmerged branch; the dispatcher reconciles them at merge. FND-232 holds the measurement and FND-231 holds what the demonstration cannot repair. |
 | 0102 | A settlement reads its own ground rule, not the passability rule. Blocked by 0071 and 0092, in that order. |
 | 0187 | Nothing moves a carried load into a store, so gathering cannot feed anybody. It moved here from `Next` because 0186 is complete and a unit now carries something. It closes the chain from the ground to the store, and it is what makes a hungry unit able to feed itself. |
 | 0216 | It replaces 0185 and 0186 at the top, because both are complete and neither reaches a watcher. The engine steers a step by the option and orders a gather, and the demonstration feeds every unit, so the option is always `roam` and no unit ever forages. FND-226 holds the measurement. The loop that 0185 and 0186 built is invisible until this is done. |
