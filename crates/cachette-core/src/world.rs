@@ -4802,7 +4802,40 @@ struct TileCounts {
 }
 
 impl TileCounts {
-    /// Returns the count that one tile carries.
+    /// Returns the count that one tile carries, for a caller that asks in
+    /// ascending tile order.
+    ///
+    /// **The caller must ask for tiles in ascending order and must not change
+    /// the table between two asks.** The position only moves forward, so a
+    /// tile below the last one asked for reads zero rather than its count. The
+    /// debug assertion below is what states that, and
+    /// `a_forward_reader_agrees_with_the_search` is what proves it.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`
+    fn read_ascending(&self, at: &mut usize, tile: u32) -> u32 {
+        while *at < self.entries.len() && self.entries[*at].0 < tile {
+            *at += 1;
+        }
+        if *at < self.entries.len() && self.entries[*at].0 == tile {
+            self.entries[*at].1
+        } else {
+            0
+        }
+    }
+
+    /// Returns the count that one tile carries, by searching for it.
+    ///
+    /// **Nothing in the engine calls this.** It is the independent answer that
+    /// `a_forward_reader_agrees_with_the_search` compares the forward reader
+    /// against, and it is kept because a reader with nothing to disagree with
+    /// proves nothing.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: Testing Rules, section 2. `.claude/rules/testing.md`
+    #[cfg(test)]
     fn get(&self, tile: u32) -> u32 {
         match self.entries.binary_search_by_key(&tile, |(key, _)| *key) {
             Ok(at) => self.entries[at].1,
@@ -5039,12 +5072,22 @@ fn admit(
     // Each thread writes its own chunk of the table, and a chunk is named by
     // its position in the table rather than by the thread that filled it, so
     // the result never depends on which thread finished first.[^7]
+    // The freshness of the derived structure is established once, here, rather
+    // than on every tile the fill asks about. The borrow of the arena is what
+    // stops the world changing while the fill walks it.
+    bridge.describes(soldiers)?;
     let chunk_len = segments.len().div_ceil(threads).max(1);
-    let mut refusal: Option<BridgeError> = None;
     std::thread::scope(|scope| {
         let mut handles = Vec::new();
         for chunk in segments.chunks_mut(chunk_len) {
             handles.push(scope.spawn(move || {
+                // The segments of a chunk are in ascending tile order, so one
+                // reader walks the block rather than searching it for each
+                // segment. A reader is per-thread, because it carries the
+                // position of its own walk.[^9]
+                //
+                // [^9]: Findings register, FND-302. `docs/FINDINGS.md`
+                let mut cursor = bridge.tile_cursor();
                 for segment in chunk.iter_mut() {
                     let Some(address) = grid.address_of(TileIdx(segment.tile)) else {
                         // The tile came from a key the sort built out of a
@@ -5064,23 +5107,18 @@ fn admit(
                         .map_or(0, crate::terrain::TileKind::capacity);
                     segment.capacity =
                         upgrade::capacity_with(ground, upgrades.finished(TileIdx(segment.tile)));
-                    match bridge.count_on_tile(soldiers, address) {
-                        Ok(standing) => segment.standing = standing as u32,
-                        Err(error) => return Err(error),
-                    }
+                    segment.standing = bridge
+                        .units_on_tile(&mut cursor, TileIdx(segment.tile))
+                        .len() as u32;
                 }
-                Ok(())
             }));
         }
         for handle in handles {
-            if let Ok(Err(error)) = handle.join() {
-                refusal.get_or_insert(error);
-            }
+            // A thread here reads shared memory and writes its own chunk of
+            // the table, so it has no failure of its own.
+            handle.join().expect("an admission thread cannot fail");
         }
     });
-    if let Some(error) = refusal {
-        return Err(error.into());
-    }
 
     let mut granted = vec![false; intents.len()];
     let mut arrived = TileCounts::default();
@@ -5093,13 +5131,22 @@ fn admit(
         // pass are already an ascending run.
         let mut arrivals: Vec<(u32, u32)> = Vec::new();
 
+        // The segments are in ascending tile order and both count tables are
+        // too, and neither table changes while this loop runs. One forward
+        // reader for each therefore replaces a search for each segment.[^10]
+        //
+        // [^10]: Findings register, FND-305. `docs/FINDINGS.md`
+        let mut standing_at = 0usize;
+        let mut arrived_at = 0usize;
         for segment in &segments {
             // A departure only ever leaves a tile a unit stood on, so the
             // subtraction cannot go below zero. It saturates rather than
             // wrapping, because a wrap here would read as a full tile and
             // reject every unit in silence.
-            let occupancy = segment.standing.saturating_sub(departed.get(segment.tile))
-                + arrived.get(segment.tile);
+            let occupancy = segment
+                .standing
+                .saturating_sub(departed.read_ascending(&mut standing_at, segment.tile))
+                + arrived.read_ascending(&mut arrived_at, segment.tile);
             let mut room = segment.capacity.saturating_sub(occupancy);
             if room == 0 {
                 continue;
@@ -5230,6 +5277,35 @@ mod tests {
     //! [^1]: Testing policy, section 2. `docs/TESTING.md`
 
     use super::*;
+
+    /// The forward reader is a second way to answer what the search already
+    /// answers. This drives both over a wide range of tiles, in the ascending
+    /// order the reader requires, and compares them.[^1]
+    ///
+    /// The table is deliberately gappy, so the reader must step over tiles it
+    /// holds no count for, and it holds the first and the last tile of the
+    /// range so neither end is a special case.
+    ///
+    /// # References
+    ///
+    /// [^1]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`
+    #[test]
+    fn a_forward_reader_agrees_with_the_search() {
+        let mut counts = TileCounts::default();
+        counts.merge_ascending(&[(0, 3), (1, 1), (7, 9), (8, 2), (40, 5), (99, 7)]);
+        let mut at = 0usize;
+        for tile in 0..100u32 {
+            assert_eq!(
+                counts.read_ascending(&mut at, tile),
+                counts.get(tile),
+                "the two answers disagree at tile {tile}"
+            );
+        }
+        // The reader stays on its answer, so asking twice repeats it.
+        let mut again = 0usize;
+        assert_eq!(counts.read_ascending(&mut again, 7), 9);
+        assert_eq!(counts.read_ascending(&mut again, 7), 9);
+    }
 
     /// Builds a world with a broken part.
     fn broken(change: impl FnOnce(&mut World)) -> World {

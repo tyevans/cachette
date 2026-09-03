@@ -300,6 +300,26 @@ pub struct BlockRange {
     pub length: u32,
 }
 
+/// A forward-only reader over the units of the world, in tile order.
+///
+/// **A pass that asks for many tiles in ascending order should hold one of
+/// these rather than search for each tile.** The low part of a bridge key is
+/// the row-major offset of the tile inside its block, so ascending tile order
+/// gives ascending keys inside every block. The cursor of a block therefore
+/// only ever moves forward, and a whole walk costs the tiles asked for plus
+/// the units, rather than a search for each tile.[^1]
+///
+/// The reader holds one position for each block, so it is the size of the
+/// block count and not of the population.
+///
+/// # References
+///
+/// [^1]: ADR-0018, the unit-to-tile bridge is derived, and it rebuilds at the barrier, decision D2. `docs/adrs/accepted/adr-0018-the-unit-to-tile-bridge-is-derived-and-rebuilds-at-the-barrier.md`
+#[derive(Clone, Debug)]
+pub struct TileCursor {
+    positions: Vec<u32>,
+}
+
 /// The map from a tile to the units that stand on it.
 ///
 /// The bridge is wholly derived from the soldier columns.[^1] Two rebuilds
@@ -580,6 +600,67 @@ impl UnitTileBridge {
         (&self.keys[start..end], &self.units[start..end])
     }
 
+    /// Returns a forward-only reader over the units, positioned at the start
+    /// of every block.
+    ///
+    /// A pass makes one of these for each thread, because a reader carries the
+    /// position of its own walk.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0009, parallel stages write disjoint outputs, decision D1. `docs/adrs/accepted/adr-0009-parallel-stages-write-disjoint-outputs.md`
+    #[must_use]
+    pub fn tile_cursor(&self) -> TileCursor {
+        TileCursor {
+            positions: vec![0; self.ranges.len()],
+        }
+    }
+
+    /// Returns the units that stand on one tile, by walking the block rather
+    /// than searching it.
+    ///
+    /// **The caller must ask for tiles in ascending order.** Nothing in the
+    /// type can enforce that, so a test drives this and the search over every
+    /// tile of a small world and compares them.[^1]
+    ///
+    /// The reader is left on the answer and not after it, so asking twice for
+    /// one tile gives the same answer twice.
+    ///
+    /// This read takes no arena and performs no freshness check. The caller
+    /// establishes that the structure describes the arena before it starts to
+    /// walk, and holds the borrow of the arena for the whole walk.
+    ///
+    /// Returns an empty slice for a tile the world does not hold.
+    ///
+    /// # References
+    ///
+    /// [^1]: Findings register, FND-302. `docs/FINDINGS.md`
+    pub fn units_on_tile(&self, cursor: &mut TileCursor, tile: TileIdx) -> &[Entity] {
+        let Some(key) = self.layout.key_of(tile) else {
+            return &[];
+        };
+        let block = self.layout.block_of_key(key) as usize;
+        let (keys, units) = self.block_window(block as u32);
+        if keys.is_empty() {
+            return &[];
+        }
+        let mut at = cursor.positions.get(block).map_or(0, |at| *at as usize);
+        if at > keys.len() {
+            at = 0;
+        }
+        while at < keys.len() && keys[at] < key {
+            at += 1;
+        }
+        let first = at;
+        while at < keys.len() && keys[at] == key {
+            at += 1;
+        }
+        if let Some(position) = cursor.positions.get_mut(block) {
+            *position = first as u32;
+        }
+        &units[first..at]
+    }
+
     /// Returns the units that stand inside one block.
     ///
     /// A system that needs many per-tile answers within one block reads the
@@ -800,6 +881,64 @@ mod tests {
 
     use super::*;
     use crate::types::FactionId;
+    use crate::types::TileIdx;
+    /// The cursor walk is a second way to answer what the derived unit
+    /// structure already answers by searching. This drives both over every
+    /// tile of a small world, in the ascending order the walk requires, and
+    /// compares them tile by tile.[^1]
+    ///
+    /// The world puts more than one unit on one tile, puts two units of one
+    /// block on different tiles, and leaves whole blocks empty, so the walk
+    /// meets a run of length two, a forward step inside a block, and a block
+    /// it must skip.
+    ///
+    /// # References
+    ///
+    /// [^1]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`
+    #[test]
+    fn the_cursor_walk_agrees_with_the_search() {
+        let grid = Grid::new(16, 16).expect("a small extent describes a grid");
+        let mut arena = SoldierArena::new(grid, 64);
+        for address in [
+            Axial::new(1, 1),
+            Axial::new(1, 1),
+            Axial::new(2, 1),
+            Axial::new(3, 2),
+            Axial::new(15, 15),
+            Axial::new(9, 4),
+            Axial::new(0, 0),
+        ] {
+            arena
+                .spawn(address, FactionId(0))
+                .expect("the spawn must succeed");
+        }
+        let layout = BlockLayout::new(grid, 2).expect("the exponent is inside the ceiling");
+        let mut bridge = UnitTileBridge::new(layout);
+        bridge.rebuild(&arena).expect("the rebuild must succeed");
+
+        let mut cursor = bridge.tile_cursor();
+        for index in 0..grid.tile_count() {
+            let tile = TileIdx(index);
+            let address = grid
+                .address_of(tile)
+                .expect("the index is inside the world");
+            let searched = bridge
+                .on_tile(&arena, address)
+                .expect("the bridge describes the arena");
+            let walked = bridge.units_on_tile(&mut cursor, tile);
+            assert_eq!(walked, searched, "the two answers disagree at tile {index}");
+            // The cursor stays on the answer, so a second ask repeats it.
+            let again = bridge.units_on_tile(&mut cursor, tile);
+            assert_eq!(again, searched, "the second ask differs at tile {index}");
+        }
+        assert!(
+            (0..grid.tile_count()).any(|index| {
+                let mut fresh = bridge.tile_cursor();
+                bridge.units_on_tile(&mut fresh, TileIdx(index)).len() > 1
+            }),
+            "the fixture must hold a tile with more than one unit"
+        );
+    }
 
     /// Builds an arena and a fresh bridge over a small world.
     fn built() -> (SoldierArena, UnitTileBridge) {
