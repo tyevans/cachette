@@ -652,6 +652,101 @@ The one that does not is the apply, at 35.6 milliseconds. It sorts the changed
 tiles and merges one ascending run into the held list, which is the same shape
 as the change merge.
 
+## Every stage of a frame, after the tile value field became a dense delta
+
+**This section supersedes the two above it.** They measured a tree in which the
+tile value field stored its changes as a sorted list, and a stage merged a run
+into that list on every frame. The field now stores one delta for each tile and
+the tile scan's workers write it directly, so the merge stage no longer
+exists.[^DENSE1]
+
+Machine D. 16,777,216 tiles, 1,000,000 units scattered, 12 threads, block edge
+32. Every row is the mean of nine frames after two warm-up frames, and every
+row comes from one run. The kernel gave transparent huge pages on the `madvise`
+setting, which the engine never asks for, so read this table as the cost
+without huge pages.
+
+| Machine D | Value |
+|---|---|
+| Instance type | `c7g.4xlarge` |
+| Region | `us-west-2` |
+| Processor | Graviton3. Implementer `0x41`, part `0xd40` |
+| Hardware threads | 16 |
+| Cache line | 64 bytes |
+| Memory | 32,246,808 kB |
+| Kernel | `Linux 6.18.44-99.149.amzn2023.aarch64` |
+| Compiler | `rustc 1.100.0-nightly (0dfb098f3 2026-08-31)` |
+| Base commit | `4e768e9e34e998264b5c9750d545c15f35dd0772` |
+| Working tree | Clean |
+| Crate features | `stage-cost` |
+| Date | 3 September 2026 |
+
+| Stage | ns for each frame | Share of the frame | Takes a thread count |
+|---|---|---|---|
+| `holding_spread` | 122,719,178 | 50.84 percent | yes |
+| — of which `holding_decide` | 69,845,980 | 28.94 percent | yes |
+| — of which `holding_apply` | 34,593,757 | 14.33 percent | **no** |
+| — of which `holding_candidates` | 17,201,761 | 7.13 percent | yes |
+| `admit` | 32,569,259 | 13.49 percent | yes |
+| `bridge_refresh_barrier` | 31,332,853 | 12.98 percent | yes |
+| `tile_scan` | 14,319,802 | 5.93 percent | yes |
+| `influence_solve` | 12,681,675 | 5.25 percent | yes |
+| `rebuild_level_1` | 6,755,064 | 2.80 percent | yes |
+| `stamp_holders` | 6,365,000 | 2.64 percent | **no** |
+| `log_join` | 5,700,377 | 2.36 percent | **no** |
+| `movement_intents` | 3,296,169 | 1.37 percent | yes |
+| `gather` | 2,021,124 | 0.84 percent | yes |
+| `build` | 1,562,305 | 0.65 percent | yes |
+| `choose` | 525,289 | 0.22 percent | yes |
+| `place_granted` | 465,914 | 0.19 percent | **no** |
+| `consume` | 169,537 | 0.07 percent | yes |
+| `reap` | 36,166 | 0.01 percent | yes |
+| `apply_rates` | 610 | under 0.01 percent | yes |
+| `settle_positions` | 421 | under 0.01 percent | yes |
+| `bridge_refresh_after_reap` | 376 | under 0.01 percent | yes |
+| `depletion_recover` | 294 | under 0.01 percent | **no** |
+| `bridge_refresh_opening` | 221 | under 0.01 percent | yes |
+| **Every stage** | **240,521,640** | | |
+| **The frame, timed from outside** | **241,374,071** | | |
+
+**The frame costs 241.4 milliseconds against 463.4 for the same apparatus
+before the change.** That is 1.92 times less. It is 2.41 times the 100
+millisecond budget instead of 4.63 times.[^BUDG291]
+
+**Resident memory is 645,193,728 bytes.**
+
+### Where the 222 milliseconds went
+
+The whole saving is 222,057,676 nanoseconds for each frame. Four stages hold
+208,542,791 of it and the rest is spread across every other row.
+
+| Stage | Before | After | Change |
+|---|---|---|---|
+| `change_merge` | 119,454,829 | the stage no longer exists | −119,454,829 |
+| `rebuild_level_1` | 78,112,992 | 6,755,064 | −71,357,928 |
+| `bridge_refresh_barrier` | 40,511,452 | 31,332,853 | −9,178,599 |
+| `tile_scan` | 22,871,237 | 14,319,802 | −8,551,435 |
+| `admit` | 30,605,355 | 32,569,259 | +1,963,904 |
+
+**Only the first row was predicted.** The change was justified by the merge
+alone, and the merge is a little over half of what it returned.
+
+**The second row is the larger surprise and it has a plain cause.** The level 1
+rebuild sums the value of every tile. Reading one tile used to be a binary
+search into a sorted list that held an entry for almost every tile, so a pass
+over the world paid a logarithmic search 16,777,216 times. It is now one index.
+The rebuild costs 11.6 times less and nothing in it changed.
+
+The tile scan gains for the same reason, and it gains despite taking over the
+writes the merge used to do.
+
+**The engine reads the tile value field far more often than it writes it, and
+the cost of the sparse form was concentrated in the reads.** The finding that
+opened this work measured the write side, because the write side is what the
+stage table named. A structure is not priced by the pass that carries its
+name.[^DENSE2]
+
+
 ## Huge pages
 
 **The engine asks for no huge page.** This measurement changes the kernel
