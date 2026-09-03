@@ -423,6 +423,60 @@ in the paragraph above about ADR-0068, and it is a real one.
 
 ## Open
 
+### DEC-092 — Can a caller ask anything about a character who has died?
+
+**Open. A reviewer owns it. The recommendation is Option A.**
+
+The record of descent outlives every character in it, and that is why it exists:
+a parent edge cannot live in a structure keyed on a slot, because a watcher must
+read a parent after that parent has died.[^DEC92A] [^DEC71C]
+
+**No reader delivers it.** All four world-level readers take an entity, and an
+entity that names a dead character resolves to nothing. The parents of a dead
+character return nothing. Its ancestors and its descendants return an empty
+list. Its relation to anybody returns zero.[^DEC92C]
+
+**Zero already means two things, and a dead character makes three.** Two
+characters with no common ancestor stand at zero, and so do two whose only
+common ancestor is beyond the stated depth. A caller cannot tell any of the
+three apart.
+
+**The answer names things the caller cannot ask about.** The ancestor walk
+returns descent identities, and an ancestor is usually dead. No world-level
+reader takes a descent identity, so a caller holds an answer it can do nothing
+with. That is the shape a finding already records from the control plane
+side.[^F147]
+
+**Option A. Add a reader keyed on a descent identity, beside each reader keyed
+on an entity.** The entity reader keeps its meaning, which is a question about a
+living character, and the new reader answers a question about a row of the
+record. A caller that walked to an ancestor can then ask about it. The cost is
+four more readers and a rule about which one a caller wants.
+
+**Option B. Make the existing readers take either, and resolve internally.** One
+reader for each question. The cost is that a caller cannot tell whether it asked
+about somebody alive, and the readers that return zero or an empty list for a
+dead identity would stop distinguishing dead from absent, which is the
+distinction this row is about.
+
+**Option C. Narrow the record's force to what the readers give.** Say that
+descent outlives a character so that a living character's line stays correct
+after its ancestors die, and not so that a watcher can ask about the dead.
+Nothing changes in the code. The accepted product record has to agree, and it is
+the thing that asks for the watcher.[^DEC71C]
+
+**Recommendation: A.** The storage already carries the answer, the walk already
+hands out the key, and the missing part is four functions. Option C is the
+cheapest and it gives up the reason the storage is shaped as it is.
+
+**Whichever option closes it, a backlog item follows**, and it needs a number
+that this work did not hold.
+
+**Revisit when** anything exposes a character to the control plane. No binding
+exposes a character, a parent, a walk or a relation today, so the need is served
+in Rust and not in Python, and the shape of the Python answer may decide this
+one.
+
 ### DEC-091 — Does a group store its members, or does a member store its group?
 
 **Open. A reviewer owns it. The recommendation is Option A. The author of
@@ -2034,3 +2088,5 @@ a failed founding is correct.[^PRD12]
 [^DEC91B]: ADR-0065, a group is a site membership, not a region, decision D1. `docs/adrs/draft/adr-0065-a-group-is-a-site-membership-not-a-region.md`
 [^DEC91C]: Review 0223, the group membership record. `docs/reviews/0223-the-group-membership-record.md`
 [^DEC91D]: Decisions register, DEC-036, in this document.
+[^DEC92A]: ADR-0078, descent is a bounded record, and a relation is a bounded recursion, decision D1. `docs/adrs/draft/adr-0078-descent-is-a-bounded-record-and-a-relation-is-a-bounded-recursion.md`
+[^DEC92C]: Review 0223, the descent record. `docs/reviews/0223-the-descent-record.md`
