@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-322**
+**Next number: FND-324**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -9587,3 +9587,84 @@ fix.[^F321C] A backlog item holds the removal and the check.[^F321D]
 [^F319A]: Project orientation, the Python example. `README.md`
 [^F319B]: Recurring defect shapes, shape 5. `.claude/rules/recurring-defects.md`
 [^F319C]: Product requirement record 0021, a developer can use the control plane without reading its source. `docs/product/accepted/prd-0021-a-developer-can-use-the-control-plane-without-reading-its-source.md`
+
+### FND-322 — The document a newcomer reads first sells a pyramid level that nothing writes
+
+**Believed.** The orientation document of this repository states that the engine
+organises the world into three levels of detail, and it describes the third:
+region-scale summaries that combine blocks of level 1 cells. It lists the
+spatial pyramid among the key capabilities of the engine, and it says that three
+levels of detail provide instant answers for continental aggregate
+queries.[^F322A]
+
+**True.** Level 2 does not exist. The pyramid holds one derived level. The
+project instruction file says so in bold, and it warns that a reader who takes
+the three-level paragraph for the code plans against a level that nothing
+writes.[^F322B] The Rust source agrees in its own words: the pyramid names the
+whole-world summary as what level 2 **would** hold, in the conditional.[^F322C]
+
+**Evidence.**
+
+```
+grep -n "Level 2" README.md
+grep -rn "level 2" crates/ --include="*.rs"
+```
+
+**Follows.** The two orientation documents disagree, and one of them is the only
+document a person outside this project reads. This is the shape a backlog item
+already holds for a different sentence in the same pair of files, and the finding
+behind it records the same cost.[^F322D] The documentation plan inherits the
+claim, because the reader the plan serves arrives through this document, and the
+worked example the plan turns into a tutorial sits on the same page as the false
+paragraph.[^F322E] Repair the paragraph, or delete it and let the generated
+reference report what the pyramid holds.
+
+### FND-323 — The orientation document sells the agent server as a product capability, and the package does not install it
+
+**Believed.** The orientation document lists native support for artificial
+intelligence agents among the key capabilities of the engine. It says an
+integrated Model Context Protocol server connects external agents directly to
+the engine, it names the capability again under a third audience, and it gives
+the command that starts the server.[^F322A]
+
+**True, in the sense that the server exists, and false in the sense a reader
+takes.** The server is a tool for a contributor to this repository. Its own
+docstring says so, and it says that the reference implementation of the protocol
+is a development dependency and not a runtime dependency of the
+package.[^F323A] The project manifest agrees: the protocol library sits in the
+development dependency group, with a comment that states the reason. The runtime
+dependency list holds one entry, and it is not that library.[^F323B]
+
+**A reader who follows the document gets an import error.** Install the package
+from an index, run the command the document gives, and nothing starts, because
+the package never installed the library the server imports.
+
+**The product records draw the line the other way round.** The record that holds
+the game developer states three times that the tool server is not part of that
+need: it serves an agent that works on this repository, and another record holds
+that audience.[^F323C] [^F323D]
+
+**Evidence.**
+
+```
+grep -n "cachette.agent\|Model Context Protocol" README.md
+grep -n "mcp>=" pyproject.toml
+grep -n "dependencies" pyproject.toml
+```
+
+**Follows.** The product record requires the documentation to separate the
+surface a program may depend on from the surface that exists for this
+repository, and to state what the package cannot do yet, so that a reader who
+wants a missing thing does not conclude that they failed to find it.[^F323C]
+This finding is one instance of that gap and the explanation quadrant of the
+documentation plan holds the page that states the line.[^F322E]
+
+[^F322A]: Project orientation, the key capabilities and the architectural foundation. `README.md`
+[^F322B]: Project instructions, the levels of detail. `CLAUDE.md`
+[^F322C]: The pyramid of the core crate. `crates/cachette-core/src/pyramid.rs`
+[^F322D]: Findings register, FND-259, in this document.
+[^F322E]: Backlog item 0308, the documentation plan. `docs/backlog/refined/0308-the-documentation-plan.md`
+[^F323A]: The agent-facing protocol server of the control plane. `python/cachette/agent/server.py`
+[^F323B]: The project manifest. `pyproject.toml`
+[^F323C]: Product requirement record 0021, what this does not do. `docs/product/accepted/prd-0021-a-developer-can-use-the-control-plane-without-reading-its-source.md`
+[^F323D]: Product requirement record 0019, an agent can ask the running engine what it holds. `docs/product/shaped/prd-0019-an-agent-can-ask-the-running-engine-what-it-holds.md`
