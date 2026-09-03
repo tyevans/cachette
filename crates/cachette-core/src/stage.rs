@@ -151,7 +151,6 @@ macro_rules! declare_stages {
 declare_stages! {
     TileScan,                 "tile_scan",                  true,  1, false;
     LogJoin,                  "log_join",                   false, 1, false;
-    ChangeMerge,              "change_merge",               false, 1, false;
     BridgeRefreshOpening,     "bridge_refresh_opening",     true,  1, false;
     Choose,                   "choose",                     true,  1, false;
     MovementIntents,          "movement_intents",           true,  1, false;

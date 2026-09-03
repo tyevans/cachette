@@ -86,7 +86,7 @@ pub use sort::{SortError, SortKey};
 pub use stage::{FrameCosts, Stage, StageCost, STAGES, STAGE_COUNT};
 pub use terrain::{Terrain, TerrainTile, TileKind};
 pub use tier::{EntityTier, Shape, CHARACTER_CEILING};
-pub use tile_value::{TileValueRange, TileValues};
+pub use tile_value::{TileValueChunk, TileValueRange, TileValues};
 pub use types::{Accum, Entity, FactionId, Fix32, Tick, TileIdx};
 pub use upgrade::{UpgradeKind, UpgradeMap, UpgradeSite, UPGRADE_KIND_COUNT};
 pub use world::{IdentityError, StepError, World, WorldConfig, WorldError};

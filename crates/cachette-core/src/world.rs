@@ -61,7 +61,7 @@ use crate::sort;
 use crate::sort::{BoundedKey, SortError};
 use crate::stage::{self, Stage};
 use crate::terrain::{Terrain, TerrainTile, TileKind};
-use crate::tile_value::{TileValueRange, TileValues};
+use crate::tile_value::{TileValueChunk, TileValues};
 use crate::types::{Accum, Entity, FactionId, Fix32, Tick, TileIdx, FACTION_CEILING};
 use crate::upgrade::{self, UpgradeKind, UpgradeMap, UpgradeSite};
 
@@ -2952,29 +2952,45 @@ impl World {
         let mut slots: Slots<ChunkResult> =
             Slots::filled(threads, ChunkResult::default()).map_err(|_| StepError::ZeroThreads)?;
 
-        // Each worker reads one contiguous range of tiles and writes to its
-        // own slot. No worker writes to the field, because the merge that
-        // follows the join is the one place that fixes the order.[^12]
+        // **Each worker writes its own contiguous range of the field.** The
+        // field hands out disjoint chunks, so no two workers touch one tile
+        // and no worker needs an atomic. The requirement on a parallel stage
+        // is met by the type and not by a rule a reviewer has to check.[^12]
         //
-        // [^12]: ADR-0009, parallel stages write disjoint outputs. `docs/adrs/REGISTRY.md`
+        // The field used to be read here and written afterwards, by a merge
+        // that took the joined changes, sorted them and rebuilt the stored
+        // list. That merge is gone. It cost a share of the frame that grew
+        // with the tiles that had ever changed, and the dense array it now
+        // writes needs no run, no sort and no join.[^14] [^15]
+        //
+        // [^12]: ADR-0009, parallel stages write disjoint outputs, decision D1. `docs/adrs/accepted/adr-0009-parallel-stages-write-disjoint-outputs.md`
+        // [^14]: ADR-0103, the tile value field stores a dense delta, never a sparse change list, the consequences. `docs/adrs/draft/adr-0103-the-tile-value-field-stores-a-dense-delta.md`
+        // [^15]: Findings register, FND-292. `docs/FINDINGS.md`
         {
             let _span = stage::open(Stage::TileScan);
-            let values = &self.values;
+            // The array is allocated here, on the first frame that runs, and
+            // never when the world is built.
+            self.values.prepare();
             std::thread::scope(|scope| {
-                let mut start = 0u32;
-                for slot in slots.entries_mut() {
-                    if start >= count {
-                        break;
-                    }
-                    let end = start.saturating_add(chunk_len).min(count);
-                    let range = values.range(start, end);
+                for (slot, chunk) in slots
+                    .entries_mut()
+                    .iter_mut()
+                    .zip(self.values.chunks_mut(chunk_len))
+                {
                     scope.spawn(move || {
-                        *slot = update_range(tick, seed, start, end, range);
+                        *slot = update_range(tick, seed, chunk);
                     });
-                    start = end;
                 }
             });
         }
+
+        // The count of changed tiles is a sum over the chunks. Addition of
+        // integers does not depend on the order of the terms, so the count is
+        // the same at any thread count.[^13]
+        //
+        // [^13]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
+        self.values
+            .absorb_changed(slots.combine(0i64, |total, slot| total + slot.changed));
 
         {
             let _span = stage::open(Stage::LogJoin);
@@ -2984,22 +3000,6 @@ impl World {
                 joined.extend_from_slice(&slot.events);
                 joined
             });
-        }
-
-        // The ranges are disjoint, so each tile appears in one run at most.
-        // The merge needs one ascending run, and the sort by tile index is
-        // what gives it one. Nothing here reads the order the slots joined
-        // in, so the field is the same at any thread count.[^13]
-        //
-        // [^13]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
-        {
-            let _span = stage::open(Stage::ChangeMerge);
-            let mut run: Vec<(u32, Fix32)> = slots.combine(Vec::new(), |mut joined, slot| {
-                joined.extend_from_slice(&slot.changes);
-                joined
-            });
-            run.sort_unstable_by_key(|pair| pair.0);
-            self.values.merge_ascending(&run);
         }
 
         // Every soldier chooses a neighbour, then the step applies the
@@ -4945,29 +4945,34 @@ fn admit(
 struct ChunkResult {
     /// The events of the range, in ascending tile order.
     events: Vec<TileChanged>,
-    /// The change made to each tile of the range, in ascending tile order.
-    changes: Vec<(u32, Fix32)>,
+    /// The net change this range made to the count of changed tiles.
+    ///
+    /// The range applied its own changes to the field as it went, so nothing
+    /// is carried here for a later pass to apply. Only the count comes back,
+    /// because the count belongs to the whole field and not to one range.
+    changed: i64,
 }
 
-/// Updates one contiguous range of tiles and returns what it changed.
+/// Updates one contiguous range of tiles, in place, and returns its events.
 ///
-/// The function is pure in the sense that the record requires: the same
-/// prior values and the same key give the same result.[^1]
+/// The function is pure in the sense that the record requires: the same prior
+/// values and the same key give the same result.[^1]
 ///
-/// The range is read through a view of the field rather than through a
-/// mutable slice, because the field stores no array of values to slice.
+/// **The range is a mutable chunk of the field, and it is the only writer of
+/// those tiles.** The field hands out disjoint chunks, so this function
+/// cannot reach a tile another worker holds, and it needs no atomic.[^2]
+///
+/// The draw is keyed on the system, the frame and the tile, so a tile gives
+/// the same answer whichever worker holds it and at any thread count.[^3]
 ///
 /// # References
 ///
 /// [^1]: ADR-0006, an event is plain data and applying it is pure, decision D1. `docs/adrs/accepted/adr-0006-an-event-is-plain-data-and-applying-it-is-pure.md`
-fn update_range(
-    tick: Tick,
-    seed: u64,
-    start: u32,
-    end: u32,
-    range: TileValueRange<'_>,
-) -> ChunkResult {
+/// [^2]: ADR-0009, parallel stages write disjoint outputs, decision D1. `docs/adrs/accepted/adr-0009-parallel-stages-write-disjoint-outputs.md`
+/// [^3]: ADR-0003, every random draw is keyed, never stateful, decision D1. `docs/adrs/accepted/adr-0003-every-random-draw-is-keyed-never-stateful.md`
+fn update_range(tick: Tick, seed: u64, mut chunk: TileValueChunk<'_>) -> ChunkResult {
     let mut result = ChunkResult::default();
+    let (start, end) = (chunk.start(), chunk.end());
     for index in start..end {
         let raw = rng::draw_below(seed, rng::SYSTEM_TILE_STUB, tick.0, u64::from(index), 0, 8);
         if raw >= 4 {
@@ -4977,12 +4982,12 @@ fn update_range(
         if delta.0 == 0 {
             continue;
         }
-        // The value is read here and not at the top of the loop, because a
-        // tile the draw did not choose needs no value. The read is one index
-        // into the range, so a skipped tile costs nothing.
-        let value = range.value(TileIdx(index));
-        let updated = sim_math::add(value, delta);
-        result.changes.push((index, delta));
+        // The tile is inside the chunk by construction, because the loop
+        // walks the chunk's own range. A `None` here would mean the chunk
+        // reported a range it does not hold.
+        let Some(updated) = chunk.add(TileIdx(index), delta) else {
+            continue;
+        };
         let kind = if delta.0 > 0 {
             CHANGE_KIND_RAISED
         } else {
@@ -4990,9 +4995,9 @@ fn update_range(
         };
         // The holder is stamped after the holding spread, at the end of the
         // step. This pass runs at the top of the step, so any holder it read
-        // here would be the holder of the frame before.[^2]
+        // here would be the holder of the frame before.[^4]
         //
-        // [^2]: Findings register, FND-029. `docs/FINDINGS.md`
+        // [^4]: Findings register, FND-029. `docs/FINDINGS.md`
         result.events.push(TileChanged::new(
             tick,
             TileIdx(index),
@@ -5001,6 +5006,7 @@ fn update_range(
             kind,
         ));
     }
+    result.changed = chunk.changed();
     result
 }
 

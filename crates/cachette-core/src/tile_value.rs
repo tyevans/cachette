@@ -446,6 +446,141 @@ impl<'a> TileValueRange<'a> {
     }
 }
 
+/// One contiguous range of tiles that a worker may write.
+///
+/// **The slice bounds the worker.** A chunk carries the deltas of its own
+/// range and nothing else, so two chunks of one field write disjoint memory
+/// and a worker cannot reach a tile that another worker holds. That is the
+/// requirement on a parallel stage, met by construction rather than by a rule
+/// a reviewer has to check.[^1]
+///
+/// A chunk cannot name a tile outside the extent either, because the field
+/// built it from the array and the array covers the extent exactly.
+///
+/// # References
+///
+/// [^1]: ADR-0009, parallel stages write disjoint outputs, decision D1. `docs/adrs/accepted/adr-0009-parallel-stages-write-disjoint-outputs.md`
+#[derive(Debug)]
+pub struct TileValueChunk<'a> {
+    /// The seed that the generated part is drawn from.
+    seed: u64,
+    /// The tile the slice starts at.
+    start: u32,
+    /// The delta of each tile of this range, in tile order.
+    deltas: &'a mut [Fix32],
+    /// The net change this chunk made to the count of non-zero deltas.
+    changed: i64,
+}
+
+impl TileValueChunk<'_> {
+    /// Returns the first tile of the range.
+    #[must_use]
+    pub const fn start(&self) -> u32 {
+        self.start
+    }
+
+    /// Returns the tile after the last tile of the range.
+    #[must_use]
+    pub fn end(&self) -> u32 {
+        self.start + self.deltas.len() as u32
+    }
+
+    /// Returns the value of one tile of the range.
+    ///
+    /// A tile outside the range reads the generated value alone. The caller
+    /// walks the range it was given, so that case does not arise.
+    #[must_use]
+    pub fn value(&self, tile: TileIdx) -> Fix32 {
+        let stored = tile
+            .0
+            .checked_sub(self.start)
+            .and_then(|at| self.deltas.get(at as usize))
+            .copied()
+            .unwrap_or(Fix32(0));
+        sim_math::add(TileValues::generated(self.seed, tile), stored)
+    }
+
+    /// Adds to one tile of the range and returns the value it then holds.
+    ///
+    /// Returns `None` when the tile is outside the range. The field cannot
+    /// see that case, because the range is the whole of what this chunk owns,
+    /// so the caller is the one that must not ignore it.
+    #[must_use]
+    pub fn add(&mut self, tile: TileIdx, delta: Fix32) -> Option<Fix32> {
+        let at = tile.0.checked_sub(self.start)? as usize;
+        let slot = self.deltas.get_mut(at)?;
+        let before = *slot;
+        let after = sim_math::add(before, delta);
+        *slot = after;
+        match (before.0 == 0, after.0 == 0) {
+            (true, false) => self.changed += 1,
+            (false, true) => self.changed -= 1,
+            _ => {}
+        }
+        Some(sim_math::add(TileValues::generated(self.seed, tile), after))
+    }
+
+    /// Returns the net change this chunk made to the count of changed tiles.
+    #[must_use]
+    pub const fn changed(&self) -> i64 {
+        self.changed
+    }
+}
+
+impl TileValues {
+    /// Allocates the delta array if it is not allocated already.
+    ///
+    /// A caller that is about to write the field calls this once, before it
+    /// divides the field between workers. **Building a world does not call
+    /// it**, so a world that has run no frame still allocates nothing for
+    /// this field.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0103, the tile value field stores a dense delta, never a sparse change list, decision D2. `docs/adrs/draft/adr-0103-the-tile-value-field-stores-a-dense-delta.md`
+    pub fn prepare(&mut self) {
+        if self.deltas.is_empty() {
+            self.deltas = vec![Fix32(0); self.grid.tile_count() as usize];
+        }
+    }
+
+    /// Divides the field into contiguous chunks that workers may write.
+    ///
+    /// The chunks are disjoint and they cover the extent in ascending tile
+    /// order. The caller must have called `prepare` first; a field that holds
+    /// no array yields no chunk, and the caller would then write nothing.
+    ///
+    /// **The division is by tile and never by thread completion.** Two runs
+    /// at two thread counts give each tile to one chunk, and each chunk
+    /// writes only its own tiles, so the field does not depend on which
+    /// worker finished first.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
+    pub fn chunks_mut(&mut self, chunk_len: u32) -> impl Iterator<Item = TileValueChunk<'_>> {
+        let seed = self.seed;
+        let stride = chunk_len.max(1) as usize;
+        self.deltas
+            .chunks_mut(stride)
+            .enumerate()
+            .map(move |(index, deltas)| TileValueChunk {
+                seed,
+                start: (index * stride) as u32,
+                deltas,
+                changed: 0,
+            })
+    }
+
+    /// Applies the net change that the chunks reported.
+    ///
+    /// The sum is over integers, so it does not depend on the order the
+    /// chunks are added in.
+    pub fn absorb_changed(&mut self, delta: i64) {
+        self.changed = self.changed.saturating_add_signed(delta as isize);
+    }
+}
+
 impl TileValues {
     /// Returns a read-only view of one contiguous range of tiles.
     ///
