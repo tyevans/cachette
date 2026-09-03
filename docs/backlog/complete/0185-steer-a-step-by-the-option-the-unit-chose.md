@@ -211,7 +211,7 @@ holds no direction, without naming what a neighbour must beat. The scan starts
 at the value of the cell itself, and the record now says so. It is a draft, and
 the author is not its reviewer.
 
-**Registers.** FND-209, FND-210 and FND-211 were added. DEC-079 carries what
+**Registers.** FND-226, FND-227 and FND-228 were added. DEC-079 carries what
 the run showed, and it stays open because the run did not reach the case.
 DEC-074 carries what the falsification found. No blocker opened or closed.
 
@@ -222,7 +222,7 @@ place of the field failed the same test. Removing the engine write of the
 gather order failed five gather tests. Setting the map from the option to the
 resource kind to nothing failed four.
 
-**The first fixture failed the falsification, and FND-210 records it.** The
+**The first fixture failed the falsification, and FND-227 records it.** The
 pinned option column left all sixteen new tests green, because the cell under
 test pointed the same way for the pinned option as for the option the test set.
 The fixture now chooses a direction that no other option points at, and it
@@ -234,7 +234,7 @@ uniform draw to 36, and the furthest unit from 40 tiles to 74. Both figures are
 one run each, on a development machine, at the same seed and settings. **The
 migration is toward open ground and not toward food**, because the
 demonstration feeds every unit and the `forage` option therefore scores zero.
-FND-209 holds the measurement, and item 0216 holds the repair.
+FND-226 holds the measurement, and item 0216 holds the repair.
 
 ## References
 

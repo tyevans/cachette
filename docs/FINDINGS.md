@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-212**
+**Next number: FND-229**
 
 ## A. Corrections to stated rules
 
@@ -4825,16 +4825,16 @@ integration and a reader waits for it. The reason is that the script states one
 thing and does another, in the place a contributor looks to learn what the
 check asserts.
 
-### FND-209 — The demonstration feeds every unit, so it never forages
+### FND-226 — The demonstration feeds every unit, so it never forages
 
 **Believed.** The engine now steers a step by the option a unit chose, and it
-writes a gather order for the unit that chooses to forage.[^F209A] [^F209B]
+writes a gather order for the unit that chooses to forage.[^F226A] [^F226B]
 The demonstration runs the same engine, so a watcher was expected to see units
 walk to food and take it.
 
 **True.** No unit in the demonstration ever forages. The `forage` row is driven
 by what a unit lacks, and the demonstration founds each group on a site whose
-store feeds it.[^F209C] Every unit therefore holds a whole need on every frame,
+store feeds it.[^F226C] Every unit therefore holds a whole need on every frame,
 the drive of the row is zero, and the score is zero whatever the ground
 carries. Every unit chooses `roam`, which reads the share of a cell that admits
 a unit.
@@ -4864,9 +4864,9 @@ furthest unit from 40 tiles to 74. Both figures are one run each, on a
 development machine, at the same seed and settings.[^28]
 
 The repair is a demonstration parameter and not an engine change. An item holds
-it.[^F209E]
+it.[^F226E]
 
-### FND-210 — A fixture in which two options point one way cannot see a pinned option column
+### FND-227 — A fixture in which two options point one way cannot see a pinned option column
 
 **Believed.** A test that drives the step, reads the exit direction of a cell,
 and names the tile a unit must reach proves that the step read the option of
@@ -4889,7 +4889,7 @@ the map from the option to the resource kind set to nothing. Each failed the
 tests that name it.
 
 **Follows.** This is the shape the register already holds, on a new value. One
-finding says to pin the site the consumer reads.[^F210B] This adds the other
+finding says to pin the site the consumer reads.[^F227B] This adds the other
 half: **the fixture must separate the value under test from every other value
 the consumer could have read.** A pin reaches the consumer and still proves
 nothing when two inputs give one answer.
@@ -4898,7 +4898,7 @@ The rule generalises to any lookup keyed on a small set. Build the fixture so
 that each key gives a different answer, and assert that the other keys do not
 give the answer under test. The exit field test asserts that now.
 
-### FND-211 — An engine writer of a control-plane column replaces what a caller wrote
+### FND-228 — An engine writer of a control-plane column replaces what a caller wrote
 
 **Believed.** Adding an engine writer to the gather order column leaves a
 caller that sets the order from the control plane working as before. The verb
@@ -4924,11 +4924,11 @@ quietly: the value is read back correctly and it is the wrong value.
 
 ## References
 
-[^F209A]: Backlog item 0185, steer a step by the option the unit chose. `docs/backlog/complete/0185-steer-a-step-by-the-option-the-unit-chose.md`
-[^F209B]: Backlog item 0186, let the engine order a gather. `docs/backlog/complete/0186-let-the-engine-order-a-gather.md`
-[^F209C]: ADR-0063, a need is a rate with a threshold, and crossing it is a fact, decision D2. `docs/adrs/accepted/adr-0063-a-need-is-a-rate-with-a-threshold-and-crossing-it-is-a-fact.md`
-[^F209E]: Backlog item 0216, let the demonstration make a unit hungry. `docs/backlog/proposed/0216-let-the-demonstration-make-a-unit-hungry.md`
-[^F210B]: Findings register, FND-183, in this document.
+[^F226A]: Backlog item 0185, steer a step by the option the unit chose. `docs/backlog/complete/0185-steer-a-step-by-the-option-the-unit-chose.md`
+[^F226B]: Backlog item 0186, let the engine order a gather. `docs/backlog/complete/0186-let-the-engine-order-a-gather.md`
+[^F226C]: ADR-0063, a need is a rate with a threshold, and crossing it is a fact, decision D2. `docs/adrs/accepted/adr-0063-a-need-is-a-rate-with-a-threshold-and-crossing-it-is-a-fact.md`
+[^F226E]: Backlog item 0216, let the demonstration make a unit hungry. `docs/backlog/proposed/0216-let-the-demonstration-make-a-unit-hungry.md`
+[^F227B]: Findings register, FND-183, in this document.
 [^F177A]: The founding refuses ground that admits nobody. `crates/cachette-core/src/world.rs`
 [^F177B]: The terrain capacity table. `crates/cachette-core/src/terrain.rs`
 [^F180A]: ADR-0064, a unit chooses by scoring a small fixed option set, decision D3. `docs/adrs/accepted/adr-0064-a-unit-chooses-by-scoring-a-small-fixed-option-set.md`

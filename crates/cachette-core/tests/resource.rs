@@ -84,7 +84,7 @@ const FRAMES: u64 = 200;
 /// # References
 ///
 /// [^1]: ADR-0064, a unit chooses by scoring a small fixed option set, decision D4. `docs/adrs/accepted/adr-0064-a-unit-chooses-by-scoring-a-small-fixed-option-set.md`
-/// [^2]: Findings register, FND-211. `docs/FINDINGS.md`
+/// [^2]: Findings register, FND-228. `docs/FINDINGS.md`
 fn hold_the_choice(world: &mut World) {
     let schedule =
         ChoiceSchedule::new(choose::PERIOD_LOG2_CEILING).expect("the exponent is inside the range");
@@ -568,7 +568,7 @@ fn every_unit_takes_from_the_tile_the_frame_left_it_on() {
     // The units are therefore made hungry, every weight but the one on the
     // foraging option is removed, and the engine orders the gather.
     //
-    // [^1]: Findings register, FND-211. `docs/FINDINGS.md`
+    // [^1]: Findings register, FND-228. `docs/FINDINGS.md`
     let mut field = world(SEED);
     let kind = ResourceKind::Food;
     field

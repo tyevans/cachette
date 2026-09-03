@@ -96,7 +96,7 @@ fn world(seed: u64, width: u32, height: u32) -> World {
 /// # References
 ///
 /// [^1]: ADR-0064, a unit chooses by scoring a small fixed option set, decision D4. `docs/adrs/accepted/adr-0064-a-unit-chooses-by-scoring-a-small-fixed-option-set.md`
-/// [^2]: Findings register, FND-211. `docs/FINDINGS.md`
+/// [^2]: Findings register, FND-228. `docs/FINDINGS.md`
 fn hold_the_choice(world: &mut World, frames: u64) {
     let schedule =
         ChoiceSchedule::new(choose::PERIOD_LOG2_CEILING).expect("the exponent is inside the range");

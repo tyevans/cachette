@@ -1991,9 +1991,9 @@ a failed founding is correct.[^PRD12]
 [^DEC79A]: ADR-0091, movement takes its direction from a per-cell field, never from a per-unit search, decisions D1 and D4. `docs/adrs/draft/adr-0091-movement-takes-its-direction-from-a-per-cell-field.md`
 [^DEC79B]: ADR-0018, the unit-to-tile bridge is derived, and it rebuilds at the barrier, decision D2. `docs/adrs/accepted/adr-0018-the-unit-to-tile-bridge-is-derived-and-rebuilds-at-the-barrier.md`
 [^DEC79D]: Backlog item 0185, steer a step by the option the unit chose. `docs/backlog/complete/0185-steer-a-step-by-the-option-the-unit-chose.md`
-[^DEC79E]: Findings register, FND-209. `docs/FINDINGS.md`
+[^DEC79E]: Findings register, FND-226. `docs/FINDINGS.md`
 [^DEC79F]: Backlog item 0216, let the demonstration make a unit hungry. `docs/backlog/proposed/0216-let-the-demonstration-make-a-unit-hungry.md`
-[^DEC74SEP]: Findings register, FND-210. `docs/FINDINGS.md`
+[^DEC74SEP]: Findings register, FND-227. `docs/FINDINGS.md`
 [^DEC80B]: Backlog item 0187, give a carried load somewhere to go. `docs/backlog/refined/0187-give-a-carried-load-somewhere-to-go.md`
 [^DEC81A]: Findings register, FND-193. `docs/FINDINGS.md`
 [^DEC81B]: ADR-0074, a spawn may over-fill a tile, and only admission enforces the capacity, decision D1. `docs/adrs/accepted/adr-0074-a-spawn-may-over-fill-a-tile-and-only-admission-enforces-the-capacity.md`

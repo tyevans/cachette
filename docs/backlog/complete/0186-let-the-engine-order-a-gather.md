@@ -158,14 +158,14 @@ a gathering option, so nothing can disagree with it.
 survives every frame on which the cell of the unit does not choose, and the
 choice replaces it on the frame that it does. One test drives both halves.
 
-**An existing probe fixture had to absorb the new writer, and FND-211 records
+**An existing probe fixture had to absorb the new writer, and FND-228 records
 it.** The gather probe set the choice interval to every tick and then ordered a
 gather from outside, so the choice replaced that order before the resolve read
 it and the contest disappeared. The fixture now puts the choice far enough
 apart that no cell of a gatherer chooses on the frame under test, and it
 asserts that.
 
-**Registers.** FND-209 and FND-211 were added. No blocker opened or closed.
+**Registers.** FND-226 and FND-228 were added. No blocker opened or closed.
 
 **Evidence.** Two defects were put back separately, and the source was restored
 after each. Removing the engine write of the gather order failed five of the
@@ -175,7 +175,7 @@ nothing failed four of them.
 **The loop is inert in the demonstration.** Every unit there is fed, so the
 `forage` row scores zero and the engine orders no gather at any tick that was
 measured. The engine tests drive a hungry unit and it forages, gathers, and
-works a deposit down. FND-209 holds the measurement, and item 0216 holds the
+works a deposit down. FND-226 holds the measurement, and item 0216 holds the
 repair.
 
 ## References
