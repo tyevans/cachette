@@ -2769,14 +2769,11 @@ a failed founding is correct.[^PRD12]
 [^DEC96D]: ADR-0064, a unit chooses by scoring a small fixed option set, decision D1. `docs/adrs/accepted/adr-0064-a-unit-chooses-by-scoring-a-small-fixed-option-set.md`
 [^DEC97B]: Target platform costs. `docs/reference/graviton-costs.md`
 [^SWEEP]: Recurring Defect Shapes, shape 2. `.claude/rules/recurring-defects.md`
-<<<<<<< HEAD
 [^DEC107A]: The pyglet package index entry, read 2 September 2026. https://pypi.org/pypi/pyglet/json
 [^DEC107B]: The pygame and pygame-ce package index entries, read 2 September 2026. https://pypi.org/pypi/pygame/json
 [^DEC107C]: ADR-0094, the caller owns the camera and the pixels, decision D5. `docs/adrs/draft/adr-0094-the-caller-owns-the-camera-and-the-pixels.md`
 [^DEC107E]: ADR-0094, the caller owns the camera and the pixels, decision D4. `docs/adrs/draft/adr-0094-the-caller-owns-the-camera-and-the-pixels.md`
-=======
 [^DEC109A]: ADR-0018, the unit-to-tile bridge is derived, and it rebuilds at the barrier, decision D1. `docs/adrs/accepted/adr-0018-the-unit-to-tile-bridge-is-derived-and-rebuilds-at-the-barrier.md`
 [^DEC109B]: Findings register, FND-274. `docs/FINDINGS.md`
 [^DEC109C]: ADR-0014, entity identity is an index plus a generation, decision D1. `docs/adrs/accepted/adr-0014-entity-identity-is-an-index-plus-a-generation.md`
 [^DEC109D]: The cost benchmark, the reorder cost mode. `crates/cachette-core/benches/target_cost.rs`
->>>>>>> feat-w39
