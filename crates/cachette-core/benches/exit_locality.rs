@@ -78,6 +78,16 @@
 //! cargo bench --bench exit_locality -- 4096x4096 1000000
 //! ```
 //!
+//! **Run it through `cargo bench` and never through the path under
+//! `target/release/deps`.** That path holds a binary which `cargo build
+//! --bench` stops refreshing, and `cargo bench` writes its executable
+//! somewhere else, so invoking the path directly can time a build hours older
+//! than the tree. Nothing warns.[^6]
+//!
+//! A mode this benchmark does not know falls through to the default sweep and
+//! prints the header of another row, which is the only signal that the binary
+//! is old. That signal is worth remembering, because it is what catches this.
+//!
 //! Every duration is in nanoseconds. A benchmark does not gate a merge, and
 //! no test in this project asserts on time.[^2]
 //!
@@ -88,6 +98,7 @@
 //! [^3]: Findings register, FND-281. `docs/FINDINGS.md`
 //! [^4]: Backlog item 0268, hold the cell index on the unit. `docs/backlog/complete/0268-hold-the-cell-index-on-the-unit.md`
 //! [^5]: Blockers register, BLK-007. `docs/BLOCKERS.md`
+//! [^6]: Findings register, FND-297. `docs/FINDINGS.md`
 
 use std::time::Instant;
 
@@ -146,6 +157,15 @@ fn main() {
     }
     if arguments.first().map(String::as_str) == Some("growth") {
         growth_rows(&arguments[1..]);
+        return;
+    }
+    if arguments.first().map(String::as_str) == Some("held") {
+        held_rows(&arguments[1..]);
+        return;
+    }
+    #[cfg(feature = "census-holding")]
+    if arguments.first().map(String::as_str) == Some("apply") {
+        apply_rows(&arguments[1..]);
         return;
     }
     let (width, height) = extent_argument(&arguments);
@@ -463,6 +483,124 @@ fn frame_rows(arguments: &[String]) {
         elapsed
     });
     report("frame", &samples);
+}
+
+/// Reports what the holding apply does on each frame.
+///
+/// **The apply has three parts and the stage table names only the whole.** It
+/// writes the holder of each changed tile, rebuilds the held list, and repairs
+/// the block mask of every block a change touched. The mask repair reads every
+/// tile of a dirty block, so its cost is the dirty blocks times the tiles in a
+/// block, and that product is what this row exists to compare against the
+/// other two.
+///
+/// The row counts work and not nanoseconds.
+#[cfg(feature = "census-holding")]
+fn apply_rows(arguments: &[String]) {
+    use cachette_core::holding::census;
+
+    let (width, height) = extent_argument(arguments);
+    let units: u32 = arguments
+        .get(1)
+        .and_then(|word| word.parse().ok())
+        .unwrap_or(10_000);
+    let threads: usize = arguments
+        .get(2)
+        .and_then(|word| word.parse().ok())
+        .unwrap_or(1);
+    let frames: usize = arguments
+        .get(3)
+        .and_then(|word| word.parse().ok())
+        .unwrap_or(20);
+
+    let config = WorldConfig {
+        width,
+        height,
+        seed: SEED,
+        faction_count: FACTIONS,
+        unit_capacity: units.max(1024),
+    };
+    let mut world = World::new(config).expect("the extent must describe a world");
+    let placed = populate_scattered(&mut world, units);
+    let layout = world.bridge().layout();
+    let block_tiles = u64::from(layout.block_edge()) * u64::from(layout.block_edge());
+
+    println!("# what the holding apply does on each frame");
+    println!("# tiles\t{}", world.grid().tile_count());
+    println!("# units_placed\t{placed}");
+    println!("# blocks\t{}", layout.block_count());
+    println!("# tiles_for_each_block\t{block_tiles}");
+    println!("frame\tmoved\tdirty_blocks\theld_rebuilt\tmask_tile_reads");
+
+    for frame in 0..frames {
+        census::reset();
+        world.step(threads).expect("the step must run");
+        let (moved, dirty, rebuilt) = census::totals();
+        println!(
+            "{frame}\t{moved}\t{dirty}\t{rebuilt}\t{}",
+            dirty * block_tiles
+        );
+    }
+}
+
+/// Reports how the held tile list grows, frame by frame.
+///
+/// **The holding apply rebuilds the whole held list on every frame**, in the
+/// same shape as the change merge that this benchmark helped remove. Whether
+/// that is worth changing depends on one thing that no argument settles:
+/// whether the held list saturates the way the tile change list did.
+///
+/// A tile enters the list when a faction takes it and leaves when the last
+/// holder goes, so the list can shrink. The tile change list could not. That
+/// is the reason this has to be counted rather than assumed.
+///
+/// The row counts entries rather than nanoseconds, so a loaded machine does
+/// not disturb it.
+fn held_rows(arguments: &[String]) {
+    let (width, height) = extent_argument(arguments);
+    let units: u32 = arguments
+        .get(1)
+        .and_then(|word| word.parse().ok())
+        .unwrap_or(10_000);
+    let threads: usize = arguments
+        .get(2)
+        .and_then(|word| word.parse().ok())
+        .unwrap_or(1);
+    let frames: usize = arguments
+        .get(3)
+        .and_then(|word| word.parse().ok())
+        .unwrap_or(20);
+
+    let config = WorldConfig {
+        width,
+        height,
+        seed: SEED,
+        faction_count: FACTIONS,
+        unit_capacity: units.max(1024),
+    };
+    let mut world = World::new(config).expect("the extent must describe a world");
+    let placed = populate_scattered(&mut world, units);
+
+    println!("# how the held tile list grows");
+    println!("# tiles\t{}", world.grid().tile_count());
+    println!("# units_placed\t{placed}");
+    println!("# threads\t{threads}");
+    println!("# an entry is four bytes");
+    println!("frame\theld\tadded\tbytes\tshare_of_tiles_milli");
+
+    let tiles = u64::from(world.grid().tile_count());
+    let mut last = 0i64;
+    for frame in 0..frames {
+        world.step(threads).expect("the step must run");
+        let held = world.holding().held().len();
+        let share = (held as u64 * 1000) / tiles.max(1);
+        println!(
+            "{frame}\t{held}\t{}\t{}\t{share}",
+            held as i64 - last,
+            held * 4
+        );
+        last = held as i64;
+    }
 }
 
 /// Reports how the stored tile changes grow, frame by frame.

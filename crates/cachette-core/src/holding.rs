@@ -41,6 +41,58 @@
 use bytemuck::{Pod, Zeroable};
 
 use crate::bridge::{BlockLayout, BridgeError, TileCursor, UnitTileBridge};
+/// Counts what the holding apply does on each frame.
+///
+/// **The switch exists because the apply has three parts and the stage table
+/// names only the whole.** The apply writes the holder of each changed tile,
+/// rebuilds the list of held tiles, and repairs the block mask of every block
+/// a change touched. Those grow with different things, and a figure for the
+/// stage says nothing about which one carries it.
+///
+/// The counters observe. Nothing reads them inside the engine, and no
+/// simulated value depends on one, so they cannot reach a result.[^1]
+///
+/// The whole module compiles to nothing when the switch is off.
+///
+/// # References
+///
+/// [^1]: ADR-0003, every random draw is keyed, never stateful, decision D1. `docs/adrs/accepted/adr-0003-every-random-draw-is-keyed-never-stateful.md`
+#[cfg(feature = "census-holding")]
+pub mod census {
+    use core::sync::atomic::{AtomicU64, Ordering};
+
+    /// The tiles whose holder changed, since the last reset.
+    static MOVED: AtomicU64 = AtomicU64::new(0);
+    /// The blocks whose mask was read again, since the last reset.
+    static DIRTY: AtomicU64 = AtomicU64::new(0);
+    /// The entries the held list was rebuilt with, since the last reset.
+    static REBUILT: AtomicU64 = AtomicU64::new(0);
+
+    /// Records one apply.
+    pub fn record(moved: u64, dirty: u64, rebuilt: u64) {
+        MOVED.fetch_add(moved, Ordering::Relaxed);
+        DIRTY.fetch_add(dirty, Ordering::Relaxed);
+        REBUILT.fetch_add(rebuilt, Ordering::Relaxed);
+    }
+
+    /// Returns the moved tiles, the dirty blocks and the rebuilt entries.
+    #[must_use]
+    pub fn totals() -> (u64, u64, u64) {
+        (
+            MOVED.load(Ordering::Relaxed),
+            DIRTY.load(Ordering::Relaxed),
+            REBUILT.load(Ordering::Relaxed),
+        )
+    }
+
+    /// Sets every count back to zero.
+    pub fn reset() {
+        MOVED.store(0, Ordering::Relaxed);
+        DIRTY.store(0, Ordering::Relaxed);
+        REBUILT.store(0, Ordering::Relaxed);
+    }
+}
+
 use crate::hash::StateHash;
 use crate::hex::{Axial, Grid, NEIGHBOUR_COUNT};
 use crate::slots::Slots;
@@ -159,6 +211,17 @@ impl FactionMask {
         Self(self.0 | Self::of(faction).0)
     }
 
+    /// Returns the set with one faction removed.
+    ///
+    /// Removing a faction the set does not hold gives the same set.
+    #[must_use]
+    pub const fn without(self, faction: FactionId) -> Self {
+        if faction.0 as u32 >= MASK_BITS {
+            return self;
+        }
+        Self(self.0 & !(1u64 << faction.0))
+    }
+
     /// Returns the union of two sets.
     ///
     /// The operation is associative, commutative and exact, so a fold over a
@@ -249,7 +312,31 @@ pub struct Holding {
     /// The number of tiles each faction holds, indexed by the faction bit.
     census: [i64; MASK_BITS as usize],
     /// The factions that hold ground in each block.
+    ///
+    /// The mask is derived from the counts below and is kept beside them, so
+    /// that a reader of one block pays one read rather than one for each
+    /// faction. The invariant check derives both from the holder column and
+    /// fails when either disagrees.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`
     block_masks: Vec<FactionMask>,
+    /// The number of tiles each faction holds in each block.
+    ///
+    /// The entry of a block and a faction sits at the block index times the
+    /// mask width plus the faction bit.
+    ///
+    /// **This exists so that a mask never has to be read again from the
+    /// tiles.** A block loses a faction bit exactly when that faction's count
+    /// in the block reaches zero, and a count sees that in one step. Reading
+    /// the block instead costs every tile of it, and a frame at the target
+    /// scale dirties most blocks.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: Findings register, FND-307. `docs/FINDINGS.md`
+    block_census: Vec<u32>,
 }
 
 impl Holding {
@@ -263,6 +350,7 @@ impl Holding {
             held: Vec::new(),
             census: [0; MASK_BITS as usize],
             block_masks: vec![FactionMask::EMPTY; layout.block_count() as usize],
+            block_census: vec![0; layout.block_count() as usize * MASK_BITS as usize],
         }
     }
 
@@ -611,48 +699,98 @@ impl Holding {
     ///
     /// The write is one scattered store for each change, and it runs on the
     /// calling thread because it reads the holder it is about to overwrite.
-    /// The two repairs after it read the holder column and write somewhere
-    /// else, and both take a thread count.
     ///
-    /// **Both repairs cost the thing they repair and not the thing that
-    /// changed.** The held list is rebuilt by a merge that reads all of it,
-    /// and the mask of a block is derived by reading the whole block. Neither
-    /// follows the change count, so both grow as a holding grows.[^1]
+    /// **One repair follows the change count and the other follows the list
+    /// it repairs.** The mask of a block is no longer derived by reading the
+    /// block: the holding counts the tiles each faction holds in each block,
+    /// so a mask gains a bit when a count leaves zero and loses one when a
+    /// count reaches zero, and a moved tile touches two counters.[^1] The held
+    /// list is still rebuilt by a merge that reads all of it, and that merge
+    /// takes a thread count.[^2]
     ///
     /// # References
     ///
-    /// [^1]: Findings register, FND-294. `docs/FINDINGS.md`
+    /// [^1]: Findings register, FND-307. `docs/FINDINGS.md`
+    /// [^2]: ADR-0009, parallel stages write disjoint outputs, decisions D1, D2 and D3. `docs/adrs/accepted/adr-0009-parallel-stages-write-disjoint-outputs.md`
     fn apply(&mut self, changes: &[(TileIdx, Holder)], threads: usize) {
         let threads = threads.max(1);
-        let mut dirty: Vec<u32> = Vec::with_capacity(changes.len());
         let mut moved: Vec<TileIdx> = Vec::with_capacity(changes.len());
         for (tile, holder) in changes {
             let previous = self.holders[tile.0 as usize];
             if previous == *holder {
                 continue;
             }
+            let block = self
+                .layout
+                .key_of(*tile)
+                .map(|key| self.layout.block_of_key(key) as usize);
             if let Some(faction) = previous.faction() {
                 self.census[faction.0 as usize] -= 1;
+                if let Some(block) = block {
+                    self.leave_block(block, faction);
+                }
             }
             if let Some(faction) = holder.faction() {
                 self.census[faction.0 as usize] += 1;
+                if let Some(block) = block {
+                    self.enter_block(block, faction);
+                }
             }
             self.holders[tile.0 as usize] = *holder;
             moved.push(*tile);
-            if let Some(key) = self.layout.key_of(*tile) {
-                dirty.push(self.layout.block_of_key(key));
-            }
         }
         if moved.is_empty() {
             return;
         }
         moved.sort_unstable();
         moved.dedup();
-        dirty.sort_unstable();
-        dirty.dedup();
+        #[cfg(feature = "census-holding")]
+        let moved_count = moved.len() as u64;
 
         self.rebuild_held(&moved, threads);
-        self.rebuild_masks(&dirty, threads);
+
+        // **No block is read again.** A block loses a faction bit exactly when
+        // that faction's count in the block reaches zero, and the counts above
+        // saw that as each tile moved. Rereading a block cost every tile of
+        // it, and a frame at the target scale dirties most blocks.[^1]
+        //
+        // [^1]: Findings register, FND-307. `docs/FINDINGS.md`
+        #[cfg(feature = "census-holding")]
+        census::record(moved_count, 0, self.held.len() as u64);
+    }
+
+    /// Records that one faction took one more tile of one block.
+    ///
+    /// The mask gains the bit when the count leaves zero, and at no other
+    /// time.
+    fn enter_block(&mut self, block: usize, faction: FactionId) {
+        let at = block * MASK_BITS as usize + faction.0 as usize;
+        let Some(count) = self.block_census.get_mut(at) else {
+            return;
+        };
+        *count += 1;
+        if *count == 1 {
+            if let Some(mask) = self.block_masks.get_mut(block) {
+                *mask = mask.with(faction);
+            }
+        }
+    }
+
+    /// Records that one faction gave up one tile of one block.
+    ///
+    /// The mask loses the bit when the count reaches zero, and at no other
+    /// time.
+    fn leave_block(&mut self, block: usize, faction: FactionId) {
+        let at = block * MASK_BITS as usize + faction.0 as usize;
+        let Some(count) = self.block_census.get_mut(at) else {
+            return;
+        };
+        *count = count.saturating_sub(1);
+        if *count == 0 {
+            if let Some(mask) = self.block_masks.get_mut(block) {
+                *mask = mask.without(faction);
+            }
+        }
     }
 
     /// Rebuilds the held list from the old list and the tiles that changed.
@@ -730,56 +868,6 @@ impl Holding {
         self.held = rebuilt;
     }
 
-    /// Rebuilds the faction mask of every block that a change touched.
-    ///
-    /// A block loses a bit only when the last tile of that faction leaves it,
-    /// and no running count can see that without reading the block. A block
-    /// that changed is therefore read once, and a block that did not change is
-    /// not read at all.
-    ///
-    /// **A block is read by one thread and written by one thread.** The blocks
-    /// are cut into contiguous runs of the dirty list, and the write below
-    /// walks the dirty list and the buffers together in that order.[^1]
-    ///
-    /// # References
-    ///
-    /// [^1]: ADR-0009, parallel stages write disjoint outputs, decisions D1, D2 and D3. `docs/adrs/accepted/adr-0009-parallel-stages-write-disjoint-outputs.md`
-    fn rebuild_masks(&mut self, dirty: &[u32], threads: usize) {
-        if dirty.is_empty() {
-            return;
-        }
-        let chunk_len = dirty.len().div_ceil(threads).max(1);
-        let bands = dirty.len().div_ceil(chunk_len);
-        let layout = self.layout;
-        let holders = &self.holders[..];
-        let mut slots: Slots<Vec<FactionMask>> = Slots::filled(bands, Vec::new())
-            .expect("a non-empty dirty list names at least one band");
-        std::thread::scope(|scope| {
-            let mut handles = Vec::new();
-            for (chunk, slot) in dirty.chunks(chunk_len).zip(slots.entries_mut()) {
-                handles.push(scope.spawn(move || {
-                    *slot = chunk
-                        .iter()
-                        .map(|block| mask_of_block(layout, holders, *block))
-                        .collect();
-                }));
-            }
-            for handle in handles {
-                // A band reads the holder column and writes its own buffer, so
-                // it has no failure of its own.
-                handle.join().expect("a band of the dirty list cannot fail");
-            }
-        });
-
-        let mut at = 0usize;
-        for band in slots.entries() {
-            for mask in band {
-                self.block_masks[dirty[at] as usize] = *mask;
-                at += 1;
-            }
-        }
-    }
-
     /// Reports whether the holding holds its invariants.
     ///
     /// The holder column is the truth. The held list, the census and the
@@ -804,10 +892,16 @@ impl Holding {
         if self.block_masks.len() != self.layout.block_count() as usize {
             return false;
         }
+        if self.block_census.len() != self.layout.block_count() as usize * MASK_BITS as usize {
+            return false;
+        }
 
         let mut census = [0i64; MASK_BITS as usize];
         let mut held: Vec<TileIdx> = Vec::new();
         let mut masks = vec![FactionMask::EMPTY; self.block_masks.len()];
+        // The per-block count is a second declaration of what the holder
+        // column says, so it is derived here and compared like the rest.[^1]
+        let mut counts = vec![0u32; self.block_census.len()];
         for (index, holder) in self.holders.iter().enumerate() {
             let tile = TileIdx(index as u32);
             let Some(faction) = holder.faction() else {
@@ -832,33 +926,18 @@ impl Holding {
             };
             let block = self.layout.block_of_key(key) as usize;
             masks[block] = masks[block].with(faction);
-        }
-
-        census == self.census && held == self.held && masks == self.block_masks
-    }
-}
-
-/// Returns the factions that hold ground in one block, read from the holder
-/// column.
-fn mask_of_block(layout: BlockLayout, holders: &[Holder], block: u32) -> FactionMask {
-    let grid = layout.grid();
-    let edge = layout.block_edge();
-    let first_column = (block % layout.blocks_wide()) * edge;
-    let first_row = (block / layout.blocks_wide()) * edge;
-    let mut mask = FactionMask::EMPTY;
-    for row in first_row..(first_row + edge).min(grid.height()) {
-        let start = (row * grid.width() + first_column) as usize;
-        let end = (row * grid.width() + (first_column + edge).min(grid.width())) as usize;
-        if start >= end || end > holders.len() {
-            continue;
-        }
-        for holder in &holders[start..end] {
-            if let Some(faction) = holder.faction() {
-                mask = mask.with(faction);
+            let at = block * MASK_BITS as usize + faction.0 as usize;
+            if at >= counts.len() {
+                return false;
             }
+            counts[at] += 1;
         }
+
+        census == self.census
+            && held == self.held
+            && masks == self.block_masks
+            && counts == self.block_census
     }
-    mask
 }
 
 /// Sets the bit of one tile in a tile bit plane.

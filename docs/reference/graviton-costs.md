@@ -847,6 +847,67 @@ It has grown as a share because the frame shrank, and it is 12 milliseconds in
 absolute terms in every run since the candidate pass began allocating on each
 frame. The cause is still not identified.[^RESID291]
 
+## Every stage of a frame, after the block masks became counts
+
+**This section supersedes the one above it.** That one measured a tree in which
+the holding apply repaired a block mask by rereading every tile of the block.
+The holding now counts the tiles each faction holds in each block, so a mask
+gains a bit when a count leaves zero and loses one when a count reaches zero,
+and no block is read again.[^DENSE5]
+
+Machine E. 16,777,216 tiles, 1,000,000 units scattered, 12 threads, block edge
+32, `c7g.4xlarge` in `us-west-2`, `rustc 1.100.0-nightly`, crate features
+`stage-cost`, 3 September 2026. Every row is the mean of nine frames after two
+warm-up frames, and every row comes from one run. The kernel gave transparent
+huge pages on the `madvise` setting, which the engine never asks for.
+
+| Stage | ns for each frame | Share of the frame | Takes a thread count |
+|---|---|---|---|
+| `holding_spread` | 103,956,217 | 46.47 percent | yes |
+| — of which `holding_decide` | 69,756,788 | 31.19 percent | yes |
+| — of which `holding_candidates` | 17,389,138 | 7.77 percent | yes |
+| — of which `holding_apply` | 15,897,708 | 7.11 percent | **no** |
+| `bridge_refresh_barrier` | 32,934,706 | 14.72 percent | yes |
+| `admit` | 32,787,212 | 14.66 percent | yes |
+| `tile_scan` | 14,222,771 | 6.36 percent | yes |
+| `influence_solve` | 12,563,278 | 5.62 percent | yes |
+| `rebuild_level_1` | 6,575,255 | 2.94 percent | yes |
+| `stamp_holders` | 6,403,694 | 2.86 percent | **no** |
+| `log_join` | 5,699,972 | 2.55 percent | **no** |
+| **Every stage** | **223,366,658** | | |
+| **The frame, timed from outside** | **223,684,319** | | |
+
+The rows below `log_join` are each under one percent of the frame and are
+unchanged from the section above.
+
+**The frame costs 223.7 milliseconds against 241.4 for the same apparatus
+before the change.** The apply costs 15.9 against 34.6, which is 2.18 times
+less, and the frame is 17.7 milliseconds cheaper. The apply is nested inside
+the holding spread, so the two figures are the same saving and not two.
+
+**No memory figure is quoted from this run.** The resident line of a stage-cost
+run reports the high mark of the process rather than the cost of the world, and
+this project has read that figure wrongly twice.[^DENSE4] The counts cost the
+block count times the mask width as a `u32`, which is 4 MB at this extent, and
+that is a derivation rather than a measurement.
+
+**The apply still takes no thread count**, and it is now 7.11 percent of the
+frame rather than 14.33.
+
+### These two tables measured two branches, and neither holds the other's change
+
+**Read the share columns of the two sections above with care.** They were taken
+on two branches at the same time, and neither branch held the other's change.
+The first measured a tree in which admission still searched its count tables.
+The second measured a tree in which the holding apply still repaired a block
+mask by rereading the block.
+
+**So neither supersedes the other, and neither describes the trunk.** Each
+absolute figure is sound for the tree it names, and each share is against a
+frame that held one change and not the other. A run after the merge of the two
+supersedes both, and it is the only table that describes what the engine now
+does.
+
 ## Every stage of a frame after admission stopped searching
 
 **This section supersedes every stage table above it.** Read the ones above as
@@ -937,7 +998,6 @@ was about 12 milliseconds in three runs earlier in the day, and the register
 concluded then that it followed an allocation the candidate pass makes on every
 frame. That pass still makes it. The conclusion was wrong, and a finding
 corrects it.[^RESID298]
-
 ## Huge pages
 
 **The engine asks for no huge page.** This measurement changes the kernel
@@ -1440,6 +1500,8 @@ commit what changed. Do not edit a row to make a later run agree with it.
 
 [^DENSE1]: ADR-0103, the tile value field stores a dense delta, never a sparse change list. `docs/adrs/draft/adr-0103-the-tile-value-field-stores-a-dense-delta.md`
 [^DENSE2]: Findings register, FND-292. `docs/FINDINGS.md`
+[^DENSE5]: Findings register, FND-307. `docs/FINDINGS.md`
+[^DENSE4]: Findings register, FND-298. `docs/FINDINGS.md`
 [^ITEM297]: Backlog item 0297, take the rest of the holding spread. `docs/backlog/complete/0297-take-the-rest-of-the-holding-spread.md`
 [^DENOM297]: Findings register, FND-296. `docs/FINDINGS.md`
 [^ITEM298]: Backlog item 0298, walk the tables admission searches. `docs/backlog/complete/0298-walk-the-tables-admission-searches.md`
