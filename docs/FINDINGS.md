@@ -575,7 +575,7 @@ interface, the verb interface and the view scope are not written yet.
 
 **True.** The selector interface is not written. The other two are. The
 compiled module carries set-valued verbs and columnar reads, and the worked
-example in the project orientation calls both.[^F334A]
+example in the project orientation calls both.[^F319A]
 
 **Evidence.** The example in the orientation document was run unchanged
 against the installed package. It built a world, spawned a set of units, gave
@@ -591,9 +591,9 @@ grep -n "fn spawn_soldiers\|fn order_gather\|fn event_log_columns" crates/cachet
 **Follows.** The one sentence the package writes about itself is wrong about
 two of the three things it names, and nothing fails, because a docstring is
 prose. This is the shape the recurring defect rule names last: a document that
-no longer describes the code.[^F334B] It is also the need that product record
+no longer describes the code.[^F319B] It is also the need that product record
 0021 states, and that record cites the same shape as the cost it must
-carry.[^F334C]
+carry.[^F319C]
 
 **The repair is not made here.** The sentence and the documentation of this
 package are one statement, and correcting the sentence alone would create a
@@ -9387,13 +9387,13 @@ commodity, and the ration a unit receives is not that account.
 **Believed.** The type stub for the compiled extension module is a generated
 artefact. Its own docstring says that the contributing guide requires the
 continuous integration system to check the stubs, that the build regenerates
-them, and that the job fails when the result differs from the file.[^F335A]
+them, and that the job fails when the result differs from the file.[^F320A]
 
 **True.** No stub generator exists anywhere in the tree. No workflow job
 regenerates the stub, and no job compares it against anything. The stub is
 hand-written. The contributing guide never states the requirement that the
 docstring attributes to it. Its only use of the word "stub" describes the Rust
-crates as unimplemented.[^F335B]
+crates as unimplemented.[^F320B]
 
 **The claim is wrong twice.** It names a guide that says something else, and it
 names a mechanism that does not exist. A contributor who changes a binding and
@@ -9404,7 +9404,7 @@ for each typed dictionary and for each exception class. It carries none for any
 method of `World` and none for any method of `Camera`. The Rust bindings crate
 carries that prose, and PyO3 puts it on the compiled objects. So the stub and
 the compiled module are two declaration sites for the public interface, they
-already disagree about the prose, and nothing fails.[^F335C]
+already disagree about the prose, and nothing fails.[^F320C]
 
 **Evidence.**
 
@@ -9419,13 +9419,13 @@ The second finds one match, and it describes the Rust crates.
 A documentation build measured the second half. A site built from the compiled
 module produced a page of 105,348 bytes that held the method prose. The same
 site built with module inspection turned off fell back to the stub, produced
-29,038 bytes, and held no method prose at all.[^F335D]
+29,038 bytes, and held no method prose at all.[^F320D]
 
 **Follows.** Repair the stub docstring, or make the claim true with a
 generator. The research report on the documentation toolchain treats the
 Rust doc comment as the single source of the prose for exactly this
-reason.[^F335D] A generator would also remove the second declaration site for
-every signature, which is the shape the recurring defect rule names.[^F335E]
+reason.[^F320D] A generator would also remove the second declaration site for
+every signature, which is the shape the recurring defect rule names.[^F320E]
 
 ### FND-321 — The stub already carries prose the Rust source owns, and the copy that drifted dropped the paragraph that warns against a copy
 
@@ -9437,7 +9437,7 @@ stub carries no docstring for any method of `World` and none for any method of
 
 **True, and the sharper half is what the stub does carry.** Nine exception
 classes carry a docstring in the stub. All nine are the same words as the string
-that the Rust macro gives the same exception, character for character.[^F335C]
+that the Rust macro gives the same exception, character for character.[^F320C]
 The `World` class docstring is a one line copy of the Rust doc comment, and it
 agrees. The `Camera` class docstring is an abridged copy of the Rust doc comment,
 and it does not agree: it keeps the first and the last paragraph and drops two.
@@ -9538,11 +9538,11 @@ index against the set of open items and never against what an item says.
 
 ## References
 
-[^F335A]: The type stub for the compiled module. `python/cachette/_core.pyi`
-[^F335B]: Contributing guide, the opening section. `CONTRIBUTING.md`
-[^F335C]: The Python bindings crate. `crates/cachette-py/src/lib.rs`
-[^F335D]: Research report 19, the documentation toolchain, sections 4.2 and 7. `docs/research/reports/19-documentation-toolchain.md`
-[^F335E]: Recurring Defect Shapes, shape 1, redundant declaration sites. `.claude/rules/recurring-defects.md`
+[^F320A]: The type stub for the compiled module. `python/cachette/_core.pyi`
+[^F320B]: Contributing guide, the opening section. `CONTRIBUTING.md`
+[^F320C]: The Python bindings crate. `crates/cachette-py/src/lib.rs`
+[^F320D]: Research report 19, the documentation toolchain, sections 4.2 and 7. `docs/research/reports/19-documentation-toolchain.md`
+[^F320E]: Recurring Defect Shapes, shape 1, redundant declaration sites. `.claude/rules/recurring-defects.md`
 [^F321A]: Findings register, FND-320, in this document.
 [^F321C]: ADR-0107, the Python reference is generated from the compiled module, decision D3. `docs/adrs/draft/adr-0107-the-python-reference-is-generated-from-the-compiled-module.md`
 [^F321D]: Backlog item 0307, generate the type stub from the compiled module. `docs/backlog/proposed/0307-generate-the-type-stub-from-the-compiled-module.md`
@@ -9883,9 +9883,9 @@ index against the set of open items and never against what an item says.
 [^F313A]: The workspace manifest, the release profile. `Cargo.toml`
 [^F306B]: Findings register, FND-313, in this document.
 [^F311A]: Findings register, FND-304, in this document.
-[^F334A]: Project orientation, the Python example. `README.md`
-[^F334B]: Recurring defect shapes, shape 5. `.claude/rules/recurring-defects.md`
-[^F334C]: Product requirement record 0021, a developer can use the control plane without reading its source. `docs/product/accepted/prd-0021-a-developer-can-use-the-control-plane-without-reading-its-source.md`
+[^F319A]: Project orientation, the Python example. `README.md`
+[^F319B]: Recurring defect shapes, shape 5. `.claude/rules/recurring-defects.md`
+[^F319C]: Product requirement record 0021, a developer can use the control plane without reading its source. `docs/product/accepted/prd-0021-a-developer-can-use-the-control-plane-without-reading-its-source.md`
 
 ### FND-322 — The document a newcomer reads first sells a pyramid level that nothing writes
 
@@ -10022,14 +10022,14 @@ uv run python scripts/check_reference.py --import-only
 loses its first.[^F325C] The gap is the audience of the prose and not the
 absence of it: a doc comment written for a contributor to the core under-serves
 the Python developer that the product record names, and no check can see
-that.[^F325A] [^F334C] The check that the documentation job runs reports every
+that.[^F325A] [^F319C] The check that the documentation job runs reports every
 member with no prose, without failing, so the first half stays covered if a new
 member arrives with none.
 
 ### FND-331 — Three exception classes the package exports and documents, and nothing raises
 
 **Believed.** The compiled module declares nine exception classes and exports
-every one of them.[^F335C] The package re-exports all nine, and a test asserts
+every one of them.[^F320C] The package re-exports all nine, and a test asserts
 that each one is a subclass of the root class.[^F331B] Each carried a docstring
 that reads as a statement of when the engine raises it. A reader takes the list
 for the set of failures the engine reports.
@@ -10143,7 +10143,7 @@ documentation job now reports that every one of the fifty-nine summaries
 reached the site.
 
 **Follows.** This is one fact held in two places, with nothing that fails when
-the copies disagree.[^F335E] The module registration now sets the dotted path on
+the copies disagree.[^F320E] The module registration now sets the dotted path on
 each error class before it adds it, so one statement of the path reaches every
 member.
 
