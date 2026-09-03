@@ -23,7 +23,6 @@ writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
 **Next number: FND-288**
-**Next number: FND-288**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
