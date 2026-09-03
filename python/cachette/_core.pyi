@@ -255,6 +255,9 @@ class FrameReading(TypedDict):
     soldiers_painted: int
     soldiers_live: int
     sites_held: int
+    seats: int
+    seats_taken: int
+    panel_height: int
     units_short: int
     units_carrying: int
     carried_by_kind: tuple[int, int, int]

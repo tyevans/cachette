@@ -53,13 +53,20 @@ FACTION_COUNT = 4
 # The number of people each faction founds with.
 GROUP = 64
 
-# The height a picture of the whole panel needs.
+# The height a picture of the whole panel starts at.
 #
-# The panel holds every section, and a window a person opens is shorter than
-# that. The panel states that it was cut when it does not fit, so a short
-# picture is honest rather than wrong, but it is still less than was asked
-# for.
+# **This is a starting point, not the answer.** The panel grows with the
+# faction count, with the number of foundings, and with every section a count
+# switches on, so a constant that fits today cuts tomorrow. The picture asks
+# the engine how tall the panel needs to be and resizes to it.
 PICTURE_HEIGHT = 1400
+
+# How many times the picture may resize before it gives up.
+#
+# Resizing changes what the window paints, and a section a count switches on
+# adds lines, so one answer can move the next. Two passes settle it in
+# practice. The bound stops a panel that never settles from looping.
+RESIZES = 4
 
 # The engine steps once for each drawn frame.
 FRAMES_EACH_SECOND = 30
@@ -269,9 +276,26 @@ def _write_picture(demo: Demo, path: str, frames: int) -> int:
     """
     for _ in range(frames):
         reading = demo.advance(panel=True)
+
+    # Ask the panel how tall it needed to be, and draw again at that height.
+    # The loop ends when the picture is tall enough for the panel it drew.
+    for attempt in range(RESIZES):
+        needed = reading["panel_height"]
+        if needed <= demo.surface.height:
+            break
+        if attempt + 1 == RESIZES:
+            print(
+                f"the panel still needs {needed} pixels after {RESIZES} "
+                f"resizes, so the picture holds less than the whole panel"
+            )
+            break
+        demo.surface = Surface(demo.surface.width, needed)
+        reading = demo.advance(panel=True)
+
     demo.surface.write_ppm(path)
     print(
         f"wrote {path} at tick {reading['tick']}, "
+        f"{demo.surface.width} by {demo.surface.height}, "
         f"{reading['tiles_painted']} tiles and "
         f"{reading['soldiers_painted']} people painted"
     )
