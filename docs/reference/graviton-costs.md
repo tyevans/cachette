@@ -1681,8 +1681,7 @@ commit what changed. Do not edit a row to make a later run agree with it.
 [^DECL298]: Findings register, FND-301. `docs/FINDINGS.md`
 [^ADR71298]: ADR-0071, the bridge rebuild orders on one thread, decision D2. `docs/adrs/accepted/adr-0071-the-bridge-rebuild-orders-on-one-thread.md`
 [^RESID298]: Findings register, FND-303. `docs/FINDINGS.md`
-[^LAYOUT]: Findings register, FND-309. `docs/FINDINGS.md`
-[^LAYOUT]: Findings register, FND-308. `docs/FINDINGS.md`
+[^LAYOUT]: Findings register, FND-313. `docs/FINDINGS.md`
 [^ITEM301]: Backlog item 0301, narrow the sort guard to a repeated key. `docs/backlog/complete/0303-narrow-the-sort-guard-to-a-repeated-key.md`
 [^ADR105]: ADR-0105, a total order needs no repeated identifier, only no repeated key. `docs/adrs/draft/adr-0105-a-total-order-needs-no-repeated-key.md`
 
