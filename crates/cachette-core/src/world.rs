@@ -2312,6 +2312,30 @@ impl World {
         self.bridge.count_on_tile(&self.soldiers, address)
     }
 
+    /// Returns the number of live soldiers of one faction.
+    ///
+    /// **This is one read, not a pass over the population.** The arena
+    /// maintains the count where a slot becomes live and where it stops being
+    /// live, so a caller that asks how many people a faction has left never
+    /// reads a unit.[^1]
+    ///
+    /// A faction whose last unit ends reads zero here, and nothing else in
+    /// the engine says so.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0070, the head-up display reports what the drawing pass read, decision D1. `docs/adrs/accepted/adr-0070-the-head-up-display-reports-what-the-drawing-pass-read.md`
+    #[must_use]
+    pub fn population_of(&self, faction: FactionId) -> u32 {
+        self.soldiers.population_of(faction)
+    }
+
+    /// Returns the live soldier count of every faction, by faction number.
+    #[must_use]
+    pub const fn population_by_faction(&self) -> &[u32; FACTION_CEILING as usize] {
+        self.soldiers.population_by_faction()
+    }
+
     /// Rebuilds the unit-to-tile bridge from the soldier columns.
     ///
     /// The step calls this at the barrier. A caller that changes the

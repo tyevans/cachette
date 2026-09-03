@@ -9,8 +9,13 @@ wheel with no bundled native library, and it binds the system graphics through
 ctypes, so it adds no compiled dependency to a machine that installs this
 package.[^2]
 
-The engine steps once for each frame it draws, so the drawing rate and the
-tick rate are one number.[^3]
+The engine tick and the wall clock are separate. The window draws at its own
+rate, and a clock says how many ticks the world runs between two drawings. A
+paused world runs none and still draws.
+
+Every draw still follows the steps of that frame, on one thread, which is what
+the viewer record fixes.[^3] The number of steps in a frame belongs to the
+caller, and this module is the caller.[^4]
 
 References
 ----------
@@ -22,6 +27,8 @@ Decisions register, the window library of the Python demonstration.
 
 ADR-0067, the viewer reads the world and never writes to it, decision D4.
 ``docs/adrs/accepted/adr-0067-the-viewer-reads-the-world-and-never-writes-to-it.md``
+
+Findings register, FND-327. ``docs/FINDINGS.md``
 """
 
 from __future__ import annotations
@@ -37,6 +44,8 @@ if TYPE_CHECKING:
     # in the stub beside the compiled module and not in the module itself, so
     # importing them at run time would fail.
     from cachette._core import FoundingReport, FrameReading
+from cachette.demo.clock import SPEEDS, Clock
+from cachette.demo.settings import Settings
 from cachette.demo.surface import Surface
 
 # The size of the window in pixels.
@@ -93,7 +102,17 @@ class Demo:
     frame.
     """
 
-    __slots__ = ("camera", "reference", "surface", "threads", "world")
+    __slots__ = (
+        "camera",
+        "clock",
+        "panels",
+        "pointer",
+        "reference",
+        "settings",
+        "surface",
+        "threads",
+        "world",
+    )
 
     def __init__(
         self,
@@ -111,6 +130,17 @@ class Demo:
         # and the answer lives for one frame.
         self.reference = False
         self.camera = Camera()
+        # The engine tick and the wall clock are separate. The window draws at
+        # its own rate and this says how far the world moves between two
+        # drawings.
+        self.clock = Clock()
+        self.settings = Settings()
+        # The panels of the deck the frame draws, by name. The engine holds
+        # the list of names, so this cannot name one that does not exist.
+        self.panels: list[str] = []
+        # The tile the watcher pointed at, in axial coordinates. The engine
+        # has no cursor, so the control plane supplies one.
+        self.pointer: tuple[int, int] | None = None
 
     def found(self) -> list[FoundingReport]:
         """Found one run for every faction, and give back what each got.
@@ -170,13 +200,44 @@ class Demo:
             f"became {what}{earned}, {reading['characters']} in the world"
         )
 
+    def toggle_panel(self, name: str) -> None:
+        """Add a panel of the deck to the frame, or take it off.
+
+        The engine names the panels it can draw, so a name that no panel
+        carries is refused here rather than at the drawing.
+        """
+        if name not in World.panel_names():
+            message = f"no panel is called {name!r}"
+            raise ValueError(message)
+        if name in self.panels:
+            self.panels.remove(name)
+        else:
+            self.panels.append(name)
+
+    def point_at(self, x: float, y: float) -> None:
+        """Name the tile under a place in the window.
+
+        The engine answers which tile a pixel covers. This names one address
+        and reads no tile.
+        """
+        self.pointer = self.camera.tile_at(x, y)
+
     def advance(self, panel: bool = False) -> FrameReading:
-        """Step the engine once and fill the surface with one frame.
+        """Step the engine as far as the clock says, then draw one frame.
+
+        **The engine tick and the wall clock are separate.** The clock says
+        how many ticks this frame owes. A paused world owes none and still
+        draws, so the camera still moves and the panel still reads.
 
         Returns what the drawing pass read. The caller reports those numbers
         rather than starting a second pass to find them.
+
+        The reading names what the last step logged. A frame that runs several
+        ticks therefore reports the last of them, and the logs of the earlier
+        ticks are gone. A watcher who wants every tick sets the speed to one.
         """
-        self.world.step(self.threads)
+        for _ in range(self.clock.ticks_due()):
+            self.world.step(self.threads)
         reading = self.world.draw(
             self.camera,
             self.surface.width,
@@ -184,6 +245,8 @@ class Demo:
             self.surface.pixels,
             reference=self.reference,
             panel=panel,
+            panels=self.panels or None,
+            pointer=self.pointer,
         )
         self.announce(reading)
         return reading
@@ -313,6 +376,12 @@ def main(argv: list[str] | None = None) -> int:
     )
     print("arrow keys or WASD scroll, minus and equals zoom")
     print("hold tab to name the colours")
+    print("space pauses, full stop steps one tick, brackets change the speed")
+    print(f"the speeds are {', '.join(f'x{speed}' for speed in SPEEDS)}")
+    print("F10 opens the settings, F11 fullscreen, F12 window size")
+    keys = ", ".join(f"F{at + 1} {name}" for at, name in enumerate(World.panel_names()))
+    print(f"the panels are {keys}")
+    print("click a tile to point at it")
     print("close the window or press escape to stop")
 
     return _run_window(demo, arguments.frames)
@@ -368,6 +437,62 @@ def _write_picture(demo: Demo, path: str, frames: int) -> int:
     return 0
 
 
+def _toggle_panel_key(demo: Demo, symbol: int, key: object) -> None:
+    """Put a panel of the deck on the frame, or take it off.
+
+    The function keys F1 upward name the panels in the order the engine
+    registers them. The engine owns that order, so a panel that joins the deck
+    gets a key with no edit here.
+    """
+    names = World.panel_names()
+    first = getattr(key, "F1", 0)
+    at = symbol - first
+    if 0 <= at < len(names) and at < 9:
+        demo.toggle_panel(names[at])
+        shown = ", ".join(demo.panels) if demo.panels else "none"
+        print(f"panels: {shown}")
+
+
+def _apply_settings(demo: Demo, window: object) -> None:
+    """Give the window the video settings, and resize the pixels to match.
+
+    The surface is the memory the engine fills. A window of a new size needs a
+    surface of that size, so the two are changed together.
+    """
+    refused = demo.settings.apply_to(window)
+    if refused:
+        print(f"the window refused: {', '.join(refused)}")
+    width, height = demo.settings.video.size
+    if (width, height) != (demo.surface.width, demo.surface.height):
+        demo.surface = Surface(width, height)
+        demo.camera.clamp(demo.world, width, height)
+
+
+def _show_settings(demo: Demo, window: object) -> None:
+    """Write the settings menu, or say that it closed.
+
+    **The menu is written to the console and not over the map.** The engine
+    draws the frame, and it draws what it reads from the world. It takes no
+    text from the caller, so a menu over the map would need a second drawing
+    path and two drawing paths disagree about the world.[^1]
+
+    References
+    ----------
+    ADR-0094, the caller owns the camera and the pixels, decision D5.
+    ``docs/adrs/draft/adr-0094-the-caller-owns-the-camera-and-the-pixels.md``
+    """
+    if not demo.settings.open:
+        print("settings closed")
+        return
+    print("settings")
+    for name, rows in demo.settings.sections():
+        print(f"  {name}")
+        for label, value in rows:
+            print(f"    {label}: {value}")
+    print("  F11 fullscreen, F12 window size")
+    _apply_settings(demo, window)
+
+
 def _run_window(demo: Demo, frame_limit: int) -> int:
     """Drives the window until it closes.
 
@@ -414,14 +539,55 @@ def _run_window(demo: Demo, frame_limit: int) -> int:
         window.clear()
         image.blit(0, 0)
 
+    def on_mouse_press(x: int, y: int, _button: int, _modifiers: int) -> None:
+        # The window numbers its rows from the bottom and the engine numbers
+        # them from the top, so the height turns one into the other.
+        demo.point_at(float(x), float(demo.surface.height - y))
+        q, r = demo.pointer if demo.pointer is not None else (0, 0)
+        print(f"pointing at tile ({q}, {r})")
+
     def on_key_press(symbol: int, _modifiers: int) -> None:
-        if symbol == pyglet.window.key.ESCAPE:
+        key = pyglet.window.key
+        if symbol == key.ESCAPE:
             pyglet.app.exit()
+            return
+        if symbol == key.SPACE:
+            demo.clock.toggle()
+            print(f"the world is {demo.clock.says()}")
+            return
+        if symbol == key.PERIOD:
+            demo.clock.step_once()
+            return
+        if symbol == key.BRACKETLEFT:
+            demo.clock.slower()
+            print(f"speed {demo.clock.says()}")
+            return
+        if symbol == key.BRACKETRIGHT:
+            demo.clock.faster()
+            print(f"speed {demo.clock.says()}")
+            return
+        if symbol == key.F10:
+            demo.settings.toggle()
+            _show_settings(demo, window)
+            return
+        if symbol == key.F11:
+            demo.settings.video.fullscreen = not demo.settings.video.fullscreen
+            _apply_settings(demo, window)
+            return
+        if symbol == key.F12:
+            demo.settings.video.next_size()
+            _apply_settings(demo, window)
+            return
+        _toggle_panel_key(demo, symbol, key)
 
     # The handlers are registered by name rather than by decorator. The
     # library ships no type information, so a decorator from it would make
     # every function it wraps untyped.
-    window.push_handlers(on_draw=on_draw, on_key_press=on_key_press)
+    window.push_handlers(
+        on_draw=on_draw,
+        on_key_press=on_key_press,
+        on_mouse_press=on_mouse_press,
+    )
 
     pyglet.clock.schedule_interval(frame, 1.0 / FRAMES_EACH_SECOND)
     pyglet.app.run()

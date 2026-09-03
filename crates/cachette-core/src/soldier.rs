@@ -390,6 +390,22 @@ pub struct SoldierArena {
     free: VecDeque<u32>,
     /// The number of live soldiers.
     live_count: u32,
+    /// The number of live soldiers of each faction.
+    ///
+    /// **The arena maintains this where a slot becomes live and where it
+    /// stops being live.** Counting it instead would read every live unit,
+    /// which is a pass over the population, and the panel that wants the
+    /// number may not start one.[^2]
+    ///
+    /// The count is derived from the live column and the faction column, so
+    /// it is one fact in two places. The arena check recounts and compares,
+    /// and it fails when the copies disagree.[^3]
+    ///
+    /// # References
+    ///
+    /// [^2]: ADR-0070, the head-up display reports what the drawing pass read, decision D1. `docs/adrs/accepted/adr-0070-the-head-up-display-reports-what-the-drawing-pass-read.md`
+    /// [^3]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`
+    by_faction: [u32; FACTION_CEILING as usize],
     /// The number of retired slots.
     retired_count: u32,
     /// The number of structural changes that the arena has taken.
@@ -449,6 +465,7 @@ impl Clone for SoldierArena {
             deed_threshold: self.deed_threshold,
             free,
             live_count: self.live_count,
+            by_faction: self.by_faction,
             retired_count: self.retired_count,
             revision: self.revision,
             identity: self.identity,
@@ -500,6 +517,7 @@ impl SoldierArena {
             // reallocate inside the step.
             free: VecDeque::with_capacity(slots),
             live_count: 0,
+            by_faction: [0; FACTION_CEILING as usize],
             retired_count: 0,
             revision: 0,
             identity: next_arena_identity(),
@@ -558,6 +576,32 @@ impl SoldierArena {
             .get(slot as usize)
             .copied()
             .unwrap_or(NO_GENERATION)
+    }
+
+    /// Returns the number of live soldiers of one faction.
+    ///
+    /// **This is one read, not a pass.** The arena maintains the count where
+    /// a slot becomes live and where it stops being live, so a caller that
+    /// wants the population of a faction never reads the population.[^1]
+    ///
+    /// Returns zero for a faction at or above the ceiling, because no such
+    /// faction can hold a soldier.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0070, the head-up display reports what the drawing pass read, decision D1. `docs/adrs/accepted/adr-0070-the-head-up-display-reports-what-the-drawing-pass-read.md`
+    #[must_use]
+    pub fn population_of(&self, faction: FactionId) -> u32 {
+        self.by_faction
+            .get(faction.0 as usize)
+            .copied()
+            .unwrap_or(0)
+    }
+
+    /// Returns the live soldier count of every faction, by faction number.
+    #[must_use]
+    pub const fn population_by_faction(&self) -> &[u32; FACTION_CEILING as usize] {
+        &self.by_faction
     }
 
     /// Returns the number of slots that the arena has retired.
@@ -628,6 +672,9 @@ impl SoldierArena {
         self.live[index] = 1;
         self.tiles[index] = tile;
         self.factions[index] = faction;
+        // The faction is below the ceiling, because the guard above refused
+        // every other value, so the index is inside the array.
+        self.by_faction[faction.0 as usize] += 1;
         // A reused slot starts empty because the despawn emptied it, and the
         // arena invariant fails when a dead slot carries anything. A second
         // reset here would be one fact in two places, and it would read back
@@ -708,6 +755,10 @@ impl SoldierArena {
             return false;
         }
         self.live[index] = 0;
+        // The faction column keeps its value, so the count falls against the
+        // faction the slot held. The spawn refused a faction above the
+        // ceiling, so the index is inside the array.
+        self.by_faction[self.factions[index].0 as usize] -= 1;
         // The load leaves with the soldier. The caller reads it before the
         // despawn and records where it went, because what leaves a tile must
         // arrive somewhere exactly.[^3]
@@ -1297,6 +1348,23 @@ impl SoldierArena {
             if self.eligible[index] != u8::from(earned) {
                 return false;
             }
+        }
+        // The per-faction population is derived from the live column and the
+        // faction column, and the arena maintains it rather than counting it.
+        // That is one fact in two places, so this recounts and compares. It is
+        // the only thing that fails when the copies disagree.[^4]
+        let mut counted = [0u32; FACTION_CEILING as usize];
+        for index in 0..slots {
+            if self.live[index] == 1 {
+                let faction = self.factions[index].0 as usize;
+                if faction >= counted.len() {
+                    return false;
+                }
+                counted[faction] += 1;
+            }
+        }
+        if counted != self.by_faction {
+            return false;
         }
         // A dead slot carries no deeds and no character. A stale link there
         // would name a character for a unit that no longer exists.

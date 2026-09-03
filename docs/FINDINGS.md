@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-326**
+**Next number: FND-329**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -31,6 +31,31 @@ collisions in one session came from the gap between the two, and a finding holds
 the case.[^ALLOC2]
 
 ## A. Corrections to stated rules
+
+### FND-327 — The demonstration drew and stepped at one rate, and a record said so as if it were a property of the viewer
+
+**Believed.** The viewer runs after the step, on the stepping thread, so the
+drawing rate and the tick rate are one number.[^F218B] The Python
+demonstration says the same in its own docstring.
+
+**True.** The first half is a property of the viewer and it still holds. Every
+draw follows the steps of that frame, on one thread. The second half described
+the loop that existed when the record was written. It is not a property of the
+viewer, because the caller owns the loop and decides how many steps a frame
+runs.[^F322B]
+
+**Evidence.** The demonstration now steps the engine as many times each frame
+as a clock says, and it draws once. A paused world runs no step and still
+draws, so the camera moves and the panel reads while the tick stands still.
+
+**Follows.** A watcher can stop the world, run it at four speeds, and ask for
+exactly one tick. That last one matters because the engine keeps its logs for
+one tick, so a promotion or a rationing was readable for one thirtieth of a
+second and no longer.
+
+**The record is not edited here.** ADR-0067 is accepted, and the sentence sits
+in prose that describes the viewer correctly. A worker who supersedes it should
+say that the caller owns the number of steps in a frame.
 
 ### FND-306 — A check that prints its failure while the commit lands looks exactly like a check that never ran
 
@@ -576,6 +601,58 @@ this package is documented owns both.
 
 
 ## C. Defects found in specified rules
+
+### FND-326 — The panel cut one line kind of eight, and the other seven stayed inside it by luck
+
+**Believed.** The panel cuts a value that does not fit, so that text can never
+be written over the panel edge.[^F321A]
+
+**True.** One line kind cut its value. The title, the note, the heading, the
+legend row, the ground row and the founding row all wrote from the left margin
+with no right bound. The length of the text was the only thing holding them
+inside the rectangle.
+
+**Evidence.** One note of 32 characters had 30 glyphs of room, and the stored
+layout picture shows its ink two glyphs into the padding. The longest note that
+fits is 30 characters, and every note in the panel was under that bound by
+accident. No author had anything to tell them what the bound was, because the
+bound follows from the panel width and the glyph size and neither was written
+down where a writer would look.
+
+**Follows.** The cut now lives in one writer that takes a right edge, and every
+line kind of both the head-up display and the deck writes through it. An author
+cannot reach the map, whatever the text says. The bound is derived from the
+width and the glyph table, so nobody counts characters and nobody counts them
+wrongly.
+
+**A cut is still a defect.** A cut line states something other than what it was
+given, in silence. The check that reports one now covers every line kind, and
+one note was rewritten rather than left to be cut.
+
+### FND-328 — Nothing in the engine could say how many units a faction had left
+
+**Believed.** The panel reports the units of each faction, so a watcher sees
+how the factions stand.
+
+**True.** Every unit count the panel stated was a count of the window. The
+drawing pass counts what it painted, by colour, over the tiles the camera
+reached. No value anywhere in the engine held the population of a faction in
+the world, and nothing could compute one without reading every live unit.
+
+**Evidence.** A search of the world interface found `holding_of`, which gives
+the tiles a faction holds, and no counterpart for its people. The soldier arena
+held one total live count and no split by faction.
+
+**Follows.** A faction whose last unit starves vanishes from the picture with no
+number falling to zero anywhere. That is the one thing a watcher most wants to
+see, and the demonstration could not show it.
+
+**A count is not the fix; a maintained count is.** Counting the units of a
+faction reads every live unit, and at the target scale that is one million reads
+for one row of one panel, every frame, which the panel record forbids.[^F323A]
+The arena now maintains the count at the two sites that change a slot's live
+byte. That is one fact in two places, so the arena check recounts and compares,
+and it fails when the copies disagree.[^13]
 
 ### FND-237 — The record check reads no source file when it runs in a worktree
 
@@ -9151,6 +9228,10 @@ commodity, and the ration a unit receives is not that account.
 
 ## References
 
+[^F321A]: The head-up display, the row drawing. `crates/cachette-view/src/hud.rs`
+[^F218B]: ADR-0067, the viewer reads the world and never writes to it, decision D4. `docs/adrs/accepted/adr-0067-the-viewer-reads-the-world-and-never-writes-to-it.md`
+[^F322B]: ADR-0094, the caller owns the camera and the pixels, decision D1. `docs/adrs/draft/adr-0094-the-caller-owns-the-camera-and-the-pixels.md`
+[^F323A]: ADR-0070, the head-up display reports what the drawing pass read, decision D1. `docs/adrs/accepted/adr-0070-the-head-up-display-reports-what-the-drawing-pass-read.md`
 [^F315B]: The refused step test. `crates/cachette-core/tests/a_refused_step_does_not_freeze.rs`
 [^F318A]: ADR-0063, a need is a rate with a threshold, and crossing it is a fact, decision D1 and the alternatives rejected. `docs/adrs/accepted/adr-0063-a-need-is-a-rate-with-a-threshold-and-crossing-it-is-a-fact.md`
 [^F318B]: ADR-0106, a cohort serves whole rations to a keyed subset, never an equal share to everybody, decision D2. `docs/adrs/draft/adr-0106-a-cohort-serves-whole-rations-to-a-keyed-subset.md`
@@ -9496,7 +9577,6 @@ fix.[^F321C] A backlog item holds the removal and the check.[^F321D]
 [^F217E]: ADR-0017, the world is a rhombus, so a tile index is raw axial, decision D1. `docs/adrs/accepted/adr-0017-the-world-is-a-rhombus-so-a-tile-index-is-raw-axial.md`
 [^F217F]: ADR-0018, the unit-to-tile bridge is derived, and it rebuilds at the barrier. `docs/adrs/accepted/adr-0018-the-unit-to-tile-bridge-is-derived-and-rebuilds-at-the-barrier.md`
 [^F217G]: Review 0223, the selector range record. `docs/reviews/0223-the-selector-range-record.md`
-[^F218B]: ADR-0067, the viewer reads the world and never writes to it, decision D4. `docs/adrs/accepted/adr-0067-the-viewer-reads-the-world-and-never-writes-to-it.md`
 [^F218D]: ADR Registry, repairing a citation is not an amendment. `docs/adrs/REGISTRY.md`
 [^F218E]: Definition of Done, section 4. `.claude/rules/definition-of-done.md`
 [^F218F]: Findings register, FND-192, in this document.

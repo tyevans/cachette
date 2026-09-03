@@ -42,6 +42,7 @@ pub mod glass;
 pub mod hud;
 pub mod metrics;
 pub mod paint;
+pub mod panel;
 pub mod picture;
 pub mod text;
 
@@ -106,6 +107,22 @@ pub fn draw_frame(
     match overlay {
         Overlay::Glass { reference } => glass::draw(&readout, canvas, reference),
         Overlay::Panel => hud::draw(&readout, canvas),
+        Overlay::Deck {
+            reference,
+            panels,
+            pointer,
+        } => {
+            glass::draw(&readout, canvas, reference);
+            let view = panel::View {
+                world,
+                camera,
+                frame_width: canvas.width(),
+                frame_height: canvas.height(),
+                focus: canvas.focus(),
+                pointer,
+            };
+            panel::draw_deck(&view, panels, canvas);
+        }
     }
     Ok(readout)
 }

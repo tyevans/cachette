@@ -726,14 +726,23 @@ impl<'a> Canvas<'a> {
     /// beyond the draw and grows with the window rather than with the
     /// population.[^1]
     ///
-    /// The engine holds no such census, and the viewer must not build one by
-    /// reading every soldier. A count of the whole world is a pass over the
-    /// whole world.[^2]
+    /// **The viewer must not build a census by reading every soldier.** A
+    /// count of the whole world is a pass over the whole world, and a panel
+    /// starts no such pass.[^2]
+    ///
+    /// The engine does answer two other questions, and neither derives from
+    /// this count. It counts one bounded window of addresses, whether or not
+    /// anything drew them.[^3] It also holds a running population for each
+    /// faction, which it maintains where a unit is created and where a unit
+    /// ends, so that read costs one load.[^4] Use those rather than counting
+    /// here.
     ///
     /// # References
     ///
     /// [^1]: PRD-0002, a developer watches the world run. `docs/product/shipped/prd-0002-a-developer-watches-the-world-run.md`
     /// [^2]: ADR-0070, the head-up display reports what the drawing pass read, decision D1. `docs/adrs/accepted/adr-0070-the-head-up-display-reports-what-the-drawing-pass-read.md`
+    /// [^3]: The window census. `crates/cachette-core/src/census.rs`
+    /// [^4]: The per-faction population of the soldier arena. `crates/cachette-core/src/soldier.rs`
     #[must_use]
     pub const fn painted_by_faction(&self) -> &[u32; COLOURED_FACTIONS] {
         &self.painted_by_faction
