@@ -388,10 +388,49 @@ impl Focus {
     }
 }
 
-pub struct Canvas {
+/// Where the pixels of a canvas live.
+///
+/// A canvas either owns its pixels or writes into memory a caller lent it.
+/// The drawing does not know which, and no drawing routine may learn: the
+/// difference is the caller's, and the picture is the same either way.
+///
+/// **The borrowed form is what makes a frame a command.** A caller supplies
+/// the memory, the engine writes one frame into it and returns, and the
+/// engine keeps no reference afterwards. The borrow checker holds that,
+/// rather than a comment.[^1]
+///
+/// # References
+///
+/// [^1]: ADR-0094, the caller owns the camera and the pixels, decision D2. `docs/adrs/draft/adr-0094-the-caller-owns-the-camera-and-the-pixels.md`
+enum Pixels<'a> {
+    /// The canvas allocated the pixels and drops them with itself.
+    Owned(Vec<u32>),
+    /// The pixels belong to a caller and outlive the canvas.
+    Borrowed(&'a mut [u32]),
+}
+
+impl Pixels<'_> {
+    /// Returns the pixels to read.
+    fn get(&self) -> &[u32] {
+        match self {
+            Self::Owned(owned) => owned,
+            Self::Borrowed(borrowed) => borrowed,
+        }
+    }
+
+    /// Returns the pixels to write.
+    fn get_mut(&mut self) -> &mut [u32] {
+        match self {
+            Self::Owned(owned) => owned,
+            Self::Borrowed(borrowed) => borrowed,
+        }
+    }
+}
+
+pub struct Canvas<'a> {
     width: usize,
     height: usize,
-    pixels: Vec<u32>,
+    pixels: Pixels<'a>,
     tiles_painted: u32,
     soldiers_painted: u32,
     blocks_read: u32,
@@ -409,7 +448,7 @@ pub struct Canvas {
     focus: Option<Focus>,
 }
 
-impl Canvas {
+impl<'a> Canvas<'a> {
     /// Builds a canvas of the given size.
     ///
     /// # Panics
@@ -422,7 +461,59 @@ impl Canvas {
         Self {
             width,
             height,
-            pixels: vec![BACKGROUND; width * height],
+            pixels: Pixels::Owned(vec![BACKGROUND; width * height]),
+            tiles_painted: 0,
+            soldiers_painted: 0,
+            blocks_read: 0,
+            blocks_skipped: 0,
+            painted_by_faction: [0; COLOURED_FACTIONS],
+            painted_by_kind: [0; KIND_COUNT],
+            holder_reads: 0,
+            ground_reads: 0,
+            tiles_held: 0,
+            crowd_worst: 0,
+            tiles_at_capacity: 0,
+            condition_reads: 0,
+            units_short: 0,
+            foundings_marked: 0,
+            focus: None,
+        }
+    }
+
+    /// Builds a canvas that draws into memory a caller lent it.
+    ///
+    /// The canvas writes the pixels and never frees them. The caller owns the
+    /// memory before the call and owns it afterwards, and the borrow checker
+    /// stops the canvas outliving it.[^1]
+    ///
+    /// The counts start at zero, in the same way they do for an owned canvas.
+    /// The pixels are not cleared here, because the drawing pass clears them.
+    ///
+    /// **The length is checked by the frame command, not here.** A caller
+    /// reaches this through that command, which refuses a buffer of the wrong
+    /// size and names the size it needed.[^1]
+    ///
+    /// # Panics
+    ///
+    /// Panics when either side is zero, or when the slice does not hold one
+    /// pixel for each pixel of the canvas. Both are refused before this point
+    /// on every path a caller can take.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0094, the caller owns the camera and the pixels, decision D2. `docs/adrs/draft/adr-0094-the-caller-owns-the-camera-and-the-pixels.md`
+    #[must_use]
+    pub fn borrowing(pixels: &'a mut [u32], width: usize, height: usize) -> Self {
+        assert!(width > 0 && height > 0, "a canvas needs a positive size");
+        assert_eq!(
+            pixels.len(),
+            width * height,
+            "a borrowed canvas needs one pixel for each pixel of the frame"
+        );
+        Self {
+            pixels: Pixels::Borrowed(pixels),
+            width,
+            height,
             tiles_painted: 0,
             soldiers_painted: 0,
             blocks_read: 0,
@@ -444,7 +535,7 @@ impl Canvas {
     /// Returns the pixels, for the window to show.
     #[must_use]
     pub fn pixels(&self) -> &[u32] {
-        &self.pixels
+        self.pixels.get()
     }
 
     /// Returns the width in pixels.
@@ -750,14 +841,14 @@ impl Canvas {
         if x >= self.width || y >= self.height {
             return None;
         }
-        Some(self.pixels[y * self.width + x])
+        Some(self.pixels.get()[y * self.width + x])
     }
 
     /// Fills the whole canvas with the background.
     ///
     /// The counts reset here, so they always describe one draw.
     pub fn clear(&mut self) {
-        self.pixels.fill(BACKGROUND);
+        self.pixels.get_mut().fill(BACKGROUND);
         self.tiles_painted = 0;
         self.soldiers_painted = 0;
         self.blocks_read = 0;
@@ -787,7 +878,7 @@ impl Canvas {
         if x >= self.width || y >= self.height {
             return;
         }
-        self.pixels[y * self.width + x] = colour;
+        self.pixels.get_mut()[y * self.width + x] = colour;
     }
 
     /// Fills a rectangle.
@@ -831,6 +922,62 @@ impl Canvas {
 /// # References
 ///
 /// [^1]: ADR-0067, the viewer reads the world and never writes to it, decision D2. `docs/adrs/accepted/adr-0067-the-viewer-reads-the-world-and-never-writes-to-it.md`
+/// The size of the surface a camera aims at.
+///
+/// **A camera verb needs the width and the height of the picture, and nothing
+/// else.** It reads no pixel. Taking the size rather than the surface lets a
+/// caller that holds no surface still steer: the control plane owns a camera
+/// and a window size, asks for a frame once, and never allocates a canvas of
+/// its own.[^1]
+///
+/// # References
+///
+/// [^1]: ADR-0094, the caller owns the camera and the pixels, decision D3. `docs/adrs/draft/adr-0094-the-caller-owns-the-camera-and-the-pixels.md`
+pub trait Extent {
+    /// Returns the width in pixels.
+    fn width(&self) -> usize;
+    /// Returns the height in pixels.
+    fn height(&self) -> usize;
+}
+
+impl Extent for Canvas<'_> {
+    fn width(&self) -> usize {
+        self.width
+    }
+
+    fn height(&self) -> usize {
+        self.height
+    }
+}
+
+/// A picture size with no pixels behind it.
+///
+/// A caller that steers a camera before it draws needs the size and not the
+/// memory. This is that size.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct FrameSize {
+    width: usize,
+    height: usize,
+}
+
+impl FrameSize {
+    /// Builds a size.
+    #[must_use]
+    pub const fn new(width: usize, height: usize) -> Self {
+        Self { width, height }
+    }
+}
+
+impl Extent for FrameSize {
+    fn width(&self) -> usize {
+        self.width
+    }
+
+    fn height(&self) -> usize {
+        self.height
+    }
+}
+
 #[derive(Clone, Copy, Debug)]
 pub struct Camera {
     /// The width of one tile in pixels.
@@ -849,7 +996,7 @@ impl Camera {
     /// The world is a parallelogram, so the drawn width is the tile count
     /// across plus the shear that the rows add.
     #[must_use]
-    pub fn fitting(world: &World, canvas: &Canvas) -> Self {
+    pub fn fitting(world: &World, canvas: &impl Extent) -> Self {
         let (spans_across, spans_down) = drawn_extent(world);
         let by_width = canvas.width() as f32 / spans_across;
         let by_height = canvas.height() as f32 / spans_down;
@@ -905,7 +1052,7 @@ impl Camera {
     ///
     /// [^1]: Findings register, FND-209. `docs/FINDINGS.md`
     #[must_use]
-    pub fn nudged(self, across: f32, down: f32, canvas: &Canvas) -> Self {
+    pub fn nudged(self, across: f32, down: f32, canvas: &impl Extent) -> Self {
         let shorter = canvas.width().min(canvas.height()) as f32;
         let step = shorter * PAN_SHARE;
         self.panned(across * step, down * step)
@@ -923,13 +1070,13 @@ impl Camera {
 
     /// Returns the camera one step closer to the world.
     #[must_use]
-    pub fn zoomed_in(self, canvas: &Canvas) -> Self {
+    pub fn zoomed_in(self, canvas: &impl Extent) -> Self {
         self.zoomed(ZOOM_STEP, canvas)
     }
 
     /// Returns the camera one step further from the world.
     #[must_use]
-    pub fn zoomed_out(self, canvas: &Canvas) -> Self {
+    pub fn zoomed_out(self, canvas: &impl Extent) -> Self {
         self.zoomed(1.0 / ZOOM_STEP, canvas)
     }
 
@@ -977,7 +1124,7 @@ impl Camera {
     ///
     /// [^1]: ADR-0067, the viewer reads the world and never writes to it, decision D2. `docs/adrs/accepted/adr-0067-the-viewer-reads-the-world-and-never-writes-to-it.md`
     #[must_use]
-    pub fn looking_at(self, address: Axial, canvas: &Canvas) -> Self {
+    pub fn looking_at(self, address: Axial, canvas: &impl Extent) -> Self {
         let (x, y) = self.centre_of(address);
         self.panned(
             x - canvas.width() as f32 * 0.5,
@@ -990,7 +1137,7 @@ impl Camera {
     /// The tile under the middle of the window stays under the middle of the
     /// window, so a zoom does not throw away what the person was looking at.
     #[must_use]
-    pub fn zoomed(self, factor: f32, canvas: &Canvas) -> Self {
+    pub fn zoomed(self, factor: f32, canvas: &impl Extent) -> Self {
         let size = (self.tile_width * factor).clamp(MIN_TILE, MAX_TILE);
         let middle_x = canvas.width() as f32 * 0.5;
         let middle_y = canvas.height() as f32 * 0.5;
@@ -1018,7 +1165,7 @@ impl Camera {
     /// first, and the horizontal bound is read from the rows that survive
     /// it.
     #[must_use]
-    pub fn clamped(self, world: &World, canvas: &Canvas) -> Self {
+    pub fn clamped(self, world: &World, canvas: &impl Extent) -> Self {
         let grid = world.grid();
         let across = (grid.width().max(1) - 1) as f32;
         let down = (grid.height().max(1) - 1) as f32;
@@ -1054,7 +1201,7 @@ impl Camera {
     /// The range is a half-open pair. It is derived from the camera and the
     /// canvas, so its length follows the window and not the world.
     #[must_use]
-    pub fn visible_rows(self, world: &World, canvas: &Canvas) -> (u32, u32) {
+    pub fn visible_rows(self, world: &World, canvas: &impl Extent) -> (u32, u32) {
         let height = world.grid().height();
         let scale = positive(self.tile_height);
         let first = ((-self.origin_y) / scale).floor() - 1.0;
@@ -1067,7 +1214,7 @@ impl Camera {
     /// Each row starts half a tile further right than the row above it, so
     /// the column range depends on the row.
     #[must_use]
-    pub fn visible_columns(self, row: u32, world: &World, canvas: &Canvas) -> (u32, u32) {
+    pub fn visible_columns(self, row: u32, world: &World, canvas: &impl Extent) -> (u32, u32) {
         let width = world.grid().width();
         let scale = positive(self.tile_width);
         let start = self.origin_x + (row as f32 / 2.0) * self.tile_width;

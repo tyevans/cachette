@@ -82,7 +82,7 @@ fn world() -> World {
 }
 
 /// Builds a canvas of the size these tests use.
-fn canvas() -> Canvas {
+fn canvas() -> Canvas<'static> {
     Canvas::new(WINDOW.0, WINDOW.1)
 }
 

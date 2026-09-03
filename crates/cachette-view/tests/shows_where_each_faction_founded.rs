@@ -88,7 +88,7 @@ fn measurements() -> Metrics {
 }
 
 /// Draws the whole frame over a window that covers the world.
-fn frame(world: &World, outcomes: &[FoundingOutcome]) -> (Canvas, Camera) {
+fn frame(world: &World, outcomes: &[FoundingOutcome]) -> (Canvas<'static>, Camera) {
     let mut canvas = Canvas::new(760, 760);
     let camera = Camera::fitting(world, &canvas);
     draw_frame(
@@ -116,7 +116,11 @@ fn frame(world: &World, outcomes: &[FoundingOutcome]) -> (Canvas, Camera) {
 /// # References
 ///
 /// [^1]: Findings register, FND-093. `docs/FINDINGS.md`
-fn frame_at(world: &World, outcomes: &[FoundingOutcome], place: Axial) -> (Canvas, Camera) {
+fn frame_at(
+    world: &World,
+    outcomes: &[FoundingOutcome],
+    place: Axial,
+) -> (Canvas<'static>, Camera) {
     let mut canvas = Canvas::new(760, 900);
     let camera = Camera::at_tile_size(20.0).looking_at(place, &canvas);
     draw_frame(

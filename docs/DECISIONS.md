@@ -23,7 +23,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^ALLOC]
 
-**Next number: DEC-107**
+**Next number: DEC-108**
 
 ## Open
 
@@ -1137,6 +1137,38 @@ figure is 168 MB. The storage argument for vectors is stronger than the report
 concluded, and it called that argument its weakest.
 
 ## Closed
+
+### DEC-107 — Which window library does the Python demonstration use?
+
+**Closed. pyglet. The engineer who moved the demonstration to the control plane
+closed it.**
+
+**The question was raised because pyglet was thought to be dead.** It is not.
+The project published version 2.1.16 on 22 August 2026, eleven days before this
+was decided.[^DEC107A] The library that looks unmaintained is the original
+pygame, whose last release is from September 2024. Its community fork,
+pygame-ce, is current.[^DEC107B]
+
+**The choice is small, because the presenter draws nothing.** A presenter owns
+a buffer and a camera, asks for a frame, and puts the result on a screen.[^DEC107C]
+Every pixel comes from one renderer in the core, so swapping the window library
+changes how a frame reaches a screen and changes no picture. This is why the
+question needs no record: a future contributor could reasonably choose
+otherwise, but choosing otherwise later costs about as much as choosing it now,
+so the second condition of the scope test fails.[^SCOPE1]
+
+**pyglet wins on the size of the dependency.** It ships as a pure Python wheel
+and binds the system graphics through ctypes, so it adds no compiled artefact
+to a machine that installs the package. pygame-ce ships a bundled native
+library. Both present a raw buffer well, and both were maintained this month.
+The demonstration needs a window, a keyboard and a way to upload an array of
+pixels, and both give all three.
+
+**The dependency is optional, and that is the part that matters.** The package
+fills a frame into memory with no window library and no display connection at
+all.[^DEC107E] A caller that wants pixels rather than a screen installs neither
+pyglet nor a display server. If pyglet does die, the loss is one module.
+
 
 ### DEC-097 — What does the project do with an accepted record whose imported fact a register made false?
 
@@ -2585,3 +2617,7 @@ a failed founding is correct.[^PRD12]
 [^DEC96D]: ADR-0064, a unit chooses by scoring a small fixed option set, decision D1. `docs/adrs/accepted/adr-0064-a-unit-chooses-by-scoring-a-small-fixed-option-set.md`
 [^DEC97B]: Target platform costs. `docs/reference/graviton-costs.md`
 [^SWEEP]: Recurring Defect Shapes, shape 2. `.claude/rules/recurring-defects.md`
+[^DEC107A]: The pyglet package index entry, read 2 September 2026. https://pypi.org/pypi/pyglet/json
+[^DEC107B]: The pygame and pygame-ce package index entries, read 2 September 2026. https://pypi.org/pypi/pygame/json
+[^DEC107C]: ADR-0094, the caller owns the camera and the pixels, decision D5. `docs/adrs/draft/adr-0094-the-caller-owns-the-camera-and-the-pixels.md`
+[^DEC107E]: ADR-0094, the caller owns the camera and the pixels, decision D4. `docs/adrs/draft/adr-0094-the-caller-owns-the-camera-and-the-pixels.md`
