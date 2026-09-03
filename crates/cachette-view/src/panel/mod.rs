@@ -111,6 +111,24 @@ pub const SWATCH: i32 = text::GLYPH_HEIGHT;
 /// The gap between a swatch and the label beside it, in pixels.
 pub const SWATCH_GAP: i32 = 6;
 
+/// The colour of the mark that says the panel cut a line.
+///
+/// **The mark is what makes a cut visible to the person watching.** A cut line
+/// states something other than what it was given, and it does so in
+/// silence.[^1] The check that finds a cut had one caller and it was a test, so
+/// no run ever asked whether the panel cut something.[^2] The drawing now asks
+/// on every line of every frame, and it paints this mark when the answer is
+/// yes.
+///
+/// # References
+///
+/// [^1]: Backlog item 0300. `docs/backlog/complete/0300-cut-every-panel-line-to-the-width-of-the-panel.md`
+/// [^2]: Backlog item 0072. `docs/backlog/complete/0072-run-the-panel-fit-check-in-the-drawing-pass.md`
+pub const CUT_MARK: u32 = 0x00e0_5a3c;
+
+/// The width and the height of the mark that says the panel cut a line.
+pub const CUT_MARK_SIZE: i32 = 4;
+
 /// Returns the pixel room a panel gives its text.
 #[must_use]
 pub const fn text_room() -> i32 {
@@ -169,10 +187,39 @@ pub fn write_fitted(
     scale: i32,
     colour: u32,
 ) -> bool {
+    // The mark takes room from the text, so the cut is measured against what
+    // is left. A text that fits without the mark still fits, because the mark
+    // is only drawn when the text does not.
     let shown = fit(line, right - left, scale);
     let cut = shown.chars().count() != line.chars().count();
-    canvas.write(left, pen, &shown, scale, colour);
+    if cut {
+        let shown = fit(line, right - left - CUT_MARK_SIZE - 2, scale);
+        canvas.write(left, pen, &shown, scale, colour);
+        mark_the_cut(canvas, right, pen);
+    } else {
+        canvas.write(left, pen, &shown, scale, colour);
+    }
     cut
+}
+
+/// Paints the mark that says the panel cut a line.
+///
+/// **This runs on the drawing path, on every line of every frame.** A check
+/// that only a test invokes is a capability nobody invokes, and this project
+/// records that shape.[^1] The mark is visible to the person watching, which
+/// is what the panel is for.
+///
+/// # References
+///
+/// [^1]: Recurring Defect Shapes, shape 3. `.claude/rules/recurring-defects.md`
+fn mark_the_cut(canvas: &mut Canvas, right: i32, pen: i32) {
+    canvas.block(
+        right - CUT_MARK_SIZE,
+        pen + 2,
+        CUT_MARK_SIZE,
+        CUT_MARK_SIZE,
+        CUT_MARK,
+    );
 }
 
 /// Writes a text against the right edge, and never past the left one.
@@ -187,10 +234,21 @@ pub fn write_against_right(
     line: &str,
     colour: u32,
 ) -> bool {
-    let shown = fit(line, right - left, 1);
-    let cut = shown.chars().count() != line.chars().count();
-    let start = left.max(right - text::width_of(&shown, 1));
+    let room = right - left;
+    let whole = fit(line, room, 1);
+    let cut = whole.chars().count() != line.chars().count();
+    // The mark sits against the right edge, so a cut value stops short of it.
+    let shown = if cut {
+        fit(line, room - CUT_MARK_SIZE - 2, 1)
+    } else {
+        whole
+    };
+    let edge = if cut { right - CUT_MARK_SIZE - 2 } else { right };
+    let start = left.max(edge - text::width_of(&shown, 1));
     canvas.write(start, pen, &shown, 1, colour);
+    if cut {
+        mark_the_cut(canvas, right, pen);
+    }
     cut
 }
 

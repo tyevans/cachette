@@ -130,6 +130,49 @@ fn the_uncut_path_does_escape_the_panel() {
     );
 }
 
+/// Returns how many pixels of the mark colour the canvas holds.
+fn marks(canvas: &Canvas) -> usize {
+    canvas
+        .pixels()
+        .iter()
+        .filter(|pixel| **pixel == panel::CUT_MARK)
+        .count()
+}
+
+#[test]
+fn the_drawing_marks_a_line_it_cut() {
+    // The fit check had one caller and it was a test, so no run ever asked
+    // whether the panel cut something. The drawing now asks on every line of
+    // every frame and paints a mark when the answer is yes. The mark is
+    // visible to the person watching, which is what the panel is for.
+    let mut canvas = Canvas::new(WIDE, TALL);
+    panel::draw_one(&mut canvas, LEFT, TOP, &every_kind_too_long());
+    assert!(
+        marks(&canvas) > 0,
+        "a panel that cut a line must paint the mark that says so"
+    );
+}
+
+#[test]
+fn the_drawing_marks_nothing_when_no_line_is_cut() {
+    // The mark must be able to be absent. A mark on every frame says nothing.
+    let mut canvas = Canvas::new(WIDE, TALL);
+    let lines = vec![
+        Line::Title("SHORT".to_string()),
+        Line::note("a short note"),
+        Line::heading("A HEADING"),
+        Line::Rule,
+        Line::row("tick", "1 200"),
+        Line::swatch(0x0000_ff00, "faction 0", "64"),
+    ];
+    panel::draw_one(&mut canvas, LEFT, TOP, &lines);
+    assert_eq!(
+        marks(&canvas),
+        0,
+        "a panel that cut nothing must paint no mark"
+    );
+}
+
 #[test]
 fn every_over_long_line_reports_that_it_was_cut() {
     // A cut keeps the ink inside the panel and still states something other

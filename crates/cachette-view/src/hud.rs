@@ -2426,6 +2426,10 @@ pub fn ink_key() -> Vec<(u32, char)> {
         (LABEL, 'l'),
         (VALUE, 'v'),
         (TITLE, 'y'),
+        // The mark the drawing paints when it cut a line. It appears in a
+        // stored picture only when the panel cut something, which is what a
+        // reader of the picture must see.
+        (panel::CUT_MARK, 'x'),
     ];
     for (slot, mark) in ['r', 'b', 'g', 'y', 'm', 'c'].iter().enumerate() {
         key.push((faction_colour(cachette_core::FactionId(slot as u16)), *mark));

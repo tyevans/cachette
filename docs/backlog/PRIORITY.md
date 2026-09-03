@@ -112,7 +112,6 @@ These are real and none of them blocks anything today.
 | 0226 | The relabel pass has no caller in the step, so a world left to run cannot answer a dynasty question about anybody born since it started. |
 | 0225 | The record check reads no source file from a worktree, so its uncited note is a false signal there. |
 | 0135 | The deposit amount reader has no caller, and the record now rests on the step order instead. |
-| 0072 | The panel fit check has no production caller. |
 | 0077 | The batched structural path, once its record exists. |
 | 0145 | The faction count states what zero means at six sites in one module. Item 0080 may absorb it. |
 | 0053 | Superseded in substance by the completed resource work. Close it or restate it. |
