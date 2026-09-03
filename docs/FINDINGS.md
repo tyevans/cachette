@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-264**
+**Next number: FND-270**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -6632,6 +6632,71 @@ has been chosen at all.
 because each part sounds like it needs a record and the reviewer's instinct is
 to write three. The evidence that separates them is in the source and in the
 registry, not in the framing.
+
+### FND-269 — Three completed subsystems produce nothing at all in the demonstration world
+
+**Believed.** The demonstration shows less than the engine holds because the
+drawing has not caught up. The repair for a feature a watcher cannot see is
+therefore drawing work, in the way that items 0216 and 0240 were fixture
+work.[^F269A]
+
+**True for some subsystems and false for three.** Positions, characters and
+improvements do not merely go undrawn in the demonstration. **They never
+happen.** A front end that drew them today would draw an empty set, and the
+test that proved the drawing correct would be measuring the fixture.[^23]
+
+**The measurement.** The world the demonstration builds, founded for four
+factions with a group each, stepped on four threads. The counts are read from
+the public readers of the engine at the tick named.
+
+| Quantity | Tick 50 | Tick 200 |
+|---|---|---|
+| Units alive | 192 | 192 |
+| Settlements | 4 | 4 |
+| Position seats that exist | 16 | 16 |
+| Position seats a unit holds | 0 | 0 |
+| Characters | 0 | 0 |
+| Upgrade sites | 0 | 0 |
+| Units the shortage ended | 0 | 0 |
+| Units carrying a load | 0 | 45 |
+| Units whose chosen option is forage | 0 | 44 |
+| Tiles held, summed over the factions | 7,866 | 46,992 |
+
+**Each zero has a cause, and every cause is an open item.** Nothing seats a
+unit in a position, which is what item 0063 does. Nothing promotes a unit into
+the character tier, which is what item 0088 does. No option in the option set
+orders a build, which is what item 0180 does. The subsystems are complete and
+correct; what is absent is the caller that makes one instance of each occur.
+
+**Every one of those three items sits in `Later`.** They sit there for reasons
+that are each defensible on their own, and the priority index states them. The
+consequence that no row states is the one the project owner names most often:
+the demonstration cannot show a feature that never occurs, so the work that
+makes the demonstration show its features is ordered below the work that makes
+it faster.
+
+**Follows.** Three things.
+
+**Ask whether a feature occurs before asking whether it is drawn.** An audit
+that reads the drawing finds the features the drawing omits. It cannot find a
+feature the world never produces, because both look identical from the front
+end: an empty set.
+
+**A zero is the cheapest evidence this project has, and nothing prints one.**
+Every figure above came from a throwaway probe that no test holds and no
+command runs. The demonstration prints whether a founded ground carries its
+group, and that line exists because a silent fixture cost the project a
+round.[^F269A] It prints nothing about a subsystem that produced no instance.
+Item 0278 asks for that.
+
+**The three items are not equivalent in cost.** Item 0063 writes into a
+structure that exists and holds sixteen empty seats already. Item 0088 has no
+stated blocker. Item 0180 adds an option to the pass that item 0238 is
+rewriting, and the index says it should read that pass afterwards. Moving the
+first two is cheap; moving the third against a stated sequencing reason is not.
+
+[^F269A]: Findings register, FND-232, in this document.
+
 
 ### FND-263 — The needs of one cell spread widest while a store empties, and they polarise afterwards
 

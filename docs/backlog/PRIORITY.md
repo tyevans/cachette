@@ -46,6 +46,9 @@ These close a gap a review found, or they unblock the items above.
 |---|---|
 | 0244 | The project orientation is two files and they have already diverged: one carries a repaired sentence and the other still says no measurement exists on the target platform. An agent that opens the second reads something false and nothing fails. FND-259 holds it. It sits beside 0242 because both are one fact in two places with nothing that compares them, and refining one should ask whether they are one script. |
 | 0242 | Nothing fails when a document states a register in its own words, and that was tested rather than assumed: a stale sentence went back into a product record and all eight document checks passed. FND-258 holds the case and FND-223 holds the ninety documents it cost last time. It sits at the top of `Next` because the sweep it replaces has now been paid for three times. |
+| 0063 | Assigning a unit to a position. **The structure it writes into holds sixteen empty seats in the demonstration world and no unit has ever sat in one**, so a front end that drew a position today would draw an absence. FND-269 holds the measurement. It moved here from `Later` on 2 September 2026, because nothing blocks it and because the row that placed it read the structure as the missing half when the caller is. |
+| 0088 | Promotion into the character tier. **The demonstration world holds no character at any tick**, so the whole descent tier, which three completed items built, produces nothing a watcher or an agent could read. FND-269 holds the measurement. It moved here from `Later` on 2 September 2026, and it states no blocker. |
+| 0278 | Nothing says that a subsystem produced no instance, so an audit is the only way to find one. Three were found that way, and two were found the same way before them. It sits below 0063 and 0088 because those two remove two of the three zeros, and a guard is worth more once the thing it guards can be non-zero. |
 | 0224 | The control plane names one entity of a mass shape in four places, and a test pays four crossings for each site because of it. FND-215 holds the measurement. It sits below 0223 because the review that found it returned ADR-0040 for an amendment, and the amendment names this item. |
 
 | 0189 | The rules against inert work look for an absent caller, and this defect has one. DEC-074 holds the options and recommends this. |
@@ -88,14 +91,12 @@ These are real and none of them blocks anything today.
 | 0109 | Decide how the world holds a condition that moves. |
 | 0110 | Advance a weather condition each tick. Follows 0109. |
 | 0111 | Let the weather change a unit and show it. Follows 0110. |
-| 0063 | Assigning a unit to a position. The structure it writes into now exists. |
 | 0181 | A kind of work maps onto the one commodity that exists, so the map carries no information. It waits on an economy that holds more than one. |
 | 0065 | Letting the job decide what a unit weighs. Waits on 0063 and 0064. |
 | 0169 | The influence solve runs on every tick for every faction, and the research says that is the wrong cadence at the target scale. It waits on a measurement. |
 | 0124 | A fully recovered deposit still stores a take of zero. The recovery pass now reads that entry on every tick, so the depleted set grows and never shrinks. |
 | 0125 | Show a watcher a deposit recovering. The engine recovers a deposit, and nothing shows it. |
 | 0068 | A ruler and a succession. Item 0067 is complete, so the descent it reads exists. |
-| 0088 | Promotion into the character tier. |
 | 0262 | A unit cannot destroy an upgrade. The engine removes one instantly through a control-plane call, and the owner answered on 3 September 2026 that destruction takes work while the instant path stays. It sits beside 0180 because both add a verb the choice pass will need, and neither should be written before item 0238 rewrites that pass. |
 | 0180 | Nothing makes a unit choose to build, so a world left to run improves no tile. **The faction rule it waited on is answered**, and item 0058 is complete, so nothing blocks it. It stays here rather than moving up because it adds an option to the option set that item 0238 is rewriting, and it should read that pass after it changes rather than before. |
 | 0050 | Four product collisions still carried. |
