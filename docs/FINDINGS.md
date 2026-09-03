@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-238**
+**Next number: FND-239**
 
 ## A. Corrections to stated rules
 
@@ -825,6 +825,49 @@ the scope rule names as recording an intent as a fact.
 
 
 ## G. Process
+
+### FND-238 — The gate prints ten screens of red when it passes
+
+**Believed.** A reader can tell a passing gate run from a failing one by
+reading its output. Red means something is wrong.
+
+**True.** A fully green `just check` prints ten test binaries reporting
+`FAILED` and ten `error: test failed` lines. They come from the probe
+recipes, whose passing condition is a non-zero exit, so the recipe marks each
+one and the gate exits zero with all of them red.[^238A] The probes exist for
+a good reason: a determinism test with no proven failure mode is
+decoration.[^238B] The cost is not the probes. It is that the gate has spent
+its whole vocabulary of alarm on its success path.
+
+**Evidence.** A worker read the block as a determinism defect and
+investigated it: decoded the event bytes, found two tile events in reverse
+order, traced the emission site, and ran the suite in isolation and under
+load. The investigation ended only when the reversed order turned out to be
+*exactly* reverse, which is what the probe feature injects and not what a
+thread-order defect produces. The dispatcher reports reading past the same
+block four times in one day, and recognising it only from having hit it
+early.
+
+**Follows.** Three things.
+
+**A check whose success prints as failure has no alarm left for a real
+failure.** The reader who has learnt to skim ten `FAILED` lines will skim the
+eleventh. This is the same shape as a gate left broken because it cannot
+pass: both train everyone to ignore the pipeline.[^238C]
+
+**The probe output is convincing, not merely noisy.** A reader who does not
+skim it loses time instead, because the injected defect is a plausible one by
+construction. The probe reverses the combine order, and reversed order is
+exactly what a result ordered by thread completion would look like.
+
+**What distinguished the probe from a real defect was the exactness.** A
+result taken from thread completion order varies between runs. A result that
+is exactly reversed, every time, on an idle machine and a loaded one, is a
+deliberate switch. Record that as the test to apply next time, because it is
+cheaper than decoding the bytes.
+
+This finding proposes no fix. The shape is the finding.
+
 
 ### FND-028 — Concurrent agents collide on shared numbering
 
@@ -5130,6 +5173,9 @@ check asserts.
 [^F201B]: Backlog item 0208. `docs/backlog/proposed/0208-draw-the-boundary-of-a-holding-and-not-of-every-tile.md`
 [^F194REF]: Findings register, FND-194, in this document.
 [^237B]: Decision Record Scope, section 6. `.claude/rules/adr-scope.md`
+[^238A]: The gate recipes. `justfile`
+[^238B]: Testing Rules, section 1. `.claude/rules/testing.md`
+[^238C]: Definition of Done, section 5. `.claude/rules/definition-of-done.md`
 [^235A]: The record of descent, the labelled row count. `crates/cachette-core/src/descent.rs`
 [^236A]: Backlog item 0097. `docs/backlog/complete/0097-write-the-layout-record-with-the-descent-columns.md`
 [^236B]: Backlog item 0067, record a parent and walk a line. `docs/backlog/complete/0067-record-a-parent-and-walk-a-line.md`
