@@ -6165,6 +6165,178 @@ a retired number fails a gate and a closed blocker does not, so this one cannot
 be forgotten. That is luck rather than design, and the register records which of
 the two it is.
 
+### FND-233 — Four cell fields with incompatible ranges go into one argmax, so a weight is a preference times an unwritten unit conversion
+
+**Believed.** A weight expresses how much a unit prefers an option. The default
+profile gives every option a weight of one, which was read as no preference.
+
+**True.** The score of an option is the drive times the weight times the field
+the option reads. With every weight at one, the score is the drive times the
+field. **The four fields do not share a range**, so the comparison is decided
+partly by which field carries the larger units.
+
+- The open share is a count over a count, bounded at one by construction.
+- The mean food is a stock over a tile count, and its ceiling is whatever a
+  tile can hold.
+- The units for each open tile is a count over a count, and its ceiling is the
+  capacity of a tile.
+- The mean height is a mean over the height range.
+
+**Evidence.** A short unit of the demonstration was seen to choose roam while
+standing on ground that carried food. Its need was 0.48, so roam took the met
+drive at 0.48 and forage took the unmet drive at 0.52. The open share of its
+cell was near one, giving roam a score near 0.48. The mean food of its cell was
+0.669, giving forage 0.348. **Nothing is broken. The unit preferred open ground
+to food, because a share of one outscores a mean stock of two thirds.**
+
+**The comparison works in this world by coincidence.** The food generator puts
+the mean stock near one, so a share and a stock happen to be comparable. Raise
+the ceiling of a tile and forage wins everywhere, whatever a unit needs,
+because the mean food climbs past one and a share cannot follow.
+
+**Follows.** **A weight is not a preference. It is a preference multiplied by a
+unit conversion, and nobody has written the conversion down.** A content author
+who sets a weight of two for forage cannot tell whether they doubled a
+preference or corrected half a scale error, and the two are not distinguishable
+from the value.
+
+**No fix is proposed.** Whether the fields are normalised, or a weight carries
+its scale explicitly, is a design decision and it needs a record. This entry
+records the fact.
+
+### FND-234 — The exit field does steer the crowd, and a prediction from one frame said it did not
+
+**Believed.** A pre-registered prediction, written before the run: hungry units
+would not stand on better ground than fed ones, most would choose roam over
+forage, and only a minority in food-rich cells would forage. The prediction
+came from one rendered frame in which one short unit chose roam, and from the
+scale defect that explains why it did.[^F234A]
+
+**True. The prediction is refuted on both counts.** Over eight hundred ticks of
+the demonstration, at three sampled ticks:
+
+- Hungry units stand on cells whose mean food is 1.041, 0.781 and 0.876.
+- Fed units stand on cells whose mean food is 0.243, 0.224 and 0.257.
+- The world mean over a spread sample of the same cells is near 0.61.
+
+**A hungry unit stands on three to four times the food that a fed unit stands
+on**, and well above the world mean, while a fed unit stands well below it. The
+share of hungry units choosing forage is 28 in 48, then 34 in 48, then 36 in
+48. **It rises with time rather than holding.**
+
+**Follows.** The field steers. A unit that needs food moves onto ground that
+carries it, and the population separates into two by where it stands.
+
+**What the measurement does not settle.** The hungry units belong to the two
+poorest sites and the fed units to the two richest, so a raw comparison between
+the two groups confounds steering with where their sites sit. The world mean is
+the baseline that survives that, and both groups sit far from it in opposite
+directions. The rising share of foragers is the second independent signal,
+because geography does not change with time and that share does.
+
+**The mean food under the hungry crowd falls and then recovers**, from 1.041 to
+0.781 and back to 0.876. That is consistent with a crowd that depletes where it
+stands and moves on while the ground behind it recovers, which is the negative
+feedback the work was built for. It is consistent, not proven.
+
+**The lesson is about the prediction, not the engine.** The frame that produced
+it was real and the unit in it was in the quarter that chose roam. **One frame
+generalised to a population is the same error as one render generalised to a
+world**, which this register already holds twice.[^F201C] The pre-registration
+is what makes this entry cheap: the prediction was written down before the run,
+so its refutation is a fact rather than a memory.
+
+### FND-231 — A unit draws from its home site wherever it stands, so nothing it does can make it hungry
+
+**Believed.** A unit that walks away from the site it belongs to gets hungry,
+so a demonstration in which units migrate would show hunger somewhere. The
+brief for the work that found this asked for a population fed near its site and
+hungry away from it, which assumes distance costs a unit something.
+
+**True.** **Feeding has no distance term anywhere.** The draw is keyed on the
+home site of a unit and on its faction, and on nothing else. A founding sets
+the home site of every person it seats, once. A unit seventy-three tiles from
+that site draws from its store exactly as one standing on the site does, and it
+keeps drawing for as long as the store pays.
+
+**Evidence.** The demonstration was run for twelve hundred ticks with four
+groups of thirty. Every unit was fed at every sampled tick, no unit was ever
+short or starved, the ration never failed, and not one tile of the world was
+ever gathered from. Over the same run the mean distance from a founding rose
+and the furthest unit reached seventy-three tiles. **The units migrated and
+stayed fed.**
+
+**Follows.** **A unit cannot be made hungry by going anywhere.** Hunger is a
+property of the site a unit belongs to and of the group that site carries, and
+a unit changes neither by moving.
+
+**The consequence reaches past the demonstration.** The forage option scores
+against the deficit of a unit. If no movement can produce a deficit, then no
+movement can drive the option, and the option cannot close a loop with
+movement. Two open items exist to make a step read the option a unit chose and
+to let the engine order a gather.[^F226A] [^F226B] Neither can produce a unit
+that grew hungry by travelling, because nothing does.
+
+**It also bears on a strategy that a unit would follow.** A record under
+consideration holds that a strategy is a field a unit follows. **"Return to my
+site" is the first strategy anybody will want, and today a unit has no reason
+to return**, because being away costs it nothing.
+
+**This is why the engine tests are built the opposite way from the
+demonstration.** The starvation fixture gives every second site a store that
+empties and no production, and says in its own comment that the demonstration
+world is chosen to look right and that every unit in it eats. That fixture
+reaches the hungry case by choosing the site, which is the only handle there
+is.[^F231C]
+
+**No fix is proposed here.** Whether feeding gains a distance term is a design
+decision and it needs a record, not a repair. This entry records the fact and
+what it forbids.
+
+### FND-232 — The demonstration fed every unit forever, so the food layer decided nothing a watcher could see
+
+**Believed.** The demonstration exercises the food loop. A watcher of the
+running window sees units that gather, ground that empties, and a choice that
+varies with what the ground carries.
+
+**True.** No unit of the demonstration was ever hungry, so the forage option
+scored zero on every unit on every frame whatever the ground held, and **not
+one tile of the world was ever gathered from.** The window showed a food layer
+that decided nothing. The panel stated it plainly and it was read as a healthy
+world: the nearest unit reported the food under it and a score of zero for the
+option that reads that food, because it was fed.
+
+**Evidence.** Twelve hundred ticks, four groups of thirty. Fed at every sampled
+tick, none short, none starved, no ration ever failed, and zero tiles of two
+hundred and eighty-one thousand six hundred showed any depletion. The site
+stores grew without interruption for the whole run.
+
+**Two candidate causes were eliminated by measurement before anything
+changed.** It is not the starting store: **at the first tick every store is
+zero and every unit is still fed**, so an empty store does not make a unit
+hungry, and the repair anyone would reach for first would have changed nothing.
+It is not the declared upkeep rate either, which is zero at every group size,
+because the founding never sets one. **A cohort does not draw the declared
+upkeep. It draws its own ration from the store.**
+
+**The relation that governs it is exact.** The founding sets the production
+rate of a site to a sixteenth of the food its survey reached, and the default
+need rule gives a person a ration of a sixteenth of a full need for each
+application. The two cancel. **A site feeds exactly as many people as the food
+its survey measured**, and that number is one the founding already prints.
+
+**Follows.** **A fixture that produces one condition everywhere measures
+itself.** The group size now falls inside the spread of what the founded sites
+reach, so some ground cannot carry its group and other ground can, and a
+watcher sees both conditions at once. The split follows the ground rather than
+the number.
+
+**A run that loses the split now says so.** The founding report states for each
+site whether its ground carries its group, and the run prints a note when every
+seated group came out the same way. The defect that this entry records is that
+nobody noticed for as long as the demonstration ran, and a silent fixture is
+what allowed that.
+
 ### FND-219 — The next-number line reflects merged state, so it cannot allocate across branches
 
 **Believed.** Each register carries an explicit next number, and a writer claims
@@ -6481,7 +6653,7 @@ has the rule.
 [^F226A]: Backlog item 0185, steer a step by the option the unit chose. `docs/backlog/complete/0185-steer-a-step-by-the-option-the-unit-chose.md`
 [^F226B]: Backlog item 0186, let the engine order a gather. `docs/backlog/complete/0186-let-the-engine-order-a-gather.md`
 [^F226C]: ADR-0063, a need is a rate with a threshold, and crossing it is a fact, decision D2. `docs/adrs/accepted/adr-0063-a-need-is-a-rate-with-a-threshold-and-crossing-it-is-a-fact.md`
-[^F226E]: Backlog item 0216, let the demonstration make a unit hungry. `docs/backlog/proposed/0216-let-the-demonstration-make-a-unit-hungry.md`
+[^F226E]: Backlog item 0240, let the demonstration make a unit hungry. `docs/backlog/complete/0240-let-the-demonstration-make-a-unit-hungry.md`
 [^F227B]: Findings register, FND-183, in this document.
 [^F222]: Target platform costs. `docs/reference/graviton-costs.md`
 [^F223C]: ADR Registry, how a record changes. `docs/adrs/REGISTRY.md`
@@ -6673,7 +6845,6 @@ has the rule.
 [^F202G]: PRD-0019, an agent can ask the running engine what it holds. `docs/product/shaped/prd-0019-an-agent-can-ask-the-running-engine-what-it-holds.md`
 [^F204C]: Findings register, FND-048, in this document.
 [^F206B]: Findings register, FND-201, in this document.
-[^F201C]: Findings register, FND-206, in this document.
 [^F206C]: The holder layer of the drawing pass. `crates/cachette-view/src/paint.rs`
 [^F207A]: The tile rectangle of the drawing pass. `crates/cachette-view/src/paint.rs`
 [^F209A]: Findings register, FND-208, in this document.
@@ -6730,3 +6901,6 @@ has the rule.
 [^239A]: The footnote check. `scripts/check_footnotes.py`
 [^239B]: The priority check. `scripts/check_priority.py`
 [^F257B]: The merge-defect check. `scripts/check_merge_defects.py`
+[^F231C]: The starvation suite of the core. `crates/cachette-core/tests/starvation.rs`
+[^F234A]: Findings register, FND-233, in this document.
+[^F201C]: Findings register, FND-206, in this document.

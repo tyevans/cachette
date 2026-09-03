@@ -2388,7 +2388,7 @@ a failed founding is correct.[^PRD12]
 [^DEC79B]: ADR-0018, the unit-to-tile bridge is derived, and it rebuilds at the barrier, decision D2. `docs/adrs/accepted/adr-0018-the-unit-to-tile-bridge-is-derived-and-rebuilds-at-the-barrier.md`
 [^DEC79D]: Backlog item 0185, steer a step by the option the unit chose. `docs/backlog/complete/0185-steer-a-step-by-the-option-the-unit-chose.md`
 [^DEC79E]: Findings register, FND-226. `docs/FINDINGS.md`
-[^DEC79F]: Backlog item 0216, let the demonstration make a unit hungry. `docs/backlog/proposed/0216-let-the-demonstration-make-a-unit-hungry.md`
+[^DEC79F]: Backlog item 0240, let the demonstration make a unit hungry. `docs/backlog/complete/0240-let-the-demonstration-make-a-unit-hungry.md`
 [^DEC74SEP]: Findings register, FND-227. `docs/FINDINGS.md`
 [^DEC80B]: Backlog item 0187, give a carried load somewhere to go. `docs/backlog/refined/0187-give-a-carried-load-somewhere-to-go.md`
 [^DEC81A]: Findings register, FND-193. `docs/FINDINGS.md`
