@@ -122,13 +122,13 @@ The review holds the whole account.[^15]
 [^3]: ADR-0046, every error is typed, decision D3. `docs/adrs/draft/adr-0046-every-error-is-typed.md`
 [^4]: Blockers register, BLK-007. `docs/BLOCKERS.md`
 [^5]: Blockers register, BLK-034. `docs/BLOCKERS.md`
-[^6]: Backlog item 0309, publish the Python reference generated from the compiled module. `docs/backlog/refined/0309-publish-the-python-reference-generated-from-the-compiled-module.md`
+[^6]: Backlog item 0309, publish the Python reference generated from the compiled module. `docs/backlog/complete/0309-publish-the-python-reference-generated-from-the-compiled-module.md`
 [^7]: Findings register, FND-321. `docs/FINDINGS.md`
 [^8]: Decision Record Scope, section 1. `.claude/rules/adr-scope.md`
 [^9]: Findings register, FND-322. `docs/FINDINGS.md`
 [^10]: Findings register, FND-323. `docs/FINDINGS.md`
 [^11]: Findings register, FND-320. `docs/FINDINGS.md`
-[^12]: Findings register, FND-326. `docs/FINDINGS.md`
-[^13]: Findings register, FND-327. `docs/FINDINGS.md`
+[^12]: Findings register, FND-331. `docs/FINDINGS.md`
+[^13]: Findings register, FND-332. `docs/FINDINGS.md`
 [^14]: ADR-0074, a spawn may over-fill a tile, and only admission enforces the capacity, decision D1. `docs/adrs/accepted/adr-0074-a-spawn-may-over-fill-a-tile-and-only-admission-enforces-the-capacity.md`
 [^15]: The review of the Rust doc comments. `docs/reviews/0310-the-rust-doc-comments.md`

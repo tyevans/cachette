@@ -22,11 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-<<<<<<< HEAD
-**Next number: FND-331**
-=======
-**Next number: FND-328**
->>>>>>> worktree-agent-aa308c3f248672191
+**Next number: FND-334**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -46,7 +42,7 @@ demonstration says the same in its own docstring.
 draw follows the steps of that frame, on one thread. The second half described
 the loop that existed when the record was written. It is not a property of the
 viewer, because the caller owns the loop and decides how many steps a frame
-runs.[^F322B]
+runs.[^F327B]
 
 **Evidence.** The demonstration now steps the engine as many times each frame
 as a clock says, and it draws once. A paused world runs no step and still
@@ -653,7 +649,7 @@ see, and the demonstration could not show it.
 
 **A count is not the fix; a maintained count is.** Counting the units of a
 faction reads every live unit, and at the target scale that is one million reads
-for one row of one panel, every frame, which the panel record forbids.[^F323A]
+for one row of one panel, every frame, which the panel record forbids.[^F328A]
 The arena now maintains the count at the two sites that change a slot's live
 byte. That is one fact in two places, so the arena check recounts and compares,
 and it fails when the copies disagree.[^13]
@@ -9283,8 +9279,8 @@ commodity, and the ration a unit receives is not that account.
 
 [^F326A]: The head-up display, the row drawing. `crates/cachette-view/src/hud.rs`
 [^F218B]: ADR-0067, the viewer reads the world and never writes to it, decision D4. `docs/adrs/accepted/adr-0067-the-viewer-reads-the-world-and-never-writes-to-it.md`
-[^F322B]: ADR-0094, the caller owns the camera and the pixels, decision D1. `docs/adrs/draft/adr-0094-the-caller-owns-the-camera-and-the-pixels.md`
-[^F323A]: ADR-0070, the head-up display reports what the drawing pass read, decision D1. `docs/adrs/accepted/adr-0070-the-head-up-display-reports-what-the-drawing-pass-read.md`
+[^F327B]: ADR-0094, the caller owns the camera and the pixels, decision D1. `docs/adrs/draft/adr-0094-the-caller-owns-the-camera-and-the-pixels.md`
+[^F328A]: ADR-0070, the head-up display reports what the drawing pass read, decision D1. `docs/adrs/accepted/adr-0070-the-head-up-display-reports-what-the-drawing-pass-read.md`
 [^F315B]: The refused step test. `crates/cachette-core/tests/a_refused_step_does_not_freeze.rs`
 [^F318A]: ADR-0063, a need is a rate with a threshold, and crossing it is a fact, decision D1 and the alternatives rejected. `docs/adrs/accepted/adr-0063-a-need-is-a-rate-with-a-threshold-and-crossing-it-is-a-fact.md`
 [^F318B]: ADR-0106, a cohort serves whole rations to a keyed subset, never an equal share to everybody, decision D2. `docs/adrs/draft/adr-0106-a-cohort-serves-whole-rations-to-a-keyed-subset.md`
@@ -9879,7 +9875,6 @@ documentation plan holds the page that states the line.[^F322E]
 [^F323C]: Product requirement record 0021, what this does not do. `docs/product/accepted/prd-0021-a-developer-can-use-the-control-plane-without-reading-its-source.md`
 [^F323D]: Product requirement record 0019, an agent can ask the running engine what it holds. `docs/product/shaped/prd-0019-an-agent-can-ask-the-running-engine-what-it-holds.md`
 
-<<<<<<< HEAD
 ### FND-324 — The strict mode of the site builder does not see the fallback to the type stub
 
 **Believed.** A research report measured that a documentation build with module
@@ -9923,12 +9918,26 @@ The binding library does not copy the doc comment of a constructor onto the
 Python object, so the module carries the standard interpreter sentence there and
 nothing else. The reference therefore says what a class is and never says how to
 build one. The prose for that belongs in the doc comment of the class.
-=======
-### FND-326 — Three exception classes the package exports and documents, and nothing raises
+
+**Evidence.**
+
+```
+uv run python scripts/check_reference.py --import-only
+```
+
+**Follows.** The item that repairs the doc comments keeps its second half and
+loses its first.[^F325C] The gap is the audience of the prose and not the
+absence of it: a doc comment written for a contributor to the core under-serves
+the Python developer that the product record names, and no check can see
+that.[^F325A] [^F319C] The check that the documentation job runs reports every
+member with no prose, without failing, so the first half stays covered if a new
+member arrives with none.
+
+### FND-331 — Three exception classes the package exports and documents, and nothing raises
 
 **Believed.** The compiled module declares nine exception classes and exports
 every one of them.[^F320C] The package re-exports all nine, and a test asserts
-that each one is a subclass of the root class.[^F326B] Each carried a docstring
+that each one is a subclass of the root class.[^F331B] Each carried a docstring
 that reads as a statement of when the engine raises it. A reader takes the list
 for the set of failures the engine reports.
 
@@ -9943,31 +9952,10 @@ produce it.** The bindings crate installs no panic hook. The binding library
 catches a panic at the boundary and raises its own `pyo3_runtime.PanicException`,
 which is not a subclass of the root class. A caller that catches the root class
 in order to survive a panic does not survive one.
->>>>>>> worktree-agent-aa308c3f248672191
 
 **Evidence.**
 
 ```
-<<<<<<< HEAD
-uv run python scripts/check_reference.py --import-only
-```
-
-**Follows.** The item that repairs the doc comments keeps its second half and
-loses its first.[^F325C] The gap is the audience of the prose and not the
-absence of it: a doc comment written for a contributor to the core under-serves
-the Python developer that the product record names, and no check can see
-that.[^F325A] [^F319C] The check that the documentation job runs reports every
-member with no prose, without failing, so the first half stays covered if a new
-member arrives with none.
-
-[^F324A]: Research report 19, the documentation toolchain, section 4.2. `docs/research/reports/19-documentation-toolchain.md`
-[^F324B]: The documentation probe. `scripts/docs-probe.sh`
-[^F324C]: The broken site configuration. `tests/fixtures/docs-inspection-off/mkdocs.yml`
-[^F324D]: The reference check. `scripts/check_reference.py`
-[^F325A]: ADR-0107, the Python reference is generated from the compiled module, the consequences. `docs/adrs/draft/adr-0107-the-python-reference-is-generated-from-the-compiled-module.md`
-[^F325B]: Backlog priority index, the row for item 0310. `docs/backlog/PRIORITY.md`
-[^F325C]: Backlog item 0310, write the Rust doc comments for the Python reader. `docs/backlog/proposed/0310-write-the-rust-doc-comments-for-the-python-reader.md`
-=======
 grep -rn "SelectorError\|DeterminismError\|EnginePanic" crates python tests scripts
 ```
 
@@ -9975,14 +9963,14 @@ The search returns the declaration, the registration, the package re-export and
 the membership test. It returns no raise site.
 
 **Follows.** This is the shape the project already names: a capability that
-nothing invokes, declared and documented as if it were fact.[^F326C] The product
+nothing invokes, declared and documented as if it were fact.[^F331C] The product
 record requires a reader to learn which error a
 call raises, and to learn what the package cannot do yet rather than conclude
-that they failed to find it.[^F326E] The three docstrings now say plainly that
+that they failed to find it.[^F331E] The three docstrings now say plainly that
 nothing raises them. Either something raises each class, or the class goes. Do
 not delete one while its docstring is the only place that says it is inert.
 
-### FND-327 — A refused faction names the project ceiling, and the engine applied the faction count of the world
+### FND-332 — A refused faction names the project ceiling, and the engine applied the faction count of the world
 
 **Believed.** The refusal that a verb returns for a faction it will not accept
 reads `the faction 3 is at or above the ceiling 63`. A caller reads the number
@@ -9991,8 +9979,8 @@ in the message as the bound that was applied.
 **True: the world applies its own faction count, and the message names a
 different number.** The world checks the faction against the faction count that
 its constructor took, and it raises the arena's own ceiling error to report
-that.[^F327A] The arena formats that error with the project-wide ceiling, which
-is a constant of the storage.[^F327B] The two bounds are unrelated, and the
+that.[^F332A] The arena formats that error with the project-wide ceiling, which
+is a constant of the storage.[^F332B] The two bounds are unrelated, and the
 message names the one that was not applied.
 
 **Evidence.** A world built with a faction count of one refuses the faction
@@ -10007,15 +9995,68 @@ settlement arena.
 
 **Follows.** The message misdirects the reader that the product record serves,
 because that reader learns which error a call raises from the message and from
-the reference alone.[^F326E] A caller who reads it raises the faction count of
+the reference alone.[^F331E] A caller who reads it raises the faction count of
 the world and meets the same refusal. This work documents the behaviour and
 does not repair the message, because the repair changes the text a verb returns
 and that is engine work rather than documentation work.
 
-[^F326B]: The public interface test of the package. `tests/test_public_api.py`
-[^F326C]: Recurring Defect Shapes, shape 3, inert code that nothing invokes. `.claude/rules/recurring-defects.md`
-[^F326E]: Product requirement record 0021, what the person cannot do today. `docs/product/accepted/prd-0021-a-developer-can-use-the-control-plane-without-reading-its-source.md`
-[^F327A]: The world of the core crate, the soldier spawn. `crates/cachette-core/src/world.rs`
-[^F327B]: The soldier arena of the core crate. `crates/cachette-core/src/soldier.rs`
+[^F324A]: Research report 19, the documentation toolchain, section 4.2. `docs/research/reports/19-documentation-toolchain.md`
+[^F324B]: The documentation probe. `scripts/docs-probe.sh`
+[^F324C]: The broken site configuration. `tests/fixtures/docs-inspection-off/mkdocs.yml`
+[^F324D]: The reference check. `scripts/check_reference.py`
+[^F325A]: ADR-0107, the Python reference is generated from the compiled module, the consequences. `docs/adrs/draft/adr-0107-the-python-reference-is-generated-from-the-compiled-module.md`
+[^F325B]: Backlog priority index, the row for item 0310. `docs/backlog/PRIORITY.md`
+[^F325C]: Backlog item 0310, write the Rust doc comments for the Python reader. `docs/backlog/complete/0310-write-the-rust-doc-comments-for-the-python-reader.md`
+[^F331B]: The public interface test of the package. `tests/test_public_api.py`
+[^F331C]: Recurring Defect Shapes, shape 3, inert code that nothing invokes. `.claude/rules/recurring-defects.md`
+[^F331E]: Product requirement record 0021, what the person cannot do today. `docs/product/accepted/prd-0021-a-developer-can-use-the-control-plane-without-reading-its-source.md`
+[^F332A]: The world of the core crate, the soldier spawn. `crates/cachette-core/src/world.rs`
+[^F332B]: The soldier arena of the core crate. `crates/cachette-core/src/soldier.rs`
 
->>>>>>> worktree-agent-aa308c3f248672191
+### FND-333 — Nine error classes named a module that was not the module they belong to, and the reference dropped every one
+
+**Believed.** The reference publishes each public member that the import of the
+compiled module finds. The nine error classes are public, they are named in the
+export list of the module, and each one carries prose, so the reference carries
+all nine.
+
+**True.** It carried none of them. Every error class reported the bare name
+`_core` as its module, and every other member reported the dotted path
+`cachette._core`. The documentation builder reads the module of a member and
+skips one that names a different module, because such a member is an import
+from somewhere else rather than a member of the module it documents. The nine
+classes left the page. The page rendered fifteen members and looked complete.
+
+**The macro writes the module name, and the binding library writes the dotted
+path.** The declaration of an error takes a module name as its first argument,
+and it puts that argument into the class. A class that the binding library
+builds takes the dotted path instead. So one module described itself in two
+ways, and the two disagreed.
+
+**Evidence.** The import reports the module of each member.
+
+```
+uv run python -c "import cachette._core as m; print(m.World.__module__, m.CachetteError.__module__)"
+```
+
+The built site names each member it rendered.
+
+```
+grep -o 'id="cachette._core\.[A-Za-z_]*"' target/site/reference/index.html | sort -u | wc -l
+```
+
+That count was fifteen before the repair and twenty-four after it. The
+documentation job now reports that every one of the fifty-nine summaries
+reached the site.
+
+**Follows.** This is one fact held in two places, with nothing that fails when
+the copies disagree.[^F320E] The module registration now sets the dotted path on
+each error class before it adds it, so one statement of the path reaches every
+member.
+
+**A check that derived its expectation is what found this.** The check asks the
+imported module which members carry prose, and it compares that set against the
+built site.[^F324D] A written list of the members to document would have omitted
+the nine classes as well, and it would have agreed with the site for ever.
+
+

@@ -59,6 +59,10 @@ TAG = re.compile(r"<[^>]+>")
 FOOTNOTE_MARKER = re.compile(r"\[\^[^\]]+\]")
 EMPHASIS = re.compile(r"[`*]")
 WHITESPACE = re.compile(r"\s+")
+# A renderer turns an inline code span into an element. Removing the tag
+# leaves a space in front of the punctuation that follows it, and the
+# prose that the import carries holds no such space.
+PUNCTUATION_SPACE = re.compile(r"\s+([.,;:!?)\]])")
 
 
 @dataclass(frozen=True)
@@ -74,7 +78,8 @@ def normalise(text: str) -> str:
     text = html.unescape(TAG.sub(" ", text))
     text = FOOTNOTE_MARKER.sub(" ", text)
     text = EMPHASIS.sub("", text)
-    return WHITESPACE.sub(" ", text).strip()
+    text = WHITESPACE.sub(" ", text)
+    return PUNCTUATION_SPACE.sub(r"\1", text).strip()
 
 
 def summary_of(obj: object) -> str:

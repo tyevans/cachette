@@ -25,6 +25,7 @@ use pyo3::create_exception;
 use pyo3::exceptions::PyException;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
+use pyo3::PyTypeInfo;
 
 // ADR-0046: one root exception type holds the whole hierarchy. The
 // engine never raises a bare runtime error. The macro builds the types,
@@ -531,7 +532,6 @@ impl PyWorld {
         self.lock().soldiers().len()
     }
 
-<<<<<<< HEAD
     /// Returns the number of live units of each faction, by faction number.
     ///
     /// **This is one call and it names no unit.** The engine maintains the
@@ -572,8 +572,6 @@ impl PyWorld {
             .collect()
     }
 
-    /// Adds a soldier at each address and returns the identity column.
-=======
     /// Adds a soldier at each address and returns their identities.
     ///
     /// The addresses are a sequence of `(q, r)` pairs of integers. The
@@ -583,7 +581,6 @@ impl PyWorld {
     /// for each address, in the order of the addresses. Keep the array and
     /// pass it to `order_gather` or `despawn_soldiers`. Take one entry as a
     /// Python integer for `soldier_tile` or `explain_choice`.
->>>>>>> worktree-agent-aa308c3f248672191
     ///
     /// The call takes a set and answers once. It is not a per-unit verb that
     /// a caller repeats, because a soldier is the mass tier and no caller
@@ -2275,17 +2272,34 @@ fn cachette_core_module(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<PyWorld>()?;
     module.add_class::<PyCamera>()?;
     module.add_function(wrap_pyfunction!(version, module)?)?;
-    module.add("CachetteError", module.py().get_type::<CachetteError>())?;
-    module.add("StepError", module.py().get_type::<StepError>())?;
-    module.add("FrameError", module.py().get_type::<FrameError>())?;
-    module.add("ConfigError", module.py().get_type::<ConfigError>())?;
-    module.add("SelectorError", module.py().get_type::<SelectorError>())?;
-    module.add("VerbError", module.py().get_type::<VerbError>())?;
-    module.add("ViewError", module.py().get_type::<ViewError>())?;
-    module.add(
-        "DeterminismError",
-        module.py().get_type::<DeterminismError>(),
-    )?;
-    module.add("EnginePanic", module.py().get_type::<EnginePanic>())?;
+    add_error::<CachetteError>(module, "CachetteError")?;
+    add_error::<StepError>(module, "StepError")?;
+    add_error::<FrameError>(module, "FrameError")?;
+    add_error::<ConfigError>(module, "ConfigError")?;
+    add_error::<SelectorError>(module, "SelectorError")?;
+    add_error::<VerbError>(module, "VerbError")?;
+    add_error::<ViewError>(module, "ViewError")?;
+    add_error::<DeterminismError>(module, "DeterminismError")?;
+    add_error::<EnginePanic>(module, "EnginePanic")?;
     Ok(())
+}
+
+/// The dotted path that every member of this module reports as its own.
+const MODULE_PATH: &str = "cachette._core";
+
+/// Adds one error class to the module, under the dotted module path.
+///
+/// The macro that declares an error writes the bare module name into
+/// `__module__`. Every other member of this module reports the dotted path,
+/// because the binding library writes it. A documentation build reads the
+/// import and skips a member whose module does not match the module it
+/// documents, so an error class published no prose and nothing failed.[^1]
+///
+/// # References
+///
+/// [^1]: Findings register, FND-333. `docs/FINDINGS.md`
+fn add_error<T: PyTypeInfo>(module: &Bound<'_, PyModule>, name: &str) -> PyResult<()> {
+    let class = module.py().get_type::<T>();
+    class.setattr("__module__", MODULE_PATH)?;
+    module.add(name, class)
 }

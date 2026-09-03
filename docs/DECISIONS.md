@@ -1429,9 +1429,9 @@ layout of what a watcher reads should live beside it.
 
 **It must not, because the control plane places no glyph.** The viewer fills a
 whole frame in one call, and the control plane hands it memory and puts the
-result on a screen.[^DEC113A] A layout standard written in Python would
+result on a screen.[^DEC116A] A layout standard written in Python would
 describe measurement and placement that nothing in Python performs. That is a
-capability nobody invokes, and this project records that shape.[^DEC113B]
+capability nobody invokes, and this project records that shape.[^DEC116B]
 
 **One panel is one file, and that is the part that was chosen rather than
 found.** The alternative was one list of sections in the drawing module, which
@@ -2957,8 +2957,8 @@ a failed founding is correct.[^PRD12]
 [^DEC96D]: ADR-0064, a unit chooses by scoring a small fixed option set, decision D1. `docs/adrs/accepted/adr-0064-a-unit-chooses-by-scoring-a-small-fixed-option-set.md`
 [^DEC97B]: Target platform costs. `docs/reference/graviton-costs.md`
 [^SWEEP]: Recurring Defect Shapes, shape 2. `.claude/rules/recurring-defects.md`
-[^DEC113A]: ADR-0094, the caller owns the camera and the pixels, decision D1. `docs/adrs/draft/adr-0094-the-caller-owns-the-camera-and-the-pixels.md`
-[^DEC113B]: Recurring Defect Shapes, shape 3. `.claude/rules/recurring-defects.md`
+[^DEC116A]: ADR-0094, the caller owns the camera and the pixels, decision D1. `docs/adrs/draft/adr-0094-the-caller-owns-the-camera-and-the-pixels.md`
+[^DEC116B]: Recurring Defect Shapes, shape 3. `.claude/rules/recurring-defects.md`
 [^DEC107A]: The pyglet package index entry, read 2 September 2026. https://pypi.org/pypi/pyglet/json
 [^DEC107B]: The pygame and pygame-ce package index entries, read 2 September 2026. https://pypi.org/pypi/pygame/json
 [^DEC107C]: ADR-0094, the caller owns the camera and the pixels, decision D5. `docs/adrs/draft/adr-0094-the-caller-owns-the-camera-and-the-pixels.md`

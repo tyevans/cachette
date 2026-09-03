@@ -256,7 +256,7 @@ choice for the site item, which can see the rendering.
 
 [^1]: Backlog item 0310, write the Rust doc comments for the Python reader. `docs/backlog/complete/0310-write-the-rust-doc-comments-for-the-python-reader.md`
 [^2]: ADR-0107, the Python reference is generated from the compiled module. `docs/adrs/draft/adr-0107-the-python-reference-is-generated-from-the-compiled-module.md`
-[^3]: Backlog item 0309, publish the Python reference generated from the compiled module. `docs/backlog/refined/0309-publish-the-python-reference-generated-from-the-compiled-module.md`
+[^3]: Backlog item 0309, publish the Python reference generated from the compiled module. `docs/backlog/complete/0309-publish-the-python-reference-generated-from-the-compiled-module.md`
 [^4]: The Python bindings crate. `crates/cachette-py/src/lib.rs`
 [^5]: Findings register, FND-321. `docs/FINDINGS.md`
 [^6]: Decision Record Scope, section 1. `.claude/rules/adr-scope.md`
@@ -269,6 +269,6 @@ choice for the site item, which can see the rendering.
 [^13]: Product requirement record 0021, what this does not do. `docs/product/accepted/prd-0021-a-developer-can-use-the-control-plane-without-reading-its-source.md`
 [^14]: ADR-0002, simulated and aggregated state holds no floating point number, decision D1. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
 [^15]: Documentation Rules, section 2. `.claude/rules/documentation.md`
-[^16]: Findings register, FND-326. `docs/FINDINGS.md`
-[^17]: Findings register, FND-327. `docs/FINDINGS.md`
+[^16]: Findings register, FND-331. `docs/FINDINGS.md`
+[^17]: Findings register, FND-332. `docs/FINDINGS.md`
 [^18]: ADR-0074, a spawn may over-fill a tile, and only admission enforces the capacity, decisions D1 and D2. `docs/adrs/accepted/adr-0074-a-spawn-may-over-fill-a-tile-and-only-admission-enforces-the-capacity.md`
