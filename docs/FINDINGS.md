@@ -32,13 +32,19 @@ the case.[^ALLOC2]
 
 ## A. Corrections to stated rules
 
-### FND-306 — A gate in a pipeline prints its failure and does not stop the chain
+### FND-306 — A check that prints its failure while the commit lands looks exactly like a check that never ran
 
-**Believed, twice, and wrong both times.** A commit landed on the trunk holding
-conflict markers, after the marker check had run. The first explanation was
-that the check reports a failure and exits zero. The second was that the check
-skips a worktree's own files when it runs from inside that worktree, because a
-worktree path is in its skip list.
+**The symptom is the finding.** A commit landed on the trunk holding conflict
+markers. The marker check had run in the same command, and its failure text had
+scrolled past on the way. That is what a working check looks like when
+something discards its answer, and it is also what a check looks like when it
+does not run. Nothing in the output distinguishes the two.
+
+**Believed, twice, and wrong both times.** The first explanation was that the
+check reports a failure and exits zero. The second was that the check skips a
+worktree's own files when it runs from inside that worktree, because a worktree
+path is in its skip list. Two readers reached for "the check is broken" before
+"my shell discarded its answer", because the symptom points that way.
 
 **Both are false, and the check is sound.** A probe put a real marker in a file
 inside a worktree and ran the check from inside that worktree. It named the
@@ -70,7 +76,19 @@ python3 scripts/check_conflict_markers.py > /dev/null && echo REACHED
   (nothing)
 ```
 
-**Follows.** Three things.
+**The defect appeared inside the attempt to verify it.** The second reader ran
+the probe piped through a reader of its output, saw exit zero, and concluded
+the check was blind. Unpiped, the same tree gives exit 1. So a status was
+masked by a pipeline during the checking of a claim about a status masked by a
+pipeline.
+
+**Follows.** Four things.
+
+**Read the symptom as ambiguous, not as evidence.** Failure text with a
+successful outcome has three possible causes: the check did not run, the check
+ran and cannot see, or the check ran and something threw away its verdict. The
+output is identical in all three. Anyone who names one of them without a probe
+is guessing, and two readers guessed wrong in one night.
 
 **Never put a gate on the left of a pipe.** Redirect its output if the output
 is long. A gate exists to stop the next command, and a pipe takes that away

@@ -112,27 +112,11 @@ whole system that no consumer ever reads. Nothing has priced the copy against
 that storage, because no run separates the two, so the decision takes the
 smaller storage and says which figure would reopen it.[^11]
 
-**A second ground for the trade now exists, and this decision did not weigh
-it.** The paragraph above weighs the copy against the storage. A measurement
-since taken weighs a third quantity that neither side of that sentence names:
-the cost of opening a parallel section. One scratch plane means a pass relaxes
-one faction at a time, so a solve opens a thread scope for each faction in each
-pass. Giving each faction its own plane would let one scope serve them all.
-The register holds the figures and the machine they came from.[^12]
-
-**The reopening condition this decision states is not the one that was met.**
-It asks for a run that separates the copy from the storage, and no run has. The
-spawn cost is a different quantity, and it was measured on a development
-machine rather than on the target platform, so it does not close the question
-either. This paragraph records that the ground has widened. It does not change
-the decision, and the decision stands as written until a run on the target
-platform prices the spawn against the storage.[^11]
-
 **A plane of one faction is read only by that faction.** That is what makes
 one scratch enough: relaxing one plane before another changes neither of them,
 so the order over the factions cannot change the result. The order is fixed
 anyway, in ascending faction identifier, because a reader should not have to
-prove that to know what a pass returns.[^13]
+prove that to know what a pass returns.[^12]
 
 ## Consequences
 
@@ -171,5 +155,4 @@ reference units hold values that must not be compared.
 [^9]: ADR-0023, an aggregate combines exactly, in any order, decisions D1 and D2. `docs/adrs/accepted/adr-0023-an-aggregate-combines-exactly-in-any-order.md`
 [^10]: ADR-0023, an aggregate combines exactly, in any order, decision D4. `docs/adrs/accepted/adr-0023-an-aggregate-combines-exactly-in-any-order.md`
 [^11]: Blockers register, BLK-007. `docs/BLOCKERS.md`
-[^12]: Findings register, FND-300. `docs/FINDINGS.md`
-[^13]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
+[^12]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
