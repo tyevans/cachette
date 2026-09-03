@@ -38,6 +38,49 @@ fn any_grid_and_address() -> impl Strategy<Value = (Grid, Axial)> {
     })
 }
 
+/// A strategy that produces a grid of any legal width, and an index in it.
+///
+/// The width reaches the whole legal range rather than the modest extent the
+/// strategy above uses. **The conversion from an index to an address
+/// multiplies by a reciprocal that the width decides, so a narrow spread of
+/// widths would exercise one reciprocal and report that the whole range
+/// works.**[^1] The height is chosen after the width, so that the tile count
+/// stays inside the ceiling that makes the reciprocal exact.
+///
+/// # References
+///
+/// [^1]: Testing rules, section 2a. `.claude/rules/testing.md`
+fn any_wide_grid_and_index() -> impl Strategy<Value = (Grid, u32)> {
+    (1u32..=u32::MAX)
+        .prop_flat_map(|width| {
+            let tallest = (u32::MAX / width).max(1);
+            (Just(width), 1u32..=tallest)
+        })
+        .prop_map(|(width, height)| {
+            Grid::new(width, height).expect("the height was chosen to fit the ceiling")
+        })
+        .prop_flat_map(|grid| {
+            let count = grid.tile_count();
+            let width = grid.width();
+            let rows = grid.height();
+            // **The index is drawn at a row boundary, not uniformly.** A
+            // reciprocal that is one too small gives the wrong quotient
+            // exactly at a multiple of the width, and nowhere else. A uniform
+            // index below the tile count lands on a multiple with probability
+            // one over the width, so at a wide extent it never lands on one,
+            // and the property passes against a broken reciprocal.
+            //
+            // This was not reasoned out in advance. The defect was put back
+            // and the uniform version of this strategy stayed green.[^1]
+            //
+            // [^1]: Testing rules, section 2a. `.claude/rules/testing.md`
+            (Just(grid), 0u32..rows, -1i64..=1).prop_map(move |(grid, row, offset)| {
+                let at = i64::from(row) * i64::from(width) + offset;
+                (grid, at.clamp(0, i64::from(count) - 1) as u32)
+            })
+        })
+}
+
 proptest! {
     #![proptest_config(ProptestConfig {
         // An integration test has no lib.rs or main.rs above it, so the
@@ -73,6 +116,23 @@ proptest! {
         let index = TileIdx(raw);
         let address = grid.address_of(index).expect("an inside index has an address");
         prop_assert_eq!(grid.index_of(address), Some(index));
+    }
+
+    /// The address of an index is the quotient and the remainder by the width.
+    ///
+    /// **This states the division that `address_of` no longer runs.** The
+    /// conversion multiplies by a reciprocal that the grid computes once, and
+    /// the claim that makes it legal is that the multiply gives the answer the
+    /// division gives, for every index of every world the crate can
+    /// build.[^2] A round trip through `index_of` cannot see a defect here,
+    /// because `index_of` would undo a wrong split of the same index.
+    ///
+    /// [^2]: Findings register, FND-282. `docs/FINDINGS.md`
+    #[test]
+    fn an_address_is_the_quotient_and_the_remainder((grid, raw) in any_wide_grid_and_index()) {
+        let address = grid.address_of(TileIdx(raw)).expect("an inside index has an address");
+        prop_assert_eq!(address.q as u32, raw % grid.width());
+        prop_assert_eq!(address.r as u32, raw / grid.width());
     }
 
     /// The index of an address is inside the world.
@@ -272,6 +332,64 @@ fn the_neighbour_offsets_are_six_distinct_unit_steps() {
     for (index, first) in NEIGHBOURS.iter().enumerate() {
         for second in &NEIGHBOURS[index + 1..] {
             assert_ne!(first, second);
+        }
+    }
+}
+
+/// Every index of every narrow world splits the way a division splits it.
+///
+/// The property above samples. This walks every index of every world up to a
+/// small edge, so the narrow widths are covered exhaustively rather than by
+/// chance. A width of one and a width of two are the two cases the reciprocal
+/// treats specially or nearly so.
+#[test]
+fn a_narrow_world_splits_every_index_the_way_a_division_does() {
+    for width in 1u32..=64 {
+        for height in 1u32..=64 {
+            let grid = Grid::new(width, height).expect("a small extent must describe a grid");
+            for raw in 0..grid.tile_count() {
+                let address = grid
+                    .address_of(TileIdx(raw))
+                    .expect("an inside index has an address");
+                assert_eq!(
+                    (address.q as u32, address.r as u32),
+                    (raw % width, raw / width),
+                    "width {width}, height {height}, index {raw}"
+                );
+            }
+        }
+    }
+}
+
+/// The widest and the narrowest worlds split their extreme indices correctly.
+///
+/// The reciprocal is exact because the tile count stays inside a `u32`. These
+/// are the worlds that sit on that bound, so they are the ones an error in the
+/// bound would reach first.
+#[test]
+fn the_extreme_worlds_split_their_extreme_indices() {
+    let extremes = [
+        (1u32, u32::MAX),
+        (u32::MAX, 1u32),
+        (2, u32::MAX / 2),
+        (u32::MAX / 2, 2),
+        (65_535, 65_535),
+    ];
+    for (width, height) in extremes {
+        let grid = Grid::new(width, height).expect("the extent must describe a world");
+        let count = grid.tile_count();
+        // A world one row tall has no index at the width, so the probes are
+        // filtered rather than assumed.
+        let probes = [0, 1, width.saturating_sub(1), width, count / 2, count - 1];
+        for raw in probes.into_iter().filter(|raw| *raw < count) {
+            let address = grid
+                .address_of(TileIdx(raw))
+                .expect("an inside index has an address");
+            assert_eq!(
+                (address.q as u32, address.r as u32),
+                (raw % width, raw / width),
+                "width {width}, height {height}, index {raw}"
+            );
         }
     }
 }

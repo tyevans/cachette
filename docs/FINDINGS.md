@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-284**
+**Next number: FND-285**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -7061,6 +7061,13 @@ items came from one reading of one pass, and the reading counted lookups. The
 item that removes four steps loses. The item that removes two steps wins,
 because those two are a division and the other two are a cache hit.
 
+**Neither item was built.** This finding recommended the smaller one, and a
+later measurement removed the division outright, so the smaller item was
+refused as well.[^F282A] A division is not a thing that needs a stored copy to
+avoid. The grid now holds a reciprocal of its width, one value derived from one
+value at one site, and every caller of the conversion is cheaper rather than
+only the unit passes.
+
 ### FND-283 — Three items competed to optimise under one percent of a frame, and none of them had a denominator
 
 **Believed.** The cost of turning a tile into a cell is worth an item. Three
@@ -7105,6 +7112,52 @@ would have stopped all three items was the cheapest one to write.
 **An item that names a cost should name its share.** All three items opened by
 naming a mechanism and pricing it in bytes or in steps. None of them stated what
 fraction of a frame it stood to win, and none of the reviews of them asked.
+
+### FND-284 — A property test over the whole legal range passed against a broken reciprocal, and an exhaustive test over a narrow one caught it
+
+**Believed.** A property test that samples the whole legal range of a parameter
+covers that range better than a test that walks a small part of it
+exhaustively. The wider strategy was written first for that reason.
+
+**True.** The wide property passed against a defect that the narrow exhaustive
+test failed on immediately. **A uniform sample over a large range is a weak
+fixture when the defect lives at a sparse set of inputs.**
+
+**Evidence.** The grid now converts a tile index to an address by multiplying by
+a reciprocal of the width, rather than dividing.[^F282C] The classic error in
+that construction is to omit the increment, which makes the reciprocal one too
+small. The defect was put back, and five tests were watched.
+
+The wrong reciprocal gives a wrong quotient at an exact multiple of the width,
+and at no other index. A uniform index below the tile count is a multiple of the
+width with probability one over the width. The strategy drew widths across the
+whole legal range, so a typical width was near two thousand million, and the
+property never drew a failing index in any run.
+
+The exhaustive test over widths one to sixty-four failed at once, because at
+those widths almost every draw is near a multiple.
+
+**The fix was to the fixture, not to the assertion.** The strategy now draws a
+row and an offset of minus one, zero or one, so every case sits on or beside a
+row boundary. The defect was put back a second time and the property then
+failed. Both the assertion and the range were correct throughout; only the
+distribution was wrong.
+
+**Follows.** Three things.
+
+**A wide range and a good fixture are different things, and the first looks like
+the second.** The strategy that sampled every legal width read as the more
+thorough test. It was the weaker one, and nothing in reading it would have said
+so.
+
+**Ask where the defect lives before choosing the distribution.** The failing set
+here is describable in one sentence, and the sentence names the distribution the
+test needed. That question is cheaper than the test.
+
+**The rule that caught this is the rule that says to put the defect back.** The
+project already holds two instances of a fixture that hid a defect.[^F262D] This
+is the third, and it is the first where the fixture covered a wider range than
+the test that worked.
 
 ## References
 
@@ -7387,7 +7440,7 @@ fraction of a frame it stood to win, and none of the reviews of them asked.
 [^F281A]: Backlog item 0267, hold the exit direction on the tile. `docs/backlog/complete/0267-hold-the-exit-direction-on-the-tile.md`
 [^F281B]: The exit locality benchmark. `crates/cachette-core/benches/exit_locality.rs`
 [^F281D]: Decisions register, DEC-105. `docs/DECISIONS.md`
-[^F282A]: Backlog item 0268, hold the cell index on the unit. `docs/backlog/proposed/0268-hold-the-cell-index-on-the-unit.md`
+[^F282A]: Backlog item 0268, hold the cell index on the unit. `docs/backlog/complete/0268-hold-the-cell-index-on-the-unit.md`
 [^F282B]: Findings register, FND-252, in this document.
 [^F282C]: The grid address conversion. `crates/cachette-core/src/hex.rs`
 [^F282D]: Backlog priority index. `docs/backlog/PRIORITY.md`
