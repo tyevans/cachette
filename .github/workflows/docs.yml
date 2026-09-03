@@ -1,0 +1,85 @@
+# The documentation site. ADR-0107 D1 and D4.
+#
+# The reference comes from an import of the compiled extension module, so this
+# is a compile job. It builds the Rust bindings crate, installs the built
+# module, and only then builds the site. It fails rather than publishes when
+# the import does not happen.
+name: docs
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: docs-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    name: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # rust-toolchain.toml pins the compiler. The site build needs it,
+      # because the reference needs the compiled module.
+      - name: Install the toolchain
+        run: rustup show active-toolchain || rustup toolchain install
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: docs
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - uses: extractions/setup-just@v3
+
+      # The recipe builds the extension, installs it, builds the site, and
+      # checks that every summary the import found reached a page. The order
+      # and the checks are in the script, which is their one declaration site.
+      - name: Build the site
+        run: just docs
+
+      # A guard nobody has seen fire has not been shown to exist. The recipe
+      # takes the compiled module out of the environment, then turns module
+      # inspection off, and requires the job above to fail both times. The
+      # second case is the one that reports nothing on its own.
+      - name: Prove that the build fails when the import fails
+        run: just docs-probe
+
+      # The artefact is built on every run. Publishing it is a separate job,
+      # and BLK-035 holds the address it would publish to.
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: target/site
+
+  # BLK-035 is open. Nobody in this tree can say where the site publishes, or
+  # who turns the publishing on. This job therefore takes the switch as a
+  # repository variable and never as a value in a file. It does nothing until
+  # the project owner sets CACHETTE_DOCS_PUBLISH to `true` and sets the hosting
+  # source to GitHub Actions. The address comes back from the host, so no file
+  # in this repository states one.
+  publish:
+    name: publish
+    needs: build
+    if: github.ref == 'refs/heads/main' && vars.CACHETTE_DOCS_PUBLISH == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

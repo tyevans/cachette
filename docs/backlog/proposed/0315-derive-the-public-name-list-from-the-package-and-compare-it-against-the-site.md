@@ -66,4 +66,4 @@ same set.
 [^5]: Testing Rules, section 2a. `.claude/rules/testing.md`
 [^6]: Backlog item 0310, write the Rust doc comments for the Python reader. `docs/backlog/proposed/0310-write-the-rust-doc-comments-for-the-python-reader.md`
 [^7]: Backlog item 0307, generate the type stub from the compiled module. `docs/backlog/proposed/0307-generate-the-type-stub-from-the-compiled-module.md`
-[^8]: Backlog item 0309, publish the Python reference generated from the compiled module. `docs/backlog/refined/0309-publish-the-python-reference-generated-from-the-compiled-module.md`
+[^8]: Backlog item 0309, publish the Python reference generated from the compiled module. `docs/backlog/complete/0309-publish-the-python-reference-generated-from-the-compiled-module.md`

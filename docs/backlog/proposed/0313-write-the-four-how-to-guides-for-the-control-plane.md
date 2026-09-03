@@ -70,5 +70,5 @@ item draws the line between the two.
 [^5]: Product requirement record 0019, an agent can ask the running engine what it holds. `docs/product/shaped/prd-0019-an-agent-can-ask-the-running-engine-what-it-holds.md`
 [^6]: Blockers register, BLK-007. `docs/BLOCKERS.md`
 [^7]: Blockers register, BLK-034. `docs/BLOCKERS.md`
-[^8]: Backlog item 0309, publish the Python reference generated from the compiled module. `docs/backlog/refined/0309-publish-the-python-reference-generated-from-the-compiled-module.md`
+[^8]: Backlog item 0309, publish the Python reference generated from the compiled module. `docs/backlog/complete/0309-publish-the-python-reference-generated-from-the-compiled-module.md`
 [^9]: Backlog item 0314, write the explanation pages and link out rather than copy. `docs/backlog/proposed/0314-write-the-explanation-pages-and-link-out-rather-than-copy.md`

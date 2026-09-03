@@ -57,4 +57,4 @@ reference, so that the page and the reference cannot disagree.
 [^2]: Backlog item 0311, execute every documentation example from the test suite. `docs/backlog/proposed/0311-execute-every-documentation-example-from-the-test-suite.md`
 [^3]: Blockers register, BLK-007. `docs/BLOCKERS.md`
 [^4]: Product requirement record 0019, an agent can ask the running engine what it holds. `docs/product/shaped/prd-0019-an-agent-can-ask-the-running-engine-what-it-holds.md`
-[^5]: Backlog item 0309, publish the Python reference generated from the compiled module. `docs/backlog/refined/0309-publish-the-python-reference-generated-from-the-compiled-module.md`
+[^5]: Backlog item 0309, publish the Python reference generated from the compiled module. `docs/backlog/complete/0309-publish-the-python-reference-generated-from-the-compiled-module.md`

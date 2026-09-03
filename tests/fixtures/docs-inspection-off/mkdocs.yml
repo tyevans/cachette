@@ -1,0 +1,46 @@
+# A broken configuration. It exists to be rejected.
+#
+# It is the real site configuration with one setting added: module inspection
+# is off. The builder then cannot import the compiled extension module, so it
+# falls back to the type stub. The build still succeeds, and the reference
+# loses the prose of every method. Research report 19 section 4.2 measured that
+# page against this repository, and neither build reported an error.
+#
+# The `docs-probe` recipe builds this and requires the documentation job to
+# fail. A guard that nobody has seen fire has not been shown to exist.
+#
+# The builder resolves every path here against the directory that holds the
+# configuration file, and it refuses a directory outside that one. The two
+# paths below are therefore written from the repository root, and the probe
+# copies this file there before it builds.
+site_name: Cachette
+site_description: A deterministic world simulation engine.
+
+docs_dir: docs/site
+site_dir: target/site-inspection-off
+
+theme:
+  name: material
+
+markdown_extensions:
+  - footnotes
+  - admonition
+  - toc:
+      permalink: true
+
+nav:
+  - Home: index.md
+  - Reference: reference.md
+
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          options:
+            # This is the setting that the real configuration never sets, and
+            # that ADR-0107 D1 forbids.
+            allow_inspection: false
+            filters:
+              - "!^__"
+            show_root_heading: true

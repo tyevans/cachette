@@ -69,4 +69,4 @@ site that item 0309 builds.[^6]
 [^3]: Findings register, FND-223. `docs/FINDINGS.md`
 [^4]: Findings register, FND-242. `docs/FINDINGS.md`
 [^5]: Testing Rules, section 2a. `.claude/rules/testing.md`
-[^6]: Backlog item 0309, publish the Python reference generated from the compiled module. `docs/backlog/refined/0309-publish-the-python-reference-generated-from-the-compiled-module.md`
+[^6]: Backlog item 0309, publish the Python reference generated from the compiled module. `docs/backlog/complete/0309-publish-the-python-reference-generated-from-the-compiled-module.md`
