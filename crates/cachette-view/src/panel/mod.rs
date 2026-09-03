@@ -557,16 +557,22 @@ fn paint(canvas: &mut Canvas, left: i32, right: i32, pen: i32, line: &Line) {
             write_fitted(canvas, left, right, pen, text, 1, HEADING);
         }
         Line::Rule => canvas.block(left, pen + 3, right - left, 1, EDGE),
+        // A label is bounded by the panel edge and not by the value column.
+        // The bound that matters is the one that stops text reaching the map,
+        // and a label wider than the column is still legible, because the
+        // value is written against the right edge. The pair is reported as a
+        // cut when the two together are wider than the row, which is the case
+        // where the value would sit over the label.
         Line::Row(label, value) => {
             let column = left + VALUE_COLUMN;
-            write_fitted(canvas, left, column, pen, label, 1, LABEL);
+            write_fitted(canvas, left, right, pen, label, 1, LABEL);
             write_against_right(canvas, column, right, pen, value, VALUE);
         }
         Line::Swatch(colour, label, value) => {
             canvas.block(left, pen, SWATCH, SWATCH, *colour);
             let text_left = left + SWATCH + SWATCH_GAP;
             let column = left + VALUE_COLUMN;
-            write_fitted(canvas, text_left, column, pen, label, 1, LABEL);
+            write_fitted(canvas, text_left, right, pen, label, 1, LABEL);
             write_against_right(canvas, column, right, pen, value, VALUE);
         }
     }
