@@ -163,7 +163,7 @@ declare_stages! {
     HoldingSpread,            "holding_spread",             true,  1, false;
     HoldingCandidates,        "holding_candidates",         true,  1, true;
     HoldingDecide,            "holding_decide",             true,  1, true;
-    HoldingApply,             "holding_apply",              false, 1, true;
+    HoldingApply,             "holding_apply",              true,  1, true;
     StampHolders,             "stamp_holders",              false, 1, false;
     ApplyRates,               "apply_rates",                true,  1, false;
     Consume,                  "consume",                    true,  1, false;
