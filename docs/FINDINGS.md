@@ -1042,16 +1042,47 @@ reported 14571 failures and named the lock file on every line.
 **What follows.** A search for a name needs two conditions that a fixed-string
 search does not carry. The name must be distinctive enough that a match means
 a reference, and the match must stand on its own rather than sit inside a
-longer name. The check now asks both. It searches for a path only when the
-path holds a directory separator or a file extension, and it accepts a match
-only when neither neighbouring character continues a path.
+longer name. The check now asks both.
 
-**A skipped path is reported, not dropped.** A name with no directory and no
-extension is still a moved file, and the check prints a note for it. The note
-says why the search did not run, so a reader can search by hand. This leaves a
-real gap: a move of a file such as `justfile` goes unsearched. The gap is
-stated rather than hidden, because a check that silently declines to look is
-the worse failure.
+**The two conditions do different work, and the measurement says which does
+which.** The first repair asked both at once, and the tidier reading was that
+the second condition carried it. That reading is wrong. Over the tree at the
+merge, a fixed-string search for `0` matches 14588 lines. The
+stands-on-its-own condition alone leaves 2066 of them, because prose holds
+sentences such as "level 0 holds individual tiles". It annihilates the lock
+file only because a lock file holds no prose. **The distinctive-name condition
+is the one that carries this defect, and anyone who simplifies it away
+reopens it.**
+
+**The first form of the distinctive-name condition was too wide.** It searched
+for a path only when the path held a directory separator or a file extension.
+That rejects the bare number and it also rejects `justfile`, which 16 lines of
+this project name and which no prose holds by accident. A move of it reported
+nothing and the gate passed. The condition now asks the narrower question:
+can ordinary prose hold this token? A bare number can, a word cannot, so the
+check skips a path whose last segment is all digits and searches every other
+path. A bare number one directory down is the same defect and is skipped for
+the same reason.
+
+**A skipped path is reported, not dropped.** A moved file the check does not
+search for is still a moved file, and the check prints a note for it. The note
+says why the search did not run, so a reader can search by hand. A residual
+gap remains for a name that is neither a number nor distinctive, such as a
+one-letter file at the root. It is stated rather than closed, because no such
+file exists and an escape written before a real instance is a capability
+nobody invokes.[^37]
+
+**A match now survives a full stop that ends a sentence.** A full stop
+continues a name in `docs/a.md.bak` and closes one in "the detail is in
+docs/a.md." The two are told apart by the character after the stop. Prose that
+names a path outside a code span breaks the documentation rule, and it is
+therefore the prose most likely to be stale.
+
+**The rule now has a probe, and it did not before.** Each condition above was
+put back as a defect, one at a time, and the probe was run against it. The
+condition that shipped first fails exactly the case built for `justfile`. A
+probe is the thing that would have found this hole without anyone reasoning
+about it, and its absence is why two repairs were needed rather than one.
 
 **The shape.** This is the inert-capability shape inverted. The rule was not
 inert; it ran, and it ran on the first input that was outside the distribution
@@ -1060,8 +1091,11 @@ one-character name, so the assertion never received the input that would fail
 it.[^84] The defect lived at an extreme of the distribution, and the
 fixture modelled the typical case.
 
-**The cost of finding it was one gate.** The check is nine hours old and this
-is its first live merge.[^F257B]
+**The cost of finding it was one gate, and then one review.** The check is
+nine hours old, this was its first live merge, and its first repair carried a
+second instance of the same shape.[^F257B] Both instances are one shape: a
+rule was narrowed against the input in front of it, and nothing measured what
+the narrowing cost on the inputs that were not.
 
 
 ### FND-256 — The fixture of a benchmark is its least reviewed code and its most load-bearing

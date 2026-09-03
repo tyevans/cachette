@@ -53,6 +53,9 @@ Modes:
   --since REF     check the change from REF to the working tree.
   --branch        the same, against the merge base with the default branch.
                   This is the gate, which runs with nothing staged.
+  --root PATH     read that repository rather than this one. It comes first,
+                  and it exists so that a probe can build a history and drive
+                  the real command over it.[^6]
 
 **The hook cannot be the whole answer, and not only because it is
 bypassable.** Git runs the pre-commit hook when a merge stops and a person
@@ -70,6 +73,7 @@ beyond the standard library and git.
 [^3]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`
 [^4]: Recurring defect shapes, shape 3. `.claude/rules/recurring-defects.md`
 [^5]: The priority check. `scripts/check_priority.py`
+[^6]: The probe. `scripts/merge-defect-probe.sh`
 """
 
 import re
@@ -77,6 +81,9 @@ import subprocess
 import sys
 from pathlib import Path
 
+# The repository the check reads. `--root` moves it, which is the only way to
+# drive this check over a history built for a test: its input is a change, not
+# a directory, so a fixture directory cannot express it. The probe uses it.
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
@@ -172,19 +179,41 @@ def changed(since: str | None) -> tuple[list[str], list[str]]:
 
 
 # A path is worth searching for only when a citation could hold it. A bare
-# name with no directory and no extension is a substring of ordinary text, so
-# a search for it reports every line that happens to contain it. One such name
-# reached this check: a file called `0`, whose search returned 14571 lines of a
-# lock file and no true finding.
+# number is a substring of ordinary text, so a search for it reports every line
+# that happens to contain it. One such name reached this check: a file called
+# `0`, whose search returned 14571 lines and no true finding.
+#
+# The first form of this guard asked for a directory separator or a file
+# extension. That rejected the bare number and it also rejected `justfile`,
+# which is a distinctive name that documents cite, so a move of it was reported
+# as nothing at all. The guard now asks the narrower question the comment above
+# always stated: can ordinary prose hold this token? A number can. A word
+# cannot.
 def citation_shaped(path: str) -> bool:
     """Say whether a moved path is distinctive enough to search for."""
-    return "/" in path or "." in path
+    return not path.rsplit("/", 1)[-1].isdigit()
 
 
 # A path names a file when it stands on its own. These characters continue a
 # path or a word, so a match with one of them on either side is a longer name
 # that merely contains the moved one.
 CONTINUES = re.compile(r"[A-Za-z0-9_./-]")
+
+
+def ends_the_sentence(text: str, end: int) -> bool:
+    """Say whether the character at `end` is a full stop rather than a path.
+
+    A full stop continues a path in `docs/a.md.bak` and ends a sentence in
+    `see docs/a.md.` The two are told apart by what follows the stop: a path
+    character continues the name, and anything else closes it. Without this,
+    prose that ends a sentence with a bare path is invisible to the rule, and
+    prose that names a path outside a code span is the prose most likely to
+    go stale.
+    """
+    if end >= len(text) or text[end] != ".":
+        return False
+    after = text[end + 1] if end + 1 < len(text) else " "
+    return not CONTINUES.match(after)
 
 
 def names_path(text: str, path: str) -> bool:
@@ -194,7 +223,8 @@ def names_path(text: str, path: str) -> bool:
         end = start + len(path)
         before = text[start - 1] if start else " "
         after = text[end] if end < len(text) else " "
-        if not CONTINUES.match(before) and not CONTINUES.match(after):
+        closes = not CONTINUES.match(after) or ends_the_sentence(text, end)
+        if not CONTINUES.match(before) and closes:
             return True
         start = text.find(path, start + 1)
     return False
@@ -265,6 +295,11 @@ def register_defects() -> list[tuple[str, str, str]]:
     """
     out: list[tuple[str, str, str]] = []
     for prefix, path in check_registers.REGISTERS:
+        # The register list is the register check's, and its paths are rooted
+        # at the real repository. Re-root them rather than restating the list.
+        path = ROOT / path.relative_to(check_registers.ROOT)
+        if not path.is_file():
+            continue
         for failure in check_registers.check(prefix, path):
             test = "pointer" if "next number" in failure else "collision"
             out.append((path.name, test, failure.split(": ", 1)[-1]))
@@ -292,7 +327,11 @@ def repeated_rows() -> list[tuple[str, str, str]]:
 
 
 def main() -> int:
+    global ROOT
     argv = sys.argv[1:]
+    if len(argv) >= 2 and argv[0] == "--root":
+        ROOT = Path(argv[1]).resolve()
+        argv = argv[2:]
     since: str | None = None
     if argv and argv[0] == "--since":
         if len(argv) < 2:
