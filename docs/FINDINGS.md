@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-301**
+**Next number: FND-305**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -1786,6 +1786,10 @@ statement about what a copy of a holding means.
 
 **A saving of 384 milliseconds bought a cost of 12.** The trade is good and the
 cost is recorded so that it is not found again as a mystery.
+
+**This row's conclusion is wrong, and a later row corrects it.** The residual
+did not follow the allocation. The pass still allocates and the residual is back
+under half a millisecond.[^F277C]
 
 
 ## F. Sourcing
@@ -8130,6 +8134,165 @@ reason.
 **Check the time on the artefact you are about to measure.** One `ls` would have
 caught it two hours earlier.
 
+### FND-304 — Admission searched two count tables once for each segment, and it visits them in the order they are stored
+
+**Believed.** The passes that grant an intent read two small tables of counts,
+one for arrivals and one for departures. A lookup in a small table is cheap, so
+reading them once for each target tile costs little.
+
+**True.** The tables are not small. At the target scale they reach one entry for
+almost every target tile, and a lookup is a binary search over them. The grant
+passes were 60 percent of the whole admission stage, and they run on the calling
+thread.
+
+**The order the pass already has removes the search.** The segments are in
+ascending tile order because the admission sort put them there, both tables are
+in ascending tile order because the merge that fills them requires it, and
+neither table changes while the pass walks the segments. One forward reader for
+each table therefore replaces every search, and the walk costs the segments plus
+the entries.
+
+**The measurement.** A probe inside the stage. Development machine, 16,777,216
+tiles, 1,000,000 units scattered, 12 threads. The last frame of ten, with
+314,158 intents and 291,047 segments:
+
+| Part | ns | Share | Runs on |
+|---|---|---|---|
+| Sort the intents by target tile | 208,785,397 | 20.1 percent | one thread |
+| Follow the permutation | 13,198,816 | 1.3 percent | one thread |
+| Build the segment table | 59,892,786 | 5.8 percent | one thread |
+| Read the capacity and the occupancy | 132,558,620 | 12.8 percent | every thread |
+| Grant the intents | 623,729,193 | 60.1 percent | one thread |
+
+**Eighty-seven percent of the stage runs on one thread**, and the stage declares
+that it takes a thread count. The declaration is not wrong, because the one
+parallel part is real, but the column cannot say that seven eighths of a stage
+ignores the number.
+
+**Follows.** Two things.
+
+**A table that grows with the tiles is not a small table, whatever it is named
+for.** These hold arrivals and departures, which sound like a handful of events,
+and they reach almost every target tile at the target density.
+
+**This is the third place tonight where a search was removed by the order the
+caller already had.** The other two are the spread deciding a tile and the same
+stage reading how many units stand on a target.[^F304A] The shape is worth
+looking for: a bounded search whose caller walks in the order the searched
+structure is stored in.
+
+### FND-301 — The bridge rebuild is 16.4 percent of a frame, and the record that gives it one thread says it has not earned one
+
+**Believed.** The bridge rebuild does not earn a thread. The record says so in
+those words, and it argues that splitting a radix histogram across threads is
+more machinery than the whole rebuild costs.[^F301A]
+
+**True as a design argument and false as a cost claim.** The rebuild is
+30,754,053 nanoseconds of a 187,862,216 nanosecond frame, which is 16.37
+percent. It is the third largest stage in the engine. The record was written
+before any measurement existed on the target platform, and the phrase "does not
+earn one" is a claim about cost.
+
+**Nothing here changes the record.** The reasoning it gives about the histogram,
+the fixed combine order and the placement offsets is unaffected by how large the
+stage is, and every one of those is a place where a result could take its order
+from a thread. What the measurement changes is the premise, not the argument.
+
+**Where the time goes.** A probe inside the rebuild. Development machine,
+16,777,216 tiles, 1,000,000 units, 12 threads, the last frame of ten:
+
+| Part | ns | Share |
+|---|---|---|
+| Walk the arena and build the keys | 109,373,561 | 16.7 percent |
+| Order the keys | 412,957,538 | 63.0 percent |
+| Follow the permutation | 117,637,598 | 17.9 percent |
+| Rebuild the block ranges | 16,026,693 | 2.4 percent |
+
+**The stage declared that it takes a thread count, and the record says it
+accepts none.** Three stages wrap this one call and all three declared `true`.
+Measured at one thread and at twelve on the development machine, at 4,194,304
+tiles and 250,000 units, the stage costs 43,040,085 and 57,165,452 nanoseconds:
+it does not improve, and it may get worse. The declarations are now `false`.
+
+**Follows.** Two things.
+
+**A record that argues from cost needs its cost re-read when a measurement
+arrives.** This one is still right, and nobody could have known that without
+taking the figure.
+
+**A declaration in the source is a claim, and this project already said so.**
+The cost register states that the thread-count column is a declaration rather
+than a measurement, and that the table is where the two can be compared. Three
+rows disagreed with an accepted record for as long as the table has existed, and
+the comparison the register invites is what found them.
+
+### FND-302 — Every ordering pass sorts the whole key set a second time, to check that no identifier repeats
+
+**Believed.** The key vector sort costs its radix passes. The guard that refuses
+a repeated identifier is a check, and a check is cheap beside the work it
+guards.
+
+**True.** The guard allocates one 64-bit value for each key and comparison-sorts
+them, before the radix runs. It is a second full sort of the same set, and both
+passes that this project measures tonight pay it: the admission sort over about
+314 thousand intents and the bridge rebuild over one million units, on every
+frame.
+
+**The measurement is not clean and it is reported that way.** The development
+machine was loaded, and the figures for one configuration varied by a factor of
+five between runs. What is not in doubt is the shape: the guard is
+`sort_unstable` over a vector it allocates, and the radix that follows is three
+counting passes. Take the shares below as an order of magnitude and not as a
+figure.
+
+| Set | Guard, ns | Radix, ns |
+|---|---|---|
+| 1,000,000 keys | 11,781,361 to 60,213,363 | 131,517,658 to 337,357,895 |
+| about 300,000 keys | 86,882,731 to 111,072,468 | 71,317,708 to 71,643,957 |
+
+**The guard protects determinism, and that is why it is not simply removed.**
+The identifier is what makes the order total. Two keys that share both the
+ordering field and the identifier tie, and a tie is a place where the result can
+depend on something the caller did not state.
+
+**The guard is stronger than the property it protects.** It refuses two keys
+that share an identifier even when their ordering fields differ, and such a pair
+ties nothing. The narrower property, that no two keys share the pair, is
+adjacent in the sorted result and therefore free to check after the radix rather
+than before it.
+
+**Nothing is changed here.** Narrowing the contract of a shared sort is a
+determinism decision, and the scope rule says a determinism decision always gets
+a record even when it looks obvious. The decisions register holds the
+options.[^F302A]
+
+### FND-303 — The twelve millisecond residual was not the allocation, and it has gone
+
+**Believed.** The unmeasured part of a frame grew from 22,202 nanoseconds to
+about 12 milliseconds when the candidate pass began allocating a bit plane on
+every frame, and it stayed there when twelve allocations became one. The
+register concluded that the residual follows the allocation.[^F277C]
+
+**True.** The residual is 310,942 nanoseconds, which is 0.17 percent of a
+187,862,216 nanosecond frame. **The candidate pass still allocates a bit plane
+on every frame, and nothing in it changed.** What changed is that the tile value
+field became a dense delta and the change merge stage went away.
+
+**So the earlier conclusion was wrong.** The residual did not follow the
+allocation. It followed something in the pass that has since been removed, and
+the coincidence in timing was strong enough to survive one attempt to refute it.
+
+**Follows.** Two things.
+
+**One refutation is not enough when the alternative was never tested.** The
+earlier row ruled out the number of mappings and then concluded that the
+allocation was the cause, without ever testing a build that did not allocate.
+The remaining hypothesis inherited the confidence of the one that was tested.
+
+**A residual is a difference of two large numbers, and it moves when either
+does.** Twelve milliseconds against a 463 millisecond frame and 0.31
+milliseconds against a 188 millisecond frame are not the same measurement twice.
+
 ## References
 
 [^F261B]: The holder count test of the viewer. `crates/cachette-view/tests/shows_who_holds_the_ground.rs`
@@ -8447,3 +8610,6 @@ caught it two hours earlier.
 [^F297A]: The target platform benchmark script. `scripts/graviton-benchmark.sh`
 [^F300A]: Backlog item 0277, hold a thread back when the work will not pay for it. `docs/backlog/proposed/0277-hold-a-thread-back-when-the-work-will-not-pay-for-it.md`
 [^F300B]: The demonstration stage split. `crates/cachette-core/examples/demo_stage_split.rs`
+[^F300A]: Findings register, FND-299 and FND-295, in this document.
+[^F301A]: ADR-0071, the bridge rebuild orders on one thread, decision D2. `docs/adrs/accepted/adr-0071-the-bridge-rebuild-orders-on-one-thread.md`
+[^F302A]: Decisions register, DEC-111. `docs/DECISIONS.md`
