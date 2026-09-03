@@ -26,9 +26,13 @@ font8x8 = { version = "0.3", default-features = false }
 minifb = { version = "0.28", optional = true }
 
 [features]
-# On by default, so that the window recipes build the binary with no extra
-# flag. A caller that wants the drawing and not the window turns it off.
-default = ["window"]
+# **Off by default, and that is the point.** A default feature is enabled by
+# feature unification whenever anything in the workspace builds this crate
+# with its defaults, and the binding crate then links a window library into a
+# module that only fills an array in memory. Turning it off by default makes
+# the record's constraint hold for every build and not only for the wheel.
+# The recipe that opens the window asks for it by name.
+default = []
 window = ["dep:minifb"]
 
 # The binary needs the window library, and nothing else in this crate does.

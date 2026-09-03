@@ -63,8 +63,11 @@ test-python:
 # to name the colours. Run `just inspect` for every number it does not show.
 #
 # Open the window and watch the world run. Needs a display.
+#
+# The window library is not a default feature, so this recipe names it. Every
+# other recipe here fills a frame into memory and needs no window at all.
 watch:
-    cargo run --release --package cachette-view
+    cargo run --release --package cachette-view --features window
 
 # This is where the panel went. It holds every section, at a height that never
 # cuts, and a person reads it without opening a window.
