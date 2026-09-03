@@ -228,25 +228,41 @@ def report(plan: Plan, before: str, after: str, started: str) -> None:
         )
     else:
         print("Nothing was rebuilt. This is the run the budget describes.")
+
+    # A recipe that stops early costs less than a recipe that runs, and its
+    # row looks like a fast gate. The two are told apart only here, so this
+    # says so before the table rather than after it.
+    broken = [row for row in plan.rows if row.status != 0]
+    if broken:
+        print()
+        count = f"{len(broken)} command line" + ("s" if len(broken) > 1 else "")
+        print(f"{count} failed. THIS RUN IS NOT A MEASUREMENT.")
+        print("A gate that stops early costs less than a gate that runs, so every")
+        print("share below is wrong. Read the failures, then run it again.")
+        for row in broken:
+            print(f"  exit {row.status}: {row.recipe}: {row.command}")
     print()
 
     width = max(len(name) for name in by_recipe) if by_recipe else 10
-    print(f"{'recipe'.ljust(width)}  {'wall':>8}  {'share':>6}  {'inner':>8}  built")
-    print(f"{'-' * width}  {'-' * 8}  {'-' * 6}  {'-' * 8}  -----")
+    header = f"{'recipe'.ljust(width)}  {'wall':>8}  {'share':>6}  {'inner':>8}  built  bad"
+    rule = f"{'-' * width}  {'-' * 8}  {'-' * 6}  {'-' * 8}  -----  ---"
+    print(header)
+    print(rule)
     for name, rows in by_recipe.items():
         seconds = sum(row.seconds for row in rows)
         inner = sum(row.inner_seconds for row in rows)
         built = sum(row.compiled for row in rows)
+        bad = sum(1 for row in rows if row.status != 0)
         share = seconds / total if total else 0.0
         print(
             f"{name.ljust(width)}  {seconds:8.1f}  {share * 100:5.1f}%  "
-            f"{inner:8.1f}  {built:5d}"
+            f"{inner:8.1f}  {built:5d}  {bad:3d}"
         )
-    print(f"{'-' * width}  {'-' * 8}  {'-' * 6}  {'-' * 8}  -----")
+    print(rule)
     inner_total = sum(row.inner_seconds for row in plan.rows)
     print(
         f"{'total'.ljust(width)}  {total:8.1f}  {100.0:5.1f}%  "
-        f"{inner_total:8.1f}  {compiled:5d}"
+        f"{inner_total:8.1f}  {compiled:5d}  {len(broken):3d}"
     )
 
     print()
@@ -271,6 +287,8 @@ def report(plan: Plan, before: str, after: str, started: str) -> None:
     print("The `inner` column is what each tool reported about itself. The gap")
     print("between `wall` and `inner` is what the gate spends outside its own")
     print("work: the process start, the fingerprint check and the link.")
+    print("The `bad` column counts the command lines that failed. Any figure in")
+    print("a row with a failure describes a run that stopped, not a gate.")
     print("This figure describes a development machine. It is not evidence")
     print("about the target platform.")
 
