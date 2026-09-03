@@ -225,7 +225,6 @@ records:
     ./scripts/check-conflict-markers.sh
     ./scripts/check-footnotes.sh
 
-# Prove that the record checks can fail. Each must reject its broken fixture.
 # Install the pre-commit hook, once per clone. The hooks are versioned.
 install-hooks:
     git config core.hooksPath .githooks
@@ -244,6 +243,13 @@ install-hooks:
 merge-defects:
     ./scripts/check-merge-defects.sh --branch
 
+# The merge-defect probe carries no `!`, because its input is a change rather
+# than a directory and it holds both polarities. The rule it covers has failed
+# twice and both failures were the check staying quiet, so a case that demands
+# silence is as load-bearing as a case that demands a failure. That script
+# holds the reasoning and reports its own verdict.
+#
+# Prove that the record checks can fail. Each must reject its broken fixture.
 records-probe:
     ! ./scripts/check-adrs.sh tests/fixtures/records-broken
     ! ./scripts/check-prds.sh tests/fixtures/prd-broken
@@ -251,6 +257,7 @@ records-probe:
     ! ./scripts/check-conflict-markers.sh tests/fixtures/conflict-broken
     ! ./scripts/check-footnotes.sh tests/fixtures/footnotes-broken
     ! CACHETTE_FOOTNOTE_BASELINE=tests/fixtures/footnotes-stale/baseline.txt ./scripts/check-footnotes.sh tests/fixtures/footnotes-stale
+    ./scripts/merge-defect-probe.sh
 
 # Everything a commit must pass. The wrapper times the run and reports the
 # cost against the local budget for this architecture. It reports; it does
