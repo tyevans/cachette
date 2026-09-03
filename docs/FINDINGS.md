@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-258**
+**Next number: FND-310**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -1183,6 +1183,82 @@ not an optimisation. It is also the mechanism a future rollback needs.
 A dense `u8` visibility counter costs about 868,000 cache-missing writes for
 each faction each tick at late-game scale, roughly 87 core-ms. The mechanism
 that existed to make fog cheap was the most expensive thing in the frame.
+
+### FND-309 — Four instruments in one night reported a figure about something other than what they measured, and not one of them said so
+
+**Two of the four instances below live outside this branch.** The first was
+recorded on the trunk after this branch left it, and the fourth was reported
+and not yet recorded. Both are cited by description rather than by number, and
+both owe a number here. The citation check refuses a number the register does
+not hold, which is how this was noticed rather than shipped.
+
+**Believed.** An instrument that finishes and prints a number has measured the
+thing it was pointed at. A run that fails is visible, so a run that reports is
+a run that worked.
+
+**True.** Four instruments broke that in one night. Each returned a figure a
+reader could not tell from a valid one. In every case the invalid run was
+cheaper, cleaner or steadier than the valid one, so the wrong answer was the
+one a tired reader wants.
+
+| The instrument | What the figure described | What caught it |
+|---|---|---|
+| The local benchmark | A binary built two hours earlier | A probe printed nothing when it should have printed a line for each frame |
+| The gate timing harness | A gate that stopped early, priced as a gate that ran | Nothing. It was read out of the code before it cost a run |
+| The gate timing harness | A tree that changed under the run, because three branches merged into it | A person read the log |
+| The stage cost measurement | The code layout, not the change | Four stages the change never touched moved, and moved reproducibly |
+
+**Each was caught by a control outside the instrument, and three of those
+controls existed by accident.** The probe of the first was written for another
+purpose.[^309A] The moved stages of the fourth were nobody's control. The third
+was caught by a person reading a log at the right moment. Only the second was
+found on purpose, and it was found by reading rather than by running.
+
+**The second and third are the same instrument, and the interval between them
+is the point.** The stopped-gate hazard was read out of the code and repaired
+before it cost anything. The repaired instrument then met the tree-move hazard
+on its first live run. An apparatus meets its own failure modes sooner than
+anyone expects, and the repair paid for itself the same night.
+
+**The fourth instance carries the sharpest form of the rule.** This project
+builds with link-time optimisation and one code generation unit, so a change to
+any file relays the whole binary. One fixed tree measured twice gave 36.46 and
+29.07 milliseconds for one stage, a span of 25 percent, and one of those runs
+sat below both runs of the tree it was compared against. The same stage on the
+base tree repeats to 0.7 percent. Four stages the change never touched moved,
+and the compute-bound stages least sensitive to layout barely moved. So a
+single binary against a single binary cannot separate the change from the code
+layout, and every performance figure taken that night carries an unquantified
+layout term of up to about 8 percent.[^309B]
+
+**The discriminator is worth more than the figure.** A pair of runs is evidence
+only when the things that should not have moved did not. That test is what
+turned a plausible story about a slow memory host into a refuted one, and the
+worker refuted its own explanation rather than letting it stand.
+
+**Follows.** Three things.
+
+**An instrument must carry its own control, and the control must fail loudly.**
+Two were added to the gate timing harness. It now names every command line that
+failed and says in those words that the run is not a measurement, so a gate
+that stopped cannot read as a gate that is cheap. It also reads the commit
+before and after the run and reports when the two differ, so a table cannot
+describe a tree that never existed.[^309C]
+
+**State the discriminator beside the figure.** A figure with no stated way of
+being wrong is not a measurement, and the reader cannot supply one later. Every
+row above was saved by a discriminator, and three of those were luck.
+
+**A discipline is not a control.** The answer to a merge landing mid-run is not
+a rule that nobody merges during a run. That rule lives in one person's head at
+the end of a long night with four things moving, and this register exists
+because facts kept in heads do not survive. The answer is that the instrument
+reads the commit and says when it moved.
+
+**This is the same shape the testing rule states for a fixture, one level
+up.**[^309D] A fixture that supplies no extreme measures itself. An instrument
+with no control measures itself. In both the test passes, the number arrives,
+and nothing says which question was answered.
 
 ## E. Layout and platform corrections
 
@@ -6698,6 +6774,10 @@ has the rule.
 [^F180B]: What a unit does in a tick, section 3.1. `docs/research/what-a-unit-does-in-a-tick.md`
 [^F180C]: PRD-0009, a unit acts on the world it can see. `docs/product/accepted/prd-0009-a-unit-acts-on-the-world-it-can-see.md`
 [^F180D]: Backlog item 0064, choose an action by scoring a fixed option set. `docs/backlog/complete/0064-choose-an-action-by-scoring-a-fixed-option-set.md`
+[^309A]: The local benchmark finding of 2 September 2026: a release build served an executable two hours old, and three trees measured the same. It is recorded on the trunk and this branch predates it, so its number is owed here.
+[^309B]: The stage cost measurement, reported on 3 September 2026 and not yet recorded. It gains a number when it lands.
+[^309C]: The per-recipe timing harness. `scripts/gate-times.sh`
+[^309D]: Testing rules, section 2a, a uniform input hides a defect. `.claude/rules/testing.md`
 [^F181B]: Testing Rules, section 5. `.claude/rules/testing.md`
 [^F181C]: Findings register, FND-180, in this document.
 [^F181D]: What a unit does in a tick, section 3.4. `docs/research/what-a-unit-does-in-a-tick.md`

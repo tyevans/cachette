@@ -53,10 +53,26 @@ lint, tests and the record checks.[^5]
 | Whole gate suite, wall clock | 435 s | Intel Core i7-1260P, 16 hardware threads | x86_64 | dev, no optimisation | An isolated run. Nothing to rebuild. The profile the project used before | 1 September 2026 |
 | Whole gate suite, wall clock | 441 s | Intel Core i7-1260P, 16 hardware threads | x86_64 | dev, opt-level 1 | An isolated run. An empty target directory | 1 September 2026 |
 | Whole gate suite, wall clock | 746 s | Intel Core i7-1260P, 16 hardware threads | x86_64 | dev, no optimisation | An isolated run. An empty target directory. The profile the project used before | 1 September 2026 |
+| Whole gate suite, wall clock | 1563 s | Intel Core i7-1260P, 16 hardware threads | x86_64 | dev, opt-level 1, `nightly-2026-09-01` | A passing run. One other worker building throughout. Load average 7.35, falling from 21. 56 test binaries | 3 September 2026 |
 
 The budget is the measured figure plus an allowance of one fifth, rounded up
 to the nearest ten seconds. A run over the budget is a signal to look, not a
 failure.
+
+**The last row is not comparable to any row above it, and the budget row no
+longer describes the suite.** Three things changed between them, and each alone
+breaks the comparison. The Rust test binaries went from 44 to 56. The toolchain
+moved from a pinned stable release to a nightly one, so the two figures come
+from different compilers. The machine carried another worker throughout, and
+the load average was 7.35. The row is here because it is the only real total
+anyone has taken since the suite grew, not because it measures the same thing.
+
+**Do not adjust the budget row to cover it.** The register's own rule forbids
+raising a budget to cover a growth, and that rule holds. The budget row
+describes a tree that no longer exists, so it needs replacing by a figure
+taken under stated conditions rather than adjusting. Nobody has taken one. A
+harness that splits the cost by recipe exists and waits for a quiet machine and
+a still tree.[^12]
 
 **The budget describes a run with nothing to rebuild, and only such a run.**
 That is the run a contributor makes many times a day. A run that starts from
