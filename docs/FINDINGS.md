@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-316**
+**Next number: FND-317**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -8957,9 +8957,53 @@ field holds one direction for a block, and routing around an obstacle needs a
 field that reaches further than one neighbour. That is a different claim and it
 has no record.
 
+### FND-316 — The delivery had no golden scenario and two of its own tests were empty
+
+**Believed.** A pass that writes into state the golden hash covers is guarded by
+the golden file, and a test that asserts an equality across that pass is a test
+of the pass.
+
+**True.** Neither held for the delivery of a carried load.
+
+**The golden scenarios did not reach the pass.** The gathering scenario spawns
+its units on deposit tiles and gives none of them a home site, so no unit ever
+stood on the tile of its own site holding a load. Adding the whole delivery
+pass moved no golden file at all. A golden file that cannot move is a guard
+that has already stopped working, and this is the third pass to meet that gap.
+The item that holds the class names the other two.[^F316A]
+
+**Two of the pass's own tests could not fail.** The first asserted that the
+store gained exactly what the carry lost. With no delivery both sides read
+zero, and zero equals zero. The second compared three worlds at one, two and
+twelve threads and found them identical, which they are when the pass never
+runs in any of them.
+
+**Evidence.** The delivery was removed and the suite was watched. Seven tests,
+three failed. The two above passed, and so did the two negative tests, which
+are correct to pass. After both were given a check that the fixture reached the
+case, five of the seven fail with the pass removed.
+
+**Follows.** Three things.
+
+**An equality across a pass needs a witness that the pass ran.** An equality
+between two quantities that a missing pass leaves at zero is not an assertion
+about the pass. It is an assertion about zero.
+
+**A thread-equivalence test is the easiest test in this project to write
+empty.** It compares runs against each other and never against a stated value,
+so it holds whenever the runs agree, including when they agree on having done
+nothing. Every equivalence test wants a second assertion that the work happened
+in each run.
+
+**Removing the pass is the cheap check that finds all of this at once.** It
+took one line and it separated the three real tests from the four that were
+either empty or negative. The rule already says to put the defect back, and
+this is the case where the defect is the whole pass.[^23]
+
 ## References
 
 [^F315B]: The refused step test. `crates/cachette-core/tests/a_refused_step_does_not_freeze.rs`
+[^F316A]: Backlog item 0279, let a golden scenario reach the position pass. `docs/backlog/proposed/0279-let-a-golden-scenario-reach-the-position-pass.md`
 [^F261B]: The holder count test of the viewer. `crates/cachette-view/tests/shows_who_holds_the_ground.rs`
 [^F261C]: Backlog item 0271, count the ground generations that one frame runs. `docs/backlog/proposed/0271-count-the-ground-generations-that-one-frame-runs.md`
 

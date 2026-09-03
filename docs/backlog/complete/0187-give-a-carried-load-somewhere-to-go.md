@@ -1,7 +1,7 @@
 ---
 id: 0187
 title: Give a carried load somewhere to go
-status: refined
+status: complete
 created: 2026-09-02
 implements: [ADR-0002 D1, ADR-0004 D1, ADR-0004 D3, ADR-0004 D4, ADR-0022 D2, ADR-0023 D1, ADR-0023 D2, ADR-0062 D3, ADR-0062 D5, ADR-0063 D5, ADR-0072 D5, ADR-0073 D2, ADR-0073 D4]
 changes: []
@@ -155,7 +155,41 @@ site that holds nothing of a commodity is not a site that holds no store.[^17]
 
 ## Outcome
 
-Filled in when the item moves to `complete/`.
+The delivery runs between the holder stamp and the rate pass. A unit that
+stands on the tile of its home site gives its whole load to the store of that
+site, in an order fixed by the site and then by the identity of the unit. What
+the store cannot hold stays in the carry. The conservation check gained the
+delivered term and both checks balance across a delivery.
+
+**Seven tests pass, and five of them were watched to fail with the pass
+removed.** The two that still pass are the negative ones: a unit away from home
+and a unit with no home deliver nothing, which is also true when nothing
+delivers at all. They are paired with the positive test rather than standing
+alone.
+
+**Two of the tests were empty on the first writing.** The equality between what
+the store gained and what the carry lost held as zero against zero, and the
+thread-equivalence test compared three worlds in which the pass had never run.
+Both now assert that the fixture reached the case.
+
+**No golden scenario reached the pass, and one now does.** The gathering
+scenario spawned its units on deposit tiles with no home site, so nothing ever
+stood at home holding a load and the golden file could not move when the
+delivery changed. The scenario now seats a site on its first food deposit and
+homes the units there. Removing the delivery pass then fails the golden test,
+which is the proof that the file guards it. This is the gap item 0279 holds,
+closed here for one pass.[^20]
+
+**The item said wood and stone answer no commodity, and the code says
+otherwise.** The declared map sends all three kinds to commodity zero, and the
+decisions register says that is correct while the commodity set holds one
+entry.[^21] The delivery reads that map rather than adding a third literal, so
+all three kinds deliver into the one commodity. Nothing in the engine gathers
+wood or stone today, because only the `forage` row names a kind, so only food
+moves unless the control plane orders otherwise. The map absorbs the change
+when a second commodity exists.
+
+**The founding rate did not change, and the survey did not change.**
 
 ## References
 
@@ -178,3 +212,5 @@ Filled in when the item moves to `complete/`.
 [^17]: Findings register, FND-043. `docs/FINDINGS.md`
 [^18]: Testing Rules, sections 2a and 5. `.claude/rules/testing.md`
 [^19]: Decisions register, DEC-074. `docs/DECISIONS.md`
+[^20]: Backlog item 0279, let a golden scenario reach the position pass. `docs/backlog/proposed/0279-let-a-golden-scenario-reach-the-position-pass.md`
+[^21]: Decisions register, DEC-073. `docs/DECISIONS.md`

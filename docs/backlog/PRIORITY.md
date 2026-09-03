@@ -38,7 +38,6 @@ engine gets wrong today.
 | 0272 | Decide whether the choice interval can go. **This is the behavioural half of what 0238 was for**, and 0238 deliberately left it. The deciding work no longer follows the population, so the reason a unit acts on a reading as old as the interval has weakened. **The measurement it waited for now exists**: the choice costs 0.571 milliseconds of an 836 millisecond frame at the target scale, which is 0.07 percent, so the interval buys almost nothing. It sits last here because removing it also removes what makes a choice sticky, and ADR-0064 D2 says why stickiness is what makes the behaviour legible. |
 
 | 0102 | A settlement reads its own ground rule, not the passability rule. Blocked by 0071 and 0092, in that order. |
-| 0187 | Nothing moves a carried load into a store, so gathering cannot feed anybody. It moved here from `Next` because 0186 is complete and a unit now carries something. It closes the chain from the ground to the store, and it is what makes a hungry unit able to feed itself. |
 
 ## Next
 

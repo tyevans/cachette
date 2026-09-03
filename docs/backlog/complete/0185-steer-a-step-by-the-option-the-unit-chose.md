@@ -241,7 +241,7 @@ FND-226 holds the measurement, and item 0216 holds the repair.
 [^1]: Findings register, FND-180. `docs/FINDINGS.md`
 [^2]: PRD-0009, a unit acts on the world it can see. `docs/product/accepted/prd-0009-a-unit-acts-on-the-world-it-can-see.md`
 [^3]: Backlog item 0186, let the engine order a gather. `docs/backlog/complete/0186-let-the-engine-order-a-gather.md`
-[^4]: Backlog item 0187, give a carried load somewhere to go. `docs/backlog/refined/0187-give-a-carried-load-somewhere-to-go.md`
+[^4]: Backlog item 0187, give a carried load somewhere to go. `docs/backlog/complete/0187-give-a-carried-load-somewhere-to-go.md`
 [^5]: Backlog item 0183, carry the food of a cell into the level 1 summary. `docs/backlog/complete/0183-carry-the-food-of-a-cell-into-the-level-1-summary.md`
 [^6]: Backlog item 0184, score the forage option against food. `docs/backlog/complete/0184-score-the-forage-option-against-food.md`
 [^7]: Decisions register, DEC-067. `docs/DECISIONS.md`
