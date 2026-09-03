@@ -36,7 +36,7 @@ work.**
 A world at the target scale holds 876 MB resident at 12 threads and peaks at
 957 MB. The measured machine holds 32 GB. The engine uses about three percent
 of the target machine and misses the frame budget by a factor of five.[^DEC105A]
-[^DEC105B]
+[^BLK7]
 
 **The split says where the room is.** The same world with no unit holds 456 MB,
 so a population of one million adds 89 MB. A tile costs 27 bytes and a unit
@@ -44,7 +44,7 @@ costs 89 bytes. Nothing the engine holds is close to the machine.
 
 **One accepted record spends time to save space, and says so.** It states that
 a tile field is a generated base and a stored change, and that building the
-field visits no tile and allocates nothing for it.[^DEC105C] That record is
+field visits no tile and allocates nothing for it.[^DEC68D] That record is
 sound as written. It was written when every cost figure in this project was
 derived, and the derivation that made space the scarce quantity is the one the
 benchmark contradicts.
@@ -77,7 +77,7 @@ change, because it also costs the reader an explanation.
 
 **Revisit when** a measurement shows a world at the target scale that holds
 settlements and characters, since every memory figure the project holds is a
-lower bound taken on a world that holds neither.[^DEC105B]
+lower bound taken on a world that holds neither.[^BLK7]
 
 ### DEC-106 — How many buckets should the choice divide the need range into?
 
@@ -2566,10 +2566,7 @@ a failed founding is correct.[^PRD12]
 [^DEC96A]: ADR Registry, the retcon window. `docs/adrs/REGISTRY.md`
 [^DEC96B]: Findings register, FND-218. `docs/FINDINGS.md`
 [^DEC96C]: ADR-0096, cost follows the lattice, not the population, and a unit is a reader, decision D4. `docs/adrs/draft/adr-0096-cost-follows-the-lattice-not-the-population.md`
-[^DEC96E]: Backlog item 0243. `docs/backlog/proposed/0243-repair-the-accepted-records-that-state-the-missing-measurement.md`
 [^DEC105A]: Target platform costs, the resident memory rows. `docs/reference/graviton-costs.md`
-[^DEC105B]: Blockers register, BLK-007. `docs/BLOCKERS.md`
-[^DEC105C]: ADR-0088, a tile field is a generated base and a stored change, decision D1. `docs/adrs/draft/adr-0088-a-tile-field-is-a-generated-base-and-a-stored-change.md`
 [^DEC96D]: ADR-0064, a unit chooses by scoring a small fixed option set, decision D1. `docs/adrs/accepted/adr-0064-a-unit-chooses-by-scoring-a-small-fixed-option-set.md`
 [^DEC97B]: Target platform costs. `docs/reference/graviton-costs.md`
 [^SWEEP]: Recurring Defect Shapes, shape 2. `.claude/rules/recurring-defects.md`
