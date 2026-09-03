@@ -849,6 +849,15 @@ frame. The cause is still not identified.[^RESID291]
 
 ## Every stage of a frame after admission stopped searching
 
+**Every comparison in this document is a pair of runs of two binaries, and a
+pair carries a layout term this document does not separate.** The project builds
+with full link-time optimisation and one code generation unit, so a change in
+one module relays the whole binary and stages that share no code with it move by
+up to about eight percent. A finding holds the measurement and the
+discriminator: a pair is evidence when the stages that should not have moved did
+not.[^LAYOUT]
+
+
 **This section supersedes every stage table above it.** Read the ones above as
 history: each measured a tree that no longer exists, and each share is against a
 frame that no longer exists either.
@@ -937,6 +946,66 @@ was about 12 milliseconds in three runs earlier in the day, and the register
 concluded then that it followed an allocation the candidate pass makes on every
 frame. That pass still makes it. The conclusion was wrong, and a finding
 corrects it.[^RESID298]
+
+## The narrowed sort guard, measured across five runs
+
+**This section is a comparison and not a stage table.** It supersedes no table
+above it, because it changes no row that a reader plans from. It is here because
+of how the figures had to be taken.
+
+Backlog item 0301 narrowed what the key vector sort refuses, from a repeated
+identifier to a repeated key, and moved the check from a pre-pass that sorted
+the whole key set into the pass that orders ties.[^ITEM301] [^ADR105]
+
+| Machine C | Value |
+|---|---|
+| Instance type | `c7g.4xlarge` |
+| Region | `us-west-2` |
+| Processor | Graviton3. Implementer `0x41`, part `0xd40` |
+| Base commit | `79d851deb0dc50a27e6a74391b22b684917dcefb` |
+| Changed commit | `97caac8` and its parents |
+| Crate features | `stage-cost` |
+| Date | 3 September 2026 |
+
+16,777,216 tiles, 1,000,000 units scattered, 12 threads. Nine frames after two
+warm-up frames. **Five runs, each on its own instance:** two of the base tree
+and three of the changed tree.
+
+| Stage | Base A | Base B | Changed A | Changed B | Changed C | Median change |
+|---|---|---|---|---|---|---|
+| `admit` | 21,274,145 | 20,923,668 | 18,226,851 | 17,929,533 | 18,574,381 | 13.6 percent less |
+| `bridge_refresh_barrier` | 31,394,191 | 31,181,809 | 36,459,500 | 29,068,978 | 29,873,853 | 4.5 percent less |
+| `holding_apply` | 19,048,855 | 18,762,498 | 20,686,347 | 20,353,567 | 19,868,849 | 7.7 percent more |
+| `holding_spread` | 71,234,385 | 70,731,392 | 74,083,110 | 73,897,963 | 73,653,068 | 4.1 percent more |
+| `holding_candidates` | 16,991,822 | 17,041,445 | 17,505,343 | 17,523,387 | 17,642,925 | 3.0 percent more |
+| `holding_decide` | 34,180,009 | 34,128,995 | 35,095,173 | 35,066,717 | 35,052,848 | 2.7 percent more |
+| `rebuild_level_1` | 6,686,010 | 6,574,382 | 6,637,035 | 6,736,831 | 6,831,556 | 1.6 percent more |
+| `tile_scan` | 14,224,080 | 14,213,068 | 14,379,662 | 14,390,942 | 14,393,388 | 1.2 percent more |
+| `influence_solve` | 12,614,492 | 12,625,658 | 12,653,479 | 12,600,545 | 13,482,993 | 0.3 percent more |
+| **The frame, timed from outside** | **177,862,658** | **176,501,059** | **184,219,536** | **175,551,738** | **177,179,712** | **unchanged** |
+
+**Only the admission sort was meant to move, and only it moved for a reason this
+change explains.** It is 13.6 percent cheaper by the median, and the three runs
+of the changed tree agree with each other to 3.4 percent.
+
+**Four stages rose in all three runs and none of them shares any code with the
+sort.** The holding apply, the spread, the candidate pass and the deciding pass
+were not edited. That is the cost of relaying the binary, and a finding holds
+what it bounds.[^LAYOUT]
+
+**One stage answered two ways from one binary.** The bridge rebuild measured
+36,459,500 nanoseconds on the first run of the changed tree and 29,068,978 on
+the second, a spread of 25 percent, while the two base runs agree to 0.7
+percent. Its median is below the base, so **the change is not a regression
+there, and no improvement is established either.**
+
+**The frame is unchanged.** The saving in admission is about the size of the
+rise across the holding stages, and the second is not caused by the change.
+
+**Read this section as the reason the project now takes more than one run of a
+changed tree.** A single pair taken at the first run would have reported a 9
+percent worse frame. A single pair taken at the second would have reported a 1
+percent better one. Both would have been honest, and both would have been wrong.
 
 ## Huge pages
 
@@ -1446,3 +1515,6 @@ commit what changed. Do not edit a row to make a later run agree with it.
 [^DECL298]: Findings register, FND-301. `docs/FINDINGS.md`
 [^ADR71298]: ADR-0071, the bridge rebuild orders on one thread, decision D2. `docs/adrs/accepted/adr-0071-the-bridge-rebuild-orders-on-one-thread.md`
 [^RESID298]: Findings register, FND-303. `docs/FINDINGS.md`
+[^LAYOUT]: Findings register, FND-308. `docs/FINDINGS.md`
+[^ITEM301]: Backlog item 0301, narrow the sort guard to a repeated key. `docs/backlog/complete/0301-narrow-the-sort-guard-to-a-repeated-key.md`
+[^ADR105]: ADR-0105, a total order needs no repeated identifier, only no repeated key. `docs/adrs/draft/adr-0105-a-total-order-needs-no-repeated-key.md`

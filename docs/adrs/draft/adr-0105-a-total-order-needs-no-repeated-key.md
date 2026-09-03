@@ -74,9 +74,24 @@ identifier is named. A test drives the refusal at five thread counts.[^5]
 
 ## Consequences
 
-**Every ordering pass loses a full sort of its own key set.** The saving follows
-the key count, so the passes that sort the most gain the most. The cost register
-holds what it was worth on the target platform.[^6]
+**Every ordering pass loses a full sort of its own key set, and the frame did
+not move.** The admission sort is measurably cheaper. The frame is unchanged.
+The saving is real and it is given back somewhere else. The cost register holds
+the runs and the figures.[^6]
+
+**Where it is given back is not this record's subject, and it is worth knowing
+anyway.** Three stages of the holding rose in every run of the changed binary,
+and none of them shares any code with the sort. The project builds with full
+link-time optimisation and one code generation unit, so a change inside one
+module relays the whole binary. A finding holds the measurement and the bound it
+puts under every figure taken from a single pair of runs.[^8]
+
+**So this record is accepted for its property and not for its speed.** The
+narrow guarantee is the one determinism needs, it is now the one the sort makes,
+and it is the one three tests hold it to. It also removes a full comparison sort
+of the key set from every ordering pass, which is work the engine does not need
+to do. Whether a reader can see that in a frame cost is a separate question, and
+today the answer is no.
 
 **The sort refuses less than it did, and one class of caller defect now passes.**
 A caller that issues one identifier to two keys with different ordering fields
@@ -111,3 +126,4 @@ refuses.
 [^5]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
 [^6]: Target platform costs, every stage of a frame after the sort stopped sorting twice. `docs/reference/graviton-costs.md`
 [^7]: Testing Rules, section 1. `.claude/rules/testing.md`
+[^8]: Findings register, FND-308. `docs/FINDINGS.md`
