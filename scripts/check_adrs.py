@@ -224,12 +224,19 @@ def main(argv: list[str]) -> int:
     # the run that owns them, they change under this one, and a file deleted
     # mid-scan raises rather than reporting. The citation check skips them for
     # the same reason.
-    skip = {".git", "target", "worktrees"}
+    # The skip names paths and not path components. A component named
+    # `worktrees` matches every file of a checkout that is itself inside
+    # `.claude/worktrees`, so the component form silently scanned nothing when
+    # this script ran from a worktree, and reported every record as cited by no
+    # source file.[^1] The three sibling checks already name paths.
+    #
+    # [^1]: Findings register, FND-307. `docs/FINDINGS.md`
+    skip = (ROOT / ".git", ROOT / "target", ROOT / ".claude" / "worktrees")
     code = [
         p
         for ext in ("*.rs", "*.py")
         for p in ROOT.rglob(ext)
-        if not skip & set(p.parts)
+        if not any(p.is_relative_to(d) for d in skip)
     ]
     corpus = "\n".join(bodies[n] for n in files) + registry + "\n".join(
         p.read_text(encoding="utf-8", errors="ignore") for p in code

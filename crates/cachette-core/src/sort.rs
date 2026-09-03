@@ -93,13 +93,21 @@ pub enum SortError {
     },
     /// Two keys carry the same identifier in the last field.
     ///
-    /// The last field must be a stable identifier, so the value must be
-    /// unique across the set.[^1]
+    /// The last field is a stable identifier and it breaks the tie, so two
+    /// keys that agree in every field, the identifier included, tie with
+    /// nothing left to separate them.[^1] The value is the identifier of the
+    /// repeated key.
+    ///
+    /// **Two keys that share an identifier and differ in an ordering field do
+    /// not raise this.** They are separated by the field they differ in, and
+    /// the order of the set is total without the identifier deciding
+    /// anything.[^2]
     ///
     /// # References
     ///
     /// [^1]: ADR-0007, content supplies a key vector, never a comparator, decision D2. `docs/adrs/accepted/adr-0007-content-supplies-a-key-vector-never-a-comparator.md`
-    RepeatedIdentifier(u64),
+    /// [^2]: ADR-0105, a total order needs no repeated identifier, only no repeated key. `docs/adrs/draft/adr-0105-a-total-order-needs-no-repeated-key.md`
+    RepeatedKey(u64),
     /// The caller asked for zero threads. A sort needs at least one.
     ZeroThreads,
     /// The set holds more items than an index can name.
@@ -119,8 +127,11 @@ impl core::fmt::Display for SortError {
             Self::LengthMismatch { items, keys } => {
                 write!(formatter, "{items} items carry {keys} keys")
             }
-            Self::RepeatedIdentifier(value) => {
-                write!(formatter, "two keys carry the identifier {value}")
+            Self::RepeatedKey(value) => {
+                write!(
+                    formatter,
+                    "two keys agree in every field, the identifier {value} included"
+                )
             }
             Self::ZeroThreads => write!(formatter, "a sort needs at least one thread"),
             Self::TooManyItems(count) => write!(formatter, "an index cannot name {count} items"),
@@ -239,7 +250,6 @@ pub fn order_on<const N: usize>(
     if keys.len() > u32::MAX as usize {
         return Err(SortError::TooManyItems(keys.len()));
     }
-    check_identifiers(keys)?;
     if keys.is_empty() {
         return Ok(Vec::new());
     }
@@ -271,7 +281,13 @@ pub fn order_on<const N: usize>(
         gathered.push(run.as_slice());
         gathered
     });
-    Ok(merge_runs(&ordered, keys))
+    let order = merge_runs(&ordered, keys);
+    // The check reads the order rather than the input, so it costs one pass
+    // over a slice the sort already holds.[^3]
+    //
+    // [^3]: ADR-0105, a total order needs no repeated identifier, only no repeated key. `docs/adrs/draft/adr-0105-a-total-order-needs-no-repeated-key.md`
+    check_no_repeated_key(&order, keys)?;
+    Ok(order)
 }
 
 /// Returns the items in key order.
@@ -303,18 +319,30 @@ pub fn sorted<T: Copy, const N: usize>(
     Ok(order.iter().map(|index| items[*index as usize]).collect())
 }
 
-/// Fails when two keys carry the same identifier.
+/// Fails when two keys agree in every field.
 ///
-/// The check sorts a copy of the last field and looks at each neighbouring
-/// pair. It reports the lowest repeated value, so the report does not depend
-/// on the input order.
-fn check_identifiers<const N: usize>(keys: &[SortKey<N>]) -> Result<(), SortError> {
-    let mut identifiers: Vec<u64> = keys.iter().map(SortKey::identifier).collect();
-    identifiers.sort_unstable();
-    for pair in identifiers.windows(2) {
-        if pair[0] == pair[1] {
-            return Err(SortError::RepeatedIdentifier(pair[0]));
+/// **The check reads the sorted order, so it costs one pass and no
+/// allocation.** Two keys that agree in every field sort adjacent, so a
+/// neighbouring pair is the whole of the test. The earlier check answered a
+/// wider question and paid a second sort of the whole set to do it.[^1]
+///
+/// It reports the identifier of the lowest repeated key, so the report does
+/// not depend on the input order or on the thread count.
+///
+/// # References
+///
+/// [^1]: ADR-0105, a total order needs no repeated identifier, only no repeated key. `docs/adrs/draft/adr-0105-a-total-order-needs-no-repeated-key.md`
+fn check_no_repeated_key<const N: usize>(
+    order: &[u32],
+    keys: &[SortKey<N>],
+) -> Result<(), SortError> {
+    let mut previous: Option<SortKey<N>> = None;
+    for index in order {
+        let key = keys[*index as usize];
+        if previous == Some(key) {
+            return Err(SortError::RepeatedKey(key.identifier()));
         }
+        previous = Some(key);
     }
     Ok(())
 }
@@ -457,13 +485,19 @@ pub fn order_bounded(keys: &[BoundedKey], ceiling: u64) -> Result<Vec<u32>, Sort
             });
         }
     }
-    check_bounded_identifiers(keys)?;
     if keys.is_empty() {
         return Ok(Vec::new());
     }
 
     let mut order = radix_order(keys, digit_count(ceiling));
-    order_ties(&mut order, keys);
+    // The tie pass is the only place a repeated key can be, so it is the place
+    // that looks. A run of one ordering field holding one entry cannot hold a
+    // repeated key, and that is nearly every run.[^4]
+    //
+    // [^4]: ADR-0105, a total order needs no repeated identifier, only no repeated key. `docs/adrs/draft/adr-0105-a-total-order-needs-no-repeated-key.md`
+    if let Some(identifier) = order_ties(&mut order, keys) {
+        return Err(SortError::RepeatedKey(identifier));
+    }
     Ok(order)
 }
 
@@ -477,21 +511,6 @@ const fn digit_count(ceiling: u64) -> u32 {
     } else {
         bits.div_ceil(DIGIT_BITS)
     }
-}
-
-/// Fails when two keys carry the same identifier.
-///
-/// The check reports the lowest repeated value, so the report does not depend
-/// on the input order.
-fn check_bounded_identifiers(keys: &[BoundedKey]) -> Result<(), SortError> {
-    let mut identifiers: Vec<u64> = keys.iter().map(|key| key.identifier).collect();
-    identifiers.sort_unstable();
-    for pair in identifiers.windows(2) {
-        if pair[0] == pair[1] {
-            return Err(SortError::RepeatedIdentifier(pair[0]));
-        }
-    }
-    Ok(())
 }
 
 /// Orders the indices by the ordering field, least significant digit first.
@@ -541,8 +560,9 @@ const fn digit_of(order: u64, shift: u32) -> usize {
 /// # References
 ///
 /// [^1]: ADR-0007, content supplies a key vector, never a comparator, decision D2. `docs/adrs/accepted/adr-0007-content-supplies-a-key-vector-never-a-comparator.md`
-fn order_ties(order: &mut [u32], keys: &[BoundedKey]) {
+fn order_ties(order: &mut [u32], keys: &[BoundedKey]) -> Option<u64> {
     let mut start = 0usize;
+    let mut repeated: Option<u64> = None;
     while start < order.len() {
         let field = keys[order[start] as usize].order;
         let mut end = start + 1;
@@ -551,7 +571,21 @@ fn order_ties(order: &mut [u32], keys: &[BoundedKey]) {
         }
         if end - start > 1 {
             order[start..end].sort_unstable_by_key(|index| keys[*index as usize].identifier);
+            // Two keys that agree in both fields sit in this run, and the sort
+            // above has just put them next to each other. The entries are in
+            // the cache because the sort has just touched them, and a run of
+            // one entry never reaches here at all.
+            if repeated.is_none() {
+                for pair in order[start..end].windows(2) {
+                    let here = keys[pair[0] as usize].identifier;
+                    if here == keys[pair[1] as usize].identifier {
+                        repeated = Some(here);
+                        break;
+                    }
+                }
+            }
         }
         start = end;
     }
+    repeated
 }
