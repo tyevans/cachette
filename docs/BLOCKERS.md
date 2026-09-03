@@ -25,7 +25,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^ALLOC]
 
-**Next number: BLK-037**
+**Next number: BLK-046**
 
 [^ALLOC]: Findings register, FND-038. `docs/FINDINGS.md`
 
@@ -121,6 +121,36 @@ unset.
 **What closes this.** The project owner names the address and confirms that the
 hosting is turned on, or states that the site is built and not published.
 
+
+### BLK-045 — No Python developer outside this repository has used the interface
+
+**Owner:** the project owner. **Blocks:** confidence in the ranking of the jobs
+that the Python interface must serve.
+
+**A research report ranks five jobs and designs the interface around the
+first.**[^BLK45A] That ranking rests on two graded reads of the published
+reference page, and on the shape of the Python inside this repository. Both are
+evidence. Neither is a user.
+
+**The two graded reads share one method, so they share its limits.** Each reader
+was given one web address and nothing else. A reader who cannot install the
+package cannot say which call they would reach for on the second day, and cannot
+say which of five jobs they would meet first. Both reads led with the same
+complaint, which is a strong signal about the documentation and a weak one about
+the ranking.
+
+**This is information and not a judgement.** The options are not known, because
+nobody has said what they wanted to build. A guess produces an interface that is
+elegant against a job nobody has.
+
+**Work continues.** Two of the five jobs are settled by records that do not
+depend on this row: a selector is specified in full, and the boundary rule is
+fixed.[^BLK45B] [^BLK45C] The report's ranking is the part this row governs, and
+a product record that states the ranking expresses it against this row.
+
+**What closes this.** The project owner puts the package in front of a Python
+developer who has an idea and has not read this source, and records what that
+person tried to do first and where they stopped.
 
 ### BLK-036 — Does an upgrade change hands when the ground does?
 
@@ -328,3 +358,6 @@ normally.
 [^BLK35B]: Backlog item 0308, the documentation plan. `docs/backlog/refined/0308-the-documentation-plan.md`
 [^BLK35C]: Research report 19, the documentation toolchain, section 3.6. `docs/research/reports/19-documentation-toolchain.md`
 [^BLK35D]: The documentation site job. `.github/workflows/docs.yml`
+[^BLK45A]: Research report 20, what the Python interface should be, section 1. `docs/research/reports/20-the-python-interface.md`
+[^BLK45B]: ADR-0051, a selector is a lazy expression tree that Rust evaluates. `docs/adrs/accepted/adr-0051-a-selector-is-a-lazy-expression-tree.md`
+[^BLK45C]: ADR-0040, Python is a control plane, not a data plane. `docs/adrs/draft/adr-0040-python-is-a-control-plane-not-a-data-plane.md`

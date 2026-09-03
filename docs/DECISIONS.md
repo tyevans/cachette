@@ -23,10 +23,115 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^ALLOC]
 
-**Next number: DEC-118**
-**Next number: DEC-113**
+**Next number: DEC-135**
 
 ## Open
+
+### DEC-130 — Does the package ship a friendly Python tier above the compiled module, and where does the line fall?
+
+**Open. The project owner owns it. It blocks every other row below.**
+
+The package re-exports the compiled extension module and adds nothing. A
+research report holds the evidence and the argument.[^DEC130A]
+
+**Option A. One tier.** The compiled module is the whole interface, and every
+ergonomic change is a Rust change. This is the state today.
+
+**Option B. Two tiers.** The compiled module stays as it is. A pure Python tier
+sits above it and holds the selectors, the value types, the named constructors
+and the viewer. The line is that the Python tier holds no simulation state and
+copies no column. A caller crosses down through one named attribute and up
+through one named constructor.
+
+**Option C. The friendly tier in Rust.** One module, and the ergonomics compile.
+
+**Recommendation: Option B.** Python is in this project so that a designer
+changes behaviour without a compile.[^DEC130B] The ergonomic surface is the part
+that will change most while the project learns what a developer needs, and a
+pure Python tier can be rewritten without a rebuild. Option C puts the fastest
+moving code behind the slowest change.
+
+### DEC-131 — Does a bare Python float reach a fixed-point argument?
+
+**Open. Engineering owns it. It blocks the value types.**
+
+The fixed-point scale reaches Python as a plain integer. A caller who writes the
+number one means one, and the engine reads one part in 65536. A fresh reader
+graded this the top hazard of the interface.[^DEC131A]
+
+**Option A. Accept a float and scale it.** A caller writes `target=1.5`. The
+engine multiplies. This is what the fresh reader recommends.
+
+**Option B. Refuse a bare float, and refuse a bare integer.** The argument takes
+a fixed-point value only. The error names the exact constructor to use.
+
+**Option C. Accept a float through a named constructor only.** A caller who
+holds a float writes the conversion, and a reader can see it.
+
+**Recommendation: Option B, with Option C as the route for a caller who holds a
+float.** A float multiply in Python happens outside the deterministic core. The
+rounding is invisible at the call site and the result reaches simulated state.
+Option A makes the invisible conversion the default, which is the shape the
+first hard invariant exists to prevent.[^DEC131B]
+
+### DEC-132 — Where does the prose of a pure Python member live?
+
+**Open. Engineering owns it. It blocks the friendly tier.**
+
+One record binds the prose of a member the compiled module provides to the Rust
+doc comment, and generates the reference by importing the module.[^DEC112C] A
+pure Python tier has its prose in a Python docstring, and the record does not
+cover that case. It is silent rather than wrong.
+
+**Option A. The Python docstring is authoritative for a Python member.** The
+record gains one decision that says so.
+
+**Option B. Every member's prose lives in Rust, and the Python tier copies.**
+This creates the second declaration site the record exists to prevent.
+
+**Recommendation: Option A, written before the tier exists.** A silent gap
+becomes two authoritative sites that nothing compares. The existing record
+already measured what a second prose site costs.[^DEC112C]
+
+### DEC-133 — Is a kind enumeration generated from the compiled module, or written in Python?
+
+**Open. Engineering owns it.**
+
+Three integer scales share the name `kind`. The engine checks the range of a
+resource kind and refuses two of the five ground kinds, and accepts the other
+three in full.[^DEC133A] A named type is the repair, and the question is where
+the names live.
+
+**Option A. Written in Python.** A short class, easy to read, and a second
+declaration site for a numbering that the Rust source already holds.
+
+**Option B. Generated from the compiled module.** The module exports the names
+in order, and Python builds the enumeration from them.
+
+**Recommendation: Option B.** Option A is the redundant declaration shape, and
+nothing fails when the two copies part.[^SHAPE1] Option B costs one exported
+function for each scale.
+
+### DEC-134 — Does the compiled module get a public name, and does the friendly tier become the documented import?
+
+**Open. Engineering owns it.**
+
+The compiled module is `cachette._core`. A leading underscore tells a Python
+reader that a module is private, and the published reference documents that
+private module. A fresh reader's first line was a guess at whether importing it
+was allowed.[^DEC134A]
+
+**Option A. Leave the name.** The reference keeps documenting a private module.
+
+**Option B. Add a pure Python module that re-exports it under a public name.**
+One file, no build change, and the reference points at a name that says what it
+is.
+
+**Option C. Rename the compiled module.** This changes the build configuration
+and the record that names it.
+
+**Recommendation: Option B.** It costs one file and it removes the contradiction
+a fresh reader met at line one.
 
 ### DEC-117 — What does a laden unit do when the nearest site of its faction is not its own home?
 
@@ -3026,3 +3131,9 @@ a failed founding is correct.[^PRD12]
 [^DEC114C]: Product requirement record 0021, a developer can use the control plane without reading its source. `docs/product/accepted/prd-0021-a-developer-can-use-the-control-plane-without-reading-its-source.md`
 [^DEC114D]: Recurring Defect Shapes, shape 1, redundant declaration sites. `.claude/rules/recurring-defects.md`
 [^DEC117A]: ADR-0110, a unit returns by climbing a reach field seeded at every site of its faction, decision D1. `docs/adrs/draft/adr-0110-a-unit-returns-by-climbing-a-reach-field.md`
+[^DEC130A]: Research report 20, what the Python interface should be, section 5. `docs/research/reports/20-the-python-interface.md`
+[^DEC130B]: ADR-0040, Python is a control plane, not a data plane, the context section. `docs/adrs/draft/adr-0040-python-is-a-control-plane-not-a-data-plane.md`
+[^DEC131A]: Interface review of the published reference, section 6a, 3 September 2026. `~/cachette-reader-rounds/round-1-interface.md`
+[^DEC131B]: Project orientation, the hard invariants. `CLAUDE.md`
+[^DEC133A]: Findings register, FND-352. `docs/FINDINGS.md`
+[^DEC134A]: Fresh reader review of the published reference, section B. `~/cachette-reader-rounds/round-1-reference.md`
