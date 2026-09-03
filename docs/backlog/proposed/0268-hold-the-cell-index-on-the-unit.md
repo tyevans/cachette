@@ -13,12 +13,23 @@ blocked-by: []
 ## Why
 
 **Every unit pass recomputes which cell a unit stands in.** It reads the unit's
-tile, turns the tile into a layout key, and turns the key into a block. Two of
-the four scattered reads a review found in the choice pass are these two
-steps.[^1]
+tile, turns the tile into a layout key, and turns the key into a block. A
+review of the choice pass named these two steps as two of four scattered
+reads.[^1]
+
+**That naming is wrong, and a measurement says so.** The two steps read no
+memory. They are one remainder and one quotient by the world width, and the
+width is a runtime value, so both are a hardware division. The division is the
+largest single part of the chain, and reading a stored cell index costs a small
+fraction of deriving one.[^5]
 
 The answer changes only when the unit moves. The engine recomputes it on every
 pass that needs it, on every frame.
+
+**The same measurement refused the item that sat above this one.** That item
+proposed a tile-indexed exit direction, and it lost on both halves of its
+trade.[^6] This item is not the smaller half of that win. It is the part of the
+chain that costs, and it costs 4 MB rather than 67 MB.
 
 **The trade is space for time, and the space is small.** One cell index for
 each of 1,000,000 units is about 4 MB. A world at the target scale holds
@@ -61,3 +72,5 @@ holds that.[^4]
 [^2]: Target platform costs, the resident memory rows. `docs/reference/graviton-costs.md`
 [^3]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`
 [^4]: Decisions register, DEC-105. `docs/DECISIONS.md`
+[^5]: Findings register, FND-282. `docs/FINDINGS.md`
+[^6]: Findings register, FND-281. `docs/FINDINGS.md`

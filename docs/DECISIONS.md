@@ -75,6 +75,14 @@ Each of those is a record or an item, and each must measure the trade rather
 than assume it. A change that spends 67 MB and saves nothing is worse than no
 change, because it also costs the reader an explanation.
 
+**One candidate trade has now been measured, and it was refused.** A
+tile-indexed exit direction costs an order of magnitude more than it saves, and
+the read it proposes is itself slower than the read it replaces.[^DEC105B] The
+figure this row states is a capacity figure. It says the machine has room and it
+says nothing about cache, and the refused trade lost on cache. **Every remaining
+candidate under this row must answer the cache question separately from the
+capacity question.**
+
 **Revisit when** a measurement shows a world at the target scale that holds
 settlements and characters, since every memory figure the project holds is a
 lower bound taken on a world that holds neither.[^BLK7]
@@ -2582,6 +2590,7 @@ a failed founding is correct.[^PRD12]
 [^DEC96B]: Findings register, FND-218. `docs/FINDINGS.md`
 [^DEC96C]: ADR-0096, cost follows the lattice, not the population, and a unit is a reader, decision D4. `docs/adrs/draft/adr-0096-cost-follows-the-lattice-not-the-population.md`
 [^DEC105A]: Target platform costs, the resident memory rows. `docs/reference/graviton-costs.md`
+[^DEC105B]: Findings register, FND-281. `docs/FINDINGS.md`
 [^DEC96D]: ADR-0064, a unit chooses by scoring a small fixed option set, decision D1. `docs/adrs/accepted/adr-0064-a-unit-chooses-by-scoring-a-small-fixed-option-set.md`
 [^DEC97B]: Target platform costs. `docs/reference/graviton-costs.md`
 [^SWEEP]: Recurring Defect Shapes, shape 2. `.claude/rules/recurring-defects.md`

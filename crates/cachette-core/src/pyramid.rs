@@ -824,6 +824,14 @@ pub const NO_EXIT: u8 = u8::MAX;
 /// summaries, and those are hashed, so hashing it as well would state one fact
 /// in two places with nothing to fail when the copies disagree.[^7]
 ///
+/// **The array is indexed by the cell, and writing it once for each tile was
+/// measured and refused.** A tile-indexed copy would let a unit read at its own
+/// tile index and drop the arithmetic in front of the read. It loses twice.
+/// The pass that fills it costs more than the whole frame budget, and the read
+/// itself is slower than the read it replaces, because this array is small
+/// enough to stay in cache for a whole pass and a tile-indexed one is not.[^8]
+/// [^9]
+///
 /// # References
 ///
 /// [^1]: ADR-0091, movement takes its direction from a per-cell field, never from a per-unit search, decision D1. `docs/adrs/draft/adr-0091-movement-takes-its-direction-from-a-per-cell-field.md`
@@ -833,6 +841,8 @@ pub const NO_EXIT: u8 = u8::MAX;
 /// [^5]: ADR-0024, every summary field is declared extensive or intensive, decision D2. `docs/adrs/accepted/adr-0024-every-summary-field-is-declared-extensive-or-intensive.md`
 /// [^6]: ADR-0002, simulated and aggregated state holds no floating point number, decision D1. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
 /// [^7]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`
+/// [^8]: Findings register, FND-281. `docs/FINDINGS.md`
+/// [^9]: The exit locality benchmark. `crates/cachette-core/benches/exit_locality.rs`
 #[derive(Clone, Debug)]
 pub struct ExitField {
     cells: Grid,

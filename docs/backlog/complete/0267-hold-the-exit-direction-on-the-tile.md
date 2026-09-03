@@ -1,7 +1,7 @@
 ---
 id: 0267
 title: Hold the exit direction on the tile
-status: proposed
+status: complete
 created: 2026-09-03
 implements: []
 changes: []
@@ -62,9 +62,39 @@ holds that.[^4]
 It does not change the derive, the tie-break order, or any property the field
 records state.[^3]
 
+## Outcome
+
+**Measured and refused. Nothing was built.** The item asked for the added pass
+to be measured rather than assumed, and the measurement says no.
+
+The cheapest shape of the added write pass costs a figure in the low hundreds
+of milliseconds at the target scale. The saving in the movement pass is a
+figure in the tens, taken over every live unit rather than over the units that
+hold an intent, which is the reading most favourable to this item. The frame
+budget is one hundred milliseconds, so the added pass alone is larger than the
+whole budget.[^5]
+
+**The read the item proposes is also slower than the read it replaces.** The
+cell-indexed array is 64 kibibytes and stays in cache for a whole pass. The
+tile-indexed array is 64 mebibytes and does not. Removing the arithmetic in
+front of the read does not pay for missing cache on every unit, so the item
+loses on its own half of the trade before any write cost is counted.
+
+The apparatus stays in the tree as a benchmark, so a later contributor who
+reaches for this shape can take the figures again rather than argue.[^6] The
+figures were taken on a development machine and not on the target platform, and
+one blocker still holds that gap open.[^7] The margin is wide enough that a
+cache line difference cannot close it.
+
+The finding holds the evidence and what follows from it.[^5]
+
+
 ## References
 
 [^1]: Findings register, FND-252. `docs/FINDINGS.md`
 [^2]: Target platform costs, the resident memory rows. `docs/reference/graviton-costs.md`
 [^3]: ADR-0091, movement takes its direction from a per-cell field. `docs/adrs/draft/adr-0091-movement-takes-its-direction-from-a-per-cell-field.md`
 [^4]: Decisions register, DEC-105. `docs/DECISIONS.md`
+[^5]: Findings register, FND-281. `docs/FINDINGS.md`
+[^6]: The exit locality benchmark. `crates/cachette-core/benches/exit_locality.rs`
+[^7]: Blockers register, BLK-007. `docs/BLOCKERS.md`

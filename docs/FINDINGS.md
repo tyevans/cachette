@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-264**
+**Next number: FND-283**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -6980,6 +6980,87 @@ missed.** The first pass here reported clean against its own search. That report
 was true about the search and false about the tree, and nothing in the result
 distinguished the two.
 
+### FND-281 — The tile-indexed exit direction costs an order of magnitude more than it saves, and the smaller item beats it on the read as well
+
+**Believed.** A unit reads its exit direction through a chain of scattered
+lookups, so writing the direction once for each tile removes the chain and the
+movement pass gets faster. The item that proposes it prices the memory at about
+67 MB against 31 GB the engine does not use, and it names the added pass over
+the tile count as a risk to measure.[^F281A]
+
+**True.** The added pass costs between five and twenty-five times what the
+movement pass saves, and the proposed read is itself slower than the read it
+replaces. The item is refused on the measurement, and it is refused twice over.
+
+**Evidence.** A benchmark builds the tile-indexed array outside the crate, from
+the public exit field, and prices both halves in one process on one build.[^F281B]
+The world holds 16777216 tiles and one million units. The lookup rows read
+every live unit rather than only the units that hold an intent, which is the
+most the change can ever reach and is therefore the reading most favourable to
+the item. The commit body holds the table and the command.
+
+The two halves do not meet. The cheapest shape of the added write pass costs a
+figure in the low hundreds of milliseconds. The difference between the two
+lookup rows is a figure in the tens. The frame budget is one hundred
+milliseconds, so the added pass alone is larger than the whole budget.[^99]
+
+**The second refusal was not predicted.** The read the item proposes is slower
+than the read it replaces, before any write cost is counted. The
+cell-indexed array covers 16384 cells and four options, which is 64 kibibytes
+and stays in cache for a whole pass. The tile-indexed array covers 16777216
+tiles and four options, which is 64 mebibytes and cannot. Removing the
+arithmetic in front of the read does not pay for missing cache on every unit.
+
+**Follows.** Three things.
+
+**An indirection into a small table is not a cost, and the word scattered hid
+that.** The item described four scattered lookups. In the movement pass the
+middle two are arithmetic that touches no memory, and the last is a read of a
+table that fits in cache. Only the first reads a scattered address. A
+description that counts steps says nothing about what each step costs.
+
+**Price the destination of a move, not only the source.** The item measured
+what the chain costs and assumed the replacement was free. Both sides needed a
+row, and the replacement lost on its own row.
+
+**A trade that spends memory must name the level of the hierarchy it spends
+it at.** The register that opened the memory question states that the engine
+uses about three percent of the machine.[^F281D] That is true of capacity and
+says nothing about cache. Every candidate trade under that register has to
+answer the cache question separately, and this one is the first to be asked it.
+
+### FND-282 — The chain the two items name is mostly one integer division, and the four megabyte item takes the larger share of it
+
+**Believed.** The cost of turning a tile into a cell is the scattered memory it
+touches. Two items describe the conversion as scattered reads, and the finding
+they both cite reads the conversion as part of a locality problem.[^F281A]
+[^F282A] [^F282B]
+
+**True.** The conversion touches no memory at all. It is one remainder and one
+quotient by the world width, and the width is a runtime value, so both are a
+hardware division.[^F282C] The division is the largest single part of the
+chain, and a stored cell index removes it.
+
+**Evidence.** The same benchmark holds the downstream read fixed and changes
+only how the cell is reached.[^F281B] Reading a stored cell index costs a small
+fraction of deriving it. A row that isolates the address conversion alone
+accounts for most of the difference. The machine was loaded while the rows were
+taken, so the figures spread; the ordering between the rows did not.
+
+**Follows.** Two things.
+
+**The two items were not two halves of one win, and the priority index said
+they were.** The index placed the tile-indexed direction above the stored cell
+index, because it removes the whole chain rather than two steps of it. The
+measurement reverses that. The two steps the smaller item removes are the
+expensive ones. It costs 4 MB rather than 67 MB, and it adds no pass over the
+tile count. The index now carries the measured order.[^F282D]
+
+**Counting steps ranked these two items, and it ranked them backwards.** Both
+items came from one reading of one pass, and the reading counted lookups. The
+item that removes four steps loses. The item that removes two steps wins,
+because those two are a division and the other two are a cache hit.
+
 ## References
 
 [^F261B]: The holder count test of the viewer. `crates/cachette-view/tests/shows_who_holds_the_ground.rs`
@@ -7257,3 +7338,11 @@ distinguished the two.
 [^F231C]: The starvation suite of the core. `crates/cachette-core/tests/starvation.rs`
 [^F234A]: Findings register, FND-233, in this document.
 [^F201C]: Findings register, FND-206, in this document.
+
+[^F281A]: Backlog item 0267, hold the exit direction on the tile. `docs/backlog/complete/0267-hold-the-exit-direction-on-the-tile.md`
+[^F281B]: The exit locality benchmark. `crates/cachette-core/benches/exit_locality.rs`
+[^F281D]: Decisions register, DEC-105. `docs/DECISIONS.md`
+[^F282A]: Backlog item 0268, hold the cell index on the unit. `docs/backlog/proposed/0268-hold-the-cell-index-on-the-unit.md`
+[^F282B]: Findings register, FND-252, in this document.
+[^F282C]: The grid address conversion. `crates/cachette-core/src/hex.rs`
+[^F282D]: Backlog priority index. `docs/backlog/PRIORITY.md`
