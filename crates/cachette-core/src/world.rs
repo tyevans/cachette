@@ -3028,37 +3028,25 @@ impl World {
             self.choose(threads)?;
         }
 
-<<<<<<< HEAD
+        // The walk order of the movement pass. The bridge holds every live
+        // unit in block-major tile order, and it sorted them at the barrier,
+        // so this order costs the frame nothing more than it already paid.
+        let live = self.bridge.units(&self.soldiers)?.to_vec();
         let intents = {
             let _span = stage::open(Stage::MovementIntents);
             soldier_moves(
                 tick,
                 seed,
                 self.terrain,
-                &self.soldiers,
+                &UnitWalk {
+                    soldiers: &self.soldiers,
+                    live: &live,
+                },
                 self.pyramid.layout(),
                 &self.exits,
                 threads,
             )?
         };
-=======
-        // The walk order of the movement pass. The bridge holds every live
-        // unit in block-major tile order, and it sorted them at the barrier,
-        // so this order costs the frame nothing more than it already paid.
-        let live = self.bridge.units(&self.soldiers)?.to_vec();
-        let intents = soldier_moves(
-            tick,
-            seed,
-            self.terrain,
-            &UnitWalk {
-                soldiers: &self.soldiers,
-                live: &live,
-            },
-            self.pyramid.layout(),
-            &self.exits,
-            threads,
-        )?;
->>>>>>> feat-w39
 
         // Admission grants the intents. It reads the occupancy of a target
         // from the derived structure, which the last barrier rebuilt, so it

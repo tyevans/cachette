@@ -22,11 +22,8 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-<<<<<<< HEAD
 **Next number: FND-288**
-=======
 **Next number: FND-288**
->>>>>>> feat-w41
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -7860,7 +7857,6 @@ fraction of a frame it stood to win, and none of the reviews of them asked.
 [^F282B]: Findings register, FND-252, in this document.
 [^F282C]: The grid address conversion. `crates/cachette-core/src/hex.rs`
 [^F282D]: Backlog priority index. `docs/backlog/PRIORITY.md`
-<<<<<<< HEAD
 [^F262A]: Project orientation, hard invariants 2 and 4. `CLAUDE.md`
 [^F262B]: ADR-0041, a crate split enforces the boundary at compile time. `docs/adrs/draft/adr-0041-a-crate-split-enforces-the-boundary-at-compile-time.md`
 [^F262C]: The testing guide, section 3.5. `docs/TESTING.md`
@@ -7876,8 +7872,6 @@ fraction of a frame it stood to win, and none of the reviews of them asked.
 [^F274B]: ADR-0018, the unit-to-tile bridge is derived, and it rebuilds at the barrier, decision D1. `docs/adrs/accepted/adr-0018-the-unit-to-tile-bridge-is-derived-and-rebuilds-at-the-barrier.md`
 [^F274C]: The drifted arena suite of the core. `crates/cachette-core/tests/drifted_arena.rs`
 [^F274D]: ADR-0056, movement is tile-discrete and admitted by sort-then-admit, decision D3. `docs/adrs/accepted/adr-0056-movement-is-tile-discrete-and-admitted-by-sort-then-admit.md`
-=======
 [^F287A]: Findings register, FND-281, in this document.
 [^F287B]: Findings register, FND-282, in this document.
 [^F287C]: The exit locality benchmark, the frame row. `crates/cachette-core/benches/exit_locality.rs`
->>>>>>> feat-w41
