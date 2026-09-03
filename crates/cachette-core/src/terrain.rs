@@ -142,9 +142,8 @@ impl TileKind {
     /// be one fact in two places, and nothing would fail when the two
     /// disagreed.
     ///
-    /// This module states which tiles admit a unit. It does not state what a
-    /// tile costs to cross. The cost multiplier is an open choice, and the
-    /// register holds it.[^1]
+    /// This module states which tiles admit a unit. What a tile costs to
+    /// cross is a separate answer, and the step multiplier gives it.[^1]
     ///
     /// # References
     ///
@@ -152,6 +151,41 @@ impl TileKind {
     #[must_use]
     pub const fn is_passable(self) -> bool {
         admits_a_unit(self.capacity())
+    }
+
+    /// Returns the factor that scales the step cost of a tile of this kind.
+    ///
+    /// A crossing time is a function of three quantities, and this is the
+    /// third of them. The capacity of the tile and the dwell of a unit are
+    /// the other two, and an arithmetic check that omits any one of the
+    /// three gives a confident wrong answer.[^1]
+    ///
+    /// The multiplier is content, and it sits here beside the capacity
+    /// because the capacity and the multiplier describe the same tile.[^2] A
+    /// step-cost literal in the movement kernel is the violation that the
+    /// movement record names, in the same way a capacity literal is.[^3]
+    ///
+    /// **This reader states no rule about passability.** Ground that admits
+    /// no unit still answers a multiplier, because the capacity table is the
+    /// one declaration of which ground admits a unit and a second rule here
+    /// would be one fact in two places.[^4] Nothing reads the multiplier of
+    /// ground that nobody stands on.
+    ///
+    /// The match is exhaustive over the kinds, so the compiler refuses a
+    /// kind that states no multiplier.
+    ///
+    /// # References
+    ///
+    /// [^1]: Findings register, FND-037. `docs/FINDINGS.md`
+    /// [^2]: Decisions register, DEC-017. `docs/DECISIONS.md`
+    /// [^3]: ADR-0056, movement is tile-discrete and admitted by sort-then-admit, decision D4. `docs/adrs/accepted/adr-0056-movement-is-tile-discrete-and-admitted-by-sort-then-admit.md`
+    /// [^4]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`
+    #[must_use]
+    pub const fn step_multiplier(self) -> Fix32 {
+        match self {
+            Self::Water | Self::Plain | Self::Forest | Self::Hill => ORDINARY_MULTIPLIER,
+            Self::Mountain => MOUNTAIN_MULTIPLIER,
+        }
     }
 
     /// Returns the number of units that may stand on a tile of this kind.
@@ -213,6 +247,81 @@ const ORDINARY_CAPACITY: u32 = 8;
 /// [^2]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`
 /// [^3]: ADR-0090, a tile upgrade is stored sparsely, as the difference from the generated world, decision D3. `docs/adrs/draft/adr-0090-a-tile-upgrade-is-stored-sparsely.md`
 pub const CROSSING_CAPACITY: u32 = 16;
+
+/// The step multiplier of ordinary ground.
+///
+/// Ordinary ground is the baseline of the movement calibration. The dwell of
+/// a unit is derived from the tile edge and the march rate over ordinary
+/// ground, so ordinary ground scales the step cost by one, by
+/// construction.[^1] **This value is derived, not measured.** No measurement
+/// exists on the target platform.[^2]
+///
+/// # References
+///
+/// [^1]: Budgets and costs, the scale constants. `docs/reference/budgets.md`
+/// [^2]: Blockers register, BLK-007. `docs/BLOCKERS.md`
+pub const ORDINARY_MULTIPLIER: Fix32 = Fix32::ONE;
+
+/// The step multiplier of a mountain tile.
+///
+/// The value follows from the two accepted crossing times. The project
+/// accepted an ordinary crossing of 12.5 seconds and a mountain crossing of
+/// 50 seconds, and the ratio of those two figures is the multiplier.[^1]
+/// **The value is derived, not measured, and nobody has decided it
+/// directly.**[^2] [^3]
+///
+/// # References
+///
+/// [^1]: Decisions register, DEC-008. `docs/DECISIONS.md`
+/// [^2]: Findings register, FND-037. `docs/FINDINGS.md`
+/// [^3]: Blockers register, BLK-007. `docs/BLOCKERS.md`
+pub const MOUNTAIN_MULTIPLIER: Fix32 = Fix32::from_int(2);
+
+/// The smallest step multiplier that content may state.
+///
+/// Ordinary ground is the floor, because the dwell that the calibration
+/// fixed is the dwell over ordinary ground. Ground that scaled the step cost
+/// below one would carry a unit faster than the march rate that fixed the
+/// dwell, and the calibration would then state a rate the world does not
+/// keep.[^1]
+///
+/// # References
+///
+/// [^1]: Budgets and costs, the scale constants. `docs/reference/budgets.md`
+pub const MULTIPLIER_FLOOR: Fix32 = ORDINARY_MULTIPLIER;
+
+/// The largest step multiplier that content may state.
+///
+/// The project has accepted two crossing times, and the mountain crossing is
+/// the longer of the two.[^1] The multiplier that it implies is therefore the
+/// largest multiplier the calibration admits. Ground that wants a larger one
+/// needs a crossing time that the project has accepted, and no such figure
+/// exists.
+///
+/// **This is a bound, and it is not a copy of the mountain multiplier.** The
+/// two carry the same value today, because the mountain crossing is the
+/// longest accepted crossing. They answer different questions. A raised
+/// mountain multiplier fails the range check against this bound, and that
+/// failure is the correct outcome: it asks for the accepted crossing time
+/// that would justify the new value.
+///
+/// This bound is what engine code would give if the multiplier lived in
+/// engine code. Content states it instead, and content states it once.[^2]
+///
+/// # References
+///
+/// [^1]: Decisions register, DEC-008. `docs/DECISIONS.md`
+/// [^2]: Decisions register, DEC-017. `docs/DECISIONS.md`
+pub const MULTIPLIER_CEILING: Fix32 = Fix32::from_int(2);
+
+/// Reports whether a step multiplier sits inside the validated range.
+///
+/// The function takes the multiplier rather than the kind, so a test can
+/// state the rule for a value that no kind carries today.
+#[must_use]
+pub const fn multiplier_is_valid(multiplier: Fix32) -> bool {
+    multiplier.0 >= MULTIPLIER_FLOOR.0 && multiplier.0 <= MULTIPLIER_CEILING.0
+}
 
 /// Returns the largest number of units that any ground admits.
 ///

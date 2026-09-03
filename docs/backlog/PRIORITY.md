@@ -87,9 +87,10 @@ These are real and none of them blocks anything today.
 | 0068 | A ruler and a succession. Item 0067 is complete, so the descent it reads exists. |
 | 0088 | Promotion into the character tier. |
 | 0180 | Nothing makes a unit choose to build, so a world left to run improves no tile. It waits on the faction rule of BLK-034. |
-| 0097 | The layout record. Write it with the descent columns, not before.[^5] |
 | 0050 | Four product collisions still carried. |
 | 0099 | The faction mask union has no engine caller. |
+| 0226 | The relabel pass has no caller in the step, so a world left to run cannot answer a dynasty question about anybody born since it started. |
+| 0225 | The record check reads no source file from a worktree, so its uncited note is a false signal there. |
 | 0135 | The deposit amount reader has no caller, and the record now rests on the step order instead. |
 | 0072 | The panel fit check has no production caller. |
 | 0077 | The batched structural path, once its record exists. |
@@ -102,7 +103,6 @@ These are real and none of them blocks anything today.
 | 0039 | A rejected unit is not stuck. Waits on units having plans. |
 | 0040 | Record where an out-of-frame change gets its barrier. |
 | 0034 | Measure the generated terrain against a stored one. |
-| 0011 | Record the terrain multiplier. |
 | 0022 | Random behaviour through a keyed draw. Read against 0064 first. |
 | 0021 | Audit the movement records for acceptance. |
 | 0004 | Reconcile the public API examples. |
@@ -125,7 +125,6 @@ These are real and none of them blocks anything today.
 [^2]: Backlog guide. `docs/backlog/README.md`
 [^3]: The priority check script. `scripts/check_priority.py`
 [^4]: Blockers register, BLK-018. `docs/BLOCKERS.md`
-[^5]: Decisions register, DEC-032. `docs/DECISIONS.md`
 [^7]: Findings register, FND-080. `docs/FINDINGS.md`
 [^8]: Findings register, FND-100. `docs/FINDINGS.md`
 [^9]: PRD-0018, a depleted deposit comes back. `docs/product/shaped/prd-0018-a-depleted-deposit-comes-back.md`

@@ -73,6 +73,12 @@ reserved until the code that needs them exists.[^6]
 | No. | Why it sits here |
 |---|---|
 | 0021 | Layout follows the access pattern. Write it with the descent columns, not before.[^7] |
+
+| 0051 | The selector as a lazy expression tree. The owner decided that a set-valued command is how the control plane reaches a set, so this governs every verb written after it. Write it before the next verb.[^12] |
+| 0052 | A selector result may be a range. It carries the cost argument that makes 0051 affordable at the target scale, so the two are reviewed together.[^12] |
+| 0040 | Python is a control plane. The orientation states it and nothing enforces it. It is the rule 0043 and 0051 rest on.[^12] |
+| 0043 | A declared tier refuses the loop. Today the rule is prose, and prose lost to a missing read once already.[^13] |
+| 0021 | Written and at `Draft`, with the descent columns it points at. It needs a reviewer, and the author must not be the reviewer.[^7] |
 | 0069 | Weather. Nothing needs it. |
 | 0077 | The golden state hash. Write it when the first real golden file is committed, not before.[^9] |
 | 0055 | The modifier pipeline. One source modifies a rate, so the test fails today.[^8] |

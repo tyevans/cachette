@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-220**
+**Next number: FND-239**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -276,6 +276,40 @@ the wrong field. A solver that stops early is the same shape.
 
 ## C. Defects found in specified rules
 
+### FND-237 — The record check reads no source file when it runs in a worktree
+
+**Believed.** The record check reports a record that no other record and no
+source file cites. Running it from a worktree gives the same answer as running
+it from the main checkout.
+
+**True.** It reads no source file at all from a worktree. The check walks the
+tree for Rust and Python files and skips any path that holds a part named
+`.git`, `target` or `worktrees`. A worktree of this project lives under
+`.claude/worktrees/`, so every path below it holds that part and every source
+file is skipped.
+
+The effect is confined to the uncited note. The section check, the volatile
+figure check, the citation check and the registry check all read documents,
+and those are unaffected.
+
+**Evidence.** The file walk of the check was run against a worktree root with
+the same skip set. It returned zero Rust files. The same run reports the
+uncited note for twelve records, including one whose claim is cited from two
+source modules.
+
+**Follows.** **A filter that names a directory by its base name reaches every
+path that passes through it.** The skip set means "do not descend into a
+worktree from the main checkout". Inside a worktree it means "skip
+everything", because the root itself is inside one.
+
+**A check that reads nothing reports the same shape as a check that found
+nothing.** Zero files scanned and zero citations found produce the same note.
+Nothing distinguishes them, and the note reads as a finding about the record.
+A check that walks a tree should state how many files it read.[^37]
+
+The uncited note is a note and never a failure, so no gate went green that
+should have been red.[^237B] The cost is a false signal to whoever reads it.
+
 ### FND-011 — The progress accumulator overflows
 
 An unclamped accumulator lets a unit whose speed exceeds the local step cost
@@ -338,8 +372,34 @@ the note.
 
 **Follows:** a crossing time is a function of three quantities, not two.
 Capacity, dwell and the terrain multiplier all enter it. **Check that a rate
-derivation names every multiplier on its path.** No record states the mountain
-multiplier, so the 50-second figure implies its value rather than citing it.
+derivation names every multiplier on its path.**
+
+**Outcome, 2 September 2026. The terrain table now states the multiplier.**
+Every kind of ground answers a step multiplier beside its capacity, because
+the capacity and the multiplier describe the same tile.[^37HOME] The mountain
+kind carries two and every other kind carries one. The scale constants table
+holds the row and says the value is derived from the ratio of the two accepted
+crossing times.[^99] The value is derived, not measured, and nobody decided
+it directly.[^28] The forest kind and the hill kind carry the baseline,
+because no accepted crossing time separates them from level ground, and a
+register row holds that open choice.[^37NEXT]
+
+**The 4-tick difference has a candidate explanation, and it is unverified.**
+The closed-form law gives 125 ticks and the timing check measured 129. The law
+counts the steady state only. A formation pays two stages outside the steady
+state: the leading rank spends one dwell to enter the chokepoint before any
+unit leaves it, and the last rank spends one dwell to clear the exit tile
+after the steady state ends. Two dwells at the baseline dwell of 2 ticks is
+4 ticks, and 125 plus 4 is 129. The arithmetic matches exactly.
+
+**Mark this unverified.** The match is an arithmetic identity, not a
+measurement. The movement kernel does not exist, so nothing re-ran the check
+and nothing instrumented the entry tick or the clearing tick. **What would
+verify it:** run the same formation through the movement kernel when it
+exists, count the tick that the leading rank enters the chokepoint and the
+tick that the last rank leaves the exit tile, and confirm that the two stages
+cost one dwell each. A record must not state a crossing time as an exact
+figure until that check has run.
 
 ### FND-035 — The float ban lint does not catch an inferred literal
 
@@ -571,6 +631,70 @@ that existed to make fog cheap was the most expensive thing in the frame.
 
 ## E. Layout and platform corrections
 
+### FND-235 — A stored watermark read nothing, because a sentinel already said it
+
+**Believed.** The record of descent needed a stored count of how many rows the
+Euler labels covered. A query about a row above that count would answer
+nothing rather than answering from a stale label.
+
+**True.** The count read nothing. The two label columns already mark an
+unlabelled row with an absent-value sentinel, which a birth writes and a
+relabel clears. The sentinel alone decides every answer. The stored count was
+a second declaration of the same fact, and the length of the Euler order was a
+third.
+
+**Evidence.** The watermark check was removed from the label reader and the
+whole suite stayed green: twelve tests, none of which could see the
+difference. The behaviour was covered. The declaration was redundant, and only
+removing it showed that.
+
+**Follows.** Two things.
+
+**A green suite after a removal is evidence about the removal, not about the
+test.** The suite proved the watermark unnecessary. It would equally have
+proved a necessary check unnecessary if no test reached the case, which is why
+the removal was paired with a test that does reach it: a character born after
+the relabel must answer nothing, and that test fails when the sentinel is
+wrong.
+
+**Count the declaration sites of a derived quantity before storing it.** The
+number of labelled rows is derivable from the Euler order length, and the
+label columns already answer per row. Neither needed a third site. The record
+now derives the count and stores nothing.[^235A]
+
+### FND-236 — The descent columns went to the record, not to the arena
+
+**Believed.** The backlog item said to add the descent columns to the
+character arena: the two parent edges, the house, and the two Euler
+labels.[^236A]
+
+**True.** Three of the five belong to the record of descent, and two were
+already there. Item 0067 had put the parent edges in a separate append-only
+record keyed on a descent identity rather than on a slot, and it gave the
+reason: the arena reuses a slot after a death, so a slot names a different
+character later.[^236B]
+
+The same reason governs the other three. A house on a slot column would be
+released when its holder died, so a dynasty would lose its founder and every
+dead member of its line. A Euler label on a slot column would be worse, since
+the father forest holds every character the world ever created and the labels
+must cover all of them. The character arena holds a reader for each, and the
+reader resolves the identity to a descent row.
+
+**Evidence.** A test removes a character and asserts that the record of
+descent still answers its house, and that a living descendant keeps the house
+of the dead ancestor.
+
+**Follows.** **A backlog item names the structure it expects, and the item may
+be wrong about it.** This one was written before the work that built the
+record, and it named the arena because that is where the columns sat when it
+was written. Read an item's structure name as its author's expectation and not
+as a constraint. A constraint lives in a record.[^16]
+
+This is the same shape as the misattribution that ADR-0021 now forbids: a
+sentence that names one home for a set of fields whose passes disagree about
+where they belong.[^236D]
+
 ### FND-022 — Array-of-structs for characters, struct-of-arrays for cohorts
 
 **Believed:** struct-of-arrays vectorises well, so use it everywhere.
@@ -707,6 +831,49 @@ the scope rule names as recording an intent as a fact.
 
 
 ## G. Process
+
+### FND-238 — The gate prints ten screens of red when it passes
+
+**Believed.** A reader can tell a passing gate run from a failing one by
+reading its output. Red means something is wrong.
+
+**True.** A fully green `just check` prints ten test binaries reporting
+`FAILED` and ten `error: test failed` lines. They come from the probe
+recipes, whose passing condition is a non-zero exit, so the recipe marks each
+one and the gate exits zero with all of them red.[^238A] The probes exist for
+a good reason: a determinism test with no proven failure mode is
+decoration.[^238B] The cost is not the probes. It is that the gate has spent
+its whole vocabulary of alarm on its success path.
+
+**Evidence.** A worker read the block as a determinism defect and
+investigated it: decoded the event bytes, found two tile events in reverse
+order, traced the emission site, and ran the suite in isolation and under
+load. The investigation ended only when the reversed order turned out to be
+*exactly* reverse, which is what the probe feature injects and not what a
+thread-order defect produces. The dispatcher reports reading past the same
+block four times in one day, and recognising it only from having hit it
+early.
+
+**Follows.** Three things.
+
+**A check whose success prints as failure has no alarm left for a real
+failure.** The reader who has learnt to skim ten `FAILED` lines will skim the
+eleventh. This is the same shape as a gate left broken because it cannot
+pass: both train everyone to ignore the pipeline.[^238C]
+
+**The probe output is convincing, not merely noisy.** A reader who does not
+skim it loses time instead, because the injected defect is a plausible one by
+construction. The probe reverses the combine order, and reversed order is
+exactly what a result ordered by thread completion would look like.
+
+**What distinguished the probe from a real defect was the exactness.** A
+result taken from thread completion order varies between runs. A result that
+is exactly reversed, every time, on an idle machine and a loaded one, is a
+deliberate switch. Record that as the test to apply next time, because it is
+cheaper than decoding the bytes.
+
+This finding proposes no fix. The shape is the finding.
+
 
 ### FND-028 — Concurrent agents collide on shared numbering
 
@@ -5688,3 +5855,14 @@ needs it, and in each case nothing fails until two readers disagree.
 [^F218E]: Definition of Done, section 4. `.claude/rules/definition-of-done.md`
 [^F218F]: Findings register, FND-192, in this document.
 [^ALLOC2]: Findings register, FND-219, in this document.
+
+[^237B]: Decision Record Scope, section 6. `.claude/rules/adr-scope.md`
+[^238A]: The gate recipes. `justfile`
+[^238B]: Testing Rules, section 1. `.claude/rules/testing.md`
+[^238C]: Definition of Done, section 5. `.claude/rules/definition-of-done.md`
+[^235A]: The record of descent, the labelled row count. `crates/cachette-core/src/descent.rs`
+[^236A]: Backlog item 0097. `docs/backlog/complete/0097-write-the-layout-record-with-the-descent-columns.md`
+[^236B]: Backlog item 0067, record a parent and walk a line. `docs/backlog/complete/0067-record-a-parent-and-walk-a-line.md`
+[^236D]: ADR-0021, a layout claim names one structure and one pass, and never a tier, decision D1. `docs/adrs/draft/adr-0021-layout-follows-the-access-pattern.md`
+[^37HOME]: Decisions register, DEC-017. `docs/DECISIONS.md`
+[^37NEXT]: Decisions register, DEC-093. `docs/DECISIONS.md`

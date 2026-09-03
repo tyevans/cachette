@@ -1,7 +1,7 @@
 ---
 id: 0097
 title: Write the layout record with the descent columns
-status: refined
+status: complete
 created: 2026-08-31
 implements: [ADR-0066 D1, ADR-0066 D3]
 changes: []
@@ -101,7 +101,57 @@ covers, because naming the tier is what caused the error.
 
 ## Outcome
 
-Filled in when the item moves to `complete/`.
+**Done on 2 September 2026.**
+
+**The columns went to the record of descent, not to the character arena.** The
+item said the arena, and item 0067 had already put descent in a separate
+append-only record keyed on a descent identity rather than on a slot. The
+house and the two Euler labels belong with the parent edges, for the reason
+0067 gave for the edges: the arena reuses a slot after a death, so a column on
+the arena would lose the house of every dead ancestor and a dynasty would end
+whenever its founder died. The finding records the correction.[^12]
+
+**The two parent edges were already there.** Item 0067 recorded them. This
+work added the three that were missing: the house, and the two Euler interval
+labels of the father forest.
+
+**A pass reads them.** A relabel walks the father forest once in preorder and
+writes the labels. After it runs, "is this character a patrilineal ancestor of
+that one" is two integer comparisons at any depth of line, "every patrilineal
+descendant" is one span of the Euler order, and a cadet split is a map over
+that span. A house is named by the character that founded it, so a split
+allocates nothing.
+
+**The labels are ungapped, and a birth after the pass leaves the new row
+unlabelled.** The research names the gapped variant as the optimisation to
+take if a measurement demands it, and says not to build it first. No
+measurement exists on the target platform, so nothing demands it. An
+unlabelled row answers nothing rather than answering from a stale label.
+
+**The record sits on the reserved row and states one claim**: a layout claim
+names one structure and one pass, and never a tier. It gives four rejected
+alternatives with a reason for each. It holds no count, no file table and no
+measured figure, and it states no crossover. The registry row reads `Draft`
+and names the file. A reviewer sets `Accepted`.
+
+**The record carries one correction that the work found.** The research
+describes a cadet split as a contiguous range write. It is contiguous in the
+Euler order and gathered in the columns, because the rows are stored in birth
+order. That is the same error the record forbids, in miniature: "contiguous"
+means nothing until it names which array.
+
+**A restored defect found one redundant declaration.** The record held a
+stored watermark for how many rows carried a label, and the two label columns
+already marked an unlabelled row with a sentinel. Removing the watermark check
+left the whole suite green, which proved the check read nothing. The field is
+gone and the Euler order length answers instead. FND-235 records it.[^13]
+
+**Twelve tests cover the work, and five restored defects proved they can
+fail.** A birth copying the mother's house failed every test, through the
+invariant check. A subtree span one position too wide failed three. The house
+column removed from the state hash failed exactly one, which is the test
+written for it. A new row born carrying a label failed one. A split that wrote
+the whole record instead of the span failed two.
 
 ## References
 
@@ -116,3 +166,5 @@ Filled in when the item moves to `complete/`.
 [^9]: Backlog item 0067. `docs/backlog/complete/0067-record-a-parent-and-walk-a-line.md`
 [^10]: ADR-0066, entity storage holds four fixed shapes, decisions D1 and D3. `docs/adrs/accepted/adr-0066-entity-storage-holds-four-fixed-shapes.md`
 [^11]: ADR-0054, an entity belongs to one of three tiers, declared at creation. `docs/adrs/accepted/adr-0054-an-entity-belongs-to-one-of-three-tiers-declared-at-creation.md`
+[^12]: Findings register, FND-236. `docs/FINDINGS.md`
+[^13]: Findings register, FND-235. `docs/FINDINGS.md`

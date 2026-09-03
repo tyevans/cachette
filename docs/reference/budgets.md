@@ -41,6 +41,9 @@ that held it and says how the value was reached.
 | Ordinary crossing | 12.5 s | BLK-001 | Approved calibration, consistent at an 80 m tile |
 | Crossing-terrain capacity | 16 units | BLK-001, BLK-009 | Derived from dwell 2 at the approved crossing time |
 | Ordinary tile capacity | 8 units | BLK-009 | Owner decision, stored as `u8` |
+| Mountain crossing | 50 s | BLK-007 | Owner decision, accepting the recalibrated figure |
+| Ordinary step multiplier | 1 | BLK-007 | The calibration baseline. The dwell is derived over ordinary ground |
+| Mountain step multiplier | 2 | BLK-007 | Derived from the ratio of the two accepted crossing times. Nobody decided it directly |
 | Tiles crossed in a simulated day | 300 | BLK-012 | March rate divided by the tile edge |
 | Ticks in a simulated day | 600 | BLK-012 | Tiles crossed multiplied by the dwell |
 | Simulated time in one tick | 2.4 minutes | BLK-012 | A simulated day divided by the ticks in it |
@@ -59,6 +62,27 @@ that held it and says how the value was reached.
 The tile upgrade fraction picks sparse storage over dense storage. The
 character layer figure is derived by scaling, not measured. BLK-007 still holds
 every cost figure in this project.
+
+The step multiplier scales the step cost of a tile, and it is the third
+quantity that a crossing time depends on. Capacity and dwell are the other
+two.[^10] A crossing derivation that omits the multiplier gives a confident
+wrong answer. The multiplier is content, and it sits in the terrain table
+beside the terrain capacity, because the capacity and the multiplier describe
+the same tile.[^11]
+
+**The mountain multiplier is derived and nobody decided it directly.** The
+project accepted an ordinary crossing of 12.5 seconds and a mountain crossing
+of 50 seconds, and the ratio of the two figures is the multiplier.[^12] The
+validated range runs from the ordinary multiplier to the mountain multiplier.
+Ordinary ground is the floor, because the dwell was derived over ordinary
+ground. The mountain multiplier is the ceiling, because the mountain crossing
+is the longest crossing the project has accepted. Ground that wants a larger
+multiplier needs an accepted crossing time that would justify it.
+
+The forest kind and the hill kind carry the ordinary multiplier. No accepted
+crossing time distinguishes them from level ground, and inventing an
+intermediate value would state a figure that nobody derived. The register
+holds the open choice.[^13]
 
 The relation depth bounds the recursion that computes the relation between two
 characters. Each step of that recursion halves a value, so the smallest term
@@ -180,3 +204,7 @@ a footnote.
 [^7]: Development budgets, the local register. `docs/reference/development-budgets.md`
 [^8]: Decisions register, DEC-033 and DEC-001. `docs/DECISIONS.md`
 [^9]: The character graph and inheritance, sections 2.3 and 3.6. `docs/research/reports/14-character-graph-and-inheritance.md`
+[^10]: Findings register, FND-037. `docs/FINDINGS.md`
+[^11]: Decisions register, DEC-017. `docs/DECISIONS.md`
+[^12]: Decisions register, DEC-008. `docs/DECISIONS.md`
+[^13]: Decisions register, DEC-093. `docs/DECISIONS.md`
