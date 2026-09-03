@@ -23,7 +23,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^ALLOC]
 
-**Next number: DEC-113**
+**Next number: DEC-114**
 
 ## Open
 
@@ -1326,6 +1326,41 @@ figure is 168 MB. The storage argument for vectors is stronger than the report
 concluded, and it called that argument its weakest.
 
 ## Closed
+
+### DEC-113 — Where does the panel layout standard live, and what is one panel?
+
+**Closed. The standard lives in the viewer crate, in Rust, and one panel is one
+file. The engineer who built the deck closed it.**
+
+**The question was raised because the demonstration is a Python program.** A
+watcher runs the control plane, and the control plane opens the window, holds
+the camera, owns the pixel memory and drives the loop. It looked as though the
+layout of what a watcher reads should live beside it.
+
+**It must not, because the control plane places no glyph.** The viewer fills a
+whole frame in one call, and the control plane hands it memory and puts the
+result on a screen.[^DEC113A] A layout standard written in Python would
+describe measurement and placement that nothing in Python performs. That is a
+capability nobody invokes, and this project records that shape.[^DEC113B]
+
+**One panel is one file, and that is the part that was chosen rather than
+found.** The alternative was one list of sections in the drawing module, which
+is what the head-up display already is. A section added there edits the same
+file and the same method as every other section, so two people cannot add two
+sections at once. A panel that states its own name, its own title and its own
+lines, and that appears in one registration list, costs one indirection through
+a trait object once for each drawn panel.
+
+**The registration list is the second declaration site, and it is deliberate.**
+A panel that is not in the list is not drawn and cannot be named. The bindings
+read the same list to answer which panels exist, so the Python side holds no
+copy of the names.[^SHAPE1]
+
+**This needs no decision record.** A future contributor could lay a panel out
+elsewhere, but moving it later costs about as much as choosing it now, and the
+reasoning is visible in the module. The second and third conditions of the
+scope test both fail.[^SCOPE1]
+
 
 ### DEC-111 — Should the key vector sort check that no identifier repeats, or only that no two keys tie?
 
@@ -2832,6 +2867,8 @@ a failed founding is correct.[^PRD12]
 [^DEC96D]: ADR-0064, a unit chooses by scoring a small fixed option set, decision D1. `docs/adrs/accepted/adr-0064-a-unit-chooses-by-scoring-a-small-fixed-option-set.md`
 [^DEC97B]: Target platform costs. `docs/reference/graviton-costs.md`
 [^SWEEP]: Recurring Defect Shapes, shape 2. `.claude/rules/recurring-defects.md`
+[^DEC113A]: ADR-0094, the caller owns the camera and the pixels, decision D1. `docs/adrs/draft/adr-0094-the-caller-owns-the-camera-and-the-pixels.md`
+[^DEC113B]: Recurring Defect Shapes, shape 3. `.claude/rules/recurring-defects.md`
 [^DEC107A]: The pyglet package index entry, read 2 September 2026. https://pypi.org/pypi/pyglet/json
 [^DEC107B]: The pygame and pygame-ce package index entries, read 2 September 2026. https://pypi.org/pypi/pygame/json
 [^DEC107C]: ADR-0094, the caller owns the camera and the pixels, decision D5. `docs/adrs/draft/adr-0094-the-caller-owns-the-camera-and-the-pixels.md`

@@ -48,6 +48,7 @@ These close a gap a review found, or they unblock the items above.
 
 | No. | Why it sits here |
 |---|---|
+| 0310 | Expose the three logs the control plane cannot see. **The control plane cannot see a unit die.** The engine records a unit a shortage ended, a unit a step promoted and a site that fell short, and the bindings expose none of the three. It sits here because it is a gap in the boundary rather than a defect in the engine, and because the three logs that are exposed already set the shape it must take. |
 | 0293 | The move to a dated nightly opened a door the compiler used to hold shut: the reassociating float methods now compile, and only the script's name check stands in it. The lint can name them and does not. FND-284 holds the measurement and DEC-107 must close first. It sits at the top of `Next` because it is the one thing the toolchain move made worse before anything makes it better, and because the fix is three lines and a check. |
 | 0294 | The toolchain is declared in three places that now disagree in kind. The manifest's minimum version claim is true today only because nothing uses an unstable feature yet, and the moment something does it becomes false silently. |
 | 0295 | Nothing enforces that the toolchain names a dated nightly rather than a floating channel. One deleted word turns the pin back into a moving compiler, and ADR-0097 D2 is prose that nothing checks. |

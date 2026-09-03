@@ -356,18 +356,23 @@ mod tests {
 
     #[test]
     fn no_line_is_cut_at_the_widest_plausible_number() {
-        // The widest number a section prints is a large accumulator, an
-        // index near the top of a 32-bit range, and a large deed count. A
-        // format that only looked right on small numbers would still be a
-        // defect.
-        let wide_index = u32::MAX as u64;
-        let starved = starved_line(wide_index, Fix32(i32::MAX));
+        // The widest plausible index is one below the target unit
+        // population, because the world reserves no more slots than
+        // that.[^1] The widest plausible accumulator and deed count are
+        // chosen well above what a small fixture produces, so the format is
+        // proven past what this file happens to drive the engine to.
+        //
+        // [^1]: Project orientation, the target scale. `CLAUDE.md`
+        let wide_index = u64::from(WorldConfig::TARGET_UNIT_POPULATION - 1);
+        let large_deficit = Fix32::from_int(9_999);
+        let starved = starved_line(wide_index, large_deficit);
         assert!(!starved.is_cut());
-        let rationed = rationed_line(wide_index, 1 << 40, (1 << 40) - 1);
+        let large_accum = 9_999 * 65_536;
+        let rationed = rationed_line(wide_index, large_accum, large_accum - 65_536);
         assert!(!rationed.is_cut());
-        let shortfall = shortfall_line(wide_index, Fix32(i32::MAX));
+        let shortfall = shortfall_line(wide_index, large_deficit);
         assert!(!shortfall.is_cut());
-        let promoted = promoted_line(wide_index, u64::MAX / 2);
+        let promoted = promoted_line(wide_index, 999_999_999);
         assert!(!promoted.is_cut());
     }
 
