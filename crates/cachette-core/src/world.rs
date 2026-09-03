@@ -4596,11 +4596,49 @@ fn build_intents(soldiers: &SoldierArena, threads: usize) -> Result<Vec<BuildInt
     }))
 }
 
+/// Returns the tile one step away, or `None` when nothing may stand there.
+///
+/// The call answers two refusals with one value, because a caller that wanted
+/// to tell them apart would have to ask the grid and the terrain separately
+/// and would then hold the rule twice.[^1]
+///
+/// A neighbour outside the world is no tile. The world is a rhombus and it
+/// does not wrap.[^2]
+///
+/// Ground that admits no unit is no target. The capacity table is the one
+/// statement of which ground admits a unit.[^3]
+///
+/// # References
+///
+/// [^1]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`
+/// [^2]: ADR-0017, the world is a rhombus, so a tile index is raw axial, decision D3. `docs/adrs/accepted/adr-0017-the-world-is-a-rhombus-so-a-tile-index-is-raw-axial.md`
+/// [^3]: ADR-0068, terrain is generated from the seed and is never stored as a map, decision D4. `docs/adrs/accepted/adr-0068-terrain-is-generated-from-the-seed-and-is-never-stored-as-a-map.md`
+fn step_target(grid: Grid, terrain: Terrain, here: Axial, direction: usize) -> Option<Axial> {
+    let target = grid.neighbour(here, direction)?;
+    if terrain.kind(target)?.is_passable() {
+        Some(target)
+    } else {
+        None
+    }
+}
+
 /// The draw index of the movement direction.
 ///
 /// The movement system takes one draw for each soldier in each frame. A
 /// second draw in the same system and frame must take the next index.
 const DRAW_MOVE_DIRECTION: u32 = 0;
+
+/// The draw index of the direction a unit takes when the ground refuses the
+/// exit of its cell.
+///
+/// The fall-back is a second draw in the same system and the same frame, so
+/// it takes the next index. A fall-back that reused the first index would
+/// give the refused unit the direction that was just refused.[^1]
+///
+/// # References
+///
+/// [^1]: ADR-0003, every random draw is keyed, never stateful, decision D1. `docs/adrs/accepted/adr-0003-every-random-draw-is-keyed-never-stateful.md`
+const DRAW_MOVE_FALLBACK: u32 = 1;
 
 /// Returns the move that each live soldier chose, in slot order.
 ///
@@ -4737,16 +4775,43 @@ fn soldier_moves(
                                 NEIGHBOUR_COUNT as u64,
                             ) as usize,
                         };
-                        // A neighbour outside the world gives `None`. The
-                        // soldier then stays put, because the world does not
-                        // wrap.
-                        let target = grid.neighbour(here, direction)?;
-                        // The ground refuses the soldier outright. The
-                        // soldier stays put, and nothing later in the frame
-                        // sees the intent.
-                        if !terrain.kind(target)?.is_passable() {
-                            return None;
-                        }
+                        // **A refused direction falls back to a draw, and it
+                        // never freezes the unit.** The exit of a cell is one
+                        // direction for a block of tiles, and the ground under
+                        // one unit of that block may refuse it. That refusal
+                        // repeats every frame, because the cell, the option
+                        // and the direction all hold, so a unit that only
+                        // stayed put would stay put for ever. A unit against
+                        // a shoreline is the case that showed it.[^16]
+                        //
+                        // The fall-back is the same keyed draw that a cell
+                        // with no exit already takes, at the next draw index.
+                        // It is keyed on the frame, so a unit the draw refuses
+                        // again draws a different direction on the next
+                        // frame.[^10]
+                        //
+                        // The fall-back reads the six neighbours of no cell.
+                        // It reads one tile, which is the tile the unit would
+                        // step onto, so the rule that a unit never searches
+                        // its neighbourhood holds.[^17]
+                        //
+                        // [^16]: Findings register, FND-315. `docs/FINDINGS.md`
+                        // [^17]: ADR-0091, movement takes its direction from a per-cell field, never from a per-unit search, decision D1. `docs/adrs/draft/adr-0091-movement-takes-its-direction-from-a-per-cell-field.md`
+                        let target = step_target(grid, terrain, here, direction);
+                        let target = match target {
+                            Some(target) => target,
+                            None => {
+                                let again = rng::draw_below(
+                                    seed,
+                                    rng::SYSTEM_SOLDIER_MOVE,
+                                    tick.0,
+                                    soldier.to_bits(),
+                                    DRAW_MOVE_FALLBACK,
+                                    NEIGHBOUR_COUNT as u64,
+                                ) as usize;
+                                step_target(grid, terrain, here, again)?
+                            }
+                        };
                         Some((*soldier, target))
                     })
                     .collect();

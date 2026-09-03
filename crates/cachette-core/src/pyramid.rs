@@ -959,6 +959,29 @@ impl ExitField {
                     let Some(summary) = pyramid.cell(index.0) else {
                         continue;
                     };
+                    // **A cell that admits no unit is not a candidate.** The
+                    // rank reads a field that says nothing about whether a
+                    // unit may stand there, so open water outranks dry ground
+                    // on any field that water scores well on, and a whole
+                    // block is then sent at a coast it can never cross.[^10]
+                    //
+                    // The open tile count is the one statement of how much of
+                    // a cell admits a unit, and it is the same count the open
+                    // share reads. A second rule here would be that fact in
+                    // two places.[^11] [^12]
+                    //
+                    // This refuses a cell that admits nobody at all. A cell
+                    // that admits somebody stays a candidate, whatever the
+                    // shape of the ground inside it, because the field holds
+                    // one direction for the whole block and the tile a unit
+                    // stands against is not a fact the block carries.[^10]
+                    //
+                    // [^10]: Findings register, FND-315. `docs/FINDINGS.md`
+                    // [^11]: ADR-0024, every summary field is declared extensive or intensive, decision D4. `docs/adrs/accepted/adr-0024-every-summary-field-is-declared-extensive-or-intensive.md`
+                    // [^12]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`
+                    if summary.open_tiles() == 0 {
+                        continue;
+                    }
                     let value = field_value(summary, row.field);
                     if value > best_value {
                         best_value = value;
