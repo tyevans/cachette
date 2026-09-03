@@ -1,5 +1,5 @@
 ---
-id: 0301
+id: 0303
 title: Narrow the sort guard to a repeated key
 status: complete
 created: 2026-09-03

@@ -1683,7 +1683,7 @@ commit what changed. Do not edit a row to make a later run agree with it.
 [^RESID298]: Findings register, FND-303. `docs/FINDINGS.md`
 [^LAYOUT]: Findings register, FND-309. `docs/FINDINGS.md`
 [^LAYOUT]: Findings register, FND-308. `docs/FINDINGS.md`
-[^ITEM301]: Backlog item 0301, narrow the sort guard to a repeated key. `docs/backlog/complete/0301-narrow-the-sort-guard-to-a-repeated-key.md`
+[^ITEM301]: Backlog item 0301, narrow the sort guard to a repeated key. `docs/backlog/complete/0303-narrow-the-sort-guard-to-a-repeated-key.md`
 [^ADR105]: ADR-0105, a total order needs no repeated identifier, only no repeated key. `docs/adrs/draft/adr-0105-a-total-order-needs-no-repeated-key.md`
 
 [^DECIDE309]: Findings register, FND-309. `docs/FINDINGS.md`

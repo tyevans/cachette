@@ -1,5 +1,5 @@
 ---
-id: 0300
+id: 0302
 title: Fail when a stage declaration disagrees with a measurement
 status: proposed
 created: 2026-09-03
