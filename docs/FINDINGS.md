@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-309**
+**Next number: FND-310**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -8529,6 +8529,51 @@ tested the refusal.[^F308B]
 still 40 megabytes and it still drives the largest stage in the engine. The
 answer here is neither the dense array nor leaving it alone, and naming the
 ceiling is what makes that visible.
+### FND-309 — The decide pass sorted five million lists on each frame, and three quarters of them held one entry or none
+
+**Believed.** The decide pass is the largest stage in the engine and it already
+takes a thread count, so it may simply be that expensive. Nothing had divided
+it.
+
+**True.** It reads about five million candidate tiles on each frame, and a
+quarter of them raise more than one supporter. **It sorted every one of them.**
+Three quarters of the sorts ordered a list of one entry or of none.
+
+**Evidence.** A counting switch on the pass, at 16,777,216 tiles with one
+million units. At frame 15 it read 4,965,973 candidates, raised 6,609,326
+supporters, and 1,245,193 candidates raised more than one. About 1.33
+supporters for each candidate, and 1,281,555 candidates had a challenger able
+to beat the holder, which is 26 percent. A candidate with no challenger does
+not read the ground, so that count is also the count of ground reads.
+
+**The sort was not needed at all.** It existed to put the supporters in
+ascending identifier order, so that a strict comparison would give the stable
+key of support descending and identifier ascending. **Stating the tie in the
+comparison gives the same key from any order**, so the sort is gone and the
+result no longer depends on one.
+
+The two are equivalent by construction rather than by measurement. The old form
+takes the first faction that reaches the highest support in ascending
+identifier order. The new form takes the highest support and, on a tie, the
+lower identifier. Both name the same faction for every input.
+
+**Follows.** Three things.
+
+**A sort that exists to produce an order for one comparison can usually move
+into the comparison.** The ordering was never wanted for itself. It was a way
+of expressing a tie-break, and a tie-break is two lines where a sort is a pass.
+
+**Removing it made the pass order-independent, which is worth more than the
+time.** The result used to depend on the sort putting the supporters in one
+order. It now depends on nothing but the set of supporters, so there is no
+order left for a defect to disturb.
+
+**The counting says what the pass does and not where its time goes.** A
+quarter of the candidates do the work and all of them pay for the read of six
+neighbours and a walk of the units on the tile. Whether the sort was a large
+share of the stage is a question for a measurement, and this finding does not
+answer it.
+
 ## References
 
 [^F261B]: The holder count test of the viewer. `crates/cachette-view/tests/shows_who_holds_the_ground.rs`
