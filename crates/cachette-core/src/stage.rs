@@ -170,6 +170,7 @@ declare_stages! {
     Reap,                     "reap",                       true,  1, false;
     BridgeRefreshAfterReap,   "bridge_refresh_after_reap",  true,  1, false;
     SettlePositions,          "settle_positions",           true,  1, false;
+    Promote,                  "promote",                    true,  1, false;
     RebuildLevel1,            "rebuild_level_1",            true,  1, false;
     InfluenceSolve,           "influence_solve",            true,  1, false;
 }
