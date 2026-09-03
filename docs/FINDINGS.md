@@ -8377,43 +8377,63 @@ search was found not to be a small search, because each of its steps was a
 miss.[^F306A] The same arithmetic run backwards says a sequential sort can beat
 a random-access scan, and it was not applied.
 
-### FND-307 — A check that skipped a path component named `worktrees` scanned nothing when it ran from a worktree
+### FND-307 — Two checks were blind in two different ways, and a pipeline hid the second
 
-**Believed.** The record check reports which records no source file cites, and a
-worker running it from a worktree gets that report about their own tree.
+**Believed, first.** The record check reports which records no source file cites,
+and a worker running it from a worktree gets that report about their own tree.
 
-**True.** It reported every record as cited by nothing. The check skips a path
-whose parts include `worktrees`, so that one run does not read files another run
-owns. A worktree of this project lives under `.claude/worktrees`, so when the
-check runs from inside one, every file it would scan has `worktrees` among its
-parts and the skip removes all of them. The corpus was empty and the note fired
-for every record.
+**True.** It reported every record as cited by nothing. The check skipped any
+path whose parts include `worktrees`, so that one run does not read files another
+run owns. A worktree of this project lives under `.claude/worktrees`, so when the
+check ran from inside one, every file it would scan had `worktrees` among its
+parts and the skip removed all of them.
 
-**The measurement.** The same commit, checked twice. From the repository root:
-two notes. From inside a worktree: fifteen. Thirteen records were reported as
-cited by no source file while their citations sat in files the run never opened.
+**The measurement.** One commit, checked twice. From the repository root: two
+notes. From inside a worktree: fifteen. Thirteen records were reported as cited
+by no source file while their citations sat in files the run never opened. Three
+sibling checks name paths rather than components and none has the defect. The fix
+makes this one name paths too.
 
-**Three sibling checks name paths and not components**, and none of them has the
-defect. The fix makes this one name paths too.
+**Believed, second.** The conflict marker check has the same defect, so running
+it from inside a worktree reports a clean sweep of files it never looked at.
 
-**The same shape has a second half, and it points the other way.** The conflict
-marker check skips the worktree directory correctly, so a run from the
-repository root skips a worker's whole tree. Planting a marker in a worktree and
-running the check from the root reports 861 files and no failure. Running it
-from the worktree reports the marker. **A worker whose changes are in a worktree
-must run it from the worktree**, and guidance to run it from the root is the
-blind configuration for exactly the files that changed.
+**False, and it was disproved by a probe rather than by reading.** That check
+skips a path built from the script's own location, so inside a worktree the skip
+names that worktree's own empty nested directory and removes nothing. A real
+marker planted in a worktree and the check run from that worktree, unpiped:
+three named failures and exit 1.
 
-**Follows.** Two things.
+**The blindness is real but it points the other way.** The same probe, with the
+root copy of the script run against the same planted marker: 864 files, no
+failure, exit 0. **A worker whose changes are in a worktree must run the check
+from the worktree.** Running it from the repository root is the blind
+configuration for exactly the files that changed.
+
+**Neither of those is how markers reached the trunk.** A pipeline exits with the
+status of its last command, and the failures go to standard error:
+
+```text
+python3 scripts/check_conflict_markers.py | tail -2 && git add -A
+```
+
+The `git add` runs whatever the check found, because the status belongs to
+`tail`. Verified in this worktree on a tree holding three markers: unpiped the
+script exits 1, and through `| tail -1` the shell reports 0.
+
+**Follows.** Three things.
 
 **A skip that names a component is a skip that matches its own root.** Name the
 path.
 
-**A check that scans nothing reports success.** Both halves of this are silent:
-the record check printed a note about every record instead of none, which looks
-like a finding rather than an absence, and the marker check printed a file count
-that a reader has no reason to doubt. A check should say what it scanned, and a
-reader should compare that count against what they expected to change.
+**Read the count a check prints, not the status of the pipeline you put it in.**
+A check that scans nothing and a check whose failures were swallowed both look
+like success. The file count is the part a reader can compare against what they
+expected to change.
+
+**Two wrong diagnoses of the same script were corrected by the same method.** The
+first was corrected by planting a marker, the second by running the command
+unpiped. Neither was found by reading the script, and one of them was written
+into a probe that itself used the pipeline it was testing for.
 
 ## References
 

@@ -29,9 +29,14 @@ in one night printed `yes` for all three.[^3]
 **The failure is silent in both directions.** A stage declared to take a thread
 count that does not is read by a planner as parallel work that has already been
 done, so nobody looks at it. A stage declared not to take one that does is read
-as a serial bottleneck that is not there. One worker found the apparatus blind to
-a stage that gets worse with more threads, which is the first direction and the
-harder one to notice.
+as a serial bottleneck that is not there.
+
+**The first direction is the harder one, and this project has an instance of
+it.** The bridge rebuild not only fails to improve with more threads, it
+measured worse at twelve than at one. A check that only looks for improvement
+where `false` is declared would not have found it. Nothing here rests on a
+report of a second instance elsewhere; refining this item should look for one
+rather than assume it.
 
 **This is one fact in two places with nothing that fails when they disagree**,
 which is the defect shape this project records most often, and it is
