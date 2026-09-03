@@ -29,7 +29,9 @@
 
 use crate::bridge::{BlockLayout, BridgeError, UnitTileBridge, BLOCK_BITS_DEFAULT};
 use crate::character::{CharacterArena, CharacterError};
-use crate::choose::{self, ChoiceError, ChoiceExplanation, ChoiceSchedule, WeightProfile};
+use crate::choose::{
+    self, ChoiceError, ChoiceExplanation, ChoiceSchedule, NeedBuckets, WeightProfile,
+};
 use crate::cohort::{
     self, CohortError, CohortTable, DeathPlane, DrawLedger, NeedCondition, NeedRule, SiteRationed,
     UnitStarved,
@@ -481,6 +483,21 @@ pub struct World {
     starved_log: Vec<UnitStarved>,
     /// When each unit re-reads the world and chooses again.
     choice: ChoiceSchedule,
+    /// How finely the choice tells two needs apart.
+    ///
+    /// **The width of the bucket is the mechanism of the decision and not a
+    /// detail of it.** A need is a Q16.16 quantity, so unbucketed two units in
+    /// one cell almost never share a need and the pass computes one answer for
+    /// each unit.[^1] The width is a parameter of the world because no record
+    /// sets it and no measurement chooses it, and a blocker governs every cost
+    /// figure this project holds.[^2] [^3]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0097, the choice is decided for each cell and each bucket of need, decision D1. `docs/adrs/draft/adr-0097-the-choice-is-decided-for-each-cell-and-each-bucket-of-need.md`
+    /// [^2]: Blockers register, BLK-007. `docs/BLOCKERS.md`
+    /// [^3]: Decisions register, DEC-097. `docs/DECISIONS.md`
+    buckets: NeedBuckets,
     /// The weight that a unit puts on each option of the choice.
     ///
     /// The profile is content, and it is a table of values. The engine reads
@@ -595,6 +612,7 @@ impl World {
             death_plane: DeathPlane::new(),
             starved_log: Vec::new(),
             choice: ChoiceSchedule::DEFAULT,
+            buckets: NeedBuckets::DEFAULT,
             weights: WeightProfile::EVEN,
             positions: PositionTable::new(),
             position_schedule: RateSchedule::DEFAULT,
@@ -2851,6 +2869,7 @@ impl World {
         let frame = self.tick.0;
         let schedule = self.choice;
         let weights = &self.weights;
+        let buckets = self.buckets;
         let pyramid = &self.pyramid;
         let bridge = &self.bridge;
         let soldiers = &self.soldiers;
@@ -2883,7 +2902,7 @@ impl World {
                         let units = bridge
                             .in_block(soldiers, cell)
                             .expect("the caller checked that the bridge describes this arena");
-                        let mut answers = choose::CellAnswers::new(summary);
+                        let mut answers = choose::CellAnswers::new(summary, buckets);
                         for unit in units {
                             let need = needs[unit.index() as usize];
                             chosen.push((*unit, answers.answer(need, weights)));
@@ -3181,6 +3200,41 @@ impl World {
         self.choice
     }
 
+    /// Returns how finely the choice tells two needs apart.
+    #[must_use]
+    pub const fn need_buckets(&self) -> NeedBuckets {
+        self.buckets
+    }
+
+    /// Sets the width of a need bucket, as a power of two.
+    ///
+    /// **This changes what a unit does.** Two units whose needs share a bucket
+    /// receive one answer, so a wider bucket makes two units of different need
+    /// act alike and a narrower one approaches one answer for each unit.[^1]
+    /// The reference table holds the value a world starts with and the
+    /// derivation of it, and an open decision holds the choice of a better
+    /// one.[^2] [^3]
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the exponent is outside the range that the answer
+    /// table holds.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0097, the choice is decided for each cell and each bucket of need, decision D1. `docs/adrs/draft/adr-0097-the-choice-is-decided-for-each-cell-and-each-bucket-of-need.md`
+    /// [^2]: Budgets and costs, the choice pass. `docs/reference/budgets.md`
+    /// [^3]: Decisions register, DEC-097. `docs/DECISIONS.md`
+    pub const fn set_need_buckets(&mut self, shift: u32) -> Result<(), ChoiceError> {
+        match NeedBuckets::new(shift) {
+            Ok(buckets) => {
+                self.buckets = buckets;
+                Ok(())
+            }
+            Err(error) => Err(error),
+        }
+    }
+
     /// Sets the interval between two choices, as a power of two.
     ///
     /// An exponent of zero makes every unit choose on every tick. The
@@ -3279,6 +3333,7 @@ impl World {
             need,
             summary,
             &self.weights,
+            self.buckets,
             intent,
             self.choice.chooses_now(cell, self.tick.0.wrapping_add(1)),
         ))

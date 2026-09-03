@@ -151,7 +151,7 @@ that pass are budget parameters and not design knobs, so they live here.[^5]
 | Score floor | 16,384 in the Q16.16 scale | BLK-007 | Report 16, section 3.7. One quarter of one unit of weighted need |
 | Choice interval | 32 ticks | BLK-007 | Report 16, section 3.5. A power of two, at the low end of the range the owner asked for |
 | Stagger key | The level 1 cell index, mixed | BLK-007 | Report 16, section 3.5, and FND-023 |
-| Need bucket count | 65 buckets, from a shift of ten in the Q16.16 scale | BLK-007 | A quarter of one tick of need decay, see below |
+| Need bucket width | A shift of twelve in the Q16.16 scale, so 17 buckets | None | One tick of the default need decay, measured, see below |
 
 **The floor decides the mover count.** A unit whose highest score is below the
 floor holds what it was doing and does not move. Without the floor, a world in
@@ -163,44 +163,45 @@ the population, so a change to the floor changes the frame budget.
 division. The engine takes it as a parameter of the world, and the value above
 is the default.
 
-**The bucket count decides how finely the engine tells two needs apart.** The
+**The bucket width decides how finely the engine tells two needs apart.** The
 choice is decided for each cell and each bucket of need, so two units whose
-needs share a bucket receive one answer.[^16] A coarse bucket makes two units
-with clearly different needs act alike. A fine bucket approaches one answer for
-each unit and shares nothing.
+needs share a bucket receive one answer.[^16] **The width is the mechanism of
+that decision and not a detail of it.** A need is a Q16.16 quantity, so
+unbucketed two units in one cell almost never share a need and the decision buys
+nothing.
 
-**The count is chosen for behaviour, not for cost.** A cell scores a bucket the
-first time a unit asks for it, so a cell never scores more buckets than it holds
-units. The deciding work is therefore capped at the per-unit cost whatever the
-count is, and the count does not have to sit at a break-even point.
+**The width is a parameter of the world, and no record sets it.** A review of the
+record that governs the pass placed the choice on the item that implemented it,
+and that item took a measurement.
 
-**The derivation.** The default need rule takes a sixteenth of the need range off
-a unit on every tick. A bucket of a sixty-fourth of the range is a quarter of
-that step, so a unit crosses four buckets between two ticks. The quantisation is
-therefore finer than the resolution at which the need itself moves, and a unit
-never acts on a need it did not hold within one tick. The bucket width is a power
-of two in the fixed-point scale, so the bucket of a need is a shift and never a
-division.
+**The derivation, and it is measured rather than argued.** The default need rule
+takes a sixteenth of the need range off a unit on every tick. The width is that
+amount, so a unit crosses one bucket in one tick. A finer bucket separates two
+needs that the rule cannot separate inside a tick. A coarser one lets a need
+change without the bucket changing, so the choice lags the need.
 
-**A cost argument runs against this value, and the project accepts it for now.**
-The measurement register holds a table of the collapse a cell would show against
-the number of need buckets in play, and at the target density the median cell
-holds about as many units as this value holds buckets.[^17] So in the worst case,
-where every unit of a cell lands in its own bucket, the sharing saves nothing.
+The measurement says what the finer bucket costs. In a world that consumes, at
+the density the project states, the median cell holds about 75 units. At the
+moment the needs are most spread, the matched width gives 17 distinct keys in
+that cell and a width four times finer gives 41. **The finer bucket buys nothing
+and it is not free.** The findings register holds the table, both placements it
+is bounded by, and the fixture that produced it.[^19]
 
-**The lazy fill is why that is a weak loss and not a cost.** A cell scores a
-bucket the first time a unit asks for it, so the deciding work of a cell is the
-smaller of the units it holds and the bucket count. A fine bucket therefore risks
-buying nothing. It does not risk costing more than the per-unit pass it replaced.
+**The decay is a parameter of the need rule, so the two are coupled.** A caller
+who changes the decay and leaves the width alone has unmatched them. That
+coupling is why the world takes the width as a parameter rather than a module
+holding it as a constant. A closed decision holds the reasoning.[^18]
 
-**The measurement that would settle the value does not exist.** Nobody has
-measured how many need values coexist in one cell in a world that consumes, and
-the measurement register says plainly that no fixture in this project produces
-one. An open decision holds the choice.[^18] **Nothing here was measured on the
-target platform**, and the blocker above covers this row in the same way it
-covers the other three.
+**This row names no blocker, and that is deliberate.** The measurement behind it
+is a distribution and not a cost. The simulation is deterministic integer
+arithmetic, so the figures are the same on every machine. **What the pass costs
+under this width on the target platform is not measured**, and the blocker below
+covers that in the way it covers every cost figure.
 
-BLK-007 holds all three rows. The derivations come from a research report, and
+The width is a power of two in the fixed-point scale, so the bucket of a need is
+a shift and never a division.
+
+BLK-007 holds the first three rows. The derivations come from a research report, and
 the run that narrowed that blocker measured none of the three.
 
 ## What belongs here
@@ -271,5 +272,5 @@ a footnote.
 [^14]: Target platform costs, the measurement register. `docs/reference/graviton-costs.md`
 [^15]: Findings register, FND-242. `docs/FINDINGS.md`
 [^16]: ADR-0097, the choice is decided for each cell and each bucket of need. `docs/adrs/draft/adr-0097-the-choice-is-decided-for-each-cell-and-each-bucket-of-need.md`
-[^17]: Target platform costs, would the choice pass collapse if it decided for each cell. `docs/reference/graviton-costs.md`
 [^18]: Decisions register, DEC-097. `docs/DECISIONS.md`
+[^19]: Findings register, FND-259. `docs/FINDINGS.md`

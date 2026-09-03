@@ -48,8 +48,8 @@ pub use bridge::{BlockLayout, BlockRange, BridgeError, UnitTileBridge};
 pub use census::{census, Census, CensusError};
 pub use character::{CharacterArena, CharacterError, Sex};
 pub use choose::{
-    CellField, ChoiceError, ChoiceExplanation, ChoiceSchedule, Drive, OptionRow, WeightProfile,
-    NO_INTENT, OPTIONS, OPTION_COUNT,
+    CellField, ChoiceError, ChoiceExplanation, ChoiceSchedule, Drive, NeedBuckets, OptionRow,
+    WeightProfile, NO_INTENT, OPTIONS, OPTION_COUNT,
 };
 pub use cohort::{
     CohortError, CohortRow, CohortTable, DeathPlane, DrawLedger, DrawPass, NeedCondition, NeedRule,
