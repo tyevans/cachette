@@ -1,0 +1,66 @@
+# The OpenTelemetry collector.
+#
+# It does two things. It reads the log of every benchmark run and forwards it
+# to Loki, and it holds an OTLP port so that anything else in this project
+# sends telemetry to one address rather than to each store in turn.
+#
+# **It does not carry the benchmark rows.** Those go to the SQL table, and the
+# reason is in the observability guide: a row is a backfilled experiment
+# result keyed by a commit, and the metric model is built for a live stream
+# keyed by wall clock time.
+
+receivers:
+  # Anything that wants to send telemetry sends it here.
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+  # The log of every benchmark run. The provisioning script writes one file
+  # for each run into this directory.
+  filelog:
+    include: [/runs/*.log]
+    start_at: beginning
+    include_file_name: true
+    include_file_path: false
+    operators:
+      - type: add
+        field: attributes.source
+        value: graviton-benchmark
+
+processors:
+  batch:
+    timeout: 5s
+  # A log line that names no run is hard to read a week later. The file name
+  # is the run identifier, and this puts it on every line.
+  resource:
+    attributes:
+      - key: service.name
+        value: cachette-benchmark
+        action: upsert
+
+exporters:
+  otlphttp/loki:
+    endpoint: http://loki:3100/otlp
+  debug:
+    verbosity: basic
+
+service:
+  telemetry:
+    logs:
+      level: warn
+  pipelines:
+    logs:
+      receivers: [otlp, filelog]
+      processors: [resource, batch]
+      exporters: [otlphttp/loki]
+    metrics:
+      receivers: [otlp]
+      processors: [resource, batch]
+      exporters: [debug]
+    traces:
+      receivers: [otlp]
+      processors: [resource, batch]
+      exporters: [debug]

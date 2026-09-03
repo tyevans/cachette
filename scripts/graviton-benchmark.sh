@@ -383,5 +383,10 @@ scp "${ssh_options[@]}" "$remote:/tmp/result.txt" "$out" >/dev/null
     printf '# taken_utc\t%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 } | cat - "$out" > "$out.tmp" && mv "$out.tmp" "$out"
 
+# The log goes beside the result, under the same name, so the shipper finds
+# it without being told and the observability stack holds both.
+cp "${CACHETTE_BENCH_LOG:-/dev/null}" "${out%.txt}.log" 2>/dev/null || true
+
 say "Wrote $out"
+say "Load it into the local stack with: just obs-load $out"
 cat "$out"

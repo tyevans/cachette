@@ -37,3 +37,6 @@ python/cachette/*.dylib
 .agents/last-docs-run
 .claude/last-docs-run
 
+# The observability stack copies a benchmark run log here so that the
+# collector can read it. The run itself is the record, not the copy.
+observability/runs/*.log

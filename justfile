@@ -174,6 +174,42 @@ graviton-bench profile="full":
 graviton-orphans:
     ./scripts/graviton-benchmark.sh --orphans
 
+# Start the local observability stack. Nothing here gates a commit.
+#
+# It runs ClickHouse for the benchmark rows, Loki for the run logs, an
+# OpenTelemetry collector, and Grafana over both. Every port binds to the
+# loopback address, so nothing is reachable from another machine. Grafana is
+# at http://127.0.0.1:3000 and it needs no password.
+obs-up:
+    docker compose up -d
+    # The Loki image carries no shell, so its readiness is checked from here
+    # rather than by a health check inside the container.
+    @printf 'Waiting for Loki '
+    @for _ in $(seq 1 60); do \
+        if curl -sf http://127.0.0.1:3100/ready > /dev/null; then break; fi; \
+        printf '.'; sleep 2; \
+    done; printf '\n'
+    @curl -sf http://127.0.0.1:3100/ready > /dev/null \
+        && echo "Loki is ready" \
+        || echo "Loki did not become ready. Run: docker logs cachette-loki"
+    @echo "Grafana: http://127.0.0.1:3000"
+
+# Stop the stack. The data stays in the volumes.
+obs-down:
+    docker compose down
+
+# Stop the stack and delete every stored row and log.
+obs-clean:
+    docker compose down --volumes
+
+# Load a benchmark result into the stack. Give the file a run produced.
+obs-load result log="":
+    ./scripts/ship_bench.py {{result}} {{ if log == "" { "" } else { "--log " + log } }}
+
+# Read a benchmark result and write the rows it would load. Sends nothing.
+obs-check result:
+    ./scripts/ship_bench.py {{result}} --print
+
 # Run mutation testing over the Rust core. Slow. Not a commit gate.
 mutants:
     cargo mutants --no-shuffle

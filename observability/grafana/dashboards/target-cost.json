@@ -1,0 +1,355 @@
+{
+  "uid": "cachette-target-cost",
+  "title": "Target platform costs",
+  "description": "What a frame costs on AWS Graviton, and what a world holds. Every figure is a measurement. The register at docs/reference/graviton-costs.md holds the same rows with the reasoning.",
+  "tags": [
+    "cachette",
+    "benchmark"
+  ],
+  "timezone": "utc",
+  "editable": true,
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "",
+  "time": {
+    "from": "now-90d",
+    "to": "now"
+  },
+  "templating": {
+    "list": [
+      {
+        "name": "instance",
+        "label": "Instance type",
+        "type": "query",
+        "datasource": {
+          "type": "grafana-clickhouse-datasource",
+          "uid": "cachette-clickhouse"
+        },
+        "refresh": 1,
+        "includeAll": false,
+        "multi": false,
+        "query": "SELECT DISTINCT instance_type FROM bench.rows ORDER BY instance_type"
+      },
+      {
+        "name": "commit",
+        "label": "Commit",
+        "type": "query",
+        "datasource": {
+          "type": "grafana-clickhouse-datasource",
+          "uid": "cachette-clickhouse"
+        },
+        "refresh": 1,
+        "includeAll": false,
+        "multi": false,
+        "query": "SELECT DISTINCT commit_sha FROM bench.rows WHERE instance_type = '$instance' ORDER BY commit_sha"
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "title": "The frame at the target scale, against the thread count",
+      "description": "16777216 tiles and 1000000 units. The budget of 100 ms is a target the project chose. It is not derived and it is not measured.",
+      "type": "barchart",
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 0,
+        "y": 0
+      },
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "cachette-clickhouse"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "cachette-clickhouse"
+          },
+          "refId": "A",
+          "queryType": "sql",
+          "format": 1,
+          "rawSql": "SELECT toString(threads) AS thread_count, median_ns / 1000000 AS median_ms FROM bench.rows WHERE instance_type = '$instance' AND commit_sha = '$commit' AND bench = 'step_at_target_scale' ORDER BY threads"
+        }
+      ],
+      "options": {
+        "xField": "thread_count",
+        "orientation": "auto",
+        "showValue": "always"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "custom": {
+            "axisLabel": "one frame"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 100
+              }
+            ]
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 2,
+      "title": "The two halves of a frame, against the thread count",
+      "description": "The tile pass is a world of no units at 16777216 tiles. The unit passes are the difference between 1000000 units and none, at 4194304 tiles. The unit half reaches a floor and stops.",
+      "type": "barchart",
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 12,
+        "y": 0
+      },
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "cachette-clickhouse"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "cachette-clickhouse"
+          },
+          "refId": "A",
+          "queryType": "sql",
+          "format": 1,
+          "rawSql": "SELECT toString(t.threads) AS thread_count,\n       t.median_ns / 1000000 AS tile_pass_ms,\n       (u.median_ns - z.median_ns) / 1000000 AS unit_passes_ms\nFROM (SELECT threads, median_ns FROM bench.rows WHERE instance_type = '$instance' AND commit_sha = '$commit' AND bench = 'step_by_tiles' AND tiles = 16777216) AS t\nINNER JOIN (SELECT threads, median_ns FROM bench.rows WHERE instance_type = '$instance' AND commit_sha = '$commit' AND bench = 'step_by_units' AND tiles = 4194304 AND units = 1000000) AS u USING (threads)\nINNER JOIN (SELECT threads, median_ns FROM bench.rows WHERE instance_type = '$instance' AND commit_sha = '$commit' AND bench = 'step_by_units' AND tiles = 4194304 AND units = 0) AS z USING (threads)\nORDER BY t.threads"
+        }
+      ],
+      "options": {
+        "xField": "thread_count",
+        "orientation": "auto",
+        "showValue": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 3,
+      "title": "The cost of one tile, against the extent",
+      "description": "A flat column means the frame is linear in the tile count. The rows at 4096 tiles disagree with every larger extent and nobody has explained why. Backlog item 0229 holds the question.",
+      "type": "table",
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 0,
+        "y": 9
+      },
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "cachette-clickhouse"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "cachette-clickhouse"
+          },
+          "refId": "A",
+          "queryType": "sql",
+          "format": 1,
+          "rawSql": "SELECT tiles, threads, round(median_ns / tiles, 1) AS ns_for_each_tile, median_ns, samples FROM bench.rows WHERE instance_type = '$instance' AND commit_sha = '$commit' AND bench = 'step_by_tiles' ORDER BY tiles, threads"
+        }
+      ],
+      "options": {
+        "showHeader": true
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      }
+    },
+    {
+      "id": 4,
+      "title": "Resident memory, against the extent and the unit count",
+      "description": "The peak is what a machine must have free to build the world. The resident size is what it must have to hold one.",
+      "type": "table",
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 12,
+        "y": 9
+      },
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "cachette-clickhouse"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "cachette-clickhouse"
+          },
+          "refId": "A",
+          "queryType": "sql",
+          "format": 1,
+          "rawSql": "SELECT tiles, units, resident_bytes, peak_bytes, round((resident_bytes - empty_bytes) / tiles, 1) AS bytes_for_each_tile FROM bench.rows WHERE instance_type = '$instance' AND commit_sha = '$commit' AND bench = 'memory' ORDER BY tiles, units"
+        }
+      ],
+      "options": {
+        "showHeader": true
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "bytes_for_each_tile"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "none"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "tiles"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "none"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "units"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "none"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 5,
+      "title": "Building a world, and hashing one",
+      "description": "Both take one core. The constructor rebuilds the first pyramid level at one thread, so a larger machine does not reach it.",
+      "type": "table",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 18
+      },
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "cachette-clickhouse"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "cachette-clickhouse"
+          },
+          "refId": "A",
+          "queryType": "sql",
+          "format": 1,
+          "rawSql": "SELECT bench, tiles, round(median_ns / tiles, 1) AS ns_for_each_tile, round(median_ns / 1000000, 1) AS median_ms, samples FROM bench.rows WHERE instance_type = '$instance' AND commit_sha = '$commit' AND bench IN ('build', 'build_at_target_reservation', 'state_hash') ORDER BY bench, tiles"
+        }
+      ],
+      "options": {
+        "showHeader": true
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      }
+    },
+    {
+      "id": 6,
+      "title": "Every row of the run",
+      "description": "The whole table, for a question the panels above do not answer.",
+      "type": "table",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 18
+      },
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "cachette-clickhouse"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "cachette-clickhouse"
+          },
+          "refId": "A",
+          "queryType": "sql",
+          "format": 1,
+          "rawSql": "SELECT bench, tiles, units, threads, samples, min_ns, median_ns, max_ns, resident_bytes, peak_bytes FROM bench.rows WHERE instance_type = '$instance' AND commit_sha = '$commit' ORDER BY bench, tiles, units, threads"
+        }
+      ],
+      "options": {
+        "showHeader": true
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      }
+    },
+    {
+      "id": 7,
+      "title": "The log of the run",
+      "type": "logs",
+      "description": "What the provisioning script and the compiler said. This is where the answer is when a run fails rather than returns a figure.",
+      "gridPos": {
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 26
+      },
+      "datasource": {
+        "type": "loki",
+        "uid": "cachette-loki"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "cachette-loki"
+          },
+          "refId": "A",
+          "expr": "{service_name=\"cachette-benchmark\"}",
+          "queryType": "range"
+        }
+      ],
+      "options": {
+        "showTime": true,
+        "wrapLogMessage": true,
+        "sortOrder": "Ascending"
+      }
+    }
+  ]
+}
