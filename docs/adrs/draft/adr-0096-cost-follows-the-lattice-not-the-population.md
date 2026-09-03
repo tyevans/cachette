@@ -126,6 +126,14 @@ does not collapse a cell to a single answer. It is also far below the units in
 the cell, so the population is not the bound either. The exact key collapses a
 little, and this decision needs a key that collapses to the lattice.
 
+**The bound of the exact key belongs to the content, and this decision must
+not rest on it.** A cohort is a thing a world holds, not a thing the engine
+guarantees. A world that gave every unit a site of its own would put one key
+on every unit, and nothing in the engine refuses such a world. A bound that
+an author of content can remove cannot carry a claim that the population must
+not raise the work. **A bucket gives a bound the engine holds.** That is why
+D4 names one.
+
 **The width is a parameter, and this record does not set it.** A measurement
 now holds the spread of the needs of one cell in a world that consumes, and a
 register holds it with the fixture that produced it.[^3] A wide bucket makes
