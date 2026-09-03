@@ -1236,6 +1236,21 @@ impl PyWorld {
         // walk over the sites, so neither follows the world.
         report.set_item("seats", readout.seats())?;
         report.set_item("seats_taken", readout.seats_taken())?;
+        // The character tier, walked once. A caller may walk this tier and
+        // no other, because it holds a bounded population.
+        report.set_item("characters", readout.characters())?;
+        // How many units the last step promoted, and the deeds that earned
+        // the first of them. Both come from the log of that step, so a caller
+        // sees the promotion on the frame it happened rather than watching a
+        // number go up.
+        report.set_item("promoted_now", readout.promoted_now())?;
+        report.set_item("promoted_deeds", readout.promoted_deeds())?;
+        report.set_item(
+            "newest_character",
+            readout
+                .newest_character()
+                .map(|(faction, birth)| (faction.0, birth)),
+        )?;
         // The height a picture needs to hold the whole panel. A caller that
         // writes the panel to a file resizes to this rather than guessing a
         // constant, because the panel grows with the faction count, with the

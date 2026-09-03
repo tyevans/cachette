@@ -163,13 +163,14 @@ declare_stages! {
     HoldingSpread,            "holding_spread",             true,  1, false;
     HoldingCandidates,        "holding_candidates",         true,  1, true;
     HoldingDecide,            "holding_decide",             true,  1, true;
-    HoldingApply,             "holding_apply",              false, 1, true;
+    HoldingApply,             "holding_apply",              true,  1, true;
     StampHolders,             "stamp_holders",              false, 1, false;
     ApplyRates,               "apply_rates",                true,  1, false;
     Consume,                  "consume",                    true,  1, false;
     Reap,                     "reap",                       true,  1, false;
     BridgeRefreshAfterReap,   "bridge_refresh_after_reap",  true,  1, false;
     SettlePositions,          "settle_positions",           true,  1, false;
+    Promote,                  "promote",                    true,  1, false;
     RebuildLevel1,            "rebuild_level_1",            true,  1, false;
     InfluenceSolve,           "influence_solve",            true,  1, false;
 }

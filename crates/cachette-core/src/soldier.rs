@@ -136,6 +136,20 @@ const fn order_of(value: u8) -> Option<ResourceKind> {
 /// [^1]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`
 const NO_BUILD: u8 = 0;
 
+/// The deeds at which a unit becomes eligible for promotion, before a caller
+/// says otherwise.
+///
+/// **This is a fixture-facing parameter and not a budget.** It says how much
+/// a unit must have gathered before the world will consider making a person
+/// of it, and a caller changes it without touching the engine. No record
+/// holds the value, because no record may hold a number a measurement or a
+/// content choice can move.[^1]
+///
+/// # References
+///
+/// [^1]: Decision Record Scope, section 4.1. `.claude/rules/adr-scope.md`
+pub const DEFAULT_DEED_THRESHOLD: u64 = 24;
+
 /// Returns the build order that a column value names.
 const fn build_of(value: u8) -> Option<UpgradeKind> {
     if value == NO_BUILD {
@@ -308,6 +322,70 @@ pub struct SoldierArena {
     ///
     /// [^1]: ADR-0064, a unit chooses by scoring a small fixed option set, decisions D1 and D2. `docs/adrs/accepted/adr-0064-a-unit-chooses-by-scoring-a-small-fixed-option-set.md`
     intents: Vec<u8>,
+    /// What each slot has ever gathered, summed over every kind.
+    ///
+    /// **The value never falls.** It is a running total of what a unit took
+    /// from the ground, and nothing subtracts from it. A carried load leaves
+    /// a unit when the unit dies or delivers, and this column does not
+    /// follow the load. It records the deed, not the goods.
+    ///
+    /// The eligibility scan reads a level and not an edge, so the scan is
+    /// correct only while the value rises. A rule that lowered it would break
+    /// the scan in silence, and the invariant check states that.[^1]
+    ///
+    /// The column is an integer count of an integer amount. No part of it is
+    /// fixed-point, so no part of it rounds.[^2]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0104, a soldier is promoted from a level that never falls, decision D2. `docs/adrs/draft/adr-0104-a-soldier-is-promoted-from-a-level-that-never-falls.md`
+    /// [^2]: ADR-0002, simulated and aggregated state holds no floating point number, decision D1. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
+    deeds: Vec<u64>,
+    /// One for a slot whose deeds reach the threshold, zero otherwise.
+    ///
+    /// **This is a second statement of `deeds >= deed_threshold`.** It exists
+    /// so that the promotion scan reads one byte for each unit rather than
+    /// eight, and the arena writes it in the same call that raises the deeds.
+    /// The invariant check fails when the two disagree, because a value in
+    /// two places drifts and nothing else would notice.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`
+    eligible: Vec<u8>,
+    /// The character that each slot was promoted into, as identity bits, or
+    /// zero for a slot that holds no character.
+    ///
+    /// **The link runs one way, from the unit to the character.** A character
+    /// holds no unit column. One direction cannot disagree with the other,
+    /// and a character outlives the unit that carried it, so a link from the
+    /// character would name a dead unit for the rest of that character's
+    /// life.[^1]
+    ///
+    /// The value is a whole identity and never a bare slot index, so a
+    /// character that was removed does not resolve to the character created
+    /// next in its slot.[^2]
+    ///
+    /// A slot with a character above zero is already promoted, so this column
+    /// is also what stops a unit being promoted twice. That is one value
+    /// answering one question, and not a second flag.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0104, a soldier is promoted from a level that never falls, decision D3. `docs/adrs/draft/adr-0104-a-soldier-is-promoted-from-a-level-that-never-falls.md`
+    /// [^2]: ADR-0014, entity identity is an index plus a generation, decision D2. `docs/adrs/accepted/adr-0014-entity-identity-is-an-index-plus-a-generation.md`
+    characters: Vec<u64>,
+    /// The deeds at which a slot becomes eligible for promotion.
+    ///
+    /// **This is the one storage site of the threshold.** The world exposes a
+    /// setter that forwards here and keeps no copy, because the arena is what
+    /// maintains the eligibility column and a second copy would let the
+    /// column disagree with the rule that wrote it.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`
+    deed_threshold: u64,
     /// The free slots, oldest first.
     free: VecDeque<u32>,
     /// The number of live soldiers.
@@ -365,6 +443,10 @@ impl Clone for SoldierArena {
             deficits: copy_column(&self.deficits, capacity),
             homes: copy_column(&self.homes, capacity),
             intents: copy_column(&self.intents, capacity),
+            deeds: copy_column(&self.deeds, capacity),
+            eligible: copy_column(&self.eligible, capacity),
+            characters: copy_column(&self.characters, capacity),
+            deed_threshold: self.deed_threshold,
             free,
             live_count: self.live_count,
             retired_count: self.retired_count,
@@ -409,6 +491,10 @@ impl SoldierArena {
             deficits: Vec::with_capacity(slots),
             homes: Vec::with_capacity(slots),
             intents: Vec::with_capacity(slots),
+            deeds: Vec::with_capacity(slots),
+            eligible: Vec::with_capacity(slots),
+            characters: Vec::with_capacity(slots),
+            deed_threshold: DEFAULT_DEED_THRESHOLD,
             // Every opened slot can be free at once, because every soldier
             // can die on one tick. A queue that grew on that tick would
             // reallocate inside the step.
@@ -559,6 +645,14 @@ impl SoldierArena {
         // A unit arrives holding nothing. It takes an intent at the first
         // choice its cell schedules, and it does not move before then.
         self.intents[index] = NO_INTENT;
+        // A unit arrives having done nothing, eligible for nothing, and
+        // carrying no character. The despawn cleared all three, and the
+        // arena invariant fails when a dead slot carries any of them, so a
+        // reset here would be one fact in two places. The assert states the
+        // dependency instead, in the way the columns above it do.[^3]
+        debug_assert_eq!(self.deeds[index], 0);
+        debug_assert_eq!(self.eligible[index], 0);
+        debug_assert_eq!(self.characters[index], 0);
         self.live_count += 1;
         self.revision = self.revision.wrapping_add(1);
         Ok(Entity::new(slot, self.generations[index])
@@ -582,6 +676,9 @@ impl SoldierArena {
         self.deficits.push(Fix32::ZERO);
         self.homes.push(NO_HOME);
         self.intents.push(NO_INTENT);
+        self.deeds.push(0);
+        self.eligible.push(0);
+        self.characters.push(0);
         Ok(slot)
     }
 
@@ -623,6 +720,14 @@ impl SoldierArena {
         self.deficits[index] = Fix32::ZERO;
         self.homes[index] = NO_HOME;
         self.intents[index] = NO_INTENT;
+        // The deeds end with the unit. The character does not: it was created
+        // as its own entity and it outlives the body that earned it, so the
+        // despawn clears the link and never removes the character.[^4]
+        //
+        // [^4]: ADR-0104, a soldier is promoted from a level that never falls, decision D3. `docs/adrs/draft/adr-0104-a-soldier-is-promoted-from-a-level-that-never-falls.md`
+        self.deeds[index] = 0;
+        self.eligible[index] = 0;
+        self.characters[index] = 0;
         self.live_count -= 1;
         self.revision = self.revision.wrapping_add(1);
         if self.generations[index] == LAST_GENERATION {
@@ -791,6 +896,101 @@ impl SoldierArena {
         };
         let index = slot as usize;
         self.carries[index] = self.carries[index].with(kind, amount);
+        // **This is the one place a deed is recorded.** A unit receives what
+        // it gathered here and nowhere else, so the running total rises here
+        // and nowhere else, and it cannot fall because nothing else writes
+        // it. The eligibility byte is written in the same statement pair, so
+        // the two cannot be left disagreeing by a path that raises one.[^4]
+        //
+        // The add saturates. A total that wrapped would fall, and a level
+        // that falls breaks the scan that reads it.[^4]
+        //
+        // [^4]: ADR-0104, a soldier is promoted from a level that never falls, decisions D1 and D2. `docs/adrs/draft/adr-0104-a-soldier-is-promoted-from-a-level-that-never-falls.md`
+        self.deeds[index] = self.deeds[index].saturating_add(u64::from(amount.0));
+        self.eligible[index] = u8::from(self.deeds[index] >= self.deed_threshold);
+        true
+    }
+
+    /// Returns what a soldier has ever gathered, summed over every kind.
+    ///
+    /// Returns `None` when the identity is dead.
+    #[must_use]
+    pub fn deeds(&self, entity: Entity) -> Option<u64> {
+        let slot = self.slot_of(entity)?;
+        Some(self.deeds[slot as usize])
+    }
+
+    /// Returns the whole deed column.
+    #[must_use]
+    pub fn deed_column(&self) -> &[u64] {
+        &self.deeds
+    }
+
+    /// Returns the whole eligibility column. One means eligible.
+    #[must_use]
+    pub fn eligible_column(&self) -> &[u8] {
+        &self.eligible
+    }
+
+    /// Returns the whole character link column, as identity bits.
+    #[must_use]
+    pub fn character_column(&self) -> &[u64] {
+        &self.characters
+    }
+
+    /// Returns the deeds at which a unit becomes eligible for promotion.
+    #[must_use]
+    pub const fn deed_threshold(&self) -> u64 {
+        self.deed_threshold
+    }
+
+    /// Sets the deeds at which a unit becomes eligible for promotion.
+    ///
+    /// The eligibility column is a second statement of the comparison, so
+    /// changing the threshold rewrites it. A pass that left the column as the
+    /// old threshold wrote it would promote against a rule nobody set.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`
+    pub fn set_deed_threshold(&mut self, threshold: u64) {
+        self.deed_threshold = threshold;
+        for index in 0..self.deeds.len() {
+            self.eligible[index] =
+                u8::from(self.live[index] == 1 && self.deeds[index] >= threshold);
+        }
+    }
+
+    /// Returns the character that a soldier was promoted into.
+    ///
+    /// The outer option reports whether the identity is live. The inner one
+    /// reports whether the soldier carries a character. The answer names a
+    /// character that may already have been removed, so resolve it against
+    /// the character arena before reading anything of it.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0014, entity identity is an index plus a generation, decision D2. `docs/adrs/accepted/adr-0014-entity-identity-is-an-index-plus-a-generation.md`
+    #[must_use]
+    pub fn character_of(&self, entity: Entity) -> Option<Option<Entity>> {
+        let slot = self.slot_of(entity)?;
+        Some(Entity::from_bits(self.characters[slot as usize]))
+    }
+
+    /// Links a soldier to the character it was promoted into.
+    ///
+    /// Returns `false` when the identity is dead, and `false` when the
+    /// soldier already carries a character. A second promotion of one unit
+    /// would put two people in one body.
+    pub(crate) fn promote(&mut self, entity: Entity, character: Entity) -> bool {
+        let Some(slot) = self.slot_of(entity) else {
+            return false;
+        };
+        let index = slot as usize;
+        if self.characters[index] != 0 {
+            return false;
+        }
+        self.characters[index] = character.to_bits();
         true
     }
 
@@ -1011,6 +1211,10 @@ impl SoldierArena {
             .write(bytemuck::cast_slice(&self.deficits))
             .write(bytemuck::cast_slice(&self.homes))
             .write(&self.intents)
+            .write(bytemuck::cast_slice(&self.deeds))
+            .write(&self.eligible)
+            .write(bytemuck::cast_slice(&self.characters))
+            .write_u64(self.deed_threshold)
             .write(&self.live);
         for generation in &self.generations {
             hash = hash.write(&generation.to_le_bytes());
@@ -1041,6 +1245,38 @@ impl SoldierArena {
         }
         if self.intents.len() != slots {
             return false;
+        }
+        if self.deeds.len() != slots
+            || self.eligible.len() != slots
+            || self.characters.len() != slots
+        {
+            return false;
+        }
+        // The eligibility byte states `deeds >= deed_threshold`, and the
+        // deeds state it too. This is the check that fails when the two
+        // copies disagree, because nothing else would.[^4]
+        //
+        // A dead slot is eligible for nothing. It holds no deeds either, so
+        // the comparison would answer for it, but a threshold of zero makes
+        // every dead slot read as eligible and the promotion scan would find
+        // them.
+        //
+        // [^4]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`
+        for index in 0..slots {
+            let earned = self.live[index] == 1 && self.deeds[index] >= self.deed_threshold;
+            if self.eligible[index] != u8::from(earned) {
+                return false;
+            }
+        }
+        // A dead slot carries no deeds and no character. A stale link there
+        // would name a character for a unit that no longer exists.
+        for index in 0..slots {
+            if self.live[index] == 1 {
+                continue;
+            }
+            if self.deeds[index] != 0 || self.characters[index] != 0 {
+                return false;
+            }
         }
         // An intent names an option the set holds, or it names nothing. A
         // number outside the set would index past the option table.

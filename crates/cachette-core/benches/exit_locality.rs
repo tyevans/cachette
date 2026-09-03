@@ -78,6 +78,16 @@
 //! cargo bench --bench exit_locality -- 4096x4096 1000000
 //! ```
 //!
+//! **Run it through `cargo bench` and never through the path under
+//! `target/release/deps`.** That path holds a binary which `cargo build
+//! --bench` stops refreshing, and `cargo bench` writes its executable
+//! somewhere else, so invoking the path directly can time a build hours older
+//! than the tree. Nothing warns.[^6]
+//!
+//! A mode this benchmark does not know falls through to the default sweep and
+//! prints the header of another row, which is the only signal that the binary
+//! is old. That signal is worth remembering, because it is what catches this.
+//!
 //! Every duration is in nanoseconds. A benchmark does not gate a merge, and
 //! no test in this project asserts on time.[^2]
 //!
@@ -88,6 +98,7 @@
 //! [^3]: Findings register, FND-281. `docs/FINDINGS.md`
 //! [^4]: Backlog item 0268, hold the cell index on the unit. `docs/backlog/complete/0268-hold-the-cell-index-on-the-unit.md`
 //! [^5]: Blockers register, BLK-007. `docs/BLOCKERS.md`
+//! [^6]: Findings register, FND-297. `docs/FINDINGS.md`
 
 use std::time::Instant;
 

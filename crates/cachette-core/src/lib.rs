@@ -28,6 +28,7 @@ pub mod holding;
 mod household;
 pub mod influence;
 pub mod position;
+pub mod promotion;
 pub mod pyramid;
 pub mod rates;
 pub mod resource;

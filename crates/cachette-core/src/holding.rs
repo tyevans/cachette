@@ -99,7 +99,7 @@ use crate::slots::Slots;
 use crate::soldier::SoldierArena;
 use crate::stage::{self, Stage};
 use crate::terrain::{Terrain, TileKind};
-use crate::types::{FactionId, TileIdx, FACTION_CEILING};
+use crate::types::{Entity, FactionId, TileIdx, FACTION_CEILING};
 
 /// The number of bits in a faction mask.
 ///
@@ -335,7 +335,7 @@ pub struct Holding {
     ///
     /// # References
     ///
-    /// [^1]: Findings register, FND-294. `docs/FINDINGS.md`
+    /// [^1]: Findings register, FND-301. `docs/FINDINGS.md`
     block_census: Vec<u32>,
 }
 
@@ -515,35 +515,32 @@ impl Holding {
         let mut slots: Slots<Vec<(TileIdx, Holder)>> = Slots::filled(slot_count, Vec::new())
             .expect("the candidate list is not empty, so it needs at least one slot");
         let holders = &self.holders[..];
-        let mut refusal: Option<BridgeError> = None;
+        let layout = self.layout;
         let decide_span = stage::open(Stage::HoldingDecide);
         std::thread::scope(|scope| {
             let mut handles = Vec::new();
             for (chunk, slot) in candidates.chunks(chunk_len).zip(slots.entries_mut()) {
                 handles.push(scope.spawn(move || {
                     let mut changes = Vec::new();
-                    let mut scratch = Scratch::new();
+                    let mut scratch = Scratch::new(layout.block_count() as usize);
                     for tile in chunk {
-                        let decided =
-                            decide(grid, terrain, holders, arena, bridge, &mut scratch, *tile)?;
-                        if let Some(holder) = decided {
+                        if let Some(holder) =
+                            decide(layout, terrain, holders, arena, bridge, &mut scratch, *tile)
+                        {
                             changes.push((*tile, holder));
                         }
                     }
                     *slot = changes;
-                    Ok(())
                 }));
             }
             for handle in handles {
-                if let Ok(Err(error)) = handle.join() {
-                    refusal.get_or_insert(error);
-                }
+                // A thread here reads shared memory and writes its own slot.
+                // The freshness of the derived unit structure was established
+                // once, before the walk started, so no thread can refuse.
+                handle.join().expect("a decide thread cannot fail");
             }
         });
         drop(decide_span);
-        if let Some(error) = refusal {
-            return Err(error);
-        }
 
         // The join and the write are one stage. The join is what fixes the
         // order of the result, and the write is what the order is for, so a
@@ -553,7 +550,7 @@ impl Holding {
             joined.extend_from_slice(slot);
             joined
         });
-        self.apply(&changes);
+        self.apply(&changes, threads);
         Ok(changes.len())
     }
 
@@ -699,7 +696,24 @@ impl Holding {
     }
 
     /// Writes the decided changes and repairs the three derived parts.
-    fn apply(&mut self, changes: &[(TileIdx, Holder)]) {
+    ///
+    /// The write is one scattered store for each change, and it runs on the
+    /// calling thread because it reads the holder it is about to overwrite.
+    ///
+    /// **One repair follows the change count and the other follows the list
+    /// it repairs.** The mask of a block is no longer derived by reading the
+    /// block: the holding counts the tiles each faction holds in each block,
+    /// so a mask gains a bit when a count leaves zero and loses one when a
+    /// count reaches zero, and a moved tile touches two counters.[^1] The held
+    /// list is still rebuilt by a merge that reads all of it, and that merge
+    /// takes a thread count.[^2]
+    ///
+    /// # References
+    ///
+    /// [^1]: Findings register, FND-301. `docs/FINDINGS.md`
+    /// [^2]: ADR-0009, parallel stages write disjoint outputs, decisions D1, D2 and D3. `docs/adrs/accepted/adr-0009-parallel-stages-write-disjoint-outputs.md`
+    fn apply(&mut self, changes: &[(TileIdx, Holder)], threads: usize) {
+        let threads = threads.max(1);
         let mut moved: Vec<TileIdx> = Vec::with_capacity(changes.len());
         for (tile, holder) in changes {
             let previous = self.holders[tile.0 as usize];
@@ -728,37 +742,19 @@ impl Holding {
         if moved.is_empty() {
             return;
         }
-
-        // The held list stays in ascending tile order. A change either adds a
-        // tile to it or takes one out, so the merge below reads the old list
-        // once and the changed tiles once.
         moved.sort_unstable();
         moved.dedup();
         #[cfg(feature = "census-holding")]
         let moved_count = moved.len() as u64;
-        let mut held: Vec<TileIdx> = Vec::with_capacity(self.held.len() + moved.len());
-        let mut cursor = 0usize;
-        for tile in moved {
-            while cursor < self.held.len() && self.held[cursor] < tile {
-                held.push(self.held[cursor]);
-                cursor += 1;
-            }
-            if cursor < self.held.len() && self.held[cursor] == tile {
-                cursor += 1;
-            }
-            if !self.holders[tile.0 as usize].is_nobody() {
-                held.push(tile);
-            }
-        }
-        held.extend_from_slice(&self.held[cursor..]);
-        self.held = held;
+
+        self.rebuild_held(&moved, threads);
 
         // **No block is read again.** A block loses a faction bit exactly when
         // that faction's count in the block reaches zero, and the counts above
-        // saw that as each tile moved. Rereading a block cost every tile of it,
-        // and a frame at the target scale dirties most blocks.[^1]
+        // saw that as each tile moved. Rereading a block cost every tile of
+        // it, and a frame at the target scale dirties most blocks.[^1]
         //
-        // [^1]: Findings register, FND-294. `docs/FINDINGS.md`
+        // [^1]: Findings register, FND-301. `docs/FINDINGS.md`
         #[cfg(feature = "census-holding")]
         census::record(moved_count, 0, self.held.len() as u64);
     }
@@ -795,6 +791,81 @@ impl Holding {
                 *mask = mask.without(faction);
             }
         }
+    }
+
+    /// Rebuilds the held list from the old list and the tiles that changed.
+    ///
+    /// The held list stays in ascending tile order. A change either adds a
+    /// tile to it or takes one out, so the merge reads the old list once and
+    /// the changed tiles once.
+    ///
+    /// **The tile space is cut at values taken from the old list, and both
+    /// lists are cut at the same values.** A thread therefore merges one band
+    /// of tiles, writes its own buffer, and no two threads produce one tile.
+    /// The join reads the buffers in band order, which is ascending tile
+    /// order, and never in the order a thread finished.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0009, parallel stages write disjoint outputs, decisions D1, D2 and D3. `docs/adrs/accepted/adr-0009-parallel-stages-write-disjoint-outputs.md`
+    fn rebuild_held(&mut self, moved: &[TileIdx], threads: usize) {
+        let held = std::mem::take(&mut self.held);
+        let chunk_len = held.len().div_ceil(threads).max(1);
+
+        // The cut points are tile values and not positions, so the two lists
+        // are cut at the same places and every tile falls in exactly one band.
+        let mut cuts: Vec<(usize, usize)> = vec![(0, 0)];
+        let mut at = chunk_len;
+        while at < held.len() {
+            let pivot = held[at];
+            cuts.push((at, moved.partition_point(|tile| *tile < pivot)));
+            at += chunk_len;
+        }
+        cuts.push((held.len(), moved.len()));
+
+        let holders = &self.holders[..];
+        let bands = cuts.len() - 1;
+        let mut slots: Slots<Vec<TileIdx>> = Slots::filled(bands, Vec::new())
+            .expect("the cut list always holds a first and a last entry");
+        std::thread::scope(|scope| {
+            let mut handles = Vec::new();
+            for (band, slot) in slots.entries_mut().iter_mut().enumerate() {
+                let (held_from, moved_from) = cuts[band];
+                let (held_to, moved_to) = cuts[band + 1];
+                let old = &held[held_from..held_to];
+                let changed = &moved[moved_from..moved_to];
+                handles.push(scope.spawn(move || {
+                    let mut joined: Vec<TileIdx> = Vec::with_capacity(old.len() + changed.len());
+                    let mut cursor = 0usize;
+                    for tile in changed {
+                        while cursor < old.len() && old[cursor] < *tile {
+                            joined.push(old[cursor]);
+                            cursor += 1;
+                        }
+                        if cursor < old.len() && old[cursor] == *tile {
+                            cursor += 1;
+                        }
+                        if !holders[tile.0 as usize].is_nobody() {
+                            joined.push(*tile);
+                        }
+                    }
+                    joined.extend_from_slice(&old[cursor..]);
+                    *slot = joined;
+                }));
+            }
+            for handle in handles {
+                // A band reads shared memory and writes its own buffer, so it
+                // has no failure of its own.
+                handle.join().expect("a band of the held list cannot fail");
+            }
+        });
+
+        let total: usize = slots.entries().iter().map(Vec::len).sum();
+        let mut rebuilt: Vec<TileIdx> = Vec::with_capacity(total);
+        for band in slots.entries() {
+            rebuilt.extend_from_slice(band);
+        }
+        self.held = rebuilt;
     }
 
     /// Reports whether the holding holds its invariants.
@@ -945,14 +1016,19 @@ fn neighbour_indices(grid: Grid, tile: u32) -> ([u32; NEIGHBOUR_COUNT], usize) {
 struct Scratch {
     tally: [u32; MASK_BITS as usize],
     supporters: Vec<u16>,
+    /// How far the walk has reached inside each block of the derived unit
+    /// structure. One entry for each block of the world.
+    cursors: Vec<u32>,
 }
 
 impl Scratch {
-    /// Builds working memory in which no faction has support.
-    fn new() -> Self {
+    /// Builds working memory in which no faction has support and no block has
+    /// been walked.
+    fn new(blocks: usize) -> Self {
         Self {
             tally: [0; MASK_BITS as usize],
             supporters: Vec::with_capacity(MASK_BITS as usize),
+            cursors: vec![0; blocks],
         }
     }
 
@@ -995,36 +1071,28 @@ impl Scratch {
 ///
 /// [^1]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
 fn decide(
-    grid: Grid,
+    layout: BlockLayout,
     terrain: Terrain,
     holders: &[Holder],
     arena: &SoldierArena,
     bridge: &UnitTileBridge,
     scratch: &mut Scratch,
     tile: TileIdx,
-) -> Result<Option<Holder>, BridgeError> {
+) -> Option<Holder> {
+    let grid = layout.grid();
     scratch.clear();
-    let Some(address) = grid.address_of(tile) else {
-        return Ok(None);
-    };
-    let Some(kind) = terrain.kind(address) else {
-        return Ok(None);
-    };
-    let Some(threshold) = claim_threshold(kind) else {
-        // The ground admits no holder. A tile of open water that somebody
-        // held would be a defect, and the invariant check names it.
-        return Ok(None);
-    };
+    let address = grid.address_of(tile)?;
 
-    for neighbour in grid.neighbours(address).into_iter().flatten() {
-        let Some(index) = grid.index_of(neighbour) else {
-            continue;
-        };
-        if let Some(faction) = holders[index.0 as usize].faction() {
+    // The neighbour index of a tile is one fixed offset from the index, so
+    // this reads the holder column directly rather than converting to an
+    // address and back for each of the six directions.
+    let (neighbours, found) = neighbour_indices(grid, tile.0);
+    for index in &neighbours[..found] {
+        if let Some(faction) = holders[*index as usize].faction() {
             scratch.raise(faction, 1);
         }
     }
-    for unit in bridge.on_tile(arena, address)? {
+    for unit in units_on_tile(layout, bridge, &mut scratch.cursors, tile) {
         if let Some(faction) = arena.faction(*unit) {
             scratch.raise(faction, PRESENCE_SUPPORT);
         }
@@ -1055,15 +1123,87 @@ fn decide(
             continue;
         }
         let support = scratch.tally[*faction as usize];
-        if support < threshold || support <= incumbent {
+        if support <= incumbent {
             continue;
         }
         if best.is_none_or(|(top, _)| support > top) {
             best = Some((support, *faction));
         }
     }
+    let (support, faction) = best?;
 
-    Ok(best.map(|(_, faction)| Holder::of(FactionId(faction))))
+    // **The ground is read last, because it can only refuse.** It says how
+    // much support the tile asks for, and open water asks for more than any
+    // claim can raise. A tile whose best challenger does not beat the holder
+    // keeps its holder whatever the ground says, so the read is skipped for
+    // it. Reading the ground first cost a generated value for every candidate
+    // tile, and most candidates have no challenger.[^1]
+    //
+    // The threshold is one number for the tile, so the strongest challenger
+    // is the one most likely to reach it. A challenger that the threshold
+    // refuses is refused for every weaker challenger too.
+    //
+    // [^1]: Findings register, FND-293. `docs/FINDINGS.md`
+    let threshold = claim_threshold(terrain.kind(address)?)?;
+    if support < threshold {
+        // The ground either admits no holder at all, or asks for more support
+        // than the challenger raised. A tile of open water that somebody held
+        // would be a defect, and the invariant check names it.
+        return None;
+    }
+
+    Some(Holder::of(FactionId(faction)))
+}
+
+/// Returns the units that stand on one tile, by walking the block rather than
+/// searching it.
+///
+/// **The caller must ask for the tiles of a block in ascending tile order.**
+/// The low part of a bridge key is the row-major offset of the tile inside its
+/// block, so ascending tile order gives ascending keys inside every block.[^1]
+/// The cursor of a block therefore only ever moves forward, and the whole walk
+/// over a candidate list costs the list plus the units, rather than a search
+/// for each candidate.
+///
+/// The cursor is left at the first entry of the answer and not after it, so
+/// asking twice for one tile gives the same answer twice.
+///
+/// The caller establishes that the structure describes the arena before it
+/// starts to walk, and holds the borrow of the arena for the whole walk.[^2]
+///
+/// # References
+///
+/// [^1]: ADR-0018, the unit-to-tile bridge is derived, and it rebuilds at the barrier, decision D2. `docs/adrs/accepted/adr-0018-the-unit-to-tile-bridge-is-derived-and-rebuilds-at-the-barrier.md`
+/// [^2]: Findings register, FND-295. `docs/FINDINGS.md`
+fn units_on_tile<'a>(
+    layout: BlockLayout,
+    bridge: &'a UnitTileBridge,
+    cursors: &mut [u32],
+    tile: TileIdx,
+) -> &'a [Entity] {
+    let Some(key) = layout.key_of(tile) else {
+        return &[];
+    };
+    let block = layout.block_of_key(key) as usize;
+    let (keys, units) = bridge.block_window(block as u32);
+    if keys.is_empty() {
+        return &[];
+    }
+    let mut at = cursors.get(block).map_or(0, |cursor| *cursor as usize);
+    if at > keys.len() {
+        at = 0;
+    }
+    while at < keys.len() && keys[at] < key {
+        at += 1;
+    }
+    let first = at;
+    while at < keys.len() && keys[at] == key {
+        at += 1;
+    }
+    if let Some(cursor) = cursors.get_mut(block) {
+        *cursor = first as u32;
+    }
+    &units[first..at]
 }
 
 #[cfg(test)]
@@ -1101,6 +1241,71 @@ mod tests {
                 "the two derivations disagree at tile {tile}"
             );
         }
+    }
+
+    /// The cursor walk is a second way to answer what the derived unit
+    /// structure already answers by searching. This drives both over every
+    /// tile of a small world, in the ascending order the walk requires, and
+    /// compares them tile by tile.[^1]
+    ///
+    /// The world puts more than one unit on one tile, puts two units of one
+    /// block on different tiles, and leaves whole blocks empty, so the walk
+    /// meets a run of length two, a forward step inside a block, and a block
+    /// it must skip.
+    ///
+    /// # References
+    ///
+    /// [^1]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`
+    #[test]
+    fn the_cursor_walk_agrees_with_the_search() {
+        use crate::hex::Axial;
+        let grid = Grid::new(16, 16).expect("a small extent describes a grid");
+        let mut arena = SoldierArena::new(grid, 64);
+        for address in [
+            Axial::new(1, 1),
+            Axial::new(1, 1),
+            Axial::new(2, 1),
+            Axial::new(3, 2),
+            Axial::new(15, 15),
+            Axial::new(9, 4),
+            Axial::new(0, 0),
+        ] {
+            arena
+                .spawn(address, FactionId(0))
+                .expect("the spawn must succeed");
+        }
+        let layout = BlockLayout::new(grid, 2).expect("the exponent is inside the ceiling");
+        let mut bridge = UnitTileBridge::new(layout);
+        bridge.rebuild(&arena).expect("the rebuild must succeed");
+
+        let mut cursors = vec![0u32; layout.block_count() as usize];
+        for index in 0..grid.tile_count() {
+            let tile = TileIdx(index);
+            let address = grid
+                .address_of(tile)
+                .expect("the index is inside the world");
+            let searched = bridge
+                .on_tile(&arena, address)
+                .expect("the bridge describes the arena");
+            let walked = units_on_tile(layout, &bridge, &mut cursors, tile);
+            assert_eq!(walked, searched, "the two answers disagree at tile {index}");
+            // The cursor stays on the answer, so a second ask repeats it.
+            let again = units_on_tile(layout, &bridge, &mut cursors, tile);
+            assert_eq!(again, searched, "the second ask differs at tile {index}");
+        }
+        assert!(
+            (0..grid.tile_count()).any(|index| {
+                units_on_tile(
+                    layout,
+                    &bridge,
+                    &mut vec![0; layout.block_count() as usize],
+                    TileIdx(index),
+                )
+                .len()
+                    > 1
+            }),
+            "the fixture must hold a tile with more than one unit"
+        );
     }
 
     /// A bit plane holds a set, and the scan reads it back in ascending

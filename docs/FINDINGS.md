@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-296**
+**Next number: FND-303**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -31,6 +31,131 @@ collisions in one session came from the gap between the two, and a finding holds
 the case.[^ALLOC2]
 
 ## A. Corrections to stated rules
+
+### FND-300 — The influence solve gets slower as the thread count rises, on a small world
+
+**Believed.** A stage that takes a thread count runs faster with more threads.
+The stage register declares `influence_solve` as taking one, and the target
+scale measurement agrees: it is 12.68 milliseconds and 5.25 percent of a 241
+millisecond frame at 16.7 million tiles and twelve threads.
+
+**True at the target extent, and the reverse on a small world.** On the
+demonstration world the solve costs more with every thread added. Measured on
+an x86-64 development machine, 256 by 256 tiles, 256 units, four factions, the
+mean of 120 frames after 30 warm-up frames:
+
+| Threads | The frame | `influence_solve` | Its share |
+|---|---|---|---|
+| 1 | 36.314 ms | 9.343 ms | 25.7 percent |
+| 2 | 30.229 ms | 11.465 ms | 37.9 percent |
+| 4 | 35.786 ms | 19.749 ms | 55.2 percent |
+| 8 | 55.716 ms | 37.313 ms | 67.0 percent |
+| 12 | 81.471 ms | 55.482 ms | 68.1 percent |
+
+The solve is 5.9 times slower at twelve threads than at one, and the frame is
+2.7 times slower at twelve than at two. **The solve also costs more in absolute
+terms on the small world than on the target one**, 55.5 milliseconds against
+12.7, on a world with 256 times fewer tiles.
+
+**How to take the measurement again.** An example prices every stage on a
+world of a given extent, group and thread count, and prints the state hash
+beside the split so a sweep is also a determinism check.[^F300B]
+
+**The cause is the shape of the parallel section, not the arithmetic in it.**
+One relaxation pass opens a thread scope for each faction, and a solve runs a
+fixed count of passes, so a frame opens the pass count multiplied by the
+faction count of them. At the target extent each spawned thread relaxes
+thousands of cells and the spawn is paid back. On the demonstration world each
+one gets a handful of cells and the spawn is the whole cost.
+
+**The guard that exists cannot catch it, by design.** The code holds a thread
+back only when the cell count is at or below the thread count, and it says why:
+the rule reads the two numbers the caller already supplied and holds no
+constant of its own. A world of this extent has far more cells than twelve, so
+the guard never fires and every scope spawns.
+
+**The solve does not cross over at any extent measured.** A second sweep took
+three extents at one thread and at twelve. The frame crosses over between
+65,536 and 262,144 tiles, where other stages start to carry the win. The solve
+itself is still 7.6 times slower with twelve threads than with one at 1,048,576
+tiles, so the extent at which threads pay this stage is above a million cells
+of world.
+
+**The determinism holds.** The state hash is identical at one thread and at
+twelve, at every extent measured, so this is a cost defect and not a
+correctness one.
+
+**The absolute figures are noisy and the direction is not.** The machine ran
+other builds throughout, and one point measured 81 ms in one sweep and 192 ms
+in another. Every point in both sweeps has the same sign.
+
+**Follows.** Three things.
+
+**A stage declared as taking a thread count can still lose by taking one.** The
+stage apparatus states that a measured speedup far from one on a stage declared
+`false` means the declaration is wrong. It checks one direction. A negative
+speedup on a stage declared `true` is the same class of error and nothing looks
+for it.
+
+**A measurement taken only at the target extent cannot see this shape.** Every
+frame figure in this project was taken at the target extent, where the defect
+is invisible. The small end is a different regime and it had never been
+measured.
+
+**The demonstration is slow for this reason and for no other.** Both front ends
+ask for the smaller of the machine's parallelism and twelve. Asking for fewer
+would make the demonstration between two and three times faster today with no
+engine change, and that is the reason not to change the requested frame rate.
+The repair belongs in the solver, so that no caller has to know. An item holds
+it.[^F300A]
+
+### FND-293 — No golden scenario reached a promotion, and the files still moved
+
+**Believed.** A golden file that moves when a subsystem lands is evidence that
+the golden set covers the subsystem. The state hash is exact and
+order-sensitive, so a file that moved saw the change.
+
+**True that it moved, and false that it covered anything.** All eight golden
+files moved when the promotion work landed. **None of the eight promoted
+anybody.** The files moved because three new unit columns and two new schedules
+enter the state hash, which happens whatever the pass does. A change to the
+promotion rule itself would have moved nothing.
+
+**The evidence.** The gathering scenario is the only one that gathers, and
+gathering is what the promotion reads. A temporary assertion that it produced a
+character failed. A second probe printed the reason: the best unit in that
+scenario gathers 5 over the frames it runs, against a default threshold of 24.
+Every other scenario gathers nothing at all, so no unit in the golden set has
+ever had a deed to its name.
+
+**The repair was in the scenario, not in the engine.** The gathering scenario
+already states its own recovery periods, on the stated ground that a period is
+a parameter of the kind and the engine holds no test value. The threshold is
+the same kind of parameter, so the scenario now states it too, at a value this
+world reaches. Two mutations confirm the file now guards the behaviour: ranking
+the candidates by identity instead of by deeds moves the file, and promoting
+nobody trips the assertion.
+
+**Follows.** Three things.
+
+**A golden file that moved is not evidence that a golden file covers.** A
+change that widens the hashed state moves every file, and it looks exactly like
+a change that altered behaviour. The question to ask is not whether the file
+moved but whether the scenario reaches the pass, and the answer to that is an
+assertion in the fixture rather than a diff.
+
+**Assert the case in the scenario, in the same place the parameters are set.**
+The gathering scenario already carried two such assertions, for a stored take
+and for a recovery, each written after a fixture covered half a rule while
+looking complete. This is the third of the same kind, and the pattern is worth
+following rather than rediscovering.
+
+**The same gap is open for the positions and nothing has closed it.** Item 0279
+records that no golden scenario reaches the position pass. The promotion case
+was found and repaired in the same round; the position case still stands, and
+the two together say that a new pass should be assumed uncovered until a
+scenario asserts otherwise.
+
 
 ### FND-001 — A monoid needs EXACT associativity
 
@@ -7791,7 +7916,7 @@ sparse form cost more in the passes that read the field than in the one that
 wrote it, and no stage is named after reading a tile value. The stage table is
 a map of where time goes and not a map of what causes it.
 
-### FND-293 — A benchmark that measures its own process reports the history of the run, and this project has read it twice
+### FND-298 — A benchmark that measures its own process reports the history of the run, and this project has read it twice
 
 **Believed.** A process that has built a world and stepped it can report what
 that world costs, by reading its own resident size.
@@ -7807,10 +7932,10 @@ line of a stage-cost run. The dedicated instrument, which starts one process
 for each point, gave a different answer for the same pair of trees: the
 resident size fell by 34,074,624 bytes and the peak by 196,821,088. The
 direction was right and the size was not. The benchmark already carried the
-right instrument, and its own comment says why it exists.[^F293A]
+right instrument, and its own comment says why it exists.[^F298A]
 
 The first instance is the resident memory entry, where a figure taken at one
-thread was quoted for a machine that needs a larger one.[^F293B]
+thread was quoted for a machine that needs a larger one.[^F298B]
 
 **Follows.** Three things.
 
@@ -7827,8 +7952,185 @@ available to be read.
 have been wrong because a process measured its own past. Treat any resident
 size taken after other work in the same process as an upper bound and nothing
 more.
+### FND-299 — The spread read the ground of every candidate tile, and the ground can only refuse
 
-### FND-294 — The holding apply spent more on rereading blocks than on the list everyone was looking at
+**Believed.** The ground governs a claim, so the rule that decides a tile reads
+the ground first. The ground says how much support the tile asks for, and open
+water asks for more than any claim can raise, so a pass that reads it first
+refuses the impossible cases before it does any work.
+
+**True.** The ground can only refuse. It never turns a losing challenger into a
+winning one, so a tile whose best challenger does not beat the holder keeps its
+holder whatever the ground says. Reading it first therefore paid for the answer
+on every candidate and used it on few. **The ground of a tile is generated from
+the seed rather than stored, so the read is a draw and not a load.**[^F299A]
+
+**The measurement.** An ablation that replaced the ground read with a constant.
+Development machine, 4,194,304 tiles, 250,000 units scattered, 12 threads, nine
+frames, the minimum of three runs because the machine was loaded.
+
+| The pass reads | ns for each frame |
+|---|---|
+| Everything | 311,285,062 |
+| No ground | 87,708,130 |
+| No units | 54,872,312 |
+| No supporter sort | 294,343,620 |
+
+**The ground read was 72 percent of the pass and the unit read was 82 percent,
+and the two sum to more than the whole.** They overlap: removing one lets the
+other's memory latency overlap with the arithmetic. Read each figure as an
+upper bound on what removing that one thing buys, not as a share of a partition.
+
+**The supporter sort is 5 percent**, and a plan that started from the source
+would have gone there first, because a sort inside a per-tile loop looks worse
+than a field read.
+
+**Follows.** Three things.
+
+**Order the tests in a decision by what they can do, not by what they are
+about.** A test that can only refuse belongs after the tests that can decide.
+The ground is the subject of the rule, and that is why it was first.
+
+**A generated field is a computation wearing the clothes of a read.** The
+project chose to generate the ground rather than store it, and the call site
+looks like an array index.[^F299A] Nothing at the call site says that it costs a
+draw, and the pass that read it 4.8 million times each frame did not know.
+
+**Ablate before you plan.** The pass had four parts and the plan named the wrong
+one. Removing one part and measuring took three builds and found a 72 percent
+term that no reading of the source had suggested.
+
+### FND-294 — Both repairs after a holding change cost the holding, not the change
+
+**Believed.** The pass that writes a decided change is a scattered write for
+each change, so its cost follows the number of tiles that changed hands.
+
+**True.** The write is 7 percent of it. The two repairs after the write are 92
+percent, and neither follows the change count.
+
+**The held list is rebuilt by a merge that reads all of it.** The list holds
+every tile somebody holds, in ascending tile order, and the merge walks the old
+list and the changed tiles together into a new buffer. At the target scale it
+rewrites 6.9 million entries to apply 359 thousand.
+
+**A block mask is rebuilt by reading the whole block.** A block loses a bit only
+when the last tile of a faction leaves it, and no running count can see that
+without reading the block. At 13 thousand dirty blocks of 1,024 tiles each, that
+is 13.3 million holder reads for 359 thousand changes.
+
+**The measurement.** A probe inside the pass. Development machine, 16,777,216
+tiles, 1,000,000 units scattered, 12 threads. The last frame of ten:
+
+| Part | ns | Share |
+|---|---|---|
+| Join the buffers of the deciding threads | 4,045,295 | 0.5 percent |
+| Write the holders and the census | 50,583,368 | 6.6 percent |
+| Rebuild the held list | 326,193,156 | 42.7 percent |
+| Rebuild the mask of every dirty block | 383,562,012 | 50.2 percent |
+
+**Follows.** Two things.
+
+**A stage named for a write can be dominated by its repairs.** The name said
+what the pass was for. The cost was in keeping three derived declarations of one
+fact in agreement, which is the shape this project records most often.[^22]
+
+**Both repairs take a thread count now, and neither has stopped following the
+holding.** Threading them divided the cost. It did not change what the cost
+follows, and a holding that reaches the whole world will bring it back.[^F277B]
+
+### FND-295 — The derived unit structure was searched once for each tile, and the tile order makes it a walk
+
+**Believed.** Asking which units stand on a tile is a bounded search: the
+structure holds one contiguous run for each block, and the search is bounded by
+the block size rather than by the unit count.[^F295A] A pass that asks for many
+tiles therefore pays a small bounded cost for each.
+
+**True.** The bound is small and the cost is not, because the search is two
+binary searches into an eight megabyte key array and every probe is a cache
+miss. The spread asked 4.8 million times in each frame. The reading that made it
+look cheap counted probes, and a probe is not the unit of cost.
+
+**The order the caller already had makes the search unnecessary.** The low part
+of a bridge key is the row-major offset of a tile inside its block, so a caller
+that visits tiles in ascending tile order asks for ascending keys inside every
+block. One cursor for each block therefore only ever moves forward, and the
+whole walk costs the candidate list plus the units rather than a search for each
+candidate.
+
+**This is not a property of the structure alone.** It holds only while the
+caller visits in ascending tile order, and nothing in the type can enforce that.
+A test drives both the walk and the search over every tile of a small world and
+compares them, and the walk was made to fail once on purpose to prove the test
+reaches it.[^84]
+
+**Follows.** Two things.
+
+**A bounded cost is not a small cost.** The bound here is the block size and it
+is correct. What the bound omits is that each of its steps is a miss, and that
+the caller runs it millions of times.
+
+**When a search is bounded, ask what order the caller already has.** The caller
+had ascending tile order, which the candidate pass produces by construction, and
+that was enough to remove the search entirely.
+
+### FND-296 — A stage was 16.9 percent of a frame and was 2.2 percent four hours later, and the plan that named it was written in between
+
+**Believed.** The level 1 rebuild is 16.9 percent of a frame and is the third
+largest stage. That figure came from a measurement on the target platform, and a
+plan was written from it.[^F286A]
+
+**True.** It is 6,600,185 nanoseconds of a 300,016,572 nanosecond frame, which
+is 2.20 percent. Nothing changed in the rebuild. Another change made the frame
+smaller and made the rebuild itself cheaper, and the figure the plan rested on
+expired before the plan was read.
+
+**The measurement.** Machine C, `c7g.4xlarge`, Graviton3, 16,777,216 tiles,
+1,000,000 units scattered, 12 threads, nine frames, `stage-cost` feature.[^F296B]
+
+**Follows.** Two things.
+
+**Take the denominator again when you start, not when the plan was written.**
+The project already holds a finding about three items that competed over a
+region under one percent of a frame.[^F296C] This is the same failure at a
+different point in the pipeline: the figure was right when it was measured and
+wrong when it was used, and nothing between the two said so.
+
+**A share moves when anything in the frame moves.** A stage that costs the same
+number of nanoseconds can double its share while getting no worse. Quote the
+nanoseconds beside the share, and name the run both came from.
+
+### FND-297 — A local benchmark reported a two-hour-old build, and nothing said so
+
+**Believed.** `cargo build --release --bench target_cost --features stage-cost`
+rebuilds the benchmark binary, so a run of that binary measures the tree.
+
+**True.** It stopped doing so. The command reported success, compiled the
+library, and left the executable it had built two hours earlier untouched. Three
+successive measurements of three different trees returned the same figures, and
+the only reason it was caught is that a probe printed nothing when it should
+have printed a line for every frame.
+
+**The build that works is `cargo bench -p cachette-core --bench target_cost
+--features stage-cost --no-run`, and it puts the executable somewhere else.**
+The stale binary sat under `target/release/deps/` and the fresh one under
+`target/release/build/`, so a path that had worked all evening kept resolving to
+the old file.
+
+**The measurements on the target platform were never affected.** The harness
+copies the tracked files to a clean instance and builds there, so it cannot
+carry a stale artefact.[^F297A]
+
+**Follows.** Two things.
+
+**A measurement apparatus needs a liveness signal that fails loudly.** A stale
+binary and a change that did nothing look identical, and the second is the
+answer a tired reader wants. The probe that caught this was there for another
+reason.
+
+**Check the time on the artefact you are about to measure.** One `ls` would have
+caught it two hours earlier.
+
+### FND-301 — The holding apply spent more on rereading blocks than on the list everyone was looking at
 
 **Believed.** The holding apply is expensive because it rebuilds the held tile
 list on every frame, in the same shape as the change merge that this project
@@ -7849,7 +8151,7 @@ The repair is now gone rather than smaller. The holding keeps a count of the
 tiles each faction holds in each block, so a mask gains a bit when a count
 leaves zero and loses one when a count reaches zero. A moved tile touches two
 counters. No block is read again. A measurement on the target platform found
-the apply 2.18 times cheaper and the frame 17.7 milliseconds cheaper.[^F294A]
+the apply 2.18 times cheaper and the frame 17.7 milliseconds cheaper.[^F301A]
 
 **The test that should have covered this could not.** The existing test
 compares every mask against a full pass after a run, so it proves the masks
@@ -7862,14 +8164,14 @@ in the consumption file failed by accident.
 
 **The stage table names a pass, and a pass is not a cause.** This is the second
 time in one night that the cost of a named stage sat somewhere the name did not
-point.[^F294B] Divide a stage before optimising it, and divide it by counting
+point.[^F301B] Divide a stage before optimising it, and divide it by counting
 rather than by reading.
 
 **A test that compares two states cannot see a transition.** The mask agreed
 with the tiles at every moment the fixture reached, and the defect lives in the
 moment the fixture never reached. The replacement asserts that at least one
 block lost a faction during the run, so it cannot pass by never reaching the
-case it exists for.[^F294C]
+case it exists for.[^F301C]
 
 **Ask what a running count cannot see, then check whether it still cannot.**
 The comment beside the reread said that no running count can see a block lose
@@ -7877,12 +8179,12 @@ its last tile of a faction. That is true of a count of tiles in a block, and
 false of a count of tiles for each faction in a block. The sentence was correct
 about the count it described and it stopped anyone reaching for a different one.
 
-### FND-295 — The held tile list does not saturate, so the move that fixed the tile value field does not transfer to it
+### FND-302 — The held tile list does not saturate, so the move that fixed the tile value field does not transfer to it
 
 **Believed.** The held tile list is rebuilt whole on every frame, which is the
 shape that made the tile value field expensive, so the same repair applies. The
 tile value field saturated and its sparse form became a dense array with an
-index column attached.[^F294B]
+index column attached.[^F301B]
 
 **True.** The held list converges to about 10.0 million entries, which is 59.7
 percent of the tiles, and it is flat by frame 60. It has a ceiling below the
@@ -7906,7 +8208,7 @@ the same shape, the same rebuild and the same cost curve at first sight. They
 differ in whether an entry can leave, and that decides whether the repair
 applies. The record for the dense field says in its own text that it governs one
 field and is not a licence to convert others, and this is the first case that
-tested the refusal.[^F295B]
+tested the refusal.[^F302B]
 
 **Sixty percent is not sparse, and it is not saturated either.** The list is
 still 40 megabytes and it still drives the largest stage in the engine. The
@@ -8221,9 +8523,16 @@ ceiling is what makes that visible.
 [^F292A]: The world, the stored tile change count. `crates/cachette-core/src/world.rs`
 [^F292B]: The exit locality benchmark, the growth row. `crates/cachette-core/benches/exit_locality.rs`
 [^F292C]: Target platform costs, the stage table. `docs/reference/graviton-costs.md`
-[^F293A]: The cost benchmark, the memory point mode. `crates/cachette-core/benches/target_cost.rs`
-[^F293B]: Findings register, FND-246, in this document.
-[^F294A]: Target platform costs, every stage of a frame after the block masks became counts. `docs/reference/graviton-costs.md`
-[^F294B]: Findings register, FND-292, in this document.
-[^F294C]: The holding suite of the core. `crates/cachette-core/tests/holding.rs`
-[^F295B]: ADR-0103, the tile value field stores a dense delta, never a sparse change list, decision D4. `docs/adrs/draft/adr-0103-the-tile-value-field-stores-a-dense-delta.md`
+[^F298A]: The cost benchmark, the memory point mode. `crates/cachette-core/benches/target_cost.rs`
+[^F298B]: Findings register, FND-246, in this document.
+[^F293A]: ADR-0068, terrain is generated from the seed and is never stored as a map, decision D1. `docs/adrs/accepted/adr-0068-terrain-is-generated-from-the-seed-and-is-never-stored-as-a-map.md`
+[^F295A]: ADR-0018, the unit-to-tile bridge is derived, and it rebuilds at the barrier, decision D4. `docs/adrs/accepted/adr-0018-the-unit-to-tile-bridge-is-derived-and-rebuilds-at-the-barrier.md`
+[^F296B]: Target platform costs, every stage of a frame after the ground read moved last. `docs/reference/graviton-costs.md`
+[^F296C]: Findings register, FND-290, in this document.
+[^F297A]: The target platform benchmark script. `scripts/graviton-benchmark.sh`
+[^F294A]: Backlog item 0277, hold a thread back when the work will not pay for it. `docs/backlog/proposed/0277-hold-a-thread-back-when-the-work-will-not-pay-for-it.md`
+[^F294B]: The demonstration stage split. `crates/cachette-core/examples/demo_stage_split.rs`
+[^F301A]: Target platform costs, every stage of a frame after the block masks became counts. `docs/reference/graviton-costs.md`
+[^F301B]: Findings register, FND-292, in this document.
+[^F301C]: The holding suite of the core. `crates/cachette-core/tests/holding.rs`
+[^F302B]: ADR-0103, the tile value field stores a dense delta, never a sparse change list, decision D4. `docs/adrs/draft/adr-0103-the-tile-value-field-stores-a-dense-delta.md`
