@@ -281,7 +281,7 @@ Filled in when the item moves to `complete/`.
 [^2]: The Diátaxis documentation framework, read 3 September 2026. https://diataxis.fr/
 [^3]: ADR-0107, the Python reference is generated from the compiled module, decisions D1, D2, D3 and D4. `docs/adrs/draft/adr-0107-the-python-reference-is-generated-from-the-compiled-module.md`
 [^4]: Backlog item 0309, publish the Python reference generated from the compiled module. `docs/backlog/refined/0309-publish-the-python-reference-generated-from-the-compiled-module.md`
-[^5]: Backlog item 0310, write the Rust doc comments for the Python reader. `docs/backlog/proposed/0310-write-the-rust-doc-comments-for-the-python-reader.md`
+[^5]: Backlog item 0310, write the Rust doc comments for the Python reader. `docs/backlog/complete/0310-write-the-rust-doc-comments-for-the-python-reader.md`
 [^6]: Backlog item 0307, generate the type stub from the compiled module. `docs/backlog/proposed/0307-generate-the-type-stub-from-the-compiled-module.md`
 [^7]: Backlog priority index. `docs/backlog/PRIORITY.md`
 [^8]: Decisions register, DEC-114. `docs/DECISIONS.md`

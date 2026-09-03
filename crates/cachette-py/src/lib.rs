@@ -33,43 +33,151 @@ create_exception!(
     _core,
     CachetteError,
     PyException,
-    "The root of every Cachette error."
+    "The base class of every error this module raises.
+
+Catch this class to catch every refusal the engine makes. It is a subclass
+of the Python built-in `Exception`.
+
+Every other error class in this module is a subclass of this one. The engine
+reports every refusal of its own through one of them, and never through a
+bare `RuntimeError`.
+
+The binding still refuses an argument before the call reaches the engine, and
+it refuses with a built-in class. A wrong argument type raises `TypeError`.
+An integer outside the range of the parameter raises `OverflowError`. A
+sequence of the wrong shape raises `ValueError`. None of the three is a
+subclass of this class."
 );
-create_exception!(_core, StepError, CachetteError, "A step refused to run.");
-create_exception!(_core, FrameError, CachetteError, "A frame refused to fill.");
+create_exception!(
+    _core,
+    StepError,
+    CachetteError,
+    "A step refused to run.
+
+`World.step` raises this class when the thread count is zero. A step needs
+at least one thread."
+);
+create_exception!(
+    _core,
+    FrameError,
+    CachetteError,
+    "A frame refused to fill.
+
+`World.draw` raises this class when the pixel array does not match the width
+and the height, when a side is zero, when the array is not one contiguous
+block, or when the camera draws a tile smaller than one pixel.
+
+An array of the wrong element type raises `TypeError` instead, because the
+interpreter refuses the argument before the engine reads it. Build the array
+with the `numpy.uint32` element type."
+);
 create_exception!(
     _core,
     ConfigError,
     CachetteError,
-    "The world settings do not describe a world."
+    "The world settings do not describe a world.
+
+The `World` constructor raises this class. A side of zero is the case a
+caller meets first."
 );
 create_exception!(
     _core,
     SelectorError,
     CachetteError,
-    "A selector was not valid."
+    "A selector was not valid.
+
+**No call in this module raises this class today.** The module declares it
+for the selector interface, and that interface is not written. A finding
+records the gap.[^1]
+
+# References
+
+[^1]: Findings register, FND-326. `docs/FINDINGS.md`"
 );
-create_exception!(_core, VerbError, CachetteError, "A verb refused a command.");
+create_exception!(
+    _core,
+    VerbError,
+    CachetteError,
+    "A verb refused a command.
+
+A verb is a call that changes the world. The class covers a refusal the
+engine makes about the command itself: a number that names no kind, an
+address the ground refuses, a target below zero, or a radius above the
+ceiling. The message names the value that refused.
+
+A verb that takes a set refuses the whole set. It writes nothing and leaves
+nothing half made."
+);
 create_exception!(
     _core,
     ViewError,
     CachetteError,
-    "A view was stale or out of scope."
+    "A view was stale or out of scope.
+
+The class covers two cases. The first is an identity that names no live
+entity, which includes an identity the engine gave for an entity that has
+since died. The second is an address or a window outside the world.
+
+An identity is stale rather than wrong. The engine compares the generation,
+so it refuses the dead identity and never answers for the next occupant of
+the slot.[^1]
+
+# References
+
+[^1]: ADR-0085, an entity crosses to Python as one opaque identity that the engine resolves, decision D3. `docs/adrs/accepted/adr-0085-an-entity-crosses-to-python-as-one-opaque-identity.md`"
 );
 create_exception!(
     _core,
     DeterminismError,
     CachetteError,
-    "The engine detected a determinism defect."
+    "The engine detected a determinism defect.
+
+**No call in this module raises this class today.** The module declares it
+for a check that is not written. Two tests in the Rust workspace hold the
+determinism guarantee instead, and neither reports through this class. A
+finding records the gap.[^1]
+
+# References
+
+[^1]: Findings register, FND-326. `docs/FINDINGS.md`"
 );
 create_exception!(
     _core,
     EnginePanic,
     CachetteError,
-    "A Rust panic reached the boundary."
+    "A Rust panic reached the boundary.
+
+**No call in this module raises this class today, and a panic does not
+produce it.** The binding library catches a panic and raises its own
+`pyo3_runtime.PanicException`, which is not a subclass of `CachetteError`.
+A caller that wants to survive a panic catches `BaseException`. A finding
+records the gap.[^1]
+
+# References
+
+[^1]: Findings register, FND-326. `docs/FINDINGS.md`"
 );
 
-/// A simulated world.
+/// A simulated world, and the whole of the engine a program drives.
+///
+/// Build a world, put units in it, give the units orders, then step it. Read
+/// what the step did from the logs and the reports.
+///
+/// **The world is the unit of simulation, not a global.** A process may hold
+/// many worlds. Two worlds share nothing.
+///
+/// **A step gives one answer at any thread count.** The same world, stepped
+/// the same number of times with the same orders, reaches the same state hash
+/// whether one thread or twelve threads ran it.[^1] That guarantee is what
+/// makes a run repeatable. It says nothing about whether the run is correct.
+///
+/// **The methods that answer are the ones a program reads.** No method hands
+/// out a view into the world. A method that copies says so, and a method that
+/// answers about one thing takes one identity or one address.
+///
+/// # References
+///
+/// [^1]: ADR-0001, one binary gives one answer at any thread count, decision D1. `docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
 #[pyclass(name = "World", module = "cachette._core", frozen)]
 pub struct PyWorld {
     inner: std::sync::Mutex<CoreWorld>,
@@ -96,13 +204,33 @@ struct Presenter {
 
 #[pymethods]
 impl PyWorld {
-    /// Builds a world.
+    /// Builds a world of the given extent, from the given seed.
     ///
-    /// The world is a rhombus, so the extent is a width and a height.
+    /// The world is a rhombus of hexagonal tiles, so the extent is a width in
+    /// columns and a height in rows. Both count tiles, and both must be at
+    /// least one. The tile at column `q` and row `r` has the axial address
+    /// `(q, r)`.
+    ///
+    /// The seed is a 64-bit integer. It fixes the ground: two worlds of one
+    /// extent and one seed hold the same terrain, the same heights and the
+    /// same resources. Change the seed to get another world.
+    ///
+    /// The faction count is how many factions the world holds. A faction is
+    /// then a number from zero to one below that count.
+    ///
+    /// **The new world holds no unit and no settlement.** Call
+    /// `found_run_for_every_faction` to seat a group for each faction, or
+    /// `spawn_soldiers` to put units at addresses you choose.
+    ///
+    /// **The world reserves slots for the target unit population, whatever
+    /// the extent is.** The constructor exposes no capacity, so a small world
+    /// reserves as much unit storage as a large one. That reservation is what
+    /// `spawn_soldiers` means by a full arena.
     ///
     /// # Errors
     ///
-    /// Raises `ConfigError` when the extent does not describe a world.
+    /// Raises `ConfigError` when the extent does not describe a world. A side
+    /// of zero is the case a caller meets first.
     #[new]
     #[pyo3(signature = (width = 64, height = 64, seed = 0x0123_4567_89ab_cdef, faction_count = 4))]
     fn new(width: u32, height: u32, seed: u64, faction_count: u16) -> PyResult<Self> {
@@ -123,49 +251,99 @@ impl PyWorld {
         })
     }
 
-    /// Returns the number of columns in the world.
+    /// The number of columns of tiles, as an integer.
+    ///
+    /// This is the width the constructor took. It never changes.
     #[getter]
     fn width(&self) -> u32 {
         self.lock().grid().width()
     }
 
-    /// Returns the number of rows in the world.
+    /// The number of rows of tiles, as an integer.
+    ///
+    /// This is the height the constructor took. It never changes.
     #[getter]
     fn height(&self) -> u32 {
         self.lock().grid().height()
     }
 
-    /// Returns the current tick.
+    /// The number of steps the world has run, as an integer.
+    ///
+    /// A new world is at tick zero. Each `step` call adds one.
     #[getter]
     fn tick(&self) -> u64 {
         self.lock().tick().0
     }
 
-    /// Returns the number of tiles.
+    /// The number of tiles in the world, as an integer.
+    ///
+    /// The value is the width multiplied by the height.
     #[getter]
     fn tile_count(&self) -> usize {
         self.lock().tile_count()
     }
 
-    /// Returns the number of events that the last step emitted.
+    /// The number of tile change events the last step emitted, as an integer.
+    ///
+    /// The count covers the last step alone. A new world reports zero. Read
+    /// the events themselves with `event_log_columns`.
     #[getter]
     fn event_count(&self) -> usize {
         self.lock().event_log().len()
     }
 
-    /// Returns the hash of the whole state.
+    /// Returns the hash of the whole world state, as an integer.
+    ///
+    /// The value is an unsigned 64-bit integer. Two worlds that hold the same
+    /// state give the same hash, and the hash does not depend on the thread
+    /// count of any step that ran.[^1]
+    ///
+    /// **Compare hashes to check that a run repeated.** A hash that differs
+    /// means the states differ. Equal hashes do not prove that either run is
+    /// correct, because a defect that is itself repeatable gives one hash
+    /// every time.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0001, one binary gives one answer at any thread count, decision D1. `docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
     fn state_hash(&self) -> u64 {
         self.lock().state_hash().finish()
     }
 
-    /// Reports whether the world holds its invariants.
+    /// Reports whether the world holds its own invariants, as a `bool`.
+    ///
+    /// The engine checks its internal rules and returns `True` when they all
+    /// hold. It is a check of the engine, not of the program that drives it.
+    /// It reads the stored structures of the world, so a caller runs it in a
+    /// test rather than on every step.
     fn check_invariants(&self) -> bool {
         self.lock().check_invariants()
     }
 
-    /// Runs one frame and returns the number of events.
+    /// Runs one step of the simulation and returns the number of tile change
+    /// events it emitted, as an integer.
     ///
-    /// The method releases the global interpreter lock for the whole step.
+    /// The thread count is how many threads the step may use. It has no
+    /// default, so name it. **The result does not depend on it.** One thread
+    /// and twelve threads give the same events. They give them in the same
+    /// order, and they leave the same state hash.[^1]
+    ///
+    /// The step releases the global interpreter lock for its whole run, so
+    /// another Python thread runs while the simulation runs. No Python code
+    /// runs inside the step.[^2]
+    ///
+    /// The step replaces the logs of the step before it. Read
+    /// `event_log_columns` and `gather_log_columns` after the call and before
+    /// the next one.
+    ///
+    /// # Errors
+    ///
+    /// Raises `StepError` when the thread count is zero.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0001, one binary gives one answer at any thread count, decision D1. `docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
+    /// [^2]: ADR-0042, the interpreter is released for the whole step, decision D1. `docs/adrs/draft/adr-0042-the-interpreter-is-released-for-the-whole-step.md`
     fn step(&self, python: Python<'_>, threads: usize) -> PyResult<usize> {
         // ADR-0042: release the interpreter for the whole step. The
         // closure may not capture the interpreter token, so the compiler
@@ -184,16 +362,40 @@ impl PyWorld {
         Ok(events)
     }
 
-    /// Returns the raw event log of the last step as bytes.
+    /// Returns the tile change log of the last step as a `bytes` object.
+    ///
+    /// The bytes are the event records of the last step, one after another,
+    /// in the order the engine wrote them. Each record holds the tick, the
+    /// tile, the value, the holder, the change kind and its declared padding.
+    ///
+    /// **A caller that reads a field out of these bytes holds a copy of the
+    /// record layout, and nothing fails when the layout changes.** Call
+    /// `event_log_columns` instead. It gives the same events as arrays, by
+    /// field name.
+    ///
+    /// This method exists for a caller that stores or ships the log without
+    /// reading it.
     fn event_log_bytes<'py>(&self, python: Python<'py>) -> Bound<'py, pyo3::types::PyBytes> {
         pyo3::types::PyBytes::new(python, self.lock().event_log_bytes())
     }
 
-    /// Copies the tile value column into a new array.
+    /// Copies the tile value column into a new NumPy array.
+    ///
+    /// Returns a one-dimensional array of `numpy.int32`, one entry for each
+    /// tile, in row-major order. Entry `r * width + q` is the tile at the
+    /// address `(q, r)`.
+    ///
+    /// **Each entry is a Q16.16 fixed-point value as its raw integer.**
+    /// Divide by 65536 to read it as a quantity.[^1]
     ///
     /// This method copies, and it also generates. The world holds no array
     /// of tile values, so the call visits every tile. A caller that wants
-    /// one tile asks for one tile.
+    /// one tile calls `tile_report` instead.[^2]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0002, simulated and aggregated state holds no floating point number, decision D1. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
+    /// [^2]: ADR-0044, what copies and what does not is declared at the call site. `docs/adrs/REGISTRY.md`
     fn tile_values<'py>(&self, python: Python<'py>) -> Bound<'py, PyArray1<i32>> {
         let world = self.lock();
         let raw: Vec<i32> = world
@@ -204,30 +406,42 @@ impl PyWorld {
         raw.to_pyarray(python)
     }
 
-    /// Returns the tile change log of the last step, one column for each
-    /// field.
+    /// Returns the tile change log of the last step, as a `dict` of NumPy
+    /// arrays.
+    ///
+    /// Every array has one entry for each event, and all five arrays are the
+    /// same length. That length is `event_count`. A new world gives five
+    /// empty arrays.
+    ///
+    /// - `tick`, `numpy.uint64`. The step at which the change happened.
+    /// - `tile`, `numpy.uint32`. The tile that changed, as a row-major index.
+    ///   Take `index % world.width` for the column and `index // world.width`
+    ///   for the row.
+    /// - `value`, `numpy.int32`. The tile value after the change. **This is a
+    ///   Q16.16 fixed-point value as its raw integer. Divide by 65536.**[^2]
+    /// - `holder`, `numpy.uint16`. The faction that holds the tile, as the
+    ///   step left it. The value 65535 means that nobody holds it, and it
+    ///   sits above the faction ceiling, so no faction collides with it.[^4]
+    /// - `kind`, `numpy.uint8`. The kind of change. One means that the value
+    ///   rose, and two means that it fell.
     ///
     /// The keys are the field names of the event. The caller reads a field
     /// by its name, so no caller holds a byte offset, a field width or a
     /// field order. Those live in the Rust source and nowhere else.[^1]
     ///
-    /// The value column carries the fixed-point value as its raw integer.
-    /// It is never a floating point number, because a float in simulated
-    /// state does not add associatively and this is that state leaving the
-    /// engine.[^2]
-    ///
     /// This method copies each column. The log of one step is small next to
     /// the world.[^3]
+    ///
+    /// # Errors
+    ///
+    /// Raises `ViewError` when the dictionary cannot be built.
     ///
     /// # References
     ///
     /// [^1]: Decisions register, DEC-060. `docs/DECISIONS.md`
     /// [^2]: ADR-0002, simulated and aggregated state holds no floating point number, decision D1. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
     /// [^3]: ADR-0044, what copies and what does not is declared at the call site. `docs/adrs/REGISTRY.md`
-    ///
-    /// # Errors
-    ///
-    /// Raises `ViewError` when the dictionary cannot be built.
+    /// [^4]: ADR-0053, a faction is a bit in a mask, and a relation is a plane, decision D2. `docs/adrs/accepted/adr-0053-a-faction-is-a-bit-in-a-mask-and-a-relation-is-a-plane.md`
     fn event_log_columns<'py>(&self, python: Python<'py>) -> PyResult<Bound<'py, PyDict>> {
         let world = self.lock();
         let log = world.event_log();
@@ -245,7 +459,19 @@ impl PyWorld {
         Ok(columns)
     }
 
-    /// Returns the gather log of the last step, one column for each field.
+    /// Returns the gather log of the last step, as a `dict` of NumPy arrays.
+    ///
+    /// A gather event says that one unit took an amount of one resource from
+    /// one tile. Every array has one entry for each event, and all five
+    /// arrays are the same length. That length is `gather_count`.
+    ///
+    /// - `tick`, `numpy.uint64`. The step at which the unit took the amount.
+    /// - `unit`, `numpy.uint64`. The identity of the unit that took it.
+    /// - `tile`, `numpy.uint32`. The tile it took from, as a row-major index.
+    /// - `amount`, `numpy.uint32`. How much it took. This is a whole number
+    ///   of units of stock, and it is not fixed point.
+    /// - `kind`, `numpy.uint8`. The resource kind. Food is zero, wood is one
+    ///   and stone is two.
     ///
     /// The unit column holds the whole identity of the unit that took the
     /// amount. It is not a slot index. A slot index survives the death of
@@ -257,14 +483,14 @@ impl PyWorld {
     ///
     /// This method copies each column.[^2]
     ///
+    /// # Errors
+    ///
+    /// Raises `ViewError` when the dictionary cannot be built.
+    ///
     /// # References
     ///
     /// [^1]: ADR-0085, an entity crosses to Python as one opaque identity that the engine resolves, decisions D1 and D3. `docs/adrs/accepted/adr-0085-an-entity-crosses-to-python-as-one-opaque-identity.md`
     /// [^2]: ADR-0044, what copies and what does not is declared at the call site. `docs/adrs/REGISTRY.md`
-    ///
-    /// # Errors
-    ///
-    /// Raises `ViewError` when the dictionary cannot be built.
     fn gather_log_columns<'py>(&self, python: Python<'py>) -> PyResult<Bound<'py, PyDict>> {
         let world = self.lock();
         let log = world.gather_log();
@@ -282,13 +508,16 @@ impl PyWorld {
         Ok(columns)
     }
 
-    /// Returns the number of gather events that the last step emitted.
+    /// The number of gather events the last step emitted, as an integer.
+    ///
+    /// The count covers the last step alone. Read the events themselves with
+    /// `gather_log_columns`.
     #[getter]
     fn gather_count(&self) -> usize {
         self.lock().gather_log().len()
     }
 
-    /// Returns the number of soldiers alive in the world.
+    /// The number of soldiers alive in the world, as an integer.
     ///
     /// The engine counts them. A caller never counts a population by
     /// walking it, because a soldier is the mass tier.[^1]
@@ -301,7 +530,15 @@ impl PyWorld {
         self.lock().soldiers().len()
     }
 
-    /// Adds a soldier at each address and returns the identity column.
+    /// Adds a soldier at each address and returns their identities.
+    ///
+    /// The addresses are a sequence of `(q, r)` pairs of integers. The
+    /// faction is the number of the faction that owns the new soldiers.
+    ///
+    /// Returns a one-dimensional NumPy array of `numpy.uint64`, one identity
+    /// for each address, in the order of the addresses. Keep the array and
+    /// pass it to `order_gather` or `despawn_soldiers`. Take one entry as a
+    /// Python integer for `soldier_tile` or `explain_choice`.
     ///
     /// The call takes a set and answers once. It is not a per-unit verb that
     /// a caller repeats, because a soldier is the mass tier and no caller
@@ -316,16 +553,23 @@ impl PyWorld {
     /// The verb is set-valued at the boundary. It is still a loop inside, and
     /// spawning has no cheaper whole-set algorithm today.[^2]
     ///
-    /// # References
-    ///
-    /// [^1]: ADR-0054, an entity belongs to one of three tiers, declared at creation, decision D1. `docs/adrs/accepted/adr-0054-an-entity-belongs-to-one-of-three-tiers-declared-at-creation.md`
-    /// [^2]: Decisions register, DEC-063. `docs/DECISIONS.md`
-    ///
     /// # Errors
     ///
     /// Raises `VerbError` when the arena is full, when an address is outside
     /// the world, when the ground admits no unit, or when the world has no
-    /// such faction. The error names the address that refused.
+    /// such faction. The error names the address that refused. Water is the
+    /// ground that admits no unit.
+    ///
+    /// **A spawn reads no occupancy, so it may put a tile above its
+    /// capacity.** An over-full tile is a state of the world and not a
+    /// fault. Movement is what holds a tile to its capacity, and it only
+    /// ever takes units off an over-full tile.[^3]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0054, an entity belongs to one of three tiers, declared at creation, decision D1. `docs/adrs/accepted/adr-0054-an-entity-belongs-to-one-of-three-tiers-declared-at-creation.md`
+    /// [^2]: Decisions register, DEC-063. `docs/DECISIONS.md`
+    /// [^3]: ADR-0074, a spawn may over-fill a tile, and only admission enforces the capacity, decisions D1 and D2. `docs/adrs/accepted/adr-0074-a-spawn-may-over-fill-a-tile-and-only-admission-enforces-the-capacity.md`
     fn spawn_soldiers<'py>(
         &self,
         python: Python<'py>,
@@ -357,16 +601,22 @@ impl PyWorld {
 
     /// Removes every soldier the identities name.
     ///
+    /// The units are a sequence of identities, or the NumPy array of
+    /// `numpy.uint64` that `spawn_soldiers` returned. Returns `None`.
+    ///
     /// **The set is all or nothing.** Every identity resolves before anything
     /// is removed, so one dead identity removes nothing and raises.[^1]
     ///
-    /// # References
-    ///
-    /// [^1]: ADR-0085, an entity crosses to Python as one opaque identity that the engine resolves, decision D3. `docs/adrs/accepted/adr-0085-an-entity-crosses-to-python-as-one-opaque-identity.md`
+    /// A removed soldier leaves its slot to the next soldier. Its identity is
+    /// then stale, and every call that takes an identity refuses it.
     ///
     /// # Errors
     ///
     /// Raises `ViewError` when an identity names no live soldier.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0085, an entity crosses to Python as one opaque identity that the engine resolves, decision D3. `docs/adrs/accepted/adr-0085-an-entity-crosses-to-python-as-one-opaque-identity.md`
     fn despawn_soldiers(&self, units: Vec<u64>) -> PyResult<()> {
         let mut world = self.lock();
         let mut resolved = Vec::with_capacity(units.len());
@@ -384,7 +634,15 @@ impl PyWorld {
 
     /// Tells every soldier the identities name to gather a kind of resource.
     ///
-    /// The kind is the number the gather event carries in its `kind` column.
+    /// The units are a sequence of identities, or the NumPy array of
+    /// `numpy.uint64` that `spawn_soldiers` returned. Returns `None`.
+    ///
+    /// The kind is the resource kind: food is zero, wood is one and stone is
+    /// two. It is the same number the gather log carries in its `kind`
+    /// column.
+    ///
+    /// The call gives the order. It takes nothing. Step the world to make the
+    /// soldiers act, then read `gather_log_columns` for what they took.
     ///
     /// **The set is all or nothing.** Every identity resolves, and the kind is
     /// checked, before any order is given.
@@ -410,7 +668,14 @@ impl PyWorld {
         Ok(())
     }
 
-    /// Returns the tile that one soldier stands on.
+    /// Returns the tile that one soldier stands on, as an integer.
+    ///
+    /// The unit is one identity, as a Python integer. Take an entry of the
+    /// array that `spawn_soldiers` returned, or of the `unit` column of the
+    /// gather log.
+    ///
+    /// The result is a row-major tile index. Take `index % world.width` for
+    /// the column and `index // world.width` for the row.
     ///
     /// The engine resolves the identity against the arena. A soldier that
     /// died leaves its slot to another soldier, and this method refuses the
@@ -424,11 +689,14 @@ impl PyWorld {
     ///
     /// # References
     ///
-    /// [^1]: ADR-0085, an entity crosses to Python as one opaque identity that the engine resolves, decision D3. `docs/adrs/accepted/adr-0085-an-entity-crosses-to-python-as-one-opaque-identity.md`
-    ///
     /// # Errors
     ///
-    /// Raises `ViewError` when the identity names no live soldier.
+    /// Raises `ViewError` when the identity names no live soldier, and when
+    /// the value is not an identity the engine ever gave.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0085, an entity crosses to Python as one opaque identity that the engine resolves, decision D3. `docs/adrs/accepted/adr-0085-an-entity-crosses-to-python-as-one-opaque-identity.md`
     fn soldier_tile(&self, unit: u64) -> PyResult<u32> {
         let world = self.lock();
         let entity = resolve(&world, unit)?;
@@ -439,16 +707,25 @@ impl PyWorld {
             .ok_or_else(|| ViewError::new_err(format!("the identity {unit} names no live soldier")))
     }
 
-    /// Returns the number of settlements standing in the world.
+    /// The number of settlements standing in the world, as an integer.
     #[getter]
     fn settlement_count(&self) -> u32 {
         self.lock().settlements().len()
     }
 
-    /// Founds a settlement at each address and returns the identity column.
+    /// Founds a settlement at each address and returns their identities.
     ///
-    /// The call takes a set and answers once. The identities come back as
-    /// one column, in the order of the addresses.
+    /// The addresses are a sequence of `(q, r)` pairs of integers. The
+    /// faction is the number of the faction that owns the new settlements.
+    ///
+    /// Returns a one-dimensional NumPy array of `numpy.uint64`, one identity
+    /// for each address, in the order of the addresses. Pass an entry as a
+    /// Python integer to `site_economy`, `site_positions`, `site_preference`
+    /// or `prefer_at_sites`.
+    ///
+    /// **A settlement founded here earns nothing.** The production rate comes
+    /// from the ground that a survey read, and this call runs no survey. Call
+    /// `found_group` for a settlement that produces.[^1]
     ///
     /// **The set is all or nothing.** An address the world refuses destroys
     /// every settlement this call made and raises.
@@ -459,6 +736,10 @@ impl PyWorld {
     /// the world, when the ground admits nobody, when the world has no such
     /// faction, or when a settlement already stands on the tile. The error
     /// names the address that refused.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0062, production and upkeep are rates attached to a site, decision D2. `docs/adrs/accepted/adr-0062-production-and-upkeep-are-rates-attached-to-a-site.md`
     fn found_settlements<'py>(
         &self,
         python: Python<'py>,
@@ -495,23 +776,34 @@ impl PyWorld {
     /// rebalance. A caller that named the workers would be looping over
     /// entities, and the control plane never does that.[^1]
     ///
-    /// The kind is the number that the gather event carries in its `kind`
-    /// column. The target is a Q16.16 value as its raw integer, because a
-    /// float in simulated state does not add associatively.[^2]
+    /// The sites are a sequence of settlement identities, or the NumPy array
+    /// of `numpy.uint64` that `found_settlements` returned. Returns `None`.
+    ///
+    /// The kind is the kind of work: food is zero, wood is one and stone is
+    /// two. It is the same numbering the gather log uses in its `kind`
+    /// column.
+    ///
+    /// **The target is a Q16.16 value as its raw integer.** Multiply the
+    /// share you want by 65536. A new site wants 65536, which is one, of
+    /// every kind. The engine holds no floating point number in simulated
+    /// state, because float addition is not associative.[^2]
+    ///
+    /// The engine acts on the new target at the next rebalance, and
+    /// `set_position_schedule` says how often that runs.
     ///
     /// **The set is all or nothing.** Every identity resolves, and the target
     /// is checked, before anything is written.
-    ///
-    /// # References
-    ///
-    /// [^1]: ADR-0040, Python is a control plane, not a data plane, decision D1. `docs/adrs/draft/adr-0040-python-is-a-control-plane-not-a-data-plane.md`
-    /// [^2]: ADR-0002, simulated and aggregated state holds no floating point number, decision D1. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
     ///
     /// # Errors
     ///
     /// Raises `ViewError` when an identity names no live settlement. Raises
     /// `VerbError` when the number names no kind, or when the target is
     /// below zero.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0040, Python is a control plane, not a data plane, decision D1. `docs/adrs/draft/adr-0040-python-is-a-control-plane-not-a-data-plane.md`
+    /// [^2]: ADR-0002, simulated and aggregated state holds no floating point number, decision D1. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
     fn prefer_at_sites(&self, sites: Vec<u64>, kind: u8, target: i32) -> PyResult<()> {
         let mut world = self.lock();
         let kind = ResourceKind::from_u8(kind)
@@ -525,10 +817,28 @@ impl PyWorld {
             .map_err(|error| VerbError::new_err(error.to_string()))
     }
 
-    /// Returns the positions that one site holds, one column for each field.
+    /// Returns the positions that one site holds, as a `dict` of NumPy
+    /// arrays.
+    ///
+    /// A position is one seat of work at a settlement. The site is one
+    /// settlement identity, as a Python integer.
+    ///
+    /// Every array has one entry for each position, and all three arrays are
+    /// the same length.
+    ///
+    /// - `kind`, `numpy.uint8`. The kind of work: food is zero, wood is one
+    ///   and stone is two.
+    /// - `rank`, `numpy.uint8`. The rank of the position inside its kind,
+    ///   counting from zero.
+    /// - `holder`, `numpy.uint64`. The identity of the unit that holds the
+    ///   position, and zero where a position holds nobody.
     ///
     /// The columns hold the positions of the site and nothing else. An entry
     /// of the storage that is no position does not appear.
+    ///
+    /// **A site holds no position until a rebalance runs**, so a site founded
+    /// in this step reports three empty arrays. Step the world, and read
+    /// `set_position_schedule` for how often the rebalance runs.
     ///
     /// The holder column carries the whole identity of the unit that holds
     /// each position, and zero where a position holds nobody. It is not a
@@ -538,14 +848,14 @@ impl PyWorld {
     /// the same reason the unit read does: a set form would have to answer
     /// for a dead identity with a value that stands for nothing.[^1]
     ///
-    /// # References
-    ///
-    /// [^1]: ADR-0085, an entity crosses to Python as one opaque identity that the engine resolves, decision D3. `docs/adrs/accepted/adr-0085-an-entity-crosses-to-python-as-one-opaque-identity.md`
-    ///
     /// # Errors
     ///
     /// Raises `ViewError` when the identity names no live settlement, or
     /// when the dictionary cannot be built.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0085, an entity crosses to Python as one opaque identity that the engine resolves, decision D3. `docs/adrs/accepted/adr-0085-an-entity-crosses-to-python-as-one-opaque-identity.md`
     fn site_positions<'py>(&self, python: Python<'py>, site: u64) -> PyResult<Bound<'py, PyDict>> {
         let world = self.lock();
         let entity = resolve_site(&world, site)?;
@@ -563,10 +873,16 @@ impl PyWorld {
         Ok(columns)
     }
 
-    /// Returns what one site wants of each kind of work.
+    /// Returns what one site wants of each kind of work, as a NumPy array.
     ///
-    /// The column holds one Q16.16 value for each kind, as its raw integer,
-    /// in the order of the kind numbering.
+    /// The site is one settlement identity, as a Python integer.
+    ///
+    /// Returns a one-dimensional array of `numpy.int32`, one entry for each
+    /// resource kind, in the order food, wood, stone.
+    ///
+    /// **Each entry is a Q16.16 value as its raw integer.** Divide by 65536.
+    /// A new site wants 65536, which is one, of every kind. Write a target
+    /// with `prefer_at_sites`.
     ///
     /// # Errors
     ///
@@ -590,13 +906,22 @@ impl PyWorld {
 
     /// Sets how often the engine rebalances the positions of every site.
     ///
-    /// The period is in ticks, and the phase is the offset inside it. The
-    /// interval is a parameter of the world.
+    /// Returns `None`.
+    ///
+    /// The period is a count of ticks, and it must be at least one. A period
+    /// of one rebalances on every step. The phase is the offset inside the
+    /// period, so a period of four and a phase of one rebalance on the ticks
+    /// one, five and nine. A phase at or above the period wraps into it.
+    ///
+    /// The world starts with a schedule already set. This call replaces it.
+    ///
+    /// A rebalance is what turns the targets that `prefer_at_sites` wrote
+    /// into the positions that `site_positions` reports.
     ///
     /// # Errors
     ///
     /// Raises `VerbError` when the period is zero, or above the range that
-    /// the scaling multiply takes.
+    /// the scaling multiply takes. The message names the limit it applied.
     fn set_position_schedule(&self, period: u32, phase: u32) -> PyResult<()> {
         self.lock()
             .set_position_schedule(period, phase)
@@ -604,7 +929,35 @@ impl PyWorld {
     }
 
     /// Returns what the founding would read if a group of this size looked
-    /// for a place now.
+    /// for a place now, as a `dict`.
+    ///
+    /// The group is the number of people that would settle. The faction is
+    /// the number of the faction that would settle them, and it chooses the
+    /// sample, so two factions read two samples.[^3]
+    ///
+    /// Eleven entries are NumPy arrays with one entry for each candidate
+    /// place, and three are plain integers.
+    ///
+    /// - `q` and `r`, `numpy.int32`. The address of the candidate place.
+    /// - `score`, `numpy.int64`. The weighted sum that ranks the place.
+    ///   **This is a Q16.16 value as its raw integer. Divide by 65536.**
+    /// - `food`, `wood` and `stone`, `numpy.uint32`. How much of each
+    ///   resource the disc around the place holds. These are whole units of
+    ///   stock, and they are not fixed point.
+    /// - `open_ground`, `numpy.uint32`. How many tiles of the disc admit a
+    ///   unit.
+    /// - `room`, `numpy.uint32`. How many units the open tiles of the disc
+    ///   hold together.
+    /// - `water_edge`, `numpy.uint32`. How many of the six neighbours of the
+    ///   centre hold open water.
+    /// - `eligible`, `numpy.uint8`. One when the founding would accept the
+    ///   place, and zero when it refuses it.
+    /// - `separated`, `numpy.uint8`. One when the place keeps its distance
+    ///   from every place a founding before it took.
+    /// - `drawn`, a plain integer. How many candidate places the survey drew.
+    /// - `considered`, a plain integer. How many distinct places it read. Two
+    ///   draws may name one tile, and the survey reads such a tile once.
+    /// - `tiles_read`, a plain integer. How many tiles it read in all.
     ///
     /// The survey draws a fixed number of candidate places and reads a fixed
     /// number of tiles around each one. Neither number follows the extent of
@@ -621,13 +974,16 @@ impl PyWorld {
     ///
     /// # References
     ///
-    /// [^1]: ADR-0075, the founding choice reads a bounded sample of the world, decision D1. `docs/adrs/accepted/adr-0075-the-founding-choice-reads-a-bounded-sample-of-the-world.md`
-    /// [^2]: ADR-0075, the founding choice reads a bounded sample of the world, decision D5. `docs/adrs/accepted/adr-0075-the-founding-choice-reads-a-bounded-sample-of-the-world.md`
-    ///
     /// # Errors
     ///
     /// Raises `VerbError` when the group holds nobody, or when the ordering
     /// of the candidates refuses to run.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0075, the founding choice reads a bounded sample of the world, decision D1. `docs/adrs/accepted/adr-0075-the-founding-choice-reads-a-bounded-sample-of-the-world.md`
+    /// [^2]: ADR-0075, the founding choice reads a bounded sample of the world, decision D5. `docs/adrs/accepted/adr-0075-the-founding-choice-reads-a-bounded-sample-of-the-world.md`
+    /// [^3]: ADR-0076, a founding keeps a fixed distance from the foundings before it, decision D3. `docs/adrs/accepted/adr-0076-a-founding-keeps-a-fixed-distance-from-the-foundings-before-it.md`
     fn founding_survey<'py>(
         &self,
         python: Python<'py>,
@@ -692,7 +1048,26 @@ impl PyWorld {
     }
 
     /// Founds a group the way the engine founds one, and reports what it
-    /// chose.
+    /// chose, as a `dict`.
+    ///
+    /// The group is the number of people to settle. The faction is the number
+    /// of the faction that settles them.
+    ///
+    /// Every entry is a plain integer.
+    ///
+    /// - `site`. The identity of the settlement the founding made. Pass it to
+    ///   `site_economy`, `site_positions` or `prefer_at_sites`.
+    /// - `q` and `r`. The address the founding took.
+    /// - `faction`. The faction the call took.
+    /// - `seated`. **How many people the founding seated**, and not whether
+    ///   it seated any. The report of `found_run_for_every_faction` uses the
+    ///   same key for a `bool`.
+    /// - `score`. The weighted sum of the chosen place. **This is a Q16.16
+    ///   value as its raw integer. Divide by 65536.**
+    /// - `food`, `wood`, `stone`, `open_ground`, `room` and `water_edge`.
+    ///   What the survey read at the chosen place. Each is a whole count, and
+    ///   `founding_survey` describes each one.
+    /// - `drawn`, `considered` and `tiles_read`. What the survey did.
     ///
     /// This is the whole loop in one call: the survey reads the ground, the
     /// founding takes the best place the sample offered, it seats the group
@@ -701,19 +1076,19 @@ impl PyWorld {
     /// founded at an address of its own would get a site that earns nothing,
     /// because the rate comes from the survey.
     ///
-    /// The report holds the identity of the site, the place, the number of
-    /// people seated, and the counts the survey read at the chosen place.
-    /// Every number is the engine's own. This binding recomputes no score.
+    /// Every number in the report is the engine's own. This binding
+    /// recomputes no score.
+    ///
+    /// # Errors
+    ///
+    /// Raises `VerbError` when the group holds nobody, when the world has no
+    /// such faction, when the sample offered no place that admits the group,
+    /// or when the seating refuses.
     ///
     /// # References
     ///
     /// [^1]: ADR-0075, the founding choice reads a bounded sample of the world, decision D5. `docs/adrs/accepted/adr-0075-the-founding-choice-reads-a-bounded-sample-of-the-world.md`
     /// [^2]: ADR-0062, production and upkeep are rates attached to a site, decision D2. `docs/adrs/accepted/adr-0062-production-and-upkeep-are-rates-attached-to-a-site.md`
-    ///
-    /// # Errors
-    ///
-    /// Raises `VerbError` when the group holds nobody, when the sample
-    /// offered no place that admits the group, or when the seating refuses.
     fn found_group<'py>(
         &self,
         python: Python<'py>,
@@ -748,24 +1123,46 @@ impl PyWorld {
         Ok(report)
     }
 
-    /// Returns the level 1 summary of the cell that covers one tile.
+    /// Returns the summary of the cell that covers one tile, as a `dict`.
+    ///
+    /// A cell is a square block of tiles. The world summarises each block, so
+    /// a reader asks about a region without reading its tiles. Give the
+    /// address of any tile, and the call answers about the cell that covers
+    /// it.
+    ///
+    /// Every entry is a plain integer.
+    ///
+    /// - `tiles`. How many tiles the cell covers.
+    /// - `open_tiles`. How many of them admit a unit.
+    /// - `units`. How many units stand on them.
+    /// - `held_tiles`. How many of them a faction holds. The entry does not
+    ///   say which faction.
+    /// - `value_total`. The sum of the tile values. **This is a Q16.16 value
+    ///   as its raw integer. Divide by 65536.**
+    /// - `height_total`. The sum of the tile heights. **This is also a Q16.16
+    ///   value as its raw integer. Divide by 65536.**
+    /// - `food_total`. The food the tiles still hold. **This one is a whole
+    ///   count of units of stock. Do not divide it.**
+    ///
+    /// **Two of the three totals carry the fixed-point scale and the third
+    /// does not.** A reader that divides all three reports a food total
+    /// 65536 times too small.
     ///
     /// Level 0 is the only truth, and this level is derived from it. Every
-    /// field is an exact integer total over the tiles of the cell, so a
-    /// reader can add the level 0 tiles of the cell and get this number
-    /// back.[^1] [^2]
+    /// entry is an exact integer total over the tiles of the cell, so a
+    /// reader can add the tiles of the cell and get this number back.[^1] [^2]
     ///
     /// The call reads one cell. It starts no pass over the world.
-    ///
-    /// # References
-    ///
-    /// [^1]: ADR-0022, level 0 is the only truth, and every level above it is derived, decision D1. `docs/adrs/accepted/adr-0022-level-0-is-the-only-truth-and-every-level-above-it-is-derived.md`
-    /// [^2]: ADR-0023, an aggregate combines exactly, in any order, decision D1. `docs/adrs/accepted/adr-0023-an-aggregate-combines-exactly-in-any-order.md`
     ///
     /// # Errors
     ///
     /// Raises `ViewError` when the address lies outside the world, or when
     /// the pyramid holds no cell for it.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0022, level 0 is the only truth, and every level above it is derived, decision D1. `docs/adrs/accepted/adr-0022-level-0-is-the-only-truth-and-every-level-above-it-is-derived.md`
+    /// [^2]: ADR-0023, an aggregate combines exactly, in any order, decision D1. `docs/adrs/accepted/adr-0023-an-aggregate-combines-exactly-in-any-order.md`
     fn region_summary<'py>(
         &self,
         python: Python<'py>,
@@ -787,27 +1184,47 @@ impl PyWorld {
         Ok(fields)
     }
 
-    /// Returns what one site earns, holds and owes, and what it last
-    /// rationed.
+    /// Returns what one site earns, holds and owes, as a `dict`.
     ///
-    /// The store is what the site holds now. The production is what it adds
-    /// each time the rate pass runs, and the upkeep is what it owes. Every
-    /// one is a Q16.16 value as its raw integer, because a float in
-    /// simulated state does not add associatively.[^1]
+    /// The site is one settlement identity, as a Python integer. The
+    /// commodity is the number of the commodity to report on, and it
+    /// defaults to zero.
+    ///
+    /// - `q` and `r`, integers. The address of the site.
+    /// - `faction`, an integer. The faction that owns the site.
+    /// - `commodity`, an integer. The commodity the call took.
+    /// - `store`, an integer. What the site holds now. **A Q16.16 value as
+    ///   its raw integer. Divide by 65536.**
+    /// - `production`, an integer. What it adds each time the rate pass runs.
+    ///   **Also Q16.16.**
+    /// - `upkeep`, an integer. What it owes each time. **Also Q16.16.**
+    /// - `rationed`, a `bool`. Whether the last draw could not serve every
+    ///   cohort in full.
+    /// - `demanded` and `granted`, integers or `None`. What the cohorts asked
+    ///   for and what the store gave. **Both are Q16.16 when they are
+    ///   integers.** Both are `None` when `rationed` is `False`.
+    ///
+    /// The engine holds no floating point number in simulated state, because
+    /// float addition is not associative.[^1]
+    ///
+    /// **A settlement founded by `found_settlements` produces nothing**, and
+    /// reports a production of zero. The rate comes from the survey, and only
+    /// `found_group` and `found_run_for_every_faction` run one.[^3]
     ///
     /// The ration row comes from the log of the draw that just ran. The
     /// engine keeps that log for one tick, so a site that served every
     /// cohort in full reports no shortfall.[^2]
     ///
-    /// # References
-    ///
-    /// [^1]: ADR-0002, simulated and aggregated state holds no floating point number, decision D1. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
-    /// [^2]: ADR-0063, a need is a rate with a threshold, and crossing it is a fact, decision D3. `docs/adrs/accepted/adr-0063-a-need-is-a-rate-with-a-threshold-and-crossing-it-is-a-fact.md`
-    ///
     /// # Errors
     ///
     /// Raises `ViewError` when the identity names no live settlement, or
     /// when the world holds no such commodity.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0002, simulated and aggregated state holds no floating point number, decision D1. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
+    /// [^2]: ADR-0063, a need is a rate with a threshold, and crossing it is a fact, decision D3. `docs/adrs/accepted/adr-0063-a-need-is-a-rate-with-a-threshold-and-crossing-it-is-a-fact.md`
+    /// [^3]: ADR-0062, production and upkeep are rates attached to a site, decision D2. `docs/adrs/accepted/adr-0062-production-and-upkeep-are-rates-attached-to-a-site.md`
     #[pyo3(signature = (site, commodity = 0))]
     fn site_economy<'py>(
         &self,
@@ -861,29 +1278,43 @@ impl PyWorld {
         Ok(report)
     }
 
-    /// Returns why one unit chose what it chose.
+    /// Returns why one unit chose what it chose, as a `dict`.
+    ///
+    /// The unit is one soldier identity, as a Python integer.
+    ///
+    /// - `tile`, an integer. The row-major index of the tile the unit stands
+    ///   on.
+    /// - `q` and `r`, integers. The address of that tile. Pass them to
+    ///   `region_summary` to read the cell the unit scored.
+    /// - `cell`, an integer. The index of that cell.
+    /// - `need`, an integer. What the unit still needs. **A Q16.16 value as
+    ///   its raw integer. Divide by 65536.**
+    /// - `scores`, `fields` and `weights`, lists of integers. One entry for
+    ///   each option, in option order. The field is what the option read, the
+    ///   weight is what the option carried, and the score is what the engine
+    ///   made of the two. **All three hold Q16.16 values as raw integers.**
+    /// - `floor`, an integer. The score an option had to reach. **Also
+    ///   Q16.16.**
+    /// - `best`, an integer. The option the scores select, or the no-intent
+    ///   value when every score is below the floor.
+    /// - `best_name`, a `str` or `None`. The engine's own name for that
+    ///   option. It is `None` for a hold.
+    /// - `intent`, an integer. The intent the unit carries now.
+    /// - `chooses_next_frame`, a `bool`. Whether the unit reads the world
+    ///   again on the next step.
     ///
     /// The engine recomputes the answer from the world as it stands. It
     /// stores no score, so the explanation costs nothing when nobody
     /// asks.[^1]
     ///
-    /// Every score, field value, weight and floor is a Q16.16 value as its
-    /// raw integer. The best entry is the option the scores select, or the
-    /// no-intent value when every score is below the floor. The name entry
-    /// is the engine's own name for that option, and it is `None` for a
-    /// hold.
-    ///
-    /// The address entries name the tile the unit stands on. Pass them to
-    /// `region_summary` to read the cell the unit scored.
-    ///
-    /// # References
-    ///
-    /// [^1]: ADR-0064, a unit chooses by scoring a small fixed option set, decision D2. `docs/adrs/accepted/adr-0064-a-unit-chooses-by-scoring-a-small-fixed-option-set.md`
-    ///
     /// # Errors
     ///
     /// Raises `ViewError` when the identity names no live unit, or when the
     /// engine would say nothing about it.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0064, a unit chooses by scoring a small fixed option set, decision D2. `docs/adrs/accepted/adr-0064-a-unit-chooses-by-scoring-a-small-fixed-option-set.md`
     fn explain_choice<'py>(&self, python: Python<'py>, unit: u64) -> PyResult<Bound<'py, PyDict>> {
         let world = self.lock();
         let entity = resolve(&world, unit)?;
@@ -936,16 +1367,28 @@ impl PyWorld {
         Ok(report)
     }
 
-    /// Returns what one tile holds.
+    /// Returns what one tile holds, as a `dict`.
+    ///
+    /// The address is the column `q` and the row `r`, both counting from
+    /// zero.
+    ///
+    /// - `q` and `r`, integers. The address the call took.
+    /// - `kind`, an integer. The ground: water is zero, plain is one, forest
+    ///   is two, hill is three and mountain is four.
+    /// - `passable`, a `bool`. Whether the ground admits a unit.
+    /// - `capacity`, an integer. How many units the tile holds.
+    /// - `stock`, `generated` and `taken`, lists of integers. One entry for
+    ///   each resource kind, in the order food, wood, stone. Each is a whole
+    ///   count of units of stock, and none of them is fixed point.
+    /// - `value`, an integer. The tile value. **A Q16.16 value as its raw
+    ///   integer. Divide by 65536.**
+    /// - `holder`, an integer or `None`. The faction that holds the ground,
+    ///   and `None` for ground that nobody holds.[^2]
     ///
     /// The stock of a tile is what the generator put there less what units
     /// took from it. The generated entry is the first, the taken entry is
     /// the second, and the stock entry is the difference the engine
-    /// computes.[^1] Each is one entry for each kind of resource, in the
-    /// order of the kind numbering.
-    ///
-    /// The holder entry names the faction that holds the ground, and it is
-    /// `None` for ground that nobody holds.[^2]
+    /// computes.[^1]
     ///
     /// The capacity composes the ground with the finished upgrade, which is
     /// what admission reads. This call holds neither table.[^3]
@@ -955,15 +1398,15 @@ impl PyWorld {
     /// reader of the ground should not be refused because the population
     /// moved. Ask `window_census` for the units.
     ///
+    /// # Errors
+    ///
+    /// Raises `ViewError` when the address lies outside the world.
+    ///
     /// # References
     ///
     /// [^1]: ADR-0072, a tile stock is generated, and only what was taken is stored, decision D4. `docs/adrs/accepted/adr-0072-a-tile-stock-is-generated-and-only-what-was-taken-is-stored.md`
     /// [^2]: ADR-0053, a faction is a bit in a mask, and a relation is a plane, decision D2. `docs/adrs/accepted/adr-0053-a-faction-is-a-bit-in-a-mask-and-a-relation-is-a-plane.md`
     /// [^3]: ADR-0056, movement is tile-discrete and admitted by sort-then-admit, decision D4. `docs/adrs/accepted/adr-0056-movement-is-tile-discrete-and-admitted-by-sort-then-admit.md`
-    ///
-    /// # Errors
-    ///
-    /// Raises `ViewError` when the address lies outside the world.
     fn tile_report<'py>(
         &self,
         python: Python<'py>,
@@ -1005,10 +1448,27 @@ impl PyWorld {
         Ok(report)
     }
 
-    /// Returns what one window of the world holds.
+    /// Returns what one window of the world holds, as a `dict`.
     ///
     /// The window is the square of the given radius around the address,
-    /// clipped to the world. The engine walks it and answers once. A caller
+    /// clipped to the world. A radius of zero reads one tile.
+    ///
+    /// - `q`, `r` and `radius`, integers. The arguments the call took.
+    /// - `first_q`, `first_r`, `last_q` and `last_r`, integers. The corners
+    ///   of the window after the engine clipped it to the world.
+    /// - `tiles`, an integer. How many tiles the window covers.
+    /// - `by_kind`, a list of integers. One count for each ground kind, in
+    ///   the order water, plain, forest, hill, mountain.
+    /// - `open_tiles`, an integer. How many tiles admit a unit.
+    /// - `units`, an integer. How many units stand in the window.
+    /// - `crowd_worst`, an integer. The largest number of units on any one
+    ///   tile of the window.
+    /// - `tiles_at_capacity`, an integer. How many tiles hold as many units
+    ///   as their capacity.
+    /// - `crowded_q` and `crowded_r`, integers or `None`. The address that
+    ///   holds the most units. Both are `None` when the window holds none.
+    ///
+    /// The engine walks the window and answers once. A caller
     /// that walked the addresses itself would be looping over the world from
     /// the control plane, which this boundary does not permit.[^1]
     ///
@@ -1019,16 +1479,16 @@ impl PyWorld {
     /// rebuilds at the barrier. A caller that changed the population and did
     /// not step is refused rather than answered from a stale bridge.[^2]
     ///
+    /// # Errors
+    ///
+    /// Raises `VerbError` when the radius is above the ceiling. The message
+    /// names the ceiling. Raises `ViewError` when the window covers no
+    /// address of the world, or when the bridge holds no answer.
+    ///
     /// # References
     ///
     /// [^1]: ADR-0040, Python is a control plane, not a data plane, decision D1. `docs/adrs/draft/adr-0040-python-is-a-control-plane-not-a-data-plane.md`
     /// [^2]: ADR-0018, the unit-to-tile bridge is derived, and it rebuilds at the barrier, decision D3. `docs/adrs/accepted/adr-0018-the-unit-to-tile-bridge-is-derived-and-rebuilds-at-the-barrier.md`
-    ///
-    /// # Errors
-    ///
-    /// Raises `VerbError` when the radius is above the ceiling. Raises
-    /// `ViewError` when the window covers no address of the world, or when
-    /// the bridge holds no answer.
     #[pyo3(signature = (q, r, radius = 8))]
     fn window_census<'py>(
         &self,
@@ -1080,9 +1540,33 @@ impl PyWorld {
     /// place and the panel names each refusal. A founded place is history,
     /// and the engine holds no copy of it.
     ///
-    /// Returns one dictionary for each faction. A seated faction gives its
-    /// place, its people and what the ground it chose reaches. A refused
-    /// faction gives the reason.
+    /// The group is how many people to seat for each faction.
+    ///
+    /// Returns a `list` of one `dict` for each faction of the world, in
+    /// faction order. Every entry is a plain integer, a `bool` or a `str`.
+    ///
+    /// Every report holds these two.
+    ///
+    /// - `faction`, an integer. The faction the report is about.
+    /// - `seated`, a `bool`. **Whether the faction got a place**, and not how
+    ///   many people it seated. The report of `found_group` uses the same key
+    ///   for a count.
+    ///
+    /// A report whose `seated` entry is `True` holds these as well.
+    ///
+    /// - `q` and `r`, integers. The address the founding took.
+    /// - `people`, an integer. How many people it seated.
+    /// - `considered`, an integer. How many distinct places the survey read.
+    /// - `food`, `wood`, `stone`, `open_ground` and `water_edge`, integers.
+    ///   What the survey read at the chosen place. Each is a whole count.
+    /// - `carries_its_group`, a `bool`. Whether the food the survey read
+    ///   holds the whole group.
+    ///
+    /// A report whose `seated` entry is `False` holds `refusal` instead, a
+    /// `str` that says why the faction got no place.
+    ///
+    /// **A report holds no site identity.** Call `found_group` for a founding
+    /// that hands one back.
     ///
     /// # Errors
     ///
@@ -1152,17 +1636,41 @@ impl PyWorld {
     /// unit. A caller that walked tiles to draw them would cross the boundary
     /// once for each tile, and the crossing costs more than the drawing.[^2]
     ///
-    /// The array must hold `width * height` unsigned 32-bit values and must be
-    /// contiguous. Each value holds red, green and blue in its low three
-    /// bytes.
+    /// The camera says what part of the world the picture shows. The width
+    /// and the height are the size of the picture in pixels.
+    ///
+    /// The pixels are a one-dimensional NumPy array of `numpy.uint32`. It
+    /// must hold `width * height` entries and must be one contiguous block.
+    /// Each entry holds red, green and blue in its low three bytes. Build one
+    /// with `numpy.zeros(width * height, dtype=numpy.uint32)`, and reshape it
+    /// to `(height, width)` after the call to show it.
     ///
     /// Set `reference` to show the layer that names the colours. Set `panel`
     /// to draw the whole panel instead of the cards, which is what a caller
     /// that writes a picture to a file wants.
     ///
-    /// Returns what the drawing pass read, so a caller reports the numbers
-    /// the picture was made from rather than starting a second pass to find
-    /// them.[^3]
+    /// Returns a `dict` of what the drawing pass read.[^3] A caller reports
+    /// the numbers the picture was made from, and starts no second pass to
+    /// find them.
+    ///
+    /// Most entries are plain integers. Five are not. `promoted_deeds` and
+    /// `newest_character` may be `None`. `centre` and `extent_shown` are
+    /// pairs of integers. `carried_by_kind` is a list of one count for each
+    /// resource kind. The three trailing entries are floating point numbers.
+    ///
+    /// **The three floating point entries measure this machine and not the
+    /// simulation.** `step_mean_micros` and `draw_mean_micros` are mean
+    /// durations in microseconds, and `ticks_each_second` is a rate. Nothing
+    /// in the engine reads them, and no two runs need agree on them.
+    ///
+    /// **`rationed_short_accum` is a Q16.16 value as its raw integer.**
+    /// Divide by 65536. Its name says so, because a caller that read it as a
+    /// count of goods would report a quantity 65536 times too large. Every
+    /// other integer entry is a whole count.
+    ///
+    /// `panel_height` is the picture height that holds the whole panel. A
+    /// caller that writes the panel to a file draws once, reads this entry,
+    /// then draws again at that height.
     ///
     /// # Errors
     ///
@@ -1173,6 +1681,10 @@ impl PyWorld {
     /// the first already holds, so the work is provably invisible and a
     /// caller could otherwise sweep the whole world for a picture of a few
     /// pixels.[^4]
+    ///
+    /// Raises `TypeError` when the array does not hold `numpy.uint32`
+    /// entries. The interpreter refuses the argument before the engine reads
+    /// it, so that refusal is not a `CachetteError`.
     ///
     /// # References
     ///
@@ -1284,6 +1796,10 @@ impl PyWorld {
         Ok(report)
     }
 
+    /// Returns a `str` that names the world, its extent and its tick.
+    ///
+    /// The arguments in the text are the parameters the constructor takes, so
+    /// a reader can paste the text back.
     fn __repr__(&self) -> String {
         let world = self.lock();
         // The arguments name the constructor's own parameters, so that the
@@ -1300,7 +1816,15 @@ impl PyWorld {
     }
 }
 
-/// A camera the control plane owns.
+/// A camera the control plane owns, which says what a picture shows.
+///
+/// Build a camera, steer it, then pass it to `World.draw`. The camera holds
+/// the size of one tile in pixels and the pixel offset of the tile at the
+/// origin. Nothing else.
+///
+/// **A camera is not attached to a world.** One camera draws any world, and
+/// two cameras draw one world. The camera verbs that need the size of the
+/// picture take the width and the height as arguments.
 ///
 /// **The engine holds no camera.** It is given one for the length of a call
 /// and keeps nothing of it afterwards, so a frame is a pure function of a
@@ -1342,9 +1866,18 @@ pub struct PyCamera {
 #[allow(clippy::disallowed_types)]
 #[pymethods]
 impl PyCamera {
-    /// Builds the camera the demonstration opens with.
+    /// Builds a camera.
     ///
-    /// The tile size is a viewer choice and not a world property.
+    /// The tile size is the width and the height of one tile, in pixels, as a
+    /// `float`. Give `None`, which is the default, for the size the
+    /// demonstration opens with. The tile size is a choice of the caller and
+    /// not a property of the world.
+    ///
+    /// The new camera sits at the corner of the world, so it shows the tile
+    /// at the address `(0, 0)`. Call `look_at` to place it somewhere else, or
+    /// build one with `fitting` instead. The constructor holds the tile size
+    /// inside the range the camera accepts, so a size outside that range
+    /// gives the nearest size inside it.
     #[new]
     #[pyo3(signature = (tile_size = None))]
     fn new(tile_size: Option<f32>) -> Self {
@@ -1353,7 +1886,14 @@ impl PyCamera {
         }
     }
 
-    /// Returns a camera that fits the whole world into a picture of this size.
+    /// Returns a camera that fits the whole world into a picture of this
+    /// size.
+    ///
+    /// The world is the world to fit. The width and the height are the size
+    /// of the picture in pixels.
+    ///
+    /// **This is the camera to start from.** It shows every tile, so a caller
+    /// that draws with it sees the world rather than an empty picture.
     #[staticmethod]
     fn fitting(world: &PyWorld, width: usize, height: usize) -> Self {
         Self {
@@ -1361,13 +1901,13 @@ impl PyCamera {
         }
     }
 
-    /// The width of one tile in pixels.
+    /// The width of one tile in pixels, as a `float`.
     #[getter]
     const fn tile_width(&self) -> f32 {
         self.inner.tile_width
     }
 
-    /// Sets the width of one tile in pixels.
+    /// Sets the width of one tile in pixels, as a `float`.
     ///
     /// **The setter does not hold the value to any bound.** The caller owns
     /// the camera, so the caller may build any camera it likes, and the frame
@@ -1388,76 +1928,111 @@ impl PyCamera {
         self.inner.tile_width = pixels;
     }
 
-    /// The height of one tile in pixels.
+    /// The height of one tile in pixels, as a `float`.
     #[getter]
     const fn tile_height(&self) -> f32 {
         self.inner.tile_height
     }
 
-    /// Sets the height of one tile in pixels, and holds it to no bound.
+    /// Sets the height of one tile in pixels, as a `float`.
+    ///
+    /// The setter holds the value to no bound, in the same way the width
+    /// setter does. `World.draw` refuses a camera it cannot draw.
     #[setter]
     const fn set_tile_height(&mut self, pixels: f32) {
         self.inner.tile_height = pixels;
     }
 
-    /// The pixel offset of the tile at the origin.
+    /// The pixel offset across the picture of the tile at the origin, as a
+    /// `float`.
+    ///
+    /// The tile at the address `(0, 0)` is drawn at this offset. A larger
+    /// value moves the world to the right in the picture.
     #[getter]
     const fn origin_x(&self) -> f32 {
         self.inner.origin_x
     }
 
-    /// Sets the pixel offset of the tile at the origin.
+    /// Sets the pixel offset across the picture of the tile at the origin, as
+    /// a `float`.
     #[setter]
     const fn set_origin_x(&mut self, pixels: f32) {
         self.inner.origin_x = pixels;
     }
 
-    /// The pixel offset of the tile at the origin.
+    /// The pixel offset down the picture of the tile at the origin, as a
+    /// `float`.
+    ///
+    /// A larger value moves the world down in the picture.
     #[getter]
     const fn origin_y(&self) -> f32 {
         self.inner.origin_y
     }
 
-    /// Sets the pixel offset of the tile at the origin.
+    /// Sets the pixel offset down the picture of the tile at the origin, as a
+    /// `float`.
     #[setter]
     const fn set_origin_y(&mut self, pixels: f32) {
         self.inner.origin_y = pixels;
     }
 
-    /// Moves the view by whole presses of a scroll key.
+    /// Moves the view by whole presses of a scroll key. Returns `None`.
+    ///
+    /// The across value and the down value are counts of presses, as
+    /// `float` values. Pass minus one, zero or one for each direction. The
+    /// width and the height are the size of the picture in pixels.
     ///
     /// **This is the call a person drives.** The step is a share of the
     /// picture, so one press moves the view by the same part of it at every
-    /// zoom. Pass minus one, zero or one for each direction.
+    /// zoom.
     fn nudge(&mut self, across: f32, down: f32, width: usize, height: usize) {
         self.inner = self
             .inner
             .nudged(across, down, &FrameSize::new(width, height));
     }
 
-    /// Moves the view by a count of pixels.
+    /// Moves the view by a count of pixels. Returns `None`.
+    ///
+    /// The across value and the down value are counts of pixels, as `float`
+    /// values. The call needs no picture size, because a pixel is a pixel at
+    /// every zoom.
     fn pan(&mut self, across: f32, down: f32) {
         self.inner = self.inner.panned(across, down);
     }
 
-    /// Makes each tile larger by one press.
+    /// Makes each tile larger by one press. Returns `None`.
+    ///
+    /// The width and the height are the size of the picture in pixels. The
+    /// call keeps the tile under the middle of the picture under the middle,
+    /// and it holds the tile size inside the range the camera accepts.
     fn zoom_in(&mut self, width: usize, height: usize) {
         self.inner = self.inner.zoomed_in(&FrameSize::new(width, height));
     }
 
-    /// Makes each tile smaller by one press.
+    /// Makes each tile smaller by one press. Returns `None`.
+    ///
+    /// The width and the height are the size of the picture in pixels. The
+    /// call keeps the tile under the middle of the picture under the middle,
+    /// and it holds the tile size inside the range the camera accepts.
     fn zoom_out(&mut self, width: usize, height: usize) {
         self.inner = self.inner.zoomed_out(&FrameSize::new(width, height));
     }
 
-    /// Puts a tile in the middle of the picture.
+    /// Puts a tile in the middle of the picture. Returns `None`.
+    ///
+    /// The address is the column `q` and the row `r`. The width and the
+    /// height are the size of the picture in pixels. The call changes the
+    /// offset alone, and it changes no tile size.
     fn look_at(&mut self, q: i32, r: i32, width: usize, height: usize) {
         self.inner = self
             .inner
             .looking_at(Axial::new(q, r), &FrameSize::new(width, height));
     }
 
-    /// Holds the view inside the world.
+    /// Holds the view inside the world. Returns `None`.
+    ///
+    /// The world is the world to stay inside. The width and the height are
+    /// the size of the picture in pixels.
     ///
     /// A camera that ran off the edge would show a picture of nothing, and a
     /// person could not tell that from an empty world.
@@ -1467,7 +2042,14 @@ impl PyCamera {
             .clamped(&world.lock(), &FrameSize::new(width, height));
     }
 
-    /// Returns the tile under a pixel, as a pair of axial coordinates.
+    /// Returns the tile under a pixel, as a `tuple` of two integers.
+    ///
+    /// The pixel offsets are `float` values, across and then down. The result
+    /// is the column `q` and the row `r`.
+    ///
+    /// **The result may lie outside the world.** The call converts a pixel
+    /// into an address and reads nothing, so check the pair against `width`
+    /// and `height` before you pass it on.
     ///
     /// **This is how a click reaches a tile without a loop.** The control
     /// plane sends one pixel and gets one address, rather than walking the
@@ -1477,6 +2059,7 @@ impl PyCamera {
         (address.q, address.r)
     }
 
+    /// Returns a `str` that names the camera, its tile size and its origin.
     fn __repr__(&self) -> String {
         format!(
             "Camera(tile_width={}, tile_height={}, origin_x={}, origin_y={})",
@@ -1529,13 +2112,92 @@ impl PyWorld {
     }
 }
 
-/// Returns the version of the engine.
+/// Returns the version of the engine, as a `str`.
+///
+/// The value is the version of the compiled extension module. The package
+/// exposes the same string as `cachette.__version__`.
 #[pyfunction]
 fn version() -> &'static str {
     env!("CARGO_PKG_VERSION")
 }
 
-/// Builds the extension module.
+/// The compiled core of the Cachette simulation engine.
+///
+/// The module holds the `World` class, the `Camera` class, the `version`
+/// function and the error classes. The `cachette` package re-exports all of
+/// them, so import from `cachette` rather than from here.
+///
+/// Five conventions run through the whole interface. Read them once, and each
+/// member below is then readable on its own.
+///
+/// # A fixed-point number crosses as a raw integer
+///
+/// The engine holds no floating point number in simulated state, because
+/// float addition is not associative and an aggregate must combine exactly in
+/// any order.[^1] It uses one fixed-point scale everywhere, Q16.16.
+///
+/// **A Q16.16 value reaches Python as a plain integer that is 65536 times the
+/// value it stands for.** Divide by 65536 to read it as a quantity. Multiply
+/// by 65536 to write one. A caller that reads such an integer as a count
+/// reports a number 65536 times too large.
+///
+/// Each member below names the entries that carry this scale. An entry that
+/// no member calls fixed point is a whole number, and the totals of a region
+/// summary are the case where the two sit side by side.
+///
+/// # An entity crosses as one opaque identity
+///
+/// A soldier or a settlement reaches Python as one unsigned 64-bit integer.
+/// The integer holds a slot and a generation together, and Python cannot take
+/// it apart or build one.[^2] Pass it back to the engine, and the engine
+/// resolves it.
+///
+/// The generation is what makes the identity safe. A soldier that dies leaves
+/// its slot to the next soldier. The engine compares the generation, refuses
+/// the dead identity, and raises `ViewError` rather than answer for the new
+/// occupant.
+///
+/// # A tile crosses as a row-major index or as an axial address
+///
+/// The world is a rhombus of hexagonal tiles. An address is the pair `q` and
+/// `r`, where `q` is the column and `r` is the row. Both start at zero.
+///
+/// A column of tiles uses the index instead, which is `r * width + q`. Take
+/// `index % world.width` for the column and `index // world.width` for the
+/// row.
+///
+/// # A kind crosses as a small integer
+///
+/// The resource kinds are food, wood and stone, numbered in that order from
+/// zero. A column or a list of one entry for each resource kind is in that
+/// order.
+///
+/// The ground kinds are water, plain, forest, hill and mountain, numbered in
+/// that order from zero.
+///
+/// A faction is a number from zero to one below the faction count of the
+/// world. Where a value may name nobody, the entry is either `None` or the
+/// number 65535, and each member below says which.[^3]
+///
+/// # Python sends one command over a set
+///
+/// Python builds a set and sends one command. Python does not loop over the
+/// units of a population.[^4] The verbs that take a set accept a list of
+/// identities, or the array of identities that an earlier call returned.
+///
+/// **A set-valued verb is all or nothing.** It resolves every identity and
+/// checks every argument before it writes. One refusal leaves the world as it
+/// was and raises.
+///
+/// **This module does not enforce the rule.** No type here refuses a loop. A
+/// program that loops works on a small world and fails to scale.
+///
+/// # References
+///
+/// [^1]: ADR-0002, simulated and aggregated state holds no floating point number, decision D1. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
+/// [^2]: ADR-0085, an entity crosses to Python as one opaque identity that the engine resolves, decisions D1 and D2. `docs/adrs/accepted/adr-0085-an-entity-crosses-to-python-as-one-opaque-identity.md`
+/// [^3]: ADR-0053, a faction is a bit in a mask, and a relation is a plane, decision D2. `docs/adrs/accepted/adr-0053-a-faction-is-a-bit-in-a-mask-and-a-relation-is-a-plane.md`
+/// [^4]: ADR-0040, Python is a control plane, not a data plane, decision D1. `docs/adrs/draft/adr-0040-python-is-a-control-plane-not-a-data-plane.md`
 #[pymodule]
 #[pyo3(name = "_core")]
 fn cachette_core_module(module: &Bound<'_, PyModule>) -> PyResult<()> {

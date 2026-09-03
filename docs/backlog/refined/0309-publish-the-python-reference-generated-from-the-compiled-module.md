@@ -138,7 +138,7 @@ Filled in when the item moves to `complete/`.
 [^1]: Product requirement record 0021, a developer can use the control plane without reading its source. `docs/product/accepted/prd-0021-a-developer-can-use-the-control-plane-without-reading-its-source.md`
 [^2]: ADR-0107, the Python reference is generated from the compiled module, decisions D1, D2, D3 and D4. `docs/adrs/draft/adr-0107-the-python-reference-is-generated-from-the-compiled-module.md`
 [^3]: Research report 19, the documentation toolchain, sections 4 and 7. `docs/research/reports/19-documentation-toolchain.md`
-[^4]: Backlog item 0310, write the Rust doc comments for the Python reader. `docs/backlog/proposed/0310-write-the-rust-doc-comments-for-the-python-reader.md`
+[^4]: Backlog item 0310, write the Rust doc comments for the Python reader. `docs/backlog/complete/0310-write-the-rust-doc-comments-for-the-python-reader.md`
 [^5]: Decisions register, DEC-113. `docs/DECISIONS.md`
 [^6]: Decisions register, DEC-114. `docs/DECISIONS.md`
 [^7]: Blockers register, BLK-035. `docs/BLOCKERS.md`
