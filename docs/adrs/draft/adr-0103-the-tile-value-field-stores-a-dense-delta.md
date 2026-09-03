@@ -99,6 +99,13 @@ convert them.
 frame allocates one delta for every tile, whether the frame changed one tile or
 all of them. The budget table holds the figure.[^1]
 
+**The field is cheaper to read, and that turned out to matter more than the
+write.** Reading one tile was a binary search into a list that held an entry
+for almost every tile. It is now one index. Every pass that walks the field
+gains, and the pass that sums every tile into level 1 gains most. A measurement
+on the target platform found that pass an order of magnitude cheaper with
+nothing in it changed.[^10]
+
 **The count of changed tiles changes meaning.** It counted entries and now
 counts tiles whose delta is not zero. A tile whose changes cancel back to zero
 now leaves the count, which the sorted list could not express. The count is
@@ -114,8 +121,18 @@ each tile. A dense slice needs neither.
 tile scan already partitions the world into contiguous tile ranges and gives
 each worker its own, so each worker writes a disjoint part of one array and
 needs no atomic.[^8] The field hands out those parts as chunks, so a worker
-cannot reach a tile another worker holds, and the requirement on a parallel
-stage is met by the type rather than by a rule a reviewer has to check.
+cannot reach a tile another worker holds.
+
+**That is what the parallel-stage record asks for, stated as a type rather than
+as a rule.**[^8] The record cannot enforce its own requirement: a reviewer has
+to read a pass and decide whether two threads can reach one place. A chunk
+carries a slice of its own range, so the compiler decides instead, and it
+decides before the code runs. The chunks come from the standard mutable
+chunking of a slice, so there is no unsafe code to check either.
+
+A rule that a reviewer applies catches what the reviewer looks at. A type
+catches every caller, including the one written next year by someone who never
+read the record.
 
 **There is no longer a stage that merges the changes.** The run, the sort and
 the join that fed it are all gone with it, and so is the stage name.
@@ -169,3 +186,4 @@ does it.
 [^7]: Decisions register, DEC-105. `docs/DECISIONS.md`
 [^8]: ADR-0009, parallel stages write disjoint outputs, decision D1. `docs/adrs/accepted/adr-0009-parallel-stages-write-disjoint-outputs.md`
 [^9]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`
+[^10]: Target platform costs, every stage of a frame after the tile value field became a dense delta. `docs/reference/graviton-costs.md`

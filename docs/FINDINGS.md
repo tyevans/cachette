@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-293**
+**Next number: FND-294**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -441,7 +441,15 @@ that some intent named, fills each from the derived structure, and discards
 the set at the end of the tick. That is what ADR-0056 D3 describes. No array
 over every tile exists, and none ever did.
 
-**Follows.** Three things.
+**The reads held more of the cost than the writes, and nothing predicted
+that.** A measurement on the target platform after the change found the frame
+1.92 times cheaper, and the merge that justified the work is a little over half
+of what the change returned. The larger single surprise is the level 1 rebuild,
+which costs 11.6 times less with nothing in it changed: it sums the value of
+every tile, and reading one tile used to be a binary search into a list holding
+an entry for almost every tile. The table holds the rows.[^F292C]
+
+**Follows.** Four things.
 
 **ADR-0018's stated reason is false, and it was never load-bearing.** The
 first answer to DEC-020 would have made it true by adding the array. The owner
@@ -7777,6 +7785,49 @@ states the horizon over which the claim holds.
 useful figure is not that the list grows with what changed. It is that what
 changed reaches everything in ten frames.
 
+**A structure is not priced by the pass that carries its name.** This work
+started from a stage called the change merge, so it measured merging. The
+sparse form cost more in the passes that read the field than in the one that
+wrote it, and no stage is named after reading a tile value. The stage table is
+a map of where time goes and not a map of what causes it.
+
+### FND-293 — A benchmark that measures its own process reports the history of the run, and this project has read it twice
+
+**Believed.** A process that has built a world and stepped it can report what
+that world costs, by reading its own resident size.
+
+**True.** It reports the high mark of everything the process has done. An
+allocator does not return memory to the kernel when a vector is dropped, so a
+transient buffer that existed for one frame is still in the figure. **The
+number is the history of the run and not the cost of the world.**
+
+**Evidence, and this is the second instance.** A recent change to the tile
+value field was reported as saving 225,906,688 bytes, from the `resident_bytes`
+line of a stage-cost run. The dedicated instrument, which starts one process
+for each point, gave a different answer for the same pair of trees: the
+resident size fell by 34,074,624 bytes and the peak by 196,821,088. The
+direction was right and the size was not. The benchmark already carried the
+right instrument, and its own comment says why it exists.[^F293A]
+
+The first instance is the resident memory entry, where a figure taken at one
+thread was quoted for a machine that needs a larger one.[^F293B]
+
+**Follows.** Three things.
+
+**Prefer the instrument that was built for the question.** The stage-cost run
+reports a resident size because it is cheap to print, not because it answers a
+memory question. A line that a run happens to emit is not a measurement of
+anything in particular.
+
+**A memory figure needs one process for each point.** That is the rule the
+benchmark already follows where it means to measure memory, and the rule was
+available to be read.
+
+**This is now a shape rather than an incident.** Two figures in this project
+have been wrong because a process measured its own past. Treat any resident
+size taken after other work in the same process as an upper bound and nothing
+more.
+
 ## References
 
 [^F261B]: The holder count test of the viewer. `crates/cachette-view/tests/shows_who_holds_the_ground.rs`
@@ -8094,3 +8145,5 @@ changed reaches everything in ten frames.
 [^F292A]: The world, the stored tile change count. `crates/cachette-core/src/world.rs`
 [^F292B]: The exit locality benchmark, the growth row. `crates/cachette-core/benches/exit_locality.rs`
 [^F292C]: Target platform costs, the stage table. `docs/reference/graviton-costs.md`
+[^F293A]: The cost benchmark, the memory point mode. `crates/cachette-core/benches/target_cost.rs`
+[^F293B]: Findings register, FND-246, in this document.
