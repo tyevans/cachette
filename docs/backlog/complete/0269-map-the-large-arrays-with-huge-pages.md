@@ -102,7 +102,7 @@ percent with no way to say where.[^7]
 [^1]: Target platform costs, the stage split. `docs/reference/graviton-costs.md`
 [^2]: Backlog item 0266, order the unit arena by cell. `docs/backlog/refined/0266-order-the-unit-arena-by-cell.md`
 [^3]: Backlog item 0267, hold the exit direction on the tile. `docs/backlog/complete/0267-hold-the-exit-direction-on-the-tile.md`
-[^4]: Backlog item 0268, hold the cell index on the unit. `docs/backlog/proposed/0268-hold-the-cell-index-on-the-unit.md`
+[^4]: Backlog item 0268, hold the cell index on the unit. `docs/backlog/complete/0268-hold-the-cell-index-on-the-unit.md`
 [^5]: Backlog item 0290, ask for a huge page in the allocation. `docs/backlog/proposed/0290-ask-for-a-huge-page-in-the-allocation.md`
 [^6]: Findings register, FND-278. `docs/FINDINGS.md`
 [^7]: Backlog item 0289, price every stage of a frame by name. `docs/backlog/complete/0289-price-every-stage-of-a-frame-by-name.md`

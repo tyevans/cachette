@@ -103,32 +103,52 @@ const GENERATED_DRAW: u32 = 0;
 /// is what the eager column held before the field became generated.
 const GENERATED_SHIFT: u32 = 40;
 
-/// One stored change to one tile.
-///
-/// The tile index and the change are separate fields, so a lookup compares
-/// one integer and reads one integer.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-struct Change {
-    /// The tile the change belongs to.
-    tile: u32,
-    /// What the frames have added to the generated part of that tile.
-    delta: Fix32,
-}
-
 /// The tile stub value field.
 ///
-/// The field holds the seed, the extent, and one entry for each tile that a
-/// frame has changed. It holds no entry for any other tile.
+/// The field holds the seed, the extent, and one delta for every tile once
+/// any tile has changed.
+///
+/// **The stored part is dense, and it is never a sorted list of changes.**[^1]
+/// A sparse list is smaller only while few tiles have changed, and a
+/// measurement of the target extent found that the list reaches almost every
+/// tile within ten frames. After that the sparse form costs more memory than
+/// a dense one, because it carries a tile index beside every value and needs
+/// a second buffer to merge into, and it costs more time, because a merge
+/// that rebuilds the list walks every entry to apply a handful.[^2]
+///
+/// **The array is allocated at the first change and never at build.** A world
+/// that has not changed a tile holds no array, so building a world still
+/// visits no tile and allocates nothing for the field.[^3] [^4]
+///
+/// # References
+///
+/// [^1]: ADR-0103, the tile value field stores a dense delta, never a sparse change list, decision D1. `docs/adrs/draft/adr-0103-the-tile-value-field-stores-a-dense-delta.md`
+/// [^2]: Findings register, FND-292. `docs/FINDINGS.md`
+/// [^3]: ADR-0103, the tile value field stores a dense delta, never a sparse change list, decision D2. `docs/adrs/draft/adr-0103-the-tile-value-field-stores-a-dense-delta.md`
+/// [^4]: ADR-0088, a tile field is a generated base and a stored change. `docs/adrs/draft/adr-0088-a-tile-field-is-a-generated-base-and-a-stored-change.md`
 #[derive(Clone, Debug)]
 pub struct TileValues {
     /// The seed that the generated part is drawn from.
     seed: u64,
     /// The extent that the field covers.
     grid: Grid,
-    /// The stored changes, in ascending tile order, one entry for each tile.
-    changes: Vec<Change>,
-    /// The buffer that a merge builds into, kept so a merge allocates once.
-    scratch: Vec<Change>,
+    /// One delta for every tile, in tile order.
+    ///
+    /// The vector is empty until the first change, and it holds exactly one
+    /// entry for each tile afterwards. Those are the only two shapes it
+    /// takes, and the invariant check states that.
+    deltas: Vec<Fix32>,
+    /// The number of tiles whose delta is not zero.
+    changed: usize,
+    /// Whether a run has ever named a tile outside the extent.
+    ///
+    /// **A dense array cannot hold such a tile, so it would otherwise leave
+    /// no trace.** The sorted list this replaced stored the bad entry, and
+    /// the invariant check found it there. The flag keeps that defect
+    /// detectable, and it is sticky for the same reason the bad entry was
+    /// permanent: the caller wrote something the grid does not name, and a
+    /// later good run does not make that untrue.
+    outside: bool,
 }
 
 impl TileValues {
@@ -141,8 +161,9 @@ impl TileValues {
         Self {
             seed,
             grid,
-            changes: Vec::new(),
-            scratch: Vec::new(),
+            deltas: Vec::new(),
+            changed: 0,
+            outside: false,
         }
     }
 
@@ -158,14 +179,18 @@ impl TileValues {
         self.grid.tile_count() as usize
     }
 
-    /// Returns the number of tiles that hold a stored change.
+    /// Returns the number of tiles whose value differs from the generated one.
     ///
-    /// A world that has never stepped holds none, at any tile count. The
-    /// count grows with what the frames have changed and never with the size
-    /// of the world alone.
+    /// A world that has never stepped holds none, at any tile count.
+    ///
+    /// **This counts tiles and not entries.** The field stores a delta for
+    /// every tile once any tile has changed, so the count is a property of
+    /// the world rather than of the allocation. A tile whose deltas cancel
+    /// back to zero leaves the count, which the sorted list this replaced
+    /// could not express.
     #[must_use]
     pub fn stored_changes(&self) -> usize {
-        self.changes.len()
+        self.changed
     }
 
     /// Returns the generated part of one tile.
@@ -192,14 +217,14 @@ impl TileValues {
 
     /// Returns the stored change of one tile, which is zero when none is
     /// stored.
+    ///
+    /// The read is one index. A world that has changed no tile holds no
+    /// array, and every tile of it reads zero.
     fn stored(&self, tile: TileIdx) -> Fix32 {
-        match self
-            .changes
-            .binary_search_by_key(&tile.0, |entry| entry.tile)
-        {
-            Ok(at) => self.changes[at].delta,
-            Err(_) => Fix32(0),
-        }
+        self.deltas
+            .get(tile.0 as usize)
+            .copied()
+            .unwrap_or(Fix32(0))
     }
 
     /// Returns the value of one tile.
@@ -283,12 +308,31 @@ impl TileValues {
         running
     }
 
-    /// Adds a run of changes, given in ascending tile order.
+    /// Adds a run of changes.
     ///
     /// Each pair is a tile index and the amount to add to what that tile
-    /// already holds. The caller states the order and the merge relies on
-    /// it. A run out of order would produce an unsorted result, and every
-    /// later lookup would then read the wrong tile.
+    /// already holds.
+    ///
+    /// **The cost follows the run and never the field.** The pass writes one
+    /// entry for each pair and reads nothing else, so a frame that changes a
+    /// handful of tiles pays for a handful. The sorted list this replaced
+    /// rebuilt itself on every call, so its cost followed the number of tiles
+    /// that had ever changed, and a measurement found that number reaching
+    /// almost every tile within ten frames.[^1]
+    ///
+    /// **The result does not depend on the order of the run**, because each
+    /// pair writes its own tile and no pair reads another. The caller still
+    /// passes an ascending run with each tile once, and the assertion below
+    /// holds it to that, because a repeated tile would add twice and mean
+    /// something the caller did not say.
+    ///
+    /// The array is allocated here, on the first call that carries a change,
+    /// and never when the world is built.[^2]
+    ///
+    /// # References
+    ///
+    /// [^1]: Findings register, FND-292. `docs/FINDINGS.md`
+    /// [^2]: ADR-0103, the tile value field stores a dense delta, never a sparse change list, decision D2. `docs/adrs/draft/adr-0103-the-tile-value-field-stores-a-dense-delta.md`
     pub fn merge_ascending(&mut self, run: &[(u32, Fix32)]) {
         debug_assert!(
             run.windows(2).all(|pair| pair[0].0 < pair[1].0),
@@ -297,53 +341,60 @@ impl TileValues {
         if run.is_empty() {
             return;
         }
-        self.scratch.clear();
-        self.scratch.reserve(self.changes.len() + run.len());
-        let (mut here, mut there) = (0usize, 0usize);
-        while here < self.changes.len() && there < run.len() {
-            let (mine, theirs) = (self.changes[here], run[there]);
-            if mine.tile < theirs.0 {
-                self.scratch.push(mine);
-                here += 1;
-            } else if theirs.0 < mine.tile {
-                self.scratch.push(Change {
-                    tile: theirs.0,
-                    delta: theirs.1,
-                });
-                there += 1;
-            } else {
-                self.scratch.push(Change {
-                    tile: mine.tile,
-                    delta: sim_math::add(mine.delta, theirs.1),
-                });
-                here += 1;
-                there += 1;
+        if self.deltas.is_empty() {
+            self.deltas = vec![Fix32(0); self.grid.tile_count() as usize];
+        }
+        for (tile, delta) in run {
+            let Some(slot) = self.deltas.get_mut(*tile as usize) else {
+                // A tile outside the extent is a caller defect. The array
+                // cannot hold it, and growing to fit it would put an entry in
+                // the array for something the grid says is not a tile. The
+                // field records the defect instead, so that the invariant
+                // check reports it rather than the write vanishing.
+                self.outside = true;
+                continue;
+            };
+            let before = *slot;
+            let after = sim_math::add(before, *delta);
+            *slot = after;
+            match (before.0 == 0, after.0 == 0) {
+                (true, false) => self.changed += 1,
+                (false, true) => self.changed -= 1,
+                _ => {}
             }
         }
-        self.scratch.extend_from_slice(&self.changes[here..]);
-        for pair in &run[there..] {
-            self.scratch.push(Change {
-                tile: pair.0,
-                delta: pair.1,
-            });
-        }
-        core::mem::swap(&mut self.changes, &mut self.scratch);
     }
 
-    /// Reports whether the stored changes hold their stated shape.
+    /// Reports whether the stored deltas hold their stated shape.
     ///
-    /// Every entry names a tile inside the extent, and the entries are in
-    /// ascending tile order with each tile held once. A lookup is a binary
-    /// search, so an unsorted entry would not fail. It would return the
-    /// wrong tile.
+    /// The array takes one of two shapes and no other. It is empty, which is
+    /// a world that has changed no tile, or it holds exactly one entry for
+    /// each tile of the extent. A shorter array would read zero for a tile
+    /// that holds a change, and a longer one would hold an entry for a tile
+    /// the grid does not name.
+    ///
+    /// **A run that named a tile outside the extent fails this check**, and
+    /// it keeps failing. The array cannot hold such a tile, so the field
+    /// records that it was asked to and reports it here.
+    ///
+    /// The count of changed tiles is derived from the array, so this checks
+    /// it against the array rather than trusting it. The count is maintained
+    /// as the array is written, which is a second place that one fact
+    /// lives, and this is what fails when the two disagree.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`
     #[must_use]
     pub fn check_invariants(&self) -> bool {
-        let count = self.grid.tile_count();
-        self.changes.iter().all(|entry| entry.tile < count)
-            && self
-                .changes
-                .windows(2)
-                .all(|pair| pair[0].tile < pair[1].tile)
+        if self.outside {
+            return false;
+        }
+        if self.deltas.is_empty() {
+            return self.changed == 0;
+        }
+        self.deltas.len() == self.grid.tile_count() as usize
+            && self.changed == self.deltas.iter().filter(|delta| delta.0 != 0).count()
     }
 }
 
@@ -361,26 +412,36 @@ impl TileValues {
 pub struct TileValueRange<'a> {
     /// The seed that the generated part is drawn from.
     seed: u64,
-    /// The stored changes of this range, in ascending tile order.
-    changes: &'a [Change],
+    /// The tile the slice below starts at.
+    start: u32,
+    /// The stored delta of each tile of this range, in tile order.
+    ///
+    /// The slice is empty when the world has changed no tile, and every tile
+    /// of the range then reads zero.
+    deltas: &'a [Fix32],
 }
 
 impl<'a> TileValueRange<'a> {
     /// Returns the value of one tile of the range.
     ///
-    /// The walk is linear in the stored changes of the range, because the
-    /// caller visits the tiles in ascending order and the changes are held
-    /// in that order. The cursor is what makes it linear rather than one
-    /// binary search for each tile.
+    /// **The read is one index.** The sorted list this replaced needed a
+    /// cursor, which the caller carried and advanced, so that a walk over the
+    /// range cost one pass rather than one binary search for each tile. A
+    /// dense slice needs neither, so the cursor is gone and the caller no
+    /// longer carries one.
+    ///
+    /// A tile outside the range reads the generated value alone. The caller
+    /// walks the range it asked for, so that case does not arise, and
+    /// returning the generated value is the answer for a tile that holds no
+    /// change in any event.
     #[must_use]
-    pub fn value(&self, tile: TileIdx, cursor: &mut usize) -> Fix32 {
-        while *cursor < self.changes.len() && self.changes[*cursor].tile < tile.0 {
-            *cursor += 1;
-        }
-        let stored = match self.changes.get(*cursor) {
-            Some(entry) if entry.tile == tile.0 => entry.delta,
-            _ => Fix32(0),
-        };
+    pub fn value(&self, tile: TileIdx) -> Fix32 {
+        let stored = tile
+            .0
+            .checked_sub(self.start)
+            .and_then(|at| self.deltas.get(at as usize))
+            .copied()
+            .unwrap_or(Fix32(0));
         sim_math::add(TileValues::generated(self.seed, tile), stored)
     }
 }
@@ -393,11 +454,12 @@ impl TileValues {
     /// disjoint ranges read disjoint entries.
     #[must_use]
     pub fn range(&self, start: u32, end: u32) -> TileValueRange<'_> {
-        let first = self.changes.partition_point(|entry| entry.tile < start);
-        let last = self.changes.partition_point(|entry| entry.tile < end);
+        let first = (start as usize).min(self.deltas.len());
+        let last = (end as usize).clamp(first, self.deltas.len());
         TileValueRange {
             seed: self.seed,
-            changes: &self.changes[first..last],
+            start,
+            deltas: &self.deltas[first..last],
         }
     }
 }

@@ -60,4 +60,4 @@ Filled in when the item moves to `complete/`.
 
 [^1]: Target platform costs, huge pages. `docs/reference/graviton-costs.md`
 [^2]: Backlog item 0266, order the unit arena by cell. `docs/backlog/refined/0266-order-the-unit-arena-by-cell.md`
-[^3]: Backlog item 0268, hold the cell index on the unit. `docs/backlog/proposed/0268-hold-the-cell-index-on-the-unit.md`
+[^3]: Backlog item 0268, hold the cell index on the unit. `docs/backlog/complete/0268-hold-the-cell-index-on-the-unit.md`

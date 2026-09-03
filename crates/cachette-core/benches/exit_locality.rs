@@ -144,6 +144,10 @@ fn main() {
         frame_rows(&arguments[1..]);
         return;
     }
+    if arguments.first().map(String::as_str) == Some("growth") {
+        growth_rows(&arguments[1..]);
+        return;
+    }
     let (width, height) = extent_argument(&arguments);
     let units: u32 = arguments
         .get(1)
@@ -459,6 +463,63 @@ fn frame_rows(arguments: &[String]) {
         elapsed
     });
     report("frame", &samples);
+}
+
+/// Reports how the stored tile changes grow, frame by frame.
+///
+/// **The change merge rebuilds the whole stored change list on every frame.**
+/// It walks the list and the run together and writes both into a second
+/// buffer, so its cost follows the length of the list rather than the length
+/// of the run. The list only grows: an entry is added when a tile first
+/// changes and is never removed.
+///
+/// This row says how fast it grows and what it reaches. It counts entries
+/// rather than nanoseconds, so a loaded machine does not disturb it.
+fn growth_rows(arguments: &[String]) {
+    let (width, height) = extent_argument(arguments);
+    let units: u32 = arguments
+        .get(1)
+        .and_then(|word| word.parse().ok())
+        .unwrap_or(10_000);
+    let threads: usize = arguments
+        .get(2)
+        .and_then(|word| word.parse().ok())
+        .unwrap_or(1);
+    let frames: usize = arguments
+        .get(3)
+        .and_then(|word| word.parse().ok())
+        .unwrap_or(20);
+
+    let config = WorldConfig {
+        width,
+        height,
+        seed: SEED,
+        faction_count: FACTIONS,
+        unit_capacity: units.max(1024),
+    };
+    let mut world = World::new(config).expect("the extent must describe a world");
+    let placed = populate_scattered(&mut world, units);
+
+    println!("# how the stored tile change list grows");
+    println!("# tiles\t{}", world.grid().tile_count());
+    println!("# units_placed\t{placed}");
+    println!("# threads\t{threads}");
+    println!("# an entry is eight bytes, so the bytes column is the list size");
+    println!("frame\tstored_changes\tadded\tbytes\tshare_of_tiles_milli");
+
+    let tiles = u64::from(world.grid().tile_count());
+    let mut last = 0usize;
+    for frame in 0..frames {
+        world.step(threads).expect("the step must run");
+        let stored = world.stored_tile_changes();
+        let share = (stored as u64 * 1000) / tiles.max(1);
+        println!(
+            "{frame}\t{stored}\t{}\t{}\t{share}",
+            stored - last,
+            stored * 8
+        );
+        last = stored;
+    }
 }
 
 /// Returns the reciprocal that replaces a division by `divisor`.
