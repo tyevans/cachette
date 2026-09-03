@@ -16,6 +16,7 @@ References
     ``docs/adrs/REGISTRY.md``
 [^3]: Testing Rules, section 4. ``.claude/rules/testing.md``
 [^4]: Testing Rules, section 2a. ``.claude/rules/testing.md``
+[^5]: Findings register, FND-203. ``docs/FINDINGS.md``
 """
 
 from __future__ import annotations
@@ -48,9 +49,12 @@ SERVER = StdioServerParameters(command=sys.executable, args=["-m", "cachette.age
 # first version of this test used seed 7 and asked for food, and it failed for
 # that reason.
 #
-# **The control plane cannot check this.** No read tells Python where a
-# resource is, so the seed was chosen against the engine's read from Rust and
-# recorded here. That gap is the finding, not an accident of this test.
+# **The control plane can now check this, and one test below does.** When
+# this comment was written no read told Python where a resource was, so the
+# seed was chosen against the engine's read from Rust and recorded here. The
+# tile read closes that gap, and the claim about seed 1 is an assertion in
+# test_a_tile_reports_the_stock_as_what_was_given_less_what_was_taken. The
+# day it stops being true is the day the suite goes red.[^5]
 GATHER_SEED = 1
 GATHER_KIND = 0
 
