@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-285**
+**Next number: FND-286**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -7159,6 +7159,52 @@ project already holds two instances of a fixture that hid a defect.[^F262D] This
 is the third, and it is the first where the fixture covered a wider range than
 the test that worked.
 
+### FND-285 — The sparse tile change list reaches every tile in ten frames, so the sparse form costs four times what a dense one would
+
+**Believed.** The tile value field is a generated base and a stored list of
+changes, and the list holds what the frames have changed rather than the size
+of the world. The reader that returns the count says so in its own words, and a
+product record rests on it.[^F285A]
+
+**True.** The list reaches 99.8 percent of the tiles within fourteen frames at
+the target extent, and it saturates in about ten. **The sparse form is sparse
+for one second of simulated time.** After that it is a dense array with an
+index column attached, and it costs four times what a dense array would.
+
+**Evidence.** A row counts the entries after each frame at 16777216 tiles and
+one million units.[^F285B] The count is entries and not nanoseconds, so a
+loaded machine does not disturb it. Frame 0 stores 6291370 entries. Frame 5
+stores 15777624. Frame 13 stores 16753789, which is 998 parts in a thousand of
+the tiles, and it added 14016 that frame.
+
+**The merge rewrites the whole list on every frame.** It walks the stored list
+and the new run together and writes both into a second buffer, so its cost
+follows the length of the list and not the length of the run. At frame 13 it
+rewrites 16753789 entries to apply 14016. The stage table measured that pass at
+120,529,050 nanoseconds, which is 14.4 percent of a frame, and it takes no
+thread count.[^F285C]
+
+**The memory runs the same way.** An entry holds a tile index and a value, so
+it is eight bytes, and the second buffer holds as many. At saturation the two
+together are about 268 megabytes. A dense value for every tile is four bytes
+and needs no second buffer, so it is about 67 megabytes.
+
+**Follows.** Three things.
+
+**This is not a trade.** A dense field is smaller and faster at once. The usual
+question of what to spend memory on does not arise, because the sparse form is
+the expensive one on both axes as soon as it saturates. A decision that
+compares them must be read against the saturated state and not the empty one.
+
+**A structure named for what it stores was measured for what it stores, and
+never for how long that stayed true.** The count is honest on frame one and
+false by frame ten. Nothing in the reader or in the record that governs it
+states the horizon over which the claim holds.
+
+**A claim about growth needs the frame at which it stops being true.** The
+useful figure is not that the list grows with what changed. It is that what
+changed reaches everything in ten frames.
+
 ## References
 
 [^F261B]: The holder count test of the viewer. `crates/cachette-view/tests/shows_who_holds_the_ground.rs`
@@ -7447,3 +7493,6 @@ the test that worked.
 [^F283A]: Findings register, FND-281, in this document.
 [^F283B]: Findings register, FND-282, in this document.
 [^F283C]: The exit locality benchmark, the frame row. `crates/cachette-core/benches/exit_locality.rs`
+[^F285A]: The world, the stored tile change count. `crates/cachette-core/src/world.rs`
+[^F285B]: The exit locality benchmark, the growth row. `crates/cachette-core/benches/exit_locality.rs`
+[^F285C]: Target platform costs, the stage table. `docs/reference/graviton-costs.md`
