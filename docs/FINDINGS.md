@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-315**
+**Next number: FND-320**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -8900,7 +8900,60 @@ That gives a protocol sharper than reading which stages moved. **Run each tree
 twice.** The spread inside one tree bounds the machine. A difference between
 trees that exceeds it is the layout and the change together, and a difference
 that does not exceed it is nothing at all.
+
+### FND-319 — The type stub claims a check that regenerates it, and no generator and no check exist
+
+**Believed.** The type stub for the compiled extension module is a generated
+artefact. Its own docstring says that the contributing guide requires the
+continuous integration system to check the stubs, that the build regenerates
+them, and that the job fails when the result differs from the file.[^F319A]
+
+**True.** No stub generator exists anywhere in the tree. No workflow job
+regenerates the stub, and no job compares it against anything. The stub is
+hand-written. The contributing guide never states the requirement that the
+docstring attributes to it. Its only use of the word "stub" describes the Rust
+crates as unimplemented.[^F319B]
+
+**The claim is wrong twice.** It names a guide that says something else, and it
+names a mechanism that does not exist. A contributor who changes a binding and
+reads that docstring concludes that a job will catch a stale stub. Nothing will.
+
+**A second half makes the first half expensive.** The stub carries a docstring
+for each typed dictionary and for each exception class. It carries none for any
+method of `World` and none for any method of `Camera`. The Rust bindings crate
+carries that prose, and PyO3 puts it on the compiled objects. So the stub and
+the compiled module are two declaration sites for the public interface, they
+already disagree about the prose, and nothing fails.[^F319C]
+
+**Evidence.**
+
+```
+grep -rniE "stub|pyi|pyo3-stub-gen" justfile scripts/ .github/ crates/cachette-py/Cargo.toml
+grep -niE "stub|\.pyi" CONTRIBUTING.md
+```
+
+The first command finds two matches, and neither generates or compares a stub.
+The second finds one match, and it describes the Rust crates.
+
+A documentation build measured the second half. A site built from the compiled
+module produced a page of 105,348 bytes that held the method prose. The same
+site built with module inspection turned off fell back to the stub, produced
+29,038 bytes, and held no method prose at all.[^F319D]
+
+**Follows.** Repair the stub docstring, or make the claim true with a
+generator. The research report on the documentation toolchain treats the
+Rust doc comment as the single source of the prose for exactly this
+reason.[^F319D] A generator would also remove the second declaration site for
+every signature, which is the shape the recurring defect rule names.[^F319E]
+
+
 ## References
+
+[^F319A]: The type stub for the compiled module. `python/cachette/_core.pyi`
+[^F319B]: Contributing guide, the opening section. `CONTRIBUTING.md`
+[^F319C]: The Python bindings crate. `crates/cachette-py/src/lib.rs`
+[^F319D]: Research report 19, the documentation toolchain, sections 4.2 and 7. `docs/research/reports/19-documentation-toolchain.md`
+[^F319E]: Recurring Defect Shapes, shape 1, redundant declaration sites. `.claude/rules/recurring-defects.md`
 
 [^F261B]: The holder count test of the viewer. `crates/cachette-view/tests/shows_who_holds_the_ground.rs`
 [^F261C]: Backlog item 0271, count the ground generations that one frame runs. `docs/backlog/proposed/0271-count-the-ground-generations-that-one-frame-runs.md`
