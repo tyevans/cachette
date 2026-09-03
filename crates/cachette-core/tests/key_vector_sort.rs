@@ -240,14 +240,56 @@ proptest! {
 }
 
 #[test]
-fn a_repeated_identifier_is_an_error() {
-    // ADR-0007 D2: the last field is a stable identifier, so it is unique.
+fn a_repeated_key_is_an_error() {
+    // ADR-0105 D1: two keys that agree in every field, the identifier
+    // included, tie with nothing left to separate them.
+    let keys = [
+        SortKey::new([1, 7]),
+        SortKey::new([1, 7]),
+        SortKey::new([0, 9]),
+    ];
+    assert_eq!(sort::order(&keys), Err(SortError::RepeatedKey(7)));
+}
+
+/// Two keys that share an identifier and differ in an ordering field are
+/// separated by the field they differ in, so the order is total without the
+/// identifier deciding anything.
+///
+/// **The sort refused this until ADR-0105.** The check it refused it with cost
+/// a comparison sort of the whole set on every call, and this is the case that
+/// pays for it and gains nothing.[^1]
+///
+/// # References
+///
+/// [^1]: ADR-0105 D2, a total order needs no repeated identifier, only no repeated key. `docs/adrs/draft/adr-0105-a-total-order-needs-no-repeated-key.md`
+#[test]
+fn a_repeated_identifier_that_ties_nothing_is_accepted() {
     let keys = [
         SortKey::new([1, 7]),
         SortKey::new([2, 7]),
         SortKey::new([0, 9]),
     ];
-    assert_eq!(sort::order(&keys), Err(SortError::RepeatedIdentifier(7)));
+    assert_eq!(sort::order(&keys), Ok(vec![2, 0, 1]));
+}
+
+/// The refusal is the same at every thread count, because it is a property of
+/// the keys and not of how they were divided.[^1]
+///
+/// # References
+///
+/// [^1]: ADR-0001, one binary gives one answer at any thread count. `docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
+#[test]
+fn a_repeated_key_is_an_error_at_every_thread_count() {
+    let keys: Vec<SortKey<2>> = (0..64u64)
+        .map(|value| SortKey::new([value / 2, value / 2]))
+        .collect();
+    for threads in [1usize, 2, 3, 8, 12] {
+        assert_eq!(
+            sort::order_on(&keys, threads),
+            Err(SortError::RepeatedKey(0)),
+            "the refusal differs at {threads} threads"
+        );
+    }
 }
 
 #[test]
@@ -336,17 +378,34 @@ fn a_key_at_the_ceiling_is_accepted() {
 }
 
 #[test]
-fn a_repeated_identifier_is_an_error_in_the_bounded_order() {
-    // ADR-0007 D2: the last field is a stable identifier, so it is unique.
+fn a_repeated_key_is_an_error_in_the_bounded_order() {
+    // ADR-0105 D1: two keys that agree in both fields tie with nothing left
+    // to separate them.
+    let keys = [
+        BoundedKey::new(1, 7),
+        BoundedKey::new(1, 7),
+        BoundedKey::new(0, 9),
+    ];
+    assert_eq!(
+        sort::order_bounded(&keys, 4),
+        Err(SortError::RepeatedKey(7))
+    );
+}
+
+/// The bounded order accepts a repeated identifier that ties nothing, in the
+/// same way the general order does.[^1]
+///
+/// # References
+///
+/// [^1]: ADR-0105 D2, a total order needs no repeated identifier, only no repeated key. `docs/adrs/draft/adr-0105-a-total-order-needs-no-repeated-key.md`
+#[test]
+fn a_repeated_identifier_that_ties_nothing_is_accepted_in_the_bounded_order() {
     let keys = [
         BoundedKey::new(1, 7),
         BoundedKey::new(2, 7),
         BoundedKey::new(0, 9),
     ];
-    assert_eq!(
-        sort::order_bounded(&keys, 4),
-        Err(SortError::RepeatedIdentifier(7))
-    );
+    assert_eq!(sort::order_bounded(&keys, 4), Ok(vec![2, 0, 1]));
 }
 
 #[test]
