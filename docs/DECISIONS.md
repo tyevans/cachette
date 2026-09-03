@@ -143,6 +143,27 @@ nobody has seen. Option C pays the tile count against the same defect. The
 cheap move is to look first, and the item that builds the field carries the
 question to whoever runs it.[^DEC79D]
 
+**What the run showed. The row stays open, and the reason has changed.** The
+field was built and the demonstration was run and rendered. A block of marching
+squares was not visible, and neither was a crowd, because the demonstration
+supplies no unit that the field moves as a group. Every unit chooses the option
+that reads the share of a cell which admits a unit, and that value is a
+property of the ground, so the field it steers by never changes and the
+population walks to a local maximum and settles there.[^DEC79E] The founded
+groups hold thirty people each, spread over several cells, so no cell ever
+holds the crowd that the question is about.
+
+The run did settle the smaller half of the question. The step is directed and
+not a walk: over three hundred ticks of the demonstration world the mean
+distance from the starting tile rose from 13 tiles under the uniform draw to
+36, and the furthest unit from 40 tiles to 74. Both figures are one run each,
+on a development machine.[^BLK7]
+
+**The question needs a run that puts a crowd in one cell and gives it a reason
+to move.** That needs a demonstration that makes a unit hungry, and an item
+holds it.[^DEC79F] Nobody should choose Option B against the run above, because
+the run did not reach the case.
+
 ### DEC-080 — Does a founding keep its fixed production rate once a carried load can reach a store?
 
 **Open. Engineering owns it. The recommendation is Option A.**
@@ -231,6 +252,16 @@ change.
 opened the row, and it costs least. C is cheap and may be taken beside A, but
 not instead of it. B buys a baseline that the project has already learned to
 carry rather than repair. D is what happens if nothing is chosen.
+
+**The first work to apply Option A found that the falsification is not
+enough on its own.** The option column was pinned to a constant and the whole
+suite of the new tests stayed green, because the fixture gave one answer for
+the pinned value and for the value under test. The pin reached the consumer and
+still proved nothing. A finding holds the case and the rule it adds: separate
+the value under test from every other value the consumer could read, and assert
+that the others do not give the answer under test.[^DEC74SEP] Option A stands.
+The line it adds to the review must ask for the separation as well as for the
+pin.
 
 ### DEC-071 — Does the world draw the sex of a character, or does content supply it?
 
@@ -1959,7 +1990,10 @@ a failed founding is correct.[^PRD12]
 [^DEC74PRI]: Backlog priority index. `docs/backlog/PRIORITY.md`
 [^DEC79A]: ADR-0091, movement takes its direction from a per-cell field, never from a per-unit search, decisions D1 and D4. `docs/adrs/draft/adr-0091-movement-takes-its-direction-from-a-per-cell-field.md`
 [^DEC79B]: ADR-0018, the unit-to-tile bridge is derived, and it rebuilds at the barrier, decision D2. `docs/adrs/accepted/adr-0018-the-unit-to-tile-bridge-is-derived-and-rebuilds-at-the-barrier.md`
-[^DEC79D]: Backlog item 0185, steer a step by the option the unit chose. `docs/backlog/refined/0185-steer-a-step-by-the-option-the-unit-chose.md`
+[^DEC79D]: Backlog item 0185, steer a step by the option the unit chose. `docs/backlog/complete/0185-steer-a-step-by-the-option-the-unit-chose.md`
+[^DEC79E]: Findings register, FND-209. `docs/FINDINGS.md`
+[^DEC79F]: Backlog item 0216, let the demonstration make a unit hungry. `docs/backlog/proposed/0216-let-the-demonstration-make-a-unit-hungry.md`
+[^DEC74SEP]: Findings register, FND-210. `docs/FINDINGS.md`
 [^DEC80B]: Backlog item 0187, give a carried load somewhere to go. `docs/backlog/refined/0187-give-a-carried-load-somewhere-to-go.md`
 [^DEC81A]: Findings register, FND-193. `docs/FINDINGS.md`
 [^DEC81B]: ADR-0074, a spawn may over-fill a tile, and only admission enforces the capacity, decision D1. `docs/adrs/accepted/adr-0074-a-spawn-may-over-fill-a-tile-and-only-admission-enforces-the-capacity.md`

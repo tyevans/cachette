@@ -65,7 +65,7 @@ use std::collections::BTreeMap;
 
 use cachette_core::rng;
 use cachette_core::terrain::TileKind;
-use cachette_core::{Axial, Entity, FactionId, World, WorldConfig};
+use cachette_core::{Axial, Entity, FactionId, World, WorldConfig, OPTION_COUNT};
 
 /// The extent of the fixture world.
 const EXTENT: u32 = 96;
@@ -249,10 +249,24 @@ struct Frame {
     predicted: u32,
 }
 
-/// Runs one frame and checks the prediction of the draw against the engine.
+/// Runs one frame and checks the prediction of the direction against the
+/// engine.
+///
+/// **A unit takes its direction from the exit field of its cell, and it falls
+/// back to the keyed draw only where its cell holds no direction.**[^1] This
+/// file therefore predicts both halves. It reads the field before the step,
+/// because the step derives the field again at its own barrier and a unit acts
+/// on the field that the last barrier left.[^2] It reads the option after the
+/// step, because the choice pass writes the option inside the frame and before
+/// the movement that reads it.
 ///
 /// Returns what the frame reported. The caller asserts the invariant from the
 /// occupancy it reads around the call.
+///
+/// # References
+///
+/// [^1]: ADR-0091, movement takes its direction from a per-cell field, never from a per-unit search, decisions D1 and D4. `docs/adrs/draft/adr-0091-movement-takes-its-direction-from-a-per-cell-field.md`
+/// [^2]: ADR-0091, movement takes its direction from a per-cell field, never from a per-unit search, decision D2. `docs/adrs/draft/adr-0091-movement-takes-its-direction-from-a-per-cell-field.md`
 fn run_frame(world: &mut World, threads: usize, over: Axial) -> Frame {
     let grid = world.grid();
     let seed = world.config().seed;
@@ -261,6 +275,19 @@ fn run_frame(world: &mut World, threads: usize, over: Axial) -> Frame {
         .iter()
         .filter_map(|soldier| Some((soldier, world.soldiers().address(soldier)?)))
         .collect();
+    // The field as the last barrier left it. The step below replaces it.
+    let field: Vec<Option<u8>> = {
+        let exits = world.exit_field();
+        (0..exits.cells().tile_count())
+            .flat_map(|cell| {
+                (0..OPTION_COUNT as u8)
+                    .map(move |option| (cell, option))
+                    .collect::<Vec<_>>()
+            })
+            .map(|(cell, option)| exits.exit(cell, option).expect("the entry exists"))
+            .collect()
+    };
+    let layout = world.pyramid().layout();
 
     world.step(threads).expect("the step must run");
     let frame = world.tick().0;
@@ -273,17 +300,26 @@ fn run_frame(world: &mut World, threads: usize, over: Axial) -> Frame {
         let Some(now) = world.soldiers().address(soldier) else {
             continue;
         };
-        let direction = rng::draw_below(
-            seed,
-            rng::SYSTEM_SOLDIER_MOVE,
-            frame,
-            soldier.to_bits(),
-            DRAW_MOVE_DIRECTION,
-            NEIGHBOUR_COUNT,
-        ) as usize;
-        let target = grid.neighbour(was, direction);
         // A unit with no intent never asked for anything.
-        let holds_an_intent = world.soldier_intent(soldier).flatten().is_some();
+        let option = world.soldier_intent(soldier).flatten();
+        let holds_an_intent = option.is_some();
+        let steered = option.and_then(|option| {
+            let tile = grid.index_of(was)?;
+            let cell = layout.block_of_key(layout.key_of(tile)?);
+            field[cell as usize * OPTION_COUNT + option as usize]
+        });
+        let direction = match steered {
+            Some(direction) => direction as usize,
+            None => rng::draw_below(
+                seed,
+                rng::SYSTEM_SOLDIER_MOVE,
+                frame,
+                soldier.to_bits(),
+                DRAW_MOVE_DIRECTION,
+                NEIGHBOUR_COUNT,
+            ) as usize,
+        };
+        let target = grid.neighbour(was, direction);
         if holds_an_intent && target == Some(over) && was != over {
             asked += 1;
         }
@@ -294,8 +330,10 @@ fn run_frame(world: &mut World, threads: usize, over: Axial) -> Frame {
             left += 1;
         }
         if now != was {
-            // The unit moved. It can only have moved to the target of its
-            // draw, so the prediction above and the engine agree.
+            // The unit moved. It can only have moved to the target that the
+            // exit field of its cell named, or to the target of its draw where
+            // the cell named none, so the prediction above and the engine
+            // agree.
             assert_eq!(
                 target,
                 Some(now),

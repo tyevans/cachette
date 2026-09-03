@@ -30,6 +30,7 @@
 
 use crate::cohort::NEED_FULL;
 use crate::pyramid::CellSummary;
+use crate::resource::ResourceKind;
 use crate::sim_math;
 use crate::types::Fix32;
 
@@ -120,6 +121,18 @@ pub struct OptionRow {
     pub drive: Drive,
     /// What the option reads from the level 1 cell.
     pub field: CellField,
+    /// The resource that a unit gathers while it holds this option.
+    ///
+    /// **This row is the one declaration of the map from an option to a
+    /// resource kind.** A second site that named the kind of a gathering
+    /// option would be one value in two places, with nothing to fail when the
+    /// copies disagree.[^1] [^2]
+    ///
+    /// # References
+    ///
+    /// [^1]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`
+    /// [^2]: Findings register, FND-191. `docs/FINDINGS.md`
+    pub gathers: Option<ResourceKind>,
 }
 
 /// The fixed option set, in option index order.
@@ -138,21 +151,31 @@ pub const OPTIONS: [OptionRow; OPTION_COUNT] = [
         name: "roam",
         drive: Drive::Met,
         field: CellField::OpenShare,
+        gathers: None,
     },
     OptionRow {
         name: "forage",
         drive: Drive::Unmet,
         field: CellField::MeanFood,
+        // The option is driven by what the unit lacks, and what a unit lacks
+        // is the ration that the consumption pass draws. Food is the only
+        // kind that answers it. Wood and stone answer no need today, and a
+        // world that holds three kinds does not make three options.[^1]
+        //
+        // [^1]: ADR-0063, a need is a rate with a threshold, and crossing it is a fact, decision D2. `docs/adrs/accepted/adr-0063-a-need-is-a-rate-with-a-threshold-and-crossing-it-is-a-fact.md`
+        gathers: Some(ResourceKind::Food),
     },
     OptionRow {
         name: "climb",
         drive: Drive::Met,
         field: CellField::MeanHeight,
+        gathers: None,
     },
     OptionRow {
         name: "join",
         drive: Drive::Met,
         field: CellField::UnitsForEachOpenTile,
+        gathers: None,
     },
 ];
 
@@ -540,4 +563,25 @@ pub fn explain(
         intent,
         chooses_next_frame,
     }
+}
+
+/// Returns the resource that one option gathers.
+///
+/// Returns `None` when the option gathers nothing, and when the value is not
+/// an option index at all. A unit that holds no intent therefore gathers
+/// nothing, in the same call and by the same rule.[^1]
+///
+/// The answer comes from the option row and from nowhere else, so the map
+/// from an option to a resource kind has one declaration site.[^2]
+///
+/// # References
+///
+/// [^1]: ADR-0064, a unit chooses by scoring a small fixed option set, decision D3. `docs/adrs/accepted/adr-0064-a-unit-chooses-by-scoring-a-small-fixed-option-set.md`
+/// [^2]: Findings register, FND-191. `docs/FINDINGS.md`
+#[must_use]
+pub const fn gathers(option: u8) -> Option<ResourceKind> {
+    if option as usize >= OPTION_COUNT {
+        return None;
+    }
+    OPTIONS[option as usize].gathers
 }

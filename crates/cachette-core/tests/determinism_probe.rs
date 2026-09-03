@@ -47,6 +47,7 @@
 //! [^2]: ADR-0056, movement is tile-discrete and admitted by sort-then-admit, decision D3. `docs/adrs/accepted/adr-0056-movement-is-tile-discrete-and-admitted-by-sort-then-admit.md`
 #![cfg(feature = "probe-nondeterminism")]
 
+use cachette_core::choose::{self, ChoiceSchedule};
 use cachette_core::cohort::{NeedRule, NEED_FULL};
 use cachette_core::influence::PASSES_FOR_EACH_SOLVE;
 use cachette_core::resource::{Amount, ResourceKind};
@@ -54,7 +55,7 @@ use cachette_core::site::CommodityId;
 use cachette_core::slots::{Candidate, Slots};
 use cachette_core::terrain::TileKind;
 use cachette_core::{Axial, CarryLoad, FactionId, Fix32, Grid, Terrain, World, WorldConfig};
-use cachette_core::{Conductance, Influence, InfluenceField, TileIdx};
+use cachette_core::{CellSummary, Conductance, Influence, InfluenceField, TileIdx};
 
 /// The scenario. It must hold more tiles than threads, so that a run at
 /// twelve threads fills more than one output slot.
@@ -231,13 +232,18 @@ fn gathered_after_a_frame(threads: usize) -> Vec<CarryLoad> {
         unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
     })
     .expect("the extent must describe a world");
-    // A unit takes an intent at the interval its level 1 cell schedules, and
-    // it does not move before it has one. This fixture is about the order of
-    // a contest, so it sets the interval to every tick.[^C]
+    // The choice pass writes the gather order of a unit whose level 1 cell
+    // chooses on that frame, and that write replaces the order a caller
+    // gave.[^C] This fixture is about the order of a contest for one deposit,
+    // so it puts the choice far enough apart that no cell of a gatherer
+    // chooses on the frame under test. It asserts that below rather than
+    // assuming it.
     //
     // [^C]: ADR-0064, a unit chooses by scoring a small fixed option set, decision D4. `docs/adrs/accepted/adr-0064-a-unit-chooses-by-scoring-a-small-fixed-option-set.md`
+    let schedule =
+        ChoiceSchedule::new(choose::PERIOD_LOG2_CEILING).expect("the exponent is inside the range");
     world
-        .set_choice_schedule(0)
+        .set_choice_schedule(schedule.period_log2())
         .expect("the exponent is inside the range");
 
     let grid = world.grid();
@@ -264,6 +270,14 @@ fn gathered_after_a_frame(threads: usize) -> Vec<CarryLoad> {
                 .spawn_soldier(address, FactionId((ordinal % 2) as u16))
                 .expect("the open tile admits a unit");
             assert!(world.order_gather(unit, kind));
+            let layout = world.pyramid().layout();
+            let tile = grid.index_of(address).expect("the address is a tile");
+            let cell = layout.block_of_key(layout.key_of(tile).expect("the tile is a tile"));
+            assert!(
+                !schedule.chooses_now(cell, 1),
+                "cell {cell} chooses on the frame under test, so the choice \
+                 replaces the order this fixture gave"
+            );
             units.push(unit);
         }
     }
@@ -615,6 +629,100 @@ fn the_tie_break_test_fails_when_the_option_order_breaks() {
     // The perturbation moves the winner and nothing else. A probe that also
     // changed a score would prove less.
     assert!(why.scores[2] < why.scores[0], "the probe changed a score");
+}
+
+/// The extent of the world that the exit field probe reads.
+///
+/// The extent covers several level 1 blocks in each direction, so the lattice
+/// of cells holds a cell with six neighbours.
+const EXIT_EXTENT: u32 = 256;
+
+/// The option index of the row that scores the units of a cell.
+const EXIT_OPTION: u8 = 3;
+
+#[test]
+fn the_direction_tie_break_test_fails_when_the_direction_order_breaks() {
+    // The probe scans the six directions from the top, so the strict
+    // comparison now gives a tie between two equal neighbouring cells to the
+    // highest direction index.
+    //
+    // This defect is invisible to both determinism tests. The field is derived
+    // on the calling thread and it is identical on every run, so only a test
+    // that builds two equal neighbours and names the winner sees it.[^1]
+    //
+    // [^1]: Testing rules, section 2. `.claude/rules/testing.md`
+    let mut world = World::new(WorldConfig {
+        width: EXIT_EXTENT,
+        height: EXIT_EXTENT,
+        seed: 7,
+        faction_count: 2,
+        unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
+    })
+    .expect("the extent must describe a world");
+
+    let cells = world.exit_field().cells();
+    let layout = world.pyramid().layout();
+    let open_of = |world: &World, cell: u32| -> Vec<Axial> {
+        let edge = layout.block_edge();
+        let first_column = (cell % layout.blocks_wide()) * edge;
+        let first_row = (cell / layout.blocks_wide()) * edge;
+        let mut found = Vec::new();
+        for row in first_row..first_row + edge {
+            for column in first_column..first_column + edge {
+                let address = Axial::new(column as i32, row as i32);
+                if world.admits_a_unit(address) {
+                    found.push(address);
+                }
+            }
+        }
+        found
+    };
+
+    // A cell whose neighbours in the two directions under test both hold open
+    // ground. The scan is ascending, so the answer is fixed.
+    let (middle, low, high) = (0..cells.tile_count())
+        .find_map(|cell| {
+            let here = cells.address_of(TileIdx(cell))?;
+            let low = cells.index_of(cells.neighbour(here, 0)?)?.0;
+            let high = cells.index_of(cells.neighbour(here, 4)?)?.0;
+            let usable = [cell, low, high]
+                .iter()
+                .all(|each| !open_of(&world, *each).is_empty());
+            usable.then_some((cell, low, high))
+        })
+        .expect("the probe world holds no cell with these two neighbours open");
+
+    for cell in [low, high] {
+        for address in open_of(&world, cell) {
+            for _ in 0..2 {
+                world
+                    .spawn_soldier(address, FactionId(0))
+                    .expect("the open tile admits the unit");
+            }
+        }
+    }
+    world.rebuild_pyramid(1).expect("the rebuild must run");
+
+    // The probe moves the winner and nothing else. The two neighbours read the
+    // same value, so only the order decides.
+    assert_eq!(
+        world
+            .pyramid()
+            .cell(low)
+            .and_then(CellSummary::units_for_each_open_tile),
+        world
+            .pyramid()
+            .cell(high)
+            .and_then(CellSummary::units_for_each_open_tile),
+        "the probe world holds no tie, so the tie-break test has no proven \
+         failure mode"
+    );
+    assert_eq!(
+        world.exit_field().exit(middle, EXIT_OPTION),
+        Some(Some(4)),
+        "the probe did not reverse the direction order, so the tie-break test \
+         has no proven failure mode"
+    );
 }
 
 /// The extent that the starvation probe stands on.

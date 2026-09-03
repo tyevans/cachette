@@ -23,11 +23,13 @@
 //! [^2]: Testing rules, section 2. `.claude/rules/testing.md`
 //! [^3]: Testing rules, section 5. `.claude/rules/testing.md`
 
+use cachette_core::choose::{self, ChoiceSchedule};
+use cachette_core::cohort::{NeedRule, NEED_FULL};
 use cachette_core::resource::{
     Amount, RecoveryRules, ResourceKind, RESOURCE_KIND_COUNT, TICKS_IN_A_SIMULATED_DAY,
 };
 use cachette_core::terrain::TileKind;
-use cachette_core::{Axial, Entity, FactionId, TileIdx, World, WorldConfig};
+use cachette_core::{Axial, Entity, FactionId, Fix32, TileIdx, World, WorldConfig};
 
 /// The extent that most tests read.
 ///
@@ -62,17 +64,77 @@ fn world(seed: u64) -> World {
         unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
     })
     .expect("the extent must describe a world");
-    // The choice interval is not the subject of this file. A unit takes an
-    // intent at the interval its level 1 cell schedules, and it does not move
-    // before it has one, so a test about movement sets the interval to every
-    // tick.[^C]
-    //
-    // [^C]: ADR-0064, a unit chooses by scoring a small fixed option set, decision D4. `docs/adrs/accepted/adr-0064-a-unit-chooses-by-scoring-a-small-fixed-option-set.md`
-    world
-        .set_choice_schedule(0)
-        .expect("the exponent is inside the range");
+    hold_the_choice(&mut world);
     world
 }
+
+/// The number of frames that the longest test in this file runs.
+const FRAMES: u64 = 200;
+
+/// Puts the choice far enough apart that it does not replace a gather order.
+///
+/// **The choice pass writes the gather order of a unit whose level 1 cell
+/// chooses on that frame, and that write replaces the order a caller
+/// gave.**[^1] [^2] Every test in this file gives the order from outside, so
+/// the fixture keeps the choice away from the frames under test.
+///
+/// The phase of a cell is a pure function of the cell index, so the answer is
+/// the same on every run. The assertion states it rather than trusting it.
+///
+/// # References
+///
+/// [^1]: ADR-0064, a unit chooses by scoring a small fixed option set, decision D4. `docs/adrs/accepted/adr-0064-a-unit-chooses-by-scoring-a-small-fixed-option-set.md`
+/// [^2]: Findings register, FND-211. `docs/FINDINGS.md`
+fn hold_the_choice(world: &mut World) {
+    let schedule =
+        ChoiceSchedule::new(choose::PERIOD_LOG2_CEILING).expect("the exponent is inside the range");
+    world
+        .set_choice_schedule(schedule.period_log2())
+        .expect("the exponent is inside the range");
+    for cell in 0..world.pyramid().len() as u32 {
+        for frame in 1..=FRAMES {
+            assert!(
+                !schedule.chooses_now(cell, frame),
+                "cell {cell} chooses on frame {frame}, so the choice replaces \
+                 the gather order that a test gave"
+            );
+        }
+    }
+}
+
+/// Takes the whole need of every unit in one tick, and lets nobody die of it.
+///
+/// The foraging option is driven by what a unit lacks, so a unit at full need
+/// scores zero for it whatever the ground carries. A test that needs the
+/// engine to order a gather must supply a hungry unit.
+///
+/// The bound sits at the top of the range, so no unit reaches the death scan
+/// inside a short run.
+fn make_them_hungry(world: &mut World) {
+    world
+        .set_economy_schedule(1, 0)
+        .expect("the period is inside the range");
+    let rule = NeedRule::new(
+        NEED_FULL,
+        NEED_FULL,
+        Fix32(NEED_FULL.0 / 2),
+        Fix32(NEED_FULL.0 / 16),
+        Fix32::MAX,
+    )
+    .expect("every rate is at or above zero");
+    world.set_need_rule(rule);
+    for option in 0..choose::OPTION_COUNT as u8 {
+        world
+            .set_option_weight(option, Fix32::ZERO)
+            .expect("the index is inside the set");
+    }
+    world
+        .set_option_weight(FORAGE, Fix32::MAX)
+        .expect("the index is inside the set");
+}
+
+/// The option index of the row that forages.
+const FORAGE: u8 = 1;
 
 /// Returns every address of the extent, in row-major order.
 fn addresses() -> Vec<Axial> {
@@ -498,8 +560,21 @@ fn every_unit_takes_from_the_tile_the_frame_left_it_on() {
     // the tile it ends the frame on and never from the tile it left. A
     // resolve that ran first would give a wrong answer that repeats
     // perfectly, so no determinism test could see it.
+    //
+    // **This test takes its order from the engine and not from a caller.** A
+    // unit only moves when it holds an intent, and the pass that writes the
+    // intent writes the gather order beside it, so a fixture that ordered from
+    // outside and then let the units choose would have its order replaced.[^1]
+    // The units are therefore made hungry, every weight but the one on the
+    // foraging option is removed, and the engine orders the gather.
+    //
+    // [^1]: Findings register, FND-211. `docs/FINDINGS.md`
     let mut field = world(SEED);
     let kind = ResourceKind::Food;
+    field
+        .set_choice_schedule(0)
+        .expect("the exponent is inside the range");
+    make_them_hungry(&mut field);
     let patch: Vec<Axial> = addresses()
         .into_iter()
         .filter(|address| field.admits_a_unit(*address))
@@ -510,9 +585,28 @@ fn every_unit_takes_from_the_tile_the_frame_left_it_on() {
         let unit = field
             .spawn_soldier(address, FactionId(0))
             .expect("the ground admits a unit");
-        assert!(field.order_gather(unit, kind));
         units.push((unit, address));
     }
+
+    // The need falls in a pass that runs after the choice, so the first frame
+    // reads a unit that still holds a whole need. The second frame is the one
+    // on which the engine orders the gather.
+    field.step(1).expect("the step must run");
+    field.step(1).expect("the step must run");
+    let units: Vec<(Entity, Axial)> = units
+        .iter()
+        .filter_map(|(unit, _)| Some((*unit, field.soldiers().address(*unit)?)))
+        .collect();
+    // A unit whose cell carries no food scores zero and orders nothing. The
+    // fixture needs gatherers, and it says how many it found.
+    let ordered = units
+        .iter()
+        .filter(|(unit, _)| field.gather_order(*unit) == Some(Some(kind)))
+        .count();
+    assert!(
+        ordered > 0,
+        "the engine ordered no gather, so the fixture holds no gatherer"
+    );
 
     field.step(1).expect("the step must run");
 
@@ -1121,9 +1215,7 @@ fn the_recovery_work_does_not_grow_with_the_extent() {
             unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
         })
         .expect("the extent must describe a world");
-        field
-            .set_choice_schedule(0)
-            .expect("the exponent is inside the range");
+        hold_the_choice(&mut field);
         field.set_recovery_rules(quick_rules());
         let kind = ResourceKind::Wood;
         let address = addresses()
@@ -1183,14 +1275,25 @@ fn a_gather_takes_what_the_deposit_holds_at_that_tick() {
     let mut worked = worked();
     worked.field.set_recovery_rules(quick_rules());
     let (address, kind) = worked.emptied;
-    // Let the emptied deposit recover a part of its stock.
+    let original = worked.field.original_stock(address, kind).expect("inside");
+    // Let the emptied deposit recover, and stop at the first frame on which it
+    // holds something. A fixed number of frames would fill a small deposit and
+    // the case would then be the full deposit rather than the partial one.
+    let mut holding = Amount::ZERO;
     for _ in 0..(WOOD_PERIOD * 2) {
         worked.field.step(2).expect("the step must run");
+        holding = worked.field.tile_stock(address, kind).expect("inside");
+        if holding > Amount::ZERO {
+            break;
+        }
     }
-    let holding = worked.field.tile_stock(address, kind).expect("inside");
     assert!(holding > Amount::ZERO, "the deposit recovered nothing");
-    let original = worked.field.original_stock(address, kind).expect("inside");
-    assert!(holding < original, "the deposit is already full");
+    assert!(
+        holding < original,
+        "the deposit is already full: it holds {} of {}",
+        holding.0,
+        original.0
+    );
 
     let unit = worked
         .field

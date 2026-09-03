@@ -1,6 +1,14 @@
 //! Soldier movement under a keyed draw.
 //!
-//! Each tick every live soldier chooses one of the six neighbour
+//! A soldier takes its direction from the exit field of the level 1 cell it
+//! stands in, and it falls back to a keyed draw where its cell holds no
+//! direction.[^6] **This file is about the draw**, so its world is one level 1
+//! cell wide. A cell with no neighbour inside the lattice can hold no exit
+//! direction, so the draw steers every step here. The fixture asserts the cell
+//! count, because a wider world would make these tests measure the field
+//! instead of the draw.
+//!
+//! Each tick every live soldier therefore chooses one of the six neighbour
 //! directions. The choice comes from the counter-based generator, keyed on
 //! the tuple of the system, the frame, the entity and the draw index. The
 //! same soldier in the same frame gets the same direction however the work
@@ -24,6 +32,7 @@
 //! [^3]: ADR-0056, movement is tile-discrete and admitted by sort-then-admit, decision D2. `docs/adrs/accepted/adr-0056-movement-is-tile-discrete-and-admitted-by-sort-then-admit.md`
 //! [^4]: Testing policy. `docs/TESTING.md`
 //! [^5]: ADR-0068, terrain is generated from the seed and is never stored as a map, decision D4. `docs/adrs/accepted/adr-0068-terrain-is-generated-from-the-seed-and-is-never-stored-as-a-map.md`
+//! [^6]: ADR-0091, movement takes its direction from a per-cell field, never from a per-unit search, decisions D1 and D4. `docs/adrs/draft/adr-0091-movement-takes-its-direction-from-a-per-cell-field.md`
 
 use cachette_core::{Axial, Entity, FactionId, World, WorldConfig};
 use proptest::prelude::*;
@@ -95,6 +104,15 @@ fn peopled(seed: u64) -> (World, Vec<Entity>) {
             .expect("the address and the faction must be valid");
         kept.push(soldier);
     }
+    // The world is one level 1 cell, so no cell of it has a neighbour and the
+    // exit field holds no direction anywhere. The draw is therefore what
+    // steers every step in this file.
+    assert_eq!(
+        world.pyramid().len(),
+        1,
+        "the fixture holds more than one cell, so the exit field steers a step \
+         here and these tests no longer measure the draw"
+    );
     (world, kept)
 }
 

@@ -32,6 +32,7 @@
 //! [^3]: Testing rules, section 5. `.claude/rules/testing.md`
 //! [^4]: Testing rules, section 2a. `.claude/rules/testing.md`
 
+use cachette_core::choose::{self, ChoiceSchedule};
 use cachette_core::resource::{Amount, ResourceKind};
 use cachette_core::terrain::TileKind;
 use cachette_core::upgrade::{
@@ -80,6 +81,38 @@ fn world(seed: u64, width: u32, height: u32) -> World {
         .set_choice_schedule(0)
         .expect("the exponent is inside the range");
     world
+}
+
+/// Puts the choice far enough apart that it does not replace a gather order.
+///
+/// **The choice pass writes the gather order of a unit whose level 1 cell
+/// chooses on that frame, and that write replaces the order a caller
+/// gave.**[^1] [^2] A test that gives the order from outside must keep the
+/// choice away from the frames it runs.
+///
+/// The phase of a cell is a pure function of the cell index, so the answer is
+/// the same on every run. The assertion states it rather than trusting it.
+///
+/// # References
+///
+/// [^1]: ADR-0064, a unit chooses by scoring a small fixed option set, decision D4. `docs/adrs/accepted/adr-0064-a-unit-chooses-by-scoring-a-small-fixed-option-set.md`
+/// [^2]: Findings register, FND-211. `docs/FINDINGS.md`
+fn hold_the_choice(world: &mut World, frames: u64) {
+    let schedule =
+        ChoiceSchedule::new(choose::PERIOD_LOG2_CEILING).expect("the exponent is inside the range");
+    world
+        .set_choice_schedule(schedule.period_log2())
+        .expect("the exponent is inside the range");
+    let now = world.tick().0;
+    for cell in 0..world.pyramid().len() as u32 {
+        for ahead in 1..=frames {
+            assert!(
+                !schedule.chooses_now(cell, now + ahead),
+                "cell {cell} chooses inside the run, so the choice replaces \
+                 the gather order that this test gave"
+            );
+        }
+    }
 }
 
 /// Returns every address of an extent, in row-major order.
@@ -467,6 +500,7 @@ fn a_finished_terrace_raises_what_a_unit_takes_from_the_tile() {
     let idle = plain
         .spawn_soldier(address, FactionId(0))
         .expect("the ground admits a unit");
+    hold_the_choice(&mut plain, 1);
     assert!(plain.order_gather(idle, kind));
     plain.step(1).expect("the step must run");
     let without = plain
@@ -488,6 +522,7 @@ fn a_finished_terrace_raises_what_a_unit_takes_from_the_tile() {
     let taker = improved
         .spawn_soldier(address, FactionId(0))
         .expect("the ground admits a unit");
+    hold_the_choice(&mut improved, 1);
     assert!(improved.order_gather(taker, kind));
     improved.step(1).expect("the step must run");
     let with = improved

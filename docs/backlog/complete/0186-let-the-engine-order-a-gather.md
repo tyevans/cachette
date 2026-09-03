@@ -1,7 +1,7 @@
 ---
 id: 0186
 title: Let the engine order a gather
-status: refined
+status: complete
 created: 2026-09-02
 implements: [ADR-0002 D1, ADR-0004 D1, ADR-0022 D1, ADR-0064 D1, ADR-0064 D4, ADR-0064 D6, ADR-0072 D4, ADR-0072 D5, ADR-0073 D1, ADR-0073 D3, ADR-0073 D4, ADR-0080 D1]
 changes: []
@@ -145,13 +145,44 @@ once.[^13]
 
 ## Outcome
 
-Filled in when the item moves to `complete/`.
+The choice pass writes the gather order beside the intent, in the same write.
+A unit whose option is `forage` holds an order for food. A unit that chose any
+other option, and a unit that chose nothing, holds no order. The demonstration
+world of a test now produces gather events with no caller ordering a gather.
+
+**The map from an option to a resource kind is declared once.** The option row
+carries it, beside the field the option reads. No second site names the kind of
+a gathering option, so nothing can disagree with it.
+
+**The precedence is asserted and not described.** A control-plane order
+survives every frame on which the cell of the unit does not choose, and the
+choice replaces it on the frame that it does. One test drives both halves.
+
+**An existing probe fixture had to absorb the new writer, and FND-211 records
+it.** The gather probe set the choice interval to every tick and then ordered a
+gather from outside, so the choice replaced that order before the resolve read
+it and the contest disappeared. The fixture now puts the choice far enough
+apart that no cell of a gatherer chooses on the frame under test, and it
+asserts that.
+
+**Registers.** FND-209 and FND-211 were added. No blocker opened or closed.
+
+**Evidence.** Two defects were put back separately, and the source was restored
+after each. Removing the engine write of the gather order failed five of the
+six gather tests. Setting the map from the option to the resource kind to
+nothing failed four of them.
+
+**The loop is inert in the demonstration.** Every unit there is fed, so the
+`forage` row scores zero and the engine orders no gather at any tick that was
+measured. The engine tests drive a hungry unit and it forages, gathers, and
+works a deposit down. FND-209 holds the measurement, and item 0216 holds the
+repair.
 
 ## References
 
 [^1]: What a unit does in a tick, section 3.6. `docs/research/what-a-unit-does-in-a-tick.md`
 [^2]: Testing Rules, section 5. `.claude/rules/testing.md`
-[^3]: Backlog item 0185, steer a step by the option the unit chose. `docs/backlog/refined/0185-steer-a-step-by-the-option-the-unit-chose.md`
+[^3]: Backlog item 0185, steer a step by the option the unit chose. `docs/backlog/complete/0185-steer-a-step-by-the-option-the-unit-chose.md`
 [^4]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`
 [^5]: ADR-0064, a unit chooses by scoring a small fixed option set, decision D4. `docs/adrs/accepted/adr-0064-a-unit-chooses-by-scoring-a-small-fixed-option-set.md`
 [^6]: ADR-0073, gathering is admitted by sort-then-admit against the tile, decision D1. `docs/adrs/accepted/adr-0073-gathering-is-admitted-by-sort-then-admit-against-the-tile.md`
