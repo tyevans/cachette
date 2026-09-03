@@ -814,7 +814,9 @@ fn the_forage_option_reads_the_food_that_the_tiles_hold() {
 fn drive_to_a_divergent_need(world: &mut World, unit: Entity) -> Fix32 {
     // Hold the need still for one tick, so the pyramid counts the unit and the
     // search reads the summary that the choice will read.
-    world.set_economy_schedule(1, 0).expect("the period is inside the range");
+    world
+        .set_economy_schedule(1, 0)
+        .expect("the period is inside the range");
     world.set_need_rule(
         NeedRule::new(
             Fix32::ZERO,
