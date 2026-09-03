@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-288**
+**Next number: FND-290**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -1289,6 +1289,14 @@ second run, with three spans inside the spread, to say that one serial
 function is 49 percent of the frame. A stage is the unit that a reader can
 act on, and this one needed two.
 
+**This row is history, and the code no longer matches its present tense.**
+Backlog item 0291 replaced the list and the sort with a bit plane over the
+tiles, and gave the pass a thread count. The pass costs 16.7 milliseconds
+instead of 400.9, and a frame costs 463.4 milliseconds instead of
+825.4.[^FND277A] Two findings hold what that work corrected, and one of them
+shows that the figure this row rests on was read from the wrong
+world.[^F277B] [^F277C]
+
 ### FND-278 — Huge pages are worth 3.9 percent, and they cost five times the memory the estimate gave
 
 **Believed.** Huge pages might explain part of the unattributed cost, and the
@@ -1552,6 +1560,99 @@ every frame.
 The residual that only a physical reorder removes is now separable from the
 part the walk order removes, and both belong on a target-platform run before
 anyone spends a refactor on them.[^F274A]
+### FND-285 — The held ground of the demonstration world is 140 times smaller than the held ground of the benchmark world
+
+**Believed:** the holding covers a few tens of thousands of tiles. The register
+holds the figure. The demonstration world, founded for four factions with a
+group each, holds 7,866 tiles at tick 50 and 46,992 at tick 200.[^F285A] That
+figure was read as the size of a holding, and work on the candidate pass was
+planned from it: at 46,992 held tiles the pass would sort about 1.3 million
+indices, of which one million come from the units.
+
+**True:** the benchmark world holds 6,615,358 tiles after nine frames. That is
+39 percent of the world and 141 times the demonstration figure. The raw
+candidate list reaches 14,884,176 entries, of which 13.9 million come from the
+held tiles and one million from the units. **The units are 6.7 percent of the
+list, not 77 percent.**
+
+**The measurement.** A probe inside the candidate pass, printing the held
+count and the list length for each frame. Machine: the development machine,
+not the target platform, because the two counts are properties of the
+simulation and not of the processor. 16,777,216 tiles, 1,000,000 units
+scattered, 12 threads, ten frames.
+
+| Frame | Tiles held | Raw candidate entries | Distinct candidates |
+|---|---|---|---|
+| 1 | 0 | 1,000,000 | 998,551 |
+| 2 | 998,551 | 7,984,285 | 2,616,812 |
+| 5 | 3,218,758 | 12,724,736 | 4,355,868 |
+| 10 | 6,615,358 | 14,884,176 | 4,821,144 |
+
+**The cause is the population, and it is a fixture difference and not a
+defect.** The demonstration places 192 units on 16,777,216 tiles. The
+benchmark places 1,000,000 scattered. A unit takes the ground it stands on
+when nobody holds it, so the held ground grows with the units and then spreads
+from every seed at once. The two worlds are the same rule at two densities.
+
+**Follows.** Three things.
+
+**Do not carry a count from the demonstration world into a statement about the
+target scale.** The demonstration is built to look right, and the testing rule
+already says that a fixture chosen to look right supplies no extreme.[^84]
+The two worlds differ by four orders of magnitude in the population, and every
+derived quantity differs with it.
+
+**A figure in the register names the world it was measured in.** The row above
+does. The reading of it did not, and the reading is what reached a plan.
+
+**The unit walk was the wrong thing to remove.** The plan that came from the
+small figure proposed dropping the walk over the live units, because it looked
+like three quarters of the work. It is 6.7 percent. The sort was 68 percent
+and the walk over the held tiles was 31 percent, and both follow the held
+ground rather than the population.
+
+### FND-286 — A pass that allocates on every frame cost twelve milliseconds that no stage measures, and the mapping count is not the cause
+
+**Believed:** the cost of a buffer that a parallel stage allocates for each
+thread falls inside the stage that allocates it. The stage table would
+therefore see it.
+
+**True:** twelve milliseconds of it fall outside every stage. The candidate
+pass began allocating a bit plane of 2,097,152 bytes for each of twelve
+threads on every frame. The residual of the frame, which is the part no span
+measures, went from 22,202 nanoseconds to 12,196,680. Nothing else changed
+between the two runs.
+
+**Then the project believed the mapping count was the cause**, because giving
+back a mapping a thread has written reaches every core. **That is refuted.**
+Twelve mappings became one array of twelve chunks, which is one allocation
+instead of twelve, and the residual measured 11,739,029 nanoseconds. The two
+figures are the same to within the spread of this apparatus.
+
+**The measurement.** Machine C, `c7g.4xlarge`, Graviton3, 16,777,216 tiles,
+1,000,000 units scattered, 12 threads, nine frames, `stage-cost` feature.
+Three runs at one base commit, differing only in the tree.[^F286A]
+
+| The pass allocates | Residual, ns | Share of the frame |
+|---|---|---|
+| Nothing. It sorts a list | 22,202 | 0.0027 percent |
+| One plane for each thread | 12,196,680 | 2.74 percent |
+| One array of twelve chunks | 11,739,029 | 2.53 percent |
+
+**The cause is not identified, and this row says so rather than guessing
+again.** What is established is that the residual follows the allocation and
+not the number of mappings.
+
+**Follows.** Two things.
+
+**The plane should be held across frames rather than allocated in each one.**
+That is the change the evidence points at, and it is not made. It asks a
+design question the pass does not answer today: the holding is copied by a
+derive, and a buffer it holds would be copied with it, so the buffer needs a
+statement about what a copy of a holding means.
+
+**A saving of 384 milliseconds bought a cost of 12.** The trade is good and the
+cost is recorded so that it is not found again as a mystery.
 
 
 ## F. Sourcing
@@ -7458,7 +7559,7 @@ on judgement. It now rests on an observation: the first mechanism can be
 switched off by a typing mistake in a configuration file, and the tool that
 reads that file will not say so.
 
-### FND-285 — Miri cannot drive the engine at the fixture sizes the suite uses, because every world reserves the unit columns at the target population
+### FND-288 — Miri cannot drive the engine at the fixture sizes the suite uses, because every world reserves the unit columns at the target population
 
 **Believed.** That a Miri gate would run over the tests the project already
 has, or over some subset chosen for relevance.
@@ -7490,7 +7591,7 @@ rather than what the test needs.[^23] Here the copied value made the test
 impossible rather than merely weak, which is the friendlier of the two
 failures, because it announced itself.
 
-### FND-286 — The overflow record's reason for preferring a test to a lint rests on a channel property, and the pin changed it
+### FND-289 — The overflow record's reason for preferring a test to a lint rests on a channel property, and the pin changed it
 
 **Believed.** The overflow record says that the switch naming the gate build
 "is not stable on the pinned toolchain, so a lint cannot see this and a test
@@ -7874,3 +7975,7 @@ fraction of a frame it stood to win, and none of the reviews of them asked.
 [^F287A]: Findings register, FND-281, in this document.
 [^F287B]: Findings register, FND-282, in this document.
 [^F287C]: The exit locality benchmark, the frame row. `crates/cachette-core/benches/exit_locality.rs`
+[^F285A]: Findings register, FND-269, in this document.
+[^F286A]: Target platform costs, every stage of a frame after the candidate pass became a bit plane. `docs/reference/graviton-costs.md`
+[^F277B]: Findings register, FND-285, in this document.
+[^F277C]: Findings register, FND-286, in this document.

@@ -162,7 +162,7 @@ declare_stages! {
     Gather,                   "gather",                     true,  1, false;
     Build,                    "build",                      true,  1, false;
     HoldingSpread,            "holding_spread",             true,  1, false;
-    HoldingCandidates,        "holding_candidates",         false, 1, true;
+    HoldingCandidates,        "holding_candidates",         true,  1, true;
     HoldingDecide,            "holding_decide",             true,  1, true;
     HoldingApply,             "holding_apply",              false, 1, true;
     StampHolders,             "stamp_holders",              false, 1, false;

@@ -428,6 +428,10 @@ did not take it.
 switches and left 62 percent of the cost in one residual. This one names every
 pass, and the residual is 0.0025 percent.
 
+**A later section supersedes this one.** Backlog item 0291 changed the largest
+pass named here, and the section that measures the tree after it is above the
+huge page section.[^ITEM291] Read this table as the cost before that change.
+
 Machine C. 16,777,216 tiles, 1,000,000 units scattered, 12 threads, block edge
 32. The kernel gave transparent huge pages on the `madvise` setting, which is
 the default of the image and which this engine never asks for, so read this
@@ -543,6 +547,103 @@ takes one, so a reader who counts only the outer rows misses them.
 in the source, not a measurement.** A stage declared `no` that improves with
 the thread count means the declaration is wrong, and this table is where the
 two can be compared.
+
+## Every stage of a frame, after the candidate pass became a bit plane
+
+**This section supersedes the section above it.** That one measured the tree
+before backlog item 0291, in which the candidate pass of the holding spread
+built a list of tile indices and ordered it with a comparison sort. The pass
+now sets one bit for each candidate in a plane over the tiles and reads the
+plane back in ascending order, and it takes a thread count.[^ITEM291]
+
+Machine C, the same instance type, the same region and the same base commit as
+the section above. The tree is modified against that commit, which is how the
+script carries a change that is not yet merged.
+
+| Machine C | Value |
+|---|---|
+| Instance type | `c7g.4xlarge` |
+| Region | `us-west-2` |
+| Processor | Graviton3. Implementer `0x41`, part `0xd40` |
+| Hardware threads | 16 |
+| Cache line | 64 bytes |
+| Kernel | `Linux 6.18.44-99.149.amzn2023.aarch64` |
+| Compiler | `rustc 1.91.1 (ed61e7d7e 2025-11-07)` |
+| Base commit | `14e311a1088825f32ee4c421827e87a286d4094d` |
+| Working tree | Modified. The script copies the tracked files with the content the tree holds |
+| Crate features | `stage-cost` |
+| Date | 3 September 2026 |
+
+16,777,216 tiles, 1,000,000 units scattered, 12 threads, block edge 32. The
+kernel gave transparent huge pages on the `madvise` setting, which the engine
+never asks for, so read this table as the cost without huge pages. Every row
+is the mean of nine frames after two warm-up frames.
+
+**Every row here comes from one run**, unlike the section above, so the three
+indented rows and the outer rows are the same nine frames and their shares are
+against the same frame.
+
+| Stage | ns for each frame | Share of the frame | Takes a thread count |
+|---|---|---|---|
+| `holding_spread` | 124,953,422 | 26.96 percent | yes |
+| — of which `holding_decide` | 71,397,398 | 15.41 percent | yes |
+| — of which `holding_apply` | 35,640,121 | 7.69 percent | **no** |
+| — of which `holding_candidates` | 16,732,018 | 3.61 percent | yes |
+| `change_merge` | 119,454,829 | 25.78 percent | **no** |
+| `rebuild_level_1` | 78,112,992 | 16.86 percent | yes |
+| `bridge_refresh_barrier` | 40,511,452 | 8.74 percent | yes |
+| `admit` | 30,605,355 | 6.60 percent | yes |
+| `tile_scan` | 22,871,237 | 4.94 percent | yes |
+| `influence_solve` | 12,846,131 | 2.77 percent | yes |
+| `stamp_holders` | 6,660,936 | 1.44 percent | **no** |
+| `log_join` | 5,924,590 | 1.28 percent | **no** |
+| `movement_intents` | 4,722,220 | 1.02 percent | yes |
+| `gather` | 2,155,229 | 0.47 percent | yes |
+| `build` | 1,591,385 | 0.34 percent | yes |
+| `choose` | 565,668 | 0.12 percent | yes |
+| `place_granted` | 517,194 | 0.11 percent | **no** |
+| `consume` | 166,714 | 0.04 percent | yes |
+| `reap` | 31,657 | under 0.01 percent | yes |
+| `apply_rates` | 633 | under 0.01 percent | yes |
+| `bridge_refresh_after_reap` | 346 | under 0.01 percent | yes |
+| `settle_positions` | 297 | under 0.01 percent | yes |
+| `bridge_refresh_opening` | 284 | under 0.01 percent | yes |
+| `depletion_recover` | 137 | under 0.01 percent | **no** |
+| **Every stage** | **451,692,718** | | |
+| **The frame, timed from outside** | **463,431,747** | | |
+
+**The frame costs 463.4 milliseconds against 825.4 for the same apparatus
+before the change.** That is 1.78 times less, and it is 4.6 times the 100
+millisecond budget instead of 8.3 times.[^BUDG291]
+
+**The candidate pass costs 16.7 milliseconds against 400.9.** That is 24.0
+times less. It was 49.1 percent of a frame and it is now 3.6 percent. The two
+figures come from two runs of this script on this instance type at this base
+commit, one before the change and one after it.
+
+**The measurement that gives the 825.4 milliseconds is a run of its own.** The
+section above quotes 836.0 from an earlier run of the same point, and the two
+differ by 1.3 percent. Read every comparison in this section against 825.4,
+because that run and this one are a pair.
+
+**The residual is 11,739,029 nanoseconds, which is 2.53 percent of the
+frame.** It was 22,202 nanoseconds before the change, and the finding holds
+what is known about the difference and what was ruled out.[^RESID291]
+
+**Three stages are 69.6 percent of the frame.** They are the holding spread,
+the change merge and the level 1 rebuild, which is the same three as before
+the change, in the same order. The spread fell from 61.5 percent of a larger
+frame to 27.0 percent of a smaller one.
+
+**The change merge is now the largest serial pass in the engine.** It is 119.5
+milliseconds and it takes no thread count, so it bounds every thread count
+above it. Five stages take no thread count and together they are 34.5 percent
+of the frame, and the merge is three quarters of that.
+
+**Two of the three rows inside the holding spread now take a thread count.**
+The one that does not is the apply, at 35.6 milliseconds. It sorts the changed
+tiles and merges one ascending run into the held list, which is the same shape
+as the change merge.
 
 ## Huge pages
 
@@ -1040,3 +1141,6 @@ commit what changed. Do not edit a row to make a later run agree with it.
 [^18]: ADR-0084, the world reserves the unit columns at construction, decision D3. `docs/adrs/draft/adr-0084-the-world-reserves-the-unit-columns-at-construction.md`
 [^19]: Backlog item 0290, ask for a huge page in the allocation. `docs/backlog/proposed/0290-ask-for-a-huge-page-in-the-allocation.md`
 [^ARENAORDER]: Findings register, FND-273. `docs/FINDINGS.md`
+[^ITEM291]: Backlog item 0291, stop the holding spread walking the population. `docs/backlog/complete/0291-stop-the-holding-spread-walking-the-population.md`
+[^BUDG291]: Budgets and costs, the scale constants. `docs/reference/budgets.md`
+[^RESID291]: Findings register, FND-286. `docs/FINDINGS.md`
