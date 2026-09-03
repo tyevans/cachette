@@ -92,11 +92,24 @@ fn a_founded_group_is_alive_after_the_span_that_would_starve_it() {
         world.step(THREADS).expect("the step runs");
     }
 
+    // **The claim is that the group lives, and no longer that every person is
+    // fed on every tick.** A cohort now serves whole rations to as many of its
+    // units as its share covers, rather than an equal part to everybody, so a
+    // unit of a site that is even slightly short misses a ration sometimes and
+    // carries a deficit between one application and the next.[^2] A site that
+    // covers its people loses nobody, which is what this test is for.
+    //
+    // [^2]: ADR-0106, a cohort serves whole rations to a keyed subset, never an equal share to everybody, decision D1. `docs/adrs/draft/adr-0106-a-cohort-serves-whole-rations-to-a-keyed-subset.md`
     for person in &people {
-        assert_eq!(
-            world.unit_condition(*person),
-            Some(NeedCondition::Fed),
-            "the person eats what the site produces"
+        let condition = world.unit_condition(*person);
+        assert!(
+            condition.is_some(),
+            "the person left the world, so the site did not feed its group"
+        );
+        assert_ne!(
+            condition,
+            Some(NeedCondition::Starved),
+            "the person reached the bound, so the site did not feed its group"
         );
     }
 }

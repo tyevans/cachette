@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-317**
+**Next number: FND-319**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -9000,9 +9000,129 @@ took one line and it separated the three real tests from the four that were
 either empty or negative. The rule already says to put the defect back, and
 this is the case where the defect is the whole pass.[^23]
 
+### FND-317 — The delivery works and never runs: nothing gives a unit a reason to go home
+
+**Believed.** Moving a carried load into a store closes the chain from the
+ground to the store to the ration, so what a settlement holds now depends on
+what its people fetched.[^F317A]
+
+**True.** The chain is closed and nothing walks along it. The delivery fires
+only for a unit that stands on the tile of its own site, and no rule in the
+engine ever puts a unit there on purpose. A unit gathers where it stands and
+then steps wherever the exit field of its cell points, which is chosen by the
+food, the height, the open share or the crowd of a neighbouring cell. **None of
+the four options is "go home".**
+
+**Evidence.** The demonstration world, 256 by 256 at four factions and 64
+people each, driven 4000 ticks. **The delivered total is zero for every kind on
+every tick.** At tick 3200 the first faction had all 64 of its units carrying
+food and its store read zero. The store of every short faction read zero on
+every tick of the run, exactly as it did before the delivery existed, and both
+factions that died before died at the same ticks: 820 and 3450.
+
+**The pass is not wrong. It is unreachable from the behaviour.** Its own tests
+pass because they construct the case, seating a site and a unit on one tile.
+The engine does not construct it. This is the shape the rules call a capability
+nobody invokes, met from the other side: the caller exists, and no behaviour
+ever satisfies its condition.[^37]
+
+**Follows.** Three things.
+
+**A test that drives the engine can still miss an unreachable pass.** The rule
+says to ask whether the engine or the user must invoke a mechanism, and to
+start the test at the engine when it is the engine.[^F317C] These tests did
+start at the step. They set up a world the engine never produces, so they
+proved the pass works without proving anything reaches it. **Driving the real
+caller and reaching the real case are two requirements, not one.**
+
+**The economy is still a constant.** Every conclusion drawn from the demand
+side of it still holds: a site's food rate is set once at founding from the
+survey, and it never moves. Closing the sink did not change that, because the
+sink takes nothing.
+
+**A laden unit needs a reason to go home, and that is a behaviour claim with no
+record.** The exit field ranks a neighbouring cell on a summary field, and a
+site is not a summary field. Whatever answers this either adds a field that
+says where a unit belongs, or admits that a unit's own site is a fact no cell
+carries. The backlog holds the question.[^F317D]
+
+### FND-318 — The per-unit accumulator does not remove the cliff, and the draw that replaced it created food
+
+**Believed.** A whole-group model has a cliff: a place is fine a little above
+its demand and starves entirely a little below it. The per-unit deficit
+accumulator removes the cliff, because a shortage then degrades before it
+kills. An accepted record says this three times.[^F318A]
+
+**True.** The accumulator delays the cliff and does not spread it. Every unit
+of a cohort gains the same share, decays at the same rate and founds with the
+same need, so every unit holds the same accumulator value for ever and crosses
+the death bound on one tick.
+
+**Evidence.** The demonstration world, 256 by 256 at four factions and 64
+people each, driven 4000 ticks with the deficit of every unit read on every
+tick. **One distinct deficit value for each faction, on every tick of the
+run.** Two of the four factions lost all 64 units on a single tick each, at
+tick 820 and tick 3450. The other two never lost one.
+
+**The equilibrium is what makes it certain.** The decay saturates at zero, so a
+unit's need settles at exactly the ration it is granted, and nothing moves that
+number afterwards. Measured per application: the four sites granted 32,000,
+29,440, 37,760 and a full ration against a threshold of 32,768. The two below
+the threshold accrued deficit at a constant rate and died. The two above it
+never accrued any.
+
+**The population is the variable that would fix it and it never changed.**
+Supply is fixed and demand scales with the headcount, so the second faction's
+supply covered 46 of its 64 units. Losing 18 would have left 46 fed to full,
+for ever. The engine removed 64.
+
+**The first replacement created food.** A keyed draw for each unit, on each
+application, gives each unit an independent chance of eating. The number that
+eats is then binomial and not the count the store paid for. Measured on a
+fixture whose share covered exactly one ration: **two units ate on one
+application and none on another.** The conservation check did not fail, because
+a need is not a conserved quantity and the commodity had correctly left the
+store. The units simply received more ration than the store handed over.
+
+**What works is a rotation.** Each unit holds its place inside its own cohort,
+which the rebuild already walks and counts. A cohort draws one offset for the
+frame, and a unit eats when its ordinal advanced by that offset falls below the
+served count. A rotation is a bijection, so exactly as many units eat as the
+share covered.[^F318B]
+
+**After the change**, the same 4000-tick run loses units a few at a time and
+settles. The four factions end at 53, 46, 62 and 64 of 64. **The second lands
+on exactly the 46 its supply carries**, with a deficit of zero and a store that
+now grows.
+
+**Follows.** Three things.
+
+**A record can state a property that its own decisions do not deliver.** ADR-0063
+D1 is correct about what a per-unit need buys. The claim that it removes the
+cliff is a claim about a distribution, and nothing in the record produces one.
+Every input to a need was shared, so the outputs were shared too. **Look for the
+thing that differs between two units before believing that two units differ.**
+
+**A draw is not a shuffle, and the difference is conservation.** An independent
+draw for each member gives the right answer on average and the wrong answer on
+any one application. Where a count has been paid for, the selection has to be a
+bijection. This was caught by a test that asserted the served count against the
+count the share covered, and by nothing else: the conservation check passed
+throughout, because the quantity it conserves is not the one that was wrong.
+
+**An invariant that passes is not a proof that the right invariant exists.** The
+store conservation check and the carry conservation check both held while a
+cohort was eating rations the store never gave. The account they balance is the
+commodity, and the ration a unit receives is not that account.
+
 ## References
 
 [^F315B]: The refused step test. `crates/cachette-core/tests/a_refused_step_does_not_freeze.rs`
+[^F318A]: ADR-0063, a need is a rate with a threshold, and crossing it is a fact, decision D1 and the alternatives rejected. `docs/adrs/accepted/adr-0063-a-need-is-a-rate-with-a-threshold-and-crossing-it-is-a-fact.md`
+[^F318B]: ADR-0106, a cohort serves whole rations to a keyed subset, never an equal share to everybody, decision D2. `docs/adrs/draft/adr-0106-a-cohort-serves-whole-rations-to-a-keyed-subset.md`
+[^F317A]: Backlog item 0187, give a carried load somewhere to go. `docs/backlog/complete/0187-give-a-carried-load-somewhere-to-go.md`
+[^F317C]: Testing rules, section 5. `.claude/rules/testing.md`
+[^F317D]: Backlog item 0305, give a laden unit a reason to go home. `docs/backlog/proposed/0305-give-a-laden-unit-a-reason-to-go-home.md`
 [^F316A]: Backlog item 0279, let a golden scenario reach the position pass. `docs/backlog/proposed/0279-let-a-golden-scenario-reach-the-position-pass.md`
 [^F261B]: The holder count test of the viewer. `crates/cachette-view/tests/shows_who_holds_the_ground.rs`
 [^F261C]: Backlog item 0271, count the ground generations that one frame runs. `docs/backlog/proposed/0271-count-the-ground-generations-that-one-frame-runs.md`

@@ -4523,6 +4523,11 @@ impl World {
 
         cohort::satisfy(
             rule,
+            schedule.per_application(rule.ration()),
+            cohort::DrawKey {
+                seed: self.config.seed,
+                tick: self.tick,
+            },
             &pass.shares,
             &self.cohorts,
             self.soldiers.need_update(),

@@ -43,6 +43,7 @@
 use bytemuck::{Pod, Zeroable};
 
 use crate::hash::StateHash;
+use crate::rng;
 use crate::sim_math;
 use crate::site::{CommodityId, Store, StoreUpdate, COMMODITY_COUNT};
 use crate::slots::Slots;
@@ -320,7 +321,16 @@ pub struct CohortTable {
     /// so that the headcount of the whole table plus this number is the
     /// live population, which is the equality a test asserts.
     unattached: u32,
+    /// The place of each unit inside its own cohort, in slot order.
+    ordinals: Vec<u32>,
 }
+
+/// The ordinal of a unit that belongs to no cohort.
+///
+/// The value sits at the top of the range, which no headcount reaches,
+/// because the unit reservation is far below it. It is a property of the
+/// column layout and not a budget.
+pub const NO_ORDINAL: u32 = u32::MAX;
 
 impl CohortTable {
     /// Builds an empty table.
@@ -329,6 +339,7 @@ impl CohortTable {
         Self {
             rows: Vec::new(),
             unattached: 0,
+            ordinals: Vec::new(),
         }
     }
 
@@ -389,6 +400,8 @@ impl CohortTable {
     ///
     /// [^1]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
     pub fn rebuild(&mut self, homes: &[u32], factions: &[FactionId], live: &[u8], sites: u32) {
+        self.ordinals.clear();
+        self.ordinals.resize(homes.len(), NO_ORDINAL);
         self.rows.clear();
         self.rows
             .resize(sites as usize * COHORTS_PER_SITE, CohortRow::default());
@@ -408,13 +421,42 @@ impl CohortTable {
                 continue;
             }
             match self.rows.get_mut(row_index(*home, factions[slot].0)) {
-                Some(row) => row.headcount += 1,
+                Some(row) => {
+                    // **The ordinal is the place of this unit in its own
+                    // cohort, in slot order.** The rebuild already walks every
+                    // unit and already counts them, so the ordinal costs the
+                    // write and nothing else. It is what lets the ration pass
+                    // serve exactly as many units as the share covers, without
+                    // sorting anything.[^2]
+                    //
+                    // [^2]: ADR-0106, a cohort serves whole rations to a keyed subset, never an equal share to everybody, decision D2. `docs/adrs/draft/adr-0106-a-cohort-serves-whole-rations-to-a-keyed-subset.md`
+                    self.ordinals[slot] = row.headcount;
+                    row.headcount += 1;
+                }
                 // A home that names no live site, or a faction above the
                 // ceiling, counts as unattached here. The world refuses
                 // both, and its invariant check states so.
                 None => self.unattached += 1,
             }
         }
+    }
+
+    /// Returns the place of each unit inside its own cohort, in slot order.
+    ///
+    /// A unit that belongs to no cohort holds `NO_ORDINAL`.
+    ///
+    /// The column is derived from the unit columns at every rebuild and it
+    /// carries nothing between frames, in the same way the rows do. It does
+    /// not reach the state hash, because it is an exact function of the
+    /// columns that do, and hashing it as well would state one fact in two
+    /// places.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`
+    #[must_use]
+    pub fn ordinals(&self) -> &[u32] {
+        &self.ordinals
     }
 
     /// Absorbs the table into the state hash.
@@ -863,12 +905,90 @@ pub fn decay(rate: Fix32, update: NeedUpdate<'_>, threads: usize) -> Result<(), 
     Ok(())
 }
 
-/// Feeds every unit from what its cohort received, and moves the deficit.
+/// The draw index of the place a unit takes in the queue of its cohort.
 ///
-/// The share of a cohort spreads over its headcount, so a unit gains the
-/// same amount as every other unit of its cohort. The need clamps at the
-/// top, and the clamp is safe because a need is not a conserved
-/// quantity.[^1]
+/// The consumption pass takes one draw for each unit in each application. A
+/// second draw in the same system and frame must take the next index.[^1]
+///
+/// # References
+///
+/// [^1]: ADR-0003, every random draw is keyed, never stateful, decision D1. `docs/adrs/accepted/adr-0003-every-random-draw-is-keyed-never-stateful.md`
+const DRAW_RATION_PLACE: u32 = 0;
+
+/// Returns the whole rations a share covers, and what is left over.
+///
+/// The share of a cohort covers a whole number of full rations and a
+/// remainder below one. The parts sum to the whole, so nothing is created and
+/// nothing is lost.[^1]
+///
+/// A cohort with no headcount serves nobody. A ration of zero would divide by
+/// zero, so it serves every member and leaves nothing over: a rule that asks
+/// for nothing is met by giving nothing.
+///
+/// The count never exceeds the headcount. A store that gave more than the
+/// cohort asked for would otherwise serve a unit that is not there.
+///
+/// # References
+///
+/// [^1]: ADR-0023, an aggregate combines exactly, in any order, decision D1. `docs/adrs/accepted/adr-0023-an-aggregate-combines-exactly-in-any-order.md`
+fn whole_rations(share: Accum, ration: Fix32, headcount: u32) -> (u32, Fix32) {
+    if headcount == 0 || share.0 <= 0 {
+        return (0, Fix32::ZERO);
+    }
+    if ration.0 <= 0 {
+        return (headcount, Fix32::ZERO);
+    }
+    let whole = share.0 / i64::from(ration.0);
+    let capped = u32::try_from(whole).unwrap_or(u32::MAX).min(headcount);
+    let taken = i64::from(ration.0) * i64::from(capped);
+    let left = share.0 - taken;
+    let remainder = Fix32(i32::try_from(left).unwrap_or(i32::MAX));
+    (capped, remainder)
+}
+
+/// What a keyed draw of the consumption pass takes from the frame.
+///
+/// The two travel together. A draw is keyed on the seed of the world and the
+/// frame it runs in, and a caller that could pass one without the other could
+/// key a frame against the seed of a different world.[^1]
+///
+/// # References
+///
+/// [^1]: ADR-0003, every random draw is keyed, never stateful, decision D1. `docs/adrs/accepted/adr-0003-every-random-draw-is-keyed-never-stateful.md`
+#[derive(Clone, Copy, Debug)]
+pub struct DrawKey {
+    /// The seed of the world.
+    pub seed: u64,
+    /// The frame the pass runs in.
+    pub tick: Tick,
+}
+
+/// Feeds a keyed subset of each cohort whole, and moves the deficit.
+///
+/// **A cohort serves whole rations to as many of its units as its share
+/// covers, and never an equal share to everybody.**[^2] An equal split makes
+/// every unit of a cohort numerically identical, because every other input to
+/// a need is the same for all of them, and identical units cross the death
+/// bound on one tick. Serving a subset is what puts two different needs, and
+/// therefore two different deficits, on two units of one cohort.[^3]
+///
+/// **The subset is the ordinals of a cohort, rotated by an offset keyed on the
+/// cohort and the frame.**[^4] A rotation is a bijection, so exactly as many
+/// units fall below the served count as the share covered. A draw taken for
+/// each unit on its own gives each unit an independent chance, and the number
+/// that eats then varies around the count the store paid for.[^3]
+///
+/// The offset is drawn again on each application, so the block of ordinals
+/// that eats slides and no unit is always first. A fixed offset would feed the
+/// same units every time, and a cohort would hold a caste rather than a
+/// shortage.[^4]
+///
+/// The parts still sum to the whole. The share covers a whole number of full
+/// rations, and the remainder that covers no whole ration goes to the one unit
+/// the draw would serve next.[^6]
+///
+/// The need clamps at the top, and the clamp is safe because a need is not a
+/// conserved quantity.[^1]
 ///
 /// A unit whose need is below the threshold adds the shortfall to its
 /// deficit accumulator, and a unit at or above the threshold takes the
@@ -884,8 +1004,14 @@ pub fn decay(rate: Fix32, update: NeedUpdate<'_>, threads: usize) -> Result<(), 
 /// # References
 ///
 /// [^1]: Research report 15, needs, consumption and the input-output economy, sections 6.3 and 6.4. `docs/research/reports/15-needs-consumption-and-economy.md`
+/// [^2]: ADR-0106, a cohort serves whole rations to a keyed subset, never an equal share to everybody, decision D1. `docs/adrs/draft/adr-0106-a-cohort-serves-whole-rations-to-a-keyed-subset.md`
+/// [^3]: Findings register, FND-318. `docs/FINDINGS.md`
+/// [^4]: ADR-0106, a cohort serves whole rations to a keyed subset, never an equal share to everybody, decision D2. `docs/adrs/draft/adr-0106-a-cohort-serves-whole-rations-to-a-keyed-subset.md`
+/// [^6]: ADR-0023, an aggregate combines exactly, in any order, decision D1. `docs/adrs/accepted/adr-0023-an-aggregate-combines-exactly-in-any-order.md`
 pub fn satisfy(
     rule: NeedRule,
+    ration: Fix32,
+    key: DrawKey,
     shares: &[Accum],
     table: &CohortTable,
     update: NeedUpdate<'_>,
@@ -916,15 +1042,28 @@ pub fn satisfy(
         return Ok(());
     }
 
-    // What one unit of each cohort gains. The division runs once for each
-    // cohort, never once for each unit.
-    let gains: Vec<Fix32> = table
+    // What each cohort serves: the number of whole rations its share covers,
+    // and the remainder that covers no whole one. Both run once for each
+    // cohort and never once for each unit.
+    //
+    // **The ration is the one the draw asked with, and not the one the rule
+    // holds.** The schedule scales a rate to one application, so a pass that
+    // read the rule directly would divide a share taken at the scaled rate by
+    // the unscaled one. The caller passes the same value it gave the draw, so
+    // the two cannot disagree.[^7]
+    //
+    // [^7]: ADR-0062, production and upkeep are rates attached to a site, decision D4. `docs/adrs/accepted/adr-0062-production-and-upkeep-are-rates-attached-to-a-site.md`
+    let served: Vec<(u32, Fix32)> = table
         .rows()
         .iter()
         .zip(shares)
-        .map(|(row, share)| sim_math::divide_by_count(*share, row.headcount).unwrap_or(Fix32::ZERO))
+        .map(|(row, share)| whole_rations(*share, ration, row.headcount))
         .collect();
-    let gains = &gains[..];
+    let served = &served[..];
+    let ordinals = table.ordinals();
+    if ordinals.len() != count {
+        return Err(CohortError::ColumnsDisagree);
+    }
     let threshold = rule.threshold();
     let recovery = rule.recovery();
 
@@ -947,8 +1086,48 @@ pub fn satisfy(
                     }
                     let home = home_span[offset];
                     if home != NO_HOME {
-                        if let Some(gain) = gains.get(row_index(home, faction_span[offset].0)) {
-                            let fed = sim_math::add(need_span[offset], *gain);
+                        let row = row_index(home, faction_span[offset].0);
+                        if let (Some((whole, remainder)), Some(head)) = (
+                            served.get(row),
+                            table.rows().get(row).map(|row| row.headcount),
+                        ) {
+                            // **The place of a unit in the queue of its cohort
+                            // is its ordinal, rotated by a keyed offset.** A
+                            // rotation is a bijection on the ordinals of a
+                            // cohort, so exactly as many units fall below the
+                            // served count as the share covered. A draw taken
+                            // for each unit on its own would give each unit an
+                            // independent chance, and the number that ate
+                            // would then vary around the count the store paid
+                            // for. That was measured: a cohort whose share
+                            // covered one ration served two units on one
+                            // application and none on another.[^3]
+                            //
+                            // The offset is keyed on the cohort and the frame,
+                            // so the block of ordinals that eats slides from
+                            // one application to the next and no unit is
+                            // always first.[^4]
+                            let ordinal = ordinals[start + offset];
+                            if ordinal == NO_ORDINAL {
+                                continue;
+                            }
+                            let offset_of_frame = rng::draw_below(
+                                key.seed,
+                                rng::SYSTEM_CONSUMPTION,
+                                key.tick.0,
+                                row as u64,
+                                DRAW_RATION_PLACE,
+                                u64::from(head),
+                            );
+                            let place = (u64::from(ordinal) + offset_of_frame) % u64::from(head);
+                            let gain = if place < u64::from(*whole) {
+                                ration
+                            } else if place == u64::from(*whole) {
+                                *remainder
+                            } else {
+                                Fix32::ZERO
+                            };
+                            let fed = sim_math::add(need_span[offset], gain);
                             need_span[offset] = if fed > NEED_FULL { NEED_FULL } else { fed };
                         }
                     }

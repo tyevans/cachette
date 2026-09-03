@@ -96,6 +96,17 @@ const fn mix(value: u64) -> u64 {
 /// identity when the draw happens.
 pub const SYSTEM_CHARACTER: SystemId = 6;
 
+/// The system identifier of the consumption pass.
+///
+/// The pass owns this identifier alone. Two systems that share an identifier
+/// draw the same value from the same frame, entity and draw index, so a unit
+/// would then be fed and moved on one number.[^1]
+///
+/// # References
+///
+/// [^1]: ADR-0003, every random draw is keyed, never stateful, decision D1. `docs/adrs/accepted/adr-0003-every-random-draw-is-keyed-never-stateful.md`
+pub const SYSTEM_CONSUMPTION: SystemId = 7;
+
 /// The system identifier of the founding.
 ///
 /// The founding owns this identifier alone. It does not share the identifier
