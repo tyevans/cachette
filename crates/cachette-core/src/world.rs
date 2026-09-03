@@ -59,6 +59,7 @@ use crate::soldier::{SoldierArena, SoldierError};
 #[cfg(not(feature = "probe-nondeterminism"))]
 use crate::sort;
 use crate::sort::{BoundedKey, SortError};
+use crate::stage::{self, Stage};
 use crate::terrain::{Terrain, TerrainTile, TileKind};
 use crate::tile_value::{TileValueRange, TileValues};
 use crate::types::{Accum, Entity, FactionId, Fix32, Tick, TileIdx, FACTION_CEILING};
@@ -2958,6 +2959,7 @@ impl World {
         //
         // [^12]: ADR-0009, parallel stages write disjoint outputs. `docs/adrs/REGISTRY.md`
         {
+            let _span = stage::open(Stage::TileScan);
             let values = &self.values;
             std::thread::scope(|scope| {
                 let mut start = 0u32;
@@ -2975,12 +2977,15 @@ impl World {
             });
         }
 
-        let mut log = core::mem::take(&mut self.log);
-        log.clear();
-        self.log = slots.combine(log, |mut joined, slot| {
-            joined.extend_from_slice(&slot.events);
-            joined
-        });
+        {
+            let _span = stage::open(Stage::LogJoin);
+            let mut log = core::mem::take(&mut self.log);
+            log.clear();
+            self.log = slots.combine(log, |mut joined, slot| {
+                joined.extend_from_slice(&slot.events);
+                joined
+            });
+        }
 
         // The ranges are disjoint, so each tile appears in one run at most.
         // The merge needs one ascending run, and the sort by tile index is
@@ -2988,12 +2993,15 @@ impl World {
         // in, so the field is the same at any thread count.[^13]
         //
         // [^13]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
-        let mut run: Vec<(u32, Fix32)> = slots.combine(Vec::new(), |mut joined, slot| {
-            joined.extend_from_slice(&slot.changes);
-            joined
-        });
-        run.sort_unstable_by_key(|pair| pair.0);
-        self.values.merge_ascending(&run);
+        {
+            let _span = stage::open(Stage::ChangeMerge);
+            let mut run: Vec<(u32, Fix32)> = slots.combine(Vec::new(), |mut joined, slot| {
+                joined.extend_from_slice(&slot.changes);
+                joined
+            });
+            run.sort_unstable_by_key(|pair| pair.0);
+            self.values.merge_ascending(&run);
+        }
 
         // Every soldier chooses a neighbour, then the step applies the
         // choices. The choice is a pure read of the world, so the two halves
@@ -3006,41 +3014,56 @@ impl World {
         //
         // This is not a second barrier. The rebuild at the end of this
         // function is the barrier of this frame, and it stays last.
-        self.refresh_bridge()?;
+        {
+            let _span = stage::open(Stage::BridgeRefreshOpening);
+            self.refresh_bridge()?;
+        }
 
         // The choice runs before movement, and it is what movement reads.
         // It reads level 1 as the last barrier left it, and it writes
         // nothing to any level above level 0.[^11]
         //
         // [^11]: ADR-0022, level 0 is the only truth, and every level above it is derived, decisions D1 and D3. `docs/adrs/accepted/adr-0022-level-0-is-the-only-truth-and-every-level-above-it-is-derived.md`
-        self.choose(threads)?;
+        {
+            let _span = stage::open(Stage::Choose);
+            self.choose(threads)?;
+        }
 
-        let intents = soldier_moves(
-            tick,
-            seed,
-            self.terrain,
-            &self.soldiers,
-            self.pyramid.layout(),
-            &self.exits,
-            threads,
-        )?;
+        let intents = {
+            let _span = stage::open(Stage::MovementIntents);
+            soldier_moves(
+                tick,
+                seed,
+                self.terrain,
+                &self.soldiers,
+                self.pyramid.layout(),
+                &self.exits,
+                threads,
+            )?
+        };
 
         // Admission grants the intents. It reads the occupancy of a target
         // from the derived structure, which the last barrier rebuilt, so it
         // must run before anything moves.[^3]
-        let granted = admit(
-            &intents,
-            &self.soldiers,
-            &self.bridge,
-            self.terrain,
-            &self.upgrades,
-            self.grid,
-            threads,
-        )?;
-        for (soldier, address) in granted {
-            self.soldiers
-                .place(soldier, address)
-                .expect("the granted address is inside the world and admits a unit");
+        let granted = {
+            let _span = stage::open(Stage::Admit);
+            admit(
+                &intents,
+                &self.soldiers,
+                &self.bridge,
+                self.terrain,
+                &self.upgrades,
+                self.grid,
+                threads,
+            )?
+        };
+        {
+            let _span = stage::open(Stage::PlaceGranted);
+            for (soldier, address) in granted {
+                self.soldiers
+                    .place(soldier, address)
+                    .expect("the granted address is inside the world and admits a unit");
+            }
         }
 
         // The bridge rebuilds here, at the barrier, and after the structural
@@ -3052,7 +3075,10 @@ impl World {
         // [^2]: ADR-0018, the unit-to-tile bridge is derived, and it rebuilds at the barrier, decision D3. `docs/adrs/accepted/adr-0018-the-unit-to-tile-bridge-is-derived-and-rebuilds-at-the-barrier.md`
         // [^3]: ADR-0056, movement is tile-discrete and admitted by sort-then-admit, decision D3. `docs/adrs/accepted/adr-0056-movement-is-tile-discrete-and-admitted-by-sort-then-admit.md`
         // [^4]: ADR-0018, the unit-to-tile bridge is derived, and it rebuilds at the barrier, decision D3. `docs/adrs/accepted/adr-0018-the-unit-to-tile-bridge-is-derived-and-rebuilds-at-the-barrier.md`
-        self.refresh_bridge()?;
+        {
+            let _span = stage::open(Stage::BridgeRefreshBarrier);
+            self.refresh_bridge()?;
+        }
 
         // The gather resolve runs after the barrier of this frame. It reads
         // where each unit stands, and the movement above has just moved
@@ -3072,9 +3098,15 @@ impl World {
         // gathered nothing does no work here, at any tile count.[^14]
         //
         // [^14]: ADR-0080, a depleted deposit recovers by ageing the stored take, decisions D1 and D2. `docs/adrs/accepted/adr-0080-a-depleted-deposit-recovers-by-ageing-the-stored-take.md`
-        self.depletion.recover(tick);
+        {
+            let _span = stage::open(Stage::DepletionRecover);
+            self.depletion.recover(tick);
+        }
 
-        self.gather(threads)?;
+        {
+            let _span = stage::open(Stage::Gather);
+            self.gather(threads)?;
+        }
 
         // The build advance runs after the barrier of this frame, for the
         // same reason the gather resolve does: it reads where each unit
@@ -3088,7 +3120,10 @@ impl World {
         // any tile count.[^16]
         //
         // [^16]: ADR-0090, a tile upgrade is stored sparsely, as the difference from the generated world, decisions D1 and D2. `docs/adrs/draft/adr-0090-a-tile-upgrade-is-stored-sparsely.md`
-        self.build(threads)?;
+        {
+            let _span = stage::open(Stage::Build);
+            self.build(threads)?;
+        }
 
         // The holding spreads after the barrier of this frame, because it
         // reads where each unit stands and the movement above has just moved
@@ -3096,8 +3131,11 @@ impl World {
         // above stays the barrier of this frame.[^7]
         //
         // [^7]: ADR-0053, a faction is a bit in a mask, and a relation is a plane, decision D4. `docs/adrs/accepted/adr-0053-a-faction-is-a-bit-in-a-mask-and-a-relation-is-a-plane.md`
-        self.holding
-            .advance(self.terrain, &self.soldiers, &self.bridge, threads)?;
+        {
+            let _span = stage::open(Stage::HoldingSpread);
+            self.holding
+                .advance(self.terrain, &self.soldiers, &self.bridge, threads)?;
+        }
 
         // The event reports the tile as this frame left it, so the holder is
         // stamped here and not in the value pass above. The value pass runs
@@ -3111,9 +3149,12 @@ impl World {
         // tile.
         //
         // [^15]: Findings register, FND-029 and FND-079. `docs/FINDINGS.md`
-        let holders = self.holding.holders();
-        for event in &mut self.log {
-            event.holder = holders[event.tile.0 as usize];
+        {
+            let _span = stage::open(Stage::StampHolders);
+            let holders = self.holding.holders();
+            for event in &mut self.log {
+                event.holder = holders[event.tile.0 as usize];
+            }
         }
         // The site rates apply after the barrier of this frame and after the
         // gather resolve, and before level 1 rebuilds.
@@ -3131,7 +3172,10 @@ impl World {
         //
         // [^8]: ADR-0022, level 0 is the only truth, and every level above it is derived, decision D2. `docs/adrs/accepted/adr-0022-level-0-is-the-only-truth-and-every-level-above-it-is-derived.md`
         // [^9]: ADR-0062, production and upkeep are rates attached to a site, decision D4. `docs/adrs/accepted/adr-0062-production-and-upkeep-are-rates-attached-to-a-site.md`
-        self.apply_rates(threads)?;
+        {
+            let _span = stage::open(Stage::ApplyRates);
+            self.apply_rates(threads)?;
+        }
 
         // Consumption runs after the rates, on the same schedule. A unit
         // draws from the store of the site it belongs to, and the rates are
@@ -3144,7 +3188,10 @@ impl World {
         // store column.
         //
         // [^10]: ADR-0063, a need is a rate with a threshold, and crossing it is a fact, decision D5. `docs/adrs/accepted/adr-0063-a-need-is-a-rate-with-a-threshold-and-crossing-it-is-a-fact.md`
-        self.consume(threads)?;
+        {
+            let _span = stage::open(Stage::Consume);
+            self.consume(threads)?;
+        }
 
         // The scan of the death plane runs after consumption, because
         // consumption is what moves a deficit to the bound. It is a
@@ -3159,15 +3206,24 @@ impl World {
         //
         // [^12]: ADR Registry, row 0020. `docs/adrs/REGISTRY.md`
         // [^13]: ADR-0018, the unit-to-tile bridge is derived, and it rebuilds at the barrier, decision D3. `docs/adrs/accepted/adr-0018-the-unit-to-tile-bridge-is-derived-and-rebuilds-at-the-barrier.md`
-        self.reap(threads)?;
-        self.refresh_bridge()?;
+        {
+            let _span = stage::open(Stage::Reap);
+            self.reap(threads)?;
+        }
+        {
+            let _span = stage::open(Stage::BridgeRefreshAfterReap);
+            self.refresh_bridge()?;
+        }
 
         // The positions of the sites settle after the deaths of this frame.
         // A position that named a unit the scan above ended would hold a
         // stale identity, and the invariant check refuses that state.[^17]
         //
         // [^17]: ADR-0065, a group is a site membership, not a region, decision D2. `docs/adrs/draft/adr-0065-a-group-is-a-site-membership-not-a-region.md`
-        self.settle_positions(threads)?;
+        {
+            let _span = stage::open(Stage::SettlePositions);
+            self.settle_positions(threads)?;
+        }
 
         // Level 1 rebuilds after the structure it reads, and after every
         // change to level 0 that this frame made. It is derived, so it is
@@ -3181,7 +3237,10 @@ impl World {
         // be quietly repaired instead of refused.
         //
         // [^5]: ADR-0022, level 0 is the only truth, and every level above it is derived, decision D2. `docs/adrs/accepted/adr-0022-level-0-is-the-only-truth-and-every-level-above-it-is-derived.md`
-        self.rebuild_level_1(threads)?;
+        {
+            let _span = stage::open(Stage::RebuildLevel1);
+            self.rebuild_level_1(threads)?;
+        }
 
         // The influence solve runs last, after every change this frame made
         // and after the derived level it reads was rebuilt. It runs the same
@@ -3190,7 +3249,10 @@ impl World {
         // exists.[^16]
         //
         // [^16]: ADR-0087, an influence solve runs a fixed iteration count over the whole plane, decision D1. `docs/adrs/draft/adr-0087-an-influence-solve-runs-a-fixed-iteration-count.md`
-        self.influence.solve(threads)?;
+        {
+            let _span = stage::open(Stage::InfluenceSolve);
+            self.influence.solve(threads)?;
+        }
         Ok(&self.log)
     }
 

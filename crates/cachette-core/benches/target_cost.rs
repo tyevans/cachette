@@ -63,6 +63,7 @@
 use std::time::Instant;
 
 use cachette_core::choose::PERIOD_LOG2_CEILING;
+use cachette_core::stage;
 use cachette_core::{Axial, Entity, ExitField, FactionId, Fix32, Grid, World, WorldConfig};
 
 /// The seed that every world in this benchmark takes.
@@ -269,6 +270,7 @@ fn main() {
         "memory-point" => memory_point(&arguments),
         "memory" => memory_sweep(&full()),
         "stages" => stage_rows(&arguments),
+        "stage-cost" => stage_cost_rows(&arguments),
         "placement" => placement_rows(&arguments),
         "collapse" => collapse_rows(&arguments),
         "exitfield" => exit_field_rows(&arguments),
@@ -415,6 +417,160 @@ fn stage_rows(arguments: &[String]) {
         threads,
         &samples,
     );
+}
+
+/// Prices every stage of a frame by name.
+///
+/// # Why this mode exists
+///
+/// The `stages` mode above prices a pass by running a whole frame with the
+/// pass switched off and taking the difference. Three switches exist, so that
+/// method left 62 percent of the cost of a unit in one residual that nothing
+/// on the public interface could divide.[^1]
+///
+/// This mode reads a table that the step fills in as it runs. Every pass is
+/// named, so nothing is left in a residual except the glue between the
+/// passes, and this mode reports that glue as its own row.
+///
+/// # It needs a feature
+///
+/// The table is behind the `stage-cost` feature and is off by default. A run
+/// without the feature reports zeros and says so in the preamble, so a reader
+/// cannot mistake "this build does not measure" for "the frame cost nothing".
+///
+/// ```text
+/// cargo bench --bench target_cost --features stage-cost -- stage-cost 4096x4096 1000000 12
+/// ```
+///
+/// # What the columns mean
+///
+/// `frames` is how many frames the row averaged over. `entries` is how many
+/// times the step opened the stage across those frames, and it should be
+/// `frames` times what the stage declares. `total_ns` is the sum, and
+/// `ns_for_each_frame` is the figure a register quotes. `takes_threads` is a
+/// declaration in the source rather than a measurement: a stage declared
+/// `false` that improves with the thread count means the declaration is
+/// wrong.
+///
+/// `nested` says whether the row divides the row above it rather than adding
+/// to the frame. The sum skips a nested row, because its time is already in
+/// the stage it divides.
+///
+/// The last two rows are not stages. `all_stages` is the sum of the rows
+/// above it, with the nested rows left out. `frame_wall` is the wall time of the same frames measured from
+/// outside, and the difference between the two is the cost of the step that
+/// no span covers, plus what the clock costs to read.
+///
+/// # References
+///
+/// [^1]: Target platform costs, where the unit cost goes. `docs/reference/graviton-costs.md`
+fn stage_cost_rows(arguments: &[String]) {
+    let extent = extent_argument(arguments, 1);
+    let units: u32 = arguments
+        .get(2)
+        .and_then(|word| word.parse().ok())
+        .expect("the third argument must be a unit count");
+    let threads: usize = arguments
+        .get(3)
+        .and_then(|word| word.parse().ok())
+        .unwrap_or(1);
+    let scattered = arguments.get(4).map(String::as_str) == Some("scattered");
+
+    /// How many frames one row averages over.
+    ///
+    /// The table is a sum, so a row here is an average and not a median. A
+    /// single frame would carry whatever the operating system did during it.
+    const FRAMES: usize = 9;
+
+    println!("# stage cost rows. Each row is one named pass of a frame");
+    println!("# recording\t{}", stage::is_recording());
+    println!(
+        "# placement\t{}",
+        if scattered { "scattered" } else { "packed" }
+    );
+    println!("# frames\t{FRAMES}");
+    println!("# transparent_huge_pages\t{}", huge_page_setting());
+    println!(
+        "stage\ttiles\tunits\tthreads\tframes\tentries\ttotal_ns\tns_for_each_frame\ttakes_threads\tnested"
+    );
+
+    let capacity = units.max(1024);
+    let mut world = World::new(extent.config(capacity)).expect("the extent must describe a world");
+    let placed = if scattered {
+        populate_scattered(&mut world, units)
+    } else {
+        populate(&mut world, units)
+    };
+    for _ in 0..WARMUP_FRAMES {
+        world.step(threads).expect("the step must run");
+    }
+
+    stage::reset();
+    let start = now();
+    for _ in 0..FRAMES {
+        let log = world.step(threads).expect("the step must run");
+        std::hint::black_box(log.len());
+    }
+    let wall = start.elapsed().as_nanos();
+    let costs = stage::costs();
+
+    let tiles = extent.tiles();
+    let frames = FRAMES as u64;
+    for stage in cachette_core::STAGES {
+        let cost = costs.cost(*stage);
+        println!(
+            "{}\t{tiles}\t{placed}\t{threads}\t{FRAMES}\t{}\t{}\t{}\t{}\t{}",
+            stage.name(),
+            cost.entries,
+            cost.nanos,
+            cost.nanos / frames,
+            stage.takes_threads(),
+            stage.is_nested()
+        );
+    }
+    let total = costs.total_nanos();
+    println!(
+        "all_stages\t{tiles}\t{placed}\t{threads}\t{FRAMES}\t{FRAMES}\t{total}\t{}\ttrue\tfalse",
+        total / frames
+    );
+    let wall = u64::try_from(wall).unwrap_or(u64::MAX);
+    println!(
+        "frame_wall\t{tiles}\t{placed}\t{threads}\t{FRAMES}\t{FRAMES}\t{wall}\t{}\ttrue\tfalse",
+        wall / frames
+    );
+    println!(
+        "# anon_huge_pages_bytes\t{}",
+        smaps_rollup_kib("AnonHugePages:") * 1024
+    );
+    println!("# resident_bytes\t{}", status_kib("VmRSS:") * 1024);
+}
+
+/// Reads how the kernel is set to give transparent huge pages.
+///
+/// The value is the whole line, with the current setting in square brackets.
+/// A row that names a huge page setting is reproducible; a row that does not
+/// is a figure about a machine nobody can name.
+fn huge_page_setting() -> String {
+    std::fs::read_to_string("/sys/kernel/mm/transparent_hugepage/enabled")
+        .map_or_else(|_| "unreadable".to_owned(), |text| text.trim().to_owned())
+}
+
+/// Reads one field of the rolled up mapping summary of this process, in kB.
+///
+/// `AnonHugePages` is the part of the anonymous memory of the process that
+/// sits on huge pages. It is the direct evidence that a huge page setting
+/// reached this process, rather than the assumption that it did.
+fn smaps_rollup_kib(field: &str) -> u64 {
+    let Ok(text) = std::fs::read_to_string("/proc/self/smaps_rollup") else {
+        return 0;
+    };
+    for line in text.lines() {
+        if let Some(rest) = line.strip_prefix(field) {
+            let digits: String = rest.chars().filter(char::is_ascii_digit).collect();
+            return digits.parse().unwrap_or(0);
+        }
+    }
+    0
 }
 
 /// Reads an extent argument, as `WIDTHxHEIGHT`.

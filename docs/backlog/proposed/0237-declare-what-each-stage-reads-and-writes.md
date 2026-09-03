@@ -24,11 +24,15 @@ mechanical. Two stages whose write sets intersect cannot run together. A stage
 whose read set intersects another's write set has an ordering constraint that a
 check can state rather than a reviewer remember.
 
-**It pays a second time, and that is why it is worth doing before the
-optimisation and not after.** A stage with a declared boundary can be run and
-timed from outside. Today a frame is a sequence of private methods on the world,
-so a cost belongs to the frame rather than to a stage, and a large cost cannot be
-attributed without editing the engine to measure it.
+**It paid a second time, and that half is now done under its own number.** A
+stage with a declared boundary can be timed from outside. Item 0289 named every
+pass of a frame and made the step record what each one costs, so a cost now
+belongs to a stage.[^5] **That item declares no read set and no write set**, and
+it says so: an instrument that a feature switches off binds nothing, and the
+declaration this item is about is a constraint.
+
+**What is left here is the checking half alone.** Two stages whose write sets
+intersect cannot run together, and today only a reviewer can see that.
 
 The record on cost states the constraint that makes this urgent and deliberately
 does not carry this claim, because a record holds one claim and mixing cost with
@@ -38,15 +42,20 @@ observability would make neither rejectable on its own.[^2]
 
 - The impact review, and whether this needs a record of its own or is a design
   document. It states a mechanism rather than a constraint, which is the test
-  that decides.[^3]
+  that decides.[^3] The answer may differ now that the timing half is out: a
+  declaration that a check enforces is closer to a constraint than an
+  instrument is.[^5]
 - What a declaration is. A type, a const table, an attribute, or a doc comment
   that a script parses. Only the first two can fail a build.
 - Whether the declaration can be derived rather than written. A second
   declaration site that nothing checks against the code is the shape this project
   meets most often.[^4]
 - Whether the ordering check runs at compile time or as a test.
-- What a stage is. The frame is a sequence of private methods today, and some of
-  them do several things.
+- What a stage is. **Item 0289 answered this in one direction**: the frame is
+  now a named list of twenty-one passes, derived from one macro list, and a test
+  compares that list against the step.[^5] Whether the same list is the right
+  unit for a read set and a write set is open, because three of its entries are
+  the same function called at three positions.
 
 ## Done when
 
@@ -62,3 +71,4 @@ Filled in when the item moves to `complete/`.
 [^2]: ADR-0096, cost follows the lattice, not the population, and a unit is a reader. `docs/adrs/draft/adr-0096-cost-follows-the-lattice-not-the-population.md`
 [^3]: Decision Record Scope, section 1. `.claude/rules/adr-scope.md`
 [^4]: Recurring Defect Shapes, shape 1. `.claude/rules/recurring-defects.md`
+[^5]: Backlog item 0289, price every stage of a frame by name. `docs/backlog/complete/0289-price-every-stage-of-a-frame-by-name.md`
