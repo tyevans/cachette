@@ -104,9 +104,9 @@ The cost that matters is which term it follows. An answer computed for each
 unit costs the population. An answer computed for each block of tiles costs the
 block count, and the block count does not change when units are born.
 
-**No figure is stated here.** No measurement exists on the target platform, and
-every cost figure in this project is derived rather than measured.[^5] A record
-that quoted one would be quoting an estimate.
+**No figure is stated here.** One blocker governs every cost figure in this
+project, and it says which figures are measured and which are derived.[^5] A
+record that quoted one would be quoting an estimate.
 
 ## Which blockers govern this
 
@@ -124,9 +124,9 @@ carries reaches further every tick. If the carried form is refused, a unit far
 from its destination reads nothing and this need is met over short distances and
 not long ones. A second open row holds that consequence for this case.[^7]
 
-**No measurement exists on the target platform.** Every cost claim about this
-need is derived rather than measured, so the statement above about which term
-the cost follows is an argument and not a result.[^5]
+**One blocker governs every cost claim about this need.**[^5] No claim here is
+measured, so the statement above about which term the cost follows is an
+argument and not a result.
 
 **Nothing here is blocked by an unanswered question the owner holds.** The three
 above are engineering questions. The need itself is stated and does not wait on

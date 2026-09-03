@@ -85,14 +85,14 @@ multiplier of 2 against ordinary ground, at capacity 8.
 The terrain table now states that value, beside the terrain capacity, and the
 scale constants table holds the row.[^6] [^7] **The value is still inferred
 from the result.** It is derived from the ratio of the two accepted crossing
-times, and nobody decided it directly. Every cost figure in this project is
-derived, not measured.[^2]
+times, and nobody decided it directly. The value is derived and not measured,
+and one blocker holds the reason.[^2]
 
 ## What this note could not do
 
-The check could not compute the per-frame cost of the movement pass. No
-measurement exists on the target platform. A blocker already records that
-gap.[^2] Every cost figure in this project is derived, not measured.
+The check could not compute the per-frame cost of the movement pass. No run on
+the target platform separates one pass from the rest of a step. A blocker
+already records that gap.[^2]
 
 ## What follows
 

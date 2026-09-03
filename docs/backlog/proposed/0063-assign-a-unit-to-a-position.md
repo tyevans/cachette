@@ -41,7 +41,8 @@ reaches the same conclusion from a different direction: a policy that takes a
 comparator can be intransitive, and an intransitive comparator makes the output
 depend on the sort algorithm, which no tie-break repairs.[^4]
 
-**Blockers.** BLK-007 governs every cost figure, so this item states none.
+**Blockers.** BLK-007 governs the cost figures this item would state, so it
+states none.
 BLK-005 gives the settlement count.[^5]
 
 **Serves.** PRD-0017, and PRD-0011 for the statement that a unit's job changes

@@ -143,9 +143,9 @@ The engine returns tile values and event fields as columns. Each is one
 crossing and one answer.[^10] A future read that returns the world so that
 Python can search it is a breach, whatever it costs.
 
-**This record states no cost.** No measurement exists on the target platform,
-so every cost figure in this project is derived rather than measured.[^11] The
-argument here is about the shape of the traffic and not about its price.
+**This record states no cost.** One blocker holds every cost figure this record
+would state, and it says which figures are measured.[^11] The argument here is
+about the shape of the traffic and not about its price.
 
 **Nothing enforces this record today.** The rule is prose in the orientation
 and in the package, and no check fails when a caller breaks it. Two records

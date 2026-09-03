@@ -101,14 +101,15 @@ decision. It states the shape both must meet.
 - The cost of the ground must not grow with the number of units, and the cost
   of the units must not grow with the ground.
 
-No cost figure appears here, because nobody has measured one on the target
-platform.[^2] The shape of the growth is the requirement. The figure is not.
+No cost figure appears here, because one blocker holds every cost figure this
+record would state.[^2] The shape of the growth is the requirement. The figure is not.
 
 ## Which blockers govern this
 
-- **No measurement exists on the target platform.**[^2] Every cost statement
-  above states a shape, not a number. A memory figure and a per-tile time are
-  both measurements, so this record states neither.
+- **One blocker governs every cost figure here.**[^2] It says which figures
+  are measured and which are derived. Every cost statement above states a
+  shape, not a number. A memory figure and a per-tile time are both
+  measurements, so this record states neither.
 
 The question that governed the world shape is answered, and the question that
 governed the tile edge is answered, so this record states neither of them

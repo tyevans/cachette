@@ -116,8 +116,8 @@ is applied, so there is no decision left to record.[^15] The double count
 between the founding rate and the delivery is a decision, and it sits in the
 register with options and a recommendation.[^12]
 
-**Blockers.** None. BLK-007 governs any cost figure, and this item states
-none.[^16]
+**Blockers.** None. BLK-007 governs the cost figures this item would state,
+and it states none.[^16]
 
 **Precedent.** FND-191 records that the engine writes the number of the food
 commodity wherever it needs one, and that the map a backlog item holds is read

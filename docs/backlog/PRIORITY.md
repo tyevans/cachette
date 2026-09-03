@@ -32,7 +32,6 @@ engine gets wrong today.
 | 0268 | Hold the cell index on the unit. It removes two of the four scattered reads for about 4 MB. It sits below 0267 because it is the smaller half of the same win, and it carries a real risk that 0267 does not: a second declaration site for a value the tile already fixes, which is the defect shape this project records most often. The item refuses to be done without the check that fails when the two disagree. |
 | 0266 | Order the unit arena by cell. It is the largest measured cost in the engine that no item held: the unit cost is 2.11 times higher with the units scattered than packed at the target scale, and the same layout is why the unit passes reach only 1.88 at 12 threads and 1.85 at 16. It sits below 0238 and 0237 because a decision that follows the lattice asks for the units of a cell together, and because a reorder that runs every frame could cost more than it saves, which 0237 is what makes measurable. |
 | 0237 | Declare what each stage reads and writes. It sits with 0238 because a stage nobody can time from outside cannot be shown to have improved, and because it makes ADR-0009 checkable, which that record says in its own consequences it is not. |
-| 0236 | Repair every record that calls BLK-007 open. A benchmark exists on a branch, and the moment it merges a large number of documents state something false and nothing fails. FND-042 records that this has already happened twice. It sits here so the sweep is ready before the merge rather than after it. |
 | 0102 | A settlement reads its own ground rule, not the passability rule. Blocked by 0071 and 0092, in that order. |
 | 0187 | Nothing moves a carried load into a store, so gathering cannot feed anybody. It moved here from `Next` because 0186 is complete and a unit now carries something. It closes the chain from the ground to the store, and it is what makes a hungry unit able to feed itself. |
 
@@ -42,6 +41,8 @@ These close a gap a review found, or they unblock the items above.
 
 | No. | Why it sits here |
 |---|---|
+| 0244 | The project orientation is two files and they have already diverged: one carries a repaired sentence and the other still says no measurement exists on the target platform. An agent that opens the second reads something false and nothing fails. FND-259 holds it. It sits beside 0242 because both are one fact in two places with nothing that compares them, and refining one should ask whether they are one script. |
+| 0242 | Nothing fails when a document states a register in its own words, and that was tested rather than assumed: a stale sentence went back into a product record and all eight document checks passed. FND-258 holds the case and FND-223 holds the ninety documents it cost last time. It sits at the top of `Next` because the sweep it replaces has now been paid for three times. |
 | 0224 | The control plane names one entity of a mass shape in four places, and a test pays four crossings for each site because of it. FND-215 holds the measurement. It sits below 0223 because the review that found it returned ADR-0040 for an amendment, and the amendment names this item. |
 
 | 0189 | The rules against inert work look for an absent caller, and this defect has one. DEC-074 holds the options and recommends this. |
@@ -125,6 +126,7 @@ These are real and none of them blocks anything today.
 | 0234 | BLK-010 and ADR-0065 state opposite directions for one question, and the code follows the record. DEC-091 must close first. It sits here because only the workforce case is built, so the cost falls on the first person who builds a formation from the register. |
 | 0221 | Source footnotes name the registry for six records that now have files. FND-214 found it. Nothing fails and nothing will, so it sits here, and it is worth a check rather than a sweep because the next reserved number a source file cites will do the same. |
 | 0222 | The error hierarchy declares three exception types that nothing raises. ADR-0046 states the gap in its own consequences rather than claiming the capability, so a reader is not misled today. It waits on the selector for one of the three. |
+| 0243 | Seven accepted records say in their own words that no measurement exists on the target platform, and the retcon window forbids repairing them. DEC-096 must close first, and a reviewer owns it. It sits here because the documents that guide work today are already repaired and these are read for their claims rather than for their cost clauses. |
 | 0229 | The first measurement on the target platform found a frame cost at 4,096 tiles that disagrees with every larger extent, and four threads beat one thread on a machine with two. It sits last because it explains a figure rather than repairing behaviour, and because 4,096 tiles is the size most tests use, so anything it finds is paid by the suite and not by a player. |
 
 ## References

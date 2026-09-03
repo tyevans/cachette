@@ -32,9 +32,8 @@ between changing the code and changing the record, and chose the code.[^6]
 that does not fit is an ordinary spawn. It is not the largest, and it is not
 the last. A run therefore pays for the copy of every column on a tick that
 depends on the population, and a caller that reads the frame cost sees a
-figure that has nothing to do with the frame. No measurement exists on the
-target platform, so nobody can say what the copy costs, only when it
-arrives.[^7]
+figure that has nothing to do with the frame. No run has priced the copy, so nobody
+can say what it costs, only when it arrives.[^7]
 
 **A cost that arrives at construction is a cost a developer can see.** A
 reservation is one call, in one place, before the first frame. A developer who

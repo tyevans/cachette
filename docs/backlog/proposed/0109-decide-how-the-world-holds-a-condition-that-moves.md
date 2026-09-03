@@ -37,8 +37,8 @@ determinism is the one property this project cannot recover.
 - **The condition is not chosen.** Rain, wind, temperature and snow are
   candidates. The product record needs one that works, not a catalogue. The
   review chooses one and says why.
-- **No measurement exists on the target platform.**[^4] The record states a
-  cost shape, not a figure.
+- **One blocker holds the cost figures this record would state.**[^4] The
+  record states a cost shape, not a figure.
 
 ## Done when
 

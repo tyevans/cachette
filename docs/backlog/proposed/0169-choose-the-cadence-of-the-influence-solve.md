@@ -19,8 +19,7 @@ solved on each tick, and the rest carry the field the last solve left
 them.[^1]
 
 Item 0104 built the field and declined to choose the cadence, because a
-cadence is a value chosen against a cost and no measurement exists on the
-target platform.[^2] The engine already holds two schedules of this shape, one
+cadence is a value chosen against a cost and no run has priced a solve.[^2] The engine already holds two schedules of this shape, one
 for the site rates and one for the choice, so the mechanism is not the hard
 part.[^3]
 

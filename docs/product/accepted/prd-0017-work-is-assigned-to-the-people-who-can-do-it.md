@@ -111,8 +111,9 @@ must keep the changing part of that term small.[^2]
 
 ## Which blockers govern this
 
-- **No measurement exists on the target platform.**[^1] Every cost statement
-  above states a shape, not a number.
+- **One blocker governs every cost figure here.**[^1] It says which figures
+  are measured and which are derived. Every cost statement above states a
+  shape, not a number.
 
 The settlement count is answered, so this record states no number of
 places.[^3] The population is answered, and it counts everybody rather than

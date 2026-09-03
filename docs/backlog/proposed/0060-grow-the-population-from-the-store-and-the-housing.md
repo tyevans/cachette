@@ -63,7 +63,8 @@ item implements it.
 item does not change that: growth counts the free places itself, in the way
 ADR-0074 D4 requires of a caller that must not over-fill.[^9] [^10]
 
-**Blockers.** BLK-007 governs every cost figure, so this item states none.
+**Blockers.** BLK-007 governs the cost figures this item would state, so it
+states none.
 BLK-003 gives the population target and BLK-005 gives the settlement
 count.[^11] [^12]
 

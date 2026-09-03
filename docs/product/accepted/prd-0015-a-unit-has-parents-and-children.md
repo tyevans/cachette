@@ -111,8 +111,9 @@ one of those things.[^2]
 
 ## Which blockers govern this
 
-- **No measurement exists on the target platform.**[^1] Every cost statement
-  above states a shape, not a number.
+- **One blocker governs every cost figure here.**[^1] It says which figures
+  are measured and which are derived. Every cost statement above states a
+  shape, not a number.
 
 The size of the population that carries a line is answered, so this record
 states no number.[^3] The project already holds that a unit raised from the

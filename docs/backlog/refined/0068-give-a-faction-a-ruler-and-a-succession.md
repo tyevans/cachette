@@ -43,7 +43,8 @@ tie-break on the identifier does not repair a cycle.[^1] [^2] ADR-0004 D1 and
 D4 fix the order.[^3] ADR-0014 D1 makes the ruler a generational identity, so
 a vacant position and a dead ruler are two different states.[^4]
 
-**Blockers.** BLK-007 governs every cost figure, so this item states none.
+**Blockers.** BLK-007 governs the cost figures this item would state, so it
+states none.
 BLK-013 gives the faction ceiling and BLK-004 the size of the population that
 can hold a position.[^5] [^6] **BLK-011 is resolved and it is the constraint
 that shapes the rule**: a character raised from the ranks cannot inherit by

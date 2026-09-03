@@ -136,17 +136,17 @@ else grows is a special case of a rule the world does not have. **No number
 is reserved for the crop record.** The project reserves a number when it
 writes the record, and reserving one now would state an intent as a fact.
 
-No cost figure appears here. The one measurement this project holds was taken
-on a development machine and not on the target platform, and every figure in
-the project is derived rather than measured.[^1] The statements above give a
+No cost figure appears here. One blocker holds every cost figure this record
+would state, and it says which figures a run has measured.[^1] The statements above give a
 shape, not a number. The shape that matters is the one the project already
 found: the term that grows with the number of things dominates the term that
 grows with the number of tiles.[^2]
 
 ## Which blockers govern this
 
-- **No measurement exists on the target platform.**[^1] Every cost statement
-  above states a shape, not a number.
+- **One blocker governs every cost figure here.**[^1] It says which figures
+  are measured and which are derived. Every cost statement above states a
+  shape, not a number.
 
 No other blocker governs this record. The tile edge, the world extent and the
 simulated time in one tick are all answered, so a recovery period can be

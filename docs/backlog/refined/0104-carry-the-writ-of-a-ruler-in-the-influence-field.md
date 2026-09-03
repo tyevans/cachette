@@ -88,8 +88,8 @@ edit it. The conflict above is carried to a reviewer as an open choice.
 count. Both rows were moved to `Draft` before the records were written.[^7] The
 author is not the reviewer of either.
 
-**Blockers.** BLK-007 governs every cost figure in this work, because no
-measurement exists on the target platform. The solve therefore states no
+**Blockers.** BLK-007 governs every cost figure in this work, because no run
+has priced a solve. The solve therefore states no
 budget, carries no cadence chosen against a figure, and holds no cost
 comment in the code. The cadence that the research recommends is a separate
 item.[^8] [^10]

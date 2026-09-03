@@ -359,7 +359,7 @@ structural change. It is a list of the instances.
   migration reads as a migration on the screen can only be settled by running
   the demonstration.
 - The cost of every step is stated as a shape. No cost figure appears, because
-  no measurement exists on the target platform.[^30]
+  one blocker holds every cost figure a step would state.[^30]
 - The counts in this document are counts of the tree on this branch. Another
   worker may have changed any of them. Five workers hold the influence field,
   the households, the descent, the positions and the world construction while

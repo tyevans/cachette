@@ -41,7 +41,8 @@ directly. It reads two records that do not exist yet: the choice record that
 item 0064 writes into row 0064, and the assignment record that item 0063
 allocates.[^1]
 
-**Blockers.** BLK-007 governs every cost figure, so this item states none.
+**Blockers.** BLK-007 governs the cost figures this item would state, so it
+states none.
 
 **Serves.** PRD-0009 and PRD-0017.
 
