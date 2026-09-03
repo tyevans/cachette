@@ -113,5 +113,5 @@ which is why D4 names what would supersede it.
 [^1]: PRD-0002, a developer watches the world run. `docs/product/shipped/prd-0002-a-developer-watches-the-world-run.md`
 [^2]: ADR-0002, simulated and aggregated state holds no floating point number, decision D4. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
 [^3]: ADR-0001, one binary gives one answer at any thread count. `docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
-[^4]: ADR-0036, a snapshot copies dirty chunks, not the world. `docs/adrs/REGISTRY.md`
+[^4]: ADR Registry, the retired numbers. `docs/adrs/REGISTRY.md`
 [^5]: ADR-0017, the world is a rhombus, so a tile index is raw axial, decision D4. `docs/adrs/accepted/adr-0017-the-world-is-a-rhombus-so-a-tile-index-is-raw-axial.md`

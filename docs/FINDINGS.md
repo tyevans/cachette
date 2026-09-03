@@ -24,6 +24,12 @@ precedent.[^1]
 
 **Next number: FND-239**
 
+**This line answers from merged history, so it cannot see a number that a
+branch has taken and not merged.** A dispatcher issues ranges above it for that
+reason, and those ranges live in prompts that no register can read. Four
+collisions in one session came from the gap between the two, and a finding holds
+the case.[^ALLOC2]
+
 ## A. Corrections to stated rules
 
 ### FND-001 — A monoid needs EXACT associativity
@@ -4783,6 +4789,203 @@ that ordering was correct at the time it was chosen.
 the record, because a person reads an image and an agent does not. The two
 paths answer different readers, and the tool did not replace the picture.
 
+### FND-209 — The camera was not slow at the far zoom. The pan step was the wrong size for the view
+
+**Believed.** A watcher reported that camera navigation is "incredibly sluggish"
+at the far zoom, and the reading taken from that was a cost problem. A drawing
+at the smallest tile the camera allows costs about a third of a second on a
+development machine, which supported the reading.[^F209A]
+
+**True.** **Nothing was slow.** The project owner corrected it from watching the
+window move: the step is the same size however far out the view is zoomed. One
+press moved a fixed count of tiles, and a tile is a fixed number of pixels only
+at one zoom. At the zoom the viewer opens on, a press moved eighteen pixels. At
+the smallest tile the camera allows, the same press moved three. The camera was
+covering a fortieth of the distance for the same effort, and a watcher reads
+that as slowness.
+
+**Evidence.** The step was one and a half tiles, multiplied by the tile width in
+pixels. The tile width runs from two pixels to sixty-four, so the pixel distance
+of one press varied by a factor of thirty-two across the range the camera
+allows. The window polls the keyboard once for each drawn frame, so a held key
+crossed the window in about two seconds at the opening zoom and in about
+fourteen at the far zoom.
+
+**The cost figure is real and is not the cause.** The drawing does cost about a
+third of a second at the far zoom on a development machine, and the ground of
+every visible tile is generated twice to produce it.[^F209B] That is a separate
+defect with its own item.[^F209C] It made the frame rate low; it did not make
+the camera cover three pixels a press.
+
+**Follows.** **A pan covers a share of what the window shows.** The step is now
+a share of the window and not a count of tiles, so a press moves the same part
+of the picture at every zoom.
+
+**The share preserves rather than improves.** It is the share the old step
+covered at the zoom the viewer opens on: eighteen pixels in a window seven
+hundred and twenty pixels on its shorter side, which is one in forty. The one
+zoom nobody reported is unchanged and every other zoom now matches it. No part
+of the value was read off a render, and one test asserts the opening zoom still
+moves what it moved before.
+
+**The zoom did not have the matching defect, and now a test says so.** A zoom
+press multiplies the tile size by a factor. A press therefore changes the view
+by the same proportion wherever it is taken, which is the property the pan
+lacked. A zoom that added a count of tiles would produce the same complaint in
+the other direction, so a test asserts the ratio is one number across the range.
+
+**A measurement can be right and still answer the wrong question.** The cost of
+a drawing was measured carefully, on the correct binary, and it supported a
+diagnosis that was wrong. The person watching the window had the answer, and
+nobody asked them until after the measurement was taken. **Ask the reporter what
+they saw before measuring what you think they meant.**
+
+### FND-207 — The grid a watcher saw is the gap between the tiles, and the gap was neither whole nor bounded
+
+**Believed.** The window draws a black border around each tile, and the lattice
+that emerged at some zooms and not others was a defect of that border. The
+holding border was the suspect, because it is the only border the drawing
+names.
+
+**True.** The drawing draws no black line at all. It fills a square smaller
+than the tile and leaves the space around it, and that space shows the colour
+of the ground outside the world. What a watcher reads as a grid is the space
+the drawing does not fill. The holding border is a separate layer, in the
+colour of a faction, and it is not involved.
+
+The gap had two defects, and they answer two different halves of the report.
+
+**The lattice.** The drawing took one integer square width from the tile width
+and placed it at the rounded centre of each tile. A tile is a fractional number
+of pixels wide at nearly every zoom, because each zoom step multiplies the size
+by a fraction. The rounded centres therefore advanced by a whole pixel more
+under some tiles than under others, while the square stayed one width, so the
+gap was one pixel under some tiles and two under others. The pattern repeats
+across the picture at the beat of the fraction, and the eye reads a beat as a
+lattice.
+
+**The far zoom.** The square was a fixed share of the tile width, and the share
+rounded down to a whole number of pixels. At the smallest tile the camera
+allows, the square was one pixel of two and the gap took three quarters of the
+cell in area. The picture at that zoom is mostly the colour outside the world,
+with the ground showing through as specks. That is the state in which the grid
+"emerges", and it emerges because the map disappears.
+
+**Evidence.** The gaps were counted rather than judged, across a hundred
+neighbouring tiles in one row, at ten tile widths on a development machine. At
+a whole width the gap was one value. At a width of four and a half pixels it
+was zero under half the tiles and one under the other half; at six and a half
+it was one under half and two under the other half. Rendering the same world at
+each width showed the banding at exactly the widths the count named, so the
+artefact is in a still picture and is not a motion artefact.
+
+**Follows.** **A separator must be a whole number of pixels, and it must be the
+same number under every tile.** The drawing now takes the far edge of a tile
+from the near edge of the tile beside it, read the same way, so the two agree by
+construction rather than by arithmetic that a reader must check.
+
+**Two snapped values that a reader expects to be equal are one fact in two
+places.** The first repair computed the right edge as the rounded centre plus
+half a width, and the next tile's left edge as its own rounded centre less half
+a width. Those are equal in exact arithmetic and are not always equal in
+floating point. A test over twelve widths found the disagreement at a width of
+three and three tenths, which no picture would have shown.
+
+**A separator that covers more of the cell than the tile is not a separator.**
+The drawing leaves the gap out below the width at which the gap takes half the
+cell. The bound comes from that identity and from nothing else. It is not read
+off a picture and it does not depend on the world, the seed or the window.[^F207A]
+
+**What the bound does not settle.** At a tile of four pixels the gap passes the
+bound and still takes forty-four parts in a hundred of the cell, and the picture
+at that width still reads as a grid. The bound is the one value in its family
+that a sentence forces. Any other share is a matter of taste, and the register
+holds the question rather than a number somebody liked.[^F207B]
+
+### FND-208 — The window stated a drawing cost of zero in every stored picture, and it was a mean over no measurement
+
+**Believed.** The cost card of the window reports what the drawing cost. Every
+stored picture of the window said `draw 0.0 ms`, and the drawing was assumed to
+be very cheap.
+
+**True.** **A drawing cannot measure itself.** The run records the cost of a
+frame after that frame has been drawn. The cost card is drawn inside the frame,
+so the mean it states covers the frames before it. A picture written by one
+call to the drawing has no frame before it, and the mean is then taken over
+nothing. The card printed the result of that division as `0.0 ms`, which reads
+as a measurement of a free drawing.
+
+The live window is not affected after its first frame, because by then frames
+have been recorded. Every picture anybody looked at was affected, because a
+picture is one frame. The one instrument the project had was saying zero in
+every image the project examined.
+
+**Evidence.** The drawing was timed outside itself, over five frames at each of
+ten tile widths, on a development machine and not on the target platform. At the
+smallest tile the camera allows, one drawing of the demonstration world cost
+about a third of a second. That is three frames a second, and it is the reason a
+watcher reports that the camera is sluggish when zoomed out. The figure the card
+would have shown had it been able to measure itself is four orders of magnitude
+away from zero.
+
+**Follows.** **A cost the run has not measured is absent, not zero.** The
+window now says so in words. The record already required this of a number the
+window cannot afford, and a number nobody has taken is the same case.[^F208A]
+
+**A row that reads as a measurement must carry the count it was taken over.**
+The count travels with the mean into the readout, so no caller can print a mean
+without knowing whether one exists.
+
+**The stored picture did not catch this.** The test that stores a picture of
+the panel supplies fixed costs, because a clock gives a new number on every
+run. That is correct, and it is why the fixture never reached the case where no
+measurement exists. The test that closes this drives the real drawing with a
+run that has recorded nothing.[^F200A]
+
+### FND-206 — The holding border already draws only on a boundary, and the busy picture was the fixture
+
+**Believed.** A dense picture of a world was hard to read because the holding
+border drew on every held tile. The repair was to draw the boundary of a
+holding instead: a tile whose neighbours all share its holder would draw
+nothing, and only a tile on the edge of a holding would draw a border. A
+register entry and a backlog item both stated it that way.[^F201B]
+
+**True.** The drawing already does that. The border test reads the six
+neighbours of a held tile and draws only when one of them has a different
+holder. A tile surrounded by its own faction draws no border and never did.
+The repair was already in the code, and the entry that proposed it described a
+defect that does not exist.
+
+**Evidence.** The world was counted rather than judged. Of the held tiles, 83
+in 100 sit on a boundary in the picture that looked bad, 89 in 100 in the
+picture that looks best, and 85 in 100 in a third. **The picture that reads
+best has the highest share.** That number therefore does not explain the
+difference and cannot be the mechanism.
+
+The number that does explain it is the share of the world that is held. It is
+74 in 100 in the picture that looked bad and 8 in 100 in the picture that reads
+best. A world where three quarters of the ground is claimed draws as a map of
+factions, because it is one.
+
+**Follows.** **The fixture made the defect.** The bad picture came from six
+hundred units on a world of thirty-six hundred tiles, which is one unit for
+every six. Nobody chose that density for a reason; it was carried from one
+command line to the next while reproducing a different problem. The
+demonstration seats thirty people for each faction in a world of a quarter of a
+million tiles, and the default picture command is a fortieth as dense.
+
+**A measurement before a repair would have cost one run.** The first repair for
+this was a border weight that fell with the tile size, and it was removed for
+keying on the wrong variable.[^F206B] The second repair was the boundary rule,
+and it was already implemented. Both were proposed from a rendered picture and
+neither was proposed from a count. The count took one throwaway example and it
+refuted both.
+
+**What is real.** The drawing borders a holding against unclaimed ground and
+against another faction alike, and its own comment says it marks "where one
+holding meets another". The code and the comment disagree, and the comment is
+the thing that is wrong.[^F206C]
+
 ### FND-201 — The holding edge carries no information when holdings interleave at tile scale
 
 **Believed.** A dense picture of a world was hard to read, and the units were
@@ -4818,6 +5021,13 @@ repair was written, rendered, judged better, and then removed for that reason.
 Drawing the outer boundary of a contiguous holding rather than the boundary of
 every tile would carry information at any density. That is real work and it is
 a separate item.[^F201B]
+
+**Corrected. The drawing already draws the boundary and not every tile, and
+this entry was wrong about the mechanism.** The share of held tiles that sit on
+a boundary is highest in the picture that reads best, so it cannot be the
+cause. The share of the world that is held is the difference, and the picture
+that looked bad came from a fixture nobody chose on purpose. The correction
+holds the counts.[^F201C]
 
 ### FND-200 — A predicate that accepts a prefix accepts every rename that keeps it
 
@@ -4991,6 +5201,436 @@ hides best.[^22]
 integration and a reader waits for it. The reason is that the script states one
 thing and does another, in the place a contributor looks to learn what the
 check asserts.
+
+### FND-202 — A growth policy lived in a completed backlog item, where nothing read it
+
+**Believed.** The rule that governs how the agent protocol server grows was
+recorded, and a worker who needed it would find it.
+
+**True.** The rule existed in one sentence, in the closing section of the
+backlog item that built the first slice of the server: add a tool when an agent
+needs it, and not before.[^F202A] That file sits in the completed directory. No
+product record and no decision record held the rule. The three product records
+about watching a world all serve a person at a window, and none of them
+mentions an agent at a protocol.[^F202B] [^F202C] [^F202D]
+
+The project owner considers the rule binding and stated it as the original
+intent. Nothing a worker reads before starting work carried it.
+
+**Evidence.** A search of the tree for the rule returns the one sentence, in
+`complete/`. In the same round, one worker designed a change to the viewer,
+went looking for the detail the change would need, and reported that the server
+could not carry it, without any sign that a rule already governed what to do
+next. A second worker was then dispatched to close the gap and had to be told
+the rule in the dispatch message, because it could not be read.
+
+**Follows.** Three things.
+
+**This is the project's own recurring shape, applied to a rule.** One fact
+stored where nothing reads it, with nothing that fails when a reader misses
+it.[^F202E] The registers exist because a fact in prose decays silently, and a
+rule in a completed work item is a fact with no reader at all.
+
+**A completed backlog item is not a place to record a rule.** It is the correct
+place to record what a change cost and what it left open, which is what the
+rest of that section does. A rule that governs later work outlives the item,
+and it belongs in a record.
+
+**The repair is a record, and it names the audience.** The growth policy is a
+constraint on a surface, so it is a decision record.[^F202F] The need behind it
+is a question an agent could not answer, so it is also a product record, and
+that record names an audience this directory had not served before.[^F202G]
+
+### FND-203 — The control plane could not read the ground, so a fixture recorded it in a comment
+
+**Believed.** The seed of the gather fixture in the agent tests was chosen for
+a reason a reader could check.
+
+**True.** It was chosen against the engine's own read, from Rust, and the
+result was written into a comment beside the fixture. The comment says so
+plainly, and it says why: no read told Python where a resource sat, so nothing
+in the test could ask. The comment names three addresses that hold food under
+one seed, and two that hold stone under another. Nothing checked any of it
+again.
+
+**Evidence.** The comment is in the agent test file and it states the gap as a
+finding rather than an accident. The first version of that test used a seed
+with no food at the addresses it gathered from, and failed for that reason.
+
+**Follows.** Two things.
+
+**A measured fact in a comment is a fact with no defence.** The generator is
+derived from the seed, so the claim is true until any change to terrain
+generation, and nothing fails on the day it stops being true. This is the same
+shape as a count in a decision record.[^F202E]
+
+**A reader that closes the gap turns the comment into a check.** The tile read
+now reports what the generator gave, what units took, and the difference, at
+one address. The claim about the seed is now an assertion in the same test that
+depends on it, so the day it stops being true is the day the suite goes red.
+
+### FND-204 — A world where every tile admits a unit hid a swapped read
+
+**Believed.** A test that compares a level 1 cell against every tile of the
+world, one at a time, checks that the cell reports what it summarises. The
+comparison covers each field it names.
+
+**True.** It covered one of the two fields it named. The fixture built an 8 by
+8 world of hill and mountain, in which every tile admits a unit. The count of
+tiles and the count of open tiles were therefore the same number. A read that
+returned the open tiles where the tiles belong satisfied the assertion, because
+both sides moved together.
+
+**Evidence.** The defect was put back in the binding and the whole agent suite
+stayed green, at exit code zero, with no test failing. The same run caught six
+other defects, each by the test written for it. A search over seeds with the
+engine's own census found that seed 51 gives three tiles of water in the same
+extent. The fixture moved to that seed, the defect was put back again, and the
+test then failed.
+
+**Follows.** Three things.
+
+**The rule already existed and the test still shipped with the hole.** The
+testing rule says that a uniform input hides a defect, and that putting the
+defect back is the only proof a fixture reaches the case.[^23] The register
+holds two earlier instances, in two subsystems.[^11] [^F204C] This is a
+third, written after the rule, by someone who had read it. **The rule is not
+enough on its own.** Only the probe found this.
+
+**A fixture chosen for convenience is chosen for the wrong reason.** The seed
+came from a neighbouring test, where it was correct. Nothing asked what
+distribution this assertion needed. The question to ask of a fixture is what
+value would fail, not what world is nearby.
+
+**A test can now say when its fixture stops reaching the case.** The repaired
+test asserts that the open tiles are fewer than the tiles, and that the window
+holds more than one kind of ground. Those assertions fail if a change to the
+generator makes the world uniform again, so the hole cannot come back quietly.
+
+### FND-214 — A reserved row is a guess that a constraint exists, and half of them were wrong
+
+**Believed.** Eighteen registry rows reserved for the log and for the Python
+boundary described eighteen constraints waiting to be written down. Two refined
+backlog items said so: each named its range of rows and listed the whole range
+under what it creates. The rows were derived from two long drafts by giving each
+decision of a draft its own number, so a reader could reasonably read the count
+of rows as a count of claims.
+
+**True.** Nine of the eighteen stated no constraint that this project can hold.
+Seven were written, and two already had files. The nine that went failed in four
+distinct ways, and the pattern is worth more than the count.
+
+- **One stated the alternative that another row refuses.** The rejection of
+  classic event sourcing is what the arena record rejects, and the scope rule
+  puts a rejected alternative inside the record that rejects it.[^F214A]
+- **Two restated a constraint an accepted record already holds.** The barrier
+  concatenation is two decisions of the record on parallel stages, and the
+  region aggregate is the same record seen through a vocabulary this project
+  does not use.[^F214B]
+- **Four described a mechanism for which nothing had chosen anything.** No
+  command queue, no rejection summary, no snapshot and no save format exists,
+  and no product record asks for one. This is the failure that retired the
+  first number the project ever retired, and the row for it already names the
+  shape.[^F192A]
+- **One guarded a hazard the project does not have.** Three layers of view
+  safety defend a borrow of engine memory. Every read across the boundary
+  copies, so no borrow is handed out and nothing was being defended.[^F214D]
+
+**Evidence.** Each row was read against the three-condition test of the record
+scope rule, with the removed draft that the row came from open beside it, and
+with the code the row would govern. The tree was searched for every citation of
+each of the eighteen numbers: six numbers are cited by a source file, a build
+manifest, a gate script or a Python test, and every one of those six was
+written. Of the nine retired, one was cited, by an accepted record that cited it
+for its absence and said so in its own text.
+
+**Follows.** **A reserved row reserves a number and asserts nothing.** The
+registry already says this and the record priority index already says it twice.
+This entry is the measurement that says how often it matters: for one block of
+rows derived from drafts rather than from code, the yield was half.
+
+**Derive a row from a claim and it can still be a topic.** The registry was
+re-derived from claims specifically to avoid topic titles, and it worked: none
+of the eighteen was a topic. Seven of them were nonetheless not constraints. A
+claim title bounds a record. It does not prove that the record should exist.
+
+**A citation from a source file was the strongest single signal.** Every row a
+source file, a manifest, a gate or a test cited passed the test, and every row
+nothing cited outside the registry failed it or was one of two written for a
+reason the code cannot yet show. That is one block of rows and not a law, and it
+is worth testing against the next block.
+
+### FND-215 — The control plane names one entity of a mass shape in four places
+
+**Believed.** The control plane rule was unenforced but not yet broken. The
+records say nothing at the Python boundary reads the tier, so the rule is prose,
+and the repair is the enforcement that ADR-0043 describes.[^F215A]
+
+**True.** The rule is already broken, by the interface itself, in four places.
+Enforcement would not have prevented three of them, because the engine offers
+them deliberately and a caller reaches them by calling a documented method once
+for each member of a set.
+
+**Evidence.** Both the soldier shape and the settlement shape declare the mass
+tier in the core crate, and the soldier's declaration carries its reason in the
+same comment: a soldier is one of a million, so no caller walks the
+population.[^F215B]
+
+The bindings answer the tile of one soldier, the positions of one site and the
+preference of one site. The agent server wraps the first as a tool that reads one
+unit.[^F215C] [^F215D] A caller that wants any of those answers for a set calls
+once for each member, so the crossing count is a function of the population,
+which is the case the control plane record refuses in its own checkable
+form.[^F215E]
+
+**The type stub directs a reader into the pattern.** The documentation of the
+gather event columns tells a reader to take a value from the unit column and hand
+it back to the per-unit read.
+
+**A test pays it four times for each site.** The thread count test for the site
+positions sets a preference one site at a time, then reads the positions of each
+site twice. Eight sites cost twenty-four crossings. It does that because the
+set-valued command takes one target for the whole set and the test wants a
+different target for each site, and because no read answers for a set.
+
+**Follows.** **A set-valued verb is not a set-valued interface.** The project
+took the owner's rule that a command takes a set and applied it to the commands.
+The reads kept the singular form, and a read is a crossing like any other. Half a
+rule applied is not a weaker version of the rule; it is a boundary that still
+grows with the population, through the half nobody looked at.
+
+**A command that takes a set and one value still forces a loop.** The preference
+command is set-valued and cannot say a different thing about each member, so a
+caller that needs per-member values sends one command for each member. The set
+form removed the loop from the signature and left it in the caller. This is the
+same shape the register already holds: a principle satisfied in form and not in
+substance.[^F215F]
+
+**This is FND-147 again, at the read rather than at the write.** That entry
+records that a rule which forbids a shape and offers no alternative loses to the
+absence of the read. The alternative is still absent, and the sweep it produces
+is still written by people who know the rule.[^F215G]
+
+**The enforcement record would not have caught it.** ADR-0043 describes a
+refusal raised at a caller's loop over a set. Three of these four are one call
+that the engine documents and answers. Nothing would refuse them, because the
+engine offers them.
+
+### FND-216 — The declared tier of a mass shape reaches no code in either crate
+
+**Believed.** The tier is declared once and the core crate checks it when it
+builds the storage of a shape. The gap is that the tier reaches no code outside
+the core crate, so nothing at the Python boundary reads it.[^F216A]
+
+**True.** The tier of a mass shape reaches no code inside the core crate either.
+One shape out of three reads a declared tier: the character arena reads its own
+ceiling to size itself at construction.[^F216B] The mass tier states no ceiling,
+by design, because the mass tier is the one no ceiling bounds. So the check that
+consumes a tier has nothing to consume for a mass shape.
+
+**Evidence.** The soldier module and the settlement module contain no mention of
+the tier, the trait or the constant. Their declarations live in the tier module,
+and a search of both modules returns nothing. The only reader of a declared tier
+is the character arena's ceiling.
+
+**Follows.** **A declaration is not a mechanism, and this one reads as both.**
+The tier is an associated constant on a sealed trait, which is the shape of an
+enforced thing. It is enforced for one shape and inert for two, and the two it is
+inert for are the two the whole rule is about.
+
+**A record said so, and the sentence was believable because it was nearly
+true.** The tier record's context claims the core crate checks the tier when it
+builds a shape's storage. That is a correct description of the character arena
+and a false description of the soldier and settlement arenas. A reader concludes
+there is a mechanism to extend to the boundary, when there is a mechanism to
+build.
+
+**This is the inert-capability shape, in a place the project already trusted.**
+The rule says to ask who is obligated to invoke a declared capability.[^65]
+Nobody invokes the tier of a mass shape. It passes no test of its own because
+there is nothing to test, and the compile-time assertion that exists asserts the
+character tier.
+
+**The repair is not to delete the declaration.** The declaration is the single
+site the boundary rule needs, and a second site at the boundary is the failure
+the tier record's D1 refuses. The repair is to make something read it, and the
+review that found this says so.[^F216D]
+
+### FND-217 — The tiles are stored row by row, and one record reads the reserved row as settled
+
+**Believed.** The tiles are stored in blocks at the aggregation block size, and
+the summary pyramid divides the world into the same blocks, so a structure that
+walks blocks walks the storage in memory order.
+
+**True.** The pyramid divides the world into blocks. The tile columns are stored
+row by row. The grid derives a tile index as the row times the width plus the
+column, and that is the only storage order the engine has.[^F217A]
+
+A block-major space does exist, and it is a different space. The block layout of
+the unit-to-tile bridge builds a key by interleaving the block of an address with
+the position inside that block, and the engine converts between that key and the
+tile index.[^F217B]
+
+**Evidence.** The pyramid's own fold says it, in its own comments. Summarising
+one block reads one contiguous run for each row of the block, not one run for the
+block, because a block is a rectangle over a row-major column.[^F217C] A block of
+edge `n` costs `n` runs.
+
+**Follows.** **The reserved row for a block-tiled layout has no record and no
+implementation, and the corpus is otherwise careful about it.** Three accepted
+records cite that row and every one of them speaks conditionally: the storage
+record says the derivation is arithmetic whichever order the tiles sit in, the
+tile index record says the record holding the memory order may choose a block
+order rather than a row order, and the bridge record cites it without asserting
+it.[^F217D] [^F217E] [^F217F]
+
+**One draft asserted it as present fact, and built a cost case on it.** The
+selector range record says tiles are stored in blocks at the aggregation block
+size, and its D3 concludes from that that a verb reads a run rather than
+gathering scattered values, and that the engine maps no space onto another. Both
+conclusions fail under the storage that exists.[^F217G]
+
+**A reserved row accumulates belief.** Nothing about the row changed. It was
+cited carefully three times, and the fourth citation read the careful ones as
+evidence that the thing was true. This is the same shape as a summary going
+stale, arriving from the other direction: the register did not decay, the reading
+of it did.
+
+**A row that governs a layout should say what the layout is today.** The registry
+row states the claim the record would make and says nothing about what the code
+does instead. A reader who wants to know how the tiles are stored has to read the
+grid.
+
+### FND-218 — The retcon window governs what a record claims, not where its pointers go
+
+**Believed.** An accepted record does not change except in status, and the
+retcon window is the only door. Any edit to an accepted record therefore has to
+pass all three of its conditions, and the first is that nothing depends on the
+record yet.[^8]
+
+**True.** The window governs an amendment, which is a change to what the record
+claims. A citation is not a claim. Repairing a pointer that became false through
+no fault of the record is not an amendment, and the three conditions do not
+apply to it.
+
+**Evidence.** A review retired nine reserved registry rows. One of them,
+`ADR-0036`, was cited once by ADR-0067, which is accepted, in a footnote, and
+cited for its absence: the record says an alternative design needs a snapshot
+mechanism that no record holds.[^F218B]
+
+The number is written in a code span above, because a retired number is
+mentioned and never cited, and the citation check enforces it. **This entry
+broke that rule on its first draft and the gate caught it.** That is a second
+instance of the cost the register already carries: a document that must explain
+why a number went cannot name the number the ordinary way.[^F218F]
+
+Retiring the row made that footnote name nothing. The record check fails on a
+citation of a number that no record file and no registry row has, so the
+citation was also a red gate.
+
+**The record's first condition could not be met and the other two could.**
+ADR-0067 has a dependent, so the window as written was shut. The edit was made
+anyway: the footnote now names the registry's retired numbers, and the body
+sentence it supports is unchanged and still true.
+
+**Three roads were open and two were worse.** Leaving the citation gives an
+accepted record that names a number holding nothing, which is a record that lies
+with the authority of an accepted one. Writing a superseding record whose entire
+content is a corrected file path is a record for a topic and not for a
+constraint, which is the failure the scope rule measures against.[^16] The
+third was to repair the pointer, which changes nothing a reader decides.
+
+**Follows.** **The registry now states the rule, and this entry holds the
+case.**[^F218D] The test is whether the edit changes what a reader would decide.
+Repointing a footnote at the row that now holds the material does not.
+Rewording the sentence that carries the marker does, and the window governs
+that.
+
+**The rule cannot be used to smuggle a change through.** Adding, removing or
+reversing a claim, a force, a rejected alternative or a consequence is an
+amendment however small the diff and whatever else the commit touches. A commit
+that repairs a citation and edits a sentence in the same breath is an amendment,
+and it is reviewed as one.
+
+**A retirement is a sweep, and the sweep reaches accepted records.** The rule
+that a closed blocker must be searched for across the tree already exists, and
+this is the same operation for a retired number.[^F218E] The difference is that
+a retired number fails a gate and a closed blocker does not, so this one cannot
+be forgotten. That is luck rather than design, and the register records which of
+the two it is.
+
+### FND-219 — The next-number line reflects merged state, so it cannot allocate across branches
+
+**Believed.** Each register carries an explicit next number, and a writer claims
+it before writing the row. That remedy was installed after two writers collided
+on FND-035 and DEC-013, and it was believed to close the class.[^1]
+
+**True.** The remedy holds for writers who commit between claims. It does not
+hold for writers on separate branches, and the project now works that way by
+default.
+
+**The line reflects merged state and nothing else.** A writer on a branch reads
+it, takes the number, and writes the row. The line does not change for anybody
+else until the branch merges. Six workers on six branches read the same number
+on the same day, and every one of them followed the documented procedure
+correctly.
+
+**A second authority exists and no register can see it.** The dispatcher holds
+ranges and issues them in prompts. A prompt is not a file. No writer can consult
+it, no check can read it, and it disagrees with the line by construction,
+because the line answers from merged history and the range answers from work in
+flight.
+
+So one question has two authorities, neither is observable to the other, and
+both give a correct answer to the question they were asked.
+
+**Evidence.** Four collisions in one session. Two workers filed FND-198 and
+FND-199 for different subjects. One worker took `FND-209` from the line while
+the dispatcher had reserved it. The same happened to FND-218. One worker
+renumbered its FND-198 and FND-199 to `FND-202` and `FND-203` to get out of the
+way.
+
+**Three of those numbers are written in code spans, and the reason is this
+entry's own subject.** The citation check resolves a register number against
+the rows this branch holds, and those rows live on branches this one cannot see.
+Citing them the ordinary way turned the gate red. So a finding about numbers
+being invisible across branches cannot cite its own evidence, for the same
+mechanical reason that a document explaining a retired number cannot name
+it.[^F218F] That is a third arrival of one cost, and it is the cheapest possible
+demonstration of the claim above.
+
+**This branch can verify one of the four.** FND-198 and FND-199 stand here under
+one worker's subjects, and this entry's own number was reported as reserved by
+somebody the register cannot name. The rest is the dispatcher's account, because
+no branch can see another branch. **That is not a weakness of the evidence. It is
+the finding.** A writer who wanted to check whether a number was taken has
+nowhere to look.
+
+**Follows.** Four things.
+
+**A remedy carries a scope that nobody states.** FND-038 fixed the allocator for
+serial writers, because serial writers were what the project had. The fix was
+correct and it is still correct. What went unrecorded is the condition it rests
+on: that a claim becomes visible to the next writer before the next writer
+claims. Parallel branches removed that condition without anybody deciding to.
+
+**The failure is invisible at the moment it happens.** A collision costs nothing
+when it occurs. Both writers are correct, both rows are good, and both branches
+are green. It surfaces at the merge, and by then two documents cite two
+different rows under one number.
+
+**The cost is the renumber, not the collision.** Moving a row means finding every
+citation of the old number across records, registers, reviews, backlog items and
+source comments. That is the sweep this project gets wrong most often, and one
+of the four collisions has already required it.
+
+**This is the third face of one shape.** A record's status is carried by the
+directory its file sits in, so accepting it breaks every citation of the
+path.[^F197C] A retired number is a row that the citation check cannot resolve,
+so a document explaining why a number went cannot name it.[^F218F] A number is
+allocated by a line that cannot see uncommitted work. In each case the registry
+stores a piece of state somewhere that cannot be read atomically by everyone who
+needs it, and in each case nothing fails until two readers disagree.
 
 ## References
 
@@ -5170,8 +5810,52 @@ check asserts.
 [^F199B]: Backlog item 0206. `docs/backlog/proposed/0206-let-the-agent-tool-read-what-the-panel-reads.md`
 [^F200A]: The viewer suite for the glass. `crates/cachette-view/tests/shows_the_moment_on_the_glass.rs`
 [^F201A]: Findings register, FND-193, in this document.
-[^F201B]: Backlog item 0208. `docs/backlog/proposed/0208-draw-the-boundary-of-a-holding-and-not-of-every-tile.md`
+[^F201B]: Backlog item 0208. `docs/backlog/complete/0208-draw-the-boundary-of-a-holding-and-not-of-every-tile.md`
 [^F194REF]: Findings register, FND-194, in this document.
+[^F202A]: Backlog item 0152, what is still open. `docs/backlog/complete/0152-let-an-agent-drive-the-engine-through-a-protocol-server.md`
+[^F202B]: PRD-0002, a developer watches the world run. `docs/product/shipped/prd-0002-a-developer-watches-the-world-run.md`
+[^F202C]: PRD-0004, the world has weather that a watcher can read. `docs/product/accepted/prd-0004-the-world-has-weather-that-a-watcher-can-read.md`
+[^F202D]: PRD-0005, a watcher can tell what is happening and why. `docs/product/shipped/prd-0005-a-watcher-can-tell-what-is-happening-and-why.md`
+[^F202E]: Recurring Defect Shapes, shapes 1 and 2. `.claude/rules/recurring-defects.md`
+[^F202F]: ADR-0092, the agent tool surface grows one tool at a time, against a stated need. `docs/adrs/draft/adr-0092-the-agent-tool-surface-grows-against-a-stated-need.md`
+[^F202G]: PRD-0019, an agent can ask the running engine what it holds. `docs/product/shaped/prd-0019-an-agent-can-ask-the-running-engine-what-it-holds.md`
+[^F204C]: Findings register, FND-048, in this document.
+[^F206B]: Findings register, FND-201, in this document.
+[^F201C]: Findings register, FND-206, in this document.
+[^F206C]: The holder layer of the drawing pass. `crates/cachette-view/src/paint.rs`
+[^F207A]: The tile rectangle of the drawing pass. `crates/cachette-view/src/paint.rs`
+[^F209A]: Findings register, FND-208, in this document.
+[^F209B]: The drawing pass of the viewer. `crates/cachette-view/src/paint.rs`
+[^F209C]: Backlog item 0210, generate the ground of a drawn tile once. `docs/backlog/proposed/0210-generate-the-ground-of-a-drawn-tile-once.md`
+[^F207B]: Decisions register, DEC-088. `docs/DECISIONS.md`
+[^F208A]: ADR-0070, the head-up display reports what the drawing pass read, decision D2. `docs/adrs/accepted/adr-0070-the-head-up-display-reports-what-the-drawing-pass-read.md`
+
+[^F214A]: Decision Record Scope, section 5. `.claude/rules/adr-scope.md`
+[^F214B]: ADR-0009, parallel stages write disjoint outputs, decisions D1 and D2. `docs/adrs/accepted/adr-0009-parallel-stages-write-disjoint-outputs.md`
+[^F214D]: ADR-0044, what copies and what does not is declared at the call site. `docs/adrs/draft/adr-0044-what-copies-and-what-does-not-is-declared-at-the-call-site.md`
+[^F215A]: ADR-0043, a declared tier enforces the no-loop rule, and the API refuses the loop, decision D5. `docs/adrs/draft/adr-0043-a-declared-tier-enforces-the-no-loop-rule.md`
+[^F215B]: The shape tier declarations. `crates/cachette-core/src/tier.rs`
+[^F215C]: The bindings. `crates/cachette-py/src/lib.rs`
+[^F215D]: The agent protocol server, the one-unit tool. `python/cachette/agent/server.py`
+[^F215E]: ADR-0040, Python is a control plane, not a data plane, decision D2. `docs/adrs/draft/adr-0040-python-is-a-control-plane-not-a-data-plane.md`
+[^F215F]: Decisions register, DEC-063. `docs/DECISIONS.md`
+[^F215G]: Findings register, FND-147, in this document.
+[^F216A]: ADR-0043, a declared tier enforces the no-loop rule, and the API refuses the loop. `docs/adrs/draft/adr-0043-a-declared-tier-enforces-the-no-loop-rule.md`
+[^F216B]: The character arena ceiling, and the shape tier declarations. `crates/cachette-core/src/tier.rs`
+[^F216D]: Review 0223, the tier record. `docs/reviews/0223-the-tier-record.md`
+[^F217A]: The grid index function. `crates/cachette-core/src/hex.rs`
+[^F217B]: The block layout key. `crates/cachette-core/src/bridge.rs`
+[^F217C]: The block fold of the pyramid. `crates/cachette-core/src/pyramid.rs`
+[^F217D]: ADR-0012, tiles are dense columns and units are a generational arena. `docs/adrs/accepted/adr-0012-tiles-are-dense-columns-and-units-are-a-generational-arena.md`
+[^F217E]: ADR-0017, the world is a rhombus, so a tile index is raw axial, decision D1. `docs/adrs/accepted/adr-0017-the-world-is-a-rhombus-so-a-tile-index-is-raw-axial.md`
+[^F217F]: ADR-0018, the unit-to-tile bridge is derived, and it rebuilds at the barrier. `docs/adrs/accepted/adr-0018-the-unit-to-tile-bridge-is-derived-and-rebuilds-at-the-barrier.md`
+[^F217G]: Review 0223, the selector range record. `docs/reviews/0223-the-selector-range-record.md`
+[^F218B]: ADR-0067, the viewer reads the world and never writes to it, decision D4. `docs/adrs/accepted/adr-0067-the-viewer-reads-the-world-and-never-writes-to-it.md`
+[^F218D]: ADR Registry, repairing a citation is not an amendment. `docs/adrs/REGISTRY.md`
+[^F218E]: Definition of Done, section 4. `.claude/rules/definition-of-done.md`
+[^F218F]: Findings register, FND-192, in this document.
+[^ALLOC2]: Findings register, FND-219, in this document.
+
 [^237B]: Decision Record Scope, section 6. `.claude/rules/adr-scope.md`
 [^238A]: The gate recipes. `justfile`
 [^238B]: Testing Rules, section 1. `.claude/rules/testing.md`

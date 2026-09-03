@@ -163,7 +163,7 @@ enforcement nothing performs is the defect this project keeps catching.[^12]
 [^6]: ADR-0054, an entity belongs to one of three tiers, declared at creation, decision D1. `docs/adrs/accepted/adr-0054-an-entity-belongs-to-one-of-three-tiers-declared-at-creation.md`
 [^7]: ADR-0043, a declared tier enforces the no-loop rule, and the API refuses the loop. `docs/adrs/draft/adr-0043-a-declared-tier-enforces-the-no-loop-rule.md`
 [^8]: ADR-0054, an entity belongs to one of three tiers, declared at creation, decision D2. `docs/adrs/accepted/adr-0054-an-entity-belongs-to-one-of-three-tiers-declared-at-creation.md`
-[^9]: ADR-0051, a selector is a lazy expression tree that Rust evaluates. `docs/adrs/draft/adr-0051-a-selector-is-a-lazy-expression-tree.md`
+[^9]: ADR-0051, a selector is a lazy expression tree that Rust evaluates. `docs/adrs/accepted/adr-0051-a-selector-is-a-lazy-expression-tree.md`
 [^10]: Decisions register, DEC-060. `docs/DECISIONS.md`
 [^11]: Blockers register, BLK-007. `docs/BLOCKERS.md`
 [^12]: Recurring Defect Shapes, shape 3. `.claude/rules/recurring-defects.md`

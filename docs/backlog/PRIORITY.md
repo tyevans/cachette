@@ -37,17 +37,24 @@ These close a gap a review found, or they unblock the items above.
 
 | No. | Why it sits here |
 |---|---|
+| 0224 | The control plane names one entity of a mass shape in four places, and a test pays four crossings for each site because of it. FND-215 holds the measurement. It sits below 0223 because the review that found it returned ADR-0040 for an amendment, and the amendment names this item. |
 | 0187 | Nothing moves a carried load into a store, so gathering cannot feed anybody. It ships a verb with nothing to move until 0186 makes a unit carry something, so it follows 0186. |
 | 0189 | The rules against inert work look for an absent caller, and this defect has one. DEC-074 holds the options and recommends this. |
 | 0190 | The pyramid folds level 1 into a state hash and nothing calls the fold. It is a small instance of what 0189 is about, and it sits below 0189 because the rule should come before the sweep. |
 | 0194 | The tile value pass writes a random walk over every tile on every tick, and no reader decides anything from it. Items 0183, 0184 and 0188 removed the last three. What is left is storage, a hash contribution and a public reader. Nothing blocks it. |
+| 0211 | The agent tool surface can go stale against the engine and nothing fails. ADR-0092 names the failure mode and does not fix it. A worker who meets a wall cannot tell a gap in the engine from a gap in the surface. |
+| 0212 | Two places count what a window holds, and the rule for a full tile is written in both. The engine now holds a census the viewer could call. Two workers changed this ground in one round, so read both before planning. |
 | 0104 | A ruler decides nothing that reaches anybody. DEC-040 carries the writ in the influence field. |
 | 0171 | Building a world still passes over every tile, twice, through the first pyramid level. PRD-0003 states it must not, so the record is still false of the code. Item 0112 removed the third pass and FND-162 records what it left. |
 | 0113 | Admission enforces the capacity from a bridge count that no test compares against a scan. |
 | 0080 | The settings struct prices every new parameter at twenty-five files. |
 | 0130 | Three registers state a next number that the rows already hold, and it went stale and conflicted four times in one night. |
-| 0208 | The holding border draws on every held tile, so at tile-scale interleaving every tile is a border and the ground is lost. FND-201 holds the measurement and records a repair that was tried and removed for keying on the wrong variable. |
+| 0239 | A picture of a whole world walks every tile in it, and ADR-0094 D6 refuses that rather than serving it. Level 1 already holds the answer and the drawing cannot reach it. It sits below 0210 because 0210 halves the cost of every frame and this one adds a second path, and below the spike of the render verb, which has to exist before anything draws through it. ADR-0022 D4 forbids the easy version, so this cannot be a quiet fallback. |
+| 0210 | The drawing generates the ground of every visible tile twice on every frame, and one of the two answers is a value it already holds. At the far zoom that is most of the cost of a drawing, and a watcher feels it as a sluggish camera. It sits above 0209 because it repairs something the owner reported and 0209 adds a distinction nobody asked for. It needs a reader that the core crate does not have. |
+| 0209 | The holding border draws the same picture for a frontier with another faction and for the edge of the claimed ground. Between 6 and 13 held tiles in every 100 border only unclaimed ground, so the two cases are distinguishable. FND-206 holds the counts and warns against judging this layer from a render. |
 | 0206 | Superseded. Another worker closed every gap this item names, in the same round it was written. It stays open only until somebody confirms that and closes it against the item that did the work. Do not take it. |
+| 0235 | A register number has two authorities and neither can see the other: the next-number line answers from merged history, and the dispatcher's ranges live in prompts. Four collisions in one session, every writer following the procedure correctly. FND-219 records it. It sits beside 0198 because both are the registry storing state where it cannot be read atomically, and refining one should decide whether they are one item. |
+| 0198 | The record check reads any mention of a record number as a citation, so a record cannot name a number the registry retired. FND-192 records it. It moved up from `Later` on 2 September 2026, when a review of the reserved log and Python boundary rows retired nine more numbers. The cost it names grows with each one, and a record that must explain why a claim was dropped is the record that most needs to name the number. |
 | 0153 | Python holds no way to read an event, so an agent gets bytes and a digest. Any decoder in Python is a second copy of the layout. |
 | 0161 | The control plane cannot say where to act, so a caller sweeps. Four reserved rows hold the answer and none is written. DEC-063 names it the destination. |
 | 0155 | Every test fixture builds its own world by hand, and the rule that forbids the easy route has no shared answer. |
@@ -101,15 +108,16 @@ These are real and none of them blocks anything today.
 | 0004 | Reconcile the public API examples. |
 | 0005 | The cross-cutting records. |
 | 0007 | The storage claims. |
-| 0009 | The log claims. |
-| 0010 | The Python boundary claims. |
 | 0168 | The control plane cannot name a dwelling, so a household binding would be inert. Waits on 0161. |
 | 0167 | A reverse index from a dwelling to its units. Take it when a measurement asks for it, and BLK-007 says none exists. |
 | 0200 | Admission admits more units onto a roaded tile than the position table believes it holds, and the fold that reports the largest capacity walks one of the two tables that state one. FND-193 records it. DEC-081 must close first, and no run reaches it until something makes a unit build. |
 | 0201 | The record check drops every source file when it runs inside a worktree, so it reports records as uncited that source files cite. FND-194 records it. The same function also builds a corpus of every source file and never reads it, which FND-195 records and this item carries. It sits above 0198 because every worker runs in a worktree and reads the wrong count, and below 0200 because the check reports the note rather than failing on it. |
 | 0205 | Accepting a record moves its file, and every citation of the old path then names nothing. Two records are at verdict Accept with a file move between them and binding, and the cost of a move scales with how well a record is cited. FND-197 records it, DEC-083 must close first, and 0198 is the same problem seen from the other side. |
-| 0198 | The record check reads any mention of a record number as a citation, so a record cannot name the one number the registry retired. FND-192 records it. It sits here because one number is retired and the cost grows only as more are. |
 | 0166 | The footnote baseline holds every document the new check would fail. It can only shrink, and it does not shrink by itself.[^10] |
+| 0233 | The record of descent outlives every character and no reader delivers that, so a caller holds the descent identity of a dead ancestor and can ask nothing about it. DEC-092 must close first. It sits here because nothing exposes a character to the control plane, so the need is served in Rust alone. |
+| 0234 | BLK-010 and ADR-0065 state opposite directions for one question, and the code follows the record. DEC-091 must close first. It sits here because only the workforce case is built, so the cost falls on the first person who builds a formation from the register. |
+| 0221 | Source footnotes name the registry for six records that now have files. FND-214 found it. Nothing fails and nothing will, so it sits here, and it is worth a check rather than a sweep because the next reserved number a source file cites will do the same. |
+| 0222 | The error hierarchy declares three exception types that nothing raises. ADR-0046 states the gap in its own consequences rather than claiming the capability, so a reader is not misled today. It waits on the selector for one of the three. |
 
 ## References
 

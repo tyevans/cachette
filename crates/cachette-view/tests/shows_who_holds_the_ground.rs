@@ -219,14 +219,14 @@ fn corner_and_inside(
     address: Axial,
     canvas: &Canvas,
 ) -> Option<((i32, i32), (i32, i32))> {
-    let side = (camera.tile_width * 0.92).max(1.0) as i32;
-    let (x, y) = camera.centre_of(address);
-    let (left, top) = (x as i32 - side / 2, y as i32 - side / 2);
+    // The rectangle comes from the drawing itself. A test that computed it
+    // again would be a second declaration site for where a tile lands.
+    let (left, top, wide, tall) = paint::tile_rect(camera, address);
     let inside_the_canvas = left >= 0
         && top >= 0
-        && left + side <= canvas.width() as i32
-        && top + side <= canvas.height() as i32;
-    if !inside_the_canvas || side < 2 * INSET + 3 {
+        && left + wide <= canvas.width() as i32
+        && top + tall <= canvas.height() as i32;
+    if !inside_the_canvas || wide.min(tall) < 2 * INSET + 3 {
         return None;
     }
     Some(((left, top), (left + INSET, top + INSET)))
@@ -384,8 +384,8 @@ fn the_edge_of_a_holding_is_drawn() {
     let camera = close_camera(&world, &canvas);
     paint::draw(&world, camera, &mut canvas).expect("the world draws");
 
-    let side = (camera.tile_width * 0.92).max(1.0) as i32;
-    assert!(side >= 3, "a tile {side} pixels wide has no border to read");
+    let (_, _, wide, _) = paint::tile_rect(camera, Axial::new(0, 0));
+    assert!(wide >= 3, "a tile {wide} pixels wide has no border to read");
 
     let mut edges = 0;
     let mut insides = 0;

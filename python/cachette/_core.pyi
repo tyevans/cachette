@@ -63,6 +63,173 @@ class PositionColumns(TypedDict):
     rank: npt.NDArray[np.uint8]
     holder: npt.NDArray[np.uint64]
 
+class FoundingColumns(TypedDict):
+    """What one founding chose, and what it made.
+
+    The site is the whole identity of the settlement the founding seated. It
+    is not a slot index.
+
+    The counts are the ones the survey read at the chosen place, and the
+    score is the engine's own weighted sum of them.
+    """
+
+    site: int
+    q: int
+    r: int
+    faction: int
+    seated: int
+    score: int
+    food: int
+    wood: int
+    stone: int
+    open_ground: int
+    room: int
+    water_edge: int
+    drawn: int
+    considered: int
+    tiles_read: int
+
+class SurveyColumns(TypedDict):
+    """What a founding survey read, one column for each candidate place.
+
+    The rows are the candidates in the order the founding ranks them, best
+    first. Row zero is the place a founding would take.
+
+    The score column holds the engine's own weighted sum of the counts beside
+    it. It is an exact integer and never a floating point number.
+
+    The three trailing entries are scalars. The survey counts them as it
+    reads, so they measure the run rather than restate the sample size.
+    """
+
+    q: npt.NDArray[np.int32]
+    r: npt.NDArray[np.int32]
+    score: npt.NDArray[np.int64]
+    food: npt.NDArray[np.uint32]
+    wood: npt.NDArray[np.uint32]
+    stone: npt.NDArray[np.uint32]
+    open_ground: npt.NDArray[np.uint32]
+    room: npt.NDArray[np.uint32]
+    water_edge: npt.NDArray[np.uint32]
+    eligible: npt.NDArray[np.uint8]
+    separated: npt.NDArray[np.uint8]
+    drawn: int
+    considered: int
+    tiles_read: int
+
+class RegionSummary(TypedDict):
+    """The level 1 summary of one cell.
+
+    Every field is an exact integer total over the level 0 tiles of the cell.
+    The three totals are raw accumulator integers and never floating point
+    numbers.
+    """
+
+    tiles: int
+    open_tiles: int
+    units: int
+    held_tiles: int
+    value_total: int
+    height_total: int
+    food_total: int
+
+class SiteEconomy(TypedDict):
+    """What one site earns, holds and owes, for one commodity.
+
+    The store, the production and the upkeep are Q16.16 values as their raw
+    integers.
+
+    The demanded and granted entries hold the last ration the site could not
+    serve in full, and they are ``None`` when it served every cohort.
+    """
+
+    q: int
+    r: int
+    faction: int
+    commodity: int
+    store: int
+    production: int
+    upkeep: int
+    rationed: bool
+    demanded: int | None
+    granted: int | None
+
+class ChoiceReport(TypedDict):
+    """Why one unit chose what it chose.
+
+    Every score, field value, weight and floor is a Q16.16 value as its raw
+    integer.
+
+    The best entry names the option the scores select, or the no-intent value
+    when every score is below the floor. The name entry is ``None`` for a
+    hold.
+    """
+
+    tile: int
+    q: int
+    r: int
+    cell: int
+    need: int
+    scores: list[int]
+    fields: list[int]
+    weights: list[int]
+    floor: int
+    best: int
+    best_name: str | None
+    intent: int
+    chooses_next_frame: bool
+
+class TileReport(TypedDict):
+    """What one tile holds.
+
+    The stock, generated and taken entries hold one amount for each kind of
+    resource, in the order of the kind numbering. The stock is the generated
+    amount less what units took.
+
+    The holder names the faction that holds the ground, and it is ``None``
+    for ground that nobody holds.
+    """
+
+    q: int
+    r: int
+    kind: int
+    passable: bool
+    capacity: int
+    stock: list[int]
+    generated: list[int]
+    taken: list[int]
+    value: int
+    holder: int | None
+
+class WindowCensus(TypedDict):
+    """What one window of the world holds.
+
+    The four corner entries give the window after the engine clipped it to
+    the world, so a reader can repeat the count one address at a time.
+
+    The by_kind entry holds one count for each kind of ground, in the order
+    of the kind numbering.
+
+    The crowded entries name the address that holds the largest number of
+    units, and they are ``None`` when the window holds no unit.
+    """
+
+    q: int
+    r: int
+    radius: int
+    first_q: int
+    first_r: int
+    last_q: int
+    last_r: int
+    tiles: int
+    by_kind: list[int]
+    open_tiles: int
+    units: int
+    crowd_worst: int
+    tiles_at_capacity: int
+    crowded_q: int | None
+    crowded_r: int | None
+
 class CachetteError(Exception):
     """The root of every Cachette error."""
 
@@ -133,5 +300,12 @@ class World:
     def site_positions(self, site: int) -> PositionColumns: ...
     def site_preference(self, site: int) -> npt.NDArray[np.int32]: ...
     def set_position_schedule(self, period: int, phase: int) -> None: ...
+    def found_group(self, group: int, faction: int) -> FoundingColumns: ...
+    def founding_survey(self, group: int, faction: int) -> SurveyColumns: ...
+    def region_summary(self, q: int, r: int) -> RegionSummary: ...
+    def site_economy(self, site: int, commodity: int = ...) -> SiteEconomy: ...
+    def explain_choice(self, unit: int) -> ChoiceReport: ...
+    def tile_report(self, q: int, r: int) -> TileReport: ...
+    def window_census(self, q: int, r: int, radius: int = ...) -> WindowCensus: ...
 
 def version() -> str: ...

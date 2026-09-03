@@ -99,21 +99,27 @@ rather than a reviewer's question, which is what the decision claims for it.
 
 ## 3. The dependency, and why it does not hold this record
 
-The registry says ADR-0067 depends on ADR-0001 and ADR-0036. ADR-0001 is
-accepted. ADR-0036 is `Proposed`, which means a number is reserved and no file
+The registry says ADR-0067 depends on ADR-0001 and `ADR-0036`. ADR-0001 is
+accepted. `ADR-0036` is `Proposed`, which means a number is reserved and no file
 exists.
 
 A record that rests on a record with no file could not be accepted, for the
 reason the review of ADR-0070 gives. This is not that case.
 
-ADR-0067 cites ADR-0036 exactly once, and it cites it for its absence: the
+ADR-0067 cites `ADR-0036` exactly once, and it cites it for its absence: the
 alternative design "needs a snapshot mechanism that no record holds". The
 citation is to the registry row, which is the documented way to name a
-reserved number. Nothing in ADR-0067 is built on a decision of ADR-0036,
-because ADR-0036 has no decisions.
+reserved number. Nothing in ADR-0067 is built on a decision of `ADR-0036`,
+because `ADR-0036` has no decisions.
 
 The binding content of ADR-0067 rests on ADR-0001, ADR-0002 and ADR-0017, all
 of which are accepted.
+
+**This section reads its subject as it stood at the review.** On 2 September
+2026 the project retired that reserved number and repaired the footnote in
+ADR-0067 and the row in the registry. The conclusion is unchanged and is
+stronger: the number now holds nothing at all, and ADR-0067 never rested on
+it.[^R47A]
 
 **The registry's "Depends on" column does not distinguish the two kinds of
 citation.** That is worth knowing and is not worth changing: a reviewer who
@@ -194,3 +200,4 @@ review by a second person supersedes this one.
 ## References
 
 [^1]: Findings register, FND-056. `docs/FINDINGS.md`
+[^R47A]: ADR Registry, the retired numbers. `docs/adrs/REGISTRY.md`

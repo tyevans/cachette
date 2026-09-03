@@ -6,7 +6,7 @@
 # no hook, because it reads as protection that is not there.** Install it once
 # per clone:
 #
-#     git config core.hooksPath .githooks
+#     just install-hooks
 #
 # The hooks live in the repository rather than in `.git/hooks`, so they are
 # versioned and a change to one reaches everybody who runs that line.
