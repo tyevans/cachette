@@ -42,6 +42,8 @@ These close a gap a review found, or they unblock the items above.
 | 0190 | The pyramid folds level 1 into a state hash and nothing calls the fold. It is a small instance of what 0189 is about, and it sits below 0189 because the rule should come before the sweep. |
 | 0133 | The panel is longer than the window and cuts, and item 0188 added three sections to it. The order of the sections bought one placement and cannot buy a second. DEC-078 holds the measurement and recommends the scroll. |
 | 0194 | The tile value pass writes a random walk over every tile on every tick, and no reader decides anything from it. Items 0183, 0184 and 0188 removed the last three. What is left is storage, a hash contribution and a public reader. Nothing blocks it. |
+| 0211 | The agent tool surface can go stale against the engine and nothing fails. ADR-0092 names the failure mode and does not fix it. A worker who meets a wall cannot tell a gap in the engine from a gap in the surface. |
+| 0212 | Two places count what a window holds, and the rule for a full tile is written in both. The engine now holds a census the viewer could call. Two workers changed this ground in one round, so read both before planning. |
 | 0104 | A ruler decides nothing that reaches anybody. DEC-040 carries the writ in the influence field. |
 | 0171 | Building a world still passes over every tile, twice, through the first pyramid level. PRD-0003 states it must not, so the record is still false of the code. Item 0112 removed the third pass and FND-162 records what it left. |
 | 0113 | Admission enforces the capacity from a bridge count that no test compares against a scan. |

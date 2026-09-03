@@ -23,9 +23,48 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^ALLOC]
 
-**Next number: DEC-084**
+**Next number: DEC-087**
 
 ## Open
+
+### DEC-086 — Does the agent protocol server ship in the installed package?
+
+**Open. Engineering owns it. The recommendation is Option B.**
+
+The server lives in the Python package, and the library that runs the protocol
+sits in the development dependency group. An installed wheel therefore carries
+the server module and not the thing that runs it. Importing the module from an
+installed wheel fails on the import of the protocol library. Nothing fails at
+build time and nothing fails at install time, so the first person to learn this
+is a person who tried.
+
+The question was left open when the server was built.[^DEC86A] It is sharper
+now: the surface has grown, and a growth policy binds it.[^DEC86B] A module that grows is a module somebody will find and import.
+
+**Option A. Move the protocol library into the runtime dependencies.** Every
+installation of the engine then carries a protocol server it will never run.
+The engine is a simulation core, and the people who install it are not the
+people this server serves.
+
+**Option B. Move the server out of the package, into the contributor tools.**
+The package then holds the control plane and nothing else. The server sits
+beside the checks and the scripts, where the other things that serve a
+contributor sit. What is lost is the import path: a contributor runs the server
+by a different route than a module of the package.
+
+**Option C. Leave it, and make the failure say what happened.** The module
+catches the import error and raises one that names the dependency group to
+install. This is the smallest change and it keeps the shape that caused the
+question.
+
+**Recommendation: B.** The record that governs the surface states plainly that
+it serves an agent working on this repository, and the product record names
+that audience.[^DEC86B] [^DEC86C] A tool for a contributor belongs with the
+contributor tools. Option A prices every installation for an audience that is
+not installing. Option C documents the confusion rather than removing it.
+
+**What follows either way.** Nothing is blocked. The server runs from the
+repository today, which is the only place anybody runs it from.
 
 ### DEC-083 — Should a citation of a record name the directory the record sits in?
 
@@ -1875,3 +1914,6 @@ a failed founding is correct.[^PRD12]
 [^DEC77A]: ADR-0064, a unit chooses by scoring a small fixed option set, decision D2. `docs/adrs/accepted/adr-0064-a-unit-chooses-by-scoring-a-small-fixed-option-set.md`
 [^DEC77B]: ADR-0070, the head-up display reports what the drawing pass read, decision D1. `docs/adrs/accepted/adr-0070-the-head-up-display-reports-what-the-drawing-pass-read.md`
 [^DEC78A]: Backlog item 0133. `docs/backlog/proposed/0133-let-a-watcher-reach-a-panel-longer-than-the-window.md`
+[^DEC86A]: Backlog item 0152, what is still open. `docs/backlog/complete/0152-let-an-agent-drive-the-engine-through-a-protocol-server.md`
+[^DEC86B]: ADR-0092, the agent tool surface grows one tool at a time, against a stated need. `docs/adrs/draft/adr-0092-the-agent-tool-surface-grows-against-a-stated-need.md`
+[^DEC86C]: PRD-0019, an agent can ask the running engine what it holds. `docs/product/shaped/prd-0019-an-agent-can-ask-the-running-engine-what-it-holds.md`

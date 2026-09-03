@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-196**
+**Next number: FND-205**
 
 ## A. Corrections to stated rules
 
@@ -4663,6 +4663,111 @@ integration and a reader waits for it. The reason is that the script states one
 thing and does another, in the place a contributor looks to learn what the
 check asserts.
 
+### FND-202 — A growth policy lived in a completed backlog item, where nothing read it
+
+**Believed.** The rule that governs how the agent protocol server grows was
+recorded, and a worker who needed it would find it.
+
+**True.** The rule existed in one sentence, in the closing section of the
+backlog item that built the first slice of the server: add a tool when an agent
+needs it, and not before.[^F202A] That file sits in the completed directory. No
+product record and no decision record held the rule. The three product records
+about watching a world all serve a person at a window, and none of them
+mentions an agent at a protocol.[^F202B] [^F202C] [^F202D]
+
+The project owner considers the rule binding and stated it as the original
+intent. Nothing a worker reads before starting work carried it.
+
+**Evidence.** A search of the tree for the rule returns the one sentence, in
+`complete/`. In the same round, one worker designed a change to the viewer,
+went looking for the detail the change would need, and reported that the server
+could not carry it, without any sign that a rule already governed what to do
+next. A second worker was then dispatched to close the gap and had to be told
+the rule in the dispatch message, because it could not be read.
+
+**Follows.** Three things.
+
+**This is the project's own recurring shape, applied to a rule.** One fact
+stored where nothing reads it, with nothing that fails when a reader misses
+it.[^F202E] The registers exist because a fact in prose decays silently, and a
+rule in a completed work item is a fact with no reader at all.
+
+**A completed backlog item is not a place to record a rule.** It is the correct
+place to record what a change cost and what it left open, which is what the
+rest of that section does. A rule that governs later work outlives the item,
+and it belongs in a record.
+
+**The repair is a record, and it names the audience.** The growth policy is a
+constraint on a surface, so it is a decision record.[^F202F] The need behind it
+is a question an agent could not answer, so it is also a product record, and
+that record names an audience this directory had not served before.[^F202G]
+
+### FND-203 — The control plane could not read the ground, so a fixture recorded it in a comment
+
+**Believed.** The seed of the gather fixture in the agent tests was chosen for
+a reason a reader could check.
+
+**True.** It was chosen against the engine's own read, from Rust, and the
+result was written into a comment beside the fixture. The comment says so
+plainly, and it says why: no read told Python where a resource sat, so nothing
+in the test could ask. The comment names three addresses that hold food under
+one seed, and two that hold stone under another. Nothing checked any of it
+again.
+
+**Evidence.** The comment is in the agent test file and it states the gap as a
+finding rather than an accident. The first version of that test used a seed
+with no food at the addresses it gathered from, and failed for that reason.
+
+**Follows.** Two things.
+
+**A measured fact in a comment is a fact with no defence.** The generator is
+derived from the seed, so the claim is true until any change to terrain
+generation, and nothing fails on the day it stops being true. This is the same
+shape as a count in a decision record.[^F202E]
+
+**A reader that closes the gap turns the comment into a check.** The tile read
+now reports what the generator gave, what units took, and the difference, at
+one address. The claim about the seed is now an assertion in the same test that
+depends on it, so the day it stops being true is the day the suite goes red.
+
+### FND-204 — A world where every tile admits a unit hid a swapped read
+
+**Believed.** A test that compares a level 1 cell against every tile of the
+world, one at a time, checks that the cell reports what it summarises. The
+comparison covers each field it names.
+
+**True.** It covered one of the two fields it named. The fixture built an 8 by
+8 world of hill and mountain, in which every tile admits a unit. The count of
+tiles and the count of open tiles were therefore the same number. A read that
+returned the open tiles where the tiles belong satisfied the assertion, because
+both sides moved together.
+
+**Evidence.** The defect was put back in the binding and the whole agent suite
+stayed green, at exit code zero, with no test failing. The same run caught six
+other defects, each by the test written for it. A search over seeds with the
+engine's own census found that seed 51 gives three tiles of water in the same
+extent. The fixture moved to that seed, the defect was put back again, and the
+test then failed.
+
+**Follows.** Three things.
+
+**The rule already existed and the test still shipped with the hole.** The
+testing rule says that a uniform input hides a defect, and that putting the
+defect back is the only proof a fixture reaches the case.[^23] The register
+holds two earlier instances, in two subsystems.[^11] [^F204C] This is a
+third, written after the rule, by someone who had read it. **The rule is not
+enough on its own.** Only the probe found this.
+
+**A fixture chosen for convenience is chosen for the wrong reason.** The seed
+came from a neighbouring test, where it was correct. Nothing asked what
+distribution this assertion needed. The question to ask of a fixture is what
+value would fail, not what world is nearby.
+
+**A test can now say when its fixture stops reaching the case.** The repaired
+test asserts that the open tiles are fewer than the tiles, and that the window
+holds more than one kind of ground. Those assertions fail if a change to the
+generator makes the world uniform again, so the hole cannot come back quietly.
+
 ## References
 
 [^F177A]: The founding refuses ground that admits nobody. `crates/cachette-core/src/world.rs`
@@ -4836,3 +4941,11 @@ check asserts.
 [^F186A]: The viewer suite for the food and the reason. `crates/cachette-view/tests/shows_the_food_and_the_reason.rs`
 [^F187A]: The viewer suite for the ground. `crates/cachette-view/tests/draws_the_ground.rs`
 [^F187B]: PRD-0003, a developer sees a world worth looking at. `docs/product/accepted/prd-0003-a-developer-sees-a-world-worth-looking-at.md`
+[^F202A]: Backlog item 0152, what is still open. `docs/backlog/complete/0152-let-an-agent-drive-the-engine-through-a-protocol-server.md`
+[^F202B]: PRD-0002, a developer watches the world run. `docs/product/shipped/prd-0002-a-developer-watches-the-world-run.md`
+[^F202C]: PRD-0004, the world has weather that a watcher can read. `docs/product/accepted/prd-0004-the-world-has-weather-that-a-watcher-can-read.md`
+[^F202D]: PRD-0005, a watcher can tell what is happening and why. `docs/product/shipped/prd-0005-a-watcher-can-tell-what-is-happening-and-why.md`
+[^F202E]: Recurring Defect Shapes, shapes 1 and 2. `.claude/rules/recurring-defects.md`
+[^F202F]: ADR-0092, the agent tool surface grows one tool at a time, against a stated need. `docs/adrs/draft/adr-0092-the-agent-tool-surface-grows-against-a-stated-need.md`
+[^F202G]: PRD-0019, an agent can ask the running engine what it holds. `docs/product/shaped/prd-0019-an-agent-can-ask-the-running-engine-what-it-holds.md`
+[^F204C]: Findings register, FND-048, in this document.

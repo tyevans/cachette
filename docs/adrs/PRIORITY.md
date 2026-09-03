@@ -37,6 +37,7 @@ A record here binds nothing until a reviewer moves it.
 
 | No. | What it claims |
 |---|---|
+| 0092 | The agent tool surface grows one tool at a time, against a stated need. It records a policy that existed in one sentence, in a completed backlog item, where nothing a worker reads before starting carried it.[^20] The code that implements it exists: the surface grew this round against seven gaps another worker named, and no tool was built that nobody asked for. A reviewer should test D2 hardest, because it is the decision that has to hold when somebody meets a gap in a hurry. |
 | 0091 | Movement takes its direction from a per-cell field, and never from a per-unit search over the neighbouring cells. **It runs ahead of the code.** No engine pass derives the field yet, and the item that builds it is refined and not started.[^17] A reviewer must read it as an argument and not as a description. The search it forbids is the obvious implementation, and the reason the field gives the same answer is invisible inside that loop. It also fixes a tie-break order, which is a determinism property. |
 | 0081 | Housing. Two reviews returned it: the engine already holds the per-site count that its decision D3 asks the project to store.[^12] [^18] An open row holds the choice that follows.[^13] It reads against ADR-0074 D3 correctly, and that objection failed. **It runs ahead of the code.** No settlement holds a housing capacity, and the birth that its D3 names as a frequent caller does not exist either. |
 | 0082 | Population growth. A review found its own decisions sound and returned it, because it rests on the free places of 0081.[^12] It moves when 0081 moves. |
@@ -100,3 +101,4 @@ plainly that nothing implements it yet.[^1]
 [^17]: Backlog item 0185, steer a step by the option the unit chose. `docs/backlog/refined/0185-steer-a-step-by-the-option-the-unit-chose.md`
 [^18]: Review 0199, the influence, tile field, upgrade and housing records. `docs/reviews/0199-the-influence-tile-field-upgrade-and-housing-records.md`
 [^19]: Review 0204, the two corrected records. `docs/reviews/0204-the-two-corrected-records.md`
+[^20]: Findings register, FND-202. `docs/FINDINGS.md`
