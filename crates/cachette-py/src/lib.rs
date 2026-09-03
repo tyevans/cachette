@@ -1232,6 +1232,15 @@ impl PyWorld {
         report.set_item("soldiers_painted", readout.soldiers_painted())?;
         report.set_item("soldiers_live", readout.soldiers_live())?;
         report.set_item("sites_held", readout.sites_held())?;
+        // A position is a seat at a site. Both numbers come from the bounded
+        // walk over the sites, so neither follows the world.
+        report.set_item("seats", readout.seats())?;
+        report.set_item("seats_taken", readout.seats_taken())?;
+        // The height a picture needs to hold the whole panel. A caller that
+        // writes the panel to a file resizes to this rather than guessing a
+        // constant, because the panel grows with the faction count, with the
+        // number of foundings, and with every section a count switches on.
+        report.set_item("panel_height", readout.height_for_whole_panel())?;
         report.set_item("units_short", readout.units_short())?;
         // What the drawn units are hauling and where they live. Both are
         // counts of the window, taken on the loop that painted them, so a

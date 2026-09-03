@@ -248,6 +248,14 @@ fn cards(readout: &Readout, reference: bool) -> Vec<(Anchor, Card)> {
     if readout.units_carrying() > 0 {
         cards.push((Anchor::TopLeft, load_card(readout)));
     }
+    // **The card appears only when a seat exists.** A site that declares no
+    // position is a different fact from a site whose positions are empty, and
+    // a card that reported "0 of 0" on every frame would say neither.[^11]
+    //
+    // [^11]: Testing Rules, section 2a. `.claude/rules/testing.md`
+    if readout.seats() > 0 {
+        cards.push((Anchor::TopLeft, seat_card(readout)));
+    }
     if let Some(choice) = readout.choice() {
         cards.push((Anchor::BottomRight, unit_card(&choice)));
     }
@@ -457,6 +465,25 @@ fn load_card(readout: &Readout) -> Card {
     Card {
         heading: "WHAT THEY CARRY",
         rows,
+    }
+}
+
+/// The card that says how many positions the sites hold.
+///
+/// A position is a seat at a site: a named job that one unit holds. The count
+/// comes from the bounded walk the panel already makes over the sites, so the
+/// card starts no pass of its own.[^1]
+///
+/// # References
+///
+/// [^1]: ADR-0070, the head-up display reports what the drawing pass read, decision D2. `docs/adrs/accepted/adr-0070-the-head-up-display-reports-what-the-drawing-pass-read.md`
+fn seat_card(readout: &Readout) -> Card {
+    Card {
+        heading: "THE SEATS",
+        rows: vec![Row::new(
+            "held at the sites",
+            format!("{} of {}", readout.seats_taken(), readout.seats()),
+        )],
     }
 }
 
