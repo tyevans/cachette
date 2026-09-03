@@ -269,6 +269,7 @@ fn main() {
         "memory-point" => memory_point(&arguments),
         "memory" => memory_sweep(&full()),
         "stages" => stage_rows(&arguments),
+        "placement" => placement_rows(&arguments),
         "one" => one_point(&arguments),
         "full" => timing_sweep(&full()),
         _ => timing_sweep(&quick()),
@@ -441,6 +442,104 @@ fn one_point(arguments: &[String]) {
     println!("bench\ttiles\tunits\tthreads\tsamples\tmin_ns\tmedian_ns\tmax_ns");
     let samples = step_samples(extent.config(units.max(1024)), units, threads);
     report("step_one_point", extent.tiles(), units, threads, &samples);
+}
+
+/// Places the units evenly over the whole world, and returns the count.
+///
+/// The other pattern fills the first open tiles it meets, which packs the
+/// whole population into a band at one unit for each tile and leaves the rest
+/// of the world empty. That is not the world the project describes: one
+/// million units over 16777216 tiles is one unit for each seventeen tiles.
+///
+/// This pattern walks the world at a stride, so the units sit at the density
+/// the target scale implies. It is the same on every run, because the stride
+/// is arithmetic and which tiles hold water is a property of the seed.
+fn populate_scattered(world: &mut World, units: u32) -> u32 {
+    if units == 0 {
+        return 0;
+    }
+    let grid = world.grid();
+    let width = grid.width();
+    let count = grid.tile_count();
+    let stride = (count / units).max(1);
+    let ceiling = u32::from(world.config().faction_count.max(1));
+    let mut placed = 0u32;
+    for step in 0..units {
+        let start = step.saturating_mul(stride);
+        if start >= count {
+            break;
+        }
+        // A tile that admits no unit is passed over, and the search stops at
+        // the next stride so that the spread stays even.
+        for offset in 0..stride {
+            let index = start + offset;
+            if index >= count {
+                break;
+            }
+            let address = Axial::new((index % width) as i32, (index / width) as i32);
+            if !world.admits_a_unit(address) {
+                continue;
+            }
+            let faction = FactionId((placed % ceiling) as u16);
+            if world.spawn_soldier(address, faction).is_ok() {
+                placed += 1;
+                break;
+            }
+        }
+    }
+    placed
+}
+
+/// Measures one frame under both placement patterns, back to back.
+///
+/// The two rows come from one process, on one machine, from one build, so the
+/// difference between them is the placement and nothing else. A comparison
+/// across two runs would carry the machine and the build as well.
+///
+/// This exists because a benchmark measures its fixture as much as its
+/// subject. A population packed into a band gives every unit a neighbour,
+/// concentrates the derived structure into few cells, and puts every
+/// admission in contention. A population at the density the project states
+/// does none of those.
+fn placement_rows(arguments: &[String]) {
+    let extent = extent_argument(arguments, 1);
+    let units: u32 = arguments
+        .get(2)
+        .and_then(|word| word.parse().ok())
+        .expect("the third argument must be a unit count");
+    let threads: usize = arguments
+        .get(3)
+        .and_then(|word| word.parse().ok())
+        .unwrap_or(1);
+
+    println!("# the same frame under two placement patterns, in one process");
+    println!("# packed: one unit for each open tile, from the first tile");
+    println!("# scattered: the units spread over the whole world at a stride");
+    println!("bench\ttiles\tunits\tthreads\tsamples\tmin_ns\tmedian_ns\tmax_ns");
+
+    for (name, scattered) in [("packed", false), ("scattered", true)] {
+        let capacity = units.max(1024);
+        let mut world =
+            World::new(extent.config(capacity)).expect("the extent must describe a world");
+        let placed = if scattered {
+            populate_scattered(&mut world, units)
+        } else {
+            populate(&mut world, units)
+        };
+        for _ in 0..WARMUP_FRAMES {
+            world.step(threads).expect("the step must run");
+        }
+        let resident = status_kib("VmRSS:") * 1024;
+        let samples = samples_of(move || {
+            let start = now();
+            let log = world.step(threads).expect("the step must run");
+            let elapsed = start.elapsed().as_nanos();
+            std::hint::black_box(log.len());
+            elapsed
+        });
+        report(name, extent.tiles(), placed, threads, &samples);
+        println!("# {name}_resident_bytes\t{resident}");
+    }
 }
 
 /// Reads a size in kibibytes from the process status file.
