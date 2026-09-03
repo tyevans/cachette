@@ -4937,6 +4937,46 @@ refusal raised at a caller's loop over a set. Three of these four are one call
 that the engine documents and answers. Nothing would refuse them, because the
 engine offers them.
 
+### FND-216 — The declared tier of a mass shape reaches no code in either crate
+
+**Believed.** The tier is declared once and the core crate checks it when it
+builds the storage of a shape. The gap is that the tier reaches no code outside
+the core crate, so nothing at the Python boundary reads it.[^F216A]
+
+**True.** The tier of a mass shape reaches no code inside the core crate either.
+One shape out of three reads a declared tier: the character arena reads its own
+ceiling to size itself at construction.[^F216B] The mass tier states no ceiling,
+by design, because the mass tier is the one no ceiling bounds. So the check that
+consumes a tier has nothing to consume for a mass shape.
+
+**Evidence.** The soldier module and the settlement module contain no mention of
+the tier, the trait or the constant. Their declarations live in the tier module,
+and a search of both modules returns nothing. The only reader of a declared tier
+is the character arena's ceiling.
+
+**Follows.** **A declaration is not a mechanism, and this one reads as both.**
+The tier is an associated constant on a sealed trait, which is the shape of an
+enforced thing. It is enforced for one shape and inert for two, and the two it is
+inert for are the two the whole rule is about.
+
+**A record said so, and the sentence was believable because it was nearly
+true.** The tier record's context claims the core crate checks the tier when it
+builds a shape's storage. That is a correct description of the character arena
+and a false description of the soldier and settlement arenas. A reader concludes
+there is a mechanism to extend to the boundary, when there is a mechanism to
+build.
+
+**This is the inert-capability shape, in a place the project already trusted.**
+The rule says to ask who is obligated to invoke a declared capability.[^65]
+Nobody invokes the tier of a mass shape. It passes no test of its own because
+there is nothing to test, and the compile-time assertion that exists asserts the
+character tier.
+
+**The repair is not to delete the declaration.** The declaration is the single
+site the boundary rule needs, and a second site at the boundary is the failure
+the tier record's D1 refuses. The repair is to make something read it, and the
+review that found this says so.[^F216D]
+
 ## References
 
 [^F177A]: The founding refuses ground that admits nobody. `crates/cachette-core/src/world.rs`
@@ -5127,3 +5167,6 @@ engine offers them.
 [^F215E]: ADR-0040, Python is a control plane, not a data plane, decision D2. `docs/adrs/draft/adr-0040-python-is-a-control-plane-not-a-data-plane.md`
 [^F215F]: Decisions register, DEC-063. `docs/DECISIONS.md`
 [^F215G]: Findings register, FND-147, in this document.
+[^F216A]: ADR-0043, a declared tier enforces the no-loop rule, and the API refuses the loop. `docs/adrs/draft/adr-0043-a-declared-tier-enforces-the-no-loop-rule.md`
+[^F216B]: The character arena ceiling, and the shape tier declarations. `crates/cachette-core/src/tier.rs`
+[^F216D]: Review 0223, the tier record. `docs/reviews/0223-the-tier-record.md`
