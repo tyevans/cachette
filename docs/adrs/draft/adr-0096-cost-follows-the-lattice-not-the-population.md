@@ -118,16 +118,19 @@ type or a profile of its own, so today the inputs to a choice are the unit's
 cell and the unit's need and nothing else.[^13]
 
 **The need enters the key as a bucket, and the width of the bucket is the
-mechanism and not a detail of it.** A need is a fixed-point quantity, so it
-takes far more values than a world holds units. Unbucketed, two units in one
-cell almost never share a need, the distinct pairs equal the population, and
-this decision buys nothing.
+mechanism and not a detail of it.** A unit takes its ration with its cohort,
+and every unit of one cohort gains the same amount, so a need follows the
+cohort and not the unit.[^14] The distinct keys of a cell are therefore bounded by
+the cohorts that the cell holds. That bound is far above one, so the exact need
+does not collapse a cell to a single answer. It is also far below the units in
+the cell, so the population is not the bound either. The exact key collapses a
+little, and this decision needs a key that collapses to the lattice.
 
-**The width is a parameter, and this record does not set it.** No measurement
-exists of how many need values coexist in one cell in a world that consumes,
-and a blocker holds that measurement open.[^4] A wide bucket makes two units of
-different need act alike. A narrow one approaches one answer for each unit. The
-item that implements this decision carries that choice.[^14]
+**The width is a parameter, and this record does not set it.** A measurement
+now holds the spread of the needs of one cell in a world that consumes, and a
+register holds it with the fixture that produced it.[^3] A wide bucket makes
+two units of different need act alike. A narrow one approaches one answer for
+each unit. The item that implements this decision carries that choice.[^15]
 
 A value computed for each distinct pair of a cell and a need bucket is computed
 once for every unit that shares it.
@@ -137,7 +140,7 @@ that the cost of the choice pass is the option count times the population and
 nothing else. Under this decision it is not. That sentence is a consequence the
 record derived, not a decision it made. A closed decision now says that the
 project strikes such a sentence in place rather than superseding the record, and
-the registry holds the rule.[^15] [^16] The strike belongs to the commit that
+the registry holds the rule.[^16] [^17] The strike belongs to the commit that
 accepts this record.
 
 ## The alternatives this rejects
@@ -157,7 +160,7 @@ chose, and it should not be the price of a cost that a better axis removes.**
 **Order the arena by tile so that a per-unit pass reads contiguously.** This
 would keep the axis and fix the locality. It is rejected because it needs the
 arena to compact, and compaction invalidates every identity that names a
-slot.[^17] The project chose the generational identity deliberately, and this
+slot.[^18] The project chose the generational identity deliberately, and this
 record does not reopen it.
 
 **Declare the read set and the write set of every stage, and check the ordering
@@ -165,10 +168,10 @@ mechanically.** This is a good idea and it is not this record. It is a separate
 claim: it would make part of an existing accepted record checkable. That record
 says in its own consequences that a reviewer can see an atomic and a lock, and
 that the compiler refuses the violation a reviewer cannot see. The part that
-neither the reviewer nor the compiler covers is the ordering.[^18] A record
+neither the reviewer nor the compiler covers is the ordering.[^19] A record
 holds one claim, and mixing a claim about cost with a claim about observability
-produces a record that neither of them can be rejected from separately.[^19] An
-item carries it.[^20]
+produces a record that neither of them can be rejected from separately.[^20] An
+item carries it.[^21]
 
 ## Consequences
 
@@ -181,7 +184,7 @@ whole value of the record: it moves the refusal from a benchmark to a review.
 **The engine as it stands does not satisfy this record.** Most passes walk the
 population. This record is written against the engine and not from it, and a
 reader must not take it as a description. The work that closes the gap is
-filed.[^20] [^14]
+filed.[^21] [^15]
 
 **A pass may still touch every unit, and the record says which part is bound.**
 Applying an answer to a unit is per-unit by necessity. Deciding the answer is
@@ -192,7 +195,7 @@ exists because scoring every unit every frame is expensive. Under D4 the
 expensive part is computed per cell and per need, so the reason for the interval
 weakens. This record does not delete it, because the interval is a decision of
 an accepted record and its removal has a frame-budget consequence that nobody
-has measured under the new shape.[^21] An item holds it.[^14]
+has measured under the new shape.[^22] An item holds it.[^15]
 
 **Two units that share a cell and a need cannot be told apart by the engine.**
 D4 makes that explicit rather than incidental. It is already true, for a
@@ -210,7 +213,7 @@ exists.
 
 **Nothing enforces this record.** No check counts what a pass is indexed by. A
 reviewer applies D1 by reading the pass, and a contributor who writes a per-unit
-decision gets no failure. A reader must treat this as unenforced.[^21]
+decision gets no failure. A reader must treat this as unenforced.[^22]
 
 ## References
 
@@ -227,11 +230,12 @@ decision gets no failure. A reader must treat this as unenforced.[^21]
 [^11]: ADR-0095, a behavioural strategy arrives as a field over cells, never as a search from a unit, decision D1. `docs/adrs/draft/adr-0095-a-behavioural-strategy-arrives-as-a-field-over-cells.md`
 [^12]: ADR-0064, a unit chooses by scoring a small fixed option set, decision D1. `docs/adrs/accepted/adr-0064-a-unit-chooses-by-scoring-a-small-fixed-option-set.md`
 [^13]: Findings register, FND-251. `docs/FINDINGS.md`
-[^14]: Backlog item 0238. `docs/backlog/complete/0238-decide-per-cell-and-need-rather-than-per-unit.md`
-[^15]: Decisions register, DEC-096. `docs/DECISIONS.md`
-[^16]: ADR Registry, repairing a derived consequence is not an amendment. `docs/adrs/REGISTRY.md`
-[^17]: ADR-0014, entity identity is an index plus a generation, decision D1. `docs/adrs/accepted/adr-0014-entity-identity-is-an-index-plus-a-generation.md`
-[^18]: ADR-0009, parallel stages write disjoint outputs, the consequences. `docs/adrs/accepted/adr-0009-parallel-stages-write-disjoint-outputs.md`
-[^19]: Decision Record Scope, section 2. `.claude/rules/adr-scope.md`
-[^20]: Backlog item 0237. `docs/backlog/proposed/0237-declare-what-each-stage-reads-and-writes.md`
-[^21]: Recurring Defect Shapes, shape 3. `.claude/rules/recurring-defects.md`
+[^14]: The pass that feeds every unit from what its cohort received. `crates/cachette-core/src/cohort.rs`
+[^15]: Backlog item 0238. `docs/backlog/complete/0238-decide-per-cell-and-need-rather-than-per-unit.md`
+[^16]: Decisions register, DEC-096. `docs/DECISIONS.md`
+[^17]: ADR Registry, repairing a derived consequence is not an amendment. `docs/adrs/REGISTRY.md`
+[^18]: ADR-0014, entity identity is an index plus a generation, decision D1. `docs/adrs/accepted/adr-0014-entity-identity-is-an-index-plus-a-generation.md`
+[^19]: ADR-0009, parallel stages write disjoint outputs, the consequences. `docs/adrs/accepted/adr-0009-parallel-stages-write-disjoint-outputs.md`
+[^20]: Decision Record Scope, section 2. `.claude/rules/adr-scope.md`
+[^21]: Backlog item 0237. `docs/backlog/proposed/0237-declare-what-each-stage-reads-and-writes.md`
+[^22]: Recurring Defect Shapes, shape 3. `.claude/rules/recurring-defects.md`
