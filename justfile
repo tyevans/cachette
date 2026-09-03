@@ -144,6 +144,31 @@ target-check:
     # ADR-0008 names the primary target for the engine, which is what ships.
     cargo check --package cachette-core --package cachette-py --target aarch64-unknown-linux-gnu
 
+# Measure the cost of a frame. A benchmark does not gate a merge.
+#
+# The sweep runs the step against the tile count and against the unit count,
+# and it reaches the target scale of the project on the `full` profile. The
+# `quick` profile checks the apparatus in about a minute and measures nothing
+# that the project may cite.
+#
+# A figure taken here is a figure about this machine, and the target register
+# takes no such figure. Run `just graviton-bench` for a figure the project may
+# record.
+bench profile="quick":
+    cargo bench --bench target_cost -- {{profile}}
+
+# Measure the cost of a frame on the target platform, on a Graviton machine.
+#
+# The script launches an instance, builds the benchmark on it, runs the sweep,
+# brings the rows back, and destroys everything it made. It needs the AWS
+# command line tool, authenticated. It costs a few cents.
+graviton-bench profile="full":
+    ./scripts/graviton-benchmark.sh {{profile}}
+
+# List anything a Graviton benchmark run left behind. It should list nothing.
+graviton-orphans:
+    ./scripts/graviton-benchmark.sh --orphans
+
 # Run mutation testing over the Rust core. Slow. Not a commit gate.
 mutants:
     cargo mutants --no-shuffle

@@ -33,3 +33,11 @@ proptest.workspace = true
 
 [lints]
 workspace = true
+
+# The benchmark measures the cost of a frame on the target platform. It is not
+# a test, and no assertion in this project reads a clock. `test = false` keeps
+# it out of `cargo test`, and `cargo bench --bench target_cost` runs it.
+[[bench]]
+name = "target_cost"
+harness = false
+test = false
