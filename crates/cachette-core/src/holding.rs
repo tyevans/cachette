@@ -465,7 +465,7 @@ impl Holding {
             joined.extend_from_slice(slot);
             joined
         });
-        self.apply(&changes);
+        self.apply(&changes, threads);
         Ok(changes.len())
     }
 
@@ -611,7 +611,22 @@ impl Holding {
     }
 
     /// Writes the decided changes and repairs the three derived parts.
-    fn apply(&mut self, changes: &[(TileIdx, Holder)]) {
+    ///
+    /// The write is one scattered store for each change, and it runs on the
+    /// calling thread because it reads the holder it is about to overwrite.
+    /// The two repairs after it read the holder column and write somewhere
+    /// else, and both take a thread count.
+    ///
+    /// **Both repairs cost the thing they repair and not the thing that
+    /// changed.** The held list is rebuilt by a merge that reads all of it,
+    /// and the mask of a block is derived by reading the whole block. Neither
+    /// follows the change count, so both grow as a holding grows.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: Findings register, FND-288. `docs/FINDINGS.md`
+    fn apply(&mut self, changes: &[(TileIdx, Holder)], threads: usize) {
+        let threads = threads.max(1);
         let mut dirty: Vec<u32> = Vec::with_capacity(changes.len());
         let mut moved: Vec<TileIdx> = Vec::with_capacity(changes.len());
         for (tile, holder) in changes {
@@ -634,61 +649,138 @@ impl Holding {
         if moved.is_empty() {
             return;
         }
-
-        // The held list stays in ascending tile order. A change either adds a
-        // tile to it or takes one out, so the merge below reads the old list
-        // once and the changed tiles once.
         moved.sort_unstable();
         moved.dedup();
-        let mut held: Vec<TileIdx> = Vec::with_capacity(self.held.len() + moved.len());
-        let mut cursor = 0usize;
-        for tile in moved {
-            while cursor < self.held.len() && self.held[cursor] < tile {
-                held.push(self.held[cursor]);
-                cursor += 1;
-            }
-            if cursor < self.held.len() && self.held[cursor] == tile {
-                cursor += 1;
-            }
-            if !self.holders[tile.0 as usize].is_nobody() {
-                held.push(tile);
-            }
-        }
-        held.extend_from_slice(&self.held[cursor..]);
-        self.held = held;
-
-        // A block loses a bit only when the last tile of that faction leaves
-        // it, and no running count can see that without reading the block. A
-        // block that changed is therefore read once, and a block that did not
-        // change is not read at all.
         dirty.sort_unstable();
         dirty.dedup();
-        for block in dirty {
-            self.block_masks[block as usize] = self.mask_of_block(block);
-        }
+
+        self.rebuild_held(&moved, threads);
+        self.rebuild_masks(&dirty, threads);
     }
 
-    /// Returns the factions that hold ground in one block, read from the
-    /// holder column.
-    fn mask_of_block(&self, block: u32) -> FactionMask {
-        let grid = self.layout.grid();
-        let edge = self.layout.block_edge();
-        let first_column = (block % self.layout.blocks_wide()) * edge;
-        let first_row = (block / self.layout.blocks_wide()) * edge;
-        let mut mask = FactionMask::EMPTY;
-        for row in first_row..(first_row + edge).min(grid.height()) {
-            let start = (row * grid.width() + first_column) as usize;
-            let end = (row * grid.width() + (first_column + edge).min(grid.width())) as usize;
-            if start >= end || end > self.holders.len() {
-                continue;
+    /// Rebuilds the held list from the old list and the tiles that changed.
+    ///
+    /// The held list stays in ascending tile order. A change either adds a
+    /// tile to it or takes one out, so the merge reads the old list once and
+    /// the changed tiles once.
+    ///
+    /// **The tile space is cut at values taken from the old list, and both
+    /// lists are cut at the same values.** A thread therefore merges one band
+    /// of tiles, writes its own buffer, and no two threads produce one tile.
+    /// The join reads the buffers in band order, which is ascending tile
+    /// order, and never in the order a thread finished.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0009, parallel stages write disjoint outputs, decisions D1, D2 and D3. `docs/adrs/accepted/adr-0009-parallel-stages-write-disjoint-outputs.md`
+    fn rebuild_held(&mut self, moved: &[TileIdx], threads: usize) {
+        let held = std::mem::take(&mut self.held);
+        let chunk_len = held.len().div_ceil(threads).max(1);
+
+        // The cut points are tile values and not positions, so the two lists
+        // are cut at the same places and every tile falls in exactly one band.
+        let mut cuts: Vec<(usize, usize)> = vec![(0, 0)];
+        let mut at = chunk_len;
+        while at < held.len() {
+            let pivot = held[at];
+            cuts.push((at, moved.partition_point(|tile| *tile < pivot)));
+            at += chunk_len;
+        }
+        cuts.push((held.len(), moved.len()));
+
+        let holders = &self.holders[..];
+        let bands = cuts.len() - 1;
+        let mut slots: Slots<Vec<TileIdx>> = Slots::filled(bands, Vec::new())
+            .expect("the cut list always holds a first and a last entry");
+        std::thread::scope(|scope| {
+            let mut handles = Vec::new();
+            for (band, slot) in slots.entries_mut().iter_mut().enumerate() {
+                let (held_from, moved_from) = cuts[band];
+                let (held_to, moved_to) = cuts[band + 1];
+                let old = &held[held_from..held_to];
+                let changed = &moved[moved_from..moved_to];
+                handles.push(scope.spawn(move || {
+                    let mut joined: Vec<TileIdx> = Vec::with_capacity(old.len() + changed.len());
+                    let mut cursor = 0usize;
+                    for tile in changed {
+                        while cursor < old.len() && old[cursor] < *tile {
+                            joined.push(old[cursor]);
+                            cursor += 1;
+                        }
+                        if cursor < old.len() && old[cursor] == *tile {
+                            cursor += 1;
+                        }
+                        if !holders[tile.0 as usize].is_nobody() {
+                            joined.push(*tile);
+                        }
+                    }
+                    joined.extend_from_slice(&old[cursor..]);
+                    *slot = joined;
+                }));
             }
-            for holder in &self.holders[start..end] {
-                if let Some(faction) = holder.faction() {
-                    mask = mask.with(faction);
-                }
+            for handle in handles {
+                // A band reads shared memory and writes its own buffer, so it
+                // has no failure of its own.
+                handle.join().expect("a band of the held list cannot fail");
+            }
+        });
+
+        let total: usize = slots.entries().iter().map(Vec::len).sum();
+        let mut rebuilt: Vec<TileIdx> = Vec::with_capacity(total);
+        for band in slots.entries() {
+            rebuilt.extend_from_slice(band);
+        }
+        self.held = rebuilt;
+    }
+
+    /// Rebuilds the faction mask of every block that a change touched.
+    ///
+    /// A block loses a bit only when the last tile of that faction leaves it,
+    /// and no running count can see that without reading the block. A block
+    /// that changed is therefore read once, and a block that did not change is
+    /// not read at all.
+    ///
+    /// **A block is read by one thread and written by one thread.** The blocks
+    /// are cut into contiguous runs of the dirty list, and the write below
+    /// walks the dirty list and the buffers together in that order.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0009, parallel stages write disjoint outputs, decisions D1, D2 and D3. `docs/adrs/accepted/adr-0009-parallel-stages-write-disjoint-outputs.md`
+    fn rebuild_masks(&mut self, dirty: &[u32], threads: usize) {
+        if dirty.is_empty() {
+            return;
+        }
+        let chunk_len = dirty.len().div_ceil(threads).max(1);
+        let bands = dirty.len().div_ceil(chunk_len);
+        let layout = self.layout;
+        let holders = &self.holders[..];
+        let mut slots: Slots<Vec<FactionMask>> = Slots::filled(bands, Vec::new())
+            .expect("a non-empty dirty list names at least one band");
+        std::thread::scope(|scope| {
+            let mut handles = Vec::new();
+            for (chunk, slot) in dirty.chunks(chunk_len).zip(slots.entries_mut()) {
+                handles.push(scope.spawn(move || {
+                    *slot = chunk
+                        .iter()
+                        .map(|block| mask_of_block(layout, holders, *block))
+                        .collect();
+                }));
+            }
+            for handle in handles {
+                // A band reads the holder column and writes its own buffer, so
+                // it has no failure of its own.
+                handle.join().expect("a band of the dirty list cannot fail");
+            }
+        });
+
+        let mut at = 0usize;
+        for band in slots.entries() {
+            for mask in band {
+                self.block_masks[dirty[at] as usize] = *mask;
+                at += 1;
             }
         }
-        mask
     }
 
     /// Reports whether the holding holds its invariants.
@@ -747,6 +839,29 @@ impl Holding {
 
         census == self.census && held == self.held && masks == self.block_masks
     }
+}
+
+/// Returns the factions that hold ground in one block, read from the holder
+/// column.
+fn mask_of_block(layout: BlockLayout, holders: &[Holder], block: u32) -> FactionMask {
+    let grid = layout.grid();
+    let edge = layout.block_edge();
+    let first_column = (block % layout.blocks_wide()) * edge;
+    let first_row = (block / layout.blocks_wide()) * edge;
+    let mut mask = FactionMask::EMPTY;
+    for row in first_row..(first_row + edge).min(grid.height()) {
+        let start = (row * grid.width() + first_column) as usize;
+        let end = (row * grid.width() + (first_column + edge).min(grid.width())) as usize;
+        if start >= end || end > holders.len() {
+            continue;
+        }
+        for holder in &holders[start..end] {
+            if let Some(faction) = holder.faction() {
+                mask = mask.with(faction);
+            }
+        }
+    }
+    mask
 }
 
 /// Sets the bit of one tile in a tile bit plane.
@@ -887,20 +1002,13 @@ fn decide(
     let Some(address) = grid.address_of(tile) else {
         return Ok(None);
     };
-    let Some(kind) = terrain.kind(address) else {
-        return Ok(None);
-    };
-    let Some(threshold) = claim_threshold(kind) else {
-        // The ground admits no holder. A tile of open water that somebody
-        // held would be a defect, and the invariant check names it.
-        return Ok(None);
-    };
 
-    for neighbour in grid.neighbours(address).into_iter().flatten() {
-        let Some(index) = grid.index_of(neighbour) else {
-            continue;
-        };
-        if let Some(faction) = holders[index.0 as usize].faction() {
+    // The neighbour index of a tile is one fixed offset from the index, so
+    // this reads the holder column directly rather than converting to an
+    // address and back for each of the six directions.
+    let (neighbours, found) = neighbour_indices(grid, tile.0);
+    for index in &neighbours[..found] {
+        if let Some(faction) = holders[*index as usize].faction() {
             scratch.raise(faction, 1);
         }
     }
@@ -935,15 +1043,42 @@ fn decide(
             continue;
         }
         let support = scratch.tally[*faction as usize];
-        if support < threshold || support <= incumbent {
+        if support <= incumbent {
             continue;
         }
         if best.is_none_or(|(top, _)| support > top) {
             best = Some((support, *faction));
         }
     }
+    let Some((support, faction)) = best else {
+        return Ok(None);
+    };
 
-    Ok(best.map(|(_, faction)| Holder::of(FactionId(faction))))
+    // **The ground is read last, because it can only refuse.** It says how
+    // much support the tile asks for, and open water asks for more than any
+    // claim can raise. A tile whose best challenger does not beat the holder
+    // keeps its holder whatever the ground says, so the read is skipped for
+    // it. Reading the ground first cost a generated value for every candidate
+    // tile, and most candidates have no challenger.[^1]
+    //
+    // The threshold is one number for the tile, so the strongest challenger
+    // is the one most likely to reach it. A challenger that the threshold
+    // refuses is refused for every weaker challenger too.
+    //
+    // [^1]: Findings register, FND-287. `docs/FINDINGS.md`
+    let Some(kind) = terrain.kind(address) else {
+        return Ok(None);
+    };
+    let Some(threshold) = claim_threshold(kind) else {
+        // The ground admits no holder. A tile of open water that somebody
+        // held would be a defect, and the invariant check names it.
+        return Ok(None);
+    };
+    if support < threshold {
+        return Ok(None);
+    }
+
+    Ok(Some(Holder::of(FactionId(faction))))
 }
 
 #[cfg(test)]
