@@ -281,10 +281,11 @@ printf '# machine facts\n' > /tmp/facts.txt
 {
     printf '# uname\t%s\n' "$(uname -srm)"
     printf '# instance_type\t%s\n' "$(curl -s -H "X-aws-ec2-metadata-token: $(curl -sX PUT http://169.254.169.254/latest/api/token -H 'X-aws-ec2-metadata-token-ttl-seconds: 60')" http://169.254.169.254/latest/meta-data/instance-type)"
-    printf '# cpu_model\t%s\n' "$(lscpu | sed -n 's/^Model name: *//p' | head -1)"
+    printf '# cpu_implementer\t%s\n' "$(sed -n 's/^CPU implementer[^:]*: *//p' /proc/cpuinfo | head -1)"
+    printf '# cpu_part\t%s\n' "$(sed -n 's/^CPU part[^:]*: *//p' /proc/cpuinfo | head -1)"
     printf '# cpu_count\t%s\n' "$(nproc)"
     printf '# cache_line_bytes\t%s\n' "$(cat /sys/devices/system/cpu/cpu0/cache/index0/coherency_line_size)"
-    printf '# memory_kb\t%s\n' "$(sed -n 's/^MemTotal: *//p' /proc/meminfo)"
+    printf '# memory_kb\t%s\n' "$(sed -n 's/^MemTotal: *\([0-9]*\).*/\1/p' /proc/meminfo)"
     printf '# rustc\t%s\n' "$(rustc --version)"
 } >> /tmp/facts.txt
 cat /tmp/facts.txt
