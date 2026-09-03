@@ -122,14 +122,83 @@ The test is one question. **Does the edit change what a reader would decide?**
 - Repointing a footnote at the row that now holds the material is a repair.
   Nothing a reader decides from the record changes.
 - Rewording the sentence that carries the footnote marker is an amendment, and
-  the window governs it.
-- Adding, removing or reversing a claim, a force, a rejected alternative or a
-  consequence is an amendment, whatever else the commit touches.
+  the window governs it. The exception is a sentence whose own content the
+  register made false, and the section on an imported fact states it.
+- Adding, removing or reversing a claim, a force or a rejected alternative is
+  an amendment, whatever else the commit touches. A consequence the record
+  derived from its own claim is the one exception, and the next section states
+  it.
 
 The commit still says what changed and why, because that is the audit trail and
 a silent edit to an accepted record is the failure this whole section is about.
 
 This has happened once, and the finding holds the case and the reasoning.[^CITE]
+
+### Repairing a derived consequence is not an amendment
+
+**A record states what follows from its claim. What follows changes when the
+project learns, and the claim does not.**
+
+A consequence that a record derived from its own claim may be struck or
+corrected in place, in an accepted record, whatever depends on it. Do not test
+it against the window. Do not write a superseding record to change one derived
+clause, because that record's subject is a topic and not a constraint.[^SCOPE]
+
+The test is the same question. **Does the edit change what a reader would
+decide?** A reviewer refuses a change because of the claim. A reviewer does not
+refuse one because of a cost clause. Striking the cost clause therefore leaves
+every refusal the record supports.
+
+- A cost clause, a complexity claim, or a sentence that follows "therefore" and
+  restates the claim in another unit is derived. Strike it.
+- A sentence that a reader would cite on its own is a claim, however late in the
+  record it sits. The window governs it.
+- The record that stales the consequence binds first. A draft stales nothing, so
+  the strike waits for the acceptance.
+
+The commit says which sentence went, which record staled it, and why the edit is
+a repair. A register holds the reasoning and the case that raised it.[^DERIVED]
+
+### Repairing a fact a record imported from a register is not an amendment
+
+**A record sometimes states the condition of the project rather than its own
+reasoning.** It says that no measurement exists, or that a question is open, and
+it cites the register that held that condition. The register then moves, and the
+sentence is false through no fault of the record.
+
+This is the sibling of the section above and it is not the same case. A derived
+consequence follows from the record's own claim. An imported fact follows from a
+register. Do not read one section into the other, because "derived" would then
+mean "anything a later fact made false", and that reading swallows the whole
+amendment rule.
+
+**Reword the sentence in place, in an accepted record, whatever depends on it.**
+Keep the footnote marker, because the register the record cites is still the
+register that holds the condition. Correcting the sentence and dropping the
+citation are two edits, and only the first one is a repair.
+
+The test is the same question. **Does the edit change what a reader would
+decide?**
+
+- A clause that states the condition of a register is imported. Reword it to the
+  condition that now holds, or strike it when nothing is left to say.
+- **A record does not gain a figure in exchange.** The rule that keeps a
+  measured figure out of a record body does not depend on whether the
+  measurement exists.[^SCOPE] A sweep that adds a number while it repairs a
+  sentence has made the record worse.
+- **A claim that rested on the condition is not imported.** Ask whether the
+  record would have decided differently if the register had said the other
+  thing. If it would, the sentence is a force and not a fact, and the window
+  governs it.
+- **Reword each record against its own subject, and never once for the group.**
+  A register narrows in parts. A sentence that names the whole project is false
+  everywhere, and the narrow sentence beneath it often survives. A sweep that
+  applies one replacement to every file states a new false thing in the files
+  where the narrow sentence was still true.[^SWEEP]
+
+The commit says which sentence changed, which register row moved, and why the
+freeze did not apply. A register holds the reasoning and the case that raised
+it.[^IMPORTED]
 
 ## What does not belong in a record
 
@@ -401,3 +470,6 @@ Then the cross-cutting models, 0007 to 0013. Then the subsystems.
 [^SCOPE]: Decision Record Scope, the test for whether a decision needs a record. `.claude/rules/adr-scope.md`
 [^YIELD]: Findings register, FND-214. `docs/FINDINGS.md`
 [^CITE]: Findings register, FND-218. `docs/FINDINGS.md`
+[^DERIVED]: Decisions register, DEC-096. `docs/DECISIONS.md`
+[^IMPORTED]: Decisions register, DEC-097. `docs/DECISIONS.md`
+[^SWEEP]: Recurring Defect Shapes, shape 2. `.claude/rules/recurring-defects.md`

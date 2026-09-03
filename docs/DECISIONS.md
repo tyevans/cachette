@@ -586,69 +586,6 @@ in the paragraph above about ADR-0068, and it is a real one.
 
 ## Open
 
-### DEC-096 — How does the project repair a stale consequence inside an accepted record?
-
-**Open. A reviewer owns it. The recommendation is Option A.**
-
-An accepted record does not change except in status, and to change a decision
-the project writes a record that supersedes it.[^DEC96A] A finding settled the
-adjacent case this session: repairing a citation is not an amendment, because a
-citation is not a claim.[^DEC96B]
-
-**Neither answers the case in the middle.** ADR-0064 D1 ends with a sentence
-that says the cost of the choice pass is the option count times the population
-and nothing else. It is a consequence the record derived from its own decision,
-introduced by "therefore", and ADR-0096 makes it false.[^DEC96C] Nothing about
-the decision changes: a unit still takes the option that the fixed set and its
-own state select, and it still reads one cell.
-
-The record is accepted and it has many dependents, so the retcon window is
-shut.[^DEC96A]
-
-**A group of accepted records now waits on this row, and they are the same
-case.** The blocker about the missing measurement narrowed, and a sweep repaired
-every document it was free to touch. It stopped at the accepted records, which
-say in their own words that no measurement exists on the target platform. That
-sentence carries a footnote marker, so rewording it is an amendment and the
-window governs it. A backlog item holds the work and waits here.[^BLK7] [^DEC96E]
-
-**A stale consequence is not rare and it is not this record's alone.** A
-consequence is where a record says what follows, and what follows changes when
-the project learns. The scope rule already forbids a record holding a value a
-measurement can change, and a cost clause is one.[^SCOPE] Every record with a
-consequence of that shape will reach this question.
-
-**Option A. Strike the stale sentence in place, and treat a consequence as
-repairable.** A consequence is derived, not decided. Correcting one changes
-nothing a reader would decide from the record's claim, which is the test the
-citation finding already gives.[^DEC96B] The commit says what changed and why,
-as that finding requires.
-
-**Option B. Supersede ADR-0064 in full.** One record replaces it and restates
-its other four decisions. This is what the current rule says. It costs a whole
-record to change one sentence, produces a record whose subject is a topic rather
-than a constraint, and every citation of the old number then needs review.
-
-**Option C. Leave the sentence and let ADR-0096 contradict it.** The newer
-record wins by date. It is rejected on sight: a record the code contradicts is
-worse than no record, and two accepted records disagreeing in the corpus is
-worse still.
-
-**Recommendation: A**, with the boundary stated so it cannot be stretched.
-Striking a derived consequence is a repair. Striking, adding or reversing a
-claim, a force or a rejected alternative is an amendment and the window governs
-it. The test is the one the citation finding already gives: does the edit change
-what a reader would decide?
-
-**Closing this settles more than one sentence.** It gives the third case in a
-series the project has now met three times: a pointer that decays, a consequence
-that decays, and a claim that is wrong. The first is settled, the third is
-settled, and this is the gap between them.
-
-**Whoever closes it should also decide whether the rule belongs in the registry
-beside the citation rule**, since a reader looking for one will look for the
-other in the same place.
-
 ### DEC-095 — Is a strategy field derived from nothing each rebuild, or carried between frames?
 
 **Open. Engineering owns it. It waits on DEC-067 and does not decide before
@@ -1200,6 +1137,100 @@ figure is 168 MB. The storage argument for vectors is stronger than the report
 concluded, and it called that argument its weakest.
 
 ## Closed
+
+### DEC-097 — What does the project do with an accepted record whose imported fact a register made false?
+
+**Closed. Reword it in place. A reviewer closed it, beside DEC-096.**
+
+**The case.** A blocker narrowed, and seven accepted records still say that no
+measurement exists on the target platform and that every cost figure in this
+project is derived.[^BLK7] A benchmark now runs on the target platform and a
+reference table holds measured rows.[^DEC97B] A sweep repaired 49 documents and
+stopped at the seven, because the retcon window is shut on all of them and
+rewording a sentence reads as an amendment.[^DEC96A]
+
+**DEC-096 does not reach this case, and stretching it would cost more than it
+saves.** That decision covers a consequence a record derived from its own claim.
+These sentences derive from the condition of a register. If "derived" grows to
+mean "anything a later fact made false", nothing is left of the amendment rule.
+
+**The answer is a sibling rule and not a wider reading.** A record that states
+the condition of the project imported that condition. The register owns it, the
+register moved, and the record is false through no fault of its own. Reword the
+sentence in place and keep the citation. The registry holds the rule beside the
+other two.[^DEC96A]
+
+**The test is the one the citation finding gives.**[^DEC96B] A reader decides
+from the record's constraint. Every one of the seven states no figure, and the
+scope rule forbids the figure whether or not a measurement exists.[^SCOPE] So
+correcting the reason for an absence changes no decision that anybody makes from
+the record.
+
+**The boundary. A claim that rested on the condition is not an imported fact.**
+Ask whether the record would have decided the other way if the register had said
+the other thing. None of the seven would. Each one chose its option on
+determinism, on the shape of the traffic, or on the structure of the storage,
+and each says separately that it states no figure.
+
+**The seven are not false in the same way, and a single replacement would make
+some of them false again.** Every one holds a universal clause and a narrow one.
+The universal clause says that every cost figure in this project is derived, and
+it is now wrong in all seven. The narrow clause says that the quantity this
+record needs is unmeasured, and it is still right in all seven, because the
+blocker stayed open for a stage inside a step and for a world that holds
+settlements.[^BLK7] Strike the universal clause. Keep the narrow one. Reword
+each record against its own subject, which is the second recurring defect
+shape.[^SWEEP]
+
+**A record gains no figure in exchange.** The rule that keeps a measured figure
+out of a record body does not depend on whether the measurement exists.[^SCOPE]
+
+**What the repair costs.** One commit for each record, or one commit for the
+group, that says which sentence changed, which register row moved, and why the
+freeze did not apply. The footnote marker stays, because the blocker is narrowed
+and not closed.
+
+
+### DEC-096 — How does the project repair a stale consequence inside an accepted record?
+
+**Closed. Option A. A reviewer closed it, in the review of ADR-0096.**
+
+**The rule. A consequence that a record derived from its own claim may be
+struck or corrected in place, in an accepted record, whatever depends on it.** A
+claim, a force and a rejected alternative may not. The test is the one the
+citation finding gives: does the edit change what a reader would decide?[^DEC96B]
+The registry now holds this rule beside the citation rule, because a reader who
+looks for one looks for the other in the same place.[^DEC96A]
+
+**The case that raised it.** ADR-0064 D1 ends with a sentence that says the cost
+of the choice pass is the option count times the population, and nothing
+else.[^DEC96D] The sentence follows "therefore". It derives from the two
+sentences before it, which say that a unit scores a fixed option set and reads
+one cell. Nothing binds on it. A reviewer refuses a change because a unit
+searched the world, and never because a cost clause named a quantity. The clause
+is also the shape that the scope rule keeps out of a record body.[^SCOPE]
+
+**So the sentence is a derived consequence and not a decision.** Strike it.
+Supersession would cost a whole record, restate five decisions that nobody
+disputes, and put every citation of the number under review.
+
+**The boundary, so that nobody stretches it.** ADR-0064 D1 also says that every
+unit scores every option in the set. That sentence states the selection, and not
+the place the work runs. ADR-0064 says so in its own second force: the engine
+precomputes the option values for each cell rather than for each unit. A later
+record that moves where the scoring runs therefore leaves the sentence true. A
+record that makes a unit select by a different rule falsifies a claim, and the
+retcon window governs that.[^DEC96A]
+
+**The strike waits for the record that stales the sentence.** ADR-0096 is a
+draft, and this review returned it for correction.[^DEC96C] A draft binds
+nobody, so it stales nothing. The sentence is struck in the commit that accepts
+ADR-0096, and that commit says which sentence went and why the edit is a repair.
+
+**What this settles beyond one sentence.** The project has met three cases: a
+pointer that decays, a consequence that decays, and a claim that is wrong. The
+first and the third were settled. This closes the gap between them.
+
 
 ### DEC-085 — Does a shipped product record constrain a design, or follow it?
 
@@ -2494,3 +2525,6 @@ a failed founding is correct.[^PRD12]
 [^DEC105A]: Target platform costs, the resident memory rows. `docs/reference/graviton-costs.md`
 [^DEC105B]: Blockers register, BLK-007. `docs/BLOCKERS.md`
 [^DEC105C]: ADR-0088, a tile field is a generated base and a stored change, decision D1. `docs/adrs/draft/adr-0088-a-tile-field-is-a-generated-base-and-a-stored-change.md`
+[^DEC96D]: ADR-0064, a unit chooses by scoring a small fixed option set, decision D1. `docs/adrs/accepted/adr-0064-a-unit-chooses-by-scoring-a-small-fixed-option-set.md`
+[^DEC97B]: Target platform costs. `docs/reference/graviton-costs.md`
+[^SWEEP]: Recurring Defect Shapes, shape 2. `.claude/rules/recurring-defects.md`
