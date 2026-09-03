@@ -110,7 +110,7 @@ plainly that nothing implements it yet.[^1]
 [^14]: Decisions register, DEC-059. `docs/DECISIONS.md`
 [^15]: Review 0164, the gate build profile record. `docs/reviews/0164-the-gate-build-profile-record.md`
 [^16]: Review 0175, the unit reservation record. `docs/reviews/0175-the-unit-reservation-record.md`
-[^17]: Backlog item 0185, steer a step by the option the unit chose. `docs/backlog/refined/0185-steer-a-step-by-the-option-the-unit-chose.md`
+[^17]: Backlog item 0185, steer a step by the option the unit chose. `docs/backlog/complete/0185-steer-a-step-by-the-option-the-unit-chose.md`
 [^18]: Review 0199, the influence, tile field, upgrade and housing records. `docs/reviews/0199-the-influence-tile-field-upgrade-and-housing-records.md`
 [^19]: Review 0204, the two corrected records. `docs/reviews/0204-the-two-corrected-records.md`
 [^20]: Findings register, FND-202. `docs/FINDINGS.md`

@@ -62,8 +62,9 @@
 //! [^15]: ADR-0072, a tile stock is generated, and only what was taken is stored, decision D4. `docs/adrs/accepted/adr-0072-a-tile-stock-is-generated-and-only-what-was-taken-is-stored.md`
 
 use crate::bridge::{BlockLayout, BridgeError, UnitTileBridge};
+use crate::choose::{field_value, OPTIONS, OPTION_COUNT};
 use crate::hash::StateHash;
-use crate::hex::Axial;
+use crate::hex::{Axial, Grid, NEIGHBOUR_COUNT};
 use crate::holding::Holder;
 use crate::resource::{ledger_key, Amount, DepletionLedger, ResourceField, ResourceKind};
 use crate::sim_math;
@@ -790,4 +791,205 @@ fn addresses_of_block(layout: BlockLayout, block: u32) -> impl Iterator<Item = A
     (first_row..first_row + edge).flat_map(move |row| {
         (first_column..first_column + edge).map(move |column| Axial::new(column as i32, row as i32))
     })
+}
+
+/// The exit direction that means a cell holds none.
+///
+/// The value sits at the top of the byte range, which no direction index
+/// reaches, because the neighbour count is far below it. It is a property of
+/// the array layout and not a budget.
+pub const NO_EXIT: u8 = u8::MAX;
+
+/// The direction that each cell holds, for each option.
+///
+/// **Movement takes its direction from this array, and never from a per-unit
+/// search over the neighbouring cells.**[^1] A unit reads the entry of its
+/// cell and its option, and it steps to the neighbouring tile in that
+/// direction. The cost of the array follows the cell count and the option
+/// count. It does not follow the population.
+///
+/// The array is a projection of level 0. The engine derives every entry again
+/// at each rebuild of level 1, from the summaries that the rebuild produced,
+/// and nothing accumulates between two derivations.[^2] Level 0 stays the only
+/// source of truth, and this array states no fact of its own.[^3]
+///
+/// **The array is not a summary field.** A summary field is extensive, and two
+/// summaries combine by adding their fields. Two directions do not add, so the
+/// array sits beside the level and never inside it.[^4] [^5]
+///
+/// It holds no floating point value. A direction is a small unsigned
+/// integer.[^6]
+///
+/// The array does not reach the state hash. It is an exact function of the
+/// summaries, and those are hashed, so hashing it as well would state one fact
+/// in two places with nothing to fail when the copies disagree.[^7]
+///
+/// # References
+///
+/// [^1]: ADR-0091, movement takes its direction from a per-cell field, never from a per-unit search, decision D1. `docs/adrs/draft/adr-0091-movement-takes-its-direction-from-a-per-cell-field.md`
+/// [^2]: ADR-0091, movement takes its direction from a per-cell field, never from a per-unit search, decision D2. `docs/adrs/draft/adr-0091-movement-takes-its-direction-from-a-per-cell-field.md`
+/// [^3]: ADR-0022, level 0 is the only truth, and every level above it is derived, decision D1. `docs/adrs/accepted/adr-0022-level-0-is-the-only-truth-and-every-level-above-it-is-derived.md`
+/// [^4]: ADR-0091, movement takes its direction from a per-cell field, never from a per-unit search, decision D3. `docs/adrs/draft/adr-0091-movement-takes-its-direction-from-a-per-cell-field.md`
+/// [^5]: ADR-0024, every summary field is declared extensive or intensive, decision D2. `docs/adrs/accepted/adr-0024-every-summary-field-is-declared-extensive-or-intensive.md`
+/// [^6]: ADR-0002, simulated and aggregated state holds no floating point number, decision D1. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
+/// [^7]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`
+#[derive(Clone, Debug)]
+pub struct ExitField {
+    cells: Grid,
+    /// One entry for each cell and each option, at the cell index times the
+    /// option count plus the option index.
+    directions: Vec<u8>,
+}
+
+impl ExitField {
+    /// Builds a field over a cell lattice, with no direction anywhere.
+    ///
+    /// The lattice is a hex grid at the pitch of one level 1 block, which is
+    /// the lattice the influence field already solves over. This type declares
+    /// no geometry of its own.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0018, the unit-to-tile bridge is derived, and it rebuilds at the barrier, decision D2. `docs/adrs/accepted/adr-0018-the-unit-to-tile-bridge-is-derived-and-rebuilds-at-the-barrier.md`
+    #[must_use]
+    pub fn new(cells: Grid) -> Self {
+        let count = cells.tile_count() as usize * OPTION_COUNT;
+        Self {
+            cells,
+            directions: vec![NO_EXIT; count],
+        }
+    }
+
+    /// Returns the cell lattice the field covers.
+    #[must_use]
+    pub const fn cells(&self) -> Grid {
+        self.cells
+    }
+
+    /// Returns the exit direction of one cell and one option.
+    ///
+    /// The outer option reports whether the cell and the option name an entry.
+    /// The inner one reports whether the cell holds a direction at all. A cell
+    /// that no neighbour beats keeps none, and a unit there falls back to the
+    /// uniform draw.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0091, movement takes its direction from a per-cell field, never from a per-unit search, decision D4. `docs/adrs/draft/adr-0091-movement-takes-its-direction-from-a-per-cell-field.md`
+    #[must_use]
+    pub fn exit(&self, cell: u32, option: u8) -> Option<Option<u8>> {
+        if option as usize >= OPTION_COUNT {
+            return None;
+        }
+        let at = (cell as usize).checked_mul(OPTION_COUNT)? + option as usize;
+        let direction = *self.directions.get(at)?;
+        Some(if direction == NO_EXIT {
+            None
+        } else {
+            Some(direction)
+        })
+    }
+
+    /// Derives every entry from a level 1.
+    ///
+    /// **A cell ranks its neighbours on the value that the option reads from a
+    /// cell, and never on the score of the option.** A score multiplies that
+    /// value by what one unit wants. A want of zero makes every score equal,
+    /// and the multiplication saturates, so under either property the
+    /// tie-break would decide the direction and the ground would not.[^1] [^2]
+    ///
+    /// The scan reads the six directions in ascending direction index and
+    /// compares strictly, so the lowest direction index wins a tie. That is the
+    /// order that every other walk over the neighbours of a hex uses, and it is
+    /// the rule the choice pass already uses for a tie between two
+    /// options.[^3] [^4]
+    ///
+    /// The running best starts at the value of the cell itself, so a neighbour
+    /// must beat the ground the unit already stands on. A cell that no
+    /// neighbour beats holds no direction.[^1]
+    ///
+    /// A neighbour outside the lattice is not a candidate. The world does not
+    /// wrap.
+    ///
+    /// **The pass writes every entry and accumulates nothing.** Deriving twice
+    /// from one level 1 gives one answer, so the field carries nothing between
+    /// two frames.[^5]
+    ///
+    /// The pass runs on the calling thread. It reads the summaries and writes
+    /// the directions, in ascending cell order and then in ascending option
+    /// order, so the result names no thread and depends on no thread
+    /// count.[^3] No figure appears here, because no measurement exists on the
+    /// target platform.[^6]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0091, movement takes its direction from a per-cell field, never from a per-unit search, decision D4. `docs/adrs/draft/adr-0091-movement-takes-its-direction-from-a-per-cell-field.md`
+    /// [^2]: Findings register, FND-190. `docs/FINDINGS.md`
+    /// [^3]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
+    /// [^4]: ADR-0064, a unit chooses by scoring a small fixed option set, decision D5. `docs/adrs/accepted/adr-0064-a-unit-chooses-by-scoring-a-small-fixed-option-set.md`
+    /// [^5]: ADR-0091, movement takes its direction from a per-cell field, never from a per-unit search, decision D2. `docs/adrs/draft/adr-0091-movement-takes-its-direction-from-a-per-cell-field.md`
+    /// [^6]: Blockers register, BLK-007. `docs/BLOCKERS.md`
+    pub fn derive(&mut self, pyramid: &Pyramid) {
+        let cells = self.cells;
+        for cell in 0..cells.tile_count() {
+            let (Some(here), Some(mine)) = (cells.address_of(TileIdx(cell)), pyramid.cell(cell))
+            else {
+                continue;
+            };
+            for (option, row) in OPTIONS.iter().enumerate() {
+                let mut best = NO_EXIT;
+                let mut best_value = field_value(mine, row.field);
+                for direction in direction_order() {
+                    let Some(there) = cells.neighbour(here, direction) else {
+                        continue;
+                    };
+                    let Some(index) = cells.index_of(there) else {
+                        continue;
+                    };
+                    let Some(summary) = pyramid.cell(index.0) else {
+                        continue;
+                    };
+                    let value = field_value(summary, row.field);
+                    if value > best_value {
+                        best_value = value;
+                        best = direction as u8;
+                    }
+                }
+                self.directions[cell as usize * OPTION_COUNT + option] = best;
+            }
+        }
+    }
+}
+
+/// Returns the order in which the derivation scans the six directions.
+///
+/// The order is ascending direction index. The comparison is strict, so the
+/// lowest direction index wins a tie between two equal neighbours.[^1]
+///
+/// # References
+///
+/// [^1]: ADR-0004, iteration order is explicit, decisions D1 and D3. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
+#[cfg(not(feature = "probe-nondeterminism"))]
+const fn direction_order() -> [usize; NEIGHBOUR_COUNT] {
+    [0, 1, 2, 3, 4, 5]
+}
+
+/// Returns the directions in descending index order, which is a defect.
+///
+/// This is the perturbed build. The scan reads the neighbours from the top, so
+/// the strict comparison now gives a tie to the **highest** direction index.
+/// The field is still deterministic and still gives one answer at any thread
+/// count, so neither determinism test can see it. Only a test that builds two
+/// equal neighbours and names the winner can.[^1]
+///
+/// The whole point is that it must fail. A determinism test with no proven
+/// failure mode is decoration.[^2]
+///
+/// # References
+///
+/// [^1]: Testing rules, section 2. `.claude/rules/testing.md`
+/// [^2]: Testing rules, section 1. `.claude/rules/testing.md`
+#[cfg(feature = "probe-nondeterminism")]
+const fn direction_order() -> [usize; NEIGHBOUR_COUNT] {
+    [5, 4, 3, 2, 1, 0]
 }

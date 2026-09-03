@@ -101,7 +101,9 @@ determinism:
 # it reaches the scan of the death plane, which then ends the marked units in
 # the order the output slots joined rather than in ascending slot order. It
 # also scans the choice options from the top of the set, so a tie goes to the
-# highest option index rather than the lowest.
+# highest option index rather than the lowest, and it scans the six directions
+# of the exit field the same way, so a tie between two equal neighbouring cells
+# goes to the highest direction index.
 # Each test binary below must then fail, and the probe binary, which asserts
 # that every perturbation is visible, must pass. Both determinism tests of
 # ADR-0001 D4 are in the list, because ADR-0001 D5 asks both to be able to
@@ -115,6 +117,7 @@ probe:
     ! cargo test --package cachette-core --features probe-nondeterminism --test founding
     ! cargo test --package cachette-core --features probe-nondeterminism --test consumption
     ! cargo test --package cachette-core --features probe-nondeterminism --test choice
+    ! cargo test --package cachette-core --features probe-nondeterminism --test exit_field
     ! cargo test --package cachette-core --features probe-nondeterminism --test starvation
     ! cargo test --package cachette-core --features probe-nondeterminism --test influence
     cargo test --package cachette-core --features probe-nondeterminism --test determinism_probe

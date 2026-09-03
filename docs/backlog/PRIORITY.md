@@ -28,8 +28,8 @@ engine gets wrong today.
 | No. | Why it sits here |
 |---|---|
 | 0102 | A settlement reads its own ground rule, not the passability rule. Blocked by 0071 and 0092, in that order. |
-| 0185 | The engine computes an option for every unit on every tick and then discards it. Movement reads whether a unit chose, not what it chose, so every pass that feeds the choice feeds one bit. FND-180 records it. The forage option now scores real food, so a step that reads the option steers toward something a system writes. ADR-0091 governs it. |
-| 0186 | It moved here from `Next` because it is the negative feedback of 0185. Without it the exit field of 0185 produces one rush in one direction, and nothing in the world turns the crowd back. Take it with 0185, or immediately after. |
+| 0187 | Nothing moves a carried load into a store, so gathering cannot feed anybody. It moved here from `Next` because 0186 is complete and a unit now carries something. It closes the chain from the ground to the store, and it is what makes a hungry unit able to feed itself. |
+| 0216 | It replaces 0185 and 0186 at the top, because both are complete and neither reaches a watcher. The engine steers a step by the option and orders a gather, and the demonstration feeds every unit, so the option is always `roam` and no unit ever forages. FND-226 holds the measurement. The loop that 0185 and 0186 built is invisible until this is done. |
 
 ## Next
 
@@ -38,7 +38,7 @@ These close a gap a review found, or they unblock the items above.
 | No. | Why it sits here |
 |---|---|
 | 0224 | The control plane names one entity of a mass shape in four places, and a test pays four crossings for each site because of it. FND-215 holds the measurement. It sits below 0223 because the review that found it returned ADR-0040 for an amendment, and the amendment names this item. |
-| 0187 | Nothing moves a carried load into a store, so gathering cannot feed anybody. It ships a verb with nothing to move until 0186 makes a unit carry something, so it follows 0186. |
+
 | 0189 | The rules against inert work look for an absent caller, and this defect has one. DEC-074 holds the options and recommends this. |
 | 0190 | The pyramid folds level 1 into a state hash and nothing calls the fold. It is a small instance of what 0189 is about, and it sits below 0189 because the rule should come before the sweep. |
 | 0194 | The tile value pass writes a random walk over every tile on every tick, and no reader decides anything from it. Items 0183, 0184 and 0188 removed the last three. What is left is storage, a hash contribution and a public reader. Nothing blocks it. |

@@ -94,9 +94,16 @@ The scan reads the six directions in ascending direction index and compares
 strictly. The lowest direction index therefore wins a tie. That direction
 order is fixed, and every other walk over the neighbours of a hex uses it.[^12]
 
-A neighbour outside the lattice is not a candidate. A cell that no neighbour
-beats strictly holds no exit direction. A unit in such a cell keeps the
-uniform draw that it takes today, so the field leaves no unit without a rule.
+A neighbour outside the lattice is not a candidate.
+
+**The scan starts at the value of the cell itself.** A neighbour must beat the
+ground the unit already stands on, so a cell that no neighbour beats holds no
+exit direction. A unit in such a cell keeps the uniform draw that it takes
+today, so the field leaves no unit without a rule.
+
+A scan that started below every value would give a direction to a cell that is
+already the best of its neighbourhood, and every unit there would step onto
+worse ground for ever.
 
 ## Consequences
 

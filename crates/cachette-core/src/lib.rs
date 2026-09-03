@@ -68,6 +68,7 @@ pub use position::{
     release_the_dead, Position, PositionError, PositionTable, SitePreference, NO_WORK,
     POSITIONS_PER_SITE, WORK_COMMODITY,
 };
+pub use pyramid::{CellSummary, ExitField, Pyramid, NO_EXIT};
 pub use rates::{
     RateError, RateLedger, RatePass, RateSchedule, RateTable, SiteRate, SiteShortfall,
 };

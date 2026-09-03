@@ -1,7 +1,7 @@
 ---
 id: 0185
 title: Steer a step by the option the unit chose
-status: refined
+status: complete
 created: 2026-09-02
 implements: [ADR-0002 D1, ADR-0002 D2, ADR-0004 D1, ADR-0004 D3, ADR-0018 D2, ADR-0022 D1, ADR-0022 D2, ADR-0022 D3, ADR-0024 D2, ADR-0056 D2, ADR-0056 D3, ADR-0064 D1, ADR-0064 D5, ADR-0064 D6, ADR-0091 D1, ADR-0091 D2, ADR-0091 D3, ADR-0091 D4]
 changes: []
@@ -185,13 +185,62 @@ which is why both rebuild paths derive the field.[^8]
 
 ## Outcome
 
-Filled in when the item moves to `complete/`.
+The engine holds one exit direction for each level 1 cell and each option. The
+movement pass reads the option of a unit and the entry of its cell, and it
+steps the unit to the neighbouring tile in that direction. A unit in a cell
+that no neighbour beats keeps the uniform draw.
+
+**The field is derived in one place.** One private call rebuilds level 1 and
+derives the field from the summaries it produced. Building a world, the barrier
+of a step, and the public rebuild all go through it, so no path leaves a stale
+field behind. A test asserts that the step path and the public path give one
+field.
+
+**The behaviour changed, and three golden files record it.** They were recorded
+again from this source. No file was edited by hand.
+
+**The probe gained a perturbation.** The perturbed build scans the six
+directions from the top, so a tie between two equal neighbouring cells goes to
+the highest direction index. The field stays deterministic under it, so neither
+determinism test sees it, and the tie test is what fails. The exit field test
+binary is now in the probe list, and the probe binary asserts that the
+perturbation is visible.
+
+**The record was tightened.** ADR-0091 D4 said that a cell no neighbour beats
+holds no direction, without naming what a neighbour must beat. The scan starts
+at the value of the cell itself, and the record now says so. It is a draft, and
+the author is not its reviewer.
+
+**Registers.** FND-226, FND-227 and FND-228 were added. DEC-079 carries what
+the run showed, and it stays open because the run did not reach the case.
+DEC-074 carries what the falsification found. No blocker opened or closed.
+
+**Evidence.** Four defects were put back separately, and the source was
+restored after each. Pinning the option column to one value at the site
+movement reads it failed the movement test. Putting the uniform draw back in
+place of the field failed the same test. Removing the engine write of the
+gather order failed five gather tests. Setting the map from the option to the
+resource kind to nothing failed four.
+
+**The first fixture failed the falsification, and FND-227 records it.** The
+pinned option column left all sixteen new tests green, because the cell under
+test pointed the same way for the pinned option as for the option the test set.
+The fixture now chooses a direction that no other option points at, and it
+asserts that.
+
+**What a run showed.** The demonstration migrates. Over three hundred ticks the
+mean distance of a unit from its starting tile rose from 13 tiles under the
+uniform draw to 36, and the furthest unit from 40 tiles to 74. Both figures are
+one run each, on a development machine, at the same seed and settings. **The
+migration is toward open ground and not toward food**, because the
+demonstration feeds every unit and the `forage` option therefore scores zero.
+FND-226 holds the measurement, and item 0216 holds the repair.
 
 ## References
 
 [^1]: Findings register, FND-180. `docs/FINDINGS.md`
 [^2]: PRD-0009, a unit acts on the world it can see. `docs/product/accepted/prd-0009-a-unit-acts-on-the-world-it-can-see.md`
-[^3]: Backlog item 0186, let the engine order a gather. `docs/backlog/refined/0186-let-the-engine-order-a-gather.md`
+[^3]: Backlog item 0186, let the engine order a gather. `docs/backlog/complete/0186-let-the-engine-order-a-gather.md`
 [^4]: Backlog item 0187, give a carried load somewhere to go. `docs/backlog/refined/0187-give-a-carried-load-somewhere-to-go.md`
 [^5]: Backlog item 0183, carry the food of a cell into the level 1 summary. `docs/backlog/complete/0183-carry-the-food-of-a-cell-into-the-level-1-summary.md`
 [^6]: Backlog item 0184, score the forage option against food. `docs/backlog/complete/0184-score-the-forage-option-against-food.md`

@@ -5632,8 +5632,110 @@ allocated by a line that cannot see uncommitted work. In each case the registry
 stores a piece of state somewhere that cannot be read atomically by everyone who
 needs it, and in each case nothing fails until two readers disagree.
 
+### FND-226 — The demonstration feeds every unit, so it never forages
+
+**Believed.** The engine now steers a step by the option a unit chose, and it
+writes a gather order for the unit that chooses to forage.[^F226A] [^F226B]
+The demonstration runs the same engine, so a watcher was expected to see units
+walk to food and take it.
+
+**True.** No unit in the demonstration ever forages. The `forage` row is driven
+by what a unit lacks, and the demonstration founds each group on a site whose
+store feeds it.[^F226C] Every unit therefore holds a whole need on every frame,
+the drive of the row is zero, and the score is zero whatever the ground
+carries. Every unit chooses `roam`, which reads the share of a cell that admits
+a unit.
+
+**Evidence.** A run of the demonstration world was measured on a development
+machine, at one, sixty, two hundred, six hundred and one thousand two hundred
+ticks. At every reading the mean need was the full need, every live unit held
+the `roam` option, no unit held a gather order, and the depletion ledger held
+no entry. The panel of a founded run states the same thing in one card: the
+nearest unit reads a food value of 0.86 from its cell and scores 0.00 for the
+option that reads it, because it is fed.
+
+**Follows.** Two things.
+
+**The chain of items 0185 and 0186 is real in the engine and inert in the
+demonstration.** The engine tests drive a hungry unit and it forages, gathers,
+and works a deposit down. The demonstration supplies no hungry unit, so the
+negative feedback never engages and a watcher sees one behaviour and not the
+loop.
+
+**The migration a watcher does see is toward open ground.** The `roam` row
+reads a property of the ground, which no system writes, so the field it steers
+by never changes. The units walk to a local maximum of open ground and stop
+there. A directed walk is visible: over three hundred ticks the mean distance
+from the starting tile rose from 13 tiles under the uniform draw to 36, and the
+furthest unit from 40 tiles to 74. Both figures are one run each, on a
+development machine, at the same seed and settings.[^28]
+
+The repair is a demonstration parameter and not an engine change. An item holds
+it.[^F226E]
+
+### FND-227 — A fixture in which two options point one way cannot see a pinned option column
+
+**Believed.** A test that drives the step, reads the exit direction of a cell,
+and names the tile a unit must reach proves that the step read the option of
+that unit. The register recommends exactly that falsification: pin the value to
+a constant and watch the suite stay green.[^F183A]
+
+**True.** The first fixture failed the falsification. The option column was
+pinned to option zero at the site where movement reads it, and every test
+stayed green. The cell under test pointed the same way for the pinned option as
+for the option the test set, so the assertion could not tell the two apart. The
+test measured the fixture.
+
+**Evidence.** The pin was applied on a development machine and the whole suite
+of both new test files was run. Ten exit field tests and six gather tests
+passed. The fixture was then rebuilt to choose a direction that no other option
+points at, and the same pin failed the movement test. Three further pins were
+run separately, each with the source restored afterwards: the uniform draw put
+back in place of the field, the engine write of the gather order removed, and
+the map from the option to the resource kind set to nothing. Each failed the
+tests that name it.
+
+**Follows.** This is the shape the register already holds, on a new value. One
+finding says to pin the site the consumer reads.[^F227B] This adds the other
+half: **the fixture must separate the value under test from every other value
+the consumer could have read.** A pin reaches the consumer and still proves
+nothing when two inputs give one answer.
+
+The rule generalises to any lookup keyed on a small set. Build the fixture so
+that each key gives a different answer, and assert that the other keys do not
+give the answer under test. The exit field test asserts that now.
+
+### FND-228 — An engine writer of a control-plane column replaces what a caller wrote
+
+**Believed.** Adding an engine writer to the gather order column leaves a
+caller that sets the order from the control plane working as before. The verb
+stays, and the item that added the writer states the precedence in prose.
+
+**True.** The engine write replaces the caller write on every frame that the
+level 1 cell of the unit chooses. A probe fixture set the choice interval to
+every tick and then ordered a gather from outside, so the choice replaced that
+order before the resolve read it. The contest the fixture existed to build
+disappeared, and the test that proves the gather sort can fail stopped failing.
+
+**Evidence.** The determinism probe run under its feature reported one failure
+after the engine write was added, in the test that asserts the gather sort has
+a proven failure mode. The fixture now puts the choice far enough apart that no
+cell of a gatherer chooses on the frame under test, and it asserts that rather
+than assuming it. Nineteen probe tests then pass.
+
+**Follows.** **When a pass gains a second writer of a column, every fixture that
+wrote that column from outside is now a fixture about precedence.** Search for
+the callers of the setter, not only for the readers of the column. A fixture
+that sets a value and then runs a frame is the shape that breaks, and it breaks
+quietly: the value is read back correctly and it is the wrong value.
+
 ## References
 
+[^F226A]: Backlog item 0185, steer a step by the option the unit chose. `docs/backlog/complete/0185-steer-a-step-by-the-option-the-unit-chose.md`
+[^F226B]: Backlog item 0186, let the engine order a gather. `docs/backlog/complete/0186-let-the-engine-order-a-gather.md`
+[^F226C]: ADR-0063, a need is a rate with a threshold, and crossing it is a fact, decision D2. `docs/adrs/accepted/adr-0063-a-need-is-a-rate-with-a-threshold-and-crossing-it-is-a-fact.md`
+[^F226E]: Backlog item 0216, let the demonstration make a unit hungry. `docs/backlog/proposed/0216-let-the-demonstration-make-a-unit-hungry.md`
+[^F227B]: Findings register, FND-183, in this document.
 [^F177A]: The founding refuses ground that admits nobody. `crates/cachette-core/src/world.rs`
 [^F177B]: The terrain capacity table. `crates/cachette-core/src/terrain.rs`
 [^F180A]: ADR-0064, a unit chooses by scoring a small fixed option set, decision D3. `docs/adrs/accepted/adr-0064-a-unit-chooses-by-scoring-a-small-fixed-option-set.md`

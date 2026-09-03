@@ -43,7 +43,7 @@ use crate::holding::{FactionMask, Holder, Holding};
 use crate::household;
 use crate::influence::{Influence, InfluenceError, InfluenceField};
 use crate::position::{self, Position, PositionError, PositionTable, SitePreference};
-use crate::pyramid::{CellSummary, Pyramid};
+use crate::pyramid::{CellSummary, ExitField, Pyramid};
 use crate::rates::{RateError, RateLedger, RateSchedule, RateTable, SiteShortfall};
 use crate::resource::{
     ledger_key, Amount, CarryLoad, DepletionLedger, RecoveryRules, ResourceField, ResourceKind,
@@ -418,6 +418,17 @@ pub struct World {
     upgrades: UpgradeMap,
     /// Level 1 of the pyramid, derived from level 0 at the barrier.
     pyramid: Pyramid,
+    /// The direction that each level 1 cell holds, for each option.
+    ///
+    /// The array is what movement steers by. It is a projection of level 1,
+    /// derived again at every rebuild of it, and it sits beside the summaries
+    /// rather than inside them, because two directions do not add.[^1] [^2]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0091, movement takes its direction from a per-cell field, never from a per-unit search, decisions D2 and D3. `docs/adrs/draft/adr-0091-movement-takes-its-direction-from-a-per-cell-field.md`
+    /// [^2]: ADR-0024, every summary field is declared extensive or intensive, decision D2. `docs/adrs/accepted/adr-0024-every-summary-field-is-declared-extensive-or-intensive.md`
+    exits: ExitField,
     /// Who holds each tile, and what each faction holds.
     ///
     /// The holder column is level 0 and it is the truth. It is the one value
@@ -570,6 +581,7 @@ impl World {
             departed: [0; RESOURCE_KIND_COUNT],
             upgrades: UpgradeMap::new(),
             pyramid: Pyramid::new(layout, ResourceField::new(terrain))?,
+            exits: ExitField::new(cell_lattice),
             holding: Holding::new(layout),
             influence: InfluenceField::new(cell_lattice, config.faction_count)?,
             schedule: RateSchedule::DEFAULT,
@@ -591,14 +603,7 @@ impl World {
         // A world that has never stepped still answers a question about a
         // region. A level that nothing rebuilt would describe an empty world
         // and would be wrong rather than absent.
-        world.pyramid.rebuild(
-            &world.values,
-            world.holding.holders(),
-            &world.soldiers,
-            &world.bridge,
-            &world.depletion,
-            1,
-        )?;
+        world.rebuild_level_1(1)?;
         // The conductance of a cell follows the ground it covers, and the
         // ground does not change for the life of a world, so this runs once
         // and never again. It reads the level that the rebuild above just
@@ -753,16 +758,24 @@ impl World {
     /// runs no work of its own: the step resolves every order of the frame in
     /// one pass.[^1]
     ///
+    /// **The order holds until the unit next chooses.** The choice pass is the
+    /// engine writer of this column, and it writes the order of a unit only on
+    /// the frame that the level 1 cell of that unit chooses.[^2] An order given
+    /// here therefore survives the frames until then, and the choice replaces
+    /// it when it comes round.
+    ///
     /// # References
     ///
     /// [^1]: ADR-0073, gathering is admitted by sort-then-admit against the tile, decision D1. `docs/adrs/accepted/adr-0073-gathering-is-admitted-by-sort-then-admit-against-the-tile.md`
+    /// [^2]: ADR-0064, a unit chooses by scoring a small fixed option set, decision D4. `docs/adrs/accepted/adr-0064-a-unit-chooses-by-scoring-a-small-fixed-option-set.md`
     pub fn order_gather(&mut self, entity: Entity, kind: ResourceKind) -> bool {
         self.soldiers.set_gather_order(entity, Some(kind))
     }
 
     /// Tells one soldier to stop gathering.
     ///
-    /// Returns `false` when the identity is dead.
+    /// Returns `false` when the identity is dead. The stop holds until the
+    /// unit next chooses, in the same way an order does.
     pub fn stop_gather(&mut self, entity: Entity) -> bool {
         self.soldiers.set_gather_order(entity, None)
     }
@@ -2763,9 +2776,21 @@ impl World {
     /// The pass is one operation over all units. Nothing loops over units
     /// outside the engine.[^1]
     ///
+    /// **The pass writes the gather order in the same write as the intent.**
+    /// One pass writes both, for the same units, on the same frame. A second
+    /// stage that derived the order from the option would be a second writer
+    /// of one column, and nothing would fail when the two disagreed.[^4] The
+    /// kind that an option gathers comes from the option row, which is the one
+    /// declaration of that map.[^5]
+    ///
     /// A unit whose cell does not choose on this frame keeps the intent it
-    /// held. A unit whose every option scores below the floor holds what it
-    /// was doing, which is the case the floor exists for.[^2]
+    /// held, and it keeps the gather order it held. A control-plane order
+    /// therefore survives until the cell of that unit next chooses, and the
+    /// choice then replaces it.[^6]
+    ///
+    /// A unit whose every option scores below the floor holds what it
+    /// was doing, which is the case the floor exists for.[^2] It holds no
+    /// intent, so it takes no gather order either.
     ///
     /// Each thread reads a span of the live set and writes its own output
     /// slot. The join reads the slots in slot order, so the result never
@@ -2780,6 +2805,9 @@ impl World {
     /// [^1]: ADR-0010, Python is a control plane, and it never touches an entity one at a time. `docs/adrs/REGISTRY.md`
     /// [^2]: Findings register, FND-014. `docs/FINDINGS.md`
     /// [^3]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
+    /// [^4]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`
+    /// [^5]: Findings register, FND-191. `docs/FINDINGS.md`
+    /// [^6]: ADR-0073, gathering is admitted by sort-then-admit against the tile, decision D1. `docs/adrs/accepted/adr-0073-gathering-is-admitted-by-sort-then-admit-against-the-tile.md`
     fn choose(&mut self, threads: usize) -> Result<(), StepError> {
         if threads == 0 {
             return Err(StepError::ZeroThreads);
@@ -2795,7 +2823,7 @@ impl World {
         let layout = pyramid.layout();
         let soldiers = &self.soldiers;
         let chunk_len = live.len().div_ceil(threads).max(1);
-        let mut slots: Slots<Vec<(u32, u8)>> =
+        let mut slots: Slots<Vec<(Entity, u8)>> =
             Slots::filled(threads, Vec::new()).map_err(|_| StepError::ZeroThreads)?;
 
         std::thread::scope(|scope| {
@@ -2813,7 +2841,7 @@ impl World {
                             }
                             let summary = pyramid.cell(cell)?;
                             let need = soldiers.need_column()[unit.index() as usize];
-                            Some((unit.index(), choose::best_option(need, summary, weights)))
+                            Some((*unit, choose::best_option(need, summary, weights)))
                         })
                         .collect();
                 });
@@ -2824,8 +2852,13 @@ impl World {
             joined.extend_from_slice(slot);
             joined
         });
-        for (slot, intent) in chosen {
-            self.soldiers.set_intent_at(slot, intent);
+        for (unit, intent) in chosen {
+            self.soldiers.set_intent_at(unit.index(), intent);
+            // The same write. A unit that chose the option which gathers
+            // holds an order for that kind, and a unit that chose anything
+            // else, or nothing, holds none.
+            self.soldiers
+                .set_gather_order(unit, choose::gathers(intent));
         }
         Ok(())
     }
@@ -2916,7 +2949,15 @@ impl World {
         // [^11]: ADR-0022, level 0 is the only truth, and every level above it is derived, decisions D1 and D3. `docs/adrs/accepted/adr-0022-level-0-is-the-only-truth-and-every-level-above-it-is-derived.md`
         self.choose(threads)?;
 
-        let intents = soldier_moves(tick, seed, self.terrain, &self.soldiers, threads)?;
+        let intents = soldier_moves(
+            tick,
+            seed,
+            self.terrain,
+            &self.soldiers,
+            self.pyramid.layout(),
+            &self.exits,
+            threads,
+        )?;
 
         // Admission grants the intents. It reads the occupancy of a target
         // from the derived structure, which the last barrier rebuilt, so it
@@ -3074,14 +3115,7 @@ impl World {
         // be quietly repaired instead of refused.
         //
         // [^5]: ADR-0022, level 0 is the only truth, and every level above it is derived, decision D2. `docs/adrs/accepted/adr-0022-level-0-is-the-only-truth-and-every-level-above-it-is-derived.md`
-        self.pyramid.rebuild(
-            &self.values,
-            self.holding.holders(),
-            &self.soldiers,
-            &self.bridge,
-            &self.depletion,
-            threads,
-        )?;
+        self.rebuild_level_1(threads)?;
 
         // The influence solve runs last, after every change this frame made
         // and after the derived level it reads was rebuilt. It runs the same
@@ -3369,6 +3403,41 @@ impl World {
             .block_mask(self.holding.layout().block_of_key(key))
     }
 
+    /// Returns the exit direction of every cell and every option.
+    ///
+    /// The array is a projection of level 1. The engine derives it again at
+    /// every rebuild of that level, and it holds no fact of its own.[^1] [^2]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0091, movement takes its direction from a per-cell field, never from a per-unit search, decision D2. `docs/adrs/draft/adr-0091-movement-takes-its-direction-from-a-per-cell-field.md`
+    /// [^2]: ADR-0022, level 0 is the only truth, and every level above it is derived, decision D1. `docs/adrs/accepted/adr-0022-level-0-is-the-only-truth-and-every-level-above-it-is-derived.md`
+    #[must_use]
+    pub const fn exit_field(&self) -> &ExitField {
+        &self.exits
+    }
+
+    /// Returns the exit direction that one option holds at one address.
+    ///
+    /// The direction is the index of one of the six neighbour offsets. A unit
+    /// that stands at this address and holds this option steps to the
+    /// neighbouring tile in that direction.[^1]
+    ///
+    /// The outer option reports whether the address and the option name an
+    /// entry. The inner one reports whether the cell holds a direction. A cell
+    /// that no neighbour beats holds none, and a unit there takes the uniform
+    /// draw instead.[^2]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0091, movement takes its direction from a per-cell field, never from a per-unit search, decision D1. `docs/adrs/draft/adr-0091-movement-takes-its-direction-from-a-per-cell-field.md`
+    /// [^2]: ADR-0091, movement takes its direction from a per-cell field, never from a per-unit search, decision D4. `docs/adrs/draft/adr-0091-movement-takes-its-direction-from-a-per-cell-field.md`
+    #[must_use]
+    pub fn exit_direction(&self, address: Axial, option: u8) -> Option<Option<u8>> {
+        let tile = self.grid.index_of(address)?;
+        self.exits.exit(self.cell_of(tile)?, option)
+    }
+
     /// Returns level 1 of the pyramid.
     ///
     /// The level is derived from level 0 and holds no fact of its own.[^1]
@@ -3466,6 +3535,33 @@ impl World {
     /// arena.
     pub fn rebuild_pyramid(&mut self, threads: usize) -> Result<(), StepError> {
         self.refresh_bridge()?;
+        self.rebuild_level_1(threads)?;
+        Ok(())
+    }
+
+    /// Rebuilds level 1 and derives the exit field from it.
+    ///
+    /// **This is the one place that derives the field.** Every path that
+    /// rebuilds level 1 comes through here: building a world, the barrier of a
+    /// step, and the public rebuild that a caller runs outside a frame. A field
+    /// left behind by one of those paths would be a stale value that nothing
+    /// fails on, and a stale read is a confident wrong answer.[^1] [^2]
+    ///
+    /// The field is derived from the summaries this call just produced, so the
+    /// choice, the summary and the field that a unit reads in one frame all
+    /// come from one barrier.[^3]
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the derived unit structure does not describe the
+    /// arena.
+    ///
+    /// # References
+    ///
+    /// [^1]: Findings register, FND-029. `docs/FINDINGS.md`
+    /// [^2]: ADR-0091, movement takes its direction from a per-cell field, never from a per-unit search, the consequences. `docs/adrs/draft/adr-0091-movement-takes-its-direction-from-a-per-cell-field.md`
+    /// [^3]: ADR-0091, movement takes its direction from a per-cell field, never from a per-unit search, decision D2. `docs/adrs/draft/adr-0091-movement-takes-its-direction-from-a-per-cell-field.md`
+    fn rebuild_level_1(&mut self, threads: usize) -> Result<(), BridgeError> {
         self.pyramid.rebuild(
             &self.values,
             self.holding.holders(),
@@ -3474,6 +3570,7 @@ impl World {
             &self.depletion,
             threads,
         )?;
+        self.exits.derive(&self.pyramid);
         Ok(())
     }
 
@@ -4162,11 +4259,16 @@ const DRAW_MOVE_DIRECTION: u32 = 0;
 /// [^5]: ADR-0056, movement is tile-discrete and admitted by sort-then-admit, decision D2. `docs/adrs/accepted/adr-0056-movement-is-tile-discrete-and-admitted-by-sort-then-admit.md`
 /// [^6]: ADR-0068, terrain is generated from the seed and is never stored as a map, decision D4. `docs/adrs/accepted/adr-0068-terrain-is-generated-from-the-seed-and-is-never-stored-as-a-map.md`
 /// [^7]: ADR-0064, a unit chooses by scoring a small fixed option set, decision D3. `docs/adrs/accepted/adr-0064-a-unit-chooses-by-scoring-a-small-fixed-option-set.md`
+/// [^8]: ADR-0091, movement takes its direction from a per-cell field, never from a per-unit search, decision D1. `docs/adrs/draft/adr-0091-movement-takes-its-direction-from-a-per-cell-field.md`
+/// [^9]: ADR-0017, the world is a rhombus, so a tile index is raw axial, decision D2. `docs/adrs/accepted/adr-0017-the-world-is-a-rhombus-so-a-tile-index-is-raw-axial.md`
+/// [^10]: ADR-0003, every random draw is keyed, never stateful, decision D1. `docs/adrs/accepted/adr-0003-every-random-draw-is-keyed-never-stateful.md`
 fn soldier_moves(
     tick: Tick,
     seed: u64,
     terrain: Terrain,
     soldiers: &SoldierArena,
+    layout: BlockLayout,
+    exits: &ExitField,
     threads: usize,
 ) -> Result<Vec<(Entity, Axial)>, StepError> {
     let live: Vec<Entity> = soldiers.iter().collect();
@@ -4188,16 +4290,34 @@ fn soldier_moves(
                         // choice pass writes the intent, and a unit whose
                         // every option scored below the floor holds what it
                         // was doing.[^7]
-                        soldiers.intent(*soldier)??;
+                        let option = soldiers.intent(*soldier)??;
                         let here = soldiers.address(*soldier)?;
-                        let direction = rng::draw_below(
-                            seed,
-                            rng::SYSTEM_SOLDIER_MOVE,
-                            tick.0,
-                            soldier.to_bits(),
-                            DRAW_MOVE_DIRECTION,
-                            NEIGHBOUR_COUNT as u64,
-                        ) as usize;
+                        // **The option steers the step.** The unit reads the
+                        // entry of its own cell and its own option, and it
+                        // never scores a neighbouring cell of its own.[^8]
+                        //
+                        // The direction index of the cell lattice names the
+                        // same offset as the direction index of the tile
+                        // lattice, because both are the six neighbour offsets
+                        // of a hex.[^9]
+                        //
+                        // A cell that no neighbour beats holds no direction,
+                        // and the unit falls back to the uniform draw. The
+                        // draw is keyed on the system, the frame, the entity
+                        // and the draw index, so it never reads a
+                        // thread-local state.[^10]
+                        let cell = layout.block_of_key(layout.key_of(soldiers.tile(*soldier)?)?);
+                        let direction = match exits.exit(cell, option) {
+                            Some(Some(direction)) => direction as usize,
+                            _ => rng::draw_below(
+                                seed,
+                                rng::SYSTEM_SOLDIER_MOVE,
+                                tick.0,
+                                soldier.to_bits(),
+                                DRAW_MOVE_DIRECTION,
+                                NEIGHBOUR_COUNT as u64,
+                            ) as usize,
+                        };
                         // A neighbour outside the world gives `None`. The
                         // soldier then stays put, because the world does not
                         // wrap.
