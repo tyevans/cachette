@@ -185,4 +185,4 @@ No other open blocker governs this record.
 [^3]: Findings register, FND-223. `docs/FINDINGS.md`
 [^4]: Findings register, FND-242. `docs/FINDINGS.md`
 [^5]: Blockers register, BLK-007. `docs/BLOCKERS.md`
-[^6]: Blockers register, BLK-035. `docs/BLOCKERS.md`
+[^6]: Blockers register, BLK-036. `docs/BLOCKERS.md`

@@ -38,4 +38,4 @@ may or may not change hands when the ground does.[^4]
 [^1]: ADR-0064, a unit chooses by scoring a small fixed option set, decision D1. `docs/adrs/accepted/adr-0064-a-unit-chooses-by-scoring-a-small-fixed-option-set.md`
 [^2]: ADR-0090, a tile upgrade is stored sparsely, as the difference from the generated world. `docs/adrs/draft/adr-0090-a-tile-upgrade-is-stored-sparsely.md`
 [^3]: Blockers register, BLK-034, resolved. `docs/BLOCKERS.md`
-[^4]: Blockers register, BLK-035. `docs/BLOCKERS.md`
+[^4]: Blockers register, BLK-036. `docs/BLOCKERS.md`

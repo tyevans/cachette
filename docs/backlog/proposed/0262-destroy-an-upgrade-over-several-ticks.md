@@ -65,5 +65,5 @@ choose to build either, and one item holds that gap.[^4]
 
 [^1]: Blockers register, BLK-034, resolved. `docs/BLOCKERS.md`
 [^2]: Backlog item 0058, build an improvement over several ticks. `docs/backlog/complete/0058-build-an-improvement-over-several-ticks.md`
-[^3]: Blockers register, BLK-035. `docs/BLOCKERS.md`
+[^3]: Blockers register, BLK-036. `docs/BLOCKERS.md`
 [^4]: Backlog item 0180, let a unit choose to build. `docs/backlog/proposed/0180-let-a-unit-choose-to-build.md`

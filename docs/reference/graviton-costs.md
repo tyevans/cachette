@@ -158,7 +158,7 @@ figure.** The rows stay, because a row is a measurement of the tree that
 produced it. The frame here is 500 milliseconds, and the last whole-frame stage
 table gives 177.9 milliseconds for the same extent and unit count. **Do not
 quote 500 milliseconds as the cost of a frame.** A finding records what the
-figure cost while it stood.[^STALE321]
+figure cost while it stood.[^STALE327]
 
 This is the row the project needs most. Machine A, 16 hardware threads. The
 world held 16,777,216 tiles and 1,000,000 units, and no settlement.
@@ -199,7 +199,7 @@ count. Later work made the frame 177.9 milliseconds at 12 threads, on a world
 whose units are scattered rather than packed. The floor was a property of the
 engine of that day, and the engine changed. The frame is still above the 100
 millisecond budget. **Read the rows as history and the floor as refuted.** A
-finding holds the correction.[^STALE321]
+finding holds the correction.[^STALE327]
 
 This is the most important consequence of the run, and it does not depend on
 the size of the machine.
@@ -1698,7 +1698,7 @@ commit what changed. Do not edit a row to make a later run agree with it.
 [^ADR71298]: ADR-0071, the bridge rebuild orders on one thread, decision D2. `docs/adrs/accepted/adr-0071-the-bridge-rebuild-orders-on-one-thread.md`
 [^RESID298]: Findings register, FND-303. `docs/FINDINGS.md`
 [^LAYOUT]: Findings register, FND-313. `docs/FINDINGS.md`
-[^STALE321]: Findings register, FND-321. `docs/FINDINGS.md`
+[^STALE327]: Findings register, FND-327. `docs/FINDINGS.md`
 [^ITEM301]: Backlog item 0301, narrow the sort guard to a repeated key. `docs/backlog/complete/0303-narrow-the-sort-guard-to-a-repeated-key.md`
 [^ADR105]: ADR-0105, a total order needs no repeated identifier, only no repeated key. `docs/adrs/draft/adr-0105-a-total-order-needs-no-repeated-key.md`
 

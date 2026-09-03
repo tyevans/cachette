@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-322**
+**Next number: FND-328**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -931,7 +931,7 @@ available: the unit passes reach a floor and stop.
 
 ### FND-224 — The frame budget is out of reach on any core count
 
-**Read FND-321 before quoting a figure from this entry.** The 500 millisecond
+**Read FND-327 before quoting a figure from this entry.** The 500 millisecond
 frame and the 300 millisecond floor below are superseded. Later work made the
 frame 177.9 milliseconds at the target scale on 12 threads. The title of this
 entry still holds, because the budget is 100 milliseconds and the frame is
@@ -1621,7 +1621,7 @@ up.**[^309D] A fixture that supplies no extreme measures itself. An instrument
 with no control measures itself. In both the test passes, the number arrives,
 and nothing says which question was answered.
 
-### FND-321 — A stale frame figure sat in a blocker row and in a register, and nothing failed
+### FND-327 — A stale frame figure sat in a blocker row and in a register, and nothing failed
 
 **Believed.** A frame at the target scale costs 500 milliseconds on the target
 platform. The blocker row about derived cost figures said so in its own words,
@@ -9254,6 +9254,42 @@ Rust doc comment as the single source of the prose for exactly this
 reason.[^F320D] A generator would also remove the second declaration site for
 every signature, which is the shape the recurring defect rule names.[^F320E]
 
+### FND-321 — The stub already carries prose the Rust source owns, and the copy that drifted dropped the paragraph that warns against a copy
+
+**Believed.** The register records that the type stub and the compiled module
+are two declaration sites for the public interface, and that they already
+disagree about the prose.[^F321A] The disagreement it names is an absence: the
+stub carries no docstring for any method of `World` and none for any method of
+`Camera`.
+
+**True, and the sharper half is what the stub does carry.** Nine exception
+classes carry a docstring in the stub. All nine are the same words as the string
+that the Rust macro gives the same exception, character for character.[^F320C]
+The `World` class docstring is a one line copy of the Rust doc comment, and it
+agrees. The `Camera` class docstring is an abridged copy of the Rust doc comment,
+and it does not agree: it keeps the first and the last paragraph and drops two.
+
+**One of the dropped paragraphs is the one that names this defect.** The Rust
+doc comment says that a pan share and a zoom step written on both sides of the
+boundary would be one value in two places, with nothing failing when the copies
+disagreed. The stub is that second place, and the sentence did not survive the
+copy into it.
+
+**Evidence.**
+
+```
+grep -n "create_exception" crates/cachette-py/src/lib.rs
+sed -n '1303,1320p' crates/cachette-py/src/lib.rs
+sed -n '280,336p' python/cachette/_core.pyi
+```
+
+**Follows.** The count of copies is eleven, not zero, and nine of them agree
+today. **An agreeing copy is the worse case**, because it reads as a maintained
+file and gives a contributor no reason to look for the other site. The record on
+the provenance of the documentation prose forbids a docstring on a stub member
+that the compiled module provides, and it names this as a defect it does not
+fix.[^F321C] A backlog item holds the removal and the check.[^F321D]
+
 
 ## References
 
@@ -9262,6 +9298,9 @@ every signature, which is the shape the recurring defect rule names.[^F320E]
 [^F320C]: The Python bindings crate. `crates/cachette-py/src/lib.rs`
 [^F320D]: Research report 19, the documentation toolchain, sections 4.2 and 7. `docs/research/reports/19-documentation-toolchain.md`
 [^F320E]: Recurring Defect Shapes, shape 1, redundant declaration sites. `.claude/rules/recurring-defects.md`
+[^F321A]: Findings register, FND-320, in this document.
+[^F321C]: ADR-0107, the Python reference is generated from the compiled module, decision D3. `docs/adrs/draft/adr-0107-the-python-reference-is-generated-from-the-compiled-module.md`
+[^F321D]: Backlog item 0307, generate the type stub from the compiled module. `docs/backlog/proposed/0307-generate-the-type-stub-from-the-compiled-module.md`
 
 [^F261B]: The holder count test of the viewer. `crates/cachette-view/tests/shows_who_holds_the_ground.rs`
 [^F261C]: Backlog item 0271, count the ground generations that one frame runs. `docs/backlog/proposed/0271-count-the-ground-generations-that-one-frame-runs.md`
@@ -9598,3 +9637,84 @@ every signature, which is the shape the recurring defect rule names.[^F320E]
 [^F319A]: Project orientation, the Python example. `README.md`
 [^F319B]: Recurring defect shapes, shape 5. `.claude/rules/recurring-defects.md`
 [^F319C]: Product requirement record 0021, a developer can use the control plane without reading its source. `docs/product/accepted/prd-0021-a-developer-can-use-the-control-plane-without-reading-its-source.md`
+
+### FND-322 — The document a newcomer reads first sells a pyramid level that nothing writes
+
+**Believed.** The orientation document of this repository states that the engine
+organises the world into three levels of detail, and it describes the third:
+region-scale summaries that combine blocks of level 1 cells. It lists the
+spatial pyramid among the key capabilities of the engine, and it says that three
+levels of detail provide instant answers for continental aggregate
+queries.[^F322A]
+
+**True.** Level 2 does not exist. The pyramid holds one derived level. The
+project instruction file says so in bold, and it warns that a reader who takes
+the three-level paragraph for the code plans against a level that nothing
+writes.[^F322B] The Rust source agrees in its own words: the pyramid names the
+whole-world summary as what level 2 **would** hold, in the conditional.[^F322C]
+
+**Evidence.**
+
+```
+grep -n "Level 2" README.md
+grep -rn "level 2" crates/ --include="*.rs"
+```
+
+**Follows.** The two orientation documents disagree, and one of them is the only
+document a person outside this project reads. This is the shape a backlog item
+already holds for a different sentence in the same pair of files, and the finding
+behind it records the same cost.[^F322D] The documentation plan inherits the
+claim, because the reader the plan serves arrives through this document, and the
+worked example the plan turns into a tutorial sits on the same page as the false
+paragraph.[^F322E] Repair the paragraph, or delete it and let the generated
+reference report what the pyramid holds.
+
+### FND-323 — The orientation document sells the agent server as a product capability, and the package does not install it
+
+**Believed.** The orientation document lists native support for artificial
+intelligence agents among the key capabilities of the engine. It says an
+integrated Model Context Protocol server connects external agents directly to
+the engine, it names the capability again under a third audience, and it gives
+the command that starts the server.[^F322A]
+
+**True, in the sense that the server exists, and false in the sense a reader
+takes.** The server is a tool for a contributor to this repository. Its own
+docstring says so, and it says that the reference implementation of the protocol
+is a development dependency and not a runtime dependency of the
+package.[^F323A] The project manifest agrees: the protocol library sits in the
+development dependency group, with a comment that states the reason. The runtime
+dependency list holds one entry, and it is not that library.[^F323B]
+
+**A reader who follows the document gets an import error.** Install the package
+from an index, run the command the document gives, and nothing starts, because
+the package never installed the library the server imports.
+
+**The product records draw the line the other way round.** The record that holds
+the game developer states three times that the tool server is not part of that
+need: it serves an agent that works on this repository, and another record holds
+that audience.[^F323C] [^F323D]
+
+**Evidence.**
+
+```
+grep -n "cachette.agent\|Model Context Protocol" README.md
+grep -n "mcp>=" pyproject.toml
+grep -n "dependencies" pyproject.toml
+```
+
+**Follows.** The product record requires the documentation to separate the
+surface a program may depend on from the surface that exists for this
+repository, and to state what the package cannot do yet, so that a reader who
+wants a missing thing does not conclude that they failed to find it.[^F323C]
+This finding is one instance of that gap and the explanation quadrant of the
+documentation plan holds the page that states the line.[^F322E]
+
+[^F322A]: Project orientation, the key capabilities and the architectural foundation. `README.md`
+[^F322B]: Project instructions, the levels of detail. `CLAUDE.md`
+[^F322C]: The pyramid of the core crate. `crates/cachette-core/src/pyramid.rs`
+[^F322D]: Findings register, FND-259, in this document.
+[^F322E]: Backlog item 0308, the documentation plan. `docs/backlog/refined/0308-the-documentation-plan.md`
+[^F323A]: The agent-facing protocol server of the control plane. `python/cachette/agent/server.py`
+[^F323B]: The project manifest. `pyproject.toml`
+[^F323C]: Product requirement record 0021, what this does not do. `docs/product/accepted/prd-0021-a-developer-can-use-the-control-plane-without-reading-its-source.md`
+[^F323D]: Product requirement record 0019, an agent can ask the running engine what it holds. `docs/product/shaped/prd-0019-an-agent-can-ask-the-running-engine-what-it-holds.md`
