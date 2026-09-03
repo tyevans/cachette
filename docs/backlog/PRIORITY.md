@@ -103,7 +103,7 @@ These are real and none of them blocks anything today.
 | 0124 | A fully recovered deposit still stores a take of zero. The recovery pass now reads that entry on every tick, so the depleted set grows and never shrinks. |
 | 0125 | Show a watcher a deposit recovering. The engine recovers a deposit, and nothing shows it. |
 | 0068 | A ruler and a succession. Item 0067 is complete, so the descent it reads exists. |
-| 0262 | A unit cannot destroy an upgrade. The engine removes one instantly through a control-plane call, and the owner answered on 3 September 2026 that destruction takes work while the instant path stays. It sits beside 0180 because both add a verb the choice pass will need, and neither should be written before item 0238 rewrites that pass. |
+| 0262 | A unit cannot destroy an upgrade. The engine removes one instantly through a control-plane call, and the owner answered on 3 September 2026 that destruction takes work while the instant path stays. **The blocker resolved on the same date**, and the one question left from it, whether an upgrade changes hands when the ground does, is now BLK-035 and this item does not need it. It sits beside 0180 because both add a verb the choice pass will need, and neither should be written before item 0238 rewrites that pass. |
 | 0180 | Nothing makes a unit choose to build, so a world left to run improves no tile. **The faction rule it waited on is answered**, and item 0058 is complete, so nothing blocks it. It stays here rather than moving up because it adds an option to the option set that item 0238 is rewriting, and it should read that pass after it changes rather than before. |
 | 0050 | Four product collisions still carried. |
 | 0099 | The faction mask union has no engine caller. |

@@ -191,5 +191,5 @@ a choice, and the next worker's decision record is where a choice is made.
 [^6]: Findings register, FND-223. `docs/FINDINGS.md`
 [^7]: Findings register, FND-242. `docs/FINDINGS.md`
 [^8]: Blockers register, BLK-007. `docs/BLOCKERS.md`
-[^9]: Blockers register, BLK-034. `docs/BLOCKERS.md`
+[^9]: Blockers register, BLK-035, which held this question as part of BLK-034 when this review ran. `docs/BLOCKERS.md`
 [^10]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`

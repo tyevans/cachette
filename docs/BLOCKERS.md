@@ -25,7 +25,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^ALLOC]
 
-**Next number: BLK-035**
+**Next number: BLK-036**
 
 [^ALLOC]: Findings register, FND-038. `docs/FINDINGS.md`
 
@@ -86,46 +86,70 @@ sentence was true when it was written, and about ninety documents hold it.
 This row is the current statement. A finding records how far the sentence
 spread and why it was not swept.[^SPREAD]
 
-### BLK-034 — May a unit build on ground another faction holds, and who may destroy an upgrade?
+### BLK-035 — Does an upgrade change hands when the ground does?
 
-**Owner:** the project owner. **Blocks:** any rule that ties an upgrade to a
-faction, and the verb that removes one.
+**Owner:** the project owner. **Blocks:** any rule that ties an existing
+upgrade to the faction that holds the tile under it.
 
-The engine now stores an upgrade on a tile and lets a unit build it.[^BLK34A]
-It asks nothing about who holds the tile. Any live unit builds on any tile it
-stands on, and the control plane removes an upgrade from any tile by address.
+The engine stores an upgrade on a tile and asks nothing about who holds the
+tile.[^BLK34A] A holder column names who holds each tile, and that value moves
+as units move.[^BLK34B] Nothing says what happens to an upgrade on a tile whose
+holder changes.
 
-**This row narrowed on 3 September 2026. It did not close.** The project owner
-answered the first question and the first half of the second.
+**This row is the part of BLK-034 that stayed open when the rest of it
+resolved.** It was split out on 3 September 2026, because a row that is mostly
+answered reads as open and stops work that should proceed.
 
-**A unit builds only on ground that its own faction holds.** Building is
-restricted by the holder of the tile. The holder column already names who
-holds each tile, so the rule reads a value the engine stores.[^BLK34B]
+**The three answered questions do not answer this one.** A faction builds only
+on ground it holds. Anyone may destroy an upgrade. Destruction takes work, and
+a faction-level removal is instant. Every one of those is an act that somebody
+invokes. This question asks what happens when nobody invokes anything and the
+ground changes hands.
 
-**Anyone may destroy an upgrade.** Destruction is not restricted by the
-holder. The owner stated that the reasons to destroy one vary, so the engine
-permits the act and does not encode a motive.
+**Two shapes the answer could take.** The upgrade goes to the new holder, or
+the upgrade stays with the faction that built it. A third shape is that the
+upgrade is destroyed. Each reaches the state hash, so the engine cannot hold
+two of them.
 
-**Destruction takes work, and an instant path stays.** A unit that destroys an
-upgrade does work over several ticks, in the same way that a unit that builds
-one does. The instant removal that exists today is not deleted, because some
-needs ask for it. It stays as a control-plane call, and it is not what a unit
-does.
-
-**A unit therefore needs a verb for destruction.** The engine has no such verb
-today. It has an instant removal by address and nothing else.
-
-One question stays open.
-
-1. **Does an upgrade change hands when the ground does?** The holder of a tile
-   moves as units move, and the upgrade does not move with it.
-
-Work continues without the two answers. The engine states the storage and the
+Work continues without the answer. The engine states the storage and the
 arithmetic, and neither depends on a faction. A rule invented here would be a
-content decision made by the wrong person, and it would reach the state hash.
+content decision made by the wrong person.
 
 
 ## Resolved
+
+### BLK-034 — May a unit build on ground another faction holds, and who may destroy an upgrade?
+
+**Resolved on 3 September 2026, and one question moved to its own row.** The
+project owner answered the building rule and both halves of the destruction
+rule. The question about an upgrade whose ground changes hands is now BLK-035,
+and it is open.
+
+The engine stores an upgrade on a tile and lets a unit build it.[^BLK34A] It
+asked nothing about who holds the tile.
+
+**A faction builds only on ground it owns.** A unit may not build on ground
+another faction holds. The holder column already names who holds each tile, so
+the rule reads a value the engine stores.[^BLK34B]
+
+**Anyone may destroy an upgrade.** Destruction is not restricted to the holder
+of the ground. The owner stated that the reasons to destroy one vary, so the
+engine permits the act and does not encode a motive.
+
+**A unit-level destruction takes work, and a faction-level removal is
+instant.** A unit that destroys an upgrade does work over several ticks, in the
+same way that a unit that builds one does. The instant removal that exists
+today stays, because some needs ask for it.
+
+**The owner named the two as two verbs rather than as one verb with an
+exception, and wrote the word "perhaps".** Destroy is the unit-level verb that
+takes work. Reclaim is the faction-level verb that is instant. **Read the two
+names as the owner's current thinking and not as a settled interface.** The
+shape is decided; the names are not.
+
+**A unit therefore needs a verb for destruction.** The engine has no such verb
+today. It has an instant removal by address and nothing else. One item holds
+that work.[^BLK34C]
 
 ### BLK-018 — How many groups found a world, and does every faction found one?
 
@@ -263,4 +287,5 @@ normally.
 [^SEP]: Decisions register, DEC-037. `docs/DECISIONS.md`
 [^FOUNDDIST]: ADR-0076, a founding keeps a fixed distance from the foundings before it. `docs/adrs/accepted/adr-0076-a-founding-keeps-a-fixed-distance-from-the-foundings-before-it.md`
 [^BLK34A]: ADR-0090, a tile upgrade is stored sparsely, as the difference from the generated world. `docs/adrs/draft/adr-0090-a-tile-upgrade-is-stored-sparsely.md`
+[^BLK34C]: Backlog item 0262, destroy an upgrade over several ticks. `docs/backlog/proposed/0262-destroy-an-upgrade-over-several-ticks.md`
 [^BLK34B]: ADR-0053, a faction is a bit in a mask, and a relation is a plane, decision D2. `docs/adrs/accepted/adr-0053-a-faction-is-a-bit-in-a-mask-and-a-relation-is-a-plane.md`
