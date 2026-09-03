@@ -61,24 +61,39 @@ Each statement below can be checked.
 - The work the engine does to answer this does not grow when the population
   grows.
 
-## What this does not ask for
+## What this does not do
+
+**It does not say how the engine answers it.** The need is that a unit reaches
+a place it cannot see. Whether the engine computes that once for the whole world
+or once for each unit, and what it stores to do so, is not this record's
+business and this record states none of it.
 
 **It does not ask for a path.** Nothing here requires that a unit route around
 an obstacle, take the shortest way, or arrive in a stated number of ticks. A
-unit that moves generally toward a place satisfies this need.
+unit that moves generally toward a place satisfies this need, and a unit that
+takes a longer way than a person would still satisfies it.
+
+**It does not give a unit a destination it can name.** A unit does not hold the
+identity of a place, ask where that place is, or carry a target. The need is met
+when a unit ends up somewhere, not when a unit knows where it is going. A
+developer who wants a unit to report its destination is asking for something
+else.
 
 **It does not ask for per-unit destinations.** A developer choosing a place for
-each unit individually is a control plane looping over entities, which the
-project forbids.[^2] A place given to a set of units answers this need.
+each unit individually is a control plane walking the population, which the
+project forbids.[^2] A place given to a set of units answers this need in full.
 
 **It does not ask that a unit knows it has arrived.** What a unit does when it
-gets somewhere is a separate question, and the engine has no concept of arrival
-today.
+gets somewhere belongs to whatever it does there. The engine has no concept of
+arrival, and this need does not create one.
 
-**It does not ask for two units to want different things.** That is a real gap
-and it is a different one: the engine holds one weight profile for the whole
-world, so every unit alive scores the options identically. A finding records
-it.[^3]
+**It does not ask for two units to want different things.** This is the
+exclusion worth stating loudest, because it is the one a reader will assume is
+included. The engine holds one weight profile for every unit alive, so two units
+in one cell with the same need always choose alike, and a finding records
+it.[^3] **Letting a unit reach a place does not let two units disagree about
+which place.** They are separate needs with separate answers, and folding them
+together would let this record claim a gap it does not close.
 
 ## What it costs at the target scale
 
@@ -93,26 +108,36 @@ block count, and the block count does not change when units are born.
 every cost figure in this project is derived rather than measured.[^5] A record
 that quoted one would be quoting an estimate.
 
-## Which blockers govern it
+## Which blockers govern this
+
+**One open choice could stop the whole approach, and it is live.** Whether a
+plane over the block lattice may carry a value from one tick to the next is
+open. The project's own rule is that every level above the tiles is derived from
+the tiles, and a plane that carries a value from the last tick is not derived
+from anything below it. That question already blocks one record from being
+accepted, and it was raised against a different plane before this need
+existed.[^6]
+
+**It matters here because reach is what this need buys.** A value that is built
+fresh each time reaches only as far as the work spent building it. A value that
+carries reaches further every tick. If the carried form is refused, a unit far
+from its destination reads nothing and this need is met over short distances and
+not long ones. A second open row holds that consequence for this case.[^7]
 
 **No measurement exists on the target platform.** Every cost claim about this
-need is derived.[^5]
+need is derived rather than measured, so the statement above about which term
+the cost follows is an argument and not a result.[^5]
 
-**One open choice governs the mechanism.** Whether a plane over the block
-lattice may carry a value from one tick to the next is open, it already blocks
-another record, and the shape of the answer here depends on it.[^6] [^7]
-
-**The record that would carry this need is written and binds nothing yet.** It
-states that the answer is a field over cells and never a search from a unit, and
-it is a draft.[^8]
+**Nothing here is blocked by an unanswered question the owner holds.** The three
+above are engineering questions. The need itself is stated and does not wait on
+anybody.
 
 ## References
 
 [^1]: PRD-0009, a unit acts on the world it can see. `docs/product/accepted/prd-0009-a-unit-acts-on-the-world-it-can-see.md`
-[^2]: ADR-0040, Python is a control plane, not a data plane, decision D2. `docs/adrs/draft/adr-0040-python-is-a-control-plane-not-a-data-plane.md`
+[^2]: Project orientation, the design principles. `CLAUDE.md`
 [^3]: Findings register, FND-251. `docs/FINDINGS.md`
 [^4]: Budgets and costs, the scale constants. `docs/reference/budgets.md`
 [^5]: Blockers register, BLK-007. `docs/BLOCKERS.md`
 [^6]: Decisions register, DEC-067. `docs/DECISIONS.md`
 [^7]: Decisions register, DEC-095. `docs/DECISIONS.md`
-[^8]: ADR-0095, a behavioural strategy arrives as a field over cells, never as a search from a unit. `docs/adrs/draft/adr-0095-a-behavioural-strategy-arrives-as-a-field-over-cells.md`
