@@ -1508,7 +1508,7 @@ that existed to make fog cheap was the most expensive thing in the frame.
 ### FND-309 — Four instruments in one night reported a figure about something other than what they measured, and not one of them said so
 
 **One of the four instances below is not recorded anywhere yet.** The first is
-FND-297, which the trunk holds and which this entry now cites.[^F309X] The
+FND-297, which the trunk holds and which this entry now cites.[^F314X] The
 fourth was reported and is being written by the worker who found it, so it is
 cited by description and owes a number. The citation check refuses a number the
 register does not hold, which is how the debt was noticed rather than shipped.
@@ -8599,7 +8599,7 @@ the same shape, the same rebuild and the same cost curve at first sight. They
 differ in whether an entry can leave, and that decides whether the repair
 applies. The record for the dense field says in its own text that it governs one
 field and is not a licence to convert others, and this is the first case that
-tested the refusal.[^F308B]
+tested the refusal.[^F313B]
 
 **Sixty percent is not sparse, and it is not saturated either.** The list is
 still 40 megabytes and it still drives the largest stage in the engine. The
@@ -8690,7 +8690,7 @@ miss.[^F311A] The same arithmetic run backwards says a sequential sort can beat
 a random-access scan, and it was not applied.
 
 **This row rests on a single pair of runs, and a later finding puts a floor
-under what such a pair can claim.**[^F311B] The figure survives that floor
+under what such a pair can claim.**[^F306B] The figure survives that floor
 rather than comfortably: 42,867,673 nanoseconds is above every later reading of
 the same stage, and the base it is compared against reproduces to 0.7 percent.
 But the repaired form of the same change measured 36,459,500 and 29,068,978 on
@@ -9214,6 +9214,6 @@ honest way to keep it.
 [^F307C]: The holding suite of the core. `crates/cachette-core/tests/holding.rs`
 [^F313B]: ADR-0103, the tile value field stores a dense delta, never a sparse change list, decision D4. `docs/adrs/draft/adr-0103-the-tile-value-field-stores-a-dense-delta.md`
 [^F314X]: Findings register, FND-297, in this document.
-[^F306A]: Findings register, FND-295, in this document.
 [^F313A]: The workspace manifest, the release profile. `Cargo.toml`
 [^F306B]: Findings register, FND-313, in this document.
+[^F311A]: Findings register, FND-304, in this document.

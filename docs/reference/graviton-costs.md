@@ -19,12 +19,19 @@ and **a row from one section is not comparable to a row from another unless
 both name the same one.** No column carries it, so a reader who takes a figure
 out of its section takes it out of its conditions.
 
-**A single pair of runs is evidence only when the stages that should not have
-moved did not.** This crate builds with link-time optimisation across one
-codegen unit, so an edit anywhere relays the whole binary, and a stage that
-shares no code with a change can move by several percent from instruction
-placement alone. One run measured the same tree twice and spanned 25 percent on
-one stage while the unchanged tree reproduced to under one percent.[^LAYOUT]
+**Run each tree twice, and read the spread inside one tree before you read the
+difference between two.** A layout is a property of a binary, so two runs of
+one tree share a layout and any difference between them is the machine. One
+stage spanned 25 percent between two runs of a single fixed tree, and 29
+percent between two runs of another, so a single stage can vary that much from
+the instance alone.
+
+**A difference between trees means something only when it is larger than the
+spread inside a tree.** This crate builds with link-time optimisation across
+one codegen unit, so an edit anywhere relays the whole binary and a stage that
+shares no code with a change can move from instruction placement. Four such
+stages rose consistently across three runs of one changed tree, which is what
+that looks like; a single noisy pair is not.[^LAYOUT]
 
 ## Status
 
