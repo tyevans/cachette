@@ -49,6 +49,7 @@ A record here binds nothing until a reviewer moves it.
 | 0032 | The log holds a fact no solver reproduces, never derived state. **The code implements it**, in that no solver writes an event. The record states plainly that nothing enforces it and that a reviewer is the only check. A reviewer should test D1: the line between a fact and a derived value is the whole record, and a system author has to draw it correctly the first time. |
 | 0040 | Python is a control plane, not a data plane. It is the rule that 0041, 0042, 0043, 0044 and 0051 rest on, and nothing enforces it. **The author of this record must not review it.** |
 | 0043 | A declared tier refuses the loop. Today the rule is prose, and prose lost to a missing read once already.[^13] **The author of this record must not review it.** |
+| 0021 | Layout follows the access pattern. Written at `Draft` with the descent columns it points at, so it names one structure and one pass rather than a tier. It needs a reviewer, and the author must not be the reviewer.[^7] |
 | 0093 | The window shows what changes, and the record of a moment goes to the inspection path. **The code implements it and cites it.** The panel it replaced grew until it could not fit the window, and every addition that made it grow was correct on its own, so a future contributor adding a row will not see what stops them. The record buys the right to refuse that row. A reviewer should test D2 hardest: it puts every consulted quantity behind one hold, and the record itself names that layer as the next thing that will grow too large. |
 | 0092 | The agent tool surface grows one tool at a time, against a stated need. It records a policy that existed in one sentence, in a completed backlog item, where nothing a worker reads before starting carried it.[^20] The code that implements it exists: the surface grew this round against seven gaps another worker named, and no tool was built that nobody asked for. A reviewer should test D2 hardest, because it is the decision that has to hold when somebody meets a gap in a hurry. |
 | 0091 | Movement takes its direction from a per-cell field, and never from a per-unit search over the neighbouring cells. **It runs ahead of the code.** No engine pass derives the field yet, and the item that builds it is refined and not started.[^17] A reviewer must read it as an argument and not as a description. The search it forbids is the obvious implementation, and the reason the field gives the same answer is invisible inside that loop. It also fixes a tie-break order, which is a determinism property. |
@@ -72,13 +73,6 @@ reserved until the code that needs them exists.[^6]
 
 | No. | Why it sits here |
 |---|---|
-| 0021 | Layout follows the access pattern. Write it with the descent columns, not before.[^7] |
-
-| 0051 | The selector as a lazy expression tree. The owner decided that a set-valued command is how the control plane reaches a set, so this governs every verb written after it. Write it before the next verb.[^12] |
-| 0052 | A selector result may be a range. It carries the cost argument that makes 0051 affordable at the target scale, so the two are reviewed together.[^12] |
-| 0040 | Python is a control plane. The orientation states it and nothing enforces it. It is the rule 0043 and 0051 rest on.[^12] |
-| 0043 | A declared tier refuses the loop. Today the rule is prose, and prose lost to a missing read once already.[^13] |
-| 0021 | Written and at `Draft`, with the descent columns it points at. It needs a reviewer, and the author must not be the reviewer.[^7] |
 | 0069 | Weather. Nothing needs it. |
 | 0077 | The golden state hash. Write it when the first real golden file is committed, not before.[^9] |
 | 0055 | The modifier pipeline. One source modifies a rate, so the test fails today.[^8] |
