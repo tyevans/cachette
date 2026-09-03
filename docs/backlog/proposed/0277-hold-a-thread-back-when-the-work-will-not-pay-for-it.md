@@ -58,6 +58,26 @@ serves every faction today, on a stated decision, and running factions together
 needs one scratch each.[^2] That is a memory-for-time trade, and the register
 holds an open decision about whether that trade is now available.[^3]
 
+**Hoisting the scope removes three quarters of the cost and does not change
+the sign.** The hoisted version was built and measured, and it was not taken.
+The solve falls from 8.761 to 2.732 milliseconds at one thread and from 179.561
+to 15.447 at twelve, on this development machine, and it is still 5.7 times
+slower at twelve threads than at one afterwards. So the spawn is a large fixed
+cost and threading this stage loses on a small world for a second reason as
+well. The register holds the figures and the reason the change was not
+taken.[^1]
+
+**One measurement would settle the whole item and nobody has taken it.** Every
+row above is from a development machine, and the only figure for this stage on
+the target platform is at twelve threads. **Nobody has run the solve serially
+at the target extent.** If serial wins there too, the repair needs no
+threshold, no constant, no second scratch plane and no record change: the stage
+does not thread, and the declaration beside it in the stage table is wrong
+rather than optimistic. If threaded wins there, the crossover is between one
+and sixteen million cells and the threshold question is real. The benchmark
+script takes the point as a parameter, so this is a setting and not a
+change.[^4]
+
 **So this is a decision before it is a change**, which is why it is filed
 rather than done.
 
@@ -92,6 +112,7 @@ platform.
 
 ## References
 
-[^1]: Findings register, FND-294. `docs/FINDINGS.md`
+[^1]: Findings register, FND-300. `docs/FINDINGS.md`
 [^2]: ADR-0060, an influence map is stored as a shared basis, decision D4. `docs/adrs/draft/adr-0060-an-influence-map-is-stored-as-a-shared-basis.md`
 [^3]: Decisions register, DEC-105. `docs/DECISIONS.md`
+[^4]: The target platform benchmark script. `scripts/graviton-benchmark.sh`

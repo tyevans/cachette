@@ -38,7 +38,15 @@ fn main() {
     let units = world.soldiers().iter().count();
     let total = costs.total_nanos();
     println!("world {width} by {width} = {tiles} tiles, {units} units, {threads} threads");
-    println!("frame total {:.3} ms", total as f64 / 1e6 / frames as f64);
+    // Integer throughout. Hard invariant 1 bans the float types, and the
+    // cost benchmark beside this one already prints nanoseconds and a share
+    // in thousandths without one.
+    let per_frame = total / frames;
+    println!(
+        "frame total {}.{:03} ms",
+        per_frame / 1_000_000,
+        (per_frame % 1_000_000) / 1_000
+    );
     // The hash is printed so that a sweep over thread counts is also a
     // determinism check. One binary must give one answer at any thread count.
     println!("state hash {}", world.state_hash());
@@ -56,14 +64,17 @@ fn main() {
         if cost.nanos == 0 {
             continue;
         }
-        let ms = cost.nanos as f64 / 1e6 / frames as f64;
-        let share = cost.nanos as f64 * 100.0 / total as f64;
+        let per_frame = cost.nanos / frames;
+        // A share in tenths of a percent, computed in integers.
+        let tenths = cost.nanos.saturating_mul(1_000) / total.max(1);
         let nested = if stage.is_nested() { "  nested" } else { "" };
         println!(
-            "{:<30} {:>11.4} {:>7.1}% {:>9}{nested}",
+            "{:<30} {:>7}.{:04} {:>5}.{}% {:>9}{nested}",
             stage.name(),
-            ms,
-            share,
+            per_frame / 1_000_000,
+            (per_frame % 1_000_000) / 100,
+            tenths / 10,
+            tenths % 10,
             cost.entries
         );
     }

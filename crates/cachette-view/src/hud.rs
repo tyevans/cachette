@@ -1308,6 +1308,40 @@ impl Line {
     }
 }
 
+/// Returns what the panel says, as one line for each heading and row.
+///
+/// A heading gives its own name. A row gives its label and its value,
+/// separated by a colon. The reading walks the same list the painting walks,
+/// so a test that reads this reads what a watcher sees.[^1]
+///
+/// The glass has the same reading, and the pair is what lets a test say where
+/// a quantity is shown rather than only that it was read.[^2] A count that
+/// leaves the glass because it never moves must arrive in the panel, and a
+/// count that is on neither surface is a loss rather than restraint.
+///
+/// The list is before the cut, so this says what the panel holds and not what
+/// fits in the window it was last drawn at.
+///
+/// # References
+///
+/// [^1]: Recurring Defect Shapes, shape 1. `.claude/rules/recurring-defects.md`
+/// [^2]: ADR-0093, the window shows what changes, decision D1. `docs/adrs/draft/adr-0093-the-window-shows-what-changes.md`
+#[must_use]
+pub fn says(readout: &Readout) -> Vec<String> {
+    readout
+        .all_lines()
+        .iter()
+        .filter_map(|line| match line {
+            Line::Rule | Line::Bar => None,
+            Line::Title(text) | Line::Note(text) | Line::Heading(text) => Some((*text).to_owned()),
+            Line::Row(label, value) => Some(format!("{label}: {value}")),
+            Line::Legend(faction, count) => Some(format!("faction {faction}: {count}")),
+            Line::Ground(kind, count) => Some(format!("{}: {count}", name_of(*kind))),
+            Line::Founded(faction, value) => Some(format!("faction {}: {value}", faction.0)),
+        })
+        .collect()
+}
+
 impl Readout {
     /// Builds the lines the panel holds.
     ///
@@ -1458,7 +1492,11 @@ impl Readout {
         // [^4]: Backlog item 0188. `docs/backlog/complete/0188-show-the-food-of-a-tile-and-the-reason-a-unit-chose.md`
         lines.extend(tile_lines(self.tile.as_ref()));
         lines.extend(choice_lines(self.choice.as_ref()));
-        lines.extend(site_lines(&self.sites, self.sites_held));
+        lines.extend(site_lines(
+            &self.sites,
+            self.sites_held,
+            (self.seats_taken, self.seats),
+        ));
 
         // One row for each faction the run answered, seated or refused. A
         // panel that listed the foundings alone would say nothing about a
@@ -1918,9 +1956,28 @@ pub(crate) fn option_name(option: u8) -> &'static str {
 /// # References
 ///
 /// [^1]: What a unit does in a tick, section 1. `docs/research/what-a-unit-does-in-a-tick.md`
-fn site_lines(sites: &[SiteReadout], held: u32) -> Vec<Line> {
+fn site_lines(sites: &[SiteReadout], held: u32, seats: (u32, u32)) -> Vec<Line> {
     let mut lines = vec![Line::Rule, Line::Heading("THE SITES")];
     lines.push(Line::Row("sites in world", grouped(u64::from(held))));
+    // **The per-site rows below are bounded and this total is not.** The
+    // panel lists the first few sites, so at any real site count the rows
+    // cannot state what the world holds. This row is a count of the world and
+    // its label says so.[^2]
+    //
+    // The total is here rather than on the glass because it holds still: a
+    // pass opens the seats and fills them in the same tick, and the count
+    // reads the same on every frame after that.[^3]
+    //
+    // [^2]: ADR-0070, the head-up display reports what the drawing pass read,
+    //       decision D2. `docs/adrs/accepted/adr-0070-the-head-up-display-reports-what-the-drawing-pass-read.md`
+    // [^3]: ADR-0093, the window shows what changes, decision D1.
+    //       `docs/adrs/draft/adr-0093-the-window-shows-what-changes.md`
+    if seats.1 > 0 {
+        lines.push(Line::Row(
+            "seats held in world",
+            format!("{} of {}", seats.0, seats.1),
+        ));
+    }
     if sites.is_empty() {
         lines.push(Line::Note("the world holds no site."));
         return lines;

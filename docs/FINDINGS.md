@@ -32,6 +32,118 @@ the case.[^ALLOC2]
 
 ## A. Corrections to stated rules
 
+### FND-306 — A check that prints its failure while the commit lands looks exactly like a check that never ran
+
+**The symptom is the finding.** A commit landed on the trunk holding conflict
+markers. The marker check had run in the same command, and its failure text had
+scrolled past on the way. That is what a working check looks like when
+something discards its answer, and it is also what a check looks like when it
+does not run. Nothing in the output distinguishes the two.
+
+**Believed, twice, and wrong both times.** The first explanation was that the
+check reports a failure and exits zero. The second was that the check skips a
+worktree's own files when it runs from inside that worktree, because a worktree
+path is in its skip list. Two readers reached for "the check is broken" before
+"my shell discarded its answer", because the symptom points that way.
+
+**Both are false, and the check is sound.** A probe put a real marker in a file
+inside a worktree and ran the check from inside that worktree. It named the
+file, named all three lines, and exited 1. The skip list holds the path of a
+worktree nested inside the tree being scanned, not the tree itself, because the
+root is derived from the location of the script. The skip is also gated on the
+scan being the root.
+
+**The cause is the shell that called it.** The check ran on the left of a pipe,
+inside a chain that continues on success. A pipeline exits with the status of
+its last command, so the status belonged to the command reading the output and
+not to the check. The chain continued and the commit landed.
+
+The failure text is written to the error stream, so it printed past the reader
+and was visible the whole time. It was read as noise from the merge that ran in
+the same chain.
+
+**How to take the measurement again.** An example prices every stage on a
+world of a given extent, group and thread count, and prints the state hash
+beside the split so a sweep is also a determinism check.[^F300B]
+**Evidence.** The same check, on the same file, two ways:
+
+```
+python3 scripts/check_conflict_markers.py | tail -2 && echo REACHED
+  ... 3 failures
+  REACHED
+python3 scripts/check_conflict_markers.py > /dev/null && echo REACHED
+  ... 3 failures
+  (nothing)
+```
+
+**The defect appeared inside the attempt to verify it.** The second reader ran
+the probe piped through a reader of its output, saw exit zero, and concluded
+the check was blind. Unpiped, the same tree gives exit 1. So a status was
+masked by a pipeline during the checking of a claim about a status masked by a
+pipeline.
+
+**Follows.** Four things.
+
+**Read the symptom as ambiguous, not as evidence.** Failure text with a
+successful outcome has three possible causes: the check did not run, the check
+ran and cannot see, or the check ran and something threw away its verdict. The
+output is identical in all three. Anyone who names one of them without a probe
+is guessing, and two readers guessed wrong in one night.
+
+**Never put a gate on the left of a pipe.** Redirect its output if the output
+is long. A gate exists to stop the next command, and a pipe takes that away
+without saying so.
+
+**A failure that prints and does not stop looks exactly like a check that does
+not run.** That is why the first two explanations both blamed the check. The
+symptom carries no information about which of the three causes produced it, so
+the next person to see it will guess as well unless they probe.
+
+**Probe the check before you blame it.** Both wrong explanations were reasoned
+from reading the source. The right one took one command and a temporary file.
+Putting the defect back is the rule for a test, and it is the rule for a check
+that is under suspicion.[^13]
+
+### FND-305 — The stage apparatus flags a stage that gains from threads it does not take, and not one that loses by taking them
+
+**Believed.** The stage table finds a wrong `takes_threads` declaration. The
+benchmark states the rule in its own documentation: a stage declared `false`
+that improves with the thread count means the declaration is wrong. The table
+prints the declaration beside the measurement in every row so that a reader can
+compare them.
+
+**True in one direction only.** The rule names one case and there are two. A
+stage declared `false` that improves is caught. A stage declared `true` that
+gets worse is the same class of error, it costs more, and nothing looks for it.
+The declaration and the measurement disagree in both cases.
+
+**Evidence.** The influence solve is declared as taking a thread count. On a
+256 by 256 world it is 5.9 times slower at twelve threads than at one, and it
+is still 7.6 times slower at twelve threads on a world of 1,048,576 tiles. The
+register holds the sweeps.[^F305A]
+
+**The instrument was built the same night, to find this class of error, and it
+stayed silent.** The table printed the declaration and the cost of the stage in
+adjacent columns, at one thread and at twelve, and reported no note. A reader
+who ran it saw the rows and read nothing wrong in them, because the
+documentation told them which direction to look.
+
+**Follows.** Three things.
+
+**A rule that names one direction of a symmetric test teaches the reader to
+look one way.** The cost of the omission is not that the check missed
+something. It is that a person holding the output missed it too.
+
+**The declaration is a value with two declaration sites and no check.** The
+source states `takes_threads` and the measurement states what threading did.
+Nothing fails when the two disagree, which is the first recurring defect
+shape.[^13]
+
+**The repair is a rule, not a constant.** A speedup far from one in either
+direction is the signal. A stage that declares it threads and measures slower
+threaded fails the same comparison as one that declares it does not and
+measures faster.
+
 ### FND-300 — The influence solve gets slower as the thread count rises, on a small world
 
 **Believed.** A stage that takes a thread count runs faster with more threads.
@@ -88,6 +200,36 @@ correctness one.
 **The absolute figures are noisy and the direction is not.** The machine ran
 other builds throughout, and one point measured 81 ms in one sweep and 192 ms
 in another. Every point in both sweeps has the same sign.
+
+
+**The scope count is most of the cost and it is not the cause of the
+inversion.** A change that opens one thread scope for each pass instead of one
+for each faction in each pass was built and measured, and it was not taken. It
+removes twenty-four of the thirty-two scopes a frame opens. Measured on an
+x86-64 development machine, 256 by 256 tiles, four factions, the mean of 120
+frames after 30 warm-up frames:
+
+| Threads | Solve, one scope for each faction | Solve, one scope for each pass |
+|---|---|---|
+| 1 | 8.761 ms | 2.732 ms |
+| 4 | 47.167 ms | 6.055 ms |
+| 12 | 179.561 ms | 15.447 ms |
+
+**The spawn is about three quarters of the solve at every thread count, and
+the solve is still 5.7 times slower at twelve threads than at one after it is
+gone.** Removing the scopes does not move the sign. It follows that the spawn
+is a large fixed cost and that threading this stage loses on this world for a
+second reason as well.
+
+**The change was not taken, and the reason is a record and not a measurement.**
+The version measured above gives each faction a scratch plane of its own, so
+the write half of the solve grows with the faction count. An accepted record
+decides against exactly that and names its own reopening condition.[^F300C]
+The figures stay here as evidence about the cause. They are not a proposal.
+
+**The determinism holds across the change.** The state hash reads
+`9d81e94936b9f445` at one, four and twelve threads, before and after, on the
+same world and the same commit.
 
 **Follows.** Three things.
 
@@ -8693,6 +8835,8 @@ ceiling is what makes that visible.
 [^F297A]: The target platform benchmark script. `scripts/graviton-benchmark.sh`
 [^F300A]: Backlog item 0277, hold a thread back when the work will not pay for it. `docs/backlog/proposed/0277-hold-a-thread-back-when-the-work-will-not-pay-for-it.md`
 [^F300B]: The demonstration stage split. `crates/cachette-core/examples/demo_stage_split.rs`
+[^F300C]: ADR-0060, an influence map is stored as a shared basis, not one plane per faction, decision D4. `docs/adrs/draft/adr-0060-an-influence-map-is-stored-as-a-shared-basis.md`
+[^F305A]: Findings register, FND-300, in this document.
 [^F304A]: Findings register, FND-299 and FND-295, in this document.
 [^F301A]: ADR-0071, the bridge rebuild orders on one thread, decision D2. `docs/adrs/accepted/adr-0071-the-bridge-rebuild-orders-on-one-thread.md`
 [^F302A]: Decisions register, DEC-111. `docs/DECISIONS.md`

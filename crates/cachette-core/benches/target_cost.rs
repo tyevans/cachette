@@ -545,6 +545,11 @@ fn stage_cost_rows(arguments: &[String]) {
         smaps_rollup_kib("AnonHugePages:") * 1024
     );
     println!("# resident_bytes\t{}", status_kib("VmRSS:") * 1024);
+    // The hash makes a cost run a determinism run as well, at no extra
+    // instance. Two runs of this mode that differ only in the thread count
+    // must print the same value, because a thread count is not an input to
+    // the simulation.
+    println!("# state_hash\t{:016x}", world.state_hash().finish());
 }
 
 /// Reads how the kernel is set to give transparent huge pages.
