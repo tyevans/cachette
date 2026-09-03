@@ -1,7 +1,7 @@
 ---
 id: 0292
 title: Make the change merge take a thread count
-status: proposed
+status: complete
 created: 2026-09-03
 implements: []
 changes: []
@@ -61,3 +61,24 @@ Filled in when the item moves to `complete/`.
 [^3]: ADR-0009, parallel stages write disjoint outputs. `docs/adrs/accepted/adr-0009-parallel-stages-write-disjoint-outputs.md`
 [^4]: ADR-0001, one binary gives one answer at any thread count. `docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
 [^5]: Backlog item 0194. `docs/backlog/proposed/0194-retire-the-tile-value-pass-when-nothing-reads-it.md`
+
+## Outcome
+
+**Closed without being done, because the stage it names no longer exists.**
+
+This item asked the change merge to take a thread count. Another item made
+the tile value field a dense array, and a third let the tile scan's workers
+write that array directly, so the merge, the run it merged and the join that
+fed it were all deleted rather than threaded.[^OUT1] [^OUT2]
+
+A stage the target platform measured at 14.4 percent of a frame does not
+run. Threading it would have made it cheaper; removing it made it free.
+
+**The general form is worth more than the item.** An item that names a stage
+is an item that assumes the stage should exist. This one was written from a
+cost table, and a cost table is a map of where time goes rather than of what
+causes it.[^OUT3]
+
+[^OUT1]: ADR-0103, the tile value field stores a dense delta. `docs/adrs/draft/adr-0103-the-tile-value-field-stores-a-dense-delta.md`
+[^OUT2]: Target platform costs, the stage table. `docs/reference/graviton-costs.md`
+[^OUT3]: Findings register, FND-292. `docs/FINDINGS.md`
