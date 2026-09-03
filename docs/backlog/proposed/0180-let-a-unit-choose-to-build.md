@@ -7,7 +7,7 @@ implements: []
 changes: []
 creates: []
 serves: [PRD-0008]
-blocked-by: [0058]
+blocked-by: []
 ---
 
 ## Why
@@ -21,8 +21,14 @@ clamp absorbs every contribution. Nothing tells the unit to stop, so a builder
 that finished its work wastes every later tick. The record names this and
 declines to decide it.[^2]
 
-The item also needs the faction rule, because an option that builds must know
-whether a unit may build on ground another faction holds.[^3]
+**The faction rule is answered.** A unit builds only on ground that its own
+faction holds, so the option that builds reads the holder column and refuses
+a tile another faction holds.[^3] Anyone may destroy an upgrade, which puts
+no condition on this item.
+
+Two parts of the same blocker stay open, and neither governs this item.
+Destruction may or may not take work, and an upgrade may or may not change
+hands when the ground does.[^3]
 
 ## References
 

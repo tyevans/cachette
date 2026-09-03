@@ -80,17 +80,26 @@ The engine now stores an upgrade on a tile and lets a unit build it.[^BLK34A]
 It asks nothing about who holds the tile. Any live unit builds on any tile it
 stands on, and the control plane removes an upgrade from any tile by address.
 
-The project needs three answers before a faction rule can be written.
+**This row narrowed on 3 September 2026. It did not close.** The project owner
+answered the first question and the first half of the second.
 
-1. **May a unit build on ground that another faction holds?** The holder
-   column already names who holds each tile.[^BLK34B]
-2. **May a unit destroy an upgrade that another faction built, and does it
-   take work, or is it instant?** Destruction is instant today, and it is a
-   control-plane call rather than something a unit does.
-3. **Does an upgrade change hands when the ground does?** The holder of a tile
+**A unit builds only on ground that its own faction holds.** Building is
+restricted by the holder of the tile. The holder column already names who
+holds each tile, so the rule reads a value the engine stores.[^BLK34B]
+
+**Anyone may destroy an upgrade.** Destruction is not restricted by the
+holder. The owner stated that the reasons to destroy one vary, so the engine
+permits the act and does not encode a motive.
+
+Two questions stay open.
+
+1. **Does destruction take work, or is it instant?** It is instant today, and
+   it is a control-plane call rather than something a unit does. The answer
+   decides whether a unit needs a verb for it.
+2. **Does an upgrade change hands when the ground does?** The holder of a tile
    moves as units move, and the upgrade does not move with it.
 
-Work continues without the answers. The engine states the storage and the
+Work continues without the two answers. The engine states the storage and the
 arithmetic, and neither depends on a faction. A rule invented here would be a
 content decision made by the wrong person, and it would reach the state hash.
 

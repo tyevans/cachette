@@ -89,7 +89,7 @@ These are real and none of them blocks anything today.
 | 0125 | Show a watcher a deposit recovering. The engine recovers a deposit, and nothing shows it. |
 | 0068 | A ruler and a succession. Item 0067 is complete, so the descent it reads exists. |
 | 0088 | Promotion into the character tier. |
-| 0180 | Nothing makes a unit choose to build, so a world left to run improves no tile. It waits on the faction rule of BLK-034. |
+| 0180 | Nothing makes a unit choose to build, so a world left to run improves no tile. **The faction rule it waited on is answered**, and item 0058 is complete, so nothing blocks it. It stays here rather than moving up because it adds an option to the option set that item 0238 is rewriting, and it should read that pass after it changes rather than before. |
 | 0050 | Four product collisions still carried. |
 | 0099 | The faction mask union has no engine caller. |
 | 0226 | The relabel pass has no caller in the step, so a world left to run cannot answer a dynasty question about anybody born since it started. |
