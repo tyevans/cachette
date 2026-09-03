@@ -597,18 +597,21 @@ pub const NEED_BUCKET_CEILING: usize = ((NEED_FULL.0 >> NEED_BUCKET_SHIFT_FLOOR)
 
 /// How finely the choice tells two needs apart.
 ///
-/// A need is a Q16.16 quantity, so it takes far more values than a world holds
-/// units. **Unbucketed, two units in one cell almost never share a need, the
-/// distinct pairs equal the population, and deciding for each cell and need
-/// buys nothing.** The bucket is therefore the mechanism and not a detail of
-/// it.[^1]
+/// **Unbucketed, the key is the exact need, and the distinct keys in a cell are
+/// bounded by the cohorts standing in it.** A cohort is one site and one
+/// faction, and its units draw one ration and hold one need exactly. So units
+/// of one cohort share a key, units of two cohorts almost never do, and the
+/// bound belongs to the content rather than to the engine: a world that gave
+/// every unit a site of its own would put one key on every unit. **The bucket
+/// is the bound the engine holds**, and that is why it is the mechanism of the
+/// decision and not a detail of it.[^1] [^4]
 ///
-/// **The width is a parameter of the world, and no record sets it.** No
-/// measurement exists of how many need values coexist in one cell in a world
-/// that consumes, and one blocker governs every cost figure this project
-/// holds.[^2] A wide bucket makes two units of different need act alike. A
-/// narrow one approaches one answer for each unit. The reference table holds
-/// the value this world starts with and the derivation of it.[^3]
+/// **The width is a parameter of the world, and no record sets it.** A wide
+/// bucket makes two units of different need act alike. A narrow one approaches
+/// one answer for each unit. One blocker governs every cost figure this
+/// project holds, and no measurement of what this pass costs exists on the
+/// target platform.[^2] The reference table holds the value this world starts
+/// with and the derivation of it.[^3]
 ///
 /// The width is a power of two in the fixed-point scale, so the bucket of a
 /// need is a shift and never a division.
@@ -618,6 +621,7 @@ pub const NEED_BUCKET_CEILING: usize = ((NEED_FULL.0 >> NEED_BUCKET_SHIFT_FLOOR)
 /// [^1]: ADR-0097, the choice is decided for each cell and each bucket of need, decision D1. `docs/adrs/draft/adr-0097-the-choice-is-decided-for-each-cell-and-each-bucket-of-need.md`
 /// [^2]: Blockers register, BLK-007. `docs/BLOCKERS.md`
 /// [^3]: Budgets and costs, the choice pass. `docs/reference/budgets.md`
+/// [^4]: Findings register, FND-259. `docs/FINDINGS.md`
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct NeedBuckets {
     shift: u32,

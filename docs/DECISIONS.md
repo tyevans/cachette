@@ -1149,10 +1149,12 @@ settled it.
 
 **Context.** The choice is decided for each cell and each bucket of need, and a
 unit reads the answer of its bucket.[^D097A] **The width is the mechanism of that
-decision and not a detail of it.** A need is a fixed-point quantity, so
-unbucketed two units in one cell almost never share a need and the decision buys
-nothing. A review of the record that governs the pass returned exactly this
-defect and placed the choice of the width on the item that implemented it.[^D097E]
+decision and not a detail of it.** Unbucketed, the key is the exact need, and the
+distinct keys in a cell are bounded by the cohorts standing in it rather than by
+anything the engine holds. A review of the record that governs the pass returned
+this defect and placed the choice of the width on the item that implemented
+it.[^D097E] **The review gave a different reason, and the measurement refuted the
+reason and not the conclusion.**[^D097F]
 
 **What was missing.** No measurement existed of how many need values coexist in
 one cell in a world that consumes. The measurement register said so in its own

@@ -41,8 +41,17 @@ The engine divides the need range into equal buckets. It computes one answer for
 each cell and each bucket, and a unit reads the answer of its own bucket.
 
 **The width is the mechanism of this decision and not a detail of it.**
-Unbucketed, two units in one cell almost never share a need, the distinct pairs
-equal the population, and the decision reduces nothing.
+Unbucketed, the key is the exact need, and the number of distinct keys in a cell
+is then bounded by the cohorts standing in that cell. A cohort is one site and
+one faction, and its units draw one ration and hold one need exactly, so units of
+one cohort share a key and units of two cohorts almost never do.[^12]
+
+**That bound belongs to the content and not to the engine.** A world that gave
+every unit a site of its own would put one key on every unit, and nothing in the
+engine refuses such a world. A bound that a content author can remove cannot
+carry D1, which asks for work that the population does not raise. **The bucket
+gives a bound that the engine holds**, and that is why the key is a bucket rather
+than a need.
 
 **The width is a parameter of the world, and this record does not set it.** It
 has a behavioural consequence and a cost consequence, and both are measured

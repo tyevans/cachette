@@ -166,9 +166,10 @@ is the default.
 **The bucket width decides how finely the engine tells two needs apart.** The
 choice is decided for each cell and each bucket of need, so two units whose
 needs share a bucket receive one answer.[^16] **The width is the mechanism of
-that decision and not a detail of it.** A need is a Q16.16 quantity, so
-unbucketed two units in one cell almost never share a need and the decision buys
-nothing.
+that decision and not a detail of it.** Unbucketed, the key is the exact need,
+and the distinct keys in a cell are bounded by the cohorts standing in it. That
+bound belongs to the content, because a world that gave every unit a site of its
+own would put one key on every unit. The bucket is the bound the engine holds.
 
 **The width is a parameter of the world, and no record sets it.** A review of the
 record that governs the pass placed the choice on the item that implemented it,

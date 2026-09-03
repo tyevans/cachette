@@ -2,9 +2,10 @@
 //!
 //! The choice is decided for each cell and each bucket of need, and a unit
 //! reads the answer of its bucket.[^1] **The width of the bucket is the
-//! mechanism of that decision and not a detail of it.** A need is a Q16.16
-//! quantity, so unbucketed two units in one cell almost never share a need,
-//! the distinct pairs equal the population, and the decision buys nothing.
+//! mechanism of that decision and not a detail of it.** Unbucketed, the key is
+//! the exact need, and the distinct keys in a cell are bounded by the cohorts
+//! standing in it rather than by anything the engine holds. This file measures
+//! that bound.
 //!
 //! **No record sets the width, and no measurement chose it.** The measurement
 //! register states that no fixture in this project produces the distribution

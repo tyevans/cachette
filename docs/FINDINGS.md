@@ -6582,13 +6582,25 @@ by the distinct keys in it.
 
 The clustered placement holds 7 to 9 distinct exact needs at every frame.
 
-**The first belief is directionally right and quantitatively pessimistic.** An
-exact key does not give one distinct value for each unit. It gives 14 to 41 out
-of about 75, because a cohort is one site and one faction, and every unit of one
-cohort draws one ration and holds one need exactly. So the exact key collapses
-the median cell by between 1.8 and 5.6 times, not by 1. **It still buys almost
-nothing at the worst moment**, which is what the correction to the record
-claimed, and the correction stands.
+**The first belief is false as stated, and its conclusion holds for another
+reason.** An exact key does not give one distinct value for each unit. It gives
+14 to 41 out of about 75, because a cohort is one site and one faction, and every
+unit of one cohort draws one ration and holds one need exactly. **The distinct
+keys of a cell are bounded by the cohorts standing in it**, and that is a
+structural fact rather than a figure of this fixture.
+
+**The bound belongs to the content, and that is what decides the question.** A
+world that gave every unit a site of its own would put one key on every unit, and
+nothing in the engine refuses such a world. **A bound a content author can remove
+cannot carry a claim that the population must not raise the work.** The bucket
+gives a bound the engine holds, so the conclusion that the key must be a bucket
+survives. What does not survive is the reason given for it.
+
+**The measured collapse says the same thing in the other direction.** At the
+moment the needs are most spread, the exact key collapses the median cell 1.8
+times. A pass that does half the per-unit work is not a pass whose cost follows
+the lattice. So the exact key fails the claim on the measurement as well as on
+the argument, and it fails it in a world whose cohorts are already sharing.
 
 **The spread is transient and the steady state is polarised.** The decay takes a
 fixed amount and the gain is a share of a store. A cohort whose share is below
