@@ -22,7 +22,11 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
+<<<<<<< HEAD
 **Next number: FND-287**
+=======
+**Next number: FND-275**
+>>>>>>> feat-w39
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -1458,6 +1462,101 @@ one. Give Python the events from the place that declares them, by a column for
 each field, by a derived description of the layout, or by a query the engine
 answers. Do not add a format string to Python. A backlog item holds the
 choice.[^F137D]
+
+### FND-273 — The packed against scattered ratio measures the density, not the arena order
+
+**Believed.** The unit arena holds units in spawn order, nothing reorders it,
+and that is why a unit costs 2.11 times as much scattered as packed at 12
+threads. The backlog item took the ratio as the size of the prize for
+reordering the arena by cell.[^F273A] [^F273B]
+
+**True.** The ratio measures the placement of the units over the world. Both
+fixtures spawn in ascending tile order, so the arena is in cell order in both
+rows. One puts the units on consecutive tiles and the other puts them one in
+every seventeen. **A reorder of the arena cannot recover any part of that
+ratio, because the row that pays it already has the order the reorder would
+produce.**
+
+**Evidence.** A third fixture puts the units on the same tiles as the
+scattered row and spawns them in a permuted order, so the population is fixed
+and the arena order is the only thing that moves. The mean slot distance
+between two units next to each other in cell order is 108 in the ascending row
+and 83,269 in the permuted one, which is the decorrelation the item
+describes.[^F273C] The unit cost rises by 1.45 at one thread and 1.34 at four,
+not by 2.11. Both rows come from one process on one machine. The machine is a
+development x86-64 machine that other work shared, so the figures bound the
+shape of the effect and are not evidence about the target platform.[^28]
+
+**Follows.** Two things.
+
+**A benchmark that moves two variables together cannot price either.** The
+placement rows change the density and the arena order in one step, and the
+arena order happens not to move at all. The row that separates them is the one
+the decision needed.
+
+**The prize is real and it is smaller than the item claimed.** A drifted arena
+costs 1.24 to 1.45 on the unit half rather than 2.11, and only the part of
+that which survives the walk order is what a physical reorder would
+buy.[^F274A]
+
+### FND-274 — The unit pass is bound by the tile side, so the walk order costs more than the arena order
+
+**Believed.** A pass over the units of one cell is slow because the unit
+columns of those units sit far apart, and the fix is to move the units in the
+arena.[^F273A]
+
+**True.** The movement pass walks the live units and reads five things for
+each one. Four of them are on the tile side of the world: the exit of its
+cell, the address of its tile, the ground of its target, and the address of
+that target. One is on the unit side. **The tile side is the larger footprint
+by an order of magnitude, and the order that makes it ascending is the order
+of the walk, not the order of the arena.**
+
+Walking the arena in slot order reads the tile side at random once the arena
+has drifted. Walking in cell order reads it in ascending tile order whatever
+the arena holds. The bridge already sorts every live unit on the tile key once
+for each frame, at the barrier, so that order costs the frame nothing
+more.[^F274B]
+
+**Evidence, and what it does not cover.** The movement pass now walks the
+bridge order. The golden state hash did not move, at any scenario, and the
+whole suite stayed green.[^F274C]
+
+**The claim that no result reads the walk order was checked by perturbation
+and not by assertion.** The walk was reversed, and the golden hash still
+matched the stored file. Admission sorts what it receives on a total key of
+the target tile and the whole identity, so the same set in another order gives
+the same answer.[^F274D]
+
+**The size of the gain was not measured.** Four runs of the before and the
+after build, at four threads, gave ratios of the drifted unit cost to the
+packed one between 1.06 and 2.26, in both directions, with the two builds
+swapping places between runs. The development machine ran between eleven and
+fifty-seven runnable threads on sixteen cores while the runs took their
+samples, and the load moved by a factor of four inside one run. **The spread
+of the apparatus is larger than the effect it was measuring, so no figure here
+states what the change bought.** The measurement that would state it belongs
+on the target platform.[^28]
+
+**What the change rests on instead is structural and checked.** The pass reads
+four tile-side values for each unit. Walking in cell order makes those reads
+ascending in the tile index, and walking a drifted arena in slot order makes
+them random. That the penalty for a drifted arena exists at all is measured,
+in two independent runs of the before build: 1.24 and 1.34 at four threads,
+and 1.45 at one.
+
+**Follows.** Two things.
+
+**Ask what a pass reads before deciding where to move what it reads.** The
+item proposed moving the units. The larger of the two footprints was on the
+other side, and the order that fixes it was already built and thrown away
+every frame.
+
+**A change can be right and still unmeasured, and the report must say which.**
+The residual that only a physical reorder removes is now separable from the
+part the walk order removes, and both belong on a target-platform run before
+anyone spends a refactor on them.[^F274A]
+
 
 ## F. Sourcing
 
@@ -7135,7 +7234,7 @@ every other line agrees. The commit body holds both commands.
 **This is the redundant declaration site, with both copies in the tree and
 nothing that compares them.** The rule already states the defence: when a second
 site must exist, add a check that fails when the copies disagree.[^22] A
-backlog item holds the check.[^F259C]
+backlog item holds the check.[^F259CHECK]
 
 **A mirror that differs only by a rewrite is derivable, so the check is cheap.**
 The five rule files beside these two differ from their mirrors only in the
@@ -7433,6 +7532,7 @@ the part that decayed, and it decayed within one commit of the pin moving.
 [^F262B]: ADR-0098, the choice is decided for each cell and each bucket of need, decision D1. `docs/adrs/draft/adr-0098-the-choice-is-decided-for-each-cell-and-each-bucket-of-need.md`
 [^F262D]: Findings register, FND-051 and FND-048, in this document.
 [^F262E]: ADR-0098, the choice is decided for each cell and each bucket of need, the consequences. `docs/adrs/draft/adr-0098-the-choice-is-decided-for-each-cell-and-each-bucket-of-need.md`
+<<<<<<< HEAD
 [^F263A]: Review of ADR-0096, correction 1. The review artefact sits on the branch that holds it, so this branch cannot resolve its path and the citation names it instead.
 [^F263B]: Target platform costs, would the choice pass collapse if it decided for each cell. `docs/reference/graviton-costs.md`
 [^F263C]: The need spread measurement. `crates/cachette-core/tests/need_spread.rs`
@@ -7442,6 +7542,14 @@ the part that decayed, and it decayed within one commit of the pin moving.
 [^F263D]: Decisions register, DEC-097. `docs/DECISIONS.md`
 [^F263E]: Budgets and costs, what belongs here. `docs/reference/budgets.md`
 [^F263F]: Findings register, FND-258, in this document.
+=======
+[^F259A]: Review of ADR-0096, correction 1. The review artefact sits on the branch that holds it, so this branch cannot resolve its path and the citation names it instead.
+[^F259B]: Target platform costs, would the choice pass collapse if it decided for each cell. `docs/reference/graviton-costs.md`
+[^F259C]: The need spread measurement. `crates/cachette-core/tests/need_spread.rs`
+[^F259D]: Decisions register, DEC-097. `docs/DECISIONS.md`
+[^F259E]: Budgets and costs, what belongs here. `docs/reference/budgets.md`
+[^F259F]: Findings register, FND-258, in this document.
+>>>>>>> feat-w39
 [^F226A]: Backlog item 0185, steer a step by the option the unit chose. `docs/backlog/complete/0185-steer-a-step-by-the-option-the-unit-chose.md`
 [^F226B]: Backlog item 0186, let the engine order a gather. `docs/backlog/complete/0186-let-the-engine-order-a-gather.md`
 [^F226C]: ADR-0063, a need is a rate with a threshold, and crossing it is a fact, decision D2. `docs/adrs/accepted/adr-0063-a-need-is-a-rate-with-a-threshold-and-crossing-it-is-a-fact.md`
@@ -7450,7 +7558,7 @@ the part that decayed, and it decayed within one commit of the pin moving.
 [^F258A]: Findings register, FND-223, in this document.
 [^F258B]: The footnote baseline. `scripts/footnote-baseline.txt`
 [^F258C]: Backlog item 0242. `docs/backlog/refined/0242-fail-a-check-when-a-document-states-a-register-in-its-own-words.md`
-[^F259C]: Backlog item 0244. `docs/backlog/refined/0244-fail-a-check-when-the-two-project-orientations-disagree.md`
+[^F259CHECK]: Backlog item 0244. `docs/backlog/refined/0244-fail-a-check-when-the-two-project-orientations-disagree.md`
 [^F222]: Target platform costs. `docs/reference/graviton-costs.md`
 [^F223C]: ADR Registry, how a record changes. `docs/adrs/REGISTRY.md`
 
@@ -7702,6 +7810,7 @@ the part that decayed, and it decayed within one commit of the pin moving.
 [^F231C]: The starvation suite of the core. `crates/cachette-core/tests/starvation.rs`
 [^F234A]: Findings register, FND-233, in this document.
 [^F201C]: Findings register, FND-206, in this document.
+<<<<<<< HEAD
 
 [^F281A]: Backlog item 0267, hold the exit direction on the tile. `docs/backlog/complete/0267-hold-the-exit-direction-on-the-tile.md`
 [^F281B]: The exit locality benchmark. `crates/cachette-core/benches/exit_locality.rs`
@@ -7718,3 +7827,12 @@ the part that decayed, and it decayed within one commit of the pin moving.
 [^F262F]: The state-byte gate. `crates/cachette-core/tests/state_bytes_are_initialised.rs`
 [^F263A]: The float ban script. `scripts/check-float-ban.sh`
 [^F263B]: Backlog item 0272, name the reassociating methods in the lint. `docs/backlog/proposed/0293-name-the-reassociating-methods-in-the-lint.md`
+=======
+[^F273A]: Backlog item 0266, order the unit arena by cell. `docs/backlog/refined/0266-order-the-unit-arena-by-cell.md`
+[^F273B]: Target platform costs, the packed and scattered rows. `docs/reference/graviton-costs.md`
+[^F273C]: The cost benchmark, the arena order mode. `crates/cachette-core/benches/target_cost.rs`
+[^F274A]: Decisions register, DEC-110. `docs/DECISIONS.md`
+[^F274B]: ADR-0018, the unit-to-tile bridge is derived, and it rebuilds at the barrier, decision D1. `docs/adrs/accepted/adr-0018-the-unit-to-tile-bridge-is-derived-and-rebuilds-at-the-barrier.md`
+[^F274C]: The drifted arena suite of the core. `crates/cachette-core/tests/drifted_arena.rs`
+[^F274D]: ADR-0056, movement is tile-discrete and admitted by sort-then-admit, decision D3. `docs/adrs/accepted/adr-0056-movement-is-tile-discrete-and-admitted-by-sort-then-admit.md`
+>>>>>>> feat-w39

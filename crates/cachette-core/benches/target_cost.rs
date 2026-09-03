@@ -272,6 +272,8 @@ fn main() {
         "stages" => stage_rows(&arguments),
         "stage-cost" => stage_cost_rows(&arguments),
         "placement" => placement_rows(&arguments),
+        "arena-order" => arena_order_rows(&arguments),
+        "reorder-cost" => reorder_cost_rows(&arguments),
         "collapse" => collapse_rows(&arguments),
         "exitfield" => exit_field_rows(&arguments),
         "memory-placement" => memory_placement(&arguments),
@@ -1224,4 +1226,318 @@ fn populate(world: &mut World, units: u32) -> u32 {
         }
     }
     placed
+}
+
+/// Returns the addresses that the scattered pattern places a unit on.
+///
+/// The walk is the one that `populate_scattered` runs, with the spawn taken
+/// out. A caller then spawns on these addresses in any order it likes, so
+/// that the population sits in one place and the arena order is the only
+/// thing that moves.
+fn scattered_addresses(world: &World, units: u32) -> Vec<Axial> {
+    let grid = world.grid();
+    let width = grid.width();
+    let count = grid.tile_count();
+    if units == 0 {
+        return Vec::new();
+    }
+    let stride = (count / units).max(1);
+    let mut addresses = Vec::with_capacity(units as usize);
+    let mut cursor = 0u32;
+    for step in 0..units {
+        cursor = cursor.max(step.saturating_mul(stride));
+        while cursor < count {
+            let address = Axial::new((cursor % width) as i32, (cursor / width) as i32);
+            cursor += 1;
+            if world.admits_a_unit(address) {
+                addresses.push(address);
+                break;
+            }
+        }
+        if cursor >= count {
+            break;
+        }
+    }
+    addresses
+}
+
+/// Permutes a list in place, from a fixed seed.
+///
+/// The draw is a linear congruential step, which is enough to decorrelate an
+/// order and is the same on every run and on every machine. It seeds no
+/// simulated state, so it is not a simulation draw and no record governs
+/// it.[^1]
+///
+/// # References
+///
+/// [^1]: ADR-0003, every random draw is keyed, never stateful. `docs/adrs/accepted/adr-0003-every-random-draw-is-keyed-never-stateful.md`
+fn shuffle<T>(items: &mut [T]) {
+    let mut state: u64 = 0x9e37_79b9_7f4a_7c15;
+    for index in (1..items.len()).rev() {
+        state = state
+            .wrapping_mul(6_364_136_223_846_793_005)
+            .wrapping_add(1_442_695_040_888_963_407);
+        let pick = (state >> 33) as usize % (index + 1);
+        items.swap(index, pick);
+    }
+}
+
+/// Spawns one unit on each address, in the order given, and returns the count.
+fn populate_at(world: &mut World, addresses: &[Axial]) -> u32 {
+    let ceiling = u32::from(world.config().faction_count.max(1));
+    let mut placed = 0u32;
+    for address in addresses {
+        let faction = FactionId((placed % ceiling) as u16);
+        if world.spawn_soldier(*address, faction).is_ok() {
+            placed += 1;
+        }
+    }
+    placed
+}
+
+/// Returns the mean distance in slots between two units next to each other in
+/// the order the bridge holds.
+///
+/// The bridge order is the cell order. A value near one says that the units of
+/// one cell sit together in the arena. A large value says that reading the
+/// units of one cell touches one cache line for each unit.
+fn mean_slot_step(world: &World) -> u64 {
+    let live: Vec<Entity> = world.soldiers().iter().collect();
+    let mut in_cell_order: Vec<(u64, u32)> = Vec::with_capacity(live.len());
+    let layout = world.bridge().layout();
+    for unit in &live {
+        let Some(tile) = world.soldiers().tile(*unit) else {
+            continue;
+        };
+        let Some(key) = layout.key_of(tile) else {
+            continue;
+        };
+        in_cell_order.push((key, unit.index()));
+    }
+    in_cell_order.sort_unstable();
+    if in_cell_order.len() < 2 {
+        return 0;
+    }
+    let mut total: u64 = 0;
+    for window in in_cell_order.windows(2) {
+        total += u64::from(window[0].1.abs_diff(window[1].1));
+    }
+    total / (in_cell_order.len() as u64 - 1)
+}
+
+/// Measures one frame under two arena orders, at one set of unit positions.
+///
+/// The two rows put the units on the same tiles. The only difference is the
+/// order in which the arena took them, which fixes where each unit sits in
+/// every column. This isolates the arena order from the spread of the
+/// population, which the placement rows change together.
+///
+/// The tie order of an admission is the identity, so a different arena order
+/// can resolve a contested tile in favour of another unit. At this density a
+/// contested tile is rare, and the two rows hold the same unit count on the
+/// same tiles.
+fn arena_order_rows(arguments: &[String]) {
+    let extent = extent_argument(arguments, 1);
+    let units: u32 = arguments
+        .get(2)
+        .and_then(|word| word.parse().ok())
+        .expect("the third argument must be a unit count");
+    let threads: usize = arguments
+        .get(3)
+        .and_then(|word| word.parse().ok())
+        .unwrap_or(1);
+
+    println!("# one frame under two arena orders, at one set of unit positions");
+    println!("# ascending: the arena took the units in tile order");
+    println!("# shuffled: the arena took the same units in a permuted order");
+    println!("# baseline: the same world with a population the frame can ignore");
+    println!("# mean_slot_step is the mean slot distance between two units in cell order");
+    println!("# the three rows take their samples in turn, one frame each, in one loop");
+
+    // The three worlds are built first and sampled in turn. A machine that
+    // other work shares does not hold one load for the length of a run, so a
+    // row that takes all of its samples before the next row starts measures
+    // the load as much as the placement. An earlier version did that, and it
+    // reported a world of one thousand units as slower than the same world
+    // with two hundred and fifty thousand.
+    let capacity = units.max(1024);
+    let mut worlds: Vec<(&str, u64, World)> = Vec::new();
+    for (name, shuffled, population) in [
+        ("baseline", false, 1024u32),
+        ("ascending", false, units),
+        ("shuffled", true, units),
+    ] {
+        let mut world =
+            World::new(extent.config(capacity)).expect("the extent must describe a world");
+        let mut addresses = scattered_addresses(&world, population);
+        if shuffled {
+            shuffle(&mut addresses);
+        }
+        let placed = populate_at(&mut world, &addresses);
+        for _ in 0..WARMUP_FRAMES {
+            world.step(threads).expect("the step must run");
+        }
+        let step = mean_slot_step(&world);
+        println!("# {name}\tplaced\t{placed}\tmean_slot_step\t{step}");
+        worlds.push((name, step, world));
+    }
+
+    let mut samples: Vec<Vec<u128>> = vec![Vec::new(); worlds.len()];
+    let mut spent: u128 = 0;
+    while samples[0].len() < MAX_SAMPLES {
+        for (index, (_, _, world)) in worlds.iter_mut().enumerate() {
+            let start = now();
+            let log = world.step(threads).expect("the step must run");
+            let elapsed = start.elapsed().as_nanos();
+            std::hint::black_box(log.len());
+            samples[index].push(elapsed);
+            spent += elapsed;
+        }
+        if samples[0].len() >= MIN_SAMPLES && spent >= ROW_BUDGET_NS {
+            break;
+        }
+    }
+
+    println!(
+        "bench\torder\ttiles\tunits\tthreads\tmean_slot_step\tsamples\tmin_ns\tmedian_ns\tmax_ns"
+    );
+    for (index, (name, step, _)) in worlds.iter().enumerate() {
+        let mut row = samples[index].clone();
+        row.sort_unstable();
+        println!(
+            "arena_order\t{name}\t{}\t{units}\t{threads}\t{step}\t{}\t{}\t{}\t{}",
+            extent.tiles(),
+            row.len(),
+            row[0],
+            row[row.len() / 2],
+            row[row.len() - 1]
+        );
+    }
+}
+
+/// The bytes that one soldier holds across every column of the arena.
+///
+/// A reorder moves each of them. The figure is the sum of the column widths
+/// of the soldier shape, and it is a property of the shape rather than a
+/// budget.
+const SOLDIER_COLUMN_BYTES: usize = 38;
+
+/// Prices the reorder that would put the arena in cell order.
+///
+/// The item that proposes the reorder must price it, because a reorder of one
+/// million units on every frame can cost more than it saves. This mode
+/// measures the two halves of the work. The first half derives the
+/// permutation from the order the bridge already holds. The second half
+/// applies the permutation to columns of the widths that the soldier shape
+/// holds.
+///
+/// The gather is the honest shape of the work: a reorder reads each column at
+/// a scattered position and writes it at the next position of a new column.
+/// The read side is the cost, and no arrangement of the write side removes
+/// it.
+fn reorder_cost_rows(arguments: &[String]) {
+    let extent = extent_argument(arguments, 1);
+    let units: u32 = arguments
+        .get(2)
+        .and_then(|word| word.parse().ok())
+        .expect("the third argument must be a unit count");
+
+    let capacity = units.max(1024);
+    let mut world = World::new(extent.config(capacity)).expect("the extent must describe a world");
+    let placed = populate_scattered(&mut world, units);
+    for _ in 0..WARMUP_FRAMES {
+        world.step(1).expect("the step must run");
+    }
+
+    println!("# the cost of one reorder of the unit arena, on one thread");
+    println!("# permutation: deriving the target order from the cell key");
+    println!("# gather_all: moving every column of the soldier shape");
+    println!("# soldier_column_bytes\t{SOLDIER_COLUMN_BYTES}");
+    println!("bench\tpart\ttiles\tunits\tsamples\tmin_ns\tmedian_ns\tmax_ns");
+
+    let soldiers = world.soldiers();
+    let layout = world.bridge().layout();
+    let live: Vec<Entity> = soldiers.iter().collect();
+
+    // The permutation. The bridge already sorts on this key once for each
+    // frame, so a reorder that rides on the rebuild pays this once and not
+    // twice. It is measured apart so that a reader can tell the two costs.
+    let samples = samples_of(|| {
+        let start = now();
+        let mut keyed: Vec<(u64, u32)> = Vec::with_capacity(live.len());
+        for unit in &live {
+            let tile = soldiers.tile(*unit).expect("a live unit stands somewhere");
+            let key = layout.key_of(tile).expect("a tile of this world has a key");
+            keyed.push((key, unit.index()));
+        }
+        keyed.sort_unstable();
+        let elapsed = start.elapsed().as_nanos();
+        std::hint::black_box(keyed.len());
+        elapsed
+    });
+    report_part("reorder", "permutation", extent.tiles(), placed, &samples);
+
+    // The move. Every column of the shape is packed into one byte array of
+    // the width the shape holds, so the gather reads the same bytes at the
+    // same scattered positions as a reorder of the real columns would.
+    let mut keyed: Vec<(u64, u32)> = live
+        .iter()
+        .map(|unit| {
+            let tile = soldiers.tile(*unit).expect("a live unit stands somewhere");
+            let key = layout.key_of(tile).expect("a tile of this world has a key");
+            (key, unit.index())
+        })
+        .collect();
+    keyed.sort_unstable();
+    let order: Vec<u32> = keyed.iter().map(|pair| pair.1).collect();
+    let slots = soldiers.slot_count() as usize;
+    let source: Vec<[u8; SOLDIER_COLUMN_BYTES]> = vec![[7u8; SOLDIER_COLUMN_BYTES]; slots];
+    let mut target: Vec<[u8; SOLDIER_COLUMN_BYTES]> = vec![[0u8; SOLDIER_COLUMN_BYTES]; slots];
+
+    let samples = samples_of(|| {
+        let start = now();
+        for (position, slot) in order.iter().enumerate() {
+            target[position] = source[*slot as usize];
+        }
+        let elapsed = start.elapsed().as_nanos();
+        std::hint::black_box(target[0][0]);
+        elapsed
+    });
+    report_part("reorder", "gather_all", extent.tiles(), placed, &samples);
+
+    // The row above measures a fixture and not the work. This world spawned
+    // its units in tile order, so the target order is nearly the order the
+    // arena already holds and the gather reads almost sequentially. A reorder
+    // is only worth running when the arena has drifted, and then every read
+    // lands on another page. This row supplies that case.
+    let mut scattered_order = order.clone();
+    shuffle(&mut scattered_order);
+    let samples = samples_of(|| {
+        let start = now();
+        for (position, slot) in scattered_order.iter().enumerate() {
+            target[position] = source[*slot as usize];
+        }
+        let elapsed = start.elapsed().as_nanos();
+        std::hint::black_box(target[0][0]);
+        elapsed
+    });
+    report_part(
+        "reorder",
+        "gather_all_drifted",
+        extent.tiles(),
+        placed,
+        &samples,
+    );
+}
+
+/// Writes one row that names a part of a measured cost.
+fn report_part(name: &str, part: &str, tiles: u64, units: u32, samples: &[u128]) {
+    let last = samples.len() - 1;
+    println!(
+        "{name}\t{part}\t{tiles}\t{units}\t{}\t{}\t{}\t{}",
+        samples.len(),
+        samples[0],
+        samples[samples.len() / 2],
+        samples[last]
+    );
 }

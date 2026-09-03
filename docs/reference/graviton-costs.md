@@ -254,6 +254,13 @@ reach does not depend on the placement. The level does.
 bytes and a scattered one holds 875,999,232, which is one part in four
 thousand.
 
+**The order of the unit arena does not move between these two rows, and a
+reader has taken it as though it did.** Both patterns spawn in ascending tile
+order, so the arena carries the units in cell order in both. The ratio above
+prices the density of the population. It does not price the arena order, and
+no row of this document does. A backlog item read it as an arena order figure
+and a finding records the correction.[^ARENAORDER]
+
 ## The thread count moves the memory
 
 Every memory row in this document was taken at one thread, and the thread
@@ -1032,3 +1039,4 @@ commit what changed. Do not edit a row to make a later run agree with it.
 [^17]: Backlog item 0229. `docs/backlog/proposed/0229-explain-the-frame-cost-at-the-smallest-extent.md`
 [^18]: ADR-0084, the world reserves the unit columns at construction, decision D3. `docs/adrs/draft/adr-0084-the-world-reserves-the-unit-columns-at-construction.md`
 [^19]: Backlog item 0290, ask for a huge page in the allocation. `docs/backlog/proposed/0290-ask-for-a-huge-page-in-the-allocation.md`
+[^ARENAORDER]: Findings register, FND-273. `docs/FINDINGS.md`

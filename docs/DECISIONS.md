@@ -23,7 +23,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^ALLOC]
 
-**Next number: DEC-110**
+**Next number: DEC-111**
 
 ## Open
 
@@ -1213,6 +1213,50 @@ author who wants a build to take a stated span can convert.[^SCALE]
 **Why it is worth choosing.** A build that finishes in one tick is the defect
 that makes the whole feature pointless, and it is the one the determinism
 tests do not see.[^DEC72D]
+
+
+### DEC-110 — Does the engine move a unit inside the arena, or only choose the order it walks?
+
+**Open. Engineering owns it. It waits on a measurement of the reorder on the
+target platform.**
+
+The movement pass now walks every live unit in the order the bridge holds,
+which is the block-major tile order, and no longer in the slot order of the
+arena.[^DEC109A] That removed about half of the cost of a drifted arena and
+cost the frame nothing, because the bridge already sorts on that key at the
+barrier.[^DEC109B]
+
+**A residual remains, and only moving a unit in the arena removes it.** The
+unit columns are indexed by the slot, a slot is half of an identity, and a slot
+never moves.[^DEC109C] A pass in cell order therefore reads the unit columns at
+scattered positions whatever it does.
+
+**Move the units.** The arena separates two spaces: the slot space, which holds
+the generation and never compacts, and a row space, which holds every payload
+column packed and in cell order. The identity resolves through one more dense
+array. A bulk pass then reads a contiguous run of live units and needs no live
+filter. This does not compact the slot index space, so it does not contradict
+the identity record; it does add an indirection to every read that starts from
+an identity, and that read is on the hot path.
+
+**Leave them.** The residual has no measured size. The development machine
+could not separate the two builds, because other work shared it and its load
+moved by a factor of four inside one run.[^DEC109B] The reorder, by contrast,
+is priced: moving every column of the soldier shape once, for one million
+units on one thread, took 64 milliseconds against a frame budget of one
+hundred.[^DEC109D] **One side of the comparison is measured and the other is
+not, and the unmeasured side is the one that would justify the work.**
+
+**What decides it.** A measurement on Graviton of the residual and of the
+reorder, taken in one process. Both modes exist in the benchmark and neither
+has been run there. **A figure from the development machine is not evidence
+about the target: it has a different cache line, and other work shared it for
+every figure above.**[^BLK7]
+
+**If the answer is to move them, the interval is a second question.** A reorder
+of a packed arena costs 26 milliseconds and saves nothing, so an unconditional
+reorder on every frame wastes the common case. A fixed interval keeps the
+schedule out of the data, which is the rule a solver already follows.[^FIXEDITER]
 
 
 ## Decisions to apply at merge
@@ -2725,7 +2769,14 @@ a failed founding is correct.[^PRD12]
 [^DEC96D]: ADR-0064, a unit chooses by scoring a small fixed option set, decision D1. `docs/adrs/accepted/adr-0064-a-unit-chooses-by-scoring-a-small-fixed-option-set.md`
 [^DEC97B]: Target platform costs. `docs/reference/graviton-costs.md`
 [^SWEEP]: Recurring Defect Shapes, shape 2. `.claude/rules/recurring-defects.md`
+<<<<<<< HEAD
 [^DEC107A]: The pyglet package index entry, read 2 September 2026. https://pypi.org/pypi/pyglet/json
 [^DEC107B]: The pygame and pygame-ce package index entries, read 2 September 2026. https://pypi.org/pypi/pygame/json
 [^DEC107C]: ADR-0094, the caller owns the camera and the pixels, decision D5. `docs/adrs/draft/adr-0094-the-caller-owns-the-camera-and-the-pixels.md`
 [^DEC107E]: ADR-0094, the caller owns the camera and the pixels, decision D4. `docs/adrs/draft/adr-0094-the-caller-owns-the-camera-and-the-pixels.md`
+=======
+[^DEC109A]: ADR-0018, the unit-to-tile bridge is derived, and it rebuilds at the barrier, decision D1. `docs/adrs/accepted/adr-0018-the-unit-to-tile-bridge-is-derived-and-rebuilds-at-the-barrier.md`
+[^DEC109B]: Findings register, FND-274. `docs/FINDINGS.md`
+[^DEC109C]: ADR-0014, entity identity is an index plus a generation, decision D1. `docs/adrs/accepted/adr-0014-entity-identity-is-an-index-plus-a-generation.md`
+[^DEC109D]: The cost benchmark, the reorder cost mode. `crates/cachette-core/benches/target_cost.rs`
+>>>>>>> feat-w39
