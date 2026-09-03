@@ -74,6 +74,7 @@ name = "cachette-py"
 version = "0.0.0"
 dependencies = [
  "cachette-core",
+ "cachette-view",
  "numpy",
  "pyo3",
 ]

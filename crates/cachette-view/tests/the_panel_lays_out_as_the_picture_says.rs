@@ -212,7 +212,7 @@ const REGENERATE: &str = "UPDATE_PANEL_PICTURE=1 cargo test -p cachette-view \
 /// # References
 ///
 /// [^1]: Testing Rules, drive the real caller. `.claude/rules/testing.md`
-fn taken(factions: u16) -> (String, Canvas) {
+fn taken(factions: u16) -> (String, Canvas<'static>) {
     let (world, foundings) = world(factions);
     let metrics = measurements();
     let mut panelled = Canvas::new(WINDOW.0, WINDOW.1);

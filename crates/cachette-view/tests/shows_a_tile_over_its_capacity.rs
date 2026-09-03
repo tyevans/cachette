@@ -157,7 +157,7 @@ fn pick(open: &[Axial], wanted: Axial, taken: &[Axial]) -> Axial {
 }
 
 /// Draws the whole world into a canvas that shows all of it.
-fn draw_all(world: &World) -> (Canvas, Camera) {
+fn draw_all(world: &World) -> (Canvas<'static>, Camera) {
     let mut canvas = Canvas::new(720, 720);
     let camera = Camera::fitting(world, &canvas);
     paint::draw(world, camera, &mut canvas).expect("the bridge must describe the arena");

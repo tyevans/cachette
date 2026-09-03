@@ -13,11 +13,13 @@
 //! [^2]: ADR-0042, the interpreter is released for the whole step. `docs/adrs/REGISTRY.md`
 
 use cachette_core::census::{census, CensusError};
+use cachette_core::founding::FoundingOutcome;
 use cachette_core::{
     Axial, CommodityId, Entity, FactionId, Fix32, Holder, ResourceKind, World as CoreWorld,
     WorldConfig,
 };
-use numpy::{PyArray1, ToPyArray};
+use cachette_view::{fill_frame, Camera, FrameSize, Lap, Metrics, Overlay, Surface};
+use numpy::{PyArray1, PyReadwriteArray1, ToPyArray};
 use pyo3::create_exception;
 use pyo3::exceptions::PyException;
 use pyo3::prelude::*;
@@ -34,6 +36,7 @@ create_exception!(
     "The root of every Cachette error."
 );
 create_exception!(_core, StepError, CachetteError, "A step refused to run.");
+create_exception!(_core, FrameError, CachetteError, "A frame refused to fill.");
 create_exception!(
     _core,
     ConfigError,
@@ -70,6 +73,25 @@ create_exception!(
 #[pyclass(name = "World", module = "cachette._core", frozen)]
 pub struct PyWorld {
     inner: std::sync::Mutex<CoreWorld>,
+    presenter: std::sync::Mutex<Presenter>,
+}
+
+/// What the caller keeps between frames.
+///
+/// **The world holds none of this.** A field that existed for the viewer
+/// would be the violation the boundary record names, so the engine keeps no
+/// camera, no founding report and no timing.[^1] The binding is the caller
+/// here, in the same way the demonstration binary is the caller on the other
+/// front end, and a caller is allowed to keep what it owns.
+///
+/// # References
+///
+/// [^1]: ADR-0067, the viewer reads the world and never writes to it, decision D2. `docs/adrs/accepted/adr-0067-the-viewer-reads-the-world-and-never-writes-to-it.md`
+struct Presenter {
+    /// What the step and the frame cost, for the panel to report.
+    metrics: Metrics,
+    /// The founding report the caller kept when it founded the run.
+    outcomes: Vec<FoundingOutcome>,
 }
 
 #[pymethods]
@@ -94,6 +116,10 @@ impl PyWorld {
         .map_err(|error| ConfigError::new_err(error.to_string()))?;
         Ok(Self {
             inner: std::sync::Mutex::new(world),
+            presenter: std::sync::Mutex::new(Presenter {
+                metrics: Metrics::start(),
+                outcomes: Vec::new(),
+            }),
         })
     }
 
@@ -144,13 +170,18 @@ impl PyWorld {
         // ADR-0042: release the interpreter for the whole step. The
         // closure may not capture the interpreter token, so the compiler
         // rejects a mid-step callback a second time.
-        python.detach(|| {
+        let at = Lap::start();
+        let events = python.detach(|| {
             let mut world = self.lock();
             match world.step(threads) {
                 Ok(events) => Ok(events.len()),
                 Err(error) => Err(StepError::new_err(error.to_string())),
             }
-        })
+        })?;
+        // The clock is read here and nowhere that decides anything. The
+        // engine runs the same steps whatever this number says.
+        self.presenter().metrics.step(at.elapsed());
+        Ok(events)
     }
 
     /// Returns the raw event log of the last step as bytes.
@@ -1038,6 +1069,182 @@ impl PyWorld {
         Ok(report)
     }
 
+    /// Founds one run for every faction and keeps the report.
+    ///
+    /// **This is a set-valued command, not a loop.** One call seats every
+    /// faction the world has, because a founding must keep its distance from
+    /// the foundings before it, and a caller that founded one faction at a
+    /// time would have to carry that state across the boundary itself.
+    ///
+    /// The binding keeps the report, because the frame marks each founded
+    /// place and the panel names each refusal. A founded place is history,
+    /// and the engine holds no copy of it.
+    ///
+    /// Returns one dictionary for each faction. A seated faction gives its
+    /// place, its people and what the ground it chose reaches. A refused
+    /// faction gives the reason.
+    ///
+    /// # Errors
+    ///
+    /// Raises `VerbError` when no faction was seated. A run with no group is
+    /// not a run.
+    #[pyo3(signature = (group = 64))]
+    fn found_run_for_every_faction<'py>(
+        &self,
+        python: Python<'py>,
+        group: u32,
+    ) -> PyResult<Vec<Bound<'py, PyDict>>> {
+        let outcomes = {
+            let mut world = self.lock();
+            world.found_run_for_every_faction(group)
+        };
+        if !outcomes.iter().any(FoundingOutcome::is_seated) {
+            return Err(VerbError::new_err(
+                "no faction found a place, so the run has nothing in it".to_string(),
+            ));
+        }
+
+        let mut reports = Vec::with_capacity(outcomes.len());
+        for outcome in &outcomes {
+            let report = PyDict::new(python);
+            report.set_item("faction", outcome.faction().0)?;
+            match outcome.result() {
+                Ok(founding) => {
+                    let place = founding.place();
+                    report.set_item("seated", true)?;
+                    report.set_item("q", place.q)?;
+                    report.set_item("r", place.r)?;
+                    report.set_item("people", founding.people().len())?;
+                    report.set_item("considered", founding.survey().considered())?;
+                    if let Some(chosen) = founding.survey().chosen() {
+                        let reached = chosen.provision();
+                        report.set_item("food", reached.food.0)?;
+                        report.set_item("wood", reached.wood.0)?;
+                        report.set_item("stone", reached.stone.0)?;
+                        report.set_item("open_ground", reached.open_ground)?;
+                        report.set_item("water_edge", reached.water_edge)?;
+                        // The food the survey reached is the number of people
+                        // the site can carry, because the production rate and
+                        // the ration are both a sixteenth and the two cancel.
+                        report.set_item("carries_its_group", reached.food.0 >= group)?;
+                    }
+                }
+                Err(error) => {
+                    report.set_item("seated", false)?;
+                    report.set_item("refusal", error.to_string())?;
+                }
+            }
+            reports.push(report);
+        }
+        self.presenter().outcomes = outcomes;
+        Ok(reports)
+    }
+
+    /// Fills the caller's pixels with one frame of this world.
+    ///
+    /// **The caller owns the memory before this call and owns it
+    /// afterwards.** The engine writes each pixel of one frame into it and
+    /// returns. It allocates no frame, keeps no frame, and holds no reference
+    /// to the memory after the call ends.[^1]
+    ///
+    /// **This is one command and it carries no entity.** It takes a world, a
+    /// camera and somewhere to put the result, and it names no tile and no
+    /// unit. A caller that walked tiles to draw them would cross the boundary
+    /// once for each tile, and the crossing costs more than the drawing.[^2]
+    ///
+    /// The array must hold `width * height` unsigned 32-bit values and must be
+    /// contiguous. Each value holds red, green and blue in its low three
+    /// bytes.
+    ///
+    /// Set `reference` to show the layer that names the colours. Set `panel`
+    /// to draw the whole panel instead of the cards, which is what a caller
+    /// that writes a picture to a file wants.
+    ///
+    /// Returns what the drawing pass read, so a caller reports the numbers
+    /// the picture was made from rather than starting a second pass to find
+    /// them.[^3]
+    ///
+    /// # Errors
+    ///
+    /// Raises `FrameError` when the array does not match the width and the
+    /// height, when a side is zero, when the array is not contiguous, or when
+    /// the camera draws a tile smaller than one pixel. The last refusal names
+    /// the bound: below one pixel for each tile a second tile falls on a pixel
+    /// the first already holds, so the work is provably invisible and a
+    /// caller could otherwise sweep the whole world for a picture of a few
+    /// pixels.[^4]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0094, the caller owns the camera and the pixels, decision D2. `docs/adrs/draft/adr-0094-the-caller-owns-the-camera-and-the-pixels.md`
+    /// [^2]: ADR-0094, the caller owns the camera and the pixels, decision D1. `docs/adrs/draft/adr-0094-the-caller-owns-the-camera-and-the-pixels.md`
+    /// [^3]: ADR-0070, the head-up display reports what the drawing pass read, decision D1. `docs/adrs/accepted/adr-0070-the-head-up-display-reports-what-the-drawing-pass-read.md`
+    /// [^4]: ADR-0094, the caller owns the camera and the pixels, decision D6. `docs/adrs/draft/adr-0094-the-caller-owns-the-camera-and-the-pixels.md`
+    // The arguments are the interface a Python caller types by name, so
+    // bundling them would hide the contract rather than simplify it.
+    #[allow(clippy::too_many_arguments)]
+    #[pyo3(signature = (camera, width, height, pixels, reference = false, panel = false))]
+    fn draw<'py>(
+        &self,
+        python: Python<'py>,
+        camera: &PyCamera,
+        width: usize,
+        height: usize,
+        pixels: PyReadwriteArray1<'py, u32>,
+        reference: bool,
+        panel: bool,
+    ) -> PyResult<Bound<'py, PyDict>> {
+        let mut pixels = pixels;
+        let buffer = pixels.as_slice_mut().map_err(|_| {
+            FrameError::new_err(
+                "the frame needs a contiguous array of unsigned 32-bit values".to_string(),
+            )
+        })?;
+
+        let surface = Surface::new(width, height, buffer)
+            .map_err(|error| FrameError::new_err(error.to_string()))?;
+
+        let overlay = if panel {
+            Overlay::Panel
+        } else {
+            Overlay::Glass { reference }
+        };
+
+        let at = Lap::start();
+        let readout = {
+            let world = self.lock();
+            let presenter = self.presenter();
+            fill_frame(
+                &world,
+                camera.inner,
+                &presenter.metrics,
+                &presenter.outcomes,
+                overlay,
+                surface,
+            )
+            .map_err(|error| FrameError::new_err(error.to_string()))?
+        };
+        self.presenter().metrics.draw(at.elapsed());
+
+        let report = PyDict::new(python);
+        report.set_item("tick", readout.tick())?;
+        report.set_item("tiles_painted", readout.tiles_painted())?;
+        report.set_item("soldiers_painted", readout.soldiers_painted())?;
+        report.set_item("soldiers_live", readout.soldiers_live())?;
+        report.set_item("sites_held", readout.sites_held())?;
+        report.set_item("units_short", readout.units_short())?;
+        report.set_item("tiles_at_capacity", readout.tiles_at_capacity())?;
+        report.set_item("crowd_worst", readout.crowd_worst())?;
+        let centre = readout.centre();
+        report.set_item("centre", (centre.q, centre.r))?;
+        let (columns, rows) = readout.extent_shown();
+        report.set_item("extent_shown", (columns, rows))?;
+        report.set_item("step_mean_micros", readout.step_mean())?;
+        report.set_item("draw_mean_micros", readout.draw_mean())?;
+        report.set_item("ticks_each_second", readout.rate())?;
+        Ok(report)
+    }
+
     fn __repr__(&self) -> String {
         let world = self.lock();
         // The arguments name the constructor's own parameters, so that the
@@ -1050,6 +1257,191 @@ impl PyWorld {
             grid.width(),
             grid.height(),
             world.tick().0
+        )
+    }
+}
+
+/// A camera the control plane owns.
+///
+/// **The engine holds no camera.** It is given one for the length of a call
+/// and keeps nothing of it afterwards, so a frame is a pure function of a
+/// world and a camera. Two calls with the same world and the same camera give
+/// the same picture, which is the property that makes a scripted flight, an
+/// agent that steers, and a reproducible screenshot possible at all.[^1]
+///
+/// The state lives in Python. Python decides when to move and by how much.
+/// The arithmetic lives here, once, because a pan share and a zoom step
+/// written on both sides of the boundary would be one value in two places
+/// with nothing failing when the copies disagreed.[^2]
+///
+/// Every verb takes the width and the height of the picture the camera aims
+/// at. A camera verb reads no pixel, so a caller that has not drawn yet can
+/// still steer.
+///
+/// # References
+///
+/// [^1]: ADR-0094, the caller owns the camera and the pixels, decision D3. `docs/adrs/draft/adr-0094-the-caller-owns-the-camera-and-the-pixels.md`
+/// [^2]: Recurring Defect Shapes, shape 1. `.claude/rules/recurring-defects.md`
+// **The camera is a viewer value, and the record that bans the float types
+// allows them for rendering.**[^1] The allowance is scoped to this type and
+// its methods, and not to the crate, because everything else in this file
+// carries simulation values, which are exact by construction.
+//
+// A float cannot travel back into the engine from here. The camera is passed
+// by value into a drawing call, the drawing borrows the world shared, and
+// every value the engine accepts is an exact integer.[^2]
+//
+// [^1]: ADR-0067, the viewer reads the world and never writes to it, decision D3. `docs/adrs/accepted/adr-0067-the-viewer-reads-the-world-and-never-writes-to-it.md`
+// [^2]: ADR-0094, the caller owns the camera and the pixels, decision D3. `docs/adrs/draft/adr-0094-the-caller-owns-the-camera-and-the-pixels.md`
+#[allow(clippy::disallowed_types)]
+#[pyclass(name = "Camera", module = "cachette._core", skip_from_py_object)]
+#[derive(Clone, Copy)]
+pub struct PyCamera {
+    inner: Camera,
+}
+
+#[allow(clippy::disallowed_types)]
+#[pymethods]
+impl PyCamera {
+    /// Builds the camera the demonstration opens with.
+    ///
+    /// The tile size is a viewer choice and not a world property.
+    #[new]
+    #[pyo3(signature = (tile_size = None))]
+    fn new(tile_size: Option<f32>) -> Self {
+        Self {
+            inner: tile_size.map_or_else(Camera::opening, Camera::at_tile_size),
+        }
+    }
+
+    /// Returns a camera that fits the whole world into a picture of this size.
+    #[staticmethod]
+    fn fitting(world: &PyWorld, width: usize, height: usize) -> Self {
+        Self {
+            inner: Camera::fitting(&world.lock(), &FrameSize::new(width, height)),
+        }
+    }
+
+    /// The width of one tile in pixels.
+    #[getter]
+    const fn tile_width(&self) -> f32 {
+        self.inner.tile_width
+    }
+
+    /// Sets the width of one tile in pixels.
+    ///
+    /// **The setter does not hold the value to any bound.** The caller owns
+    /// the camera, so the caller may build any camera it likes, and the frame
+    /// verb refuses the ones it cannot draw and names the bound it refused
+    /// against. A setter that held the scale quietly would return a picture
+    /// that did not match the camera the caller asked for, and a caller could
+    /// not tell that from a picture that did.[^1]
+    ///
+    /// The scroll and zoom verbs do hold the scale, because they are what a
+    /// person drives and a person should not be able to press a key into a
+    /// refusal.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0094, the caller owns the camera and the pixels, decision D6. `docs/adrs/draft/adr-0094-the-caller-owns-the-camera-and-the-pixels.md`
+    #[setter]
+    const fn set_tile_width(&mut self, pixels: f32) {
+        self.inner.tile_width = pixels;
+    }
+
+    /// The height of one tile in pixels.
+    #[getter]
+    const fn tile_height(&self) -> f32 {
+        self.inner.tile_height
+    }
+
+    /// Sets the height of one tile in pixels, and holds it to no bound.
+    #[setter]
+    const fn set_tile_height(&mut self, pixels: f32) {
+        self.inner.tile_height = pixels;
+    }
+
+    /// The pixel offset of the tile at the origin.
+    #[getter]
+    const fn origin_x(&self) -> f32 {
+        self.inner.origin_x
+    }
+
+    /// Sets the pixel offset of the tile at the origin.
+    #[setter]
+    const fn set_origin_x(&mut self, pixels: f32) {
+        self.inner.origin_x = pixels;
+    }
+
+    /// The pixel offset of the tile at the origin.
+    #[getter]
+    const fn origin_y(&self) -> f32 {
+        self.inner.origin_y
+    }
+
+    /// Sets the pixel offset of the tile at the origin.
+    #[setter]
+    const fn set_origin_y(&mut self, pixels: f32) {
+        self.inner.origin_y = pixels;
+    }
+
+    /// Moves the view by whole presses of a scroll key.
+    ///
+    /// **This is the call a person drives.** The step is a share of the
+    /// picture, so one press moves the view by the same part of it at every
+    /// zoom. Pass minus one, zero or one for each direction.
+    fn nudge(&mut self, across: f32, down: f32, width: usize, height: usize) {
+        self.inner = self
+            .inner
+            .nudged(across, down, &FrameSize::new(width, height));
+    }
+
+    /// Moves the view by a count of pixels.
+    fn pan(&mut self, across: f32, down: f32) {
+        self.inner = self.inner.panned(across, down);
+    }
+
+    /// Makes each tile larger by one press.
+    fn zoom_in(&mut self, width: usize, height: usize) {
+        self.inner = self.inner.zoomed_in(&FrameSize::new(width, height));
+    }
+
+    /// Makes each tile smaller by one press.
+    fn zoom_out(&mut self, width: usize, height: usize) {
+        self.inner = self.inner.zoomed_out(&FrameSize::new(width, height));
+    }
+
+    /// Puts a tile in the middle of the picture.
+    fn look_at(&mut self, q: i32, r: i32, width: usize, height: usize) {
+        self.inner = self
+            .inner
+            .looking_at(Axial::new(q, r), &FrameSize::new(width, height));
+    }
+
+    /// Holds the view inside the world.
+    ///
+    /// A camera that ran off the edge would show a picture of nothing, and a
+    /// person could not tell that from an empty world.
+    fn clamp(&mut self, world: &PyWorld, width: usize, height: usize) {
+        self.inner = self
+            .inner
+            .clamped(&world.lock(), &FrameSize::new(width, height));
+    }
+
+    /// Returns the tile under a pixel, as a pair of axial coordinates.
+    ///
+    /// **This is how a click reaches a tile without a loop.** The control
+    /// plane sends one pixel and gets one address, rather than walking the
+    /// tiles to find which one was hit.
+    fn tile_at(&self, x: f32, y: f32) -> (i32, i32) {
+        let address = self.inner.tile_at(x, y);
+        (address.q, address.r)
+    }
+
+    fn __repr__(&self) -> String {
+        format!(
+            "Camera(tile_width={}, tile_height={}, origin_x={}, origin_y={})",
+            self.inner.tile_width, self.inner.tile_height, self.inner.origin_x, self.inner.origin_y
         )
     }
 }
@@ -1089,6 +1481,13 @@ impl PyWorld {
     fn lock(&self) -> std::sync::MutexGuard<'_, CoreWorld> {
         self.inner.lock().unwrap_or_else(|error| error.into_inner())
     }
+
+    /// Takes the caller's own values, recovering from a poisoned lock.
+    fn presenter(&self) -> std::sync::MutexGuard<'_, Presenter> {
+        self.presenter
+            .lock()
+            .unwrap_or_else(|error| error.into_inner())
+    }
 }
 
 /// Returns the version of the engine.
@@ -1102,9 +1501,11 @@ fn version() -> &'static str {
 #[pyo3(name = "_core")]
 fn cachette_core_module(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<PyWorld>()?;
+    module.add_class::<PyCamera>()?;
     module.add_function(wrap_pyfunction!(version, module)?)?;
     module.add("CachetteError", module.py().get_type::<CachetteError>())?;
     module.add("StepError", module.py().get_type::<StepError>())?;
+    module.add("FrameError", module.py().get_type::<FrameError>())?;
     module.add("ConfigError", module.py().get_type::<ConfigError>())?;
     module.add("SelectorError", module.py().get_type::<SelectorError>())?;
     module.add("VerbError", module.py().get_type::<VerbError>())?;

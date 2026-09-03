@@ -276,7 +276,14 @@ fn the_picture_of_a_tile_holds_still_while_its_stock_holds_still() {
 /// The panel names a unit, so the fixture must hold units. A founded run puts
 /// a group of people on the ground and gives them a home site, which is what
 /// the site rows report.
-fn founded(seed: u64) -> (World, Canvas, Camera, Vec<cachette_core::FoundingOutcome>) {
+fn founded(
+    seed: u64,
+) -> (
+    World,
+    Canvas<'static>,
+    Camera,
+    Vec<cachette_core::FoundingOutcome>,
+) {
     let mut world = world_of(seed, EXTENT);
     let outcomes = world.found_run_for_every_faction(24);
     let place = outcomes

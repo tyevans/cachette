@@ -15,7 +15,7 @@
 use std::num::NonZeroUsize;
 
 use cachette_core::{World, WorldConfig};
-use cachette_view::{Camera, Canvas, Lap, Metrics, Overlay};
+use cachette_view::{fill_frame, Camera, FrameSize, Lap, Metrics, Overlay, Surface};
 use minifb::{Key, Window, WindowOptions};
 
 /// The size of the window in pixels.
@@ -98,8 +98,8 @@ enum DemoError {
     Founding(cachette_core::FoundingError),
     /// The window could not open.
     Window(minifb::Error),
-    /// The spatial structure no longer describes the world.
-    Bridge(cachette_core::BridgeError),
+    /// The frame refused to fill.
+    Frame(cachette_view::FrameError),
 }
 
 impl std::fmt::Display for DemoError {
@@ -109,10 +109,7 @@ impl std::fmt::Display for DemoError {
             Self::Step(error) => write!(formatter, "the step refused to run: {error}"),
             Self::Founding(error) => write!(formatter, "the run refused to begin: {error}"),
             Self::Window(error) => write!(formatter, "the window refused to open: {error}"),
-            Self::Bridge(error) => write!(
-                formatter,
-                "the viewer refused to draw a world it could not read: {error}"
-            ),
+            Self::Frame(error) => write!(formatter, "the viewer refused to fill a frame: {error}"),
         }
     }
 }
@@ -234,13 +231,13 @@ fn opening_place(outcomes: &[cachette_core::FoundingOutcome]) -> cachette_core::
 /// # References
 ///
 /// [^1]: ADR-0067, the viewer reads the world and never writes to it, decision D2. `docs/adrs/accepted/adr-0067-the-viewer-reads-the-world-and-never-writes-to-it.md`
-fn steer(camera: Camera, window: &Window, world: &World, canvas: &Canvas) -> Camera {
+fn steer(camera: Camera, window: &Window, world: &World, size: &FrameSize) -> Camera {
     let mut camera = camera;
     if window.is_key_down(Key::Minus) {
-        camera = camera.zoomed_out(canvas);
+        camera = camera.zoomed_out(size);
     }
     if window.is_key_down(Key::Equal) {
-        camera = camera.zoomed_in(canvas);
+        camera = camera.zoomed_in(size);
     }
 
     // One press moves the view by one step, in each direction the person is
@@ -263,7 +260,7 @@ fn steer(camera: Camera, window: &Window, world: &World, canvas: &Canvas) -> Cam
         down += 1.0;
     }
 
-    camera.nudged(across, down, canvas).clamped(world, canvas)
+    camera.nudged(across, down, size).clamped(world, size)
 }
 
 fn main() -> Result<(), DemoError> {
@@ -275,7 +272,14 @@ fn main() -> Result<(), DemoError> {
     let mut world = World::new(DEMO).map_err(DemoError::World)?;
     let outcomes = found(&mut world)?;
 
-    let mut canvas = Canvas::new(WINDOW_WIDTH, WINDOW_HEIGHT);
+    // **The binary owns the pixels, in the same way the control plane does.**
+    // Both front ends reach the drawing through one command, and neither
+    // draws anything itself. Two presenters over one renderer is what stops
+    // the two disagreeing about the world.[^4]
+    //
+    // [^4]: ADR-0094, the caller owns the camera and the pixels, decision D5. `docs/adrs/draft/adr-0094-the-caller-owns-the-camera-and-the-pixels.md`
+    let mut pixels = vec![0_u32; WINDOW_WIDTH * WINDOW_HEIGHT];
+    let size = FrameSize::new(WINDOW_WIDTH, WINDOW_HEIGHT);
     // The world is larger than the window, so the camera shows a part of it
     // at a legible tile size. The person scrolls to see the rest. The camera
     // is the viewer's own value and never reaches the engine.
@@ -283,8 +287,8 @@ fn main() -> Result<(), DemoError> {
     // corner would show an empty map. The view opens on the place that was
     // founded, and the person scrolls away from it.
     let mut camera = Camera::opening()
-        .looking_at(opening_place(&outcomes), &canvas)
-        .clamped(&world, &canvas);
+        .looking_at(opening_place(&outcomes), &size)
+        .clamped(&world, &size);
 
     let mut window = Window::new(
         "cachette — watch the world run",
@@ -314,7 +318,7 @@ fn main() -> Result<(), DemoError> {
     let mut metrics = Metrics::start();
 
     while window.is_open() && !window.is_key_down(Key::Escape) {
-        camera = steer(camera, &window, &world, &canvas);
+        camera = steer(camera, &window, &world, &size);
 
         let at = Lap::start();
         world.step(threads).map_err(DemoError::Step)?;
@@ -340,13 +344,15 @@ fn main() -> Result<(), DemoError> {
         let overlay = Overlay::Glass {
             reference: window.is_key_down(Key::Tab),
         };
-        cachette_view::draw_frame(&world, camera, &metrics, &outcomes, overlay, &mut canvas)
-            .map_err(DemoError::Bridge)?;
+        let surface =
+            Surface::new(WINDOW_WIDTH, WINDOW_HEIGHT, &mut pixels).map_err(DemoError::Frame)?;
+        fill_frame(&world, camera, &metrics, &outcomes, overlay, surface)
+            .map_err(DemoError::Frame)?;
         metrics.draw(at.elapsed());
 
         let at = Lap::start();
         window
-            .update_with_buffer(canvas.pixels(), canvas.width(), canvas.height())
+            .update_with_buffer(&pixels, WINDOW_WIDTH, WINDOW_HEIGHT)
             .map_err(DemoError::Window)?;
         metrics.show(at.elapsed());
     }

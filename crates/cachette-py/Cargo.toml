@@ -22,6 +22,10 @@ cachette-core = { path = "../cachette-core", version = "0.0.0" }
 # binary.
 pyo3 = { workspace = true, features = ["abi3-py311"] }
 numpy = "0.29.0"
+# ADR-0094 D4: the render core carries no window library and no display
+# connection. This crate takes the drawing without the demonstration window,
+# so a wheel built from it runs on a machine that has no display.
+cachette-view = { path = "../cachette-view", version = "0.0.0", default-features = false }
 
 [lints]
 workspace = true

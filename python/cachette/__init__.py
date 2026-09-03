@@ -24,9 +24,11 @@ the loop, decision D5.
 
 from cachette._core import (
     CachetteError,
+    Camera,
     ConfigError,
     DeterminismError,
     EnginePanic,
+    FrameError,
     SelectorError,
     StepError,
     VerbError,
@@ -37,9 +39,11 @@ from cachette._core import (
 
 __all__ = [
     "CachetteError",
+    "Camera",
     "ConfigError",
     "DeterminismError",
     "EnginePanic",
+    "FrameError",
     "SelectorError",
     "StepError",
     "VerbError",
