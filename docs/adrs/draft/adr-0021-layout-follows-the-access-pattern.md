@@ -122,13 +122,18 @@ they pay more cache lines than a row layout would. The column passes are the
 majority of the work and they pay less. Nothing here claims the trade is
 optimal at the target scale, because nothing has been measured there.
 
-**A subtree of the father forest is contiguous in the Euler order and not in
-the columns.** The research describes a cadet split as a contiguous range
-write.[^13] It is contiguous in the order array. The writes into the house
-column are gathered, because the record stores its rows in birth order. This is the same error this record forbids, in miniature: the
-word "contiguous" is meaningless until it names which array. Storing the rows
-in Euler order would make the write contiguous and would move every row
-whenever the labels are rebuilt.
+**A subtree of the father forest is contiguous in the Euler order array, and
+not in the house column.** The research describes a cadet split as a
+contiguous range write.[^13] The read is contiguous: the split scans one span
+of the Euler order array. The write is not: it gathers into the house column,
+because the record stores its rows in birth order.
+
+**Name the array, or the word "contiguous" says nothing.** This is the same
+error this record forbids, in miniature. A claim about locality is checkable
+only against one named array, in the same way a claim about layout is
+checkable only against one named structure and one named pass. Storing the
+rows in Euler order would make the write contiguous too, and would move every
+row whenever the labels are rebuilt.
 
 **Nothing in this record fixes where a structure lives.** It states how a
 layout is chosen and what a layout claim must name. A module arrangement is
