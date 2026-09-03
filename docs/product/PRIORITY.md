@@ -36,6 +36,7 @@ A record here is a need, not a plan. The backlog says what work answers it.[^3]
 | 0017 | Work assigned to the people who can do it. |
 | 0008 | A unit changes the ground it stands on. |
 | 0003 | A world worth looking at. The viewer trails the engine badly. |
+| 0020 | A unit goes somewhere it cannot see. Every option the engine has is a gradient, so a place cannot be named and a unit cannot come back from anywhere. It sits below 0008 because gathering and a store both exist and nothing carries between them, so this is the need that connects what the world already holds. |
 
 ## Later
 

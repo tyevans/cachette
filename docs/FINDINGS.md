@@ -5632,6 +5632,7 @@ allocated by a line that cannot see uncommitted work. In each case the registry
 stores a piece of state somewhere that cannot be read atomically by everyone who
 needs it, and in each case nothing fails until two readers disagree.
 
+<<<<<<< HEAD
 ### FND-226 — The demonstration feeds every unit, so it never forages
 
 **Believed.** The engine now steers a step by the option a unit chose, and it
@@ -5728,6 +5729,148 @@ wrote that column from outside is now a fixture about precedence.** Search for
 the callers of the setter, not only for the readers of the column. A fixture
 that sets a value and then runs a frame is the shape that breaks, and it breaks
 quietly: the value is read back correctly and it is the wrong value.
+=======
+### FND-250 — A behavioural strategy is one constraint, not three
+
+**Believed.** A behavioural strategy decomposes into three parts that each need
+a record: a trigger, which is a condition on unit state; a field to follow,
+never a per-unit search; and an action on arrival, which is what happens when
+the field runs out.
+
+**True.** Only the middle part states a constraint this project does not
+already hold. The other two fail the scope test for different reasons, and one
+of them also misdescribes the engine.
+
+**Evidence, part one: the trigger is already recorded, and it is not a condition
+on unit state.** A unit takes an option by scoring a fixed set and taking the
+highest, and an accepted record governs that.[^F250A] The score is the unit's
+drive multiplied by a weight and then by the value the option reads from the
+level 1 cell.[^F250B] It reads unit state **and** world state, so a trigger
+described as a condition on unit state describes something the engine does not
+do. A record stating it would be a second declaration of the choice pass and a
+wrong one.
+
+**Evidence, part two: arrival is partly answered and partly unbuilt.** A unit
+holds its intent until it chooses again, and a cell that no neighbour beats
+strictly holds no exit direction, so a unit there keeps the behaviour it already
+had.[^F190C] That is what happens when a field runs out, and a draft record
+already says it. What is left is what a unit does at a destination, and the
+engine has no destination, no field and no concept of arrival, so nothing has
+chosen anything. That is the shape that retired the first number this project
+ever retired.[^F192A]
+
+**Follows.** **A three-part framing of a mechanism is not three claims.** The
+parts of a mechanism are how a builder thinks about it. A record binds a choice
+somebody could get wrong, and the three parts here have three different
+statuses: one settled, one open, one not yet a question.
+
+**The test that separated them is the ordinary one.** Ask of each part whether
+a contributor could reasonably choose otherwise, whether choosing otherwise
+costs more than changing it later, and whether the reasoning is invisible in the
+artefact.[^16] The trigger fails the first, because the choice is made and
+recorded. The arrival fails the first in the other direction, because nothing
+has been chosen at all.
+
+**A plausible decomposition is the most expensive kind of wrong framing**,
+because each part sounds like it needs a record and the reviewer's instinct is
+to write three. The evidence that separates them is in the source and in the
+registry, not in the framing.
+
+### FND-251 — There are no unit types, and one weight profile serves every unit alive
+
+**Believed.** A unit type is an index into a shared table, and types
+parameterise the verbs rather than multiplying them. This is one of the four
+design principles the project orientation states.
+
+**True.** No unit type exists. The soldier arena carries no type index and no
+weight column, and the engine holds exactly one weight profile, as a single
+field on the world, built with every option weighted equally.[^F251A]
+
+So every unit alive scores the options identically. **Two units standing in one
+cell with the same need always make the same choice**, and no mechanism can
+make them differ, because there is nothing to differ by.
+
+**Evidence.** The world holds one `WeightProfile` field, initialised to the even
+profile, and the explanation path passes that one profile for every unit it
+explains. A search of the soldier arena for a weight or a profile returns
+nothing.
+
+The option set compounds it. There are four options and every one of them reads
+a level 1 summary field, so a unit's behaviour is a function of its need, its
+cell, and nothing else. One of the five summary fields the option set can read
+is read by no option, and the field that the `roam` option reads is derived from
+terrain and never changes.[^F251B]
+
+**Follows.** **A principle with no instance is a principle nobody has tested.**
+The orientation states that types parameterise the verbs and that a type is an
+index into a shared table. Nothing in the engine is a type in that sense, so the
+principle has never had to hold, and the first thing that needs it will discover
+what it costs.
+
+**This is a different gap from the one about destinations, and it must not be
+folded into it.** A field over cells lets a unit go somewhere. It does not let
+two units want different things, and a record about fields does not touch this.
+The product record that states the destination need says so in its own scope.
+
+**Nothing is wrong today.** One profile is the correct amount of machinery for a
+world with one kind of unit. The finding records what is true so that the next
+person who reads the principle does not assume an implementation behind it,
+which is the mistake this register keeps recording.[^65]
+
+### FND-252 — The unit passes obey the rule about disjoint writes and still do not scale
+
+**Believed.** A parallel pass that does not scale is contending. The accepted
+record on parallel stages forbids two threads writing to one place and requires
+the partition to come from the data, so a pass that scales badly must be
+breaking it.[^F252A] [^F252B]
+
+**True.** The unit passes keep that record completely, and they scale badly for
+reasons the record does not govern. **Obeying it is necessary and it is not
+sufficient.**
+
+**Evidence, in the source rather than in a profile.** The choice pass gives each
+thread a contiguous chunk of the live units and one output slot of its own, and
+it joins the slots in index order.[^F252C] That is the required shape, and
+nothing in it contends.
+
+Three things cost it anyway.
+
+It collects every live unit into one list before any thread starts. That is
+serial and it grows with the population.
+
+It applies the results afterwards by walking the collected list and writing an
+intent for each entry. That is serial too, and it also grows with the
+population.
+
+Inside the parallel part, each unit reads its tile, converts the tile to a cell,
+reads that cell's summary and reads its own need from a column. The arena is in
+spawn order and never compacts, so consecutive units in a chunk touch scattered
+tiles, scattered cells and scattered needs. The choice record already states
+that condition and declines to claim the locality as a property of the
+engine.[^F252D]
+
+**Follows.** **The axis is the thing, and the record about writes does not
+choose the axis.** Partitioning by unit index satisfies every requirement of the
+parallel-stage record and destroys locality in the same move. Partitioning by
+cell satisfies the same requirements and keeps the reads contiguous, and it
+satisfies them as a side effect rather than as a constraint to be met.
+
+**A rule that is necessary invites the reading that it is sufficient.** The
+parallel-stage record is correct, it is well written, and it is about
+correctness under a weak memory model. Nothing in it claims to be about scaling,
+and nothing in it warned that a compliant pass could scale badly. A reviewer
+holding it would have passed the choice pass, because the choice pass passes.
+
+**Two serial phases were hiding in a pass everyone called parallel.** The
+collect and the apply are both O(population) and neither is threaded. A
+description of the pass as parallel is true of its middle and false of its ends,
+and the ends are what a thread count cannot help.
+
+**The general shape.** When a pass does not scale, read what it is indexed by
+before reading what it contends on. Contention is the failure that a rule
+already prevents, so it is the least likely one to be present in a project that
+has the rule.
+>>>>>>> feat-w26
 
 ## References
 
@@ -5957,6 +6100,7 @@ quietly: the value is read back correctly and it is the wrong value.
 [^F218E]: Definition of Done, section 4. `.claude/rules/definition-of-done.md`
 [^F218F]: Findings register, FND-192, in this document.
 [^ALLOC2]: Findings register, FND-219, in this document.
+<<<<<<< HEAD
 
 [^237B]: Decision Record Scope, section 6. `.claude/rules/adr-scope.md`
 [^238A]: The gate recipes. `justfile`
@@ -5968,3 +6112,13 @@ quietly: the value is read back correctly and it is the wrong value.
 [^236D]: ADR-0021, a layout claim names one structure and one pass, and never a tier, decision D1. `docs/adrs/draft/adr-0021-layout-follows-the-access-pattern.md`
 [^37HOME]: Decisions register, DEC-017. `docs/DECISIONS.md`
 [^37NEXT]: Decisions register, DEC-093. `docs/DECISIONS.md`
+=======
+[^F250A]: ADR-0064, a unit chooses by scoring a small fixed option set, decision D1. `docs/adrs/accepted/adr-0064-a-unit-chooses-by-scoring-a-small-fixed-option-set.md`
+[^F250B]: The choice pass. `crates/cachette-core/src/choose.rs`
+[^F251A]: The world, the weight profile field. `crates/cachette-core/src/world.rs`
+[^F251B]: The choice pass, the cell fields and the option set. `crates/cachette-core/src/choose.rs`
+[^F252A]: ADR-0009, parallel stages write disjoint outputs, decision D1. `docs/adrs/accepted/adr-0009-parallel-stages-write-disjoint-outputs.md`
+[^F252B]: ADR-0009, parallel stages write disjoint outputs, decision D3. `docs/adrs/accepted/adr-0009-parallel-stages-write-disjoint-outputs.md`
+[^F252C]: The choice pass of the world. `crates/cachette-core/src/world.rs`
+[^F252D]: ADR-0064, a unit chooses by scoring a small fixed option set, decision D4. `docs/adrs/accepted/adr-0064-a-unit-chooses-by-scoring-a-small-fixed-option-set.md`
+>>>>>>> feat-w26
