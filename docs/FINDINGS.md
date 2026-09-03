@@ -6702,12 +6702,12 @@ first two is cheap; moving the third against a stated sequencing reason is not.
 
 **Believed.** Two things, and both were reasonable. The first is that a need is
 a fixed-point quantity, so two units in one cell almost never share one and a
-key on the exact need reduces nothing.[^F259A] The second is that no fixture in
+key on the exact need reduces nothing.[^F263A] The second is that no fixture in
 this project produces the distribution, because it needs settlements, home sites
-and a running economy and the benchmark world holds none of the three.[^F259B]
+and a running economy and the benchmark world holds none of the three.[^F263B]
 
 **True, with a correction to the first and a replacement for the second.** A
-fixture now exists and the distribution is measured.[^F259C]
+fixture now exists and the distribution is measured.[^F263C]
 
 **The measurement.** A world of 65,536 tiles, 64 level 1 cells, 64 settlements,
 about 4,000 units with a home each, and the economy running on every tick. The
@@ -6766,7 +6766,7 @@ width gives 41 distinct keys against 17 at the peak, and the collapse falls from
 **The decay is a parameter of the need rule, so the two are coupled.** A caller
 who changes the decay and leaves the width alone has unmatched them. That
 coupling is why the width is a parameter of the world and not a constant of a
-module. An open decision closed against this measurement.[^F259D]
+module. An open decision closed against this measurement.[^F263D]
 
 **The width changes where the population ends up, and the fixture showed it by
 accident.** The measurement was taken twice, once at each of two default widths,
@@ -6774,12 +6774,12 @@ because the fixture reads the width the world holds. The median cell held 71
 units at the finer width and 67 at the matched one, at the same frame of the same
 seed. A unit takes its option from its bucket and its step from its option, so a
 different width moves a different population. **No golden file sees any of
-this**, and a separate finding records why.[^F259F]
+this**, and a separate finding records why.[^F263F]
 
 **This is not a cost figure and no blocker governs it.** The simulation is
 deterministic integer arithmetic, so every number above is the same on every
 machine. The register that holds measured cost figures is for the target
-platform, and this belongs in neither that register nor the derived one.[^F259E]
+platform, and this belongs in neither that register nor the derived one.[^F263E]
 
 **What this does not measure.** Whether the matched width dithers a unit's
 behaviour, and what the real placement of homes in a played world looks like.
@@ -6835,7 +6835,7 @@ and every scenario matched its stored file each time. So the gate is blind not
 only to the quantisation but to the parameter that decides how much the
 quantisation does. **That parameter is the mechanism of the decision**, and a
 review of the governing record said so before any of this was measured. A
-register holds the value and the measurement it was chosen against.[^F259D]
+register holds the value and the measurement it was chosen against.[^F263D]
 
 **The remedy is not a new golden scenario.** A scenario built to sit on a bucket
 boundary would pin the boundary rather than the behaviour, and the record says
@@ -7054,16 +7054,12 @@ distinguished the two.
 [^F262B]: ADR-0098, the choice is decided for each cell and each bucket of need, decision D1. `docs/adrs/draft/adr-0098-the-choice-is-decided-for-each-cell-and-each-bucket-of-need.md`
 [^F262D]: Findings register, FND-051 and FND-048, in this document.
 [^F262E]: ADR-0098, the choice is decided for each cell and each bucket of need, the consequences. `docs/adrs/draft/adr-0098-the-choice-is-decided-for-each-cell-and-each-bucket-of-need.md`
-[^F259A]: Review of ADR-0096, correction 1. The review artefact sits on the branch that holds it, so this branch cannot resolve its path and the citation names it instead.
-[^F259B]: Target platform costs, would the choice pass collapse if it decided for each cell. `docs/reference/graviton-costs.md`
-[^F259C]: The need spread measurement. `crates/cachette-core/tests/need_spread.rs`
-[^F259D]: Decisions register, DEC-097. `docs/DECISIONS.md`
-[^F259E]: Budgets and costs, what belongs here. `docs/reference/budgets.md`
-[^F259F]: Findings register, FND-258, in this document.
-[^F258A]: Backlog item 0238, decide per cell and need rather than per unit. `docs/backlog/complete/0238-decide-per-cell-and-need-rather-than-per-unit.md`
-[^F258B]: ADR-0098, the choice is decided for each cell and each bucket of need, decision D1. `docs/adrs/draft/adr-0098-the-choice-is-decided-for-each-cell-and-each-bucket-of-need.md`
-[^F258D]: Findings register, FND-051 and FND-048, in this document.
-[^F258E]: ADR-0098, the choice is decided for each cell and each bucket of need, the consequences. `docs/adrs/draft/adr-0098-the-choice-is-decided-for-each-cell-and-each-bucket-of-need.md`
+[^F263A]: Review of ADR-0096, correction 1. The review artefact sits on the branch that holds it, so this branch cannot resolve its path and the citation names it instead.
+[^F263B]: Target platform costs, would the choice pass collapse if it decided for each cell. `docs/reference/graviton-costs.md`
+[^F263C]: The need spread measurement. `crates/cachette-core/tests/need_spread.rs`
+[^F263D]: Decisions register, DEC-106. `docs/DECISIONS.md`
+[^F263E]: Budgets and costs, what belongs here. `docs/reference/budgets.md`
+[^F263F]: Findings register, FND-262, in this document.
 [^F226A]: Backlog item 0185, steer a step by the option the unit chose. `docs/backlog/complete/0185-steer-a-step-by-the-option-the-unit-chose.md`
 [^F226B]: Backlog item 0186, let the engine order a gather. `docs/backlog/complete/0186-let-the-engine-order-a-gather.md`
 [^F226C]: ADR-0063, a need is a rate with a threshold, and crossing it is a fact, decision D2. `docs/adrs/accepted/adr-0063-a-need-is-a-rate-with-a-threshold-and-crossing-it-is-a-fact.md`

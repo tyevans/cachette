@@ -2443,9 +2443,6 @@ a failed founding is correct.[^PRD12]
 [^D106A]: ADR-0098, the choice is decided for each cell and each bucket of need, decision D1. `docs/adrs/draft/adr-0098-the-choice-is-decided-for-each-cell-and-each-bucket-of-need.md`
 [^D106B]: Budgets and costs, the choice pass. `docs/reference/budgets.md`
 [^D106C]: Target platform costs, would the choice pass collapse if it decided for each cell. `docs/reference/graviton-costs.md`
-[^D106A]: ADR-0098, the choice is decided for each cell and each bucket of need, decision D1. `docs/adrs/draft/adr-0098-the-choice-is-decided-for-each-cell-and-each-bucket-of-need.md`
-[^D106B]: Budgets and costs, the choice pass. `docs/reference/budgets.md`
-[^D106C]: Target platform costs, would the choice pass collapse if it decided for each cell. `docs/reference/graviton-costs.md`
 [^D106E]: Review of ADR-0096, correction 1. The review artefact sits on the branch that holds it, so this branch cannot resolve its path and the citation names it instead.
 [^D097F]: Findings register, FND-259, and the need spread measurement. `crates/cachette-core/tests/need_spread.rs`
 [^D097G]: Findings register, FND-258, in this document.
