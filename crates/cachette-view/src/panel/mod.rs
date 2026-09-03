@@ -243,7 +243,11 @@ pub fn write_against_right(
     } else {
         whole
     };
-    let edge = if cut { right - CUT_MARK_SIZE - 2 } else { right };
+    let edge = if cut {
+        right - CUT_MARK_SIZE - 2
+    } else {
+        right
+    };
     let start = left.max(edge - text::width_of(&shown, 1));
     canvas.write(start, pen, &shown, 1, colour);
     if cut {
