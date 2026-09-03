@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-260**
+**Next number: FND-261**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -6716,6 +6716,44 @@ and it needs no judgement to do it.
 earlier finding named three documents and repaired three. The tree held four,
 and nothing in the writing of that finding could have shown the fourth, because
 the count came from a reader rather than from a search.
+
+### FND-260 — A search for a stale sentence must normalise the wrap, and the first sweep did not
+
+**Believed.** A whole-tree search finds every site of a sentence. The rule that
+governs a sweep says the sweep is done when the search comes back clean, and it
+treats the search as the reliable half of the work.[^F218E]
+
+**True.** A line-based search finds the sites where the sentence fits on one
+line. Prose in this repository wraps at about 78 columns, so a sentence of five
+words or more is usually split, and a pattern that spans the break matches
+nothing. The search comes back clean and the sites are still there.
+
+**Evidence.** The sweep for the blocker about the missing measurement ran a
+line-based search, reported clean, and left sites in four decision records. A
+second search that joined each paragraph into one line before matching found
+them, and it found more sites again in the accepted records. Both commands are
+in the commit body.
+
+The same second search found the phrase with no blocker number anywhere near it,
+in the rule files, in the project orientation and in the header of the script
+that took the measurement.
+
+**Follows.** Three things.
+
+**Normalise the text before matching, not the pattern.** Joining a paragraph
+into one line and collapsing the runs of space is one line of code, and it makes
+an ordinary pattern work. Writing a pattern that tolerates a newline at every
+word boundary does not scale past three words.
+
+**Search for the claim, and never only for the number.** A document that names a
+register is easy to find and is not the hard case. The hard case is a document
+that states the register's content and cites nothing, because the search that
+starts from the register's number cannot reach it.
+
+**A sweep is not evidence until it has found something the previous pass
+missed.** The first pass here reported clean against its own search. That report
+was true about the search and false about the tree, and nothing in the result
+distinguished the two.
 
 ## References
 

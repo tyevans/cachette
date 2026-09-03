@@ -109,10 +109,10 @@ split guarantees.[^2]
 Any such feature supersedes this record and ADR-0041 together, and it gives up
 the property in D3.
 
-**Nothing measures the cost of a release on the target platform.** No
-measurement exists there, and every cost figure in this project is
-derived.[^6] The argument above is about how many times the boundary is
-crossed, not about what a crossing costs.
+**Nothing measures the cost of a release on the target platform.** One blocker
+holds every cost figure this record would state, and it says which figures a
+run has measured.[^6] The argument above is about how many times the boundary
+is crossed, not about what a crossing costs.
 
 ## References
 

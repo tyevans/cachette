@@ -39,6 +39,9 @@ item is the same case, at a larger count, and it waits on that row.[^3]
    command in a commit body, and the finding holds the phrase family.[^4]
 5. Repair the doc comments in the engine in the same change. They are call
    sites, and the sweep left them alone because they were out of its scope.
+6. Repair the header of the provisioning script, which still says that no
+   measurement exists on the target platform. That script is the one that took
+   the measurement.
 
 ## What is missing before this is refined
 
@@ -46,6 +49,9 @@ item is the same case, at a larger count, and it waits on that row.[^3]
   survives the other answer.
 - **Whether a source comment is covered by the freeze at all.** A doc comment is
   not a record. It probably repairs freely, and nobody has said so.
+- **Who repairs the rule files and the project orientation.** Both carry the
+  sentence with no blocker number near it, and both belong to the project owner.
+  This item cannot touch either.
 - **Whether the check in item 0242 lands first.** If it does, this item's
   outcome is a baseline that shrinks rather than a sweep, and the two should be
   sequenced.[^5]

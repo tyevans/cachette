@@ -141,10 +141,9 @@ same shape and neither is in the closed row that this record implements. An
 open row states the question they raise, and the character arena raises a
 second one, because its ceiling is larger than its target.[^13]
 
-**A reader cannot tell from this record what the reservation costs.** No
-measurement exists on the target platform, and every cost figure in this
-project is derived, so this record states the shape of the cost and no
-figure.[^7]
+**A reader cannot tell from this record what the reservation costs.** One
+blocker holds every cost figure this record would state, so the record gives
+the shape of the cost and no figure.[^7]
 
 ## References
 
