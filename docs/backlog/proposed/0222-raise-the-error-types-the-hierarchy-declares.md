@@ -13,9 +13,11 @@ blocked-by: []
 ## Why
 
 **The bindings declare exception types that nothing raises.** The error
-hierarchy holds a root and seven leaves. Four leaves have a raise site. Three
+hierarchy holds a root and eight leaves. Five leaves have a raise site. Three
 do not: a selector error, a determinism error, and a panic that reached the
-boundary.
+boundary. This item said seven and four when it was written, and an audit on
+3 September 2026 counted eight and five. **Derive the counts from the tree
+when you refine this**, because the leaf count grows and nothing restates it.
 
 A caller reading the exported names concludes that the engine reports a
 determinism defect and converts a panic. It does neither. Nothing installs a
