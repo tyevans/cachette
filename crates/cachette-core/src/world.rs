@@ -3926,6 +3926,12 @@ impl World {
             self.terrain,
             threads,
         )?;
+        // The resize opens the positions and seats nobody. This fills them,
+        // and it runs on the same schedule because a seat cannot be taken
+        // before it is opened.[^1]
+        //
+        // [^1]: ADR-0099, a site fills its positions by one sort and one scan, decision D2. `docs/adrs/draft/adr-0099-a-site-fills-its-positions-by-one-sort-and-one-scan.md`
+        position::assign(&mut self.positions, &self.soldiers, threads)?;
         Ok(())
     }
 

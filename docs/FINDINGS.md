@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-270**
+**Next number: FND-271**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -6632,6 +6632,53 @@ has been chosen at all.
 because each part sounds like it needs a record and the reviewer's instinct is
 to write three. The evidence that separates them is in the source and in the
 registry, not in the framing.
+
+### FND-270 — Slot order and identity order agree in an ordinary fixture, so a test cannot tell them apart
+
+**Believed.** A test that asserts which unit took the first position proves
+that the assignment follows the identity of the unit rather than the order the
+units were read in. The two are different rules, so a test that names one of
+them distinguishes them.
+
+**True only when the fixture separates the two orders, and an ordinary fixture
+does not.** A unit spawned earlier holds both a lower slot and a lower
+identity, because an identity is a slot index with a generation above it and a
+fresh arena hands out slots in ascending order. In such a fixture the two rules
+give exactly the same answer.
+
+**The evidence.** The assignment pass sorts its applicants by a key vector
+whose last field is the whole identity. The first version of the test spawned
+four units in order and asserted that the positions went to them in identity
+order. **The sort was then replaced with the identity permutation, so the pass
+seated in the order it read the units, and all eight tests passed.** The test
+that existed to name the order could not see the difference.
+
+**The repair is in the fixture and not in the assertion.** A slot that is freed
+and filled again carries a higher generation, so the unit in the lowest slot
+holds the highest identity. The fixture now spawns two units, despawns the
+first, and spawns a third into the freed slot. Read order then names the third
+unit first and identity order names the second, and the same mutation fails the
+test.
+
+**Follows.** Three things.
+
+**This is the fixture shape the register already holds, in a new place.**
+FND-051 and FND-048 in this register record a fixture that modelled the typical
+case and so never supplied the extreme. This one is narrower and worth naming on its own: **any test
+about entity order needs a fixture in which a slot has been reused**, because
+generation is the only thing that separates slot order from identity order.
+
+**A test about an order must be mutated, not read.** Nothing in the test looked
+wrong. It named the right rule, asserted the right sequence, and was green for
+the right-looking reason. Only putting the defect back showed that it was
+measuring the fixture.[^23]
+
+**The other three mutations were caught.** Removing the pass from the step
+failed seven of eight tests, storing a bare slot index instead of an identity
+failed the reuse test, and seating an already seated unit failed two. The suite
+was sound apart from this one case, which is why the case is worth recording
+rather than the suite.
+
 
 ### FND-269 — Three completed subsystems produce nothing at all in the demonstration world
 
