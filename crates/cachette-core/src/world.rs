@@ -45,6 +45,7 @@ use crate::holding::{FactionMask, Holder, Holding};
 use crate::household;
 use crate::influence::{Influence, InfluenceError, InfluenceField};
 use crate::position::{self, Position, PositionError, PositionTable, SitePreference};
+use crate::promotion::{self, PromotionError, UnitPromoted};
 use crate::pyramid::{CellSummary, ExitField, Pyramid};
 use crate::rates::{RateError, RateLedger, RateSchedule, RateTable, SiteShortfall};
 use crate::resource::{
@@ -144,6 +145,17 @@ pub enum StepError {
     Influence(InfluenceError),
     /// A pass over the positions of the sites refused to run.
     Positions(PositionError),
+    /// The promotion pass refused to run.
+    Promotion(PromotionError),
+}
+
+impl From<PromotionError> for StepError {
+    fn from(error: PromotionError) -> Self {
+        match error {
+            PromotionError::ZeroThreads => Self::ZeroThreads,
+            other => Self::Promotion(other),
+        }
+    }
 }
 
 impl From<PositionError> for StepError {
@@ -276,6 +288,9 @@ impl core::fmt::Display for StepError {
             }
             Self::Positions(error) => {
                 write!(formatter, "the position pass refused: {error}")
+            }
+            Self::Promotion(error) => {
+                write!(formatter, "the promotion pass refused: {error}")
             }
         }
     }
@@ -482,6 +497,42 @@ pub struct World {
     death_plane: DeathPlane,
     /// The units that a shortage ended at the last scan, in slot order.
     starved_log: Vec<UnitStarved>,
+    /// The promotions of the last frame that ran the pass.
+    ///
+    /// The log is cleared at the start of each pass, in the way every other
+    /// per-frame log is, so a reader sees the promotions of one frame and
+    /// never an accumulation.
+    promoted_log: Vec<UnitPromoted>,
+    /// The schedule that the promotion pass runs on.
+    ///
+    /// **The scan runs at a barrier of its own and not on every tick.** A
+    /// pass over every unit on every frame spends the frame for an answer
+    /// that changes rarely, and the eligibility of a unit is a level that
+    /// only rises.[^1]
+    ///
+    /// The interval is a parameter of the world, so a caller changes how
+    /// often the world looks for somebody to promote without touching the
+    /// engine.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0104, a soldier is promoted from a level that never falls, decisions D2 and D5. `docs/adrs/draft/adr-0104-a-soldier-is-promoted-from-a-level-that-never-falls.md`
+    character_schedule: RateSchedule,
+    /// The most characters that one promotion pass may create.
+    ///
+    /// **This is the cut at the rank, and it is not the ceiling.** The
+    /// character arena is built at the ceiling of its declared tier and
+    /// refuses a create beyond it, so the population bound has one
+    /// enforcement site whatever this says.[^1] This says how fast the world
+    /// is willing to approach it.
+    ///
+    /// The default admits as many as the arena has room for, so a caller who
+    /// sets nothing gets the ceiling and no second bound.
+    ///
+    /// # References
+    ///
+    /// [^1]: Blockers register, BLK-004. `docs/BLOCKERS.md`
+    promotion_budget: u32,
     /// When each unit re-reads the world and chooses again.
     choice: ChoiceSchedule,
     /// How finely the choice tells two needs apart.
@@ -612,6 +663,9 @@ impl World {
             rationed_log: Vec::new(),
             death_plane: DeathPlane::new(),
             starved_log: Vec::new(),
+            promoted_log: Vec::new(),
+            character_schedule: RateSchedule::DEFAULT,
+            promotion_budget: u32::MAX,
             choice: ChoiceSchedule::DEFAULT,
             buckets: NeedBuckets::DEFAULT,
             weights: WeightProfile::EVEN,
@@ -1477,6 +1531,96 @@ impl World {
         self.soldiers
             .deficit(entity)
             .map(|deficit| self.need_rule.condition(deficit))
+    }
+
+    /// Returns the promotions of the last frame that ran the pass.
+    ///
+    /// The slice holds one row for each unit the pass promoted. It is empty
+    /// on a frame the schedule does not name, and empty on a frame that
+    /// promoted nobody. A reader cannot tell the two apart from the slice,
+    /// and nothing needs to.
+    #[must_use]
+    pub fn promoted_log(&self) -> &[UnitPromoted] {
+        &self.promoted_log
+    }
+
+    /// Returns the promotion log as bytes, for a caller across the boundary.
+    ///
+    /// The event is plain data with declared padding, so the bytes are the
+    /// same on every run.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0006, an event is plain data and applying it is pure, decision D1. `docs/adrs/accepted/adr-0006-an-event-is-plain-data-and-applying-it-is-pure.md`
+    #[must_use]
+    pub fn promoted_log_bytes(&self) -> &[u8] {
+        bytemuck::cast_slice(&self.promoted_log)
+    }
+
+    /// Returns the character that a unit was promoted into.
+    ///
+    /// The outer option reports whether the unit is live. The inner one
+    /// reports whether the unit carries a character. The answer names a
+    /// living character, because a character that the arena no longer holds
+    /// resolves to nothing.
+    #[must_use]
+    pub fn unit_character(&self, unit: Entity) -> Option<Option<Entity>> {
+        let named = self.soldiers.character_of(unit)?;
+        Some(named.filter(|character| self.characters.contains(*character)))
+    }
+
+    /// Returns what a unit has ever gathered, summed over every kind.
+    ///
+    /// Returns `None` when the identity is dead. The value never falls while
+    /// the unit lives.
+    #[must_use]
+    pub fn unit_deeds(&self, unit: Entity) -> Option<u64> {
+        self.soldiers.deeds(unit)
+    }
+
+    /// Returns the deeds at which a unit becomes eligible for promotion.
+    #[must_use]
+    pub fn deed_threshold(&self) -> u64 {
+        self.soldiers.deed_threshold()
+    }
+
+    /// Sets the deeds at which a unit becomes eligible for promotion.
+    ///
+    /// The threshold is a content parameter and not a budget. A caller raises
+    /// it to make a person rarer and lowers it to make one common.
+    pub fn set_deed_threshold(&mut self, threshold: u64) {
+        self.soldiers.set_deed_threshold(threshold);
+    }
+
+    /// Returns the most characters that one promotion pass may create.
+    #[must_use]
+    pub const fn promotion_budget(&self) -> u32 {
+        self.promotion_budget
+    }
+
+    /// Sets the most characters that one promotion pass may create.
+    ///
+    /// A budget of zero promotes nobody. The arena ceiling still binds above
+    /// this, so a budget larger than the headroom takes the headroom.
+    pub const fn set_promotion_budget(&mut self, budget: u32) {
+        self.promotion_budget = budget;
+    }
+
+    /// Returns the schedule that the promotion pass runs on.
+    #[must_use]
+    pub const fn character_schedule(&self) -> RateSchedule {
+        self.character_schedule
+    }
+
+    /// Sets the schedule that the promotion pass runs on.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the period is zero or above the range.
+    pub fn set_character_schedule(&mut self, period: u32, phase: u32) -> Result<(), RateError> {
+        self.character_schedule =
+            RateSchedule::new(period, phase).ok_or(RateError::PeriodOutsideRange(period))?;
+        Ok(())
     }
 
     /// Returns the units that a shortage ended at the last scan, in slot
@@ -2349,7 +2493,14 @@ impl World {
             .positions
             .hash_into(hash)
             .write_u64(u64::from(self.position_schedule.period()))
-            .write_u64(u64::from(self.position_schedule.phase()));
+            .write_u64(u64::from(self.position_schedule.phase()))
+            // The promotion schedule decides which frames promote, so two
+            // worlds that differ in it diverge and the hash must say so. The
+            // deed threshold and the columns it governs are folded by the
+            // unit arena, which holds them.
+            .write_u64(u64::from(self.character_schedule.period()))
+            .write_u64(u64::from(self.character_schedule.phase()))
+            .write_u64(u64::from(self.promotion_budget));
         let mut hash = self.draw_ledger.hash_into(hash);
         for total in &self.store_account {
             hash = hash.write_u64(total.0 as u64);
@@ -2492,6 +2643,22 @@ impl World {
             .any(|faction| faction.0 >= ceiling)
         {
             return false;
+        }
+        // A unit that names a character must name one the arena still holds.
+        // A link to a removed character is the stale identity that the
+        // generation exists to catch.[^1]
+        //
+        // [^1]: ADR-0014, entity identity is an index plus a generation, decision D2. `docs/adrs/accepted/adr-0014-entity-identity-is-an-index-plus-a-generation.md`
+        for (slot, bits) in self.soldiers.character_column().iter().enumerate() {
+            let Some(character) = Entity::from_bits(*bits) else {
+                continue;
+            };
+            if self.soldiers.live_column()[slot] != 1 {
+                return false;
+            }
+            if !self.characters.contains(character) {
+                return false;
+            }
         }
         if !self.characters.check_invariants() {
             return false;
@@ -3229,6 +3396,17 @@ impl World {
         {
             let _span = stage::open(Stage::SettlePositions);
             self.settle_positions(threads)?;
+        }
+
+        // The promotion scan runs after the deaths of this frame, so it never
+        // promotes a unit that the shortage ended in the same frame. It reads
+        // no derived structure and changes none, so it needs no barrier of
+        // its own.[^18]
+        //
+        // [^18]: ADR-0104, a soldier is promoted from a level that never falls, decision D5. `docs/adrs/draft/adr-0104-a-soldier-is-promoted-from-a-level-that-never-falls.md`
+        {
+            let _span = stage::open(Stage::Promote);
+            self.promote(threads)?;
         }
 
         // Level 1 rebuilds after the structure it reads, and after every
@@ -4000,6 +4178,34 @@ impl World {
         //
         // [^1]: ADR-0099, a site fills its positions by one sort and one scan, decision D2. `docs/adrs/draft/adr-0099-a-site-fills-its-positions-by-one-sort-and-one-scan.md`
         position::assign(&mut self.positions, &self.soldiers, threads)?;
+        Ok(())
+    }
+
+    /// Promotes the units that earned it, on the character schedule.
+    ///
+    /// The budget is the headroom of the character arena: the ceiling of the
+    /// declared tier less the characters alive now. The arena refuses a
+    /// create beyond its capacity whatever this says, so the ceiling has one
+    /// enforcement site and this is the cut at the rank.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0104, a soldier is promoted from a level that never falls, decision D4. `docs/adrs/draft/adr-0104-a-soldier-is-promoted-from-a-level-that-never-falls.md`
+    fn promote(&mut self, threads: usize) -> Result<(), StepError> {
+        self.promoted_log.clear();
+        if !self.character_schedule.due(self.tick) {
+            return Ok(());
+        }
+        let headroom = CharacterArena::ceiling().saturating_sub(self.characters.len());
+        let budget = self.promotion_budget.min(headroom);
+        self.promoted_log = promotion::promote(
+            &mut self.soldiers,
+            &mut self.characters,
+            self.config.seed,
+            self.tick,
+            budget,
+            threads,
+        )?;
         Ok(())
     }
 

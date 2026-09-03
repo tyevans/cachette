@@ -32,6 +32,26 @@ The golden state test is one of the two tests the project cannot lose.[^1] A
 scenario set that misses a whole pass is the same weakness that item 0179
 records for the build pass, seen in a second subsystem.[^2]
 
+## The same gap was found and closed for the promotion pass
+
+The promotion work met this exactly. All eight golden files moved when it
+landed, and none of the eight promoted anybody: the files moved because new
+unit columns entered the state hash, which happens whatever the pass does.
+FND-293 records it.[^4]
+
+**The repair there was three lines in the scenario, and it is the shape this
+item should copy.** The gathering scenario already states its own recovery
+periods, on the stated ground that a period is a parameter of the kind and the
+engine holds no test value. It now states its own promotion threshold in the
+same place, at a value that world reaches, and asserts that it produced a
+character. Two mutations confirm the file guards the behaviour.
+
+That answers one of the two questions below for this item as well: **the
+scenario states the parameter, rather than the engine changing its default.**
+What it does not answer is which scenario should carry the positions, because
+the gathering scenario founds no site and the settled scenario spawns units
+that name no home.
+
 ## What is missing before this is refined
 
 - The impact review.
@@ -60,3 +80,4 @@ Filled in when the item moves to `complete/`.
 [^1]: ADR-0001, one binary gives one answer at any thread count, decision D4. `docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
 [^2]: Backlog item 0179, give a golden scenario a build. `docs/backlog/proposed/0179-give-a-golden-scenario-a-build.md`
 [^3]: Development budgets, the gate suite budget. `docs/reference/development-budgets.md`
+[^4]: Findings register, FND-293. `docs/FINDINGS.md`

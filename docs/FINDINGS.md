@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-293**
+**Next number: FND-294**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -31,6 +31,54 @@ collisions in one session came from the gap between the two, and a finding holds
 the case.[^ALLOC2]
 
 ## A. Corrections to stated rules
+
+### FND-293 — No golden scenario reached a promotion, and the files still moved
+
+**Believed.** A golden file that moves when a subsystem lands is evidence that
+the golden set covers the subsystem. The state hash is exact and
+order-sensitive, so a file that moved saw the change.
+
+**True that it moved, and false that it covered anything.** All eight golden
+files moved when the promotion work landed. **None of the eight promoted
+anybody.** The files moved because three new unit columns and two new schedules
+enter the state hash, which happens whatever the pass does. A change to the
+promotion rule itself would have moved nothing.
+
+**The evidence.** The gathering scenario is the only one that gathers, and
+gathering is what the promotion reads. A temporary assertion that it produced a
+character failed. A second probe printed the reason: the best unit in that
+scenario gathers 5 over the frames it runs, against a default threshold of 24.
+Every other scenario gathers nothing at all, so no unit in the golden set has
+ever had a deed to its name.
+
+**The repair was in the scenario, not in the engine.** The gathering scenario
+already states its own recovery periods, on the stated ground that a period is
+a parameter of the kind and the engine holds no test value. The threshold is
+the same kind of parameter, so the scenario now states it too, at a value this
+world reaches. Two mutations confirm the file now guards the behaviour: ranking
+the candidates by identity instead of by deeds moves the file, and promoting
+nobody trips the assertion.
+
+**Follows.** Three things.
+
+**A golden file that moved is not evidence that a golden file covers.** A
+change that widens the hashed state moves every file, and it looks exactly like
+a change that altered behaviour. The question to ask is not whether the file
+moved but whether the scenario reaches the pass, and the answer to that is an
+assertion in the fixture rather than a diff.
+
+**Assert the case in the scenario, in the same place the parameters are set.**
+The gathering scenario already carried two such assertions, for a stored take
+and for a recovery, each written after a fixture covered half a rule while
+looking complete. This is the third of the same kind, and the pattern is worth
+following rather than rediscovering.
+
+**The same gap is open for the positions and nothing has closed it.** Item 0279
+records that no golden scenario reaches the position pass. The promotion case
+was found and repaired in the same round; the position case still stands, and
+the two together say that a new pass should be assumed uncovered until a
+scenario asserts otherwise.
+
 
 ### FND-001 — A monoid needs EXACT associativity
 

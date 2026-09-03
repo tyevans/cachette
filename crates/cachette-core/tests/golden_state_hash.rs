@@ -252,6 +252,15 @@ fn gather(world: &mut World) {
     world.set_recovery_rules(
         RecoveryRules::from_ticks([Some(5), Some(7), None]).expect("no period is zero"),
     );
+    // The promotion threshold is a parameter of the kind in the same way the
+    // recovery periods are, so the scenario states it and the engine holds no
+    // test value. **The default is far above what this world reaches**: the
+    // best unit here gathers 5 over the frames of the scenario, against a
+    // default of 24, so a scenario that took the default would record a file
+    // that no promotion ever moves.[^2]
+    //
+    // [^2]: Testing rules, section 2a. `.claude/rules/testing.md`
+    world.set_deed_threshold(4);
     let grid = world.grid();
     let open: Vec<Axial> = (0..grid.tile_count())
         .map(|index| Axial::new((index % grid.width()) as i32, (index / grid.width()) as i32))
@@ -486,6 +495,14 @@ fn hash_sequence(config: WorldConfig, population: Population, frames: u64) -> St
                 .iter()
                 .any(|kind| world.depletion().returned(*kind).0 > 0),
             "the gathering scenario recovered nothing"
+        );
+        // A promotion reads what a unit gathered, so this is the one
+        // scenario that can reach it. A file recorded from a run that
+        // promoted nobody would move for every reason except the one this
+        // asserts.[^1]
+        assert!(
+            !world.characters().is_empty(),
+            "the gathering scenario promoted nobody"
         );
     }
     lines
