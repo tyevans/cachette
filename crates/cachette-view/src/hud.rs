@@ -46,6 +46,28 @@ use crate::text;
 /// The gap between the window edge and the panel, in pixels.
 const MARGIN: i32 = 14;
 
+/// What a cost row says when no measurement was taken.
+///
+/// A cost is a measurement, and a measurement that nobody took is absent. The
+/// record forbids the window from estimating a number it does not have, and a
+/// mean over no measurement is an estimate of the worst kind, because it looks
+/// like a reading of zero.[^1]
+///
+/// # References
+///
+/// [^1]: ADR-0070, the head-up display reports what the drawing pass read, decision D2. `docs/adrs/accepted/adr-0070-the-head-up-display-reports-what-the-drawing-pass-read.md`
+pub(crate) const NOT_MEASURED: &str = "not measured yet";
+
+/// Returns a mean and a worst in microseconds, or the words that say neither
+/// was taken.
+fn pair_of_micros(mean: f64, worst: f64, count: u64) -> String {
+    if count == 0 {
+        NOT_MEASURED.to_string()
+    } else {
+        format!("{mean:.0} / {worst:.0} us")
+    }
+}
+
 /// The width of the panel, in pixels.
 const PANEL_WIDTH: i32 = 268;
 
@@ -529,6 +551,8 @@ pub struct Readout {
     step_worst: f64,
     draw_mean: f64,
     draw_worst: f64,
+    steps_measured: u64,
+    frames_measured: u64,
     rate: f64,
     busy: f64,
 }
@@ -645,6 +669,12 @@ impl Readout {
             step_worst: metrics.step_worst_micros(),
             draw_mean: metrics.draw_mean_micros(),
             draw_worst: metrics.draw_worst_micros(),
+            // The counts travel with the means, because a mean over no
+            // measurement is not a small number. It is an absent one.[^6]
+            //
+            // [^6]: ADR-0070, the head-up display reports what the drawing pass read, decision D2. `docs/adrs/accepted/adr-0070-the-head-up-display-reports-what-the-drawing-pass-read.md`
+            steps_measured: metrics.ticks(),
+            frames_measured: metrics.frames(),
             rate: metrics.ticks_each_second(),
             busy: metrics.busy_percent(),
         }
@@ -884,6 +914,46 @@ impl Readout {
         self.rate
     }
 
+    /// Returns the number of steps the mean step cost was taken over.
+    #[must_use]
+    pub const fn steps_measured(&self) -> u64 {
+        self.steps_measured
+    }
+
+    /// Returns the number of drawings the mean drawing cost was taken over.
+    ///
+    /// **A drawing cannot measure itself.** The cost of one frame is recorded
+    /// after that frame has been drawn, so the cost the window states is the
+    /// mean of the frames before it. The first frame of a run has no frame
+    /// before it, and a picture written by one call to the drawing has none
+    /// either. In both cases this returns zero, and the caller states that the
+    /// number is absent rather than printing a mean over nothing.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0070, the head-up display reports what the drawing pass read, decision D2. `docs/adrs/accepted/adr-0070-the-head-up-display-reports-what-the-drawing-pass-read.md`
+    #[must_use]
+    pub const fn frames_measured(&self) -> u64 {
+        self.frames_measured
+    }
+
+    /// Returns a cost in microseconds, or the words that say it was not taken.
+    ///
+    /// A count of zero means no measurement exists. Printing `0.0 ms` for that
+    /// case states a measurement that nobody took.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: Definition of Done, report the work honestly. `.claude/rules/definition-of-done.md`
+    #[must_use]
+    pub fn cost_in_millis(micros: f64, count: u64) -> String {
+        if count == 0 {
+            NOT_MEASURED.to_string()
+        } else {
+            format!("{:.1} ms", micros / 1000.0)
+        }
+    }
+
     /// Returns the tiles the window shows, across and down.
     #[must_use]
     pub const fn extent_shown(&self) -> (u32, u32) {
@@ -1103,13 +1173,20 @@ impl Readout {
             Line::Heading("COST ON THIS MACHINE"),
             Line::Row(
                 "step",
-                format!("{:.0} / {:.0} us", self.step_mean, self.step_worst),
+                pair_of_micros(self.step_mean, self.step_worst, self.steps_measured),
             ),
             Line::Row(
                 "draw",
-                format!("{:.0} / {:.0} us", self.draw_mean, self.draw_worst),
+                pair_of_micros(self.draw_mean, self.draw_worst, self.frames_measured),
             ),
-            Line::Row("rate", format!("{:.1} a second", self.rate)),
+            Line::Row(
+                "rate",
+                if self.steps_measured == 0 {
+                    NOT_MEASURED.to_string()
+                } else {
+                    format!("{:.1} a second", self.rate)
+                },
+            ),
             Line::Row("busy", format!("{:.0} in 100", self.busy)),
             // Two rows, not one. A single row that named both counts did not
             // fit the value column at every zoom, and the clip that kept it

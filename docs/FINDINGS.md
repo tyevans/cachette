@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-207**
+**Next number: FND-209**
 
 ## A. Corrections to stated rules
 
@@ -4616,6 +4616,108 @@ that ordering was correct at the time it was chosen.
 the record, because a person reads an image and an agent does not. The two
 paths answer different readers, and the tool did not replace the picture.
 
+### FND-207 — The grid a watcher saw is the gap between the tiles, and the gap was neither whole nor bounded
+
+**Believed.** The window draws a black border around each tile, and the lattice
+that emerged at some zooms and not others was a defect of that border. The
+holding border was the suspect, because it is the only border the drawing
+names.
+
+**True.** The drawing draws no black line at all. It fills a square smaller
+than the tile and leaves the space around it, and that space shows the colour
+of the ground outside the world. What a watcher reads as a grid is the space
+the drawing does not fill. The holding border is a separate layer, in the
+colour of a faction, and it is not involved.
+
+The gap had two defects, and they answer two different halves of the report.
+
+**The lattice.** The drawing took one integer square width from the tile width
+and placed it at the rounded centre of each tile. A tile is a fractional number
+of pixels wide at nearly every zoom, because each zoom step multiplies the size
+by a fraction. The rounded centres therefore advanced by a whole pixel more
+under some tiles than under others, while the square stayed one width, so the
+gap was one pixel under some tiles and two under others. The pattern repeats
+across the picture at the beat of the fraction, and the eye reads a beat as a
+lattice.
+
+**The far zoom.** The square was a fixed share of the tile width, and the share
+rounded down to a whole number of pixels. At the smallest tile the camera
+allows, the square was one pixel of two and the gap took three quarters of the
+cell in area. The picture at that zoom is mostly the colour outside the world,
+with the ground showing through as specks. That is the state in which the grid
+"emerges", and it emerges because the map disappears.
+
+**Evidence.** The gaps were counted rather than judged, across a hundred
+neighbouring tiles in one row, at ten tile widths on a development machine. At
+a whole width the gap was one value. At a width of four and a half pixels it
+was zero under half the tiles and one under the other half; at six and a half
+it was one under half and two under the other half. Rendering the same world at
+each width showed the banding at exactly the widths the count named, so the
+artefact is in a still picture and is not a motion artefact.
+
+**Follows.** **A separator must be a whole number of pixels, and it must be the
+same number under every tile.** The drawing now takes the far edge of a tile
+from the near edge of the tile beside it, read the same way, so the two agree by
+construction rather than by arithmetic that a reader must check.
+
+**Two snapped values that a reader expects to be equal are one fact in two
+places.** The first repair computed the right edge as the rounded centre plus
+half a width, and the next tile's left edge as its own rounded centre less half
+a width. Those are equal in exact arithmetic and are not always equal in
+floating point. A test over twelve widths found the disagreement at a width of
+three and three tenths, which no picture would have shown.
+
+**A separator that covers more of the cell than the tile is not a separator.**
+The drawing leaves the gap out below the width at which the gap takes half the
+cell. The bound comes from that identity and from nothing else. It is not read
+off a picture and it does not depend on the world, the seed or the window.[^F207A]
+
+**What the bound does not settle.** At a tile of four pixels the gap passes the
+bound and still takes forty-four parts in a hundred of the cell, and the picture
+at that width still reads as a grid. The bound is the one value in its family
+that a sentence forces. Any other share is a matter of taste, and the register
+holds the question rather than a number somebody liked.[^F207B]
+
+### FND-208 — The window stated a drawing cost of zero in every stored picture, and it was a mean over no measurement
+
+**Believed.** The cost card of the window reports what the drawing cost. Every
+stored picture of the window said `draw 0.0 ms`, and the drawing was assumed to
+be very cheap.
+
+**True.** **A drawing cannot measure itself.** The run records the cost of a
+frame after that frame has been drawn. The cost card is drawn inside the frame,
+so the mean it states covers the frames before it. A picture written by one
+call to the drawing has no frame before it, and the mean is then taken over
+nothing. The card printed the result of that division as `0.0 ms`, which reads
+as a measurement of a free drawing.
+
+The live window is not affected after its first frame, because by then frames
+have been recorded. Every picture anybody looked at was affected, because a
+picture is one frame. The one instrument the project had was saying zero in
+every image the project examined.
+
+**Evidence.** The drawing was timed outside itself, over five frames at each of
+ten tile widths, on a development machine and not on the target platform. At the
+smallest tile the camera allows, one drawing of the demonstration world cost
+about a third of a second. That is three frames a second, and it is the reason a
+watcher reports that the camera is sluggish when zoomed out. The figure the card
+would have shown had it been able to measure itself is four orders of magnitude
+away from zero.
+
+**Follows.** **A cost the run has not measured is absent, not zero.** The
+window now says so in words. The record already required this of a number the
+window cannot afford, and a number nobody has taken is the same case.[^F208A]
+
+**A row that reads as a measurement must carry the count it was taken over.**
+The count travels with the mean into the readout, so no caller can print a mean
+without knowing whether one exists.
+
+**The stored picture did not catch this.** The test that stores a picture of
+the panel supplies fixed costs, because a clock gives a new number on every
+run. That is correct, and it is why the fixture never reached the case where no
+measurement exists. The test that closes this drives the real drawing with a
+run that has recorded nothing.[^F200A]
+
 ### FND-206 — The holding border already draws only on a boundary, and the busy picture was the fixture
 
 **Believed.** A dense picture of a world was hard to read because the holding
@@ -5059,3 +5161,6 @@ check asserts.
 [^F206B]: Findings register, FND-201, in this document.
 [^F201C]: Findings register, FND-206, in this document.
 [^F206C]: The holder layer of the drawing pass. `crates/cachette-view/src/paint.rs`
+[^F207A]: The tile rectangle of the drawing pass. `crates/cachette-view/src/paint.rs`
+[^F207B]: Decisions register, DEC-088. `docs/DECISIONS.md`
+[^F208A]: ADR-0070, the head-up display reports what the drawing pass read, decision D2. `docs/adrs/accepted/adr-0070-the-head-up-display-reports-what-the-drawing-pass-read.md`

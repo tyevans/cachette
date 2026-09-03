@@ -54,7 +54,10 @@ use cachette_core::{Axial, BridgeError, Entity, FactionId, Holder, World};
 use crate::text;
 
 /// The colour of the space outside the world.
-const BACKGROUND: u32 = 0x0010_1418;
+///
+/// The gap between two tiles shows this colour, so a caller that counts the
+/// grid a watcher sees reads it from here rather than repeating the value.
+pub const BACKGROUND: u32 = 0x0010_1418;
 
 /// One colour for each kind of ground, in the order of the kinds.
 ///
@@ -1181,7 +1184,6 @@ pub fn draw(world: &World, camera: Camera, canvas: &mut Canvas) -> Result<(), Br
     // design mistake.[^2]
     let terrain = world.terrain();
 
-    let tile_side = (camera.tile_width * 0.92).max(1.0) as i32;
     let (first_row, last_row) = camera.visible_rows(world, canvas);
     for row in first_row..last_row {
         let (first_column, last_column) = camera.visible_columns(row, world, canvas);
@@ -1201,10 +1203,8 @@ pub fn draw(world: &World, camera: Camera, canvas: &mut Canvas) -> Result<(), Br
             let Some(ground) = terrain.tile(address) else {
                 continue;
             };
-            let (x, y) = camera.centre_of(address);
             let ground_colour = tile_colour(ground.kind, ground.height.0, food.0);
-            let left = x as i32 - tile_side / 2;
-            let top = y as i32 - tile_side / 2;
+            let (left, top, wide, tall) = tile_rect(camera, address);
 
             // The holder of this tile, read at the tile that is being
             // painted, on the loop that already runs. The layer starts no
@@ -1218,14 +1218,14 @@ pub fn draw(world: &World, camera: Camera, canvas: &mut Canvas) -> Result<(), Br
             let holder = world.tile_holder(address);
             canvas.holder_reads += 1;
             match holder.and_then(Holder::faction) {
-                None => canvas.fill_rect(left, top, tile_side, tile_side, ground_colour),
+                None => canvas.fill_rect(left, top, wide, tall, ground_colour),
                 Some(faction) => {
                     let held = faction_colour(faction);
                     canvas.fill_rect(
                         left,
                         top,
-                        tile_side,
-                        tile_side,
+                        wide,
+                        tall,
                         mix(ground_colour, held, HOLDER_WEIGHT),
                     );
                     canvas.tiles_held += 1;
@@ -1234,7 +1234,8 @@ pub fn draw(world: &World, camera: Camera, canvas: &mut Canvas) -> Result<(), Br
                             canvas,
                             left,
                             top,
-                            tile_side,
+                            wide,
+                            tall,
                             mix(ground_colour, held, EDGE_WEIGHT),
                         );
                     }
@@ -1246,9 +1247,7 @@ pub fn draw(world: &World, camera: Camera, canvas: &mut Canvas) -> Result<(), Br
     }
 
     let radius = ((camera.tile_width * 0.3) as i32).max(1);
-    draw_soldiers(
-        world, camera, canvas, radius, tile_side, first_row, last_row,
-    )
+    draw_soldiers(world, camera, canvas, radius, first_row, last_row)
 }
 
 /// Marks each place that a faction founded.
@@ -1297,9 +1296,9 @@ pub fn mark_foundings(camera: Camera, canvas: &mut Canvas, outcomes: &[FoundingO
         let colour = faction_colour(outcome.faction());
         let left = x as i32 - side / 2;
         let top = y as i32 - side / 2;
-        outline(canvas, left, top, side, colour);
-        outline(canvas, left + 1, top + 1, side - 2, FOUNDING_CORE);
-        outline(canvas, left + 2, top + 2, side - 4, colour);
+        outline(canvas, left, top, side, side, colour);
+        outline(canvas, left + 1, top + 1, side - 2, side - 2, FOUNDING_CORE);
+        outline(canvas, left + 2, top + 2, side - 4, side - 4, colour);
         canvas.foundings_marked += 1;
     }
 }
@@ -1336,12 +1335,94 @@ fn on_an_edge(world: &World, address: Axial, holder: Option<Holder>, canvas: &mu
     edge
 }
 
-/// Draws a one pixel border inside a square.
-fn outline(canvas: &mut Canvas, left: i32, top: i32, side: i32, colour: u32) {
-    canvas.fill_rect(left, top, side, 1, colour);
-    canvas.fill_rect(left, top + side - 1, side, 1, colour);
-    canvas.fill_rect(left, top, 1, side, colour);
-    canvas.fill_rect(left + side - 1, top, 1, side, colour);
+/// Draws a one pixel border inside a rectangle.
+fn outline(canvas: &mut Canvas, left: i32, top: i32, wide: i32, tall: i32, colour: u32) {
+    canvas.fill_rect(left, top, wide, 1, colour);
+    canvas.fill_rect(left, top + tall - 1, wide, 1, colour);
+    canvas.fill_rect(left, top, 1, tall, colour);
+    canvas.fill_rect(left + wide - 1, top, 1, tall, colour);
+}
+
+/// The gap the drawing leaves between two neighbouring tiles, in pixels.
+///
+/// The gap is what a watcher reads as the black grid between the tiles. It is
+/// one pixel wide, because a gap is a separator and one pixel is the
+/// narrowest a separator can be. It is a whole number of pixels, because a
+/// fractional separator lands on a different pixel under each tile and the
+/// eye reads that as a lattice.[^1]
+///
+/// # References
+///
+/// [^1]: Findings register, FND-207. `docs/FINDINGS.md`
+const TILE_GAP: i32 = 1;
+
+/// Returns the gap to leave under a tile of a given width.
+///
+/// **A separator that covers more of the picture than the thing it separates
+/// is not a separator.** A tile `w` pixels across keeps `w - 1` pixels of
+/// colour in each direction, so the gap takes `1 - ((w - 1) / w)^2` of the
+/// cell. That share reaches one half when `w * (1 - 1 / sqrt(2))` reaches
+/// one, near three and a half pixels. Below that width the drawing leaves the
+/// gap out, and the colour change from one tile to the next is what separates
+/// them.
+///
+/// The bound is derived from that identity. It is not read off a picture, and
+/// it does not depend on the world, the seed or the window.[^1]
+///
+/// # References
+///
+/// [^1]: Findings register, FND-207. `docs/FINDINGS.md`
+fn gap_for(tile_width: f32) -> i32 {
+    if tile_width * (1.0 - std::f32::consts::FRAC_1_SQRT_2) >= 1.0 {
+        TILE_GAP
+    } else {
+        0
+    }
+}
+
+/// Returns the pixel rectangle of one tile, as a left, a top, a width and a
+/// height.
+///
+/// **A tile runs from its own snapped left edge to the snapped left edge of
+/// the tile beside it.** A tile is a fractional number of pixels wide at
+/// nearly every zoom, because each zoom step multiplies the size by a
+/// fraction. A drawing that took one integer width and placed it at a rounded
+/// centre left a gap of one pixel under some tiles and two pixels under
+/// others, in a pattern that repeated across the picture, and the eye read
+/// that pattern as a lattice.[^1]
+///
+/// Taking the far edge from the neighbour makes the two agree by
+/// construction, so the gap is the same under every tile at every zoom. The
+/// far edge is not the near edge plus a width. It is the neighbour's own near
+/// edge, read the same way, because two snapped values that a reader expects
+/// to be equal are one fact in two places unless one of them is the other.
+///
+/// A test reads the rectangle from here rather than repeating the arithmetic.
+/// A second site that computed where a tile lands would be one fact in two
+/// places, and nothing would fail when the two disagreed.[^2]
+///
+/// # References
+///
+/// [^1]: Findings register, FND-207. `docs/FINDINGS.md`
+/// [^2]: Recurring Defect Shapes, shape 1. `.claude/rules/recurring-defects.md`
+#[must_use]
+pub fn tile_rect(camera: Camera, address: Axial) -> (i32, i32, i32, i32) {
+    let near = |address: Axial| {
+        let (x, y) = camera.centre_of(address);
+        (
+            (x - camera.tile_width * 0.5).round() as i32,
+            (y - camera.tile_height * 0.5).round() as i32,
+        )
+    };
+    let (left, top) = near(address);
+    let (right, _) = near(Axial::new(address.q + 1, address.r));
+    let (_, bottom) = near(Axial::new(address.q, address.r + 1));
+    (
+        left,
+        top,
+        (right - left - gap_for(camera.tile_width)).max(1),
+        (bottom - top - gap_for(camera.tile_height)).max(1),
+    )
 }
 
 /// Draws the soldiers that stand inside the visible blocks.
@@ -1377,7 +1458,6 @@ fn draw_soldiers(
     camera: Camera,
     canvas: &mut Canvas,
     radius: i32,
-    tile_side: i32,
     first_row: u32,
     last_row: u32,
 ) -> Result<(), BridgeError> {
@@ -1499,12 +1579,12 @@ fn draw_soldiers(
                 match run {
                     Some((held, count)) if held == address => run = Some((held, count + 1)),
                     other => {
-                        close_run(canvas, world, camera, tile_side, other);
+                        close_run(canvas, world, camera, other);
                         run = Some((address, 1));
                     }
                 }
             }
-            close_run(canvas, world, camera, tile_side, run);
+            close_run(canvas, world, camera, run);
         }
     }
     Ok(())
@@ -1545,13 +1625,7 @@ fn reach_from_middle(canvas: &Canvas, x: f32, y: f32) -> i64 {
 /// [^1]: ADR-0056, movement is tile-discrete and admitted by sort-then-admit, decision D4. `docs/adrs/accepted/adr-0056-movement-is-tile-discrete-and-admitted-by-sort-then-admit.md`
 /// [^2]: Findings register, FND-193. `docs/FINDINGS.md`
 /// [^3]: ADR-0090, a tile upgrade is stored sparsely, as the difference from the generated world, decision D3. `docs/adrs/draft/adr-0090-a-tile-upgrade-is-stored-sparsely.md`
-fn close_run(
-    canvas: &mut Canvas,
-    world: &World,
-    camera: Camera,
-    tile_side: i32,
-    run: Option<(Axial, u32)>,
-) {
+fn close_run(canvas: &mut Canvas, world: &World, camera: Camera, run: Option<(Axial, u32)>) {
     let Some((address, count)) = run else {
         return;
     };
@@ -1563,9 +1637,7 @@ fn close_run(
         canvas.tiles_at_capacity += 1;
     }
     if count > capacity {
-        let (x, y) = camera.centre_of(address);
-        let left = x as i32 - tile_side / 2;
-        let top = y as i32 - tile_side / 2;
-        outline(canvas, left, top, tile_side, OVER_CAPACITY);
+        let (left, top, wide, tall) = tile_rect(camera, address);
+        outline(canvas, left, top, wide, tall, OVER_CAPACITY);
     }
 }

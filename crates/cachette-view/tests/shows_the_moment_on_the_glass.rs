@@ -489,3 +489,58 @@ fn the_command_the_window_names_exists() {
         );
     }
 }
+
+#[test]
+fn a_cost_the_run_has_not_measured_is_absent_and_not_zero() {
+    // **A drawing cannot measure itself.** The window states the cost of the
+    // drawing, and the run records that cost after the drawing has ended. The
+    // card is drawn inside the frame it cannot yet have measured, so the mean
+    // it states covers the frames before it. A picture written by one call to
+    // the drawing has no frame before it.
+    //
+    // The card said `0.0 ms` in that case, which reads as a measurement of a
+    // free drawing. It was a mean over nothing. The record forbids the window
+    // from stating a number it does not have.[^5] Every stored picture of this
+    // window carried that row, so the one instrument the project had was
+    // saying zero in every picture anyone looked at.[^6]
+    //
+    // [^5]: ADR-0070, the head-up display reports what the drawing pass read, decision D2. `docs/adrs/accepted/adr-0070-the-head-up-display-reports-what-the-drawing-pass-read.md`
+    // [^6]: Findings register, FND-208. `docs/FINDINGS.md`
+    let (_, readout, _) = drawn(true);
+    assert_eq!(
+        readout.frames_measured(),
+        0,
+        "this test needs a run that has recorded no drawing, and it has one",
+    );
+    let said = glass::says(&readout, true);
+    let drawing = value_of(&said, "draw").expect("the cost card states the drawing");
+    assert!(
+        !drawing.contains("0.0"),
+        "the window states {drawing} for a drawing that nobody measured",
+    );
+    assert_eq!(drawing, "not measured yet");
+
+    // A run that has measured states the figure. A card that said the same
+    // words whatever the run did would pass the assertion above and report
+    // nothing.
+    let mut metrics = Metrics::start();
+    metrics.draw(std::time::Duration::from_micros(2500));
+    metrics.step(std::time::Duration::from_micros(1500));
+    let (world, outcomes, place) = founded();
+    let mut canvas = Canvas::new(WINDOW.0, WINDOW.1);
+    let camera = Camera::opening()
+        .looking_at(place, &canvas)
+        .clamped(&world, &canvas);
+    let readout = draw_frame(
+        &world,
+        camera,
+        &metrics,
+        &outcomes,
+        Overlay::Glass { reference: true },
+        &mut canvas,
+    )
+    .expect("the world draws");
+    let said = glass::says(&readout, true);
+    assert_eq!(value_of(&said, "draw"), Some("2.5 ms".to_string()));
+    assert_eq!(value_of(&said, "step"), Some("1.5 ms".to_string()));
+}
