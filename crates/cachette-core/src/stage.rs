@@ -151,12 +151,12 @@ macro_rules! declare_stages {
 declare_stages! {
     TileScan,                 "tile_scan",                  true,  1, false;
     LogJoin,                  "log_join",                   false, 1, false;
-    BridgeRefreshOpening,     "bridge_refresh_opening",     true,  1, false;
+    BridgeRefreshOpening,     "bridge_refresh_opening",     false, 1, false;
     Choose,                   "choose",                     true,  1, false;
     MovementIntents,          "movement_intents",           true,  1, false;
     Admit,                    "admit",                      true,  1, false;
     PlaceGranted,             "place_granted",              false, 1, false;
-    BridgeRefreshBarrier,     "bridge_refresh_barrier",     true,  1, false;
+    BridgeRefreshBarrier,     "bridge_refresh_barrier",     false, 1, false;
     DepletionRecover,         "depletion_recover",          false, 1, false;
     Gather,                   "gather",                     true,  1, false;
     Build,                    "build",                      true,  1, false;
@@ -168,7 +168,7 @@ declare_stages! {
     ApplyRates,               "apply_rates",                true,  1, false;
     Consume,                  "consume",                    true,  1, false;
     Reap,                     "reap",                       true,  1, false;
-    BridgeRefreshAfterReap,   "bridge_refresh_after_reap",  true,  1, false;
+    BridgeRefreshAfterReap,   "bridge_refresh_after_reap",  false, 1, false;
     SettlePositions,          "settle_positions",           true,  1, false;
     Promote,                  "promote",                    true,  1, false;
     RebuildLevel1,            "rebuild_level_1",            true,  1, false;

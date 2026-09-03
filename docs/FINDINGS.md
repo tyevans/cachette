@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-302**
+**Next number: FND-307**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -32,82 +32,96 @@ the case.[^ALLOC2]
 
 ## A. Corrections to stated rules
 
-### FND-301 — The influence solve gets slower as the thread count rises, on a small world
+### FND-306 — A gate in a pipeline prints its failure and does not stop the chain
 
-**Believed.** A stage that takes a thread count runs faster with more threads.
-The stage register declares `influence_solve` as taking one, and the target
-scale measurement agrees: it is 12.68 milliseconds and 5.25 percent of a 241
-millisecond frame at 16.7 million tiles and twelve threads.
+**Believed, twice, and wrong both times.** A commit landed on the trunk holding
+conflict markers, after the marker check had run. The first explanation was
+that the check reports a failure and exits zero. The second was that the check
+skips a worktree's own files when it runs from inside that worktree, because a
+worktree path is in its skip list.
 
-**True at the target extent, and the reverse on a small world.** On the
-demonstration world the solve costs more with every thread added. Measured on
-an x86-64 development machine, 256 by 256 tiles, 256 units, four factions, the
-mean of 120 frames after 30 warm-up frames:
+**Both are false, and the check is sound.** A probe put a real marker in a file
+inside a worktree and ran the check from inside that worktree. It named the
+file, named all three lines, and exited 1. The skip list holds the path of a
+worktree nested inside the tree being scanned, not the tree itself, because the
+root is derived from the location of the script. The skip is also gated on the
+scan being the root.
 
-| Threads | The frame | `influence_solve` | Its share |
-|---|---|---|---|
-| 1 | 36.314 ms | 9.343 ms | 25.7 percent |
-| 2 | 30.229 ms | 11.465 ms | 37.9 percent |
-| 4 | 35.786 ms | 19.749 ms | 55.2 percent |
-| 8 | 55.716 ms | 37.313 ms | 67.0 percent |
-| 12 | 81.471 ms | 55.482 ms | 68.1 percent |
+**The cause is the shell that called it.** The check ran on the left of a pipe,
+inside a chain that continues on success. A pipeline exits with the status of
+its last command, so the status belonged to the command reading the output and
+not to the check. The chain continued and the commit landed.
 
-The solve is 5.9 times slower at twelve threads than at one, and the frame is
-2.7 times slower at twelve than at two. **The solve also costs more in absolute
-terms on the small world than on the target one**, 55.5 milliseconds against
-12.7, on a world with 256 times fewer tiles.
+The failure text is written to the error stream, so it printed past the reader
+and was visible the whole time. It was read as noise from the merge that ran in
+the same chain.
 
-**How to take the measurement again.** An example prices every stage on a
-world of a given extent, group and thread count, and prints the state hash
-beside the split so a sweep is also a determinism check.[^F301B]
+**Evidence.** The same check, on the same file, two ways:
 
-**The cause is the shape of the parallel section, not the arithmetic in it.**
-One relaxation pass opens a thread scope for each faction, and a solve runs a
-fixed count of passes, so a frame opens the pass count multiplied by the
-faction count of them. At the target extent each spawned thread relaxes
-thousands of cells and the spawn is paid back. On the demonstration world each
-one gets a handful of cells and the spawn is the whole cost.
-
-**The guard that exists cannot catch it, by design.** The code holds a thread
-back only when the cell count is at or below the thread count, and it says why:
-the rule reads the two numbers the caller already supplied and holds no
-constant of its own. A world of this extent has far more cells than twelve, so
-the guard never fires and every scope spawns.
-
-**The solve does not cross over at any extent measured.** A second sweep took
-three extents at one thread and at twelve. The frame crosses over between
-65,536 and 262,144 tiles, where other stages start to carry the win. The solve
-itself is still 7.6 times slower with twelve threads than with one at 1,048,576
-tiles, so the extent at which threads pay this stage is above a million cells
-of world.
-
-**The determinism holds.** The state hash is identical at one thread and at
-twelve, at every extent measured, so this is a cost defect and not a
-correctness one.
-
-**The absolute figures are noisy and the direction is not.** The machine ran
-other builds throughout, and one point measured 81 ms in one sweep and 192 ms
-in another. Every point in both sweeps has the same sign.
+```
+python3 scripts/check_conflict_markers.py | tail -2 && echo REACHED
+  ... 3 failures
+  REACHED
+python3 scripts/check_conflict_markers.py > /dev/null && echo REACHED
+  ... 3 failures
+  (nothing)
+```
 
 **Follows.** Three things.
 
-**A stage declared as taking a thread count can still lose by taking one.** The
-stage apparatus states that a measured speedup far from one on a stage declared
-`false` means the declaration is wrong. It checks one direction. A negative
-speedup on a stage declared `true` is the same class of error and nothing looks
-for it.
+**Never put a gate on the left of a pipe.** Redirect its output if the output
+is long. A gate exists to stop the next command, and a pipe takes that away
+without saying so.
 
-**A measurement taken only at the target extent cannot see this shape.** Every
-frame figure in this project was taken at the target extent, where the defect
-is invisible. The small end is a different regime and it had never been
-measured.
+**A failure that prints and does not stop looks exactly like a check that does
+not run.** That is why the first two explanations both blamed the check. The
+symptom carries no information about which of the three causes produced it, so
+the next person to see it will guess as well unless they probe.
 
-**The demonstration is slow for this reason and for no other.** Both front ends
-ask for the smaller of the machine's parallelism and twelve. Asking for fewer
-would make the demonstration between two and three times faster today with no
-engine change, and that is the reason not to change the requested frame rate.
-The repair belongs in the solver, so that no caller has to know. An item holds
-it.[^F301A]
+**Probe the check before you blame it.** Both wrong explanations were reasoned
+from reading the source. The right one took one command and a temporary file.
+Putting the defect back is the rule for a test, and it is the rule for a check
+that is under suspicion.[^13]
+
+### FND-305 — The stage apparatus flags a stage that gains from threads it does not take, and not one that loses by taking them
+
+**Believed.** The stage table finds a wrong `takes_threads` declaration. The
+benchmark states the rule in its own documentation: a stage declared `false`
+that improves with the thread count means the declaration is wrong. The table
+prints the declaration beside the measurement in every row so that a reader can
+compare them.
+
+**True in one direction only.** The rule names one case and there are two. A
+stage declared `false` that improves is caught. A stage declared `true` that
+gets worse is the same class of error, it costs more, and nothing looks for it.
+The declaration and the measurement disagree in both cases.
+
+**Evidence.** The influence solve is declared as taking a thread count. On a
+256 by 256 world it is 5.9 times slower at twelve threads than at one, and it
+is still 7.6 times slower at twelve threads on a world of 1,048,576 tiles. The
+register holds the sweeps.[^F305A]
+
+**The instrument was built the same night, to find this class of error, and it
+stayed silent.** The table printed the declaration and the cost of the stage in
+adjacent columns, at one thread and at twelve, and reported no note. A reader
+who ran it saw the rows and read nothing wrong in them, because the
+documentation told them which direction to look.
+
+**Follows.** Three things.
+
+**A rule that names one direction of a symmetric test teaches the reader to
+look one way.** The cost of the omission is not that the check missed
+something. It is that a person holding the output missed it too.
+
+**The declaration is a value with two declaration sites and no check.** The
+source states `takes_threads` and the measurement states what threading did.
+Nothing fails when the two disagree, which is the first recurring defect
+shape.[^13]
+
+**The repair is a rule, not a constant.** A speedup far from one in either
+direction is the signal. A stage that declares it threads and measures slower
+threaded fails the same comparison as one that declares it does not and
+measures faster.
 
 ### FND-300 — The influence solve gets slower as the thread count rises, on a small world
 
@@ -165,6 +179,36 @@ correctness one.
 **The absolute figures are noisy and the direction is not.** The machine ran
 other builds throughout, and one point measured 81 ms in one sweep and 192 ms
 in another. Every point in both sweeps has the same sign.
+
+
+**The scope count is most of the cost and it is not the cause of the
+inversion.** A change that opens one thread scope for each pass instead of one
+for each faction in each pass was built and measured, and it was not taken. It
+removes twenty-four of the thirty-two scopes a frame opens. Measured on an
+x86-64 development machine, 256 by 256 tiles, four factions, the mean of 120
+frames after 30 warm-up frames:
+
+| Threads | Solve, one scope for each faction | Solve, one scope for each pass |
+|---|---|---|
+| 1 | 8.761 ms | 2.732 ms |
+| 4 | 47.167 ms | 6.055 ms |
+| 12 | 179.561 ms | 15.447 ms |
+
+**The spawn is about three quarters of the solve at every thread count, and
+the solve is still 5.7 times slower at twelve threads than at one after it is
+gone.** Removing the scopes does not move the sign. It follows that the spawn
+is a large fixed cost and that threading this stage loses on this world for a
+second reason as well.
+
+**The change was not taken, and the reason is a record and not a measurement.**
+The version measured above gives each faction a scratch plane of its own, so
+the write half of the solve grows with the faction count. An accepted record
+decides against exactly that and names its own reopening condition.[^F300C]
+The figures stay here as evidence about the cause. They are not a proposal.
+
+**The determinism holds across the change.** The state hash reads
+`9d81e94936b9f445` at one, four and twelve threads, before and after, on the
+same world and the same commit.
 
 **Follows.** Three things.
 
@@ -1863,6 +1907,10 @@ statement about what a copy of a holding means.
 
 **A saving of 384 milliseconds bought a cost of 12.** The trade is good and the
 cost is recorded so that it is not found again as a mystery.
+
+**This row's conclusion is wrong, and a later row corrects it.** The residual
+did not follow the allocation. The pass still allocates and the residual is back
+under half a millisecond.[^F277C]
 
 
 ## F. Sourcing
@@ -8207,6 +8255,165 @@ reason.
 **Check the time on the artefact you are about to measure.** One `ls` would have
 caught it two hours earlier.
 
+### FND-304 — Admission searched two count tables once for each segment, and it visits them in the order they are stored
+
+**Believed.** The passes that grant an intent read two small tables of counts,
+one for arrivals and one for departures. A lookup in a small table is cheap, so
+reading them once for each target tile costs little.
+
+**True.** The tables are not small. At the target scale they reach one entry for
+almost every target tile, and a lookup is a binary search over them. The grant
+passes were 60 percent of the whole admission stage, and they run on the calling
+thread.
+
+**The order the pass already has removes the search.** The segments are in
+ascending tile order because the admission sort put them there, both tables are
+in ascending tile order because the merge that fills them requires it, and
+neither table changes while the pass walks the segments. One forward reader for
+each table therefore replaces every search, and the walk costs the segments plus
+the entries.
+
+**The measurement.** A probe inside the stage. Development machine, 16,777,216
+tiles, 1,000,000 units scattered, 12 threads. The last frame of ten, with
+314,158 intents and 291,047 segments:
+
+| Part | ns | Share | Runs on |
+|---|---|---|---|
+| Sort the intents by target tile | 208,785,397 | 20.1 percent | one thread |
+| Follow the permutation | 13,198,816 | 1.3 percent | one thread |
+| Build the segment table | 59,892,786 | 5.8 percent | one thread |
+| Read the capacity and the occupancy | 132,558,620 | 12.8 percent | every thread |
+| Grant the intents | 623,729,193 | 60.1 percent | one thread |
+
+**Eighty-seven percent of the stage runs on one thread**, and the stage declares
+that it takes a thread count. The declaration is not wrong, because the one
+parallel part is real, but the column cannot say that seven eighths of a stage
+ignores the number.
+
+**Follows.** Two things.
+
+**A table that grows with the tiles is not a small table, whatever it is named
+for.** These hold arrivals and departures, which sound like a handful of events,
+and they reach almost every target tile at the target density.
+
+**This is the third place tonight where a search was removed by the order the
+caller already had.** The other two are the spread deciding a tile and the same
+stage reading how many units stand on a target.[^F304A] The shape is worth
+looking for: a bounded search whose caller walks in the order the searched
+structure is stored in.
+
+### FND-301 — The bridge rebuild is 16.4 percent of a frame, and the record that gives it one thread says it has not earned one
+
+**Believed.** The bridge rebuild does not earn a thread. The record says so in
+those words, and it argues that splitting a radix histogram across threads is
+more machinery than the whole rebuild costs.[^F301A]
+
+**True as a design argument and false as a cost claim.** The rebuild is
+30,754,053 nanoseconds of a 187,862,216 nanosecond frame, which is 16.37
+percent. It is the third largest stage in the engine. The record was written
+before any measurement existed on the target platform, and the phrase "does not
+earn one" is a claim about cost.
+
+**Nothing here changes the record.** The reasoning it gives about the histogram,
+the fixed combine order and the placement offsets is unaffected by how large the
+stage is, and every one of those is a place where a result could take its order
+from a thread. What the measurement changes is the premise, not the argument.
+
+**Where the time goes.** A probe inside the rebuild. Development machine,
+16,777,216 tiles, 1,000,000 units, 12 threads, the last frame of ten:
+
+| Part | ns | Share |
+|---|---|---|
+| Walk the arena and build the keys | 109,373,561 | 16.7 percent |
+| Order the keys | 412,957,538 | 63.0 percent |
+| Follow the permutation | 117,637,598 | 17.9 percent |
+| Rebuild the block ranges | 16,026,693 | 2.4 percent |
+
+**The stage declared that it takes a thread count, and the record says it
+accepts none.** Three stages wrap this one call and all three declared `true`.
+Measured at one thread and at twelve on the development machine, at 4,194,304
+tiles and 250,000 units, the stage costs 43,040,085 and 57,165,452 nanoseconds:
+it does not improve, and it may get worse. The declarations are now `false`.
+
+**Follows.** Two things.
+
+**A record that argues from cost needs its cost re-read when a measurement
+arrives.** This one is still right, and nobody could have known that without
+taking the figure.
+
+**A declaration in the source is a claim, and this project already said so.**
+The cost register states that the thread-count column is a declaration rather
+than a measurement, and that the table is where the two can be compared. Three
+rows disagreed with an accepted record for as long as the table has existed, and
+the comparison the register invites is what found them.
+
+### FND-302 — Every ordering pass sorts the whole key set a second time, to check that no identifier repeats
+
+**Believed.** The key vector sort costs its radix passes. The guard that refuses
+a repeated identifier is a check, and a check is cheap beside the work it
+guards.
+
+**True.** The guard allocates one 64-bit value for each key and comparison-sorts
+them, before the radix runs. It is a second full sort of the same set, and both
+passes that this project measures tonight pay it: the admission sort over about
+314 thousand intents and the bridge rebuild over one million units, on every
+frame.
+
+**The measurement is not clean and it is reported that way.** The development
+machine was loaded, and the figures for one configuration varied by a factor of
+five between runs. What is not in doubt is the shape: the guard is
+`sort_unstable` over a vector it allocates, and the radix that follows is three
+counting passes. Take the shares below as an order of magnitude and not as a
+figure.
+
+| Set | Guard, ns | Radix, ns |
+|---|---|---|
+| 1,000,000 keys | 11,781,361 to 60,213,363 | 131,517,658 to 337,357,895 |
+| about 300,000 keys | 86,882,731 to 111,072,468 | 71,317,708 to 71,643,957 |
+
+**The guard protects determinism, and that is why it is not simply removed.**
+The identifier is what makes the order total. Two keys that share both the
+ordering field and the identifier tie, and a tie is a place where the result can
+depend on something the caller did not state.
+
+**The guard is stronger than the property it protects.** It refuses two keys
+that share an identifier even when their ordering fields differ, and such a pair
+ties nothing. The narrower property, that no two keys share the pair, is
+adjacent in the sorted result and therefore free to check after the radix rather
+than before it.
+
+**Nothing is changed here.** Narrowing the contract of a shared sort is a
+determinism decision, and the scope rule says a determinism decision always gets
+a record even when it looks obvious. The decisions register holds the
+options.[^F302A]
+
+### FND-303 — The twelve millisecond residual was not the allocation, and it has gone
+
+**Believed.** The unmeasured part of a frame grew from 22,202 nanoseconds to
+about 12 milliseconds when the candidate pass began allocating a bit plane on
+every frame, and it stayed there when twelve allocations became one. The
+register concluded that the residual follows the allocation.[^F277C]
+
+**True.** The residual is 310,942 nanoseconds, which is 0.17 percent of a
+187,862,216 nanosecond frame. **The candidate pass still allocates a bit plane
+on every frame, and nothing in it changed.** What changed is that the tile value
+field became a dense delta and the change merge stage went away.
+
+**So the earlier conclusion was wrong.** The residual did not follow the
+allocation. It followed something in the pass that has since been removed, and
+the coincidence in timing was strong enough to survive one attempt to refute it.
+
+**Follows.** Two things.
+
+**One refutation is not enough when the alternative was never tested.** The
+earlier row ruled out the number of mappings and then concluded that the
+allocation was the cause, without ever testing a build that did not allocate.
+The remaining hypothesis inherited the confidence of the one that was tested.
+
+**A residual is a difference of two large numbers, and it moves when either
+does.** Twelve milliseconds against a 463 millisecond frame and 0.31
+milliseconds against a 188 millisecond frame are not the same measurement twice.
+
 ## References
 
 [^F261B]: The holder count test of the viewer. `crates/cachette-view/tests/shows_who_holds_the_ground.rs`
@@ -8515,12 +8722,17 @@ caught it two hours earlier.
 [^F292A]: The world, the stored tile change count. `crates/cachette-core/src/world.rs`
 [^F292B]: The exit locality benchmark, the growth row. `crates/cachette-core/benches/exit_locality.rs`
 [^F292C]: Target platform costs, the stage table. `docs/reference/graviton-costs.md`
-[^F293A]: The cost benchmark, the memory point mode. `crates/cachette-core/benches/target_cost.rs`
-[^F293B]: Findings register, FND-246, in this document.
-[^F293A]: ADR-0068, terrain is generated from the seed and is never stored as a map, decision D1. `docs/adrs/accepted/adr-0068-terrain-is-generated-from-the-seed-and-is-never-stored-as-a-map.md`
+[^F298A]: The cost benchmark, the memory point mode. `crates/cachette-core/benches/target_cost.rs`
+[^F298B]: Findings register, FND-246, in this document.
+[^F299A]: ADR-0068, terrain is generated from the seed and is never stored as a map, decision D1. `docs/adrs/accepted/adr-0068-terrain-is-generated-from-the-seed-and-is-never-stored-as-a-map.md`
 [^F295A]: ADR-0018, the unit-to-tile bridge is derived, and it rebuilds at the barrier, decision D4. `docs/adrs/accepted/adr-0018-the-unit-to-tile-bridge-is-derived-and-rebuilds-at-the-barrier.md`
 [^F296B]: Target platform costs, every stage of a frame after the ground read moved last. `docs/reference/graviton-costs.md`
 [^F296C]: Findings register, FND-290, in this document.
 [^F297A]: The target platform benchmark script. `scripts/graviton-benchmark.sh`
-[^F301A]: Backlog item 0277, hold a thread back when the work will not pay for it. `docs/backlog/proposed/0277-hold-a-thread-back-when-the-work-will-not-pay-for-it.md`
-[^F301B]: The demonstration stage split. `crates/cachette-core/examples/demo_stage_split.rs`
+[^F300A]: Backlog item 0277, hold a thread back when the work will not pay for it. `docs/backlog/proposed/0277-hold-a-thread-back-when-the-work-will-not-pay-for-it.md`
+[^F300B]: The demonstration stage split. `crates/cachette-core/examples/demo_stage_split.rs`
+[^F300C]: ADR-0060, an influence map is stored as a shared basis, not one plane per faction, decision D4. `docs/adrs/draft/adr-0060-an-influence-map-is-stored-as-a-shared-basis.md`
+[^F305A]: Findings register, FND-300, in this document.
+[^F304A]: Findings register, FND-299 and FND-295, in this document.
+[^F301A]: ADR-0071, the bridge rebuild orders on one thread, decision D2. `docs/adrs/accepted/adr-0071-the-bridge-rebuild-orders-on-one-thread.md`
+[^F302A]: Decisions register, DEC-111. `docs/DECISIONS.md`
