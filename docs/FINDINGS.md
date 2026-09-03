@@ -7717,4 +7717,4 @@ the part that decayed, and it decayed within one commit of the pin moving.
 [^F262E]: Recurring defect shapes, inert code that nothing invokes. `.claude/rules/recurring-defects.md`
 [^F262F]: The state-byte gate. `crates/cachette-core/tests/state_bytes_are_initialised.rs`
 [^F263A]: The float ban script. `scripts/check-float-ban.sh`
-[^F263B]: Backlog item 0272, name the reassociating methods in the lint. `docs/backlog/proposed/0272-name-the-reassociating-methods-in-the-lint.md`
+[^F263B]: Backlog item 0272, name the reassociating methods in the lint. `docs/backlog/proposed/0293-name-the-reassociating-methods-in-the-lint.md`
