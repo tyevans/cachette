@@ -237,6 +237,27 @@ obs-load result log="":
 obs-check result:
     ./scripts/ship_bench.py {{result}} --print
 
+# Build the documentation site. ADR-0107 D1 and D4.
+#
+# The reference comes from an import of the compiled extension module, so this
+# is a compile job and not a text job. The script builds the extension,
+# installs it, builds the site, and then checks that every summary the import
+# found reached a page. A build that reaches the type stub instead publishes
+# signatures and no prose, and it reports no error on its own.
+#
+# BLK-035 holds the address the site publishes to. This recipe builds and
+# publishes nothing.
+docs:
+    ./scripts/build-docs.sh
+
+# Prove that the documentation job fails when the import fails. ADR-0107 D4.
+#
+# The script takes the compiled module out of the environment, and then turns
+# module inspection off. The job must fail both times. It restores what it
+# broke. The second case is the one that reports nothing on its own.
+docs-probe:
+    ./scripts/docs-probe.sh
+
 # Run mutation testing over the Rust core. Slow. Not a commit gate.
 mutants:
     cargo mutants --no-shuffle

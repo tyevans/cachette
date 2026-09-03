@@ -135,6 +135,12 @@ cites this row.
 **Work continues.** The site, the configuration, the reference directive and the
 four quadrants do not depend on the address. Only the publishing step does.
 
+**The job now exists, and it publishes nothing.** It builds the site on every
+run and it keeps the result as an artefact.[^BLK35D] The publishing step takes
+the switch as a repository variable and takes the address from the host, so no
+file in this tree states either. The step does nothing while the variable is
+unset.
+
 **What closes this.** The project owner names the address and confirms that the
 hosting is turned on, or states that the site is built and not published.
 
@@ -280,3 +286,4 @@ normally.
 [^BLK35A]: ADR-0107, the Python reference is generated from the compiled module, decisions D1 and D4. `docs/adrs/draft/adr-0107-the-python-reference-is-generated-from-the-compiled-module.md`
 [^BLK35B]: Backlog item 0308, the documentation plan. `docs/backlog/refined/0308-the-documentation-plan.md`
 [^BLK35C]: Research report 19, the documentation toolchain, section 3.6. `docs/research/reports/19-documentation-toolchain.md`
+[^BLK35D]: The documentation site job. `.github/workflows/docs.yml`

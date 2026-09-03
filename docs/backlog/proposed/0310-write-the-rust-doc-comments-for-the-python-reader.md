@@ -66,4 +66,4 @@ turning the gap into a list.
 [^3]: ADR-0046, every error is typed, decision D3. `docs/adrs/draft/adr-0046-every-error-is-typed.md`
 [^4]: Blockers register, BLK-007. `docs/BLOCKERS.md`
 [^5]: Blockers register, BLK-034. `docs/BLOCKERS.md`
-[^6]: Backlog item 0309, publish the Python reference generated from the compiled module. `docs/backlog/refined/0309-publish-the-python-reference-generated-from-the-compiled-module.md`
+[^6]: Backlog item 0309, publish the Python reference generated from the compiled module. `docs/backlog/complete/0309-publish-the-python-reference-generated-from-the-compiled-module.md`

@@ -1,0 +1,65 @@
+# The configuration of the documentation site.
+#
+# The format is the portable one, which DEC-113 option A recommends. A second
+# builder reads the same file, so the builder stays replaceable and ADR-0107
+# can decline to name one.
+site_name: Cachette
+site_description: A deterministic world simulation engine.
+
+# The site address is not in this tree. BLK-035 holds it and the project owner
+# owns that row. Do not write a value here. The publishing job takes the
+# address from the host that answers on it.
+# site_url:
+
+repo_url: https://github.com/tyevans/cachette
+docs_dir: docs/site
+site_dir: target/site
+
+theme:
+  name: material
+  features:
+    - navigation.top
+    - toc.follow
+
+markdown_extensions:
+  # The documentation rule puts every reference in a footnote, and the Rust doc
+  # comments follow it. The reference page renders those footnotes.
+  - footnotes
+  - admonition
+  - toc:
+      permalink: true
+
+# The site holds the four quadrants of the Diataxis framework. The reference is
+# the only one that a build derives, so it is the only one here. Three items
+# write the three prose quadrants and each adds its own entry: item 0312 the
+# tutorial, item 0313 the how-to guides, and item 0314 the explanation.
+nav:
+  - Home: index.md
+  - Reference: reference.md
+  # - Tutorial: tutorial.md
+  # - How-to guides: how-to/
+  # - Explanation: explanation/
+
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          options:
+            # ADR-0107 D1: the reference comes from an import of the compiled
+            # extension module. The `allow_inspection` option permits that
+            # import and it defaults to true, so this configuration never sets
+            # it. A build that sets it to false falls back to the type stub and
+            # publishes signatures with no method prose. Research report 19
+            # section 4.2 measured both pages, and neither build reported an
+            # error.
+            #
+            # The import also collects the members that the filter below
+            # removes, and a reader does not want them. Research report 19
+            # section 4.1 measured which ones appear.
+            filters:
+              - "!^__"
+            show_root_heading: true
+            show_symbol_type_heading: true
+            show_symbol_type_toc: true
+            separate_signature: true

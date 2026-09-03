@@ -23,7 +23,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^ALLOC]
 
-**Next number: DEC-115**
+**Next number: DEC-116**
 
 ## Open
 
@@ -688,38 +688,42 @@ in the paragraph above about ADR-0068, and it is a real one.
 
 ## Open
 
-### DEC-113 — Does the documentation site configuration stay in a portable format, or move to the builder's native one?
+### DEC-115 — Does the documentation build gate a commit, or run in its own job only?
 
-**Open. Engineering owns it. Nothing is blocked on it, because no documentation
-build exists yet.**
+**Open. Engineering owns it. Nothing is blocked on it, because the build runs in
+its own job today.**
 
-**The record on the provenance of the documentation prose leans on this and does
-not bind it.**[^DEC113A] That record refuses to name a builder, and one of its
-reasons is that the same configuration file builds with a second builder. The
-consequence section states that the builder stays replaceable. Nothing makes it
-stay replaceable.
+**The documentation build is a compile job.** It builds the bindings crate,
+installs the built module, and only then builds the site, because the reference
+comes from an import of that module.[^DEC115A] It also installs a site builder
+and a docstring handler, which the manifest holds in a dependency group of their
+own.
 
-**Option A. Keep the portable configuration format.** The escape hatch stays
-open, and a builder that is young enough to describe itself as alpha costs the
-project a swap and not a rewrite. The price is that the project cannot use a
-setting the portable format has no word for, and the research report names the
-settings that have none.[^DEC113B]
+**The whole check command is what a contributor runs before a hand-over, and
+what continuous integration runs.** It does not run the documentation build
+today. The site job runs it, and the probe recipe that proves the build can fail
+runs there as well.
 
-**Option B. Move to the builder's native configuration format.** Every setting
-becomes available and the file says what it means. The escape hatch closes, and
-the argument that made it safe to adopt a young builder closes with it.
+**Option A. Leave the build in its own job.** The gate command stays the length
+it is. The price is that a change to a Rust doc comment can break the site and a
+contributor learns it from a second job.
 
-**Option C. Decide when a native setting is first needed.** Stay portable until
-something needs a setting the portable format cannot state, and reopen then. It
-costs nothing today and it defers a decision that will be made under pressure.
+**Option B. Add the build to the gate command.** A contributor sees the break
+before the hand-over. The price is the whole cost of the crate build and a tool
+install on every run of the gate, and the gate budget already reports against a
+local figure.[^DEC115B]
 
-**Recommendation: A, until something forces it.** The value of the portable
-format is not the format. It is that the record above can decline to name a
-builder and still be honest about replaceability.
+**Option C. Add the checks and not the site build.** The import check costs one
+interpreter start over an environment the gate already builds. The site build
+and the prose check stay in the site job. The price is that the check that
+matters most, which reads the built site, is the one left out.
 
-**What closes this.** A documentation build exists, and the project either
-writes the portable file and states why, or meets a setting it cannot express
-and moves.
+**Recommendation: A, until the site publishes.** The site job is not a merge
+gate for anybody until somebody reads the site, and BLK-035 holds the address it
+would publish to.[^DEC115C] Reopen this when the address exists.
+
+**What closes this.** The site publishes, and the project either moves the build
+into the gate command or states why the site job stays separate.
 
 ### DEC-114 — How does a published page cite a repository document that the reader cannot open?
 
@@ -1362,6 +1366,27 @@ figure is 168 MB. The storage argument for vectors is stronger than the report
 concluded, and it called that argument its weakest.
 
 ## Closed
+
+### DEC-113 — Does the documentation site configuration stay in a portable format, or move to the builder's native one?
+
+**Closed. Option A. The site configuration is written in the portable
+format.**[^DEC113C]
+
+**The reason is the record it serves.** The record on the provenance of the
+documentation prose refuses to name a builder, and one of its reasons is that
+the same configuration file builds with a second builder.[^DEC113A] That
+sentence was true of the format and false of this repository, because no
+configuration file existed. It is now true of both.
+
+**Nothing forced the native format.** The site holds one generated reference
+page and one index. It uses the navigation, the Markdown extensions and one
+handler, and the portable format states all three. The settings that the
+portable format has no word for are named in the research report, and this site
+needs none of them.[^DEC113B]
+
+**What this did not decide.** The build is not pinned to the builder that runs
+it today. A second builder reads the same file, and a swap is a change to one
+job and to one dependency group.
 
 ### DEC-112 — Which builder publishes the Python reference, and what does the decision record bind?
 
@@ -2915,6 +2940,10 @@ a failed founding is correct.[^PRD12]
 [^DEC112D]: Decisions register, DEC-113, in this document.
 [^DEC113A]: ADR-0107, the Python reference is generated from the compiled module, the consequences. `docs/adrs/draft/adr-0107-the-python-reference-is-generated-from-the-compiled-module.md`
 [^DEC113B]: Research report 19, the documentation toolchain, section 3.2. `docs/research/reports/19-documentation-toolchain.md`
+[^DEC113C]: The site configuration. `mkdocs.yml`
+[^DEC115A]: ADR-0107, the Python reference is generated from the compiled module, decision D4. `docs/adrs/draft/adr-0107-the-python-reference-is-generated-from-the-compiled-module.md`
+[^DEC115B]: The gate budget wrapper. `scripts/gate-budget.sh`
+[^DEC115C]: Blockers register, BLK-035. `docs/BLOCKERS.md`
 [^DEC114A]: Backlog item 0308, the documentation plan. `docs/backlog/refined/0308-the-documentation-plan.md`
 [^DEC114B]: Documentation Rules, section 3. `.claude/rules/documentation.md`
 [^DEC114C]: Product requirement record 0021, a developer can use the control plane without reading its source. `docs/product/accepted/prd-0021-a-developer-can-use-the-control-plane-without-reading-its-source.md`

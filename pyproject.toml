@@ -49,6 +49,15 @@ dev = [
     "pytest>=8.2",
     "ruff>=0.6",
 ]
+# The documentation site builder and the handler that reads the compiled
+# module. They are build tools of the documentation job, so they are not
+# runtime dependencies of the package and they are not in the dev group either.
+# ADR-0107 does not name a builder, and the site configuration stays in the
+# portable format so that a second builder reads the same file.
+docs = [
+    "mkdocstrings-python>=2.0.8",
+    "zensical>=0.0.58",
+]
 
 [tool.uv]
 # The package is a compiled extension. Rebuild it when the Rust source

@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-324**
+**Next number: FND-326**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -9668,3 +9668,69 @@ documentation plan holds the page that states the line.[^F322E]
 [^F323B]: The project manifest. `pyproject.toml`
 [^F323C]: Product requirement record 0021, what this does not do. `docs/product/accepted/prd-0021-a-developer-can-use-the-control-plane-without-reading-its-source.md`
 [^F323D]: Product requirement record 0019, an agent can ask the running engine what it holds. `docs/product/shaped/prd-0019-an-agent-can-ask-the-running-engine-what-it-holds.md`
+
+### FND-324 — The strict mode of the site builder does not see the fallback to the type stub
+
+**Believed.** A research report measured that a documentation build with module
+inspection turned off falls back to the type stub, loses the method prose, and
+reports no error.[^F324A] A reader of that report can conclude that the strict
+mode of the builder closes the hole, because a strict build ends on a warning.
+
+**True.** It does not. The documentation job now runs the builder in strict
+mode. With module inspection off, that build reported no issue, exited zero, and
+46 of the 57 member summaries that the import finds were not on any page. The
+site looked complete. Every signature was there and the prose was gone.
+
+**Evidence.** The probe recipe breaks the job in the two ways the record names
+and requires it to fail each time.[^F324B] The first case takes the compiled
+module out of the environment. The second case builds the broken configuration
+that turns inspection off.[^F324C]
+
+```
+just docs-probe
+```
+
+**Follows.** No setting of the builder is the guard. The guard must compare the
+built site against the module that the import creates, and the documentation job
+runs that comparison after the site build.[^F324D] The expected text is derived
+from the module on every run, so the check holds no copy of any docstring.
+
+### FND-325 — Every public member of the compiled module already carries prose
+
+**Believed.** The record on the provenance of the documentation prose says that
+a member with no Rust doc comment publishes with no prose and that nothing
+fails.[^F325A] The priority index says the reference publishes empty prose until
+the doc comments exist.[^F325B] Both read as though members with no prose exist
+in numbers.
+
+**True.** None does. The import of the compiled module finds 57 public members
+and every one of them carries a docstring. The count covers the module level
+names and the members that each class declares itself.
+
+**One thing the count does not cover is the constructor, and it has no prose.**
+The binding library does not copy the doc comment of a constructor onto the
+Python object, so the module carries the standard interpreter sentence there and
+nothing else. The reference therefore says what a class is and never says how to
+build one. The prose for that belongs in the doc comment of the class.
+
+**Evidence.**
+
+```
+uv run python scripts/check_reference.py --import-only
+```
+
+**Follows.** The item that repairs the doc comments keeps its second half and
+loses its first.[^F325C] The gap is the audience of the prose and not the
+absence of it: a doc comment written for a contributor to the core under-serves
+the Python developer that the product record names, and no check can see
+that.[^F325A] [^F319C] The check that the documentation job runs reports every
+member with no prose, without failing, so the first half stays covered if a new
+member arrives with none.
+
+[^F324A]: Research report 19, the documentation toolchain, section 4.2. `docs/research/reports/19-documentation-toolchain.md`
+[^F324B]: The documentation probe. `scripts/docs-probe.sh`
+[^F324C]: The broken site configuration. `tests/fixtures/docs-inspection-off/mkdocs.yml`
+[^F324D]: The reference check. `scripts/check_reference.py`
+[^F325A]: ADR-0107, the Python reference is generated from the compiled module, the consequences. `docs/adrs/draft/adr-0107-the-python-reference-is-generated-from-the-compiled-module.md`
+[^F325B]: Backlog priority index, the row for item 0310. `docs/backlog/PRIORITY.md`
+[^F325C]: Backlog item 0310, write the Rust doc comments for the Python reader. `docs/backlog/proposed/0310-write-the-rust-doc-comments-for-the-python-reader.md`

@@ -1,7 +1,7 @@
 ---
 id: 0309
 title: Publish the Python reference generated from the compiled module
-status: refined
+status: complete
 created: 2026-09-03
 implements: [ADR-0107 D1, ADR-0107 D4]
 changes: []
@@ -131,7 +131,42 @@ Nothing at run time changes. No simulation code changes.
 
 ## Outcome
 
-Filled in when the item moves to `complete/`.
+**The site, the build job and the publishing job exist, and the publishing step
+is off.** The site configuration is in the portable format. The site holds one
+generated reference page and one index page that says what the site does not
+hold yet. The reference page holds one directive over the compiled module and
+no interface prose. The build job builds the extension, installs it, builds the
+site, and then checks the built site. A workflow runs the job and keeps the
+result as an artefact.[^16]
+
+**The guard is a comparison against the module, and not a setting of the
+builder.** The check imports the compiled module, takes the first line of the
+docstring of every public member, and requires each one on a page of the built
+site.[^17] It holds no copy of any docstring, so the reference has one
+declaration site and the check derives its expectation on every run.
+
+**Two failure modes were shown, and neither is a claim.** A probe recipe takes
+the compiled module out of the environment and runs the job, then turns module
+inspection off and runs the job again. The job failed both times. The second
+case is the one that reports nothing on its own: the builder ran in strict mode,
+reported no issue, exited zero, and 46 of the 57 member summaries were absent
+from the site. A finding holds it.[^18]
+
+**What changed from the plan.** The plan expected members with no prose, and
+there are none. Every public member of the compiled module already carries a
+docstring, so the item that repairs the doc comments keeps its second half and
+loses its first. A finding holds that as well.[^19] The plan also did not name a
+home page. The site now holds one, marked as an index, because a site with a
+reference and no root page answers nothing at its own address.
+
+**What stays blocked.** The address and the hosting switch.[^7] The publishing
+job takes the switch as a repository variable and takes the address from the
+host, so no file in this tree states either. Nothing publishes until the project
+owner sets the variable and sets the hosting source.
+
+**Registers.** One choice closed and one opened.[^5] [^20] Two findings were
+recorded.[^18] [^19] The blocker row gained the state of the job and stays
+open.[^7]
 
 ## References
 
@@ -150,3 +185,8 @@ Filled in when the item moves to `complete/`.
 [^13]: Findings register, FND-323. `docs/FINDINGS.md`
 [^14]: Backlog item 0308, the documentation plan. `docs/backlog/refined/0308-the-documentation-plan.md`
 [^15]: Testing Rules, section 2a. `.claude/rules/testing.md`
+[^16]: The documentation site job. `.github/workflows/docs.yml`
+[^17]: The reference check. `scripts/check_reference.py`
+[^18]: Findings register, FND-324. `docs/FINDINGS.md`
+[^19]: Findings register, FND-325. `docs/FINDINGS.md`
+[^20]: Decisions register, DEC-115. `docs/DECISIONS.md`
