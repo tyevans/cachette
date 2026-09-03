@@ -34,8 +34,7 @@ in a file that work did not own.
 2. Choose the cadence and say what decided it. The research runs the rebuild
    once for each simulated year, and it gives the walk cost per node.[^2] The
    scale constants give the ticks in a simulated day.[^3] **The cadence
-   is derived and not measured.** No measurement exists on the target
-   platform.[^4]
+   is derived and not measured.** No run has priced the walk.[^4]
 3. Drive the engine, not the pass: step a world through a birth and assert
    that the new character answers a patrilineal question afterwards.[^5]
 

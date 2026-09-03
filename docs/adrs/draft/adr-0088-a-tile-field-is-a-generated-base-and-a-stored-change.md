@@ -142,8 +142,8 @@ it.[^14]
 that have never changed. The search does grow with the number that have, and
 the ground record accepted the same growth for the stored take.[^3]
 
-**Nothing states the cost.** No measurement exists on the target platform, so
-this record states the shape of the growth and no figure.[^15]
+**Nothing states the cost.** One blocker holds the cost figures this record
+would state, so it gives the shape of the growth and no figure.[^15]
 
 **This record leaves the dense column record standing, and states what it
 leaves.** The dense column record says that a tile field is one contiguous

@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-258**
+**Next number: FND-260**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -6648,6 +6648,75 @@ before reading what it contends on. Contention is the failure that a rule
 already prevents, so it is the least likely one to be present in a project that
 has the rule.
 
+### FND-258 — Every document check passes with a false sentence in a record, and that was tested
+
+**Believed.** A sweep repairs the documents, and the checks hold the line
+afterwards. This project runs eight checks over its prose. One of them reads a
+decision record for a version pin and for a figure a measurement can change, so
+a reader can take the set as a guard against a record that states something
+false.
+
+**True.** No check reads meaning. A sentence that states the state of a register
+in its own words is ordinary prose to all eight, and every one of them stays
+green when that sentence becomes false.
+
+**Evidence.** After the sweep that repaired the sentence about the missing
+measurement, one repaired sentence was put back into a product record in its
+stale form. All eight checks ran and all eight passed. The record then went back
+to its repaired form. The commit body holds the command and the file.
+
+**Follows.** Three things.
+
+**The defence the earlier finding names has no enforcement.** That finding says
+the defence is not a sweep, and that a document must state a blocker by citation
+and never in its own words.[^F258A] Nothing fails when a document does the
+opposite, so the defence is a habit and not a rule.
+
+**The check that would work is a search, not a parser.** The stale sentence is a
+small family of phrases about the state of measurement. A check can forbid that
+family everywhere except the registers that own the statement, and this
+repository already has the pattern for the sites that may not be repaired: a
+baseline file that lists the known failures and may only shrink.[^F258B] A
+backlog item holds the design.[^F258C]
+
+**A sweep proved by reading the files is not proved.** The testing rule already
+says that the only proof a test reaches a case is to put the defect back and
+watch the test stay green.[^84] A sweep over prose earns the same treatment,
+and the result here was the one the rule predicts.
+
+### FND-259 — The project orientation has two copies, and the sweep repaired one
+
+**Believed.** The project orientation was repaired when the blocker about the
+missing measurement narrowed. The finding that recorded the spread says so, and
+it names the orientation as one document.[^F258A]
+
+**True.** The orientation is two tracked files and a symlink. One carries the
+repaired sentence and the other still says that no measurement exists on the
+target platform, so an agent that reads the second reads something false. The
+two files differ in nothing else except the numbering of their footnotes and the
+paths inside them.
+
+**Evidence.** A search for the phrase family across the whole tree, after the
+sweep, returned the second file. A difference between the two files shows that
+every other line agrees. The commit body holds both commands.
+
+**Follows.** Three things.
+
+**This is the redundant declaration site, with both copies in the tree and
+nothing that compares them.** The rule already states the defence: when a second
+site must exist, add a check that fails when the copies disagree.[^22] A
+backlog item holds the check.[^F259C]
+
+**A mirror that differs only by a rewrite is derivable, so the check is cheap.**
+The five rule files beside these two differ from their mirrors only in the
+directory named inside a footnote. A check can apply that rewrite and compare,
+and it needs no judgement to do it.
+
+**A count of repaired sites is a count of the sites the writer knew about.** The
+earlier finding named three documents and repaired three. The tree held four,
+and nothing in the writing of that finding could have shown the fourth, because
+the count came from a reader rather than from a search.
+
 ## References
 
 [^F226A]: Backlog item 0185, steer a step by the option the unit chose. `docs/backlog/complete/0185-steer-a-step-by-the-option-the-unit-chose.md`
@@ -6655,6 +6724,10 @@ has the rule.
 [^F226C]: ADR-0063, a need is a rate with a threshold, and crossing it is a fact, decision D2. `docs/adrs/accepted/adr-0063-a-need-is-a-rate-with-a-threshold-and-crossing-it-is-a-fact.md`
 [^F226E]: Backlog item 0240, let the demonstration make a unit hungry. `docs/backlog/complete/0240-let-the-demonstration-make-a-unit-hungry.md`
 [^F227B]: Findings register, FND-183, in this document.
+[^F258A]: Findings register, FND-223, in this document.
+[^F258B]: The footnote baseline. `scripts/footnote-baseline.txt`
+[^F258C]: Backlog item 0242. `docs/backlog/refined/0242-fail-a-check-when-a-document-states-a-register-in-its-own-words.md`
+[^F259C]: Backlog item 0244. `docs/backlog/refined/0244-fail-a-check-when-the-two-project-orientations-disagree.md`
 [^F222]: Target platform costs. `docs/reference/graviton-costs.md`
 [^F223C]: ADR Registry, how a record changes. `docs/adrs/REGISTRY.md`
 

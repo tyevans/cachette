@@ -113,8 +113,8 @@ that only a run settles, and the decisions register holds it open.[^13]
 
 **The engine gains one array, indexed by the cell and by the option.** It
 costs the cell count times the option count, and it does not cost the
-population. No figure appears here, because no measurement exists on the
-target platform.[^14]
+population. No figure appears here, because one blocker holds the
+cost figures this record would state.[^14]
 
 **A unit no longer steps in a direction that its own reading chose.** The
 engine cannot give one unit of a cell a different direction from another,

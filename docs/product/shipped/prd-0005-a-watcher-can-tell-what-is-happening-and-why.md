@@ -130,14 +130,15 @@ The third property is what bounds the first two. It also decides the content:
 a number that would need its own pass is not shown at all, rather than shown
 at a cost nobody sees.
 
-No cost figure appears here, because nobody has measured one on the target
-platform.[^1] The shape of the growth is the requirement. The figure is not.
+No cost figure appears here, because one blocker holds every cost figure this
+record would state.[^1] The shape of the growth is the requirement. The figure is not.
 
 ## Which blockers govern this
 
-- **No measurement exists on the target platform.**[^1] Every cost statement
-  above states a shape, not a number. A frame rate, a draw count and a panel
-  cost are all measurements, so this record states none of them.
+- **One blocker governs every cost figure here.**[^1] It says which figures
+  are measured and which are derived. Every cost statement above states a
+  shape, not a number. A frame rate, a draw count and a panel cost are all
+  measurements, so this record states none of them.
 
   The panel itself displays measured figures. Those describe the machine the
   developer runs, which is a development machine. They do not answer this

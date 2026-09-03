@@ -100,9 +100,10 @@ dominates.[^2]
 
 ## Which blockers govern this
 
-- **No measurement exists on the target platform.**[^1] Every cost statement
-  above states a shape, not a number. A tick budget, a memory figure and an
-  update rate are all measurements, so this record states none of them.
+- **One blocker governs every cost figure here.**[^1] It says which figures
+  are measured and which are derived. Every cost statement above states a
+  shape, not a number. A tick budget, a memory figure and an update rate are
+  all measurements, so this record states none of them.
 
 This record depends on terrain. The world now gives every tile a kind and a
 height. This record states no terrain value, so no terrain decision can make

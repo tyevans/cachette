@@ -72,7 +72,8 @@ this item.
 and ADR-0081 D3 keeps a per-site one for reasons the tile case does not have.
 The two stand together and neither supersedes the other.[^9]
 
-**Blockers.** BLK-007 governs every cost figure, so this item states none.
+**Blockers.** BLK-007 governs the cost figures this item would state, so it
+states none.
 BLK-005 is resolved and gives the settlement count.[^10] BLK-003 is resolved:
 the population counts everybody, so everybody needs somewhere to live.[^11]
 

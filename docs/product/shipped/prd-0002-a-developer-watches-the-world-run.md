@@ -97,14 +97,15 @@ Two properties follow. A solution must have both.
   cost to a step. The time a drawing itself takes is excluded, because the
   demonstration binary draws every step.
 
-No cost figure appears here, because nobody has measured one on the target
-platform.[^1] The shape of the growth is the requirement. The figure is not.
+No cost figure appears here, because one blocker holds every cost figure this
+record would state.[^1] The shape of the growth is the requirement. The figure is not.
 
 ## Which blockers govern this
 
-- **No measurement exists on the target platform.**[^1] Every cost statement
-  above states a shape, not a number. A frame rate, a draw count and a memory
-  figure are all measurements, so this record states none of them.
+- **One blocker governs every cost figure here.**[^1] It says which figures
+  are measured and which are derived. Every cost statement above states a
+  shape, not a number. A frame rate, a draw count and a memory figure are all
+  measurements, so this record states none of them.
 
 The two questions that governed the world shape and the faction ceiling are
 answered, so this record states neither of them parametrically.[^2]

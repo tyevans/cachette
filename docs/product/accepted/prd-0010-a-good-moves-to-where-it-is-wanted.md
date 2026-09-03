@@ -92,8 +92,9 @@ things dominates the term that grows with the number of tiles.[^2]
 
 ## Which blockers govern this
 
-- **No measurement exists on the target platform.**[^1] Every cost statement
-  above states a shape, not a number.
+- **One blocker governs every cost figure here.**[^1] It says which figures
+  are measured and which are derived. Every cost statement above states a
+  shape, not a number.
 
 ## References
 

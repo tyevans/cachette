@@ -33,7 +33,8 @@ write to it.[^2]
 
 **Creates.** None expected. A display is not a constraint.
 
-**Blockers.** BLK-007 governs every cost figure, so this item states none.[^3]
+**Blockers.** BLK-007 governs the cost figures this item would state, so it
+states none.[^3]
 
 **Precedent.** FND-049 records the dominant cost term.[^4] A display that
 walks every link each frame pays the network for each frame.

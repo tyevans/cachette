@@ -73,8 +73,8 @@ function of the column count, and the reference tables hold what was
 measured.[^8]
 
 **The crossover figure is not in this record.** A measured figure changes when
-a better measurement arrives. A decision does not.[^9] No measurement exists on
-the target platform, and one blocker holds every cost figure here.[^10]
+a better measurement arrives. A decision does not.[^9] One blocker holds every
+cost figure here, and it says which figures are measured.[^10]
 
 ### D3. The living character columns are struct-of-arrays, and the record of descent is too
 
@@ -120,7 +120,7 @@ reaches the character columns.
 recursion.** Those two operations read two or three columns for each node, so
 they pay more cache lines than a row layout would. The column passes are the
 majority of the work and they pay less. Nothing here claims the trade is
-optimal at the target scale, because nothing has been measured there.
+optimal at the target scale, because no run has separated the two.[^10]
 
 **A subtree of the father forest is contiguous in the Euler order array, and
 not in the house column.** The research describes a cadet split as a

@@ -80,9 +80,9 @@ This is the checkable form of D1. A reviewer counts what the derivation is
 indexed by. If the population appears in that count, the strategy is a search
 wearing a field's name.
 
-**No figure appears here.** No measurement exists on the target platform, and
-every cost figure in this project is derived rather than measured.[^6] The
-argument is about which term the cost follows, not what the term is worth.
+**No figure appears here.** One blocker holds every cost figure this record
+would state, and it says which figures are measured.[^6] The argument is about
+which term the cost follows, not what the term is worth.
 
 ### D3. A strategy that names a place is seeded at that place, and the field carries the direction outward
 

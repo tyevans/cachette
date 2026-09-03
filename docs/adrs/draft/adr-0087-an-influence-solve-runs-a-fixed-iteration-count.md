@@ -64,8 +64,8 @@ is the ordinary value.[^5]
 
 **The constant is a reach, not a budget.** It is the number of cells that one
 solve adds to the field. No measurement chose it, and no measurement may be
-put in its place, because every cost figure in this project is derived and a
-blocker holds the reason.[^9]
+put in its place, because one blocker holds the cost figures a reach would be
+chosen against.[^9]
 
 ### D2. The pass count is observable, because a test must read it
 

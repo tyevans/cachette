@@ -27,12 +27,9 @@ Do not add a development machine figure to this file.
 ## Status
 
 No measured figure is recorded **in this document**. A benchmark harness now
-exists, and one run on a Graviton instance measured the cost of a frame, the
-cost of building a world and the cost of the whole-world hash.[^14] None of
-those figures replaces a row below.
 exists, and two runs on Graviton instances measured the cost of a frame, the
 cost of building a world, the cost of the whole-world hash and the resident
-memory of a world.[^10] None of those figures replaces a row below.
+memory of a world.[^14] None of those figures replaces a row below.
 
 The scale constants below are decided or derived, not measured. Each was held
 here because a blocker governed it. Those blockers are now closed.

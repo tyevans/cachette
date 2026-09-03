@@ -154,8 +154,8 @@ states what that type is comes with this one.[^10]
 protect a caller from a bounded population. It protects the world from an
 unbounded one.
 
-**This record states no cost.** No measurement exists on the target platform,
-and every cost figure in this project is derived rather than measured.[^11]
+**This record states no cost.** One blocker holds every cost figure this record
+would state, and it says which figures are measured.[^11]
 
 ## References
 

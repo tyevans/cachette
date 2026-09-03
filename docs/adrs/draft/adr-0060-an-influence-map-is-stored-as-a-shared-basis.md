@@ -109,8 +109,8 @@ faction count.
 second plane for each faction would remove the copy and would make the write
 half as large as the field itself. The write half would then be a share of the
 whole system that no consumer ever reads. Nothing has priced the copy against
-that storage, because no measurement exists on the target platform, so the
-decision takes the smaller storage and says which figure would reopen it.[^11]
+that storage, because no run separates the two, so the decision takes the
+smaller storage and says which figure would reopen it.[^11]
 
 **A plane of one faction is read only by that faction.** That is what makes
 one scratch enough: relaxing one plane before another changes neither of them,

@@ -41,7 +41,8 @@ sort to take a key vector rather than a comparison function. ADR-0056 D2 and
 D3 hold the intent-then-admission shape for movement, and this work uses the
 same shape for a different verb.[^1] [^2] [^3] [^4]
 
-**Blockers.** BLK-007 governs every cost figure, so this item states none.
+**Blockers.** BLK-007 governs the cost figures this item would state, so it
+states none.
 The commodity count follows the recommendation in DEC-001 and is not invented
 here.[^5]
 

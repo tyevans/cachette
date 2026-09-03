@@ -419,13 +419,13 @@ map has one destination and any value in it is the same value.
 ### DEC-069 — Which representation does the result of a selector take?
 
 **Open. The recommendation is a two-level form built for this storage, and the
-choice waits for a measurement that does not exist.**
+choice waits for a measurement nobody has taken.**
 
 A selector describes a set and the engine evaluates it.[^DEC69A] The evaluation
 produces a result, and the record that governs the result requires one property
 of it: a block that a predicate satisfies as a whole costs one entry, whatever
 the block holds.[^DEC69B] That record states the property and names no form,
-because no measurement exists on the target platform.[^BLK7]
+because no run separates the forms.[^BLK7]
 
 **The options.**
 
@@ -439,7 +439,7 @@ because no measurement exists on the target platform.[^BLK7]
    a conversion sits between the descent and the verb.
 3. A sorted list of indices, with a bitmask above a density threshold. This is
    the smallest amount of new code. The threshold is a value a measurement
-   decides, and no measurement exists.
+   decides, and nobody has taken one.
 
 **The recommendation is option 1.** The key space here is not arbitrary, and
 option 2 treats it as if it were. The gain the record claims comes from the
@@ -552,6 +552,13 @@ own state select, and it still reads one cell.
 
 The record is accepted and it has many dependents, so the retcon window is
 shut.[^DEC96A]
+
+**A group of accepted records now waits on this row, and they are the same
+case.** The blocker about the missing measurement narrowed, and a sweep repaired
+every document it was free to touch. It stopped at the accepted records, which
+say in their own words that no measurement exists on the target platform. That
+sentence carries a footnote marker, so rewording it is an amendment and the
+window governs it. A backlog item holds the work and waits here.[^BLK7] [^DEC96E]
 
 **A stale consequence is not rare and it is not this record's alone.** A
 consequence is where a record says what follows, and what follows changes when
@@ -913,7 +920,7 @@ count is answered and has one candidate.[^BLK5]
 the property the product record states, and it states it of the storage the
 world reserves rather than of the units alone.[^PRD12] Option 2 spends the
 difference between the target and the ceiling on every world in the process,
-and no measurement on the target platform says what that costs.[^BLK7] Option
+and no run on the target platform says what that costs.[^BLK7] Option
 3 leaves two arenas that reallocate inside a step, which is the shape the
 closed row rejected for the third.
 
@@ -1107,8 +1114,8 @@ builder adds in one tick, or nothing takes several ticks and the storage that
 carries a build between ticks has no reason to exist. A test asserts this
 against the whole catalogue rather than against a named kind.
 
-**What is not decided.** The project has no measurement on the target
-platform, so no value here is derived from one.[^BLK7] One tick is a fixed
+**What is not decided.** No run on the target platform has priced a build, so
+no value here is derived from one.[^BLK7] One tick is a fixed
 span of simulated time, and the scale constants table holds it, so a content
 author who wants a build to take a stated span can convert.[^SCALE]
 
@@ -1436,8 +1443,8 @@ The record and the code disagree, so one of them changes.[^DOD3]
    question.
 
 **The recommendation is option 1.** A reallocation of ten columns at one million
-units is a cost that arrives inside a step, and no measurement exists on the
-target platform to say what it costs.[^BLK7] A reservation moves that cost to
+units is a cost that arrives inside a step, and no run on the target platform
+says what it costs.[^BLK7] A reservation moves that cost to
 construction, where a developer can see it. It also gives the refusal path a
 real case, rather than one somebody adds after the first stall.
 
@@ -2142,8 +2149,8 @@ standing.** The target owns every claim about how the engine performs. The
 development machine owns a local gate-time budget, and that budget is never
 evidence about the target.
 
-Every cost figure in this project is derived and belongs to the target, and one
-open blocker states that no measurement exists there.[^BLK7] The rule that
+Most cost figures in this project are derived and belong to the target, and one
+open blocker says which of them a run has measured.[^BLK7] The rule that
 follows is that a measurement taken on a development machine proves nothing
 about the target, because the two differ in cache line size.
 
@@ -2224,8 +2231,7 @@ founded next in that slot feeds a population it never took. The engine clears
 them by scanning every unit.[^ADR14D7]
 
 The scan is correct and it is the whole population for one destruction. No
-figure is stated here, because no measurement exists on the target
-platform.[^BLK7] A destruction is rare, and the scan needs no second structure
+figure is stated here, because no run has priced the scan.[^BLK7] A destruction is rare, and the scan needs no second structure
 to maintain. It is one fact in one place.[^SHAPE1]
 
 A reverse index from a site to its units would touch only the units that named
@@ -2432,3 +2438,4 @@ a failed founding is correct.[^PRD12]
 [^DEC96A]: ADR Registry, the retcon window. `docs/adrs/REGISTRY.md`
 [^DEC96B]: Findings register, FND-218. `docs/FINDINGS.md`
 [^DEC96C]: ADR-0096, cost follows the lattice, not the population, and a unit is a reader, decision D4. `docs/adrs/draft/adr-0096-cost-follows-the-lattice-not-the-population.md`
+[^DEC96E]: Backlog item 0243. `docs/backlog/proposed/0243-repair-the-accepted-records-that-state-the-missing-measurement.md`

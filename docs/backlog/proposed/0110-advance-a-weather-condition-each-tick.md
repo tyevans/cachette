@@ -36,8 +36,8 @@ comparison.
   fixture built from the demonstration world supplies no extreme, and the
   test then measures the fixture.[^3] The review must say what distribution
   the test needs.
-- **No measurement exists on the target platform.**[^4] The item states a
-  cost shape, not a figure.
+- **One blocker holds the cost figures this item would state.**[^4] The item
+  states a cost shape, not a figure.
 
 ## Done when
 

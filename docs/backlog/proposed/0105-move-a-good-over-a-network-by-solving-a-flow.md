@@ -50,7 +50,8 @@ ADR-0049 states that a quantity is a rate, a constraint or a set.[^4] The
 refinement decides how many of the three this work writes. Do not choose a
 number; the registry allocates it and these three are already allocated.
 
-**Blockers.** BLK-007 governs every cost figure, so this item states none.[^5]
+**Blockers.** BLK-007 governs the cost figures this item would state, so it
+states none.[^5]
 
 **Precedent.** FND-049 records that the term which grows with the number of
 things dominates the term that grows with the number of tiles.[^6] A solver

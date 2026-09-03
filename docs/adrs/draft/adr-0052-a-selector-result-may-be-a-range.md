@@ -113,10 +113,10 @@ are open. The research recommends a two-level form built for this storage
 rather than a general compressed bitmap library, and it records that the
 recommendation is a design argument.[^8]
 
-No measurement exists on the target platform, so every cost figure in this
-project is derived rather than measured.[^12] This record therefore states the
-property the representation must have, and it states no threshold, no density
-and no size. A decision register entry carries the open choice with its options
+One blocker holds every cost figure this decision rests on, and it says which
+figures are measured.[^12] No measurement separates the forms below. This record
+therefore states the property the representation must have, and it states no
+threshold, no density and no size. A decision register entry carries the open choice with its options
 and the recommendation.[^13]
 
 ## The alternatives this rejects
