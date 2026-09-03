@@ -1,8 +1,34 @@
 """Type stubs for the compiled extension module.
 
-The contributing guide requires that continuous integration checks the stubs. The
-build regenerates them and the job fails when the result differs from this
-file. Hand-write the parts that a generator cannot infer.
+This file is hand-written. **No generator produces it and no job compares it
+against the module**, so a signature here can disagree with the module and
+nothing fails. An earlier version of this docstring claimed the opposite, and a
+finding records the correction.[^1] A backlog item holds the generator and the
+check.[^2]
+
+**This file states types. It does not state prose.** A member that the compiled
+module provides carries its prose in the Rust doc comment, and the published
+reference is generated from the module rather than from this file.[^3] A
+declaration here that the module does not provide, such as a typed dictionary
+that describes a returned mapping, has no other home and carries its own prose.
+
+The docstrings below that copy the Rust source are a defect that predates the
+record. The same backlog item removes them.[^2] [^4]
+
+References
+----------
+[^1]: Findings register, FND-320.
+``docs/FINDINGS.md``
+
+[^2]: Backlog item 0307, generate the type stub from the compiled module.
+``docs/backlog/proposed/0307-generate-the-type-stub-from-the-compiled-module.md``
+
+[^3]: ADR-0107, the Python reference is generated from the compiled module,
+decisions D2 and D3.
+``docs/adrs/draft/adr-0107-the-python-reference-is-generated-from-the-compiled-module.md``
+
+[^4]: Findings register, FND-321.
+``docs/FINDINGS.md``
 """
 
 from collections.abc import Sequence

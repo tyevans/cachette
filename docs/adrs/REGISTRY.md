@@ -377,6 +377,7 @@ without stating a constraint is worse than no record.
 | 0104 | A soldier is promoted from a level that never falls | Draft | 0004, 0007, 0014, 0054 | 14, `draft/adr-0104-a-soldier-is-promoted-from-a-level-that-never-falls.md` |
 | 0105 | A total order needs no repeated identifier, only no repeated key | Draft | 0001, 0004, 0007 | `draft/adr-0105-a-total-order-needs-no-repeated-key.md` |
 | 0106 | A cohort serves whole rations to a keyed subset, never an equal share to everybody | Draft | 0002, 0003, 0004, 0009, 0023, 0063 | `draft/adr-0106-a-cohort-serves-whole-rations-to-a-keyed-subset.md` |
+| 0107 | The Python reference is generated from the compiled module, and its prose lives in the Rust doc comment | Draft | 0040, 0041, 0046 | `draft/adr-0107-the-python-reference-is-generated-from-the-compiled-module.md` |
 
 ### Retired numbers
 

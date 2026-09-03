@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-321**
+**Next number: FND-322**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -9204,6 +9204,42 @@ Rust doc comment as the single source of the prose for exactly this
 reason.[^F320D] A generator would also remove the second declaration site for
 every signature, which is the shape the recurring defect rule names.[^F320E]
 
+### FND-321 — The stub already carries prose the Rust source owns, and the copy that drifted dropped the paragraph that warns against a copy
+
+**Believed.** The register records that the type stub and the compiled module
+are two declaration sites for the public interface, and that they already
+disagree about the prose.[^F321A] The disagreement it names is an absence: the
+stub carries no docstring for any method of `World` and none for any method of
+`Camera`.
+
+**True, and the sharper half is what the stub does carry.** Nine exception
+classes carry a docstring in the stub. All nine are the same words as the string
+that the Rust macro gives the same exception, character for character.[^F320C]
+The `World` class docstring is a one line copy of the Rust doc comment, and it
+agrees. The `Camera` class docstring is an abridged copy of the Rust doc comment,
+and it does not agree: it keeps the first and the last paragraph and drops two.
+
+**One of the dropped paragraphs is the one that names this defect.** The Rust
+doc comment says that a pan share and a zoom step written on both sides of the
+boundary would be one value in two places, with nothing failing when the copies
+disagreed. The stub is that second place, and the sentence did not survive the
+copy into it.
+
+**Evidence.**
+
+```
+grep -n "create_exception" crates/cachette-py/src/lib.rs
+sed -n '1303,1320p' crates/cachette-py/src/lib.rs
+sed -n '280,336p' python/cachette/_core.pyi
+```
+
+**Follows.** The count of copies is eleven, not zero, and nine of them agree
+today. **An agreeing copy is the worse case**, because it reads as a maintained
+file and gives a contributor no reason to look for the other site. The record on
+the provenance of the documentation prose forbids a docstring on a stub member
+that the compiled module provides, and it names this as a defect it does not
+fix.[^F321C] A backlog item holds the removal and the check.[^F321D]
+
 
 ## References
 
@@ -9212,6 +9248,9 @@ every signature, which is the shape the recurring defect rule names.[^F320E]
 [^F320C]: The Python bindings crate. `crates/cachette-py/src/lib.rs`
 [^F320D]: Research report 19, the documentation toolchain, sections 4.2 and 7. `docs/research/reports/19-documentation-toolchain.md`
 [^F320E]: Recurring Defect Shapes, shape 1, redundant declaration sites. `.claude/rules/recurring-defects.md`
+[^F321A]: Findings register, FND-320, in this document.
+[^F321C]: ADR-0107, the Python reference is generated from the compiled module, decision D3. `docs/adrs/draft/adr-0107-the-python-reference-is-generated-from-the-compiled-module.md`
+[^F321D]: Backlog item 0307, generate the type stub from the compiled module. `docs/backlog/proposed/0307-generate-the-type-stub-from-the-compiled-module.md`
 
 [^F261B]: The holder count test of the viewer. `crates/cachette-view/tests/shows_who_holds_the_ground.rs`
 [^F261C]: Backlog item 0271, count the ground generations that one frame runs. `docs/backlog/proposed/0271-count-the-ground-generations-that-one-frame-runs.md`
