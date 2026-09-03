@@ -115,6 +115,20 @@ impl Axial {
 pub struct Grid {
     width: u32,
     height: u32,
+    /// The reciprocal that replaces the division by the width.
+    ///
+    /// The value is derived from the width, and [`Grid::new`] is the only
+    /// site that writes it. The fields are private and the type has no
+    /// setter, so the two cannot disagree.[^1]
+    ///
+    /// A width of one needs no division, and its reciprocal does not fit a
+    /// `u64`, so a width of one stores zero here and the quotient is the
+    /// index itself.
+    ///
+    /// # References
+    ///
+    /// [^1]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`
+    width_reciprocal: u64,
 }
 
 /// The reason that a grid refused to build.
@@ -137,6 +151,18 @@ impl core::fmt::Display for GridError {
 
 impl std::error::Error for GridError {}
 
+/// Returns the reciprocal that replaces a division by `width`.
+///
+/// The value is `floor(2^64 / width) + 1`. A width of one needs no division
+/// and its reciprocal does not fit a `u64`, so this returns zero for it and
+/// the caller reads that as "the quotient is the index".
+const fn reciprocal_of(width: u32) -> u64 {
+    if width <= 1 {
+        return 0;
+    }
+    (((1u128 << 64) / width as u128) + 1) as u64
+}
+
 impl Grid {
     /// Builds a grid.
     ///
@@ -149,7 +175,14 @@ impl Grid {
             return Err(GridError::EmptySide);
         }
         match (width as u64).checked_mul(height as u64) {
-            Some(count) if count <= u32::MAX as u64 => Ok(Self { width, height }),
+            // **The ceiling on the tile count is what makes the reciprocal
+            // exact.** A caller that widens the tile index must revisit
+            // `address_of`, which states the bound it depends on.
+            Some(count) if count <= u32::MAX as u64 => Ok(Self {
+                width,
+                height,
+                width_reciprocal: reciprocal_of(width),
+            }),
             _ => Err(GridError::TooManyTiles),
         }
     }
@@ -200,15 +233,58 @@ impl Grid {
     ///
     /// The viewer needs this direction, so it is part of the interface
     /// rather than a test helper.
+    ///
+    /// **The conversion multiplies by a reciprocal. It does not divide.** The
+    /// width is fixed when the grid is built and is not known when the crate
+    /// is compiled, so a division here is a hardware division, and this
+    /// function has call sites in most modules of the crate. A measurement
+    /// found the division to be the largest single part of turning a tile
+    /// into a level 1 cell.[^1]
+    ///
+    /// **The multiply is exact, and it is exact by construction.** For a
+    /// width `d`, the grid stores `m = floor(2^64 / d) + 1`. Write
+    /// `e = m * d - 2^64`, which satisfies `1 <= e <= d`. Then
+    /// `floor(n * m / 2^64) = floor(n / d)` holds for every `n` with
+    /// `e * n < 2^64`.
+    ///
+    /// **This grid meets that bound because [`Grid::new`] refuses a world
+    /// whose tile count leaves a `u32`.** So `e <= d <= u32::MAX` and
+    /// `n < 2^32`, and the product stays below `2^64` for every world this
+    /// crate can build. A change that widens the tile index breaks that
+    /// argument, and it must widen this reasoning with it.
+    ///
+    /// The arithmetic is integer throughout, so the result is bit-identical
+    /// to the division it replaces and no state depends on a rounding
+    /// rule.[^2]
+    ///
+    /// # References
+    ///
+    /// [^1]: Findings register, FND-282. `docs/FINDINGS.md`
+    /// [^2]: ADR-0002, simulated and aggregated state holds no floating point number, decision D1. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
     #[must_use]
     pub const fn address_of(self, index: TileIdx) -> Option<Axial> {
         if index.0 >= self.tile_count() {
             return None;
         }
+        let row = self.row_of(index.0);
+        // The remainder follows from the quotient, so the second division
+        // goes with the first.
+        let column = index.0 - row * self.width;
         Some(Axial {
-            q: (index.0 % self.width) as i32,
-            r: (index.0 / self.width) as i32,
+            q: column as i32,
+            r: row as i32,
         })
+    }
+
+    /// Returns the row that holds an index.
+    ///
+    /// The caller has already checked that the index is inside the world.
+    const fn row_of(self, index: u32) -> u32 {
+        if self.width_reciprocal == 0 {
+            // The width is one, so every index is its own row.
+            return index;
+        }
+        ((index as u128 * self.width_reciprocal as u128) >> 64) as u32
     }
 
     /// Returns the neighbour of an address in one direction.

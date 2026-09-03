@@ -1,7 +1,7 @@
 ---
 id: 0268
 title: Hold the cell index on the unit
-status: proposed
+status: complete
 created: 2026-09-03
 implements: []
 changes: []
@@ -66,6 +66,36 @@ That check is not optional and it is not a follow-up. Write it first.
 It does not decide whether the memory trade is open in general. One open row
 holds that.[^4]
 
+## Outcome
+
+**Refused. The cost it targets was removed without the column.**
+
+The item stores a derived value beside the value it is derived from, which is
+the defect shape this project records most often, and it asked for a check to
+manage that hazard. A measurement removed the need for the hazard instead.
+
+The cost is one hardware division, because the conversion from a tile index to
+an address takes a remainder and a quotient by a width that is not known when
+the crate is compiled.[^5] The grid now stores a reciprocal of the width, so
+that conversion is a multiply. **The division is gone for every caller, and no
+value is stored twice.**
+
+Two routes were measured. A width constrained to a power of two makes the
+conversion a mask and a shift, and it closes a median of 74 percent of the gap
+between the division and a stored column. The reciprocal closes 75 percent and
+constrains nothing. The shift is not faster in any run, so the constraint and
+the wasted tiles buy nothing, and that route is refused too.[^7]
+
+**Neither route, and not this item, is frame budget work.** A frame at the
+target extent costs seconds, and the whole conversion is under one percent of
+it.[^8] The item was ranked against other items and never against a frame. It
+is refused on that as much as on the reciprocal.
+
+The remaining gap to a stored column is real and small. Reopen it against a
+measurement on a quiet target machine, and only after the passes that hold the
+frame have moved.
+
+
 ## References
 
 [^1]: Findings register, FND-252. `docs/FINDINGS.md`
@@ -74,3 +104,5 @@ holds that.[^4]
 [^4]: Decisions register, DEC-105. `docs/DECISIONS.md`
 [^5]: Findings register, FND-282. `docs/FINDINGS.md`
 [^6]: Findings register, FND-281. `docs/FINDINGS.md`
+[^7]: The exit locality benchmark. `crates/cachette-core/benches/exit_locality.rs`
+[^8]: Findings register, FND-283. `docs/FINDINGS.md`

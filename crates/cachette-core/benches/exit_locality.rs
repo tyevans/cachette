@@ -86,7 +86,7 @@
 //! [^1]: Backlog item 0267, hold the exit direction on the tile. `docs/backlog/complete/0267-hold-the-exit-direction-on-the-tile.md`
 //! [^2]: Testing rules, section 3. `.claude/rules/testing.md`
 //! [^3]: Findings register, FND-281. `docs/FINDINGS.md`
-//! [^4]: Backlog item 0268, hold the cell index on the unit. `docs/backlog/proposed/0268-hold-the-cell-index-on-the-unit.md`
+//! [^4]: Backlog item 0268, hold the cell index on the unit. `docs/backlog/complete/0268-hold-the-cell-index-on-the-unit.md`
 //! [^5]: Blockers register, BLK-007. `docs/BLOCKERS.md`
 
 use std::time::Instant;
@@ -291,7 +291,7 @@ fn main() {
     // is reached, so the difference is the key-and-block arithmetic and
     // nothing else.[^1]
     //
-    // [^1]: Backlog item 0268, hold the cell index on the unit. `docs/backlog/proposed/0268-hold-the-cell-index-on-the-unit.md`
+    // [^1]: Backlog item 0268, hold the cell index on the unit. `docs/backlog/complete/0268-hold-the-cell-index-on-the-unit.md`
     let stored: Vec<u32> = work
         .iter()
         .map(|(tile, _)| {

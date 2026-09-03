@@ -5,3 +5,5 @@
 # It is recommended to check this file in to source control so that
 # everyone who runs the test benefits from these saved cases.
 cc 3ab75d32001c383efcd2bc546b9fe9f5668e60e09195157e7aa5b4ce634ee39c # shrinks to grid = Grid { width: 1, height: 1 }, q = 0, r = 1
+cc 20a12785deacc21901cb480920bbfd47a7c0f37f57ef1327ecb7eb7d3b1a09b0 # shrinks to (grid, address) = (Grid { width: 9, height: 2, width_reciprocal: 2049638230412172401 }, Axial { q: 0, r: 1 })
+cc 17d048582c069e2ff0b49477c10726dfbdc29b74b4cd4e6d3c780fe961d8d471 # shrinks to grid = Grid { width: 13, height: 24, width_reciprocal: 1418980313362273201 }, raw = 299
