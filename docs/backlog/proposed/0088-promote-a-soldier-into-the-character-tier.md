@@ -122,5 +122,5 @@ character decides something, and item 0068 is what makes one decide.
 [^7]: Recurring Defect Shapes, shape 1. `.claude/rules/recurring-defects.md`
 [^8]: Blockers register, BLK-004. `docs/BLOCKERS.md`
 [^9]: Findings register, FND-269. `docs/FINDINGS.md`
-[^10]: Backlog item 0266, order the unit arena by cell. `docs/backlog/proposed/0266-order-the-unit-arena-by-cell.md`
+[^10]: Backlog item 0266, order the unit arena by cell. `docs/backlog/refined/0266-order-the-unit-arena-by-cell.md`
 [^11]: Recurring Defect Shapes, shape 3. `.claude/rules/recurring-defects.md`
