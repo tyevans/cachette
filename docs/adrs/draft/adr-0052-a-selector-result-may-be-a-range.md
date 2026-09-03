@@ -183,7 +183,7 @@ representation exists. This record binds the work that builds them.
 
 ## References
 
-[^1]: ADR-0051, a selector is a lazy expression tree that Rust evaluates, decision D1. `docs/adrs/draft/adr-0051-a-selector-is-a-lazy-expression-tree.md`
+[^1]: ADR-0051, a selector is a lazy expression tree that Rust evaluates, decision D1. `docs/adrs/accepted/adr-0051-a-selector-is-a-lazy-expression-tree.md`
 [^2]: Budgets and costs, the scale constants. `docs/reference/budgets.md`
 [^3]: ADR-0016, tiles are stored in block-tiled order at the aggregation block size, a reserved number with no record. `docs/adrs/REGISTRY.md`
 [^4]: ADR-0022, level 0 is the only truth, and every level above it is derived, decision D2. `docs/adrs/accepted/adr-0022-level-0-is-the-only-truth-and-every-level-above-it-is-derived.md`

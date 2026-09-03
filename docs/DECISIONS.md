@@ -503,6 +503,114 @@ in the paragraph above about ADR-0068, and it is a real one.
 
 ## Open
 
+### DEC-092 — Can a caller ask anything about a character who has died?
+
+**Open. A reviewer owns it. The recommendation is Option A.**
+
+The record of descent outlives every character in it, and that is why it exists:
+a parent edge cannot live in a structure keyed on a slot, because a watcher must
+read a parent after that parent has died.[^DEC92A] [^DEC71C]
+
+**No reader delivers it.** All four world-level readers take an entity, and an
+entity that names a dead character resolves to nothing. The parents of a dead
+character return nothing. Its ancestors and its descendants return an empty
+list. Its relation to anybody returns zero.[^DEC92C]
+
+**Zero already means two things, and a dead character makes three.** Two
+characters with no common ancestor stand at zero, and so do two whose only
+common ancestor is beyond the stated depth. A caller cannot tell any of the
+three apart.
+
+**The answer names things the caller cannot ask about.** The ancestor walk
+returns descent identities, and an ancestor is usually dead. No world-level
+reader takes a descent identity, so a caller holds an answer it can do nothing
+with. That is the shape a finding already records from the control plane
+side.[^F147]
+
+**Option A. Add a reader keyed on a descent identity, beside each reader keyed
+on an entity.** The entity reader keeps its meaning, which is a question about a
+living character, and the new reader answers a question about a row of the
+record. A caller that walked to an ancestor can then ask about it. The cost is
+four more readers and a rule about which one a caller wants.
+
+**Option B. Make the existing readers take either, and resolve internally.** One
+reader for each question. The cost is that a caller cannot tell whether it asked
+about somebody alive, and the readers that return zero or an empty list for a
+dead identity would stop distinguishing dead from absent, which is the
+distinction this row is about.
+
+**Option C. Narrow the record's force to what the readers give.** Say that
+descent outlives a character so that a living character's line stays correct
+after its ancestors die, and not so that a watcher can ask about the dead.
+Nothing changes in the code. The accepted product record has to agree, and it is
+the thing that asks for the watcher.[^DEC71C]
+
+**Recommendation: A.** The storage already carries the answer, the walk already
+hands out the key, and the missing part is four functions. Option C is the
+cheapest and it gives up the reason the storage is shaped as it is.
+
+**Whichever option closes it, a backlog item follows**, and it needs a number
+that this work did not hold.
+
+**Revisit when** anything exposes a character to the control plane. No binding
+exposes a character, a parent, a walk or a relation today, so the need is served
+in Rust and not in Python, and the shape of the Python answer may decide this
+one.
+
+### DEC-091 — Does a group store its members, or does a member store its group?
+
+**Open. A reviewer owns it. The recommendation is Option A. The author of
+ADR-0065 is not the reviewer.**
+
+The project holds two answers to one question, in two places, and nothing fails
+when they disagree.
+
+**The register says the member stores the group.** The blocker on formations is
+resolved, and its text says formation membership is an ownership column plus a
+reverse index. The unit carries the identity of its group, and the list of
+members is derived from that column.[^DEC91A]
+
+**The record says the group stores the members, and the code does that.**
+ADR-0065 D1 gives the group one row of entries, each naming a member by its
+whole identity or naming nobody.[^DEC91B] The position table implements it.
+
+**The record calls these one answer.** Its own context quotes the register
+correctly, and its D1 then says the register already resolved the case this way.
+A review found otherwise.[^DEC91C]
+
+**Option A. The group stores its members, and the register entry is
+superseded.** A stored entry that names nobody is a state and not an absence, so
+a group can say what it lacks, and what it lacks is what makes it ask for a
+member. A reverse index derived from an ownership column cannot hold a vacancy,
+because nothing owns an empty seat. This is what the code does today.
+
+**Option B. The member stores its group, and the record changes direction.**
+This is one fact in one place, and the project already chose it once for a
+different relation: a unit carries the slot of the site it lives in, and a
+reverse index from the site was refused because it adds a structure that the
+spawn, the death and the home change must all maintain.[^DEC91D] Against that,
+a vacancy needs somewhere else to live, and the resize pass needs to know what
+a group lacks.
+
+**Option C. Two directions on purpose, with a rule that says which relation
+takes which.** Work held is a group-stored row because it has vacancies.
+Residence is a member-stored column because it does not. The cost is that a
+contributor must learn the rule, and a rule with two answers is the shape this
+project meets most often.
+
+**Recommendation: A**, and say so in both places. The vacancy argument is
+decisive for a workforce, and it is the reason the code is shaped as it is. A
+formation may still want the register's shape, and if it does, the answer is
+Option C stated deliberately rather than Option A stated by accident.
+
+**Closing this costs a register repair.** The blocker is resolved, so its text
+carries the authority of a settled answer. A resolved row that states a
+superseded answer is worse than an open one, because nothing marks it as stale.
+
+**Revisit when** a formation exists. Today only the workforce case is built, so
+the disagreement costs nothing yet and will cost the first person who builds a
+formation from the register.
+
 ### DEC-067 — Does a plane that carries the state of a solver belong above level 0?
 
 **Open. Engineering owns it. It blocks the acceptance of ADR-0087.**
@@ -2010,7 +2118,7 @@ a failed founding is correct.[^PRD12]
 [^FND015]: Findings register, FND-015. `docs/FINDINGS.md`
 [^FND089]: Findings register, FND-089. `docs/FINDINGS.md`
 [^ADR80]: ADR-0080, a depleted deposit recovers by ageing the stored take. `docs/adrs/accepted/adr-0080-a-depleted-deposit-recovers-by-ageing-the-stored-take.md`
-[^DEC69A]: ADR-0051, a selector is a lazy expression tree that Rust evaluates, decision D1. `docs/adrs/draft/adr-0051-a-selector-is-a-lazy-expression-tree.md`
+[^DEC69A]: ADR-0051, a selector is a lazy expression tree that Rust evaluates, decision D1. `docs/adrs/accepted/adr-0051-a-selector-is-a-lazy-expression-tree.md`
 [^DEC69B]: ADR-0052, a selector result may be a range, not only an enumerated set, decision D2. `docs/adrs/draft/adr-0052-a-selector-result-may-be-a-range.md`
 [^DEC69C]: Selector engine and verbs, section 3.2. `docs/research/reports/04-selector-engine-and-verbs.md`
 [^DEC68A]: ADR-0012, tiles are dense columns and units are a generational arena, decision D2. `docs/adrs/accepted/adr-0012-tiles-are-dense-columns-and-units-are-a-generational-arena.md`
@@ -2061,3 +2169,10 @@ a failed founding is correct.[^PRD12]
 [^DEC86C]: PRD-0019, an agent can ask the running engine what it holds. `docs/product/shaped/prd-0019-an-agent-can-ask-the-running-engine-what-it-holds.md`
 [^DEC88A]: Findings register, FND-206. `docs/FINDINGS.md`
 [^DEC88B]: Findings register, FND-207. `docs/FINDINGS.md`
+
+[^DEC91A]: Blockers register, BLK-010. `docs/BLOCKERS.md`
+[^DEC91B]: ADR-0065, a group is a site membership, not a region, decision D1. `docs/adrs/draft/adr-0065-a-group-is-a-site-membership-not-a-region.md`
+[^DEC91C]: Review 0223, the group membership record. `docs/reviews/0223-the-group-membership-record.md`
+[^DEC91D]: Decisions register, DEC-036, in this document.
+[^DEC92A]: ADR-0078, descent is a bounded record, and a relation is a bounded recursion, decision D1. `docs/adrs/draft/adr-0078-descent-is-a-bounded-record-and-a-relation-is-a-bounded-recursion.md`
+[^DEC92C]: Review 0223, the descent record. `docs/reviews/0223-the-descent-record.md`

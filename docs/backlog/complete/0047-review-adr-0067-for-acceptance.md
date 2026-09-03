@@ -81,12 +81,16 @@ path is unchanged and the compiler still enforces it. A sentence says plainly
 that the program owning the loop is not bound by it, and why.
 
 **The dependency did not hold this record.** ADR-0067's registry row names
-ADR-0036, which is `Proposed` and has no file. The review of ADR-0070 refused
+`ADR-0036`, which is `Proposed` and has no file. The review of ADR-0070 refused
 acceptance for exactly that shape, so this had to be resolved rather than
-assumed. ADR-0067 cites ADR-0036 once and cites it for its absence: the
+assumed. ADR-0067 cites `ADR-0036` once and cites it for its absence: the
 alternative design needs a snapshot mechanism that no record holds. Nothing
-here is built on a decision of ADR-0036, because ADR-0036 has no decisions.
+here is built on a decision of `ADR-0036`, because `ADR-0036` has no decisions.
 The binding content rests on ADR-0001, ADR-0002 and ADR-0017, all accepted.
+
+This paragraph reads its subject as it stood at the review. The project retired
+that reserved number on 2 September 2026, which strengthens the conclusion
+rather than changing it.[^B47R]
 
 **The other four decisions hold against the code without a change.** No engine
 field is named for a display. No value that has been a float reaches an engine
@@ -105,3 +109,4 @@ with them.** The search command is in the commit body.
 [^1]: Review 0035, the head-up display record. `docs/reviews/0035-the-head-up-display-record.md`
 [^2]: Review 0047, the viewer boundary record. `docs/reviews/0047-the-viewer-boundary-record.md`
 [^3]: Findings register, FND-056. `docs/FINDINGS.md`
+[^B47R]: ADR Registry, the retired numbers. `docs/adrs/REGISTRY.md`
