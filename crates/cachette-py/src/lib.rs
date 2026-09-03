@@ -77,10 +77,12 @@ create_exception!(
     _core,
     ConfigError,
     CachetteError,
-    "The world settings do not describe a world.
+    "The arguments do not describe a world.
 
-The `World` constructor raises this class. A side of zero is the case a
-caller meets first."
+The `World` constructor raises this class. A side of zero and a faction count
+above 63 are the two cases a caller meets first. The doc comment of the
+`World` class names every argument the constructor takes, its default and its
+bound, so a caller checks a value before the call."
 );
 create_exception!(
     _core,
@@ -105,7 +107,8 @@ create_exception!(
 A verb is a call that changes the world. The class covers a refusal the
 engine makes about the command itself: a number that names no kind, an
 address the ground refuses, a target below zero, or a radius above the
-ceiling. The message names the value that refused.
+ceiling. The message names the value that refused. The ceiling of a window
+census is a radius of 64 tiles.
 
 A verb that takes a set refuses the whole set. It writes nothing and leaves
 nothing half made."
@@ -177,9 +180,54 @@ records the gap.[^1]
 /// out a view into the world. A method that copies says so, and a method that
 /// answers about one thing takes one identity or one address.
 ///
+/// # Build a world
+///
+/// ```text
+/// World(width=64, height=64, seed=81985529216486895, faction_count=4)
+/// ```
+///
+/// **The parameters of the constructor are here, and not under a separate
+/// entry.** The binding library does not publish the prose of a
+/// constructor, so this class doc comment is the one place that holds
+/// it.[^2]
+///
+/// - `width`, an integer. The number of columns of tiles. It counts tiles,
+///   and it must be at least one. The default is 64.
+/// - `height`, an integer. The number of rows of tiles. It counts tiles, and
+///   it must be at least one. The default is 64.
+/// - `seed`, an integer. An unsigned 64-bit number that fixes the ground.
+///   The default is 81985529216486895.
+/// - `faction_count`, an integer. How many factions the world holds. The
+///   ceiling is 63, and zero is a legal value that gives a world with no
+///   faction. The default is 4.
+///
+/// The world is a rhombus of hexagonal tiles, so the extent is a width in
+/// columns and a height in rows. The tile at column `q` and row `r` has the
+/// axial address `(q, r)`.
+///
+/// The seed fixes the ground. Two worlds of one extent and one seed hold the
+/// same terrain, the same heights and the same resources. Change the seed to
+/// get another world.
+///
+/// A faction is a number from zero to one below the faction count.
+///
+/// **The new world holds no unit and no settlement.** Call
+/// `found_run_for_every_faction` to seat a group for each faction, or
+/// `spawn_soldiers` to put units at addresses you choose.
+///
+/// **The world reserves slots for the target unit population, whatever the
+/// extent is.** The constructor exposes no capacity, so a small world
+/// reserves as much unit storage as a large one. That reservation is what
+/// `spawn_soldiers` means by a full arena.
+///
+/// The constructor raises `ConfigError` when the arguments do not describe a
+/// world. A side of zero and a faction count above the ceiling are the two
+/// cases a caller meets first.
+///
 /// # References
 ///
 /// [^1]: ADR-0001, one binary gives one answer at any thread count, decision D1. `docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
+/// [^2]: Findings register, FND-325. `docs/FINDINGS.md`
 #[pyclass(name = "World", module = "cachette._core", frozen)]
 pub struct PyWorld {
     inner: std::sync::Mutex<CoreWorld>,
@@ -208,31 +256,18 @@ struct Presenter {
 impl PyWorld {
     /// Builds a world of the given extent, from the given seed.
     ///
-    /// The world is a rhombus of hexagonal tiles, so the extent is a width in
-    /// columns and a height in rows. Both count tiles, and both must be at
-    /// least one. The tile at column `q` and row `r` has the axial address
-    /// `(q, r)`.
-    ///
-    /// The seed is a 64-bit integer. It fixes the ground: two worlds of one
-    /// extent and one seed hold the same terrain, the same heights and the
-    /// same resources. Change the seed to get another world.
-    ///
-    /// The faction count is how many factions the world holds. A faction is
-    /// then a number from zero to one below that count.
-    ///
-    /// **The new world holds no unit and no settlement.** Call
-    /// `found_run_for_every_faction` to seat a group for each faction, or
-    /// `spawn_soldiers` to put units at addresses you choose.
-    ///
-    /// **The world reserves slots for the target unit population, whatever
-    /// the extent is.** The constructor exposes no capacity, so a small world
-    /// reserves as much unit storage as a large one. That reservation is what
-    /// `spawn_soldiers` means by a full arena.
+    /// **The prose for this call lives in the doc comment of the class.** The
+    /// binding library does not copy the doc comment of a constructor onto
+    /// the Python object, so prose written here reaches no reader of the
+    /// published reference.[^1]
     ///
     /// # Errors
     ///
-    /// Raises `ConfigError` when the extent does not describe a world. A side
-    /// of zero is the case a caller meets first.
+    /// Raises `ConfigError` when the arguments do not describe a world.
+    ///
+    /// # References
+    ///
+    /// [^1]: Findings register, FND-325. `docs/FINDINGS.md`
     #[new]
     #[pyo3(signature = (width = 64, height = 64, seed = 0x0123_4567_89ab_cdef, faction_count = 4))]
     fn new(width: u32, height: u32, seed: u64, faction_count: u16) -> PyResult<Self> {
@@ -683,6 +718,14 @@ impl PyWorld {
     /// two. It is the same number the gather log carries in its `kind`
     /// column.
     ///
+    /// **The kind here is a resource kind and not a ground kind.** The two
+    /// scales are separate, and both start at zero. Water, plain and forest
+    /// are the ground kinds 0, 1 and 2, and each of those numbers also names
+    /// a resource kind. This call therefore accepts a ground kind of 0, 1 or
+    /// 2 and orders the resource of that number. It raises nothing, and the
+    /// soldiers gather the wrong resource. The engine sees a number, and not
+    /// the scale the caller meant, so no check reports this.[^1]
+    ///
     /// The call gives the order. It takes nothing. Step the world to make the
     /// soldiers act, then read `gather_log_columns` for what they took.
     ///
@@ -692,7 +735,12 @@ impl PyWorld {
     /// # Errors
     ///
     /// Raises `ViewError` when an identity names no live soldier. Raises
-    /// `VerbError` when the number names no kind.
+    /// `VerbError` when the number names no resource kind, which means three
+    /// and above.
+    ///
+    /// # References
+    ///
+    /// [^1]: Decisions register, DEC-120. `docs/DECISIONS.md`
     fn order_gather(&self, units: Vec<u64>, kind: u8) -> PyResult<()> {
         let mut world = self.lock();
         let kind = ResourceKind::from_u8(kind)
@@ -728,8 +776,6 @@ impl PyWorld {
     /// identity and returning a value that stands for nothing. That value is
     /// the false answer the record forbids, so the read answers for one
     /// identity and says which one failed.[^1]
-    ///
-    /// # References
     ///
     /// # Errors
     ///
@@ -1014,8 +1060,6 @@ impl PyWorld {
     /// best first, so row zero is the place a founding would take. A row
     /// whose `eligible` entry is zero is a place the founding refuses.
     ///
-    /// # References
-    ///
     /// # Errors
     ///
     /// Raises `VerbError` when the group holds nobody, or when the ordering
@@ -1231,6 +1275,11 @@ impl PyWorld {
     /// The site is one settlement identity, as a Python integer. The
     /// commodity is the number of the commodity to report on, and it
     /// defaults to zero.
+    ///
+    /// **A commodity is not a resource kind.** The two scales are separate.
+    /// The world holds one commodity today, and its number is zero. Every
+    /// other number raises `ViewError`, so the resource kinds one and two
+    /// name no commodity here.
     ///
     /// - `q` and `r`, integers. The address of the site.
     /// - `faction`, an integer. The faction that owns the site.
@@ -1493,7 +1542,8 @@ impl PyWorld {
     /// Returns what one window of the world holds, as a `dict`.
     ///
     /// The window is the square of the given radius around the address,
-    /// clipped to the world. A radius of zero reads one tile.
+    /// clipped to the world. **The radius counts tiles.** A radius of zero
+    /// reads one tile. The default radius is 8, and the ceiling is 64.
     ///
     /// - `q`, `r` and `radius`, integers. The arguments the call took.
     /// - `first_q`, `first_r`, `last_q` and `last_r`, integers. The corners
@@ -1515,7 +1565,7 @@ impl PyWorld {
     /// the control plane, which this boundary does not permit.[^1]
     ///
     /// **The cost follows the radius and never the world.** The engine
-    /// refuses a radius above its ceiling.
+    /// refuses a radius above 64.
     ///
     /// The unit counts come from the derived unit-to-tile bridge, which
     /// rebuilds at the barrier. A caller that changed the population and did
@@ -1523,8 +1573,8 @@ impl PyWorld {
     ///
     /// # Errors
     ///
-    /// Raises `VerbError` when the radius is above the ceiling. The message
-    /// names the ceiling. Raises `ViewError` when the window covers no
+    /// Raises `VerbError` when the radius is above 64. The message names the
+    /// ceiling. Raises `ViewError` when the window covers no
     /// address of the world, or when the bridge holds no answer.
     ///
     /// # References
@@ -1909,10 +1959,35 @@ impl PyWorld {
 /// at. A camera verb reads no pixel, so a caller that has not drawn yet can
 /// still steer.
 ///
+/// # Build a camera
+///
+/// ```text
+/// Camera(tile_size=None)
+/// ```
+///
+/// **The parameters of the constructor are here, and not under a separate
+/// entry.** The binding library does not publish the prose of a
+/// constructor, so this class doc comment is the one place that holds
+/// it.[^3]
+///
+/// - `tile_size`, a `float` or `None`. The width and the height of one tile,
+///   in pixels. The default is `None`, which gives 12.0 pixels. The
+///   constructor holds the value inside the range 2.0 to 64.0 pixels, so a
+///   size outside that range gives the nearest size inside it.
+///
+/// The tile size is a choice of the caller and not a property of the world.
+/// The new camera sits at the corner of the world, so it shows the tile at
+/// the address `(0, 0)`. Call `look_at` to place it somewhere else.
+///
+/// **Call the `fitting` static method to get the camera to start from.** It
+/// shows every tile of a world, so a caller that draws with it sees the world
+/// rather than an empty picture.
+///
 /// # References
 ///
 /// [^1]: ADR-0094, the caller owns the camera and the pixels, decision D3. `docs/adrs/draft/adr-0094-the-caller-owns-the-camera-and-the-pixels.md`
 /// [^2]: Recurring Defect Shapes, shape 1. `.claude/rules/recurring-defects.md`
+/// [^3]: Findings register, FND-325. `docs/FINDINGS.md`
 // **The camera is a viewer value, and the record that bans the float types
 // allows them for rendering.**[^1] The allowance is scoped to this type and
 // its methods, and not to the crate, because everything else in this file
@@ -1936,16 +2011,14 @@ pub struct PyCamera {
 impl PyCamera {
     /// Builds a camera.
     ///
-    /// The tile size is the width and the height of one tile, in pixels, as a
-    /// `float`. Give `None`, which is the default, for the size the
-    /// demonstration opens with. The tile size is a choice of the caller and
-    /// not a property of the world.
+    /// **The prose for this call lives in the doc comment of the class.** The
+    /// binding library does not copy the doc comment of a constructor onto
+    /// the Python object, so prose written here reaches no reader of the
+    /// published reference.[^1]
     ///
-    /// The new camera sits at the corner of the world, so it shows the tile
-    /// at the address `(0, 0)`. Call `look_at` to place it somewhere else, or
-    /// build one with `fitting` instead. The constructor holds the tile size
-    /// inside the range the camera accepts, so a size outside that range
-    /// gives the nearest size inside it.
+    /// # References
+    ///
+    /// [^1]: Findings register, FND-325. `docs/FINDINGS.md`
     #[new]
     #[pyo3(signature = (tile_size = None))]
     fn new(tile_size: Option<f32>) -> Self {
@@ -2195,6 +2268,29 @@ fn version() -> &'static str {
 /// function and the error classes. The `cachette` package re-exports all of
 /// them, so import from `cachette` rather than from here.
 ///
+/// **This module is for a programmer who drives a simulation from Python.**
+/// One example is a game server that must replay a run exactly from a seed.
+/// The caller builds a world, puts units in it, gives the units orders, and
+/// steps the world.
+///
+/// # Install the package, then read this page
+///
+/// **No public package index carries this engine.** A checkout of the
+/// repository builds it. The index name `cachette` belongs to a different
+/// project, so do not install that name.[^1]
+///
+/// ```text
+/// git clone https://github.com/tyevans/cachette
+/// cd cachette
+/// uv sync
+/// uv run python -c "import cachette; print(cachette.version())"
+/// ```
+///
+/// **This reference is the whole documentation site today.** No tutorial, no
+/// how-to guide and no explanation page exists yet. Read the five conventions
+/// below, then read the `World` class, which holds the parameters of its own
+/// constructor.
+///
 /// Five conventions run through the whole interface. Read them once, and each
 /// member below is then readable on its own.
 ///
@@ -2202,7 +2298,7 @@ fn version() -> &'static str {
 ///
 /// The engine holds no floating point number in simulated state, because
 /// float addition is not associative and an aggregate must combine exactly in
-/// any order.[^1] It uses one fixed-point scale everywhere, Q16.16.
+/// any order.[^2] It uses one fixed-point scale everywhere, Q16.16.
 ///
 /// **A Q16.16 value reaches Python as a plain integer that is 65536 times the
 /// value it stands for.** Divide by 65536 to read it as a quantity. Multiply
@@ -2217,7 +2313,7 @@ fn version() -> &'static str {
 ///
 /// A soldier or a settlement reaches Python as one unsigned 64-bit integer.
 /// The integer holds a slot and a generation together, and Python cannot take
-/// it apart or build one.[^2] Pass it back to the engine, and the engine
+/// it apart or build one.[^3] Pass it back to the engine, and the engine
 /// resolves it.
 ///
 /// The generation is what makes the identity safe. A soldier that dies leaves
@@ -2243,14 +2339,24 @@ fn version() -> &'static str {
 /// The ground kinds are water, plain, forest, hill and mountain, numbered in
 /// that order from zero.
 ///
+/// **The two scales are separate, and they overlap.** The numbers 0, 1 and 2
+/// name a resource kind and a ground kind. A member that takes a resource
+/// kind accepts a ground kind of 0, 1 or 2 and acts on the resource of that
+/// number. It raises nothing, because the number does name a resource kind.
+/// Read which scale a member takes before you pass a number to it.[^4]
+///
+/// **A commodity is a third scale, and it is not a kind.** `site_economy`
+/// takes a commodity number. The world holds one commodity today, and its
+/// number is zero.
+///
 /// A faction is a number from zero to one below the faction count of the
 /// world. Where a value may name nobody, the entry is either `None` or the
-/// number 65535, and each member below says which.[^3]
+/// number 65535, and each member below says which.[^5]
 ///
 /// # Python sends one command over a set
 ///
 /// Python builds a set and sends one command. Python does not loop over the
-/// units of a population.[^4] The verbs that take a set accept a list of
+/// units of a population.[^6] The verbs that take a set accept a list of
 /// identities, or the array of identities that an earlier call returned.
 ///
 /// **A set-valued verb is all or nothing.** It resolves every identity and
@@ -2262,10 +2368,12 @@ fn version() -> &'static str {
 ///
 /// # References
 ///
-/// [^1]: ADR-0002, simulated and aggregated state holds no floating point number, decision D1. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
-/// [^2]: ADR-0085, an entity crosses to Python as one opaque identity that the engine resolves, decisions D1 and D2. `docs/adrs/accepted/adr-0085-an-entity-crosses-to-python-as-one-opaque-identity.md`
-/// [^3]: ADR-0053, a faction is a bit in a mask, and a relation is a plane, decision D2. `docs/adrs/accepted/adr-0053-a-faction-is-a-bit-in-a-mask-and-a-relation-is-a-plane.md`
-/// [^4]: ADR-0040, Python is a control plane, not a data plane, decision D1. `docs/adrs/draft/adr-0040-python-is-a-control-plane-not-a-data-plane.md`
+/// [^1]: Findings register, FND-341. `docs/FINDINGS.md`
+/// [^2]: ADR-0002, simulated and aggregated state holds no floating point number, decision D1. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
+/// [^3]: ADR-0085, an entity crosses to Python as one opaque identity that the engine resolves, decisions D1 and D2. `docs/adrs/accepted/adr-0085-an-entity-crosses-to-python-as-one-opaque-identity.md`
+/// [^4]: Decisions register, DEC-120. `docs/DECISIONS.md`
+/// [^5]: ADR-0053, a faction is a bit in a mask, and a relation is a plane, decision D2. `docs/adrs/accepted/adr-0053-a-faction-is-a-bit-in-a-mask-and-a-relation-is-a-plane.md`
+/// [^6]: ADR-0040, Python is a control plane, not a data plane, decision D1. `docs/adrs/draft/adr-0040-python-is-a-control-plane-not-a-data-plane.md`
 #[pymodule]
 #[pyo3(name = "_core")]
 fn cachette_core_module(module: &Bound<'_, PyModule>) -> PyResult<()> {

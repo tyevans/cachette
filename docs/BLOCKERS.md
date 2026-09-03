@@ -25,7 +25,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^ALLOC]
 
-**Next number: BLK-037**
+**Next number: BLK-041**
 
 [^ALLOC]: Findings register, FND-038. `docs/FINDINGS.md`
 
@@ -121,6 +121,36 @@ unset.
 **What closes this.** The project owner names the address and confirms that the
 hosting is turned on, or states that the site is built and not published.
 
+
+### BLK-040 — Under which name does a reader install the package, and does the project publish it?
+
+**Owner:** the project owner. **Blocks:** the install line in the reference, in
+the tutorial and in the how-to guides.
+
+**A reader who reaches the published reference cannot get the software.** The
+page named no install command at all, and a graded review scored that gap as
+the second worst failure on the page.[^BLK40A] A reader who supplies the
+obvious command installs a different project, because the public Python package
+index answers on the name `cachette` with an unrelated package by another
+author.[^BLK40B]
+
+**Two facts are missing, and neither is in the tree.** The first is the
+distribution name this project publishes under. The second is whether it
+publishes to a public index at all, or expects every reader to build from a
+checkout. The package manifest states the name `cachette` and the version
+0.0.0, and no job in the tree uploads anything.
+
+**This is information and not a judgement.** A guess writes an install command
+that installs somebody else's software, and the import failure that follows
+names no cause.
+
+**Work continues.** The reference now states that no public index carries this
+engine and gives the commands that build it from a checkout. That is true today
+and it is prose that no test can hold, so it decays the moment this row closes.
+
+**What closes this.** The project owner names the distribution name and says
+whether the project publishes to a public index. A search of the tree for this
+row number then repairs every place that states the install path.
 
 ### BLK-036 — Does an upgrade change hands when the ground does?
 
@@ -328,3 +358,5 @@ normally.
 [^BLK35B]: Backlog item 0308, the documentation plan. `docs/backlog/refined/0308-the-documentation-plan.md`
 [^BLK35C]: Research report 19, the documentation toolchain, section 3.6. `docs/research/reports/19-documentation-toolchain.md`
 [^BLK35D]: The documentation site job. `.github/workflows/docs.yml`
+[^BLK40A]: Backlog item 0330, repair the defects a fresh reader found in the published reference. `docs/backlog/complete/0330-repair-the-defects-a-fresh-reader-found.md`
+[^BLK40B]: Findings register, FND-341. `docs/FINDINGS.md`
