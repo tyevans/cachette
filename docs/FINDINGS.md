@@ -22,11 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-<<<<<<< HEAD
-**Next number: FND-295**
-=======
-**Next number: FND-300**
->>>>>>> main
+**Next number: FND-302**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -36,7 +32,7 @@ the case.[^ALLOC2]
 
 ## A. Corrections to stated rules
 
-### FND-294 — The influence solve gets slower as the thread count rises, on a small world
+### FND-301 — The influence solve gets slower as the thread count rises, on a small world
 
 **Believed.** A stage that takes a thread count runs faster with more threads.
 The stage register declares `influence_solve` as taking one, and the target
@@ -63,7 +59,7 @@ terms on the small world than on the target one**, 55.5 milliseconds against
 
 **How to take the measurement again.** An example prices every stage on a
 world of a given extent, group and thread count, and prints the state hash
-beside the split so a sweep is also a determinism check.[^F294B]
+beside the split so a sweep is also a determinism check.[^F301B]
 
 **The cause is the shape of the parallel section, not the arithmetic in it.**
 One relaxation pass opens a thread scope for each faction, and a solve runs a
@@ -111,7 +107,84 @@ ask for the smaller of the machine's parallelism and twelve. Asking for fewer
 would make the demonstration between two and three times faster today with no
 engine change, and that is the reason not to change the requested frame rate.
 The repair belongs in the solver, so that no caller has to know. An item holds
-it.[^F294A]
+it.[^F301A]
+
+### FND-300 — The influence solve gets slower as the thread count rises, on a small world
+
+**Believed.** A stage that takes a thread count runs faster with more threads.
+The stage register declares `influence_solve` as taking one, and the target
+scale measurement agrees: it is 12.68 milliseconds and 5.25 percent of a 241
+millisecond frame at 16.7 million tiles and twelve threads.
+
+**True at the target extent, and the reverse on a small world.** On the
+demonstration world the solve costs more with every thread added. Measured on
+an x86-64 development machine, 256 by 256 tiles, 256 units, four factions, the
+mean of 120 frames after 30 warm-up frames:
+
+| Threads | The frame | `influence_solve` | Its share |
+|---|---|---|---|
+| 1 | 36.314 ms | 9.343 ms | 25.7 percent |
+| 2 | 30.229 ms | 11.465 ms | 37.9 percent |
+| 4 | 35.786 ms | 19.749 ms | 55.2 percent |
+| 8 | 55.716 ms | 37.313 ms | 67.0 percent |
+| 12 | 81.471 ms | 55.482 ms | 68.1 percent |
+
+The solve is 5.9 times slower at twelve threads than at one, and the frame is
+2.7 times slower at twelve than at two. **The solve also costs more in absolute
+terms on the small world than on the target one**, 55.5 milliseconds against
+12.7, on a world with 256 times fewer tiles.
+
+**How to take the measurement again.** An example prices every stage on a
+world of a given extent, group and thread count, and prints the state hash
+beside the split so a sweep is also a determinism check.[^F300B]
+
+**The cause is the shape of the parallel section, not the arithmetic in it.**
+One relaxation pass opens a thread scope for each faction, and a solve runs a
+fixed count of passes, so a frame opens the pass count multiplied by the
+faction count of them. At the target extent each spawned thread relaxes
+thousands of cells and the spawn is paid back. On the demonstration world each
+one gets a handful of cells and the spawn is the whole cost.
+
+**The guard that exists cannot catch it, by design.** The code holds a thread
+back only when the cell count is at or below the thread count, and it says why:
+the rule reads the two numbers the caller already supplied and holds no
+constant of its own. A world of this extent has far more cells than twelve, so
+the guard never fires and every scope spawns.
+
+**The solve does not cross over at any extent measured.** A second sweep took
+three extents at one thread and at twelve. The frame crosses over between
+65,536 and 262,144 tiles, where other stages start to carry the win. The solve
+itself is still 7.6 times slower with twelve threads than with one at 1,048,576
+tiles, so the extent at which threads pay this stage is above a million cells
+of world.
+
+**The determinism holds.** The state hash is identical at one thread and at
+twelve, at every extent measured, so this is a cost defect and not a
+correctness one.
+
+**The absolute figures are noisy and the direction is not.** The machine ran
+other builds throughout, and one point measured 81 ms in one sweep and 192 ms
+in another. Every point in both sweeps has the same sign.
+
+**Follows.** Three things.
+
+**A stage declared as taking a thread count can still lose by taking one.** The
+stage apparatus states that a measured speedup far from one on a stage declared
+`false` means the declaration is wrong. It checks one direction. A negative
+speedup on a stage declared `true` is the same class of error and nothing looks
+for it.
+
+**A measurement taken only at the target extent cannot see this shape.** Every
+frame figure in this project was taken at the target extent, where the defect
+is invisible. The small end is a different regime and it had never been
+measured.
+
+**The demonstration is slow for this reason and for no other.** Both front ends
+ask for the smaller of the machine's parallelism and twelve. Asking for fewer
+would make the demonstration between two and three times faster today with no
+engine change, and that is the reason not to change the requested frame rate.
+The repair belongs in the solver, so that no caller has to know. An item holds
+it.[^F300A]
 
 ### FND-293 — No golden scenario reached a promotion, and the files still moved
 
@@ -8444,13 +8517,10 @@ caught it two hours earlier.
 [^F292C]: Target platform costs, the stage table. `docs/reference/graviton-costs.md`
 [^F293A]: The cost benchmark, the memory point mode. `crates/cachette-core/benches/target_cost.rs`
 [^F293B]: Findings register, FND-246, in this document.
-<<<<<<< HEAD
-[^F294A]: Backlog item 0277, hold a thread back when the work will not pay for it. `docs/backlog/proposed/0277-hold-a-thread-back-when-the-work-will-not-pay-for-it.md`
-[^F294B]: The demonstration stage split. `crates/cachette-core/examples/demo_stage_split.rs`
-=======
 [^F293A]: ADR-0068, terrain is generated from the seed and is never stored as a map, decision D1. `docs/adrs/accepted/adr-0068-terrain-is-generated-from-the-seed-and-is-never-stored-as-a-map.md`
 [^F295A]: ADR-0018, the unit-to-tile bridge is derived, and it rebuilds at the barrier, decision D4. `docs/adrs/accepted/adr-0018-the-unit-to-tile-bridge-is-derived-and-rebuilds-at-the-barrier.md`
 [^F296B]: Target platform costs, every stage of a frame after the ground read moved last. `docs/reference/graviton-costs.md`
 [^F296C]: Findings register, FND-290, in this document.
 [^F297A]: The target platform benchmark script. `scripts/graviton-benchmark.sh`
->>>>>>> main
+[^F301A]: Backlog item 0277, hold a thread back when the work will not pay for it. `docs/backlog/proposed/0277-hold-a-thread-back-when-the-work-will-not-pay-for-it.md`
+[^F301B]: The demonstration stage split. `crates/cachette-core/examples/demo_stage_split.rs`
