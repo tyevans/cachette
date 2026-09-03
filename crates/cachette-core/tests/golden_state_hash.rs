@@ -18,6 +18,7 @@
 
 use std::path::PathBuf;
 
+use cachette_core::position::WORK_COMMODITY;
 use cachette_core::resource::{Amount, RecoveryRules, ResourceKind};
 use cachette_core::site::CommodityId;
 use cachette_core::terrain::TileKind;
@@ -26,6 +27,12 @@ use cachette_core::{Axial, World, WorldConfig};
 
 /// The number of frames that a scenario runs unless its row says otherwise.
 const FRAMES: u64 = 32;
+
+/// The food that the gathering scenario puts in the store of its site.
+///
+/// The value only has to outlast the frames the scenario runs, so that the
+/// people of the site keep the need they were spawned with.
+const STOCKED: Fix32 = Fix32(2000 << 16);
 
 /// The number of frames that a wide scenario runs.
 ///
@@ -261,6 +268,24 @@ fn gather(world: &mut World) {
     //
     // [^2]: Testing rules, section 2a. `.claude/rules/testing.md`
     world.set_deed_threshold(4);
+    // **The choice interval is a parameter of the scenario, for the same
+    // reason the threshold above is.** A unit of this world chooses about
+    // once over the frames the scenario runs, so it forages, gathers, and
+    // never chooses again. It therefore never reaches the option that carries
+    // a load home, and the golden file could not move when that option
+    // changed. A short interval makes the unit choose again while it still
+    // stands in this world.[^3]
+    //
+    // [^3]: Testing rules, section 2a. `.claude/rules/testing.md`
+    world
+        .set_choice_schedule(2)
+        .expect("the exponent is inside the range");
+    // **The carry mark is a parameter of the scenario for the same reason.**
+    // The deposits of this world hold between one and ten units each, and the
+    // largest load any unit reaches over the frames of the scenario is four,
+    // against a default mark far above that. A scenario that took the default
+    // would record a file that no unit carrying a load home ever moves.[^3]
+    world.set_carry_mark(Amount(2));
     let grid = world.grid();
     let open: Vec<Axial> = (0..grid.tile_count())
         .map(|index| Axial::new((index % grid.width()) as i32, (index / grid.width()) as i32))
@@ -309,10 +334,14 @@ fn gather(world: &mut World) {
                 .spawn_soldier(address, FactionId((ordinal % 2) as u16))
                 .expect("the open tile admits a unit");
             assert!(world.order_gather(unit, kind));
+            // **A homed unit must stand away from its own site as well.** A
+            // unit spawned on the site tile delivers on every tick, so its
+            // load never reaches the mark and it never takes the option that
+            // carries a load home. The golden file could then not move when
+            // that option changed, which was measured rather than
+            // assumed.[^3]
             if let Some(site) = home.filter(|_| ordinal % 2 == 0) {
-                if world.settlements().address(site) == Some(address) {
-                    assert!(world.set_home_site(unit, Some(site)));
-                }
+                assert!(world.set_home_site(unit, Some(site)));
             }
         }
     }
@@ -320,6 +349,17 @@ fn gather(world: &mut World) {
         home.is_some(),
         "the gathering scenario seated no site, so no unit stands at home"
     );
+    // **The site holds a store, so its people are fed.** The option that
+    // carries a load home is driven by the need a unit still holds, so a
+    // starving unit forages instead. Every unit of this scenario starved
+    // inside the frames it runs, and the option was therefore unreachable
+    // however much a unit carried. That was measured rather than
+    // assumed.[^3]
+    if let Some(site) = home {
+        world
+            .set_settlement_store(site, WORK_COMMODITY[ResourceKind::Food.index()], STOCKED)
+            .expect("the site takes a store");
+    }
 }
 
 /// Founds a run: one group for each faction, in a place the engine chose.

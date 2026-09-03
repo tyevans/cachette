@@ -172,6 +172,23 @@ that pass are budget parameters and not design knobs, so they live here.[^5]
 | Choice interval | 32 ticks | BLK-007 | Report 16, section 3.5. A power of two, at the low end of the range the owner asked for |
 | Stagger key | The level 1 cell index, mixed | BLK-007 | Report 16, section 3.5, and FND-023 |
 | Need bucket width | A shift of twelve in the Q16.16 scale, so 17 buckets | None | One tick of the default need decay, measured, see below |
+| Carry mark | 32 whole units, over every resource kind | BLK-007 | Eight ticks of the gather rate of one unit, see below |
+
+**The carry mark decides when a unit goes home.** A unit that holds a home
+site and carries at least the mark is laden, and a laden unit takes the option
+that carries its load home rather than an option that ranks the ground.[^17]
+
+**The derivation.** A unit that gathers takes a fixed whole number from a
+deposit on every tick. The mark is eight times that number, so a unit that
+gathers without interruption becomes laden inside one quarter of the choice
+interval above. A mark of one would send a unit home for a single item and
+spend its life walking. A mark far above this keeps a unit in the field until
+the deposit beside it runs dry, and a depleted deposit gives it nothing more to
+carry. **No measurement supports the multiple of eight**, and one blocker
+governs every cost figure this project holds.[^3]
+
+**A low mark is a behavioural change and not a tuning knob.** It moves the
+share of the population that walks, in the same way the floor does.
 
 **The floor decides the mover count.** A unit whose highest score is below the
 floor holds what it was doing and does not move. Without the floor, a world in
@@ -293,5 +310,6 @@ a footnote.
 [^14]: Target platform costs, the measurement register. `docs/reference/graviton-costs.md`
 [^15]: Findings register, FND-242. `docs/FINDINGS.md`
 [^16]: ADR-0098, the choice is decided for each cell and each bucket of need. `docs/adrs/draft/adr-0098-the-choice-is-decided-for-each-cell-and-each-bucket-of-need.md`
+[^17]: ADR-0107, the choice key holds a bounded class of the unit's own state, decision D3. `docs/adrs/draft/adr-0107-the-choice-key-holds-a-bounded-class-of-the-unit-state.md`
 [^18]: Decisions register, DEC-097. `docs/DECISIONS.md`
 [^19]: Findings register, FND-259. `docs/FINDINGS.md`

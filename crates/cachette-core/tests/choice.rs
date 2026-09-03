@@ -228,8 +228,9 @@ fn a_unit_responds_to_the_ground() {
     // exact, so the middle is a whole number of the fixed-point scale.
     let middle = i64::from(low.0 + high.0) / 2;
     let weight = Fix32(((i64::from(SCORE_FLOOR.0) << 16) / middle) as i32);
-    // The option that reads the mean height is the third of the set.
-    let climb = 2u8;
+    // The option that reads the mean height is the fourth of the set. The
+    // first is the one that reads the carry class of the unit.
+    let climb = 3u8;
     only(&mut world, climb, weight);
 
     let on_high = world
@@ -258,8 +259,9 @@ fn a_unit_responds_to_another_unit() {
     // the cell. Nothing else moves. The choice of the first unit must change
     // with it.
     let mut world = one_cell_world();
-    // The option that reads the units of the cell is the fourth of the set.
-    let join = 3u8;
+    // The option that reads the units of the cell is the fifth of the set.
+    // The first is the one that reads the carry class of the unit.
+    let join = 4u8;
     only(&mut world, join, Fix32::ONE);
 
     let alone = world
@@ -337,7 +339,7 @@ fn a_world_with_nothing_to_respond_to_produces_no_movement() {
 
     // No unit is stuck. The hold lasts while the world gives nothing, and it
     // ends when the world gives something.
-    only(&mut world, 0, Fix32::ONE);
+    only(&mut world, ROAM, Fix32::ONE);
     for _ in 0..2 {
         world.step(2).expect("the step must run");
     }
@@ -359,13 +361,13 @@ fn the_tie_breaks_by_the_lowest_option_index() {
     // the bit. A third option carries the same weight and a smaller field,
     // so it loses and shows that the tie sits at the top.
     let mut world = one_cell_world();
-    for index in [0u8, 2, 3] {
+    for index in [ROAM, CLIMB, JOIN] {
         world
             .set_option_weight(index, Fix32::MAX)
             .expect("the index is inside the set");
     }
     world
-        .set_option_weight(1, Fix32::ZERO)
+        .set_option_weight(FORAGE, Fix32::ZERO)
         .expect("the index is inside the set");
     let units = crowd(&mut world);
     let unit = units[0];
@@ -374,24 +376,28 @@ fn the_tie_breaks_by_the_lowest_option_index() {
 
     let why = world.explain_choice(unit).expect("alive");
     assert_eq!(
-        why.scores[0], why.scores[3],
+        why.scores[ROAM as usize], why.scores[JOIN as usize],
         "the fixture built no tie: {:?}",
         why.scores
     );
     assert!(
-        why.scores[0] > why.floor,
+        why.scores[ROAM as usize] > why.floor,
         "the tie sits below the floor, so the floor decided and not the tie"
     );
     assert!(
-        why.scores[2] < why.scores[0],
+        why.scores[CLIMB as usize] < why.scores[ROAM as usize],
         "every option tied, so the fixture proves nothing about the index"
     );
+    // The option that reads the carry class holds the lowest index of all,
+    // and no unit here carries anything, so it scores zero and stays out of
+    // the tie.
+    assert_eq!(why.scores[DELIVER as usize], Fix32::ZERO);
     assert_eq!(
-        why.best, 0,
+        why.best, ROAM,
         "the tie went to option {} and not to the lowest index",
         why.best
     );
-    assert_eq!(world.soldier_intent(unit).expect("alive"), Some(0));
+    assert_eq!(world.soldier_intent(unit).expect("alive"), Some(ROAM));
 }
 
 #[test]
@@ -441,10 +447,10 @@ fn changing_a_weight_that_the_world_cannot_pay_moves_no_hash() {
             .set_economy_schedule(1024, 0)
             .expect("the period is inside the range");
         world
-            .set_option_weight(1, weight_of_forage)
+            .set_option_weight(FORAGE, weight_of_forage)
             .expect("the index is inside the set");
         world
-            .set_option_weight(2, weight_of_climb)
+            .set_option_weight(CLIMB, weight_of_climb)
             .expect("the index is inside the set");
         let units = populate(&mut world, 4);
         for _ in 0..6 {
@@ -630,7 +636,19 @@ fn an_interval_above_the_ceiling_is_refused() {
 /// # References
 ///
 /// [^1]: ADR-0004, iteration order is explicit, decisions D1 and D3. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
-const FORAGE: u8 = 1;
+const FORAGE: u8 = 2;
+
+/// The option index that reads the carry class of the unit.
+const DELIVER: u8 = 0;
+
+/// The option index that reads the open share of the cell.
+const ROAM: u8 = 1;
+
+/// The option index that reads the mean height of the cell.
+const CLIMB: u8 = 3;
+
+/// The option index that reads the units of the cell.
+const JOIN: u8 = 4;
 
 /// Drains the need of every unit in one tick, and lets nobody die of it.
 ///
@@ -840,8 +858,8 @@ fn drive_to_a_divergent_need(world: &mut World, unit: Entity) -> Fix32 {
         .map(Fix32)
         .find(|need| {
             let lower = buckets.need(buckets.bucket(*need));
-            choose::best_option(*need, summary, &profile)
-                != choose::best_option(lower, summary, &profile)
+            choose::best_option(*need, choose::CarryClass::Free, summary, &profile)
+                != choose::best_option(lower, choose::CarryClass::Free, summary, &profile)
         })
         .expect("the fixture must reach a need whose bucket changes the answer");
 
@@ -895,7 +913,7 @@ fn a_unit_acts_on_the_bucket_of_its_need_and_not_on_its_need() {
         .cell(before.cell)
         .expect("the unit stands in a cell of the pyramid");
     let profile = choose::WeightProfile::EVEN;
-    let exact = choose::best_option(target, summary, &profile);
+    let exact = choose::best_option(target, choose::CarryClass::Free, summary, &profile);
 
     assert_ne!(
         before.need, before.scored_need,
@@ -954,12 +972,15 @@ fn a_cell_answers_once_for_every_unit_that_shares_a_bucket() {
         for bucket in 0..buckets.count() - 1 {
             let lower = buckets.need(bucket);
             let inside = Fix32(lower.0 + inset + round);
-            let expected = choose::best_option(lower, summary, &profile);
-            if round == 0 && choose::best_option(inside, summary, &profile) != expected {
+            let expected = choose::best_option(lower, choose::CarryClass::Free, summary, &profile);
+            if round == 0
+                && choose::best_option(inside, choose::CarryClass::Free, summary, &profile)
+                    != expected
+            {
                 divergent += 1;
             }
             assert_eq!(
-                full.answer(inside, &profile),
+                full.answer(inside, choose::CarryClass::Free, &profile),
                 expected,
                 "a need inside a bucket must read the answer of the lower bound of that bucket"
             );
@@ -979,7 +1000,7 @@ fn a_cell_answers_once_for_every_unit_that_shares_a_bucket() {
     let mut shared = choose::CellAnswers::new(summary, buckets);
     let step = 1 << (buckets.shift() - 4);
     for offset in 0..16 {
-        shared.answer(Fix32(offset * step), &profile);
+        shared.answer(Fix32(offset * step), choose::CarryClass::Free, &profile);
     }
     assert_eq!(
         shared.scored_count(),

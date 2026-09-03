@@ -585,13 +585,16 @@ fn the_tie_break_test_fails_when_the_option_order_breaks() {
     world
         .set_choice_schedule(0)
         .expect("the exponent is inside the range");
-    for option in [0u8, 2, 3] {
+    // The rows that rank the ground. The first row of the set ranks the carry
+    // class of the unit, and no unit here carries anything, so it scores zero
+    // and stays out of the tie whatever weight it holds.
+    for option in [CHOICE_ROAM, CHOICE_CLIMB, CHOICE_JOIN] {
         world
             .set_option_weight(option, Fix32::MAX)
             .expect("the index is inside the set");
     }
     world
-        .set_option_weight(1, Fix32::ZERO)
+        .set_option_weight(CHOICE_FORAGE, Fix32::ZERO)
         .expect("the index is inside the set");
 
     let grid = world.grid();
@@ -616,20 +619,35 @@ fn the_tie_break_test_fails_when_the_option_order_breaks() {
         .explain_choice(units[0])
         .expect("nothing despawned it");
     assert_eq!(
-        why.scores[0], why.scores[3],
+        why.scores[CHOICE_ROAM as usize], why.scores[CHOICE_JOIN as usize],
         "the probe world holds no tie, so the tie-break test has no proven \
          failure mode"
     );
     assert_eq!(
-        why.best, 3,
+        why.best, CHOICE_JOIN,
         "the probe did not reverse the option order, so the tie-break test \
          has no proven failure mode"
     );
 
     // The perturbation moves the winner and nothing else. A probe that also
     // changed a score would prove less.
-    assert!(why.scores[2] < why.scores[0], "the probe changed a score");
+    assert!(
+        why.scores[CHOICE_CLIMB as usize] < why.scores[CHOICE_ROAM as usize],
+        "the probe changed a score"
+    );
 }
+
+/// The option index of the row that ranks the open share of a cell.
+const CHOICE_ROAM: u8 = 1;
+
+/// The option index of the row that ranks the food a cell still holds.
+const CHOICE_FORAGE: u8 = 2;
+
+/// The option index of the row that ranks the mean height of a cell.
+const CHOICE_CLIMB: u8 = 3;
+
+/// The option index of the row that ranks the units of a cell.
+const CHOICE_JOIN: u8 = 4;
 
 /// The extent of the world that the exit field probe reads.
 ///
@@ -638,7 +656,7 @@ fn the_tie_break_test_fails_when_the_option_order_breaks() {
 const EXIT_EXTENT: u32 = 256;
 
 /// The option index of the row that scores the units of a cell.
-const EXIT_OPTION: u8 = 3;
+const EXIT_OPTION: u8 = CHOICE_JOIN;
 
 #[test]
 fn the_direction_tie_break_test_fails_when_the_direction_order_breaks() {

@@ -134,7 +134,7 @@ fn make_them_hungry(world: &mut World) {
 }
 
 /// The option index of the row that forages.
-const FORAGE: u8 = 1;
+const FORAGE: u8 = 2;
 
 /// Returns every address of the extent, in row-major order.
 fn addresses() -> Vec<Axial> {

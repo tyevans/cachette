@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-319**
+**Next number: FND-321**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -9020,6 +9020,11 @@ food and its store read zero. The store of every short faction read zero on
 every tick of the run, exactly as it did before the delivery existed, and both
 factions that died before died at the same ticks: 820 and 3450.
 
+**The measured zero belongs to the tree of that day.** A later change to
+movement gave a refused unit a keyed draw, and the same run then delivered a
+small amount by accident. A later finding holds that number and what it
+cost.[^F317E]
+
 **The pass is not wrong. It is unreachable from the behaviour.** Its own tests
 pass because they construct the case, seating a site and a unit on one tile.
 The engine does not construct it. This is the shape the rules call a capability
@@ -9045,6 +9050,93 @@ record.** The exit field ranks a neighbouring cell on a summary field, and a
 site is not a summary field. Whatever answers this either adds a field that
 says where a unit belongs, or admits that a unit's own site is a fact no cell
 carries. The backlog holds the question.[^F317D]
+
+### FND-319 — A delivered total above zero does not prove that anything steers a unit home
+
+**Believed.** The delivery of a carried load never runs, and the total the
+demonstration world delivers is zero for every kind on every tick.[^F319A] A
+test that drives the demonstration world and asserts a delivered total above
+zero therefore proves that a unit now goes home.
+
+**True.** Neither half holds.
+
+**The total is no longer zero, and it was not zero before this work started.**
+The same run of the demonstration world, 256 by 256 at four factions and 64
+people each, driven 4000 ticks at four threads, delivers 38 food. The
+difference from the earlier measurement is the movement fall-back that landed
+between the two: a unit whose ground refuses the exit of its cell now takes a
+keyed draw, so a random walk puts a unit on the tile of its own site once in a
+long while.[^F319B] **The delivery was reachable by accident and by nothing
+else**, which is the same defect with a smaller number on it.
+
+**A total above zero passes on an engine that steers nothing.** After the
+option and the field were built, the return field was disconnected from the
+movement pass, so a laden unit stopped gathering and then took a uniform draw.
+The test that drives the demonstration world for 300 ticks and asserts a
+delivered total above zero **passed**. A unit that only stops gathering still
+walks, and it still reaches its own site once in a while.
+
+**Evidence.** Five defects were put back one at a time and the suite was
+watched. The disconnected field is the one that separated the two tests: the
+test that asserts a total passed, and the test that names the tile a laden
+unit must step onto failed. The commit body holds the list.
+
+**Follows.** Three things.
+
+**A test that asserts a total is a test about the total.** The behaviour under
+it moves the total, and so does luck. An assertion that separates the two has
+to name what the behaviour did, and the smallest such thing here is the tile
+that the field sent a unit to.
+
+**A finding that states a measured zero states it about a tree.** The zero of
+the earlier finding was correct when it was taken. The next change to movement
+made it wrong, and nothing failed, because a finding is prose. A reader who
+takes a measured number from a register must take the date with it.
+
+**Put the defect back for every claim, not for the work as a whole.** Four of
+the five defects were caught by the test written for them, and the fifth was
+caught by no test until one was written. Restoring the whole feature would
+have shown four red tests and hidden the gap.
+
+### FND-320 — Three properties of one golden fixture each blocked the same pass, one after another
+
+**Believed.** The gathering golden scenario seats a site and gives its
+gatherers a home, so a golden file moves when the delivery of a carried load
+changes.[^F320A]
+
+**True.** It did not reach the new option at all, and closing one gap only
+uncovered the next.
+
+**The interval.** A unit of that scenario chooses about once over the frames
+the scenario runs, so it forages, gathers, and never chooses again. The option
+that carries a load home is taken at the second choice, which never came.
+
+**The load.** The deposits of that world hold between one and ten units each,
+and the largest load any unit reaches over the frames is four, against a
+default carry mark far above that. No unit was ever laden.
+
+**The need.** The site held no store, so every unit of the scenario starved
+inside the frames it runs. The option is driven by the need a unit still
+holds, so a starving unit forages whatever it carries.
+
+**Evidence.** The defect was put back after each repair and the golden test was
+watched. It passed after the first, passed after the second, and failed only
+after the third. The measurement of the loads and of the deposits came from a
+harness that rebuilt the scenario outside the test, and the commit body holds
+the command.
+
+**Follows.** Two things.
+
+**A fixture reaches a case or it does not, and repairing one property proves
+nothing about the next.** The scenario looked closer after each change, and a
+reader who stopped at the first would have recorded a guard that cannot fire.
+Only the defect being put back after each step separated them.
+
+**A parameter of the world is a parameter of the scenario.** Three values that
+the engine holds a default for had to be stated by the scenario, for the same
+reason the promotion threshold and the recovery periods already are: a default
+chosen for a world that runs for a long time reaches nothing in a scenario
+that runs for a few frames.
 
 ### FND-318 — The per-unit accumulator does not remove the cliff, and the draw that replaced it created food
 
@@ -9122,7 +9214,7 @@ commodity, and the ration a unit receives is not that account.
 [^F318B]: ADR-0106, a cohort serves whole rations to a keyed subset, never an equal share to everybody, decision D2. `docs/adrs/draft/adr-0106-a-cohort-serves-whole-rations-to-a-keyed-subset.md`
 [^F317A]: Backlog item 0187, give a carried load somewhere to go. `docs/backlog/complete/0187-give-a-carried-load-somewhere-to-go.md`
 [^F317C]: Testing rules, section 5. `.claude/rules/testing.md`
-[^F317D]: Backlog item 0305, give a laden unit a reason to go home. `docs/backlog/proposed/0305-give-a-laden-unit-a-reason-to-go-home.md`
+[^F317D]: Backlog item 0305, give a laden unit a reason to go home. `docs/backlog/complete/0305-give-a-laden-unit-a-reason-to-go-home.md`
 [^F316A]: Backlog item 0279, let a golden scenario reach the position pass. `docs/backlog/proposed/0279-let-a-golden-scenario-reach-the-position-pass.md`
 [^F261B]: The holder count test of the viewer. `crates/cachette-view/tests/shows_who_holds_the_ground.rs`
 [^F261C]: Backlog item 0271, count the ground generations that one frame runs. `docs/backlog/proposed/0271-count-the-ground-generations-that-one-frame-runs.md`
@@ -9456,3 +9548,7 @@ commodity, and the ration a unit receives is not that account.
 [^F313A]: The workspace manifest, the release profile. `Cargo.toml`
 [^F306B]: Findings register, FND-313, in this document.
 [^F311A]: Findings register, FND-304, in this document.
+[^F319A]: Findings register, FND-317, in this document.
+[^F319B]: ADR-0091, movement takes its direction from a per-cell field, never from a per-unit search, decision D6. `docs/adrs/draft/adr-0091-movement-takes-its-direction-from-a-per-cell-field.md`
+[^F320A]: Findings register, FND-316, in this document.
+[^F317E]: Findings register, FND-319, in this document.

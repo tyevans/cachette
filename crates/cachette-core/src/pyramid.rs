@@ -62,7 +62,7 @@
 //! [^15]: ADR-0072, a tile stock is generated, and only what was taken is stored, decision D4. `docs/adrs/accepted/adr-0072-a-tile-stock-is-generated-and-only-what-was-taken-is-stored.md`
 
 use crate::bridge::{BlockLayout, BridgeError, UnitTileBridge};
-use crate::choose::{field_value, OPTIONS, OPTION_COUNT};
+use crate::choose::{field_value, Ranked, OPTIONS, OPTION_COUNT};
 use crate::hash::StateHash;
 use crate::hex::{Axial, Grid, NEIGHBOUR_COUNT};
 use crate::holding::Holder;
@@ -70,7 +70,7 @@ use crate::resource::{ledger_key, Amount, DepletionLedger, ResourceField, Resour
 use crate::sim_math;
 use crate::soldier::SoldierArena;
 use crate::tile_value::TileValues;
-use crate::types::{Accum, Fix32, TileIdx};
+use crate::types::{Accum, FactionId, Fix32, TileIdx};
 
 /// The summary of one block of tiles.
 ///
@@ -947,8 +947,23 @@ impl ExitField {
                 continue;
             };
             for (option, row) in OPTIONS.iter().enumerate() {
+                // **A row that ranks no cell field holds no exit anywhere.**
+                // The exit field ranks a neighbouring cell on a value the
+                // cell carries, and a row that ranks the state of the unit
+                // names no such value. A separate field steers that row.[^13]
+                //
+                // The entry stays in the array. Dropping it would make the
+                // index of a row differ from the index of its entry, which is
+                // one order declared twice.[^14]
+                //
+                // [^13]: ADR-0108, a unit returns by climbing a reach field seeded at every site of its faction, decision D1. `docs/adrs/draft/adr-0108-a-unit-returns-by-climbing-a-reach-field.md`
+                // [^14]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`
+                let Ranked::Cell(field) = row.ranked else {
+                    self.directions[cell as usize * OPTION_COUNT + option] = NO_EXIT;
+                    continue;
+                };
                 let mut best = NO_EXIT;
-                let mut best_value = field_value(mine, row.field);
+                let mut best_value = field_value(mine, field);
                 for direction in direction_order() {
                     let Some(there) = cells.neighbour(here, direction) else {
                         continue;
@@ -982,7 +997,7 @@ impl ExitField {
                     if summary.open_tiles() == 0 {
                         continue;
                     }
-                    let value = field_value(summary, row.field);
+                    let value = field_value(summary, field);
                     if value > best_value {
                         best_value = value;
                         best = direction as u8;
@@ -1025,4 +1040,267 @@ const fn direction_order() -> [usize; NEIGHBOUR_COUNT] {
 #[cfg(feature = "probe-nondeterminism")]
 const fn direction_order() -> [usize; NEIGHBOUR_COUNT] {
     [5, 4, 3, 2, 1, 0]
+}
+
+/// The reach that means a cell reached no site of a faction.
+///
+/// The value sits at the top of the byte range. No reach reaches it, because
+/// the relaxation runs a fixed number of passes and each pass adds one.
+pub const UNREACHED: u8 = u8::MAX;
+
+/// The number of relaxation passes that one derivation of the return field
+/// runs.
+///
+/// **The count is the reach, in cells.** Each pass carries the reach of a cell
+/// one step outward, so a cell further than this from every site of its
+/// faction holds no direction and a unit there keeps the behaviour it already
+/// has. The register holds the reasoning that accepts a reach limit, and the
+/// reasoning that several sites seed one field so the limit binds on the
+/// spacing of sites rather than on the size of the world.[^1]
+///
+/// The solve reads no residual and tests no convergence. It runs this count
+/// whatever the field holds.[^2]
+///
+/// The value matches the pass count of the influence solve, so one number
+/// says how far a field reaches over this lattice. A reader who changes one
+/// should read the other. **No cost figure supports either**, and one blocker
+/// governs every cost figure this project holds.[^3] [^4]
+///
+/// # References
+///
+/// [^1]: Decisions register, DEC-095. `docs/DECISIONS.md`
+/// [^2]: ADR-0005, a solver runs a fixed iteration count, decision D1. `docs/adrs/accepted/adr-0005-a-solver-runs-a-fixed-iteration-count.md`
+/// [^3]: ADR-0087, an influence solve runs a fixed iteration count over the whole plane, decision D1. `docs/adrs/draft/adr-0087-an-influence-solve-runs-a-fixed-iteration-count.md`
+/// [^4]: Blockers register, BLK-007. `docs/BLOCKERS.md`
+pub const RETURN_PASSES: u32 = 8;
+
+/// The direction of the nearest site of a faction, for each level 1 cell.
+///
+/// **A unit that carries a load home reads one entry and steps.** It reads no
+/// neighbouring cell, it scores no neighbour, and it computes nothing from its
+/// own address toward its own site. The direction belongs to the cell and to
+/// the faction, and every unit of that cell and that faction reads one
+/// answer.[^1] [^2]
+///
+/// The field holds one plane for each faction. The faction is the major
+/// index, so the plane of one faction is one contiguous run, which is the
+/// layout the influence field over the same lattice already uses.[^3]
+///
+/// **A field indexed by the faction is refused at level 1 and admitted
+/// here.** A summary field indexed by the faction would multiply the tile side
+/// of the world by the faction count. This field is at the pitch of one level
+/// 1 cell, where the influence field is already one plane for each
+/// faction.[^4] [^5]
+///
+/// The field is derived again at every rebuild of level 1, from nothing. It
+/// carries no value between two frames, so it states no fact of its own and
+/// level 0 stays the only source of truth.[^6] [^7]
+///
+/// # References
+///
+/// [^1]: ADR-0095, a behavioural strategy arrives as a field over cells, never as a search from a unit, decision D1. `docs/adrs/draft/adr-0095-a-behavioural-strategy-arrives-as-a-field-over-cells.md`
+/// [^2]: ADR-0108, a unit returns by climbing a reach field seeded at every site of its faction, decision D1. `docs/adrs/draft/adr-0108-a-unit-returns-by-climbing-a-reach-field.md`
+/// [^3]: ADR-0060, an influence map is stored as a shared basis, decision D1. `docs/adrs/draft/adr-0060-an-influence-map-is-stored-as-a-shared-basis.md`
+/// [^4]: ADR-0053, a faction is a bit in a mask, and a relation is a plane, decision D3. `docs/adrs/accepted/adr-0053-a-faction-is-a-bit-in-a-mask-and-a-relation-is-a-plane.md`
+/// [^5]: ADR-0108, a unit returns by climbing a reach field seeded at every site of its faction, decision D3. `docs/adrs/draft/adr-0108-a-unit-returns-by-climbing-a-reach-field.md`
+/// [^6]: ADR-0022, level 0 is the only truth, and every level above it is derived, decision D1. `docs/adrs/accepted/adr-0022-level-0-is-the-only-truth-and-every-level-above-it-is-derived.md`
+/// [^7]: ADR-0091, movement takes its direction from a per-cell field, never from a per-unit search, decision D2. `docs/adrs/draft/adr-0091-movement-takes-its-direction-from-a-per-cell-field.md`
+#[derive(Clone, Debug)]
+pub struct ReturnField {
+    cells: Grid,
+    faction_count: u16,
+    /// One direction for each faction and cell. The faction is the major
+    /// index.
+    directions: Vec<u8>,
+    /// The steps from each cell to the nearest seed of the faction that the
+    /// derivation is working on. It holds one plane, and the derivation
+    /// reuses it for every faction.
+    reach: Vec<u8>,
+    /// The write half of one relaxation pass.
+    scratch: Vec<u8>,
+}
+
+impl ReturnField {
+    /// Builds a field over a cell lattice, with no direction anywhere.
+    #[must_use]
+    pub fn new(cells: Grid, faction_count: u16) -> Self {
+        let count = cells.tile_count() as usize;
+        Self {
+            cells,
+            faction_count,
+            directions: vec![NO_EXIT; count * faction_count as usize],
+            reach: vec![UNREACHED; count],
+            scratch: vec![UNREACHED; count],
+        }
+    }
+
+    /// Returns the cell lattice the field covers.
+    #[must_use]
+    pub const fn cells(&self) -> Grid {
+        self.cells
+    }
+
+    /// Returns the number of factions the field holds a plane for.
+    #[must_use]
+    pub const fn faction_count(&self) -> u16 {
+        self.faction_count
+    }
+
+    /// Returns the direction of one faction and one cell.
+    ///
+    /// The outer option reports whether the faction and the cell name an
+    /// entry. The inner one reports whether the cell holds a direction at all.
+    /// A cell that holds a site, and a cell that reached no site, both hold
+    /// none, and a unit there falls back to the keyed draw.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0091, movement takes its direction from a per-cell field, never from a per-unit search, decision D6. `docs/adrs/draft/adr-0091-movement-takes-its-direction-from-a-per-cell-field.md`
+    #[must_use]
+    pub fn direction(&self, faction: FactionId, cell: u32) -> Option<Option<u8>> {
+        let at = self.slot(faction, cell)?;
+        let direction = *self.directions.get(at)?;
+        Some(if direction == NO_EXIT {
+            None
+        } else {
+            Some(direction)
+        })
+    }
+
+    /// Returns the slot of one faction and one cell.
+    fn slot(&self, faction: FactionId, cell: u32) -> Option<usize> {
+        if faction.0 >= self.faction_count {
+            return None;
+        }
+        let count = self.cells.tile_count();
+        if cell >= count {
+            return None;
+        }
+        Some(faction.0 as usize * count as usize + cell as usize)
+    }
+
+    /// Derives every entry from a level 1 and a set of seeds.
+    ///
+    /// A seed is one faction and the cell that holds a site of it. **Several
+    /// sites of one faction seed one plane at once**, so one derivation serves
+    /// every unit of that faction and the field carries the direction of the
+    /// nearest site to each cell.[^1]
+    ///
+    /// The reach of a seed cell is zero. Each pass gives a cell one more than
+    /// the smallest reach of its neighbours, when that is smaller than the
+    /// reach it holds. The pass reads one plane and writes another, so no cell
+    /// of one pass reads a value that the same pass wrote and the answer does
+    /// not depend on the order the cells were visited in.[^2]
+    ///
+    /// **A cell that admits no unit is not a candidate, and it conducts
+    /// nothing.** A cell of open water would otherwise carry the reach across
+    /// a lake and send a whole block at a coast it can never cross. The rule
+    /// reads the open tile count, which is the same count the open share
+    /// reads, so it states no second rule of its own.[^3] [^4]
+    ///
+    /// The direction of a cell is the first neighbour, in ascending direction
+    /// index, whose reach is strictly smaller than the reach of the cell. The
+    /// lowest direction index therefore wins a tie, which is the order every
+    /// other walk over the neighbours of a hex uses.[^2]
+    ///
+    /// The pass runs on the calling thread, in ascending faction identifier
+    /// and then in ascending cell index. It names no thread and depends on no
+    /// thread count.[^2]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0095, a behavioural strategy arrives as a field over cells, never as a search from a unit, decision D3. `docs/adrs/draft/adr-0095-a-behavioural-strategy-arrives-as-a-field-over-cells.md`
+    /// [^2]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
+    /// [^3]: ADR-0091, movement takes its direction from a per-cell field, never from a per-unit search, decision D5. `docs/adrs/draft/adr-0091-movement-takes-its-direction-from-a-per-cell-field.md`
+    /// [^4]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`
+    pub fn derive(&mut self, pyramid: &Pyramid, seeds: &[(FactionId, u32)]) {
+        let cells = self.cells;
+        let count = cells.tile_count();
+        for faction in 0..self.faction_count {
+            self.reach.iter_mut().for_each(|cell| *cell = UNREACHED);
+            for (seeded, cell) in seeds {
+                if seeded.0 != faction || *cell >= count {
+                    continue;
+                }
+                if !admits_a_unit(pyramid, *cell) {
+                    continue;
+                }
+                self.reach[*cell as usize] = 0;
+            }
+            for _ in 0..RETURN_PASSES {
+                self.relax(pyramid);
+            }
+            for cell in 0..count {
+                let at = faction as usize * count as usize + cell as usize;
+                self.directions[at] = self.step_down(cell);
+            }
+        }
+    }
+
+    /// Runs one relaxation pass over the reach plane.
+    fn relax(&mut self, pyramid: &Pyramid) {
+        let cells = self.cells;
+        for cell in 0..cells.tile_count() {
+            let index = cell as usize;
+            let here = self.reach[index];
+            if !admits_a_unit(pyramid, cell) {
+                self.scratch[index] = UNREACHED;
+                continue;
+            }
+            let mut nearest = here;
+            if let Some(address) = cells.address_of(TileIdx(cell)) {
+                for direction in direction_order() {
+                    let Some(there) = cells.neighbour(address, direction) else {
+                        continue;
+                    };
+                    let Some(at) = cells.index_of(there) else {
+                        continue;
+                    };
+                    let reach = self.reach[at.0 as usize];
+                    if reach < UNREACHED && reach.saturating_add(1) < nearest {
+                        nearest = reach.saturating_add(1);
+                    }
+                }
+            }
+            self.scratch[index] = nearest;
+        }
+        self.reach.copy_from_slice(&self.scratch);
+    }
+
+    /// Returns the direction of the neighbour that is nearer to a seed.
+    fn step_down(&self, cell: u32) -> u8 {
+        let here = self.reach[cell as usize];
+        if here == UNREACHED || here == 0 {
+            return NO_EXIT;
+        }
+        let Some(address) = self.cells.address_of(TileIdx(cell)) else {
+            return NO_EXIT;
+        };
+        for direction in direction_order() {
+            let Some(there) = self.cells.neighbour(address, direction) else {
+                continue;
+            };
+            let Some(at) = self.cells.index_of(there) else {
+                continue;
+            };
+            if self.reach[at.0 as usize] < here {
+                return direction as u8;
+            }
+        }
+        NO_EXIT
+    }
+}
+
+/// Reports whether one cell of a level 1 holds any ground that admits a unit.
+///
+/// A cell outside the level 1 admits nobody. The count is the one the open
+/// share reads, so this states no second rule.[^1]
+///
+/// # References
+///
+/// [^1]: ADR-0024, every summary field is declared extensive or intensive, decision D4. `docs/adrs/accepted/adr-0024-every-summary-field-is-declared-extensive-or-intensive.md`
+fn admits_a_unit(pyramid: &Pyramid, cell: u32) -> bool {
+    pyramid
+        .cell(cell)
+        .is_some_and(|summary| summary.open_tiles() > 0)
 }

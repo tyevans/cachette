@@ -377,6 +377,8 @@ without stating a constraint is worse than no record.
 | 0104 | A soldier is promoted from a level that never falls | Draft | 0004, 0007, 0014, 0054 | 14, `draft/adr-0104-a-soldier-is-promoted-from-a-level-that-never-falls.md` |
 | 0105 | A total order needs no repeated identifier, only no repeated key | Draft | 0001, 0004, 0007 | `draft/adr-0105-a-total-order-needs-no-repeated-key.md` |
 | 0106 | A cohort serves whole rations to a keyed subset, never an equal share to everybody | Draft | 0002, 0003, 0004, 0009, 0023, 0063 | `draft/adr-0106-a-cohort-serves-whole-rations-to-a-keyed-subset.md` |
+| 0107 | The choice key holds a bounded class of the unit's own state | Draft | 0004, 0064, 0096, 0098 | `draft/adr-0107-the-choice-key-holds-a-bounded-class-of-the-unit-state.md` |
+| 0108 | A unit returns by climbing a reach field seeded at every site of its faction | Draft | 0004, 0005, 0022, 0053, 0091, 0095 | `draft/adr-0108-a-unit-returns-by-climbing-a-reach-field.md` |
 
 ### Retired numbers
 

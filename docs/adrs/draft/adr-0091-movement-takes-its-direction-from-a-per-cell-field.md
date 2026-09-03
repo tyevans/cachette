@@ -52,6 +52,15 @@ the neighbouring tile in that direction.
 
 **No unit reads a neighbouring cell. No unit scores a neighbour.**
 
+**An option that ranks no cell field takes its direction from another
+per-cell field.** This decision binds where a direction comes from, and it
+does not bind every option to this one array. An option that ranks the state
+of the unit itself has no summary field to rank a neighbour on, so the exit
+field holds no entry for it and a separate per-cell field steers it. That
+field is one plane for each faction over the same lattice, and a later record
+states it.[^26] The rule that a unit reads one entry and searches nothing is
+unchanged.
+
 The ranked quantity belongs to the cell and not to the unit. Every unit of one
 cell reads one summary, so every unit of one cell ranks the neighbours in one
 order. A per-unit search computes that one order again for each unit.
@@ -260,3 +269,4 @@ depend on a key that carries no meaning.[^19]
 [^23]: Findings register, FND-315. `docs/FINDINGS.md`
 [^24]: ADR-0003, every random draw is keyed, never stateful, decision D1. `docs/adrs/accepted/adr-0003-every-random-draw-is-keyed-never-stateful.md`
 [^25]: Decision Record Scope, section 4.1. `.claude/rules/adr-scope.md`
+[^26]: ADR-0108, a unit returns by climbing a reach field seeded at every site of its faction, decision D1. `docs/adrs/draft/adr-0108-a-unit-returns-by-climbing-a-reach-field.md`
