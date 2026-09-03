@@ -99,7 +99,7 @@ fi
 readonly PROFILE="${1:-full}"
 case "$PROFILE" in
     full | quick) ;;
-    one | stages | placement)
+    one | stages | placement | memory-placement)
         # These take one configuration rather than a sweep, and the caller
         # names it. `CACHETTE_BENCH_POINT` holds the whole argument list that
         # the benchmark receives, for example `stages 4096x4096 1000000 12`.
@@ -328,7 +328,7 @@ cargo bench --bench target_cost --no-run 2>&1 | tail -3
 
 # A caller may ask for one named point or for the stage split instead of a
 # sweep. The extra words are passed straight through to the benchmark.
-if [ "$1" = "one" ] || [ "$1" = "stages" ] || [ "$1" = "placement" ]; then
+if [ "$1" = "one" ] || [ "$1" = "stages" ] || [ "$1" = "placement" ] || [ "$1" = "memory-placement" ]; then
     cargo bench --bench target_cost -- $CACHETTE_BENCH_POINT > /tmp/rows.txt
     cat /tmp/facts.txt /tmp/rows.txt > /tmp/result.txt
     exit 0
