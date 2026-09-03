@@ -8610,6 +8610,6 @@ milliseconds against a 188 millisecond frame are not the same measurement twice.
 [^F297A]: The target platform benchmark script. `scripts/graviton-benchmark.sh`
 [^F300A]: Backlog item 0277, hold a thread back when the work will not pay for it. `docs/backlog/proposed/0277-hold-a-thread-back-when-the-work-will-not-pay-for-it.md`
 [^F300B]: The demonstration stage split. `crates/cachette-core/examples/demo_stage_split.rs`
-[^F300A]: Findings register, FND-299 and FND-295, in this document.
+[^F304A]: Findings register, FND-299 and FND-295, in this document.
 [^F301A]: ADR-0071, the bridge rebuild orders on one thread, decision D2. `docs/adrs/accepted/adr-0071-the-bridge-rebuild-orders-on-one-thread.md`
 [^F302A]: Decisions register, DEC-111. `docs/DECISIONS.md`
