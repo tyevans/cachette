@@ -153,6 +153,13 @@ project rests on it.[^9]
 
 ## One frame at the target scale
 
+**Read this section as history. The stage tables below supersede its frame
+figure.** The rows stay, because a row is a measurement of the tree that
+produced it. The frame here is 500 milliseconds, and the last whole-frame stage
+table gives 177.9 milliseconds for the same extent and unit count. **Do not
+quote 500 milliseconds as the cost of a frame.** A finding records what the
+figure cost while it stood.[^STALE330]
+
 This is the row the project needs most. Machine A, 16 hardware threads. The
 world held 16,777,216 tiles and 1,000,000 units, and no settlement.
 
@@ -185,6 +192,14 @@ The frame costs 500 milliseconds on all 16, which is 5.0 times the budget.
 Sixteen cores bought a speedup of 3.69, so the run used 0.23 of the machine.
 
 ## The budget is out of reach on any core count
+
+**The title still holds and the floor in this section does not.** This section
+concludes that a frame cannot fall below about 300 milliseconds on any core
+count. Later work made the frame 177.9 milliseconds at 12 threads, on a world
+whose units are scattered rather than packed. The floor was a property of the
+engine of that day, and the engine changed. The frame is still above the 100
+millisecond budget. **Read the rows as history and the floor as refuted.** A
+finding holds the correction.[^STALE330]
 
 This is the most important consequence of the run, and it does not depend on
 the size of the machine.
@@ -1609,10 +1624,11 @@ Read this section before you cite a figure above.
   cost of a call across the language boundary.** Three draft records state
   derived figures of those kinds, and these runs leave every one of them
   derived.[^2]
-- **No figure separates the stages inside a step.** The step, the build and
-  the hash reach the public interface, and the passes inside a step do not.
-  The two halves in the table above are a difference between two worlds, not
-  a measurement of a stage.
+- **The first two runs separated no stage inside a step.** The step, the build
+  and the hash reach the public interface, and the passes inside a step did
+  not. The two halves in the table above are a difference between two worlds,
+  not a measurement of a stage. **Later runs do name every stage**, behind a
+  crate feature, and the stage sections above hold them.
 - **The thread counts above are not the thread counts of a running engine.**
   Each row asks the step for a thread count, and the step starts threads for
   each parallel stage. No figure says what a pool would cost.
@@ -1682,6 +1698,7 @@ commit what changed. Do not edit a row to make a later run agree with it.
 [^ADR71298]: ADR-0071, the bridge rebuild orders on one thread, decision D2. `docs/adrs/accepted/adr-0071-the-bridge-rebuild-orders-on-one-thread.md`
 [^RESID298]: Findings register, FND-303. `docs/FINDINGS.md`
 [^LAYOUT]: Findings register, FND-313. `docs/FINDINGS.md`
+[^STALE330]: Findings register, FND-330. `docs/FINDINGS.md`
 [^ITEM301]: Backlog item 0301, narrow the sort guard to a repeated key. `docs/backlog/complete/0303-narrow-the-sort-guard-to-a-repeated-key.md`
 [^ADR105]: ADR-0105, a total order needs no repeated identifier, only no repeated key. `docs/adrs/draft/adr-0105-a-total-order-needs-no-repeated-key.md`
 

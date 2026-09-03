@@ -25,7 +25,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^ALLOC]
 
-**Next number: BLK-036**
+**Next number: BLK-037**
 
 [^ALLOC]: Findings register, FND-038. `docs/FINDINGS.md`
 
@@ -39,8 +39,9 @@ reports.
 **This row narrowed on 3 September 2026. It did not close.** A benchmark now
 lives in the repository, and a script runs it on a Graviton instance and
 destroys the instance afterwards. Every axis of the sweep is a parameter. Two
-runs measured five quantities, on two instances of different size. A register
-holds every row, both machines and both commits.[^MEASURED]
+runs measured five quantities, on two instances of different size, and many
+runs followed them. A register holds every row, every machine and every
+commit.[^MEASURED]
 
 **What is now measured.** The cost of one frame against the tile count and
 against the unit count, up to 16,777,216 tiles and 1,000,000 units, at 1, 2,
@@ -58,56 +59,32 @@ was taken on a world that holds no settlement and no character.
    measured world holds neither, so the rate pass, the consumption pass and
    the position pass did no work and the character arena was empty. Every
    measured frame figure and the memory figure are lower bounds.
-3. **Any figure for a stage inside a step.** The benchmark reaches the public
-   interface, and the passes inside a step do not.
+
+**A stage inside a step no longer holds this row open.** A crate feature names
+every stage of a frame, and the register holds the tables.[^MEASURED]
 
 **The machine size no longer holds this row open, and the reason is a
-result.** A run on 16 hardware threads gives a frame of 500 milliseconds at
-the target scale against a budget of 100, and the unit passes stop gaining
-above 12 threads. A larger machine is not the missing measurement.[^FLOOR]
+result.** The unit passes stop gaining above 12 threads, so a larger machine is
+not the missing measurement.[^FLOOR]
+
+**The frame figure this row once quoted is out of date, and the row now cites
+the register instead.** This row said 500 milliseconds at the target scale.
+That was the first run, on 16 hardware threads, on a world whose units were
+packed. Later work made the engine faster. The last whole-frame stage table
+gives 177.9 milliseconds at the target scale on 12 threads, and two later runs
+of a changed tree gave 167 to 169 milliseconds. The register holds every row
+with the machine, the commit and the fixture of each.[^MEASURED]
+
+**The two figures do not share a fixture, so do not read the difference as the
+whole gain.** The first packed the units and ran 16 threads. The later ones
+scatter the units and run 12, and a scattered unit costs about twice a packed
+one. **Cite the register for a frame figure. Do not cite this row.** A finding
+records how the stale figure survived here long enough to be quoted.[^STALE]
 
 **Do not read a document that says no measurement exists as current.** That
 sentence was true when it was written, and about ninety documents hold it.
 This row is the current statement. A finding records how far the sentence
 spread and why it was not swept.[^SPREAD]
-
-### BLK-034 — May a unit build on ground another faction holds, and who may destroy an upgrade?
-
-**Owner:** the project owner. **Blocks:** any rule that ties an upgrade to a
-faction, and the verb that removes one.
-
-The engine now stores an upgrade on a tile and lets a unit build it.[^BLK34A]
-It asks nothing about who holds the tile. Any live unit builds on any tile it
-stands on, and the control plane removes an upgrade from any tile by address.
-
-**This row narrowed on 3 September 2026. It did not close.** The project owner
-answered the first question and the first half of the second.
-
-**A unit builds only on ground that its own faction holds.** Building is
-restricted by the holder of the tile. The holder column already names who
-holds each tile, so the rule reads a value the engine stores.[^BLK34B]
-
-**Anyone may destroy an upgrade.** Destruction is not restricted by the
-holder. The owner stated that the reasons to destroy one vary, so the engine
-permits the act and does not encode a motive.
-
-**Destruction takes work, and an instant path stays.** A unit that destroys an
-upgrade does work over several ticks, in the same way that a unit that builds
-one does. The instant removal that exists today is not deleted, because some
-needs ask for it. It stays as a control-plane call, and it is not what a unit
-does.
-
-**A unit therefore needs a verb for destruction.** The engine has no such verb
-today. It has an instant removal by address and nothing else.
-
-One question stays open.
-
-1. **Does an upgrade change hands when the ground does?** The holder of a tile
-   moves as units move, and the upgrade does not move with it.
-
-Work continues without the two answers. The engine states the storage and the
-arithmetic, and neither depends on a faction. A rule invented here would be a
-content decision made by the wrong person, and it would reach the state hash.
 
 ### BLK-035 — Where does the documentation site publish, and who turns the publishing on?
 
@@ -145,7 +122,69 @@ unset.
 hosting is turned on, or states that the site is built and not published.
 
 
+### BLK-036 — Does an upgrade change hands when the ground does?
+
+**Owner:** the project owner. **Blocks:** any rule that ties an existing
+upgrade to the faction that holds the tile under it.
+
+The engine stores an upgrade on a tile and asks nothing about who holds the
+tile.[^BLK34A] A holder column names who holds each tile, and that value moves
+as units move.[^BLK34B] Nothing says what happens to an upgrade on a tile whose
+holder changes.
+
+**This row is the part of BLK-034 that stayed open when the rest of it
+resolved.** It was split out on 3 September 2026, because a row that is mostly
+answered reads as open and stops work that should proceed.
+
+**The three answered questions do not answer this one.** A faction builds only
+on ground it holds. Anyone may destroy an upgrade. Destruction takes work, and
+a faction-level removal is instant. Every one of those is an act that somebody
+invokes. This question asks what happens when nobody invokes anything and the
+ground changes hands.
+
+**Two shapes the answer could take.** The upgrade goes to the new holder, or
+the upgrade stays with the faction that built it. A third shape is that the
+upgrade is destroyed. Each reaches the state hash, so the engine cannot hold
+two of them.
+
+Work continues without the answer. The engine states the storage and the
+arithmetic, and neither depends on a faction. A rule invented here would be a
+content decision made by the wrong person.
+
 ## Resolved
+
+### BLK-034 — May a unit build on ground another faction holds, and who may destroy an upgrade?
+
+**Resolved on 3 September 2026, and one question moved to its own row.** The
+project owner answered the building rule and both halves of the destruction
+rule. The question about an upgrade whose ground changes hands is now BLK-036,
+and it is open.
+
+The engine stores an upgrade on a tile and lets a unit build it.[^BLK34A] It
+asked nothing about who holds the tile.
+
+**A faction builds only on ground it owns.** A unit may not build on ground
+another faction holds. The holder column already names who holds each tile, so
+the rule reads a value the engine stores.[^BLK34B]
+
+**Anyone may destroy an upgrade.** Destruction is not restricted to the holder
+of the ground. The owner stated that the reasons to destroy one vary, so the
+engine permits the act and does not encode a motive.
+
+**A unit-level destruction takes work, and a faction-level removal is
+instant.** A unit that destroys an upgrade does work over several ticks, in the
+same way that a unit that builds one does. The instant removal that exists
+today stays, because some needs ask for it.
+
+**The owner named the two as two verbs rather than as one verb with an
+exception, and wrote the word "perhaps".** Destroy is the unit-level verb that
+takes work. Reclaim is the faction-level verb that is instant. **Read the two
+names as the owner's current thinking and not as a settled interface.** The
+shape is decided; the names are not.
+
+**A unit therefore needs a verb for destruction.** The engine has no such verb
+today. It has an instant removal by address and nothing else. One item holds
+that work.[^BLK34C]
 
 ### BLK-018 — How many groups found a world, and does every faction found one?
 
@@ -273,6 +312,7 @@ normally.
 [^MEASURED]: Target platform costs. `docs/reference/graviton-costs.md`
 [^SPREAD]: Findings register, FND-223. `docs/FINDINGS.md`
 [^FLOOR]: Findings register, FND-224. `docs/FINDINGS.md`
+[^STALE]: Findings register, FND-330. `docs/FINDINGS.md`
 [^SCALE]: Budgets and costs, the scale constants. `docs/reference/budgets.md`
 [^SHAPES]: ADR-0066, entity storage holds four fixed shapes. `docs/adrs/accepted/adr-0066-entity-storage-holds-four-fixed-shapes.md`
 [^SHAPE]: ADR Registry, row 0017. `docs/adrs/REGISTRY.md`
@@ -282,6 +322,7 @@ normally.
 [^SEP]: Decisions register, DEC-037. `docs/DECISIONS.md`
 [^FOUNDDIST]: ADR-0076, a founding keeps a fixed distance from the foundings before it. `docs/adrs/accepted/adr-0076-a-founding-keeps-a-fixed-distance-from-the-foundings-before-it.md`
 [^BLK34A]: ADR-0090, a tile upgrade is stored sparsely, as the difference from the generated world. `docs/adrs/draft/adr-0090-a-tile-upgrade-is-stored-sparsely.md`
+[^BLK34C]: Backlog item 0262, destroy an upgrade over several ticks. `docs/backlog/proposed/0262-destroy-an-upgrade-over-several-ticks.md`
 [^BLK34B]: ADR-0053, a faction is a bit in a mask, and a relation is a plane, decision D2. `docs/adrs/accepted/adr-0053-a-faction-is-a-bit-in-a-mask-and-a-relation-is-a-plane.md`
 [^BLK35A]: ADR-0107, the Python reference is generated from the compiled module, decisions D1 and D4. `docs/adrs/draft/adr-0107-the-python-reference-is-generated-from-the-compiled-module.md`
 [^BLK35B]: Backlog item 0308, the documentation plan. `docs/backlog/refined/0308-the-documentation-plan.md`

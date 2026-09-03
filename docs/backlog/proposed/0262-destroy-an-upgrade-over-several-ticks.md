@@ -21,6 +21,11 @@ A unit that destroys an upgrade does work over several ticks, in the same way
 that a unit that builds one does. The instant removal stays, because some
 needs ask for it, and it stays as a control-plane call.[^1]
 
+**The owner named the two as two verbs, and wrote the word "perhaps".** Destroy
+is the unit-level verb that takes work. Reclaim is the faction-level verb that
+is instant. Read the two names as the owner's current thinking rather than as a
+settled interface, and decide the names when this item is refined.[^1]
+
 **The two paths are not the same act, and the engine must not merge them.**
 One is a unit spending ticks. The other is the control plane setting a state.
 A single code path that serves both would give the control plane a unit's
@@ -51,13 +56,14 @@ It does not decide who may order a destruction. Anyone may destroy an
 upgrade, and no faction rule restricts it.[^1]
 
 It does not decide whether an upgrade changes hands when the ground does.
-That question is still open.[^1]
+That question is still open, and it has its own row.[^3]
 
 It does not make a unit choose to destroy anything. Nothing makes a unit
-choose to build either, and one item holds that gap.[^3]
+choose to build either, and one item holds that gap.[^4]
 
 ## References
 
-[^1]: Blockers register, BLK-034. `docs/BLOCKERS.md`
+[^1]: Blockers register, BLK-034, resolved. `docs/BLOCKERS.md`
 [^2]: Backlog item 0058, build an improvement over several ticks. `docs/backlog/complete/0058-build-an-improvement-over-several-ticks.md`
-[^3]: Backlog item 0180, let a unit choose to build. `docs/backlog/proposed/0180-let-a-unit-choose-to-build.md`
+[^3]: Blockers register, BLK-036. `docs/BLOCKERS.md`
+[^4]: Backlog item 0180, let a unit choose to build. `docs/backlog/proposed/0180-let-a-unit-choose-to-build.md`
