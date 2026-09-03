@@ -301,6 +301,7 @@ without stating a constraint is worse than no record.
 | 0092 | The agent tool surface grows one tool at a time, against a stated need | Draft | 0040, 0085 | `draft/adr-0092-the-agent-tool-surface-grows-against-a-stated-need.md` |
 | 0095 | A behavioural strategy arrives as a field over cells, never as a search from a unit | Draft | 0004, 0022, 0064, 0091 | `draft/adr-0095-a-behavioural-strategy-arrives-as-a-field-over-cells.md` |
 | 0096 | Cost follows the lattice, not the population, and a unit is a reader | Draft | 0009, 0022, 0064 | `draft/adr-0096-cost-follows-the-lattice-not-the-population.md` |
+| 0097 | The choice is decided for each cell and each bucket of need | Draft | 0001, 0009, 0063, 0064, 0096 | `draft/adr-0097-the-choice-is-decided-for-each-cell-and-each-bucket-of-need.md` |
 
 ### Retired numbers
 

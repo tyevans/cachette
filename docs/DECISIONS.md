@@ -23,9 +23,51 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^ALLOC]
 
-**Next number: DEC-097**
+**Next number: DEC-098**
 
 ## Open
+
+### DEC-097 — How many buckets should the choice divide the need range into?
+
+**Context.** The choice is decided for each cell and each bucket of need, and a
+unit reads the answer of its bucket.[^D097A] The bucket count decides how finely
+the engine tells two needs apart, and it decides how much sharing the pass buys.
+The reference table holds the value the engine uses and its derivation.[^D097B]
+
+**The value in the engine was chosen for behaviour.** A bucket is a quarter of
+one tick of the default need decay, so a unit never acts on a need it did not
+hold within one tick.
+
+**A cost argument runs the other way.** The measurement register holds a table of
+the collapse a cell would show against the number of need buckets in play. At the
+target density the median cell holds about as many units as the engine holds
+buckets, so in the worst case, where every unit of a cell lands in its own
+bucket, the sharing saves nothing.[^D097C]
+
+**The loss is weak rather than a cost.** A cell scores a bucket the first time a
+unit asks for it, so the deciding work of a cell is the smaller of the units it
+holds and the bucket count. A fine bucket risks buying nothing. It cannot cost
+more than the per-unit pass it replaced.
+
+**Options.**
+
+1. **Keep the value.** Behaviour stays as fine as the need itself moves, and the
+   sharing is whatever the need distribution gives.
+2. **Take a coarser bucket.** The collapse rises in proportion, and two units
+   whose needs differ by less than a bucket act alike. This is a behavioural
+   change and the record that decides the quantisation would have to move.
+3. **Choose the value from a measured need distribution.** This is the answer the
+   question actually wants.
+
+**Recommendation: option 1, until the measurement exists.** The measurement that
+settles it is how many need values coexist in one cell in a world that consumes.
+The measurement register states that no fixture in this project produces one,
+because it needs settlements, home sites and a running economy, and the benchmark
+world holds none of the three.[^D097C] **Do not move this value against an
+argument.** Move it against that measurement.
+
+**Status: open.** Engineering owns it. One blocker governs every cost figure in
+this project.[^BLK7]
 
 ### DEC-088 — What share of its own cell must a tile keep before the window gives room to a gap?
 
@@ -2300,6 +2342,9 @@ a failed founding is correct.[^PRD12]
 [^PRD18]: Product record PRD-0018, a depleted deposit comes back. `docs/product/shaped/prd-0018-a-depleted-deposit-comes-back.md`
 [^SCALE]: Budgets and costs, the scale constants. `docs/reference/budgets.md`
 
+[^D097A]: ADR-0097, the choice is decided for each cell and each bucket of need, decision D1. `docs/adrs/draft/adr-0097-the-choice-is-decided-for-each-cell-and-each-bucket-of-need.md`
+[^D097B]: Budgets and costs, the choice pass. `docs/reference/budgets.md`
+[^D097C]: Target platform costs, would the choice pass collapse if it decided for each cell. `docs/reference/graviton-costs.md`
 [^ALLOC]: Findings register, FND-038. `docs/FINDINGS.md`
 [^TARGET]: Blockers register, BLK-004, and the scale constants. `docs/reference/budgets.md`
 [^MOVETIME]: The movement timing note, and DEC-008 above. `docs/research/movement-timing.md`

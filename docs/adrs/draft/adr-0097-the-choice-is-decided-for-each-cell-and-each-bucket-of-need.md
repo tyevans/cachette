@@ -1,0 +1,178 @@
+# ADR-0097: The choice is decided for each cell and each bucket of need
+
+## Context
+
+A unit chooses by scoring a fixed option set against the level 1 cell it stands
+in, and it takes the highest score.[^1] Each score is one product of what the
+unit wants by how much of that thing is near.
+
+**The engine holds one weight profile for every unit alive.** No unit carries a
+type and no unit carries a profile of its own, and the findings register records
+that.[^2] So the inputs to a choice are the cell of the unit and the need of the
+unit, and nothing else. Two units that stand in one cell with one need always
+receive one answer, and the engine computes it twice.
+
+A separate record binds this. The cost of a pass follows the lattice and never
+the population, and the engine computes one answer once for every reader that
+would compute the same answer.[^3] That record states the constraint. It does
+not say how a continuous input becomes a shared answer, and it says in its own
+text that the choice is the pass which must close the gap.
+
+**A need is a fixed-point value, so it is nearly continuous.** The engine cannot
+hold one answer for each value a need can take. It must therefore either compute
+one answer for each unit, which is the shape the record refuses, or divide the
+need range and hold one answer for each part of it.
+
+**Both extremes are wrong, and the interesting question is between them.** A
+coarse division makes two units with clearly different needs act alike. A fine
+division approaches one answer for each unit and shares nothing. A contributor
+could reasonably choose either, and the reasoning that picks a resolution is
+invisible in the table that results.
+
+**The choice of a representative is also a decision.** A part of the need range
+must be scored at some need. The lower bound, the midpoint and the upper bound
+are all defensible, and each gives a different answer at a boundary.
+
+## Decision
+
+### D1. The choice quantises the need into buckets, and one answer serves a bucket
+
+The engine divides the need range into a fixed number of equal buckets. It
+computes one answer for each cell and each bucket, and a unit reads the answer of
+its own bucket.
+
+The bucket count is a resolution parameter with a behavioural consequence, so the
+reference table holds it with its derivation and this record does not state
+it.[^4] The bucket width is a power of two in the fixed-point scale, so the
+bucket of a need is a shift and never a division.
+
+**This changes behaviour, and the project accepts the change.** Two units whose
+needs sit in one bucket now receive one answer where they could have received
+two. The golden state hash therefore moves, and the move is stated here rather
+than discovered by a reviewer.
+
+### D2. A bucket is scored at its lower bound
+
+The engine scores a bucket at the need that opens it. The topmost bucket holds
+the full need alone, so a unit that needs everything is scored at its exact need.
+
+The lower bound is chosen because it makes the topmost bucket exact and because
+it is the value that a shift already produces. A midpoint would need a second
+derivation of the bucket width, and one value derived in two places is the defect
+shape this project records.[^5]
+
+### D3. The table fills as a unit asks for a bucket, and the fill changes no answer
+
+A cell builds an empty table and scores a bucket the first time a unit asks for
+it. A cell that holds few units therefore scores few buckets, and the table never
+costs more than the per-unit pass it replaces. A cell that holds many units scores
+at most the bucket count, so the deciding work has a ceiling that the population
+cannot raise.
+
+**The answer of a bucket depends on the bucket, on the cell and on the profile.**
+It does not depend on which unit asked first, and it does not depend on how many
+asked. The lazy fill is therefore invisible in the result, and the pass gives one
+answer at any thread count.[^6]
+
+A table belongs to one cell and to one thread. No thread reads a table that
+another thread wrote, so the fill needs no ordering rule of its own.[^7]
+
+### D4. An explanation scores the need that the pass scored
+
+The engine answers a question about a choice by computing the scores again from
+the world as it stands, because it stores no score.[^8] That recomputation takes
+the bucket of the need and not the need.
+
+An explanation that scored the exact need would report a winner that the unit did
+not take, at every need where the bucket changes the answer. A watcher would then
+read a correct engine as a broken one. The explanation reports the exact need and
+the scored need together, so a reader can see the quantisation rather than
+discover it.
+
+## The alternatives this rejects
+
+**Score each unit at its exact need.** This is what the engine did, it is exact,
+and it is the shape the cost record refuses. It computes one answer for every
+reader rather than once for all of them.
+
+**Find the exact boundaries at which the answer changes.** Each score is monotone
+in the need, so the winner is a step function of the need and the engine could
+store the steps instead of a table. It is rejected because the fixed-point
+multiply truncates. Two scores can therefore exchange the lead more than once
+near a boundary, so the step function is not the small exact object the argument
+assumes, and a search for the boundaries would be correct only by luck.
+
+**Quantise the need in the column, so that the stored need is the bucket.** This
+would make the choice exact against the stored value, and it would remove the
+question of a representative. It is rejected because the need is a rate that a
+consumption pass fills and a decay empties.[^9] Rounding it in storage would
+round every arithmetic step that touches it, and the quantisation would leak out
+of the choice into a subsystem that never asked for it.
+
+**Give the bucket count a value that a measurement chooses.** The lazy fill of D3
+already caps the deciding work at the per-unit cost, so the count does not need
+to sit at a break-even point. Choosing it for behavioural fidelity rather than
+for cost is what D1 does, and a cost-chosen value would tie a behavioural
+parameter to a machine.
+
+## Consequences
+
+**The engine can no longer tell two units apart inside one bucket.** The cost
+record already made that true for two units with one cell and one need; this
+record widens it to a range of needs. A project that later wants finer behaviour
+must either narrow the bucket or give the units different inputs.
+
+**A test that asserts a unit's choice must state the bucket it depends on.** A
+fixture that sets a need near a bucket boundary asserts a property of the
+boundary and not of the option set. A test that wants the option set states a
+need in the middle of a bucket.
+
+**The bucket count is now behaviour.** A change to it changes what units do, so
+it is not a tuning knob that a contributor may move to make a benchmark look
+better. It moves against a stated behavioural argument, and the golden files move
+with it.
+
+**Nothing enforces D1 against a new pass.** This record binds the choice pass. A
+later pass that decides per unit gets no failure, in the same way that the cost
+record gets none.[^10]
+
+**The defect that four cell fields carry incompatible ranges is untouched, and it
+becomes cheaper to repair.** A weight today is a preference multiplied by a unit
+conversion that nobody has written down, and the findings register holds it.[^11]
+This record does not change which fields an option reads or how they compare. It
+does move the field read from the unit to the cell, so a normalisation added
+later is computed once for each cell rather than once for each unit.
+
+**The sharing may buy nothing, and the record accepts that.** The measurement
+register holds a table of the collapse a cell would show against the number of
+need buckets in play, and at the target density a cell holds about as many units
+as the reference table gives buckets.[^12] So in the worst case, where every unit
+of a cell lands in its own bucket, D1 shares no answer. **D3 is what makes that a
+weak loss rather than a cost**, because a cell scores the smaller of the units it
+holds and the bucket count. The measurement that would settle the bucket count is
+how many need values coexist in one cell in a world that consumes, and the
+register states that no fixture in this project produces one. An open decision
+holds it.[^13]
+
+**The interval stays.** The cost record argues that the interval becomes a choice
+rather than a necessity once the deciding work follows the lattice, and it
+declines to delete it because the frame consequence has not been measured under
+the new shape.[^10] This record makes no claim about the interval. The accepted
+choice record still decides it.[^14]
+
+## References
+
+[^1]: ADR-0064, a unit chooses by scoring a small fixed option set, decision D1. `docs/adrs/accepted/adr-0064-a-unit-chooses-by-scoring-a-small-fixed-option-set.md`
+[^2]: Findings register, FND-251. `docs/FINDINGS.md`
+[^3]: ADR-0096, cost follows the lattice, not the population, and a unit is a reader, decisions D1 and D4. `docs/adrs/draft/adr-0096-cost-follows-the-lattice-not-the-population.md`
+[^4]: Budgets and costs, the choice pass. `docs/reference/budgets.md`
+[^5]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`
+[^6]: ADR-0001, one binary gives one answer at any thread count, decision D1. `docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
+[^7]: ADR-0009, parallel stages write disjoint outputs, decision D1. `docs/adrs/accepted/adr-0009-parallel-stages-write-disjoint-outputs.md`
+[^8]: ADR-0064, a unit chooses by scoring a small fixed option set, decision D2. `docs/adrs/accepted/adr-0064-a-unit-chooses-by-scoring-a-small-fixed-option-set.md`
+[^9]: ADR-0063, a need is a rate with a threshold, and crossing it is a fact, decision D1. `docs/adrs/accepted/adr-0063-a-need-is-a-rate-with-a-threshold-and-crossing-it-is-a-fact.md`
+[^10]: ADR-0096, cost follows the lattice, not the population, and a unit is a reader, the consequences. `docs/adrs/draft/adr-0096-cost-follows-the-lattice-not-the-population.md`
+[^11]: Findings register, FND-233. `docs/FINDINGS.md`
+[^12]: Target platform costs, would the choice pass collapse if it decided for each cell. `docs/reference/graviton-costs.md`
+[^13]: Decisions register, DEC-097. `docs/DECISIONS.md`
+[^14]: ADR-0064, a unit chooses by scoring a small fixed option set, decision D4. `docs/adrs/accepted/adr-0064-a-unit-chooses-by-scoring-a-small-fixed-option-set.md`

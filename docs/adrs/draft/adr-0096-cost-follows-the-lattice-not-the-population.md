@@ -209,5 +209,5 @@ decision gets no failure. A reader must treat this as unenforced.[^18]
 [^14]: ADR-0009, parallel stages write disjoint outputs, the consequences. `docs/adrs/accepted/adr-0009-parallel-stages-write-disjoint-outputs.md`
 [^15]: Decision Record Scope, section 2. `.claude/rules/adr-scope.md`
 [^16]: Backlog item 0237. `docs/backlog/proposed/0237-declare-what-each-stage-reads-and-writes.md`
-[^17]: Backlog item 0238. `docs/backlog/proposed/0238-decide-per-cell-and-need-rather-than-per-unit.md`
+[^17]: Backlog item 0238. `docs/backlog/complete/0238-decide-per-cell-and-need-rather-than-per-unit.md`
 [^18]: Recurring Defect Shapes, shape 3. `.claude/rules/recurring-defects.md`

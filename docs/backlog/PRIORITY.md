@@ -27,8 +27,8 @@ engine gets wrong today.
 
 | No. | Why it sits here |
 |---|---|
-| 0238 | Decide per cell and need rather than per unit. **The owner put the lattice approach above every other item**, and this is the first pass it applies to. ADR-0096 governs it. The prize is behavioural as well as cost: if the decision is cheap, the 32-tick interval that makes a unit act on a stale reading may go. |
 | 0237 | Declare what each stage reads and writes. It sits with 0238 because a stage nobody can time from outside cannot be shown to have improved, and because it makes ADR-0009 checkable, which that record says in its own consequences it is not. |
+| 0242 | Decide whether the choice interval can go. **This is the behavioural half of what 0238 was for**, and 0238 deliberately left it. The deciding work no longer follows the population, so the reason a unit acts on a reading as old as the interval has weakened. It sits below 0237 because it needs a measurement on the target platform that nobody has, and BLK-007 holds that. Removing the interval also removes what makes a choice sticky, and ADR-0064 D2 says why stickiness is what makes the behaviour legible. |
 | 0236 | Repair every record that calls BLK-007 open. A benchmark exists on a branch, and the moment it merges a large number of documents state something false and nothing fails. FND-042 records that this has already happened twice. It sits here so the sweep is ready before the merge rather than after it. |
 | 0102 | A settlement reads its own ground rule, not the passability rule. Blocked by 0071 and 0092, in that order. |
 | 0187 | Nothing moves a carried load into a store, so gathering cannot feed anybody. It moved here from `Next` because 0186 is complete and a unit now carries something. It closes the chain from the ground to the store, and it is what makes a hungry unit able to feed itself. |

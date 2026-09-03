@@ -2776,6 +2776,20 @@ impl World {
     /// The pass is one operation over all units. Nothing loops over units
     /// outside the engine.[^1]
     ///
+    /// **The pass walks the lattice, and it never walks the population.** It
+    /// divides the level 1 cells into contiguous ranges, and each thread takes
+    /// one range. A thread skips a cell that does not choose on this frame and
+    /// a cell that holds no unit, so the deciding work follows the cell count
+    /// and the population cannot raise it.[^7] The earlier shape collected
+    /// every live unit into one list before any thread started, and that
+    /// collect was serial and grew with the population.[^8]
+    ///
+    /// **The engine computes one answer once for every unit that would compute
+    /// the same answer.**[^9] A cell holds one answer table over the buckets of
+    /// need, and a unit reads the entry for its bucket. The table fills as a
+    /// unit asks, so a cell never scores more buckets than it holds units, and
+    /// it never scores more than the bucket count.[^10]
+    ///
     /// **The pass writes the gather order in the same write as the intent.**
     /// One pass writes both, for the same units, on the same frame. A second
     /// stage that derived the order from the option would be a second writer
@@ -2792,13 +2806,20 @@ impl World {
     /// was doing, which is the case the floor exists for.[^2] It holds no
     /// intent, so it takes no gather order either.
     ///
-    /// Each thread reads a span of the live set and writes its own output
-    /// slot. The join reads the slots in slot order, so the result never
-    /// takes its order from the thread that finished first.[^3]
+    /// Each thread reads a range of the lattice and writes its own output
+    /// slot. The join reads the slots in slot order, the cells of a slot rise,
+    /// and the derived unit structure orders the units of a cell. So the
+    /// result takes its order from the lattice and never from the thread that
+    /// finished first.[^3]
+    ///
+    /// The apply walks that same order. It is the one part that touches every
+    /// unit that chose, and applying an answer to a unit is per-unit by
+    /// necessity.[^7]
     ///
     /// # Errors
     ///
-    /// Returns an error when the caller asks for zero threads.
+    /// Returns an error when the caller asks for zero threads, and when the
+    /// derived unit structure no longer describes the arena.
     ///
     /// # References
     ///
@@ -2808,43 +2829,69 @@ impl World {
     /// [^4]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`
     /// [^5]: Findings register, FND-191. `docs/FINDINGS.md`
     /// [^6]: ADR-0073, gathering is admitted by sort-then-admit against the tile, decision D1. `docs/adrs/accepted/adr-0073-gathering-is-admitted-by-sort-then-admit-against-the-tile.md`
+    /// [^7]: ADR-0096, cost follows the lattice, not the population, and a unit is a reader, decisions D1 and D3. `docs/adrs/draft/adr-0096-cost-follows-the-lattice-not-the-population.md`
+    /// [^8]: Findings register, FND-252. `docs/FINDINGS.md`
+    /// [^9]: ADR-0096, cost follows the lattice, not the population, and a unit is a reader, decision D4. `docs/adrs/draft/adr-0096-cost-follows-the-lattice-not-the-population.md`
+    /// [^10]: ADR-0097, the choice is decided for each cell and each bucket of need. `docs/adrs/draft/adr-0097-the-choice-is-decided-for-each-cell-and-each-bucket-of-need.md`
     fn choose(&mut self, threads: usize) -> Result<(), StepError> {
         if threads == 0 {
             return Err(StepError::ZeroThreads);
         }
-        let live: Vec<Entity> = self.soldiers.iter().collect();
-        if live.is_empty() {
+        // The occupancy bitplane and the block range are unguarded reads.
+        // They answer from the last rebuild and cannot refuse a stale
+        // question, so a pass that skipped a cell on a stale bitplane would
+        // skip it in silence. Ask the guarded question once, here, before
+        // any thread trusts the shape.
+        self.bridge.describes(&self.soldiers)?;
+        let layout = self.pyramid.layout();
+        let cells = layout.block_count();
+        if cells == 0 {
             return Ok(());
         }
         let frame = self.tick.0;
         let schedule = self.choice;
         let weights = &self.weights;
         let pyramid = &self.pyramid;
-        let layout = pyramid.layout();
+        let bridge = &self.bridge;
         let soldiers = &self.soldiers;
-        let chunk_len = live.len().div_ceil(threads).max(1);
+        let chunk_len = (cells as usize).div_ceil(threads).max(1) as u32;
         let mut slots: Slots<Vec<(Entity, u8)>> =
             Slots::filled(threads, Vec::new()).map_err(|_| StepError::ZeroThreads)?;
 
         std::thread::scope(|scope| {
-            for (chunk, slot) in live.chunks(chunk_len).zip(slots.entries_mut()) {
+            let mut start = 0u32;
+            for slot in slots.entries_mut() {
+                if start >= cells {
+                    break;
+                }
+                let end = start.saturating_add(chunk_len).min(cells);
                 scope.spawn(move || {
-                    *slot = chunk
-                        .iter()
-                        .filter_map(|unit| {
-                            let tile = soldiers.tile(*unit)?;
-                            let cell = layout.block_of_key(layout.key_of(tile)?);
-                            // The stagger key is the level 1 cell. It is
-                            // never the identity of the unit.
-                            if !schedule.chooses_now(cell, frame) {
-                                return None;
-                            }
-                            let summary = pyramid.cell(cell)?;
-                            let need = soldiers.need_column()[unit.index() as usize];
-                            Some((*unit, choose::best_option(need, summary, weights)))
-                        })
-                        .collect();
+                    let needs = soldiers.need_column();
+                    let mut chosen: Vec<(Entity, u8)> = Vec::new();
+                    for cell in start..end {
+                        // The stagger key is the level 1 cell. It is never
+                        // the identity of the unit.
+                        if !schedule.chooses_now(cell, frame) {
+                            continue;
+                        }
+                        if !bridge.block_is_occupied(cell) {
+                            continue;
+                        }
+                        let Some(summary) = pyramid.cell(cell) else {
+                            continue;
+                        };
+                        let units = bridge
+                            .in_block(soldiers, cell)
+                            .expect("the caller checked that the bridge describes this arena");
+                        let mut answers = choose::CellAnswers::new(summary);
+                        for unit in units {
+                            let need = needs[unit.index() as usize];
+                            chosen.push((*unit, answers.answer(need, weights)));
+                        }
+                    }
+                    *slot = chosen;
                 });
+                start = end;
             }
         });
 
