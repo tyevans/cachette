@@ -63,7 +63,7 @@
 use std::time::Instant;
 
 use cachette_core::choose::PERIOD_LOG2_CEILING;
-use cachette_core::{Axial, FactionId, World, WorldConfig};
+use cachette_core::{Axial, Entity, FactionId, Fix32, World, WorldConfig};
 
 /// The seed that every world in this benchmark takes.
 const SEED: u64 = 0x0123_4567_89ab_cdef;
@@ -270,6 +270,7 @@ fn main() {
         "memory" => memory_sweep(&full()),
         "stages" => stage_rows(&arguments),
         "placement" => placement_rows(&arguments),
+        "collapse" => collapse_rows(&arguments),
         "memory-placement" => memory_placement(&arguments),
         "one" => one_point(&arguments),
         "full" => timing_sweep(&full()),
@@ -547,6 +548,129 @@ fn placement_rows(arguments: &[String]) {
                 elapsed
             });
             report(name, extent.tiles(), placed, threads, &samples);
+        }
+    }
+}
+
+/// Counts how far the choice pass would collapse if it decided per cell.
+///
+/// One weight profile serves every unit alive, so two units in the same level
+/// 1 cell with the same need score the same options and choose alike. If that
+/// is common at scale, a pass that decided once for each distinct pair rather
+/// than once for each unit would do far less work.
+///
+/// **The collapse factor is the live unit count divided by the number of
+/// distinct pairs.** A factor of one means every unit is already unique in its
+/// cell and there is nothing to collapse. A factor near the units for each
+/// cell means the need adds almost no variety.
+///
+/// The need is a Q16.16 quantity, so it takes many values, and how coarse a
+/// bucket may be before behaviour changes is a design decision rather than
+/// one this benchmark makes. The rows therefore report several bucket widths
+/// and let a record choose. A shift of zero is the exact need.
+///
+/// Everything here comes through the public crate interface: the live units,
+/// the tile of a unit, the need of a unit, and the block layout that names
+/// the cell. Nothing reaches inside the engine.
+fn collapse_rows(arguments: &[String]) {
+    let extent = extent_argument(arguments, 1);
+    let units: u32 = arguments
+        .get(2)
+        .and_then(|word| word.parse().ok())
+        .expect("the third argument must be a unit count");
+    let threads: usize = arguments
+        .get(3)
+        .and_then(|word| word.parse().ok())
+        .unwrap_or(1);
+
+    // The fractional part of the fixed point scale holds sixteen bits, so a
+    // shift of sixteen buckets the need to whole units and a shift of twelve
+    // buckets it to sixteenths.
+    const SHIFTS: [u32; 6] = [0, 8, 12, 14, 16, 20];
+
+    println!("# the collapse of the choice pass, if it decided for each cell");
+    println!("# a pair is one level 1 cell and one bucketed need");
+    println!("# ratio_milli is the live units divided by the pairs, times 1000");
+    println!(
+        "bench\tplacement\tshift\tunits\tcells\tpairs\tratio_milli\tbiggest_cell\tmedian_cell"
+    );
+
+    for (placement, scattered) in [("packed", false), ("scattered", true)] {
+        let capacity = units.max(1024);
+        let mut world =
+            World::new(extent.config(capacity)).expect("the extent must describe a world");
+        let placed = if scattered {
+            populate_scattered(&mut world, units)
+        } else {
+            populate(&mut world, units)
+        };
+        // The frames matter. A world that has never stepped holds one need
+        // for every unit, and a count taken there would report the collapse
+        // of the fixture rather than of a running world.
+        for _ in 0..WARMUP_FRAMES {
+            world.step(threads).expect("the step must run");
+        }
+
+        let soldiers = world.soldiers();
+        let layout = world.bridge().layout();
+        let live: Vec<Entity> = soldiers.iter().collect();
+
+        // A cell and a bucketed need pack into one word, so the count is a
+        // sort and a scan. No hash map takes part, so no iteration order
+        // reaches the result.
+        let mut cells: Vec<u32> = Vec::with_capacity(live.len());
+        let mut needs: Vec<i32> = Vec::with_capacity(live.len());
+        for unit in &live {
+            let Some(tile) = soldiers.tile(*unit) else {
+                continue;
+            };
+            let Some(key) = layout.key_of(tile) else {
+                continue;
+            };
+            cells.push(layout.block_of_key(key));
+            needs.push(soldiers.need(*unit).unwrap_or(Fix32::ZERO).0);
+        }
+
+        let mut occupancy = cells.clone();
+        occupancy.sort_unstable();
+        occupancy.dedup();
+        let cell_count = occupancy.len();
+
+        // The spread of the population over the cells. A mean would hide a
+        // world in which a few cells hold everybody.
+        let mut per_cell: Vec<u32> = Vec::new();
+        {
+            let mut sorted = cells.clone();
+            sorted.sort_unstable();
+            let mut run = 0u32;
+            for window in 0..sorted.len() {
+                run += 1;
+                if window + 1 == sorted.len() || sorted[window] != sorted[window + 1] {
+                    per_cell.push(run);
+                    run = 0;
+                }
+            }
+        }
+        per_cell.sort_unstable();
+        let biggest = per_cell.last().copied().unwrap_or(0);
+        let median = per_cell.get(per_cell.len() / 2).copied().unwrap_or(0);
+
+        for shift in SHIFTS {
+            let mut pairs: Vec<u64> = Vec::with_capacity(cells.len());
+            for (cell, need) in cells.iter().zip(needs.iter()) {
+                // The need is signed, so the shift is arithmetic and the
+                // bucket is offset into the unsigned range before it packs.
+                let bucket = ((need >> shift) as i64 - i64::from(i32::MIN >> shift)) as u64;
+                pairs.push((u64::from(*cell) << 32) | (bucket & 0xffff_ffff));
+            }
+            pairs.sort_unstable();
+            pairs.dedup();
+            let distinct = pairs.len().max(1);
+            let ratio_milli = (live.len() as u64 * 1000) / distinct as u64;
+            println!(
+                "collapse\t{placement}\t{shift}\t{placed}\t{cell_count}\t{}\t{ratio_milli}\t{biggest}\t{median}",
+                pairs.len()
+            );
         }
     }
 }
