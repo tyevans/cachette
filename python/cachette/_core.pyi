@@ -257,6 +257,10 @@ class FrameReading(TypedDict):
     sites_held: int
     seats: int
     seats_taken: int
+    characters: int
+    promoted_now: int
+    promoted_deeds: int | None
+    newest_character: tuple[int, int] | None
     panel_height: int
     units_short: int
     units_carrying: int

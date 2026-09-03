@@ -256,6 +256,15 @@ fn cards(readout: &Readout, reference: bool) -> Vec<(Anchor, Card)> {
     if readout.seats() > 0 {
         cards.push((Anchor::TopLeft, seat_card(readout)));
     }
+    // **The card appears only once somebody has been promoted.** Nothing
+    // promoted anybody until this pass existed, and a card that reported
+    // "characters 0" on every frame of every run would say nothing and go on
+    // saying nothing if the pass broke.[^12]
+    //
+    // [^12]: Testing Rules, section 2a. `.claude/rules/testing.md`
+    if readout.characters() > 0 {
+        cards.push((Anchor::TopLeft, character_card(readout)));
+    }
     if let Some(choice) = readout.choice() {
         cards.push((Anchor::BottomRight, unit_card(&choice)));
     }
@@ -484,6 +493,51 @@ fn seat_card(readout: &Readout) -> Card {
             "held at the sites",
             format!("{} of {}", readout.seats_taken(), readout.seats()),
         )],
+    }
+}
+
+/// How long a promotion stays on the glass, in ticks.
+///
+/// The log holds one frame. A card driven by the log alone would show a
+/// promotion for one frame and forget it, and at the rate the demonstration
+/// runs that is under a tenth of a second. The birth tick of the newest
+/// character is stored, so the card can hold the moment for a while after it
+/// without the viewer keeping a memory of its own.
+const PROMOTION_HOLD: u64 = 90;
+
+/// The card that says a soldier became a character, and why.
+///
+/// **This is the moment, not the number.** A watcher sees that somebody was
+/// promoted, which faction they were, and the deeds that earned it, while it
+/// is fresh. The running count sits under it so that the card still says
+/// something once the moment has passed.
+///
+/// The deeds come from the log of the step that just ran, so they appear on
+/// the frame of the promotion and not after it. The faction and the age come
+/// from the character, which stores its birth tick, so those stay.[^1]
+///
+/// # References
+///
+/// [^1]: ADR-0067, the viewer reads the world and never writes to it, decision D2. `docs/adrs/accepted/adr-0067-the-viewer-reads-the-world-and-never-writes-to-it.md`
+fn character_card(readout: &Readout) -> Card {
+    let mut rows = Vec::new();
+    if let Some((faction, birth)) = readout.newest_character() {
+        let age = readout.tick().saturating_sub(birth);
+        if age <= PROMOTION_HOLD {
+            rows.push(Row::new("just promoted", format!("faction {}", faction.0)));
+            if let Some(deeds) = readout.promoted_deeds() {
+                rows.push(Row::new("  for deeds", grouped(deeds)));
+            }
+            rows.push(Row::new("  ticks ago", grouped(age)));
+        }
+    }
+    rows.push(Row::new(
+        "characters in world",
+        grouped(u64::from(readout.characters())),
+    ));
+    Card {
+        heading: "THE CHARACTERS",
+        rows,
     }
 }
 

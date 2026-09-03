@@ -526,6 +526,37 @@ fn seats_of(world: &World, site: Entity) -> (u32, u32) {
     (seats, held)
 }
 
+/// Returns what the character tier holds, in one walk of it.
+///
+/// **The record permits this walk and no other.** A character tier holds a
+/// bounded population and a caller may walk it; the mass tier does not and a
+/// caller may not.[^1] So the cost of this follows the number of characters,
+/// which is a small named few, and never the population.
+///
+/// The three answers are the live count, the faction and birth tick of the
+/// newest character, and they all come from one pass. Reading them separately
+/// would walk the tier three times for one picture.
+///
+/// # References
+///
+/// [^1]: ADR-0054, an entity belongs to one of three tiers, declared at creation, decision D1. `docs/adrs/accepted/adr-0054-an-entity-belongs-to-one-of-three-tiers-declared-at-creation.md`
+fn read_characters(world: &World) -> (u32, Option<(FactionId, u64)>) {
+    let arena = world.characters();
+    let mut live = 0;
+    let mut newest: Option<(FactionId, u64)> = None;
+    for character in arena.iter() {
+        live += 1;
+        let (Some(faction), Some(birth)) = (arena.faction(character), arena.birth(character))
+        else {
+            continue;
+        };
+        if newest.is_none_or(|(_, held)| birth.0 > held) {
+            newest = Some((faction, birth.0));
+        }
+    }
+    (live, newest)
+}
+
 fn read_sites(world: &World) -> Vec<SiteReadout> {
     // The engine holds one commodity, and it is the one the cohorts draw.
     // The identifier is the engine's, not a second name for it here.
@@ -613,6 +644,10 @@ pub struct Readout {
     sites_held: u32,
     seats: u32,
     seats_taken: u32,
+    characters: u32,
+    newest_character: Option<(FactionId, u64)>,
+    promoted_now: u32,
+    promoted_deeds: Option<u64>,
     foundings: Vec<FoundingReport>,
     refusals: Vec<(FactionId, FoundingError)>,
     units_short: u32,
@@ -662,6 +697,9 @@ impl Readout {
         // totals below are derived from it. Reading it twice would walk the
         // arena twice and could give two answers.
         let sites = read_sites(world);
+        // The character tier, walked once. The record permits a walk of this
+        // tier and of no other.
+        let (characters, newest_character) = read_characters(world);
         let seats: u32 = sites.iter().map(SiteReadout::seats).sum();
         let seats_taken: u32 = sites.iter().map(SiteReadout::seats_held).sum();
 
@@ -718,6 +756,13 @@ impl Readout {
             // world, and the row that shows it says so.[^4]
             seats,
             seats_taken,
+            characters,
+            newest_character,
+            // **The log holds the promotions of this frame and no other.**
+            // It is how a watcher sees a soldier become a character at the
+            // moment it happens, rather than reading a number that went up.
+            promoted_now: world.promoted_log().len() as u32,
+            promoted_deeds: world.promoted_log().first().map(|event| event.deeds),
             // The caller founded the run and kept what the founding
             // returned. The panel borrows that value and recomputes no part
             // of it, so the list is as long as the caller made it and the
@@ -978,6 +1023,47 @@ impl Readout {
     /// # References
     ///
     /// [^1]: Findings register, FND-119. `docs/FINDINGS.md`
+    /// Returns how many characters the world holds.
+    ///
+    /// This is a count of the world. The viewer walks the character tier,
+    /// which the record permits because that tier is bounded.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0054, an entity belongs to one of three tiers, declared at creation, decision D1. `docs/adrs/accepted/adr-0054-an-entity-belongs-to-one-of-three-tiers-declared-at-creation.md`
+    #[must_use]
+    pub const fn characters(&self) -> u32 {
+        self.characters
+    }
+
+    /// Returns the faction and birth tick of the newest character.
+    ///
+    /// **This is what lets a promotion stay on the glass after the frame it
+    /// happened in.** The log holds one frame, so a card driven by the log
+    /// alone would show a promotion for a thirteenth of a second and then
+    /// forget it. The birth tick is stored, so the viewer can say how long
+    /// ago it was without keeping a memory of its own.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0067, the viewer reads the world and never writes to it, decision D2. `docs/adrs/accepted/adr-0067-the-viewer-reads-the-world-and-never-writes-to-it.md`
+    #[must_use]
+    pub const fn newest_character(&self) -> Option<(FactionId, u64)> {
+        self.newest_character
+    }
+
+    /// Returns how many units the last step promoted.
+    #[must_use]
+    pub const fn promoted_now(&self) -> u32 {
+        self.promoted_now
+    }
+
+    /// Returns the deeds that earned the first promotion of the last step.
+    #[must_use]
+    pub const fn promoted_deeds(&self) -> Option<u64> {
+        self.promoted_deeds
+    }
+
     /// Returns how many positions the sites the panel read declare.
     ///
     /// A position is a seat at a site. This counts the sites the panel walked,
@@ -1294,6 +1380,42 @@ impl Readout {
                 "  they fell short by",
                 accumulated(self.rationed_short),
             ));
+        }
+
+        // **A soldier became a character because of what it did.** The
+        // panel names the running count and, on the frame it happens, the
+        // deeds that earned the promotion. The section appears only once
+        // somebody has been promoted, so it cannot report a permanent zero
+        // and it cannot go on reporting one if the pass breaks.[^12]
+        if self.characters > 0 {
+            lines.push(Line::Rule);
+            lines.push(Line::Heading("THE CHARACTERS"));
+            lines.push(Line::Row(
+                "characters in world",
+                grouped(u64::from(self.characters)),
+            ));
+            if self.promoted_now > 0 {
+                lines.push(Line::Row(
+                    "promoted this frame",
+                    grouped(u64::from(self.promoted_now)),
+                ));
+                if let Some(deeds) = self.promoted_deeds {
+                    lines.push(Line::Row("  for deeds", grouped(deeds)));
+                }
+            }
+            if let Some((faction, birth)) = self.newest_character {
+                // **The value column is narrow and a founded row does not
+                // cut.** A longer value here wrote past the right edge of the
+                // panel, which a test caught. The words go in the note; the
+                // value stays short.
+                lines.push(Line::Founded(
+                    faction,
+                    grouped(self.tick.saturating_sub(birth)),
+                ));
+                lines.push(Line::Note("the newest, in ticks ago."));
+            }
+            lines.push(Line::Note("counts of the world, not the"));
+            lines.push(Line::Note("window."));
         }
 
         // What the drawn units are hauling and where they live. Both are

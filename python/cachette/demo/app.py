@@ -134,6 +134,29 @@ class Demo:
             self.camera.nudge(across, down, width, height)
         self.camera.clamp(self.world, width, height)
 
+    def announce(self, reading: FrameReading) -> None:
+        """Say when a soldier becomes a character, and what earned it.
+
+        **The control plane reacts to one fact the engine reported.** It reads
+        the count the frame gave it and prints a line. It walks no entity and
+        asks the engine nothing further, so this is a reaction and not a poll.
+
+        A promotion happens on a small share of frames, so the line is rare
+        enough to read and it names the moment rather than a total that went
+        up.
+        """
+        if reading["promoted_now"] <= 0:
+            return
+        deeds = reading["promoted_deeds"]
+        earned = f" for {deeds} deeds" if deeds is not None else ""
+        one = reading["promoted_now"] == 1
+        who = "person" if one else "people"
+        what = "a character" if one else "characters"
+        print(
+            f"tick {reading['tick']}: {reading['promoted_now']} {who} "
+            f"became {what}{earned}, {reading['characters']} in the world"
+        )
+
     def advance(self, panel: bool = False) -> FrameReading:
         """Step the engine once and fill the surface with one frame.
 
@@ -141,7 +164,7 @@ class Demo:
         rather than starting a second pass to find them.
         """
         self.world.step(self.threads)
-        return self.world.draw(
+        reading = self.world.draw(
             self.camera,
             self.surface.width,
             self.surface.height,
@@ -149,6 +172,8 @@ class Demo:
             reference=self.reference,
             panel=panel,
         )
+        self.announce(reading)
+        return reading
 
 
 def build_world() -> World:
