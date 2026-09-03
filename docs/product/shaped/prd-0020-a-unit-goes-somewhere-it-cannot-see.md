@@ -1,11 +1,11 @@
 ---
-id: 0019
+id: 0020
 title: A unit goes somewhere it cannot see
 status: Shaped
 created: 2026-09-02
 ---
 
-# PRD-0019 — A unit goes somewhere it cannot see
+# PRD-0020 — A unit goes somewhere it cannot see
 
 ## Who this is for
 
@@ -110,7 +110,7 @@ it is a draft.[^8]
 
 [^1]: PRD-0009, a unit acts on the world it can see. `docs/product/accepted/prd-0009-a-unit-acts-on-the-world-it-can-see.md`
 [^2]: ADR-0040, Python is a control plane, not a data plane, decision D2. `docs/adrs/draft/adr-0040-python-is-a-control-plane-not-a-data-plane.md`
-[^3]: Findings register, FND-241. `docs/FINDINGS.md`
+[^3]: Findings register, FND-251. `docs/FINDINGS.md`
 [^4]: Budgets and costs, the scale constants. `docs/reference/budgets.md`
 [^5]: Blockers register, BLK-007. `docs/BLOCKERS.md`
 [^6]: Decisions register, DEC-067. `docs/DECISIONS.md`

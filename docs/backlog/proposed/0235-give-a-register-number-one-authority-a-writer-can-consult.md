@@ -57,6 +57,14 @@ this item.
 - Whether the registers and the record registry take the same answer. The record
   registry allocates through a table of rows rather than a line, and it has its
   own collision history.[^6]
+- **The product registry has no next-number line at all.** It says to assign the
+  number there before writing the record, and it gives no place that states
+  which number is next, so a writer reads the last row of the table. That is the
+  exact procedure FND-038 replaced everywhere else, still in use in one
+  register, and it produced a collision the same day it was found: a product
+  number was taken from the last visible row and the row above it was already
+  merged on another branch. Whatever answer this item reaches has to cover the
+  register that never got the first fix.
 - Whether the citation check should resolve a number it cannot see. It refused
   three numbers that exist on other branches while FND-219 was being written, so
   a register entry cannot cite a row that has not merged. That is the same

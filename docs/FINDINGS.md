@@ -5156,7 +5156,7 @@ allocated by a line that cannot see uncommitted work. In each case the registry
 stores a piece of state somewhere that cannot be read atomically by everyone who
 needs it, and in each case nothing fails until two readers disagree.
 
-### FND-240 — A behavioural strategy is one constraint, not three
+### FND-250 — A behavioural strategy is one constraint, not three
 
 **Believed.** A behavioural strategy decomposes into three parts that each need
 a record: a trigger, which is a condition on unit state; a field to follow,
@@ -5169,9 +5169,9 @@ of them also misdescribes the engine.
 
 **Evidence, part one: the trigger is already recorded, and it is not a condition
 on unit state.** A unit takes an option by scoring a fixed set and taking the
-highest, and an accepted record governs that.[^F240A] The score is the unit's
+highest, and an accepted record governs that.[^F250A] The score is the unit's
 drive multiplied by a weight and then by the value the option reads from the
-level 1 cell.[^F240B] It reads unit state **and** world state, so a trigger
+level 1 cell.[^F250B] It reads unit state **and** world state, so a trigger
 described as a condition on unit state describes something the engine does not
 do. A record stating it would be a second declaration of the choice pass and a
 wrong one.
@@ -5202,7 +5202,7 @@ because each part sounds like it needs a record and the reviewer's instinct is
 to write three. The evidence that separates them is in the source and in the
 registry, not in the framing.
 
-### FND-241 — There are no unit types, and one weight profile serves every unit alive
+### FND-251 — There are no unit types, and one weight profile serves every unit alive
 
 **Believed.** A unit type is an index into a shared table, and types
 parameterise the verbs rather than multiplying them. This is one of the four
@@ -5210,7 +5210,7 @@ design principles the project orientation states.
 
 **True.** No unit type exists. The soldier arena carries no type index and no
 weight column, and the engine holds exactly one weight profile, as a single
-field on the world, built with every option weighted equally.[^F241A]
+field on the world, built with every option weighted equally.[^F251A]
 
 So every unit alive scores the options identically. **Two units standing in one
 cell with the same need always make the same choice**, and no mechanism can
@@ -5225,7 +5225,7 @@ The option set compounds it. There are four options and every one of them reads
 a level 1 summary field, so a unit's behaviour is a function of its need, its
 cell, and nothing else. One of the five summary fields the option set can read
 is read by no option, and the field that the `roam` option reads is derived from
-terrain and never changes.[^F241B]
+terrain and never changes.[^F251B]
 
 **Follows.** **A principle with no instance is a principle nobody has tested.**
 The orientation states that types parameterise the verbs and that a type is an
@@ -5448,7 +5448,7 @@ which is the mistake this register keeps recording.[^65]
 [^F218E]: Definition of Done, section 4. `.claude/rules/definition-of-done.md`
 [^F218F]: Findings register, FND-192, in this document.
 [^ALLOC2]: Findings register, FND-219, in this document.
-[^F240A]: ADR-0064, a unit chooses by scoring a small fixed option set, decision D1. `docs/adrs/accepted/adr-0064-a-unit-chooses-by-scoring-a-small-fixed-option-set.md`
-[^F240B]: The choice pass. `crates/cachette-core/src/choose.rs`
-[^F241A]: The world, the weight profile field. `crates/cachette-core/src/world.rs`
-[^F241B]: The choice pass, the cell fields and the option set. `crates/cachette-core/src/choose.rs`
+[^F250A]: ADR-0064, a unit chooses by scoring a small fixed option set, decision D1. `docs/adrs/accepted/adr-0064-a-unit-chooses-by-scoring-a-small-fixed-option-set.md`
+[^F250B]: The choice pass. `crates/cachette-core/src/choose.rs`
+[^F251A]: The world, the weight profile field. `crates/cachette-core/src/world.rs`
+[^F251B]: The choice pass, the cell fields and the option set. `crates/cachette-core/src/choose.rs`
