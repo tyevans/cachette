@@ -30,6 +30,7 @@ reason, and those ranges live in prompts that no register can read. Four
 collisions in one session came from the gap between the two, and a finding holds
 the case.[^ALLOC2]
 **Next number: FND-226**
+**Next number: FND-242**
 
 ## A. Corrections to stated rules
 
@@ -608,7 +609,12 @@ commit and every row.[^F222]
 
 **Follows:** the tile pass ran 1.81 times faster on two threads and the unit
 passes ran 1.35 times faster, so the half of the frame that is larger is also
-the half that scales worse. The measured world held no settlement, so every
+the half that scales worse.
+
+**The two constants in this entry are weaker than it says.** A pre-registered
+prediction later missed by 6.2 percent, and FND-240 holds it. Read them as an
+approximation good to about ten percent. The measured rows in this entry and
+in FND-224 do not move, because neither is computed from a constant. The measured world held no settlement, so every
 figure above is a lower bound.
 
 **This entry first said the budget needs at least 19 cores at perfect
@@ -681,6 +687,73 @@ no character, and the scale constants table names 5,000 settlements and 50,000
 living characters, with the character layer derived at about 85 MB. Adding
 those to 545 MB does not reach one gigabyte, so the shape of the answer is
 unlikely to change.
+
+### FND-240 — A pre-registered prediction refuted the two-constant model
+
+**Believed:** the cost of a frame is the tile count times a constant plus the
+unit count times a second constant. The register said the two constants
+predict the target scale row to one part in two hundred, and called that the
+strongest evidence in the run.
+
+**True:** the agreement was one point. A prediction written into the register
+and committed **before** the run that tested it named 396.6 milliseconds for
+16,777,216 tiles and 500,000 units at 12 threads, with a hit defined as five
+percent. The measurement is 371.9 milliseconds, which is 6.2 percent low and
+outside the band.
+
+**The cost of a unit is not one constant.** At 16,777,216 tiles it is 248 ns
+at 500,000 units and 270 ns at 1,000,000, so it rises with the population. The
+constant the prediction used came from a world of 4,194,304 tiles, where it is
+298 ns, so it depends on the extent as well.
+
+**Evidence:** the register holds the prediction, the band, the result and both
+commits.[^F222] The commit that states the prediction holds no result, and the
+commit after it holds the result, so the order of the two is the evidence.
+
+**Follows:** the two constants are an approximation good to about ten percent,
+and the register now says so. **The headline result does not move**, because
+it never rested on the model: the frame at the target scale, the tile pass and
+the unit passes are each measured rows, and the floor in the unit passes is a
+difference between measured rows.
+
+**The method is the finding as much as the result is.** A consistency check
+computed after the data is in hand cannot fail, and this one would have stood
+in the register as strong evidence. It cost ten cents and one commit ordering
+to learn that it was worth about a tenth of what it claimed.
+
+### FND-241 — The unit cost of a frame is not one stage, and most of it cannot be measured from outside
+
+**Believed:** the unit passes are 298 milliseconds at 12 threads, and finding
+which stage holds them would give the project one optimisation target.
+
+**True:** no single stage holds them. At the target scale, of 274 milliseconds
+of unit cost in a 521 millisecond frame, the choice scoring is 71
+milliseconds, one bridge rebuild is 26, the economy is 6, and **170
+milliseconds is a residual that the public interface cannot divide.** The
+largest part is the part nobody can name.
+
+**The residual holds** the movement intents, admission, the holder spread, the
+death scan, the part of the level 1 rebuild that reads the units, and the walk
+over every live unit inside the choice pass that the interval does not remove.
+
+**Evidence:** the register holds the rows.[^F222] Each part was priced by
+running a whole frame with a switch off and taking the difference, because the
+engine holds no instrumentation and the benchmark added none. Three switches
+exist on the public interface: the economy schedule, the choice interval, and
+the bridge rebuild, which is public and was priced directly.
+
+**A correction inside this finding.** The step calls the bridge refresh three
+times in a frame, and a first reading of that put the bridge at three rebuilds
+and 79 milliseconds. The refresh compares a revision counter and returns when
+the bridge is still accurate, so the frame pays one rebuild and two constant
+checks. The figure is 26 milliseconds, not 79.
+
+**Follows:** a stage that cannot be measured from the public interface is a
+stage nobody can prove they improved, and that may be why none of this has
+been optimised. Something must make the stages separable before the largest
+part of the unit cost can be worked on. Backlog item 0229 already asks for a
+stage measurement and names the constraint that a clock must not enter the
+engine.
 
 ### FND-017 — A decision costs 4.1 nanoseconds, not 400
 

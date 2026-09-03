@@ -177,6 +177,63 @@ threads and it was still improving at 12.
 statement about a smaller population, and the measured world held no
 settlement, so the unit half is a lower bound rather than the whole of it.
 
+## Where the unit cost goes
+
+The unit passes are 274 milliseconds of a 521 millisecond frame at the target
+scale, at 12 threads. This section splits that as far as the public interface
+allows, and no further.
+
+**The engine holds no instrumentation and this benchmark adds none.** A stage
+inside a step is not callable on its own, so a stage is priced by running a
+whole frame with it switched off and taking the difference. Three switches
+exist. The rest of the frame stays in one residual.
+
+Machine A, 16,777,216 tiles, 1,000,000 units, 12 threads.
+
+| Row | Samples | Median, ns |
+|---|---|---|
+| Everything on | 9 | 521,302,567 |
+| The economy off | 9 | 515,585,208 |
+| The choice off | 9 | 449,856,083 |
+| Both off | 9 | 447,879,653 |
+| One bridge rebuild, alone | 9 | 26,286,017 |
+
+| Part | Milliseconds | Share of the unit cost |
+|---|---|---|
+| The choice, scoring only | 71.4 | 26 percent |
+| One bridge rebuild | 26.3 | 10 percent |
+| The economy | 5.7 | 2 percent |
+| **The residual, which this cannot divide** | **170.1** | **62 percent** |
+
+**It is not one stage.** The largest thing here is the part that could not be
+divided.
+
+**The residual holds** the movement intents, admission, the holder spread, the
+death scan, the part of the level 1 rebuild that reads the units, and the walk
+over every live unit inside the choice pass that the interval does not remove.
+Nothing on the public interface separates them.
+
+**The bridge is one rebuild in a frame, not three.** The step calls the
+refresh three times, and the refresh compares a revision counter and returns
+when the bridge is still accurate. That check is a constant cost. In this
+world one call finds the bridge stale, because movement moved the units, so a
+frame pays one rebuild. A world in which units also die each frame would pay
+two.
+
+**The choice scores about one unit in 32 and costs 71 milliseconds doing it.**
+The interval is 32 ticks, keyed on the level 1 cell, so about 31,000 of the
+1,000,000 units score in a frame. That is about 2.3 microseconds for each unit
+scored. The figure is a division and not a measurement, and it holds only if
+the schedule spreads the cells evenly.
+
+**The economy is small here and this run understates it.** The period is 10
+ticks, so it applies on one frame in ten and the median of nine samples mostly
+misses it. The maximum is where it shows. The measured world holds no
+settlement, so the rate pass had nothing to apply.
+
+**Two switches together cost less than the two apart**, 73.4 milliseconds
+against 77.2. The difference is inside the spread of the rows.
+
 ## The cost of a frame, as two straight lines
 
 The measured cost is the tile count times a constant, plus the unit count
@@ -187,9 +244,12 @@ times a second constant. Machine A.
 | One tile, one frame | 78 ns | 43 ns | 13 ns |
 | One unit, one frame | 561 ns | 416 ns | 303 ns |
 
-The two constants predict the target scale row. At two threads they give
-1,132 milliseconds against the 1,120 milliseconds measured, which is a
-difference of one part in a hundred.
+The two constants reproduce the target scale row at two threads: they give
+1,132 milliseconds against the 1,120 measured. **Do not read that agreement as
+accuracy.** A prediction written before its run, at 500,000 units, missed by
+6.2 percent, and the section above holds it. The cost of one unit rises with
+the population and also depends on the extent, so the two lines are an
+approximation good to about ten percent.
 
 The unit constant comes from the difference between a world of 1,000,000 units
 and a world of none, at 4,194,304 tiles. The same difference at 100,000 units
@@ -226,7 +286,33 @@ Nothing in the configuration was measured before. No row above holds 500,000
 units, and no row above holds a world of 16,777,216 tiles with any unit count
 between zero and one million.
 
-**Result: not yet run.**
+**Result: the prediction missed.** The measured median is **371.9
+milliseconds** against a prediction of 396.6, which is 6.2 percent low and
+outside the band the prediction set.
+
+| | Milliseconds |
+|---|---|
+| Predicted | 396.6 |
+| The band that counted as a hit | 376.8 to 416.5 |
+| Measured, 9 samples | 371.9 |
+| Minimum, maximum | 369.6, 400.9 |
+
+**What the miss says.** The additive model overstates the cost of a unit at
+this population. The cost of one unit is not one constant. At 16,777,216
+tiles it is 248 ns at 500,000 units and 270 ns at 1,000,000, so it rises with
+the population rather than staying flat. The constant the prediction used came
+from a world of 4,194,304 tiles, where it is 298 ns, so it also depends on the
+extent that holds the units.
+
+**The register said the constants predict the target scale row to one part in
+two hundred. That agreement was one point, and this run shows it was not a
+property.** Treat the two constants as an approximation good to about ten
+percent, and not better.
+
+**The headline result does not rest on the model.** The frame at the target
+scale, the tile pass and the unit passes are each measured rows at the thread
+count they name. The floor in the unit passes is a difference between measured
+rows. None of them is computed from a constant, so none of them moves.
 
 ## Resident memory
 
