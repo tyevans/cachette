@@ -43,8 +43,9 @@ offset.
 
 - Whether a caller wants the raw bytes as well. Three logs expose a bytes
   method beside the column method, and three do not.
-- Whether an identity in a log crosses as the packed identity the engine mints,
-  which is what every other verb takes, or as an index a reader can print.
+- Whether an identity in a log crosses as the packed identity the engine
+  mints, which is what every other verb takes, or as an index a reader can
+  print.[^1]
 
 ## References
 
