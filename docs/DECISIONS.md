@@ -1930,7 +1930,7 @@ a failed founding is correct.[^PRD12]
 [^FND015]: Findings register, FND-015. `docs/FINDINGS.md`
 [^FND089]: Findings register, FND-089. `docs/FINDINGS.md`
 [^ADR80]: ADR-0080, a depleted deposit recovers by ageing the stored take. `docs/adrs/accepted/adr-0080-a-depleted-deposit-recovers-by-ageing-the-stored-take.md`
-[^DEC69A]: ADR-0051, a selector is a lazy expression tree that Rust evaluates, decision D1. `docs/adrs/draft/adr-0051-a-selector-is-a-lazy-expression-tree.md`
+[^DEC69A]: ADR-0051, a selector is a lazy expression tree that Rust evaluates, decision D1. `docs/adrs/accepted/adr-0051-a-selector-is-a-lazy-expression-tree.md`
 [^DEC69B]: ADR-0052, a selector result may be a range, not only an enumerated set, decision D2. `docs/adrs/draft/adr-0052-a-selector-result-may-be-a-range.md`
 [^DEC69C]: Selector engine and verbs, section 3.2. `docs/research/reports/04-selector-engine-and-verbs.md`
 [^DEC68A]: ADR-0012, tiles are dense columns and units are a generational arena, decision D2. `docs/adrs/accepted/adr-0012-tiles-are-dense-columns-and-units-are-a-generational-arena.md`

@@ -236,7 +236,7 @@ without stating a constraint is worse than no record.
 | 0048 | A verb declares a pipeline of kernels | Proposed | 0001 | 06, 13 |
 | 0049 | A quantity is a rate, a constraint or a set, and each composes by one law | Proposed | 0023 | 13 |
 | 0050 | The frame schedule is static and known before the frame runs | Proposed | 0001, 0009 | 06 |
-| 0051 | A selector is a lazy expression tree that Rust evaluates | Draft | 0040, 0043 | `draft/adr-0051-a-selector-is-a-lazy-expression-tree.md` |
+| 0051 | A selector is a lazy expression tree that Rust evaluates | Accepted | 0040, 0043 | `accepted/adr-0051-a-selector-is-a-lazy-expression-tree.md` |
 | 0052 | A selector result may be a range, not only an enumerated set | Draft | 0051, 0028 | `draft/adr-0052-a-selector-result-may-be-a-range.md` |
 | 0053 | A faction is a bit in a mask, and a relation is a plane | Accepted | 0011, 0012, 0023, 0024 | 08 |
 | 0054 | An entity belongs to one of three tiers, declared at creation | Accepted | 0012, 0043 | 14, 15, 16 |

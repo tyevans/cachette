@@ -37,6 +37,7 @@ A record here binds nothing until a reviewer moves it.
 
 | No. | What it claims |
 |---|---|
+| 0052 | A selector result may be a range, not only an enumerated set. It carries the cost argument that makes ADR-0051 affordable at the target scale, and ADR-0051 was accepted without it, so a reviewer should ask whether the accepted record now rests on an unreviewed one. **Nothing implements it.** |
 | 0041 | A crate split enforces the boundary at compile time. **The code implements it and a gate proves it**, by reading the resolved dependency tree of the core crate rather than its manifest. It is the strongest record in this group: it converts the rule against a mid-step Python callback into a compile error, and determinism is what that rule protects. A reviewer should test D3 hardest, because the record is enforced by an absence and an absence is easy to fill by accident. |
 | 0042 | The interpreter is released for the whole step. **The code implements it.** Its D3 states the property the release buys, that a frame is a function of what was fixed before it began, and it carries the durable half of a reserved row that this review retired. A reviewer should ask whether D3 is really bought by D1 and D2, or whether the exclusive hold on the world is doing the work. |
 | 0044 | What copies and what does not is declared at the call site. **The code implements it, and seven files cite the number.** Every read across the boundary copies today and says so. A reviewer should test D3, which forbids a method ever changing from copying to borrowing, because that is the change a later contributor makes for speed. |
@@ -68,18 +69,19 @@ reserved until the code that needs them exists.[^6]
 
 | No. | Why it sits here |
 |---|---|
-| 0051 | The selector as a lazy expression tree. The owner decided that a set-valued command is how the control plane reaches a set, so this governs every verb written after it. Write it before the next verb.[^12] |
-| 0052 | A selector result may be a range. It carries the cost argument that makes 0051 affordable at the target scale, so the two are reviewed together.[^12] |
 | 0021 | Layout follows the access pattern. Write it with the descent columns, not before.[^7] |
 | 0069 | Weather. Nothing needs it. |
 | 0077 | The golden state hash. Write it when the first real golden file is committed, not before.[^9] |
 | 0055 | The modifier pipeline. One source modifies a rate, so the test fails today.[^8] |
 
-The two rows above moved here on 1 September 2026, when the project owner
-decided that a set-valued command is how the control plane reaches a set and
-that the selector tree is the destination the verbs are written toward.[^12]
-They are written before the tree is built, because they govern the verbs
-rather than describe them. **The author of these must not review them.**
+The two rows above were written before the tree they describe, because the
+project owner decided on 1 September 2026 that a set-valued command is how the
+control plane reaches a set and that the selector tree is the destination the
+verbs are written toward.[^12] **The author of these two must not review them.**
+
+ADR-0051 and ADR-0052 arrived here for the same reason and have both been
+written. ADR-0051 is accepted and has left this index. ADR-0052 waits for review
+in the table above.
 
 Every other reserved row in the registry is left alone on purpose. The scope
 rule asks whether a constraint exists, not whether the code exists, and most
