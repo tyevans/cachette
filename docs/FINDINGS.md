@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-321**
+**Next number: FND-322**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -931,6 +931,12 @@ available: the unit passes reach a floor and stop.
 
 ### FND-224 — The frame budget is out of reach on any core count
 
+**Read FND-321 before quoting a figure from this entry.** The 500 millisecond
+frame and the 300 millisecond floor below are superseded. Later work made the
+frame 177.9 milliseconds at the target scale on 12 threads. The title of this
+entry still holds, because the budget is 100 milliseconds and the frame is
+above it.
+
 **Believed:** FND-222 divided 1.86 core-seconds by a budget of 100
 milliseconds and concluded that 19 cores would reach it. That reasoning
 assumed the work divides.
@@ -1614,6 +1620,49 @@ reads the commit and says when it moved.
 up.**[^309D] A fixture that supplies no extreme measures itself. An instrument
 with no control measures itself. In both the test passes, the number arrives,
 and nothing says which question was answered.
+
+### FND-321 — A stale frame figure sat in a blocker row and in a register, and nothing failed
+
+**Believed.** A frame at the target scale costs 500 milliseconds on the target
+platform. The blocker row about derived cost figures said so in its own words,
+and two sections of the target platform register concluded from it that a frame
+cannot fall below about 300 milliseconds on any core count.[^F222] [^28]
+
+**True.** The frame is 177.9 milliseconds at the target scale, on 12 threads,
+on a world whose units are scattered. Two later runs of a changed tree gave 167
+to 169 milliseconds. The register holds every row with its machine, its commit
+and its fixture.[^F222]
+
+**The two figures do not measure one thing, and that is part of the finding.**
+The 500 millisecond figure came from the first run, on 16 threads, on a world
+whose units were packed. A packed unit costs about half a scattered one, so the
+later figure is better than the difference between the two numbers shows. **A
+figure without its fixture is not comparable to another figure**, and this
+register already states that rule for its own rows.[^F222]
+
+**Evidence.** The stage tables in the target platform register, taken on 3
+September 2026 on `c7g.4xlarge` instances. The 500 millisecond figure entered
+the blocker row on the same date, from the first two runs of that day.
+
+**What follows. The register moved eleven times in one day and the prose did
+not move with it.** Every stage table carries a line that supersedes the tables
+above it. No such line reaches a document outside the register. The blocker row
+held the figure as its own sentence rather than as a citation, so no check could
+see it go stale, and a priority row carried an 836 millisecond frame as the
+denominator of a share for the same reason.
+
+**This strengthens the case for two open items and does not change either.**
+One item adds a check that fails when a document states a register in its own
+words.[^F258C] This is a fourth instance of that shape, and the first where the
+stale copy sits in a register row rather than in a report. The other item makes
+a check compare the two project orientation files.[^F259CHECK] It is the same shape
+at a smaller radius, and this instance says the family of phrases the first
+check reads must include a frame figure, not only the state of measurement.
+
+**A blocker row is not a place for a figure.** The scope rule states this for a
+decision record, and the reason is the same here: a row that quotes a number
+must be edited when the number moves, and nothing fails when nobody edits
+it.[^12] The row now cites the register and states no frame figure.
 
 ## E. Layout and platform corrections
 
@@ -9150,6 +9199,7 @@ cohort was eating rations the store never gave. The account they balance is the
 commodity, and the ration a unit receives is not that account.
 
 ## References
+
 
 [^F315B]: The refused step test. `crates/cachette-core/tests/a_refused_step_does_not_freeze.rs`
 [^F318A]: ADR-0063, a need is a rate with a threshold, and crossing it is a fact, decision D1 and the alternatives rejected. `docs/adrs/accepted/adr-0063-a-need-is-a-rate-with-a-threshold-and-crossing-it-is-a-fact.md`

@@ -39,8 +39,9 @@ reports.
 **This row narrowed on 3 September 2026. It did not close.** A benchmark now
 lives in the repository, and a script runs it on a Graviton instance and
 destroys the instance afterwards. Every axis of the sweep is a parameter. Two
-runs measured five quantities, on two instances of different size. A register
-holds every row, both machines and both commits.[^MEASURED]
+runs measured five quantities, on two instances of different size, and many
+runs followed them. A register holds every row, every machine and every
+commit.[^MEASURED]
 
 **What is now measured.** The cost of one frame against the tile count and
 against the unit count, up to 16,777,216 tiles and 1,000,000 units, at 1, 2,
@@ -58,13 +59,27 @@ was taken on a world that holds no settlement and no character.
    measured world holds neither, so the rate pass, the consumption pass and
    the position pass did no work and the character arena was empty. Every
    measured frame figure and the memory figure are lower bounds.
-3. **Any figure for a stage inside a step.** The benchmark reaches the public
-   interface, and the passes inside a step do not.
+
+**A stage inside a step no longer holds this row open.** A crate feature names
+every stage of a frame, and the register holds the tables.[^MEASURED]
 
 **The machine size no longer holds this row open, and the reason is a
-result.** A run on 16 hardware threads gives a frame of 500 milliseconds at
-the target scale against a budget of 100, and the unit passes stop gaining
-above 12 threads. A larger machine is not the missing measurement.[^FLOOR]
+result.** The unit passes stop gaining above 12 threads, so a larger machine is
+not the missing measurement.[^FLOOR]
+
+**The frame figure this row once quoted is out of date, and the row now cites
+the register instead.** This row said 500 milliseconds at the target scale.
+That was the first run, on 16 hardware threads, on a world whose units were
+packed. Later work made the engine faster. The last whole-frame stage table
+gives 177.9 milliseconds at the target scale on 12 threads, and two later runs
+of a changed tree gave 167 to 169 milliseconds. The register holds every row
+with the machine, the commit and the fixture of each.[^MEASURED]
+
+**The two figures do not share a fixture, so do not read the difference as the
+whole gain.** The first packed the units and ran 16 threads. The later ones
+scatter the units and run 12, and a scattered unit costs about twice a packed
+one. **Cite the register for a frame figure. Do not cite this row.** A finding
+records how the stale figure survived here long enough to be quoted.[^STALE]
 
 **Do not read a document that says no measurement exists as current.** That
 sentence was true when it was written, and about ninety documents hold it.
@@ -238,6 +253,7 @@ normally.
 [^MEASURED]: Target platform costs. `docs/reference/graviton-costs.md`
 [^SPREAD]: Findings register, FND-223. `docs/FINDINGS.md`
 [^FLOOR]: Findings register, FND-224. `docs/FINDINGS.md`
+[^STALE]: Findings register, FND-321. `docs/FINDINGS.md`
 [^SCALE]: Budgets and costs, the scale constants. `docs/reference/budgets.md`
 [^SHAPES]: ADR-0066, entity storage holds four fixed shapes. `docs/adrs/accepted/adr-0066-entity-storage-holds-four-fixed-shapes.md`
 [^SHAPE]: ADR Registry, row 0017. `docs/adrs/REGISTRY.md`
