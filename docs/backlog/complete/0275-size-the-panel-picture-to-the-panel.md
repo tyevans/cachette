@@ -51,7 +51,8 @@ forever if it never settles. Two passes settle it in practice.
 out 1853 pixels tall against the constant's 1340. Raising the constant to 1500
 had been tried and changed nothing visible, which is what made the height look
 like the wrong explanation; it was the right explanation and the raise was too
-small.
+small. An earlier item gave the panel a way to reach past the window, and this
+one removes the constant that decided how far.[^1]
 
 ## References
 

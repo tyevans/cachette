@@ -7464,10 +7464,10 @@ because those two are a division and the other two are a cache hit.
 ### FND-283 — The orientation claimed Miri checks the unsafe code, and no toolchain the project pinned could run Miri
 
 **Believed.** The project orientation states that keeping the core crate free
-of the interpreter binding "allows Miri to check the unsafe code".[^F262A] The
+of the interpreter binding "allows Miri to check the unsafe code".[^F283A] The
 crate split record calls Miri running over the storage code the benefit that no
-test gives.[^F262B] The testing guide said there was no Miri job because there
-was no unsafe code yet.[^F262C]
+test gives.[^F283B] The testing guide said there was no Miri job because there
+was no unsafe code yet.[^F283C]
 
 **True.** Three things, and each is separately enough.
 
@@ -7481,7 +7481,7 @@ script. A search for the name found six documents that discuss Miri and no
 invocation of it.
 
 The core crate does hold unsafe code. Two items assert that the settlement
-store is plain data.[^F262D] So the testing guide's stated reason for having no
+store is plain data.[^F283D] So the testing guide's stated reason for having no
 Miri job was false as well, and it was false for a different reason than the
 channel.
 
@@ -7493,7 +7493,7 @@ The commit body holds both commands.
 **Follows.** Three things.
 
 **This is the inert capability, and the rule already names the shape.** A
-project declares a capability, documents it, and nothing calls it.[^F262E] The
+project declares a capability, documents it, and nothing calls it.[^F283E] The
 defence the rule gives is to ask who is obligated to invoke the thing. Here the
 answer was nobody, and the document that claimed the benefit was the same
 document that would have said so.
@@ -7507,14 +7507,14 @@ state hash reads whole structures and whole columns as raw bytes, and an
 undeclared padding byte would put an uninitialised byte into that read. Such a
 hash differs between two runs of one binary. No other gate in this project sees
 it, because a padding byte on a development machine is reliably zero. A gate
-now exists.[^F262F]
+now exists.[^F283F]
 
 ### FND-284 — The reassociating float methods were blocked by the compiler, not by the lint, and clippy says nothing about a lint entry that reaches nothing
 
 **Believed.** The project orientation says the script catches "the
 reassociating methods, which do not resolve on the pinned toolchain and so
 cannot be named in a lint".[^F262A] The float ban script says the same in its
-own header.[^F263A]
+own header.[^F284A]
 
 **True.** The obstacle on the pinned stable release was the compiler, not name
 resolution. A call to the reassociating add on that release is a hard error,
@@ -7546,7 +7546,7 @@ removed.
 **The lint gains real work, and it did not have any before.** The entries
 should be added, because the method is now writable. Until they are, the
 script's name check is the only thing standing where the compiler used to
-stand. A backlog item holds the addition.[^F263B]
+stand. A backlog item holds the addition.[^F284B]
 
 **The script's second job became load-bearing at the moment it stopped being
 redundant.** Before the move it duplicated a compiler error. After the move it
@@ -7583,7 +7583,7 @@ minutes and was stopped. The two differ in the reservation and in little else.
 **A Miri gate needs a fixture of its own, and the fixture is the whole design
 of the gate.** The gate that now exists builds a world that reserves a few
 thousand slots, spawns soldiers into it, steps it, and hashes it. It reaches
-the byte-level read through the engine rather than around it.[^F262F]
+the byte-level read through the engine rather than around it.[^F283F]
 
 **This is the fixture rule again, from the other direction.** The rule says
 that a fixture modelled on the demonstration world supplies what looks right
@@ -7792,15 +7792,6 @@ changed reaches everything in ten frames.
 [^F263D]: Decisions register, DEC-106. `docs/DECISIONS.md`
 [^F263E]: Budgets and costs, what belongs here. `docs/reference/budgets.md`
 [^F263F]: Findings register, FND-262, in this document.
-[^F263D]: Decisions register, DEC-097. `docs/DECISIONS.md`
-[^F263E]: Budgets and costs, what belongs here. `docs/reference/budgets.md`
-[^F263F]: Findings register, FND-258, in this document.
-[^F259A]: Review of ADR-0096, correction 1. The review artefact sits on the branch that holds it, so this branch cannot resolve its path and the citation names it instead.
-[^F259B]: Target platform costs, would the choice pass collapse if it decided for each cell. `docs/reference/graviton-costs.md`
-[^F259C]: The need spread measurement. `crates/cachette-core/tests/need_spread.rs`
-[^F259D]: Decisions register, DEC-097. `docs/DECISIONS.md`
-[^F259E]: Budgets and costs, what belongs here. `docs/reference/budgets.md`
-[^F259F]: Findings register, FND-258, in this document.
 [^F226A]: Backlog item 0185, steer a step by the option the unit chose. `docs/backlog/complete/0185-steer-a-step-by-the-option-the-unit-chose.md`
 [^F226B]: Backlog item 0186, let the engine order a gather. `docs/backlog/complete/0186-let-the-engine-order-a-gather.md`
 [^F226C]: ADR-0063, a need is a rate with a threshold, and crossing it is a fact, decision D2. `docs/adrs/accepted/adr-0063-a-need-is-a-rate-with-a-threshold-and-crossing-it-is-a-fact.md`
@@ -8069,14 +8060,14 @@ changed reaches everything in ten frames.
 [^F282B]: Findings register, FND-252, in this document.
 [^F282C]: The grid address conversion. `crates/cachette-core/src/hex.rs`
 [^F282D]: Backlog priority index. `docs/backlog/PRIORITY.md`
-[^F262A]: Project orientation, hard invariants 2 and 4. `CLAUDE.md`
-[^F262B]: ADR-0041, a crate split enforces the boundary at compile time. `docs/adrs/draft/adr-0041-a-crate-split-enforces-the-boundary-at-compile-time.md`
-[^F262C]: The testing guide, section 3.5. `docs/TESTING.md`
-[^F262D]: The settlement store asserts that it is plain data. `crates/cachette-core/src/site.rs`
-[^F262E]: Recurring defect shapes, inert code that nothing invokes. `.claude/rules/recurring-defects.md`
-[^F262F]: The state-byte gate. `crates/cachette-core/tests/state_bytes_are_initialised.rs`
-[^F263A]: The float ban script. `scripts/check-float-ban.sh`
-[^F263B]: Backlog item 0272, name the reassociating methods in the lint. `docs/backlog/proposed/0293-name-the-reassociating-methods-in-the-lint.md`
+[^F283A]: Project orientation, hard invariants 2 and 4. `CLAUDE.md`
+[^F283B]: ADR-0041, a crate split enforces the boundary at compile time. `docs/adrs/draft/adr-0041-a-crate-split-enforces-the-boundary-at-compile-time.md`
+[^F283C]: The testing guide, section 3.5. `docs/TESTING.md`
+[^F283D]: The settlement store asserts that it is plain data. `crates/cachette-core/src/site.rs`
+[^F283E]: Recurring defect shapes, inert code that nothing invokes. `.claude/rules/recurring-defects.md`
+[^F283F]: The state-byte gate. `crates/cachette-core/tests/state_bytes_are_initialised.rs`
+[^F284A]: The float ban script. `scripts/check-float-ban.sh`
+[^F284B]: Backlog item 0272, name the reassociating methods in the lint. `docs/backlog/proposed/0293-name-the-reassociating-methods-in-the-lint.md`
 [^F273A]: Backlog item 0266, order the unit arena by cell. `docs/backlog/refined/0266-order-the-unit-arena-by-cell.md`
 [^F273B]: Target platform costs, the packed and scattered rows. `docs/reference/graviton-costs.md`
 [^F273C]: The cost benchmark, the arena order mode. `crates/cachette-core/benches/target_cost.rs`

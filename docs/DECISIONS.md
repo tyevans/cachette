@@ -81,9 +81,9 @@ boundary.**
 
 **The orientation states that two mechanisms hold the boundary because one is
 not enough**, and it says the script exists partly because the reassociating
-methods cannot be named in a lint.[^DEC107A] The move to the dated nightly
+methods cannot be named in a lint.[^DEC109A] The move to the dated nightly
 changed the premise of that second half, and the findings register holds the
-measurement.[^DEC107B]
+measurement.[^DEC109B]
 
 **What changed, precisely.** On the stable release the project pinned, a call
 to the reassociating add was a compile error, so the compiler held that ground
@@ -98,7 +98,7 @@ toolchain. So a lint entry may be inert and read as live.
 **Option A. Add the lint entries and change the script in no way.** Both
 mechanisms then cover the reassociating methods, which is what the orientation
 asks for. The cost is a second declaration site for one rule, which is the
-defect shape this project keeps meeting.[^DEC107C]
+defect shape this project keeps meeting.[^DEC109C]
 
 **Option B. Add the lint entries and narrow the script to what the lint cannot
 see.** The script would then cover only the inferred float literal. One rule,
@@ -118,8 +118,8 @@ value, and they disagree only by one of them failing to fire.
 
 **What this does not decide.** It does not decide whether the reassociating
 methods should ever be permitted anywhere. They are forbidden in simulated and
-aggregated state and that is not open.[^DEC107D] A backlog item holds the
-work.[^DEC107E]
+aggregated state and that is not open.[^DEC109D] A backlog item holds the
+work.[^DEC109E]
 
 ### DEC-105 — Is the memory-for-speed trade now open, and does ADR-0088 still hold?
 
@@ -1222,13 +1222,13 @@ target platform.**
 
 The movement pass now walks every live unit in the order the bridge holds,
 which is the block-major tile order, and no longer in the slot order of the
-arena.[^DEC109A] That removed about half of the cost of a drifted arena and
+arena.[^DEC110A] That removed about half of the cost of a drifted arena and
 cost the frame nothing, because the bridge already sorts on that key at the
-barrier.[^DEC109B]
+barrier.[^DEC110B]
 
 **A residual remains, and only moving a unit in the arena removes it.** The
 unit columns are indexed by the slot, a slot is half of an identity, and a slot
-never moves.[^DEC109C] A pass in cell order therefore reads the unit columns at
+never moves.[^DEC110C] A pass in cell order therefore reads the unit columns at
 scattered positions whatever it does.
 
 **Move the units.** The arena separates two spaces: the slot space, which holds
@@ -1241,10 +1241,10 @@ an identity, and that read is on the hot path.
 
 **Leave them.** The residual has no measured size. The development machine
 could not separate the two builds, because other work shared it and its load
-moved by a factor of four inside one run.[^DEC109B] The reorder, by contrast,
+moved by a factor of four inside one run.[^DEC110B] The reorder, by contrast,
 is priced: moving every column of the soldier shape once, for one million
 units on one thread, took 64 milliseconds against a frame budget of one
-hundred.[^DEC109D] **One side of the comparison is measured and the other is
+hundred.[^DEC110D] **One side of the comparison is measured and the other is
 not, and the unmeasured side is the one that would justify the work.**
 
 **What decides it.** A measurement on Graviton of the residual and of the
@@ -2603,11 +2603,11 @@ a failed founding is correct.[^PRD12]
 ## References
 [^DEC106A]: ADR-0097, the toolchain is a dated nightly, decisions D2 and D3. `docs/adrs/draft/adr-0097-the-toolchain-is-a-dated-nightly.md`
 [^DEC106B]: Recurring defect shapes, documents that rot when a sweep names specifics. `.claude/rules/recurring-defects.md`
-[^DEC107A]: Project orientation, hard invariant 2. `CLAUDE.md`
-[^DEC107B]: Findings register, FND-284. `docs/FINDINGS.md`
-[^DEC107C]: Recurring defect shapes, redundant declaration sites. `.claude/rules/recurring-defects.md`
-[^DEC107D]: ADR-0002, state holds no floating point number, decision D1. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
-[^DEC107E]: Backlog item 0293, name the reassociating methods in the lint. `docs/backlog/proposed/0293-name-the-reassociating-methods-in-the-lint.md`
+[^DEC109A]: Project orientation, hard invariant 2. `CLAUDE.md`
+[^DEC109B]: Findings register, FND-284. `docs/FINDINGS.md`
+[^DEC109C]: Recurring defect shapes, redundant declaration sites. `.claude/rules/recurring-defects.md`
+[^DEC109D]: ADR-0002, state holds no floating point number, decision D1. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
+[^DEC109E]: Backlog item 0293, name the reassociating methods in the lint. `docs/backlog/proposed/0293-name-the-reassociating-methods-in-the-lint.md`
 
 
 [^DEC73A]: ADR-0065, a group is a site membership, not a region, decision D3. `docs/adrs/draft/adr-0065-a-group-is-a-site-membership-not-a-region.md`
@@ -2773,7 +2773,7 @@ a failed founding is correct.[^PRD12]
 [^DEC107B]: The pygame and pygame-ce package index entries, read 2 September 2026. https://pypi.org/pypi/pygame/json
 [^DEC107C]: ADR-0094, the caller owns the camera and the pixels, decision D5. `docs/adrs/draft/adr-0094-the-caller-owns-the-camera-and-the-pixels.md`
 [^DEC107E]: ADR-0094, the caller owns the camera and the pixels, decision D4. `docs/adrs/draft/adr-0094-the-caller-owns-the-camera-and-the-pixels.md`
-[^DEC109A]: ADR-0018, the unit-to-tile bridge is derived, and it rebuilds at the barrier, decision D1. `docs/adrs/accepted/adr-0018-the-unit-to-tile-bridge-is-derived-and-rebuilds-at-the-barrier.md`
-[^DEC109B]: Findings register, FND-274. `docs/FINDINGS.md`
-[^DEC109C]: ADR-0014, entity identity is an index plus a generation, decision D1. `docs/adrs/accepted/adr-0014-entity-identity-is-an-index-plus-a-generation.md`
-[^DEC109D]: The cost benchmark, the reorder cost mode. `crates/cachette-core/benches/target_cost.rs`
+[^DEC110A]: ADR-0018, the unit-to-tile bridge is derived, and it rebuilds at the barrier, decision D1. `docs/adrs/accepted/adr-0018-the-unit-to-tile-bridge-is-derived-and-rebuilds-at-the-barrier.md`
+[^DEC110B]: Findings register, FND-274. `docs/FINDINGS.md`
+[^DEC110C]: ADR-0014, entity identity is an index plus a generation, decision D1. `docs/adrs/accepted/adr-0014-entity-identity-is-an-index-plus-a-generation.md`
+[^DEC110D]: The cost benchmark, the reorder cost mode. `crates/cachette-core/benches/target_cost.rs`
