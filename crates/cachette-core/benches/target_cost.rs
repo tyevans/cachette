@@ -655,6 +655,20 @@ fn collapse_rows(arguments: &[String]) {
         let biggest = per_cell.last().copied().unwrap_or(0);
         let median = per_cell.get(per_cell.len() / 2).copied().unwrap_or(0);
 
+        // How many values the need column actually holds. If this is one,
+        // the pair count is the cell count and the row below says nothing
+        // about the need at all. That is a property of the fixture and it
+        // has to be reported rather than inferred from the pair count.
+        let mut distinct_needs = needs.clone();
+        distinct_needs.sort_unstable();
+        distinct_needs.dedup();
+        let lowest = needs.iter().copied().min().unwrap_or(0);
+        let highest = needs.iter().copied().max().unwrap_or(0);
+        println!(
+            "# {placement}_distinct_need_values\t{}\t lowest {lowest}\t highest {highest}",
+            distinct_needs.len()
+        );
+
         for shift in SHIFTS {
             let mut pairs: Vec<u64> = Vec::with_capacity(cells.len());
             for (cell, need) in cells.iter().zip(needs.iter()) {
