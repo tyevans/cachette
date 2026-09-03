@@ -1,7 +1,7 @@
 ---
 id: 0208
 title: Draw the boundary of a holding and not of every tile
-status: proposed
+status: complete
 created: 2026-09-02
 implements: []
 changes: []
@@ -53,10 +53,36 @@ Filled in when the item is refined.
 
 ## Outcome
 
-Filled in when the item moves to `complete/`.
+**Dropped. The work this item asks for is already in the code, and the defect
+it names does not exist.**
+
+The border test reads the six neighbours of a held tile and draws only when one
+of them holds differently. A tile surrounded by its own faction draws no
+border, and never did. This item asked for the behaviour the drawing already
+had.
+
+The count that settles it: of the held tiles, 83 in 100 sit on a boundary in
+the picture that looked bad and 89 in 100 in the picture that reads best. The
+share is highest where the picture is best, so it is not the mechanism. The
+share of the world that is **held** is the difference, at 74 in 100 against 8
+in 100, and that came from a fixture density nobody chose on purpose.
+
+The finding holds the counts and the lesson, which is that both proposed
+repairs came from looking at a picture and neither came from a count.[^4]
+
+**One real thing came out of it.** The drawing borders a holding against
+unclaimed ground and against another faction alike, while its comment says it
+marks where one holding meets another. The comment was wrong and is repaired.
+Whether the two cases should look different is a question this item did not
+ask, and a separate item holds it.[^5]
+
+The item keeps its number and its file, so that a later reader finds the
+reasoning rather than a gap.
 
 ## References
 
 [^1]: PRD-0006, a place belongs to somebody. `docs/product/accepted/prd-0006-a-place-belongs-to-somebody.md`
 [^2]: Findings register, FND-201. `docs/FINDINGS.md`
 [^3]: ADR-0070, the head-up display reports what the drawing pass read, decision D1. `docs/adrs/accepted/adr-0070-the-head-up-display-reports-what-the-drawing-pass-read.md`
+[^4]: Findings register, FND-206. `docs/FINDINGS.md`
+[^5]: Backlog item 0209. `docs/backlog/proposed/0209-tell-a-frontier-from-the-edge-of-the-claimed-ground.md`

@@ -94,15 +94,12 @@ fn pixel(canvas: &Canvas, x: i32, y: i32) -> u32 {
 /// A unit draws as a disc at the middle of its tile, so a reader that sampled
 /// the middle would read the colour of a unit and call it the ground.
 fn ground_pixel(camera: Camera, canvas: &Canvas, address: Axial) -> u32 {
-    let (x, y) = camera.centre_of(address);
-    // The drawing fills a square of 0.92 of the tile width, and puts a disc
-    // of 0.3 of it at the middle. The last pixel of the square is therefore
-    // inside the tile and outside the disc. The arithmetic repeats the
-    // drawing's own, because a sample that missed the square by one pixel
-    // would read the background and every comparison would then be equal.
-    let side = (camera.tile_width * 0.92).max(1.0) as i32;
-    let corner = side - 1 - side / 2;
-    pixel(canvas, x as i32 + corner, y as i32 + corner)
+    // The rectangle comes from the drawing itself, so a sample cannot miss
+    // the square by one pixel and read the background instead. The disc of a
+    // unit covers about a third of the tile at the middle, so the last pixel
+    // of the rectangle is inside the tile and outside the disc.
+    let (left, top, wide, tall) = paint::tile_rect(camera, address);
+    pixel(canvas, left + wide - 1, top + tall - 1)
 }
 
 #[test]

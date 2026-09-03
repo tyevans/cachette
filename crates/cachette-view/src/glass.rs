@@ -597,9 +597,22 @@ fn cost_card(readout: &Readout) -> Card {
     Card {
         heading: "COST ON THIS MACHINE",
         rows: vec![
-            Row::new("step", format!("{:.1} ms", readout.step_mean() / 1000.0)),
-            Row::new("draw", format!("{:.1} ms", readout.draw_mean() / 1000.0)),
-            Row::new("rate", format!("{:.1} a second", readout.rate())),
+            Row::new(
+                "step",
+                Readout::cost_in_millis(readout.step_mean(), readout.steps_measured()),
+            ),
+            Row::new(
+                "draw",
+                Readout::cost_in_millis(readout.draw_mean(), readout.frames_measured()),
+            ),
+            Row::new(
+                "rate",
+                if readout.steps_measured() == 0 {
+                    crate::hud::NOT_MEASURED.to_string()
+                } else {
+                    format!("{:.1} a second", readout.rate())
+                },
+            ),
         ],
     }
 }

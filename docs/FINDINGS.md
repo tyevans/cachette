@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-205**
+**Next number: FND-210**
 
 ## A. Corrections to stated rules
 
@@ -4616,6 +4616,203 @@ that ordering was correct at the time it was chosen.
 the record, because a person reads an image and an agent does not. The two
 paths answer different readers, and the tool did not replace the picture.
 
+### FND-209 — The camera was not slow at the far zoom. The pan step was the wrong size for the view
+
+**Believed.** A watcher reported that camera navigation is "incredibly sluggish"
+at the far zoom, and the reading taken from that was a cost problem. A drawing
+at the smallest tile the camera allows costs about a third of a second on a
+development machine, which supported the reading.[^F209A]
+
+**True.** **Nothing was slow.** The project owner corrected it from watching the
+window move: the step is the same size however far out the view is zoomed. One
+press moved a fixed count of tiles, and a tile is a fixed number of pixels only
+at one zoom. At the zoom the viewer opens on, a press moved eighteen pixels. At
+the smallest tile the camera allows, the same press moved three. The camera was
+covering a fortieth of the distance for the same effort, and a watcher reads
+that as slowness.
+
+**Evidence.** The step was one and a half tiles, multiplied by the tile width in
+pixels. The tile width runs from two pixels to sixty-four, so the pixel distance
+of one press varied by a factor of thirty-two across the range the camera
+allows. The window polls the keyboard once for each drawn frame, so a held key
+crossed the window in about two seconds at the opening zoom and in about
+fourteen at the far zoom.
+
+**The cost figure is real and is not the cause.** The drawing does cost about a
+third of a second at the far zoom on a development machine, and the ground of
+every visible tile is generated twice to produce it.[^F209B] That is a separate
+defect with its own item.[^F209C] It made the frame rate low; it did not make
+the camera cover three pixels a press.
+
+**Follows.** **A pan covers a share of what the window shows.** The step is now
+a share of the window and not a count of tiles, so a press moves the same part
+of the picture at every zoom.
+
+**The share preserves rather than improves.** It is the share the old step
+covered at the zoom the viewer opens on: eighteen pixels in a window seven
+hundred and twenty pixels on its shorter side, which is one in forty. The one
+zoom nobody reported is unchanged and every other zoom now matches it. No part
+of the value was read off a render, and one test asserts the opening zoom still
+moves what it moved before.
+
+**The zoom did not have the matching defect, and now a test says so.** A zoom
+press multiplies the tile size by a factor. A press therefore changes the view
+by the same proportion wherever it is taken, which is the property the pan
+lacked. A zoom that added a count of tiles would produce the same complaint in
+the other direction, so a test asserts the ratio is one number across the range.
+
+**A measurement can be right and still answer the wrong question.** The cost of
+a drawing was measured carefully, on the correct binary, and it supported a
+diagnosis that was wrong. The person watching the window had the answer, and
+nobody asked them until after the measurement was taken. **Ask the reporter what
+they saw before measuring what you think they meant.**
+
+### FND-207 — The grid a watcher saw is the gap between the tiles, and the gap was neither whole nor bounded
+
+**Believed.** The window draws a black border around each tile, and the lattice
+that emerged at some zooms and not others was a defect of that border. The
+holding border was the suspect, because it is the only border the drawing
+names.
+
+**True.** The drawing draws no black line at all. It fills a square smaller
+than the tile and leaves the space around it, and that space shows the colour
+of the ground outside the world. What a watcher reads as a grid is the space
+the drawing does not fill. The holding border is a separate layer, in the
+colour of a faction, and it is not involved.
+
+The gap had two defects, and they answer two different halves of the report.
+
+**The lattice.** The drawing took one integer square width from the tile width
+and placed it at the rounded centre of each tile. A tile is a fractional number
+of pixels wide at nearly every zoom, because each zoom step multiplies the size
+by a fraction. The rounded centres therefore advanced by a whole pixel more
+under some tiles than under others, while the square stayed one width, so the
+gap was one pixel under some tiles and two under others. The pattern repeats
+across the picture at the beat of the fraction, and the eye reads a beat as a
+lattice.
+
+**The far zoom.** The square was a fixed share of the tile width, and the share
+rounded down to a whole number of pixels. At the smallest tile the camera
+allows, the square was one pixel of two and the gap took three quarters of the
+cell in area. The picture at that zoom is mostly the colour outside the world,
+with the ground showing through as specks. That is the state in which the grid
+"emerges", and it emerges because the map disappears.
+
+**Evidence.** The gaps were counted rather than judged, across a hundred
+neighbouring tiles in one row, at ten tile widths on a development machine. At
+a whole width the gap was one value. At a width of four and a half pixels it
+was zero under half the tiles and one under the other half; at six and a half
+it was one under half and two under the other half. Rendering the same world at
+each width showed the banding at exactly the widths the count named, so the
+artefact is in a still picture and is not a motion artefact.
+
+**Follows.** **A separator must be a whole number of pixels, and it must be the
+same number under every tile.** The drawing now takes the far edge of a tile
+from the near edge of the tile beside it, read the same way, so the two agree by
+construction rather than by arithmetic that a reader must check.
+
+**Two snapped values that a reader expects to be equal are one fact in two
+places.** The first repair computed the right edge as the rounded centre plus
+half a width, and the next tile's left edge as its own rounded centre less half
+a width. Those are equal in exact arithmetic and are not always equal in
+floating point. A test over twelve widths found the disagreement at a width of
+three and three tenths, which no picture would have shown.
+
+**A separator that covers more of the cell than the tile is not a separator.**
+The drawing leaves the gap out below the width at which the gap takes half the
+cell. The bound comes from that identity and from nothing else. It is not read
+off a picture and it does not depend on the world, the seed or the window.[^F207A]
+
+**What the bound does not settle.** At a tile of four pixels the gap passes the
+bound and still takes forty-four parts in a hundred of the cell, and the picture
+at that width still reads as a grid. The bound is the one value in its family
+that a sentence forces. Any other share is a matter of taste, and the register
+holds the question rather than a number somebody liked.[^F207B]
+
+### FND-208 — The window stated a drawing cost of zero in every stored picture, and it was a mean over no measurement
+
+**Believed.** The cost card of the window reports what the drawing cost. Every
+stored picture of the window said `draw 0.0 ms`, and the drawing was assumed to
+be very cheap.
+
+**True.** **A drawing cannot measure itself.** The run records the cost of a
+frame after that frame has been drawn. The cost card is drawn inside the frame,
+so the mean it states covers the frames before it. A picture written by one
+call to the drawing has no frame before it, and the mean is then taken over
+nothing. The card printed the result of that division as `0.0 ms`, which reads
+as a measurement of a free drawing.
+
+The live window is not affected after its first frame, because by then frames
+have been recorded. Every picture anybody looked at was affected, because a
+picture is one frame. The one instrument the project had was saying zero in
+every image the project examined.
+
+**Evidence.** The drawing was timed outside itself, over five frames at each of
+ten tile widths, on a development machine and not on the target platform. At the
+smallest tile the camera allows, one drawing of the demonstration world cost
+about a third of a second. That is three frames a second, and it is the reason a
+watcher reports that the camera is sluggish when zoomed out. The figure the card
+would have shown had it been able to measure itself is four orders of magnitude
+away from zero.
+
+**Follows.** **A cost the run has not measured is absent, not zero.** The
+window now says so in words. The record already required this of a number the
+window cannot afford, and a number nobody has taken is the same case.[^F208A]
+
+**A row that reads as a measurement must carry the count it was taken over.**
+The count travels with the mean into the readout, so no caller can print a mean
+without knowing whether one exists.
+
+**The stored picture did not catch this.** The test that stores a picture of
+the panel supplies fixed costs, because a clock gives a new number on every
+run. That is correct, and it is why the fixture never reached the case where no
+measurement exists. The test that closes this drives the real drawing with a
+run that has recorded nothing.[^F200A]
+
+### FND-206 — The holding border already draws only on a boundary, and the busy picture was the fixture
+
+**Believed.** A dense picture of a world was hard to read because the holding
+border drew on every held tile. The repair was to draw the boundary of a
+holding instead: a tile whose neighbours all share its holder would draw
+nothing, and only a tile on the edge of a holding would draw a border. A
+register entry and a backlog item both stated it that way.[^F201B]
+
+**True.** The drawing already does that. The border test reads the six
+neighbours of a held tile and draws only when one of them has a different
+holder. A tile surrounded by its own faction draws no border and never did.
+The repair was already in the code, and the entry that proposed it described a
+defect that does not exist.
+
+**Evidence.** The world was counted rather than judged. Of the held tiles, 83
+in 100 sit on a boundary in the picture that looked bad, 89 in 100 in the
+picture that looks best, and 85 in 100 in a third. **The picture that reads
+best has the highest share.** That number therefore does not explain the
+difference and cannot be the mechanism.
+
+The number that does explain it is the share of the world that is held. It is
+74 in 100 in the picture that looked bad and 8 in 100 in the picture that reads
+best. A world where three quarters of the ground is claimed draws as a map of
+factions, because it is one.
+
+**Follows.** **The fixture made the defect.** The bad picture came from six
+hundred units on a world of thirty-six hundred tiles, which is one unit for
+every six. Nobody chose that density for a reason; it was carried from one
+command line to the next while reproducing a different problem. The
+demonstration seats thirty people for each faction in a world of a quarter of a
+million tiles, and the default picture command is a fortieth as dense.
+
+**A measurement before a repair would have cost one run.** The first repair for
+this was a border weight that fell with the tile size, and it was removed for
+keying on the wrong variable.[^F206B] The second repair was the boundary rule,
+and it was already implemented. Both were proposed from a rendered picture and
+neither was proposed from a count. The count took one throwaway example and it
+refuted both.
+
+**What is real.** The drawing borders a holding against unclaimed ground and
+against another faction alike, and its own comment says it marks "where one
+holding meets another". The code and the comment disagree, and the comment is
+the thing that is wrong.[^F206C]
+
 ### FND-201 — The holding edge carries no information when holdings interleave at tile scale
 
 **Believed.** A dense picture of a world was hard to read, and the units were
@@ -4651,6 +4848,13 @@ repair was written, rendered, judged better, and then removed for that reason.
 Drawing the outer boundary of a contiguous holding rather than the boundary of
 every tile would carry information at any density. That is real work and it is
 a separate item.[^F201B]
+
+**Corrected. The drawing already draws the boundary and not every tile, and
+this entry was wrong about the mechanism.** The share of held tiles that sit on
+a boundary is highest in the picture that reads best, so it cannot be the
+cause. The share of the world that is held is the difference, and the picture
+that looked bad came from a fixture nobody chose on purpose. The correction
+holds the counts.[^F201C]
 
 ### FND-200 — A predicate that accepts a prefix accepts every rename that keeps it
 
@@ -5108,7 +5312,7 @@ generator makes the world uniform again, so the hole cannot come back quietly.
 [^F199B]: Backlog item 0206. `docs/backlog/proposed/0206-let-the-agent-tool-read-what-the-panel-reads.md`
 [^F200A]: The viewer suite for the glass. `crates/cachette-view/tests/shows_the_moment_on_the_glass.rs`
 [^F201A]: Findings register, FND-193, in this document.
-[^F201B]: Backlog item 0208. `docs/backlog/proposed/0208-draw-the-boundary-of-a-holding-and-not-of-every-tile.md`
+[^F201B]: Backlog item 0208. `docs/backlog/complete/0208-draw-the-boundary-of-a-holding-and-not-of-every-tile.md`
 [^F194REF]: Findings register, FND-194, in this document.
 [^F202A]: Backlog item 0152, what is still open. `docs/backlog/complete/0152-let-an-agent-drive-the-engine-through-a-protocol-server.md`
 [^F202B]: PRD-0002, a developer watches the world run. `docs/product/shipped/prd-0002-a-developer-watches-the-world-run.md`
@@ -5118,3 +5322,12 @@ generator makes the world uniform again, so the hole cannot come back quietly.
 [^F202F]: ADR-0092, the agent tool surface grows one tool at a time, against a stated need. `docs/adrs/draft/adr-0092-the-agent-tool-surface-grows-against-a-stated-need.md`
 [^F202G]: PRD-0019, an agent can ask the running engine what it holds. `docs/product/shaped/prd-0019-an-agent-can-ask-the-running-engine-what-it-holds.md`
 [^F204C]: Findings register, FND-048, in this document.
+[^F206B]: Findings register, FND-201, in this document.
+[^F201C]: Findings register, FND-206, in this document.
+[^F206C]: The holder layer of the drawing pass. `crates/cachette-view/src/paint.rs`
+[^F207A]: The tile rectangle of the drawing pass. `crates/cachette-view/src/paint.rs`
+[^F209A]: Findings register, FND-208, in this document.
+[^F209B]: The drawing pass of the viewer. `crates/cachette-view/src/paint.rs`
+[^F209C]: Backlog item 0210, generate the ground of a drawn tile once. `docs/backlog/proposed/0210-generate-the-ground-of-a-drawn-tile-once.md`
+[^F207B]: Decisions register, DEC-088. `docs/DECISIONS.md`
+[^F208A]: ADR-0070, the head-up display reports what the drawing pass read, decision D2. `docs/adrs/accepted/adr-0070-the-head-up-display-reports-what-the-drawing-pass-read.md`

@@ -23,9 +23,50 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^ALLOC]
 
-**Next number: DEC-087**
+**Next number: DEC-089**
 
 ## Open
+
+### DEC-088 — What share of its own cell must a tile keep before the window gives room to a gap?
+
+**Open. The window ships one half, and one half is the only value a sentence
+forces.**
+
+The window leaves a gap of one pixel between two tiles. A watcher reads the gap
+as a black grid, because it shows the colour of the ground outside the world. A
+tile `w` pixels across keeps `w - 1` pixels of colour in each direction, so the
+gap takes `1 - ((w - 1) / w)^2` of the cell. The share grows as the tile
+shrinks, and at the smallest tile the camera allows it reaches three quarters.
+At that zoom the map is mostly grid, and a watcher reported it as a defect.
+
+**What ships.** The window gives room to the gap only while the tile keeps at
+least half of its own cell. That is the point at which a separator stops
+covering more of the picture than the thing it separates, so the rule follows
+from what a separator is. The bound sits near three and a half pixels. Below
+it, the drawing leaves the gap out and the colour change from one tile to the
+next is what separates them.
+
+**Why the row is open.** Half is forced by a sentence. Any larger share is a
+matter of taste, and taste is the project owner's. At a tile of four pixels the
+gap passes the bound and still takes forty-four parts in a hundred of the cell,
+and the picture at that width still reads as a grid to the eye that reported
+the defect.
+
+**Options.**
+
+1. **Keep one half.** Derived, defensible, and stated in one sentence. It fixes
+   the extreme and leaves the middle widths gridded.
+2. **Keep three quarters.** The bound then sits near seven and a half pixels,
+   so the gap appears only at the zooms where a tile is comfortably readable.
+   The share is chosen, not derived.
+3. **Draw no gap at any width.** The tiles then meet, and the ground reads as a
+   continuous map. The tile grid stops being visible at all, which a watcher
+   reading a tile-discrete world may want or may not.
+
+**The recommendation is to ask the owner rather than to choose.** The register
+already holds two repairs at this layer that were proposed from a rendered
+picture and refuted by a count.[^DEC88A] A third value picked because one render
+looked better would be the same mistake. The finding holds the measurement.[^DEC88B]
 
 ### DEC-086 — Does the agent protocol server ship in the installed package?
 
@@ -2018,3 +2059,5 @@ a failed founding is correct.[^PRD12]
 [^DEC86A]: Backlog item 0152, what is still open. `docs/backlog/complete/0152-let-an-agent-drive-the-engine-through-a-protocol-server.md`
 [^DEC86B]: ADR-0092, the agent tool surface grows one tool at a time, against a stated need. `docs/adrs/draft/adr-0092-the-agent-tool-surface-grows-against-a-stated-need.md`
 [^DEC86C]: PRD-0019, an agent can ask the running engine what it holds. `docs/product/shaped/prd-0019-an-agent-can-ask-the-running-engine-what-it-holds.md`
+[^DEC88A]: Findings register, FND-206. `docs/FINDINGS.md`
+[^DEC88B]: Findings register, FND-207. `docs/FINDINGS.md`

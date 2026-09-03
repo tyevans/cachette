@@ -184,24 +184,27 @@ fn steer(camera: Camera, window: &Window, world: &World, canvas: &Canvas) -> Cam
         camera = camera.zoomed_in(canvas);
     }
 
-    // One press moves the view by one and a half tiles, in each direction
-    // the person is holding.
+    // One press moves the view by one step, in each direction the person is
+    // holding. The size of a step is a share of the window and not a count of
+    // tiles, so a press covers the same part of the picture at every zoom.[^2]
+    //
+    // [^2]: Findings register, FND-209. `docs/FINDINGS.md`
     let mut across = 0.0;
     let mut down = 0.0;
     if window.is_key_down(Key::Left) || window.is_key_down(Key::A) {
-        across -= 1.5;
+        across -= 1.0;
     }
     if window.is_key_down(Key::Right) || window.is_key_down(Key::D) {
-        across += 1.5;
+        across += 1.0;
     }
     if window.is_key_down(Key::Up) || window.is_key_down(Key::W) {
-        down -= 1.5;
+        down -= 1.0;
     }
     if window.is_key_down(Key::Down) || window.is_key_down(Key::S) {
-        down += 1.5;
+        down += 1.0;
     }
 
-    camera.stepped(across, down).clamped(world, canvas)
+    camera.nudged(across, down, canvas).clamped(world, canvas)
 }
 
 fn main() -> Result<(), DemoError> {
