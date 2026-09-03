@@ -19,6 +19,12 @@
 //! frees the slot, so a character who is gone never hands the identity to
 //! the character created next in that slot.[^6]
 //!
+//! **The columns are struct-of-arrays: one array for each field.** The pass
+//! that decides that is descent and succession, and every kernel of it reads
+//! one or two columns for each row it visits.[^10] The layout follows the
+//! column count of that pass and not the name of the tier the shape sits
+//! in.[^11]
+//!
 //! Every column holds an exact integer or a Q16.16 fixed-point value. No
 //! column holds a floating point number.[^7] A renown of zero is a real
 //! state, and the renown type represents it.[^8]
@@ -38,10 +44,12 @@
 //! [^7]: ADR-0002, simulated and aggregated state holds no floating point number, decision D1. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
 //! [^8]: Findings register, FND-043. `docs/FINDINGS.md`
 //! [^9]: The character graph and inheritance, section 2.5. `docs/research/reports/14-character-graph-and-inheritance.md`
+//! [^10]: The character graph and inheritance, section 3.2. `docs/research/reports/14-character-graph-and-inheritance.md`
+//! [^11]: ADR-0021, a layout claim names one structure and one pass, and never a tier, decisions D2 and D3. `docs/adrs/draft/adr-0021-layout-follows-the-access-pattern.md`
 
 use std::collections::VecDeque;
 
-use crate::descent::{Descent, DescentError, DescentId, Parents, DESCENT_CEILING};
+use crate::descent::{Descent, DescentError, DescentId, HouseId, Parents, DESCENT_CEILING};
 use crate::hash::StateHash;
 use crate::rng;
 use crate::tier::{EntityTier, Shape};
@@ -713,6 +721,63 @@ impl CharacterArena {
     #[must_use]
     pub fn parents(&self, entity: Entity) -> Option<Parents> {
         self.descent.parents(self.descent_id(entity)?)
+    }
+
+    /// Returns the house that a character belongs to.
+    ///
+    /// A house is the group of characters that share a patrilineal founder,
+    /// and its identifier is the descent identity of that founder. A
+    /// character takes the house of its father at birth. A character with no
+    /// father founds a house of its own.
+    ///
+    /// Returns `None` when the identity is dead. The house of a character
+    /// who is gone stays in the record of descent, and a caller reads it
+    /// through the descent identity rather than through the slot.
+    #[must_use]
+    pub fn house(&self, entity: Entity) -> Option<HouseId> {
+        self.descent.house_of(self.descent_id(entity)?)
+    }
+
+    /// Rebuilds the Euler interval labels over the father forest.
+    ///
+    /// The arena runs this pass rather than labelling on every birth. A
+    /// birth after the pass leaves the new character unlabelled, and a query
+    /// about an unlabelled character answers nothing rather than answering
+    /// from a stale label.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: The character graph and inheritance, section 3.4. `docs/research/reports/14-character-graph-and-inheritance.md`
+    pub fn relabel_lines(&mut self) {
+        self.descent.relabel();
+    }
+
+    /// Reports whether one character is a patrilineal ancestor of another.
+    ///
+    /// The answer is two integer comparisons against the Euler labels, so it
+    /// costs the same at any depth of line.
+    ///
+    /// Returns `None` when either identity is dead, or when either character
+    /// was born after the last relabel.
+    #[must_use]
+    pub fn is_patrilineal_ancestor(&self, ancestor: Entity, of: Entity) -> Option<bool> {
+        self.descent
+            .is_patrilineal_ancestor(self.descent_id(ancestor)?, self.descent_id(of)?)
+    }
+
+    /// Makes a character the founder of a house and moves its line into it.
+    ///
+    /// This is the cadet split. The character and every patrilineal
+    /// descendant of it leave the house they were in. The pass reads one
+    /// contiguous span of the Euler order and writes the house column at the
+    /// rows that span names.
+    ///
+    /// Returns the number of characters that the pass wrote, or `None` when
+    /// the identity is dead or the character was born after the last
+    /// relabel.
+    pub fn found_house(&mut self, entity: Entity) -> Option<u32> {
+        let id = self.descent_id(entity)?;
+        self.descent.found_house_at(id)
     }
 
     /// Reports whether a line has ended.

@@ -53,7 +53,9 @@ pub use cohort::{
     CohortError, CohortRow, CohortTable, DeathPlane, DrawLedger, DrawPass, NeedCondition, NeedRule,
     SiteRationed, UnitStarved, COHORTS_PER_SITE,
 };
-pub use descent::{Descent, DescentError, DescentId, Parents, DESCENT_CEILING, RELATION_DEPTH};
+pub use descent::{
+    Descent, DescentError, DescentId, HouseId, Parents, DESCENT_CEILING, RELATION_DEPTH,
+};
 pub use event::{ResourceTaken, TileChanged};
 pub use founding::{Founding, FoundingError, FoundingOutcome, Provision, Survey};
 pub use hash::StateHash;
