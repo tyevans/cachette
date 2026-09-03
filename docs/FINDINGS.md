@@ -22,7 +22,11 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
+<<<<<<< HEAD
 **Next number: FND-331**
+=======
+**Next number: FND-328**
+>>>>>>> worktree-agent-aa308c3f248672191
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -9875,6 +9879,7 @@ documentation plan holds the page that states the line.[^F322E]
 [^F323C]: Product requirement record 0021, what this does not do. `docs/product/accepted/prd-0021-a-developer-can-use-the-control-plane-without-reading-its-source.md`
 [^F323D]: Product requirement record 0019, an agent can ask the running engine what it holds. `docs/product/shaped/prd-0019-an-agent-can-ask-the-running-engine-what-it-holds.md`
 
+<<<<<<< HEAD
 ### FND-324 — The strict mode of the site builder does not see the fallback to the type stub
 
 **Believed.** A research report measured that a documentation build with module
@@ -9918,10 +9923,32 @@ The binding library does not copy the doc comment of a constructor onto the
 Python object, so the module carries the standard interpreter sentence there and
 nothing else. The reference therefore says what a class is and never says how to
 build one. The prose for that belongs in the doc comment of the class.
+=======
+### FND-326 — Three exception classes the package exports and documents, and nothing raises
+
+**Believed.** The compiled module declares nine exception classes and exports
+every one of them.[^F320C] The package re-exports all nine, and a test asserts
+that each one is a subclass of the root class.[^F326B] Each carried a docstring
+that reads as a statement of when the engine raises it. A reader takes the list
+for the set of failures the engine reports.
+
+**True: six of the nine are raised, and three are not.** No call site in this
+repository raises `SelectorError`, `DeterminismError` or `EnginePanic`. Each of
+the three appears twice in the tree: once where the macro declares it, and once
+where the module registers it. Nothing else names any of them, in the core
+crate, in the bindings crate, in the package or in the tests.
+
+**The panic class is the sharper case, because a panic does happen and does not
+produce it.** The bindings crate installs no panic hook. The binding library
+catches a panic at the boundary and raises its own `pyo3_runtime.PanicException`,
+which is not a subclass of the root class. A caller that catches the root class
+in order to survive a panic does not survive one.
+>>>>>>> worktree-agent-aa308c3f248672191
 
 **Evidence.**
 
 ```
+<<<<<<< HEAD
 uv run python scripts/check_reference.py --import-only
 ```
 
@@ -9940,3 +9967,55 @@ member arrives with none.
 [^F325A]: ADR-0107, the Python reference is generated from the compiled module, the consequences. `docs/adrs/draft/adr-0107-the-python-reference-is-generated-from-the-compiled-module.md`
 [^F325B]: Backlog priority index, the row for item 0310. `docs/backlog/PRIORITY.md`
 [^F325C]: Backlog item 0310, write the Rust doc comments for the Python reader. `docs/backlog/proposed/0310-write-the-rust-doc-comments-for-the-python-reader.md`
+=======
+grep -rn "SelectorError\|DeterminismError\|EnginePanic" crates python tests scripts
+```
+
+The search returns the declaration, the registration, the package re-export and
+the membership test. It returns no raise site.
+
+**Follows.** This is the shape the project already names: a capability that
+nothing invokes, declared and documented as if it were fact.[^F326C] The product
+record requires a reader to learn which error a
+call raises, and to learn what the package cannot do yet rather than conclude
+that they failed to find it.[^F326E] The three docstrings now say plainly that
+nothing raises them. Either something raises each class, or the class goes. Do
+not delete one while its docstring is the only place that says it is inert.
+
+### FND-327 — A refused faction names the project ceiling, and the engine applied the faction count of the world
+
+**Believed.** The refusal that a verb returns for a faction it will not accept
+reads `the faction 3 is at or above the ceiling 63`. A caller reads the number
+in the message as the bound that was applied.
+
+**True: the world applies its own faction count, and the message names a
+different number.** The world checks the faction against the faction count that
+its constructor took, and it raises the arena's own ceiling error to report
+that.[^F327A] The arena formats that error with the project-wide ceiling, which
+is a constant of the storage.[^F327B] The two bounds are unrelated, and the
+message names the one that was not applied.
+
+**Evidence.** A world built with a faction count of one refuses the faction
+three, and says that three is at or above 63.
+
+```
+uv run python -c "import cachette; cachette.World(8, 8, faction_count=1).spawn_soldiers([(2, 2)], 3)"
+```
+
+The same shape reaches the settlement verbs, which raise the same error from the
+settlement arena.
+
+**Follows.** The message misdirects the reader that the product record serves,
+because that reader learns which error a call raises from the message and from
+the reference alone.[^F326E] A caller who reads it raises the faction count of
+the world and meets the same refusal. This work documents the behaviour and
+does not repair the message, because the repair changes the text a verb returns
+and that is engine work rather than documentation work.
+
+[^F326B]: The public interface test of the package. `tests/test_public_api.py`
+[^F326C]: Recurring Defect Shapes, shape 3, inert code that nothing invokes. `.claude/rules/recurring-defects.md`
+[^F326E]: Product requirement record 0021, what the person cannot do today. `docs/product/accepted/prd-0021-a-developer-can-use-the-control-plane-without-reading-its-source.md`
+[^F327A]: The world of the core crate, the soldier spawn. `crates/cachette-core/src/world.rs`
+[^F327B]: The soldier arena of the core crate. `crates/cachette-core/src/soldier.rs`
+
+>>>>>>> worktree-agent-aa308c3f248672191

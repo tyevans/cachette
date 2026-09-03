@@ -12,8 +12,9 @@ reference is generated from the module rather than from this file.[^3] A
 declaration here that the module does not provide, such as a typed dictionary
 that describes a returned mapping, has no other home and carries its own prose.
 
-The docstrings below that copy the Rust source are a defect that predates the
-record. The same backlog item removes them.[^2] [^4]
+Every docstring that copied the Rust source is gone. The prose that stays
+below belongs to a declaration the compiled module does not provide, and a
+finding records what the copies were.[^4]
 
 References
 ----------
@@ -95,8 +96,13 @@ class FoundingColumns(TypedDict):
     The site is the whole identity of the settlement the founding seated. It
     is not a slot index.
 
-    The counts are the ones the survey read at the chosen place, and the
-    score is the engine's own weighted sum of them.
+    The counts are the ones the survey read at the chosen place, and they are
+    whole numbers. The score is the engine's own weighted sum of them, as a
+    Q16.16 value in its raw integer.
+
+    The seated entry is how many people the founding seated. It is not a
+    flag. The report of ``World.found_run_for_every_faction`` uses the same
+    key for a ``bool``.
     """
 
     site: int
@@ -122,7 +128,8 @@ class SurveyColumns(TypedDict):
     first. Row zero is the place a founding would take.
 
     The score column holds the engine's own weighted sum of the counts beside
-    it. It is an exact integer and never a floating point number.
+    it. It is a Q16.16 value as its raw integer, and never a floating point
+    number. The counts beside it are whole numbers.
 
     The three trailing entries are scalars. The survey counts them as it
     reads, so they measure the run rather than restate the sample size.
@@ -146,9 +153,12 @@ class SurveyColumns(TypedDict):
 class RegionSummary(TypedDict):
     """The level 1 summary of one cell.
 
-    Every field is an exact integer total over the level 0 tiles of the cell.
-    The three totals are raw accumulator integers and never floating point
-    numbers.
+    Every field is an exact integer total over the level 0 tiles of the cell,
+    and none is a floating point number.
+
+    The value total and the height total are Q16.16 values as their raw
+    integers. The food total is a whole count of units of stock. A reader that
+    scales all three reports a food total 65536 times too small.
     """
 
     tiles: int
@@ -183,8 +193,8 @@ class SiteEconomy(TypedDict):
 class ChoiceReport(TypedDict):
     """Why one unit chose what it chose.
 
-    Every score, field value, weight and floor is a Q16.16 value as its raw
-    integer.
+    The need, every score, every field value, every weight and the floor are
+    Q16.16 values as their raw integers.
 
     The best entry names the option the scores select, or the no-intent value
     when every score is below the floor. The name entry is ``None`` for a
@@ -290,7 +300,7 @@ class FrameReading(TypedDict):
     panel_height: int
     units_short: int
     units_carrying: int
-    carried_by_kind: tuple[int, int, int]
+    carried_by_kind: list[int]
     units_housed: int
     sites_rationed: int
     # Fixed point at a scale of 65536, not a count of goods.
@@ -303,45 +313,17 @@ class FrameReading(TypedDict):
     draw_mean_micros: float
     ticks_each_second: float
 
-class CachetteError(Exception):
-    """The root of every Cachette error."""
-
-class StepError(CachetteError):
-    """A step refused to run."""
-
-class SelectorError(CachetteError):
-    """A selector was not valid."""
-
-class VerbError(CachetteError):
-    """A verb refused a command."""
-
-class ViewError(CachetteError):
-    """A view was stale or out of scope."""
-
-class DeterminismError(CachetteError):
-    """The engine detected a determinism defect."""
-
-class EnginePanic(CachetteError):
-    """A Rust panic reached the boundary."""
-
-class FrameError(CachetteError):
-    """A frame refused to fill."""
-
-class ConfigError(CachetteError):
-    """The world settings do not describe a world."""
+class CachetteError(Exception): ...
+class StepError(CachetteError): ...
+class SelectorError(CachetteError): ...
+class VerbError(CachetteError): ...
+class ViewError(CachetteError): ...
+class DeterminismError(CachetteError): ...
+class EnginePanic(CachetteError): ...
+class FrameError(CachetteError): ...
+class ConfigError(CachetteError): ...
 
 class Camera:
-    """A camera the control plane owns.
-
-    The engine holds no camera. It is given one for the length of a call and
-    keeps nothing of it afterwards, so a frame is a pure function of a world
-    and a camera.
-
-    Every verb takes the width and the height of the picture the camera aims
-    at. A camera verb reads no pixel, so a caller that has not drawn yet can
-    still steer.
-    """
-
     def __init__(self, tile_size: float | None = ...) -> None: ...
     @staticmethod
     def fitting(world: World, width: int, height: int) -> Camera: ...
@@ -358,8 +340,6 @@ class Camera:
     def tile_at(self, x: float, y: float) -> tuple[int, int]: ...
 
 class World:
-    """A simulated world."""
-
     def __init__(
         self,
         width: int = ...,
