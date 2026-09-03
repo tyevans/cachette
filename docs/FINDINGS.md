@@ -29,6 +29,7 @@ branch has taken and not merged.** A dispatcher issues ranges above it for that
 reason, and those ranges live in prompts that no register can read. Four
 collisions in one session came from the gap between the two, and a finding holds
 the case.[^ALLOC2]
+**Next number: FND-226**
 
 ## A. Corrections to stated rules
 
@@ -605,12 +606,81 @@ tiles.
 **Evidence:** the target platform register holds the run, the machine, the
 commit and every row.[^F222]
 
-**Follows:** a frame of 100 milliseconds needs a speedup of at least 18.6
-against one core, so it needs at least 19 cores even when every core is used
-perfectly. This machine used 0.82 of the two cores it had. The tile pass ran
-1.81 times faster on two threads and the unit passes ran 1.35 times faster, so
-the half of the frame that is larger is also the half that scales worse. The
-measured world held no settlement, so every figure above is a lower bound.
+**Follows:** the tile pass ran 1.81 times faster on two threads and the unit
+passes ran 1.35 times faster, so the half of the frame that is larger is also
+the half that scales worse. The measured world held no settlement, so every
+figure above is a lower bound.
+
+**This entry first said the budget needs at least 19 cores at perfect
+efficiency. A later run on 16 cores refuted the reasoning behind that
+sentence, and FND-224 holds the correction.** Perfect efficiency is not
+available: the unit passes reach a floor and stop.
+
+### FND-224 — The frame budget is out of reach on any core count
+
+**Believed:** FND-222 divided 1.86 core-seconds by a budget of 100
+milliseconds and concluded that 19 cores would reach it. That reasoning
+assumed the work divides.
+
+**True:** it does not all divide. A run on 16 Graviton3 hardware threads gives
+a frame of 500 milliseconds at the target scale, which is 5.0 times the
+budget, at a speedup of 3.69 on 16 cores. **The unit passes reach a floor near
+300 milliseconds and gain nothing between 12 threads and 16.** The tile pass
+has no floor in the range measured and reached 6.13 on 16 threads.
+
+**A frame at the target scale therefore cannot fall below about 300
+milliseconds on this engine, whatever the core count.** The budget is 100
+milliseconds. No machine reaches it.
+
+**Evidence:** the target platform register holds both runs, the machines, the
+commits and every row.[^F222] The unit half is the difference between a world
+of 1,000,000 units and a world of none, at 4,194,304 tiles, taken at five
+thread counts.
+
+**Follows:** buying a larger machine does not deliver the tick rate. Either a
+unit must cost less in a frame, or fewer units must do work in a frame. The
+project already holds the second shape as a design principle, because a
+set-valued command permits a cheaper algorithm than a per-entity loop. This is
+the first measurement that says the principle is load-bearing rather than
+tidy.
+
+**Two cautions.** The measured world held no settlement and no character, so
+the unit half is a lower bound and the floor may be higher. The step starts
+threads for each parallel stage rather than using a pool, so part of the floor
+may be that cost rather than the work.
+
+### FND-225 — The tiles hold the memory at the target scale, and the units do not
+
+**Believed:** memory at the target scale would be dominated by the entity
+tiers rather than by the tiles, on the reasoning that a tile is generated and
+only its change is stored. A derivation put the total at one to three
+gigabytes.
+
+**True:** a world of 16,777,216 tiles and 1,000,000 units holds **545 MB
+resident**. The same world with no unit holds 456 MB, so the whole population
+of one million adds 89 MB. **A tile costs 27 bytes and a unit costs 89 bytes.**
+The tiles are five sixths of the total.
+
+**The generated-tile records are not contradicted.** Nothing stores a tile
+value or a tile stock. The 27 bytes are the columns the world does allocate
+for each tile, and one proposed item already names the holder column as one of
+them.[^F162D]
+
+**Building the world needs more than holding it.** The high water mark at the
+target scale is 872 MB against 545 MB resident, and the gap holds at every
+large extent. A machine sized to hold the world will fail to build it.
+
+**Evidence:** the target platform register.[^F222] Each point was measured by
+a process that built one world and exited, because a process that has already
+built a large world does not return the memory and would report the high mark
+of the run.
+
+**Follows:** the derived figure was high by a factor of two to six, and it was
+wrong about which half dominates. The measured world holds no settlement and
+no character, and the scale constants table names 5,000 settlements and 50,000
+living characters, with the character layer derived at about 85 MB. Adding
+those to 545 MB does not reach one gigabyte, so the shape of the answer is
+unlikely to change.
 
 ### FND-017 — A decision costs 4.1 nanoseconds, not 400
 

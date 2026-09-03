@@ -17,9 +17,17 @@ figures in this project are still derived, and one blocker states which.[^4]
 Measured figures exist. A benchmark lives in the repository and a script runs
 it on the target platform.[^5] [^6]
 
-The figures below come from one run, on one instance, on one date. They cover
-four operations of the public crate interface. They do not cover the passes
-that a world with settlements runs, because the measured world holds none.
+The figures below come from two runs on one date, on two instances of
+different size. They cover five quantities of the public crate interface: the
+cost of a frame, the cost of building a world, the cost of the whole-world
+hash, the resident memory of a world, and whether a frame at the target scale
+trips an integer overflow check. They do not cover the passes that a world
+with settlements runs, because the measured world holds none.
+
+**The two runs agree.** Every row the two instances share falls within 1.4
+percent of the other. The build at the target extent differs by one part in
+eight hundred and the hash by one part in two thousand. Two machines that
+agree to that degree are measuring the engine and not the machine.
 
 ## How to take a figure
 
@@ -32,10 +40,14 @@ just graviton-bench full
 just graviton-orphans
 ```
 
-The script needs the AWS command line tool, authenticated. The run below cost
-about one cent and took about seven minutes, and the build was most of that
-time. The second command lists what a run left behind, and it must list
-nothing.
+The script needs the AWS command line tool, authenticated. Every axis is a
+parameter: the instance type, the extents, the thread counts and the unit
+counts each read an environment variable, and the script header lists them. A
+run on a larger machine is a setting and not a change to a file.
+
+The two runs below took about seven and about ten minutes, and the build was
+most of both. Together they cost about twelve cents. The second command lists
+what a run left behind, and it must list nothing.
 
 The benchmark also runs on a development machine, and a figure taken there
 belongs in neither this register nor any other.[^7] Use it to check the
@@ -45,32 +57,34 @@ apparatus.
 just bench quick
 ```
 
-## The machine
+## The machines
 
-Every figure below was taken on this machine, and on no other.
+Two machines produced the figures below. Every table names which one.
 
-| Fact | Value |
-|---|---|
-| Instance type | `c7g.large` |
-| Region | `us-west-2` |
-| Processor | Graviton3. Implementer `0x41`, part `0xd40` |
-| Hardware threads | 2 |
-| Cache line | 64 bytes |
-| Memory | 3,897,492 kB |
-| Kernel | `Linux 6.18.44-99.149.amzn2023.aarch64` |
-| Compiler | `rustc 1.91.1 (ed61e7d7e 2025-11-07)` |
-| Build profile | `bench`, which inherits `release` |
-| Commit | `9aaf6443f80ebfdb35348d679d7c23604bb3807b` |
-| Date | 3 September 2026 |
+| Fact | Machine A | Machine B |
+|---|---|---|
+| Instance type | `c7g.4xlarge` | `c7g.large` |
+| Region | `us-west-2` | `us-west-2` |
+| Processor | Graviton3. Implementer `0x41`, part `0xd40` | The same |
+| Hardware threads | 16 | 2 |
+| Cache line | 64 bytes | 64 bytes |
+| Memory | 32,246,808 kB | 3,897,492 kB |
+| Kernel | `Linux 6.18.44-99.149.amzn2023.aarch64` | The same |
+| Compiler | `rustc 1.91.1 (ed61e7d7e 2025-11-07)` | The same |
+| Build profile | `bench`, which inherits `release` | The same |
+| Commit | `6b845be102134c21b31f762fda3cee705cbeeb2b` | `9aaf6443f80ebfdb35348d679d7c23604bb3807b` |
+| Run time | About 10 minutes | About 7 minutes |
+| Date | 3 September 2026 | 3 September 2026 |
 
-**The instance holds two hardware threads.** The project targets a server, and
-a server holds many more. Read the thread columns below as the scaling this
-machine showed, and not as the scaling a large instance would show.
+**Machine A is the one to cite.** It holds 16 hardware threads, so it runs
+every thread count the determinism tests use, and those are 1, 2 and 12.[^8]
+Machine B holds two, so it cannot run the top count at all, and that is a fact
+about the machine rather than about the engine.
 
-**The instance is not burstable.** A burstable instance earns processor
+**Neither instance is burstable.** A burstable instance earns processor
 credits and falls back to a fraction of one core when they run out. A sweep of
 this length would exhaust them, and every row after that point would measure
-the throttle.
+the throttle rather than the engine.
 
 ## What each row measures
 
@@ -92,161 +106,284 @@ slots, which is the reservation a world takes by default.
 
 **`state_hash`** takes the hash of the whole world. The golden state test
 compares this value against a stored file, and the determinism rule of this
-project rests on it.[^8]
+project rests on it.[^9]
 
 ## One frame at the target scale
 
-This is the row the project needs most.
+This is the row the project needs most. Machine A, 16 hardware threads. The
+world held 16,777,216 tiles and 1,000,000 units, and no settlement.
 
-| Threads | Samples | Minimum, ns | Median, ns | Maximum, ns |
-|---|---|---|---|---|
-| 1 | 6 | 1,840,105,650 | 1,860,922,702 | 1,940,664,749 |
-| 2 | 9 | 1,119,920,790 | 1,135,293,186 | 1,190,617,672 |
-| 4 | 9 | 1,125,529,839 | 1,139,342,771 | 1,170,654,514 |
-
-The world held 16,777,216 tiles and 1,000,000 units, and no settlement.
+| Threads | Samples | Minimum, ns | Median, ns | Maximum, ns | Speedup |
+|---|---|---|---|---|---|
+| 1 | 6 | 1,827,238,759 | 1,848,231,346 | 1,945,931,865 | 1.00 |
+| 2 | 9 | 1,107,133,264 | 1,120,190,816 | 1,159,728,596 | 1.65 |
+| 4 | 9 | 751,737,651 | 767,062,531 | 790,873,646 | 2.41 |
+| 12 | 9 | 506,451,963 | 517,347,864 | 536,613,400 | 3.57 |
+| 16 | 9 | 479,584,531 | 500,368,433 | 526,893,922 | 3.69 |
 
 **The frame budget is 100 milliseconds.** The engine runs at ten ticks for
-each second, and the scale constants table derives that rate.[^2] The median
-frame above costs 1,135 milliseconds at two threads. That is 11.4 times the
-budget on this machine.
+each second, and the scale constants table derives that rate.[^2]
 
-**The frame holds 1.86 core-seconds of work.** The one-thread row is that
-figure. A frame of 100 milliseconds therefore needs a speedup of at least 18.6
-against one core, so it needs at least 19 cores even when every core is used
-perfectly. This machine reached a speedup of 1.64 on two cores, so it used
-0.82 of the two cores it had.
+**The engine does not meet the budget, and 16 cores do not close the gap.**
+The frame costs 500 milliseconds on all 16, which is 5.0 times the budget.
+Sixteen cores bought a speedup of 3.69, so the run used 0.23 of the machine.
 
-**A fourth thread bought nothing.** The instance holds two hardware threads,
-and the four-thread row matches the two-thread row.
+## The budget is out of reach on any core count
+
+This is the most important consequence of the run, and it does not depend on
+the size of the machine.
+
+**Separate the frame into two halves.** The tile pass scales. The unit passes
+stop scaling. The table below gives each half at the target scale, on machine
+A. The unit half is the difference between a world of 1,000,000 units and a
+world of none, at 4,194,304 tiles.
+
+| Threads | Tile pass, ns | Speedup | Unit passes, ns | Speedup |
+|---|---|---|---|---|
+| 1 | 1,304,351,811 | 1.00 | 561,211,275 | 1.00 |
+| 2 | 716,310,130 | 1.82 | 416,075,247 | 1.35 |
+| 4 | 444,188,060 | 2.94 | 348,697,567 | 1.61 |
+| 12 | 247,703,940 | 5.27 | 297,877,514 | 1.88 |
+| 16 | 212,768,859 | 6.13 | 303,443,126 | 1.85 |
+
+**The unit passes reach a floor near 300 milliseconds and stay there.** They
+gain nothing between 12 threads and 16. A frame at the target scale therefore
+cannot fall below about 300 milliseconds on this engine, whatever the core
+count, and the budget is 100 milliseconds. Adding cores does not reach it.
+Something must do less work for each unit, or fewer units must do work in a
+frame.
+
+The tile pass has no such floor in the range measured. It reached 6.13 on 16
+threads and it was still improving at 12.
+
+**This is a statement about one million units in one frame.** It is not a
+statement about a smaller population, and the measured world held no
+settlement, so the unit half is a lower bound rather than the whole of it.
 
 ## The cost of a frame, as two straight lines
 
 The measured cost is the tile count times a constant, plus the unit count
-times a second constant.
+times a second constant. Machine A.
 
-| Quantity | Cost at 1 thread | Cost at 2 threads |
-|---|---|---|
-| One tile, one frame | 78 ns | 43 ns |
-| One unit, one frame | 557 ns | 411 ns |
+| Quantity | 1 thread | 2 threads | 16 threads |
+|---|---|---|---|
+| One tile, one frame | 78 ns | 43 ns | 13 ns |
+| One unit, one frame | 561 ns | 416 ns | 303 ns |
 
 The two constants predict the target scale row. At two threads they give
-1,129 milliseconds against the 1,135 milliseconds measured, which is a
-difference of one part in two hundred.
+1,132 milliseconds against the 1,120 milliseconds measured, which is a
+difference of one part in a hundred.
 
 The unit constant comes from the difference between a world of 1,000,000 units
 and a world of none, at 4,194,304 tiles. The same difference at 100,000 units
-gives 417 ns and at 10,000 units gives 350 ns, so the line is straight over
-two orders of magnitude.
+gives 573 ns for each unit at one thread, and at 10,000 units it gives 768 ns,
+so the line is straight over two orders of magnitude and bends upward slightly
+at the smallest count.
 
-**The units scale worse than the tiles.** The tile pass ran 1.81 times faster
-on two threads than on one. The unit passes ran 1.35 times faster.
+## Resident memory
+
+Each row below comes from a process that measured one point and exited. A
+process that has already built a large world does not return the memory to the
+operating system, so one process measuring every point would report the high
+mark of the run rather than the cost of the world it holds. Machine A, one
+thread, two frames run before the reading.
+
+| Tiles | Units | Empty process, bytes | Resident, bytes | Peak, bytes |
+|---|---|---|---|---|
+| 4,096 | 0 | 2,056,192 | 2,564,096 | 2,564,096 |
+| 65,536 | 0 | 2,027,520 | 4,476,928 | 5,443,584 |
+| 65,536 | 10,000 | 2,064,384 | 5,570,560 | 6,639,616 |
+| 1,048,576 | 0 | 2,015,232 | 33,947,648 | 55,984,128 |
+| 1,048,576 | 10,000 | 2,121,728 | 35,262,464 | 57,225,216 |
+| 1,048,576 | 100,000 | 2,027,520 | 45,568,000 | 67,608,576 |
+| 4,194,304 | 0 | 2,068,480 | 155,004,928 | 192,585,728 |
+| 4,194,304 | 10,000 | 2,048,000 | 156,016,640 | 193,576,960 |
+| 4,194,304 | 100,000 | 2,076,672 | 166,506,496 | 204,083,200 |
+| 4,194,304 | 1,000,000 | 2,097,152 | 217,436,160 | 294,014,976 |
+| 16,777,216 | 0 | 2,076,672 | 456,155,136 | 707,706,880 |
+| 16,777,216 | 10,000 | 2,031,616 | 457,134,080 | 708,923,392 |
+| 16,777,216 | 100,000 | 2,015,232 | 463,851,520 | 721,616,896 |
+| 16,777,216 | 1,000,000 | 2,121,728 | 545,161,216 | 871,923,712 |
+
+**A world at the target scale holds 545 MB.** That is 16,777,216 tiles and
+1,000,000 units, and no settlement and no character.
+
+**The tiles are the cost, and the units are not.** The same world with no unit
+holds 456 MB, so the whole population of one million adds 89 MB. A tile costs
+27 bytes and a unit costs 89 bytes.
+
+**A tile costs 27 bytes even though the ground is generated.** Two records
+state that a tile field is a generated base with only the change stored, and
+that a tile stock is generated with only what was taken stored.[^10] [^11]
+Both hold: nothing here stores a tile value or a stock. The 27 bytes are the
+columns the world does allocate for each tile, and one proposed item already
+names the holder column as one of them.[^12]
+
+**Building the world needs 872 MB, not 545 MB.** The peak is 60 percent above
+the resident size at every large row. A machine sized to hold the world will
+fail to build it. The gap is the build and not the frame, because the
+constructor sums every tile into the first pyramid level.
+
+## Integer overflow at the target scale
+
+Hard invariant 9 states that a `u8` tile field summed over 16,777,216 tiles
+reaches 4,258,500,000, that this is inside a `u32` by 0.85 percent, and that
+an accumulator must not depend on that margin.
+
+**No accumulator overflowed.** One frame at the target scale ran a second
+time, built with the overflow check on, and it passed.
+
+The check is not on in the rows above. The bench profile inherits the release
+profile, which carries no overflow check, so a wrap in any row above would
+have wrapped in silence.[^13] The check costs time, so the checked run is a
+separate build and gives no timing row. A timing row taken under it would
+measure the check.
 
 ## One frame against the tile count
 
-The world holds no unit in every row of this table.
+The world holds no unit in every row of this table. Machine A.
 
 | Tiles | Threads | Samples | Minimum, ns | Median, ns | Maximum, ns | Median, ns for each tile |
 |---|---|---|---|---|---|---|
-| 4,096 | 1 | 9 | 1,472,983 | 1,511,341 | 1,642,037 | 369 |
-| 4,096 | 2 | 9 | 2,448,516 | 2,535,514 | 3,670,996 | 619 |
-| 4,096 | 4 | 9 | 235,419 | 242,654 | 276,706 | 59 |
-| 65,536 | 1 | 9 | 4,683,312 | 4,997,363 | 5,378,755 | 76 |
-| 65,536 | 2 | 9 | 4,509,280 | 4,845,675 | 5,827,293 | 74 |
-| 65,536 | 4 | 9 | 6,952,238 | 7,678,044 | 8,506,648 | 117 |
-| 1,048,576 | 1 | 9 | 72,321,895 | 74,683,858 | 84,260,887 | 71 |
-| 1,048,576 | 2 | 9 | 38,095,061 | 38,983,900 | 46,100,844 | 37 |
-| 1,048,576 | 4 | 9 | 40,833,011 | 45,872,330 | 51,309,765 | 44 |
-| 4,194,304 | 1 | 9 | 286,187,036 | 291,980,590 | 335,700,630 | 70 |
-| 4,194,304 | 2 | 9 | 164,716,910 | 168,199,802 | 194,785,952 | 40 |
-| 4,194,304 | 4 | 9 | 158,612,382 | 166,862,993 | 193,992,172 | 40 |
-| 16,777,216 | 1 | 8 | 1,270,605,624 | 1,303,922,093 | 1,457,765,572 | 78 |
-| 16,777,216 | 2 | 9 | 707,988,028 | 718,533,494 | 811,507,732 | 43 |
-| 16,777,216 | 4 | 9 | 730,095,296 | 742,332,248 | 842,049,703 | 44 |
+| 4,096 | 1 | 9 | 1,717,026 | 1,744,274 | 1,896,541 | 426 |
+| 4,096 | 2 | 9 | 2,306,275 | 2,338,395 | 2,465,025 | 571 |
+| 4,096 | 4 | 9 | 210,463 | 216,027 | 248,083 | 53 |
+| 4,096 | 12 | 9 | 291,742 | 332,634 | 381,595 | 81 |
+| 4,096 | 16 | 9 | 342,502 | 396,705 | 454,637 | 97 |
+| 65,536 | 1 | 9 | 4,982,822 | 5,099,313 | 5,656,232 | 78 |
+| 65,536 | 2 | 9 | 4,163,700 | 4,257,284 | 4,748,725 | 65 |
+| 65,536 | 4 | 9 | 4,925,825 | 5,103,368 | 5,516,727 | 78 |
+| 65,536 | 12 | 9 | 9,637,008 | 9,952,308 | 10,708,199 | 152 |
+| 65,536 | 16 | 9 | 13,911,391 | 14,729,123 | 15,271,263 | 225 |
+| 1,048,576 | 1 | 9 | 73,085,231 | 73,669,292 | 85,340,039 | 70 |
+| 1,048,576 | 2 | 9 | 37,502,534 | 38,355,233 | 45,016,455 | 37 |
+| 1,048,576 | 4 | 9 | 25,545,133 | 26,213,968 | 30,578,016 | 25 |
+| 1,048,576 | 12 | 9 | 22,504,222 | 23,490,612 | 24,267,862 | 22 |
+| 1,048,576 | 16 | 9 | 24,881,684 | 25,446,686 | 27,096,053 | 24 |
+| 4,194,304 | 1 | 9 | 286,930,898 | 292,797,311 | 336,879,542 | 70 |
+| 4,194,304 | 2 | 9 | 165,799,063 | 168,525,184 | 195,158,892 | 40 |
+| 4,194,304 | 4 | 9 | 94,216,038 | 96,860,321 | 116,157,579 | 23 |
+| 4,194,304 | 12 | 9 | 60,061,382 | 61,796,720 | 71,233,285 | 15 |
+| 4,194,304 | 16 | 9 | 58,284,041 | 59,992,025 | 73,305,872 | 14 |
+| 16,777,216 | 1 | 8 | 1,265,389,463 | 1,304,351,811 | 1,461,720,279 | 78 |
+| 16,777,216 | 2 | 9 | 704,467,143 | 716,310,130 | 813,892,821 | 43 |
+| 16,777,216 | 4 | 9 | 438,273,221 | 444,188,060 | 501,454,124 | 26 |
+| 16,777,216 | 12 | 9 | 241,174,924 | 247,703,940 | 273,698,751 | 15 |
+| 16,777,216 | 16 | 9 | 210,788,974 | 212,768,859 | 248,676,104 | 13 |
 
 **The rows at 4,096 tiles disagree with the rest of the table, and nobody
-has explained why.** One thread costs 369 ns for each tile
-and four threads cost 59 ns, on a machine with two hardware threads. Every
-other extent costs between 37 and 78 ns for each tile. The result repeated
-across nine samples with a spread under one fifth, so it is not noise. A
-backlog item holds the question.[^9] Do not cite the 4,096-tile rows.
+has explained why.** One thread costs 426 ns for each tile, two threads cost
+571 ns, and four threads cost 53 ns. Every larger extent costs between 13 and
+78 ns for each tile at every thread count. Nine samples produced a spread
+under one fifth in each row, and the pattern repeated on both machines, so it
+is not noise and it is not one instance. A backlog item holds the
+question.[^14] Do not cite the 4,096-tile rows.
+
+**The small extents lose from a high thread count, and that is ordinary.**
+At 65,536 tiles a frame costs more at 16 threads than at 2. The step starts
+threads for each parallel stage, and at a small tile count that cost is larger
+than the work it divides. It is not the same effect as the 4,096-tile rows,
+because it rises with the thread count instead of falling.
 
 ## One frame against the unit count
 
-Every row below holds 4,194,304 tiles.
+Every row below holds 4,194,304 tiles. Machine A.
 
 | Units | Threads | Samples | Minimum, ns | Median, ns | Maximum, ns |
 |---|---|---|---|---|---|
-| 0 | 1 | 9 | 303,919,358 | 309,426,222 | 352,424,250 |
-| 0 | 2 | 9 | 164,958,771 | 168,031,578 | 193,613,809 |
-| 0 | 4 | 9 | 159,873,272 | 165,813,439 | 190,615,890 |
-| 10,000 | 1 | 9 | 310,294,762 | 315,203,913 | 358,105,768 |
-| 10,000 | 2 | 9 | 168,839,527 | 171,504,795 | 196,420,606 |
-| 10,000 | 4 | 9 | 163,614,638 | 168,373,126 | 194,237,013 |
-| 100,000 | 1 | 9 | 362,946,177 | 365,723,806 | 391,955,811 |
-| 100,000 | 2 | 9 | 206,043,380 | 209,690,746 | 230,021,514 |
-| 100,000 | 4 | 9 | 200,561,755 | 207,498,707 | 231,548,700 |
-| 1,000,000 | 1 | 9 | 840,637,132 | 866,042,558 | 927,499,751 |
-| 1,000,000 | 2 | 9 | 550,258,972 | 578,770,080 | 624,622,056 |
-| 1,000,000 | 4 | 9 | 559,232,237 | 582,273,957 | 626,056,798 |
-
+| 0 | 1 | 9 | 304,007,597 | 309,451,825 | 353,963,846 |
+| 0 | 2 | 9 | 165,490,045 | 168,193,306 | 193,524,047 |
+| 0 | 4 | 9 | 93,961,116 | 96,668,092 | 116,226,479 |
+| 0 | 12 | 9 | 60,404,398 | 62,262,243 | 72,036,426 |
+| 0 | 16 | 9 | 58,249,543 | 59,994,847 | 72,758,851 |
+| 10,000 | 1 | 9 | 311,377,770 | 317,134,685 | 357,567,720 |
+| 10,000 | 2 | 9 | 169,602,316 | 173,992,098 | 198,989,514 |
+| 10,000 | 4 | 9 | 98,892,057 | 100,642,724 | 116,506,830 |
+| 10,000 | 12 | 9 | 64,804,280 | 66,011,497 | 75,277,327 |
+| 10,000 | 16 | 9 | 63,020,801 | 64,511,186 | 77,297,883 |
+| 100,000 | 1 | 9 | 363,083,821 | 366,151,243 | 401,824,560 |
+| 100,000 | 2 | 9 | 208,075,968 | 209,997,919 | 230,769,076 |
+| 100,000 | 4 | 9 | 127,815,907 | 129,865,250 | 145,846,669 |
+| 100,000 | 12 | 9 | 88,990,069 | 90,361,628 | 97,612,221 |
+| 100,000 | 16 | 9 | 86,424,837 | 89,265,763 | 97,551,034 |
+| 1,000,000 | 1 | 9 | 837,376,783 | 870,663,100 | 931,796,421 |
+| 1,000,000 | 2 | 9 | 550,162,380 | 584,268,553 | 622,467,209 |
+| 1,000,000 | 4 | 9 | 418,979,726 | 445,365,659 | 476,276,656 |
+| 1,000,000 | 12 | 9 | 333,401,457 | 360,139,757 | 384,476,187 |
+| 1,000,000 | 16 | 9 | 327,615,102 | 363,437,973 | 376,565,148 |
 ## Building a world
+
+Machine A. The build takes no thread count from the caller.
 
 | Tiles | Samples | Minimum, ns | Median, ns | Maximum, ns | Median, ns for each tile |
 |---|---|---|---|---|---|
-| 4,096 | 9 | 1,153,188 | 1,156,689 | 1,274,970 | 282 |
-| 65,536 | 9 | 18,065,869 | 18,071,591 | 18,254,339 | 276 |
-| 1,048,576 | 9 | 287,286,297 | 287,321,050 | 289,491,597 | 274 |
-| 4,194,304 | 9 | 1,155,862,111 | 1,156,171,565 | 1,156,818,869 | 276 |
-| 16,777,216 | 3 | 4,630,439,413 | 4,630,699,305 | 4,633,008,922 | 276 |
+| 4,096 | 9 | 1,178,508 | 1,189,665 | 1,370,799 | 290 |
+| 65,536 | 9 | 18,096,642 | 18,099,749 | 18,282,420 | 276 |
+| 1,048,576 | 9 | 287,456,064 | 287,509,793 | 289,825,287 | 274 |
+| 4,194,304 | 9 | 1,156,823,643 | 1,157,183,481 | 1,157,780,822 | 276 |
+| 16,777,216 | 3 | 4,636,191,433 | 4,636,309,563 | 4,638,105,825 | 276 |
 
 **Building a world costs 276 ns for each tile, at every extent measured.**
-Building a world at the target extent therefore takes 4.63 seconds, and it
-takes them on one core. The tile value field generates a tile and stores
-nothing, so it visits no tile.[^10] The first level of the pyramid does visit
-every tile, and the constructor rebuilds it. A proposed backlog item holds
-that pass and names the two shapes that would remove it.[^11]
+Building a world at the target extent therefore takes 4.64 seconds.
+
+**Sixteen cores did not make it faster.** The two-core machine took 4.63
+seconds for the same build, which is within one part in eight hundred of
+machine A. The constructor rebuilds the first pyramid level at one thread, so
+the build is serial and the size of the machine does not reach it.
+
+The tile value field generates a tile and stores nothing, so it visits no
+tile.[^10] The first level of the pyramid does visit every tile, and the
+constructor rebuilds it. A proposed backlog item holds that pass and names the
+two shapes that would remove it.[^12]
 
 **Reserving a million unit slots costs nothing that this run could see.** A
 build at the target extent with the default reservation took a median of
-4,631,106,264 ns, against 4,630,699,305 ns with a reservation of 1024. The
-difference is one part in ten thousand, and it is inside the spread of both
+4,637,235,543 ns, against 4,636,309,563 ns with a reservation of 1024. The
+difference is one part in five thousand, and it is inside the spread of both
 rows. The reservation record states that the cost is paid once, at
-construction, and that the cost of a tick does not grow with it.[^12] This run
+construction, and that the cost of a tick does not grow with it.[^15] This run
 gives the first measured support for the first half of that claim.
 
 ## The hash of the whole world
 
+Machine A. The hash takes no thread count.
+
 | Tiles | Samples | Minimum, ns | Median, ns | Maximum, ns | Median, ns for each tile |
 |---|---|---|---|---|---|
-| 4,096 | 9 | 1,273,541 | 1,278,276 | 1,292,892 | 312 |
-| 65,536 | 9 | 21,283,563 | 21,343,512 | 21,505,996 | 326 |
-| 1,048,576 | 9 | 351,362,737 | 351,741,590 | 351,997,609 | 335 |
-| 4,194,304 | 7 | 1,426,173,459 | 1,427,107,778 | 1,445,243,855 | 340 |
-| 16,777,216 | 3 | 6,018,511,641 | 6,023,536,841 | 6,023,813,980 | 359 |
+| 4,096 | 9 | 1,276,666 | 1,282,615 | 1,298,580 | 313 |
+| 65,536 | 9 | 21,262,532 | 21,272,684 | 21,377,755 | 325 |
+| 1,048,576 | 9 | 351,351,703 | 351,620,466 | 351,964,335 | 335 |
+| 4,194,304 | 8 | 1,424,822,378 | 1,426,095,428 | 1,427,671,952 | 340 |
+| 16,777,216 | 3 | 6,018,879,287 | 6,020,360,980 | 6,022,534,409 | 359 |
 
 The hash costs about 340 ns for each tile, and it takes one core. A golden
 state test at the target extent therefore costs 6.02 seconds for each frame it
 checks. The hash regenerates the ground, the stock and the tile value, because
 each of those is generated from the seed rather than stored.
 
-## What this run did not measure
+## What these runs did not measure
 
 Read this section before you cite a figure above.
 
-- **The measured world holds no settlement.** The rate pass, the consumption
-  pass and the position pass therefore did no work. Every frame figure above
-  is a lower bound on a frame at the target scale, and not the whole of it.
-- **The machine holds two hardware threads.** No figure above says what a
-  large instance does. The thread columns give the scaling of two cores.
-- **One run, one instance, one date.** A second run on a second instance of
-  the same type would give a second set of figures, and nobody has taken one.
+- **The measured world holds no settlement, and no character.** The rate pass,
+  the consumption pass and the position pass therefore did no work, and the
+  character arena was empty. Every frame figure above is a lower bound on a
+  frame at the target scale, and the 545 MB is a lower bound on the memory.
+  The scale constants table names 5,000 settlements and 50,000 living
+  characters, and this run held none of either.[^2]
+- **Two runs, on one date.** A run on another date would give another set of
+  figures, and nobody has taken one.
 - **No figure above measures a cache hit rate, an allocation count, or the
   cost of a call across the language boundary.** Three draft records state
-  derived figures of those kinds, and this run leaves every one of them
+  derived figures of those kinds, and these runs leave every one of them
   derived.[^2]
-- **The benchmark measures four operations.** The step, the build and the hash
-  reach the public interface. No figure separates the stages inside a step.
+- **No figure separates the stages inside a step.** The step, the build and
+  the hash reach the public interface, and the passes inside a step do not.
+  The two halves in the table above are a difference between two worlds, not
+  a measurement of a stage.
+- **The thread counts above are not the thread counts of a running engine.**
+  Each row asks the step for a thread count, and the step starts threads for
+  each parallel stage. No figure says what a pool would cost.
 
 ## What belongs here
 
@@ -279,8 +416,11 @@ commit what changed. Do not edit a row to make a later run agree with it.
 [^5]: The benchmark. `crates/cachette-core/benches/target_cost.rs`
 [^6]: The provisioning script. `scripts/graviton-benchmark.sh`
 [^7]: Testing rules, section 3. `.claude/rules/testing.md`
-[^8]: ADR-0001, one binary gives one answer at any thread count, decision D4. `docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
-[^9]: Backlog item 0229. `docs/backlog/proposed/0229-explain-the-frame-cost-at-the-smallest-extent.md`
+[^8]: ADR-0001, one binary gives one answer at any thread count, decision D5. `docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
+[^9]: ADR-0001, one binary gives one answer at any thread count, decision D4. `docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
 [^10]: ADR-0088, a tile field is a generated base and a stored change. `docs/adrs/draft/adr-0088-a-tile-field-is-a-generated-base-and-a-stored-change.md`
-[^11]: Backlog item 0171. `docs/backlog/proposed/0171-build-the-first-level-without-a-pass-over-every-tile.md`
-[^12]: ADR-0084, the world reserves the unit columns at construction, decision D3. `docs/adrs/draft/adr-0084-the-world-reserves-the-unit-columns-at-construction.md`
+[^11]: ADR-0072, a tile stock is generated, and only what was taken is stored. `docs/adrs/accepted/adr-0072-a-tile-stock-is-generated-and-only-what-was-taken-is-stored.md`
+[^12]: Backlog item 0171. `docs/backlog/proposed/0171-build-the-first-level-without-a-pass-over-every-tile.md`
+[^13]: ADR-0083, the gate build checks every integer overflow. `docs/adrs/draft/adr-0083-the-gate-build-checks-every-integer-overflow.md`
+[^14]: Backlog item 0229. `docs/backlog/proposed/0229-explain-the-frame-cost-at-the-smallest-extent.md`
+[^15]: ADR-0084, the world reserves the unit columns at construction, decision D3. `docs/adrs/draft/adr-0084-the-world-reserves-the-unit-columns-at-construction.md`
