@@ -335,7 +335,7 @@ pub struct Holding {
     ///
     /// # References
     ///
-    /// [^1]: Findings register, FND-305. `docs/FINDINGS.md`
+    /// [^1]: Findings register, FND-307. `docs/FINDINGS.md`
     block_census: Vec<u32>,
 }
 
@@ -710,7 +710,7 @@ impl Holding {
     ///
     /// # References
     ///
-    /// [^1]: Findings register, FND-305. `docs/FINDINGS.md`
+    /// [^1]: Findings register, FND-307. `docs/FINDINGS.md`
     /// [^2]: ADR-0009, parallel stages write disjoint outputs, decisions D1, D2 and D3. `docs/adrs/accepted/adr-0009-parallel-stages-write-disjoint-outputs.md`
     fn apply(&mut self, changes: &[(TileIdx, Holder)], threads: usize) {
         let threads = threads.max(1);
@@ -754,7 +754,7 @@ impl Holding {
         // saw that as each tile moved. Rereading a block cost every tile of
         // it, and a frame at the target scale dirties most blocks.[^1]
         //
-        // [^1]: Findings register, FND-305. `docs/FINDINGS.md`
+        // [^1]: Findings register, FND-307. `docs/FINDINGS.md`
         #[cfg(feature = "census-holding")]
         census::record(moved_count, 0, self.held.len() as u64);
     }

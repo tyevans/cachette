@@ -1500,7 +1500,7 @@ commit what changed. Do not edit a row to make a later run agree with it.
 
 [^DENSE1]: ADR-0103, the tile value field stores a dense delta, never a sparse change list. `docs/adrs/draft/adr-0103-the-tile-value-field-stores-a-dense-delta.md`
 [^DENSE2]: Findings register, FND-292. `docs/FINDINGS.md`
-[^DENSE5]: Findings register, FND-305. `docs/FINDINGS.md`
+[^DENSE5]: Findings register, FND-307. `docs/FINDINGS.md`
 [^DENSE4]: Findings register, FND-298. `docs/FINDINGS.md`
 [^ITEM297]: Backlog item 0297, take the rest of the holding spread. `docs/backlog/complete/0297-take-the-rest-of-the-holding-spread.md`
 [^DENOM297]: Findings register, FND-296. `docs/FINDINGS.md`

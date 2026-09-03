@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-307**
+**Next number: FND-309**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -8434,7 +8434,7 @@ The remaining hypothesis inherited the confidence of the one that was tested.
 **A residual is a difference of two large numbers, and it moves when either
 does.** Twelve milliseconds against a 463 millisecond frame and 0.31
 milliseconds against a 188 millisecond frame are not the same measurement twice.
-### FND-305 — The holding apply spent more on rereading blocks than on the list everyone was looking at
+### FND-307 — The holding apply spent more on rereading blocks than on the list everyone was looking at
 
 **Believed.** The holding apply is expensive because it rebuilds the held tile
 list on every frame, in the same shape as the change merge that this project
@@ -8455,7 +8455,7 @@ The repair is now gone rather than smaller. The holding keeps a count of the
 tiles each faction holds in each block, so a mask gains a bit when a count
 leaves zero and loses one when a count reaches zero. A moved tile touches two
 counters. No block is read again. A measurement on the target platform found
-the apply 2.18 times cheaper and the frame 17.7 milliseconds cheaper.[^F305A]
+the apply 2.18 times cheaper and the frame 17.7 milliseconds cheaper.[^F307A]
 
 **The test that should have covered this could not.** The existing test
 compares every mask against a full pass after a run, so it proves the masks
@@ -8468,14 +8468,14 @@ in the consumption file failed by accident.
 
 **The stage table names a pass, and a pass is not a cause.** This is the second
 time in one night that the cost of a named stage sat somewhere the name did not
-point.[^F305B] Divide a stage before optimising it, and divide it by counting
+point.[^F307B] Divide a stage before optimising it, and divide it by counting
 rather than by reading.
 
 **A test that compares two states cannot see a transition.** The mask agreed
 with the tiles at every moment the fixture reached, and the defect lives in the
 moment the fixture never reached. The replacement asserts that at least one
 block lost a faction during the run, so it cannot pass by never reaching the
-case it exists for.[^F305C]
+case it exists for.[^F307C]
 
 **Ask what a running count cannot see, then check whether it still cannot.**
 The comment beside the reread said that no running count can see a block lose
@@ -8483,12 +8483,12 @@ its last tile of a faction. That is true of a count of tiles in a block, and
 false of a count of tiles for each faction in a block. The sentence was correct
 about the count it described and it stopped anyone reaching for a different one.
 
-### FND-306 — The held tile list does not saturate, so the move that fixed the tile value field does not transfer to it
+### FND-308 — The held tile list does not saturate, so the move that fixed the tile value field does not transfer to it
 
 **Believed.** The held tile list is rebuilt whole on every frame, which is the
 shape that made the tile value field expensive, so the same repair applies. The
 tile value field saturated and its sparse form became a dense array with an
-index column attached.[^F305B]
+index column attached.[^F307B]
 
 **True.** The held list converges to about 10.0 million entries, which is 59.7
 percent of the tiles, and it is flat by frame 60. It has a ceiling below the
@@ -8512,7 +8512,7 @@ the same shape, the same rebuild and the same cost curve at first sight. They
 differ in whether an entry can leave, and that decides whether the repair
 applies. The record for the dense field says in its own text that it governs one
 field and is not a licence to convert others, and this is the first case that
-tested the refusal.[^F306B]
+tested the refusal.[^F308B]
 
 **Sixty percent is not sparse, and it is not saturated either.** The list is
 still 40 megabytes and it still drives the largest stage in the engine. The
@@ -8840,7 +8840,7 @@ ceiling is what makes that visible.
 [^F304A]: Findings register, FND-299 and FND-295, in this document.
 [^F301A]: ADR-0071, the bridge rebuild orders on one thread, decision D2. `docs/adrs/accepted/adr-0071-the-bridge-rebuild-orders-on-one-thread.md`
 [^F302A]: Decisions register, DEC-111. `docs/DECISIONS.md`
-[^F305A]: Target platform costs, every stage of a frame after the block masks became counts. `docs/reference/graviton-costs.md`
-[^F305B]: Findings register, FND-292, in this document.
-[^F305C]: The holding suite of the core. `crates/cachette-core/tests/holding.rs`
-[^F306B]: ADR-0103, the tile value field stores a dense delta, never a sparse change list, decision D4. `docs/adrs/draft/adr-0103-the-tile-value-field-stores-a-dense-delta.md`
+[^F307A]: Target platform costs, every stage of a frame after the block masks became counts. `docs/reference/graviton-costs.md`
+[^F307B]: Findings register, FND-292, in this document.
+[^F307C]: The holding suite of the core. `crates/cachette-core/tests/holding.rs`
+[^F308B]: ADR-0103, the tile value field stores a dense delta, never a sparse change list, decision D4. `docs/adrs/draft/adr-0103-the-tile-value-field-stores-a-dense-delta.md`
