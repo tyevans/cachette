@@ -8454,8 +8454,19 @@ changes**, and the list is under half of it.
 The repair is now gone rather than smaller. The holding keeps a count of the
 tiles each faction holds in each block, so a mask gains a bit when a count
 leaves zero and loses one when a count reaches zero. A moved tile touches two
-counters. No block is read again. A measurement on the target platform found
-the apply 2.18 times cheaper and the frame 17.7 milliseconds cheaper.[^F307A]
+counters. No block is read again.
+
+**The figure this finding first carried was taken against a baseline that no
+longer existed.** It said the apply was 2.18 times cheaper and the frame 17.7
+milliseconds cheaper, and both were measured against the serial apply. Another
+branch had already made both repairs after a write take a thread count, so the
+reread was being divided among twelve threads rather than done once. A pair
+taken after the two branches merged, on one instance type and one extent, gives
+the apply 1.99 times cheaper and the frame 9.6 milliseconds cheaper.[^F307A]
+
+**The work removed did not change and the value of removing it halved.** The
+count says 11,634,688 holder reads either way. What changed is what those reads
+were costing when they were deleted.
 
 **The test that should have covered this could not.** The existing test
 compares every mask against a full pass after a run, so it proves the masks
