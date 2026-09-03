@@ -791,7 +791,7 @@ fn masks_by_a_full_pass(world: &World) -> Vec<FactionMask> {
 ///
 /// # References
 ///
-/// [^1]: Findings register, FND-301. `docs/FINDINGS.md`
+/// [^1]: Findings register, FND-305. `docs/FINDINGS.md`
 /// [^2]: Testing rules, section 2a. `.claude/rules/testing.md`
 #[test]
 fn a_block_mask_loses_a_faction_when_its_last_tile_there_goes() {

@@ -100,7 +100,7 @@ reaches the whole world will bring them back.[^11]
 [^6]: ADR-0053, a faction is a bit in a mask, and a relation is a plane, decision D4. `docs/adrs/accepted/adr-0053-a-faction-is-a-bit-in-a-mask-and-a-relation-is-a-plane.md`
 [^7]: ADR-0068, terrain is generated from the seed and is never stored as a map, decision D1. `docs/adrs/accepted/adr-0068-terrain-is-generated-from-the-seed-and-is-never-stored-as-a-map.md`
 [^8]: Decision Record Scope, section 1. `.claude/rules/adr-scope.md`
-[^9]: Findings register, FND-293. `docs/FINDINGS.md`
+[^9]: Findings register, FND-299. `docs/FINDINGS.md`
 [^10]: Findings register, FND-295. `docs/FINDINGS.md`
 [^11]: Findings register, FND-294. `docs/FINDINGS.md`
 [^12]: Target platform costs, every stage of a frame after the ground read moved last. `docs/reference/graviton-costs.md`

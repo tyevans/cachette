@@ -894,7 +894,110 @@ that is a derivation rather than a measurement.
 **The apply still takes no thread count**, and it is now 7.11 percent of the
 frame rather than 14.33.
 
+### These two tables measured two branches, and neither holds the other's change
 
+**Read the share columns of the two sections above with care.** They were taken
+on two branches at the same time, and neither branch held the other's change.
+The first measured a tree in which admission still searched its count tables.
+The second measured a tree in which the holding apply still repaired a block
+mask by rereading the block.
+
+**So neither supersedes the other, and neither describes the trunk.** Each
+absolute figure is sound for the tree it names, and each share is against a
+frame that held one change and not the other. A run after the merge of the two
+supersedes both, and it is the only table that describes what the engine now
+does.
+
+## Every stage of a frame after admission stopped searching
+
+**This section supersedes every stage table above it.** Read the ones above as
+history: each measured a tree that no longer exists, and each share is against a
+frame that no longer exists either.
+
+Backlog item 0298 removed two searches from admission. The passes that grant an
+intent read two count tables with a forward reader rather than a binary search
+for each segment, and the pass that reads how many units stand on a target walks
+the block rather than searching it.[^ITEM298] It also corrected the thread-count
+declaration of the three stages that wrap the bridge rebuild, which claimed a
+thread count that an accepted record refuses them.[^DECL298]
+
+| Machine C | Value |
+|---|---|
+| Instance type | `c7g.4xlarge` |
+| Region | `us-west-2` |
+| Processor | Graviton3. Implementer `0x41`, part `0xd40` |
+| Hardware threads | 16 |
+| Cache line | 64 bytes |
+| Kernel | `Linux 6.18.44-99.149.amzn2023.aarch64` |
+| Base commit before | `51b9a8f38e5360faf56e9a3fb9e3a86f63902f26` |
+| Base commit after | `ef8173b8f5fcf492a854d88d36c2509ffe5bc1f6` |
+| Crate features | `stage-cost` |
+| Date | 3 September 2026 |
+
+16,777,216 tiles, 1,000,000 units scattered, 12 threads, block edge 32. The
+kernel gave transparent huge pages on the `madvise` setting, which the engine
+never asks for, so read this table as the cost without huge pages. Every row is
+the mean of nine frames after two warm-up frames, from one run.
+
+### What the change bought
+
+| Stage | Before, ns | After, ns | Change |
+|---|---|---|---|
+| `admit` | 32,973,316 | 21,274,145 | 35.5 percent less |
+| **The frame, timed from outside** | **187,862,216** | **177,862,658** | **5.3 percent less** |
+
+**Every other stage is unchanged.** The largest movement outside admission is
+`log_join` at 2.1 percent, and the apparatus spreads by about 2.4 percent
+between two runs, so nothing else here moved.
+
+### The whole frame
+
+| Stage | ns for each frame | Share of the frame | Takes a thread count |
+|---|---|---|---|
+| `holding_spread` | 71,234,385 | 40.05 percent | yes |
+| — of which `holding_decide` | 34,180,009 | 19.22 percent | yes |
+| — of which `holding_apply` | 19,048,855 | 10.71 percent | yes |
+| — of which `holding_candidates` | 16,991,822 | 9.55 percent | yes |
+| `bridge_refresh_barrier` | 31,394,191 | 17.65 percent | **no** |
+| `admit` | 21,274,145 | 11.96 percent | yes |
+| `tile_scan` | 14,224,080 | 8.00 percent | yes |
+| `influence_solve` | 12,614,492 | 7.09 percent | yes |
+| `rebuild_level_1` | 6,686,010 | 3.76 percent | yes |
+| `stamp_holders` | 6,308,685 | 3.55 percent | **no** |
+| `log_join` | 5,616,442 | 3.16 percent | **no** |
+| `movement_intents` | 3,163,542 | 1.78 percent | yes |
+| `gather` | 2,012,960 | 1.13 percent | yes |
+| `build` | 1,530,988 | 0.86 percent | yes |
+| `place_granted` | 695,689 | 0.39 percent | **no** |
+| `choose` | 523,798 | 0.29 percent | yes |
+| `consume` | 168,741 | 0.09 percent | yes |
+| `promote` | 65,508 | 0.04 percent | yes |
+| `reap` | 30,281 | 0.02 percent | yes |
+| `apply_rates` | 694 | under 0.01 percent | yes |
+| `settle_positions` | 405 | under 0.01 percent | yes |
+| `bridge_refresh_after_reap` | 363 | under 0.01 percent | **no** |
+| `depletion_recover` | 270 | under 0.01 percent | **no** |
+| `bridge_refresh_opening` | 179 | under 0.01 percent | **no** |
+| **Every stage** | **177,545,854** | | |
+| **The frame, timed from outside** | **177,862,658** | | |
+
+**The frame is 1.78 times its budget of 100 milliseconds.**[^BUDG291] It was 8.3
+times that budget when the first of these tables was taken.
+
+**The bridge rebuild is the largest single stage that is not divided further, at
+17.65 percent.** It takes no thread count, and an accepted record is what gives
+it one thread rather than an oversight.[^ADR71298] Sixty-three percent of it is
+the ordering pass.[^DECL298]
+
+**Six stages take no thread count and together they are 24.4 percent of the
+frame.** The bridge rebuild is nearly three quarters of that. The rest is the
+holder stamp and the log join.
+
+**The residual is 316,804 nanoseconds, which is 0.18 percent of the frame.** It
+was about 12 milliseconds in three runs earlier in the day, and the register
+concluded then that it followed an allocation the candidate pass makes on every
+frame. That pass still makes it. The conclusion was wrong, and a finding
+corrects it.[^RESID298]
 ## Huge pages
 
 **The engine asks for no huge page.** This measurement changes the kernel
@@ -1397,7 +1500,11 @@ commit what changed. Do not edit a row to make a later run agree with it.
 
 [^DENSE1]: ADR-0103, the tile value field stores a dense delta, never a sparse change list. `docs/adrs/draft/adr-0103-the-tile-value-field-stores-a-dense-delta.md`
 [^DENSE2]: Findings register, FND-292. `docs/FINDINGS.md`
-[^DENSE5]: Findings register, FND-301. `docs/FINDINGS.md`
+[^DENSE5]: Findings register, FND-305. `docs/FINDINGS.md`
 [^DENSE4]: Findings register, FND-298. `docs/FINDINGS.md`
 [^ITEM297]: Backlog item 0297, take the rest of the holding spread. `docs/backlog/complete/0297-take-the-rest-of-the-holding-spread.md`
 [^DENOM297]: Findings register, FND-296. `docs/FINDINGS.md`
+[^ITEM298]: Backlog item 0298, walk the tables admission searches. `docs/backlog/complete/0298-walk-the-tables-admission-searches.md`
+[^DECL298]: Findings register, FND-301. `docs/FINDINGS.md`
+[^ADR71298]: ADR-0071, the bridge rebuild orders on one thread, decision D2. `docs/adrs/accepted/adr-0071-the-bridge-rebuild-orders-on-one-thread.md`
+[^RESID298]: Findings register, FND-303. `docs/FINDINGS.md`

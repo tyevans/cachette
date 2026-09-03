@@ -40,7 +40,7 @@
 
 use bytemuck::{Pod, Zeroable};
 
-use crate::bridge::{BlockLayout, BridgeError, UnitTileBridge};
+use crate::bridge::{BlockLayout, BridgeError, TileCursor, UnitTileBridge};
 /// Counts what the holding apply does on each frame.
 ///
 /// **The switch exists because the apply has three parts and the stage table
@@ -99,7 +99,7 @@ use crate::slots::Slots;
 use crate::soldier::SoldierArena;
 use crate::stage::{self, Stage};
 use crate::terrain::{Terrain, TileKind};
-use crate::types::{Entity, FactionId, TileIdx, FACTION_CEILING};
+use crate::types::{FactionId, TileIdx, FACTION_CEILING};
 
 /// The number of bits in a faction mask.
 ///
@@ -335,7 +335,7 @@ pub struct Holding {
     ///
     /// # References
     ///
-    /// [^1]: Findings register, FND-301. `docs/FINDINGS.md`
+    /// [^1]: Findings register, FND-305. `docs/FINDINGS.md`
     block_census: Vec<u32>,
 }
 
@@ -522,7 +522,7 @@ impl Holding {
             for (chunk, slot) in candidates.chunks(chunk_len).zip(slots.entries_mut()) {
                 handles.push(scope.spawn(move || {
                     let mut changes = Vec::new();
-                    let mut scratch = Scratch::new(layout.block_count() as usize);
+                    let mut scratch = Scratch::new(bridge);
                     for tile in chunk {
                         if let Some(holder) =
                             decide(layout, terrain, holders, arena, bridge, &mut scratch, *tile)
@@ -710,7 +710,7 @@ impl Holding {
     ///
     /// # References
     ///
-    /// [^1]: Findings register, FND-301. `docs/FINDINGS.md`
+    /// [^1]: Findings register, FND-305. `docs/FINDINGS.md`
     /// [^2]: ADR-0009, parallel stages write disjoint outputs, decisions D1, D2 and D3. `docs/adrs/accepted/adr-0009-parallel-stages-write-disjoint-outputs.md`
     fn apply(&mut self, changes: &[(TileIdx, Holder)], threads: usize) {
         let threads = threads.max(1);
@@ -754,7 +754,7 @@ impl Holding {
         // saw that as each tile moved. Rereading a block cost every tile of
         // it, and a frame at the target scale dirties most blocks.[^1]
         //
-        // [^1]: Findings register, FND-301. `docs/FINDINGS.md`
+        // [^1]: Findings register, FND-305. `docs/FINDINGS.md`
         #[cfg(feature = "census-holding")]
         census::record(moved_count, 0, self.held.len() as u64);
     }
@@ -1017,18 +1017,22 @@ struct Scratch {
     tally: [u32; MASK_BITS as usize],
     supporters: Vec<u16>,
     /// How far the walk has reached inside each block of the derived unit
-    /// structure. One entry for each block of the world.
-    cursors: Vec<u32>,
+    /// structure.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0018, the unit-to-tile bridge is derived, and it rebuilds at the barrier, decision D2. `docs/adrs/accepted/adr-0018-the-unit-to-tile-bridge-is-derived-and-rebuilds-at-the-barrier.md`
+    cursor: TileCursor,
 }
 
 impl Scratch {
     /// Builds working memory in which no faction has support and no block has
     /// been walked.
-    fn new(blocks: usize) -> Self {
+    fn new(bridge: &UnitTileBridge) -> Self {
         Self {
             tally: [0; MASK_BITS as usize],
             supporters: Vec::with_capacity(MASK_BITS as usize),
-            cursors: vec![0; blocks],
+            cursor: bridge.tile_cursor(),
         }
     }
 
@@ -1092,7 +1096,7 @@ fn decide(
             scratch.raise(faction, 1);
         }
     }
-    for unit in units_on_tile(layout, bridge, &mut scratch.cursors, tile) {
+    for unit in bridge.units_on_tile(&mut scratch.cursor, tile) {
         if let Some(faction) = arena.faction(*unit) {
             scratch.raise(faction, PRESENCE_SUPPORT);
         }
@@ -1143,7 +1147,7 @@ fn decide(
     // is the one most likely to reach it. A challenger that the threshold
     // refuses is refused for every weaker challenger too.
     //
-    // [^1]: Findings register, FND-293. `docs/FINDINGS.md`
+    // [^1]: Findings register, FND-299. `docs/FINDINGS.md`
     let threshold = claim_threshold(terrain.kind(address)?)?;
     if support < threshold {
         // The ground either admits no holder at all, or asks for more support
@@ -1153,57 +1157,6 @@ fn decide(
     }
 
     Some(Holder::of(FactionId(faction)))
-}
-
-/// Returns the units that stand on one tile, by walking the block rather than
-/// searching it.
-///
-/// **The caller must ask for the tiles of a block in ascending tile order.**
-/// The low part of a bridge key is the row-major offset of the tile inside its
-/// block, so ascending tile order gives ascending keys inside every block.[^1]
-/// The cursor of a block therefore only ever moves forward, and the whole walk
-/// over a candidate list costs the list plus the units, rather than a search
-/// for each candidate.
-///
-/// The cursor is left at the first entry of the answer and not after it, so
-/// asking twice for one tile gives the same answer twice.
-///
-/// The caller establishes that the structure describes the arena before it
-/// starts to walk, and holds the borrow of the arena for the whole walk.[^2]
-///
-/// # References
-///
-/// [^1]: ADR-0018, the unit-to-tile bridge is derived, and it rebuilds at the barrier, decision D2. `docs/adrs/accepted/adr-0018-the-unit-to-tile-bridge-is-derived-and-rebuilds-at-the-barrier.md`
-/// [^2]: Findings register, FND-295. `docs/FINDINGS.md`
-fn units_on_tile<'a>(
-    layout: BlockLayout,
-    bridge: &'a UnitTileBridge,
-    cursors: &mut [u32],
-    tile: TileIdx,
-) -> &'a [Entity] {
-    let Some(key) = layout.key_of(tile) else {
-        return &[];
-    };
-    let block = layout.block_of_key(key) as usize;
-    let (keys, units) = bridge.block_window(block as u32);
-    if keys.is_empty() {
-        return &[];
-    }
-    let mut at = cursors.get(block).map_or(0, |cursor| *cursor as usize);
-    if at > keys.len() {
-        at = 0;
-    }
-    while at < keys.len() && keys[at] < key {
-        at += 1;
-    }
-    let first = at;
-    while at < keys.len() && keys[at] == key {
-        at += 1;
-    }
-    if let Some(cursor) = cursors.get_mut(block) {
-        *cursor = first as u32;
-    }
-    &units[first..at]
 }
 
 #[cfg(test)]
@@ -1241,71 +1194,6 @@ mod tests {
                 "the two derivations disagree at tile {tile}"
             );
         }
-    }
-
-    /// The cursor walk is a second way to answer what the derived unit
-    /// structure already answers by searching. This drives both over every
-    /// tile of a small world, in the ascending order the walk requires, and
-    /// compares them tile by tile.[^1]
-    ///
-    /// The world puts more than one unit on one tile, puts two units of one
-    /// block on different tiles, and leaves whole blocks empty, so the walk
-    /// meets a run of length two, a forward step inside a block, and a block
-    /// it must skip.
-    ///
-    /// # References
-    ///
-    /// [^1]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`
-    #[test]
-    fn the_cursor_walk_agrees_with_the_search() {
-        use crate::hex::Axial;
-        let grid = Grid::new(16, 16).expect("a small extent describes a grid");
-        let mut arena = SoldierArena::new(grid, 64);
-        for address in [
-            Axial::new(1, 1),
-            Axial::new(1, 1),
-            Axial::new(2, 1),
-            Axial::new(3, 2),
-            Axial::new(15, 15),
-            Axial::new(9, 4),
-            Axial::new(0, 0),
-        ] {
-            arena
-                .spawn(address, FactionId(0))
-                .expect("the spawn must succeed");
-        }
-        let layout = BlockLayout::new(grid, 2).expect("the exponent is inside the ceiling");
-        let mut bridge = UnitTileBridge::new(layout);
-        bridge.rebuild(&arena).expect("the rebuild must succeed");
-
-        let mut cursors = vec![0u32; layout.block_count() as usize];
-        for index in 0..grid.tile_count() {
-            let tile = TileIdx(index);
-            let address = grid
-                .address_of(tile)
-                .expect("the index is inside the world");
-            let searched = bridge
-                .on_tile(&arena, address)
-                .expect("the bridge describes the arena");
-            let walked = units_on_tile(layout, &bridge, &mut cursors, tile);
-            assert_eq!(walked, searched, "the two answers disagree at tile {index}");
-            // The cursor stays on the answer, so a second ask repeats it.
-            let again = units_on_tile(layout, &bridge, &mut cursors, tile);
-            assert_eq!(again, searched, "the second ask differs at tile {index}");
-        }
-        assert!(
-            (0..grid.tile_count()).any(|index| {
-                units_on_tile(
-                    layout,
-                    &bridge,
-                    &mut vec![0; layout.block_count() as usize],
-                    TileIdx(index),
-                )
-                .len()
-                    > 1
-            }),
-            "the fixture must hold a tile with more than one unit"
-        );
     }
 
     /// A bit plane holds a set, and the scan reads it back in ascending
