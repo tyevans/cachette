@@ -621,7 +621,7 @@ impl Holding {
     ///
     /// # References
     ///
-    /// [^1]: Findings register, FND-288. `docs/FINDINGS.md`
+    /// [^1]: Findings register, FND-294. `docs/FINDINGS.md`
     fn apply(&mut self, changes: &[(TileIdx, Holder)], threads: usize) {
         let threads = threads.max(1);
         let mut dirty: Vec<u32> = Vec::with_capacity(changes.len());
@@ -1064,7 +1064,7 @@ fn decide(
     // is the one most likely to reach it. A challenger that the threshold
     // refuses is refused for every weaker challenger too.
     //
-    // [^1]: Findings register, FND-287. `docs/FINDINGS.md`
+    // [^1]: Findings register, FND-293. `docs/FINDINGS.md`
     let threshold = claim_threshold(terrain.kind(address)?)?;
     if support < threshold {
         // The ground either admits no holder at all, or asks for more support
@@ -1095,7 +1095,7 @@ fn decide(
 /// # References
 ///
 /// [^1]: ADR-0018, the unit-to-tile bridge is derived, and it rebuilds at the barrier, decision D2. `docs/adrs/accepted/adr-0018-the-unit-to-tile-bridge-is-derived-and-rebuilds-at-the-barrier.md`
-/// [^2]: Findings register, FND-289. `docs/FINDINGS.md`
+/// [^2]: Findings register, FND-295. `docs/FINDINGS.md`
 fn units_on_tile<'a>(
     layout: BlockLayout,
     bridge: &'a UnitTileBridge,
