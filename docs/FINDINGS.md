@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-324**
+**Next number: FND-327**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -32,7 +32,7 @@ the case.[^ALLOC2]
 
 ## A. Corrections to stated rules
 
-### FND-322 — The demonstration drew and stepped at one rate, and a record said so as if it were a property of the viewer
+### FND-325 — The demonstration drew and stepped at one rate, and a record said so as if it were a property of the viewer
 
 **Believed.** The viewer runs after the step, on the stepping thread, so the
 drawing rate and the tick rate are one number.[^F218B] The Python
@@ -602,7 +602,7 @@ this package is documented owns both.
 
 ## C. Defects found in specified rules
 
-### FND-321 — The panel cut one line kind of eight, and the other seven stayed inside it by luck
+### FND-324 — The panel cut one line kind of eight, and the other seven stayed inside it by luck
 
 **Believed.** The panel cuts a value that does not fit, so that text can never
 be written over the panel edge.[^F321A]
@@ -629,7 +629,7 @@ wrongly.
 given, in silence. The check that reports one now covers every line kind, and
 one note was rewritten rather than left to be cut.
 
-### FND-323 — Nothing in the engine could say how many units a faction had left
+### FND-326 — Nothing in the engine could say how many units a faction had left
 
 **Believed.** The panel reports the units of each faction, so a watcher sees
 how the factions stand.

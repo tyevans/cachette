@@ -23,7 +23,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^ALLOC]
 
-**Next number: DEC-114**
+**Next number: DEC-116**
 
 ## Open
 
@@ -1327,7 +1327,7 @@ concluded, and it called that argument its weakest.
 
 ## Closed
 
-### DEC-113 — Where does the panel layout standard live, and what is one panel?
+### DEC-115 — Where does the panel layout standard live, and what is one panel?
 
 **Closed. The standard lives in the viewer crate, in Rust, and one panel is one
 file. The engineer who built the deck closed it.**

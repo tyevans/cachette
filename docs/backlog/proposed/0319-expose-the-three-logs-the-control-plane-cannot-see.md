@@ -1,5 +1,5 @@
 ---
-id: 0310
+id: 0319
 title: Expose the three logs the control plane cannot see
 status: proposed
 created: 2026-09-03

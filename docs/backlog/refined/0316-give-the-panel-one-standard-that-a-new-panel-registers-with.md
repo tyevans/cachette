@@ -1,5 +1,5 @@
 ---
-id: 0307
+id: 0316
 title: Give the panel one standard that a new panel registers with
 status: refined
 created: 2026-09-03

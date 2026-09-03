@@ -28,7 +28,7 @@ Decisions register, the window library of the Python demonstration.
 ADR-0067, the viewer reads the world and never writes to it, decision D4.
 ``docs/adrs/accepted/adr-0067-the-viewer-reads-the-world-and-never-writes-to-it.md``
 
-Findings register, FND-322. ``docs/FINDINGS.md``
+Findings register, FND-325. ``docs/FINDINGS.md``
 """
 
 from __future__ import annotations

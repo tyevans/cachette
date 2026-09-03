@@ -1,5 +1,5 @@
 ---
-id: 0309
+id: 0318
 title: Show the characters, the statistics, the events and a tile in panels
 status: refined
 created: 2026-09-03
@@ -41,7 +41,7 @@ point at a tile.
   pass writes.
 - A panel states the tile the watcher pointed at, its ground, its stock, its
   holder and the units on it.
-- Each panel is one file and registers with the standard of item 0307.
+- Each panel is one file and registers with the standard of item 0316.
 - Each panel has a test that renders it and asserts on the lines it holds.
 
 ## Impact review

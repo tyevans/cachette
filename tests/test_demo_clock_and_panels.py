@@ -9,7 +9,7 @@ and reads a count the engine gave it.
 
 References
 ----------
-Findings register, FND-322. ``docs/FINDINGS.md``
+Findings register, FND-325. ``docs/FINDINGS.md``
 
 ADR-0040, Python is a control plane, not a data plane, decision D1.
 ``docs/adrs/draft/adr-0040-python-is-a-control-plane-not-a-data-plane.md``

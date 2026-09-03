@@ -100,4 +100,4 @@ A finding records what the panel believed about its own cut.[^3]
 
 [^1]: Recurring Defect Shapes, shape 1. `.claude/rules/recurring-defects.md`
 [^2]: ADR-0070, the head-up display reports what the drawing pass read, decision D1. `docs/adrs/accepted/adr-0070-the-head-up-display-reports-what-the-drawing-pass-read.md`
-[^3]: Findings register, FND-321. `docs/FINDINGS.md`
+[^3]: Findings register, FND-324. `docs/FINDINGS.md`
