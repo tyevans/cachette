@@ -108,6 +108,19 @@ architecture that runs it.[^5] The script reads the value from the table
 above. The figure has one home, so a change to the budget is a change to this
 file and to nothing else.
 
+### How to find the gate that grew
+
+A whole-suite figure says that a gate grew. It does not say which one. A
+second harness times each recipe of the suite separately and reports each
+against the whole.[^12] It reads the recipes from the gate definitions rather
+than restating them, so it cannot disagree with the suite. It reads the budget
+from the table above through the same reader the cost report uses.
+
+Run the harness on a machine with no other work on it. It prints the load
+average before and after the run, and it counts the crate builds it saw, so a
+reader can throw away a contended figure and can tell a cold run from a warm
+one.
+
 The report never fails the build. A wall clock figure on a loaded machine is
 not a gate, and a timing assertion trains a reader to ignore a red
 pipeline.[^7]
@@ -119,6 +132,7 @@ Run the whole suite and the single test on the machine you name in the row.
 ```
 just check
 cargo test --package cachette-core --test golden_state_hash
+./scripts/gate-times.sh
 ```
 
 State the machine, the architecture, the build profile and the date beside any
@@ -162,3 +176,4 @@ command, and the date. Cite the source in a footnote.
 [^9]: ADR-0083, the gate build checks every integer overflow. `docs/adrs/draft/adr-0083-the-gate-build-checks-every-integer-overflow.md`
 [^10]: Findings register, FND-142. `docs/FINDINGS.md`
 [^11]: Target platform costs, the measurement register. `docs/reference/graviton-costs.md`
+[^12]: The per-recipe timing harness. `scripts/gate-times.sh`
