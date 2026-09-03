@@ -185,9 +185,10 @@ and a second body of work, and an item holds it.[^8] A reader who hits the
 refusal should find that item, not a dead end.
 
 **A frame is not free, and this record does not make it cheaper.** The cost of
-one frame follows the tiles the camera covers. That cost is a defect the
-register already holds, with its own item.[^9] Moving the boundary does not
-touch it, and a reader of this record must not take the move as a repair.
+one frame follows the tiles the camera covers. A separate item halved that
+cost, by giving the drawing a reader that takes the ground the drawing already
+holds.[^9] Moving the boundary neither made that repair nor depends on it, and
+a reader of this record must not take the move as a repair.
 
 ## Alternatives rejected
 
@@ -225,4 +226,4 @@ later without a second migration, so the order is deliberate.
 [^6]: ADR-0022, level 0 is the only truth and every level above it is derived, decision D4. `docs/adrs/accepted/adr-0022-level-0-is-the-only-truth-and-every-level-above-it-is-derived.md`
 [^7]: ADR-0022, level 0 is the only truth and every level above it is derived, decision D2. `docs/adrs/accepted/adr-0022-level-0-is-the-only-truth-and-every-level-above-it-is-derived.md`
 [^8]: Backlog item 0239, draw a world too small for its tiles from level 1. `docs/backlog/proposed/0239-draw-a-world-too-small-for-its-tiles-from-level-1.md`
-[^9]: Backlog item 0210, generate the ground of a drawn tile once. `docs/backlog/proposed/0210-generate-the-ground-of-a-drawn-tile-once.md`
+[^9]: Backlog item 0210, generate the ground of a drawn tile once. `docs/backlog/complete/0210-generate-the-ground-of-a-drawn-tile-once.md`

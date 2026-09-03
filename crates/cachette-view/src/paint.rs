@@ -399,6 +399,7 @@ pub struct Canvas {
     painted_by_faction: [u32; COLOURED_FACTIONS],
     painted_by_kind: [u32; KIND_COUNT],
     holder_reads: u32,
+    ground_reads: u32,
     tiles_held: u32,
     crowd_worst: u32,
     tiles_at_capacity: u32,
@@ -429,6 +430,7 @@ impl Canvas {
             painted_by_faction: [0; COLOURED_FACTIONS],
             painted_by_kind: [0; KIND_COUNT],
             holder_reads: 0,
+            ground_reads: 0,
             tiles_held: 0,
             crowd_worst: 0,
             tiles_at_capacity: 0,
@@ -472,6 +474,31 @@ impl Canvas {
     #[must_use]
     pub const fn holder_reads(&self) -> u32 {
         self.holder_reads
+    }
+
+    /// Returns the number of times the last draw generated a ground.
+    ///
+    /// The ground of a tile is generated from the seed and the address, and
+    /// the engine holds no map of it.[^1] The generation is the largest part
+    /// of what a drawing costs, so the count of generations is the number
+    /// that says whether a change to this layer worked.
+    ///
+    /// The counter stands at the one site in the drawing that generates a
+    /// ground. A test reads it against the count of painted tiles, because a
+    /// drawing that generated the ground of each tile twice would paint the
+    /// same picture.[^2]
+    ///
+    /// **The counter counts the calls this layer makes, not the generations
+    /// the engine runs.** A reader below this layer that generated a ground
+    /// of its own would not appear here.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0068, terrain is generated from the seed and is never stored as a map, decision D1. `docs/adrs/accepted/adr-0068-terrain-is-generated-from-the-seed-and-is-never-stored-as-a-map.md`
+    /// [^2]: ADR-0070, the head-up display reports what the drawing pass read, decision D1. `docs/adrs/accepted/adr-0070-the-head-up-display-reports-what-the-drawing-pass-read.md`
+    #[must_use]
+    pub const fn ground_reads(&self) -> u32 {
+        self.ground_reads
     }
 
     /// Returns the number of painted tiles that a faction holds.
@@ -738,6 +765,7 @@ impl Canvas {
         self.painted_by_faction = [0; COLOURED_FACTIONS];
         self.painted_by_kind = [0; KIND_COUNT];
         self.holder_reads = 0;
+        self.ground_reads = 0;
         self.tiles_held = 0;
         self.crowd_worst = 0;
         self.tiles_at_capacity = 0;
@@ -1222,6 +1250,7 @@ pub fn kind_colour(kind: TileKind) -> u32 {
 /// [^3]: ADR-0070, the head-up display reports what the drawing pass read, decision D1. `docs/adrs/accepted/adr-0070-the-head-up-display-reports-what-the-drawing-pass-read.md`
 /// [^4]: ADR-0053, a faction is a bit in a mask, and a relation is a plane, decision D2. `docs/adrs/accepted/adr-0053-a-faction-is-a-bit-in-a-mask-and-a-relation-is-a-plane.md`
 /// [^5]: ADR-0072, a tile stock is generated, and only what was taken is stored, decision D4. `docs/adrs/accepted/adr-0072-a-tile-stock-is-generated-and-only-what-was-taken-is-stored.md`
+/// [^6]: ADR-0072, a tile stock is generated, and only what was taken is stored, decision D1. `docs/adrs/accepted/adr-0072-a-tile-stock-is-generated-and-only-what-was-taken-is-stored.md`
 pub fn draw(world: &World, camera: Camera, canvas: &mut Canvas) -> Result<(), BridgeError> {
     canvas.clear();
     let grid = world.grid();
@@ -1239,15 +1268,25 @@ pub fn draw(world: &World, camera: Camera, canvas: &mut Canvas) -> Result<(), Br
             if grid.index_of(address).is_none() {
                 continue;
             }
+            // The ground of the tile. This is the one generation of the
+            // ground that the drawing of a tile pays for, and the counter
+            // stands at the site that pays it.[^3]
+            let Some(ground) = terrain.tile(address) else {
+                continue;
+            };
+            canvas.ground_reads += 1;
+
             // The stock of a tile is the stock the ground generated, less
             // what somebody took from it. The engine stores the second term
             // only, so the viewer asks for the tiles the window covers and
-            // for no other, and a tile nobody touched costs a generation and
-            // a search that finds nothing.[^5]
-            let Some(food) = world.tile_stock(address, ResourceKind::Food) else {
-                continue;
-            };
-            let Some(ground) = terrain.tile(address) else {
+            // for no other, and a tile nobody touched costs a search that
+            // finds nothing.[^5]
+            //
+            // The reader takes the ground read above. The reader that starts
+            // from the address alone would generate the ground a second time,
+            // and the two answers would be the same answer.[^6]
+            let Some(food) = world.tile_stock_of_ground(address, ground.kind, ResourceKind::Food)
+            else {
                 continue;
             };
             let ground_colour = tile_colour(ground.kind, ground.height.0, food.0);

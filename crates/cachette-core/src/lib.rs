@@ -37,6 +37,7 @@ pub mod site;
 pub mod slots;
 pub mod soldier;
 pub mod sort;
+mod stock;
 pub mod terrain;
 pub mod tier;
 pub mod tile_value;
