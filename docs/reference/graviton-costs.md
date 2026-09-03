@@ -1037,6 +1037,42 @@ those reads cost at the moment they were deleted.[^DENSE5]
 **The frame is 1.67 times the hundred millisecond budget.**
 
 
+## The decide pass against the sort it no longer runs
+
+**This is a measured refusal rather than a stage table.** The decide pass is the
+largest stage in the engine. A counting switch found it sorting the supporters
+of every candidate tile, about five million on each frame, while three quarters
+of those lists held one entry or none.[^DECIDE309] The sort was removed by
+stating the tie-break in the comparison instead. **It bought no time.**
+
+Machine G. 16,777,216 tiles, 1,000,000 units scattered, 12 threads, block edge
+32, `c7g.4xlarge` in `us-west-2`, `stage-cost`, 3 September 2026. Nine frames
+after two warm-up frames. Four runs, two trees.
+
+| Run | Tree | `holding_decide`, ns for each frame |
+|---|---|---|
+| 1 | with the sort | 34,174,920 |
+| 2 | with the sort | 34,134,468 |
+| 3 | without the sort | 34,128,759 |
+| 4 | without the sort | 34,054,721 |
+
+**The whole spread is 120,199 nanoseconds on 34 milliseconds, and the change
+sits inside it.** Removing five million sorts on each frame is not measurable
+here.
+
+**One run of the four carried an unrelated spike and it was chased rather than
+averaged away.** Run 3 gave `bridge_refresh_barrier` 39,742,813 against
+30,846,661 in run 2 and 30,695,188 in run 4, and its frame was 178,921,173
+against 167,142,223 and 168,352,493. Nothing in the change can reach the bridge
+refresh. A repeat on the same tree brought both back into line, so the spike is
+the instance and not the tree.
+
+**What this says about the stage.** Its cost is not the sort. Every candidate
+pays for six neighbour reads and a walk of the units on its tile, and about a
+quarter of them produce a change. The reading of the other three quarters is
+where the stage goes, and no change here touched it.
+
+
 ## Huge pages
 
 **The engine asks for no huge page.** This measurement changes the kernel
@@ -1547,3 +1583,5 @@ commit what changed. Do not edit a row to make a later run agree with it.
 [^DECL298]: Findings register, FND-301. `docs/FINDINGS.md`
 [^ADR71298]: ADR-0071, the bridge rebuild orders on one thread, decision D2. `docs/adrs/accepted/adr-0071-the-bridge-rebuild-orders-on-one-thread.md`
 [^RESID298]: Findings register, FND-303. `docs/FINDINGS.md`
+
+[^DECIDE309]: Findings register, FND-309. `docs/FINDINGS.md`

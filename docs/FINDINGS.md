@@ -8529,7 +8529,7 @@ tested the refusal.[^F308B]
 still 40 megabytes and it still drives the largest stage in the engine. The
 answer here is neither the dense array nor leaving it alone, and naming the
 ceiling is what makes that visible.
-### FND-309 — The decide pass sorted five million lists on each frame, and three quarters of them held one entry or none
+### FND-309 — The decide pass sorted five million lists on each frame, three quarters of them held one entry or none, and removing the sort bought nothing
 
 **Believed.** The decide pass is the largest stage in the engine and it already
 takes a thread count, so it may simply be that expensive. Nothing had divided
@@ -8568,11 +8568,25 @@ time.** The result used to depend on the sort putting the supporters in one
 order. It now depends on nothing but the set of supporters, so there is no
 order left for a defect to disturb.
 
-**The counting says what the pass does and not where its time goes.** A
-quarter of the candidates do the work and all of them pay for the read of six
-neighbours and a walk of the units on the tile. Whether the sort was a large
-share of the stage is a question for a measurement, and this finding does not
-answer it.
+**The counting says what the pass does and not where its time goes, and the
+measurement then said the sort was not the cost.** Four runs on the target
+platform give the stage at 34,174,920, 34,134,468, 34,128,759 and 34,054,721
+nanoseconds. The first two are the tree with the sort and the last two are the
+tree without it. **The whole spread is 120 microseconds on 34 milliseconds, and
+the change sits inside it.** Removing five million sorts on each frame bought
+no time that this apparatus can see.
+
+So the stage costs what it costs for the other reason: every candidate pays for
+six neighbour reads and a walk of the units on its tile, and only a quarter of
+them produce anything. A quarter of five million is still more than a million
+tiles that change hands, so the work is not obviously wasted; it is the reading
+of the other three quarters that is.
+
+**The sort removal is kept anyway, and not for the time.** It removes work that
+provably does nothing, and it makes the result depend on the set of supporters
+rather than on an ordering of them. A change that buys no time and removes an
+ordering is still worth making, and saying that it bought no time is the
+honest way to keep it.
 
 ## References
 
