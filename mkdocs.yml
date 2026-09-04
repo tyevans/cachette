@@ -27,13 +27,11 @@ theme:
     - navigation.top
     - toc.follow
 
-markdown_extensions:
-  # The documentation rule puts every reference in a footnote, and the Rust doc
-  # comments follow it. The reference page renders those footnotes.
-  - footnotes
-  - admonition
-  - toc:
-      permalink: true
+# No `markdown_extensions` key on purpose. When the key is absent, the builder
+# applies its default extension list. That list holds the footnote extension
+# and the code fence extension. Setting the key with a partial list replaces
+# the default list, drops the code fence extension, and renders fenced code
+# blocks as inline code.
 
 # The site holds the four quadrants of the Diataxis framework. The reference is
 # the only one that a build derives, so it is the only one here. Three items
