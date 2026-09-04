@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-382**
+**Next number: FND-394**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -1294,6 +1294,93 @@ ten keys before this change, and none of them named an upgrade.
 The report of one tile now carries the kind, the work done and whether the work
 is finished. Binding a write verb is not finished when the write lands: the
 work is finished when a caller can read the result back.
+### FND-390 — A fight resolved at the level 1 cell smears, and a fight resolved at the tile does not
+
+**Believed.** Nobody knew. Two factions had never been run into contact in this
+engine, and a blocker held the gap.[^F390A]
+
+**True.** The band that holds the middle 90 percent of the casualties is 1 tile
+wide at the tile, in every arrangement measured. It runs from 1 to 30 tiles wide
+at the level 1 cell, against a block edge of 32 tiles. The furthest casualty of a
+cell resolution stood 36 tiles from the nearest enemy, which is further than the
+block edge because the block diagonal is longer than its side. Between 67 and 72
+percent of the casualties of a cell resolution stood on a tile that held no
+enemy at all.
+
+**Evidence.** A harness runs four arrangements of two armies in a world of
+128 by 96 tiles, resolves 24 frames at each granularity, and reports the
+band.[^F390B] It ran on an x86-64 development machine. The figures are a shape
+and not a cost, so the target platform would report the same numbers.
+
+**The casualty rule is a model and the geometry is the engine.** The engine
+holds no contest, so the harness supplies a provisional rule that removes up to
+one unit for each side of each contested resolution unit in each frame. The
+world, the terrain, the unit arena, the faction column, the unit-to-tile bridge
+and the block layout are the engine.
+
+**Follows.** Resolve a fight at the tile. The cell keeps the job the sketch gave
+it, which is deciding where an army goes.[^F390C] The measurement closes the
+blocker and settles the decision row that waited on it.[^F390D]
+
+### FND-391 — A thin fixture reports no smear, and it would have closed the blocker with the wrong answer
+
+**Believed.** One arrangement of two armies is enough to measure the band.
+
+**True.** It is not. The same rule, over the same world, reports a cell band of
+1 tile for two armies two tiles deep, and 30 tiles for one army that fills a
+level 1 cell against an enemy at one corner of it. An arrangement with nothing
+behind the front has nothing to smear, so it cannot show the defect that the
+blocker asked about.
+
+**Evidence.** The harness runs a two-tile arrangement beside three deeper
+ones.[^F390B] The two-tile arrangement reports a band of 1 tile and no casualty
+away from an enemy, at the granularity that every other arrangement smears at.
+
+**Follows.** This is a local instance of the shape the testing rule names: a
+fixture that models the typical case supplies no extreme.[^23] A measurement
+that decides between two designs states which arrangement it measured, and it
+measures the arrangement that would fail.
+
+### FND-392 — Ordinary ground holds eight units, so a full tile refuses the enemy that would fight it
+
+**Believed.** A design sketch resolves a fight for each tile as a table over
+unit types, without a stated bound on the table.
+
+**True.** The capacity of ordinary ground is 8 units, and the admission rule
+reads that capacity and not the faction. So a contest at one tile reads at most
+8 units in total across every faction and every type. A tile that already holds
+8 units of one faction offers no room, so no enemy can stand on it, and a rule
+that needs the two factions on one tile never fires against a packed army.
+
+**Evidence.** Read on 3 September 2026. `grep -n "ORDINARY_CAPACITY"
+crates/cachette-core/src/terrain.rs` reported `const ORDINARY_CAPACITY: u32 =
+8`, and the passability of a kind is that capacity above zero. A search of the
+admission pass for the word `faction` returned nothing.
+
+**Follows.** A per-tile table is small, which is the good half. The other half
+is a game rule that nobody has stated: whether a contest reads the tile alone,
+or the tile and its neighbours. A decision row holds it.[^F392A]
+
+### FND-393 — The threshold after the sum fails the acceptance test at eleven bowmen
+
+**Believed.** The order of the threshold and the sum matters. The research
+judged the sketch sound and stated the reasoning rather than a number.[^F393A]
+
+**True.** With an effect of 10 for each bowman and a threshold of 100 on the
+tank, the threshold applied before the sum gives zero at every count, including
+one million. The same numbers with the threshold applied after the sum give
+zero at four bowmen and a positive result at eleven. So the acceptance test
+survives one order and fails the other, and it fails at a count a player reaches
+in an ordinary game.
+
+**Evidence.** Two folds over integers, in a model.[^F390B] **This is a model
+and not the engine.** A unit carries no type and no strength, so the engine
+cannot express either side of the test.
+
+**Follows.** The order is the whole mechanism, and a record must state it as an
+order rather than as a threshold. The cliff that the order buys is stated with a
+number in the same harness: a crowd of 1000 whose effect is 99 against a
+threshold of 100 does nothing, and the same crowd at 101 does everything.
 
 ## D. Cost estimates that were wrong
 
@@ -10681,3 +10768,9 @@ itself rather than merely underspecified.
 [^F380A]: Project orientation, the open questions. `CLAUDE.md`
 [^F380C]: Backlog item 0370, refuse a build on ground another faction holds. `docs/backlog/proposed/0370-refuse-a-build-on-ground-another-faction-holds.md`
 [^F380D]: Decisions register, DEC-161. `docs/DECISIONS.md`
+[^F390A]: Blockers register, BLK-052. `docs/BLOCKERS.md`
+[^F390B]: The casualty band harness. `crates/cachette-core/tests/casualty_band.rs`
+[^F390C]: Research report 21, what a god needs from this engine, section 4.2. `docs/research/reports/21-what-a-god-needs.md`
+[^F390D]: Decisions register, DEC-144. `docs/DECISIONS.md`
+[^F392A]: Decisions register, DEC-170. `docs/DECISIONS.md`
+[^F393A]: Research report 21, what a god needs from this engine, section 4.1. `docs/research/reports/21-what-a-god-needs.md`

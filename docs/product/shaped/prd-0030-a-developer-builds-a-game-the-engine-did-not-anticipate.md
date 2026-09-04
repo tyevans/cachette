@@ -144,9 +144,10 @@ runs.[^5] The whole bargain about loops is priced at one million units. A game
 that runs ten thousand pays a different price, and several conclusions about
 what is worth building change with it.
 
-**One blocker holds the fighting.** Nobody has run two sides into contact, so
-nobody knows whether a fight at this engine's granularity looks like a
-fight.[^6] It governs the fifth item on the list and nothing else.
+**The blocker that held the fighting is resolved.** Two sides have now been run
+into contact, and the band that holds the casualties is 1 tile wide at the tile
+and up to 30 tiles wide at the level 1 cell.[^6] A fight therefore resolves at
+the tile, and the fifth item on the list is no longer held.
 
 **One blocker holds a smaller question that touches building.** Whether a built
 thing changes hands when the ground under it does is unanswered.[^7] A
@@ -164,5 +165,5 @@ guessing.
 [^3]: Blockers register, BLK-007. `docs/BLOCKERS.md`
 [^4]: Blockers register, BLK-050. `docs/BLOCKERS.md`
 [^5]: Blockers register, BLK-051. `docs/BLOCKERS.md`
-[^6]: Blockers register, BLK-052. `docs/BLOCKERS.md`
+[^6]: Findings register, FND-390. `docs/FINDINGS.md`
 [^7]: Blockers register, BLK-036. `docs/BLOCKERS.md`

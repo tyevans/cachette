@@ -7,7 +7,7 @@ implements: []
 changes: []
 creates: []
 serves: [PRD-0030]
-blocked-by: [BLK-052]
+blocked-by: [BLK-080]
 ---
 
 ## Why
@@ -32,10 +32,18 @@ each unit is what this reuses the rule to avoid.
 ## What is missing before this can be refined
 
 - Item 0343 must land. Nothing here is expressible until a unit has a type.
-- Item 0344 must report. It decides whether the resolution sits at the tile or
-  at the cell.[^3]
-- Two choices must close: where the fight resolves, and whether the threshold is
-  hard.[^4] [^5]
+- One choice must close: whether the threshold is hard.[^5] The project owner
+  owns it.
+- **The granularity is settled.** A fight resolves at the tile. The band that
+  holds the middle 90 percent of the casualties is 1 tile wide at the tile and
+  up to 30 tiles wide at the level 1 cell, and about seven in ten of the
+  casualties of a cell resolution stand on a tile that holds no enemy.[^4]
+- **What a contest reads is open, and it is new.** Ordinary ground holds 8
+  units, and the admission rule reads the capacity and not the faction, so an
+  army packed to that capacity cannot be entered and a same-tile rule never
+  fires against it. A decision row holds it.[^3]
+- **Nothing has driven two factions onto one tile through the movement pass.**
+  The measurement placed them there directly. Item 0380 holds that gap.
 - The records the report names. The determinism half of this needs a written
   constraint, because a later contributor who wants a smoother fight will reach
   for a draw for each unit and nothing will refuse it.[^6]
@@ -47,8 +55,8 @@ each unit is what this reuses the rule to avoid.
 
 [^1]: Research report 21, what a god needs from this engine, section 4.1. `docs/research/reports/21-what-a-god-needs.md`
 [^2]: ADR-0106, a cohort serves whole rations to a keyed subset, decisions D1 and D2. `docs/adrs/draft/adr-0106-a-cohort-serves-whole-rations-to-a-keyed-subset.md`
-[^3]: Blockers register, BLK-052. `docs/BLOCKERS.md`
-[^4]: Decisions register, DEC-144. `docs/DECISIONS.md`
+[^3]: Decisions register, DEC-170. `docs/DECISIONS.md`
+[^4]: Findings register, FND-390. `docs/FINDINGS.md`
 [^5]: Decisions register, DEC-145. `docs/DECISIONS.md`
 [^6]: Research report 21, what a god needs from this engine, section 6.2. `docs/research/reports/21-what-a-god-needs.md`
 [^7]: Testing Rules, section 2. `.claude/rules/testing.md`
