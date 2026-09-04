@@ -3,7 +3,7 @@ id: 0420
 title: Let two factions bind each other to a future delivery
 status: complete
 created: 2026-09-03
-implements: [ADR-0120 D1, ADR-0120 D2, ADR-0120 D3, ADR-0120 D4, ADR-0120 D5, ADR-0121 D1, ADR-0121 D2, ADR-0121 D3, ADR-0121 D4, ADR-0122 D1, ADR-0122 D2, ADR-0122 D3, ADR-0122 D4]
+implements: [ADR-0126 D1, ADR-0126 D2, ADR-0126 D3, ADR-0126 D4, ADR-0126 D5, ADR-0127 D1, ADR-0127 D2, ADR-0127 D3, ADR-0127 D4, ADR-0128 D1, ADR-0128 D2, ADR-0128 D3, ADR-0128 D4]
 changes: []
 creates: [ADR-0120, ADR-0121, ADR-0122]
 serves: [PRD-0034]

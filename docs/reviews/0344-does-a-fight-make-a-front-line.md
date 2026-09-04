@@ -266,5 +266,5 @@ of section 5.
 [^13]: Decisions register, DEC-145. `docs/DECISIONS.md`
 [^14]: Findings register, FND-392. `docs/FINDINGS.md`
 [^15]: Decisions register, DEC-170. `docs/DECISIONS.md`
-[^16]: Backlog item 0345, resolve a meeting between two factions. `docs/backlog/proposed/0345-resolve-a-meeting-between-two-factions.md`
+[^16]: Backlog item 0345, resolve a meeting between two factions. `docs/backlog/complete/0345-resolve-a-meeting-between-two-factions.md`
 [^17]: Decisions register, DEC-144. `docs/DECISIONS.md`

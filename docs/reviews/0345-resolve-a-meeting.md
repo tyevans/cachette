@@ -240,7 +240,7 @@ three extents, and it compares the fallen log byte for byte.
 |---|---|
 | Decisions | DEC-144 closed on the tile. DEC-145 closed on the hard threshold. DEC-180 opened, on whether the resolution runs on a schedule. |
 | Findings | FND-400, FND-401 and FND-402 opened. |
-| Blockers | None opened. BLK-052 stays open, and neither item waits on it any more. The allocation of BLK-090 and BLK-091 was not used, because this work found nothing that needs information the project does not have. |
+| Blockers | None opened. BLK-052 stays open, and neither item waits on it any more. The allocation of `BLK-090` and `BLK-091` was not used, because this work found nothing that needs information the project does not have. |
 | Registry | Four rows added, each at status `Draft`. Four rows added to the record priority index, each naming what a reviewer should test hardest. |
 
 **No cost figure was recorded.** The target platform register holds a table of

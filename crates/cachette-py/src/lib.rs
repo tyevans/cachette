@@ -15,9 +15,9 @@
 use cachette_core::census::{census, CensusError};
 use cachette_core::founding::FoundingOutcome;
 use cachette_core::hex::NEIGHBOURS;
-use cachette_core::upgrade::UpgradeKind;
-use cachette_core::unit_type::UnitTypeId;
 use cachette_core::luxury::{LuxuryId, LUXURY_CEILING};
+use cachette_core::unit_type::UnitTypeId;
+use cachette_core::upgrade::UpgradeKind;
 use cachette_core::TileIdx;
 use cachette_core::{
     Axial, CommodityId, Entity, FactionId, Fix32, Holder, ResourceKind, World as CoreWorld,
@@ -2571,6 +2571,41 @@ impl PyWorld {
     /// A faction with nobody in it gives two empty arrays, which is an answer
     /// and not an error. A number that names no faction of this world does
     /// the same, because no soldier holds it.
+    ///
+    /// # Errors
+    ///
+    /// Raises `ViewError` when the dictionary cannot be built.
+    ///
+    /// # References
+    ///
+    /// [^1]: Project orientation, the design principles. `CLAUDE.md`
+    /// [^2]: Research report 20, what the Python interface should be, section 2.3. `docs/research/reports/20-the-python-interface.md`
+    /// [^3]: ADR-0085, an entity crosses to Python as one opaque identity that the engine resolves, decision D3. `docs/adrs/accepted/adr-0085-an-entity-crosses-to-python-as-one-opaque-identity.md`
+    /// [^4]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
+    fn faction_units<'py>(
+        &self,
+        python: Python<'py>,
+        faction: u16,
+    ) -> PyResult<Bound<'py, PyDict>> {
+        let world = self.lock();
+        let soldiers = world.soldiers();
+        let mut unit: Vec<u64> = Vec::new();
+        let mut tile: Vec<u32> = Vec::new();
+        for entity in soldiers.iter_faction(FactionId(faction)) {
+            unit.push(entity.to_bits());
+            tile.push(
+                soldiers
+                    .tile(entity)
+                    .expect("a live identity from the walk names a tile")
+                    .0,
+            );
+        }
+        let columns = PyDict::new(python);
+        columns.set_item("unit", unit.to_pyarray(python))?;
+        columns.set_item("tile", tile.to_pyarray(python))?;
+        Ok(columns)
+    }
+
     /// Opens a trade negotiation from one faction toward another.
     ///
     /// A trade has two halves. This half is the conversation. The other half
@@ -2609,7 +2644,7 @@ impl PyWorld {
     ///
     /// # References
     ///
-    /// [^1]: ADR-0126, a trade negotiation is engine state and the words are not, decision D3. `docs/adrs/draft/adr-0126-a-trade-negotiation-is-engine-state.md`
+    /// [^1]: ADR-0120, a trade negotiation is engine state and the words are not, decision D3. `docs/adrs/draft/adr-0120-a-trade-negotiation-is-engine-state.md`
     #[allow(clippy::too_many_arguments)]
     fn offer_trade(
         &self,
@@ -2799,7 +2834,7 @@ impl PyWorld {
     ///
     /// # References
     ///
-    /// [^1]: ADR-0126, a trade negotiation is engine state and the words are not, decision D5. `docs/adrs/draft/adr-0126-a-trade-negotiation-is-engine-state.md`
+    /// [^1]: ADR-0120, a trade negotiation is engine state and the words are not, decision D5. `docs/adrs/draft/adr-0120-a-trade-negotiation-is-engine-state.md`
     fn trade_status<'py>(
         &self,
         python: Python<'py>,
@@ -2937,34 +2972,6 @@ impl PyWorld {
     ///
     /// # References
     ///
-    /// [^1]: Project orientation, the design principles. `CLAUDE.md`
-    /// [^2]: Research report 20, what the Python interface should be, section 2.3. `docs/research/reports/20-the-python-interface.md`
-    /// [^3]: ADR-0085, an entity crosses to Python as one opaque identity that the engine resolves, decision D3. `docs/adrs/accepted/adr-0085-an-entity-crosses-to-python-as-one-opaque-identity.md`
-    /// [^4]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
-    fn faction_units<'py>(
-        &self,
-        python: Python<'py>,
-        faction: u16,
-    ) -> PyResult<Bound<'py, PyDict>> {
-        let world = self.lock();
-        let soldiers = world.soldiers();
-        let mut unit: Vec<u64> = Vec::new();
-        let mut tile: Vec<u32> = Vec::new();
-        for entity in soldiers.iter_faction(FactionId(faction)) {
-            unit.push(entity.to_bits());
-            tile.push(
-                soldiers
-                    .tile(entity)
-                    .expect("a live identity from the walk names a tile")
-                    .0,
-            );
-        }
-        let columns = PyDict::new(python);
-        columns.set_item("unit", unit.to_pyarray(python))?;
-        columns.set_item("tile", tile.to_pyarray(python))?;
-        Ok(columns)
-    }
-
     /// [^1]: ADR-0006, an event is plain data and applying it is pure, decision D2. `docs/adrs/accepted/adr-0006-an-event-is-plain-data-and-applying-it-is-pure.md`
     /// [^2]: ADR-0044, what copies and what does not is declared at the call site. `docs/adrs/REGISTRY.md`
     fn trade_log_columns<'py>(&self, python: Python<'py>) -> PyResult<Bound<'py, PyDict>> {
@@ -3495,7 +3502,7 @@ impl PyWorld {
 ///
 /// # References
 ///
-/// [^1]: ADR-0127, a terminal refusal closes an ordered pair until a named tick, decision D3. `docs/adrs/draft/adr-0127-a-terminal-refusal-closes-a-pair-until-a-named-tick.md`
+/// [^1]: ADR-0121, a terminal refusal closes an ordered pair until a named tick, decision D3. `docs/adrs/draft/adr-0121-a-terminal-refusal-closes-a-pair-until-a-named-tick.md`
 fn trade_refusal(error: cachette_core::TradeError) -> PyErr {
     use cachette_core::TradeError as Refusal;
     let said = match error {
