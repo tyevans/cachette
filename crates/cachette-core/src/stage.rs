@@ -165,6 +165,7 @@ declare_stages! {
     HoldingDecide,            "holding_decide",             true,  1, true;
     HoldingApply,             "holding_apply",              true,  1, true;
     StampHolders,             "stamp_holders",              false, 1, false;
+    Contest,                  "contest",                    true,  1, false;
     ApplyRates,               "apply_rates",                true,  1, false;
     Consume,                  "consume",                    true,  1, false;
     Reap,                     "reap",                       true,  1, false;

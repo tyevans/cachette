@@ -31,6 +31,7 @@ use crate::hash::StateHash;
 use crate::hex::{Axial, Grid};
 use crate::resource::{Amount, CarryLoad, ResourceKind};
 use crate::types::{Entity, FactionId, Fix32, TileIdx, FACTION_CEILING};
+use crate::unit_type::{UnitTypeId, DEFAULT_UNIT_TYPE, UNIT_TYPE_COUNT};
 use crate::upgrade::UpgradeKind;
 
 /// The generation that means a slot carries no identity.
@@ -249,6 +250,20 @@ pub struct SoldierArena {
     tiles: Vec<TileIdx>,
     /// The faction of each slot.
     factions: Vec<FactionId>,
+    /// The type of each slot, as a row of the shared unit type table.
+    ///
+    /// **The column holds the index and never a copy of the row.** A copy
+    /// would be the table in a second place, and a world that changed the
+    /// table would then hold units that fought by the old one.[^1]
+    ///
+    /// The type is part of the unit shape, so it is a column of this arena
+    /// and not a side table keyed on the identity.[^2]
+    ///
+    /// # References
+    ///
+    /// [^1]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`
+    /// [^2]: ADR-0120, a unit carries a type, and the type is an index into a table the world is built with, decision D3. `docs/adrs/draft/adr-0120-a-unit-carries-a-type-that-indexes-a-table.md`
+    types: Vec<UnitTypeId>,
     /// What the soldier in each slot carries.
     ///
     /// The load is part of the soldier shape, so it is a column of this arena
@@ -452,6 +467,7 @@ impl Clone for SoldierArena {
             live: copy_column(&self.live, capacity),
             tiles: copy_column(&self.tiles, capacity),
             factions: copy_column(&self.factions, capacity),
+            types: copy_column(&self.types, capacity),
             carries: copy_column(&self.carries, capacity),
             orders: copy_column(&self.orders, capacity),
             builds: copy_column(&self.builds, capacity),
@@ -501,6 +517,7 @@ impl SoldierArena {
             live: Vec::with_capacity(slots),
             tiles: Vec::with_capacity(slots),
             factions: Vec::with_capacity(slots),
+            types: Vec::with_capacity(slots),
             carries: Vec::with_capacity(slots),
             orders: Vec::with_capacity(slots),
             builds: Vec::with_capacity(slots),
@@ -682,6 +699,7 @@ impl SoldierArena {
         //
         // [^3]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`
         debug_assert_eq!(self.carries[index], CarryLoad::EMPTY);
+        debug_assert_eq!(self.types[index], DEFAULT_UNIT_TYPE);
         debug_assert_eq!(self.orders[index], NO_ORDER);
         debug_assert_eq!(self.builds[index], NO_BUILD);
         // A unit arrives fed and out of deficit, and it belongs to no site
@@ -716,6 +734,7 @@ impl SoldierArena {
         self.live.push(0);
         self.tiles.push(TileIdx(0));
         self.factions.push(FactionId(0));
+        self.types.push(DEFAULT_UNIT_TYPE);
         self.carries.push(CarryLoad::EMPTY);
         self.orders.push(NO_ORDER);
         self.builds.push(NO_BUILD);
@@ -765,6 +784,10 @@ impl SoldierArena {
         //
         // [^3]: ADR-0072, a tile stock is generated, and only what was taken is stored, decision D5. `docs/adrs/accepted/adr-0072-a-tile-stock-is-generated-and-only-what-was-taken-is-stored.md`
         self.carries[index] = CarryLoad::EMPTY;
+        // The type goes with the unit. A stale type in a dead slot would
+        // reach the state hash and would give the next unit in the slot a
+        // type that no caller asked for.
+        self.types[index] = DEFAULT_UNIT_TYPE;
         self.orders[index] = NO_ORDER;
         self.builds[index] = NO_BUILD;
         self.needs[index] = Fix32::ZERO;
@@ -839,6 +862,43 @@ impl SoldierArena {
     pub fn faction(&self, entity: Entity) -> Option<FactionId> {
         let slot = self.slot_of(entity)?;
         Some(self.factions[slot as usize])
+    }
+
+    /// Returns the type of a soldier, or `None` when the identity is dead.
+    ///
+    /// The type is a row of the shared unit type table. This arena holds no
+    /// copy of that row, so a caller that wants the attack or the armour
+    /// reads the table with the value this returns.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0120, a unit carries a type, and the type is an index into a table the world is built with, decision D3. `docs/adrs/draft/adr-0120-a-unit-carries-a-type-that-indexes-a-table.md`
+    #[must_use]
+    pub fn unit_type(&self, entity: Entity) -> Option<UnitTypeId> {
+        let slot = self.slot_of(entity)?;
+        Some(self.types[slot as usize])
+    }
+
+    /// Sets the type of one soldier.
+    ///
+    /// Returns `false` when the identity is dead. The caller handles the
+    /// absent soldier or skips it.
+    ///
+    /// A type is not a structural fact, so it does not raise the revision.
+    /// The derived unit structure maps a tile to the units on it, and a type
+    /// moves no unit.
+    pub fn set_unit_type(&mut self, entity: Entity, unit_type: UnitTypeId) -> bool {
+        let Some(slot) = self.slot_of(entity) else {
+            return false;
+        };
+        self.types[slot as usize] = unit_type;
+        true
+    }
+
+    /// Returns the whole type column.
+    #[must_use]
+    pub fn type_column(&self) -> &[UnitTypeId] {
+        &self.types
     }
 
     /// Moves a soldier to another tile.
@@ -1285,6 +1345,7 @@ impl SoldierArena {
             .write_u64(u64::from(self.retired_count))
             .write(bytemuck::cast_slice(&self.tiles))
             .write(bytemuck::cast_slice(&self.factions))
+            .write(bytemuck::cast_slice(&self.types))
             .write(bytemuck::cast_slice(&self.carries))
             .write(&self.orders)
             .write(&self.builds)
@@ -1412,6 +1473,25 @@ impl SoldierArena {
             return false;
         }
         if self.carries.len() != slots || self.orders.len() != slots {
+            return false;
+        }
+        if self.types.len() != slots {
+            return false;
+        }
+        // A type names a row the table holds. A number outside it would index
+        // past the table, and the contest reads that table for every pair of
+        // types it meets.
+        if self
+            .types
+            .iter()
+            .any(|unit_type| unit_type.index() >= UNIT_TYPE_COUNT)
+        {
+            return false;
+        }
+        // A dead slot holds the default type. A stale type there would reach
+        // the state hash and would give the next unit in the slot a type that
+        // no caller asked for.
+        if (0..slots).any(|slot| self.live[slot] == 0 && self.types[slot] != DEFAULT_UNIT_TYPE) {
             return false;
         }
         if self.builds.len() != slots {

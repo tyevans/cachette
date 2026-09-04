@@ -23,7 +23,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^ALLOC]
 
-**Next number: DEC-147**
+**Next number: DEC-181**
 
 ## Open
 
@@ -120,8 +120,14 @@ testable.
 
 ### DEC-144 — Does a fight resolve at the tile or at the level 1 cell?
 
-**Open. Engineering owns it. One blocker holds the evidence that would settle
-it.**
+**Closed on 3 September 2026. Option B: a fight resolves at the tile.** The
+project owner decided it ahead of the measurement, and a record now holds the
+constraint.[^DEC144C] The blocker stays open, because it measures how wide the
+casualty band is and not where the fight resolves.[^DEC144B]
+
+The reasoning that decided it is the second option below, unchanged: the tile
+form needs no new input, its cost follows a small set, and the derived unit
+structure already lists the units of one tile at every barrier.
 
 A design sketch resolves combat for each level 1 cell, as a small table over
 unit types. A cell summarises a block of tiles, and the block edge is a power of
@@ -142,7 +148,11 @@ would decide it, and it is cheap.[^DEC144B]
 
 ### DEC-145 — Does an attacker below the defender's threshold contribute exactly zero?
 
-**Open. The project owner owns it, because it is a game-design judgement.**
+**Closed on 3 September 2026. Option A: a hard threshold.** The project owner
+decided it, and a record now holds the constraint.[^DEC145C] He accepted the
+cliff that the third paragraph below states, because his acceptance test asks
+for it: ten thousand bowmen must lose to one tank, and only a sum of zeroes
+gives that without a constant to hold it up.
 
 The project owner's acceptance test for combat is that one tank still kills four
 bowmen, and the sketch that meets it applies a penetration threshold for each
@@ -165,6 +175,31 @@ per-unit accumulator, and this project recorded that reasoning.[^DEC145B]
 recommendation is weak, and it should be taken only from the owner. Option A
 also removes attrition entirely for the pairs it applies to, and attrition is
 what produces the crowd behaviour the owner asked for.
+
+### DEC-180 — Does the resolution of a meeting run on every frame, or on a schedule?
+
+**Open. Engineering owns it. It decides how fast a fight goes and what it
+costs.**
+
+The resolution of a meeting runs on every frame today.[^DEC144C] Two other
+passes that change state do not: the rate pass and the consumption pass run on
+a schedule that the world holds, and the world scales the rate to one
+application.[^DEC180B]
+
+**Option A. Run on every frame.** The fight resolves as fast as the table says.
+The cost is one walk over the units of every occupied block, on every frame.
+
+**Option B. Run on a schedule, and scale the attack to one application.** The
+cost falls by the period. The fight then advances in steps that a watcher sees
+as jumps, and the attack of a table row means a different thing at two periods.
+
+**Option C. Run on every frame, and let the table hold the pace.** A caller
+that wants a slower fight lowers every attack. The engine holds one rule and
+the content holds the speed.
+
+**Recommendation: Option C, until a measurement says the cost matters.** It
+needs no new state and it keeps one meaning for a table row. The measurement
+that would move this is the same one the front-line blocker asks for.[^DEC180C]
 
 ### DEC-146 — Is attack a verb, or a destination and a posture?
 
@@ -3454,3 +3489,7 @@ a failed founding is correct.[^PRD12]
 [^DEC144B]: Blockers register, BLK-052, in this repository. `docs/BLOCKERS.md`
 [^DEC145A]: Research report 21, what a god needs from this engine, section 4.1. `docs/research/reports/21-what-a-god-needs.md`
 [^DEC145B]: ADR-0106, a cohort serves whole rations to a keyed subset, the context section. `docs/adrs/draft/adr-0106-a-cohort-serves-whole-rations-to-a-keyed-subset.md`
+[^DEC144C]: ADR-0121, a meeting between two factions resolves at the tile, decision D1. `docs/adrs/draft/adr-0121-a-meeting-between-two-factions-resolves-at-the-tile.md`
+[^DEC145C]: ADR-0122, an attacker whose attack does not exceed the defender's armour contributes exactly zero, decision D1. `docs/adrs/draft/adr-0122-an-attacker-below-the-armour-contributes-exactly-zero.md`
+[^DEC180B]: ADR-0063, a need is a rate with a threshold, and crossing it is a fact, decision D5. `docs/adrs/accepted/adr-0063-a-need-is-a-rate-with-a-threshold-and-crossing-it-is-a-fact.md`
+[^DEC180C]: Blockers register, BLK-052. `docs/BLOCKERS.md`

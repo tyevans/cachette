@@ -1217,17 +1217,31 @@ impl UnitStarved {
     }
 }
 
-/// One bit for each unit slot: the units that a shortage has ended.
+/// One bit for each unit slot: the units that a pass has marked to end.
 ///
-/// The plane is dense, so the mark pass writes into disjoint words and the
-/// plane is identical at any thread count. A bitwise write into a word that
-/// one thread owns is commutative. The scan that reads the plane is ordered
-/// all the same, because the deaths apply in the order the scan finds
-/// them.[^1]
+/// The scan that reads the plane is ordered, because the deaths apply in the
+/// order the scan finds them and the scan runs from the lowest slot to the
+/// highest.[^1]
+///
+/// **A pass that partitions the unit slots owns whole words, and it may write
+/// into one plane.** The shortage pass does that. Each thread takes a
+/// contiguous run of words, so no two threads touch one word.
+///
+/// **A pass that partitions anything else does not own whole words, and it
+/// must take one plane for each thread and join them.** The resolution of a
+/// meeting partitions the tiles, and two tiles held by two threads can hold
+/// units whose slots share one word. Join with [`Self::union_each`], which is
+/// commutative and associative.[^2]
+///
+/// The safety of the first case is a property of that pass and not of this
+/// type. It was documented as a property of this type, and a finding records
+/// what that would have cost the second caller.[^3]
 ///
 /// # References
 ///
 /// [^1]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
+/// [^2]: ADR-0023, an aggregate combines exactly, in any order, decision D1. `docs/adrs/accepted/adr-0023-an-aggregate-combines-exactly-in-any-order.md`
+/// [^3]: Findings register, FND-401. `docs/FINDINGS.md`
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct DeathPlane {
     /// One bit for each slot, in slot order, least significant bit first.
@@ -1251,6 +1265,47 @@ impl DeathPlane {
     pub fn cover(&mut self, slots: usize) {
         self.words.clear();
         self.words.resize(slots.div_ceil(PLANE_BITS), 0);
+    }
+
+    /// Marks one slot.
+    ///
+    /// A mark states that the slot must end. It ends nothing on its own: the
+    /// caller applies the marks in ascending slot order, after the pass that
+    /// wrote them.[^1]
+    ///
+    /// A mark outside the covered range writes nothing. A pass that reaches
+    /// one has read a slot the plane does not cover, and the caller that
+    /// covers the plane owns that.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
+    pub fn mark(&mut self, slot: usize) {
+        if let Some(word) = self.words.get_mut(slot / PLANE_BITS) {
+            *word |= 1u64 << (slot % PLANE_BITS);
+        }
+    }
+
+    /// Takes the union of this plane with every plane given.
+    ///
+    /// A bitwise union is commutative and associative, so the result does not
+    /// depend on the order of the planes and does not depend on which thread
+    /// wrote which.[^1] A pass whose output ranges are not disjoint gives each
+    /// thread its own plane and joins them here.
+    ///
+    /// A plane of another length contributes the words it holds. The caller
+    /// covers every plane to one length, and the invariant check of the caller
+    /// owns that.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0023, an aggregate combines exactly, in any order, decision D1. `docs/adrs/accepted/adr-0023-an-aggregate-combines-exactly-in-any-order.md`
+    pub fn union_each(&mut self, planes: &[Self]) {
+        for plane in planes {
+            for (word, other) in self.words.iter_mut().zip(&plane.words) {
+                *word |= *other;
+            }
+        }
     }
 
     /// Reports whether the plane marks a slot.

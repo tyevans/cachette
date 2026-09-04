@@ -19,6 +19,7 @@ use cachette_core::holding::Holder;
 use cachette_core::resource::{Amount, RecoveryRules, ResourceKind};
 use cachette_core::site::CommodityId;
 use cachette_core::terrain::TileKind;
+use cachette_core::unit_type::UnitTypeId;
 use cachette_core::{Axial, Entity, FactionId, Fix32, World, WorldConfig};
 
 /// The thread counts that every scenario runs at.
@@ -1074,4 +1075,137 @@ fn a_world_whose_holdings_contend_is_identical_at_every_thread_count() {
         contested > 0,
         "no scenario produced a border, so the contested case was not covered"
     );
+}
+
+/// Seats two factions of two unit types on one patch of ground.
+///
+/// Every tile of the patch holds units of both factions, so every tile is
+/// contested and the resolution of a meeting runs on all of them. The tiles
+/// hold more units than the ground admits, so admission refuses every step
+/// onto them and the meeting holds for the frames the scenario runs.[^1]
+///
+/// The type table is content, so the fixture states it. One pair of types
+/// cannot reach the other and one pair reaches both ways, so the run covers
+/// the threshold that refuses and the exchange that does not.[^2]
+///
+/// The pattern is fixed, so it is the same on every run and at every thread
+/// count.[^3]
+///
+/// # References
+///
+/// [^1]: ADR-0074, a spawn may over-fill a tile, and only admission enforces the capacity. `docs/adrs/accepted/adr-0074-a-spawn-may-over-fill-a-tile-and-only-admission-enforces-the-capacity.md`
+/// [^2]: Testing rules, section 2a. `.claude/rules/testing.md`
+/// [^3]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
+fn contenders(world: &mut World) -> usize {
+    world
+        .define_unit_type(0, Fix32::from_int(1), Fix32(Fix32::ONE.0 / 2))
+        .expect("the row is inside the table");
+    world
+        .define_unit_type(1, Fix32(Fix32::ONE.0 * 3 / 2), Fix32::from_int(2))
+        .expect("the row is inside the table");
+    let grid = world.grid();
+    let patch: Vec<Axial> = (0..grid.tile_count())
+        .map(|index| Axial::new((index % grid.width()) as i32, (index / grid.width()) as i32))
+        .filter(|address| world.admits_a_unit(*address))
+        .take(24)
+        .collect();
+    let mut seated = 0usize;
+    for (ordinal, address) in patch.iter().enumerate() {
+        for seat in 0..12u32 {
+            let unit = world
+                .spawn_soldier(*address, FactionId((seat % 2) as u16))
+                .expect("the open tile admits a unit");
+            let kind = UnitTypeId::from_u8(((seat as usize + ordinal) % 2) as u8)
+                .expect("the number names a row of the table");
+            assert!(world.set_unit_type(unit, kind), "the unit is alive");
+            seated += 1;
+        }
+    }
+    seated
+}
+
+/// Runs the frames over a world in which two factions meet.
+fn run_with_a_contest(config: WorldConfig, frames: u64, threads: usize) -> (Vec<u8>, u64, usize) {
+    let mut world = World::new(config).expect("the extent must describe a world");
+    let seated = contenders(&mut world);
+    let mut fell = 0usize;
+    for _ in 0..frames {
+        world.step(threads).expect("the step must run");
+        // The fallen log holds the units of one frame, so a sum over the
+        // frames is what the whole run cost.
+        fell += world.fell_log().len();
+    }
+    assert!(world.check_invariants());
+    assert!(fell > 0, "the scenario resolved no meeting at all");
+    assert!(
+        (world.soldiers().len() as usize) < seated,
+        "the scenario ended nobody"
+    );
+    (
+        world.fell_log_bytes().to_vec(),
+        world.state_hash().finish(),
+        fell,
+    )
+}
+
+/// The scenarios in which two factions meet.
+///
+/// They are their own list, because a meeting needs at least two factions and
+/// a patch of open ground.
+const CONTESTED: &[(&str, WorldConfig, u64)] = &[
+    (
+        "one tile",
+        WorldConfig {
+            width: 1,
+            height: 1,
+            seed: 1,
+            faction_count: 2,
+            unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
+        },
+        4,
+    ),
+    (
+        "an uneven split",
+        WorldConfig {
+            width: 17,
+            height: 59,
+            seed: 0x0123_4567_89ab_cdef,
+            faction_count: 4,
+            unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
+        },
+        8,
+    ),
+    (
+        "many blocks",
+        WorldConfig {
+            width: 256,
+            height: 256,
+            seed: 42,
+            faction_count: 16,
+            unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
+        },
+        4,
+    ),
+];
+
+#[test]
+fn a_world_whose_factions_meet_is_identical_at_every_thread_count() {
+    for (name, config, frames) in CONTESTED {
+        let expected = run_with_a_contest(*config, *frames, THREAD_COUNTS[0]);
+        for threads in &THREAD_COUNTS[1..] {
+            let produced = run_with_a_contest(*config, *frames, *threads);
+            assert_eq!(
+                produced.0, expected.0,
+                "scenario {name}: the fallen log differs at {threads} threads"
+            );
+            assert_eq!(
+                produced.1, expected.1,
+                "scenario {name}: the state hash differs at {threads} threads"
+            );
+            assert_eq!(
+                produced.2, expected.2,
+                "scenario {name}: the number that fell differs at {threads} threads"
+            );
+        }
+    }
 }

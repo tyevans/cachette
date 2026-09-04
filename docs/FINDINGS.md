@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-364**
+**Next number: FND-403**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -1156,6 +1156,85 @@ file names either.
 mechanism. Reading the record's status as the state of the code costs the
 project a large estimate for a small change. A draft record that the code
 already implements should say so, and this one does not.
+
+### FND-400 — A contest was said to need a count structure sized by three counts, and the tile form needs none
+
+**Believed.** A contest needs a count for each faction and each type, at
+whatever granularity the fight uses. That structure is the largest new thing
+the design asks for, and its size is the product of three counts, so it must be
+sized on purpose.[^F400A]
+
+**True.** The tile form needs no such structure at all. The resolution builds
+the counts for one tile, from the units standing on that tile, and it discards
+them before it reads the next tile. The list holds one entry for each pair of a
+faction and a type that the tile carries, so its length follows the occupancy of
+the tile and never the faction count or the type count. One buffer for each
+thread serves the whole world.
+
+**Evidence.** Built on 3 September 2026. The resolution walks the derived unit
+structure block by block, and the counts of a tile live in one reused vector
+per thread. The world gained no field for them. The claim the report made is
+correct for a resolution at the level 1 cell, which would have to hold the
+counts of every cell at once, and the project chose the tile.[^F400B]
+
+**Follows.** A design that resolves at the tile is cheaper in storage than the
+report estimated, and not only in the width of the killing. Read a storage
+estimate against the granularity it assumed, because the two options here differ
+by a whole structure rather than by a constant.
+
+### FND-401 — The death plane was documented as safe under any parallel marking, and it is safe only under a slot partition
+
+**Believed.** The plane is dense, so a marking pass writes into disjoint words
+and the plane is identical at any thread count. The doc comment of the plane
+states that as a property of the plane.[^F401A]
+
+**True.** It is a property of the pass that was written first, and not of the
+plane. That pass partitions the unit slots, so each thread owns whole words. A
+pass that partitions something else does not own whole words: the resolution of
+a meeting partitions the tiles, and two tiles held by two threads can hold units
+whose slots share one word.
+
+**Evidence.** Built on 3 September 2026. The resolution gives each thread its
+own plane and joins them by a bitwise union, which is commutative and
+associative. A shared plane would have needed an atomic write, and an atomic
+write would have been correct here by luck rather than by the argument the doc
+comment gives.
+
+**Follows.** A doc comment that states a safety property must name the pass that
+supplies it. A second caller reads the property, believes it holds for its own
+partition, and writes a data race that a single-threaded test cannot see. The
+plane now documents both cases and offers the union.
+
+### FND-402 — A fight was designed to fire when two factions share a tile, and admission makes that state unreachable
+
+**Believed.** Two factions meet when they stand on one tile, so a contest fires
+on co-occupation. The design brief for the contest said so, and the research
+report that shaped it describes a fight over the units of one place.[^F400A]
+
+**True.** Admission enforces the capacity of a target tile by reading the
+capacity of the ground and the number of units standing there. **It never reads
+the faction.** A tile that an army has filled therefore refuses every unit,
+including every enemy, so two factions cannot come to share a tile by walking.
+A rule that fired only on co-occupation would never fire against an army that
+packed itself to capacity, which is exactly the state a fight is about.
+
+**Evidence.** Read on 3 September 2026. The admission pass fills a segment
+table with the capacity of each target and the number of units the derived
+structure reports standing on it, and it grants an intent only while the second
+is below the first. No line of it reads the faction column. A parallel
+measurement of the front line found the same fact from the other direction, and
+the merge of the two branches must fold that row and this one into one.
+
+**Follows.** Contact is adjacency. A unit reaches every unit of another faction
+on its own tile and on the six tiles beside it, so nobody has to enter
+anything.[^F402B] The alternative was a rule that lets an enemy enter a full
+tile, and it was rejected: it supersedes an accepted record and it makes the
+capacity mean nothing at the one moment it exists for.[^F274D]
+
+**A design that fires on a state can be correct and still never fire.** Ask
+what produces the state, not only what the state is. The brief, the research
+report and the first implementation all passed their own tests, because a spawn
+may over-fill a tile and every fixture spawned.
 
 ## D. Cost estimates that were wrong
 
@@ -10535,4 +10614,8 @@ itself rather than merely underspecified.
 [^F361A]: ADR-0053, a faction is a bit in a mask, and a relation is a plane, decisions D2 and D4. `docs/adrs/accepted/adr-0053-a-faction-is-a-bit-in-a-mask-and-a-relation-is-a-plane.md`
 [^F361B]: PRD-0031, a god knows whose ground its people stand on. `docs/product/shaped/prd-0031-a-god-knows-whose-ground-its-people-stand-on.md`
 [^F362A]: Budgets and costs, the scale constants and the faction ceiling. `docs/reference/budgets.md`
+[^F402B]: ADR-0121, a meeting between two factions resolves at the tile, decision D1. `docs/adrs/draft/adr-0121-a-meeting-between-two-factions-resolves-at-the-tile.md`
+[^F400A]: Research report 21, what a god needs from this engine, section 4.5. `docs/research/reports/21-what-a-god-needs.md`
+[^F400B]: ADR-0121, a meeting between two factions resolves at the tile, decision D3. `docs/adrs/draft/adr-0121-a-meeting-between-two-factions-resolves-at-the-tile.md`
+[^F401A]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
 [^F363A]: ADR-0110, a unit returns by climbing a reach field seeded at every site of its faction, decision D2. `docs/adrs/draft/adr-0110-a-unit-returns-by-climbing-a-reach-field.md`

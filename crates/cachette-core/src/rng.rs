@@ -114,3 +114,16 @@ pub const SYSTEM_CONSUMPTION: SystemId = 7;
 /// that share an identifier draw the same value from the same frame, entity
 /// and draw index. The sample would then sit on the lattice of the ground.
 pub const SYSTEM_FOUNDING: SystemId = 5;
+
+/// The system identifier of the contest that resolves a meeting.
+///
+/// The contest owns this identifier alone. It does not share the identifier
+/// of the movement system, because two systems that share an identifier draw
+/// the same value from the same frame, entity and draw index. The units that
+/// fell on a tile would then follow the step that the units of that tile
+/// took.[^1]
+///
+/// # References
+///
+/// [^1]: ADR-0003, every random draw is keyed, never stateful, decision D1. `docs/adrs/accepted/adr-0003-every-random-draw-is-keyed-never-stateful.md`
+pub const SYSTEM_CONTEST: SystemId = 8;

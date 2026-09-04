@@ -548,21 +548,51 @@ impl UnitTileBridge {
             .grid()
             .index_of(address)
             .ok_or(BridgeError::AddressOutsideWorld(address))?;
-        let key = self
-            .layout
-            .key_of(tile)
-            .ok_or(BridgeError::AddressOutsideWorld(address))?;
+        Ok(self.on_tile_unguarded(tile))
+    }
+
+    /// Returns the units that stand on one tile, without a freshness check.
+    ///
+    /// The call reads the range for the block that holds the tile, then
+    /// searches that range for the tile key. The search is bounded by the
+    /// block size and not by the unit count.[^1]
+    ///
+    /// **The caller establishes freshness once, before it starts to read.**
+    /// This read answers from the last rebuild and cannot refuse a stale
+    /// question. The borrow of the arena is what stops the world changing
+    /// while the caller reads.
+    ///
+    /// A pass that asks for many tiles in ascending order holds a forward
+    /// reader instead, because a reader walks the block rather than searching
+    /// it.[^1] This call exists for a pass that asks for tiles in no order,
+    /// such as one that reads the six neighbours of a tile.
+    ///
+    /// Returns an empty slice for a tile the world does not hold.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0018, the unit-to-tile bridge is derived, and it rebuilds at the barrier, decisions D2 and D4. `docs/adrs/accepted/adr-0018-the-unit-to-tile-bridge-is-derived-and-rebuilds-at-the-barrier.md`
+    #[must_use]
+    pub fn on_tile_unguarded(&self, tile: TileIdx) -> &[Entity] {
+        let Some(key) = self.layout.key_of(tile) else {
+            return &[];
+        };
         let block = self.layout.block_of_key(key);
         if !self.block_is_occupied(block) {
-            return Ok(&[]);
+            return &[];
         }
-        let range = self.ranges[block as usize];
+        let Some(range) = self.ranges.get(block as usize).copied() else {
+            return &[];
+        };
         let start = range.start as usize;
         let end = start + range.length as usize;
+        if end > self.keys.len() || end > self.units.len() {
+            return &[];
+        }
         let window = &self.keys[start..end];
         let low = start + window.partition_point(|held| *held < key);
         let high = start + window.partition_point(|held| *held <= key);
-        Ok(&self.units[low..high])
+        &self.units[low..high]
     }
 
     /// Returns the keys and the units of one block, in key order.
