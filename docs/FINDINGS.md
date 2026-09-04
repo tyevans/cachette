@@ -32,6 +32,112 @@ the case.[^ALLOC2]
 
 ## A. Corrections to stated rules
 
+### FND-450 — A field over the level 1 cell lattice was believed to smear whatever it carried
+
+**Believed.** A quantity carried at level 1 granularity smears, because a cell
+covers a block of tiles and the block is large. A measurement of a fight at
+that granularity found the smear and the record refuses the granularity by
+name.[^F450A] [^F450B]
+
+**True.** The smear is a property of the thing carried, not of the lattice. A
+fight is an event between two units standing on one tile, so a cell is coarser
+than the thing being resolved and the answer spreads over a thousand tiles that
+were not in the fight. A weather field varies slowly over distance, so a cell
+samples it. Two units in one cell genuinely stand in the same weather.
+
+**Evidence.** The engine already carries a field at this pitch and nobody calls
+it smeared. The influence field is a plane over the same lattice, and a unit
+reads the cell it stands in.[^F450C] The difference between the two cases is
+whether the carried thing varies inside a block.
+
+**Follows.** Ask what varies inside a block before choosing a granularity. Do
+not read the combat answer as a rule about level 1. The weather record states
+the argument rather than citing the combat record for it.[^F450D]
+
+### FND-451 — A relaxation kernel taken from the influence solve would have lost water that nothing accounted for
+
+**Believed.** The weather spread could reuse the influence relaxation. Both are
+fields over the level 1 cell lattice, both read the six neighbours, and reusing
+the kernel would avoid a second machine for one shape.
+
+**True.** The influence kernel is not conservative. Its weights sum to less
+than the range, and the difference is what a cell loses on every pass, so an
+unforced field falls to nothing.[^F451A] That is correct for a reach. For a
+quantity it means water disappears and no reader can say where it went, and the
+product record asks that what leaves one place arrive at another exactly, with
+no loss to rounding and no gain.[^F451B]
+
+**Evidence.** The weather field now runs a transfer kernel instead. A cell
+hands each neighbour a truncated integer share and the receiver adds the same
+integer, so the pass conserves exactly. The world invariant check reads a
+running account and fails when the totals disagree, and the account balances at
+every frame of a forty-eight frame run.
+
+**Follows.** A field is not one thing. A reach and a quantity need different
+kernels, and the shared part is the lattice and the neighbour walk. Ask whether
+the carried thing has to balance before reusing a solver.
+
+### FND-452 — Conservation and decay looked like a contradiction, and the resource account already held the answer
+
+**Believed.** A weather condition cannot both conserve exactly and end on its
+own. A storm that conserves stays for ever, and a storm that decays loses
+quantity that nothing accounts for.
+
+**True.** The two hold together when the thing that leaves is counted. Water
+leaves the air onto the ground, and it leaves the ground into a running total.
+The sum of the air, the ground and that total is invariant, and a storm still
+ends.
+
+**Evidence.** The project had already solved this shape for a resource. A unit
+that dies takes its load out of the world, and the world records where the load
+went rather than letting it disappear.[^F452A] The weather account is the same
+pattern with a different name.
+
+**Follows.** When a rule seems to force a choice between conservation and
+change, add the account rather than dropping the conservation. Look for a
+running total that already exists for the same shape.
+
+### FND-453 — A world of one level 1 cell made a gate test pass for the wrong reason
+
+**Believed.** A twenty-four by twenty-four world is a good small fixture for a
+verb that gates on the ground of a level 1 cell. It is cheap to step and it
+holds no open water, which is what the effect test needed.
+
+**True.** The block edge is thirty-two tiles, so a world that narrow is one
+level 1 cell. Every address in it names the same cell, so a gate that refuses a
+place outside the faction's ground can never refuse anything, and a test of the
+refusal passes only because the second faction holds nothing at all.
+
+**Evidence.** The test that names one held place and one unheld place in the
+same call did not refuse. It succeeded, because both places named one cell. The
+fixture moved to a sixty-four by sixty-four world, which holds four cells and
+still holds no open water, and the test then refused as it should.
+
+**Follows.** A fixture for a rule that works at level 1 must be wider than the
+block edge, or it measures nothing. State the property in the fixture and
+assert it, so that a change to the block edge fails the fixture rather than the
+assertion.
+
+### FND-454 — A test matched the singular form of a message, and a change that made the plural true read as no event at all
+
+**Believed.** The demonstration prints one line when a unit is promoted, and a
+test that searches the output for that line proves a promotion happened before
+the picture was drawn.
+
+**True.** The line reads one way for one promotion and another way for more
+than one. The test searched for the singular form only. A change that made
+three units promote in one frame therefore produced a promotion and read as no
+promotion at all.
+
+**Evidence.** Adding weather changed what units gather, which changed what they
+earn, which moved the first promotion from one unit at a later tick to three
+units at an earlier one. The output held the line and the test failed. The test
+now matches the part of the message that both forms share.
+
+**Follows.** Do not assert on a rendered sentence that varies with a count. If
+a test must read printed output, match the invariant part of the message, or
+read the number the message was built from.
+
 ### FND-327 — The demonstration drew and stepped at one rate, and a record said so as if it were a property of the viewer
 
 **Believed.** The viewer runs after the step, on the stepping thread, so the
@@ -11371,3 +11477,10 @@ itself rather than merely underspecified.
 [^F480C]: The whole-world state hash. `crates/cachette-core/src/world.rs`
 [^F480D]: The recovery pass of the depletion ledger. `crates/cachette-core/src/resource.rs`
 [^F480E]: Backlog item 0471, fold the recovery rules into the state hash. `docs/backlog/proposed/0471-fold-the-recovery-rules-into-the-state-hash.md`
+[^F450A]: ADR-0121, a meeting between two factions resolves at the tile, decision D2. `docs/adrs/draft/adr-0121-a-meeting-between-two-factions-resolves-at-the-tile.md`
+[^F450B]: Findings register, FND-402, in this document.
+[^F450C]: ADR-0087, an influence solve runs a fixed iteration count over the whole plane, decision D1. `docs/adrs/draft/adr-0087-an-influence-solve-runs-a-fixed-iteration-count.md`
+[^F450D]: ADR-0140, weather is a field over the level 1 cell lattice, decision D1. `docs/adrs/draft/adr-0140-weather-is-a-field-over-the-level-1-cell-lattice.md`
+[^F451A]: The influence field, the self weight and the neighbour weight. `crates/cachette-core/src/influence.rs`
+[^F451B]: PRD-0004, the world has weather that a watcher can read, what good looks like. `docs/product/accepted/prd-0004-the-world-has-weather-that-a-watcher-can-read.md`
+[^F452A]: ADR-0072, a tile stock is generated, and only what was taken is stored, decision D5. `docs/adrs/accepted/adr-0072-a-tile-stock-is-generated-and-only-what-was-taken-is-stored.md`

@@ -105,6 +105,31 @@ closes.[^BLK110C]
 reads it back. A game built on this engine makes its own rule from it, outside
 the simulation. The doc comment of the write says that nothing in the engine
 reads the column, so a caller is not told that a mechanism exists.
+### BLK-130 — Nobody has said what weather should be worth
+
+**Owner:** the project owner. **Blocks:** every quantity that the weather
+system carries.
+
+The world now makes weather, and a god now puts weather on a place. Eight
+values decide what either one is worth, and no measurement and no owner chose
+any of them.
+
+The engine holds a value for each. How much water the sea lifts at once, how
+often it lifts, how much of the air falls in one solve, how much of the ground
+dries in one solve, the quantity at which ground counts as wet, how much extra
+a gatherer takes from wet ground, how strong one storm may be, and how long a
+faction waits between storms.[^BLK130A] [^BLK130B]
+
+**What would close this.** A statement of what the downstream game wants a
+storm to be worth: how long a storm should last in ticks, how much of the map
+one should cover, and how much a wet season should change what a congregation
+gathers. Three numbers close six of the eight.
+
+**What the project does meanwhile.** The engine carries the values above as
+named constants beside the rule that reads each one. No decision record states
+any of them, because the record rule forbids a value that an unanswered
+question governs.[^BLK110C] A game built on this engine cannot change them
+without a rebuild, and that is the cost of leaving them here.
 
 ### BLK-110 — Nobody has said what the variety score should change
 
@@ -689,3 +714,5 @@ normally.
 
 [^BLK122A]: ADR-0133, a unit converts to the faction that leads the influence field at its cell, decisions D1 and D4. `docs/adrs/draft/adr-0133-a-unit-converts-to-the-faction-that-leads-the-field.md`
 [^BLK123A]: ADR-0132, conversion changes the faction of a unit and adds no second allegiance, decision D2. `docs/adrs/draft/adr-0132-conversion-changes-the-faction-of-a-unit.md`
+[^BLK130A]: ADR-0142, a god inflicts weather only on ground its own faction holds, decisions D2 and D4. `docs/adrs/draft/adr-0142-a-god-inflicts-weather-only-on-ground-it-holds.md`
+[^BLK130B]: ADR-0143, wet ground yields more to a gatherer, decision D2. `docs/adrs/draft/adr-0143-wet-ground-yields-more-to-a-gatherer.md`

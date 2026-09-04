@@ -180,10 +180,11 @@ def test_the_picture_runs_the_world_before_it_draws(
     reported every one of those subsystems at zero. Each zero was the fixture
     and not the engine.
 
-    Sixty steps is past the first promotion, which the engine makes at tick
-    50 in this world. The world takes a fixed seed and the engine gives one
-    answer at any thread count, so the tick a promotion lands on is a
-    property of the engine rather than of this machine.
+    Sixty steps is past the first promotion. The world takes a fixed seed and
+    the engine gives one answer at any thread count, so the tick a promotion
+    lands on is a property of the engine rather than of this machine. The tick
+    itself is not asserted here, because it moves whenever a pass that feeds a
+    unit changes.
     """
     from cachette.demo.app import main
 
@@ -196,6 +197,9 @@ def test_the_picture_runs_the_world_before_it_draws(
     tick = int(written[0].split("at tick ")[1].split(",")[0])
     assert tick >= 60, printed
 
-    promotions = [line for line in printed.splitlines() if "became a character" in line]
+    # The line reads "became a character" for one and "became characters" for
+    # more than one, so a match on the singular alone counts a promotion of
+    # three as no promotion at all.
+    promotions = [line for line in printed.splitlines() if "became " in line]
     assert promotions, printed
     assert path.read_bytes()[:8] == SIGNATURE

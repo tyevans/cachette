@@ -67,6 +67,7 @@ documents cite it.
 | 0047 | A game states its own economy | Shaped | Game developer | `shaped/prd-0047-a-game-states-its-own-economy.md` |
 | 0045 | A god knows its congregation by name | Shaped | Game developer | `shaped/prd-0045-a-god-knows-its-congregation-by-name.md` |
 | 0046 | A god raises somebody up | Shaped | Game developer | `shaped/prd-0046-a-god-raises-somebody-up.md` |
+| 0040 | A god inflicts weather on a place | Shaped | Game developer | `shaped/prd-0040-a-god-inflicts-weather-on-a-place.md` |
 
 ## What does not belong in a record
 

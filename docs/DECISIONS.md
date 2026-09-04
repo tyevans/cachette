@@ -2047,6 +2047,107 @@ names, and nothing in it is indexed by the faction.
 field over the same lattice, seeded by the engine at the frontier of each
 faction and derived at the barrier beside the other two. The relaxation is the
 one this work made shared, so exploration writes no relaxation of its own.
+### DEC-235 — At what granularity does weather live?
+
+**Closed. Weather lives on the level 1 cell lattice. A tile holds none.**
+
+**Option A. The tile.** A game could then put a shower over one tile. The price
+is the shape the product record rejects by name: an update that visits every
+tile of the world on every frame costs the world, whatever the weather is
+doing.[^DEC235A]
+
+**Option B. The level 1 cell.** The lattice is smaller than the world by the
+square of the block edge. The price is that two tiles of one cell hold the same
+weather.
+
+**Option C. Something coarser than level 1.** The pyramid holds one derived
+level, so a coarser lattice would have to be built for weather alone.
+
+**Why B.** A storm is larger than a block, so a cell samples a field that
+varies slowly rather than smearing events that are distinct. **The combat
+answer is the opposite and it does not carry over.** A meeting between two
+factions resolves at the tile, because a cell covers a block and a fight
+resolved there kills units spread over all of them, and a measurement found
+that smear directly.[^DEC235B] [^DEC235C] A fight is an event between two units
+on one tile, so a cell is coarser than the thing being resolved. Weather is
+not.
+
+The record holds the claim and the reasoning.[^DEC235D]
+
+### DEC-236 — Does weather carry a wind direction?
+
+**Closed. It does not. The spread is isotropic.**
+
+**Option A. A wind plane beside the air plane.** Each cell holds a direction
+and a strength, and the spread carries more water downwind. A storm then has a
+track, and a watcher can see where it is going.
+
+**Option B. No wind. The spread is isotropic.** A cell hands each neighbour the
+same share.
+
+**Why B.** Nothing in the engine reads a direction of weather. The product
+record asks for a condition that spreads and decays, and it says plainly that
+it needs one that works rather than a catalogue.[^DEC236A] A wind plane would
+be a third quantity that only the spread reads, and the rule on recurring
+defects says not to declare a capability before something calls it.[^DEC116B]
+
+**What would reopen this.** A pass that reads a direction. A storm track that a
+watcher steers by, or a movement rule that costs more into the wind, would each
+make wind a value that something consumes.
+
+### DEC-237 — What does weather change?
+
+**Closed. It changes what a gatherer takes. It changes nothing else.**
+
+Four passes could read weather. The choice below is one of them, and the other
+three are recorded here so that the silence is a decision rather than an
+oversight.
+
+**Gathering. Chosen.** A unit that gathers from a tile inside a wet cell takes
+more in one tick. The read is one lookup for the whole run of units that gather
+one resource from one tile, beside the deposit read the resolve already
+makes.[^DEC237A]
+
+**Movement. Not chosen. Recommend a record of its own.** A step cost from a
+field rather than from the terrain table is a real claim, and the movement
+record fixes where a step cost comes from.[^ADR56D4] It is the most likely
+second wiring.
+
+**Consumption. Not chosen. Recommend against.** Weather that changes what a
+unit needs is weather that kills, and the product record says plainly that it
+does not damage a unit.[^DEC236A]
+
+**The choice pass. Not chosen. Recommend after movement.** Weather that changes
+what a unit wants is a larger claim than a first wiring should make, and the
+choice key is already a bounded class that a record fixes.[^DEC237D]
+
+**Why gathering first.** The product record requires that the condition
+influence a unit as a checkable statement, so an effect is required and
+silence is not an option here.[^DEC237E] Gathering is the cheapest of the four
+to read and the easiest to see: a watcher reads the gather log and the amounts
+differ.
+
+### DEC-238 — May a god take weather away?
+
+**Open. Recommend a second verb, and not an argument of the first.**
+
+A god puts water into the air over a set of places. Nothing removes it, and the
+field only loses water by the rule it applies each tick.
+
+**Option A. A second verb that clears the air over a set of places.** The water
+it removes has to go somewhere the account can see, so it would raise the total
+that counts water leaving the world.[^DEC238A]
+
+**Option B. A signed strength on the one verb.** One verb then does two things,
+and a caller that passed the wrong sign would dry a place it meant to soak.
+
+**Option C. Nothing. A god waits.**
+
+**Recommend A.** A verb states one act, and the two acts have different gates: a
+god that may soak its own ground need not be able to dry it. **This is not
+implemented and nothing calls it.** The row exists so that the absence is
+recorded rather than assumed.
+
 ### DEC-200 — Does anything in the engine consume the variety score?
 
 **Closed. Nothing consumes it. The variety is a read for the control plane,
@@ -4234,3 +4335,12 @@ exactly so that a caller cannot build a wrong one.[^DEC120C]
 [^DEC202B]: Blockers register, BLK-111. `docs/BLOCKERS.md`
 [^DEC250A]: ADR-0121, a meeting between two factions resolves at the tile, decision D3. `docs/adrs/draft/adr-0121-a-meeting-between-two-factions-resolves-at-the-tile.md`
 [^DEC270A]: The recovery rules and the depletion ledger. `crates/cachette-core/src/resource.rs`
+[^DEC235A]: PRD-0004, the world has weather that a watcher can read, what it costs at the target scale. `docs/product/accepted/prd-0004-the-world-has-weather-that-a-watcher-can-read.md`
+[^DEC235B]: ADR-0121, a meeting between two factions resolves at the tile, decision D2. `docs/adrs/draft/adr-0121-a-meeting-between-two-factions-resolves-at-the-tile.md`
+[^DEC235C]: Findings register, FND-402. `docs/FINDINGS.md`
+[^DEC235D]: ADR-0140, weather is a field over the level 1 cell lattice, decision D1. `docs/adrs/draft/adr-0140-weather-is-a-field-over-the-level-1-cell-lattice.md`
+[^DEC236A]: PRD-0004, the world has weather that a watcher can read, what this does not do. `docs/product/accepted/prd-0004-the-world-has-weather-that-a-watcher-can-read.md`
+[^DEC237A]: ADR-0143, wet ground yields more to a gatherer, decision D1. `docs/adrs/draft/adr-0143-wet-ground-yields-more-to-a-gatherer.md`
+[^DEC237D]: ADR-0109, the choice key holds a bounded class of the unit's own state, decision D3. `docs/adrs/draft/adr-0109-the-choice-key-holds-a-bounded-class-of-the-unit-state.md`
+[^DEC237E]: PRD-0004, the world has weather that a watcher can read, what good looks like. `docs/product/accepted/prd-0004-the-world-has-weather-that-a-watcher-can-read.md`
+[^DEC238A]: ADR-0141, a weather pass moves water and never scales it, decision D2. `docs/adrs/draft/adr-0141-a-weather-pass-moves-water-and-never-scales-it.md`

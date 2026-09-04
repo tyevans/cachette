@@ -51,6 +51,7 @@ pub mod trade;
 pub mod types;
 pub mod unit_type;
 pub mod upgrade;
+pub mod weather;
 pub mod world;
 
 pub use bridge::{BlockLayout, BlockRange, BridgeError, UnitTileBridge};
@@ -111,3 +112,7 @@ pub use unit_type::{
 };
 pub use upgrade::{UpgradeKind, UpgradeMap, UpgradeSite, UPGRADE_KIND_COUNT};
 pub use world::{ConvertError, IdentityError, StepError, World, WorldConfig, WorldError};
+pub use weather::{
+    Drops, Storm, WeatherError, WeatherField, COOLDOWN_TICKS, PLACES_CEILING, STRENGTH_CEILING,
+    WET_MARK,
+};

@@ -395,6 +395,10 @@ without stating a constraint is worse than no record.
 | 0132 | Conversion changes the faction of a unit, and adds no second allegiance | Draft | 0014, 0065, 0070, 0072, 0099, 0104, 0111, 0134 | `draft/adr-0132-conversion-changes-the-faction-of-a-unit.md` |
 | 0133 | A unit converts to the faction that leads the influence field at its cell | Draft | 0002, 0003, 0004, 0087, 0096, 0111, 0123, 0128, 0132, 0134 | 09, `draft/adr-0133-a-unit-converts-to-the-faction-that-leads-the-field.md` |
 | 0134 | A god reads conversion as an event log and as the counts it already reads | Draft | 0006, 0064, 0065, 0070, 0132, 0133 | `draft/adr-0134-a-god-reads-conversion-as-an-event-log.md` |
+| 0140 | Weather is a field over the level 1 cell lattice | Draft | 0001, 0004, 0009, 0022, 0087, 0121 | `draft/adr-0140-weather-is-a-field-over-the-level-1-cell-lattice.md` |
+| 0141 | A weather pass moves water and never scales it | Draft | 0002, 0004, 0009, 0023, 0072, 0087 | `draft/adr-0141-a-weather-pass-moves-water-and-never-scales-it.md` |
+| 0142 | A god inflicts weather only on ground its own faction holds | Draft | 0004, 0040, 0053, 0111, 0125, 0128, 0140 | `draft/adr-0142-a-god-inflicts-weather-only-on-ground-it-holds.md` |
+| 0143 | Wet ground yields more to a gatherer | Draft | 0056, 0072, 0073, 0140 | `draft/adr-0143-wet-ground-yields-more-to-a-gatherer.md` |
 
 ### Retired numbers
 
