@@ -28,7 +28,7 @@ This skill targets the four Diataxis categories explicitly:
 ## State File
 
 The state file stores the git commit SHA that was last processed:
-Check `.agents/last-docs-run` (or `.claude/last-docs-run` if migrating).
+Check `.agents/last-docs-run`.
 
 1. Read the baseline SHA from the state file. If missing, treat as first run
    and scan all tracked files (`git ls-files`).
@@ -39,14 +39,13 @@ Check `.agents/last-docs-run` (or `.claude/last-docs-run` if migrating).
 
 ## Isolation
 
-When dispatching workers with `invoke_subagent`, specify `Workspace: 'share'`.
-This provides isolated git worktree environments so that scratch files do not
-pollute the working directory.
+When dispatching workers, give each worker its own git worktree so that
+scratch files do not pollute the working directory.
 
-## Wave Orchestration with Antigravity Subagents
+## Wave Orchestration
 
 Do not run this workflow as a single agent reading a diff serially. Orchestrate
-work in distinct waves using Antigravity subagents:
+work in distinct waves using subagents:
 
 1. **Wave 1: Scope (Single Agent)**
    - Resolve baseline SHA from `.agents/last-docs-run`.
@@ -54,7 +53,7 @@ work in distinct waves using Antigravity subagents:
    - Partition changed files into bounded contexts (top-level modules or packages).
    - Return changed files and a summary for each bounded context.
 
-2. **Wave 2: Research (Parallel Subagents via `invoke_subagent`)**
+2. **Wave 2: Research (Parallel Subagents)**
    - Launch one research subagent per bounded context.
    - Each agent reads the changed source files and existing documentation.
    - Identify necessary documentation updates across the four Diataxis categories.

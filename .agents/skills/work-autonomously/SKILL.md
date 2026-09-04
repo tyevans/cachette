@@ -42,10 +42,10 @@ commit body.
 
 ## Dispatch along these axes
 
-Dispatch workers using the Antigravity `invoke_subagent` tool. Configure each worker
-with `Workspace: 'share'` to guarantee isolated git worktrees.
+Dispatch workers using the subagent tool of the agent system in use.
 
-- **Isolation.** Set `Workspace: 'share'` on each worker. Scratch files stay inside it.
+- **Isolation.** Give each worker its own git worktree. Scratch files stay
+  inside it.
 - **File disjointness.** Name the files each worker owns. The world step
   function is the bottleneck; only one worker changes it at a time.
 - **Dependency.** Say what each item unblocks. Storage precedes the systems

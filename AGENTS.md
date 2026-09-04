@@ -144,8 +144,10 @@ move one.[^7]
 | `python/` | The Python control plane package |
 | `docs/reference/` | Registers of figures that change |
 | `scripts/` | Checks that run in continuous integration |
-| `.agents/rules/` | Rules that apply to all work in this repository |
-| `.claude/rules/` | Rules that apply to all work in this repository |
+| `.agents/rules/` | Rules that apply to all work in this repository. The canonical copy |
+| `.claude/rules/` | A symlink to `.agents/rules/`, so the two stay in sync |
+| `.agents/skills/` | Skills that apply to all work in this repository. The canonical copy |
+| `.claude/skills/` | A symlink to `.agents/skills/`, so the two stay in sync |
 | `docs/backlog/` | The work queue |
 | `docs/product/` | Product requirement records |
 
