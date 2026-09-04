@@ -54,6 +54,19 @@ DOCUMENTED_COMMODITY = 0
 DOCUMENTED_RESOURCE_KINDS = (0, 1, 2)
 DOCUMENTED_FIRST_REFUSED_KIND = 3
 
+# The doc comment of `World.order_build` states that a road is zero and a
+# terrace is one, and that two and above name no upgrade kind. The doc
+# comments of `World.build_order` and `World.tile_report` state the same
+# numbering.
+DOCUMENTED_ROAD = 0
+DOCUMENTED_TERRACE = 1
+DOCUMENTED_UPGRADE_KINDS = (DOCUMENTED_ROAD, DOCUMENTED_TERRACE)
+DOCUMENTED_FIRST_REFUSED_UPGRADE_KIND = 2
+
+# The doc comment of `World.direction_offsets` states that a tile of this
+# world has this many neighbours.
+DOCUMENTED_NEIGHBOUR_COUNT = 6
+
 
 def test_the_constructor_defaults_are_the_documented_ones() -> None:
     default = cachette.World()
@@ -142,3 +155,60 @@ def test_a_ground_kind_that_overlaps_a_resource_kind_is_not_refused(
     for ground_kind in ground_kinds_that_do_not_overlap:
         with pytest.raises(cachette.VerbError):
             world.order_gather([], ground_kind)
+
+
+def test_the_build_order_takes_two_upgrade_kinds_and_refuses_the_third(
+    seed: int,
+) -> None:
+    # The verb checks the kind before it resolves the set, so an empty set
+    # reads the check alone.
+    world = cachette.World(width=8, height=8, seed=seed, faction_count=1)
+    for kind in DOCUMENTED_UPGRADE_KINDS:
+        world.order_build([], kind)
+    with pytest.raises(cachette.VerbError):
+        world.order_build([], DOCUMENTED_FIRST_REFUSED_UPGRADE_KIND)
+
+
+def test_the_road_and_the_terrace_carry_the_documented_numbers(
+    seed: int,
+) -> None:
+    # The doc comment of `World.order_build` names each number. A read of the
+    # order and a read of the tile must both report the number that went in.
+    world = cachette.World(width=16, height=16, seed=seed, faction_count=1)
+    for kind in (DOCUMENTED_ROAD, DOCUMENTED_TERRACE):
+        world = cachette.World(width=16, height=16, seed=seed, faction_count=1)
+        address = _first_open_address(world)
+        units = world.spawn_soldiers([address], faction=0)
+        world.order_build(units, kind)
+        assert world.build_order(int(units[0])) == kind
+        world.step(threads=1)
+        assert world.tile_report(*address)["upgrade"] == kind
+
+
+def test_a_resource_kind_that_overlaps_an_upgrade_kind_is_not_refused(
+    seed: int,
+) -> None:
+    # The doc comment of `World.order_build` says the engine accepts the
+    # resource kind of food or wood, because each of those numbers also names
+    # an upgrade kind. Nothing here asserts that the behaviour is right. It
+    # asserts that the sentence describes what the engine does.
+    world = cachette.World(width=8, height=8, seed=seed, faction_count=1)
+    resource_kinds_that_overlap = (0, 1)
+    for resource_kind in resource_kinds_that_overlap:
+        world.order_build([], resource_kind)
+    with pytest.raises(cachette.VerbError):
+        world.order_build([], 2)
+
+
+def test_a_tile_has_the_documented_number_of_neighbours() -> None:
+    assert len(cachette.World.direction_offsets()) == DOCUMENTED_NEIGHBOUR_COUNT
+
+
+def _first_open_address(world: cachette.World) -> tuple[int, int]:
+    """Return an address of ground that admits a unit."""
+    for q in range(world.width):
+        for r in range(world.height):
+            if world.tile_report(q, r)["passable"]:
+                return (q, r)
+    message = "the world admits a unit nowhere"
+    raise AssertionError(message)
