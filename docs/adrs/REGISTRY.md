@@ -381,6 +381,7 @@ without stating a constraint is worse than no record.
 | 0109 | The choice key holds a bounded class of the unit's own state | Draft | 0004, 0064, 0096, 0098 | `draft/adr-0109-the-choice-key-holds-a-bounded-class-of-the-unit-state.md` |
 | 0110 | A unit returns by climbing a reach field seeded at every site of its faction | Draft | 0004, 0005, 0022, 0053, 0091, 0095 | `draft/adr-0110-a-unit-returns-by-climbing-a-reach-field.md` |
 | 0111 | The presence relation is derived at the end of the step and never stored as a fact | Draft | 0001, 0004, 0009, 0018, 0023, 0040, 0053 | `draft/adr-0111-the-presence-relation-is-derived-at-the-end-of-the-step.md` |
+| 0125 | The control plane names the seed set of a destination field | Draft | 0004, 0005, 0022, 0085, 0091, 0095, 0110 | 20, 21, `draft/adr-0125-the-control-plane-names-the-seed-set-of-a-destination-field.md` |
 
 ### Retired numbers
 

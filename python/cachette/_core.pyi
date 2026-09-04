@@ -90,6 +90,20 @@ class PositionColumns(TypedDict):
     rank: npt.NDArray[np.uint8]
     holder: npt.NDArray[np.uint64]
 
+class FactionUnitColumns(TypedDict):
+    """One column for each field of a live soldier of one faction.
+
+    The engine builds the set at the moment of the call, so every entry names
+    a live soldier and no entry stands for nothing.
+
+    The unit column holds the whole identity of each soldier. It is not a slot
+    index. The tile column holds the row-major tile index that each soldier
+    stands on.
+    """
+
+    unit: npt.NDArray[np.uint64]
+    tile: npt.NDArray[np.uint32]
+
 class FoundingColumns(TypedDict):
     """What one founding chose, and what it made.
 
@@ -405,6 +419,17 @@ class World:
     def return_direction(self, faction: int, q: int, r: int) -> int | None: ...
     @staticmethod
     def direction_offsets() -> list[tuple[int, int]]: ...
+    def send_units_to(
+        self,
+        units: Identities,
+        seeds: Sequence[tuple[int, int]],
+        destination: int = ...,
+    ) -> None: ...
+    def stop_sending(self, units: Identities) -> None: ...
+    @property
+    def destination_count(self) -> int: ...
+    def set_destination_count(self, count: int) -> None: ...
+    def faction_units(self, faction: int) -> FactionUnitColumns: ...
     @property
     def settlement_count(self) -> int: ...
     def found_settlements(

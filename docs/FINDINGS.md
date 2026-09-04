@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-394**
+**Next number: FND-412**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -601,6 +601,85 @@ this package is documented owns both.
 
 
 ## C. Defects found in specified rules
+
+### FND-411 — A unit ordered to a place stopped at a shoreline and never arrived, and it was not frozen
+
+**Believed.** A unit that the control plane sends to a place walks there. The
+field holds a direction for every cell between the unit and the destination,
+and the fall-back to a keyed draw stops the unit freezing, so the unit arrives
+in about as many frames as there are tiles between the two.[^F411A]
+
+**True.** It arrives only when the ground on the way is open. A field at the
+pitch of a block says which way a block should go, and it cannot say how one
+unit gets around the water in front of it. A record already states that
+consequence, and this is the first case that shows what it costs an ordered
+unit.[^F411B]
+
+**The unit is not frozen, and it does not arrive.** The two are different
+failures, and the fall-back answers only the first. The unit takes a step every
+frame, it wanders inside the cell it is stuck in, and it never crosses the
+barrier. A caller who watched it would see movement and no progress.
+
+**Evidence.** The demonstration extent at the shared seed. A unit was placed at
+one address and sent to the first open tile of the world, which lies about
+eighty tiles west. It walked west for about twenty tiles and then held a
+three-tile neighbourhood for the remaining four thousand frames. The direction
+of its cell pointed west for all of them, and the tile west of it is water. The
+diagnostic run is in the commit history of this branch, and the test that the
+work kept is the fixture rule that came out of it.[^F411C]
+
+**Follows.** Three things.
+
+**A test must not assert that a sent set arrives, unless the fixture proves the
+ground is open.** The fixture of this work walks the field from each candidate
+start and rejects a start whose walk meets ground that refuses it. Without that
+rule the test asserts a promise the engine does not make, and it fails on a seed
+rather than on a defect.
+
+**The verb is honest and the promise is narrower than it reads.** A caller sends
+a set toward a place. The engine does not promise that the set arrives, and the
+Python prose says what it does promise.
+
+**Routing around a barrier is a different claim and it needs a different
+field.** The reach that this work spreads is over cells, and the barrier is a
+tile. A backlog row holds the gap.[^F411D]
+
+### FND-410 — A control-plane order reached the movement pass behind the intent filter, so a unit that had chosen nothing could not be ordered anywhere
+
+**Believed.** An order from the control plane is another input to the step that
+moves a unit, so the movement pass can read it wherever it reads the other
+inputs. The pass opens by reading the intent of a unit and returning early when
+the unit holds none, and that early return looked like a filter on units that
+have nothing to do.[^F180A]
+
+**True.** It is a filter on units that have not chosen yet, which is a
+different set. The choice pass writes an intent only on the frame that the cell
+of a unit chooses, so a unit spawned between two choices holds none.[^F252D] An
+order read after that filter therefore reached no newly spawned unit at all, and
+reached every other unit only on the frames after its cell had chosen.
+
+**A caller cannot see the difference from outside.** The order is accepted, the
+call returns, and the unit stands still. Nothing fails, and the caller has no
+read that would say why.
+
+**Evidence.** A world with the choice schedule set to a long period. One unit
+was spawned, and the test asserted that it held no intent. It was then sent to a
+destination four cells away and the step was driven for 32 frames. With the
+order read after the intent filter, it held its starting tile for all 32. With
+the order read before the filter, it left on an early frame. The test is the
+record of it, and the commit body holds the command.[^F411C]
+
+**Follows.** Two things.
+
+**An order is not a preference, and it does not enter the pass where a
+preference enters.** A unit chooses an option by scoring, and an order from the
+control plane joins no score. It replaces the field that steers the step, and it
+replaces nothing else. The record states that.[^F410D]
+
+**A filter that looks like it drops idle units may drop unstarted ones.** The
+two sets differ only in the frames after a spawn and before a choice, and no
+fixture that spawns and then steps many frames reaches the difference. A test
+that wants the case must hold the choice off.[^23]
 
 ### FND-326 — The panel cut one line kind of eight, and the other seven stayed inside it by luck
 
@@ -9783,6 +9862,11 @@ commodity, and the ration a unit receives is not that account.
 
 ## References
 
+[^F411A]: ADR-0125, the control plane names the seed set of a destination field, decision D4. `docs/adrs/draft/adr-0125-the-control-plane-names-the-seed-set-of-a-destination-field.md`
+[^F411B]: ADR-0091, movement takes its direction from a per-cell field, never from a per-unit search, the consequences. `docs/adrs/draft/adr-0091-movement-takes-its-direction-from-a-per-cell-field.md`
+[^F411C]: The sent set test of the core. `crates/cachette-core/tests/a_sent_set_walks_to_its_destination.rs`
+[^F411D]: Backlog item 0401, decide how a sent unit gets around a barrier the field cannot see. `docs/backlog/proposed/0401-decide-how-a-sent-unit-gets-around-a-barrier.md`
+[^F410D]: ADR-0125, the control plane names the seed set of a destination field, decision D2. `docs/adrs/draft/adr-0125-the-control-plane-names-the-seed-set-of-a-destination-field.md`
 [^F326A]: The head-up display, the row drawing. `crates/cachette-view/src/hud.rs`
 [^F218B]: ADR-0067, the viewer reads the world and never writes to it, decision D4. `docs/adrs/accepted/adr-0067-the-viewer-reads-the-world-and-never-writes-to-it.md`
 [^F327B]: ADR-0094, the caller owns the camera and the pixels, decision D1. `docs/adrs/draft/adr-0094-the-caller-owns-the-camera-and-the-pixels.md`

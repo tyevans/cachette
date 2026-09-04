@@ -23,7 +23,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^ALLOC]
 
-**Next number: DEC-171**
+**Next number: DEC-192**
 
 ## Open
 
@@ -51,29 +51,6 @@ the control plane keeps the whole notion.
 storage and every verb in the report resolves against it. Option B is the
 interesting one for a game about gods, and it should be chosen deliberately
 rather than by default.
-
-### DEC-142 — Does the control plane name the seed set of a strategy field?
-
-**Open. Engineering owns it. It is what makes a unit go to a chosen place.**
-
-The engine derives a reach for each faction and each level 1 cell, seeded at
-every live site of that faction, and a laden unit climbs it home.[^DEC142A] The
-seed set is fixed by the record.
-
-**Option A. Leave the seeds fixed.** A unit goes to a site of its faction and
-nowhere else. This is the state today.
-
-**Option B. Let the control plane name a set of addresses that seeds a plane.**
-The derivation, the relaxation, the tie-break and the per-unit read all stay as
-they are. Only the seeds change.
-
-**Option C. Give a unit a destination it carries.** Rejected before it is
-considered: a quantity computed from a unit's own position toward a unit's own
-destination is the search that the governing record forbids.[^DEC142B]
-
-**Recommendation: Option B.** It gives "move units somewhere" and "gather units
-in a place" from one change, and it gives neither unit a search. It amends a
-draft record rather than superseding an accepted one.
 
 ### DEC-143 — Is an upgrade kind a variant in the engine, or a row in a catalogue the world is built with?
 
@@ -1870,6 +1847,90 @@ finding holds the numbers and names the machine.[^DEC144C]
 
 **What this did not decide.** It does not decide what a contest reads once it
 sits at the tile. A separate row holds that.[^DEC144D]
+### DEC-142 — Does the control plane name the seed set of a strategy field?
+
+**Closed. Option B. The control plane names a set of tiles, and the engine
+seeds a field at every one of them.**[^DEC142C]
+
+The engine derives a reach for each faction and each level 1 cell, seeded at
+every live site of that faction, and a laden unit climbs it home.[^DEC142A] The
+seed set of that field is fixed by the record, so a unit goes to a site of its
+faction and nowhere else.
+
+**Option A. Leave the seeds fixed.** A unit goes to a site of its faction and
+nowhere else. It was rejected because it answers no verb a caller needs: a
+mountain is not a site, and a place a player chose is not a site.
+
+**Option B. Let the control plane name a set of addresses that seeds a plane.**
+The derivation, the relaxation, the tie-break and the per-unit read all stay as
+they are. Only the seeds change.
+
+**Option C. Give a unit a destination it carries.** Rejected before it was
+considered: a quantity computed from a unit's own position toward a unit's own
+destination is the search that the governing record forbids.[^DEC142B]
+
+**What the work found.** The return field keeps its own seed set, so the record
+that holds it needed no amendment. The engine gained a second field beside it,
+and both share one relaxation. Two questions that the item raised are now
+answered in their own rows.[^DEC142D] [^DEC142E]
+
+### DEC-190 — Does the engine allocate a destination plane, or does the caller name one?
+
+**Closed. The caller names the plane. The engine allocates none.**[^DEC190A]
+
+A destination plane is one field over the level 1 cells. A world holds a fixed
+number of them, and the count is a parameter of the world.
+
+**Option A. The engine allocates the lowest free plane and returns its
+number.** The call site is shorter and a caller never runs out silently.
+
+**Option B. The caller names the plane.** A caller that names a plane again
+replaces the seed set of that plane, and every unit already sent to it climbs
+the new one.
+
+**Outcome: Option B.** An allocator is state. It must enter the state hash, it
+must be freed, and it must answer what happens when the planes run out. A
+number the caller names answers all three by holding nothing. Re-aiming a live
+plane is also the behaviour a caller wants: a god that moves its congregation on
+names the same plane with new seeds, and no unit needs a second order.
+
+### DEC-191 — Is exploration the same verb as ordered movement with a different seed set?
+
+**Closed. The mechanism is the same. The verb is not, and this work does not
+build it.**[^DEC190A]
+
+The question is whether a caller explores by naming a seed set, in the same call
+that sends a set of units to a place.
+
+**Option A. One verb.** Exploration is a send whose seeds are the unknown
+ground. The caller names them.
+
+**Option B. Two verbs, one mechanism.** A send takes the seeds the caller names.
+Exploration takes seeds that the engine derives from what a faction has
+observed.
+
+**Outcome: Option B.** Three things separate them, and the mechanism is not one
+of them.
+
+**The seed set of exploration is not a place a caller can name.** It is the
+frontier between what a faction has observed and what it has not, and that
+frontier moves on every frame as the units walk. A caller that named it would
+have to read it back, derive the difference and name it again on every frame,
+which is a loop over the world in the control plane.
+
+**Exploration needs a model that does not exist.** The engine hides nothing
+today. Every tile is readable by every caller and by every unit, so there is
+nothing to uncover. A product record asks that a faction sees only what its own
+units observe, and it is accepted and unbuilt.[^DEC191A]
+
+**The seed set of exploration is per faction, and a destination plane is not.**
+Two factions exploring at once need two frontiers. A send is a plane the caller
+names, and nothing in it is indexed by the faction.
+
+**What follows.** When the observation store exists, exploration is a third
+field over the same lattice, seeded by the engine at the frontier of each
+faction and derived at the barrier beside the other two. The relaxation is the
+one this work made shared, so exploration writes no relaxation of its own.
 
 ### DEC-118 — Does the publishing job keep a switch of its own, now that the address is known?
 
@@ -3582,6 +3643,11 @@ a failed founding is correct.[^PRD12]
 [^DEC150A]: ADR-0009, parallel stages write disjoint outputs, decisions D1, D2 and D3. `docs/adrs/accepted/adr-0009-parallel-stages-write-disjoint-outputs.md`
 [^DEC150B]: ADR-0071, the bridge rebuild orders on one thread, decision D2. `docs/adrs/accepted/adr-0071-the-bridge-rebuild-orders-on-one-thread.md`
 [^DEC142A]: ADR-0110, a unit returns by climbing a reach field seeded at every site of its faction, decisions D1 and D2. `docs/adrs/draft/adr-0110-a-unit-returns-by-climbing-a-reach-field.md`
+[^DEC142C]: ADR-0125, the control plane names the seed set of a destination field, decision D1. `docs/adrs/draft/adr-0125-the-control-plane-names-the-seed-set-of-a-destination-field.md`
+[^DEC142D]: Decisions register, DEC-190, in this document.
+[^DEC142E]: Decisions register, DEC-191, in this document.
+[^DEC190A]: Backlog item 0342, let the control plane name the seed set of a strategy field. `docs/backlog/complete/0342-let-the-control-plane-name-the-seed-set-of-a-strategy-field.md`
+[^DEC191A]: Research report 21, what a god needs from this engine, section 1.2. `docs/research/reports/21-what-a-god-needs.md`
 [^DEC142B]: ADR-0095, a behavioural strategy arrives as a field over cells, never as a search from a unit, decision D1. `docs/adrs/draft/adr-0095-a-behavioural-strategy-arrives-as-a-field-over-cells.md`
 [^DEC144A]: Research report 21, what a god needs from this engine, section 4.2. `docs/research/reports/21-what-a-god-needs.md`
 [^DEC144B]: Blockers register, BLK-052, in this repository. `docs/BLOCKERS.md`

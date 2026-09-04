@@ -86,6 +86,19 @@ const FIRST_GENERATION: u32 = 1;
 /// [^1]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`
 const NO_ORDER: u8 = 0;
 
+/// The send value that means nobody sent the unit anywhere.
+///
+/// Any other value is the destination plane number plus one. One value
+/// therefore says both whether the control plane sent the unit and which
+/// destination field steers it, so no second column can disagree with this
+/// one.[^1] [^2]
+///
+/// # References
+///
+/// [^1]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`
+/// [^2]: ADR-0125, the control plane names the seed set of a destination field, decision D2. `docs/adrs/draft/adr-0125-the-control-plane-names-the-seed-set-of-a-destination-field.md`
+const NO_SEND: u16 = 0;
+
 /// The home value that means a unit belongs to no site.
 ///
 /// The value is the top of the slot index range, which no arena reaches,
@@ -278,6 +291,24 @@ pub struct SoldierArena {
     ///
     /// [^1]: ADR-0090, a tile upgrade is stored sparsely, as the difference from the generated world, decision D1. `docs/adrs/draft/adr-0090-a-tile-upgrade-is-stored-sparsely.md`
     builds: Vec<u8>,
+    /// The destination that the control plane sent each slot to.
+    ///
+    /// The value zero means nobody sent the unit anywhere. Any other value is
+    /// the destination plane number plus one. The column holds a small
+    /// integer and not an option, because it is plain data that reaches the
+    /// state hash.
+    ///
+    /// **The send is a column of this arena, and the destination is a field
+    /// over the cells.** The unit carries which plane it obeys. It carries no
+    /// address, no route and no distance, because a quantity computed from a
+    /// unit's own position toward a unit's own destination is the search that
+    /// the movement record forbids.[^1] [^2]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0091, movement takes its direction from a per-cell field, never from a per-unit search, decision D1. `docs/adrs/draft/adr-0091-movement-takes-its-direction-from-a-per-cell-field.md`
+    /// [^2]: ADR-0125, the control plane names the seed set of a destination field, decision D2. `docs/adrs/draft/adr-0125-the-control-plane-names-the-seed-set-of-a-destination-field.md`
+    sends: Vec<u16>,
     /// The need of each slot.
     ///
     /// A need runs from zero to full. It falls at an interval by a
@@ -455,6 +486,7 @@ impl Clone for SoldierArena {
             carries: copy_column(&self.carries, capacity),
             orders: copy_column(&self.orders, capacity),
             builds: copy_column(&self.builds, capacity),
+            sends: copy_column(&self.sends, capacity),
             needs: copy_column(&self.needs, capacity),
             deficits: copy_column(&self.deficits, capacity),
             homes: copy_column(&self.homes, capacity),
@@ -504,6 +536,7 @@ impl SoldierArena {
             carries: Vec::with_capacity(slots),
             orders: Vec::with_capacity(slots),
             builds: Vec::with_capacity(slots),
+            sends: Vec::with_capacity(slots),
             needs: Vec::with_capacity(slots),
             deficits: Vec::with_capacity(slots),
             homes: Vec::with_capacity(slots),
@@ -684,6 +717,7 @@ impl SoldierArena {
         debug_assert_eq!(self.carries[index], CarryLoad::EMPTY);
         debug_assert_eq!(self.orders[index], NO_ORDER);
         debug_assert_eq!(self.builds[index], NO_BUILD);
+        debug_assert_eq!(self.sends[index], NO_SEND);
         // A unit arrives fed and out of deficit, and it belongs to no site
         // until something gives it one.
         self.needs[index] = NEED_FULL;
@@ -719,6 +753,7 @@ impl SoldierArena {
         self.carries.push(CarryLoad::EMPTY);
         self.orders.push(NO_ORDER);
         self.builds.push(NO_BUILD);
+        self.sends.push(NO_SEND);
         self.needs.push(NEED_FULL);
         self.deficits.push(Fix32::ZERO);
         self.homes.push(NO_HOME);
@@ -767,6 +802,9 @@ impl SoldierArena {
         self.carries[index] = CarryLoad::EMPTY;
         self.orders[index] = NO_ORDER;
         self.builds[index] = NO_BUILD;
+        // A send ends with the unit. A stale send in a free slot would put the
+        // next unit in that slot under an order nobody gave it.
+        self.sends[index] = NO_SEND;
         self.needs[index] = Fix32::ZERO;
         self.deficits[index] = Fix32::ZERO;
         self.homes[index] = NO_HOME;
@@ -1135,6 +1173,82 @@ impl SoldierArena {
         true
     }
 
+    /// Returns the destination that the control plane sent a soldier to.
+    ///
+    /// The outer option reports whether the identity names a live soldier.
+    /// The inner one reports whether anybody sent it anywhere.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0125, the control plane names the seed set of a destination field, decision D2. `docs/adrs/draft/adr-0125-the-control-plane-names-the-seed-set-of-a-destination-field.md`
+    #[must_use]
+    pub fn sent(&self, entity: Entity) -> Option<Option<u16>> {
+        let slot = self.slot_of(entity)?;
+        let stored = self.sends[slot as usize];
+        Some(if stored == NO_SEND {
+            None
+        } else {
+            Some(stored - 1)
+        })
+    }
+
+    /// Sends a soldier to a destination, or stops sending it.
+    ///
+    /// Returns `false` when the identity names no live soldier.
+    ///
+    /// The arena holds no destination field, so it cannot say whether the
+    /// number names one. The world checks that, because the world holds both
+    /// the arena and the field.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`
+    pub fn set_sent(&mut self, entity: Entity, destination: Option<u16>) -> bool {
+        let Some(slot) = self.slot_of(entity) else {
+            return false;
+        };
+        self.sends[slot as usize] = match destination {
+            Some(destination) => destination.saturating_add(1),
+            None => NO_SEND,
+        };
+        true
+    }
+
+    /// Returns the whole send column.
+    #[must_use]
+    pub fn send_column(&self) -> &[u16] {
+        &self.sends
+    }
+
+    /// Returns the live soldiers of one faction, in slot order.
+    ///
+    /// **One call answers for a whole faction.** A caller that walked the
+    /// identities one at a time would pay one crossing for each unit, and the
+    /// control plane never loops over the population.[^1]
+    ///
+    /// The order is the slot order, and it is the same on every run. It is
+    /// never a thread completion order and never a hash order.[^2]
+    ///
+    /// Every identity the walk returns names a live soldier at the moment of
+    /// the call, so no entry stands for nothing and the result needs no
+    /// validity mask.[^3]
+    ///
+    /// # References
+    ///
+    /// [^1]: Project orientation, the design principles. `CLAUDE.md`
+    /// [^2]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
+    /// [^3]: ADR-0085, an entity crosses to Python as one opaque identity that the engine resolves, decision D3. `docs/adrs/accepted/adr-0085-an-entity-crosses-to-python-as-one-opaque-identity.md`
+    pub fn iter_faction(&self, faction: FactionId) -> impl Iterator<Item = Entity> + '_ {
+        self.live
+            .iter()
+            .enumerate()
+            .filter(move |(index, live)| **live == 1 && self.factions[*index] == faction)
+            .map(|(index, _)| {
+                Entity::new(index as u32, self.generations[index])
+                    .expect("a live slot holds a generation of one or more")
+            })
+    }
+
     /// Returns the need of a soldier, or `None` when the identity is dead.
     #[must_use]
     pub fn need(&self, entity: Entity) -> Option<Fix32> {
@@ -1288,6 +1402,7 @@ impl SoldierArena {
             .write(bytemuck::cast_slice(&self.carries))
             .write(&self.orders)
             .write(&self.builds)
+            .write(bytemuck::cast_slice(&self.sends))
             .write(bytemuck::cast_slice(&self.needs))
             .write(bytemuck::cast_slice(&self.deficits))
             .write(bytemuck::cast_slice(&self.homes))
@@ -1324,7 +1439,13 @@ impl SoldierArena {
         if self.needs.len() != slots || self.deficits.len() != slots || self.homes.len() != slots {
             return false;
         }
-        if self.intents.len() != slots {
+        if self.intents.len() != slots || self.sends.len() != slots {
+            return false;
+        }
+        // A dead slot holds no send. A stale send there would reach the state
+        // hash, and the next unit in the slot would march to a destination
+        // that nobody sent it to.
+        if (0..slots).any(|slot| self.live[slot] == 0 && self.sends[slot] != NO_SEND) {
             return false;
         }
         if self.deeds.len() != slots

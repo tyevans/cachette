@@ -50,7 +50,7 @@ use crate::position::{
 };
 use crate::presence::PresenceRelation;
 use crate::promotion::{self, PromotionError, UnitPromoted};
-use crate::pyramid::{CellSummary, ExitField, Pyramid, ReturnField};
+use crate::pyramid::{CellSummary, ExitField, Pyramid, ReturnField, SeededField};
 use crate::rates::{RateError, RateLedger, RateSchedule, RateTable, SiteShortfall};
 use crate::resource::{
     ledger_key, Amount, CarryLoad, DepletionLedger, RecoveryRules, ResourceField, ResourceKind,
@@ -124,6 +124,42 @@ impl core::fmt::Display for IdentityError {
 }
 
 impl std::error::Error for IdentityError {}
+
+/// The reason that the world refused to send a set of units somewhere.
+///
+/// Each value names the thing that refused, so a caller repairs the call
+/// without guessing which part of the set was wrong.[^1]
+///
+/// # References
+///
+/// [^1]: ADR-0085, an entity crosses to Python as one opaque identity that the engine resolves, decision D3. `docs/adrs/accepted/adr-0085-an-entity-crosses-to-python-as-one-opaque-identity.md`
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum SendError {
+    /// The number names no destination plane of this world.
+    NoSuchDestination(u16),
+    /// An identity names no live soldier.
+    DeadUnit(Entity),
+    /// A seed address is outside the world.
+    AddressOutsideWorld(Axial),
+}
+
+impl core::fmt::Display for SendError {
+    fn fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            Self::NoSuchDestination(destination) => {
+                write!(formatter, "{destination} names no destination")
+            }
+            Self::DeadUnit(unit) => {
+                write!(formatter, "the identity {unit:?} names no live soldier")
+            }
+            Self::AddressOutsideWorld(address) => {
+                write!(formatter, "the address {address:?} is outside the world")
+            }
+        }
+    }
+}
+
+impl std::error::Error for SendError {}
 
 /// The reason that a step refused to run.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -367,6 +403,19 @@ impl WorldConfig {
     /// [^1]: Budgets and costs, the scale constants. `docs/reference/budgets.md`
     /// [^2]: Blockers register, BLK-007. `docs/BLOCKERS.md`
     pub const TARGET_UNIT_POPULATION: u32 = 1_000_000;
+
+    /// The number of destination planes that a world holds when the caller
+    /// states no other.
+    ///
+    /// **This is a fixture-facing parameter and not a budget.** It says how
+    /// many places a control plane may send units to at one time, before it
+    /// re-aims a plane it already used. No record holds the value and no
+    /// measurement chooses it.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: Blockers register, BLK-007. `docs/BLOCKERS.md`
+    pub const DEFAULT_DESTINATION_COUNT: u16 = 4;
 }
 
 impl Default for WorldConfig {
@@ -480,6 +529,33 @@ pub struct World {
     ///
     /// [^1]: ADR-0110, a unit returns by climbing a reach field seeded at every site of its faction, decision D1. `docs/adrs/draft/adr-0110-a-unit-returns-by-climbing-a-reach-field.md`
     returns: ReturnField,
+    /// The direction of the nearest tile of a named destination, for each
+    /// level 1 cell and each destination plane.
+    ///
+    /// It steers a unit that the control plane sent somewhere. The field is
+    /// derived at every rebuild of level 1, beside the exit field and the
+    /// return field, and it is derived again when the seeds change.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0125, the control plane names the seed set of a destination field, decision D1. `docs/adrs/draft/adr-0125-the-control-plane-names-the-seed-set-of-a-destination-field.md`
+    destinations: SeededField,
+    /// The seed cells of each destination plane, in ascending order.
+    ///
+    /// **The control plane names these, and nothing else writes them.** The
+    /// entry of one plane holds each cell once and in ascending order, so the
+    /// derivation reads one set whatever order the caller named the tiles
+    /// in.[^1]
+    ///
+    /// The set holds cells and not tiles. A destination is a place a block
+    /// can be steered at, and a field at block pitch cannot answer a
+    /// tile.[^2]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
+    /// [^2]: Findings register, FND-315. `docs/FINDINGS.md`
+    destination_seeds: Vec<Vec<u32>>,
     /// The load at which a unit counts as laden.
     ///
     /// A laden unit takes the option that carries its load home, and a unit
@@ -696,6 +772,8 @@ impl World {
             pyramid: Pyramid::new(layout, ResourceField::new(terrain))?,
             exits: ExitField::new(cell_lattice),
             returns: ReturnField::new(cell_lattice, config.faction_count),
+            destinations: SeededField::new(cell_lattice, WorldConfig::DEFAULT_DESTINATION_COUNT),
+            destination_seeds: vec![Vec::new(); WorldConfig::DEFAULT_DESTINATION_COUNT as usize],
             carry_mark: CARRY_MARK_DEFAULT,
             holding: Holding::new(layout),
             influence: InfluenceField::new(cell_lattice, config.faction_count)?,
@@ -912,6 +990,203 @@ impl World {
     #[must_use]
     pub fn gather_order(&self, entity: Entity) -> Option<Option<ResourceKind>> {
         self.soldiers.gather_order(entity)
+    }
+
+    /// Sends a set of units to a set of tiles, through one destination plane.
+    ///
+    /// **The control plane names the seed set, and the engine builds one
+    /// field.** The seeds are the tiles the caller wants the units at. The
+    /// engine takes the level 1 cell of each of them, seeds the plane at every
+    /// one, and relaxes a reach outward from the whole set at once. Every unit
+    /// the call names then reads one entry of that plane and steps.[^1] [^2]
+    ///
+    /// **No unit gains a search.** A unit reads the entry of its own cell and
+    /// its own plane. It reads no neighbouring cell, it scores no neighbour,
+    /// and it computes nothing from its own address toward a destination.[^3]
+    ///
+    /// **The set is all or nothing.** Every identity resolves and every
+    /// address is inside the world before anything changes.
+    ///
+    /// The order of the seeds does not reach the field. The engine sorts the
+    /// cells and holds each of them once, so two calls that name one set in
+    /// two orders derive one field.[^4]
+    ///
+    /// A caller that names the same plane again replaces the seed set of that
+    /// plane. Every unit already sent to it then climbs the new one.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the number names no destination plane, when an
+    /// identity names no live soldier, or when an address is outside the
+    /// world.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0125, the control plane names the seed set of a destination field, decision D1. `docs/adrs/draft/adr-0125-the-control-plane-names-the-seed-set-of-a-destination-field.md`
+    /// [^2]: ADR-0095, a behavioural strategy arrives as a field over cells, never as a search from a unit, decision D3. `docs/adrs/draft/adr-0095-a-behavioural-strategy-arrives-as-a-field-over-cells.md`
+    /// [^3]: ADR-0091, movement takes its direction from a per-cell field, never from a per-unit search, decision D1. `docs/adrs/draft/adr-0091-movement-takes-its-direction-from-a-per-cell-field.md`
+    /// [^4]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
+    pub fn send_units_to(
+        &mut self,
+        units: &[Entity],
+        seeds: &[Axial],
+        destination: u16,
+    ) -> Result<(), SendError> {
+        if destination >= self.destinations.plane_count() {
+            return Err(SendError::NoSuchDestination(destination));
+        }
+        for unit in units {
+            if self.soldiers.slot_of(*unit).is_none() {
+                return Err(SendError::DeadUnit(*unit));
+            }
+        }
+        let mut cells = Vec::with_capacity(seeds.len());
+        for address in seeds {
+            let tile = self
+                .grid
+                .index_of(*address)
+                .ok_or(SendError::AddressOutsideWorld(*address))?;
+            let cell = self
+                .cell_of(tile)
+                .ok_or(SendError::AddressOutsideWorld(*address))?;
+            cells.push(cell);
+        }
+        // The set is a set. The sort and the dedup make the stored order a
+        // property of the cells and never of the order the caller named them
+        // in.[^4]
+        cells.sort_unstable();
+        cells.dedup();
+        self.destination_seeds[destination as usize] = cells;
+        for unit in units {
+            assert!(
+                self.soldiers.set_sent(*unit, Some(destination)),
+                "a resolved identity must name a soldier the arena can send"
+            );
+        }
+        // The field is derived here as well as at the barrier. A caller reads
+        // the direction between two steps, and a derived value that one path
+        // leaves stale is a confident wrong answer.[^5]
+        //
+        // [^5]: Findings register, FND-029. `docs/FINDINGS.md`
+        self.destinations
+            .derive(&self.pyramid, &self.destination_seed_pairs());
+        Ok(())
+    }
+
+    /// Stops sending a set of units.
+    ///
+    /// Every unit the call names goes back to the option it chose for itself.
+    /// **The set is all or nothing**: every identity resolves before anything
+    /// changes.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when an identity names no live soldier.
+    pub fn stop_sending(&mut self, units: &[Entity]) -> Result<(), SendError> {
+        for unit in units {
+            if self.soldiers.slot_of(*unit).is_none() {
+                return Err(SendError::DeadUnit(*unit));
+            }
+        }
+        for unit in units {
+            assert!(
+                self.soldiers.set_sent(*unit, None),
+                "a resolved identity must name a soldier the arena can stop"
+            );
+        }
+        Ok(())
+    }
+
+    /// Returns the destination that the control plane sent one unit to.
+    ///
+    /// The outer option reports whether the identity names a live soldier.
+    /// The inner one reports whether anybody sent it anywhere.
+    #[must_use]
+    pub fn sent_to(&self, entity: Entity) -> Option<Option<u16>> {
+        self.soldiers.sent(entity)
+    }
+
+    /// Returns the number of destination planes that the world holds.
+    #[must_use]
+    pub const fn destination_count(&self) -> u16 {
+        self.destinations.plane_count()
+    }
+
+    /// Sets the number of destination planes that the world holds.
+    ///
+    /// **The caller names the plane that carries an order, and the engine
+    /// allocates none.** The count says how many places a control plane may
+    /// send units to at one time, before it re-aims a plane it already
+    /// used.[^1]
+    ///
+    /// The call clears the seed set of every plane, so no order steers
+    /// anything until the caller sends a set again. A unit that was sent to a
+    /// plane the world no longer holds reads no direction, and it takes the
+    /// keyed draw rather than standing still.[^2]
+    ///
+    /// The cost is the cell count times the number of planes, in bytes. No
+    /// figure appears here, because one blocker governs every cost figure this
+    /// project holds.[^3]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0125, the control plane names the seed set of a destination field, decision D3. `docs/adrs/draft/adr-0125-the-control-plane-names-the-seed-set-of-a-destination-field.md`
+    /// [^2]: ADR-0125, the control plane names the seed set of a destination field, decision D4. `docs/adrs/draft/adr-0125-the-control-plane-names-the-seed-set-of-a-destination-field.md`
+    /// [^3]: Blockers register, BLK-007. `docs/BLOCKERS.md`
+    pub fn set_destination_count(&mut self, count: u16) {
+        self.destinations = SeededField::new(self.destinations.cells(), count);
+        self.destination_seeds = vec![Vec::new(); count as usize];
+    }
+
+    /// Returns the direction that a unit sent to one destination takes from
+    /// one address.
+    ///
+    /// The outer option reports whether the address and the destination name
+    /// an entry. The inner one reports whether the cell holds a direction at
+    /// all. **A cell that holds a seed, and a cell the reach never arrived
+    /// at, both hold none**, and a unit there falls back to the keyed draw
+    /// rather than standing still.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0125, the control plane names the seed set of a destination field, decision D4. `docs/adrs/draft/adr-0125-the-control-plane-names-the-seed-set-of-a-destination-field.md`
+    #[must_use]
+    pub fn destination_direction(&self, destination: u16, address: Axial) -> Option<Option<u8>> {
+        let tile = self.grid.index_of(address)?;
+        self.destinations
+            .direction(destination, self.cell_of(tile)?)
+    }
+
+    /// Returns the destination field of the world.
+    ///
+    /// The field holds one direction for each level 1 cell and each
+    /// destination plane.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0125, the control plane names the seed set of a destination field, decision D1. `docs/adrs/draft/adr-0125-the-control-plane-names-the-seed-set-of-a-destination-field.md`
+    #[must_use]
+    pub const fn destination_field(&self) -> &SeededField {
+        &self.destinations
+    }
+
+    /// Returns one seed for each destination plane and each cell of its set.
+    ///
+    /// The walk is over the planes in ascending order and over the cells of
+    /// each plane in ascending order, so the set does not depend on a thread
+    /// count.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
+    fn destination_seed_pairs(&self) -> Vec<(u16, u32)> {
+        let mut seeds = Vec::new();
+        for (plane, cells) in self.destination_seeds.iter().enumerate() {
+            for cell in cells {
+                seeds.push((plane as u16, *cell));
+            }
+        }
+        seeds
     }
 
     /// Returns the gather events of the last step.
@@ -2566,7 +2841,20 @@ impl World {
         // What each faction reaches is state that a later frame reads: the
         // next solve starts from the field this one left. Two worlds that
         // hold the same tiles and different fields must diverge.
-        let hash = self.influence.hash_into(hash);
+        let mut hash = self.influence.hash_into(hash);
+        // The seed set of each destination is state that a later frame reads.
+        // The field itself is derived from it and from level 1, and a derived
+        // value states no fact of its own, so the seeds enter the hash and the
+        // field does not. The send column of each unit is already in the
+        // arena hash above.[^4]
+        //
+        // [^4]: ADR-0022, level 0 is the only truth, and every level above it is derived, decision D1. `docs/adrs/accepted/adr-0022-level-0-is-the-only-truth-and-every-level-above-it-is-derived.md`
+        for cells in &self.destination_seeds {
+            hash = hash.write_u64(cells.len() as u64);
+            for cell in cells {
+                hash = hash.write(&cell.to_le_bytes());
+            }
+        }
         // A position is state that a later frame reads: a unit that holds
         // one still holds it on the next frame, and the preference decides
         // what the next rebalance opens. Two worlds that hold the same
@@ -3311,6 +3599,7 @@ impl World {
                     layout: self.pyramid.layout(),
                     exits: &self.exits,
                     returns: &self.returns,
+                    destinations: &self.destinations,
                 },
                 threads,
             )?
@@ -4100,6 +4389,8 @@ impl World {
         )?;
         self.exits.derive(&self.pyramid);
         self.returns.derive(&self.pyramid, &self.site_seeds());
+        self.destinations
+            .derive(&self.pyramid, &self.destination_seed_pairs());
         Ok(())
     }
 
@@ -5202,6 +5493,14 @@ struct Steering<'a> {
     exits: &'a ExitField,
     /// One direction for each cell and each faction.
     returns: &'a ReturnField,
+    /// One direction for each cell and each destination plane.
+    ///
+    /// The control plane names the seed set of a plane. A unit it sent to
+    /// that plane reads one entry of it, in place of the entry that its own
+    /// option would have read.[^3]
+    ///
+    /// [^3]: ADR-0125, the control plane names the seed set of a destination field, decision D1. `docs/adrs/draft/adr-0125-the-control-plane-names-the-seed-set-of-a-destination-field.md`
+    destinations: &'a SeededField,
 }
 
 struct UnitWalk<'a> {
@@ -5224,6 +5523,7 @@ fn soldier_moves(
         layout,
         exits,
         returns,
+        destinations,
     } = *steering;
     // **The walk is in cell order, not in slot order.** The two hold the same
     // units and differ only in the order. Every read below the filter is a
@@ -5264,12 +5564,30 @@ fn soldier_moves(
                 *slot = chunk
                     .iter()
                     .filter_map(|soldier| {
+                        let here = soldiers.address(*soldier)?;
+                        // **A unit the control plane sent somewhere climbs
+                        // the plane it was sent to, and it reads no intent.**
+                        // An order from the control plane is not a score, so
+                        // it does not join the option set and it does not
+                        // compete with one. It replaces the field that steers
+                        // the step, and it replaces nothing else.[^20]
+                        //
+                        // The test sits above the intent filter on purpose. A
+                        // unit that has chosen nothing yet holds no intent,
+                        // and a sent unit that waited for one would stand
+                        // still until its cell next chose.[^21]
+                        //
+                        // [^20]: ADR-0125, the control plane names the seed set of a destination field, decision D2. `docs/adrs/draft/adr-0125-the-control-plane-names-the-seed-set-of-a-destination-field.md`
+                        // [^21]: ADR-0064, a unit chooses by scoring a small fixed option set, decision D4. `docs/adrs/accepted/adr-0064-a-unit-chooses-by-scoring-a-small-fixed-option-set.md`
+                        let sent = soldiers.sent(*soldier)?;
                         // A unit that holds no intent does not move. The
                         // choice pass writes the intent, and a unit whose
                         // every option scored below the floor holds what it
                         // was doing.[^7]
-                        let option = soldiers.intent(*soldier)??;
-                        let here = soldiers.address(*soldier)?;
+                        let option = match sent {
+                            Some(_) => None,
+                            None => Some(soldiers.intent(*soldier)??),
+                        };
                         // **The option steers the step.** The unit reads the
                         // entry of its own cell and its own option, and it
                         // never scores a neighbouring cell of its own.[^8]
@@ -5299,9 +5617,21 @@ fn soldier_moves(
                         //
                         // [^18]: ADR-0110, a unit returns by climbing a reach field seeded at every site of its faction, decision D1. `docs/adrs/draft/adr-0110-a-unit-returns-by-climbing-a-reach-field.md`
                         // [^19]: ADR-0095, a behavioural strategy arrives as a field over cells, never as a search from a unit, decision D1. `docs/adrs/draft/adr-0095-a-behavioural-strategy-arrives-as-a-field-over-cells.md`
-                        let steer = match OPTIONS[option as usize].ranked {
-                            Ranked::Cell(_) => exits.exit(cell, option),
-                            Ranked::Carry => returns.direction(soldiers.faction(*soldier)?, cell),
+                        let steer = match (sent, option) {
+                            // **The destination plane wins over the option
+                            // row.** A caller that sends a unit somewhere has
+                            // said where it goes, and the option the unit
+                            // scored for itself says only what it wants.[^20]
+                            (Some(destination), _) => destinations.direction(destination, cell),
+                            (None, Some(option)) => match OPTIONS[option as usize].ranked {
+                                Ranked::Cell(_) => exits.exit(cell, option),
+                                Ranked::Carry => {
+                                    returns.direction(soldiers.faction(*soldier)?, cell)
+                                }
+                            },
+                            // A unit that holds no intent and no destination
+                            // left the walk at the filter above.
+                            (None, None) => None,
                         };
                         let direction = match steer {
                             Some(Some(direction)) => direction as usize,

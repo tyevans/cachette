@@ -304,3 +304,122 @@ def test_a_refused_order_set_gives_no_order(seed: int) -> None:
     # The living unit took no order, so the world grants nothing.
     world.step(threads=1)
     assert world.gather_count == 0
+
+
+# The addresses of the fixture that reads a faction as a set.
+#
+# The count is the assertion's, not the world's. Five units in one faction and
+# two in another prove that the read answers for one faction and not for the
+# world.
+FACTION_ADDRESSES = ((0, 0), (1, 0), (2, 0), (3, 0), (4, 0))
+OTHER_ADDRESSES = ((0, 1), (1, 1))
+
+
+def test_the_units_of_a_faction_come_back_as_columns(seed: int) -> None:
+    # The read takes a faction and answers with columns. It takes no identity
+    # from the caller, so every entry names a live soldier and no entry needs
+    # a validity mask.
+    world = cachette.World(width=16, height=16, seed=seed, faction_count=3)
+    world.spawn_soldiers(FACTION_ADDRESSES, 1)
+    world.spawn_soldiers(OTHER_ADDRESSES, 2)
+
+    columns = world.faction_units(1)
+    assert set(columns) == {"unit", "tile"}
+    # The element types are the ones the doc comment declares. A caller that
+    # read a different width would read a different number.
+    assert columns["unit"].dtype == np.uint64
+    assert columns["tile"].dtype == np.uint32
+    assert len(columns["unit"]) == len(FACTION_ADDRESSES)
+    assert len(world.faction_units(2)["unit"]) == len(OTHER_ADDRESSES)
+    assert len(world.faction_units(0)["unit"]) == 0
+
+
+def test_the_set_read_agrees_with_the_singular_read(seed: int) -> None:
+    # The set read must answer what the loop answered, for every unit. A read
+    # that disagreed with the singular one would be a second answer to one
+    # question, and nothing would fail when the two disagreed.
+    world = cachette.World(width=16, height=16, seed=seed, faction_count=3)
+    world.spawn_soldiers(FACTION_ADDRESSES, 1)
+    world.spawn_soldiers(OTHER_ADDRESSES, 2)
+    world.step(threads=1)
+
+    columns = world.faction_units(1)
+    # This loop is the thing the read exists to remove. It runs here because
+    # the fixture holds five units, and it is the only way to prove that the
+    # column says what the loop said.
+    assert len(columns["unit"]), "the fixture must hold a unit"
+    for row in range(len(columns["unit"])):
+        unit = int(columns["unit"][row])
+        assert world.soldier_tile(unit) == int(columns["tile"][row])
+
+
+def test_the_set_read_returns_arrays_and_not_one_object_for_each_unit(
+    seed: int,
+) -> None:
+    # **One crossing, and no Python object for any entity.** The result is two
+    # NumPy arrays that hold the engine's own values. A read that built one
+    # object for each unit would cross once for each of them at the target
+    # scale.
+    world = cachette.World(width=16, height=16, seed=seed, faction_count=3)
+    world.spawn_soldiers(FACTION_ADDRESSES, 1)
+
+    columns = world.faction_units(1)
+    assert isinstance(columns["unit"], np.ndarray)
+    assert isinstance(columns["tile"], np.ndarray)
+    # An array of Python objects would have this element type, and it is the
+    # failure this assertion names.
+    assert columns["unit"].dtype != np.dtype(object)
+
+
+def test_a_dead_unit_leaves_the_set_read(seed: int) -> None:
+    # The engine builds the set at the moment of the call, so a unit that died
+    # is not in it. Nothing here stands for nothing.
+    world = cachette.World(width=16, height=16, seed=seed, faction_count=3)
+    units = [int(unit) for unit in world.spawn_soldiers(FACTION_ADDRESSES, 1)]
+    world.despawn_soldiers([units[0]])
+
+    columns = world.faction_units(1)
+    assert len(columns["unit"]) == len(FACTION_ADDRESSES) - 1
+    assert units[0] not in {int(unit) for unit in columns["unit"]}
+
+
+def test_a_sent_set_takes_one_call_and_leaves_the_units_alive(seed: int) -> None:
+    # The control plane names a set of units and a set of tiles in one call.
+    # The engine builds one field and every unit of the set climbs it.
+    world = cachette.World(width=64, height=64, seed=seed, faction_count=3)
+    units = world.spawn_soldiers(FACTION_ADDRESSES, 1)
+
+    world.send_units_to(units, [(32, 32)])
+    for _ in range(4):
+        world.step(threads=1)
+
+    # The read side answers where the set went, in one call.
+    columns = world.faction_units(1)
+    assert len(columns["unit"]) == len(FACTION_ADDRESSES)
+
+    world.stop_sending(units)
+
+
+def test_a_send_refuses_a_destination_the_world_does_not_hold(seed: int) -> None:
+    world = cachette.World(width=16, height=16, seed=seed, faction_count=2)
+    units = world.spawn_soldiers([(0, 0)], 1)
+    with pytest.raises(cachette.VerbError):
+        world.send_units_to(units, [(1, 1)], 2**16 - 1)
+
+
+def test_a_send_refuses_an_address_outside_the_world(seed: int) -> None:
+    world = cachette.World(width=16, height=16, seed=seed, faction_count=2)
+    units = world.spawn_soldiers([(0, 0)], 1)
+    with pytest.raises(cachette.VerbError):
+        world.send_units_to(units, [(99, 99)])
+
+
+def test_a_refused_send_set_sends_nobody(seed: int) -> None:
+    # Every identity resolves before anything changes, so one dead identity
+    # leaves the whole set untouched.
+    world = cachette.World(width=16, height=16, seed=seed, faction_count=2)
+    units = [int(unit) for unit in world.spawn_soldiers([(0, 0), (1, 0)], 1)]
+    world.despawn_soldiers([units[1]])
+
+    with pytest.raises(cachette.ViewError):
+        world.send_units_to(units, [(2, 2)])
