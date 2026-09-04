@@ -1153,9 +1153,12 @@ impl PyWorld {
     #[pyo3(signature = (sites, rate, commodity = 0))]
     fn spend_at_sites(&self, sites: Vec<u64>, rate: i32, commodity: u16) -> PyResult<()> {
         let mut world = self.lock();
-        if rate < 0 {
-            return Err(VerbError::new_err(format!("the rate {rate} is below zero")));
-        }
+        // **The engine holds the one check of the rate, and this call adds
+        // none.** A copy here would be a second statement of a rule the engine
+        // already enforces, and nothing would fail when the two disagreed. The
+        // engine checks the rate before it writes anything, and the rate is
+        // one value for the whole set, so the first refusal leaves every site
+        // untouched.
         let goods = CommodityId(commodity);
         let mut resolved = Vec::with_capacity(sites.len());
         for site in &sites {

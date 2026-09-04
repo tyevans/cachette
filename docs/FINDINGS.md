@@ -647,7 +647,7 @@ The commit body holds the search command.
 shortfall log and the upkeep rate together, because binding the reader alone
 would have shipped a call that answers with an empty log for ever. That is the
 inert capability shape with an extra step in it: the reader is invoked, and the
-thing it reads is not.[^F460B]
+thing it reads is not.[^37]
 
 **The same question applies to every other log.** Ask what writes it, and ask
 whether a caller can reach that writer. The four other logs this work bound each
@@ -671,7 +671,7 @@ The commit body holds both runs.
 **Follows.** A test for a log of scarcity states the extent and the faction
 count as the thing that makes the case, and says so where a reader will look.
 The fixture rule already says not to model the typical case, and this is that
-rule reaching a subsystem it had not reached.[^F461A]
+rule reaching a subsystem it had not reached.[^84]
 
 ### FND-411 — A unit ordered to a place stopped at a shoreline and never arrived, and it was not frozen
 
@@ -11103,5 +11103,3 @@ itself rather than merely underspecified.
 [^F420C]: Decisions register, DEC-201, in this document's companion. `docs/DECISIONS.md`
 [^F421A]: The luxury tests. `crates/cachette-core/tests/luxury.rs`
 [^F460A]: ADR-0062, production and upkeep are rates attached to a site, decision D2. `docs/adrs/accepted/adr-0062-production-and-upkeep-are-rates-attached-to-a-site.md`
-[^F460B]: Recurring defect shapes, shape 3. `.claude/rules/recurring-defects.md`
-[^F461A]: Testing Rules, section 2a. `.claude/rules/testing.md`

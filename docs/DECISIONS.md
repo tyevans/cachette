@@ -1805,7 +1805,7 @@ number, and the table read returns the rows.
 **Why A.** Option B and option C put one value in two declaration sites, and
 nothing fails when the copies disagree. That is the defect shape this project
 has recorded a local instance of, and the rule says to declare a value once and
-to add a check when a second site must exist.[^DEC250B] There is no second site
+to add a check when a second site must exist.[^DEC73B] There is no second site
 worth checking here, because the array a caller already holds carries the
 number.
 
@@ -3911,4 +3911,3 @@ game rule, and a blocker holds it.[^DEC213B]
 [^DEC202A]: ADR-0053, a faction is a bit in a mask, and a relation is a plane, decision D3. `docs/adrs/accepted/adr-0053-a-faction-is-a-bit-in-a-mask-and-a-relation-is-a-plane.md`
 [^DEC202B]: Blockers register, BLK-111. `docs/BLOCKERS.md`
 [^DEC250A]: ADR-0121, a meeting between two factions resolves at the tile, decision D3. `docs/adrs/draft/adr-0121-a-meeting-between-two-factions-resolves-at-the-tile.md`
-[^DEC250B]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`

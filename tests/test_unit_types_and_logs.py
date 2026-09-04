@@ -323,9 +323,15 @@ def test_the_upkeep_verb_refuses_a_rate_below_zero(seed: int) -> None:
     world = cachette.World(width=32, height=32, seed=seed, faction_count=2)
     site = int(world.found_group(64, 0)["site"])
     before = world.site_economy(site)["upkeep"]
+    # **The hash is the assertion, and the rate read is not enough.** The
+    # engine opens its rate table before it checks the rate, and an opened
+    # table is a change that the whole-world hash covers while every rate in
+    # it still reads back as zero. A refusal must change nothing at all.
+    hash_before = world.state_hash()
     with pytest.raises(cachette.VerbError):
         world.spend_at_sites([site], rate=-1)
     assert world.site_economy(site)["upkeep"] == before
+    assert world.state_hash() == hash_before
 
 
 def test_the_meeting_gives_one_answer_at_every_thread_count(seed: int) -> None:
