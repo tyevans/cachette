@@ -389,6 +389,9 @@ without stating a constraint is worse than no record.
 | 0126 | A trade negotiation is engine state, and the words are not | Draft | 0001, 0002, 0004, 0053, 0090 | 21, `draft/adr-0126-a-trade-negotiation-is-engine-state.md` |
 | 0127 | A terminal refusal closes an ordered pair until a named tick | Draft | 0120 | `draft/adr-0127-a-terminal-refusal-closes-a-pair-until-a-named-tick.md` |
 | 0128 | A contract moves a quantity only when a unit carries it onto the ground of the other party | Draft | 0004, 0062, 0063, 0072, 0073, 0120, 0121 | `draft/adr-0128-a-contract-moves-a-quantity-only-when-a-unit-carries-it.md` |
+| 0129 | A trade negotiation is engine state, and the words are not | Draft | 0001, 0002, 0004, 0053, 0090 | 21, `draft/adr-0129-a-trade-negotiation-is-engine-state.md` |
+| 0130 | A terminal refusal closes an ordered pair until a named tick | Draft | 0129 | `draft/adr-0130-a-terminal-refusal-closes-a-pair-until-a-named-tick.md` |
+| 0131 | A contract moves a quantity only when a unit carries it onto the ground of the other party | Draft | 0004, 0062, 0063, 0072, 0073, 0129, 0130 | `draft/adr-0131-a-contract-moves-a-quantity-only-when-a-unit-carries-it.md` |
 
 ### Retired numbers
 
