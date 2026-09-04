@@ -14,7 +14,7 @@ You configure, drive, and inspect the world from Python.[^4]
 - **Exact determinism**: One binary yields the identical state hash and byte-for-byte event log across any thread count.[^5]
 - **Zero floating-point drift**: All simulation calculations use integer and Q16.16 fixed-point arithmetic.[^6]
 - **Emergent behaviour**: Famines, migration, and trade emerge naturally from individual needs and local production.[^7]
-- **Spatial pyramid**: Three levels of detail provide instant answers for continental aggregate queries.[^8]
+- **Spatial pyramid**: Level 0 is the source of truth, and a derived level 1 gives exact summaries over blocks of tiles.[^8]
 - **Native AI agent support**: An integrated Model Context Protocol server connects external agents directly to the engine.[^9]
 
 ## Who It Is For
@@ -71,20 +71,20 @@ The other test compares world state hashes against stored golden files.
 
 ### The Spatial Pyramid
 
-The engine organises the world into three levels of detail:
-
-- **Level 0**: Individual tiles and individual units.[^8] This level is the only source of truth.
-- **Level 1**: City-scale summaries combining blocks of level 0 tiles.
-- **Level 2**: Region-scale summaries combining blocks of level 1 cells.
+The engine organises the world into levels of detail.
+Level 0 holds individual tiles and individual units, and it is the only source of truth.[^8]
+A derived level 1 summarises blocks of level 0 tiles at city scale.
+The pyramid holds level 0 and this one derived level.
+A level 2 that summarises blocks of level 1 cells is the accepted target design, and it is not built yet.[^8]
 
 Upper pyramid levels are derived projections, not approximations.[^8]
 Totals are exact sums of their component tiles.[^15]
 Extremes are exact minimums and maximums.
 Averages store exact numerators and denominators to prevent rounding errors.
 
-Continental queries evaluate upper levels first.
-A query dismisses whole regions when their aggregate bounds do not match the filter.
-The engine descends to individual tiles only where boundaries require inspection.
+An aggregate query evaluates the derived level before it reads individual tiles.
+It dismisses whole blocks when their aggregate bounds do not match the filter.
+The engine descends to individual tiles only where a boundary requires inspection.
 
 ### Python Control Plane and Rust Data Plane
 
@@ -168,14 +168,16 @@ Continuous integration gates test unit properties, slot reductions, and multi-th
 Hardware performance targets AWS Graviton server instances with 64-byte cache lines.[^3]
 Development takes place on x86-64 and Apple Silicon architectures.
 Local execution verifies logic and determinism.
-Benchmark measurements on the target server hardware will be published as testing progresses.[^20]
+Benchmark measurements on the target server hardware are recorded in the
+target platform costs register, each with the machine, commit, and date that
+produced it.[^20]
 
 ## Getting Started
 
 ### Prerequisites
 
 - Rust toolchain (2024 edition)
-- Python 3.12 or newer
+- Python 3.11 or newer
 - `uv` package manager
 - `just` command runner
 
@@ -213,6 +215,6 @@ Review the decision records for architectural rationale and design rules.[^22]
 [^17]: ADR-0051, lazy expression tree selectors. `docs/adrs/accepted/adr-0051-a-selector-is-a-lazy-expression-tree.md`
 [^18]: ADR-0042, release Python interpreter. `docs/adrs/REGISTRY.md`
 [^19]: PRD-0002, watching the world run. `docs/product/shipped/prd-0002-a-developer-watches-the-world-run.md`
-[^20]: Budgets and costs register. `docs/reference/budgets.md`
+[^20]: Target platform costs register. `docs/reference/graviton-costs.md`
 [^21]: Contribution guide. `CONTRIBUTING.md`
 [^22]: ADR Registry. `docs/adrs/REGISTRY.md`

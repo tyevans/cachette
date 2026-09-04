@@ -1,8 +1,9 @@
 # Contributing to Cachette
 
 Cachette is a world simulation engine. A Rust core runs the simulation. A
-Python control plane issues commands. The project is in design, and the
-Rust crates hold stubs.
+Python control plane issues commands. Part of the design is still open, and
+the registry states which records bind the work. The Rust crates hold
+working implementation code.
 
 Read this document before your first change. It is short on purpose.
 
@@ -122,7 +123,7 @@ took.[^2]
 ## References
 
 [^1]: ADR-0097, the toolchain is a dated nightly. `docs/adrs/draft/adr-0097-the-toolchain-is-a-dated-nightly.md`
-[^2]: Definition of done. `.claude/rules/definition-of-done.md`
+[^2]: Definition of done. `.agents/rules/definition-of-done.md`
 [^3]: ADR registry. `docs/adrs/REGISTRY.md`
 [^4]: ADR-0002, simulated and aggregated state holds no floating point number, decision D1. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
 [^5]: ADR-0002, simulated and aggregated state holds no floating point number, decision D2. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
@@ -131,4 +132,4 @@ took.[^2]
 [^8]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
 [^9]: ADR-0006, an event is plain data and applying it is pure, decision D1. `docs/adrs/accepted/adr-0006-an-event-is-plain-data-and-applying-it-is-pure.md`
 [^10]: Testing policy. `docs/TESTING.md`
-[^11]: Documentation rules. `.claude/rules/documentation.md`
+[^11]: Documentation rules. `.agents/rules/documentation.md`
