@@ -23,7 +23,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^ALLOC]
 
-**Next number: DEC-147**
+**Next number: DEC-171**
 
 ## Open
 
@@ -117,28 +117,6 @@ so nothing about the frame changes.
 and not code, and that types parameterise the verbs rather than multiplying
 them.[^ORIENT] Option A contradicts that in the one place it is currently
 testable.
-
-### DEC-144 — Does a fight resolve at the tile or at the level 1 cell?
-
-**Open. Engineering owns it. One blocker holds the evidence that would settle
-it.**
-
-A design sketch resolves combat for each level 1 cell, as a small table over
-unit types. A cell summarises a block of tiles, and the block edge is a power of
-two set by one constant.[^DEC144A]
-
-**Option A. Resolve at the cell.** The cost follows the cell count. It reuses
-the lattice everything else uses. The risk is that casualties spread across a
-whole block, so an army smears rather than forming a front line.
-
-**Option B. Resolve at the tile.** The engine already lists the units standing
-on one tile, and it rebuilds that at every barrier, so the input exists. The
-cost follows the contested tiles, which is a small set, and the block masks
-already say which blocks hold more than one faction.
-
-**Recommendation: Option B, after the measurement.** The tile form needs no new
-input and its cost follows a small set. The blocker states the measurement that
-would decide it, and it is cheap.[^DEC144B]
 
 ### DEC-145 — Does an attacker below the defender's threshold contribute exactly zero?
 
@@ -1717,6 +1695,34 @@ reorder on every frame wastes the common case. A fixed interval keeps the
 schedule out of the data, which is the rule a solver already follows.[^FIXEDITER]
 
 
+### DEC-170 — Does a contest read one tile, or a tile and its neighbours?
+
+**Open. The project owner owns it, because it is a game-design judgement.**
+
+The measurement settled that a fight resolves at the tile.[^DEC144C] That leaves
+a question the cell form never had to ask. Ordinary ground holds 8 units, and
+the admission rule reads the capacity and not the faction.[^DEC170B] So a rule
+that fires only when two factions stand on one tile has two consequences that a
+player meets at once.
+
+**Option A. Read the tile alone.** A contest fires when one tile holds two
+factions. The input is what the unit-to-tile bridge already lists, so the pass
+needs no new read. Two armies that stand on adjacent tiles do nothing to each
+other, and an army that fills its tiles to the capacity of the ground cannot be
+entered and therefore cannot be fought.
+
+**Option B. Read the tile and its six neighbours.** A contest fires when a tile
+holds units and an adjacent tile holds an enemy. Two armies fight the moment
+they meet, and a packed army is not immune. The pass reads seven tiles rather
+than one, and the same pair of units is read from both sides, so the rule must
+say which tile owns the kill or the same unit dies twice.
+
+**Recommendation: Option B, weakly.** Option A gives a result a player would
+call wrong at the first battle, and the fault is not the threshold. The
+recommendation is weak because Option B costs a rule about ownership that
+Option A does not need, and because the project owner has stated no rule about
+what standing beside an enemy means.
+
 ## Decisions to apply at merge
 
 These are mechanical. They do not need judgement, but they must not be
@@ -1741,6 +1747,34 @@ figure is 168 MB. The storage argument for vectors is stronger than the report
 concluded, and it called that argument its weakest.
 
 ## Closed
+
+### DEC-144 — Does a fight resolve at the tile or at the level 1 cell?
+
+**Closed on 3 September 2026. Option B. A fight resolves at the tile.**
+
+A design sketch resolved combat for each level 1 cell, as a small table over
+unit types. A cell summarises a block of tiles, and the block edge is a power of
+two that one layout constant sets.[^DEC144A] The row waited on a measurement,
+and the measurement is taken.[^DEC144C]
+
+**Option A. Resolve at the cell.** The cost follows the cell count. It reuses
+the lattice everything else uses. The risk was that casualties spread across a
+whole block.
+
+**Option B. Resolve at the tile.** The engine already lists the units standing
+on one tile, and it rebuilds that at every barrier, so the input exists. The
+cost follows the contested tiles, which is a small set, and the block masks
+already say which blocks hold more than one faction.
+
+**Why B.** The band that holds the middle 90 percent of the casualties is 1 tile
+wide at the tile and up to 30 tiles wide at the cell, and about seven in ten of
+the casualties of a cell resolution stand on a tile that holds no enemy. The
+finding holds the numbers and names the machine.[^DEC144C]
+
+**The blocker that held this row is resolved.**[^DEC144B]
+
+**What this did not decide.** It does not decide what a contest reads once it
+sits at the tile. A separate row holds that.[^DEC144D]
 
 ### DEC-118 — Does the publishing job keep a switch of its own, now that the address is known?
 
@@ -3454,3 +3488,6 @@ a failed founding is correct.[^PRD12]
 [^DEC144B]: Blockers register, BLK-052, in this repository. `docs/BLOCKERS.md`
 [^DEC145A]: Research report 21, what a god needs from this engine, section 4.1. `docs/research/reports/21-what-a-god-needs.md`
 [^DEC145B]: ADR-0106, a cohort serves whole rations to a keyed subset, the context section. `docs/adrs/draft/adr-0106-a-cohort-serves-whole-rations-to-a-keyed-subset.md`
+[^DEC144C]: Findings register, FND-390. `docs/FINDINGS.md`
+[^DEC144D]: Decisions register, DEC-170, in this document.
+[^DEC170B]: Findings register, FND-392. `docs/FINDINGS.md`

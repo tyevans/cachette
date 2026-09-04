@@ -25,7 +25,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^ALLOC]
 
-**Next number: BLK-053**
+**Next number: BLK-081**
 
 [^ALLOC]: Findings register, FND-038. `docs/FINDINGS.md`
 
@@ -232,38 +232,64 @@ scale. The ordering of it may.
 **What closes this.** The project owner states the unit count, the god count
 and the world size that the downstream game runs at.
 
-### BLK-052 — Nobody has measured whether a fight at this granularity looks like a fight
+### BLK-080 — Nobody has measured whether the engine's own movement ever brings two factions onto one tile
 
-**Owner:** engineering. **Blocks:** the choice between resolving a fight at a
-tile and resolving it at a level 1 cell.
+**Owner:** engineering. **Blocks:** confidence that a contest at the tile ever
+fires in a running world.
 
-A level 1 cell summarises one block of tiles, and the block edge is a power of
-two set by one constant. A design sketch for combat resolves a fight for each
-cell, as a small table over unit types.[^BLK52A]
+A fight resolves at the tile, and a tile contest needs both factions on one
+tile.[^BLK80A] The admission rule reads the capacity of the ground and not the
+faction, so nothing refuses a mixed tile. Ordinary ground holds 8 units, and a
+tile already full of one faction offers no room.[^BLK80B]
 
-**The risk is that an army smears.** A fight resolved for a whole block kills
-units spread across the whole block, so the casualties may not form a front
-line. Whether that reads as a battle is not a matter of opinion, and it is
-measurable before anything is built.
+**The evidence that settled the granularity does not settle this.** The harness
+placed the armies on shared tiles directly, through the placement call, which
+skips admission and skips the movement pass. So the arrangement it measured is
+one the engine has never produced for itself.
 
-**This is information and not a judgement.** Two factions have never been run
-into contact in this engine, so there is no evidence either way. Both options
-are known and each is buildable.
+**A god cannot aim an army today.** A unit takes its direction from a field over
+cells, and the control plane names no destination, so no call sends one army at
+another.[^BLK80C] Until a seed set exists, nothing can drive the case.
 
-**The measurement is stated and cheap.** Seed two factions on opposite sides of
-a world, run them to contact, and report the band of tiles that holds the middle
-90 percent of the casualties. Compare that band against the block edge. Then put
-the defect back: resolve at the cell on purpose and confirm the band widens. The
-report holds the method.[^BLK52B]
+**Work continues.** The granularity is decided and the band is measured. What is
+unknown is how often a running world reaches a contested tile, which changes how
+much a contest costs and not where it resolves.
 
-**Work continues.** Everything else the combat sketch needs is unaffected: a
-unit still needs a type, the table is still data, and the randomness rule is
-already settled by an existing record.
-
-**What closes this.** Somebody runs that measurement and records the band width
-in tiles.
+**What closes this.** Somebody drives two factions together through the movement
+pass, with a seed set the control plane named, and reports how many tiles hold
+two factions.
 
 ## Resolved
+
+### BLK-052 — Nobody has measured whether a fight at this granularity looks like a fight
+
+**Resolved on 3 September 2026. The measurement is taken, and a fight resolves
+at the tile.**
+
+A level 1 cell summarises one block of tiles, and the block edge is 32. A design
+sketch resolved a fight for each cell, and the risk was that an army smears
+rather than forming a front line.[^BLK52A] The research report stated the
+method, and the measurement followed it.[^BLK52B]
+
+**What was measured.** Four arrangements of two armies, in a world of 128 by 96
+tiles, on an x86-64 development machine. The band that holds the middle 90
+percent of the casualties is 1 tile wide at the tile, in every arrangement. It
+runs from 1 to 30 tiles wide at the level 1 cell. The furthest casualty of a
+cell resolution stood 36 tiles from the nearest enemy. Between 67 and 72 percent
+of the casualties of a cell resolution stood on a tile that held no enemy at
+all.[^BLK52C]
+
+**The defect was put back.** Every arrangement resolved twice, once for each
+tile and once for each cell, and the two runs differ in the granularity and in
+nothing else.
+
+**One thing the measurement also showed.** An arrangement two tiles deep reports
+no smear at either granularity, so a single typical fixture would have closed
+this row with the wrong answer.[^BLK52D]
+
+**What follows.** The decision row is closed on Option B.[^BLK80A] A new row
+holds the question this one did not ask: whether a running world ever produces a
+tile that holds two factions.[^BLK52F]
 
 ### BLK-035 — Where does the documentation site publish, and who turns the publishing on?
 
@@ -488,3 +514,9 @@ normally.
 [^BLK50B]: Research report 21, what a god needs from this engine, section 8. `docs/research/reports/21-what-a-god-needs.md`
 [^BLK52A]: Research report 21, what a god needs from this engine, section 4. `docs/research/reports/21-what-a-god-needs.md`
 [^BLK52B]: Research report 21, what a god needs from this engine, section 4.2. `docs/research/reports/21-what-a-god-needs.md`
+[^BLK52C]: Findings register, FND-390. `docs/FINDINGS.md`
+[^BLK52D]: Findings register, FND-391. `docs/FINDINGS.md`
+[^BLK52F]: Blockers register, BLK-080, in this document.
+[^BLK80A]: Decisions register, DEC-144. `docs/DECISIONS.md`
+[^BLK80B]: Findings register, FND-392. `docs/FINDINGS.md`
+[^BLK80C]: Findings register, FND-363. `docs/FINDINGS.md`

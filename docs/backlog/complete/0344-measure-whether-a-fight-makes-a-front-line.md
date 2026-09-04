@@ -1,13 +1,13 @@
 ---
 id: 0344
 title: Measure whether a fight makes a front line
-status: refined
+status: complete
 created: 2026-09-03
 implements: []
 changes: []
 creates: []
 serves: [PRD-0030]
-blocked-by: [BLK-052]
+blocked-by: []
 ---
 
 ## Why
@@ -18,8 +18,8 @@ a power of two set by one constant in the bridge.
 
 **A fight resolved for a whole block kills units across the whole block.** So
 the casualties may not form a front line, and an army may read as a smear. Two
-factions have never been run into contact in this engine, so there is no
-evidence either way. One blocker holds that gap.[^1]
+factions had never been run into contact in this engine, so there was no
+evidence either way. One blocker held that gap.[^1]
 
 The measurement is cheap and it decides between two designs. Building either one
 first risks throwing it away.
@@ -40,12 +40,12 @@ capability. It adds one test file to the core crate.
 **Creates.** No record. The decision that the measurement settles already has a
 row in the decisions register.[^6]
 
-**Blockers.** BLK-052 governs this item, and this item closes it.
+**Blockers.** BLK-052 governed this item, and this item closes it.
 
 **Precedent.** The testing rule says a fixture that models the typical case
-supplies no extreme, and the findings register holds two instances of that
-shape.[^7] This item therefore measures four arrangements and not one, and one
-of the four exists to show that a thin arrangement reports no smear.
+supplies no extreme, and the findings register held two instances of that shape
+before this one.[^7] This item therefore measures four arrangements and not one,
+and one of the four exists to show that a thin arrangement reports no smear.
 
 **The provisional casualty rule is thrown away.** Nothing kills a unit in a
 fight today, so the measurement needs a rule to place casualties on tiles. That
@@ -71,6 +71,29 @@ anticipate.[^8]
   whether it came from the engine or from a model.
 - The whole check command runs green.
 
+## Outcome
+
+**Done. A fight resolves at the tile.**
+
+The band that holds the middle 90 percent of the casualties is 1 tile wide at
+the tile, in all four arrangements. It runs from 1 to 30 tiles wide at the level
+1 cell, against a block edge of 32. The furthest casualty of a cell resolution
+stood 36 tiles from the nearest enemy. Between 67 and 72 percent of the
+casualties of a cell resolution stood on a tile that held no enemy. The review
+holds the table, the method and the machine.[^9]
+
+**What changed from the plan.** Nothing in the plan. Two results arrived that
+the plan did not ask for. The first is that an arrangement two tiles deep
+reports no smear, so one typical fixture would have closed the blocker with the
+wrong answer. The second is that ordinary ground holds 8 units and the admission
+rule reads the capacity and not the faction, so an army packed to that capacity
+cannot be entered and therefore cannot be fought by a same-tile rule.
+
+**Registers.** BLK-052 is resolved and BLK-080 is open.[^1] [^10] DEC-144 is
+closed on Option B, and DEC-170 is open.[^6] [^11] Findings FND-390 to FND-393
+hold the measurement, the fixture lesson, the tile capacity bound and the tank
+test.[^12]
+
 ## References
 
 [^1]: Blockers register, BLK-052. `docs/BLOCKERS.md`
@@ -81,3 +104,7 @@ anticipate.[^8]
 [^6]: Decisions register, DEC-144. `docs/DECISIONS.md`
 [^7]: Testing rules, section 2a. `.claude/rules/testing.md`
 [^8]: PRD-0030, a developer builds a game the engine did not anticipate. `docs/product/shaped/prd-0030-a-developer-builds-a-game-the-engine-did-not-anticipate.md`
+[^9]: Review, does a fight make a front line. `docs/reviews/0344-does-a-fight-make-a-front-line.md`
+[^10]: Blockers register, BLK-080. `docs/BLOCKERS.md`
+[^11]: Decisions register, DEC-170. `docs/DECISIONS.md`
+[^12]: Findings register, FND-390 to FND-393. `docs/FINDINGS.md`
