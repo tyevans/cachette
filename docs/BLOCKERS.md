@@ -116,6 +116,36 @@ a product record that states the ranking expresses it against this row.
 developer who has an idea and has not read this source, and records what that
 person tried to do first and where they stopped.
 
+### BLK-040 — Under which name does a reader install the package, and does the project publish it?
+
+**Owner:** the project owner. **Blocks:** the install line in the reference, in
+the tutorial and in the how-to guides.
+
+**A reader who reaches the published reference cannot get the software.** The
+page named no install command at all, and a graded review scored that gap as
+the second worst failure on the page.[^BLK40A] A reader who supplies the
+obvious command installs a different project, because the public Python package
+index answers on the name `cachette` with an unrelated package by another
+author.[^BLK40B]
+
+**Two facts are missing, and neither is in the tree.** The first is the
+distribution name this project publishes under. The second is whether it
+publishes to a public index at all, or expects every reader to build from a
+checkout. The package manifest states the name `cachette` and the version
+0.0.0, and no job in the tree uploads anything.
+
+**This is information and not a judgement.** A guess writes an install command
+that installs somebody else's software, and the import failure that follows
+names no cause.
+
+**Work continues.** The reference now states that no public index carries this
+engine and gives the commands that build it from a checkout. That is true today
+and it is prose that no test can hold, so it decays the moment this row closes.
+
+**What closes this.** The project owner names the distribution name and says
+whether the project publishes to a public index. A search of the tree for this
+row number then repairs every place that states the install path.
+
 ### BLK-036 — Does an upgrade change hands when the ground does?
 
 **Owner:** the project owner. **Blocks:** any rule that ties an existing
@@ -364,3 +394,5 @@ normally.
 [^BLK45A]: Research report 20, what the Python interface should be, section 1. `docs/research/reports/20-the-python-interface.md`
 [^BLK45B]: ADR-0051, a selector is a lazy expression tree that Rust evaluates. `docs/adrs/accepted/adr-0051-a-selector-is-a-lazy-expression-tree.md`
 [^BLK45C]: ADR-0040, Python is a control plane, not a data plane. `docs/adrs/draft/adr-0040-python-is-a-control-plane-not-a-data-plane.md`
+[^BLK40A]: Backlog item 0330, repair the defects a fresh reader found in the published reference. `docs/backlog/complete/0330-repair-the-defects-a-fresh-reader-found.md`
+[^BLK40B]: Findings register, FND-341. `docs/FINDINGS.md`

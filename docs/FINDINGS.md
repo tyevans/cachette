@@ -10328,3 +10328,115 @@ information, and it stops work that has everything it needs.
 [^F351B]: Interface review, section 2e. `~/cachette-reader-rounds/round-1-interface.md`
 [^F352A]: Interface review, section 6a. `~/cachette-reader-rounds/round-1-interface.md`
 [^F352B]: Research report 20, what the Python interface should be, section 3.1. `docs/research/reports/20-the-python-interface.md`
+
+### FND-340 — The reference cited an error that a call it never published raises, and a fresh reader could not write the third line of a program
+
+**Believed.** The constructor gap is a gap in the audience of the prose. Every
+public member of the compiled module carries a docstring, so the reference says
+what each call does. The one member with no prose is the constructor, and a
+register recorded that as a note rather than as a failure.[^F340A]
+
+**True.** The gap makes the page self-contradictory and it stops a reader at
+the third line. A developer who was given the address of the published
+reference and nothing else read it six times and could not build a `World`. The
+page carries an error class whose own prose says "The `World` constructor
+raises this class", and it names "the world settings", a term that appears
+nowhere else on the page. So the error documentation asserts a call, and names
+an argument, that the class documentation omits.
+
+**A graded review scored the first action at 1 of 5 and trust at 3 of 5**, and
+it named the constructor as the repair for both. The reader's next move was to
+clone the repository and read the Rust source, which is the move the reference
+exists to prevent.[^F340B]
+
+**Evidence.** The import shows that the binding library replaces the doc
+comment of a constructor with the standard interpreter sentence.
+
+uv run python -c "import cachette._core as m; print(m.World.__init__.__doc__)"
+
+**Follows.** The prose of a constructor lives in the doc comment of its class,
+and the class doc comment states each parameter, its default and its bound. The
+`World` class and the `Camera` class now hold theirs. A doc comment on the
+constructor function itself says where the prose lives and holds none, so the
+two sites cannot part.
+
+**A member that carries prose is not a member that a reader can use.** The
+check that guards the documentation build counts members with a docstring, and
+it counted 59 of 59 while the page could not be acted on.[^F340C] The count
+measures presence. It cannot measure sufficiency, and no check can.
+
+### FND-341 — The name a reader would install belongs to an unrelated project
+
+**Believed.** Nothing in the tree says how a reader installs the package. The
+distribution name is `cachette`, and the reference gave no install line at all,
+so a reader supplies the obvious one.
+
+**True.** The obvious one installs somebody else's software. The public Python
+package index answers on the name `cachette` with a cache extension for
+frameworks that serve web requests, at a version this project has never
+published. A reader who runs the obvious install command gets that package, and
+the import then fails with a message that names no cause.
+
+**Evidence.** Taken on 3 September 2026.
+
+curl -s https://pypi.org/pypi/cachette/json | python3 -c "import json,sys; d=json.load(sys.stdin); print(d['info']['name'], d['info']['version'], d['info']['home_page'])"
+
+It printed a name, a version and a repository address that belong to another
+author.
+
+**Follows.** The reference now says that no public index carries this engine,
+and it gives the four commands that build it from a checkout. A blocker holds
+the question of which name this project publishes under, because the project
+owner owns that choice and no reader of the tree can answer it.[^F341A]
+
+**This is a claim that decays, and it is written where a test cannot reach
+it.** The prose states what was true on one day about a service outside this
+repository. Treat it as a reason to close the blocker rather than as a fact the
+project maintains.
+
+### FND-342 — The check that a gather order documents cannot fire on half the numbers a caller confuses
+
+**Believed.** The gather verb checks its kind argument. The reference said it
+raises the typed refusal "when the number names no kind", and the error class
+says the same. A reader concluded that a wrong kind is refused.
+
+**True.** The check tests membership of one scale, and two scales share their
+low numbers. The resource kinds are food, wood and stone, numbered 0, 1 and 2.
+The ground kinds are water, plain, forest, hill and mountain, numbered 0 to 4.
+The verb converts its argument to a resource kind and refuses 3 and above. A
+caller who reads a ground kind from a tile report and passes it to the gather
+verb passes 0, 1 or 2, is not refused, and orders the whole set to gather the
+resource of that number.
+
+**The wrong answer then repeats exactly.** The engine is deterministic, so the
+mistake gives one answer at every thread count and on every run. The two
+determinism tests compare a run against a run, so neither can see it. The
+testing rule states this shape, and this is the shape reaching the public
+interface.[^43]
+
+**Evidence.** The verb checks the kind before it resolves the set, so an empty
+set reads the check alone.
+
+uv run pytest tests/test_documented_values.py -k ground_kind
+
+The test asserts that 0, 1 and 2 pass and that 3 and 4 are refused.
+
+**Follows.** The prose now states the true guard rather than the guard a reader
+would want. The reference says that the two scales overlap, that a member which
+takes a resource kind accepts an overlapping ground kind, and that nothing
+reports it. The errors section says the refusal covers three and above.
+
+**The interface question is recorded and not answered here.** Making the two
+scales distinct types at the boundary changes the interface, and a decision
+register row holds the options and the recommendation.[^F342B] The library
+already made this decision the other way for an entity, which crosses as one
+opaque identity that Python cannot build, so the interface is inconsistent with
+itself rather than merely underspecified.
+
+## References
+
+[^F340A]: Findings register, FND-325, in this document.
+[^F340B]: Backlog item 0330, repair the defects a fresh reader found in the published reference. `docs/backlog/complete/0330-repair-the-defects-a-fresh-reader-found.md`
+[^F340C]: The reference check script. `scripts/check_reference.py`
+[^F341A]: Blockers register, BLK-040. `docs/BLOCKERS.md`
+[^F342B]: Decisions register, DEC-120. `docs/DECISIONS.md`

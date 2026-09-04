@@ -173,6 +173,69 @@ site and not about movement.
 **Revisit when** a world holds two sites of one faction, or when somebody asks
 why a unit stands at a settlement holding food.
 
+
+### DEC-120 — Does a resource kind stay a bare integer at the Python boundary, or become a distinct type?
+
+**Open. Engineering owns it. It governs the gather verb, the tile report, the
+window census and every later member that takes a kind.**
+
+**Two integer scales share their low numbers, and the guard cannot tell them
+apart.** The resource kinds are food, wood and stone, numbered 0, 1 and 2. The
+ground kinds are water, plain, forest, hill and mountain, numbered 0 to 4. A
+tile report returns a ground kind. The gather verb takes a resource kind. A
+caller who moves a number from the first to the second passes 0, 1 or 2, is not
+refused, and orders every soldier in the set to gather the wrong
+resource.[^DEC120A]
+
+**The wrong answer repeats exactly, so no test the project owns can see it.**
+The engine is deterministic. The two determinism tests compare a run against a
+run, and both runs hold the same mistake. The testing rule states this shape in
+its own words: a determinism test cannot tell correct from consistently
+wrong.[^DEC120B]
+
+**The interface is inconsistent with itself, and that is the strongest
+argument.** An entity crosses to Python as one opaque identity, and the
+reference says that Python cannot take it apart or build one.[^DEC120C] The
+project made exactly this decision for an identity and did not make it for a
+kind.
+
+**Option A. Leave the interface and repair the prose.** Say in the reference
+that the two scales overlap, that an overlapping number is accepted, and that
+nothing reports it. Cheapest, and it is what the current work did. It moves the
+whole guard onto the reader, and a reader who does not read that sentence gets
+no second chance.
+
+**Option B. Make a kind a distinct type at the boundary.** The gather verb takes
+a resource kind object, and the tile report returns a ground kind object. A
+ground kind passed where a resource kind belongs raises the interpreter's own
+type refusal, before the call reaches the engine. It closes the whole class. It
+breaks every caller that passes an integer today, it adds two types to a
+boundary the project has kept narrow, and it must not make a kind something
+Python can compose out of nothing.
+
+**Option C. Accept an integer and a named constant, and check nothing.** Export
+two constant groups from the package and ask callers to use them. It costs least
+after A. It is a convention, and a convention is not a check, so the defect
+survives every caller who does not follow it.
+
+**Option D. Widen the numbering so the two scales cannot overlap.** Number the
+ground kinds from an offset, so no number names a kind in both. It needs no new
+type and it makes the existing guard sufficient. It changes a numbering that a
+state hash, an event column and a sort key all read, which is the reason the
+core calls the numbering stable.
+
+**Recommendation: B, and reject D.** D is the cheapest thing that works and it
+pays for it in the one place this project cannot afford, because the kind
+numbering reaches the state hash. B is the decision the project already made for
+an identity, and the reasoning transfers without change. A is what the reference
+says today, and it is a description of the defect rather than a repair of it.
+
+**A second question sits inside this one, and it should be answered whichever
+option wins.** The reference and the error class both described a guard that
+cannot fire on the overlapping range. That was a prose defect and the prose is
+now true. Whether the guard itself is missing, rather than merely
+mis-described, is the question B answers and A does not.
+
 ### DEC-108 — How often does the project move the nightly date, and who owns the move?
 
 **Open. Engineering owns it. It governs every commit that touches the toolchain
@@ -1550,6 +1613,42 @@ path under option A is never taken by anybody.[^DEC117D]
 **What this did not decide.** It does not decide whether the documentation
 build joins the whole check command. A separate row holds that, and it now has
 the address it waited for.[^DEC117E]
+### DEC-121 — Where does the prose of a constructor live, when the binding library publishes none?
+
+**Closed. Option A. The doc comment of the class holds it.**
+
+**The binding library does not copy the doc comment of a constructor onto the
+Python object.** The published entry carries the standard interpreter sentence
+instead. The reference therefore said what a class is and never said how to
+build one, and a register recorded the mechanism before a reader met
+it.[^DEC121A]
+
+**Option A. Put the parameters in the class doc comment.** The class doc comment
+is a doc comment of the bindings crate, so the record on the provenance of the
+prose holds without amendment.[^DEC121B] It publishes. It puts a signature in
+prose beside a signature the builder renders elsewhere, so the two can part.
+
+**Option B. Set the docstring of the constructor at module registration.** Write
+the prose once in Rust and attach it to the Python object when the module
+registers the class. It puts the entry where a reader looks for it. It is code
+that exists to move a string, it runs on every import, and the builder still has
+to render an entry for a member whose signature the stub declares.
+
+**Option C. Write the constructor prose on the reference page by hand.** The
+record forbids it. The reference page holds a directive and no interface
+prose.[^DEC121B]
+
+**Why A.** C is forbidden. B is the better page and the worse mechanism, and
+nothing in the reader review asked for a separate entry: it asked for the
+parameters, their types, their defaults and their bounds, in a place the page
+carries. A puts them one heading below the class summary, which is where a
+reader who is reading the class already is.
+
+**What holds the two sites together.** A test reads each documented default,
+bound and ceiling through the public interface and fails when the code moves
+one.[^DEC121C] The doc comment on the constructor function itself now states
+where the prose lives and holds none of it, so a contributor who edits the wrong
+one writes into an empty place rather than into a second authority.
 
 ### DEC-113 — Does the documentation site configuration stay in a portable format, or move to the builder's native one?
 
@@ -3179,3 +3278,9 @@ a failed founding is correct.[^PRD12]
 [^DEC131B]: Project orientation, the hard invariants. `CLAUDE.md`
 [^DEC133A]: Findings register, FND-352. `docs/FINDINGS.md`
 [^DEC134A]: Fresh reader review of the published reference, section B. `~/cachette-reader-rounds/round-1-reference.md`
+[^DEC120A]: Findings register, FND-342. `docs/FINDINGS.md`
+[^DEC120B]: Testing Rules, section 2. `.claude/rules/testing.md`
+[^DEC120C]: ADR-0085, an entity crosses to Python as one opaque identity that the engine resolves, decision D1. `docs/adrs/accepted/adr-0085-an-entity-crosses-to-python-as-one-opaque-identity.md`
+[^DEC121A]: Findings register, FND-325. `docs/FINDINGS.md`
+[^DEC121B]: ADR-0107, the Python reference is generated from the compiled module, decisions D1 and D2. `docs/adrs/draft/adr-0107-the-python-reference-is-generated-from-the-compiled-module.md`
+[^DEC121C]: The test that pins every documented value. `tests/test_documented_values.py`
