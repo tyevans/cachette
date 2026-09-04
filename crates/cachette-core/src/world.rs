@@ -2641,6 +2641,40 @@ impl World {
         &self.characters
     }
 
+    /// Resolves the value of an identity back to the character it names.
+    ///
+    /// A caller outside this crate holds an identity as the value the engine
+    /// gave. It cannot build one, and this is the only way back.[^1]
+    ///
+    /// The call compares the generation the value carries against the
+    /// generation the arena holds for the slot. It refuses a mismatch, and it
+    /// never returns the character who now holds the slot.[^2]
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the value is not an identity, when the arena
+    /// holds no such slot, or when the slot holds a later generation.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0085, an entity crosses to Python as one opaque identity that the engine resolves, decisions D2 and D3. `docs/adrs/accepted/adr-0085-an-entity-crosses-to-python-as-one-opaque-identity.md`
+    /// [^2]: ADR-0014, entity identity is an index plus a generation, decision D2. `docs/adrs/accepted/adr-0014-entity-identity-is-an-index-plus-a-generation.md`
+    pub fn resolve_character(&self, identity: u64) -> Result<Entity, IdentityError> {
+        let entity = Entity::from_bits(identity).ok_or(IdentityError::NotAnIdentity)?;
+        let slot = entity.index();
+        if slot >= self.characters.slot_count() {
+            return Err(IdentityError::NoSuchSlot { slot });
+        }
+        if self.characters.contains(entity) {
+            return Ok(entity);
+        }
+        Err(IdentityError::Stale {
+            slot,
+            given: entity.generation(),
+            held: self.characters.generation_of(slot),
+        })
+    }
+
     /// Creates a character in the world and returns their identity.
     ///
     /// The character is born on the current tick of the world.

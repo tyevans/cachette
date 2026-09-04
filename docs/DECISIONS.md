@@ -3803,6 +3803,160 @@ the whole rule set in one crossing, and a refusal leaves the world unchanged.
 **What follows for the caller.** A caller that wants to change one kind states
 the other two as well. That is the cost of the choice, and it is what stops
 two callers from disagreeing about a kind neither of them meant to change.
+### DEC-260 — What shape does a lineage read take at the boundary?
+
+**Closed on 3 September 2026. One call answers with three groups of parallel
+columns.**
+
+**The question.** The core answers the parents, the ancestors and the
+descendants of a character with three separate calls. A binding could pass all
+three through, or it could join them.
+
+**The outcome.** One call answers the whole question. It gives three groups,
+and each group holds four parallel arrays of the same length: the identity,
+the birth order, whether the person is alive, and the role. The parent group
+carries the mother and the father in that order.
+
+**Why.** Three separate calls invite a caller to walk the graph one node at a
+time, and a walk across the boundary is the loop the control plane rule
+forbids.[^DEC73C] One call with a fixed set of keys cannot be walked, because
+there is nothing left to ask for. The four columns of a group have one shape,
+so a reader learns the shape once and applies it three times.
+
+**What was rejected.** A handle that a caller follows edge by edge. It reads
+naturally and it pays a crossing for each edge, and a line is deep.
+
+### DEC-261 — What names a person inside a lineage answer?
+
+**Closed on 3 September 2026. The identity the arena minted at their birth.**
+
+**The question.** A row of the record of descent has two names: the row number,
+which is the birth order, and the entity identity the arena minted when the
+character was born. A lineage answer must carry one of them, because most
+ancestors are gone and the record outlives them.
+
+**The outcome.** The answer carries the minted identity. It also carries the
+birth order, as data that no call accepts.
+
+**Why.** The engine never reissues an identity, so the minted identity names
+one person for ever, even after that person is gone.[^DEC261A] Python cannot
+build one, which is the property the boundary already relies on.[^DEC261B] The
+row number is an integer that Python can build, so publishing it as a handle
+would add a second kind of identity with weaker properties than the first.
+
+**The birth order still crosses, as data.** It is what a caller sorts on and
+what names a house. No call takes it, so it cannot become a handle by accident.
+
+**A live column comes with it.** The record outlives the person, so a caller
+must be able to tell a living ancestor from a dead one without asking once for
+each. Asking once for each is the loop the rule forbids.[^DEC73C]
+
+### DEC-262 — Is the relation read singular or set-valued?
+
+**Closed on 3 September 2026. It takes one subject and a set of others.**
+
+**The question.** The core computes the relation between two characters. A
+binding could pass that pair through, or take a set.
+
+**The outcome.** The call takes one subject and a sequence of others, and it
+answers with one value for each member of the sequence, in that order.
+
+**Why.** The question a caller asks is who this person is related to, and the
+number of candidates grows with the population. A pairwise call would cross the
+boundary once for each candidate.[^DEC73C] The set form answers the pairwise
+question too, with a sequence of one member.
+
+**The whole set of pairs was rejected.** A call that took two sequences and
+answered a matrix would grow as the square of the population, and no caller
+asked for that.
+
+### DEC-263 — Does the renown write take one value or one value for each person?
+
+**Closed on 3 September 2026. One value for the whole set.**
+
+**The question.** A write over a set could take one value, or a sequence of
+values of the same length as the set.
+
+**The outcome.** One value for the whole set. A caller that wants two values
+makes two calls.
+
+**Why.** Every set-valued write already in this interface takes one value for
+the set.[^DEC263A] A second convention in one interface is a cost a reader pays
+on every call. The number of distinct values a game uses does not grow with the
+population, so a loop over values is bounded and a loop over people is not.
+
+### DEC-264 — Does the boundary bind the promotion budget?
+
+**Closed on 3 September 2026. Not in this work.**
+
+**The question.** The engine cuts the set of units it raises at a budget, and
+the core lets a caller set that budget. The binding could expose it beside the
+level and the schedule.
+
+**The outcome.** The binding exposes the level of deeds and the schedule. It
+does not expose the budget.
+
+**Why.** The level and the schedule are content parameters that a game tunes.
+The budget is a cut at a rank, and the arena ceiling binds above it whatever it
+says.[^DEC264A] A caller that sets the budget is choosing how many people exist
+per pass, which is closer to a storage decision than to a game rule, and no
+stated need asks for it.
+
+**What stays open.** A game that wants exactly one hero in a generation needs
+the budget. Nothing asks for that today.
+
+### DEC-265 — How does a caller ask whether a line has ended?
+
+**Open.**
+
+**The question.** The engine answers whether a line has ended, and the answer
+is about a character who is gone. Every read at the boundary takes an identity
+of a living character, so no read can ask it. A finding holds the
+measurement.[^DEC265A]
+
+**The options.**
+
+1. **A read that takes a house.** A house is named by the birth order of its
+   founder, which a lineage answer already carries. The read answers whether
+   any member of the house is alive. It takes data rather than an identity, so
+   it needs no living character.
+2. **A read that takes a minted identity and answers for a dead one.** It
+   breaks the rule that the boundary refuses an identity the engine no longer
+   holds, and that rule is what stops a stale identity naming the next
+   occupant of a slot.
+3. **A column on the character read.** It answers for the living, which is the
+   population that never has an ended line, so it answers nothing.
+
+**The recommendation is option 1.** The house is the unit a game asks about,
+and it is named by a number rather than by an identity, so it survives the
+death of everybody in it.
+
+### DEC-266 — How does a caller tell a unit identity from a character identity?
+
+**Open.**
+
+**The question.** Each arena numbers its own slots, so one number names a unit
+in one arena and a person in another. Neither call refuses the other's number,
+and nothing reports the mistake. A finding holds the measurement.[^DEC266A]
+
+**The options.**
+
+1. **Put the arena in the identity.** The identity is a slot index and a
+   generation packed into one number, and a few bits could name the arena. It
+   changes every stored state hash and every identity a caller holds.
+2. **Give each kind its own type at the boundary.** Python then cannot pass one
+   where the other belongs. It adds a class for each kind and it does not stop
+   a caller who unwraps the number.
+3. **State the hazard in the prose and check nothing.** This is what the work
+   did, and it is what the overlapping resource and ground kinds already
+   do.[^DEC120A]
+
+**The recommendation is option 1**, because it is the only one that makes the
+mistake impossible rather than documented, and because the cost falls now
+rather than after a game has stored identities. The interface already made this
+choice once, for the same reason: an entity crosses as one opaque number
+exactly so that a caller cannot build a wrong one.[^DEC120C]
+
 
 
 ## References
@@ -3810,6 +3964,12 @@ two callers from disagreeing about a kind neither of them meant to change.
 [^DEC224A]: Review of backlog item 0345, section 10. `docs/reviews/0345-resolve-a-meeting.md`
 [^DEC224B]: Backlog item 0432, decide the lifetime of every log the bindings expose. `docs/backlog/proposed/0432-decide-the-lifetime-of-every-log-the-bindings-expose.md`
 
+[^DEC261A]: ADR-0014, entity identity is an index plus a generation, decision D3. `docs/adrs/accepted/adr-0014-entity-identity-is-an-index-plus-a-generation.md`
+[^DEC261B]: ADR-0085, an entity crosses to Python as one opaque identity that the engine resolves, decision D2. `docs/adrs/accepted/adr-0085-an-entity-crosses-to-python-as-one-opaque-identity.md`
+[^DEC263A]: Review of item 0341, bind the build verbs, the shape table. `docs/reviews/0341-bind-the-build-verbs.md`
+[^DEC264A]: ADR-0104, a soldier is promoted from a level that never falls, decision D4. `docs/adrs/draft/adr-0104-a-soldier-is-promoted-from-a-level-that-never-falls.md`
+[^DEC265A]: Findings register, FND-471. `docs/FINDINGS.md`
+[^DEC266A]: Findings register, FND-472. `docs/FINDINGS.md`
 [^DEC210A]: ADR-0126, a trade negotiation is engine state, and the words are not, decision D2. `docs/adrs/draft/adr-0126-a-trade-negotiation-is-engine-state.md`
 [^DEC211A]: ADR-0128, a contract moves a quantity only when a unit carries it onto the ground of the other party, decision D1. `docs/adrs/draft/adr-0128-a-contract-moves-a-quantity-only-when-a-unit-carries-it.md`
 [^DEC211B]: ADR-0062, production and upkeep are rates attached to a site, decision D2. `docs/adrs/accepted/adr-0062-production-and-upkeep-are-rates-attached-to-a-site.md`

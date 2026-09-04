@@ -157,7 +157,17 @@ impl Sex {
     }
 
     /// Returns the raw value that the column stores.
-    const fn to_column(self) -> u8 {
+    ///
+    /// A boundary that answers with a column of sexes reports this value. It
+    /// reads the number from here rather than writing a second copy of the
+    /// encoding, because two copies of one value have nothing that fails when
+    /// they disagree.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`
+    #[must_use]
+    pub const fn to_column(self) -> u8 {
         match self {
             Self::Female => 0,
             Self::Male => 1,
@@ -613,6 +623,24 @@ impl CharacterArena {
     /// # References
     ///
     /// [^1]: ADR-0014, entity identity is an index plus a generation, decision D2. `docs/adrs/accepted/adr-0014-entity-identity-is-an-index-plus-a-generation.md`
+    /// Returns the generation that one slot carries.
+    ///
+    /// A slot that carries no identity returns zero, and zero is never the
+    /// generation of a live character.[^1] A boundary that refuses a stale
+    /// identity reports this value, so a caller reads what the arena holds
+    /// rather than guessing.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0014, entity identity is an index plus a generation, decision D6. `docs/adrs/accepted/adr-0014-entity-identity-is-an-index-plus-a-generation.md`
+    #[must_use]
+    pub fn generation_of(&self, slot: u32) -> u32 {
+        self.generations
+            .get(slot as usize)
+            .copied()
+            .unwrap_or(NO_GENERATION)
+    }
+
     #[must_use]
     pub fn slot_of(&self, entity: Entity) -> Option<u32> {
         let slot = entity.index();
