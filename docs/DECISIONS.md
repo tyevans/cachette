@@ -23,9 +23,40 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^ALLOC]
 
-**Next number: DEC-214**
+**Next number: DEC-225**
 
 ## Open
+
+### DEC-224 — Does a log the bindings expose hold more than the last step?
+
+**Open. Engineering owns it.**
+
+Every log the bindings expose holds the last step alone, and the next step
+empties it. The doc comment of each one says so, and a caller that steps twice
+before it reads has lost the first step with nothing failing. The fallen log
+joins that rule, and a reader of the combat work named the hazard: correct use
+is a discipline the caller holds in its head.[^DEC224A]
+
+**Option A. Leave the rule as it is, and state it at every call site.** The
+engine holds one step of each log, and the published reference says so in the
+same words each time. The cost of a frame does not change, and the memory a
+world holds stays bounded by the work of one step.
+
+**Option B. The engine keeps a queue of steps, and a caller drains it.** A
+caller that steps ten times then reads gets all ten steps. The queue needs a
+bound, a rule for what happens when it fills, and a decision record, because a
+queue that drops the oldest entry silently is the same failure one layer on.
+
+**Option C. The caller keeps what it needs, and a helper in the control plane
+does the keeping.** The engine stays as it is, and the Python package holds a
+recorder that reads each log after each step. Nothing about the engine changes,
+and the discipline moves from the caller into a named object.
+
+**Recommendation: Option A until a caller states a need, then Option C.** The
+rule is uniform today, which is worth more than any one log's convenience, and
+a queue inside the engine buys a caller nothing that a recorder in the control
+plane cannot buy outside it. A backlog item holds the work.[^DEC224B]
+
 
 ### DEC-140 — Is a god a faction, or a thing that owns a faction?
 
@@ -3625,6 +3656,9 @@ game rule, and a blocker holds it.[^DEC213B]
 
 
 ## References
+
+[^DEC224A]: Review of backlog item 0345, section 10. `docs/reviews/0345-resolve-a-meeting.md`
+[^DEC224B]: Backlog item 0432, decide the lifetime of every log the bindings expose. `docs/backlog/proposed/0432-decide-the-lifetime-of-every-log-the-bindings-expose.md`
 
 [^DEC210A]: ADR-0126, a trade negotiation is engine state, and the words are not, decision D2. `docs/adrs/draft/adr-0126-a-trade-negotiation-is-engine-state.md`
 [^DEC211A]: ADR-0128, a contract moves a quantity only when a unit carries it onto the ground of the other party, decision D1. `docs/adrs/draft/adr-0128-a-contract-moves-a-quantity-only-when-a-unit-carries-it.md`

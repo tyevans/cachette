@@ -75,6 +75,23 @@ class ResourceTakenColumns(TypedDict):
     amount: npt.NDArray[np.uint32]
     kind: npt.NDArray[np.uint8]
 
+class UnitFellColumns(TypedDict):
+    """One column for each field of the fallen event.
+
+    The unit column holds the whole identity of the unit that fell. Every
+    identity in it is dead, because the step ended the unit it names. The
+    tile column carries the ground the unit stood on, so a reader places the
+    death without a second read.
+
+    The log covers the last step alone. The next step empties it.
+    """
+
+    tick: npt.NDArray[np.uint64]
+    unit: npt.NDArray[np.uint64]
+    tile: npt.NDArray[np.uint32]
+    faction: npt.NDArray[np.uint16]
+    unit_type: npt.NDArray[np.uint8]
+
 class PositionColumns(TypedDict):
     """One column for each field of a position at a site.
 
@@ -463,10 +480,13 @@ class World:
     @property
     def gather_count(self) -> int: ...
     @property
+    def fell_count(self) -> int: ...
+    @property
     def soldier_count(self) -> int: ...
     def event_log_bytes(self) -> bytes: ...
     def event_log_columns(self) -> TileChangedColumns: ...
     def gather_log_columns(self) -> ResourceTakenColumns: ...
+    def fell_log_columns(self) -> UnitFellColumns: ...
     def tile_values(self) -> npt.NDArray[np.int32]: ...
     def spawn_soldiers(
         self, addresses: Sequence[tuple[int, int]], faction: int
