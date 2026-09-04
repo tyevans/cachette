@@ -39,6 +39,7 @@
 //! [^7]: ADR-0009, parallel stages write disjoint outputs, because the memory model is weak. `docs/adrs/accepted/adr-0009-parallel-stages-write-disjoint-outputs.md`
 //! [^8]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
 
+use crate::bridge::BlockLayout;
 use crate::hash::StateHash;
 use crate::hex::{Axial, Grid};
 use crate::pyramid::CellSummary;
@@ -55,6 +56,29 @@ pub enum InfluenceError {
     FactionCountAboveCeiling(u16),
     /// The conductance plane does not cover the cell lattice.
     ConductanceLengthMismatch,
+}
+
+/// Returns the address, on the cell lattice, of the cell that covers one
+/// tile.
+///
+/// The lattice is the level 1 block lattice at the pitch of one block, so the
+/// mapping is the block of the tile read as an address on that lattice.
+///
+/// **This is the one place that states the mapping.** The world reads it for
+/// a point query, and the conversion pass reads it for every occupied tile. A
+/// second statement of it would be one fact in two places, and the two would
+/// disagree the first time the lattice moved.[^1]
+///
+/// Returns `None` when the tile lies outside the world, or when the block
+/// lies outside the lattice.
+///
+/// # References
+///
+/// [^1]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`
+#[must_use]
+pub fn cell_of_tile(layout: BlockLayout, cells: Grid, tile: TileIdx) -> Option<Axial> {
+    let block = layout.block_of_key(layout.key_of(tile)?);
+    cells.address_of(TileIdx(block))
 }
 
 /// One cell of an influence field.

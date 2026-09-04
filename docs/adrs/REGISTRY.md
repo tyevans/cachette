@@ -392,6 +392,9 @@ without stating a constraint is worse than no record.
 | 0129 | A trade negotiation is engine state, and the words are not | Draft | 0001, 0002, 0004, 0053, 0090 | 21, `draft/adr-0129-a-trade-negotiation-is-engine-state.md` |
 | 0130 | A terminal refusal closes an ordered pair until a named tick | Draft | 0129 | `draft/adr-0130-a-terminal-refusal-closes-a-pair-until-a-named-tick.md` |
 | 0131 | A contract moves a quantity only when a unit carries it onto the ground of the other party | Draft | 0004, 0062, 0063, 0072, 0073, 0129, 0130 | `draft/adr-0131-a-contract-moves-a-quantity-only-when-a-unit-carries-it.md` |
+| 0132 | Conversion changes the faction of a unit, and adds no second allegiance | Draft | 0014, 0065, 0070, 0072, 0099, 0104, 0111, 0134 | `draft/adr-0132-conversion-changes-the-faction-of-a-unit.md` |
+| 0133 | A unit converts to the faction that leads the influence field at its cell | Draft | 0002, 0003, 0004, 0087, 0096, 0111, 0123, 0128, 0132, 0134 | 09, `draft/adr-0133-a-unit-converts-to-the-faction-that-leads-the-field.md` |
+| 0134 | A god reads conversion as an event log and as the counts it already reads | Draft | 0006, 0064, 0065, 0070, 0132, 0133 | `draft/adr-0134-a-god-reads-conversion-as-an-event-log.md` |
 
 ### Retired numbers
 

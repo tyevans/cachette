@@ -3655,6 +3655,99 @@ already.
 game rule, and a blocker holds it.[^DEC213B]
 
 
+### DEC-214 — What makes a unit convert?
+
+**Closed on 3 September 2026. The influence field, by strict dominance at the
+level 1 cell.**
+
+**The question.** Conversion changes the faction of a unit outright, and the
+project owner decided that. What nobody had decided was what triggers it: a
+field, a proximity rule between units, a verb a god calls, or a standing
+policy.
+
+**The outcome.** A unit converts to the faction that reaches its level 1 cell
+most strongly, and only when that faction leads its own strictly.[^DEC214A] A
+god causes it deliberately in two ways: it sets an influence source, which is
+slow and spatial, or it calls a set-valued verb, which is immediate and names
+people.[^DEC214B]
+
+**Why.** The engine already holds a field that carries the reach of a faction
+across the world and falls with distance. Belief is that shape. A second field
+for belief would be a second declaration of one idea, and nothing would fail
+when the two disagreed.[^DEC73B] A proximity rule was rejected because its
+cost follows the population.
+
+**What stays open.** What a god pays for belief is a game rule, and a blocker
+holds it.[^DEC214D]
+
+### DEC-215 — What stops two factions flipping one unit every frame?
+
+**Closed on 3 September 2026. Strict dominance. The engine holds no cooldown
+and no threshold.**
+
+**The question.** A rule that moves a unit toward whoever leads can move it
+back on the next frame. A cooldown counter and a margin threshold were both
+available.
+
+**The outcome.** A unit converts only where another faction leads its own
+strictly. After the change that faction is its own, so the margin against it is
+zero and the unit cannot convert again while the field stands
+still.[^DEC215A] The rule is antisymmetric by construction and needs no state
+on the unit.
+
+**Why.** A cooldown is a column that every unit carries so that a rare case
+behaves, and it enters the state hash. A threshold is a tuning value that
+decides behaviour, so it enters the state hash too, and it buys nothing that
+strict dominance does not already give.
+
+**What stays open.** Nothing about the engine. A control plane that calls the
+verb on alternate frames flips a unit on alternate frames, and the engine
+states no rule against it.
+
+### DEC-216 — What does a convert keep, and what does it lose?
+
+**Closed on 3 September 2026. It keeps every physical fact and loses every
+order.**
+
+**The question.** A unit carries a type, a load, a home site, a seat, three
+orders and sometimes a character. Each one either follows the unit into the new
+faction or does not.
+
+**The outcome.** The type, the load, the tile, the home and the seat
+survive.[^DEC216A] The gather order, the build order and the destination end.
+A character changes faction with the body that carries it.[^DEC216B]
+
+**Why.** A load that vanished would break the conservation the engine checks. A
+home that vanished would stop the unit eating on the frame it converted, and
+conversion would then be a disguised death. An order is a standing instruction
+from the control plane that owned the unit, and a convert that kept one would
+let a god steer the units of another god.
+
+**What stays open.** A convert may hold a seat at a site of its old faction
+until that site opens its seats again. A blocker holds the question of whether
+that is right.[^DEC216C]
+
+### DEC-217 — Is conversion gated on territory, as messaging and trade are?
+
+**Closed on 3 September 2026. It is not. The field is already the gate.**
+
+**The question.** The trade verbs are gated on presence: a player speaks to
+another only while one of its own units stands in that player's territory. The
+same gate was available for conversion.
+
+**The outcome.** Conversion reads the influence field alone.[^DEC217A] A
+faction reaches a cell because the control plane put a source there and the
+solve spread it, and the ground already governs that spread. A second gate that
+asked who holds the tile would state the same restriction twice.[^DEC73B]
+
+**Why.** The presence gate would make conversion useless. A god that already
+holds the ground has less need to convert the people on it, and a god that does
+not could never start.
+
+**What stays open.** Whether the downstream game wants a territorial gate is a
+game rule, and a blocker holds the rules of that game.[^DEC214D]
+
+
 ## References
 
 [^DEC224A]: Review of backlog item 0345, section 10. `docs/reviews/0345-resolve-a-meeting.md`
@@ -3666,6 +3759,14 @@ game rule, and a blocker holds it.[^DEC213B]
 [^DEC212A]: ADR-0128, a contract moves a quantity only when a unit carries it onto the ground of the other party, decision D4. `docs/adrs/draft/adr-0128-a-contract-moves-a-quantity-only-when-a-unit-carries-it.md`
 [^DEC213A]: ADR-0126, a trade negotiation is engine state, and the words are not, decision D5. `docs/adrs/draft/adr-0126-a-trade-negotiation-is-engine-state.md`
 [^DEC213B]: Blockers register, BLK-121. `docs/BLOCKERS.md`
+[^DEC214A]: ADR-0133, a unit converts to the faction that leads the influence field at its cell, decision D1. `docs/adrs/draft/adr-0133-a-unit-converts-to-the-faction-that-leads-the-field.md`
+[^DEC214B]: ADR-0133, a unit converts to the faction that leads the influence field at its cell, decision D4. `docs/adrs/draft/adr-0133-a-unit-converts-to-the-faction-that-leads-the-field.md`
+[^DEC214D]: Blockers register, BLK-122. `docs/BLOCKERS.md`
+[^DEC215A]: ADR-0133, a unit converts to the faction that leads the influence field at its cell, decision D2. `docs/adrs/draft/adr-0133-a-unit-converts-to-the-faction-that-leads-the-field.md`
+[^DEC216A]: ADR-0132, conversion changes the faction of a unit and adds no second allegiance, decision D2. `docs/adrs/draft/adr-0132-conversion-changes-the-faction-of-a-unit.md`
+[^DEC216B]: ADR-0132, conversion changes the faction of a unit and adds no second allegiance, decision D4. `docs/adrs/draft/adr-0132-conversion-changes-the-faction-of-a-unit.md`
+[^DEC216C]: Blockers register, BLK-123. `docs/BLOCKERS.md`
+[^DEC217A]: ADR-0133, a unit converts to the faction that leads the influence field at its cell, decision D6. `docs/adrs/draft/adr-0133-a-unit-converts-to-the-faction-that-leads-the-field.md`
 [^DEC106A]: ADR-0097, the toolchain is a dated nightly, decisions D2 and D3. `docs/adrs/draft/adr-0097-the-toolchain-is-a-dated-nightly.md`
 [^DEC106B]: Recurring defect shapes, documents that rot when a sweep names specifics. `.claude/rules/recurring-defects.md`
 [^DEC109A]: Project orientation, hard invariant 2. `CLAUDE.md`

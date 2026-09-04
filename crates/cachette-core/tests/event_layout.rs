@@ -92,3 +92,33 @@ fn a_unit_type_row_holds_no_padding_at_all() {
     use cachette_core::unit_type::UnitTypeRow;
     assert_eq!(size_of::<UnitTypeRow>(), 2 * size_of::<Fix32>());
 }
+
+#[test]
+fn the_conversion_event_declares_every_padding_byte() {
+    // The event of a unit that changed faction is plain data. Its own doc
+    // comment states the layout, and this is what fails when the two
+    // disagree. The fields fill the type exactly, so it declares no padding
+    // and the sum below holds no padding term.
+    use cachette_core::conversion::UnitConverted;
+    let declared = size_of::<Tick>()
+        + size_of::<u64>()
+        + size_of::<TileIdx>()
+        + size_of::<FactionId>()
+        + size_of::<FactionId>();
+    assert_eq!(size_of::<UnitConverted>(), declared);
+    assert_eq!(size_of::<UnitConverted>() % 8, 0);
+    assert_eq!(align_of::<UnitConverted>(), 8);
+}
+
+#[test]
+fn the_conversion_event_round_trips_through_bytes() {
+    use cachette_core::conversion::UnitConverted;
+    let events = [
+        UnitConverted::new(Tick(4), 9, TileIdx(1), FactionId(0), FactionId(2)),
+        UnitConverted::new(Tick(4), 11, TileIdx(3), FactionId(2), FactionId(0)),
+    ];
+    let bytes: &[u8] = bytemuck::cast_slice(&events);
+    assert_eq!(bytes.len(), 2 * size_of::<UnitConverted>());
+    let restored: &[UnitConverted] = bytemuck::cast_slice(bytes);
+    assert_eq!(restored, &events);
+}

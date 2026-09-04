@@ -865,6 +865,31 @@ impl CharacterArena {
         &self.factions
     }
 
+    /// Changes the faction of a character, and reports whether it wrote.
+    ///
+    /// Returns `false` when the identity is dead, and when the faction is at
+    /// or above the ceiling.
+    ///
+    /// A character is the person that a unit became, and the unit is the body
+    /// that carries the person. A body that changes faction and a person that
+    /// does not would be one allegiance held in two places, with the two in
+    /// disagreement and nothing that fails.[^1] [^2]
+    ///
+    /// # References
+    ///
+    /// [^1]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`
+    /// [^2]: ADR-0132, conversion changes the faction of a unit and adds no second allegiance, decision D4. `docs/adrs/draft/adr-0132-conversion-changes-the-faction-of-a-unit.md`
+    pub fn set_faction(&mut self, entity: Entity, faction: FactionId) -> bool {
+        if faction.0 >= FACTION_CEILING {
+            return false;
+        }
+        let Some(slot) = self.slot_of(entity) else {
+            return false;
+        };
+        self.factions[slot as usize] = faction;
+        true
+    }
+
     /// Returns the whole birth column.
     #[must_use]
     pub fn birth_column(&self) -> &[Tick] {

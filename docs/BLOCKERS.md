@@ -25,11 +25,62 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^ALLOC]
 
-**Next number: BLK-122**
+**Next number: BLK-124**
 
 [^ALLOC]: Findings register, FND-038. `docs/FINDINGS.md`
 
 ## Open
+
+### BLK-122 — Nobody has said what belief costs a god
+
+**Owner:** the project owner. **Blocks:** nothing today. It governs whether
+taking people is a resource decision or a free one.
+
+A god takes the people of another god in two ways. It sets an influence source,
+which spreads belief across the world, or it calls a verb on a named set of
+units.[^BLK122A] The engine charges nothing for either one. It holds no cost,
+no cooldown and no eligibility rule.
+
+**The engine is right to hold none of those.** A price is a game rule, and the
+project keeps game rules above the engine. The gap is that nobody has said what
+the downstream game charges, so nobody knows whether the engine gives that game
+the terms it needs to charge anything at all.
+
+Three answers are workable. The game charges from a store it keeps itself, and
+the engine needs no change. The game wants a source to draw from a settlement
+store, which is a rate and the engine already has rates. The game wants a
+per-unit price at the moment of conversion, which the engine cannot express
+today, because the pass converts a group and never names a payer.
+
+**Work continues.** The engine states the free version plainly. The third
+answer is the only one that would change the engine, and it would add a term to
+the pass rather than change its shape.
+
+### BLK-123 — Nobody has said what a convert does with a seat and a home at a site of its old faction
+
+**Owner:** the project owner. **Blocks:** nothing today. It governs what a
+converted unit eats and what work it does.
+
+A unit that changes faction keeps the site it lives in and the seat it holds
+there.[^BLK123A] The site belongs to its old faction. So a convert draws what
+it consumes from the store of a faction it no longer belongs to, and it may
+hold a position that the old faction opened, until the next rebalance of that
+site opens the seats again.
+
+**The engine is consistent either way.** The cohort table is keyed on the site
+and the faction together, so a convert simply appears in a different row of the
+same site. The invariant checks pass.
+
+Three answers are workable. The convert keeps the home, which is what the
+engine does and which reads as a person who changed their mind and stayed in
+town. The convert loses the home at once, which makes conversion a kind of
+exile and starves it unless the new faction takes it in. The convert keeps the
+home and loses the seat, which needs a rule that releases a live holder and the
+engine has none.
+
+**Work continues.** The engine states the first answer plainly and a record
+gives the reasoning.[^BLK123A] A change of rule changes the apply function and
+its tests.
 
 ### BLK-110 — Nobody has said what the variety score should change
 
@@ -609,3 +660,6 @@ normally.
 [^BLK111A]: Decisions register, DEC-202. `docs/DECISIONS.md`
 [^BLK120A]: ADR-0128, a contract moves a quantity only when a unit carries it onto the ground of the other party, decision D1. `docs/adrs/draft/adr-0128-a-contract-moves-a-quantity-only-when-a-unit-carries-it.md`
 [^BLK121A]: ADR-0126, a trade negotiation is engine state, and the words are not, decision D5. `docs/adrs/draft/adr-0126-a-trade-negotiation-is-engine-state.md`
+
+[^BLK122A]: ADR-0133, a unit converts to the faction that leads the influence field at its cell, decisions D1 and D4. `docs/adrs/draft/adr-0133-a-unit-converts-to-the-faction-that-leads-the-field.md`
+[^BLK123A]: ADR-0132, conversion changes the faction of a unit and adds no second allegiance, decision D2. `docs/adrs/draft/adr-0132-conversion-changes-the-faction-of-a-unit.md`
