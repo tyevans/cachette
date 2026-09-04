@@ -23,9 +23,170 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^ALLOC]
 
-**Next number: DEC-135**
+**Next number: DEC-147**
 
 ## Open
+
+### DEC-140 — Is a god a faction, or a thing that owns a faction?
+
+**Open. The project owner owns it. It governs the subject of every verb the
+downstream game asks for.**
+
+A game called Gods and Congregations is being built on this engine, and a god
+directs a congregation. The engine holds four entity shapes and none of them is
+a god.[^DEC140A]
+
+**Option A. A god is a faction.** A faction already owns units and ground, and
+the engine already keeps a running total of both for each one. The ceiling is 63
+gods. This is what a research report assumed throughout, and it says so.[^DEC140B]
+
+**Option B. A god is a character who owns a faction.** The engine holds a
+character tier with a bounded population, descent and renown. A god would then
+have parents, a lifespan and a relation to other gods.
+
+**Option C. A god is outside the world.** The engine holds nothing for it, and
+the control plane keeps the whole notion.
+
+**Recommendation: Option A, until the owner says otherwise.** It needs no new
+storage and every verb in the report resolves against it. Option B is the
+interesting one for a game about gods, and it should be chosen deliberately
+rather than by default.
+
+### DEC-141 — Does the engine derive a presence relation between factions, or does the selector answer presence?
+
+**Open. Engineering owns it. It decides what the downstream game's central
+mechanic rests on.**
+
+The question is whether any unit of one faction stands on ground that another
+faction holds. The engine holds every part of the answer and exposes none of
+it as one call.[^DEC141A]
+
+**Option A. Derive a relation at the barrier.** One set of factions for each
+faction, folded by union while the engine rebuilds the derived position of the
+population. The answer is a fixed size, the combine is a union, and the
+derivation adds one read for each unit to a pass that already runs.
+
+**Option B. Answer it through the selector.** A caller describes the units of
+one faction standing on ground another faction holds, and reads the set back.
+This is the general mechanism and it also names the units.
+
+**Option C. Both.** The relation answers the gate. The selector answers which.
+
+**Recommendation: Option C, with Option A first.** The gate is asked whenever
+anybody wants to speak, and a fixed-size answer cannot be made slow by a large
+world. The selector does not exist yet and it answers a wider question.
+
+### DEC-142 — Does the control plane name the seed set of a strategy field?
+
+**Open. Engineering owns it. It is what makes a unit go to a chosen place.**
+
+The engine derives a reach for each faction and each level 1 cell, seeded at
+every live site of that faction, and a laden unit climbs it home.[^DEC142A] The
+seed set is fixed by the record.
+
+**Option A. Leave the seeds fixed.** A unit goes to a site of its faction and
+nowhere else. This is the state today.
+
+**Option B. Let the control plane name a set of addresses that seeds a plane.**
+The derivation, the relaxation, the tie-break and the per-unit read all stay as
+they are. Only the seeds change.
+
+**Option C. Give a unit a destination it carries.** Rejected before it is
+considered: a quantity computed from a unit's own position toward a unit's own
+destination is the search that the governing record forbids.[^DEC142B]
+
+**Recommendation: Option B.** It gives "move units somewhere" and "gather units
+in a place" from one change, and it gives neither unit a search. It amends a
+draft record rather than superseding an accepted one.
+
+### DEC-143 — Is an upgrade kind a variant in the engine, or a row in a catalogue the world is built with?
+
+**Open. Engineering owns it.**
+
+The engine holds two upgrade kinds as a Rust enumeration, and each carries a
+fixed work cost. A game that wants a shrine cannot add one from Python.
+
+**Option A. Leave it an enumeration.** A new kind is an engine change and a new
+release.
+
+**Option B. Make it a table the world is built with.** Each row holds a work
+cost and a declared effect on the tile. A lookup in a table is not a callback,
+so nothing about the frame changes.
+
+**Recommendation: Option B.** The project already states that upgrades are data
+and not code, and that types parameterise the verbs rather than multiplying
+them.[^ORIENT] Option A contradicts that in the one place it is currently
+testable.
+
+### DEC-144 — Does a fight resolve at the tile or at the level 1 cell?
+
+**Open. Engineering owns it. One blocker holds the evidence that would settle
+it.**
+
+A design sketch resolves combat for each level 1 cell, as a small table over
+unit types. A cell summarises a block of tiles, and the block edge is a power of
+two set by one constant.[^DEC144A]
+
+**Option A. Resolve at the cell.** The cost follows the cell count. It reuses
+the lattice everything else uses. The risk is that casualties spread across a
+whole block, so an army smears rather than forming a front line.
+
+**Option B. Resolve at the tile.** The engine already lists the units standing
+on one tile, and it rebuilds that at every barrier, so the input exists. The
+cost follows the contested tiles, which is a small set, and the block masks
+already say which blocks hold more than one faction.
+
+**Recommendation: Option B, after the measurement.** The tile form needs no new
+input and its cost follows a small set. The blocker states the measurement that
+would decide it, and it is cheap.[^DEC144B]
+
+### DEC-145 — Does an attacker below the defender's threshold contribute exactly zero?
+
+**Open. The project owner owns it, because it is a game-design judgement.**
+
+The project owner's acceptance test for combat is that one tank still kills four
+bowmen, and the sketch that meets it applies a penetration threshold for each
+attacker type before anything is aggregated.[^DEC145A]
+
+**Option A. A hard threshold.** An attacker below the threshold contributes
+exactly zero. A sum of zeroes is zero at any count, so no number of bowmen
+reaches the tank. The test passes structurally and no constant holds it up.
+
+**Option B. A soft threshold.** A contribution below the threshold falls off
+steeply but never to zero. Some very large number of bowmen eventually kills the
+tank.
+
+**The cost of Option A is a cliff.** An effect of 99 against a threshold of 100
+does nothing and 101 does everything. One point of armour makes a unit immune to
+a whole class. The consumption module met the same shape and removed it with a
+per-unit accumulator, and this project recorded that reasoning.[^DEC145B]
+
+**Recommendation: Option A, because the stated test asks for it.** The
+recommendation is weak, and it should be taken only from the owner. Option A
+also removes attrition entirely for the pairs it applies to, and attrition is
+what produces the crowd behaviour the owner asked for.
+
+### DEC-146 — Is attack a verb, or a destination and a posture?
+
+**Open. Engineering owns it. It decides how many verbs the vocabulary grows
+by.**
+
+Three candidate verbs were named: attack these units, hold this ground, and raid
+and withdraw.
+
+**Option A. Three verbs.** Each is a command with its own arguments and its own
+pass.
+
+**Option B. One destination and one posture.** The destination is the seed set
+of DEC-142. The posture is one small value on a unit that says what it does when
+it stands beside an enemy: engage, hold, or refuse. The three candidates then
+differ only in a stored value.
+
+**Recommendation: Option B.** The project already states that types parameterise
+the verbs rather than multiplying them.[^ORIENT] Three verbs that differ only in
+a stored value are one verb and a value. One case does not fit: a unit that must
+withdraw inside the frame in which it meets something cannot wait for the control
+plane, and that rule belongs in the posture column.
 
 ### DEC-130 — Does the package ship a friendly Python tier above the compiled module, and where does the line fall?
 
@@ -3284,3 +3445,12 @@ a failed founding is correct.[^PRD12]
 [^DEC121A]: Findings register, FND-325. `docs/FINDINGS.md`
 [^DEC121B]: ADR-0107, the Python reference is generated from the compiled module, decisions D1 and D2. `docs/adrs/draft/adr-0107-the-python-reference-is-generated-from-the-compiled-module.md`
 [^DEC121C]: The test that pins every documented value. `tests/test_documented_values.py`
+[^DEC140A]: ADR-0066, entity storage holds four fixed shapes. `docs/adrs/accepted/adr-0066-entity-storage-holds-four-fixed-shapes.md`
+[^DEC140B]: Research report 21, what a god needs from this engine, section 8. `docs/research/reports/21-what-a-god-needs.md`
+[^DEC141A]: Research report 21, what a god needs from this engine, section 2. `docs/research/reports/21-what-a-god-needs.md`
+[^DEC142A]: ADR-0110, a unit returns by climbing a reach field seeded at every site of its faction, decisions D1 and D2. `docs/adrs/draft/adr-0110-a-unit-returns-by-climbing-a-reach-field.md`
+[^DEC142B]: ADR-0095, a behavioural strategy arrives as a field over cells, never as a search from a unit, decision D1. `docs/adrs/draft/adr-0095-a-behavioural-strategy-arrives-as-a-field-over-cells.md`
+[^DEC144A]: Research report 21, what a god needs from this engine, section 4.2. `docs/research/reports/21-what-a-god-needs.md`
+[^DEC144B]: Blockers register, BLK-052, in this repository. `docs/BLOCKERS.md`
+[^DEC145A]: Research report 21, what a god needs from this engine, section 4.1. `docs/research/reports/21-what-a-god-needs.md`
+[^DEC145B]: ADR-0106, a cohort serves whole rations to a keyed subset, the context section. `docs/adrs/draft/adr-0106-a-cohort-serves-whole-rations-to-a-keyed-subset.md`

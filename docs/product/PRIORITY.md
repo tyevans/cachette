@@ -36,6 +36,7 @@ A record here is a need, not a plan. The backlog says what work answers it.[^3]
 | 0017 | Work assigned to the people who can do it. |
 | 0008 | A unit changes the ground it stands on. |
 | 0003 | A world worth looking at. The viewer trails the engine badly. |
+| 0031 | A god knows whose ground its people stand on. **It is the central mechanic of a game the project owner named**, and the engine already holds every part of the answer: a tile carries a holder, and a unit carries a faction and a tile. What is missing is a read. The answer for the whole world is one word for each faction, so it does not follow the population and it needs no selector. It sits here rather than under `Later` because it is the cheapest stated need on this list and it ships without any new verb. |
 | 0020 | A unit goes somewhere it cannot see. Every option the engine has is a gradient, so a place cannot be named and a unit cannot come back from anywhere. It sits below 0008 because gathering and a store both exist and nothing carries between them, so this is the need that connects what the world already holds. |
 
 ## Later
@@ -44,6 +45,7 @@ A record here is a need, not a plan. The backlog says what work answers it.[^3]
 |---|---|
 | 0019 | An agent can ask the running engine what it holds. It sits under `Later` because most of it is met: an agent builds a world, runs it, and reads what it holds through a protocol, and the derived answers can be checked against the parts they came from. What is not met is the last statement, that a gap reaches the next agent, and item 0211 holds that work. |
 | 0021 | The control plane has no published documentation. It sits under `Later` because the selector interface and the verb interface are not written, and prose written against a surface that still moves decays faster than anybody repairs it. It sits above 0018 because nothing else on this list gives the engine a front door for a person who has not read the source. |
+| 0030 | A developer builds a game the engine did not anticipate. Six of the things a named downstream game must do sit outside the control plane's command set, and a developer cannot tell which are refused by the architecture and which are merely unbuilt. It sits under `Later` because BLK-050 holds the whole list: the rules of that game are one paragraph, and what each verb does on success or failure is unstated. It sits above 0018 because the gaps it names are real whatever the game turns out to be, and because 0031 is one bounded piece of it that can ship first. |
 | 0018 | A deposit never comes back. Wants 0013, because nothing drains the world until units consume. |
 | 0015 | Family and descent. Wants the character tier to be doing something first. |
 | 0016 | A ruler. Wants a family to succeed from. |
