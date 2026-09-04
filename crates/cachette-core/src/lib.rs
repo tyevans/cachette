@@ -46,6 +46,7 @@ mod stock;
 pub mod terrain;
 pub mod tier;
 pub mod tile_value;
+pub mod trade;
 pub mod types;
 pub mod unit_type;
 pub mod upgrade;
@@ -97,6 +98,11 @@ pub use stage::{FrameCosts, Stage, StageCost, STAGES, STAGE_COUNT};
 pub use terrain::{Terrain, TerrainTile, TileKind};
 pub use tier::{EntityTier, Shape, CHARACTER_CEILING};
 pub use tile_value::{TileValueChunk, TileValueRange, TileValues};
+pub use trade::{
+    TradeError, TradeRow, TradeSpoken, TradeTable, ACT_ACCEPT, ACT_CLOSE, ACT_COUNT, ACT_COUNTER,
+    ACT_DEFAULT, ACT_OFFER, ACT_REFUSE, ACT_REOPEN, ACT_SETTLE, TRADE_BOUND, TRADE_COUNTERED,
+    TRADE_DEFAULTED, TRADE_IDLE, TRADE_OFFERED, TRADE_ROW_BYTES, TRADE_SETTLED, TRADE_STATUS_COUNT,
+};
 pub use types::{Accum, Entity, FactionId, Fix32, Tick, TileIdx};
 pub use unit_type::{
     UnitTypeError, UnitTypeId, UnitTypeRow, UnitTypeTable, DEFAULT_UNIT_TYPE, UNIT_TYPE_COUNT,

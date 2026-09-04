@@ -386,6 +386,9 @@ without stating a constraint is worse than no record.
 | 0121 | A meeting between two factions resolves at the tile, never at a level 1 cell | Draft | 0004, 0009, 0018, 0022, 0053, 0120 | 21, `draft/adr-0121-a-meeting-between-two-factions-resolves-at-the-tile.md` |
 | 0122 | An attacker whose attack does not exceed the defender's armour contributes exactly zero | Draft | 0002, 0023, 0120, 0121 | 21, `draft/adr-0122-an-attacker-below-the-armour-contributes-exactly-zero.md` |
 | 0123 | Casualties are whole units served to a keyed subset, never a fraction of everybody | Draft | 0001, 0002, 0003, 0004, 0009, 0106, 0121 | 21, `draft/adr-0123-casualties-are-whole-units-served-to-a-keyed-subset.md` |
+| 0126 | A trade negotiation is engine state, and the words are not | Draft | 0001, 0002, 0004, 0053, 0090 | 21, `draft/adr-0126-a-trade-negotiation-is-engine-state.md` |
+| 0127 | A terminal refusal closes an ordered pair until a named tick | Draft | 0120 | `draft/adr-0127-a-terminal-refusal-closes-a-pair-until-a-named-tick.md` |
+| 0128 | A contract moves a quantity only when a unit carries it onto the ground of the other party | Draft | 0004, 0062, 0063, 0072, 0073, 0120, 0121 | `draft/adr-0128-a-contract-moves-a-quantity-only-when-a-unit-carries-it.md` |
 
 ### Retired numbers
 

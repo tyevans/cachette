@@ -61,6 +61,7 @@ documents cite it.
 | 0030 | A developer builds a game the engine did not anticipate | Shaped | Game developer | `shaped/prd-0030-a-developer-builds-a-game-the-engine-did-not-anticipate.md` |
 | 0031 | A god knows whose ground its people stand on | Shaped | Game developer | `shaped/prd-0031-a-god-knows-whose-ground-its-people-stand-on.md` |
 | 0032 | A god knows what its ground is rich in | Shaped | Game developer | `shaped/prd-0032-a-god-knows-what-its-ground-is-rich-in.md` |
+| 0034 | Two players hold each other to a future delivery | Shaped | Game developer | `shaped/prd-0034-two-players-hold-each-other-to-a-future-delivery.md` |
 
 ## What does not belong in a record
 

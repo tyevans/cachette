@@ -25,7 +25,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^ALLOC]
 
-**Next number: BLK-112**
+**Next number: BLK-122**
 
 [^ALLOC]: Findings register, FND-038. `docs/FINDINGS.md`
 
@@ -300,6 +300,47 @@ much a contest costs and not where it resolves.
 pass, with a seed set the control plane named, and reports how many tiles hold
 two factions.
 
+### BLK-120 — Nobody has said what a contract does when the other party holds no settlement
+
+**Owner:** the project owner. **Blocks:** nothing today. It governs what a
+contract means at the edge of a run.
+
+A contract binds each party to deliver a quantity to the other. A unit carries
+the quantity onto the tile of a settlement the other party holds, and the store
+of that settlement receives it.[^BLK120A]
+
+**A party with no settlement can receive nothing.** The engine today runs the
+contract to its deadline and fails it, which costs the party that could not
+deliver the direction it would ask on again. That is the engine behaving
+consistently. Whether the game wants it is a rule nobody has stated.
+
+Three answers are workable. The contract fails, which is what the engine does.
+The contract pauses while the party holds no settlement. The contract ends
+without a default, because the failure was not the debtor's doing.
+
+**Work continues.** The engine states the first answer plainly and a test
+covers it, so a change of rule changes one branch and one test.
+
+### BLK-121 — Nobody has said whether a player may read a negotiation it is not party to
+
+**Owner:** the project owner. **Blocks:** nothing today. It governs what a
+control plane must hide.
+
+The engine holds one row for each ordered pair of factions, and it answers the
+status of any pair to any caller. It holds no notion of who is asking, and a
+notion of the asker would be an authentication model.[^BLK121A]
+
+**The read is shaped for privacy and it does not enforce it.** A caller asks
+for the rows one faction is a party to, so a control plane that hands each
+player its own view writes one call. A control plane that hands out the whole
+plane shows every negotiation in the world.
+
+The question is a game rule. A game in which players see each other's deals is
+a different game from one in which they do not, and both are playable.
+
+**Work continues.** The engine answers the same way under either rule.
+
+
 ## Resolved
 
 ### BLK-052 — Nobody has measured whether a fight at this granularity looks like a fight
@@ -566,3 +607,5 @@ normally.
 [^BLK110B]: Research report 21, what a god needs from this engine. `docs/research/reports/21-what-a-god-needs.md`
 [^BLK110C]: Decision Record Scope, section 4.5. `.claude/rules/adr-scope.md`
 [^BLK111A]: Decisions register, DEC-202. `docs/DECISIONS.md`
+[^BLK120A]: ADR-0128, a contract moves a quantity only when a unit carries it onto the ground of the other party, decision D1. `docs/adrs/draft/adr-0128-a-contract-moves-a-quantity-only-when-a-unit-carries-it.md`
+[^BLK121A]: ADR-0126, a trade negotiation is engine state, and the words are not, decision D5. `docs/adrs/draft/adr-0126-a-trade-negotiation-is-engine-state.md`

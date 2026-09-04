@@ -359,6 +359,68 @@ class Camera:
     def clamp(self, world: World, width: int, height: int) -> None: ...
     def tile_at(self, x: float, y: float) -> tuple[int, int]: ...
 
+class TradeStatus(TypedDict):
+    """What stands between one ordered pair of factions.
+
+    The status is a small integer. Zero is idle, one means the proposer spoke
+    last, two means the responder spoke last, three means a contract binds
+    both, four means both delivered in full, and five means the deadline
+    passed with a debt.
+
+    The turn names the faction that answers next, and it is ``None`` when
+    nobody is waiting on an answer.
+
+    The closed entry is what separates a refusal from a terminal refusal. It
+    is zero when nothing closed the direction, and it is otherwise the step at
+    which the direction opens again.
+    """
+
+    status: int
+    turn: int | None
+    give_kind: int
+    give_amount: int
+    take_kind: int
+    take_amount: int
+    given: int
+    taken: int
+    opened: int
+    deadline: int
+    term: int
+    closed_until: int
+    rounds: int
+
+class TradeBookColumns(TypedDict):
+    """One column for each field of a trade row, for one faction's pairs."""
+
+    proposer: npt.NDArray[np.uint16]
+    responder: npt.NDArray[np.uint16]
+    status: npt.NDArray[np.uint8]
+    give_kind: npt.NDArray[np.uint8]
+    take_kind: npt.NDArray[np.uint8]
+    give_amount: npt.NDArray[np.uint32]
+    take_amount: npt.NDArray[np.uint32]
+    given: npt.NDArray[np.uint32]
+    taken: npt.NDArray[np.uint32]
+    term: npt.NDArray[np.uint32]
+    opened: npt.NDArray[np.uint64]
+    deadline: npt.NDArray[np.uint64]
+    closed_until: npt.NDArray[np.uint64]
+    rounds: npt.NDArray[np.uint8]
+
+class TradeSpokenColumns(TypedDict):
+    """One column for each field of a trade event.
+
+    The act is a small integer. Zero is an offer, one a counteroffer, two an
+    acceptance, three a refusal, four a terminal refusal, five an opening, six
+    a settlement and seven a default.
+    """
+
+    tick: npt.NDArray[np.uint64]
+    proposer: npt.NDArray[np.uint16]
+    responder: npt.NDArray[np.uint16]
+    act: npt.NDArray[np.uint8]
+    status: npt.NDArray[np.uint8]
+
 class World:
     def __init__(
         self,
@@ -447,6 +509,33 @@ class World:
     def site_economy(self, site: int, commodity: int = ...) -> SiteEconomy: ...
     def explain_choice(self, unit: int) -> ChoiceReport: ...
     def tile_report(self, q: int, r: int) -> TileReport: ...
+    def offer_trade(
+        self,
+        proposer: int,
+        responder: int,
+        give_kind: int,
+        give_amount: int,
+        take_kind: int,
+        take_amount: int,
+        term: int,
+    ) -> None: ...
+    def counter_trade(
+        self,
+        speaker: int,
+        other: int,
+        give_kind: int,
+        give_amount: int,
+        take_kind: int,
+        take_amount: int,
+    ) -> None: ...
+    def accept_trade(self, speaker: int, other: int) -> None: ...
+    def refuse_trade(self, speaker: int, other: int) -> None: ...
+    def close_trade(self, speaker: int, other: int, steps: int) -> None: ...
+    def reopen_trade(self, speaker: int, other: int) -> None: ...
+    def trade_status(self, proposer: int, responder: int) -> TradeStatus: ...
+    def trade_book(self, faction: int) -> TradeBookColumns: ...
+    def trade_log_columns(self) -> TradeSpokenColumns: ...
+    def stands_in_territory_of(self, speaker: int, listener: int) -> bool: ...
     def window_census(self, q: int, r: int, radius: int = ...) -> WindowCensus: ...
     def seed_luxuries(self, placements: Sequence[tuple[int, int]]) -> None: ...
     @staticmethod

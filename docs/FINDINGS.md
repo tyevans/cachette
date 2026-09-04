@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-422**
+**Next number: FND-433**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -1586,6 +1586,67 @@ capacity mean nothing at the one moment it exists for.[^F274D]
 what produces the state, not only what the state is. The brief, the research
 report and the first implementation all passed their own tests, because a spawn
 may over-fill a tile and every fixture spawned.
+### FND-430 — Every resource kind credits one commodity, so a store cannot say what a contract delivered
+
+**Believed.** A settlement store holds a quantity for each commodity, and the
+three resource kinds a unit carries reach three separate totals.
+
+**True.** The store holds one commodity, and the table that maps a resource
+kind to a commodity names commodity zero three times. A unit that delivers
+wood and a unit that delivers stone raise one number. The store therefore
+answers how much arrived and never what arrived.
+
+**Evidence.** Read on 3 September 2026. `grep -n "COMMODITY_COUNT: usize"
+crates/cachette-core/src/site.rs` reported `pub const COMMODITY_COUNT: usize =
+1`. `grep -n "WORK_COMMODITY" crates/cachette-core/src/position.rs` reported
+`[CommodityId(0), CommodityId(0), CommodityId(0)]`.
+
+**Follows.** A trade contract states the resource kind exactly, in its own row
+and in its own event, because the store cannot state it. A caller that wants to
+know what a contract moved reads the contract row and never the store. A second
+commodity would change the mapping table and no code outside it, so this is a
+present fact rather than a permanent one.
+
+### FND-431 — The delivery pass carries no stage span, so a pass that moves a quantity is invisible to the cost table
+
+**Believed.** Every pass the step runs opens a stage, so the frame cost table
+accounts for the whole frame.
+
+**True.** The pass that moves a carried load into a store opens no stage. The
+step calls it between two stages and its cost falls into neither. The stage
+list is a declaration, and a pass that declares nothing is absent from every
+cost report the project takes.
+
+**Evidence.** Read on 3 September 2026. `grep -n "self.deliver(threads)"
+crates/cachette-core/src/world.rs` reported one call site, and the lines around
+it hold no `stage::open`. Every other pass in the step is wrapped in one.
+
+**Follows.** The contract settlement pass follows the same precedent, so two
+passes that move a quantity are now outside the table. A backlog item holds the
+repair, and it must add both at once rather than one.[^F431A]
+
+### FND-432 — Presence for one ordered pair needs no derived relation
+
+**Believed.** Answering whether a unit of one faction stands on ground another
+faction holds waits on a derived presence relation, because the answer for the
+whole world is a fold over every unit at the barrier.
+
+**True.** The whole-world answer does. **One ordered pair does not.** The
+soldier arena holds a faction column and a tile column, and the holding holds a
+holder column over the tiles. A walk over the live units that stops at the
+first match answers one pair exactly, from primary state alone, with nothing
+stored and nothing derived.
+
+**Evidence.** Read on 3 September 2026. The trade verbs answer the gate this
+way and their tests pass. `grep -n "pub fn holders"
+crates/cachette-core/src/holding.rs` reported the holder column, and `grep -n
+"pub fn faction_column" crates/cachette-core/src/soldier.rs` reported the
+faction column.
+
+**Follows.** A capability that needs the gate ships before the relation lands,
+and it holds no second copy of the answer, so the relation replaces the walk
+with a one-bit read and changes no behaviour. Read a missing derived structure
+as a cost question and not as a capability question.
 
 ## D. Cost estimates that were wrong
 
@@ -9993,6 +10054,8 @@ commodity, and the ration a unit receives is not that account.
 [^F411C]: The sent set test of the core. `crates/cachette-core/tests/a_sent_set_walks_to_its_destination.rs`
 [^F411D]: Backlog item 0401, decide how a sent unit gets around a barrier the field cannot see. `docs/backlog/proposed/0401-decide-how-a-sent-unit-gets-around-a-barrier.md`
 [^F410D]: ADR-0125, the control plane names the seed set of a destination field, decision D2. `docs/adrs/draft/adr-0125-the-control-plane-names-the-seed-set-of-a-destination-field.md`
+[^F431A]: Backlog item 0421, put the two quantity passes into the stage table. `docs/backlog/proposed/0421-put-the-two-quantity-passes-into-the-stage-table.md`
+
 [^F326A]: The head-up display, the row drawing. `crates/cachette-view/src/hud.rs`
 [^F218B]: ADR-0067, the viewer reads the world and never writes to it, decision D4. `docs/adrs/accepted/adr-0067-the-viewer-reads-the-world-and-never-writes-to-it.md`
 [^F327B]: ADR-0094, the caller owns the camera and the pixels, decision D1. `docs/adrs/draft/adr-0094-the-caller-owns-the-camera-and-the-pixels.md`
