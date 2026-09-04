@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-353**
+**Next number: FND-364**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -1065,6 +1065,97 @@ this register keeps recording.[^13]
 
 Research report 20 holds the design and the argument against the
 alternatives.[^F352B]
+
+### FND-360 — The core holds a general build verb, and no binding and no Python line calls it
+
+**Believed.** The control plane can found a settlement and nothing else that
+builds. A god game that wants to build things needs a build verb the engine does
+not have.
+
+**True.** The world type is public on four build methods: order a build for one
+unit and one kind, stop that order, report it, and remove a finished upgrade at
+an address. The store behind them is sparse and holds one entry for each tile
+that carries an upgrade.[^F360A] The bindings crate names none of the four, and
+neither does any Python file.
+
+**Evidence.** Measured on 3 September 2026 in this worktree. `grep -c
+"order_build\|destroy_upgrade\|stop_build" crates/cachette-py/src/lib.rs`
+reported 0. `grep -rn "order_build\|destroy_upgrade\|return_direction" python
+tests --include "*.py"` reported no line. `grep -n "    pub fn "
+crates/cachette-core/src/world.rs` reported all four on the world type.
+
+**Follows.** The build verb the downstream game wants is a binding, not an
+engine feature. This is the imported shape of a capability that nothing
+invokes: the mechanism is built, its own tests pass, and nothing reaches
+it.[^F331C] A gap in the boundary and a gap in the engine need different work,
+and the project should not price this one as the second.
+
+### FND-361 — Territory is one of the best-modelled things in the engine, and it reaches Python one tile at a time
+
+**Believed.** Territory ownership is an example of what a god game needs and
+this engine does not model.
+
+**True.** A tile carries one holder, and the holder is one faction or nobody.
+The world stores one faction mask for each block of tiles, so a query for one
+faction skips every block that does not name it. Each faction carries a running
+total of the ground it holds, maintained by the rule that changes a
+holder.[^F361A] The core answers the holder of an address, the mask near an
+address, the count for a faction, the blocks a faction holds and the tiles a
+faction holds.
+
+**Evidence.** Read on 3 September 2026 from the holding module of the core and
+from the public methods of the world type. The bindings expose two of it: one
+scalar entry in the report for one address, and one count in a region summary.
+
+**Follows.** The gap is the boundary and not the model. A need stated as "the
+engine must model territory" would produce work the engine has already done.
+The need is a read, and a product record states it.[^F361B]
+
+### FND-362 — The presence question is a relation between factions, so it does not follow the population
+
+**Believed.** Asking which units of one faction stand on ground another faction
+holds costs the population, and it waits on the selector.
+
+**True.** The gate form of the question does not. The world admits at most 63
+factions, and the reference table says the ceiling was chosen so that a relation
+is one plane and a presence set is one word.[^F362A] The answer for the whole
+world is therefore one set of factions for each faction. The engine already
+rebuilds the derived position of the population at every barrier, and that pass
+already visits every unit and its tile, so deriving the relation adds one read
+for each unit and allocates nothing. The combine is a union of sets, which has
+an identity, is associative and is commutative, so the fold gives one answer at
+any thread count.
+
+**Evidence.** Read on 3 September 2026. `grep -n "FACTION_CEILING"
+crates/cachette-core/src/types.rs` reported `pub const FACTION_CEILING: u16 =
+63`. The scale constants table states the reason for the ceiling in its own
+words.
+
+**Follows.** Separate the gate from the set. The gate is a fixed-size read that
+a large world cannot slow down, and it needs no selector. Naming which units are
+present is the wider question and it is the selector's. A design that folded the
+two together would hold the cheap answer behind the expensive one.
+
+### FND-363 — The return field is built, and the record that describes it reads as a proposal
+
+**Believed.** A record describes a reach field that would give ordered movement
+without a per-unit search, and building it is future work.
+
+**True.** The core answers a return direction for a faction and an address, and
+it answers an exit direction for an address and an option. Both are
+implemented. What is missing is not the field. It is that the seed set is fixed
+at every live site of the faction, so the control plane cannot name a
+destination.[^F363A]
+
+**Evidence.** Read on 3 September 2026. `grep -n "    pub fn "
+crates/cachette-core/src/world.rs` reported `return_direction` and
+`exit_direction` on the world type. No line of the bindings crate and no Python
+file names either.
+
+**Follows.** "Move units somewhere" is a settable seed set and not a new
+mechanism. Reading the record's status as the state of the code costs the
+project a large estimate for a small change. A draft record that the code
+already implements should say so, and this one does not.
 
 ## D. Cost estimates that were wrong
 
@@ -10328,3 +10419,8 @@ information, and it stops work that has everything it needs.
 [^F351B]: Interface review, section 2e. `~/cachette-reader-rounds/round-1-interface.md`
 [^F352A]: Interface review, section 6a. `~/cachette-reader-rounds/round-1-interface.md`
 [^F352B]: Research report 20, what the Python interface should be, section 3.1. `docs/research/reports/20-the-python-interface.md`
+[^F360A]: ADR-0090, a tile upgrade is stored sparsely, as the difference from the generated world, decision D1. `docs/adrs/draft/adr-0090-a-tile-upgrade-is-stored-sparsely.md`
+[^F361A]: ADR-0053, a faction is a bit in a mask, and a relation is a plane, decisions D2 and D4. `docs/adrs/accepted/adr-0053-a-faction-is-a-bit-in-a-mask-and-a-relation-is-a-plane.md`
+[^F361B]: PRD-0031, a god knows whose ground its people stand on. `docs/product/shaped/prd-0031-a-god-knows-whose-ground-its-people-stand-on.md`
+[^F362A]: Budgets and costs, the scale constants and the faction ceiling. `docs/reference/budgets.md`
+[^F363A]: ADR-0110, a unit returns by climbing a reach field seeded at every site of its faction, decision D2. `docs/adrs/draft/adr-0110-a-unit-returns-by-climbing-a-reach-field.md`

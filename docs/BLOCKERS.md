@@ -25,7 +25,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^ALLOC]
 
-**Next number: BLK-046**
+**Next number: BLK-053**
 
 [^ALLOC]: Findings register, FND-038. `docs/FINDINGS.md`
 
@@ -144,6 +144,94 @@ two of them.
 Work continues without the answer. The engine states the storage and the
 arithmetic, and neither depends on a faction. A rule invented here would be a
 content decision made by the wrong person.
+
+### BLK-050 — The rules of the downstream game are not written down
+
+**Owner:** the project owner. **Blocks:** the meaning of every verb the
+downstream game asks for.
+
+A game called Gods and Congregations is being built on this engine. The project
+owner named six things a god will want to do, in one sentence, and stated one
+rule in full: a god may send a message to another god only while one of its own
+units stands in that god's territory.[^BLK50A]
+
+**What is missing is what each verb does.** For each of the six, the project
+does not know what counts as success, what happens on failure, what the world
+looks like afterwards, or what a player sees. A research report reasons about
+all six, and it needed twelve assumptions to do it. That report lists every one
+of them in a single section, so that the owner can correct each.[^BLK50B]
+
+**This is information and not a judgement.** The options are not known, because
+nobody has written down what the game does. A guess produces an engine feature
+that is precise against a rule the game does not have.
+
+**Two questions inside this row matter more than the rest.** What a conversion
+changes, and what a god is in engine terms. The engine holds no belief and no
+allegiance that moves, and it holds nothing that is a god. Every verb has a
+subject, and the subject is currently a guess.
+
+**Work continues.** The engine gaps the report found are real whatever the game
+turns out to be: the core holds a build verb the bindings do not expose, the
+control plane cannot name a destination, and territory is readable one tile at a
+time. None of those depends on a game rule.
+
+**What closes this.** The project owner writes down, for each verb, what a
+player asks for and what the world does in reply.
+
+### BLK-051 — The scale the downstream game runs at is unknown
+
+**Owner:** the project owner. **Blocks:** the ranking of the interface work
+against the downstream game.
+
+This engine targets 16.7 million tiles and one million units, and the scale
+constants table holds both.[^SCALE] Every argument about what the control plane
+may do is priced at that scale. A loop over the population is forbidden because
+a million crossings in a frame cannot be paid.
+
+**A congregation may be much smaller.** Nobody has said how many units the
+downstream game runs, or how many gods. If it runs ten thousand units, a Python
+loop is merely slow rather than impossible, and several conclusions about what
+to build first change with it.
+
+**This is information and not a judgement.** The engine's own target is
+decided. What is unknown is the consumer's, and only the consumer can say.
+
+**Work continues.** Nothing the report recommends becomes wrong at a smaller
+scale. The ordering of it may.
+
+**What closes this.** The project owner states the unit count, the god count
+and the world size that the downstream game runs at.
+
+### BLK-052 — Nobody has measured whether a fight at this granularity looks like a fight
+
+**Owner:** engineering. **Blocks:** the choice between resolving a fight at a
+tile and resolving it at a level 1 cell.
+
+A level 1 cell summarises one block of tiles, and the block edge is a power of
+two set by one constant. A design sketch for combat resolves a fight for each
+cell, as a small table over unit types.[^BLK52A]
+
+**The risk is that an army smears.** A fight resolved for a whole block kills
+units spread across the whole block, so the casualties may not form a front
+line. Whether that reads as a battle is not a matter of opinion, and it is
+measurable before anything is built.
+
+**This is information and not a judgement.** Two factions have never been run
+into contact in this engine, so there is no evidence either way. Both options
+are known and each is buildable.
+
+**The measurement is stated and cheap.** Seed two factions on opposite sides of
+a world, run them to contact, and report the band of tiles that holds the middle
+90 percent of the casualties. Compare that band against the block edge. Then put
+the defect back: resolve at the cell on purpose and confirm the band widens. The
+report holds the method.[^BLK52B]
+
+**Work continues.** Everything else the combat sketch needs is unaffected: a
+unit still needs a type, the table is still data, and the randomness rule is
+already settled by an existing record.
+
+**What closes this.** Somebody runs that measurement and records the band width
+in tiles.
 
 ## Resolved
 
@@ -364,3 +452,7 @@ normally.
 [^BLK45A]: Research report 20, what the Python interface should be, section 1. `docs/research/reports/20-the-python-interface.md`
 [^BLK45B]: ADR-0051, a selector is a lazy expression tree that Rust evaluates. `docs/adrs/accepted/adr-0051-a-selector-is-a-lazy-expression-tree.md`
 [^BLK45C]: ADR-0040, Python is a control plane, not a data plane. `docs/adrs/draft/adr-0040-python-is-a-control-plane-not-a-data-plane.md`
+[^BLK50A]: PRD-0031, a god knows whose ground its people stand on. `docs/product/shaped/prd-0031-a-god-knows-whose-ground-its-people-stand-on.md`
+[^BLK50B]: Research report 21, what a god needs from this engine, section 8. `docs/research/reports/21-what-a-god-needs.md`
+[^BLK52A]: Research report 21, what a god needs from this engine, section 4. `docs/research/reports/21-what-a-god-needs.md`
+[^BLK52B]: Research report 21, what a god needs from this engine, section 4.2. `docs/research/reports/21-what-a-god-needs.md`
