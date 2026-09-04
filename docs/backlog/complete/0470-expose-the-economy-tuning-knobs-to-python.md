@@ -1,7 +1,7 @@
 ---
 id: 0470
 title: Expose the economy tuning knobs to Python
-status: refined
+status: complete
 created: 2026-09-03
 implements: [ADR-0040 D1, ADR-0043 D1, ADR-0046 D1, ADR-0085 D3, ADR-0107 D2, ADR-0002 D1, ADR-0062 D1, ADR-0062 D4]
 changes: []
@@ -79,3 +79,24 @@ named downstream game needs, and this item answers the economic part of it.
 - Each rule that the tests hold is broken once, and the test fails.
 - The determinism tests pass at 1, 2 and 12 threads.
 - Every gate passes.
+
+## Outcome
+
+Done. The control plane now sets production, upkeep, the economy cadence, a
+settlement store, the recovery rules, the deed threshold, the home site of a
+set of units, and the influence source of a set of places. It reads back the
+deed threshold, the recovery rules and the influence of a faction at a place.
+
+Three of the thirteen names in scope gained no binding, because they already
+cross inside a report that a binding builds. FND-481 records the measurement
+and the reasoning.
+
+Two boundary checks were written and then removed. Each restated a rule the
+engine already holds, and a defect put back into each of them failed no test.
+The engine is the one declaration site for both rules.
+
+The work found one defect it did not repair. The recovery rules govern the
+step and stand outside the state hash. FND-480 records it and item 0471 holds
+the repair, which moves every golden file.
+
+The review holds the detail.
