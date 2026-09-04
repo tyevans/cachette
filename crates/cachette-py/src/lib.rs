@@ -590,6 +590,133 @@ impl PyWorld {
         counts.iter().copied().take(factions).collect()
     }
 
+    /// Returns which factions stand on the ground of which other factions.
+    ///
+    /// **This is one call and it names no unit.** It answers for every pair of
+    /// factions at once. A caller that walked the population to reach the same
+    /// answer would cross the boundary twice for each unit, which the control
+    /// plane rule forbids.[^1]
+    ///
+    /// Returns a one-dimensional NumPy array of `numpy.uint64`, one entry for
+    /// each faction the world was built with. Entry `host` is a set of
+    /// factions, held as one bit for each faction. Bit `guest` is one when a
+    /// live unit of faction `guest` stands on a tile that faction `host`
+    /// holds.
+    ///
+    /// ```python
+    /// presence = world.presence_masks()
+    /// may_speak = bool(presence[other_god] & (1 << my_god))
+    /// ```
+    ///
+    /// **The size of the answer does not change when the population changes.**
+    /// A faction is one bit of a 64-bit word, and a world holds at most 63
+    /// factions, so the whole relation is one word for each faction.[^2]
+    ///
+    /// **A unit that stands on ground its own faction holds sets no bit.** The
+    /// question is whether the people of one side stand on the ground of
+    /// another side. Bit `host` of entry `host` is therefore always zero.
+    ///
+    /// **The answer is exact.** The engine reads the holder of the exact tile
+    /// that each unit stands on, and no summary reaches the answer. A bit that
+    /// is zero means that no unit of that faction is there.
+    ///
+    /// The answer states the world as the last step left it.
+    ///
+    /// # Errors
+    ///
+    /// Raises `ViewError` when the population changed since the last step. A
+    /// call to `spawn_soldiers` or to `despawn_soldiers` makes the answer
+    /// stale, and the engine refuses rather than answering. Call `step` and
+    /// ask again.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0040, Python is a control plane, not a data plane, decisions D1 and D2. `docs/adrs/draft/adr-0040-python-is-a-control-plane-not-a-data-plane.md`
+    /// [^2]: ADR-0053, a faction is a bit in a mask, and a relation is a plane, decision D7. `docs/adrs/accepted/adr-0053-a-faction-is-a-bit-in-a-mask-and-a-relation-is-a-plane.md`
+    fn presence_masks<'py>(&self, python: Python<'py>) -> PyResult<Bound<'py, PyArray1<u64>>> {
+        let world = self.lock();
+        let factions = world.config().faction_count as usize;
+        let raw: Vec<u64> = world
+            .presence_rows()
+            .map_err(|error| ViewError::new_err(error.to_string()))?
+            .iter()
+            .take(factions)
+            .map(|row| row.to_bits())
+            .collect();
+        Ok(raw.to_pyarray(python))
+    }
+
+    /// Reports whether a unit of one faction stands on ground another holds.
+    ///
+    /// `guest` is the faction whose units the question is about. `host` is the
+    /// faction that holds the ground. Both are faction numbers, counted from
+    /// zero. Returns a `bool`.
+    ///
+    /// The call answers one entry of `presence_masks` and costs the same. Ask
+    /// this one about one pair. Ask `presence_masks` about several.
+    ///
+    /// **The answer is `False` when `guest` and `host` name one faction.** A
+    /// faction is never a guest on its own ground.
+    ///
+    /// The answer states the world as the last step left it.
+    ///
+    /// # Errors
+    ///
+    /// Raises `ViewError` when the world holds no such faction, and the
+    /// message names the number that refused. Raises `ViewError` when the
+    /// population changed since the last step.
+    fn stands_in_territory(&self, guest: u16, host: u16) -> PyResult<bool> {
+        let world = self.lock();
+        let factions = world.config().faction_count;
+        for (name, number) in [("guest", guest), ("host", host)] {
+            if number >= factions {
+                return Err(ViewError::new_err(format!(
+                    "the {name} faction {number} is outside a world of {factions} factions"
+                )));
+            }
+        }
+        world
+            .stands_in_territory(FactionId(guest), FactionId(host))
+            .map_err(|error| ViewError::new_err(error.to_string()))
+    }
+
+    /// Copies the tile holder column into a new NumPy array.
+    ///
+    /// Returns a one-dimensional array of `numpy.uint16`, one entry for each
+    /// tile, in row-major order. Entry `r * width + q` is the tile at the
+    /// address `(q, r)`.
+    ///
+    /// **Each entry is a faction number, or 65535 for a tile that nobody
+    /// holds.** A faction number counts from zero, and a world holds at most
+    /// 63 factions, so 65535 can never name one.[^1]
+    ///
+    /// **This is one call and it reads no tile from Python.** The engine holds
+    /// the holders as one dense column, so the call copies that column. A
+    /// caller that read one address at a time with `tile_report` would cross
+    /// the boundary once for each tile, which the control plane rule
+    /// forbids.[^2]
+    ///
+    /// The array covers the whole world and never a window. It has the same
+    /// shape as the array that `tile_values` returns, so the two index alike.
+    ///
+    /// A holder changes only inside a step, so this call needs no freshness
+    /// check and raises nothing.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0053, a faction is a bit in a mask, and a relation is a plane, decision D2. `docs/adrs/accepted/adr-0053-a-faction-is-a-bit-in-a-mask-and-a-relation-is-a-plane.md`
+    /// [^2]: ADR-0040, Python is a control plane, not a data plane, decisions D1 and D2. `docs/adrs/draft/adr-0040-python-is-a-control-plane-not-a-data-plane.md`
+    fn tile_holders<'py>(&self, python: Python<'py>) -> Bound<'py, PyArray1<u16>> {
+        let world = self.lock();
+        let raw: Vec<u16> = world
+            .holding()
+            .holders()
+            .iter()
+            .map(|holder| holder.to_bits())
+            .collect();
+        raw.to_pyarray(python)
+    }
+
     /// Returns the name of every panel the viewer can draw.
     ///
     /// A caller passes one of these names to the drawing command. The list
