@@ -23,7 +23,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^ALLOC]
 
-**Next number: DEC-251**
+**Next number: DEC-271**
 
 ## Open
 
@@ -3776,6 +3776,33 @@ not could never start.
 
 **What stays open.** Whether the downstream game wants a territorial gate is a
 game rule, and a blocker holds the rules of that game.[^DEC214D]
+### DEC-270 — Does a caller replace the recovery rules as a whole set, or one kind at a time?
+
+**Closed. Option A. The caller passes the period of every resource kind in one
+sequence, and the engine takes the sequence or refuses it.**
+
+The recovery rules say how long a depleted deposit of each kind takes to
+return one unit of stock. The engine holds them as one value and replaces them
+as one value.[^DEC270A] The question was what shape the boundary should take.
+
+**Option A. One write for the whole rule set.** The caller passes one entry for
+each kind, in kind order. A kind that does not recover is stated as nothing.
+The write is refused as a whole.
+
+**Option B. One write for one kind.** The caller names a kind and a period, and
+the engine merges it into the set it holds.
+
+**Why A.** Option B needs a read of the current set, a merge, and a write. The
+merged value would then exist in two places for the duration of the call, and
+the engine already refuses that shape for exactly this value: the engine takes
+the whole set so that a period lives in one place and no two sites can hold a
+different value for one kind.[^DEC270A] Option B also has no all-or-nothing
+answer when a caller writes two kinds and the second is refused. Option A puts
+the whole rule set in one crossing, and a refusal leaves the world unchanged.
+
+**What follows for the caller.** A caller that wants to change one kind states
+the other two as well. That is the cost of the choice, and it is what stops
+two callers from disagreeing about a kind neither of them meant to change.
 
 
 ## References
@@ -4046,3 +4073,4 @@ game rule, and a blocker holds the rules of that game.[^DEC214D]
 [^DEC202A]: ADR-0053, a faction is a bit in a mask, and a relation is a plane, decision D3. `docs/adrs/accepted/adr-0053-a-faction-is-a-bit-in-a-mask-and-a-relation-is-a-plane.md`
 [^DEC202B]: Blockers register, BLK-111. `docs/BLOCKERS.md`
 [^DEC250A]: ADR-0121, a meeting between two factions resolves at the tile, decision D3. `docs/adrs/draft/adr-0121-a-meeting-between-two-factions-resolves-at-the-tile.md`
+[^DEC270A]: The recovery rules and the depletion ledger. `crates/cachette-core/src/resource.rs`

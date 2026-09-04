@@ -64,6 +64,7 @@ documents cite it.
 | 0034 | Two players hold each other to a future delivery | Shaped | Game developer | `shaped/prd-0034-two-players-hold-each-other-to-a-future-delivery.md` |
 | 0035 | A god takes the people of another god | Shaped | Game developer | `shaped/prd-0035-a-god-takes-the-people-of-another-god.md` |
 | 0036 | A god sees where it is winning people | Shaped | Game developer | `shaped/prd-0036-a-god-sees-where-it-is-winning-people.md` |
+| 0047 | A game states its own economy | Shaped | Game developer | `shaped/prd-0047-a-game-states-its-own-economy.md` |
 
 ## What does not belong in a record
 

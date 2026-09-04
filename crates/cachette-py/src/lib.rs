@@ -2997,86 +2997,7 @@ impl PyWorld {
             .map_err(|error| VerbError::new_err(error.to_string()))
     }
 
-    /// Sets how strongly one faction pushes belief out from one place.
-    ///
-    /// The faction is the number of the faction, from zero to one below the
-    /// faction count of the world. The place is an address, as a column `q`
-    /// and a row `r`. The strength is an integer from 0 to 65535, where 65535
-    /// is one whole reference unit of reach and 0 is none. Returns `None`.
-    ///
-    /// **The source is a standing term, not a single push.** The engine adds
-    /// it again on every pass of every step, and the reach spreads outward
-    /// and falls with distance. Set it once and it keeps working. Set it to
-    /// zero to stop it, and what it already spread then fades over the steps
-    /// that follow.
-    ///
-    /// **The reach answers for a block of ground and not for a tile.** The
-    /// engine holds one value for each faction and each block, so two
-    /// addresses in one block name one place.[^1]
-    ///
-    /// This is the ambient route to taking the people of another faction. A
-    /// unit converts where another faction reaches its place more strongly
-    /// than its own faction does.[^2]
-    ///
-    /// ```python
-    /// world.set_influence_source(faction=0, q=48, r=48, strength=65535)
-    /// for _ in range(8):
-    ///     world.step(threads=4)
-    /// gained = world.converted_log_columns()
-    /// ```
-    ///
-    /// # Errors
-    ///
-    /// Raises `ViewError` when the address lies outside the world, and when
-    /// the world holds no such faction.
-    ///
-    /// # References
-    ///
-    /// [^1]: ADR-0060, an influence map is stored as a shared basis, decision D1. `docs/adrs/draft/adr-0060-an-influence-map-is-stored-as-a-shared-basis.md`
-    /// [^2]: ADR-0133, a unit converts to the faction that leads the influence field at its cell, decision D1. `docs/adrs/draft/adr-0133-a-unit-converts-to-the-faction-that-leads-the-field.md`
-    fn set_influence_source(&self, faction: u16, q: i32, r: i32, strength: u16) -> PyResult<()> {
-        let mut world = self.lock();
-        if world.set_influence_source(FactionId(faction), Axial::new(q, r), Influence(strength)) {
-            return Ok(());
-        }
-        Err(ViewError::new_err(format!(
-            "({q}, {r}) and the faction {faction} name no place of this world"
-        )))
-    }
 
-    /// Returns how far one faction reaches at one place, as an integer.
-    ///
-    /// The faction is the number of the faction. The place is an address, as a
-    /// column `q` and a row `r`. The result runs from 0 to 65535, where 65535
-    /// is one whole reference unit of reach.
-    ///
-    /// **The reach answers for a block of ground and not for a tile**, so two
-    /// addresses in one block give one answer.[^1]
-    ///
-    /// Read this to see where the next conversion is likely. A unit converts
-    /// to the faction that reaches its place most strongly, and only when that
-    /// faction reaches it more strongly than the unit's own faction does.[^2]
-    ///
-    /// # Errors
-    ///
-    /// Raises `ViewError` when the address lies outside the world, and when
-    /// the world holds no such faction.
-    ///
-    /// # References
-    ///
-    /// [^1]: ADR-0060, an influence map is stored as a shared basis, decision D1. `docs/adrs/draft/adr-0060-an-influence-map-is-stored-as-a-shared-basis.md`
-    /// [^2]: ADR-0133, a unit converts to the faction that leads the influence field at its cell, decision D1. `docs/adrs/draft/adr-0133-a-unit-converts-to-the-faction-that-leads-the-field.md`
-    fn influence(&self, faction: u16, q: i32, r: i32) -> PyResult<u16> {
-        let world = self.lock();
-        world
-            .influence(FactionId(faction), Axial::new(q, r))
-            .map(|value| value.0)
-            .ok_or_else(|| {
-                ViewError::new_err(format!(
-                    "({q}, {r}) and the faction {faction} name no place of this world"
-                ))
-            })
-    }
 
     /// Changes the faction of every soldier the identities name.
     ///
@@ -3828,6 +3749,457 @@ impl PyWorld {
     fn faction_variety(&self, faction: u16) -> u32 {
         self.lock().faction_variety(FactionId(faction))
     }
+
+    /// Sets what a set of settlements earns of one commodity in one tick.
+    ///
+    /// Returns `None`.
+    ///
+    /// The sites are a sequence of settlement identities, or the NumPy array
+    /// of `numpy.uint64` that `found_settlements` returned.
+    ///
+    /// **The rate is a Q16.16 value as its raw integer.** Multiply the amount
+    /// you want by 65536. A rate of 65536 means one unit of the commodity in
+    /// one tick. A rate of 0 means the site earns nothing.
+    ///
+    /// **The rate is what one tick earns, not what one application earns.**
+    /// The engine multiplies it by the period of the economy schedule, so a
+    /// site earns the same amount over a span of ticks whatever the period
+    /// is.[^1] A caller that reads this as the amount of one application
+    /// writes a rate that is too large by the period.
+    ///
+    /// **The rate may be set at any time, and it takes effect at the next
+    /// application.** It is not construction-time configuration. It is state
+    /// that a later frame reads, and it enters the state hash, so two worlds
+    /// that hold different rates are two different worlds.[^2] No write can
+    /// land inside a step, because the engine releases the interpreter for
+    /// the whole step and no Python line runs while the step runs.[^3]
+    ///
+    /// **Read the rate back with `site_economy`**, under the key
+    /// `production`. This call publishes no reader of its own, because the
+    /// value would then have two places to come from.[^4]
+    ///
+    /// The commodity defaults to zero, and the world holds one commodity.
+    ///
+    /// **The set is all or nothing.** Every identity resolves before anything
+    /// is written. The engine refuses the rate and the commodity before it
+    /// writes the first site, and neither refusal depends on the site.
+    ///
+    /// # Errors
+    ///
+    /// Raises `ViewError` when an identity names no live settlement. Raises
+    /// `VerbError` when the rate is below zero, and when the number names no
+    /// commodity of this world.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0062, production and upkeep are rates attached to a site, decision D4. `docs/adrs/accepted/adr-0062-production-and-upkeep-are-rates-attached-to-a-site.md`
+    /// [^2]: ADR-0001, one binary gives one answer at any thread count, decision D4. `docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
+    /// [^3]: ADR-0042, the interpreter is released for the whole step. `docs/adrs/REGISTRY.md`
+    /// [^4]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`
+    #[pyo3(signature = (sites, rate, commodity = 0))]
+    fn set_production_rate(&self, sites: Vec<u64>, rate: i32, commodity: u16) -> PyResult<()> {
+        let mut world = self.lock();
+        let goods = CommodityId(commodity);
+        let rate = Fix32(rate);
+        let resolved = resolve_sites(&world, &sites)?;
+        for site in resolved {
+            world
+                .set_production_rate(site, goods, rate)
+                .map_err(|error| VerbError::new_err(error.to_string()))?;
+        }
+        Ok(())
+    }
+
+    /// Sets what a set of settlements owes of one commodity in one tick.
+    ///
+    /// Returns `None`.
+    ///
+    /// The sites are a sequence of settlement identities, or the NumPy array
+    /// of `numpy.uint64` that `found_settlements` returned.
+    ///
+    /// **The rate is a Q16.16 value as its raw integer, and it is at or above
+    /// zero.** Multiply the amount you want by 65536. Upkeep is a rate above
+    /// zero that subtracts. It is never a production rate below zero, and the
+    /// engine refuses one.[^1]
+    ///
+    /// **The rate is what one tick owes, not what one application owes.** The
+    /// engine multiplies it by the period of the economy schedule, in the same
+    /// way it does for production.[^2]
+    ///
+    /// Production runs before upkeep in one application, so a site pays this
+    /// bill from the earnings of the same application. Upkeep that the store
+    /// cannot pay is a shortfall: the store stops at zero rather than going
+    /// below it.
+    ///
+    /// **The rate may be set at any time, and it takes effect at the next
+    /// application.** It is state that a later frame reads, and it enters the
+    /// state hash.[^3]
+    ///
+    /// **Read the rate back with `site_economy`**, under the key `upkeep`.
+    ///
+    /// **The set is all or nothing.** Every identity resolves before anything
+    /// is written. The engine refuses the rate and the commodity before it
+    /// writes the first site, and neither refusal depends on the site.
+    ///
+    /// # Errors
+    ///
+    /// Raises `ViewError` when an identity names no live settlement. Raises
+    /// `VerbError` when the rate is below zero, and when the number names no
+    /// commodity of this world.
+    ///
+    /// # References
+    ///
+    /// [^1]: Findings register, FND-016. `docs/FINDINGS.md`
+    /// [^2]: ADR-0062, production and upkeep are rates attached to a site, decision D4. `docs/adrs/accepted/adr-0062-production-and-upkeep-are-rates-attached-to-a-site.md`
+    /// [^3]: ADR-0001, one binary gives one answer at any thread count, decision D4. `docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
+    #[pyo3(signature = (sites, rate, commodity = 0))]
+    fn set_upkeep_rate(&self, sites: Vec<u64>, rate: i32, commodity: u16) -> PyResult<()> {
+        let mut world = self.lock();
+        let goods = CommodityId(commodity);
+        let rate = Fix32(rate);
+        let resolved = resolve_sites(&world, &sites)?;
+        for site in resolved {
+            world
+                .set_upkeep_rate(site, goods, rate)
+                .map_err(|error| VerbError::new_err(error.to_string()))?;
+        }
+        Ok(())
+    }
+
+    /// Writes what a set of settlements holds of one commodity now.
+    ///
+    /// Returns `None`.
+    ///
+    /// The sites are a sequence of settlement identities, or the NumPy array
+    /// of `numpy.uint64` that `found_settlements` returned.
+    ///
+    /// **The quantity is a Q16.16 value as its raw integer.** Multiply the
+    /// amount you want by 65536. It is a quantity and not a rate: it says what
+    /// the store holds at this tick, and the next application changes it
+    /// again.
+    ///
+    /// **The write is absolute and not relative.** The store holds the value
+    /// given, whatever it held before. The engine moves its own account of the
+    /// stores by the same amount, so a world-wide total stays exact.
+    ///
+    /// **Pass a quantity at or above zero.** The engine accepts one below zero
+    /// and does not refuse it. The next application of upkeep then takes such
+    /// a store to zero and reports the whole of the upkeep as a shortfall. A
+    /// store of zero is a real state and not an absent one.[^1]
+    ///
+    /// **The store may be written at any time.** It is simulated state and it
+    /// enters the state hash.[^2]
+    ///
+    /// **Read the store back with `site_economy`**, under the key `store`.
+    ///
+    /// **The set is all or nothing.** Every identity resolves before anything
+    /// is written. The engine refuses the commodity before it writes the
+    /// first site, and that refusal does not depend on the site.
+    ///
+    /// # Errors
+    ///
+    /// Raises `ViewError` when an identity names no live settlement. Raises
+    /// `VerbError` when the number names no commodity of this world.
+    ///
+    /// # References
+    ///
+    /// [^1]: Findings register, FND-043. `docs/FINDINGS.md`
+    /// [^2]: ADR-0001, one binary gives one answer at any thread count, decision D4. `docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
+    #[pyo3(signature = (sites, quantity, commodity = 0))]
+    fn set_settlement_store(&self, sites: Vec<u64>, quantity: i32, commodity: u16) -> PyResult<()> {
+        let mut world = self.lock();
+        let goods = CommodityId(commodity);
+        let resolved = resolve_sites(&world, &sites)?;
+        for site in resolved {
+            world
+                .set_settlement_store(site, goods, Fix32(quantity))
+                .map_err(|error| VerbError::new_err(error.to_string()))?;
+        }
+        Ok(())
+    }
+
+    /// Sets how often the engine applies production and upkeep.
+    ///
+    /// Returns `None`.
+    ///
+    /// The period is a count of ticks, and it is at least one and at most
+    /// 32767. A period of one applies the economy on every step. The phase is
+    /// the offset inside the period, so a period of four and a phase of one
+    /// apply on the ticks one, five and nine. A phase at or above the period
+    /// wraps into it.
+    ///
+    /// **Raising the period does not raise what a site earns over a span of
+    /// ticks.** A rate is what one tick earns, and the engine multiplies it by
+    /// the period. The period decides how often a store moves. It does not
+    /// decide how much the store moves over time.[^1]
+    ///
+    /// **The schedule may be set at any time.** It is world-wide, so it is one
+    /// write for the world and never one write for each site. It enters the
+    /// state hash, because two worlds that apply the economy on different
+    /// ticks must diverge.[^2]
+    ///
+    /// The world starts with a schedule already set. This call replaces it.
+    ///
+    /// # Errors
+    ///
+    /// Raises `VerbError` when the period is zero, or above the range that the
+    /// scaling multiply takes. The message names the limit it applied.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0062, production and upkeep are rates attached to a site, decision D4. `docs/adrs/accepted/adr-0062-production-and-upkeep-are-rates-attached-to-a-site.md`
+    /// [^2]: ADR-0001, one binary gives one answer at any thread count, decision D4. `docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
+    fn set_economy_schedule(&self, period: u32, phase: u32) -> PyResult<()> {
+        self.lock()
+            .set_economy_schedule(period, phase)
+            .map_err(|error| VerbError::new_err(error.to_string()))
+    }
+
+    /// Returns how fast a depleted deposit of each kind returns, as a list.
+    ///
+    /// The list holds one entry for each resource kind, in the order food,
+    /// wood, stone. An entry is a count of ticks, or `None` for a kind that
+    /// does not recover.
+    ///
+    /// **A period is the simulated time in which one depleted deposit regains
+    /// one unit of stock.** It is a count of ticks and it is not fixed point.
+    ///
+    /// Write the rules with `set_recovery_rules`.
+    fn recovery_rules(&self) -> Vec<Option<u32>> {
+        let world = self.lock();
+        let rules = world.recovery_rules();
+        ResourceKind::ALL
+            .iter()
+            .map(|kind| rules.period_of(*kind))
+            .collect()
+    }
+
+    /// Sets how fast a depleted deposit of each kind returns.
+    ///
+    /// Returns `None`.
+    ///
+    /// The periods are a sequence of three entries, one for each resource
+    /// kind, in the order food, wood, stone. An entry is a count of ticks at
+    /// or above one, or `None` for a kind that does not recover.
+    ///
+    /// **A period is the simulated time in which one depleted deposit regains
+    /// one unit of stock.** It is a count of ticks and it is not fixed point.
+    /// A smaller period returns a deposit faster.
+    ///
+    /// **The caller states every kind, and the engine takes the whole set.**
+    /// No call changes one kind, because a merge would put the period of a
+    /// kind in two places while the call ran.[^1] A caller that wants to
+    /// change one kind reads the three with `recovery_rules`, changes one, and
+    /// writes the three back.
+    ///
+    /// **The rules may be set at any time.** They are world-wide, so this is
+    /// one write for the world. The engine reads them on every tick that ages
+    /// a depleted deposit.
+    ///
+    /// **The rules do not enter the state hash today, and that is a
+    /// defect.**[^2] Two worlds that hold the same tiles and different rules
+    /// hash the same and then diverge, so the golden state test reports the
+    /// effect of a change made here and never the change itself. A backlog
+    /// item holds the repair.[^3]
+    ///
+    /// # Errors
+    ///
+    /// Raises `ValueError` when the sequence does not hold exactly three
+    /// entries. Raises `VerbError` when a period is zero. A period of zero
+    /// returns the whole take in one tick, which is a second way to say that a
+    /// deposit was never depleted.
+    ///
+    /// # References
+    ///
+    /// [^1]: Decisions register, DEC-270. `docs/DECISIONS.md`
+    /// [^2]: Findings register, FND-480. `docs/FINDINGS.md`
+    /// [^3]: Backlog item 0471, fold the recovery rules into the state hash. `docs/backlog/proposed/0471-fold-the-recovery-rules-into-the-state-hash.md`
+    fn set_recovery_rules(&self, periods: Vec<Option<u32>>) -> PyResult<()> {
+        if periods.len() != RESOURCE_KIND_COUNT {
+            return Err(pyo3::exceptions::PyValueError::new_err(format!(
+                "the rules need one period for each of the {RESOURCE_KIND_COUNT} resource kinds, and {} were given",
+                periods.len()
+            )));
+        }
+        let mut taken = [None; RESOURCE_KIND_COUNT];
+        taken.copy_from_slice(&periods);
+        let rules = RecoveryRules::from_ticks(taken).ok_or_else(|| {
+            VerbError::new_err(
+                "a recovery period of zero is not a period; use None for a kind that does not recover",
+            )
+        })?;
+        self.lock().set_recovery_rules(rules);
+        Ok(())
+    }
+
+    /// Returns what a unit must have done before it may be promoted.
+    ///
+    /// The value is a count of whole units of resource that the unit has ever
+    /// gathered, summed over every kind. It is not fixed point.
+    ///
+    /// Write it with `set_deed_threshold`.
+    fn deed_threshold(&self) -> u64 {
+        self.lock().deed_threshold()
+    }
+
+    /// Sets what a unit must have done before it may be promoted.
+    ///
+    /// Returns `None`.
+    ///
+    /// The threshold is a count of whole units of resource that a unit has
+    /// ever gathered, summed over every kind. It is not fixed point. Raise it
+    /// to make a named person rarer, and lower it to make one common.
+    ///
+    /// **The threshold may be set at any time.** It is world-wide, so it is
+    /// one write for the world. It enters the state hash, because two worlds
+    /// that hold it differently promote on different frames.[^1]
+    ///
+    /// A promotion pass runs on its own schedule and takes a budget, so
+    /// lowering the threshold does not promote everybody at once.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0001, one binary gives one answer at any thread count, decision D4. `docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
+    fn set_deed_threshold(&self, threshold: u64) {
+        self.lock().set_deed_threshold(threshold);
+    }
+
+    /// Gives a set of units the settlement that they draw from.
+    ///
+    /// Returns `None`.
+    ///
+    /// The units are a sequence of unit identities, or the NumPy array of
+    /// `numpy.uint64` that `spawn_soldiers` returned. The site is one
+    /// settlement identity, or `None`.
+    ///
+    /// A unit draws its rations from the store of its home, and it lives
+    /// there. A unit whose home is `None` draws from nothing, which is a state
+    /// the world represents rather than an error.
+    ///
+    /// **The home may be set at any time.** It is simulated state and it
+    /// enters the state hash, because two worlds that feed a unit from
+    /// different stores must diverge.[^1]
+    ///
+    /// **The set is all or nothing.** The site resolves first, then every unit
+    /// identity, and nothing is written until all of them resolve.
+    ///
+    /// # Errors
+    ///
+    /// Raises `ViewError` when an identity names no live unit, and when the
+    /// site names no live settlement.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0001, one binary gives one answer at any thread count, decision D4. `docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
+    #[pyo3(signature = (units, site = None))]
+    fn set_home_site(&self, units: Vec<u64>, site: Option<u64>) -> PyResult<()> {
+        let mut world = self.lock();
+        let home = match site {
+            Some(site) => Some(resolve_site(&world, site)?),
+            None => None,
+        };
+        let mut resolved = Vec::with_capacity(units.len());
+        for unit in &units {
+            resolved.push(resolve(&world, *unit)?);
+        }
+        for unit in resolved {
+            world.set_home_site(unit, home);
+        }
+        Ok(())
+    }
+
+    /// Returns what one faction reaches at the block of ground that covers a
+    /// tile.
+    ///
+    /// **The value is unsigned fixed point against a fixed reference, and
+    /// 65535 means one reference unit.** It is not the Q16.16 scale that the
+    /// rates use, and no cell holds more than 65535.[^1]
+    ///
+    /// **The field answers for a block of ground and not for a tile**, so two
+    /// addresses in one block give one answer.
+    ///
+    /// The field is derived at the end of a step, from the sources that
+    /// `set_influence_source` wrote and from the ground. A world that has not
+    /// stepped since a source was written reports what the last step
+    /// left.[^2]
+    ///
+    /// # Errors
+    ///
+    /// Raises `ViewError` when the address lies outside the world, and when
+    /// the world holds no such faction.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0060, an influence map is stored as a shared basis, decision D2. `docs/adrs/draft/adr-0060-an-influence-map-is-stored-as-a-shared-basis.md`
+    /// [^2]: ADR-0087, an influence solve runs a fixed iteration count over the whole plane, decision D1. `docs/adrs/draft/adr-0087-an-influence-solve-runs-a-fixed-iteration-count.md`
+    fn influence(&self, faction: u16, q: i32, r: i32) -> PyResult<u16> {
+        let world = self.lock();
+        world
+            .influence(FactionId(faction), Axial { q, r })
+            .map(|value| value.0)
+            .ok_or_else(|| {
+                ViewError::new_err(format!(
+                    "the faction {faction} or the address ({q}, {r}) is outside this world"
+                ))
+            })
+    }
+
+    /// Sets what one faction injects at a set of places.
+    ///
+    /// Returns `None`.
+    ///
+    /// The addresses are a sequence of `(q, r)` pairs. Each names a tile, and
+    /// the engine writes the source at the block of ground that covers that
+    /// tile. Two addresses in one block are two writes of one cell, and the
+    /// last one stands.
+    ///
+    /// **The source is unsigned fixed point against a fixed reference, and
+    /// 65535 means one reference unit.** It is not the Q16.16 scale that the
+    /// rates use. A source of 0 is the ordinary value and it is not an
+    /// absence.[^1]
+    ///
+    /// **The engine holds no rule that decides this value.** A rule that
+    /// writes a source term lives above the engine, which is why the control
+    /// plane holds the write.[^1]
+    ///
+    /// **A source may be set at any time, and the next step spreads it.** The
+    /// solve runs last in a step, over the whole plane, for a fixed number of
+    /// passes.[^2] A source enters the state hash, because the next solve
+    /// starts from it.[^3]
+    ///
+    /// **The set is all or nothing.** Every address and the faction are
+    /// checked before anything is written.
+    ///
+    /// # Errors
+    ///
+    /// Raises `ViewError` when an address lies outside the world, and when the
+    /// world holds no such faction.
+    ///
+    /// # References
+    ///
+    /// [^1]: Decisions register, DEC-041. `docs/DECISIONS.md`
+    /// [^2]: ADR-0087, an influence solve runs a fixed iteration count over the whole plane, decision D1. `docs/adrs/draft/adr-0087-an-influence-solve-runs-a-fixed-iteration-count.md`
+    /// [^3]: ADR-0001, one binary gives one answer at any thread count, decision D4. `docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
+    fn set_influence_source(
+        &self,
+        faction: u16,
+        addresses: Vec<(i32, i32)>,
+        source: u16,
+    ) -> PyResult<()> {
+        let mut world = self.lock();
+        let who = FactionId(faction);
+        for (q, r) in &addresses {
+            if world.influence(who, Axial { q: *q, r: *r }).is_none() {
+                return Err(ViewError::new_err(format!(
+                    "the faction {faction} or the address ({q}, {r}) is outside this world"
+                )));
+            }
+        }
+        for (q, r) in addresses {
+            world.set_influence_source(who, Axial { q, r }, Influence(source));
+        }
+        Ok(())
+    }
 }
 
 /// A camera the control plane owns, which says what a picture shows.
@@ -4133,6 +4505,28 @@ fn resolve_site(world: &CoreWorld, site: u64) -> PyResult<Entity> {
     world
         .resolve_settlement(site)
         .map_err(|error| ViewError::new_err(error.to_string()))
+}
+
+// The economy knobs read two names that no other binding needs. The imports
+// sit here, beside the helpers that use them, rather than in the block at the
+// top of the file.
+use cachette_core::resource::{RecoveryRules, RESOURCE_KIND_COUNT};
+
+/// Resolves every settlement identity of a set, or raises on the first stale
+/// one.
+///
+/// The whole set resolves before a caller writes anything, so one stale
+/// identity leaves the world unchanged.[^1]
+///
+/// # References
+///
+/// [^1]: ADR-0085, an entity crosses to Python as one opaque identity that the engine resolves, decision D3. `docs/adrs/accepted/adr-0085-an-entity-crosses-to-python-as-one-opaque-identity.md`
+fn resolve_sites(world: &CoreWorld, sites: &[u64]) -> PyResult<Vec<Entity>> {
+    let mut resolved = Vec::with_capacity(sites.len());
+    for site in sites {
+        resolved.push(resolve_site(world, *site)?);
+    }
+    Ok(resolved)
 }
 
 impl PyWorld {

@@ -710,7 +710,7 @@ def test_belief_takes_units_and_the_log_says_where_they_went() -> None:
     world = cachette.World(width=64, height=64, seed=3, faction_count=2)
     seat = _open_ground(world, 8)
     world.spawn_soldiers(seat, 0)
-    world.set_influence_source(faction=1, q=seat[0][0], r=seat[0][1], strength=65535)
+    world.set_influence_source(1, [seat[0]], 65535)
     assert world.influence(1, seat[0][0], seat[0][1]) == 0, "the field starts empty"
 
     gained = 0
