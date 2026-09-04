@@ -23,6 +23,7 @@ use cachette_core::resource::{Amount, RecoveryRules, ResourceKind};
 use cachette_core::site::CommodityId;
 use cachette_core::terrain::TileKind;
 use cachette_core::types::{FactionId, Fix32};
+use cachette_core::unit_type::UnitTypeId;
 use cachette_core::{Axial, World, WorldConfig};
 
 /// The number of frames that a scenario runs unless its row says otherwise.
@@ -165,6 +166,18 @@ const SCENARIOS: &[(&str, WorldConfig, Population, u64)] = &[
         FRAMES,
     ),
     (
+        "contested",
+        WorldConfig {
+            width: 32,
+            height: 32,
+            seed: 0x0cac_4e77_0345,
+            faction_count: 2,
+            unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
+        },
+        Population::Contested,
+        FRAMES,
+    ),
+    (
         "founding",
         WorldConfig {
             width: 192,
@@ -239,6 +252,22 @@ enum Population {
     /// [^1]: ADR-0072, a tile stock is generated, and only what was taken is stored, decision D4. `docs/adrs/accepted/adr-0072-a-tile-stock-is-generated-and-only-what-was-taken-is-stored.md`
     /// [^2]: Testing rules, section 2a. `.claude/rules/testing.md`
     Gathering,
+    /// Two factions of two unit types, standing on the tiles they share.
+    ///
+    /// No other scenario holds a meeting, so no other scenario resolves one
+    /// and no other golden file moves when the resolution changes. The world
+    /// carries a unit type table, because a world whose table nobody filled
+    /// holds no contest at all.[^1]
+    ///
+    /// One pair of types cannot reach the other, and one pair reaches both
+    /// ways, so the file covers the threshold and the exchange rather than
+    /// one of the two.[^2]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0120, a unit carries a type, and the type is an index into a table the world is built with, decision D1. `docs/adrs/draft/adr-0120-a-unit-carries-a-type-that-indexes-a-table.md`
+    /// [^2]: Testing rules, section 2a. `.claude/rules/testing.md`
+    Contested,
 }
 
 /// Puts gatherers on deposits and makes the deposits recover fast.
@@ -473,6 +502,59 @@ fn crowd(world: &mut World) {
     }
 }
 
+/// Seats two factions on one patch of ground, with a unit type table.
+///
+/// Each tile of the patch holds units of both factions, so every tile of it is
+/// contested and the resolution runs on all of them. The tiles are filled past
+/// their capacity, so the units stay where they were put and the scenario
+/// keeps holding meetings for the frames it runs.[^1]
+///
+/// The table is content, and the scenario states it. The engine holds no
+/// value of its own.[^2]
+///
+/// # References
+///
+/// [^1]: ADR-0074, a spawn may over-fill a tile, and only admission enforces the capacity. `docs/adrs/accepted/adr-0074-a-spawn-may-over-fill-a-tile-and-only-admission-enforces-the-capacity.md`
+/// [^2]: Decision Record Scope, section 4.1. `.claude/rules/adr-scope.md`
+fn contest(world: &mut World) {
+    // The light type reaches the light type and never the heavy one. The
+    // heavy type reaches both. One frame therefore covers the threshold that
+    // refuses and the exchange that does not.
+    world
+        .define_unit_type(0, Fix32::from_int(1), Fix32(Fix32::ONE.0 / 2))
+        .expect("the row is inside the table");
+    world
+        .define_unit_type(1, Fix32(Fix32::ONE.0 * 3 / 2), Fix32::from_int(2))
+        .expect("the row is inside the table");
+    let grid = world.grid();
+    let patch: Vec<Axial> = (0..grid.tile_count())
+        .map(|index| Axial::new((index % grid.width()) as i32, (index / grid.width()) as i32))
+        .filter(|address| world.admits_a_unit(*address))
+        .take(48)
+        .collect();
+    assert!(
+        patch.len() >= 16,
+        "the contested scenario found only {} open tiles",
+        patch.len()
+    );
+    for (ordinal, address) in patch.iter().enumerate() {
+        // Each tile holds twelve units of two factions, which is above the
+        // capacity of ordinary ground, so admission refuses every step onto
+        // it and the meeting holds.
+        for seat in 0..12u32 {
+            let faction = FactionId((seat % 2) as u16);
+            let unit = world
+                .spawn_soldier(*address, faction)
+                .expect("the open tile admits a unit");
+            // The type pattern shifts with the tile, so the patch holds tiles
+            // whose pair cannot reach and tiles whose pair reaches both ways.
+            let kind = UnitTypeId::from_u8(((seat as usize + ordinal) % 2) as u8)
+                .expect("the number names a row of the table");
+            assert!(world.set_unit_type(unit, kind), "the unit is alive");
+        }
+    }
+}
+
 /// Fills a world with soldiers, and frees some of them.
 ///
 /// The frees matter. A run that only spawns never exercises the generation
@@ -534,7 +616,13 @@ fn hash_sequence(config: WorldConfig, population: Population, frames: u64) -> St
         Population::Settled => settle(&mut world),
         Population::Founded => found(&mut world),
         Population::Gathering => gather(&mut world),
+        Population::Contested => contest(&mut world),
     }
+    // The count before the first frame. The contested scenario asserts
+    // against it, so the assertion never restates a number the fixture owns.
+    let seated: u32 = (0..config.faction_count)
+        .map(|faction| world.population_of(FactionId(faction)))
+        .sum();
     let mut lines = String::new();
     lines.push_str(&format!("0 {}\n", world.state_hash()));
     for frame in 1..=frames {
@@ -564,6 +652,20 @@ fn hash_sequence(config: WorldConfig, population: Population, frames: u64) -> St
         assert!(
             !world.characters().is_empty(),
             "the gathering scenario promoted nobody"
+        );
+    }
+    if population == Population::Contested {
+        // The file must cover what it claims to cover. A run in which nobody
+        // fell would record a file that moves for every reason except the
+        // resolution of a meeting.[^1]
+        //
+        // [^1]: Testing rules, section 2a. `.claude/rules/testing.md`
+        let standing: u32 = (0..config.faction_count)
+            .map(|faction| world.population_of(FactionId(faction)))
+            .sum();
+        assert!(
+            standing < seated,
+            "the contested scenario ended nobody: {seated} were seated and {standing} stand"
         );
     }
     lines

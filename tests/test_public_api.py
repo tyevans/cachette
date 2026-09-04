@@ -423,3 +423,75 @@ def test_a_refused_send_set_sends_nobody(seed: int) -> None:
 
     with pytest.raises(cachette.ViewError):
         world.send_units_to(units, [(2, 2)])
+def test_one_tank_still_kills_four_bowmen(seed: int) -> None:
+    """The acceptance test the project owner set, at the Python boundary.
+
+    A bowman cannot exceed the armour of a tank, so any number of bowmen
+    deliver exactly nothing. The tank delivers four whole casualties.
+    """
+    world = cachette.World(width=1, height=1, seed=1, faction_count=2)
+    one = 65536
+    world.define_unit_type(0, one, 0)
+    world.define_unit_type(1, 4 * one, 2 * one)
+    bowmen = world.spawn_soldiers([(0, 0)] * 4, 0)
+    tank = world.spawn_soldiers([(0, 0)], 1)
+    world.set_unit_types(bowmen, 0)
+    world.set_unit_types(tank, 1)
+
+    world.step(threads=2)
+
+    population = world.faction_population()
+    assert population[0] == 0, "the tank ends all four bowmen"
+    assert population[1] == 1, "four bowmen reach the tank for exactly nothing"
+
+
+def test_ten_thousand_bowmen_also_lose_to_one_tank() -> None:
+    """A sum of zeroes stays zero, so the crowd changes nothing."""
+    crowd = 10_000
+    world = cachette.World(width=1, height=1, seed=1, faction_count=2)
+    one = 65536
+    world.define_unit_type(0, one, 0)
+    world.define_unit_type(1, 4 * one, 2 * one)
+    bowmen = world.spawn_soldiers([(0, 0)] * crowd, 0)
+    tank = world.spawn_soldiers([(0, 0)], 1)
+    world.set_unit_types(bowmen, 0)
+    world.set_unit_types(tank, 1)
+
+    world.step(threads=2)
+
+    population = world.faction_population()
+    assert population[1] == 1, "no number of bowmen reaches the tank"
+    assert population[0] == crowd - 4, "the tank ends what its attack pays for"
+
+
+def test_a_refused_unit_type_set_gives_no_type() -> None:
+    """One dead identity leaves the whole set untouched.
+
+    The module holds no read of the type of one unit, so the test reads the
+    write through what it changes: a unit of the armed type ends a unit of
+    the other faction, and a unit that kept the unarmed type ends nobody.
+    Without that step the test would assert only that the call raised, which
+    it would do whether or not the set was written.
+    """
+    world = cachette.World(width=1, height=1, seed=1, faction_count=2)
+    # Type one reaches. Type zero, which every new soldier carries, does not.
+    world.define_unit_type(1, 65536, 0)
+    attackers = [int(unit) for unit in world.spawn_soldiers([(0, 0)] * 2, 0)]
+    world.spawn_soldiers([(0, 0)], 1)
+    world.despawn_soldiers([attackers[1]])
+
+    with pytest.raises(cachette.ViewError):
+        world.set_unit_types(attackers, 1)
+
+    world.step(threads=2)
+    assert world.faction_population()[1] == 1, (
+        "the living attacker took no type, so it ends nobody"
+    )
+
+
+def test_a_unit_type_the_table_does_not_hold_is_refused(seed: int) -> None:
+    world = cachette.World(width=8, height=8, seed=seed, faction_count=2)
+    units = [int(unit) for unit in world.spawn_soldiers([(0, 0)], 1)]
+    with pytest.raises(cachette.VerbError) as refused:
+        world.set_unit_types(units, 200)
+    assert "200" in str(refused.value), "the error names the number"

@@ -62,3 +62,33 @@ fn the_sort_key_orders_by_tick_then_tile() {
     let second = TileChanged::new(Tick(2), TileIdx(0), Fix32::ZERO, Holder::NOBODY, 1);
     assert!(first.sort_key() < second.sort_key());
 }
+
+#[test]
+fn the_fallen_event_declares_every_padding_byte() {
+    // The event of a unit that fell in a meeting is plain data. Its own doc
+    // comment states the layout, and this is what fails when the two
+    // disagree.
+    use cachette_core::contest::UnitFell;
+    use cachette_core::unit_type::UnitTypeId;
+    let declared = size_of::<Tick>()
+        + size_of::<u64>()
+        + size_of::<TileIdx>()
+        + size_of::<FactionId>()
+        + size_of::<UnitTypeId>()
+        + size_of::<[u8; 1]>();
+    assert_eq!(size_of::<UnitFell>(), declared);
+    assert_eq!(size_of::<UnitFell>() % 8, 0);
+
+    let event = UnitFell::new(Tick(7), 9, TileIdx(3), FactionId(1), UnitTypeId(2));
+    assert_eq!(event.padding, [0; 1]);
+    let bytes: &[u8] = bytemuck::bytes_of(&event);
+    assert_eq!(bytes.len(), size_of::<UnitFell>());
+}
+
+#[test]
+fn a_unit_type_row_holds_no_padding_at_all() {
+    // The table enters the state hash as raw bytes, so a padding byte in a
+    // row would put an uninitialised byte into the hash.
+    use cachette_core::unit_type::UnitTypeRow;
+    assert_eq!(size_of::<UnitTypeRow>(), 2 * size_of::<Fix32>());
+}

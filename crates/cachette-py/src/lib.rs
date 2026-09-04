@@ -16,6 +16,7 @@ use cachette_core::census::{census, CensusError};
 use cachette_core::founding::FoundingOutcome;
 use cachette_core::hex::NEIGHBOURS;
 use cachette_core::upgrade::UpgradeKind;
+use cachette_core::unit_type::UnitTypeId;
 use cachette_core::{
     Axial, CommodityId, Entity, FactionId, Fix32, Holder, ResourceKind, World as CoreWorld,
     WorldConfig,
@@ -882,6 +883,98 @@ impl PyWorld {
             assert!(
                 world.order_gather(entity, kind),
                 "a resolved identity must name a soldier the arena can order"
+            );
+        }
+        Ok(())
+    }
+
+    /// Writes one row of the shared unit type table.
+    ///
+    /// A unit type is an index into this table. The table is data that the
+    /// world holds. It holds no code, and the engine reads it rather than
+    /// branching on a type name.[^1]
+    ///
+    /// The `unit_type` is the row number, as a Python integer. The table
+    /// holds eight rows, numbered zero to seven, and eight and above name
+    /// none. A new soldier carries the type zero.
+    ///
+    /// The `attack` is the harm that one unit of this type delivers in one
+    /// resolution, as a Python integer in the project fixed-point scale. The
+    /// unit of that scale is a whole casualty, and the scale holds 16
+    /// fractional bits, so one whole casualty is the value 65536. An attack
+    /// of 65536 therefore ends one unit for each attacker, and an attack of
+    /// 32768 ends one unit for every two.
+    ///
+    /// The `armour` is the attack that an attacker must exceed to reach a
+    /// unit of this type, in the same scale.
+    ///
+    /// **An attacker whose attack does not exceed the defender's armour
+    /// contributes exactly zero, however many attackers stand there.** The
+    /// engine applies that test for each attacker type before it adds
+    /// anything, so no number of weak attackers ever reaches a strong
+    /// defender.[^2]
+    ///
+    /// The call changes the table and moves nothing. Step the world to make
+    /// two factions that share a tile resolve their meeting, then read
+    /// `faction_population` for what it cost.
+    ///
+    /// Returns `None`.
+    ///
+    /// # Errors
+    ///
+    /// Raises `VerbError` when the number names no row of the table, when the
+    /// attack is below zero, or when the armour is below zero.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0120, a unit carries a type, and the type is an index into a table the world is built with, decisions D1 and D2. `docs/adrs/draft/adr-0120-a-unit-carries-a-type-that-indexes-a-table.md`
+    /// [^2]: ADR-0122, an attacker whose attack does not exceed the defender's armour contributes exactly zero, decision D1. `docs/adrs/draft/adr-0122-an-attacker-below-the-armour-contributes-exactly-zero.md`
+    fn define_unit_type(&self, unit_type: u8, attack: i32, armour: i32) -> PyResult<()> {
+        let mut world = self.lock();
+        world
+            .define_unit_type(unit_type, Fix32(attack), Fix32(armour))
+            .map_err(|error| VerbError::new_err(error.to_string()))
+    }
+
+    /// Gives every soldier the identities name one unit type.
+    ///
+    /// The units are a sequence of identities, or the NumPy array of
+    /// `numpy.uint64` that `spawn_soldiers` returned. Returns `None`.
+    ///
+    /// The `unit_type` is a row of the shared table, as a Python integer. The
+    /// table holds eight rows, numbered zero to seven, and eight and above
+    /// name none. Write the row with `define_unit_type` before
+    /// the type means anything: a row that nobody wrote holds no attack and
+    /// no armour, so a unit of that type reaches nothing.[^1]
+    ///
+    /// **The set is all or nothing.** Every identity resolves, and the type
+    /// is checked, before any soldier is written. One refusal leaves the
+    /// world unchanged and raises.[^2]
+    ///
+    /// The call gives the type. It takes nothing and it moves nothing. Step
+    /// the world to make the soldiers act.
+    ///
+    /// # Errors
+    ///
+    /// Raises `ViewError` when an identity names no live soldier. Raises
+    /// `VerbError` when the number names no row of the table.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0120, a unit carries a type, and the type is an index into a table the world is built with, decision D3. `docs/adrs/draft/adr-0120-a-unit-carries-a-type-that-indexes-a-table.md`
+    /// [^2]: ADR-0085, an entity crosses to Python as one opaque identity that the engine resolves, decision D3. `docs/adrs/accepted/adr-0085-an-entity-crosses-to-python-as-one-opaque-identity.md`
+    fn set_unit_types(&self, units: Vec<u64>, unit_type: u8) -> PyResult<()> {
+        let mut world = self.lock();
+        let kind = UnitTypeId::from_u8(unit_type)
+            .ok_or_else(|| VerbError::new_err(format!("{unit_type} names no unit type")))?;
+        let mut resolved = Vec::with_capacity(units.len());
+        for unit in &units {
+            resolved.push(resolve(&world, *unit)?);
+        }
+        for entity in resolved {
+            assert!(
+                world.set_unit_type(entity, kind),
+                "a resolved identity must name a soldier the arena can write"
             );
         }
         Ok(())

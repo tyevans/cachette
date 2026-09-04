@@ -66,6 +66,15 @@ DOCUMENTED_FIRST_REFUSED_UPGRADE_KIND = 2
 # The doc comment of `World.direction_offsets` states that a tile of this
 # world has this many neighbours.
 DOCUMENTED_NEIGHBOUR_COUNT = 6
+# The doc comments of `World.define_unit_type` and `World.set_unit_types`
+# state that the unit type table holds eight rows, and that eight and above
+# name none.
+DOCUMENTED_UNIT_TYPES = (0, 1, 2, 3, 4, 5, 6, 7)
+DOCUMENTED_FIRST_REFUSED_UNIT_TYPE = 8
+
+# The doc comment of `World.define_unit_type` states the fixed-point scale of
+# an attack and of an armour: one whole casualty is this value.
+DOCUMENTED_FIXED_POINT_ONE = 65536
 
 
 def test_the_constructor_defaults_are_the_documented_ones() -> None:
@@ -212,3 +221,29 @@ def _first_open_address(world: cachette.World) -> tuple[int, int]:
                 return (q, r)
     message = "the world admits a unit nowhere"
     raise AssertionError(message)
+def test_the_unit_type_table_holds_the_documented_rows() -> None:
+    """The table takes every documented row and refuses the first one above."""
+    world = cachette.World()
+    for unit_type in DOCUMENTED_UNIT_TYPES:
+        world.define_unit_type(unit_type, DOCUMENTED_FIXED_POINT_ONE, 0)
+    with pytest.raises(cachette.VerbError):
+        world.define_unit_type(DOCUMENTED_FIRST_REFUSED_UNIT_TYPE, 0, 0)
+
+
+def test_one_whole_casualty_is_the_documented_fixed_point_value() -> None:
+    """An attack of one whole casualty ends one defender for each attacker.
+
+    The doc comment states the value of one in the fixed-point scale. This
+    reads it back through the engine: two attackers of an attack of that
+    value end exactly two defenders in one frame.
+    """
+    world = cachette.World(width=1, height=1, seed=1, faction_count=2)
+    world.define_unit_type(0, DOCUMENTED_FIXED_POINT_ONE, 0)
+    attackers = world.spawn_soldiers([(0, 0), (0, 0)], 0)
+    defenders = world.spawn_soldiers([(0, 0)] * 5, 1)
+    world.set_unit_types(attackers, 0)
+    world.set_unit_types(defenders, 0)
+    world.step(2)
+    # Each side reaches the other, so each side loses what the other paid for.
+    assert world.faction_population()[1] == 3
+    assert world.faction_population()[0] == 0

@@ -382,6 +382,10 @@ without stating a constraint is worse than no record.
 | 0110 | A unit returns by climbing a reach field seeded at every site of its faction | Draft | 0004, 0005, 0022, 0053, 0091, 0095 | `draft/adr-0110-a-unit-returns-by-climbing-a-reach-field.md` |
 | 0111 | The presence relation is derived at the end of the step and never stored as a fact | Draft | 0001, 0004, 0009, 0018, 0023, 0040, 0053 | `draft/adr-0111-the-presence-relation-is-derived-at-the-end-of-the-step.md` |
 | 0125 | The control plane names the seed set of a destination field | Draft | 0004, 0005, 0022, 0085, 0091, 0095, 0110 | 20, 21, `draft/adr-0125-the-control-plane-names-the-seed-set-of-a-destination-field.md` |
+| 0120 | A unit carries a type, and the type is an index into a table the world is built with | Draft | 0011, 0012, 0014, 0066 | 21, `draft/adr-0120-a-unit-carries-a-type-that-indexes-a-table.md` |
+| 0121 | A meeting between two factions resolves at the tile, never at a level 1 cell | Draft | 0004, 0009, 0018, 0022, 0053, 0120 | 21, `draft/adr-0121-a-meeting-between-two-factions-resolves-at-the-tile.md` |
+| 0122 | An attacker whose attack does not exceed the defender's armour contributes exactly zero | Draft | 0002, 0023, 0120, 0121 | 21, `draft/adr-0122-an-attacker-below-the-armour-contributes-exactly-zero.md` |
+| 0123 | Casualties are whole units served to a keyed subset, never a fraction of everybody | Draft | 0001, 0002, 0003, 0004, 0009, 0106, 0121 | 21, `draft/adr-0123-casualties-are-whole-units-served-to-a-keyed-subset.md` |
 
 ### Retired numbers
 

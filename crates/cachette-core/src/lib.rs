@@ -19,6 +19,7 @@ pub mod census;
 pub mod character;
 pub mod choose;
 pub mod cohort;
+pub mod contest;
 pub mod descent;
 pub mod event;
 pub mod founding;
@@ -45,6 +46,7 @@ pub mod terrain;
 pub mod tier;
 pub mod tile_value;
 pub mod types;
+pub mod unit_type;
 pub mod upgrade;
 pub mod world;
 
@@ -59,6 +61,7 @@ pub use cohort::{
     CohortError, CohortRow, CohortTable, DeathPlane, DrawLedger, DrawPass, NeedCondition, NeedRule,
     SiteRationed, UnitStarved, COHORTS_PER_SITE,
 };
+pub use contest::{ContestError, UnitFell};
 pub use descent::{
     Descent, DescentError, DescentId, HouseId, Parents, DESCENT_CEILING, RELATION_DEPTH,
 };
@@ -91,5 +94,8 @@ pub use terrain::{Terrain, TerrainTile, TileKind};
 pub use tier::{EntityTier, Shape, CHARACTER_CEILING};
 pub use tile_value::{TileValueChunk, TileValueRange, TileValues};
 pub use types::{Accum, Entity, FactionId, Fix32, Tick, TileIdx};
+pub use unit_type::{
+    UnitTypeError, UnitTypeId, UnitTypeRow, UnitTypeTable, DEFAULT_UNIT_TYPE, UNIT_TYPE_COUNT,
+};
 pub use upgrade::{UpgradeKind, UpgradeMap, UpgradeSite, UPGRADE_KIND_COUNT};
 pub use world::{IdentityError, StepError, World, WorldConfig, WorldError};

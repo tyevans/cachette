@@ -71,9 +71,41 @@ and not code, and that types parameterise the verbs rather than multiplying
 them.[^ORIENT] Option A contradicts that in the one place it is currently
 testable.
 
+### DEC-144 — Does a fight resolve at the tile or at the level 1 cell?
+
+**Closed on 3 September 2026. Option B: a fight resolves at the tile.** The
+project owner decided it ahead of the measurement, and a record now holds the
+constraint.[^DEC144C] The blocker stays open, because it measures how wide the
+casualty band is and not where the fight resolves.[^DEC144B]
+
+The reasoning that decided it is the second option below, unchanged: the tile
+form needs no new input, its cost follows a small set, and the derived unit
+structure already lists the units of one tile at every barrier.
+
+A design sketch resolves combat for each level 1 cell, as a small table over
+unit types. A cell summarises a block of tiles, and the block edge is a power of
+two set by one constant.[^DEC144A]
+
+**Option A. Resolve at the cell.** The cost follows the cell count. It reuses
+the lattice everything else uses. The risk is that casualties spread across a
+whole block, so an army smears rather than forming a front line.
+
+**Option B. Resolve at the tile.** The engine already lists the units standing
+on one tile, and it rebuilds that at every barrier, so the input exists. The
+cost follows the contested tiles, which is a small set, and the block masks
+already say which blocks hold more than one faction.
+
+**Recommendation: Option B, after the measurement.** The tile form needs no new
+input and its cost follows a small set. The blocker states the measurement that
+would decide it, and it is cheap.[^DEC144B]
+
 ### DEC-145 — Does an attacker below the defender's threshold contribute exactly zero?
 
-**Open. The project owner owns it, because it is a game-design judgement.**
+**Closed on 3 September 2026. Option A: a hard threshold.** The project owner
+decided it, and a record now holds the constraint.[^DEC145C] He accepted the
+cliff that the third paragraph below states, because his acceptance test asks
+for it: ten thousand bowmen must lose to one tank, and only a sum of zeroes
+gives that without a constant to hold it up.
 
 The project owner's acceptance test for combat is that one tank still kills four
 bowmen, and the sketch that meets it applies a penetration threshold for each
@@ -96,6 +128,31 @@ per-unit accumulator, and this project recorded that reasoning.[^DEC145B]
 recommendation is weak, and it should be taken only from the owner. Option A
 also removes attrition entirely for the pairs it applies to, and attrition is
 what produces the crowd behaviour the owner asked for.
+
+### DEC-180 — Does the resolution of a meeting run on every frame, or on a schedule?
+
+**Open. Engineering owns it. It decides how fast a fight goes and what it
+costs.**
+
+The resolution of a meeting runs on every frame today.[^DEC144C] Two other
+passes that change state do not: the rate pass and the consumption pass run on
+a schedule that the world holds, and the world scales the rate to one
+application.[^DEC180B]
+
+**Option A. Run on every frame.** The fight resolves as fast as the table says.
+The cost is one walk over the units of every occupied block, on every frame.
+
+**Option B. Run on a schedule, and scale the attack to one application.** The
+cost falls by the period. The fight then advances in steps that a watcher sees
+as jumps, and the attack of a table row means a different thing at two periods.
+
+**Option C. Run on every frame, and let the table hold the pace.** A caller
+that wants a slower fight lowers every attack. The engine holds one rule and
+the content holds the speed.
+
+**Recommendation: Option C, until a measurement says the cost matters.** It
+needs no new state and it keeps one meaning for a table row. The measurement
+that would move this is the same one the front-line blocker asks for.[^DEC180C]
 
 ### DEC-146 — Is attack a verb, or a destination and a posture?
 
@@ -1820,33 +1877,6 @@ the engine states.
 **What follows.** The core change is a backlog item.[^DEC161C] Until it lands,
 the doc comment of the verb states that the engine does not check the holder,
 because writing the intent as a fact is what the scope rule forbids.[^DEC161D]
-### DEC-144 — Does a fight resolve at the tile or at the level 1 cell?
-
-**Closed on 3 September 2026. Option B. A fight resolves at the tile.**
-
-A design sketch resolved combat for each level 1 cell, as a small table over
-unit types. A cell summarises a block of tiles, and the block edge is a power of
-two that one layout constant sets.[^DEC144A] The row waited on a measurement,
-and the measurement is taken.[^DEC144C]
-
-**Option A. Resolve at the cell.** The cost follows the cell count. It reuses
-the lattice everything else uses. The risk was that casualties spread across a
-whole block.
-
-**Option B. Resolve at the tile.** The engine already lists the units standing
-on one tile, and it rebuilds that at every barrier, so the input exists. The
-cost follows the contested tiles, which is a small set, and the block masks
-already say which blocks hold more than one faction.
-
-**Why B.** The band that holds the middle 90 percent of the casualties is 1 tile
-wide at the tile and up to 30 tiles wide at the cell, and about seven in ten of
-the casualties of a cell resolution stand on a tile that holds no enemy. The
-finding holds the numbers and names the machine.[^DEC144C]
-
-**The blocker that held this row is resolved.**[^DEC144B]
-
-**What this did not decide.** It does not decide what a contest reads once it
-sits at the tile. A separate row holds that.[^DEC144D]
 ### DEC-142 — Does the control plane name the seed set of a strategy field?
 
 **Closed. Option B. The control plane names a set of tiles, and the engine
@@ -3659,5 +3689,7 @@ a failed founding is correct.[^PRD12]
 [^DEC161C]: Backlog item 0370, refuse a build on ground another faction holds. `docs/backlog/proposed/0370-refuse-a-build-on-ground-another-faction-holds.md`
 [^DEC161D]: Decision Record Scope, section 4.6. `.claude/rules/adr-scope.md`
 [^DEC144C]: Findings register, FND-390. `docs/FINDINGS.md`
-[^DEC144D]: Decisions register, DEC-170, in this document.
 [^DEC170B]: Findings register, FND-392. `docs/FINDINGS.md`
+[^DEC145C]: ADR-0122, an attacker whose attack does not exceed the defender's armour contributes exactly zero, decision D1. `docs/adrs/draft/adr-0122-an-attacker-below-the-armour-contributes-exactly-zero.md`
+[^DEC180B]: ADR-0063, a need is a rate with a threshold, and crossing it is a fact, decision D5. `docs/adrs/accepted/adr-0063-a-need-is-a-rate-with-a-threshold-and-crossing-it-is-a-fact.md`
+[^DEC180C]: Blockers register, BLK-052. `docs/BLOCKERS.md`

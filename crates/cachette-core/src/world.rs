@@ -37,6 +37,7 @@ use crate::cohort::{
     self, CohortError, CohortTable, DeathPlane, DrawLedger, NeedCondition, NeedRule, SiteRationed,
     UnitStarved,
 };
+use crate::contest::{self, ContestError, UnitFell};
 use crate::descent::{DescentId, Parents};
 use crate::event::{ResourceTaken, TileChanged, CHANGE_KIND_LOWERED, CHANGE_KIND_RAISED};
 use crate::founding::{self, Founding, FoundingError, FoundingOutcome, Survey};
@@ -68,6 +69,7 @@ use crate::stage::{self, Stage};
 use crate::terrain::{Terrain, TerrainTile, TileKind};
 use crate::tile_value::{TileValueChunk, TileValues};
 use crate::types::{Accum, Entity, FactionId, Fix32, Tick, TileIdx, FACTION_CEILING};
+use crate::unit_type::{UnitTypeError, UnitTypeId, UnitTypeTable};
 use crate::upgrade::{self, UpgradeKind, UpgradeMap, UpgradeSite};
 
 /// The reason that a value did not name a live entity.
@@ -187,6 +189,8 @@ pub enum StepError {
     Positions(PositionError),
     /// The promotion pass refused to run.
     Promotion(PromotionError),
+    /// The resolution of a meeting refused to run.
+    Contest(ContestError),
 }
 
 impl From<PromotionError> for StepError {
@@ -243,6 +247,15 @@ impl From<RateError> for StepError {
 impl From<SortError> for StepError {
     fn from(error: SortError) -> Self {
         Self::Sort(error)
+    }
+}
+
+impl From<ContestError> for StepError {
+    fn from(error: ContestError) -> Self {
+        match error {
+            ContestError::ZeroThreads => Self::ZeroThreads,
+            other => Self::Contest(other),
+        }
     }
 }
 
@@ -331,6 +344,9 @@ impl core::fmt::Display for StepError {
             }
             Self::Promotion(error) => {
                 write!(formatter, "the promotion pass refused: {error}")
+            }
+            Self::Contest(error) => {
+                write!(formatter, "the resolution of a meeting refused: {error}")
             }
         }
     }
@@ -615,6 +631,28 @@ pub struct World {
     death_plane: DeathPlane,
     /// The units that a shortage ended at the last scan, in slot order.
     starved_log: Vec<UnitStarved>,
+    /// The shared table that a unit type indexes.
+    ///
+    /// **The table is data that the world is built with.** It holds no code,
+    /// and a lookup in it is not a callback. A caller fills the rows it
+    /// wants, and a world that filled none holds no contest at all.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0120, a unit carries a type, and the type is an index into a table the world is built with, decisions D1 and D2. `docs/adrs/draft/adr-0120-a-unit-carries-a-type-that-indexes-a-table.md`
+    unit_types: UnitTypeTable,
+    /// One bit for each unit that the last meeting ended.
+    ///
+    /// The plane is the batch of a structural change, in the way the plane of
+    /// the shortage is, and the scan of it applies the change in ascending
+    /// slot order.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
+    fell_plane: DeathPlane,
+    /// The units that a meeting ended at the last resolution, in slot order.
+    fell_log: Vec<UnitFell>,
     /// The promotions of the last frame that ran the pass.
     ///
     /// The log is cleared at the start of each pass, in the way every other
@@ -787,6 +825,9 @@ impl World {
             rationed_log: Vec::new(),
             death_plane: DeathPlane::new(),
             starved_log: Vec::new(),
+            unit_types: UnitTypeTable::empty(),
+            fell_plane: DeathPlane::new(),
+            fell_log: Vec::new(),
             promoted_log: Vec::new(),
             character_schedule: RateSchedule::DEFAULT,
             promotion_budget: u32::MAX,
@@ -1976,6 +2017,86 @@ impl World {
         bytemuck::cast_slice(&self.starved_log)
     }
 
+    /// Returns the shared table that a unit type indexes.
+    ///
+    /// The table holds one row for each type. A row states the attack of the
+    /// type and the armour of the type, in the project fixed-point scale.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0120, a unit carries a type, and the type is an index into a table the world is built with, decision D2. `docs/adrs/draft/adr-0120-a-unit-carries-a-type-that-indexes-a-table.md`
+    #[must_use]
+    pub const fn unit_types(&self) -> &UnitTypeTable {
+        &self.unit_types
+    }
+
+    /// Writes one row of the unit type table.
+    ///
+    /// The attack is the harm that one unit of the type delivers in one
+    /// resolution, as a whole number of casualties in the fixed-point scale.
+    /// The armour is the attack that an attacker must exceed to reach a unit
+    /// of the type.[^1]
+    ///
+    /// **The values are content and not a budget.** No record holds one,
+    /// because a record may hold no number that a content choice can
+    /// move.[^2]
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the number names no row of the table, when the
+    /// attack is below zero, or when the armour is below zero.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0122, an attacker whose attack does not exceed the defender's armour contributes exactly zero, decision D1. `docs/adrs/draft/adr-0122-an-attacker-below-the-armour-contributes-exactly-zero.md`
+    /// [^2]: Decision Record Scope, section 4.1. `.claude/rules/adr-scope.md`
+    pub const fn define_unit_type(
+        &mut self,
+        unit_type: u8,
+        attack: Fix32,
+        armour: Fix32,
+    ) -> Result<(), UnitTypeError> {
+        self.unit_types.define(unit_type, attack, armour)
+    }
+
+    /// Returns the type of one unit, or `None` when the identity is dead.
+    #[must_use]
+    pub fn unit_type(&self, entity: Entity) -> Option<UnitTypeId> {
+        self.soldiers.unit_type(entity)
+    }
+
+    /// Sets the type of one unit, and reports whether it wrote.
+    ///
+    /// Returns `false` when the identity is dead. The caller handles the
+    /// absent unit or skips it.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0014, entity identity is an index plus a generation, decision D2. `docs/adrs/accepted/adr-0014-entity-identity-is-an-index-plus-a-generation.md`
+    pub fn set_unit_type(&mut self, entity: Entity, unit_type: UnitTypeId) -> bool {
+        self.soldiers.set_unit_type(entity, unit_type)
+    }
+
+    /// Returns the units that a meeting ended at the last resolution, in slot
+    /// order.
+    #[must_use]
+    pub fn fell_log(&self) -> &[UnitFell] {
+        &self.fell_log
+    }
+
+    /// Returns the fallen log as bytes.
+    ///
+    /// The thread-count equivalence test compares this slice byte for
+    /// byte.[^1] The cast is safe because the event type is plain data.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0001, one binary gives one answer at any thread count, decision D4. `docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
+    #[must_use]
+    pub fn fell_log_bytes(&self) -> &[u8] {
+        bytemuck::cast_slice(&self.fell_log)
+    }
+
     /// Returns the cohorts of the last consumption pass.
     ///
     /// The table is derived from the home column of the units, and the pass
@@ -2818,6 +2939,10 @@ impl World {
         // Who holds each tile is simulated state, so the whole-world hash
         // covers it.
         let hash = self.holding.hash_into(hash);
+        // The unit type table decides what the next meeting does, so the
+        // whole-world hash covers it. Two worlds that hold the same units and
+        // different tables must diverge at the next meeting.
+        let hash = self.unit_types.hash_into(hash);
         let hash = self.soldiers.hash_into(hash);
         let hash = self.settlements.hash_into(hash);
         let hash = self.characters.hash_into(hash);
@@ -3046,6 +3171,9 @@ impl World {
         if !self.check_cohorts() {
             return false;
         }
+        if !self.check_contest() {
+            return false;
+        }
         if !self.check_positions() {
             return false;
         }
@@ -3238,6 +3366,32 @@ impl World {
             event.padding == [0; 4]
                 && event.unit != 0
                 && self.need_rule.condition(event.deficit) == NeedCondition::Starved
+        })
+    }
+
+    /// Reports whether the unit type table and the fallen log hold their
+    /// invariants.
+    ///
+    /// The table holds no negative value, because an attack is a quantity of
+    /// harm and an armour is a threshold. The log holds declared padding, an
+    /// identity that packs, a tile inside the world, and a type the table
+    /// holds. A fallen unit is dead by the time anyone reads the log, so the
+    /// check states what the event itself must hold.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0006, an event is plain data and applying it is pure, decision D1. `docs/adrs/accepted/adr-0006-an-event-is-plain-data-and-applying-it-is-pure.md`
+    fn check_contest(&self) -> bool {
+        if !self.unit_types.check_invariants() {
+            return false;
+        }
+        let tiles = self.grid.tile_count();
+        self.fell_log.iter().all(|event| {
+            event.padding == [0; 1]
+                && event.unit != 0
+                && event.tile.0 < tiles
+                && event.faction.0 < FACTION_CEILING
+                && event.unit_type.index() < crate::unit_type::UNIT_TYPE_COUNT
         })
     }
 
@@ -3729,6 +3883,26 @@ impl World {
         // [^16]: ADR-0062, production and upkeep are rates attached to a site, decision D5. `docs/adrs/accepted/adr-0062-production-and-upkeep-are-rates-attached-to-a-site.md`
         // [^17]: ADR-0063, a need is a rate with a threshold, and crossing it is a fact, decision D5. `docs/adrs/accepted/adr-0063-a-need-is-a-rate-with-a-threshold-and-crossing-it-is-a-fact.md`
         self.deliver(threads)?;
+
+        // The meeting resolves here, after the barrier of this frame and
+        // after the holding spread. It reads where each unit stands, and the
+        // movement above has just moved them, so a resolution before the
+        // barrier would fight on the tile a unit left.[^19]
+        //
+        // **It resolves at the tile, and never at a level 1 cell.** A cell
+        // summarises a whole block of tiles, and a fight resolved there kills
+        // units spread over all of them.[^19]
+        //
+        // It removes units, so it is a structural change. Nothing between
+        // here and the refresh below reads the derived unit structure, and
+        // that refresh is the barrier of the change.[^20]
+        //
+        // [^19]: ADR-0121, a meeting between two factions resolves at the tile, decisions D1 and D2. `docs/adrs/draft/adr-0121-a-meeting-between-two-factions-resolves-at-the-tile.md`
+        // [^20]: ADR-0018, the unit-to-tile bridge is derived, and it rebuilds at the barrier, decision D3. `docs/adrs/accepted/adr-0018-the-unit-to-tile-bridge-is-derived-and-rebuilds-at-the-barrier.md`
+        {
+            let _span = stage::open(Stage::Contest);
+            self.contest(threads)?;
+        }
 
         // The site rates apply after the barrier of this frame and after the
         // gather resolve, and before level 1 rebuilds.
@@ -5114,6 +5288,71 @@ impl World {
             let ended = self.despawn_soldier(unit);
             debug_assert!(ended, "a marked slot holds a live unit");
         }
+        self.cohorts.rebuild(
+            self.soldiers.home_column(),
+            self.soldiers.faction_column(),
+            self.soldiers.live_column(),
+            self.settlements.slot_count(),
+        );
+        Ok(())
+    }
+
+    /// Resolves every meeting of this frame and ends the units that fell.
+    ///
+    /// The pass marks in parallel and applies in one ascending scan of the
+    /// slots, so the deaths never follow a thread completion order.[^1]
+    ///
+    /// It runs a fixed amount of work for the world it is given. It holds no
+    /// convergence test and no time budget.[^2]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
+    /// [^2]: ADR-0001, one binary gives one answer at any thread count, decision D3. `docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
+    fn contest(&mut self, threads: usize) -> Result<(), StepError> {
+        self.fell_log.clear();
+        // The structure the pass reads must describe the world it reads. The
+        // movement of this frame has already passed its barrier, and nothing
+        // between that barrier and here moves a unit.
+        self.bridge.describes(&self.soldiers)?;
+        contest::resolve(
+            &self.unit_types,
+            contest::DrawKey {
+                seed: self.config.seed,
+                tick: self.tick,
+            },
+            &self.soldiers,
+            &self.bridge,
+            &mut self.fell_plane,
+            threads,
+        )?;
+        let order = cohort::starved_order(&self.fell_plane, threads)?;
+        if order.is_empty() {
+            return Ok(());
+        }
+        let tick = self.tick;
+        for slot in order {
+            let index = slot as usize;
+            let tile = self.soldiers.tile_column()[index];
+            let faction = self.soldiers.faction_column()[index];
+            let unit_type = self.soldiers.type_column()[index];
+            let generation = self.soldiers.generation_of(slot);
+            let unit = Entity::new(slot, generation)
+                .expect("a marked slot is live, so it holds a generation of one or more");
+            self.fell_log.push(UnitFell::new(
+                tick,
+                unit.to_bits(),
+                tile,
+                faction,
+                unit_type,
+            ));
+            let ended = self.despawn_soldier(unit);
+            debug_assert!(ended, "a marked slot holds a live unit");
+        }
+        // The cohorts are derived from the home column of the units, and this
+        // pass has just removed some of them. A table left as it was would
+        // hold a headcount that no unit answers to, and the invariant check
+        // refuses that state.
         self.cohorts.rebuild(
             self.soldiers.home_column(),
             self.soldiers.faction_column(),
