@@ -22,8 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-412**
-**Next number: FND-403**
+**Next number: FND-422**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -451,6 +450,30 @@ project bans a measurement, ask what the ban also silences.
 
 ## B. Claims refuted
 
+### FND-420 — The gatherable resource catalogue cannot grow at run time
+
+**Believed.** A caller can build a world with any number of resource kinds,
+and the engine reads the number the caller gave.
+
+**True.** The number of gatherable kinds is a constant that the compiler
+fixes, and the code uses it as an array length. What one site wants is a row
+of that length, and the table that maps work onto a commodity is a row of that
+length as well.[^F420A] The kind numbering also reaches the state hash, the
+gather event and a sort key, so a renumbering invalidates every golden
+file.[^F420B]
+
+**Evidence.** A search of the tree for the constant finds it as the length of
+two arrays in the position module and of four more in the resource module and
+the world. The resource module states in its own prose that the numbering is
+stable, and it names the three readers that make it so.[^F420B]
+
+**Follows.** A luxury is a second tier and not a fourth kind. A luxury is a
+presence, so the engine holds a set of bits for each tile rather than a column
+of amounts. The set is one word, so its width bounds the catalogue and no
+array length changes. The control plane names the luxuries when it seeds the
+world, and the gatherable catalogue stays fixed.[^F420C]
+
+
 ### FND-007 — The promotion and demotion problem does not exist
 
 **Believed:** materialising plausible level-0 detail from a level-1 summary,
@@ -681,6 +704,30 @@ replaces nothing else. The record states that.[^F410D]
 two sets differ only in the frames after a spawn and before a choice, and no
 fixture that spawns and then steps many frames reaches the difference. A test
 that wants the case must hold the choice off.[^23]
+### FND-421 — A constructor that makes an invalid value unrepresentable makes its own invariant check unfalsifiable
+
+**Believed.** An invariant check earns its place when the project can show
+that it fails on a defect.
+
+**True.** The luxury field has one constructor. That constructor sorts the
+placements, coalesces the repeats and refuses a bad argument, so no caller can
+build an unsorted field, a repeated tile or an empty entry. The part of the
+invariant check that tests those three things cannot fail, and no test can
+trip it.
+
+**Evidence.** A sweep put ten defects back, one at a time, and ran the tests
+after each one. Nine defects failed at least two tests. The tenth turned the
+field invariant check off, and every test stayed green.[^F421A]
+
+**Follows.** Keep the check, and do not count it as covered. Say in the report
+which guards a test reaches and which it does not.
+
+**The falsifiable check is the one between two copies of one fact.** The world
+compares level 1 of the variety against the field it was derived from. A
+defect that dropped one entry from the derivation failed nine tests, and the
+world invariant check was one of them. A check on a value that no caller can
+build is a guard for a future writer. A check between two copies is a test.
+
 
 ### FND-326 — The panel cut one line kind of eight, and the other seven stayed inside it by luck
 
@@ -10941,3 +10988,7 @@ itself rather than merely underspecified.
 [^F390D]: Decisions register, DEC-144. `docs/DECISIONS.md`
 [^F392A]: Decisions register, DEC-170. `docs/DECISIONS.md`
 [^F393A]: Research report 21, what a god needs from this engine, section 4.1. `docs/research/reports/21-what-a-god-needs.md`
+[^F420A]: The site preference row and the work table. `crates/cachette-core/src/position.rs`
+[^F420B]: The resource kinds and their numbering. `crates/cachette-core/src/resource.rs`
+[^F420C]: Decisions register, DEC-201, in this document's companion. `docs/DECISIONS.md`
+[^F421A]: The luxury tests. `crates/cachette-core/tests/luxury.rs`

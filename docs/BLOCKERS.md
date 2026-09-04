@@ -25,11 +25,52 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^ALLOC]
 
-**Next number: BLK-081**
+**Next number: BLK-112**
 
 [^ALLOC]: Findings register, FND-038. `docs/FINDINGS.md`
 
 ## Open
+
+### BLK-110 — Nobody has said what the variety score should change
+
+**Owner:** the project owner. **Blocks:** wiring the luxury variety score to
+any simulation pass.
+
+The engine counts how many different luxuries stand on a tile, in a level 1
+cell, on the ground one faction holds, and in the whole world. Nothing in the
+engine reads any of those numbers.[^BLK110A]
+
+The project owner asked for luxury resources so that resource variety becomes
+a scorable thing for research. He suggested that it could change the worker
+policy of a faction, and he said that he did not know.[^BLK110B]
+
+**What would close this.** A statement of one effect: which pass reads the
+score, what the score changes, and by how much. The rule on records forbids
+inventing a value that an unanswered question governs, so the engine holds the
+score and changes nothing until this row closes.[^BLK110C]
+
+**What the project does meanwhile.** The control plane reads the score. A game
+built on this engine can make its own rule from it, outside the simulation.
+
+### BLK-111 — Nobody has said whether 64 luxuries is enough
+
+**Owner:** the project owner. **Blocks:** a catalogue wider than one word.
+
+A set of luxuries is one 64-bit word, so the catalogue addresses 64 luxuries.
+A caller that names the luxury numbered 64 gets a typed refusal, and the
+engine never folds two luxuries onto one bit.[^BLK111A]
+
+**What would close this.** A statement of how many luxuries the downstream
+game needs. A catalogue above 64 needs a wider word or a second word. Both
+change what the engine stores for each tile, and both change the state hash,
+so the choice is cheaper now than later.
+
+**What the project assumes meanwhile.** Sixty-four is enough. The ceiling is
+the width of one machine word, and the scale constants table states that width
+as the reason for the faction ceiling as well.[^SCALE] The two ceilings are not
+the same number: a faction reserves one value for nobody, and a luxury reserves
+none.
+
 
 ### BLK-007 — Most cost figures are still derived on the target platform
 
@@ -520,3 +561,8 @@ normally.
 [^BLK80A]: Decisions register, DEC-144. `docs/DECISIONS.md`
 [^BLK80B]: Findings register, FND-392. `docs/FINDINGS.md`
 [^BLK80C]: Findings register, FND-363. `docs/FINDINGS.md`
+
+[^BLK110A]: Decisions register, DEC-200. `docs/DECISIONS.md`
+[^BLK110B]: Research report 21, what a god needs from this engine. `docs/research/reports/21-what-a-god-needs.md`
+[^BLK110C]: Decision Record Scope, section 4.5. `.claude/rules/adr-scope.md`
+[^BLK111A]: Decisions register, DEC-202. `docs/DECISIONS.md`
