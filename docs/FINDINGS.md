@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-433**
+**Next number: FND-474**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -10047,8 +10047,135 @@ store conservation check and the carry conservation check both held while a
 cohort was eating rations the store never gave. The account they balance is the
 commodity, and the ration a unit receives is not that account.
 
+### FND-470 — A whole tier of the engine reached no caller, and it is the largest capability in this engine that nothing invokes
+
+**Believed.** The engine holds a character tier, and two accepted product
+records describe what it is for.[^F470A] [^F470B] A reader of those records
+concludes that a developer can name a person in the world.
+
+**True.** Nothing outside the core crate reached any of it. The core held
+thirteen methods over characters, descent and deeds. The bindings crate named
+none of them, and no Python file named any of them. A developer driving the
+engine from the control plane could not name one person, could not read a
+parent, and could not read the exact relation the engine computes.
+
+This is the shape the project already lists as inert code that nothing
+invokes.[^65] It is the largest instance of that shape found in this engine
+so far: the previous largest was five methods over building.[^F470D]
+
+**Evidence.** The search below returned every mention of the thirteen names
+outside the core crate. Before the work it returned nothing.
+
+grep -rn "create_character\|bear_character\|remove_character\|unit_character\|character_parents\|character_ancestors\|character_descendants\|character_relation\|set_character_renown\|set_character_schedule\|unit_deeds\|deed_threshold" crates/cachette-py python tests
+
+Each method carried a doc comment and each had a passing Rust test. The tests
+built the mechanism and drove it directly, which is why the gap was invisible
+to every gate.
+
+**Follows.** A Rust test over a core method proves the method works. It says
+nothing about whether the boundary reaches it. A subsystem is not shipped when
+its own tests pass. It is shipped when a test that starts at the public
+interface reaches it.[^F317C]
+
+### FND-471 — The engine reports that a line has ended, and no boundary read can ask
+
+**Believed.** The engine answers whether a line has ended, so a control plane
+can ask it. One accepted product record names that answer as a thing a watcher
+must be able to read.[^F470A]
+
+**True.** The engine answers for a row of the record of descent, and it answers
+false whenever the character of that row is alive. Every read at the boundary
+takes an identity that the engine resolves, and the engine refuses an identity
+that names no living character. So a boundary read can only ever ask about a
+living character, and the answer for a living character is always the same
+word.
+
+The answer a caller wants is about somebody who is gone. The identity of
+somebody who is gone is exactly the identity the boundary refuses.
+
+**Evidence.** The core answers false when the character of the row is alive,
+and true when the character is gone and no descendant is alive. The lineage
+read carried the answer as a key while it was written, and every value of that
+key in every test was false. The key was removed rather than published.
+
+**Follows.** A read that always answers one word is a description and not an
+answer. It is worse than absent, because a reader takes it for a real test.
+Publishing it would have been a capability nobody can invoke, which is the
+shape this project already names.[^65]
+
+**A separate read has to answer it, and it cannot take a living identity.** A
+backlog item holds the work, and a decision row holds the options.[^F471A]
+[^F471B]
+
+### FND-472 — A character identity and a unit identity are the same number, and nothing reports the mistake
+
+**Believed.** An identity crosses to Python as one opaque number that the
+engine resolves, so a wrong identity is refused.[^F472A] A reader concludes
+that passing the wrong identity to a call raises.
+
+**True.** Each arena numbers its own slots. The first character of a world and
+the first unit of a world therefore carry the identical number. A call that
+takes a unit reads the soldier arena, a call that takes a character reads the
+character arena, and neither refuses the number of the other. A caller that
+mixes the two kinds gets a legal, wrong answer, and no check reports it.
+
+**The wrong answer then repeats exactly.** The engine is deterministic, so the
+mistake gives one answer at every thread count and on every run. Both
+determinism tests compare a run against a run, so neither can see it.[^F174A]
+
+**Evidence.** A world with two units and two characters gives the two pairs of
+identical numbers. The reads then answer for the wrong arena without a
+refusal.
+
+uv run pytest tests/test_characters.py -k share_one_number
+
+The test asserts that the two arrays are equal and that both calls answer.
+
+**This is not new with the character work.** A settlement identity and a unit
+identity already overlapped the same way, and this work adds a third kind.
+What is new is that a caller now holds two identities for one person: the unit
+and the character it was raised into.
+
+**Follows.** The generation check refuses a stale identity. It does not refuse
+an identity from another arena, because there is nothing in the number that
+says which arena minted it. The doc comment of every call that gives out a
+character identity now names the hazard. A decision row holds the repair and a
+backlog item holds the work.[^F472C] [^F471A]
+
+### FND-473 — The renown column is written by nothing and read by nothing
+
+**Believed.** A character carries a renown, and the arena hashes it, so it is a
+value the simulation uses.
+
+**True.** No pass in the engine writes it and no pass reads it. The creation
+sets it to zero. One core method writes it, and before this work only tests
+called that method. The viewer says in its own source that it does not show
+the column. So the value was zero for the whole of every run that nothing
+wrote to.
+
+**Evidence.** The search below found the column outside the arena that owns it
+only in tests, in the viewer comment that says it is not shown, and in the one
+core write method.
+
+grep -rn "renown" crates --include="*.rs"
+
+**Follows.** The binding makes the column writable from the control plane, so
+a game can rank two people by it. What raises it and what lowers it inside the
+engine is an open question that this work does not answer, and a blocker holds
+it.[^F473A] The doc comment of the write says plainly that nothing in the
+engine reads the column, rather than implying a mechanism that does not
+exist.[^10]
+
 ## References
 
+[^F470A]: PRD-0015, a unit has parents and children. `docs/product/accepted/prd-0015-a-unit-has-parents-and-children.md`
+[^F470B]: PRD-0016, somebody is in charge. `docs/product/accepted/prd-0016-somebody-is-in-charge.md`
+[^F470D]: Findings register, FND-360, in this document.
+[^F471A]: Backlog item 0461, tell a caller which arena an identity belongs to. `docs/backlog/proposed/0461-tell-a-caller-which-arena-an-identity-belongs-to.md`
+[^F471B]: Decisions register, DEC-265. `docs/DECISIONS.md`
+[^F472A]: ADR-0085, an entity crosses to Python as one opaque identity that the engine resolves, decision D3. `docs/adrs/accepted/adr-0085-an-entity-crosses-to-python-as-one-opaque-identity.md`
+[^F472C]: Decisions register, DEC-266. `docs/DECISIONS.md`
+[^F473A]: Blockers register, BLK-150. `docs/BLOCKERS.md`
 [^F411A]: ADR-0125, the control plane names the seed set of a destination field, decision D4. `docs/adrs/draft/adr-0125-the-control-plane-names-the-seed-set-of-a-destination-field.md`
 [^F411B]: ADR-0091, movement takes its direction from a per-cell field, never from a per-unit search, the consequences. `docs/adrs/draft/adr-0091-movement-takes-its-direction-from-a-per-cell-field.md`
 [^F411C]: The sent set test of the core. `crates/cachette-core/tests/a_sent_set_walks_to_its_destination.rs`

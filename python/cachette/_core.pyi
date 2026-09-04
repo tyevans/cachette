@@ -104,6 +104,55 @@ class FactionUnitColumns(TypedDict):
     unit: npt.NDArray[np.uint64]
     tile: npt.NDArray[np.uint32]
 
+class CharacterColumns(TypedDict):
+    """One column for each field of a living character.
+
+    The engine builds the set at the moment of the call, so every entry names
+    a living character and no entry stands for nothing.
+
+    The character column holds the whole identity of each person. The birth
+    order column holds the position in the record of descent, and no call
+    takes that value. The renown column is a Q16.16 fixed-point value as its
+    raw integer.
+    """
+
+    character: npt.NDArray[np.uint64]
+    birth_order: npt.NDArray[np.uint32]
+    faction: npt.NDArray[np.uint16]
+    birth: npt.NDArray[np.uint64]
+    renown: npt.NDArray[np.int32]
+    sex: npt.NDArray[np.uint8]
+    house: npt.NDArray[np.uint32]
+
+class LineageColumns(TypedDict):
+    """The parents, the ancestors and the descendants of one character.
+
+    Three entries describe the character that was asked about. Three groups of
+    four parallel arrays describe other people, and the four arrays of one
+    group describe the same people in the same order.
+
+    Each identity is the one the engine minted at the birth of that person.
+    The engine never issues one identity twice, so the value names one person
+    for ever. The record of descent outlives the person, so the live column
+    says whether another call still accepts that identity.
+    """
+
+    character: int
+    birth_order: int
+    house: int
+    parent: npt.NDArray[np.uint64]
+    parent_birth_order: npt.NDArray[np.uint32]
+    parent_alive: npt.NDArray[np.uint8]
+    parent_role: npt.NDArray[np.uint8]
+    ancestor: npt.NDArray[np.uint64]
+    ancestor_birth_order: npt.NDArray[np.uint32]
+    ancestor_alive: npt.NDArray[np.uint8]
+    ancestor_role: npt.NDArray[np.uint8]
+    descendant: npt.NDArray[np.uint64]
+    descendant_birth_order: npt.NDArray[np.uint32]
+    descendant_alive: npt.NDArray[np.uint8]
+    descendant_role: npt.NDArray[np.uint8]
+
 class FoundingColumns(TypedDict):
     """What one founding chose, and what it made.
 
@@ -550,5 +599,21 @@ class World:
     def luxury_tile_count(self) -> int: ...
     def cell_variety(self, cell: int) -> int: ...
     def faction_variety(self, faction: int) -> int: ...
+    def characters(self, faction: int | None = ...) -> CharacterColumns: ...
+    def character_lineage(self, character: int) -> LineageColumns: ...
+    def character_relations(
+        self, subject: int, others: Identities
+    ) -> npt.NDArray[np.int32]: ...
+    def unit_deeds(self, units: Identities) -> npt.NDArray[np.uint64]: ...
+    def unit_characters(self, units: Identities) -> npt.NDArray[np.uint64]: ...
+    def deed_threshold(self) -> int: ...
+    def set_deed_threshold(self, threshold: int) -> None: ...
+    def set_character_schedule(self, period: int, phase: int) -> None: ...
+    def create_characters(self, faction: int, count: int) -> npt.NDArray[np.uint64]: ...
+    def bear_children(
+        self, births: Sequence[tuple[int, int]]
+    ) -> npt.NDArray[np.uint64]: ...
+    def remove_characters(self, characters: Identities) -> None: ...
+    def set_character_renown(self, characters: Identities, renown: int) -> None: ...
 
 def version() -> str: ...

@@ -25,11 +25,36 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^ALLOC]
 
-**Next number: BLK-122**
+**Next number: BLK-151**
 
 [^ALLOC]: Findings register, FND-038. `docs/FINDINGS.md`
 
 ## Open
+
+### BLK-150 — Nobody has said what raises and lowers renown
+
+**Owner:** the project owner. **Blocks:** wiring the renown column to any
+simulation pass.
+
+Every character carries a renown, and the arena hashes the column. No pass in
+the engine writes it and no pass reads it. The creation sets it to zero, and it
+stays there unless a caller writes it. A finding holds the
+measurement.[^BLK150A]
+
+Renown is what a game ranks two people by. A record that names somebody in
+charge needs a way to say who matters, and it names a small fixed set of
+properties as the need rather than a catalogue.[^BLK150B]
+
+**What would close this.** A statement of one rule: which pass writes the
+renown, what raises it, what lowers it, and whether it falls on its own. The
+rule on records forbids inventing a value that an unanswered question governs,
+so the engine holds the column and changes nothing until this row
+closes.[^BLK110C]
+
+**What the project does meanwhile.** The control plane writes the column and
+reads it back. A game built on this engine makes its own rule from it, outside
+the simulation. The doc comment of the write says that nothing in the engine
+reads the column, so a caller is not told that a mechanism exists.
 
 ### BLK-110 — Nobody has said what the variety score should change
 
@@ -564,6 +589,8 @@ house, his kinship to everyone is zero, and he cannot inherit a title by
 blood. A title holder may **appoint** him. His children inherit from him
 normally.
 
+[^BLK150A]: Findings register, FND-473. `docs/FINDINGS.md`
+[^BLK150B]: PRD-0016, somebody is in charge. `docs/product/accepted/prd-0016-somebody-is-in-charge.md`
 [^MEASURED]: Target platform costs. `docs/reference/graviton-costs.md`
 [^SPREAD]: Findings register, FND-223. `docs/FINDINGS.md`
 [^FLOOR]: Findings register, FND-224. `docs/FINDINGS.md`
