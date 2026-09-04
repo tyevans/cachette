@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-433**
+**Next number: FND-482**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -622,6 +622,29 @@ carry.[^F319C]
 package are one statement, and correcting the sentence alone would create a
 second place that states what the package holds. The worker who chooses how
 this package is documented owns both.
+
+
+### FND-481 — Three of the thirteen unbound economy names already cross to Python inside a report
+
+**Believed.** Thirteen names govern the economy of the engine, and no binding
+and no Python line reaches any of them.
+
+**True.** Ten of the thirteen reach no caller. The other three already cross,
+inside a report that a binding already builds. The production rate and the
+upkeep rate of a site cross as two entries of the economy report of that site.
+The stock a tile started with crosses as one entry of the tile report.[^F320C]
+
+**Evidence.** Read on 3 September 2026. `grep -rn "\bproduction_rate\b\|\bupkeep_rate\b\|\boriginal_stock\b" crates/cachette-py/src python tests scripts`
+reported three lines, all of them inside the bindings crate: two in the site
+economy report and one in the tile report. The same search over the other ten
+names reported nothing.
+
+**Follows.** A second binding for any of the three would be a second
+declaration site for one value, which is the defect shape this project keeps
+meeting.[^22] The work that bound the ten write knobs published no reader
+for the three, and pointed the doc comment of each write at the report that
+already answers it. A caller therefore has one place to read a rate and one
+place to write it.
 
 
 ## C. Defects found in specified rules
@@ -1647,6 +1670,35 @@ faction column.
 and it holds no second copy of the answer, so the relation replaces the walk
 with a one-bit read and changes no behaviour. Read a missing derived structure
 as a cost question and not as a capability question.
+
+### FND-480 — The recovery rules govern every tick and stand outside the state hash
+
+**Believed.** Every value that a later frame reads enters the state hash, so
+two worlds that must diverge cannot hash the same.[^F160A]
+
+**True.** The rules that say how fast a depleted deposit returns do not enter
+it. The world folds the depletion ledger into the hash, and that fold writes
+the entries of the ledger and not the rule set beside them. A caller may
+replace the whole rule set at any time. Two worlds that hold the same tiles,
+the same takes and different recovery periods therefore hash the same, and
+they diverge on the next tick that ages an entry.
+
+**Evidence.** Read on 3 September 2026. The fold of the depletion ledger
+writes the entry count and then the key, the taken amount and the anchor tick
+of each entry.[^F480B] It never reads its own rule field. The whole-world fold
+calls it once and writes nothing else about depletion.[^F480C] The recovery
+pass reads the rule field on every tick.[^F480D]
+
+**Follows.** The golden state test can pass over a change that a caller made
+to the recovery rules, until the difference has already reached a stored take.
+The hash then reports the effect and never the cause, one or more ticks late.
+The repair is one line in the fold, and it moves every golden file because it
+changes the hash chain, so a backlog item holds it on its own.[^F480E]
+
+**This is a defect the boundary work found and did not repair.** The work that
+found it was a binding, and a binding must not move a golden file. The finding
+is the handover.
+
 
 ## D. Cost estimates that were wrong
 
@@ -11055,3 +11107,7 @@ itself rather than merely underspecified.
 [^F420B]: The resource kinds and their numbering. `crates/cachette-core/src/resource.rs`
 [^F420C]: Decisions register, DEC-201, in this document's companion. `docs/DECISIONS.md`
 [^F421A]: The luxury tests. `crates/cachette-core/tests/luxury.rs`
+[^F480B]: The depletion ledger fold. `crates/cachette-core/src/resource.rs`
+[^F480C]: The whole-world state hash. `crates/cachette-core/src/world.rs`
+[^F480D]: The recovery pass of the depletion ledger. `crates/cachette-core/src/resource.rs`
+[^F480E]: Backlog item 0471, fold the recovery rules into the state hash. `docs/backlog/proposed/0471-fold-the-recovery-rules-into-the-state-hash.md`
