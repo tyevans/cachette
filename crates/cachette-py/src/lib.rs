@@ -1914,6 +1914,415 @@ impl PyWorld {
         Ok(report)
     }
 
+    /// Opens a trade negotiation from one faction toward another.
+    ///
+    /// A trade has two halves. This half is the conversation. The other half
+    /// is the contract that an acceptance makes, and the engine enforces that
+    /// one.
+    ///
+    /// The proposer and the responder are faction numbers. The pair is
+    /// ordered, and the row the engine writes belongs to the proposer and the
+    /// responder in that order.
+    ///
+    /// The give side is what the proposer owes. The take side is what the
+    /// responder owes. Each is a whole quantity of one resource kind: food is
+    /// zero, wood is one and stone is two. No term of a contract is a
+    /// fractional number.
+    ///
+    /// The term is how many steps the contract runs for once it binds. The
+    /// acceptance turns it into a deadline. A contract that cannot fail is not
+    /// a contract, so a term of zero is refused.
+    ///
+    /// **One unit of the proposer must stand on ground that the responder
+    /// holds.** This is the same rule that governs a message between two
+    /// players, and a trade is a thing two players say to each other.[^1]
+    ///
+    /// The call gives the offer. It moves nothing. Read `trade_status` for
+    /// what the pair now holds.
+    ///
+    /// # Errors
+    ///
+    /// Raises `VerbError` when a number names no faction of this world, when
+    /// the two parties are one faction, when a kind names no resource, when a
+    /// quantity is zero, when the term is zero, when the pair already holds a
+    /// live negotiation, when a terminal refusal closed this direction, or
+    /// when no unit of the proposer stands on the responder's ground. The
+    /// message says which, and a closure message states the step that opens
+    /// the direction again.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0120, a trade negotiation is engine state and the words are not, decision D3. `docs/adrs/draft/adr-0120-a-trade-negotiation-is-engine-state.md`
+    #[allow(clippy::too_many_arguments)]
+    fn offer_trade(
+        &self,
+        proposer: u16,
+        responder: u16,
+        give_kind: u8,
+        give_amount: u32,
+        take_kind: u8,
+        take_amount: u32,
+        term: u32,
+    ) -> PyResult<()> {
+        let mut world = self.lock();
+        world
+            .offer_trade(
+                FactionId(proposer),
+                FactionId(responder),
+                give_kind,
+                give_amount,
+                take_kind,
+                take_amount,
+                term,
+            )
+            .map_err(trade_refusal)
+    }
+
+    /// Restates the terms of a live negotiation.
+    ///
+    /// The speaker is the party that did not speak last. Read the status of
+    /// the pair for whose turn it is.
+    ///
+    /// The terms are always stated in the orientation of the row. The give
+    /// side is what the party that opened the pair owes, whoever speaks now.
+    ///
+    /// **One unit of the speaker must stand on ground that the other party
+    /// holds.**
+    ///
+    /// # Errors
+    ///
+    /// Raises `VerbError` when the pair holds no live negotiation, when the
+    /// terms already bind both parties, when the other party has not answered
+    /// yet, when a kind names no resource, when a quantity is zero, or when
+    /// the speaker has no unit on the other party's ground.
+    fn counter_trade(
+        &self,
+        speaker: u16,
+        other: u16,
+        give_kind: u8,
+        give_amount: u32,
+        take_kind: u8,
+        take_amount: u32,
+    ) -> PyResult<()> {
+        let mut world = self.lock();
+        world
+            .counter_trade(
+                FactionId(speaker),
+                FactionId(other),
+                give_kind,
+                give_amount,
+                take_kind,
+                take_amount,
+            )
+            .map_err(trade_refusal)
+    }
+
+    /// Agrees to the terms of a live negotiation.
+    ///
+    /// The terms then bind both parties, and the engine enforces them. The
+    /// deadline is the current step plus the term the offer named.
+    ///
+    /// The speaker is the party that did not speak last.
+    ///
+    /// **One unit of the speaker must stand on ground that the other party
+    /// holds.**
+    ///
+    /// # Errors
+    ///
+    /// Raises `VerbError` when the pair holds no live negotiation, when the
+    /// terms already bind both parties, when the other party has not answered
+    /// yet, or when the speaker has no unit on the other party's ground.
+    fn accept_trade(&self, speaker: u16, other: u16) -> PyResult<()> {
+        let mut world = self.lock();
+        world
+            .accept_trade(FactionId(speaker), FactionId(other))
+            .map_err(trade_refusal)
+    }
+
+    /// Declines the terms of a live negotiation.
+    ///
+    /// **This is a refusal and not a closed door.** The pair is idle after it,
+    /// and either party may open a new negotiation at once. Call
+    /// `close_trade` for the terminal refusal that stops the other party from
+    /// asking again.
+    ///
+    /// # Errors
+    ///
+    /// Raises `VerbError` when the pair holds no live negotiation, when the
+    /// terms already bind both parties, when the other party has not answered
+    /// yet, or when the speaker has no unit on the other party's ground.
+    fn refuse_trade(&self, speaker: u16, other: u16) -> PyResult<()> {
+        let mut world = self.lock();
+        world
+            .refuse_trade(FactionId(speaker), FactionId(other))
+            .map_err(trade_refusal)
+    }
+
+    /// Declines the terms and stops the other party from asking again.
+    ///
+    /// **This is the terminal refusal, and it differs from `refuse_trade`.**
+    /// It ends the negotiation, and it also closes the direction the other
+    /// party would open, for the number of steps named here.
+    ///
+    /// The closure is directional. The other party cannot open a negotiation
+    /// toward the speaker until the closure ends. The speaker may still open
+    /// one toward the other party, because the speaker closed its own door and
+    /// promised no silence of its own.
+    ///
+    /// **The step that opens the direction again is readable.** Read
+    /// `trade_status` with the other party first and the speaker second, and
+    /// take the `closed_until` entry. An offer made before that step raises an
+    /// error whose message states the step. A player that cannot tell a
+    /// refusal from a closed door asks for ever.
+    ///
+    /// Only the speaker opens the direction early, through `reopen_trade`.
+    /// Nothing the other party does shortens the closure.
+    ///
+    /// # Errors
+    ///
+    /// Raises `VerbError` when the number of steps is zero, when the pair
+    /// holds no live negotiation, when the terms already bind both parties,
+    /// when the other party has not answered yet, or when the speaker has no
+    /// unit on the other party's ground.
+    fn close_trade(&self, speaker: u16, other: u16, steps: u32) -> PyResult<()> {
+        let mut world = self.lock();
+        world
+            .close_trade(FactionId(speaker), FactionId(other), steps)
+            .map_err(trade_refusal)
+    }
+
+    /// Opens a direction that this faction closed, before the closure ends.
+    ///
+    /// Only the faction that closed the direction opens it again.
+    ///
+    /// # Errors
+    ///
+    /// Raises `VerbError` when this faction closed nothing toward the other
+    /// party.
+    fn reopen_trade(&self, speaker: u16, other: u16) -> PyResult<()> {
+        let mut world = self.lock();
+        world
+            .reopen_trade(FactionId(speaker), FactionId(other))
+            .map_err(trade_refusal)
+    }
+
+    /// Returns what stands between one ordered pair of factions.
+    ///
+    /// The pair is ordered. The row belongs to the proposer and the responder
+    /// in that order, and it holds the negotiation that the proposer opened
+    /// toward the responder. A pair that nobody ever spoke about answers an
+    /// idle row with every number at zero.
+    ///
+    /// The dictionary holds these entries.
+    ///
+    /// - `status`, an integer. Zero is idle, one means the proposer spoke
+    ///   last, two means the responder spoke last, three means a contract
+    ///   binds both, four means both delivered in full, and five means the
+    ///   deadline passed with a debt.
+    /// - `turn`, an integer or `None`. Which faction answers next. It is
+    ///   `None` when nobody is waiting on an answer.
+    /// - `give_kind` and `give_amount`. What the proposer owes.
+    /// - `take_kind` and `take_amount`. What the responder owes.
+    /// - `given` and `taken`. What each party has already delivered.
+    /// - `opened`, the step the negotiation opened at.
+    /// - `deadline`, the step a bound contract fails at. Zero until it binds.
+    /// - `term`, how many steps a bound contract runs for.
+    /// - `closed_until`, the step at which this direction opens again. Zero
+    ///   when nothing closed it. **This is how a caller tells a refusal from a
+    ///   closed door.**
+    /// - `rounds`, how many times somebody spoke.
+    ///
+    /// **The engine answers for any pair, and it holds no notion of who is
+    /// asking.** A game that keeps a negotiation private between its two
+    /// parties enforces that in the control plane.[^1]
+    ///
+    /// # Errors
+    ///
+    /// Raises `ViewError` when a number names no faction of this world.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0120, a trade negotiation is engine state and the words are not, decision D5. `docs/adrs/draft/adr-0120-a-trade-negotiation-is-engine-state.md`
+    fn trade_status<'py>(
+        &self,
+        python: Python<'py>,
+        proposer: u16,
+        responder: u16,
+    ) -> PyResult<Bound<'py, PyDict>> {
+        let world = self.lock();
+        let row = world
+            .trade_row(FactionId(proposer), FactionId(responder))
+            .ok_or_else(|| {
+                ViewError::new_err(format!(
+                    "the pair {proposer} and {responder} names no faction of this world"
+                ))
+            })?;
+        let turn: Option<u16> = match row.status {
+            cachette_core::TRADE_OFFERED => Some(responder),
+            cachette_core::TRADE_COUNTERED => Some(proposer),
+            _ => None,
+        };
+        let entries = PyDict::new(python);
+        entries.set_item("status", row.status)?;
+        entries.set_item("turn", turn)?;
+        entries.set_item("give_kind", row.give_kind)?;
+        entries.set_item("give_amount", row.give_amount)?;
+        entries.set_item("take_kind", row.take_kind)?;
+        entries.set_item("take_amount", row.take_amount)?;
+        entries.set_item("given", row.given)?;
+        entries.set_item("taken", row.taken)?;
+        entries.set_item("opened", row.opened.0)?;
+        entries.set_item("deadline", row.deadline.0)?;
+        entries.set_item("term", row.term)?;
+        entries.set_item("closed_until", row.closed_until.0)?;
+        entries.set_item("rounds", row.rounds)?;
+        Ok(entries)
+    }
+
+    /// Returns every pair one faction is a party to, as columns.
+    ///
+    /// This is the read a player uses to decide. It crosses once and it holds
+    /// no loop over pairs in Python. Every array has one entry for each pair
+    /// the faction is a party to, and every array is the same length.
+    ///
+    /// - `proposer` and `responder`, `numpy.uint16`. The ordered pair.
+    /// - `status`, `numpy.uint8`. The same numbering `trade_status` states.
+    /// - `give_kind`, `take_kind`, `numpy.uint8`.
+    /// - `give_amount`, `take_amount`, `given`, `taken`, `term`,
+    ///   `numpy.uint32`.
+    /// - `opened`, `deadline`, `closed_until`, `numpy.uint64`.
+    /// - `rounds`, `numpy.uint8`.
+    ///
+    /// The book is empty until somebody speaks. A world in which nobody
+    /// traded holds no row at all, so every array is empty.
+    ///
+    /// This method copies each column.[^1]
+    ///
+    /// # Errors
+    ///
+    /// Raises `ViewError` when the number names no faction of this world, and
+    /// when the dictionary cannot be built.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0044, what copies and what does not is declared at the call site. `docs/adrs/REGISTRY.md`
+    fn trade_book<'py>(&self, python: Python<'py>, faction: u16) -> PyResult<Bound<'py, PyDict>> {
+        let world = self.lock();
+        if u32::from(faction) >= u32::from(world.faction_count()) {
+            return Err(ViewError::new_err(format!(
+                "{faction} names no faction of this world"
+            )));
+        }
+        let width = usize::from(world.faction_count());
+        let rows = world.trade_book();
+        let mut chosen: Vec<(u16, u16, cachette_core::TradeRow)> = Vec::new();
+        for (index, row) in rows.iter().enumerate() {
+            let proposer = (index / width.max(1)) as u16;
+            let responder = (index % width.max(1)) as u16;
+            if proposer != faction && responder != faction {
+                continue;
+            }
+            if proposer == responder {
+                continue;
+            }
+            chosen.push((proposer, responder, *row));
+        }
+        let columns = PyDict::new(python);
+        let proposer: Vec<u16> = chosen.iter().map(|entry| entry.0).collect();
+        let responder: Vec<u16> = chosen.iter().map(|entry| entry.1).collect();
+        let status: Vec<u8> = chosen.iter().map(|entry| entry.2.status).collect();
+        let give_kind: Vec<u8> = chosen.iter().map(|entry| entry.2.give_kind).collect();
+        let take_kind: Vec<u8> = chosen.iter().map(|entry| entry.2.take_kind).collect();
+        let give_amount: Vec<u32> = chosen.iter().map(|entry| entry.2.give_amount).collect();
+        let take_amount: Vec<u32> = chosen.iter().map(|entry| entry.2.take_amount).collect();
+        let given: Vec<u32> = chosen.iter().map(|entry| entry.2.given).collect();
+        let taken: Vec<u32> = chosen.iter().map(|entry| entry.2.taken).collect();
+        let term: Vec<u32> = chosen.iter().map(|entry| entry.2.term).collect();
+        let opened: Vec<u64> = chosen.iter().map(|entry| entry.2.opened.0).collect();
+        let deadline: Vec<u64> = chosen.iter().map(|entry| entry.2.deadline.0).collect();
+        let closed_until: Vec<u64> = chosen.iter().map(|entry| entry.2.closed_until.0).collect();
+        let rounds: Vec<u8> = chosen.iter().map(|entry| entry.2.rounds).collect();
+        columns.set_item("proposer", proposer.to_pyarray(python))?;
+        columns.set_item("responder", responder.to_pyarray(python))?;
+        columns.set_item("status", status.to_pyarray(python))?;
+        columns.set_item("give_kind", give_kind.to_pyarray(python))?;
+        columns.set_item("take_kind", take_kind.to_pyarray(python))?;
+        columns.set_item("give_amount", give_amount.to_pyarray(python))?;
+        columns.set_item("take_amount", take_amount.to_pyarray(python))?;
+        columns.set_item("given", given.to_pyarray(python))?;
+        columns.set_item("taken", taken.to_pyarray(python))?;
+        columns.set_item("term", term.to_pyarray(python))?;
+        columns.set_item("opened", opened.to_pyarray(python))?;
+        columns.set_item("deadline", deadline.to_pyarray(python))?;
+        columns.set_item("closed_until", closed_until.to_pyarray(python))?;
+        columns.set_item("rounds", rounds.to_pyarray(python))?;
+        Ok(columns)
+    }
+
+    /// Returns what the last step said about trade, as columns.
+    ///
+    /// The log holds one entry for each thing a party said and for each
+    /// settlement or default the step resolved. It covers the last step alone,
+    /// and the engine delivers it at the frame barrier.[^1]
+    ///
+    /// - `tick`, `numpy.uint64`. The step it happened at.
+    /// - `proposer` and `responder`, `numpy.uint16`. The ordered pair.
+    /// - `act`, `numpy.uint8`. Zero is an offer, one a counteroffer, two an
+    ///   acceptance, three a refusal, four a terminal refusal, five an
+    ///   opening, six a settlement and seven a default.
+    /// - `status`, `numpy.uint8`. What the pair held after the act.
+    ///
+    /// This method copies each column.[^2]
+    ///
+    /// # Errors
+    ///
+    /// Raises `ViewError` when the dictionary cannot be built.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0006, an event is plain data and applying it is pure, decision D2. `docs/adrs/accepted/adr-0006-an-event-is-plain-data-and-applying-it-is-pure.md`
+    /// [^2]: ADR-0044, what copies and what does not is declared at the call site. `docs/adrs/REGISTRY.md`
+    fn trade_log_columns<'py>(&self, python: Python<'py>) -> PyResult<Bound<'py, PyDict>> {
+        let world = self.lock();
+        let log = world.trade_log();
+        let columns = PyDict::new(python);
+        let tick: Vec<u64> = log.iter().map(|event| event.tick.0).collect();
+        let proposer: Vec<u16> = log.iter().map(|event| event.proposer).collect();
+        let responder: Vec<u16> = log.iter().map(|event| event.responder).collect();
+        let act: Vec<u8> = log.iter().map(|event| event.act).collect();
+        let status: Vec<u8> = log.iter().map(|event| event.status).collect();
+        columns.set_item("tick", tick.to_pyarray(python))?;
+        columns.set_item("proposer", proposer.to_pyarray(python))?;
+        columns.set_item("responder", responder.to_pyarray(python))?;
+        columns.set_item("act", act.to_pyarray(python))?;
+        columns.set_item("status", status.to_pyarray(python))?;
+        Ok(columns)
+    }
+
+    /// Reports whether a faction has a unit on the ground another faction
+    /// holds, as a boolean.
+    ///
+    /// This is the gate that every trade verb passes. A player speaks to
+    /// another player only while one of its own units stands in that player's
+    /// territory.
+    ///
+    /// The read costs one column read for each unit alive. It answers one
+    /// ordered pair, and it is the read a caller makes before it offers.
+    ///
+    /// # Errors
+    ///
+    /// Raises `ViewError` when a number names no faction of this world.
+    fn stands_in_territory_of(&self, speaker: u16, listener: u16) -> PyResult<bool> {
+        let world = self.lock();
+        let count = world.faction_count();
+        if speaker >= count || listener >= count {
+            return Err(ViewError::new_err(format!(
+                "the pair {speaker} and {listener} names no faction of this world"
+            )));
+        }
+        Ok(world.stands_in_territory_of(FactionId(speaker), FactionId(listener)))
+    }
+
     /// Returns a `str` that names the world, its extent and its tick.
     ///
     /// The arguments in the text are the parameters the constructor takes, so
@@ -2251,6 +2660,53 @@ impl PyWorld {
             .lock()
             .unwrap_or_else(|error| error.into_inner())
     }
+}
+
+/// Turns a refusal of a trade verb into the exception a caller catches.
+///
+/// The message states which rule refused. A closure states the step that
+/// opens the direction again, because a player that cannot tell a refusal
+/// from a closed door asks for ever.[^1]
+///
+/// # References
+///
+/// [^1]: ADR-0121, a terminal refusal closes an ordered pair until a named tick, decision D3. `docs/adrs/draft/adr-0121-a-terminal-refusal-closes-a-pair-until-a-named-tick.md`
+fn trade_refusal(error: cachette_core::TradeError) -> PyErr {
+    use cachette_core::TradeError as Refusal;
+    let said = match error {
+        Refusal::SameFaction(faction) => {
+            format!("the faction {} does not trade with itself", faction.0)
+        }
+        Refusal::NoSuchFaction(faction) => {
+            format!("{} names no faction of this world", faction.0)
+        }
+        Refusal::NoSuchKind(kind) => format!("{kind} names no resource kind"),
+        Refusal::EmptyTerms => "each side of a contract binds a quantity above zero".to_string(),
+        Refusal::NoDeadline => "a contract runs for a term above zero, because a contract that cannot fail is not a contract".to_string(),
+        Refusal::AlreadyOpen => {
+            "the two parties already hold a live negotiation or a live contract".to_string()
+        }
+        Refusal::NothingOpen => "the two parties hold no live negotiation".to_string(),
+        Refusal::NotYourTurn => {
+            "the other party has not answered yet, so this party may not speak again".to_string()
+        }
+        Refusal::AlreadyBound => {
+            "the terms bind both parties, so nobody restates them and nobody refuses them"
+                .to_string()
+        }
+        Refusal::Closed(until) => format!(
+            "a terminal refusal closed this direction, and it opens again at step {}",
+            until.0
+        ),
+        Refusal::NothingClosed => "this party closed nothing toward the other party".to_string(),
+        Refusal::NoPresence => {
+            "no unit of the speaker stands on ground that the other party holds".to_string()
+        }
+        Refusal::NoDuration => {
+            "a terminal refusal closes the direction for a number of steps above zero".to_string()
+        }
+    };
+    VerbError::new_err(said)
 }
 
 /// Returns the version of the engine, as a `str`.

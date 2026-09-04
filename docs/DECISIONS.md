@@ -23,7 +23,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^ALLOC]
 
-**Next number: DEC-147**
+**Next number: DEC-214**
 
 ## Open
 
@@ -1717,6 +1717,32 @@ reorder on every frame wastes the common case. A fixed interval keeps the
 schedule out of the data, which is the rule a solver already follows.[^FIXEDITER]
 
 
+### DEC-212 — What does a default cost, beyond the closed direction?
+
+**Open. The project owner owns it. It governs how heavy a broken promise is.**
+
+A contract fails at its deadline when a debt remains. The engine records the
+failure, keeps what already arrived where it arrived, and closes the direction
+the defaulting party would ask on again, for as long as the contract
+ran.[^DEC212A]
+
+**Option A. Nothing more.** Time is the whole cost. This is what the engine
+does today, and it needs no new state.
+
+**Option B. A reputation value on the pair.** A number that falls on a default
+and recovers slowly. It gives a player a memory that the world enforces, and it
+is one more number in a row that already exists.
+
+**Option C. A seizure.** The injured party takes the shortfall from the next
+contract the defaulting party settles. It needs no new state, and it makes a
+default cost goods rather than time.
+
+**Recommendation: Option A, until the game asks for more.** The closure is
+already a real cost, and neither B nor C can be tuned before anybody has played
+a run. A record that invented a reputation rate now would hold a figure that a
+measurement changes.
+
+
 ## Decisions to apply at merge
 
 These are mechanical. They do not need judgement, but they must not be
@@ -3232,7 +3258,76 @@ founding rule and would need its own record.
 The chosen option adds no mechanism, and the product record already states that
 a failed founding is correct.[^PRD12]
 
+### DEC-210 — Where does a trade negotiation live, the engine or the control plane?
+
+**Closed on 3 September 2026. The engine holds it.**
+
+**The question.** The project owner asked for contractual trades with
+counteroffers. A negotiation is a conversation, and one of the players is a
+language model that already keeps a transcript. So the control plane was a real
+candidate for the whole exchange.
+
+**The outcome.** The engine holds the terms and the status. The control plane
+holds the words.[^DEC210A]
+
+**Why.** A contract binds future delivery, so it is engine state whatever
+happens to the conversation. The acceptance that turns a conversation into a
+contract is the last act of the conversation, so a split puts one fact in two
+places with nothing that fails when the copies disagree.[^SHAPE1] The whole
+plane is one row for each ordered pair of factions and it never follows the
+population, so no cost argument favours the control plane either.
+
+**What the control plane keeps.** Every word, every reason, and every rule
+about who may see what.
+
+### DEC-211 — Does a contract move a quantity between two stores, or does a unit carry it?
+
+**Closed on 3 September 2026. A unit carries it.**
+
+**The question.** A transfer between two settlement stores is short, exact and
+order-free at one store. A carried delivery costs a journey and needs a pass.
+
+**The outcome.** No verb and no pass moves a quantity from one store into
+another. A unit of the debtor carries the load onto the tile of a settlement
+the creditor holds, and the engine transfers it there.[^DEC211A]
+
+**Why.** The engine already moves a quantity this way, and the record that
+opened the resource sink says why a store may not simply rise.[^DEC211B] The
+downstream game is about presence and territory, and a trade whose goods appear
+without anybody carrying them makes the map decorative for the whole economy.
+The distance between two players then becomes a real cost of trading with them,
+and it falls out of the map rather than out of a rate the engine invents.
+
+**What it costs.** A player cannot trade with a partner it cannot reach.
+
+### DEC-213 — Does the engine scope a trade read to the faction that asks?
+
+**Closed on 3 September 2026. It does not.**
+
+**The question.** A negotiation between two players may be private, and the
+engine could refuse to answer for a pair the caller is not part of.
+
+**The outcome.** The engine holds no notion of who is asking and answers any
+ordered pair. The read is shaped so that a control plane can scope it: it takes
+a faction and answers the rows that faction is a party to.[^DEC213A]
+
+**Why.** A notion of the asker is an authentication model, and the engine
+process serves every player at once. Privacy is a property of what a control
+plane hands to a player, and a control plane is where the players are separated
+already.
+
+**What stays open.** Whether the game wants the negotiation private at all is a
+game rule, and a blocker holds it.[^DEC213B]
+
+
 ## References
+
+[^DEC210A]: ADR-0120, a trade negotiation is engine state, and the words are not, decision D2. `docs/adrs/draft/adr-0120-a-trade-negotiation-is-engine-state.md`
+[^DEC211A]: ADR-0122, a contract moves a quantity only when a unit carries it onto the ground of the other party, decision D1. `docs/adrs/draft/adr-0122-a-contract-moves-a-quantity-only-when-a-unit-carries-it.md`
+[^DEC211B]: ADR-0062, production and upkeep are rates attached to a site, decision D2. `docs/adrs/accepted/adr-0062-production-and-upkeep-are-rates-attached-to-a-site.md`
+[^DEC212A]: ADR-0122, a contract moves a quantity only when a unit carries it onto the ground of the other party, decision D4. `docs/adrs/draft/adr-0122-a-contract-moves-a-quantity-only-when-a-unit-carries-it.md`
+[^DEC213A]: ADR-0120, a trade negotiation is engine state, and the words are not, decision D5. `docs/adrs/draft/adr-0120-a-trade-negotiation-is-engine-state.md`
+[^DEC213B]: Blockers register, BLK-121. `docs/BLOCKERS.md`
 [^DEC106A]: ADR-0097, the toolchain is a dated nightly, decisions D2 and D3. `docs/adrs/draft/adr-0097-the-toolchain-is-a-dated-nightly.md`
 [^DEC106B]: Recurring defect shapes, documents that rot when a sweep names specifics. `.claude/rules/recurring-defects.md`
 [^DEC109A]: Project orientation, hard invariant 2. `CLAUDE.md`

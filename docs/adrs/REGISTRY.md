@@ -380,6 +380,9 @@ without stating a constraint is worse than no record.
 | 0107 | The Python reference is generated from the compiled module, and its prose lives in the Rust doc comment | Draft | 0040, 0041, 0046 | `draft/adr-0107-the-python-reference-is-generated-from-the-compiled-module.md` |
 | 0109 | The choice key holds a bounded class of the unit's own state | Draft | 0004, 0064, 0096, 0098 | `draft/adr-0109-the-choice-key-holds-a-bounded-class-of-the-unit-state.md` |
 | 0110 | A unit returns by climbing a reach field seeded at every site of its faction | Draft | 0004, 0005, 0022, 0053, 0091, 0095 | `draft/adr-0110-a-unit-returns-by-climbing-a-reach-field.md` |
+| 0120 | A trade negotiation is engine state, and the words are not | Draft | 0001, 0002, 0004, 0053, 0090 | 21, `draft/adr-0120-a-trade-negotiation-is-engine-state.md` |
+| 0121 | A terminal refusal closes an ordered pair until a named tick | Draft | 0120 | `draft/adr-0121-a-terminal-refusal-closes-a-pair-until-a-named-tick.md` |
+| 0122 | A contract moves a quantity only when a unit carries it onto the ground of the other party | Draft | 0004, 0062, 0063, 0072, 0073, 0120, 0121 | `draft/adr-0122-a-contract-moves-a-quantity-only-when-a-unit-carries-it.md` |
 
 ### Retired numbers
 

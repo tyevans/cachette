@@ -66,6 +66,11 @@ use crate::sort::{BoundedKey, SortError};
 use crate::stage::{self, Stage};
 use crate::terrain::{Terrain, TerrainTile, TileKind};
 use crate::tile_value::{TileValueChunk, TileValues};
+use crate::trade::{
+    self, TradeError, TradeRow, TradeSpoken, TradeTable, ACT_ACCEPT, ACT_CLOSE, ACT_COUNTER,
+    ACT_DEFAULT, ACT_OFFER, ACT_REFUSE, ACT_REOPEN, ACT_SETTLE, TRADE_BOUND, TRADE_COUNTERED,
+    TRADE_DEFAULTED, TRADE_IDLE, TRADE_OFFERED, TRADE_SETTLED,
+};
 use crate::types::{Accum, Entity, FactionId, Fix32, Tick, TileIdx, FACTION_CEILING};
 use crate::upgrade::{self, UpgradeKind, UpgradeMap, UpgradeSite};
 
@@ -628,6 +633,17 @@ pub struct World {
     ///
     /// [^1]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`
     store_account: [Accum; COMMODITY_COUNT],
+    /// What each ordered pair of factions has agreed, and what it still owes.
+    ///
+    /// The plane holds one row for each ordered pair, and it holds nothing
+    /// until somebody speaks. It never follows the population.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0120, a trade negotiation is engine state and the words are not, decision D1. `docs/adrs/draft/adr-0120-a-trade-negotiation-is-engine-state.md`
+    trade: TradeTable,
+    /// What the last step said about trade.
+    trade_log: Vec<TradeSpoken>,
 }
 
 impl World {
@@ -709,6 +725,8 @@ impl World {
             positions: PositionTable::new(),
             position_schedule: RateSchedule::DEFAULT,
             store_account: [Accum(0); COMMODITY_COUNT],
+            trade: TradeTable::new(config.faction_count),
+            trade_log: Vec::new(),
         };
         // A world that has never stepped still answers a question about a
         // region. A level that nothing rebuilt would describe an empty world
@@ -2410,6 +2428,19 @@ impl World {
         self.tick
     }
 
+    /// Returns how many factions this world holds.
+    ///
+    /// A faction identifier below this number names a faction. The ceiling is
+    /// a property of the mask that holds a relation between factions.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0053, a faction is a bit in a mask, and a relation is a plane, decision D2. `docs/adrs/accepted/adr-0053-a-faction-is-a-bit-in-a-mask-and-a-relation-is-a-plane.md`
+    #[must_use]
+    pub const fn faction_count(&self) -> u16 {
+        self.config.faction_count
+    }
+
     /// Returns the number of tiles.
     #[must_use]
     pub fn tile_count(&self) -> usize {
@@ -2572,7 +2603,14 @@ impl World {
         for total in &self.store_account {
             hash = hash.write_u64(total.0 as u64);
         }
-        hash
+        // What two factions agreed is state that a later frame reads: the
+        // settlement pass moves a quantity because a contract says so. The
+        // plane holds no row until somebody speaks, and it then folds nothing,
+        // so a world that never traded hashes as it did before trade
+        // existed.[^16]
+        //
+        // [^16]: ADR-0120, a trade negotiation is engine state and the words are not, decision D1. `docs/adrs/draft/adr-0120-a-trade-negotiation-is-engine-state.md`
+        self.trade.hash_into(hash)
     }
 
     /// Reports whether the world holds its invariants.
@@ -2728,6 +2766,14 @@ impl World {
             }
         }
         if !self.characters.check_invariants() {
+            return false;
+        }
+        // The plane is either empty or one row for each ordered pair, and
+        // no party ever delivered more than it owed.
+        if !self.trade.check_invariants() {
+            return false;
+        }
+        if self.trade.factions() != self.config.faction_count {
             return false;
         }
         if !self.check_store_conservation() {
@@ -3192,6 +3238,7 @@ impl World {
             return Err(StepError::ZeroThreads);
         }
 
+        self.trade_log.clear();
         self.tick = Tick(self.tick.0.wrapping_add(1));
 
         let tick = self.tick;
@@ -3425,6 +3472,17 @@ impl World {
         // [^16]: ADR-0062, production and upkeep are rates attached to a site, decision D5. `docs/adrs/accepted/adr-0062-production-and-upkeep-are-rates-attached-to-a-site.md`
         // [^17]: ADR-0063, a need is a rate with a threshold, and crossing it is a fact, decision D5. `docs/adrs/accepted/adr-0063-a-need-is-a-rate-with-a-threshold-and-crossing-it-is-a-fact.md`
         self.deliver(threads)?;
+
+        // The contract settlement runs directly after the ordinary delivery,
+        // for the same reason that one runs where it does. It reads where each
+        // unit stands, so it runs after the barrier that the movement of this
+        // frame passed. It moves a quantity, so it runs before the rate pass
+        // and before the consumption pass.[^18] [^19] It changes no structure,
+        // so it is not a barrier and it needs none.
+        //
+        // [^18]: ADR-0062, production and upkeep are rates attached to a site, decision D5. `docs/adrs/accepted/adr-0062-production-and-upkeep-are-rates-attached-to-a-site.md`
+        // [^19]: ADR-0122, a contract moves a quantity only when a unit carries it onto the ground of the other party, decision D3. `docs/adrs/draft/adr-0122-a-contract-moves-a-quantity-only-when-a-unit-carries-it.md`
+        self.settle_trades(threads)?;
 
         // The site rates apply after the barrier of this frame and after the
         // gather resolve, and before level 1 rebuilds.
@@ -4253,6 +4311,733 @@ impl World {
         Ok(())
     }
 
+    /// Returns the negotiation and the contract between one ordered pair.
+    ///
+    /// The pair is ordered. The row for the proposer and the responder, in
+    /// that order, holds the negotiation that the proposer opened toward the
+    /// responder. A pair that nobody ever spoke about answers an idle row.
+    ///
+    /// Returns `None` when either identifier is at or above the faction count
+    /// of this world.
+    #[must_use]
+    pub fn trade_row(&self, proposer: FactionId, responder: FactionId) -> Option<TradeRow> {
+        self.trade.row(proposer, responder)
+    }
+
+    /// Returns every row of the negotiation plane, in pair order.
+    ///
+    /// The slice is empty until somebody speaks. The index of a pair is the
+    /// proposer times the faction count plus the responder.
+    #[must_use]
+    pub fn trade_book(&self) -> &[TradeRow] {
+        self.trade.rows()
+    }
+
+    /// Returns what the last step said about trade.
+    ///
+    /// The log holds one entry for each speech act and for each settlement or
+    /// default that the step resolved. A control plane reads it at the frame
+    /// barrier and never inside a step.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0006, an event is plain data and applying it is pure, decision D2. `docs/adrs/accepted/adr-0006-an-event-is-plain-data-and-applying-it-is-pure.md`
+    #[must_use]
+    pub fn trade_log(&self) -> &[TradeSpoken] {
+        &self.trade_log
+    }
+
+    /// Returns the trade log as raw bytes.
+    ///
+    /// The event type is plain data with declared padding, so the bytes are
+    /// the log and nothing else.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0006, an event is plain data and applying it is pure, decision D1. `docs/adrs/accepted/adr-0006-an-event-is-plain-data-and-applying-it-is-pure.md`
+    #[must_use]
+    pub fn trade_log_bytes(&self) -> &[u8] {
+        bytemuck::cast_slice(&self.trade_log)
+    }
+
+    /// Reports whether any live unit of one faction stands on ground that
+    /// another faction holds.
+    ///
+    /// **This is the gate that every speech act passes.** A player speaks to
+    /// another player only while one of its own units stands in that player's
+    /// territory, and a trade is a thing two players say to each other.[^1]
+    ///
+    /// The read walks the unit column once and reads the holder of the tile
+    /// each unit stands on. It reads primary state only, so it holds no copy
+    /// of an answer that another structure also holds.[^2] It costs one column
+    /// read for each live unit, once for each speech act, and a speech act
+    /// happens between frames.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0120, a trade negotiation is engine state and the words are not, decision D3. `docs/adrs/draft/adr-0120-a-trade-negotiation-is-engine-state.md`
+    /// [^2]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`
+    #[must_use]
+    pub fn stands_in_territory_of(&self, speaker: FactionId, listener: FactionId) -> bool {
+        let holders = self.holding.holders();
+        let target = Holder::of(listener);
+        self.soldiers.iter().any(|unit| {
+            self.soldiers.faction(unit) == Some(speaker)
+                && self
+                    .soldiers
+                    .tile(unit)
+                    .and_then(|tile| holders.get(tile.0 as usize).copied())
+                    == Some(target)
+        })
+    }
+
+    /// Refuses a faction identifier that this world does not hold.
+    fn check_faction(&self, faction: FactionId) -> Result<(), TradeError> {
+        if faction.0 >= self.config.faction_count {
+            return Err(TradeError::NoSuchFaction(faction));
+        }
+        Ok(())
+    }
+
+    /// Refuses a pair that this world cannot hold a negotiation for.
+    fn check_pair(&self, speaker: FactionId, other: FactionId) -> Result<(), TradeError> {
+        self.check_faction(speaker)?;
+        self.check_faction(other)?;
+        if speaker == other {
+            return Err(TradeError::SameFaction(speaker));
+        }
+        Ok(())
+    }
+
+    /// Returns the orientation of the live row of an unordered pair.
+    ///
+    /// **One unordered pair holds at most one live negotiation.** Two players
+    /// discuss one thing at a time, so the answer names the row rather than
+    /// leaving the caller to guess which of the two orientations is live.
+    fn live_orientation(
+        &self,
+        speaker: FactionId,
+        other: FactionId,
+    ) -> Result<(FactionId, FactionId), TradeError> {
+        if self
+            .trade
+            .row(speaker, other)
+            .is_some_and(|row| row.is_live())
+        {
+            return Ok((speaker, other));
+        }
+        if self
+            .trade
+            .row(other, speaker)
+            .is_some_and(|row| row.is_live())
+        {
+            return Ok((other, speaker));
+        }
+        Err(TradeError::NothingOpen)
+    }
+
+    /// Returns the faction whose turn it is to answer a live row.
+    fn turn_of(row: TradeRow, proposer: FactionId, responder: FactionId) -> Option<FactionId> {
+        match row.status {
+            TRADE_OFFERED => Some(responder),
+            TRADE_COUNTERED => Some(proposer),
+            _ => None,
+        }
+    }
+
+    /// Writes one entry into the trade log.
+    fn say(&mut self, proposer: FactionId, responder: FactionId, act: u8, status: u8) {
+        self.trade_log.push(TradeSpoken::new(
+            self.tick, proposer, responder, act, status,
+        ));
+    }
+
+    /// Opens a negotiation from one faction toward another.
+    ///
+    /// The terms bind both parties. The give side is what the proposer owes
+    /// and the take side is what the responder owes. Each is a whole quantity
+    /// of one resource kind, so no term of a contract is a floating point
+    /// number.[^1]
+    ///
+    /// The term is how many ticks the contract runs for once it binds. The
+    /// acceptance turns it into a deadline. A contract that cannot fail is not
+    /// a contract, so a term of zero is refused.
+    ///
+    /// **The offer passes the presence gate.** A unit of the proposer must
+    /// stand on ground that the responder holds.[^2]
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when a party names no faction of this world, when the
+    /// two parties are one faction, when either kind names no resource, when
+    /// either quantity is zero, when the term is zero, when the unordered pair
+    /// already holds a live negotiation, when a terminal refusal closed this
+    /// direction, or when the proposer has no presence.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0002, simulated and aggregated state holds no floating point number, decision D1. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
+    /// [^2]: ADR-0120, a trade negotiation is engine state and the words are not, decision D3. `docs/adrs/draft/adr-0120-a-trade-negotiation-is-engine-state.md`
+    // The terms of a contract are six values and the parties are two more.
+    // A structure that held them would be a second name for the row this
+    // function writes, and the control plane would then state the terms twice:
+    // once to build it and once to read the row back.
+    #[allow(clippy::too_many_arguments)]
+    pub fn offer_trade(
+        &mut self,
+        proposer: FactionId,
+        responder: FactionId,
+        give_kind: u8,
+        give_amount: u32,
+        take_kind: u8,
+        take_amount: u32,
+        term: u32,
+    ) -> Result<(), TradeError> {
+        self.check_pair(proposer, responder)?;
+        let give = trade::kind_of(give_kind)?;
+        let take = trade::kind_of(take_kind)?;
+        if give_amount == 0 || take_amount == 0 {
+            return Err(TradeError::EmptyTerms);
+        }
+        if term == 0 {
+            return Err(TradeError::NoDeadline);
+        }
+        if self.live_orientation(proposer, responder).is_ok() {
+            return Err(TradeError::AlreadyOpen);
+        }
+        let row = self
+            .trade
+            .row(proposer, responder)
+            .ok_or(TradeError::NoSuchFaction(proposer))?;
+        if row.closed_until.0 > self.tick.0 {
+            return Err(TradeError::Closed(row.closed_until));
+        }
+        if !self.stands_in_territory_of(proposer, responder) {
+            return Err(TradeError::NoPresence);
+        }
+        let tick = self.tick;
+        let entry = self
+            .trade
+            .row_mut(proposer, responder)
+            .ok_or(TradeError::NoSuchFaction(proposer))?;
+        entry.clear();
+        entry.opened = tick;
+        entry.give_kind = give.to_u8();
+        entry.take_kind = take.to_u8();
+        entry.give_amount = give_amount;
+        entry.take_amount = take_amount;
+        entry.term = term;
+        entry.status = TRADE_OFFERED;
+        entry.rounds = 1;
+        self.say(proposer, responder, ACT_OFFER, TRADE_OFFERED);
+        Ok(())
+    }
+
+    /// Restates the terms of a live negotiation.
+    ///
+    /// The speaker is the party that did not speak last. The terms are always
+    /// stated in the orientation of the row, so the give side is what the
+    /// party that opened the pair owes, whoever is speaking now.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the pair holds no live negotiation, when the
+    /// terms already bind both parties, when the other party has not answered
+    /// yet, when either kind names no resource, when either quantity is zero,
+    /// or when the speaker has no presence.
+    pub fn counter_trade(
+        &mut self,
+        speaker: FactionId,
+        other: FactionId,
+        give_kind: u8,
+        give_amount: u32,
+        take_kind: u8,
+        take_amount: u32,
+    ) -> Result<(), TradeError> {
+        self.check_pair(speaker, other)?;
+        let give = trade::kind_of(give_kind)?;
+        let take = trade::kind_of(take_kind)?;
+        if give_amount == 0 || take_amount == 0 {
+            return Err(TradeError::EmptyTerms);
+        }
+        let (proposer, responder) = self.live_orientation(speaker, other)?;
+        let row = self
+            .trade
+            .row(proposer, responder)
+            .ok_or(TradeError::NothingOpen)?;
+        if row.is_bound() {
+            return Err(TradeError::AlreadyBound);
+        }
+        if Self::turn_of(row, proposer, responder) != Some(speaker) {
+            return Err(TradeError::NotYourTurn);
+        }
+        if !self.stands_in_territory_of(speaker, other) {
+            return Err(TradeError::NoPresence);
+        }
+        let status = if row.status == TRADE_OFFERED {
+            TRADE_COUNTERED
+        } else {
+            TRADE_OFFERED
+        };
+        let entry = self
+            .trade
+            .row_mut(proposer, responder)
+            .ok_or(TradeError::NothingOpen)?;
+        entry.give_kind = give.to_u8();
+        entry.take_kind = take.to_u8();
+        entry.give_amount = give_amount;
+        entry.take_amount = take_amount;
+        entry.status = status;
+        entry.rounds = entry.rounds.saturating_add(1);
+        self.say(proposer, responder, ACT_COUNTER, status);
+        Ok(())
+    }
+
+    /// Agrees to the terms of a live negotiation, so a contract binds both.
+    ///
+    /// The speaker is the party that did not speak last. The deadline is this
+    /// tick plus the term the offer named.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the pair holds no live negotiation, when the
+    /// terms already bind both parties, when the other party has not answered
+    /// yet, or when the speaker has no presence.
+    pub fn accept_trade(&mut self, speaker: FactionId, other: FactionId) -> Result<(), TradeError> {
+        self.check_pair(speaker, other)?;
+        let (proposer, responder) = self.live_orientation(speaker, other)?;
+        let row = self
+            .trade
+            .row(proposer, responder)
+            .ok_or(TradeError::NothingOpen)?;
+        if row.is_bound() {
+            return Err(TradeError::AlreadyBound);
+        }
+        if Self::turn_of(row, proposer, responder) != Some(speaker) {
+            return Err(TradeError::NotYourTurn);
+        }
+        if !self.stands_in_territory_of(speaker, other) {
+            return Err(TradeError::NoPresence);
+        }
+        let deadline = Tick(self.tick.0.saturating_add(u64::from(row.term)));
+        let entry = self
+            .trade
+            .row_mut(proposer, responder)
+            .ok_or(TradeError::NothingOpen)?;
+        entry.status = TRADE_BOUND;
+        entry.deadline = deadline;
+        entry.rounds = entry.rounds.saturating_add(1);
+        self.say(proposer, responder, ACT_ACCEPT, TRADE_BOUND);
+        Ok(())
+    }
+
+    /// Declines the terms of a live negotiation.
+    ///
+    /// **This is a refusal and not a closed door.** The pair is idle after it,
+    /// and either party may open a new negotiation on the next call. A player
+    /// that wants the other to stop asking calls the closing verb instead.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the pair holds no live negotiation, when the
+    /// terms already bind both parties, when the other party has not answered
+    /// yet, or when the speaker has no presence.
+    pub fn refuse_trade(&mut self, speaker: FactionId, other: FactionId) -> Result<(), TradeError> {
+        self.check_pair(speaker, other)?;
+        let (proposer, responder) = self.live_orientation(speaker, other)?;
+        let row = self
+            .trade
+            .row(proposer, responder)
+            .ok_or(TradeError::NothingOpen)?;
+        if row.is_bound() {
+            return Err(TradeError::AlreadyBound);
+        }
+        if Self::turn_of(row, proposer, responder) != Some(speaker) {
+            return Err(TradeError::NotYourTurn);
+        }
+        if !self.stands_in_territory_of(speaker, other) {
+            return Err(TradeError::NoPresence);
+        }
+        let entry = self
+            .trade
+            .row_mut(proposer, responder)
+            .ok_or(TradeError::NothingOpen)?;
+        entry.clear();
+        self.say(proposer, responder, ACT_REFUSE, TRADE_IDLE);
+        Ok(())
+    }
+
+    /// Declines the terms and closes the direction for a stated number of
+    /// ticks.
+    ///
+    /// **This is the terminal refusal.** It ends the negotiation, and it also
+    /// stops the other party from opening a new one toward the speaker until
+    /// the tick it names. The closure is directional: the speaker may still
+    /// open a negotiation toward the other party, because the speaker closed
+    /// its own door and promised no silence of its own.
+    ///
+    /// The tick that opens the direction again is readable. A caller reads the
+    /// closure from the row for the other party and the speaker, in that
+    /// order, which is the row the other party would open. A player that
+    /// cannot tell a refusal from a closed door asks for ever.
+    ///
+    /// Only the speaker opens the direction early, through the opening verb.
+    /// Nothing the other party does shortens the closure. That is what makes
+    /// it terminal.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the duration is zero, when the pair holds no live
+    /// negotiation, when the terms already bind both parties, when the other
+    /// party has not answered yet, or when the speaker has no presence.
+    pub fn close_trade(
+        &mut self,
+        speaker: FactionId,
+        other: FactionId,
+        ticks: u32,
+    ) -> Result<(), TradeError> {
+        self.check_pair(speaker, other)?;
+        if ticks == 0 {
+            return Err(TradeError::NoDuration);
+        }
+        let (proposer, responder) = self.live_orientation(speaker, other)?;
+        let row = self
+            .trade
+            .row(proposer, responder)
+            .ok_or(TradeError::NothingOpen)?;
+        if row.is_bound() {
+            return Err(TradeError::AlreadyBound);
+        }
+        if Self::turn_of(row, proposer, responder) != Some(speaker) {
+            return Err(TradeError::NotYourTurn);
+        }
+        if !self.stands_in_territory_of(speaker, other) {
+            return Err(TradeError::NoPresence);
+        }
+        let until = Tick(self.tick.0.saturating_add(u64::from(ticks)));
+        let entry = self
+            .trade
+            .row_mut(proposer, responder)
+            .ok_or(TradeError::NothingOpen)?;
+        entry.clear();
+        // The closure sits on the row the other party would open, which is
+        // the pair with the other party first. Writing it on the live row
+        // would close the speaker's own door and leave the other party free
+        // to ask again, which is the opposite of what the verb promises.
+        let door = self
+            .trade
+            .row_mut(other, speaker)
+            .ok_or(TradeError::NothingOpen)?;
+        door.closed_until = until;
+        self.say(proposer, responder, ACT_CLOSE, TRADE_IDLE);
+        Ok(())
+    }
+
+    /// Opens a direction that this faction closed, before the closure ends.
+    ///
+    /// Only the faction that closed the direction opens it again.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the speaker closed nothing toward this party.
+    pub fn reopen_trade(&mut self, speaker: FactionId, other: FactionId) -> Result<(), TradeError> {
+        self.check_pair(speaker, other)?;
+        let row = self
+            .trade
+            .row(other, speaker)
+            .ok_or(TradeError::NoSuchFaction(other))?;
+        if row.closed_until.0 <= self.tick.0 {
+            return Err(TradeError::NothingClosed);
+        }
+        let door = self
+            .trade
+            .row_mut(other, speaker)
+            .ok_or(TradeError::NoSuchFaction(other))?;
+        door.closed_until = Tick(0);
+        self.say(other, speaker, ACT_REOPEN, row.status);
+        Ok(())
+    }
+
+    /// Moves the load of every unit that stands on the site of a faction that
+    /// a contract obliges it to deliver to, and then fails every contract that
+    /// reached its deadline with a debt.
+    ///
+    /// **A contract moves nothing on its own.** A quantity reaches the other
+    /// party because a unit carried it onto the tile of a settlement that
+    /// party holds.[^1] The engine already moves a load this way when a unit
+    /// stands on its own site, and this pass is the same transfer against
+    /// another faction's site.
+    ///
+    /// **A delivery is admitted by sort, then by transfer.** Two units of one
+    /// faction may deliver into one store, and a store saturates at its
+    /// ceiling, so a saturating add is not order-free.[^2] The pass orders the
+    /// deliveries by the site and then by the identity of the unit, which is
+    /// the order the ordinary delivery already uses.[^3] [^4]
+    ///
+    /// **A load the store cannot hold stays in the carry.** A quantity that
+    /// vanished without a record would break the conservation equality.[^2]
+    ///
+    /// **A delivery never passes the debt.** The transfer takes the smallest
+    /// of what the unit carries, what the party owes, and what the store can
+    /// hold. A contract therefore moves the quantity it named and no more.
+    ///
+    /// **The deadline is checked after the delivery of this tick.** A contract
+    /// whose deadline is this tick gets this tick's delivery, and it fails
+    /// only when a debt survives it.
+    ///
+    /// **A default costs the defaulting party the direction it would ask on
+    /// again, for as long as the contract ran.** The duration is the term of
+    /// the contract itself, so no balance figure decides it. The quantities
+    /// that already moved stay where they arrived, because taking them back
+    /// would need a transfer that no unit carried.[^1]
+    ///
+    /// The pass runs on the calling thread. It writes one store at a time in a
+    /// stated order, so it names no thread and depends on no thread
+    /// count.[^4]
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the ordering refuses to run.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0122, a contract moves a quantity only when a unit carries it onto the ground of the other party, decisions D1 and D4. `docs/adrs/draft/adr-0122-a-contract-moves-a-quantity-only-when-a-unit-carries-it.md`
+    /// [^2]: ADR-0062, production and upkeep are rates attached to a site, decision D3. `docs/adrs/accepted/adr-0062-production-and-upkeep-are-rates-attached-to-a-site.md`
+    /// [^3]: ADR-0073, gathering is admitted by sort-then-admit against the tile, decision D2. `docs/adrs/accepted/adr-0073-gathering-is-admitted-by-sort-then-admit-against-the-tile.md`
+    /// [^4]: ADR-0004, iteration order is explicit, decisions D1, D3 and D4. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
+    fn settle_trades(&mut self, threads: usize) -> Result<(), StepError> {
+        if self.trade.is_empty() {
+            return Ok(());
+        }
+        self.carry_contract_loads(threads)?;
+        self.fail_overdue_contracts();
+        Ok(())
+    }
+
+    /// Returns every delivery a bound contract admits this tick, in slot
+    /// order.
+    ///
+    /// The walk is over the unit slots and it reads no derived structure. The
+    /// order is the slot order, which does not depend on the thread count. The
+    /// caller sorts it on a total key before it transfers anything.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
+    fn contract_carriers(&self, threads: usize) -> Vec<ContractDelivery> {
+        let _ = threads;
+        let mut found = Vec::new();
+        for unit in self.soldiers.iter() {
+            let Some(load) = self.soldiers.carry(unit) else {
+                continue;
+            };
+            if load == CarryLoad::EMPTY {
+                continue;
+            }
+            let Some(faction) = self.soldiers.faction(unit) else {
+                continue;
+            };
+            let Some(address) = self.soldiers.address(unit) else {
+                continue;
+            };
+            let Some(site) = self.settlements.on_tile(address) else {
+                continue;
+            };
+            let Some(host) = self.settlements.faction(site) else {
+                continue;
+            };
+            if host == faction {
+                continue;
+            }
+            let Some(slot) = self.settlements.slot_of(site) else {
+                continue;
+            };
+            let Ok((proposer, responder)) = self.live_orientation(faction, host) else {
+                continue;
+            };
+            let (Some(index), Some(row)) = (
+                self.trade.index_of(proposer, responder),
+                self.trade.row(proposer, responder),
+            ) else {
+                continue;
+            };
+            if !row.is_bound() {
+                continue;
+            }
+            let owes_as_proposer = faction == proposer;
+            let (kind, owed) = if owes_as_proposer {
+                (row.give_kind, row.owed_by_proposer())
+            } else {
+                (row.take_kind, row.owed_by_responder())
+            };
+            if owed == 0 {
+                continue;
+            }
+            let Some(kind) = ResourceKind::from_u8(kind) else {
+                continue;
+            };
+            if load.of(kind).0 == 0 {
+                continue;
+            }
+            found.push(ContractDelivery {
+                unit,
+                site: slot,
+                kind,
+                row: index,
+                owes_as_proposer,
+            });
+        }
+        found
+    }
+
+    /// Transfers what every contract carrier may deliver this tick.
+    fn carry_contract_loads(&mut self, threads: usize) -> Result<(), StepError> {
+        let carriers = self.contract_carriers(threads);
+        if carriers.is_empty() {
+            return Ok(());
+        }
+        let keys: Vec<BoundedKey> = carriers
+            .iter()
+            .map(|delivery| BoundedKey::new(u64::from(delivery.site), delivery.unit.to_bits()))
+            .collect();
+        let ceiling = u64::from(self.settlements.slot_count().saturating_sub(1));
+        let order = gather_order_of(&keys, ceiling)?;
+
+        for position in order {
+            let delivery = carriers[position as usize];
+            let Some(row) = self.trade.row_at(delivery.row) else {
+                continue;
+            };
+            if !row.is_bound() {
+                continue;
+            }
+            let owed = if delivery.owes_as_proposer {
+                row.owed_by_proposer()
+            } else {
+                row.owed_by_responder()
+            };
+            if owed == 0 {
+                continue;
+            }
+            let Some(load) = self.soldiers.carry(delivery.unit) else {
+                continue;
+            };
+            let carried = load.of(delivery.kind).0;
+            if carried == 0 {
+                continue;
+            }
+            let commodity = WORK_COMMODITY[delivery.kind.index()];
+            let Some(held) = self
+                .settlements
+                .store_column()
+                .get(delivery.site as usize)
+                .and_then(|store| store.quantity(commodity))
+            else {
+                continue;
+            };
+            // The room of the store, in whole units. The subtract cannot go
+            // below zero because the ceiling is the largest value the scale
+            // holds.
+            let room = sim_math::sub(Fix32::MAX, held).to_int_floor();
+            let moved = carried.min(owed).min(u32::try_from(room).unwrap_or(0));
+            if moved == 0 {
+                continue;
+            }
+            // The conversion is exact in both directions: a whole number that
+            // the room admits fits the scale, and the scale holds it with no
+            // fractional part.
+            let quantity = Fix32::from_int(i16::try_from(moved).unwrap_or(i16::MAX));
+            let moved = u32::try_from(quantity.to_int_floor()).unwrap_or(0);
+            if moved == 0 {
+                continue;
+            }
+            let after = sim_math::add(held, quantity);
+            if !self.set_store_quantity(delivery.site, commodity, after) {
+                continue;
+            }
+            self.soldiers
+                .take_carry(delivery.unit, delivery.kind, Amount(moved));
+            // The delivered account links the carry account to the store
+            // account. A transfer that forgot it would break the conservation
+            // check on the frame of the first contract delivery.
+            self.delivered[delivery.kind.index()] += u64::from(moved);
+            let paid = match self.trade.row_at_mut(delivery.row) {
+                Some(entry) => {
+                    if delivery.owes_as_proposer {
+                        entry.given = entry.given.saturating_add(moved);
+                    } else {
+                        entry.taken = entry.taken.saturating_add(moved);
+                    }
+                    if entry.is_paid() {
+                        entry.status = TRADE_SETTLED;
+                        true
+                    } else {
+                        false
+                    }
+                }
+                None => false,
+            };
+            if paid {
+                let (proposer, responder) = self.pair_of(delivery.row);
+                self.say(proposer, responder, ACT_SETTLE, TRADE_SETTLED);
+            }
+        }
+        Ok(())
+    }
+
+    /// Returns the ordered pair that one row index names.
+    fn pair_of(&self, index: usize) -> (FactionId, FactionId) {
+        let width = (self.trade.factions() as usize).max(1);
+        let proposer = (index / width) as u16;
+        let responder = (index % width) as u16;
+        (FactionId(proposer), FactionId(responder))
+    }
+
+    /// Fails every contract that reached its deadline with a debt.
+    ///
+    /// The walk is over the plane in pair order, so it names no thread and it
+    /// reads no hash order.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
+    fn fail_overdue_contracts(&mut self) {
+        let tick = self.tick;
+        let mut failed: Vec<(usize, bool, bool, u32)> = Vec::new();
+        for (index, row) in self.trade.rows().iter().enumerate() {
+            if !row.is_bound() || row.deadline.0 > tick.0 {
+                continue;
+            }
+            failed.push((
+                index,
+                row.owed_by_proposer() > 0,
+                row.owed_by_responder() > 0,
+                row.term,
+            ));
+        }
+        for (index, proposer_owes, responder_owes, term) in failed {
+            let (proposer, responder) = self.pair_of(index);
+            if let Some(entry) = self.trade.row_at_mut(index) {
+                entry.status = TRADE_DEFAULTED;
+            }
+            let until = Tick(tick.0.saturating_add(u64::from(term)));
+            // The defaulting party loses the direction it would ask on again,
+            // for as long as the contract ran. The duration comes from the
+            // contract, so no balance figure decides it.
+            if proposer_owes {
+                if let Some(door) = self.trade.row_mut(proposer, responder) {
+                    door.closed_until = until;
+                }
+            }
+            if responder_owes {
+                if let Some(door) = self.trade.row_mut(responder, proposer) {
+                    door.closed_until = until;
+                }
+            }
+            self.say(proposer, responder, ACT_DEFAULT, TRADE_DEFAULTED);
+        }
+    }
+
     /// Returns every live unit that stands on the tile of its home site, with
     /// the slot of that site.
     ///
@@ -4991,6 +5776,29 @@ fn build_intents(soldiers: &SoldierArena, threads: usize) -> Result<Vec<BuildInt
 /// [^1]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`
 /// [^2]: ADR-0017, the world is a rhombus, so a tile index is raw axial, decision D3. `docs/adrs/accepted/adr-0017-the-world-is-a-rhombus-so-a-tile-index-is-raw-axial.md`
 /// [^3]: ADR-0068, terrain is generated from the seed and is never stored as a map, decision D4. `docs/adrs/accepted/adr-0068-terrain-is-generated-from-the-seed-and-is-never-stored-as-a-map.md`
+/// One delivery that a bound contract admits.
+///
+/// The record is built in unit slot order and then sorted on a total key
+/// before anything moves, so nothing downstream reads the order it was
+/// collected in.[^1]
+///
+/// # References
+///
+/// [^1]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
+#[derive(Clone, Copy, Debug)]
+struct ContractDelivery {
+    /// The unit that carries the load.
+    unit: Entity,
+    /// The slot of the settlement that receives it.
+    site: u32,
+    /// The kind of resource that the contract names for this party.
+    kind: ResourceKind,
+    /// The index of the row in the negotiation plane.
+    row: usize,
+    /// Whether this party is the one that opened the pair.
+    owes_as_proposer: bool,
+}
+
 fn step_target(grid: Grid, terrain: Terrain, here: Axial, direction: usize) -> Option<Axial> {
     let target = grid.neighbour(here, direction)?;
     if terrain.kind(target)?.is_passable() {
