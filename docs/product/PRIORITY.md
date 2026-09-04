@@ -37,6 +37,7 @@ A record here is a need, not a plan. The backlog says what work answers it.[^3]
 | 0008 | A unit changes the ground it stands on. |
 | 0003 | A world worth looking at. The viewer trails the engine badly. |
 | 0031 | A god knows whose ground its people stand on. **It is the central mechanic of a game the project owner named**, and the engine already holds every part of the answer: a tile carries a holder, and a unit carries a faction and a tile. What is missing is a read. The answer for the whole world is one word for each faction, so it does not follow the population and it needs no selector. It sits here rather than under `Later` because it is the cheapest stated need on this list and it ships without any new verb. |
+| 0032 | A god knows what its ground is rich in. The engine now answers it, and the answer is a score that nothing consumes. It sits beside 0031 because it comes from the same game and it is the same shape of read: a fixed-size answer over the ground a faction holds. It sits below 0031 because presence gates a mechanic and variety only informs one, and because BLK-110 holds what the score should change. |
 | 0020 | A unit goes somewhere it cannot see. Every option the engine has is a gradient, so a place cannot be named and a unit cannot come back from anywhere. It sits below 0008 because gathering and a store both exist and nothing carries between them, so this is the need that connects what the world already holds. |
 
 ## Later

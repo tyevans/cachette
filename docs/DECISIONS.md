@@ -23,7 +23,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^ALLOC]
 
-**Next number: DEC-147**
+**Next number: DEC-203**
 
 ## Open
 
@@ -1742,6 +1742,92 @@ concluded, and it called that argument its weakest.
 
 ## Closed
 
+### DEC-200 — Does anything in the engine consume the variety score?
+
+**Closed. Nothing consumes it. The variety is a read for the control plane,
+and no simulation pass changes because of it.**
+
+The project owner asked for luxury resources so that resource variety becomes
+a scorable thing. He suggested that variety could change the worker policy of
+a faction, and he said that he did not know.[^DEC200A]
+
+**Option A. Wire variety to the site preference.** A site opens positions in
+proportion to what it lacks, and what it wants is a row of targets. Variety
+could raise a target. The price is a rule that nobody asked for. The value of
+the rise would be content that no measurement and no record chooses, and every
+world would then carry it.
+
+**Option B. Expose variety as a read, and change no pass.** The control plane
+reads the score for a region, for a faction and for the world. The price is a
+capability that the engine itself does not invoke.
+
+**Option C. Both.**
+
+**Why B.** The rule on records forbids a value that an unanswered question
+governs, and no answer exists for what variety should change.[^DEC200B] The
+rule on recurring defects forbids a capability that nothing invokes, and it
+asks who is obligated to invoke the thing: the engine, or the user.[^DEC75SHAPE]
+For a score, the user is obligated. A test drives the engine, steps it, and
+reads the score through the published interface, so the read has a caller.
+
+**A blocker holds what should consume it.**[^DEC200D] Close that blocker
+before wiring the score to a pass, and write a decision record for the rule
+that is chosen.
+
+### DEC-201 — Does a luxury live on a tile, or on a site?
+
+**Closed. A luxury lives on a tile. A site reads the luxuries of the tile it
+stands on.**
+
+**Option A. On a tile.** Level 0 is the only truth, and every level above it
+is derived from the tiles.[^DEC201A] A level 1 cell can then equal the exact
+combination of the tiles it covers, which is the property that makes the score
+aggregate without drift. Who holds a tile is already a level 0 fact, so the
+variety of a faction is a fold over the tiles that faction holds.
+
+**Option B. On a site.** A site is sparse, so the storage is small. The price
+is that a luxury would move when the site moved, and a region would report a
+variety that followed the building rather than the ground. A settlement that
+was lost would take its luxuries out of the world.
+
+**Option C. Both.** Two declaration sites for one fact, with nothing that
+fails when the two disagree. This project names that shape as its most
+frequent defect.[^DEC73B]
+
+**Why A.** The ground is what carries a luxury, and the ground does not move.
+The storage argument for B does not hold, because the engine stores one entry
+for each tile that carries a luxury and nothing else, in the same way it
+stores an upgrade.[^DEC201C] A world in which nobody seeded a luxury holds no
+entry at all.
+
+**This decision deserves a record, and it does not have one.** A future
+contributor could reasonably choose a site, the choice is expensive to reverse
+because it invalidates every stored state hash, and the reasoning is not
+visible in the code. A backlog item holds the record.[^DEC201D]
+
+### DEC-202 — What happens when a caller names the luxury above the catalogue ceiling?
+
+**Closed. The engine refuses the identifier. It never folds it onto another
+bit.**
+
+A set of luxuries is one 64-bit word, so the catalogue addresses 64 luxuries.
+
+**Option A. Fold an unaddressable luxury onto an overflow bit.** A set of
+factions does this, because the question a faction mask answers is whether
+anybody holds the ground, and an overflow faction still answers it.[^DEC202A]
+
+**Option B. Refuse the identifier.** The seed returns a typed error, and it
+builds nothing.
+
+**Why B.** A luxury set answers how many different luxuries stand on the
+ground. Two luxuries on one bit answer that question with the wrong number,
+and nothing else reports the error. The faction argument does not carry over,
+because the two masks answer different questions.
+
+**A blocker holds whether 64 is enough.**[^DEC202B] A wider catalogue needs a
+wider word or a second word, and both change the storage and the state hash.
+
+
 ### DEC-118 — Does the publishing job keep a switch of its own, now that the address is known?
 
 **Closed. The job keeps no switch. It publishes on every push to the main
@@ -3454,3 +3540,11 @@ a failed founding is correct.[^PRD12]
 [^DEC144B]: Blockers register, BLK-052, in this repository. `docs/BLOCKERS.md`
 [^DEC145A]: Research report 21, what a god needs from this engine, section 4.1. `docs/research/reports/21-what-a-god-needs.md`
 [^DEC145B]: ADR-0106, a cohort serves whole rations to a keyed subset, the context section. `docs/adrs/draft/adr-0106-a-cohort-serves-whole-rations-to-a-keyed-subset.md`
+[^DEC200A]: Research report 21, what a god needs from this engine. `docs/research/reports/21-what-a-god-needs.md`
+[^DEC200B]: Decision Record Scope, section 4.5. `.claude/rules/adr-scope.md`
+[^DEC200D]: Blockers register, BLK-110. `docs/BLOCKERS.md`
+[^DEC201A]: ADR-0022, level 0 is the only truth, and every level above it is derived, decision D1. `docs/adrs/accepted/adr-0022-level-0-is-the-only-truth-and-every-level-above-it-is-derived.md`
+[^DEC201C]: ADR-0090, a tile upgrade is stored sparsely, as the difference from the generated world, decision D1. `docs/adrs/draft/adr-0090-a-tile-upgrade-is-stored-sparsely.md`
+[^DEC201D]: Backlog item 0411, record where a luxury lives. `docs/backlog/proposed/0411-record-where-a-luxury-lives.md`
+[^DEC202A]: ADR-0053, a faction is a bit in a mask, and a relation is a plane, decision D3. `docs/adrs/accepted/adr-0053-a-faction-is-a-bit-in-a-mask-and-a-relation-is-a-plane.md`
+[^DEC202B]: Blockers register, BLK-111. `docs/BLOCKERS.md`

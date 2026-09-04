@@ -60,6 +60,7 @@ documents cite it.
 | 0024 | A run stays eventful for as long as it is watched | Idea | AI researcher | `idea/prd-0024-a-run-stays-eventful-for-as-long-as-it-is-watched.md` |
 | 0030 | A developer builds a game the engine did not anticipate | Shaped | Game developer | `shaped/prd-0030-a-developer-builds-a-game-the-engine-did-not-anticipate.md` |
 | 0031 | A god knows whose ground its people stand on | Shaped | Game developer | `shaped/prd-0031-a-god-knows-whose-ground-its-people-stand-on.md` |
+| 0032 | A god knows what its ground is rich in | Shaped | Game developer | `shaped/prd-0032-a-god-knows-what-its-ground-is-rich-in.md` |
 
 ## What does not belong in a record
 

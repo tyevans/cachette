@@ -45,6 +45,7 @@ use crate::hex::{Axial, Grid, GridError, NEIGHBOUR_COUNT};
 use crate::holding::{FactionMask, Holder, Holding};
 use crate::household;
 use crate::influence::{Influence, InfluenceError, InfluenceField};
+use crate::luxury::{LuxuryError, LuxuryField, LuxuryId, LuxurySet, VarietyLevel};
 use crate::position::{
     self, Position, PositionError, PositionTable, SitePreference, WORK_COMMODITY,
 };
@@ -627,6 +628,50 @@ pub struct World {
     /// # References
     ///
     /// [^1]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`
+    /// The luxuries that each tile carries.
+    ///
+    /// The field holds one entry for each tile that carries a luxury, and it
+    /// holds nothing else. A world in which nobody seeded a luxury holds no
+    /// entry.[^1]
+    ///
+    /// The control plane seeds it once, and nothing writes it after that. It
+    /// is simulated state all the same, because two worlds that carry
+    /// different luxuries are different worlds, so it enters the state
+    /// hash.[^2]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0090, a tile upgrade is stored sparsely, as the difference from the generated world, decision D1. `docs/adrs/draft/adr-0090-a-tile-upgrade-is-stored-sparsely.md`
+    /// [^2]: ADR-0001, one binary gives one answer at any thread count, decision D4. `docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
+    luxuries: LuxuryField,
+    /// The luxuries of each level 1 cell.
+    ///
+    /// The level is derived from the field above, and level 0 is the truth.
+    /// It sits beside the cell summaries rather than inside them, because a
+    /// union of luxuries is idempotent and two idempotent values do not
+    /// add.[^1] It does not enter the state hash, because it holds no fact of
+    /// its own.
+    ///
+    /// The field never changes after the world is seeded, so the level is
+    /// derived when the seed lands and never again.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0024, every summary field is declared extensive or intensive, decision D2. `docs/adrs/accepted/adr-0024-every-summary-field-is-declared-extensive-or-intensive.md`
+    variety: VarietyLevel,
+    /// Whether the world has taken a luxury seed.
+    ///
+    /// The flag is not a second copy of the field. A seed that places nothing
+    /// leaves the field empty, and an unseeded world leaves it empty as well,
+    /// so the field cannot answer the question on its own.[^1]
+    ///
+    /// The flag never reaches the state hash. Two worlds that hold the same
+    /// luxuries are the same world, whether or not somebody seeded them.
+    ///
+    /// # References
+    ///
+    /// [^1]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`
+    luxuries_seeded: bool,
     store_account: [Accum; COMMODITY_COUNT],
 }
 
@@ -689,6 +734,9 @@ impl World {
             returns: ReturnField::new(cell_lattice, config.faction_count),
             carry_mark: CARRY_MARK_DEFAULT,
             holding: Holding::new(layout),
+            luxuries: LuxuryField::new(),
+            variety: VarietyLevel::derive(layout, &LuxuryField::new()),
+            luxuries_seeded: false,
             influence: InfluenceField::new(cell_lattice, config.faction_count)?,
             schedule: RateSchedule::DEFAULT,
             rates: RateTable::new(),
@@ -2480,6 +2528,113 @@ impl World {
         self.values.total()
     }
 
+    /// Seeds the luxuries of the world.
+    ///
+    /// Each placement names a tile and a luxury. The caller gives the whole
+    /// set in one call, so the control plane crosses the boundary once and
+    /// never loops over tiles.[^1] The caller states the placements in any
+    /// order, and the engine sorts them.
+    ///
+    /// **The world takes a seed once.** The field is not a fact of a frame,
+    /// and a reader of it never has to ask which frame it read. A second call
+    /// is refused, whether or not the first one placed anything.
+    ///
+    /// The call derives level 1 from the field, so nothing derives it again
+    /// on a later frame.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`LuxuryError::AlreadySeeded`] when the world already took a
+    /// seed. Returns [`LuxuryError::IdAboveCeiling`] when a placement names a
+    /// luxury above the catalogue, and [`LuxuryError::NoSuchTile`] when a
+    /// placement names a tile outside the world. A refusal changes nothing.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0040, Python is a control plane, not a data plane, decision D1. `docs/adrs/draft/adr-0040-python-is-a-control-plane-not-a-data-plane.md`
+    pub fn seed_luxuries(&mut self, placements: &[(TileIdx, LuxuryId)]) -> Result<(), LuxuryError> {
+        if self.luxuries_seeded {
+            return Err(LuxuryError::AlreadySeeded);
+        }
+        let field = LuxuryField::seed(self.grid, placements)?;
+        self.variety = VarietyLevel::derive(self.bridge.layout(), &field);
+        self.luxuries = field;
+        self.luxuries_seeded = true;
+        Ok(())
+    }
+
+    /// Reports whether the world has taken a luxury seed.
+    #[must_use]
+    pub const fn luxuries_seeded(&self) -> bool {
+        self.luxuries_seeded
+    }
+
+    /// Returns the luxuries of the world.
+    #[must_use]
+    pub const fn luxuries(&self) -> &LuxuryField {
+        &self.luxuries
+    }
+
+    /// Returns the luxuries of every level 1 cell.
+    #[must_use]
+    pub const fn variety_level(&self) -> &VarietyLevel {
+        &self.variety
+    }
+
+    /// Returns the luxuries that one tile carries.
+    ///
+    /// A tile that carries none gives the empty set. A tile outside the world
+    /// gives the empty set as well, because it carries nothing.
+    #[must_use]
+    pub fn luxuries_at(&self, tile: TileIdx) -> LuxurySet {
+        self.luxuries.at(tile)
+    }
+
+    /// Returns the variety of the whole world.
+    ///
+    /// The variety is the number of different luxuries that stand anywhere in
+    /// the world. **Nothing in the engine reads this. It is a score for the
+    /// control plane, and no pass consumes it.**[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: Decisions register, DEC-200. `docs/DECISIONS.md`
+    #[must_use]
+    pub fn world_variety(&self) -> u32 {
+        self.luxuries.set().variety()
+    }
+
+    /// Returns the variety of the ground that one faction holds.
+    ///
+    /// The answer is the number of different luxuries on the tiles of that
+    /// faction. The fold runs over the luxury entries in ascending tile
+    /// order, and it asks the holder column for each one, so its cost follows
+    /// the number of placements and not the size of the world.[^1]
+    ///
+    /// **Nothing in the engine reads this.** It is a score for the control
+    /// plane, and no pass consumes it.[^2]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
+    /// [^2]: Decisions register, DEC-200. `docs/DECISIONS.md`
+    #[must_use]
+    pub fn faction_variety(&self, faction: FactionId) -> u32 {
+        let mut total = LuxurySet::EMPTY;
+        for row in self.luxuries.tiles() {
+            let Some(address) = self.grid.address_of(row.tile) else {
+                continue;
+            };
+            let Some(holder) = self.holding.holder(address) else {
+                continue;
+            };
+            if holder.faction() == Some(faction) {
+                total = total.union(row.set);
+            }
+        }
+        total.variety()
+    }
+
     /// Returns the hash of the whole state.
     ///
     /// The golden test compares this value against a stored file.[^1]
@@ -2528,6 +2683,12 @@ impl World {
         // Who holds each tile is simulated state, so the whole-world hash
         // covers it.
         let hash = self.holding.hash_into(hash);
+        // A luxury is authored rather than generated, so no input above
+        // produces it. Two worlds that carry different luxuries are
+        // different worlds, and only the field says so.[^4]
+        //
+        // [^4]: ADR-0001, one binary gives one answer at any thread count, decision D4. `docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
+        let hash = self.luxuries.hash_into(hash);
         let hash = self.soldiers.hash_into(hash);
         let hash = self.settlements.hash_into(hash);
         let hash = self.characters.hash_into(hash);
@@ -2798,6 +2959,31 @@ impl World {
             .iter()
             .all(|event| event.padding == [0; 7] && (event.tile.0 as usize) < self.tile_count())
         {
+            return false;
+        }
+        // The luxury entries rise, they name each tile once, and no entry is
+        // empty. A field that broke any of those answers a lookup with the
+        // wrong tile, and nothing else notices.
+        if !self.luxuries.check_invariants(self.grid.tile_count()) {
+            return false;
+        }
+        // Level 1 of the variety states the same fact a second time, and it
+        // states it over the cells. A check must fail when the two copies
+        // disagree, because a derived level that drifts reads back correctly
+        // and answers the wrong question.[^5]
+        //
+        // The check compares the union of every cell against the union of
+        // every tile. It is a fold over the cells and a fold over the
+        // entries, so it visits no tile that carries nothing.
+        //
+        // [^5]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`
+        if self.variety.total() != self.luxuries.set() {
+            return false;
+        }
+        if self.variety.deposit_total() != self.luxuries.deposits() {
+            return false;
+        }
+        if self.variety.layout() != self.bridge.layout() {
             return false;
         }
         self.log
