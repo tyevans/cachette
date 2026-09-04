@@ -23,7 +23,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^ALLOC]
 
-**Next number: DEC-147**
+**Next number: DEC-151**
 
 ## Open
 
@@ -51,30 +51,6 @@ the control plane keeps the whole notion.
 storage and every verb in the report resolves against it. Option B is the
 interesting one for a game about gods, and it should be chosen deliberately
 rather than by default.
-
-### DEC-141 — Does the engine derive a presence relation between factions, or does the selector answer presence?
-
-**Open. Engineering owns it. It decides what the downstream game's central
-mechanic rests on.**
-
-The question is whether any unit of one faction stands on ground that another
-faction holds. The engine holds every part of the answer and exposes none of
-it as one call.[^DEC141A]
-
-**Option A. Derive a relation at the barrier.** One set of factions for each
-faction, folded by union while the engine rebuilds the derived position of the
-population. The answer is a fixed size, the combine is a union, and the
-derivation adds one read for each unit to a pass that already runs.
-
-**Option B. Answer it through the selector.** A caller describes the units of
-one faction standing on ground another faction holds, and reads the set back.
-This is the general mechanism and it also names the units.
-
-**Option C. Both.** The relation answers the gate. The selector answers which.
-
-**Recommendation: Option C, with Option A first.** The gate is asked whenever
-anybody wants to speak, and a fixed-size answer cannot be made slow by a large
-world. The selector does not exist yet and it answers a wider question.
 
 ### DEC-142 — Does the control plane name the seed set of a strategy field?
 
@@ -1741,6 +1717,60 @@ figure is 168 MB. The storage argument for vectors is stronger than the report
 concluded, and it called that argument its weakest.
 
 ## Closed
+
+### DEC-141 — Does the engine derive a presence relation between factions, or does the selector answer presence?
+
+**Closed. Option C, with option A built. The engine derives the relation, and
+the selector will answer which units when it exists.**
+
+The question is whether any unit of one faction stands on ground that another
+faction holds. The engine held every part of the answer and exposed none of it
+as one call.[^DEC141A]
+
+**Option A. Derive a relation at the barrier.** One set of factions for each
+faction, folded by union while the engine visits the population. The answer is
+a fixed size, the combine is a union, and the derivation adds one read for each
+unit to work the step already does.
+
+**Option B. Answer it through the selector.** A caller describes the units of
+one faction standing on ground another faction holds, and reads the set back.
+This is the general mechanism and it also names the units.
+
+**Option C. Both.** The relation answers the gate. The selector answers which.
+
+**Why A first.** The gate is asked whenever anybody wants to speak, and a
+fixed-size answer cannot be made slow by a large world. The selector does not
+exist and it answers a wider question. The relation needs no selector, so it
+shipped without waiting for one.
+
+**What the build changed about option A.** The fold does not run at the
+barrier. The barrier runs before the holding spreads and before the starvation
+reap, so a fold there would read stale holders and name units the frame ended.
+The fold is the last stage of the step. A record states the placement, and a
+finding records the correction.[^DEC141B] [^DEC141C]
+
+### DEC-150 — Should the presence fold run on one thread, as the bridge rebuild does?
+
+**Open. Engineering owns it. It decides whether one stage of every frame takes
+a thread count it may not need.**
+
+The presence fold visits every live unit once and reads four values for each
+one. It takes a thread count and partitions the arena, in the same shape as the
+holding candidate pass.[^DEC150A]
+
+**Option A. Keep the thread count.** The work follows the population, and the
+population is the term this project cannot bound. A fold over a million units
+is not obviously cheap.
+
+**Option B. Run it on one thread.** The bridge rebuild takes no thread count,
+and a record says why: a signature that accepts one invites a caller to believe
+the pass scales with it.[^DEC150B] A fold this small may cost more in thread
+setup than it saves.
+
+**Recommendation: wait for a measurement.** The stage is named in the stage
+table, so a benchmark on the target platform prices it beside every other
+stage. One blocker governs every cost figure in this project, and no figure for
+this stage exists.[^BLK7]
 
 ### DEC-118 — Does the publishing job keep a switch of its own, now that the address is known?
 
@@ -3448,6 +3478,10 @@ a failed founding is correct.[^PRD12]
 [^DEC140A]: ADR-0066, entity storage holds four fixed shapes. `docs/adrs/accepted/adr-0066-entity-storage-holds-four-fixed-shapes.md`
 [^DEC140B]: Research report 21, what a god needs from this engine, section 8. `docs/research/reports/21-what-a-god-needs.md`
 [^DEC141A]: Research report 21, what a god needs from this engine, section 2. `docs/research/reports/21-what-a-god-needs.md`
+[^DEC141B]: ADR-0111, the presence relation is derived at the end of the step and never stored as a fact, decision D2. `docs/adrs/draft/adr-0111-the-presence-relation-is-derived-at-the-end-of-the-step.md`
+[^DEC141C]: Findings register, FND-370. `docs/FINDINGS.md`
+[^DEC150A]: ADR-0009, parallel stages write disjoint outputs, decisions D1, D2 and D3. `docs/adrs/accepted/adr-0009-parallel-stages-write-disjoint-outputs.md`
+[^DEC150B]: ADR-0071, the bridge rebuild orders on one thread, decision D2. `docs/adrs/accepted/adr-0071-the-bridge-rebuild-orders-on-one-thread.md`
 [^DEC142A]: ADR-0110, a unit returns by climbing a reach field seeded at every site of its faction, decisions D1 and D2. `docs/adrs/draft/adr-0110-a-unit-returns-by-climbing-a-reach-field.md`
 [^DEC142B]: ADR-0095, a behavioural strategy arrives as a field over cells, never as a search from a unit, decision D1. `docs/adrs/draft/adr-0095-a-behavioural-strategy-arrives-as-a-field-over-cells.md`
 [^DEC144A]: Research report 21, what a god needs from this engine, section 4.2. `docs/research/reports/21-what-a-god-needs.md`

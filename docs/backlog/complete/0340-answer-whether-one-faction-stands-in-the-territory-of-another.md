@@ -1,7 +1,7 @@
 ---
 id: 0340
 title: Answer whether one faction stands in the territory of another, in one call
-status: refined
+status: complete
 created: 2026-09-03
 implements: [ADR-0053, ADR-0111]
 changes: []

@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-364**
+**Next number: FND-374**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -1156,6 +1156,90 @@ file names either.
 mechanism. Reading the record's status as the state of the code costs the
 project a large estimate for a small change. A draft record that the code
 already implements should say so, and this one does not.
+
+### FND-370 — The presence relation cannot ride on the bridge rebuild, because that rebuild runs before the holding spreads
+
+**Believed.** Deriving the presence relation rides on the pass that already
+visits every unit and the tile it stands on. A research report named that pass
+as the rebuild of the unit-to-tile bridge, which runs at the frame
+barrier.[^F370A]
+
+**True.** The bridge rebuild is the wrong place, for two reasons that the
+report did not weigh. The barrier runs before the holding spreads, so a fold
+there reads the holders of the previous tick. The barrier also runs before the
+starvation reap, so a fold there names a unit that the same frame ends, and
+every read for the rest of that frame is then refused as stale. The fold is its
+own stage at the end of the step, after the last structural change and after
+the spread.[^F370B]
+
+**Evidence.** Read on 3 September 2026 from the step of the world type. The
+barrier stage sits above the holding spread stage, and the reap sits below both.
+The record now states the placement and why.[^F370B]
+
+**Follows.** "It rides on a pass that already runs" is an argument about the
+cost term and not about the position. The cost term survives: the fold reads
+three unit columns and one tile column once, and allocates one row array for
+each thread. Nothing here was measured, and one blocker governs every cost
+figure in this project.[^28]
+
+### FND-371 — A derived relation moves no golden state hash, and that is the check that it is derived
+
+**Believed.** Nothing. The project had no relation between factions, so nobody
+had asked what one does to the state hash.
+
+**True.** The golden state hash did not move when the presence relation was
+added. That is the expected result and it is also the evidence: the relation
+reaches no state, so it reaches no hash. A relation that had moved the hash
+would have been stored rather than derived, against the record.[^F371A]
+
+**Evidence.** `cargo test --package cachette-core --test golden_state_hash` was
+green before and after the change, with no regeneration of the golden file.
+
+**Follows.** For any future derived structure, an unmoved golden hash is a
+cheap check that the structure is derived. A moved hash is a question to answer
+before the work is done, not a file to regenerate.
+
+### FND-372 — One visiting unit takes the tile it visits, so a naive presence fixture measures the spread rule
+
+**Believed.** A test of the presence relation places a unit of one faction on a
+tile another faction holds, steps, and reads the answer.
+
+**True.** That fixture does not produce the case. A unit raises seven for a
+claim on the tile it stands on, and the holder of a tile raises one for each
+neighbour that holds with it. A lone visitor therefore beats a holder that
+draws only on its six neighbours, and the tile changes hands in the same step,
+before the fold runs. The relation then correctly reports nothing, and the test
+fails for a reason that has nothing to do with the relation.[^F372A]
+
+**Evidence.** Found while writing the presence tests on 3 September 2026. The
+fixture now places three units of the holder on the visited tile beside the
+guest, and it asserts the holder of the tile under the guest before it reads
+the relation.
+
+**Follows.** A test about a read over the holding must fix the holding first,
+or it measures the spread rule. State the assertion about the fixture, not only
+the assertion about the answer.
+
+### FND-373 — A fixture whose guest sits in the last chunk cannot catch a combine that is not order-free
+
+**Believed.** A test that runs one scenario at three thread counts and compares
+the answers catches a combine that depends on the partition.
+
+**True.** It does not, when the interesting unit sits in the last chunk of the
+arena at every thread count. The presence test spawned the guest last, so the
+guest had the highest arena slot. A combine that took the last slot and dropped
+every other one gave the right answer at one thread and at twelve, and the
+comparison passed.
+
+**Evidence.** Found by putting the defect back on 3 September 2026. The join of
+the presence fold was changed from a union to an assignment, and the
+thread-count test stayed green. The fixture now spawns a further batch of units
+after the guest, so the guest sits in a middle chunk, and the same defect then
+fails the test.
+
+**Follows.** A thread-count comparison is only as good as where the fixture
+puts the value under test. Ask which chunk holds it, and put something after
+it. This is the fixture rule applied to a parallel join.[^23]
 
 ## D. Cost estimates that were wrong
 
@@ -10536,3 +10620,7 @@ itself rather than merely underspecified.
 [^F361B]: PRD-0031, a god knows whose ground its people stand on. `docs/product/shaped/prd-0031-a-god-knows-whose-ground-its-people-stand-on.md`
 [^F362A]: Budgets and costs, the scale constants and the faction ceiling. `docs/reference/budgets.md`
 [^F363A]: ADR-0110, a unit returns by climbing a reach field seeded at every site of its faction, decision D2. `docs/adrs/draft/adr-0110-a-unit-returns-by-climbing-a-reach-field.md`
+[^F370A]: Research report 21, what a god needs from this engine, section 2.3. `docs/research/reports/21-what-a-god-needs.md`
+[^F370B]: ADR-0111, the presence relation is derived at the end of the step and never stored as a fact, decision D2. `docs/adrs/draft/adr-0111-the-presence-relation-is-derived-at-the-end-of-the-step.md`
+[^F371A]: ADR-0111, the presence relation is derived at the end of the step and never stored as a fact, decision D1. `docs/adrs/draft/adr-0111-the-presence-relation-is-derived-at-the-end-of-the-step.md`
+[^F372A]: ADR-0053, a faction is a bit in a mask, and a relation is a plane, decision D5. `docs/adrs/accepted/adr-0053-a-faction-is-a-bit-in-a-mask-and-a-relation-is-a-plane.md`

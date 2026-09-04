@@ -28,6 +28,7 @@ pub mod holding;
 mod household;
 pub mod influence;
 pub mod position;
+pub mod presence;
 pub mod promotion;
 pub mod pyramid;
 pub mod rates;
@@ -71,6 +72,7 @@ pub use position::{
     release_the_dead, Position, PositionError, PositionTable, SitePreference, NO_WORK,
     POSITIONS_PER_SITE, WORK_COMMODITY,
 };
+pub use presence::{PresenceRelation, PRESENCE_ROWS};
 pub use pyramid::{CellSummary, ExitField, Pyramid, NO_EXIT};
 pub use rates::{
     RateError, RateLedger, RatePass, RateSchedule, RateTable, SiteRate, SiteShortfall,

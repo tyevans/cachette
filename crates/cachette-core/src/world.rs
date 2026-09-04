@@ -48,6 +48,7 @@ use crate::influence::{Influence, InfluenceError, InfluenceField};
 use crate::position::{
     self, Position, PositionError, PositionTable, SitePreference, WORK_COMMODITY,
 };
+use crate::presence::PresenceRelation;
 use crate::promotion::{self, PromotionError, UnitPromoted};
 use crate::pyramid::{CellSummary, ExitField, Pyramid, ReturnField};
 use crate::rates::{RateError, RateLedger, RateSchedule, RateTable, SiteShortfall};
@@ -411,6 +412,13 @@ pub struct World {
     settlements: SettlementArena,
     characters: CharacterArena,
     bridge: UnitTileBridge,
+    /// Which factions stand on the ground of which other factions.
+    ///
+    /// The relation is derived at the end of a step and never stored as a
+    /// fact.[^3]
+    ///
+    /// [^3]: ADR-0111, the presence relation is derived at the end of the step and never stored as a fact, decision D1. `docs/adrs/draft/adr-0111-the-presence-relation-is-derived-at-the-end-of-the-step.md`
+    presence: PresenceRelation,
     terrain: Terrain,
     /// The stock that each tile started with. It stores nothing.
     resources: ResourceField,
@@ -678,6 +686,7 @@ impl World {
             settlements,
             characters,
             bridge,
+            presence: PresenceRelation::new(),
             terrain,
             resources: ResourceField::new(terrain),
             depletion: DepletionLedger::new(),
@@ -721,6 +730,12 @@ impl World {
         //
         // [^1]: ADR-0022, level 0 is the only truth, and every level above it is derived, decision D2. `docs/adrs/accepted/adr-0022-level-0-is-the-only-truth-and-every-level-above-it-is-derived.md`
         world.influence.read_the_ground(world.pyramid.cells())?;
+        // A world that has never stepped still answers the presence
+        // question. A relation that nothing derived would refuse the read,
+        // and a caller cannot tell that refusal from a stale one.[^2]
+        //
+        // [^2]: ADR-0111, the presence relation is derived at the end of the step and never stored as a fact, decision D4. `docs/adrs/draft/adr-0111-the-presence-relation-is-derived-at-the-end-of-the-step.md`
+        world.presence.rebuild(&world.soldiers, &world.holding, 1)?;
         Ok(world)
     }
 
@@ -3534,6 +3549,22 @@ impl World {
             let _span = stage::open(Stage::InfluenceSolve);
             self.influence.solve(threads)?;
         }
+
+        // The presence relation is derived last, after every structural
+        // change this frame made and after the holding spread that decides
+        // who holds each tile. A fold before the reap would name a unit the
+        // frame ended, and a fold before the spread would answer against the
+        // holders of the previous frame.[^19]
+        //
+        // The relation is derived and never stored, so it reaches no state
+        // hash and no event.[^19]
+        //
+        // [^19]: ADR-0111, the presence relation is derived at the end of the step and never stored as a fact, decisions D1 and D2. `docs/adrs/draft/adr-0111-the-presence-relation-is-derived-at-the-end-of-the-step.md`
+        {
+            let _span = stage::open(Stage::PresenceFold);
+            self.presence
+                .rebuild(&self.soldiers, &self.holding, threads)?;
+        }
         Ok(&self.log)
     }
 
@@ -3698,6 +3729,53 @@ impl World {
     #[must_use]
     pub const fn holding(&self) -> &Holding {
         &self.holding
+    }
+
+    /// Returns which factions stand on the ground of which other factions.
+    ///
+    /// Row `host` names every faction that has a live unit standing on a tile
+    /// that `host` holds. A unit on ground its own faction holds sets no bit,
+    /// so the diagonal is always empty.[^1]
+    ///
+    /// **The answer is 63 words whatever the population.** The relation is a
+    /// mask row for each faction, which is the shape every relation between
+    /// factions takes in this project.[^2]
+    ///
+    /// The relation is exact. The fold reads the holder of the exact tile
+    /// each unit stands on, so a clear bit means that no unit is there.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the population changed since the last step, so
+    /// that a caller meets a refusal rather than a stale answer.[^3]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0111, the presence relation is derived at the end of the step and never stored as a fact, decision D3. `docs/adrs/draft/adr-0111-the-presence-relation-is-derived-at-the-end-of-the-step.md`
+    /// [^2]: ADR-0053, a faction is a bit in a mask, and a relation is a plane, decision D7. `docs/adrs/accepted/adr-0053-a-faction-is-a-bit-in-a-mask-and-a-relation-is-a-plane.md`
+    /// [^3]: ADR-0111, the presence relation is derived at the end of the step and never stored as a fact, decision D4. `docs/adrs/draft/adr-0111-the-presence-relation-is-derived-at-the-end-of-the-step.md`
+    pub fn presence_rows(&self) -> Result<&[FactionMask], BridgeError> {
+        self.presence.rows(&self.soldiers)
+    }
+
+    /// Reports whether a unit of `guest` stands on ground that `host` holds.
+    ///
+    /// Returns `false` when `guest` and `host` are the same faction, because
+    /// the relation holds no diagonal.[^1]
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the population changed since the last step.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0111, the presence relation is derived at the end of the step and never stored as a fact, decision D3. `docs/adrs/draft/adr-0111-the-presence-relation-is-derived-at-the-end-of-the-step.md`
+    pub fn stands_in_territory(
+        &self,
+        guest: FactionId,
+        host: FactionId,
+    ) -> Result<bool, BridgeError> {
+        self.presence.stands_in(&self.soldiers, guest, host)
     }
 
     /// Returns every upgrade in the world, in ascending tile order.

@@ -1,7 +1,7 @@
 ---
 id: 0347
 title: Read the tile holder as a column
-status: refined
+status: complete
 created: 2026-09-03
 implements: [ADR-0053]
 changes: []
