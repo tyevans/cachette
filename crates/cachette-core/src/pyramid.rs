@@ -1074,61 +1074,52 @@ pub const UNREACHED: u8 = u8::MAX;
 /// [^4]: Blockers register, BLK-007. `docs/BLOCKERS.md`
 pub const RETURN_PASSES: u32 = 8;
 
-/// The direction of the nearest site of a faction, for each level 1 cell.
+/// One direction for each cell of a lattice, on each of several planes.
 ///
-/// **A unit that carries a load home reads one entry and steps.** It reads no
-/// neighbouring cell, it scores no neighbour, and it computes nothing from its
-/// own address toward its own site. The direction belongs to the cell and to
-/// the faction, and every unit of that cell and that faction reads one
-/// answer.[^1] [^2]
+/// **This is the one relaxation.** A plane is seeded at a set of cells, the
+/// reach spreads outward from those cells a fixed number of passes, and the
+/// direction of a cell is the neighbour whose reach is smaller. Two fields
+/// use it: the return field, whose planes are the factions and whose seeds
+/// are the live sites, and the destination field, whose planes are named by
+/// the control plane and whose seeds are the tiles it names.[^1] [^2]
 ///
-/// The field holds one plane for each faction. The faction is the major
-/// index, so the plane of one faction is one contiguous run, which is the
-/// layout the influence field over the same lattice already uses.[^3]
+/// The two differ in who names the seeds and in nothing else. A second copy
+/// of the relaxation would be one rule in two places, with nothing to fail
+/// when the copies disagree.[^3]
 ///
-/// **A field indexed by the faction is refused at level 1 and admitted
-/// here.** A summary field indexed by the faction would multiply the tile side
-/// of the world by the faction count. This field is at the pitch of one level
-/// 1 cell, where the influence field is already one plane for each
-/// faction.[^4] [^5]
-///
-/// The field is derived again at every rebuild of level 1, from nothing. It
-/// carries no value between two frames, so it states no fact of its own and
-/// level 0 stays the only source of truth.[^6] [^7]
+/// The plane is the major index, so the plane of one number is one contiguous
+/// run. That is the layout the influence field over the same lattice already
+/// uses.[^4]
 ///
 /// # References
 ///
-/// [^1]: ADR-0095, a behavioural strategy arrives as a field over cells, never as a search from a unit, decision D1. `docs/adrs/draft/adr-0095-a-behavioural-strategy-arrives-as-a-field-over-cells.md`
-/// [^2]: ADR-0110, a unit returns by climbing a reach field seeded at every site of its faction, decision D1. `docs/adrs/draft/adr-0110-a-unit-returns-by-climbing-a-reach-field.md`
-/// [^3]: ADR-0060, an influence map is stored as a shared basis, decision D1. `docs/adrs/draft/adr-0060-an-influence-map-is-stored-as-a-shared-basis.md`
-/// [^4]: ADR-0053, a faction is a bit in a mask, and a relation is a plane, decision D3. `docs/adrs/accepted/adr-0053-a-faction-is-a-bit-in-a-mask-and-a-relation-is-a-plane.md`
-/// [^5]: ADR-0110, a unit returns by climbing a reach field seeded at every site of its faction, decision D3. `docs/adrs/draft/adr-0110-a-unit-returns-by-climbing-a-reach-field.md`
-/// [^6]: ADR-0022, level 0 is the only truth, and every level above it is derived, decision D1. `docs/adrs/accepted/adr-0022-level-0-is-the-only-truth-and-every-level-above-it-is-derived.md`
-/// [^7]: ADR-0091, movement takes its direction from a per-cell field, never from a per-unit search, decision D2. `docs/adrs/draft/adr-0091-movement-takes-its-direction-from-a-per-cell-field.md`
+/// [^1]: ADR-0110, a unit returns by climbing a reach field seeded at every site of its faction, decision D2. `docs/adrs/draft/adr-0110-a-unit-returns-by-climbing-a-reach-field.md`
+/// [^2]: ADR-0125, the control plane names the seed set of a destination field, decision D1. `docs/adrs/draft/adr-0125-the-control-plane-names-the-seed-set-of-a-destination-field.md`
+/// [^3]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`
+/// [^4]: ADR-0060, an influence map is stored as a shared basis, decision D1. `docs/adrs/draft/adr-0060-an-influence-map-is-stored-as-a-shared-basis.md`
 #[derive(Clone, Debug)]
-pub struct ReturnField {
+pub struct SeededField {
     cells: Grid,
-    faction_count: u16,
-    /// One direction for each faction and cell. The faction is the major
-    /// index.
+    plane_count: u16,
+    /// One direction for each plane and cell. The plane is the major index.
     directions: Vec<u8>,
-    /// The steps from each cell to the nearest seed of the faction that the
+    /// The steps from each cell to the nearest seed of the plane that the
     /// derivation is working on. It holds one plane, and the derivation
-    /// reuses it for every faction.
+    /// reuses it for every plane.
     reach: Vec<u8>,
     /// The write half of one relaxation pass.
     scratch: Vec<u8>,
 }
 
-impl ReturnField {
+impl SeededField {
     /// Builds a field over a cell lattice, with no direction anywhere.
     #[must_use]
-    pub fn new(cells: Grid, faction_count: u16) -> Self {
+    pub fn new(cells: Grid, plane_count: u16) -> Self {
         let count = cells.tile_count() as usize;
         Self {
             cells,
-            faction_count,
-            directions: vec![NO_EXIT; count * faction_count as usize],
+            plane_count,
+            directions: vec![NO_EXIT; count * plane_count as usize],
             reach: vec![UNREACHED; count],
             scratch: vec![UNREACHED; count],
         }
@@ -1140,25 +1131,25 @@ impl ReturnField {
         self.cells
     }
 
-    /// Returns the number of factions the field holds a plane for.
+    /// Returns the number of planes the field holds.
     #[must_use]
-    pub const fn faction_count(&self) -> u16 {
-        self.faction_count
+    pub const fn plane_count(&self) -> u16 {
+        self.plane_count
     }
 
-    /// Returns the direction of one faction and one cell.
+    /// Returns the direction of one plane and one cell.
     ///
-    /// The outer option reports whether the faction and the cell name an
-    /// entry. The inner one reports whether the cell holds a direction at all.
-    /// A cell that holds a site, and a cell that reached no site, both hold
-    /// none, and a unit there falls back to the keyed draw.[^1]
+    /// The outer option reports whether the plane and the cell name an entry.
+    /// The inner one reports whether the cell holds a direction at all. A
+    /// seed cell, and a cell the reach never arrived at, both hold none, and
+    /// a unit there falls back to the keyed draw.[^1]
     ///
     /// # References
     ///
     /// [^1]: ADR-0091, movement takes its direction from a per-cell field, never from a per-unit search, decision D6. `docs/adrs/draft/adr-0091-movement-takes-its-direction-from-a-per-cell-field.md`
     #[must_use]
-    pub fn direction(&self, faction: FactionId, cell: u32) -> Option<Option<u8>> {
-        let at = self.slot(faction, cell)?;
+    pub fn direction(&self, plane: u16, cell: u32) -> Option<Option<u8>> {
+        let at = self.slot(plane, cell)?;
         let direction = *self.directions.get(at)?;
         Some(if direction == NO_EXIT {
             None
@@ -1167,24 +1158,23 @@ impl ReturnField {
         })
     }
 
-    /// Returns the slot of one faction and one cell.
-    fn slot(&self, faction: FactionId, cell: u32) -> Option<usize> {
-        if faction.0 >= self.faction_count {
+    /// Returns the slot of one plane and one cell.
+    fn slot(&self, plane: u16, cell: u32) -> Option<usize> {
+        if plane >= self.plane_count {
             return None;
         }
         let count = self.cells.tile_count();
         if cell >= count {
             return None;
         }
-        Some(faction.0 as usize * count as usize + cell as usize)
+        Some(plane as usize * count as usize + cell as usize)
     }
 
     /// Derives every entry from a level 1 and a set of seeds.
     ///
-    /// A seed is one faction and the cell that holds a site of it. **Several
-    /// sites of one faction seed one plane at once**, so one derivation serves
-    /// every unit of that faction and the field carries the direction of the
-    /// nearest site to each cell.[^1]
+    /// A seed is one plane and one cell. **Several seeds of one plane seed it
+    /// at once**, so one derivation serves every unit that reads the plane and
+    /// the field carries the direction of the nearest seed to each cell.[^1]
     ///
     /// The reach of a seed cell is zero. Each pass gives a cell one more than
     /// the smallest reach of its neighbours, when that is smaller than the
@@ -1203,8 +1193,8 @@ impl ReturnField {
     /// lowest direction index therefore wins a tie, which is the order every
     /// other walk over the neighbours of a hex uses.[^2]
     ///
-    /// The pass runs on the calling thread, in ascending faction identifier
-    /// and then in ascending cell index. It names no thread and depends on no
+    /// The pass runs on the calling thread, in ascending plane number and
+    /// then in ascending cell index. It names no thread and depends on no
     /// thread count.[^2]
     ///
     /// # References
@@ -1213,13 +1203,13 @@ impl ReturnField {
     /// [^2]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
     /// [^3]: ADR-0091, movement takes its direction from a per-cell field, never from a per-unit search, decision D5. `docs/adrs/draft/adr-0091-movement-takes-its-direction-from-a-per-cell-field.md`
     /// [^4]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`
-    pub fn derive(&mut self, pyramid: &Pyramid, seeds: &[(FactionId, u32)]) {
+    pub fn derive(&mut self, pyramid: &Pyramid, seeds: &[(u16, u32)]) {
         let cells = self.cells;
         let count = cells.tile_count();
-        for faction in 0..self.faction_count {
+        for plane in 0..self.plane_count {
             self.reach.iter_mut().for_each(|cell| *cell = UNREACHED);
             for (seeded, cell) in seeds {
-                if seeded.0 != faction || *cell >= count {
+                if *seeded != plane || *cell >= count {
                     continue;
                 }
                 if !admits_a_unit(pyramid, *cell) {
@@ -1231,7 +1221,7 @@ impl ReturnField {
                 self.relax(pyramid);
             }
             for cell in 0..count {
-                let at = faction as usize * count as usize + cell as usize;
+                let at = plane as usize * count as usize + cell as usize;
                 self.directions[at] = self.step_down(cell);
             }
         }
@@ -1288,6 +1278,97 @@ impl ReturnField {
             }
         }
         NO_EXIT
+    }
+}
+
+/// The direction of the nearest site of a faction, for each level 1 cell.
+///
+/// **A unit that carries a load home reads one entry and steps.** It reads no
+/// neighbouring cell, it scores no neighbour, and it computes nothing from its
+/// own address toward its own site. The direction belongs to the cell and to
+/// the faction, and every unit of that cell and that faction reads one
+/// answer.[^1] [^2]
+///
+/// The field holds one plane for each faction. The faction is the major
+/// index, so the plane of one faction is one contiguous run, which is the
+/// layout the influence field over the same lattice already uses.[^3]
+///
+/// **A field indexed by the faction is refused at level 1 and admitted
+/// here.** A summary field indexed by the faction would multiply the tile side
+/// of the world by the faction count. This field is at the pitch of one level
+/// 1 cell, where the influence field is already one plane for each
+/// faction.[^4] [^5]
+///
+/// The field is derived again at every rebuild of level 1, from nothing. It
+/// carries no value between two frames, so it states no fact of its own and
+/// level 0 stays the only source of truth.[^6] [^7]
+///
+/// # References
+///
+/// [^1]: ADR-0095, a behavioural strategy arrives as a field over cells, never as a search from a unit, decision D1. `docs/adrs/draft/adr-0095-a-behavioural-strategy-arrives-as-a-field-over-cells.md`
+/// [^2]: ADR-0110, a unit returns by climbing a reach field seeded at every site of its faction, decision D1. `docs/adrs/draft/adr-0110-a-unit-returns-by-climbing-a-reach-field.md`
+/// [^3]: ADR-0060, an influence map is stored as a shared basis, decision D1. `docs/adrs/draft/adr-0060-an-influence-map-is-stored-as-a-shared-basis.md`
+/// [^4]: ADR-0053, a faction is a bit in a mask, and a relation is a plane, decision D3. `docs/adrs/accepted/adr-0053-a-faction-is-a-bit-in-a-mask-and-a-relation-is-a-plane.md`
+/// [^5]: ADR-0110, a unit returns by climbing a reach field seeded at every site of its faction, decision D3. `docs/adrs/draft/adr-0110-a-unit-returns-by-climbing-a-reach-field.md`
+/// [^6]: ADR-0022, level 0 is the only truth, and every level above it is derived, decision D1. `docs/adrs/accepted/adr-0022-level-0-is-the-only-truth-and-every-level-above-it-is-derived.md`
+/// [^7]: ADR-0091, movement takes its direction from a per-cell field, never from a per-unit search, decision D2. `docs/adrs/draft/adr-0091-movement-takes-its-direction-from-a-per-cell-field.md`
+#[derive(Clone, Debug)]
+pub struct ReturnField(SeededField);
+
+impl ReturnField {
+    /// Builds a field over a cell lattice, with no direction anywhere.
+    #[must_use]
+    pub fn new(cells: Grid, faction_count: u16) -> Self {
+        Self(SeededField::new(cells, faction_count))
+    }
+
+    /// Returns the cell lattice the field covers.
+    #[must_use]
+    pub const fn cells(&self) -> Grid {
+        self.0.cells()
+    }
+
+    /// Returns the number of factions the field holds a plane for.
+    #[must_use]
+    pub const fn faction_count(&self) -> u16 {
+        self.0.plane_count()
+    }
+
+    /// Returns the direction of one faction and one cell.
+    ///
+    /// The outer option reports whether the faction and the cell name an
+    /// entry. The inner one reports whether the cell holds a direction at all.
+    /// A cell that holds a site, and a cell that reached no site, both hold
+    /// none, and a unit there falls back to the keyed draw.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0091, movement takes its direction from a per-cell field, never from a per-unit search, decision D6. `docs/adrs/draft/adr-0091-movement-takes-its-direction-from-a-per-cell-field.md`
+    #[must_use]
+    pub fn direction(&self, faction: FactionId, cell: u32) -> Option<Option<u8>> {
+        self.0.direction(faction.0, cell)
+    }
+
+    /// Derives every entry from a level 1 and a set of seeds.
+    ///
+    /// A seed is one faction and the cell that holds a site of it. **Several
+    /// sites of one faction seed one plane at once**, so one derivation serves
+    /// every unit of that faction and the field carries the direction of the
+    /// nearest site to each cell.[^1]
+    ///
+    /// The relaxation, the tie-break and the refusal of a cell that admits
+    /// nobody are the shared ones, and the shared type states them.[^2]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0095, a behavioural strategy arrives as a field over cells, never as a search from a unit, decision D3. `docs/adrs/draft/adr-0095-a-behavioural-strategy-arrives-as-a-field-over-cells.md`
+    /// [^2]: ADR-0110, a unit returns by climbing a reach field seeded at every site of its faction, decision D2. `docs/adrs/draft/adr-0110-a-unit-returns-by-climbing-a-reach-field.md`
+    pub fn derive(&mut self, pyramid: &Pyramid, seeds: &[(FactionId, u32)]) {
+        let planes: Vec<(u16, u32)> = seeds
+            .iter()
+            .map(|(faction, cell)| (faction.0, *cell))
+            .collect();
+        self.0.derive(pyramid, &planes);
     }
 }
 

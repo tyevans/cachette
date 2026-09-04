@@ -1914,6 +1914,205 @@ impl PyWorld {
         Ok(report)
     }
 
+    /// Sends every soldier the identities name to a set of tiles.
+    ///
+    /// The units are a sequence of identities, or the NumPy array of
+    /// `numpy.uint64` that `spawn_soldiers` returned. The seeds are a
+    /// sequence of `(q, r)` pairs of integers, and they are the places the
+    /// caller wants the units at. The destination is the number of the
+    /// destination plane that carries the order. Returns `None`.
+    ///
+    /// **One call names a whole set and the engine builds one field.** The
+    /// engine takes the level 1 cell of each seed, seeds a plane at every one
+    /// of them at once, and spreads a reach outward. Every unit the call
+    /// names then reads one entry of that plane on each step and takes one
+    /// step. The cost of the field follows the cell count and not the number
+    /// of units, so sending a million units costs what sending one costs.[^1]
+    ///
+    /// **No unit searches for a route.** A unit reads the entry of its own
+    /// cell. It reads no neighbouring cell and it computes nothing from its
+    /// own address toward a seed. That is the rule the engine is built on,
+    /// and this call does not bend it.[^2]
+    ///
+    /// **A cell steers a whole block, so two units in one cell take one
+    /// direction.** A caller cannot send half a cell one way and half the
+    /// other.[^2]
+    ///
+    /// **A unit that cannot reach the seeds does not freeze.** A unit whose
+    /// cell holds no direction takes a keyed draw instead, and the draw is
+    /// keyed on the frame, so it takes a different direction on the next
+    /// frame. The same holds for a unit that arrived, and for a unit whose
+    /// ground refuses the direction the field gave it.[^3]
+    ///
+    /// **The call sends a set toward a place. It does not promise that the set
+    /// arrives.** A cell steers a block of tiles, and the water in front of one
+    /// unit of that block is not a fact the block carries. A unit behind such a
+    /// barrier walks to it and then wanders beside it. It is not frozen, and it
+    /// does not get past.[^4]
+    ///
+    /// The order holds until the caller stops it with `stop_sending`. A unit
+    /// that arrives keeps the order and walks about inside the block it
+    /// arrived in. Read `faction_units` for where the set is now.
+    ///
+    /// A caller that names a destination again replaces the seed set of that
+    /// destination, and every unit already sent to it walks to the new one.
+    /// Read `destination_count` for how many the world holds, and set it with
+    /// `set_destination_count`.
+    ///
+    /// **The set is all or nothing.** Every identity resolves, every address
+    /// is checked, and the destination is checked, before anything changes.
+    ///
+    /// # Errors
+    ///
+    /// Raises `VerbError` when the number names no destination plane of this
+    /// world, and when a seed address is outside the world. Raises `ViewError`
+    /// when an identity names no live soldier.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0095, a behavioural strategy arrives as a field over cells, never as a search from a unit, decision D3. `docs/adrs/draft/adr-0095-a-behavioural-strategy-arrives-as-a-field-over-cells.md`
+    /// [^2]: ADR-0091, movement takes its direction from a per-cell field, never from a per-unit search, decision D1. `docs/adrs/draft/adr-0091-movement-takes-its-direction-from-a-per-cell-field.md`
+    /// [^3]: ADR-0125, the control plane names the seed set of a destination field, decision D4. `docs/adrs/draft/adr-0125-the-control-plane-names-the-seed-set-of-a-destination-field.md`
+    /// [^4]: Findings register, FND-411. `docs/FINDINGS.md`
+    #[pyo3(signature = (units, seeds, destination = 0))]
+    fn send_units_to(
+        &self,
+        units: Vec<u64>,
+        seeds: Vec<(i32, i32)>,
+        destination: u16,
+    ) -> PyResult<()> {
+        let mut world = self.lock();
+        let mut resolved = Vec::with_capacity(units.len());
+        for unit in &units {
+            resolved.push(resolve(&world, *unit)?);
+        }
+        let addresses: Vec<Axial> = seeds.iter().map(|(q, r)| Axial::new(*q, *r)).collect();
+        world
+            .send_units_to(&resolved, &addresses, destination)
+            .map_err(|error| VerbError::new_err(error.to_string()))
+    }
+
+    /// The number of destination planes the world holds, as an integer.
+    ///
+    /// A destination plane carries one order. The caller names the plane when
+    /// it sends a set of units somewhere, and the numbers run from zero to one
+    /// below this.
+    #[getter]
+    fn destination_count(&self) -> u16 {
+        self.lock().destination_count()
+    }
+
+    /// Sets the number of destination planes the world holds.
+    ///
+    /// The count says how many places the control plane may send units to at
+    /// one time, before it re-aims a plane it already used. **The caller names
+    /// the plane, and the engine allocates none.**[^1]
+    ///
+    /// The call clears the seed set of every plane, so no order steers
+    /// anything until the caller sends a set again. A unit that was sent to a
+    /// plane the world no longer holds reads no direction, and it takes a
+    /// keyed draw rather than standing still.[^2]
+    ///
+    /// Set this before the run, in the way the other world parameters are set.
+    /// Returns `None`.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0125, the control plane names the seed set of a destination field, decision D3. `docs/adrs/draft/adr-0125-the-control-plane-names-the-seed-set-of-a-destination-field.md`
+    /// [^2]: ADR-0125, the control plane names the seed set of a destination field, decision D4. `docs/adrs/draft/adr-0125-the-control-plane-names-the-seed-set-of-a-destination-field.md`
+    fn set_destination_count(&self, count: u16) {
+        self.lock().set_destination_count(count);
+    }
+
+    /// Stops sending every soldier the identities name.
+    ///
+    /// The units are a sequence of identities, or the NumPy array of
+    /// `numpy.uint64` that `spawn_soldiers` returned. Returns `None`.
+    ///
+    /// Each unit goes back to the option that it chose for itself.
+    ///
+    /// **The set is all or nothing.** Every identity resolves before anything
+    /// changes.
+    ///
+    /// # Errors
+    ///
+    /// Raises `ViewError` when an identity names no live soldier.
+    fn stop_sending(&self, units: Vec<u64>) -> PyResult<()> {
+        let mut world = self.lock();
+        let mut resolved = Vec::with_capacity(units.len());
+        for unit in &units {
+            resolved.push(resolve(&world, *unit)?);
+        }
+        world
+            .stop_sending(&resolved)
+            .map_err(|error| VerbError::new_err(error.to_string()))
+    }
+
+    /// Returns the live soldiers of one faction, as columns.
+    ///
+    /// The faction is the number of the faction. The result is a `dict` of
+    /// one-dimensional NumPy arrays, and every array holds one entry for each
+    /// live soldier of that faction. The keys are:
+    ///
+    /// - `unit`, `numpy.uint64`. The identity of the soldier. Pass the whole
+    ///   array to `send_units_to`, `order_gather` or `despawn_soldiers`.
+    /// - `tile`, `numpy.uint32`. The tile it stands on, as a row-major index.
+    ///   Take `index % world.width` for the column and `index // world.width`
+    ///   for the row.
+    ///
+    /// **This is one crossing, and it replaces a loop.** A caller that read
+    /// each unit through `soldier_tile` paid one crossing for each unit, and
+    /// the control plane never loops over the population.[^1] [^2]
+    ///
+    /// **Every entry names a live soldier, so no entry stands for nothing.**
+    /// The engine builds the set at the moment of the call, and it takes no
+    /// identity from the caller, so nothing here can be stale and the result
+    /// needs no validity mask. The singular read takes an identity and must
+    /// refuse a dead one, and it still does.[^3]
+    ///
+    /// The order is the slot order of the arena. It is the same on every run
+    /// and at every thread count, and it is never a thread completion
+    /// order.[^4] It is not the spawn order: a slot returns to the arena when
+    /// a soldier dies, and the next soldier takes it.
+    ///
+    /// A faction with nobody in it gives two empty arrays, which is an answer
+    /// and not an error. A number that names no faction of this world does
+    /// the same, because no soldier holds it.
+    ///
+    /// # Errors
+    ///
+    /// Raises `ViewError` when the dictionary cannot be built.
+    ///
+    /// # References
+    ///
+    /// [^1]: Project orientation, the design principles. `CLAUDE.md`
+    /// [^2]: Research report 20, what the Python interface should be, section 2.3. `docs/research/reports/20-the-python-interface.md`
+    /// [^3]: ADR-0085, an entity crosses to Python as one opaque identity that the engine resolves, decision D3. `docs/adrs/accepted/adr-0085-an-entity-crosses-to-python-as-one-opaque-identity.md`
+    /// [^4]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
+    fn faction_units<'py>(
+        &self,
+        python: Python<'py>,
+        faction: u16,
+    ) -> PyResult<Bound<'py, PyDict>> {
+        let world = self.lock();
+        let soldiers = world.soldiers();
+        let mut unit: Vec<u64> = Vec::new();
+        let mut tile: Vec<u32> = Vec::new();
+        for entity in soldiers.iter_faction(FactionId(faction)) {
+            unit.push(entity.to_bits());
+            tile.push(
+                soldiers
+                    .tile(entity)
+                    .expect("a live identity from the walk names a tile")
+                    .0,
+            );
+        }
+        let columns = PyDict::new(python);
+        columns.set_item("unit", unit.to_pyarray(python))?;
+        columns.set_item("tile", tile.to_pyarray(python))?;
+        Ok(columns)
+    }
+
     /// Returns a `str` that names the world, its extent and its tick.
     ///
     /// The arguments in the text are the parameters the constructor takes, so
