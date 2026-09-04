@@ -127,3 +127,16 @@ pub const SYSTEM_FOUNDING: SystemId = 5;
 ///
 /// [^1]: ADR-0003, every random draw is keyed, never stateful, decision D1. `docs/adrs/accepted/adr-0003-every-random-draw-is-keyed-never-stateful.md`
 pub const SYSTEM_CONTEST: SystemId = 8;
+
+/// The system identifier of the conversion pass.
+///
+/// The conversion pass owns this identifier alone. It does not share the
+/// identifier of the contest, because two systems that share an identifier
+/// draw the same value from the same frame, entity and draw index. The units
+/// that changed faction on a tile would then follow the units that fell on
+/// that tile.[^1]
+///
+/// # References
+///
+/// [^1]: ADR-0003, every random draw is keyed, never stateful, decision D1. `docs/adrs/accepted/adr-0003-every-random-draw-is-keyed-never-stateful.md`
+pub const SYSTEM_CONVERSION: SystemId = 9;

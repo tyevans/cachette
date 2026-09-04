@@ -1005,6 +1005,55 @@ impl SoldierArena {
         &self.factions
     }
 
+    /// Changes the faction of a soldier, and reports whether it wrote.
+    ///
+    /// Returns `false` when the identity is dead, when the faction is at or
+    /// above the ceiling, and when the soldier already belongs to the
+    /// faction. A write that changes nothing must not raise the revision,
+    /// because a derived structure would then rebuild for nothing.
+    ///
+    /// **The call moves the maintained count.** The arena keeps one count for
+    /// each faction, and it keeps it where a slot becomes live and where a
+    /// slot stops being live. A faction change is the third place that moves
+    /// a unit between two of those counts, and a call that did not move them
+    /// would leave one fact in two places with the copies in
+    /// disagreement.[^1] The arena check recounts and compares, so the
+    /// omission fails rather than rots.
+    ///
+    /// **The call raises the revision.** The presence relation is derived
+    /// from the faction column, and it refuses a read taken from an arena
+    /// that has moved on. A faction change that left the revision alone would
+    /// give that relation a stale answer that passed its own freshness
+    /// check.[^2] The derived unit structure does not read the faction
+    /// column, so it rebuilds for nothing here. That is the conservative side
+    /// of one counter, and a second counter would be one fact in two
+    /// places.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`
+    /// [^2]: ADR-0111, the presence relation is derived at the end of the step and never stored as a fact, decision D4. `docs/adrs/draft/adr-0111-the-presence-relation-is-derived-at-the-end-of-the-step.md`
+    pub fn set_faction(&mut self, entity: Entity, faction: FactionId) -> bool {
+        if faction.0 >= FACTION_CEILING {
+            return false;
+        }
+        let Some(slot) = self.slot_of(entity) else {
+            return false;
+        };
+        let index = slot as usize;
+        let held = self.factions[index];
+        if held == faction {
+            return false;
+        }
+        // The slot is live, because the identity resolved, so the count of
+        // the faction it held is at least one.
+        self.by_faction[held.0 as usize] -= 1;
+        self.by_faction[faction.0 as usize] += 1;
+        self.factions[index] = faction;
+        self.revision = self.revision.wrapping_add(1);
+        true
+    }
+
     /// Returns the whole carry column.
     #[must_use]
     pub fn carry_column(&self) -> &[CarryLoad] {

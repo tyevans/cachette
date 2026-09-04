@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-433**
+**Next number: FND-435**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -1647,6 +1647,55 @@ faction column.
 and it holds no second copy of the answer, so the relation replaces the walk
 with a one-bit read and changes no behaviour. Read a missing derived structure
 as a cost question and not as a capability question.
+
+### FND-433 — The arena revision means more than a structural change, and the presence relation depends on that
+
+**Believed.** The revision of the unit arena counts structural changes. The
+doc comment says a spawn, a despawn and a move each raise it by one, and it
+explains that an order and an intent do not, because the derived unit
+structure maps a tile to the units on it and neither of those moves a unit.
+
+**True.** The revision is what every structure derived from the arena checks
+its own freshness against, and the derived unit structure is not the only one.
+The presence relation is folded from the faction column, and it refuses a read
+when the revision has moved on. A write to the faction column that left the
+revision alone would give that relation a stale answer that passed its own
+freshness check.
+
+**Evidence.** Read on 3 September 2026 while adding conversion. `grep -n
+"built\|revision" crates/cachette-core/src/presence.rs` showed the relation
+recording the revision it folded at, and refusing a read when the value moved.
+The conversion pass writes the faction column and moves no unit, so it fits the
+class the doc comment says does not raise the revision.
+
+**Follows.** A faction change raises the revision. The derived unit structure
+does not read the faction column, so it rebuilds for nothing on a frame that
+converted somebody. That is the conservative side of one counter, and a second
+counter would be one fact in two places with nothing that fails on
+disagreement.[^22] Read the revision as "a derived structure must look
+again", not as "a unit was created, removed or moved".
+
+### FND-434 — A doc comment that enumerates the write sites of a maintained count goes stale the moment a third one arrives
+
+**Believed.** The per-faction live count of the unit arena has exactly two
+write sites. Its doc comment says the arena maintains it where a slot becomes
+live and where a slot stops being live, and it names those two moments as the
+reason a caller never counts a population.
+
+**True.** Conversion is a third site. It is neither a birth nor a death, and it
+moves a unit from one count to another. The sentence became false the moment
+that site existed, and nothing in the build failed, because the sentence is
+prose.
+
+**Evidence.** Added on 3 September 2026. The arena check recounts the live
+column against the maintained count and compares, so the omission of the
+update would have failed loudly. The sentence that describes where the update
+happens would not have.
+
+**Follows.** The check is what protects the count. The doc comment is what
+protects the reader, and it decays on a different schedule. Do not enumerate
+the write sites of a maintained value in prose. State the invariant instead,
+and name the check that fails when it breaks.[^46]
 
 ## D. Cost estimates that were wrong
 

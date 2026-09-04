@@ -20,7 +20,7 @@ use cachette_core::resource::{Amount, RecoveryRules, ResourceKind};
 use cachette_core::site::CommodityId;
 use cachette_core::terrain::TileKind;
 use cachette_core::unit_type::UnitTypeId;
-use cachette_core::{Axial, Entity, FactionId, Fix32, World, WorldConfig};
+use cachette_core::{Axial, Entity, FactionId, Fix32, Influence, World, WorldConfig};
 
 /// The thread counts that every scenario runs at.
 const THREAD_COUNTS: [usize; 3] = [1, 2, 12];
@@ -1187,6 +1187,143 @@ const CONTESTED: &[(&str, WorldConfig, u64)] = &[
         4,
     ),
 ];
+
+/// Seats units of several factions and gives each faction a source of belief.
+///
+/// **The sources sit apart and they are unequal.** A world in which every
+/// faction reached every cell equally would convert nobody, because the pass
+/// converts only where one faction leads strictly. The scenario would then
+/// run the pass and measure nothing.[^1]
+///
+/// Returns how many units it seated.
+///
+/// # References
+///
+/// [^1]: Testing rules, section 2a. `.claude/rules/testing.md`
+fn believers(world: &mut World) -> usize {
+    let grid = world.grid();
+    let open: Vec<Axial> = (0..grid.tile_count())
+        .map(|index| Axial::new((index % grid.width()) as i32, (index / grid.width()) as i32))
+        .filter(|address| world.admits_a_unit(*address))
+        .collect();
+    assert!(!open.is_empty(), "the scenario found no open ground");
+    // **The tiles are spread over the whole world, not taken from one
+    // corner.** The pass gives each thread a contiguous run of blocks, so a
+    // patch inside one block puts every mark on one thread and the join order
+    // is then never exercised. The stride is what reaches the case.[^1]
+    //
+    // [^1]: Testing rules, section 2a. `.claude/rules/testing.md`
+    let stride = (open.len() / 32).max(1);
+    let patch: Vec<Axial> = open.iter().copied().step_by(stride).take(32).collect();
+    let factions = world.faction_count();
+    let mut seated = 0usize;
+    for (ordinal, address) in patch.iter().enumerate() {
+        for seat in 0..8u32 {
+            world
+                .spawn_soldier(
+                    *address,
+                    FactionId(((seat + ordinal as u32) % u32::from(factions)) as u16),
+                )
+                .expect("the open tile admits a unit");
+            seated += 1;
+        }
+    }
+    // Each faction injects at a place of its own, and the strengths differ, so
+    // one faction leads at each cell and the margins are not all the same.
+    for faction in 0..factions {
+        let address = patch[(faction as usize) % patch.len()];
+        let strength = Influence(u16::MAX / (faction + 1));
+        assert!(world.set_influence_source(FactionId(faction), address, strength));
+    }
+    seated
+}
+
+/// Runs the frames over a world in which belief takes units from a faction.
+fn run_with_a_conversion(
+    config: WorldConfig,
+    frames: u64,
+    threads: usize,
+) -> (Vec<u8>, u64, usize) {
+    let mut world = World::new(config).expect("the extent must describe a world");
+    let seated = believers(&mut world);
+    assert!(seated > 0);
+    let mut converted = 0usize;
+    let mut log = Vec::new();
+    for _ in 0..frames {
+        world.step(threads).expect("the step must run");
+        // The log holds the units of one frame, so the run appends each frame
+        // and compares the whole sequence. A comparison of the last frame
+        // alone would miss an order that only differs early.
+        log.extend_from_slice(world.converted_log_bytes());
+        converted += world.converted_log().len();
+    }
+    assert!(world.check_invariants());
+    assert!(converted > 0, "the scenario converted nobody at all");
+    (log, world.state_hash().finish(), converted)
+}
+
+/// The scenarios in which belief moves units between factions.
+///
+/// A conversion needs at least two factions, a patch of open ground, and a
+/// world wide enough to hold more than one level 1 cell, because the field is
+/// a plane over those cells.
+const CONVERTED: &[(&str, WorldConfig, u64)] = &[
+    (
+        "one cell",
+        WorldConfig {
+            width: 8,
+            height: 8,
+            seed: 7,
+            faction_count: 2,
+            unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
+        },
+        6,
+    ),
+    (
+        "an uneven split",
+        WorldConfig {
+            width: 17,
+            height: 59,
+            seed: 0x0123_4567_89ab_cdef,
+            faction_count: 4,
+            unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
+        },
+        8,
+    ),
+    (
+        "many blocks",
+        WorldConfig {
+            width: 256,
+            height: 256,
+            seed: 42,
+            faction_count: 16,
+            unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
+        },
+        6,
+    ),
+];
+
+#[test]
+fn a_world_whose_belief_spreads_is_identical_at_every_thread_count() {
+    for (name, config, frames) in CONVERTED {
+        let expected = run_with_a_conversion(*config, *frames, THREAD_COUNTS[0]);
+        for threads in &THREAD_COUNTS[1..] {
+            let produced = run_with_a_conversion(*config, *frames, *threads);
+            assert_eq!(
+                produced.0, expected.0,
+                "scenario {name}: the conversion log differs at {threads} threads"
+            );
+            assert_eq!(
+                produced.1, expected.1,
+                "scenario {name}: the state hash differs at {threads} threads"
+            );
+            assert_eq!(
+                produced.2, expected.2,
+                "scenario {name}: the number that converted differs at {threads} threads"
+            );
+        }
+    }
+}
 
 #[test]
 fn a_world_whose_factions_meet_is_identical_at_every_thread_count() {

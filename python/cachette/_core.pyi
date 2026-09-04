@@ -407,6 +407,19 @@ class TradeBookColumns(TypedDict):
     closed_until: npt.NDArray[np.uint64]
     rounds: npt.NDArray[np.uint8]
 
+class UnitConvertedColumns(TypedDict):
+    """One column for each field of a conversion event.
+
+    An entry names one unit that changed faction on the last step. The unit
+    keeps its identity, so `unit` names the same unit before and after.
+    """
+
+    tick: npt.NDArray[np.uint64]
+    unit: npt.NDArray[np.uint64]
+    tile: npt.NDArray[np.uint32]
+    from_faction: npt.NDArray[np.uint16]
+    to_faction: npt.NDArray[np.uint16]
+
 class TradeSpokenColumns(TypedDict):
     """One column for each field of a trade event.
 
@@ -490,6 +503,14 @@ class World:
         destination: int = ...,
     ) -> None: ...
     def stop_sending(self, units: Identities) -> None: ...
+    def convert_units(self, units: Identities, faction: int) -> None: ...
+    def converted_log_columns(self) -> UnitConvertedColumns: ...
+    @property
+    def converted_count(self) -> int: ...
+    def set_influence_source(
+        self, faction: int, q: int, r: int, strength: int
+    ) -> None: ...
+    def influence(self, faction: int, q: int, r: int) -> int: ...
     @property
     def destination_count(self) -> int: ...
     def set_destination_count(self, count: int) -> None: ...

@@ -20,8 +20,8 @@ use cachette_core::unit_type::UnitTypeId;
 use cachette_core::upgrade::UpgradeKind;
 use cachette_core::TileIdx;
 use cachette_core::{
-    Axial, CommodityId, Entity, FactionId, Fix32, Holder, ResourceKind, World as CoreWorld,
-    WorldConfig,
+    Axial, CommodityId, Entity, FactionId, Fix32, Holder, Influence, ResourceKind,
+    World as CoreWorld, WorldConfig,
 };
 use cachette_view::panel::Set as PanelSet;
 use cachette_view::{fill_frame, Camera, FrameSize, Lap, Metrics, Overlay, Surface};
@@ -2539,6 +2539,205 @@ impl PyWorld {
         world
             .stop_sending(&resolved)
             .map_err(|error| VerbError::new_err(error.to_string()))
+    }
+
+    /// Sets how strongly one faction pushes belief out from one place.
+    ///
+    /// The faction is the number of the faction, from zero to one below the
+    /// faction count of the world. The place is an address, as a column `q`
+    /// and a row `r`. The strength is an integer from 0 to 65535, where 65535
+    /// is one whole reference unit of reach and 0 is none. Returns `None`.
+    ///
+    /// **The source is a standing term, not a single push.** The engine adds
+    /// it again on every pass of every step, and the reach spreads outward
+    /// and falls with distance. Set it once and it keeps working. Set it to
+    /// zero to stop it, and what it already spread then fades over the steps
+    /// that follow.
+    ///
+    /// **The reach answers for a block of ground and not for a tile.** The
+    /// engine holds one value for each faction and each block, so two
+    /// addresses in one block name one place.[^1]
+    ///
+    /// This is the ambient route to taking the people of another faction. A
+    /// unit converts where another faction reaches its place more strongly
+    /// than its own faction does.[^2]
+    ///
+    /// ```python
+    /// world.set_influence_source(faction=0, q=48, r=48, strength=65535)
+    /// for _ in range(8):
+    ///     world.step(threads=4)
+    /// gained = world.converted_log_columns()
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// Raises `ViewError` when the address lies outside the world, and when
+    /// the world holds no such faction.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0060, an influence map is stored as a shared basis, decision D1. `docs/adrs/draft/adr-0060-an-influence-map-is-stored-as-a-shared-basis.md`
+    /// [^2]: ADR-0133, a unit converts to the faction that leads the influence field at its cell, decision D1. `docs/adrs/draft/adr-0133-a-unit-converts-to-the-faction-that-leads-the-field.md`
+    fn set_influence_source(&self, faction: u16, q: i32, r: i32, strength: u16) -> PyResult<()> {
+        let mut world = self.lock();
+        if world.set_influence_source(FactionId(faction), Axial::new(q, r), Influence(strength)) {
+            return Ok(());
+        }
+        Err(ViewError::new_err(format!(
+            "({q}, {r}) and the faction {faction} name no place of this world"
+        )))
+    }
+
+    /// Returns how far one faction reaches at one place, as an integer.
+    ///
+    /// The faction is the number of the faction. The place is an address, as a
+    /// column `q` and a row `r`. The result runs from 0 to 65535, where 65535
+    /// is one whole reference unit of reach.
+    ///
+    /// **The reach answers for a block of ground and not for a tile**, so two
+    /// addresses in one block give one answer.[^1]
+    ///
+    /// Read this to see where the next conversion is likely. A unit converts
+    /// to the faction that reaches its place most strongly, and only when that
+    /// faction reaches it more strongly than the unit's own faction does.[^2]
+    ///
+    /// # Errors
+    ///
+    /// Raises `ViewError` when the address lies outside the world, and when
+    /// the world holds no such faction.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0060, an influence map is stored as a shared basis, decision D1. `docs/adrs/draft/adr-0060-an-influence-map-is-stored-as-a-shared-basis.md`
+    /// [^2]: ADR-0133, a unit converts to the faction that leads the influence field at its cell, decision D1. `docs/adrs/draft/adr-0133-a-unit-converts-to-the-faction-that-leads-the-field.md`
+    fn influence(&self, faction: u16, q: i32, r: i32) -> PyResult<u16> {
+        let world = self.lock();
+        world
+            .influence(FactionId(faction), Axial::new(q, r))
+            .map(|value| value.0)
+            .ok_or_else(|| {
+                ViewError::new_err(format!(
+                    "({q}, {r}) and the faction {faction} name no place of this world"
+                ))
+            })
+    }
+
+    /// Changes the faction of every soldier the identities name.
+    ///
+    /// The units are a sequence of identities, or the NumPy array of
+    /// `numpy.uint64` that `spawn_soldiers` or `faction_units` returned. The
+    /// faction is the number of the faction that the units join, from zero to
+    /// one below the faction count of the world. Returns `None`.
+    ///
+    /// A unit that changes faction keeps its identity, so every identity the
+    /// caller holds still names the same unit. It keeps its type, the load it
+    /// carries, the tile it stands on and the site it lives in. It loses its
+    /// gather order, its build order and its destination, because an order is
+    /// an instruction from the faction that no longer holds it. A unit that
+    /// carries a character takes that character with it.[^1]
+    ///
+    /// A unit that already belongs to the faction is left alone. Calling this
+    /// twice with one set therefore has the same result as calling it once.
+    ///
+    /// **The set is all or nothing.** Every identity resolves, and the faction
+    /// is checked, before anything changes.
+    ///
+    /// **This is the deliberate route.** The engine also converts a unit on
+    /// its own, where another faction reaches its place more strongly than its
+    /// own faction does. Set that reach with `set_influence_source` and read
+    /// the result with `converted_log_columns`.[^2]
+    ///
+    /// ```python
+    /// mine = world.faction_units(0)
+    /// world.convert_units(mine["unit"], 1)
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// Raises `ViewError` when an identity names no live soldier, and when the
+    /// number names no faction of this world.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0132, conversion changes the faction of a unit and adds no second allegiance, decisions D2, D3 and D4. `docs/adrs/draft/adr-0132-conversion-changes-the-faction-of-a-unit.md`
+    /// [^2]: ADR-0133, a unit converts to the faction that leads the influence field at its cell, decisions D1 and D4. `docs/adrs/draft/adr-0133-a-unit-converts-to-the-faction-that-leads-the-field.md`
+    fn convert_units(&self, units: Vec<u64>, faction: u16) -> PyResult<()> {
+        let mut world = self.lock();
+        let mut resolved = Vec::with_capacity(units.len());
+        for unit in &units {
+            resolved.push(resolve(&world, *unit)?);
+        }
+        world
+            .convert_units(&resolved, FactionId(faction))
+            .map_err(|error| VerbError::new_err(error.to_string()))
+    }
+
+    /// Returns the units that changed faction in the last step, as columns.
+    ///
+    /// The result is a `dict` of one-dimensional NumPy arrays, and every array
+    /// holds one entry for each unit that changed faction. The keys are:
+    ///
+    /// - `tick`, `numpy.uint64`. The step it happened at.
+    /// - `unit`, `numpy.uint64`. The identity of the unit. It is the identity
+    ///   the unit had before, because a unit that changes faction keeps its
+    ///   identity. Hand it back to `soldier_tile` or to `convert_units`.
+    /// - `tile`, `numpy.uint32`. The tile the unit stood on, as a row-major
+    ///   index. Take `index % world.width` for the column and
+    ///   `index // world.width` for the row.
+    /// - `from_faction`, `numpy.uint16`. The faction that lost the unit.
+    /// - `to_faction`, `numpy.uint16`. The faction that gained it.
+    ///
+    /// **The log covers the last step alone**, and the engine delivers it at
+    /// the frame barrier.[^1] Read it after each `step`. The next step clears
+    /// it.
+    ///
+    /// The log holds the units the engine converted and the units that
+    /// `convert_units` converted. Both are the same change, so one log
+    /// reports both.
+    ///
+    /// A step in which nobody changed faction gives arrays of length zero.
+    ///
+    /// This method copies each column.[^2]
+    ///
+    /// ```python
+    /// world.step(4)
+    /// changed = world.converted_log_columns()
+    /// gained = int((changed["to_faction"] == 0).sum())
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// Raises `ViewError` when the dictionary cannot be built.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0006, an event is plain data and applying it is pure, decision D2. `docs/adrs/accepted/adr-0006-an-event-is-plain-data-and-applying-it-is-pure.md`
+    /// [^2]: ADR-0044, what copies and what does not is declared at the call site. `docs/adrs/REGISTRY.md`
+    fn converted_log_columns<'py>(&self, python: Python<'py>) -> PyResult<Bound<'py, PyDict>> {
+        let world = self.lock();
+        let log = world.converted_log();
+        let columns = PyDict::new(python);
+        let tick: Vec<u64> = log.iter().map(|event| event.tick.0).collect();
+        let unit: Vec<u64> = log.iter().map(|event| event.unit).collect();
+        let tile: Vec<u32> = log.iter().map(|event| event.tile.0).collect();
+        let from: Vec<u16> = log.iter().map(|event| event.from.0).collect();
+        let to: Vec<u16> = log.iter().map(|event| event.to.0).collect();
+        columns.set_item("tick", tick.to_pyarray(python))?;
+        columns.set_item("unit", unit.to_pyarray(python))?;
+        columns.set_item("tile", tile.to_pyarray(python))?;
+        columns.set_item("from_faction", from.to_pyarray(python))?;
+        columns.set_item("to_faction", to.to_pyarray(python))?;
+        Ok(columns)
+    }
+
+    /// The number of units that changed faction in the last step, as an
+    /// integer.
+    ///
+    /// The count covers the last step alone. Read the changes themselves with
+    /// `converted_log_columns`.
+    #[getter]
+    fn converted_count(&self) -> usize {
+        self.lock().converted_log().len()
     }
 
     /// Returns the live soldiers of one faction, as columns.

@@ -134,6 +134,25 @@ pub const fn share(total: Accum, part: Accum, whole: Accum) -> Option<Accum> {
     Some(Accum(saturate_i64(wide)))
 }
 
+/// Returns what the share left behind.
+///
+/// The result is `total * part` less `whole` times the share of the same
+/// three values. The intermediate product is 128 bits wide, so it is exact
+/// for every input that a 64-bit accumulator holds. A caller that hands out
+/// the remainder needs it exactly, because the floor of the share is what
+/// makes a split sum to at most the total.
+///
+/// Returns `None` when the whole is zero. A division by zero is a caller
+/// error, and this module does not panic on it.
+#[must_use]
+pub const fn share_remainder(total: Accum, part: Accum, whole: Accum) -> Option<Accum> {
+    if whole.0 == 0 {
+        return None;
+    }
+    let wide = (total.0 as i128) * (part.0 as i128) % (whole.0 as i128);
+    Some(Accum(saturate_i64(wide)))
+}
+
 /// Divides an accumulator by a whole count.
 ///
 /// The result truncates towards zero, narrowed into the fixed-point

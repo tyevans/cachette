@@ -221,6 +221,8 @@ def _first_open_address(world: cachette.World) -> tuple[int, int]:
                 return (q, r)
     message = "the world admits a unit nowhere"
     raise AssertionError(message)
+
+
 def test_the_unit_type_table_holds_the_documented_rows() -> None:
     """The table takes every documented row and refuses the first one above."""
     world = cachette.World()

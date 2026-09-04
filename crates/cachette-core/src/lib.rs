@@ -20,6 +20,7 @@ pub mod character;
 pub mod choose;
 pub mod cohort;
 pub mod contest;
+pub mod conversion;
 pub mod descent;
 pub mod event;
 pub mod founding;
@@ -64,6 +65,7 @@ pub use cohort::{
     SiteRationed, UnitStarved, COHORTS_PER_SITE,
 };
 pub use contest::{ContestError, UnitFell};
+pub use conversion::{ConversionError, Convert, UnitConverted};
 pub use descent::{
     Descent, DescentError, DescentId, HouseId, Parents, DESCENT_CEILING, RELATION_DEPTH,
 };
@@ -108,4 +110,4 @@ pub use unit_type::{
     UnitTypeError, UnitTypeId, UnitTypeRow, UnitTypeTable, DEFAULT_UNIT_TYPE, UNIT_TYPE_COUNT,
 };
 pub use upgrade::{UpgradeKind, UpgradeMap, UpgradeSite, UPGRADE_KIND_COUNT};
-pub use world::{IdentityError, StepError, World, WorldConfig, WorldError};
+pub use world::{ConvertError, IdentityError, StepError, World, WorldConfig, WorldError};

@@ -423,6 +423,8 @@ def test_a_refused_send_set_sends_nobody(seed: int) -> None:
 
     with pytest.raises(cachette.ViewError):
         world.send_units_to(units, [(2, 2)])
+
+
 def test_one_tank_still_kills_four_bowmen(seed: int) -> None:
     """The acceptance test the project owner set, at the Python boundary.
 
@@ -495,3 +497,89 @@ def test_a_unit_type_the_table_does_not_hold_is_refused(seed: int) -> None:
     with pytest.raises(cachette.VerbError) as refused:
         world.set_unit_types(units, 200)
     assert "200" in str(refused.value), "the error names the number"
+
+
+def _open_ground(world: cachette.World, count: int) -> list[tuple[int, int]]:
+    """Find addresses that admit a unit, in row order.
+
+    The ground is generated, so a test cannot name a tile and assume it is
+    open. It searches instead.
+    """
+    found: list[tuple[int, int]] = []
+    for row in range(world.height):
+        for column in range(world.width):
+            if world.tile_report(column, row)["passable"]:
+                found.append((column, row))
+                if len(found) == count:
+                    return found
+    raise AssertionError("the world holds no open ground")
+
+
+def test_the_control_plane_converts_a_set_of_units() -> None:
+    """The verb changes the faction of a whole set in one call."""
+    world = cachette.World(width=16, height=16, seed=1, faction_count=2)
+    where = _open_ground(world, 1)[0]
+    units = world.spawn_soldiers([where] * 4, 0)
+
+    world.convert_units(units, 1)
+
+    population = world.faction_population()
+    assert population[0] == 0, "the set kept its old faction"
+    assert population[1] == 4, "the new faction did not gain the set"
+    # The identity survives, so the same array names the same units.
+    world.convert_units(units, 0)
+    assert world.faction_population()[0] == 4, "the identities stopped naming the units"
+
+
+def test_a_conversion_set_holding_a_dead_unit_changes_nobody() -> None:
+    world = cachette.World(width=16, height=16, seed=1, faction_count=2)
+    where = _open_ground(world, 1)[0]
+    units = [int(unit) for unit in world.spawn_soldiers([where] * 3, 0)]
+    world.despawn_soldiers([units[0]])
+
+    with pytest.raises(cachette.ViewError):
+        world.convert_units(units, 1)
+
+    assert world.faction_population()[1] == 0, (
+        "the verb changed a unit before it refused the set"
+    )
+
+
+def test_a_conversion_to_a_faction_the_world_does_not_hold_is_refused() -> None:
+    world = cachette.World(width=16, height=16, seed=1, faction_count=2)
+    where = _open_ground(world, 1)[0]
+    units = world.spawn_soldiers([where], 0)
+    with pytest.raises(cachette.VerbError) as refused:
+        world.convert_units(units, 9)
+    assert "9" in str(refused.value), "the error names the number"
+
+
+def test_belief_takes_units_and_the_log_says_where_they_went() -> None:
+    """A source of belief takes the units of the faction that has none."""
+    world = cachette.World(width=64, height=64, seed=3, faction_count=2)
+    seat = _open_ground(world, 8)
+    world.spawn_soldiers(seat, 0)
+    world.set_influence_source(faction=1, q=seat[0][0], r=seat[0][1], strength=65535)
+    assert world.influence(1, seat[0][0], seat[0][1]) == 0, "the field starts empty"
+
+    gained = 0
+    entries: list[tuple[int, int]] = []
+    for _ in range(12):
+        world.step(threads=4)
+        changed = world.converted_log_columns()
+        gained += world.converted_count
+        entries.extend(
+            (int(one), int(two))
+            for one, two in zip(
+                changed["from_faction"], changed["to_faction"], strict=True
+            )
+        )
+
+    assert gained > 0, "the source of belief took nobody"
+    assert world.influence(1, seat[0][0], seat[0][1]) > 0, "the field never climbed"
+    assert all(entry == (0, 1) for entry in entries), (
+        "the log reports a change that the field did not make"
+    )
+    assert world.faction_population()[1] == gained, (
+        "the population count disagrees with the log"
+    )
