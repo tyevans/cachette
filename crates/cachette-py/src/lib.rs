@@ -982,6 +982,370 @@ impl PyWorld {
         Ok(())
     }
 
+    /// Returns the unit type of one soldier, as an integer.
+    ///
+    /// The unit is one identity, as a Python integer. Take an entry of the
+    /// array that `spawn_soldiers` returned, or of the `unit` column of a
+    /// log.
+    ///
+    /// The result is a row of the shared table. Read the row itself with
+    /// `unit_type_table`, and write it with `define_unit_type`. A soldier
+    /// that nothing gave a type carries row zero.[^1]
+    ///
+    /// **This read stays singular while the write verb takes a set.** A set
+    /// form would have to choose between failing the whole call for one dead
+    /// identity and returning a value that stands for nothing. The read of
+    /// the tile of one soldier follows the same rule.[^2]
+    ///
+    /// # Errors
+    ///
+    /// Raises `ViewError` when the identity names no live soldier, and when
+    /// the value is not an identity the engine ever gave.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0120, a unit carries a type, and the type is an index into a table the world is built with, decisions D1 and D3. `docs/adrs/draft/adr-0120-a-unit-carries-a-type-that-indexes-a-table.md`
+    /// [^2]: ADR-0085, an entity crosses to Python as one opaque identity that the engine resolves, decisions D1 and D3. `docs/adrs/accepted/adr-0085-an-entity-crosses-to-python-as-one-opaque-identity.md`
+    fn unit_type(&self, unit: u64) -> PyResult<u8> {
+        let world = self.lock();
+        let entity = resolve(&world, unit)?;
+        let found = world
+            .unit_type(entity)
+            .ok_or_else(|| ViewError::new_err(format!("{unit} names no live soldier")))?;
+        Ok(found.0)
+    }
+
+    /// Returns the shared unit type table, as a `dict` of NumPy arrays.
+    ///
+    /// A unit type is a row of this table. A soldier carries the row number
+    /// alone. The table is data that the world holds, and it is not code.[^1]
+    ///
+    /// Both arrays hold one entry for each row, and the two are the same
+    /// length. **That length is the number of types the world holds.**
+    /// Nothing else states the width, so a caller reads it here rather than
+    /// from a second number that could disagree.[^3]
+    ///
+    /// - `attack`, `numpy.int32`. The harm that one unit of the row delivers
+    ///   in one resolution. The value carries the Q16.16 fixed-point scale,
+    ///   so one whole casualty is 65536 and one half casualty is 32768.
+    /// - `armour`, `numpy.int32`. The attack that an attacker must exceed to
+    ///   reach a unit of the row, in the same Q16.16 scale.
+    ///
+    /// **The width of the table is fixed, and the values are configurable.**
+    /// The world builds the table with every row at zero, and
+    /// `define_unit_type` writes one row. A row that nobody wrote holds zero
+    /// attack and zero armour, so a unit of that row reaches nothing and
+    /// nothing reaches it.[^1]
+    ///
+    /// The values are content. No record holds one, because a record may hold
+    /// no number that a content choice can move.[^4]
+    ///
+    /// This method copies each column.[^2]
+    ///
+    /// # Errors
+    ///
+    /// Raises `ViewError` when the dictionary cannot be built.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0120, a unit carries a type, and the type is an index into a table the world is built with, decisions D1 and D2. `docs/adrs/draft/adr-0120-a-unit-carries-a-type-that-indexes-a-table.md`
+    /// [^2]: ADR-0044, what copies and what does not is declared at the call site. `docs/adrs/REGISTRY.md`
+    /// [^3]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`
+    /// [^4]: Decision Record Scope, section 4.1. `.claude/rules/adr-scope.md`
+    fn unit_type_table<'py>(&self, python: Python<'py>) -> PyResult<Bound<'py, PyDict>> {
+        let world = self.lock();
+        let rows = world.unit_types().rows();
+        let columns = PyDict::new(python);
+        let attack: Vec<i32> = rows.iter().map(|row| row.attack.0).collect();
+        let armour: Vec<i32> = rows.iter().map(|row| row.armour.0).collect();
+        columns.set_item("attack", attack.to_pyarray(python))?;
+        columns.set_item("armour", armour.to_pyarray(python))?;
+        Ok(columns)
+    }
+
+    /// Returns the starved log of the last step, as a `dict` of NumPy arrays.
+    ///
+    /// A starved event says that a shortage ended one unit. The engine writes
+    /// one entry for each unit that the scan of this step removed, in
+    /// ascending slot order.
+    ///
+    /// **The log holds the last step alone.** The next step clears it before
+    /// it does anything, so the entries of a step are gone once another step
+    /// runs. Keep a copy of what you need. The engine holds no queue.
+    ///
+    /// The consumption pass runs on a schedule, and the scan runs with it. On
+    /// a step the schedule does not name, and on a step that ended nobody,
+    /// the log is empty. A reader cannot tell the two apart, and nothing
+    /// needs to.
+    ///
+    /// - `tick`, `numpy.uint64`. The step at which the scan ended the unit.
+    /// - `unit`, `numpy.uint64`. The identity of the unit that ended. It is
+    ///   not a slot index. It never resolves again, because the unit is
+    ///   dead.[^1]
+    /// - `deficit`, `numpy.int32`. What the unit went short by. The value
+    ///   carries the Q16.16 fixed-point scale, so 65536 is one whole unit of
+    ///   need. It is at or above the bound that ends a unit.
+    ///
+    /// This method copies each column.[^2]
+    ///
+    /// # Errors
+    ///
+    /// Raises `ViewError` when the dictionary cannot be built.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0085, an entity crosses to Python as one opaque identity that the engine resolves, decisions D1 and D3. `docs/adrs/accepted/adr-0085-an-entity-crosses-to-python-as-one-opaque-identity.md`
+    /// [^2]: ADR-0044, what copies and what does not is declared at the call site. `docs/adrs/REGISTRY.md`
+    fn starved_log_columns<'py>(&self, python: Python<'py>) -> PyResult<Bound<'py, PyDict>> {
+        let world = self.lock();
+        let log = world.starved_log();
+        let columns = PyDict::new(python);
+        let tick: Vec<u64> = log.iter().map(|event| event.tick.0).collect();
+        let unit: Vec<u64> = log.iter().map(|event| event.unit).collect();
+        let deficit: Vec<i32> = log.iter().map(|event| event.deficit.0).collect();
+        columns.set_item("tick", tick.to_pyarray(python))?;
+        columns.set_item("unit", unit.to_pyarray(python))?;
+        columns.set_item("deficit", deficit.to_pyarray(python))?;
+        Ok(columns)
+    }
+
+    /// Gives every settlement the identities name one upkeep rate.
+    ///
+    /// Upkeep is what a site spends of a commodity. It is a rate above zero
+    /// that subtracts, and it is never a production rate below zero.[^1]
+    ///
+    /// The sites are a sequence of settlement identities, or the NumPy array
+    /// of `numpy.uint64` that `found_settlements` returned. Returns `None`.
+    ///
+    /// The commodity is the number of the commodity. A commodity is not a
+    /// resource kind. The world holds one commodity today, and its number is
+    /// zero.
+    ///
+    /// **The rate is a Q16.16 value as its raw integer.** Multiply the amount
+    /// you want by 65536. The rate is what one tick spends, and the schedule
+    /// scales it to one application, so a longer period does not change what
+    /// a site spends over a span of steps. The engine holds no floating point
+    /// number in simulated state, because float addition is not
+    /// associative.[^2]
+    ///
+    /// **This is the one call that makes a shortfall possible.** A site that
+    /// spends nothing can never fall short, so `shortfall_log_columns`
+    /// answers with an empty log until a caller writes an upkeep rate. A
+    /// finding records that the rate had no caller outside a test before this
+    /// binding.[^4]
+    ///
+    /// **The set is all or nothing.** Every identity resolves, and the rate
+    /// and the commodity are checked, before any site is written. One refusal
+    /// leaves the world unchanged and raises.[^3]
+    ///
+    /// # Errors
+    ///
+    /// Raises `ViewError` when an identity names no live settlement. Raises
+    /// `VerbError` when the rate is below zero, and when the number names no
+    /// commodity of this world.
+    ///
+    /// # References
+    ///
+    /// [^1]: Findings register, FND-016. `docs/FINDINGS.md`
+    /// [^2]: ADR-0002, simulated and aggregated state holds no floating point number, decision D1. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
+    /// [^3]: ADR-0085, an entity crosses to Python as one opaque identity that the engine resolves, decision D3. `docs/adrs/accepted/adr-0085-an-entity-crosses-to-python-as-one-opaque-identity.md`
+    /// [^4]: Findings register, FND-460. `docs/FINDINGS.md`
+    #[pyo3(signature = (sites, rate, commodity = 0))]
+    fn spend_at_sites(&self, sites: Vec<u64>, rate: i32, commodity: u16) -> PyResult<()> {
+        let mut world = self.lock();
+        if rate < 0 {
+            return Err(VerbError::new_err(format!("the rate {rate} is below zero")));
+        }
+        let goods = CommodityId(commodity);
+        let mut resolved = Vec::with_capacity(sites.len());
+        for site in &sites {
+            resolved.push(resolve_site(&world, *site)?);
+        }
+        // The commodity is checked against the store of each site before
+        // anything is written. A write that refused halfway would leave one
+        // part of the set changed and the rest untouched. The store holds one
+        // quantity for each commodity, so it is what states the set.
+        for entity in &resolved {
+            world
+                .settlements()
+                .store(*entity)
+                .and_then(|held| held.quantity(goods))
+                .ok_or_else(|| {
+                    VerbError::new_err(format!("{commodity} names no commodity of this world"))
+                })?;
+        }
+        for entity in resolved {
+            let wrote = world
+                .set_upkeep_rate(entity, goods, Fix32(rate))
+                .map_err(|error| VerbError::new_err(error.to_string()))?;
+            assert!(
+                wrote,
+                "a resolved identity must name a settlement the world can write"
+            );
+        }
+        Ok(())
+    }
+
+    /// Returns the shortfall log of the last step, as a `dict` of NumPy
+    /// arrays.
+    ///
+    /// A shortfall event says that one site could not pay its upkeep. The
+    /// store stopped at zero rather than going below it, so the amount is
+    /// what the world must supply to make the site solvent.
+    ///
+    /// **The log holds the last step alone.** The next step clears it before
+    /// it does anything, so the entries of a step are gone once another step
+    /// runs. Keep a copy of what you need. The engine holds no queue.
+    ///
+    /// The rate pass runs on a schedule. On a step the schedule does not
+    /// name, and on a step in which every site paid, the log is empty.
+    ///
+    /// - `tick`, `numpy.uint64`. The step at which the upkeep applied.
+    /// - `site`, `numpy.uint64`. The identity of the settlement that could
+    ///   not pay. It is not a slot index. Hand it back to
+    ///   `site_economy`.[^1]
+    /// - `amount`, `numpy.int32`. What the upkeep could not take. The value
+    ///   carries the Q16.16 fixed-point scale, so 65536 is one whole unit of
+    ///   the commodity. It is never zero.
+    /// - `commodity`, `numpy.uint16`. The commodity that the site owed. A
+    ///   commodity is not a resource kind. The world holds one commodity
+    ///   today, and its number is zero.
+    ///
+    /// This method copies each column.[^2]
+    ///
+    /// # Errors
+    ///
+    /// Raises `ViewError` when the dictionary cannot be built.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0085, an entity crosses to Python as one opaque identity that the engine resolves, decisions D1 and D3. `docs/adrs/accepted/adr-0085-an-entity-crosses-to-python-as-one-opaque-identity.md`
+    /// [^2]: ADR-0044, what copies and what does not is declared at the call site. `docs/adrs/REGISTRY.md`
+    fn shortfall_log_columns<'py>(&self, python: Python<'py>) -> PyResult<Bound<'py, PyDict>> {
+        let world = self.lock();
+        let log = world.shortfall_log();
+        let columns = PyDict::new(python);
+        let tick: Vec<u64> = log.iter().map(|event| event.tick.0).collect();
+        let site: Vec<u64> = log.iter().map(|event| event.site).collect();
+        let amount: Vec<i32> = log.iter().map(|event| event.amount.0).collect();
+        let commodity: Vec<u16> = log.iter().map(|event| event.commodity).collect();
+        columns.set_item("tick", tick.to_pyarray(python))?;
+        columns.set_item("site", site.to_pyarray(python))?;
+        columns.set_item("amount", amount.to_pyarray(python))?;
+        columns.set_item("commodity", commodity.to_pyarray(python))?;
+        Ok(columns)
+    }
+
+    /// Returns the rationed log of the last step, as a `dict` of NumPy
+    /// arrays.
+    ///
+    /// A rationed event says that one site could not serve every cohort that
+    /// drew on it. A cohort is the group of units of one faction that draw
+    /// from one site. The store stopped at zero rather than going below it,
+    /// so the granted amount is always below the demanded amount.
+    ///
+    /// **The log holds the last step alone.** The next step clears it before
+    /// it does anything, so the entries of a step are gone once another step
+    /// runs. Keep a copy of what you need. The engine holds no queue.
+    ///
+    /// The consumption pass runs on a schedule. On a step the schedule does
+    /// not name, and on a step in which every site served every cohort, the
+    /// log is empty.
+    ///
+    /// - `tick`, `numpy.uint64`. The step at which the draw ran.
+    /// - `site`, `numpy.uint64`. The identity of the settlement that could
+    ///   not serve. It is not a slot index. Hand it back to
+    ///   `site_economy`.[^1]
+    /// - `demanded`, `numpy.int64`. What the cohorts of the site asked for.
+    ///   The value carries the Q16.16 fixed-point scale, so 65536 is one
+    ///   whole unit of the commodity.
+    /// - `granted`, `numpy.int64`. What the store gave, in the same Q16.16
+    ///   scale. It is always below the demanded amount.
+    /// - `commodity`, `numpy.uint16`. The commodity that the cohorts drew. A
+    ///   commodity is not a resource kind. The world holds one commodity
+    ///   today, and its number is zero.
+    ///
+    /// This method copies each column.[^2]
+    ///
+    /// # Errors
+    ///
+    /// Raises `ViewError` when the dictionary cannot be built.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0085, an entity crosses to Python as one opaque identity that the engine resolves, decisions D1 and D3. `docs/adrs/accepted/adr-0085-an-entity-crosses-to-python-as-one-opaque-identity.md`
+    /// [^2]: ADR-0044, what copies and what does not is declared at the call site. `docs/adrs/REGISTRY.md`
+    fn rationed_log_columns<'py>(&self, python: Python<'py>) -> PyResult<Bound<'py, PyDict>> {
+        let world = self.lock();
+        let log = world.rationed_log();
+        let columns = PyDict::new(python);
+        let tick: Vec<u64> = log.iter().map(|event| event.tick.0).collect();
+        let site: Vec<u64> = log.iter().map(|event| event.site).collect();
+        let demanded: Vec<i64> = log.iter().map(|event| event.demanded.0).collect();
+        let granted: Vec<i64> = log.iter().map(|event| event.granted.0).collect();
+        let commodity: Vec<u16> = log.iter().map(|event| event.commodity).collect();
+        columns.set_item("tick", tick.to_pyarray(python))?;
+        columns.set_item("site", site.to_pyarray(python))?;
+        columns.set_item("demanded", demanded.to_pyarray(python))?;
+        columns.set_item("granted", granted.to_pyarray(python))?;
+        columns.set_item("commodity", commodity.to_pyarray(python))?;
+        Ok(columns)
+    }
+
+    /// Returns the promotion log of the last step, as a `dict` of NumPy
+    /// arrays.
+    ///
+    /// A promotion event says that one soldier became a character. The engine
+    /// writes one entry for each soldier the pass promoted, in rank order,
+    /// with the highest deeds first.
+    ///
+    /// **The log holds the last step alone.** The next step clears it before
+    /// it does anything, so the entries of a step are gone once another step
+    /// runs. Keep a copy of what you need. The engine holds no queue.
+    ///
+    /// The promotion pass runs on a schedule. On a step the schedule does not
+    /// name, and on a step that promoted nobody, the log is empty.
+    ///
+    /// - `tick`, `numpy.uint64`. The step at which the pass promoted the
+    ///   soldier.
+    /// - `unit`, `numpy.uint64`. The identity of the soldier. It is not a
+    ///   slot index. The soldier stays alive, so `soldier_tile` answers for
+    ///   it.[^1]
+    /// - `character`, `numpy.uint64`. The identity of the character that the
+    ///   promotion created. It is not a slot index.[^1]
+    /// - `deeds`, `numpy.uint64`. What the soldier gathered and handed over,
+    ///   as a running total. It is a whole number of units of stock, and it
+    ///   carries no fixed-point scale.
+    /// - `faction`, `numpy.uint16`. The faction of the soldier and of the
+    ///   character.
+    ///
+    /// This method copies each column.[^2]
+    ///
+    /// # Errors
+    ///
+    /// Raises `ViewError` when the dictionary cannot be built.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0085, an entity crosses to Python as one opaque identity that the engine resolves, decisions D1 and D3. `docs/adrs/accepted/adr-0085-an-entity-crosses-to-python-as-one-opaque-identity.md`
+    /// [^2]: ADR-0044, what copies and what does not is declared at the call site. `docs/adrs/REGISTRY.md`
+    fn promoted_log_columns<'py>(&self, python: Python<'py>) -> PyResult<Bound<'py, PyDict>> {
+        let world = self.lock();
+        let log = world.promoted_log();
+        let columns = PyDict::new(python);
+        let tick: Vec<u64> = log.iter().map(|event| event.tick.0).collect();
+        let unit: Vec<u64> = log.iter().map(|event| event.unit).collect();
+        let character: Vec<u64> = log.iter().map(|event| event.character).collect();
+        let deeds: Vec<u64> = log.iter().map(|event| event.deeds).collect();
+        let faction: Vec<u16> = log.iter().map(|event| event.faction.0).collect();
+        columns.set_item("tick", tick.to_pyarray(python))?;
+        columns.set_item("unit", unit.to_pyarray(python))?;
+        columns.set_item("character", character.to_pyarray(python))?;
+        columns.set_item("deeds", deeds.to_pyarray(python))?;
+        columns.set_item("faction", faction.to_pyarray(python))?;
+        Ok(columns)
+    }
+
     /// Returns the tile that one soldier stands on, as an integer.
     ///
     /// The unit is one identity, as a Python integer. Take an entry of the

@@ -423,6 +423,8 @@ def test_a_refused_send_set_sends_nobody(seed: int) -> None:
 
     with pytest.raises(cachette.ViewError):
         world.send_units_to(units, [(2, 2)])
+
+
 def test_one_tank_still_kills_four_bowmen(seed: int) -> None:
     """The acceptance test the project owner set, at the Python boundary.
 
@@ -467,11 +469,18 @@ def test_ten_thousand_bowmen_also_lose_to_one_tank() -> None:
 def test_a_refused_unit_type_set_gives_no_type() -> None:
     """One dead identity leaves the whole set untouched.
 
-    The module holds no read of the type of one unit, so the test reads the
-    write through what it changes: a unit of the armed type ends a unit of
-    the other faction, and a unit that kept the unarmed type ends nobody.
-    Without that step the test would assert only that the call raised, which
-    it would do whether or not the set was written.
+    This test reads the write through what it changes: a unit of the armed
+    type ends a unit of the other faction, and a unit that kept the unarmed
+    type ends nobody. Without that step the test would assert only that the
+    call raised, which it would do whether or not the set was written.
+
+    The module now also reads the type of one unit back, and a test beside
+    this one asserts the refusal that way.[^1]
+
+    References
+    ----------
+    [^1]: The unit type and log tests.
+    ``tests/test_unit_types_and_logs.py``
     """
     world = cachette.World(width=1, height=1, seed=1, faction_count=2)
     # Type one reaches. Type zero, which every new soldier carries, does not.

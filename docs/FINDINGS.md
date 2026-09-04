@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-433**
+**Next number: FND-462**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -625,6 +625,53 @@ this package is documented owns both.
 
 
 ## C. Defects found in specified rules
+
+### FND-460 — The shortfall log could not hold an entry, because nothing outside a Rust test ever set an upkeep rate
+
+**Believed.** The engine records a shortfall when a site cannot pay its upkeep.
+The world holds the log, the log holds a plain data event, and the rate pass
+fills it on every scheduled step.
+
+**True.** The rate pass filled it on no step of any run a caller could make. An
+upkeep rate starts at zero for every site, and a site that spends nothing can
+never fall short. The founding sets a production rate from the food the survey
+read, and it sets no upkeep rate at all.[^F460A]
+
+**Evidence.** A whole-tree search for the writer found the core method, two
+Rust test files, and nothing else. No pass writes it. No binding exposed it.
+The commit body holds the search command.
+
+**Follows.** Two things.
+
+**A log is not reachable until its writer is reachable.** This work bound the
+shortfall log and the upkeep rate together, because binding the reader alone
+would have shipped a call that answers with an empty log for ever. That is the
+inert capability shape with an extra step in it: the reader is invoked, and the
+thing it reads is not.[^F460B]
+
+**The same question applies to every other log.** Ask what writes it, and ask
+whether a caller can reach that writer. The four other logs this work bound each
+have a writer that a step reaches on its own.
+
+### FND-461 — A small world feeds itself, so a log fixture built from one measures the fixture
+
+**Believed.** A world with soldiers, sites and the default need rule goes short
+by itself. Step it far enough and units ration, go hungry and starve.
+
+**True.** It depends on the extent and on the faction count. A world of two
+factions on 32 tiles a side fed itself for the whole of a run. Every unit held a
+full need, no site rationed, nobody starved, and nobody was promoted.
+
+**Evidence.** A probe stepped that world 400 times and recorded no entry in the
+rationed log, the starved log or the promotion log. The same probe on 64 tiles a
+side with four factions recorded entries in all three: the first rationing on
+step 10, the first promotion on step 40, and the first starvation on step 120.
+The commit body holds both runs.
+
+**Follows.** A test for a log of scarcity states the extent and the faction
+count as the thing that makes the case, and says so where a reader will look.
+The fixture rule already says not to model the typical case, and this is that
+rule reaching a subsystem it had not reached.[^F461A]
 
 ### FND-411 — A unit ordered to a place stopped at a shoreline and never arrived, and it was not frozen
 
@@ -11055,3 +11102,6 @@ itself rather than merely underspecified.
 [^F420B]: The resource kinds and their numbering. `crates/cachette-core/src/resource.rs`
 [^F420C]: Decisions register, DEC-201, in this document's companion. `docs/DECISIONS.md`
 [^F421A]: The luxury tests. `crates/cachette-core/tests/luxury.rs`
+[^F460A]: ADR-0062, production and upkeep are rates attached to a site, decision D2. `docs/adrs/accepted/adr-0062-production-and-upkeep-are-rates-attached-to-a-site.md`
+[^F460B]: Recurring defect shapes, shape 3. `.claude/rules/recurring-defects.md`
+[^F461A]: Testing Rules, section 2a. `.claude/rules/testing.md`

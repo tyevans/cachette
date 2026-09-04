@@ -23,7 +23,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^ALLOC]
 
-**Next number: DEC-214**
+**Next number: DEC-251**
 
 ## Open
 
@@ -1782,6 +1782,36 @@ figure is 168 MB. The storage argument for vectors is stronger than the report
 concluded, and it called that argument its weakest.
 
 ## Closed
+
+### DEC-250 — How does a Python caller learn how many unit types the world holds?
+
+**Closed. Option A. The caller reads the length of a column of the type table,
+and the module states the width nowhere else.**
+
+A unit type is a row of a shared table, and a caller that chooses a type must
+know which rows exist. The table width is a structural property of the engine:
+the resolution of a meeting reads the table for each ordered pair of types, so
+the cost follows the square of the width.[^DEC250A]
+
+**Option A. The table read states the width.** The call answers with one array
+for each field, and every array holds one entry for each row. A caller takes the
+length of an array.
+
+**Option B. A second call answers the width.** A static method returns the
+number, and the table read returns the rows.
+
+**Option C. Both, with the second call as a convenience.**
+
+**Why A.** Option B and option C put one value in two declaration sites, and
+nothing fails when the copies disagree. That is the defect shape this project
+has recorded a local instance of, and the rule says to declare a value once and
+to add a check when a second site must exist.[^DEC250B] There is no second site
+worth checking here, because the array a caller already holds carries the
+number.
+
+**What follows.** A caller that wants to refuse a type number before it calls
+takes the length of the attack column. The verb refuses the number as well, so
+the read is a convenience and not the enforcement.
 
 ### DEC-141 — Does the engine derive a presence relation between factions, or does the selector answer presence?
 
@@ -3880,3 +3910,5 @@ game rule, and a blocker holds it.[^DEC213B]
 [^DEC201D]: Backlog item 0411, record where a luxury lives. `docs/backlog/proposed/0411-record-where-a-luxury-lives.md`
 [^DEC202A]: ADR-0053, a faction is a bit in a mask, and a relation is a plane, decision D3. `docs/adrs/accepted/adr-0053-a-faction-is-a-bit-in-a-mask-and-a-relation-is-a-plane.md`
 [^DEC202B]: Blockers register, BLK-111. `docs/BLOCKERS.md`
+[^DEC250A]: ADR-0121, a meeting between two factions resolves at the tile, decision D3. `docs/adrs/draft/adr-0121-a-meeting-between-two-factions-resolves-at-the-tile.md`
+[^DEC250B]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`

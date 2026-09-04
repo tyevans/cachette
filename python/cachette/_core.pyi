@@ -75,6 +75,78 @@ class ResourceTakenColumns(TypedDict):
     amount: npt.NDArray[np.uint32]
     kind: npt.NDArray[np.uint8]
 
+class UnitTypeColumns(TypedDict):
+    """One column for each field of a row of the unit type table.
+
+    Both columns hold one entry for each row of the table, and the length of
+    a column is the number of types the world holds.
+
+    Both columns carry the Q16.16 fixed-point scale as a raw integer. One
+    whole casualty is 65536. Neither is a floating point number.
+    """
+
+    attack: npt.NDArray[np.int32]
+    armour: npt.NDArray[np.int32]
+
+class UnitStarvedColumns(TypedDict):
+    """One column for each field of the starved event.
+
+    The unit column holds the whole identity of the unit that a shortage
+    ended. It is not a slot index, and it never resolves again.
+
+    The deficit column carries the Q16.16 fixed-point scale as a raw integer.
+    """
+
+    tick: npt.NDArray[np.uint64]
+    unit: npt.NDArray[np.uint64]
+    deficit: npt.NDArray[np.int32]
+
+class SiteShortfallColumns(TypedDict):
+    """One column for each field of the shortfall event.
+
+    The site column holds the whole identity of the settlement. It is not a
+    slot index.
+
+    The amount column carries the Q16.16 fixed-point scale as a raw integer.
+    """
+
+    tick: npt.NDArray[np.uint64]
+    site: npt.NDArray[np.uint64]
+    amount: npt.NDArray[np.int32]
+    commodity: npt.NDArray[np.uint16]
+
+class SiteRationedColumns(TypedDict):
+    """One column for each field of the rationed event.
+
+    The site column holds the whole identity of the settlement. It is not a
+    slot index.
+
+    The demanded column and the granted column carry the Q16.16 fixed-point
+    scale as raw integers.
+    """
+
+    tick: npt.NDArray[np.uint64]
+    site: npt.NDArray[np.uint64]
+    demanded: npt.NDArray[np.int64]
+    granted: npt.NDArray[np.int64]
+    commodity: npt.NDArray[np.uint16]
+
+class UnitPromotedColumns(TypedDict):
+    """One column for each field of the promotion event.
+
+    The unit column and the character column hold whole identities. Neither
+    is a slot index.
+
+    The deeds column is a whole number of units of stock. It carries no
+    fixed-point scale.
+    """
+
+    tick: npt.NDArray[np.uint64]
+    unit: npt.NDArray[np.uint64]
+    character: npt.NDArray[np.uint64]
+    deeds: npt.NDArray[np.uint64]
+    faction: npt.NDArray[np.uint16]
+
 class PositionColumns(TypedDict):
     """One column for each field of a position at a site.
 
@@ -475,6 +547,15 @@ class World:
     def order_gather(self, units: Identities, kind: int) -> None: ...
     def define_unit_type(self, unit_type: int, attack: int, armour: int) -> None: ...
     def set_unit_types(self, units: Identities, unit_type: int) -> None: ...
+    def unit_type(self, unit: int) -> int: ...
+    def unit_type_table(self) -> UnitTypeColumns: ...
+    def spend_at_sites(
+        self, sites: Identities, rate: int, commodity: int = ...
+    ) -> None: ...
+    def starved_log_columns(self) -> UnitStarvedColumns: ...
+    def shortfall_log_columns(self) -> SiteShortfallColumns: ...
+    def rationed_log_columns(self) -> SiteRationedColumns: ...
+    def promoted_log_columns(self) -> UnitPromotedColumns: ...
     def soldier_tile(self, unit: int) -> int: ...
     def order_build(self, units: Identities, kind: int) -> None: ...
     def stop_build(self, units: Identities) -> None: ...
