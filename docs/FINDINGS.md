@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-433**
+**Next number: FND-444**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -2916,6 +2916,40 @@ the scope rule names as recording an intent as a fact.
 
 
 ## G. Process
+
+### FND-443 — A test that watches a dead identity refuse does not cover the column that carries the identity
+
+**Believed.** A log column that carries a unit identity is covered by a test
+that hands each entry back to the engine and asserts that the engine refuses
+it. The column holds dead identities, the engine refuses a dead identity, so a
+column that stopped carrying identities would go red.
+
+**True.** It stays green. The engine refuses a slot index for the same reason
+it refuses a dead identity: neither is an identity it gave out. A column that
+emitted the slot index of each fallen unit therefore passed the refusal test
+without a change. Only a test that compares the column against the identities
+the caller was given sees the difference.
+
+**Evidence.** The binding that exposes the fallen log was measured against its
+own tests. The unit column was changed to emit the low bits of each identity,
+which is the slot index. The test that asserts that every identity in the
+column refuses stayed green. The test that compares the set of fallen
+identities against the set the spawn verb returned went red, and it named both
+sets.[^F443A]
+
+**Follows.** Two things.
+
+**A refusal is evidence about the engine, not about the column.** A test that
+asserts a refusal covers the resolution rule. It says nothing about which
+number the column carried, because two different wrong numbers refuse alike.
+This is the shape of the finding that measured defence in depth, one layer
+further out.[^F443B]
+
+**A column of identities needs a round trip against a value the caller
+holds.** The caller of the spawn verb holds the identities the engine gave it.
+Comparing the column against that set is the only assertion here that fails
+when the column carries something else.
+
 
 ### FND-239 — All four merge defects were already checked. What was missing was the timing
 
@@ -10048,6 +10082,9 @@ cohort was eating rations the store never gave. The account they balance is the
 commodity, and the ration a unit receives is not that account.
 
 ## References
+
+[^F443A]: Review of backlog item 0390, section 5. `docs/reviews/0390-the-fallen-log.md`
+[^F443B]: Findings register, FND-148. `docs/FINDINGS.md`
 
 [^F411A]: ADR-0125, the control plane names the seed set of a destination field, decision D4. `docs/adrs/draft/adr-0125-the-control-plane-names-the-seed-set-of-a-destination-field.md`
 [^F411B]: ADR-0091, movement takes its direction from a per-cell field, never from a per-unit search, the consequences. `docs/adrs/draft/adr-0091-movement-takes-its-direction-from-a-per-cell-field.md`

@@ -153,6 +153,7 @@ def test_no_event_column_is_a_floating_point_array(seed: int) -> None:
     for columns in (
         _named(world.event_log_columns()),
         _named(world.gather_log_columns()),
+        _named(world.fell_log_columns()),
     ):
         for name, column in columns.items():
             assert np.issubdtype(column.dtype, np.integer), name
@@ -423,6 +424,8 @@ def test_a_refused_send_set_sends_nobody(seed: int) -> None:
 
     with pytest.raises(cachette.ViewError):
         world.send_units_to(units, [(2, 2)])
+
+
 def test_one_tank_still_kills_four_bowmen(seed: int) -> None:
     """The acceptance test the project owner set, at the Python boundary.
 
@@ -495,3 +498,148 @@ def test_a_unit_type_the_table_does_not_hold_is_refused(seed: int) -> None:
     with pytest.raises(cachette.VerbError) as refused:
         world.set_unit_types(units, 200)
     assert "200" in str(refused.value), "the error names the number"
+
+
+# The world the fallen tests build, and the units they put in it.
+#
+# The seed is part of the fixture. The terrain comes from it, and a unit
+# stands only on ground that admits it, so the seed decides whether these two
+# tiles hold anybody at all. Seed 1 admits a unit at both, and the gather
+# fixture above measured the same ground.
+#
+# **The two factions stand on neighbouring tiles, not on one tile.** A unit
+# reaches every unit of another faction on its own tile and on the six tiles
+# beside it, and admission refuses a step onto a full tile without reading the
+# faction, so a fixture that needed co-occupation would measure the case a
+# fight is least about.
+#
+# The attack and the armour are content, and this fixture states them. The
+# tank delivers four whole casualties and carries an armour above the attack
+# of the bowman, so it ends the four bowmen and takes nothing back. The
+# fixture therefore produces a fallen log of exactly four entries, of one
+# faction and one type, which is what the assertions below read.
+FALLEN_SEED = 1
+BOWMAN = 0
+TANK = 1
+BOWMAN_TILE = (0, 0)
+TANK_TILE = (1, 0)
+BOWMAN_FACTION = 1
+TANK_FACTION = 2
+BOWMAN_ADDRESSES = (BOWMAN_TILE, BOWMAN_TILE, BOWMAN_TILE, BOWMAN_TILE)
+WHOLE_UNIT = 1 << 16
+
+
+def _contested_world() -> tuple[cachette.World, list[int], list[int]]:
+    """Build a world in which one tank meets four bowmen, and spawn both.
+
+    Returns the world, the bowman identities and the tank identity, before
+    any step. The caller steps it.
+    """
+    world = cachette.World(width=16, height=16, seed=FALLEN_SEED, faction_count=3)
+    world.define_unit_type(BOWMAN, WHOLE_UNIT, 0)
+    world.define_unit_type(TANK, 4 * WHOLE_UNIT, 2 * WHOLE_UNIT)
+    bowmen = world.spawn_soldiers(BOWMAN_ADDRESSES, BOWMAN_FACTION)
+    world.set_unit_types(bowmen, BOWMAN)
+    tank = world.spawn_soldiers([TANK_TILE], TANK_FACTION)
+    world.set_unit_types(tank, TANK)
+    return world, [int(unit) for unit in bowmen], [int(unit) for unit in tank]
+
+
+def _fight(world: cachette.World, threads: int = 1) -> None:
+    """Step the world until the fallen log holds an entry."""
+    for _ in range(8):
+        world.step(threads=threads)
+        if world.fell_count:
+            return
+    raise AssertionError("the fixture must produce a fallen event")
+
+
+def test_the_fallen_columns_carry_the_fields_by_name() -> None:
+    # DEC-060: the bindings return one column for each field, so a reader
+    # holds no byte offset, no field width and no field order.
+    world, _bowmen, _tank = _contested_world()
+    _fight(world)
+
+    columns = world.fell_log_columns()
+    assert set(columns) == {"tick", "unit", "tile", "faction", "unit_type"}
+    for name, column in _named(columns).items():
+        assert len(column) == world.fell_count, name
+
+    assert columns["tick"].dtype == np.uint64
+    assert columns["unit"].dtype == np.uint64
+    assert columns["tile"].dtype == np.uint32
+    assert columns["faction"].dtype == np.uint16
+    assert columns["unit_type"].dtype == np.uint8
+
+
+def test_a_fallen_event_says_who_fell_and_where() -> None:
+    # The whole point of the log: a caller learns who fell, which faction it
+    # belonged to, where it stood and which type it carried.
+    world, bowmen, tank = _contested_world()
+    _fight(world)
+
+    columns = world.fell_log_columns()
+    assert world.fell_count == len(bowmen), "the tank ends every bowman"
+
+    fallen = {int(unit) for unit in columns["unit"]}
+    assert fallen == set(bowmen), "the log names the units the fixture spawned"
+    assert not fallen & set(tank), "the tank takes nothing back"
+
+    width = world.width
+    tile = BOWMAN_TILE[0] + BOWMAN_TILE[1] * width
+    for row in range(world.fell_count):
+        assert int(columns["tick"][row]) == world.tick
+        assert int(columns["tile"][row]) == tile
+        assert int(columns["faction"][row]) == BOWMAN_FACTION
+        assert int(columns["unit_type"][row]) == BOWMAN
+
+
+def test_an_identity_in_the_fallen_log_is_dead() -> None:
+    # ADR-0085 D3: the step ended the unit the identity names, so the engine
+    # refuses the identity rather than report on the next occupant of the
+    # slot. The tile column is what places the death, for that reason.
+    world, _bowmen, _tank = _contested_world()
+    _fight(world)
+
+    columns = world.fell_log_columns()
+    for row in range(world.fell_count):
+        with pytest.raises(cachette.ViewError):
+            world.soldier_tile(int(columns["unit"][row]))
+
+
+def test_a_step_with_no_fight_gives_an_empty_log() -> None:
+    # The hazard the doc comment names: the log covers the last step alone.
+    # A step that ends nobody must give empty columns and never the entries
+    # of the step before it.
+    world, bowmen, _tank = _contested_world()
+    _fight(world)
+    assert world.fell_count == len(bowmen)
+
+    # Nobody is left to fight the tank, so the next step ends nobody.
+    world.step(threads=1)
+    assert world.fell_count == 0
+    columns = world.fell_log_columns()
+    for name, column in _named(columns).items():
+        assert len(column) == 0, name
+
+
+def test_a_new_world_gives_an_empty_fallen_log(seed: int) -> None:
+    world = cachette.World(width=8, height=8, seed=seed, faction_count=2)
+    assert world.fell_count == 0
+    columns = world.fell_log_columns()
+    assert set(columns) == {"tick", "unit", "tile", "faction", "unit_type"}
+    for name, column in _named(columns).items():
+        assert len(column) == 0, name
+
+
+def test_the_thread_count_does_not_change_the_fallen_log() -> None:
+    # ADR-0001 D4 and ADR-0004 D1: the step ends the marked units in
+    # ascending slot order, so the log a caller reads is the same at every
+    # thread count. A claim proved at one thread count proves nothing.
+    logs = []
+    for threads in (1, 2, 12):
+        world, _bowmen, _tank = _contested_world()
+        _fight(world, threads=threads)
+        columns = world.fell_log_columns()
+        logs.append([_named(columns)[name].tolist() for name in sorted(columns)])
+    assert logs[0] == logs[1] == logs[2]

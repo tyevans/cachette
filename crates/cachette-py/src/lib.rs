@@ -559,6 +559,95 @@ impl PyWorld {
         self.lock().gather_log().len()
     }
 
+    /// Returns the fallen log of the last step, as a `dict` of NumPy arrays.
+    ///
+    /// A fallen event says that one unit fell in a meeting between two
+    /// factions. Every array has one entry for each event, and all five
+    /// arrays are the same length. That length is `fell_count`. A new world
+    /// gives five empty arrays.
+    ///
+    /// - `tick`, `numpy.uint64`. The step at which the unit fell.
+    /// - `unit`, `numpy.uint64`. The identity of the unit that fell.
+    /// - `tile`, `numpy.uint32`. The tile it stood on, as a row-major index.
+    ///   Take `index % world.width` for the column and `index // world.width`
+    ///   for the row.
+    /// - `faction`, `numpy.uint16`. The faction the unit belonged to. Every
+    ///   entry names a faction of this world, because a unit always holds
+    ///   one.
+    /// - `unit_type`, `numpy.uint8`. The row of the shared type table that
+    ///   the unit carried. It is the number `define_unit_type` writes.
+    ///
+    /// The keys are the field names of the event. The caller reads a field by
+    /// its name, so no caller holds a byte offset, a field width or a field
+    /// order.[^3]
+    ///
+    /// The entries come in ascending slot order, which is the order the step
+    /// ended the units in. That order does not depend on the thread
+    /// count.[^4]
+    ///
+    /// **The log names no killer.** The engine resolves a meeting for a whole
+    /// group of units at one tile, so no single attacker owns one death.[^5]
+    /// A caller learns who fell, which faction it belonged to, where it
+    /// stood, which type it carried, and at which step. It reads the enemy
+    /// from the tile and the step, not from this log.
+    ///
+    /// **The log covers the last step alone, and the next step destroys it.**
+    /// The step empties the log before it resolves a meeting, so a step with
+    /// no fight gives five empty arrays and never the entries of an earlier
+    /// step.[^6] Read the log after each `step` call whose deaths the caller
+    /// wants, and keep what it needs. Every other log here holds the same
+    /// rule.
+    ///
+    /// The unit column holds the whole identity of the unit that fell. It is
+    /// not a slot index. A slot index survives the death of what it named,
+    /// and a reader that held one would report on the next occupant of the
+    /// slot with nothing failing.[^1]
+    ///
+    /// **Every identity in this column is dead**, because the step ended the
+    /// unit that it names. `soldier_tile` refuses a dead identity, so the
+    /// `tile` column carries the ground the unit stood on and the caller
+    /// needs no second read to place the death.[^1]
+    ///
+    /// This method copies each column.[^2]
+    ///
+    /// # Errors
+    ///
+    /// Raises `ViewError` when the dictionary cannot be built.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0085, an entity crosses to Python as one opaque identity that the engine resolves, decisions D1 and D3. `docs/adrs/accepted/adr-0085-an-entity-crosses-to-python-as-one-opaque-identity.md`
+    /// [^2]: ADR-0044, what copies and what does not is declared at the call site. `docs/adrs/REGISTRY.md`
+    /// [^3]: Decisions register, DEC-060. `docs/DECISIONS.md`
+    /// [^4]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
+    /// [^5]: ADR-0123, casualties are whole units served to a keyed subset, decision D1. `docs/adrs/draft/adr-0123-casualties-are-whole-units-served-to-a-keyed-subset.md`
+    /// [^6]: ADR-0121, a meeting between two factions resolves at the tile, decision D4. `docs/adrs/draft/adr-0121-a-meeting-between-two-factions-resolves-at-the-tile.md`
+    fn fell_log_columns<'py>(&self, python: Python<'py>) -> PyResult<Bound<'py, PyDict>> {
+        let world = self.lock();
+        let log = world.fell_log();
+        let columns = PyDict::new(python);
+        let tick: Vec<u64> = log.iter().map(|event| event.tick.0).collect();
+        let unit: Vec<u64> = log.iter().map(|event| event.unit).collect();
+        let tile: Vec<u32> = log.iter().map(|event| event.tile.0).collect();
+        let faction: Vec<u16> = log.iter().map(|event| event.faction.0).collect();
+        let unit_type: Vec<u8> = log.iter().map(|event| event.unit_type.0).collect();
+        columns.set_item("tick", tick.to_pyarray(python))?;
+        columns.set_item("unit", unit.to_pyarray(python))?;
+        columns.set_item("tile", tile.to_pyarray(python))?;
+        columns.set_item("faction", faction.to_pyarray(python))?;
+        columns.set_item("unit_type", unit_type.to_pyarray(python))?;
+        Ok(columns)
+    }
+
+    /// The number of units that fell in the last step, as an integer.
+    ///
+    /// The count covers the last step alone. Read the events themselves with
+    /// `fell_log_columns`.
+    #[getter]
+    fn fell_count(&self) -> usize {
+        self.lock().fell_log().len()
+    }
+
     /// The number of soldiers alive in the world, as an integer.
     ///
     /// The engine counts them. A caller never counts a population by
