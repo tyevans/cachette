@@ -23,7 +23,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^ALLOC]
 
-**Next number: DEC-147**
+**Next number: DEC-162**
 
 ## Open
 
@@ -1742,6 +1742,73 @@ concluded, and it called that argument its weakest.
 
 ## Closed
 
+### DEC-160 — What does a set-valued removal answer, when an address in the set carries nothing to remove?
+
+**Closed. Option C. The call answers with the number of upgrades it
+removed.**
+
+The control plane removes the upgrade at a set of addresses in one call. Every
+other write verb at this boundary is all or nothing, and each of them answers
+with nothing or with a column of identities.[^DEC160A] A removal has a third
+case that neither of those meets: the address is a good address and it carries
+no upgrade.
+
+**Option A. Refuse the address.** An address with no upgrade raises, and the
+whole set writes nothing. It makes the call hard to repeat, and a caller that
+sweeps ground it does not track has to read every tile first, which is the loop
+the boundary refuses.[^DEC73C]
+
+**Option B. Answer with one flag for each address.** A caller learns exactly
+which address carried an upgrade. The answer then grows with the set, and a
+caller that reads it walks it.
+
+**Option C. Answer with a count.** The address is checked against the world
+before anything is removed, so a bad address still refuses the whole set. An
+address with no upgrade removes nothing and counts nothing.
+
+**Why C.** The removal is the only verb here whose result is a number rather
+than a set, because the state it writes is absence. A count is one value
+whatever the size of the set, so it holds the rule that the answer does not
+follow the population.[^DEC73C] It also makes the call repeatable: the same
+call twice counts one removal and then none, and neither raises.
+
+**What this did not decide.** It does not decide who may remove an upgrade.
+The engine checks nothing, the project orientation says anyone may, and a
+blocker holds the one question about it that stays open.[^DEC160C]
+
+### DEC-161 — Where does the rule that a unit builds only on its own faction's ground live?
+
+**Closed. Option B. The core owns it, and the binding states what the engine
+does today.**
+
+The project owner answered that a unit builds only on ground that its own
+faction holds. Nothing checks it. A finding holds the measurement.[^DEC161A]
+
+**Option A. The binding checks the holder.** The verb reads the tile of each
+unit and the holder of that tile, and refuses the set when one unit stands on
+foreign ground. It is cheap to write and it reaches a caller at once.
+
+**Option B. The core checks it, and the binding says what the engine does.**
+The pass that collects the build intents drops a unit that stands on foreign
+ground, and every caller of the core gets the rule.
+
+**Option C. The control plane holds it.** A game that wants the rule checks it
+in Python before it sends the order.
+
+**Why B.** A build continues across steps without any further command, so the
+rule has to hold at every step and not only at the moment of the order. A check
+in the binding holds it at the order alone: a unit that is ordered on its own
+ground and then loses that ground goes on building, and the binding never sees
+it. The rule is a simulation rule, and a check in the binding would be a second
+declaration site for a rule the step does not hold.[^SHAPE1]
+
+Option C fails for the same reason, and it also asks each game to hold a rule
+the engine states.
+
+**What follows.** The core change is a backlog item.[^DEC161C] Until it lands,
+the doc comment of the verb states that the engine does not check the holder,
+because writing the intent as a fact is what the scope rule forbids.[^DEC161D]
+
 ### DEC-118 — Does the publishing job keep a switch of its own, now that the address is known?
 
 **Closed. The job keeps no switch. It publishes on every push to the main
@@ -3454,3 +3521,8 @@ a failed founding is correct.[^PRD12]
 [^DEC144B]: Blockers register, BLK-052, in this repository. `docs/BLOCKERS.md`
 [^DEC145A]: Research report 21, what a god needs from this engine, section 4.1. `docs/research/reports/21-what-a-god-needs.md`
 [^DEC145B]: ADR-0106, a cohort serves whole rations to a keyed subset, the context section. `docs/adrs/draft/adr-0106-a-cohort-serves-whole-rations-to-a-keyed-subset.md`
+[^DEC160A]: ADR-0043, a declared tier enforces the no-loop rule, and the API refuses the loop, decision D1. `docs/adrs/draft/adr-0043-a-declared-tier-enforces-the-no-loop-rule.md`
+[^DEC160C]: Blockers register, BLK-036. `docs/BLOCKERS.md`
+[^DEC161A]: Findings register, FND-380. `docs/FINDINGS.md`
+[^DEC161C]: Backlog item 0370, refuse a build on ground another faction holds. `docs/backlog/proposed/0370-refuse-a-build-on-ground-another-faction-holds.md`
+[^DEC161D]: Decision Record Scope, section 4.6. `.claude/rules/adr-scope.md`

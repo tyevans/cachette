@@ -1,7 +1,7 @@
 ---
 id: 0341
 title: Bind the build order and the upgrade removal to the control plane
-status: refined
+status: complete
 created: 2026-09-03
 implements: [ADR-0040 D1, ADR-0043 D1, ADR-0046 D1, ADR-0085 D3, ADR-0090 D1, ADR-0090 D2, ADR-0090 D4, ADR-0107 D2, ADR-0110 D1]
 changes: []
@@ -80,7 +80,36 @@ FND-360 holds the search that found the gap.[^1]
 
 ## Outcome
 
-Filled in when the item moves to `complete/`.
+**Six members are new on the `World` class, and one report gained three keys.**
+The set-valued write verbs are the build order and the stop order, which take a
+set of identities, and the removal, which takes a set of addresses and answers
+with the number of upgrades it removed. The reads are the build order of one
+unit, the direction home for one faction at one address, and the offset of each
+direction. The report of one tile now carries the upgrade, the work done and
+whether the work is finished.
+
+**The core is unchanged.** Every method the bindings call was already public,
+so no core change was needed to make the capability reachable.
+
+**Two findings and two decisions went to the registers.** FND-380 records that a
+unit builds on ground of any faction, and that the rule which says otherwise
+reaches no code. FND-381 records that a finished terrace changed nothing the
+control plane could read. DEC-160 chose the answer of the removal. DEC-161 put
+the holding rule in the core rather than in a binding.
+
+**One item came out of it.** Item 0370 holds the core change that enforces the
+holding rule.
+
+**What changed from the plan.** The plan named three core methods. The work
+bound five, because the stop order and the read of the build order are the rest
+of the same capability, and because the return direction is unusable without the
+table of direction offsets. The plan did not foresee that a finished terrace was
+invisible from Python, and the report of one tile gained the three upgrade keys
+for that reason.
+
+**The work opened no blocker.** A blocker number was allocated to it and stays
+unused, so the register holds no new row. The one open question that touches
+building is BLK-036, and it was open before this work started.
 
 ## References
 
