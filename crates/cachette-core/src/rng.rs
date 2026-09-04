@@ -127,3 +127,15 @@ pub const SYSTEM_FOUNDING: SystemId = 5;
 ///
 /// [^1]: ADR-0003, every random draw is keyed, never stateful, decision D1. `docs/adrs/accepted/adr-0003-every-random-draw-is-keyed-never-stateful.md`
 pub const SYSTEM_CONTEST: SystemId = 8;
+
+/// The system identifier of the weather field.
+///
+/// The weather field owns this identifier alone. It does not share the
+/// identifier of the terrain generator, because two systems that share an
+/// identifier draw the same value from the same frame, entity and draw index.
+/// The sea over a cell would then lift exactly where the ground is high.[^1]
+///
+/// # References
+///
+/// [^1]: ADR-0003, every random draw is keyed, never stateful, decision D1. `docs/adrs/accepted/adr-0003-every-random-draw-is-keyed-never-stateful.md`
+pub const SYSTEM_WEATHER: SystemId = 9;

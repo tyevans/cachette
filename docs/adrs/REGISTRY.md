@@ -392,6 +392,10 @@ without stating a constraint is worse than no record.
 | 0129 | A trade negotiation is engine state, and the words are not | Draft | 0001, 0002, 0004, 0053, 0090 | 21, `draft/adr-0129-a-trade-negotiation-is-engine-state.md` |
 | 0130 | A terminal refusal closes an ordered pair until a named tick | Draft | 0129 | `draft/adr-0130-a-terminal-refusal-closes-a-pair-until-a-named-tick.md` |
 | 0131 | A contract moves a quantity only when a unit carries it onto the ground of the other party | Draft | 0004, 0062, 0063, 0072, 0073, 0129, 0130 | `draft/adr-0131-a-contract-moves-a-quantity-only-when-a-unit-carries-it.md` |
+| 0140 | Weather is a field over the level 1 cell lattice | Draft | 0001, 0004, 0009, 0022, 0087, 0121 | `draft/adr-0140-weather-is-a-field-over-the-level-1-cell-lattice.md` |
+| 0141 | A weather pass moves water and never scales it | Draft | 0002, 0004, 0009, 0023, 0072, 0087 | `draft/adr-0141-a-weather-pass-moves-water-and-never-scales-it.md` |
+| 0142 | A god inflicts weather only on ground its own faction holds | Draft | 0004, 0040, 0053, 0111, 0125, 0128, 0140 | `draft/adr-0142-a-god-inflicts-weather-only-on-ground-it-holds.md` |
+| 0143 | Wet ground yields more to a gatherer | Draft | 0056, 0072, 0073, 0140 | `draft/adr-0143-wet-ground-yields-more-to-a-gatherer.md` |
 
 ### Retired numbers
 

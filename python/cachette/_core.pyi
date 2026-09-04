@@ -62,6 +62,36 @@ class TileChangedColumns(TypedDict):
     holder: npt.NDArray[np.uint16]
     kind: npt.NDArray[np.uint8]
 
+class Storm(TypedDict):
+    """What one call to ``World.inflict_weather`` did.
+
+    The drops are a whole number of drops of water. A drop is not a
+    fixed-point value, so a reader does not divide it by 65536.
+
+    The cell count says how many level 1 cells took water. Two places inside
+    one cell are one place.
+    """
+
+    cells: int
+    drops: int
+    ready_at: int
+
+class WeatherTotals(TypedDict):
+    """What the weather of the whole world holds.
+
+    Every value is a whole number of drops of water, except the cell count. A
+    drop is not a fixed-point value, so a reader does not divide it by 65536.
+
+    The sum of the air, the ground and the evaporated total equals the raised
+    total at every moment.
+    """
+
+    air: int
+    ground: int
+    evaporated: int
+    raised: int
+    wet_cells: int
+
 class ResourceTakenColumns(TypedDict):
     """One column for each field of the gather event.
 
@@ -490,6 +520,27 @@ class World:
         destination: int = ...,
     ) -> None: ...
     def stop_sending(self, units: Identities) -> None: ...
+    def inflict_weather(
+        self,
+        faction: int,
+        places: Sequence[tuple[int, int]],
+        strength: int = ...,
+    ) -> Storm: ...
+    def air_at(self, q: int, r: int) -> int: ...
+    def ground_water_at(self, q: int, r: int) -> int: ...
+    def ground_is_wet(self, q: int, r: int) -> bool: ...
+    def weather_totals(self) -> WeatherTotals: ...
+    def weather_ground(self) -> npt.NDArray[np.int64]: ...
+    @property
+    def cells_wide(self) -> int: ...
+    @property
+    def weather_strength_ceiling(self) -> int: ...
+    @property
+    def weather_places_ceiling(self) -> int: ...
+    @property
+    def weather_cooldown_ticks(self) -> int: ...
+    @property
+    def weather_wet_mark(self) -> int: ...
     @property
     def destination_count(self) -> int: ...
     def set_destination_count(self, count: int) -> None: ...

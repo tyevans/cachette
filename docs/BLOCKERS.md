@@ -25,11 +25,37 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^ALLOC]
 
-**Next number: BLK-122**
+**Next number: BLK-131**
 
 [^ALLOC]: Findings register, FND-038. `docs/FINDINGS.md`
 
 ## Open
+
+### BLK-130 — Nobody has said what weather should be worth
+
+**Owner:** the project owner. **Blocks:** every quantity that the weather
+system carries.
+
+The world now makes weather, and a god now puts weather on a place. Eight
+values decide what either one is worth, and no measurement and no owner chose
+any of them.
+
+The engine holds a value for each. How much water the sea lifts at once, how
+often it lifts, how much of the air falls in one solve, how much of the ground
+dries in one solve, the quantity at which ground counts as wet, how much extra
+a gatherer takes from wet ground, how strong one storm may be, and how long a
+faction waits between storms.[^BLK130A] [^BLK130B]
+
+**What would close this.** A statement of what the downstream game wants a
+storm to be worth: how long a storm should last in ticks, how much of the map
+one should cover, and how much a wet season should change what a congregation
+gathers. Three numbers close six of the eight.
+
+**What the project does meanwhile.** The engine carries the values above as
+named constants beside the rule that reads each one. No decision record states
+any of them, because the record rule forbids a value that an unanswered
+question governs.[^BLK110C] A game built on this engine cannot change them
+without a rebuild, and that is the cost of leaving them here.
 
 ### BLK-110 — Nobody has said what the variety score should change
 
@@ -609,3 +635,5 @@ normally.
 [^BLK111A]: Decisions register, DEC-202. `docs/DECISIONS.md`
 [^BLK120A]: ADR-0128, a contract moves a quantity only when a unit carries it onto the ground of the other party, decision D1. `docs/adrs/draft/adr-0128-a-contract-moves-a-quantity-only-when-a-unit-carries-it.md`
 [^BLK121A]: ADR-0126, a trade negotiation is engine state, and the words are not, decision D5. `docs/adrs/draft/adr-0126-a-trade-negotiation-is-engine-state.md`
+[^BLK130A]: ADR-0142, a god inflicts weather only on ground its own faction holds, decisions D2 and D4. `docs/adrs/draft/adr-0142-a-god-inflicts-weather-only-on-ground-it-holds.md`
+[^BLK130B]: ADR-0143, wet ground yields more to a gatherer, decision D2. `docs/adrs/draft/adr-0143-wet-ground-yields-more-to-a-gatherer.md`

@@ -2541,6 +2541,235 @@ impl PyWorld {
             .map_err(|error| VerbError::new_err(error.to_string()))
     }
 
+    /// Puts weather over a set of places, at the command of a god.
+    ///
+    /// The faction is the number of the faction whose congregation the god
+    /// directs, from 0 to one below `faction_count`. The places are a
+    /// sequence of `(q, r)` pairs of integers, and each pair names a tile.
+    /// The strength is an integer from 1 to `weather_strength_ceiling`.
+    /// Returns a `dict`.
+    ///
+    /// **Weather lives on the level 1 cell, not on the tile.** The water
+    /// lands on the cell that covers each place, and a cell covers a block of
+    /// tiles. Two places inside one cell are therefore one place, and the
+    /// report says how many cells took water.
+    ///
+    /// **A god acts only where its own people hold the ground.** The cell of
+    /// every place must hold at least one tile of that faction. This is the
+    /// gate that the engine puts on speaking to another faction, and the
+    /// divine power does not escape it.[^1]
+    ///
+    /// **One call names a whole set, and the engine answers once.** The cost
+    /// follows the number of places and not the number of units, and the
+    /// weather that follows costs the level 1 lattice rather than the
+    /// world.[^2]
+    ///
+    /// **The set is all or nothing.** Every place is resolved, every gate is
+    /// checked, and the cooldown is checked, before anything changes. One
+    /// refusal leaves the world exactly as it was.
+    ///
+    /// The keys of the result are:
+    ///
+    /// - `cells`, an integer. How many level 1 cells took water. A cell that
+    ///   two places named counts once.
+    /// - `drops`, an integer. The water this call put into the air, in drops.
+    ///   A drop is a whole number and it is not a fixed-point value.
+    /// - `ready_at`, an integer. The first tick at which this faction may
+    ///   inflict weather again. Read `tick` for where the world is now.
+    ///
+    /// A faction waits `weather_cooldown_ticks` ticks between one storm and
+    /// the next.
+    ///
+    /// The water enters the air. It reaches the ground at the end of the next
+    /// step, and the step after that is the first one whose gathering reads
+    /// it. Read `ground_water_at` for what has landed.
+    ///
+    /// # Errors
+    ///
+    /// Raises `VerbError` when the number names no faction of this world,
+    /// when the caller names more than `weather_places_ceiling` places, when
+    /// the strength is 0 or above `weather_strength_ceiling`, when a place
+    /// lies outside the world, when the faction holds no ground in the cell
+    /// of a place, and when the faction inflicted weather too recently.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0142, a god inflicts weather only on ground its own faction holds, decision D1. `docs/adrs/draft/adr-0142-a-god-inflicts-weather-only-on-ground-it-holds.md`
+    /// [^2]: ADR-0140, weather is a field over the level 1 cell lattice, decision D1. `docs/adrs/draft/adr-0140-weather-is-a-field-over-the-level-1-cell-lattice.md`
+    #[pyo3(signature = (faction, places, strength = 1))]
+    fn inflict_weather<'py>(
+        &self,
+        python: Python<'py>,
+        faction: u16,
+        places: Vec<(i32, i32)>,
+        strength: u8,
+    ) -> PyResult<Bound<'py, PyDict>> {
+        let addresses: Vec<Axial> = places.iter().map(|(q, r)| Axial::new(*q, *r)).collect();
+        let storm = self
+            .lock()
+            .inflict_weather(FactionId(faction), &addresses, strength)
+            .map_err(|error| VerbError::new_err(error.to_string()))?;
+        let report = PyDict::new(python);
+        report.set_item("cells", storm.cells)?;
+        report.set_item("drops", storm.drops)?;
+        report.set_item("ready_at", storm.ready_at.0)?;
+        Ok(report)
+    }
+
+    /// The water in the air above one place, as an integer.
+    ///
+    /// The place is a tile, as the pair `(q, r)` of integers. The answer is
+    /// the water above the level 1 cell that covers that tile, in drops. A
+    /// drop is a whole number and it is not a fixed-point value.
+    ///
+    /// Weather lives on the level 1 cell, so two tiles of one cell answer the
+    /// same number.
+    ///
+    /// # Errors
+    ///
+    /// Raises `VerbError` when the address lies outside the world.
+    fn air_at(&self, q: i32, r: i32) -> PyResult<i64> {
+        self.lock().air_at(Axial::new(q, r)).ok_or_else(|| {
+            VerbError::new_err(format!("the address ({q}, {r}) is outside the world"))
+        })
+    }
+
+    /// The water on the ground at one place, as an integer.
+    ///
+    /// The place is a tile, as the pair `(q, r)` of integers. The answer is
+    /// the water on the ground of the level 1 cell that covers that tile, in
+    /// drops. A drop is a whole number and it is not a fixed-point value.
+    ///
+    /// The ground of a cell counts as wet at `weather_wet_mark` drops, and a
+    /// unit that gathers on wet ground takes more in one tick than a unit on
+    /// dry ground. Read `ground_is_wet` for the answer directly.
+    ///
+    /// # Errors
+    ///
+    /// Raises `VerbError` when the address lies outside the world.
+    fn ground_water_at(&self, q: i32, r: i32) -> PyResult<i64> {
+        self.lock()
+            .ground_water_at(Axial::new(q, r))
+            .ok_or_else(|| {
+                VerbError::new_err(format!("the address ({q}, {r}) is outside the world"))
+            })
+    }
+
+    /// Whether the ground at one place is wet, as a `bool`.
+    ///
+    /// The place is a tile, as the pair `(q, r)` of integers. The answer is
+    /// about the level 1 cell that covers that tile, so two tiles of one cell
+    /// answer the same.
+    ///
+    /// A unit that gathers on wet ground takes more in one tick than a unit
+    /// on dry ground.
+    ///
+    /// # Errors
+    ///
+    /// Raises `VerbError` when the address lies outside the world.
+    fn ground_is_wet(&self, q: i32, r: i32) -> PyResult<bool> {
+        self.lock().ground_is_wet(Axial::new(q, r)).ok_or_else(|| {
+            VerbError::new_err(format!("the address ({q}, {r}) is outside the world"))
+        })
+    }
+
+    /// What the weather of the whole world holds, as a `dict`.
+    ///
+    /// Every quantity is in drops. A drop is a whole number and it is not a
+    /// fixed-point value.
+    ///
+    /// The keys are:
+    ///
+    /// - `air`, an integer. The water in the air over the whole world.
+    /// - `ground`, an integer. The water on the ground over the whole world.
+    /// - `evaporated`, an integer. The water that has left the ground since
+    ///   the world was built.
+    /// - `raised`, an integer. The water that has entered the air since the
+    ///   world was built, from the sea and from every god.
+    /// - `wet_cells`, an integer. How many level 1 cells hold at least
+    ///   `weather_wet_mark` drops on the ground.
+    ///
+    /// **The account is exact.** The sum of `air`, `ground` and `evaporated`
+    /// equals `raised` at every moment. A pass moves water and never scales
+    /// it.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0141, a weather pass moves water and never scales it, decision D2. `docs/adrs/draft/adr-0141-a-weather-pass-moves-water-and-never-scales-it.md`
+    fn weather_totals<'py>(&self, python: Python<'py>) -> PyResult<Bound<'py, PyDict>> {
+        let world = self.lock();
+        let field = world.weather();
+        let report = PyDict::new(python);
+        report.set_item("air", field.air_total().0)?;
+        report.set_item("ground", field.ground_total().0)?;
+        report.set_item("evaporated", field.evaporated())?;
+        report.set_item("raised", field.raised())?;
+        report.set_item("wet_cells", field.wet_cells())?;
+        Ok(report)
+    }
+
+    /// The water on the ground of every level 1 cell, as a NumPy array.
+    ///
+    /// The result is a one-dimensional array of `numpy.int64`, in cell index
+    /// order, and the unit is drops. A drop is a whole number and it is not a
+    /// fixed-point value. Take `index % cells_wide` for the column of a cell
+    /// and `index // cells_wide` for its row.
+    ///
+    /// **This is one crossing, and it replaces a loop.** A watcher that read
+    /// each cell through `ground_water_at` would pay one crossing for each
+    /// cell, and the control plane never loops over the world.
+    ///
+    /// The array is empty when no water has entered the world yet.
+    fn weather_ground<'py>(&self, python: Python<'py>) -> Bound<'py, PyArray1<i64>> {
+        let world = self.lock();
+        let plane: Vec<i64> = world
+            .weather()
+            .ground_plane()
+            .iter()
+            .map(|drops| drops.0)
+            .collect();
+        plane.to_pyarray(python)
+    }
+
+    /// The number of level 1 cells across the world, as an integer.
+    ///
+    /// A weather array is in cell index order, so a watcher takes
+    /// `index % cells_wide` for the column of a cell and
+    /// `index // cells_wide` for its row.
+    #[getter]
+    fn cells_wide(&self) -> u32 {
+        self.lock().pyramid().layout().blocks_wide()
+    }
+
+    /// The largest strength that one storm may carry, as an integer.
+    #[getter]
+    fn weather_strength_ceiling(&self) -> u8 {
+        cachette_core::STRENGTH_CEILING
+    }
+
+    /// The most places that one call to `inflict_weather` may name, as an
+    /// integer.
+    #[getter]
+    fn weather_places_ceiling(&self) -> usize {
+        cachette_core::PLACES_CEILING
+    }
+
+    /// The ticks that a faction waits between one storm and the next, as an
+    /// integer.
+    #[getter]
+    fn weather_cooldown_ticks(&self) -> u64 {
+        cachette_core::COOLDOWN_TICKS
+    }
+
+    /// The water on the ground at which a cell counts as wet, in drops.
+    ///
+    /// The value is an integer. A drop is a whole number and it is not a
+    /// fixed-point value.
+    #[getter]
+    fn weather_wet_mark(&self) -> i64 {
+        cachette_core::WET_MARK.0
+    }
+
     /// Returns the live soldiers of one faction, as columns.
     ///
     /// The faction is the number of the faction. The result is a `dict` of

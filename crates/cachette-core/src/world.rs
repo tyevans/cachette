@@ -77,6 +77,7 @@ use crate::trade::{
 use crate::types::{Accum, Entity, FactionId, Fix32, Tick, TileIdx, FACTION_CEILING};
 use crate::unit_type::{UnitTypeError, UnitTypeId, UnitTypeTable};
 use crate::upgrade::{self, UpgradeKind, UpgradeMap, UpgradeSite};
+use crate::weather::{Ground, Storm, WeatherError, WeatherField};
 
 /// The reason that a value did not name a live entity.
 ///
@@ -197,6 +198,8 @@ pub enum StepError {
     Promotion(PromotionError),
     /// The resolution of a meeting refused to run.
     Contest(ContestError),
+    /// The weather solve refused to run.
+    Weather(WeatherError),
 }
 
 impl From<PromotionError> for StepError {
@@ -256,6 +259,15 @@ impl From<SortError> for StepError {
     }
 }
 
+impl From<WeatherError> for StepError {
+    fn from(error: WeatherError) -> Self {
+        match error {
+            WeatherError::ZeroThreads => Self::ZeroThreads,
+            other => Self::Weather(other),
+        }
+    }
+}
+
 impl From<ContestError> for StepError {
     fn from(error: ContestError) -> Self {
         match error {
@@ -290,6 +302,14 @@ pub enum WorldError {
     FactionCountAboveCeiling(u16),
     /// The influence field refused to build.
     Influence(InfluenceError),
+    /// The weather field refused to build.
+    Weather(WeatherError),
+}
+
+impl From<WeatherError> for WorldError {
+    fn from(error: WeatherError) -> Self {
+        Self::Weather(error)
+    }
 }
 
 impl From<InfluenceError> for WorldError {
@@ -315,6 +335,9 @@ impl core::fmt::Display for WorldError {
             ),
             Self::Influence(error) => {
                 write!(formatter, "the world has no influence field: {error:?}")
+            }
+            Self::Weather(error) => {
+                write!(formatter, "the world has no weather field: {error}")
             }
         }
     }
@@ -353,6 +376,9 @@ impl core::fmt::Display for StepError {
             }
             Self::Contest(error) => {
                 write!(formatter, "the resolution of a meeting refused: {error}")
+            }
+            Self::Weather(error) => {
+                write!(formatter, "the weather solve refused: {error}")
             }
         }
     }
@@ -811,6 +837,18 @@ pub struct World {
     trade: TradeTable,
     /// What the last step said about trade.
     trade_log: Vec<TradeSpoken>,
+    /// The water in the air and on the ground, over the level 1 cells.
+    ///
+    /// The field is a plane over the level 1 cell lattice and it is not a
+    /// summary: a cell of it holds what the last solve left there, and that
+    /// value appears nowhere at level 0. It is simulated state, so it enters
+    /// the state hash.[^1] [^2]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0140, weather is a field over the level 1 cell lattice, decision D1. `docs/adrs/draft/adr-0140-weather-is-a-field-over-the-level-1-cell-lattice.md`
+    /// [^2]: ADR-0001, one binary gives one answer at any thread count, decision D4. `docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
+    weather: WeatherField,
 }
 
 impl World {
@@ -879,6 +917,7 @@ impl World {
             variety: VarietyLevel::derive(layout, &LuxuryField::new()),
             luxuries_seeded: false,
             influence: InfluenceField::new(cell_lattice, config.faction_count)?,
+            weather: WeatherField::new(cell_lattice, config.faction_count)?,
             schedule: RateSchedule::DEFAULT,
             rates: RateTable::new(),
             rate_ledger: RateLedger::ZERO,
@@ -3199,7 +3238,14 @@ impl World {
         // existed.[^16]
         //
         // [^16]: ADR-0126, a trade negotiation is engine state and the words are not, decision D1. `docs/adrs/draft/adr-0126-a-trade-negotiation-is-engine-state.md`
-        self.trade.hash_into(hash)
+        let hash = self.trade.hash_into(hash);
+        // The water in the air and on the ground is state that a later frame
+        // reads: the next solve starts from the field this one left. Two
+        // worlds that hold the same tiles and different weather must
+        // diverge.[^17]
+        //
+        // [^17]: ADR-0001, one binary gives one answer at any thread count, decision D4. `docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
+        self.weather.hash_into(hash)
     }
 
     /// Reports whether the world holds its invariants.
@@ -3379,6 +3425,14 @@ impl World {
             return false;
         }
         if !self.check_contest() {
+            return false;
+        }
+        // Every drop that entered the air is in the air, on the ground, or
+        // counted as evaporated. A pass that scaled the water rather than
+        // moving it would break this, and nothing else reports it.[^9]
+        //
+        // [^9]: ADR-0141, a weather pass moves water and never scales it, decision D2. `docs/adrs/draft/adr-0141-a-weather-pass-moves-water-and-never-scales-it.md`
+        if !self.weather.check_account() {
             return false;
         }
         if !self.check_positions() {
@@ -4266,6 +4320,25 @@ impl World {
         // hash and no event.[^19]
         //
         // [^19]: ADR-0111, the presence relation is derived at the end of the step and never stored as a fact, decisions D1 and D2. `docs/adrs/draft/adr-0111-the-presence-relation-is-derived-at-the-end-of-the-step.md`
+        // The weather solve runs after level 1 rebuilds, because it reads
+        // the height and the water share of each cell from the summaries
+        // that rebuild produced. It runs the same fixed number of spread
+        // passes whatever the field holds, and it takes no branch on whether
+        // a storm exists.[^21]
+        //
+        // The gather resolve above reads the ground of the cell as the
+        // previous frame left it, in the way movement reads the exit field of
+        // the previous barrier. A solve placed before the gather would answer
+        // from a level 1 that this frame had not yet rebuilt.[^22]
+        //
+        // [^21]: ADR-0141, a weather pass moves water and never scales it, decision D3. `docs/adrs/draft/adr-0141-a-weather-pass-moves-water-and-never-scales-it.md`
+        // [^22]: ADR-0022, level 0 is the only truth, and every level above it is derived, decision D2. `docs/adrs/accepted/adr-0022-level-0-is-the-only-truth-and-every-level-above-it-is-derived.md`
+        {
+            let _span = stage::open(Stage::WeatherSolve);
+            self.weather
+                .solve(tick, seed, self.pyramid.cells(), threads)?;
+        }
+
         {
             let _span = stage::open(Stage::PresenceFold);
             self.presence
@@ -4382,6 +4455,118 @@ impl World {
 
     /// Returns the level 1 cell that covers one tile.
     #[must_use]
+    /// Returns what one gather takes in addition, because the ground is wet.
+    ///
+    /// The bonus is a whole number of resource units and it is never a
+    /// fraction of the ordinary rate. A rate multiplied by a fraction would
+    /// be a second scale beside the one the resource ledger counts in.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0143, wet ground yields more to a gatherer, decision D2. `docs/adrs/draft/adr-0143-wet-ground-yields-more-to-a-gatherer.md`
+    fn wet_bonus(&self, tile: TileIdx) -> u32 {
+        match self.cell_of(tile) {
+            Some(cell) if self.weather.cell_is_wet(cell) => WET_GATHER_BONUS,
+            _ => 0,
+        }
+    }
+
+    /// Returns the weather field of the world.
+    ///
+    /// The field is a plane over the level 1 cell lattice. It holds the water
+    /// in the air above each cell and the water on the ground of each
+    /// cell.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0140, weather is a field over the level 1 cell lattice, decision D1. `docs/adrs/draft/adr-0140-weather-is-a-field-over-the-level-1-cell-lattice.md`
+    #[must_use]
+    pub const fn weather(&self) -> &WeatherField {
+        &self.weather
+    }
+
+    /// Returns the water in the air above the cell that covers one tile.
+    ///
+    /// The unit is drops, and a drop is a whole number. Returns `None` when
+    /// the address lies outside the world.
+    #[must_use]
+    pub fn air_at(&self, address: Axial) -> Option<i64> {
+        let tile = self.grid.index_of(address)?;
+        Some(self.weather.air_at(self.cell_of(tile)?).0)
+    }
+
+    /// Returns the water on the ground of the cell that covers one tile.
+    ///
+    /// The unit is drops, and a drop is a whole number. Returns `None` when
+    /// the address lies outside the world.
+    #[must_use]
+    pub fn ground_water_at(&self, address: Axial) -> Option<i64> {
+        let tile = self.grid.index_of(address)?;
+        Some(self.weather.ground_at(self.cell_of(tile)?).0)
+    }
+
+    /// Reports whether the ground under one tile is wet.
+    ///
+    /// A unit that gathers on wet ground takes more in one tick than a unit
+    /// on dry ground.[^1]
+    ///
+    /// Returns `None` when the address lies outside the world.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0143, wet ground yields more to a gatherer, decision D1. `docs/adrs/draft/adr-0143-wet-ground-yields-more-to-a-gatherer.md`
+    #[must_use]
+    pub fn ground_is_wet(&self, address: Axial) -> Option<bool> {
+        let tile = self.grid.index_of(address)?;
+        Some(self.weather.cell_is_wet(self.cell_of(tile)?))
+    }
+
+    /// Puts weather over a set of places, at the command of a god.
+    ///
+    /// The faction is the congregation the god directs. Each place names a
+    /// tile, and the water lands on the level 1 cell that covers it, so two
+    /// places in one cell are one place.
+    ///
+    /// **A god acts only where its own people hold the ground.** The cell of
+    /// every place must hold at least one tile of the faction.[^1]
+    ///
+    /// **The call is all or nothing.** Every place is resolved and every gate
+    /// is checked before anything changes.[^2]
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the faction is outside the set this world holds,
+    /// when the caller names more places than one call carries, when the
+    /// strength is outside its range, when a place lies outside the world,
+    /// when the faction holds no ground in the cell of a place, and when the
+    /// faction inflicted weather too recently.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0142, a god inflicts weather only on ground its own faction holds, decision D1. `docs/adrs/draft/adr-0142-a-god-inflicts-weather-only-on-ground-it-holds.md`
+    /// [^2]: ADR-0142, a god inflicts weather only on ground its own faction holds, decision D3. `docs/adrs/draft/adr-0142-a-god-inflicts-weather-only-on-ground-it-holds.md`
+    pub fn inflict_weather(
+        &mut self,
+        faction: FactionId,
+        places: &[Axial],
+        strength: u8,
+    ) -> Result<Storm, WeatherError> {
+        let layout = self.pyramid.layout();
+        let holding = &self.holding;
+        let grid = self.grid;
+        let ground = Ground {
+            grid,
+            cell_of: &move |tile: TileIdx| Some(layout.block_of_key(layout.key_of(tile)?)),
+            holders_near: &move |address: Axial| {
+                let tile = grid.index_of(address)?;
+                let key = holding.layout().key_of(tile)?;
+                holding.block_mask(holding.layout().block_of_key(key))
+            },
+        };
+        self.weather
+            .inflict(faction, places, strength, self.tick, &ground)
+    }
+
     fn cell_of(&self, tile: TileIdx) -> Option<u32> {
         let layout = self.pyramid.layout();
         Some(layout.block_of_key(layout.key_of(tile)?))
@@ -5885,6 +6070,18 @@ impl World {
             //
             // [^1]: ADR-0090, a tile upgrade is stored sparsely, as the difference from the generated world, decision D3. `docs/adrs/draft/adr-0090-a-tile-upgrade-is-stored-sparsely.md`
             let rate = upgrade::gather_rate_with(GATHER_RATE, self.upgrades.finished(first.tile));
+            // Wet ground yields more. The weather field is read once for the
+            // whole segment, beside the deposit and the upgrade rate, and it
+            // is read at the level 1 cell that covers the tile because that
+            // is where the weather lives.[^2]
+            //
+            // The reader takes the ground as the solve of the previous frame
+            // left it. The solve of this frame runs at the end of the step,
+            // after level 1 rebuilds.[^3]
+            //
+            // [^2]: ADR-0143, wet ground yields more to a gatherer, decision D1. `docs/adrs/draft/adr-0143-wet-ground-yields-more-to-a-gatherer.md`
+            // [^3]: ADR-0140, weather is a field over the level 1 cell lattice, decision D3. `docs/adrs/draft/adr-0140-weather-is-a-field-over-the-level-1-cell-lattice.md`
+            let rate = rate.saturating_add(self.wet_bonus(first.tile));
             let mut granted = 0u32;
             for position in &order[at..end] {
                 if left == 0 {
@@ -6356,6 +6553,19 @@ impl World {
 /// [^1]: Decisions register, DEC-022. `docs/DECISIONS.md`
 /// [^2]: ADR-0073, gathering is admitted by sort-then-admit against the tile, decision D1. `docs/adrs/accepted/adr-0073-gathering-is-admitted-by-sort-then-admit-against-the-tile.md`
 const GATHER_RATE: u32 = 4;
+
+/// What a unit takes in addition, in one tick, from wet ground.
+///
+/// The value sits here beside the ordinary rate, because both describe what
+/// one gather takes and a second declaration elsewhere would be one fact in
+/// two places.[^1] No measurement chose it, and a blocker holds the question
+/// of what weather should be worth.[^2]
+///
+/// # References
+///
+/// [^1]: Recurring Defect Shapes, shape 1. `.claude/rules/recurring-defects.md`
+/// [^2]: Blockers register, BLK-130. `docs/BLOCKERS.md`
+const WET_GATHER_BONUS: u32 = 2;
 
 /// One gather order, ready for the resolve.
 #[derive(Clone, Copy, Debug)]

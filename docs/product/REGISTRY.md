@@ -62,6 +62,7 @@ documents cite it.
 | 0031 | A god knows whose ground its people stand on | Shaped | Game developer | `shaped/prd-0031-a-god-knows-whose-ground-its-people-stand-on.md` |
 | 0032 | A god knows what its ground is rich in | Shaped | Game developer | `shaped/prd-0032-a-god-knows-what-its-ground-is-rich-in.md` |
 | 0034 | Two players hold each other to a future delivery | Shaped | Game developer | `shaped/prd-0034-two-players-hold-each-other-to-a-future-delivery.md` |
+| 0040 | A god inflicts weather on a place | Shaped | Game developer | `shaped/prd-0040-a-god-inflicts-weather-on-a-place.md` |
 
 ## What does not belong in a record
 

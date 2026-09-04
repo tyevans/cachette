@@ -174,6 +174,7 @@ declare_stages! {
     Promote,                  "promote",                    true,  1, false;
     RebuildLevel1,            "rebuild_level_1",            true,  1, false;
     InfluenceSolve,           "influence_solve",            true,  1, false;
+    WeatherSolve,             "weather_solve",              true,  1, false;
     PresenceFold,             "presence_fold",              true,  1, false;
 }
 

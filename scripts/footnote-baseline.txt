@@ -31,7 +31,6 @@
 # undefined, in the two reviews: a review quotes a record, and the quoted text
 # carries the markers of the record it quotes. The definitions belong to the
 # source document. Repairing this means editing a quotation.
-docs/DECISIONS.md	uncited	ADR56D4
 docs/FINDINGS.md	repeated	33
 docs/FINDINGS.md	repeated	38
 docs/FINDINGS.md	repeated	41
