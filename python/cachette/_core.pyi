@@ -75,22 +75,77 @@ class ResourceTakenColumns(TypedDict):
     amount: npt.NDArray[np.uint32]
     kind: npt.NDArray[np.uint8]
 
-class UnitFellColumns(TypedDict):
-    """One column for each field of the fallen event.
+class UnitTypeColumns(TypedDict):
+    """One column for each field of a row of the unit type table.
 
-    The unit column holds the whole identity of the unit that fell. Every
-    identity in it is dead, because the step ended the unit it names. The
-    tile column carries the ground the unit stood on, so a reader places the
-    death without a second read.
+    Both columns hold one entry for each row of the table, and the length of
+    a column is the number of types the world holds.
 
-    The log covers the last step alone. The next step empties it.
+    Both columns carry the Q16.16 fixed-point scale as a raw integer. One
+    whole casualty is 65536. Neither is a floating point number.
+    """
+
+    attack: npt.NDArray[np.int32]
+    armour: npt.NDArray[np.int32]
+
+class UnitStarvedColumns(TypedDict):
+    """One column for each field of the starved event.
+
+    The unit column holds the whole identity of the unit that a shortage
+    ended. It is not a slot index, and it never resolves again.
+
+    The deficit column carries the Q16.16 fixed-point scale as a raw integer.
     """
 
     tick: npt.NDArray[np.uint64]
     unit: npt.NDArray[np.uint64]
-    tile: npt.NDArray[np.uint32]
+    deficit: npt.NDArray[np.int32]
+
+class SiteShortfallColumns(TypedDict):
+    """One column for each field of the shortfall event.
+
+    The site column holds the whole identity of the settlement. It is not a
+    slot index.
+
+    The amount column carries the Q16.16 fixed-point scale as a raw integer.
+    """
+
+    tick: npt.NDArray[np.uint64]
+    site: npt.NDArray[np.uint64]
+    amount: npt.NDArray[np.int32]
+    commodity: npt.NDArray[np.uint16]
+
+class SiteRationedColumns(TypedDict):
+    """One column for each field of the rationed event.
+
+    The site column holds the whole identity of the settlement. It is not a
+    slot index.
+
+    The demanded column and the granted column carry the Q16.16 fixed-point
+    scale as raw integers.
+    """
+
+    tick: npt.NDArray[np.uint64]
+    site: npt.NDArray[np.uint64]
+    demanded: npt.NDArray[np.int64]
+    granted: npt.NDArray[np.int64]
+    commodity: npt.NDArray[np.uint16]
+
+class UnitPromotedColumns(TypedDict):
+    """One column for each field of the promotion event.
+
+    The unit column and the character column hold whole identities. Neither
+    is a slot index.
+
+    The deeds column is a whole number of units of stock. It carries no
+    fixed-point scale.
+    """
+
+    tick: npt.NDArray[np.uint64]
+    unit: npt.NDArray[np.uint64]
+    character: npt.NDArray[np.uint64]
+    deeds: npt.NDArray[np.uint64]
     faction: npt.NDArray[np.uint16]
-    unit_type: npt.NDArray[np.uint8]
 
 class PositionColumns(TypedDict):
     """One column for each field of a position at a site.
@@ -424,19 +479,6 @@ class TradeBookColumns(TypedDict):
     closed_until: npt.NDArray[np.uint64]
     rounds: npt.NDArray[np.uint8]
 
-class UnitConvertedColumns(TypedDict):
-    """One column for each field of a conversion event.
-
-    An entry names one unit that changed faction on the last step. The unit
-    keeps its identity, so `unit` names the same unit before and after.
-    """
-
-    tick: npt.NDArray[np.uint64]
-    unit: npt.NDArray[np.uint64]
-    tile: npt.NDArray[np.uint32]
-    from_faction: npt.NDArray[np.uint16]
-    to_faction: npt.NDArray[np.uint16]
-
 class TradeSpokenColumns(TypedDict):
     """One column for each field of a trade event.
 
@@ -450,6 +492,36 @@ class TradeSpokenColumns(TypedDict):
     responder: npt.NDArray[np.uint16]
     act: npt.NDArray[np.uint8]
     status: npt.NDArray[np.uint8]
+
+class UnitFellColumns(TypedDict):
+    """One column for each field of the fallen event.
+
+    The unit column holds the whole identity of the unit that fell. Every
+    identity in it is dead, because the step ended the unit it names. The
+    tile column carries the ground the unit stood on, so a reader places the
+    death without a second read.
+
+    The log covers the last step alone. The next step empties it.
+    """
+
+    tick: npt.NDArray[np.uint64]
+    unit: npt.NDArray[np.uint64]
+    tile: npt.NDArray[np.uint32]
+    faction: npt.NDArray[np.uint16]
+    unit_type: npt.NDArray[np.uint8]
+
+class UnitConvertedColumns(TypedDict):
+    """One column for each field of a conversion event.
+
+    An entry names one unit that changed faction on the last step. The unit
+    keeps its identity, so `unit` names the same unit before and after.
+    """
+
+    tick: npt.NDArray[np.uint64]
+    unit: npt.NDArray[np.uint64]
+    tile: npt.NDArray[np.uint32]
+    from_faction: npt.NDArray[np.uint16]
+    to_faction: npt.NDArray[np.uint16]
 
 class World:
     def __init__(
@@ -493,13 +565,10 @@ class World:
     @property
     def gather_count(self) -> int: ...
     @property
-    def fell_count(self) -> int: ...
-    @property
     def soldier_count(self) -> int: ...
     def event_log_bytes(self) -> bytes: ...
     def event_log_columns(self) -> TileChangedColumns: ...
     def gather_log_columns(self) -> ResourceTakenColumns: ...
-    def fell_log_columns(self) -> UnitFellColumns: ...
     def tile_values(self) -> npt.NDArray[np.int32]: ...
     def spawn_soldiers(
         self, addresses: Sequence[tuple[int, int]], faction: int
@@ -508,6 +577,15 @@ class World:
     def order_gather(self, units: Identities, kind: int) -> None: ...
     def define_unit_type(self, unit_type: int, attack: int, armour: int) -> None: ...
     def set_unit_types(self, units: Identities, unit_type: int) -> None: ...
+    def unit_type(self, unit: int) -> int: ...
+    def unit_type_table(self) -> UnitTypeColumns: ...
+    def spend_at_sites(
+        self, sites: Identities, rate: int, commodity: int = ...
+    ) -> None: ...
+    def starved_log_columns(self) -> UnitStarvedColumns: ...
+    def shortfall_log_columns(self) -> SiteShortfallColumns: ...
+    def rationed_log_columns(self) -> SiteRationedColumns: ...
+    def promoted_log_columns(self) -> UnitPromotedColumns: ...
     def soldier_tile(self, unit: int) -> int: ...
     def order_build(self, units: Identities, kind: int) -> None: ...
     def stop_build(self, units: Identities) -> None: ...
@@ -523,14 +601,6 @@ class World:
         destination: int = ...,
     ) -> None: ...
     def stop_sending(self, units: Identities) -> None: ...
-    def convert_units(self, units: Identities, faction: int) -> None: ...
-    def converted_log_columns(self) -> UnitConvertedColumns: ...
-    @property
-    def converted_count(self) -> int: ...
-    def set_influence_source(
-        self, faction: int, q: int, r: int, strength: int
-    ) -> None: ...
-    def influence(self, faction: int, q: int, r: int) -> int: ...
     @property
     def destination_count(self) -> int: ...
     def set_destination_count(self, count: int) -> None: ...
@@ -591,5 +661,16 @@ class World:
     def luxury_tile_count(self) -> int: ...
     def cell_variety(self, cell: int) -> int: ...
     def faction_variety(self, faction: int) -> int: ...
+    @property
+    def fell_count(self) -> int: ...
+    def fell_log_columns(self) -> UnitFellColumns: ...
+    def convert_units(self, units: Identities, faction: int) -> None: ...
+    def converted_log_columns(self) -> UnitConvertedColumns: ...
+    @property
+    def converted_count(self) -> int: ...
+    def set_influence_source(
+        self, faction: int, q: int, r: int, strength: int
+    ) -> None: ...
+    def influence(self, faction: int, q: int, r: int) -> int: ...
 
 def version() -> str: ...
