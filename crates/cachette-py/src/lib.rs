@@ -14,6 +14,8 @@
 
 use cachette_core::census::{census, CensusError};
 use cachette_core::founding::FoundingOutcome;
+use cachette_core::hex::NEIGHBOURS;
+use cachette_core::upgrade::UpgradeKind;
 use cachette_core::{
     Axial, CommodityId, Entity, FactionId, Fix32, Holder, ResourceKind, World as CoreWorld,
     WorldConfig,
@@ -922,6 +924,251 @@ impl PyWorld {
             .ok_or_else(|| ViewError::new_err(format!("the identity {unit} names no live soldier")))
     }
 
+    /// Tells every soldier the identities name to build a kind of upgrade.
+    ///
+    /// The units are a sequence of identities, or the NumPy array of
+    /// `numpy.uint64` that `spawn_soldiers` returned. Returns `None`.
+    ///
+    /// The kind is the upgrade kind, as an integer. A road is zero and a
+    /// terrace is one. The argument has no default. A road lets more units
+    /// stand on the tile. A terrace lets a unit take more from the tile in
+    /// one step.
+    ///
+    /// Each soldier adds to the upgrade on the tile it stands on, at every
+    /// step, until something stops it. A soldier does not have to stay. A
+    /// soldier that walks away stops adding, and the work it did stays on the
+    /// tile.[^1] Several soldiers on one tile add to one total, and that
+    /// total is the same at every thread count.[^2]
+    ///
+    /// **An unfinished build changes nothing about the tile.** The tile
+    /// changes when the work reaches the amount its kind asks for.[^1] Read
+    /// `tile_report` for the work done so far.
+    ///
+    /// The call gives the order and builds nothing. Step the world to make
+    /// the soldiers build.
+    ///
+    /// **The kind here is an upgrade kind. It is not a resource kind and it
+    /// is not a ground kind.** More than one scale in this module carries the
+    /// name `kind`, and each of them starts at zero. This call accepts the
+    /// resource kind of food or wood, and the ground kind of water or plain,
+    /// because each of those numbers also names an upgrade kind. It raises
+    /// nothing, and the soldiers build the wrong thing. The engine sees a
+    /// number and not the scale the caller meant.[^3]
+    ///
+    /// **The engine does not check who holds the ground.** A soldier builds
+    /// on the tile it stands on, whatever faction holds that tile, and a
+    /// caller that wants the other rule holds it in Python. A finding records
+    /// the gap.[^4]
+    ///
+    /// **The set is all or nothing.** Every identity resolves, and the kind
+    /// is checked, before the engine gives any order.
+    ///
+    /// # Errors
+    ///
+    /// Raises `ViewError` when an identity names no live soldier. Raises
+    /// `VerbError` when the number names no upgrade kind, which means two and
+    /// above. The message names the number that refused.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0090, a tile upgrade is stored sparsely, as the difference from the generated world, decisions D2 and D3. `docs/adrs/draft/adr-0090-a-tile-upgrade-is-stored-sparsely.md`
+    /// [^2]: ADR-0023, an aggregate combines exactly, in any order, decision D1. `docs/adrs/accepted/adr-0023-an-aggregate-combines-exactly-in-any-order.md`
+    /// [^3]: Findings register, FND-352. `docs/FINDINGS.md`
+    /// [^4]: Findings register, FND-380. `docs/FINDINGS.md`
+    fn order_build(&self, units: Vec<u64>, kind: u8) -> PyResult<()> {
+        let mut world = self.lock();
+        let kind = UpgradeKind::from_u8(kind)
+            .ok_or_else(|| VerbError::new_err(format!("{kind} names no upgrade kind")))?;
+        let mut resolved = Vec::with_capacity(units.len());
+        for unit in &units {
+            resolved.push(resolve(&world, *unit)?);
+        }
+        for entity in resolved {
+            assert!(
+                world.order_build(entity, kind),
+                "a resolved identity must name a soldier the arena can order"
+            );
+        }
+        Ok(())
+    }
+
+    /// Tells every soldier the identities name to stop building.
+    ///
+    /// The units are a sequence of identities, or the NumPy array of
+    /// `numpy.uint64` that `spawn_soldiers` returned. Returns `None`.
+    ///
+    /// The work each soldier already did stays on its tile. A soldier that
+    /// takes the order again continues rather than restarts.[^1] Nothing here
+    /// removes an upgrade: call `destroy_upgrades` for that.
+    ///
+    /// A soldier that builds nothing takes this order and stays as it was.
+    ///
+    /// **The set is all or nothing.** Every identity resolves before the
+    /// engine stops any order.
+    ///
+    /// # Errors
+    ///
+    /// Raises `ViewError` when an identity names no live soldier.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0090, a tile upgrade is stored sparsely, as the difference from the generated world, decision D2. `docs/adrs/draft/adr-0090-a-tile-upgrade-is-stored-sparsely.md`
+    fn stop_build(&self, units: Vec<u64>) -> PyResult<()> {
+        let mut world = self.lock();
+        let mut resolved = Vec::with_capacity(units.len());
+        for unit in &units {
+            resolved.push(resolve(&world, *unit)?);
+        }
+        for entity in resolved {
+            assert!(
+                world.stop_build(entity),
+                "a resolved identity must name a soldier the arena can order"
+            );
+        }
+        Ok(())
+    }
+
+    /// Returns what one soldier builds, as an integer, or `None`.
+    ///
+    /// The unit is one identity, as a Python integer. Take an entry of the
+    /// array that `spawn_soldiers` returned.
+    ///
+    /// The result is the upgrade kind that `order_build` took: a road is zero
+    /// and a terrace is one. The result is `None` when the soldier builds
+    /// nothing.
+    ///
+    /// **This read stays singular while the write verbs take a set.** A set
+    /// form would have to choose between failing the whole call for one dead
+    /// identity and returning a value that stands for nothing, and the second
+    /// is a false answer that the record forbids.[^1] The read answers for one
+    /// identity and says which one failed.
+    ///
+    /// # Errors
+    ///
+    /// Raises `ViewError` when the identity names no live soldier, and when
+    /// the value is not an identity the engine ever gave.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0085, an entity crosses to Python as one opaque identity that the engine resolves, decision D3. `docs/adrs/accepted/adr-0085-an-entity-crosses-to-python-as-one-opaque-identity.md`
+    fn build_order(&self, unit: u64) -> PyResult<Option<u8>> {
+        let world = self.lock();
+        let entity = resolve(&world, unit)?;
+        let order = world.build_order(entity).ok_or_else(|| {
+            ViewError::new_err(format!("the identity {unit} names no live soldier"))
+        })?;
+        Ok(order.map(UpgradeKind::to_u8))
+    }
+
+    /// Removes the upgrade at each address and returns how many it removed.
+    ///
+    /// The addresses are a sequence of `(q, r)` pairs of integers. Returns an
+    /// integer, which counts the tiles that carried an upgrade.
+    ///
+    /// Each tile returns to the world that the generator made. Nothing else
+    /// stores a property of an improved tile, so removing the entry is the
+    /// whole of the return.[^1] The removal takes effect at once, and it
+    /// needs no step.
+    ///
+    /// The call removes a finished upgrade and an unfinished one alike. An
+    /// unfinished upgrade loses the work that went into it.
+    ///
+    /// **An address that carries no upgrade is not a refusal.** The engine
+    /// removes nothing there and does not count it. Two calls for one address
+    /// therefore count one removal and then none.
+    ///
+    /// **The call removes no build order.** A soldier that stands on the tile
+    /// and holds an order starts the upgrade again at the next step. Call
+    /// `stop_build` for that soldier first.
+    ///
+    /// **The engine does not check who holds the ground.** Any caller may
+    /// remove any upgrade, and the removal is instant.
+    ///
+    /// **The set is all or nothing.** Every address is checked against the
+    /// world before the engine removes anything.
+    ///
+    /// # Errors
+    ///
+    /// Raises `ViewError` when an address lies outside the world. The message
+    /// names the address that refused.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0090, a tile upgrade is stored sparsely, as the difference from the generated world, decision D4. `docs/adrs/draft/adr-0090-a-tile-upgrade-is-stored-sparsely.md`
+    fn destroy_upgrades(&self, addresses: Vec<(i32, i32)>) -> PyResult<usize> {
+        let mut world = self.lock();
+        for (q, r) in &addresses {
+            if world.tile_kind(Axial::new(*q, *r)).is_none() {
+                return Err(ViewError::new_err(format!(
+                    "({q}, {r}) lies outside this world"
+                )));
+            }
+        }
+        let mut removed = 0;
+        for (q, r) in addresses {
+            if world.destroy_upgrade(Axial::new(q, r)) {
+                removed += 1;
+            }
+        }
+        Ok(removed)
+    }
+
+    /// Returns the direction home for one faction at one address.
+    ///
+    /// The faction is the number of a faction of this world. The address is
+    /// the pair `q` and `r`, as integers.
+    ///
+    /// The result is a direction, as an integer, or `None`. A direction is an
+    /// index into the list that `direction_offsets` returns. The result is
+    /// `None` when the block of ground holds a settlement of that faction,
+    /// and when no settlement of that faction is in reach.
+    ///
+    /// **The field answers for a block of ground and not for a tile.** The
+    /// engine derives one direction for each faction and each block, so two
+    /// addresses in one block give one answer.[^1] The engine derives the
+    /// field again at every step.
+    ///
+    /// # Errors
+    ///
+    /// Raises `ViewError` when the address lies outside the world, and when
+    /// the world holds no such faction.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0110, a unit returns by climbing a reach field seeded at every site of its faction, decision D1. `docs/adrs/draft/adr-0110-a-unit-returns-by-climbing-a-reach-field.md`
+    fn return_direction(&self, faction: u16, q: i32, r: i32) -> PyResult<Option<u8>> {
+        let world = self.lock();
+        world
+            .return_direction(FactionId(faction), Axial::new(q, r))
+            .ok_or_else(|| {
+                ViewError::new_err(format!(
+                    "({q}, {r}) and the faction {faction} name no entry of the return field"
+                ))
+            })
+    }
+
+    /// Returns the offset of each direction, as a list of `(q, r)` pairs.
+    ///
+    /// A tile of this world has six neighbours, and a direction is an index
+    /// into this list. Add the pair at that index to an address to get the
+    /// neighbour in that direction. The order never changes.[^1]
+    ///
+    /// The list is the one that the engine itself uses. It is not a copy, so
+    /// no second declaration site of the order can disagree with it.
+    ///
+    /// Read `return_direction` for a direction to take.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
+    #[staticmethod]
+    fn direction_offsets() -> Vec<(i32, i32)> {
+        NEIGHBOURS
+            .iter()
+            .map(|offset| (offset.q, offset.r))
+            .collect()
+    }
+
     /// The number of settlements standing in the world, as an integer.
     #[getter]
     fn settlement_count(&self) -> u32 {
@@ -1602,6 +1849,18 @@ impl PyWorld {
     ///   integer. Divide by 65536.**
     /// - `holder`, an integer or `None`. The faction that holds the ground,
     ///   and `None` for ground that nobody holds.[^2]
+    /// - `upgrade`, an integer or `None`. The upgrade the tile carries,
+    ///   finished or under construction, and `None` for a tile that carries
+    ///   none. A road is zero and a terrace is one.
+    /// - `upgrade_progress`, an integer. The work that has gone into that
+    ///   upgrade, and zero for a tile that carries none. The number never
+    ///   rises above the work its kind asks for.[^4]
+    /// - `upgrade_complete`, a `bool`. Whether that upgrade is finished.
+    ///   `False` for a tile that carries none.
+    ///
+    /// The three upgrade entries are what a watcher of a build reads. An
+    /// unfinished upgrade changes nothing else in this report, so a caller
+    /// that watches only the capacity sees nothing until the build ends.[^5]
     ///
     /// The stock of a tile is what the generator put there less what units
     /// took from it. The generated entry is the first, the taken entry is
@@ -1625,6 +1884,8 @@ impl PyWorld {
     /// [^1]: ADR-0072, a tile stock is generated, and only what was taken is stored, decision D4. `docs/adrs/accepted/adr-0072-a-tile-stock-is-generated-and-only-what-was-taken-is-stored.md`
     /// [^2]: ADR-0053, a faction is a bit in a mask, and a relation is a plane, decision D2. `docs/adrs/accepted/adr-0053-a-faction-is-a-bit-in-a-mask-and-a-relation-is-a-plane.md`
     /// [^3]: ADR-0056, movement is tile-discrete and admitted by sort-then-admit, decision D4. `docs/adrs/accepted/adr-0056-movement-is-tile-discrete-and-admitted-by-sort-then-admit.md`
+    /// [^4]: Findings register, FND-011. `docs/FINDINGS.md`
+    /// [^5]: ADR-0090, a tile upgrade is stored sparsely, as the difference from the generated world, decisions D2 and D3. `docs/adrs/draft/adr-0090-a-tile-upgrade-is-stored-sparsely.md`
     fn tile_report<'py>(
         &self,
         python: Python<'py>,
@@ -1663,6 +1924,16 @@ impl PyWorld {
             Some(faction) => report.set_item("holder", faction.0)?,
             None => report.set_item("holder", python.None())?,
         }
+        let site = world.upgrade_at(address);
+        match site {
+            Some(site) => report.set_item("upgrade", site.kind.to_u8())?,
+            None => report.set_item("upgrade", python.None())?,
+        }
+        report.set_item("upgrade_progress", site.map_or(0, |site| site.progress.0))?;
+        report.set_item(
+            "upgrade_complete",
+            site.is_some_and(cachette_core::upgrade::UpgradeSite::is_complete),
+        )?;
         Ok(report)
     }
 

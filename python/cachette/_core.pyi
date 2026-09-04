@@ -224,6 +224,9 @@ class TileReport(TypedDict):
 
     The holder names the faction that holds the ground, and it is ``None``
     for ground that nobody holds.
+
+    The upgrade entry names the upgrade the tile carries, finished or under
+    construction, and it is ``None`` for a tile that carries none.
     """
 
     q: int
@@ -236,6 +239,9 @@ class TileReport(TypedDict):
     taken: list[int]
     value: int
     holder: int | None
+    upgrade: int | None
+    upgrade_progress: int
+    upgrade_complete: bool
 
 class WindowCensus(TypedDict):
     """What one window of the world holds.
@@ -392,6 +398,13 @@ class World:
     def despawn_soldiers(self, units: Identities) -> None: ...
     def order_gather(self, units: Identities, kind: int) -> None: ...
     def soldier_tile(self, unit: int) -> int: ...
+    def order_build(self, units: Identities, kind: int) -> None: ...
+    def stop_build(self, units: Identities) -> None: ...
+    def build_order(self, unit: int) -> int | None: ...
+    def destroy_upgrades(self, addresses: Sequence[tuple[int, int]]) -> int: ...
+    def return_direction(self, faction: int, q: int, r: int) -> int | None: ...
+    @staticmethod
+    def direction_offsets() -> list[tuple[int, int]]: ...
     @property
     def settlement_count(self) -> int: ...
     def found_settlements(

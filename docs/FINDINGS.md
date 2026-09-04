@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-374**
+**Next number: FND-382**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -1240,6 +1240,60 @@ fails the test.
 **Follows.** A thread-count comparison is only as good as where the fixture
 puts the value under test. Ask which chunk holds it, and put something after
 it. This is the fixture rule applied to a parallel join.[^23]
+### FND-380 — A unit builds on ground of any faction, and the rule that says otherwise reaches no code
+
+**Believed.** The project orientation states that a unit builds only on ground
+that its own faction holds. It states it as an answered question, beside the
+one owner question about building that stays open.[^F380A]
+
+**True.** Nothing checks the holder. The pass that collects the build intents
+of a step reads the build order of each live unit and the tile it stands on,
+and it reads no holder and no faction. The verb that gives the order reads
+none either. A unit of one faction therefore builds on ground that another
+faction holds, and it finishes.
+
+**Evidence.** Measured on 3 September 2026, through the installed package, in
+a world of 64 by 64 tiles at the seed 7. A founding run gave both factions
+ground. After 20 steps faction 1 held 662 open tiles. One soldier of faction 0
+was spawned on one of them, at the address (16, 9), and given the order to
+build a road. After 12 steps the tile reported the road finished, and it
+reported faction 1 as its holder.
+
+`grep -n "fn build_intents" -A 25 crates/cachette-core/src/world.rs` shows the
+whole input of the pass: the live set, the build order, and the tile.
+
+**Follows.** The rule is a simulation rule, so the core owns it and no binding
+may add it. A binding that checked the holder would be a second declaration
+site of a rule the step does not hold, and the step would go on building
+whenever anything else gave an order.[^13] A backlog item holds the work,
+and the decisions register holds where the rule belongs.[^F380C] [^F380D]
+
+The doc comment of the verb states what the engine does rather than what the
+project intends, because a record of an intent as a fact is the shape the scope
+rule names.[^10]
+
+### FND-381 — A finished terrace changed nothing that the control plane could read
+
+**Believed.** The upgrade store is the mark a unit leaves on a tile, and a
+watcher reads the mark from the tile.
+
+**True.** Before this change no read of the boundary reported an upgrade. The
+report of one tile carried the ground, the stock, the value, the holder and the
+capacity, and the capacity is the only entry an upgrade touched. A road raises
+the capacity, so a finished road was visible as a larger number with no stated
+cause. A terrace raises the gather bonus and touches no entry of that report,
+so a finished terrace was invisible in every read of the ground. A caller could
+infer it only from the resource log, by watching units take more than before.
+
+**Evidence.** Read on 3 September 2026. The capacity of a kind and the gather
+bonus of a kind are two tables in the upgrade module, and the terrace row of
+the capacity table is empty. The report of one tile in the bindings crate set
+ten keys before this change, and none of them named an upgrade.
+
+**Follows.** A build that a watcher cannot see is a build nobody can repair.
+The report of one tile now carries the kind, the work done and whether the work
+is finished. Binding a write verb is not finished when the write lands: the
+work is finished when a caller can read the result back.
 
 ## D. Cost estimates that were wrong
 
@@ -10624,3 +10678,6 @@ itself rather than merely underspecified.
 [^F370B]: ADR-0111, the presence relation is derived at the end of the step and never stored as a fact, decision D2. `docs/adrs/draft/adr-0111-the-presence-relation-is-derived-at-the-end-of-the-step.md`
 [^F371A]: ADR-0111, the presence relation is derived at the end of the step and never stored as a fact, decision D1. `docs/adrs/draft/adr-0111-the-presence-relation-is-derived-at-the-end-of-the-step.md`
 [^F372A]: ADR-0053, a faction is a bit in a mask, and a relation is a plane, decision D5. `docs/adrs/accepted/adr-0053-a-faction-is-a-bit-in-a-mask-and-a-relation-is-a-plane.md`
+[^F380A]: Project orientation, the open questions. `CLAUDE.md`
+[^F380C]: Backlog item 0370, refuse a build on ground another faction holds. `docs/backlog/proposed/0370-refuse-a-build-on-ground-another-faction-holds.md`
+[^F380D]: Decisions register, DEC-161. `docs/DECISIONS.md`
