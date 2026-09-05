@@ -1543,10 +1543,14 @@ impl PyWorld {
     /// The units are a sequence of identities, or the NumPy array of
     /// `numpy.uint64` that `spawn_soldiers` returned. Returns `None`.
     ///
-    /// The kind is the upgrade kind, as an integer. A road is zero and a
-    /// terrace is one. The argument has no default. A road lets more units
-    /// stand on the tile. A terrace lets a unit take more from the tile in
-    /// one step.
+    /// The kind is the upgrade kind, as an integer. A road is zero, a terrace
+    /// is one, a wonder is two and a store is three. The argument has no
+    /// default. A road lets more units stand on the tile. A terrace lets a
+    /// unit take more from the tile in one step. A wonder asks for a large
+    /// amount of work, and its completion wins the game for the faction that
+    /// holds the ground under it.[^6] A store raises the store capacity of a
+    /// settlement on or beside its tile, and **nothing in the engine reads
+    /// that raise today**. Read `site_economy` for the sum.
     ///
     /// Each soldier adds to the upgrade on the tile it stands on, at every
     /// step, until something stops it. A soldier does not have to stay. A
@@ -1563,9 +1567,9 @@ impl PyWorld {
     ///
     /// **The kind here is an upgrade kind. It is not a resource kind and it
     /// is not a ground kind.** More than one scale in this module carries the
-    /// name `kind`, and each of them starts at zero. The call accepts the
-    /// resource kinds of food and wood. It accepts the ground kinds of water
-    /// and plain. Each of those numbers also names an upgrade kind. It raises
+    /// name `kind`, and each of them starts at zero. The call accepts every
+    /// resource kind. It accepts the ground kinds of water, plain, forest and
+    /// hill. Each of those numbers also names an upgrade kind. It raises
     /// nothing, and the soldiers build the wrong thing. The engine sees a
     /// number and not the scale the caller meant.[^3]
     ///
@@ -1586,7 +1590,7 @@ impl PyWorld {
     /// # Errors
     ///
     /// Raises `ViewError` when an identity names no live soldier. Raises
-    /// `VerbError` when the number is two or above, because that names no
+    /// `VerbError` when the number is four or above, because that names no
     /// upgrade kind. The message names the number that refused. Raises
     /// `VerbError` when a unit's type has a build rate of zero.
     ///
@@ -1597,6 +1601,7 @@ impl PyWorld {
     /// [^3]: Findings register, FND-352. `docs/FINDINGS.md`
     /// [^4]: Findings register, FND-380. `docs/FINDINGS.md`
     /// [^5]: ADR-0145, a unit type is a row of capability columns, and zero means cannot, decision D2. `docs/adrs/accepted/adr-0145-a-unit-type-is-a-row-of-capability-columns-and-zero-means-cannot.md`
+    /// [^6]: ADR-0148, a game end is recorded once and stops the controllers, decision D3. `docs/adrs/accepted/adr-0148-a-game-end-is-recorded-once-and-stops-the-controllers.md`
     fn order_build(&self, units: Vec<u64>, kind: u8) -> PyResult<()> {
         let mut world = self.lock();
         let kind = UpgradeKind::from_u8(kind)
@@ -1665,9 +1670,9 @@ impl PyWorld {
     /// The unit is one identity, as a Python integer. Take an entry of the
     /// array that `spawn_soldiers` returned.
     ///
-    /// The result is the upgrade kind that `order_build` took: a road is zero
-    /// and a terrace is one. The result is `None` when the soldier builds
-    /// nothing.
+    /// The result is the upgrade kind that `order_build` took: a road is
+    /// zero, a terrace is one, a wonder is two and a store is three. The
+    /// result is `None` when the soldier builds nothing.
     ///
     /// **This read stays singular while the write verbs take a set.** A set
     /// form must choose. It fails the whole call for one dead identity, or
@@ -2298,6 +2303,11 @@ impl PyWorld {
     /// - `production`, an integer. What it adds each time the rate pass runs.
     ///   **Also Q16.16.**
     /// - `upkeep`, an integer. What it owes each time. **Also Q16.16.**
+    /// - `store_capacity_raise`, an integer. **A raw Q16.16 quantity.** The
+    ///   sum of the raise of every finished store upgrade on the tile of the
+    ///   site or on one of its six neighbours. **Nothing in the engine reads
+    ///   this.** The engine holds no store capacity, so the sum changes no
+    ///   pass.
     /// - `rationed`, a `bool`. Whether the last draw could not serve every
     ///   cohort in full.
     /// - `demanded` and `granted`, integers or `None`. What the cohorts asked
@@ -2357,6 +2367,12 @@ impl PyWorld {
         report.set_item("store", store.0)?;
         report.set_item("production", production.0)?;
         report.set_item("upkeep", upkeep.0)?;
+        report.set_item(
+            "store_capacity_raise",
+            world
+                .store_capacity_raise(entity)
+                .expect("the identity resolved to a live site above"),
+        )?;
         // The identity crosses whole. The comparison is against the value
         // the engine wrote into the log, and this code takes neither apart.
         let rationed = world
@@ -2487,7 +2503,8 @@ impl PyWorld {
     ///   and `None` for ground that nobody holds.[^1]
     /// - `upgrade`, an integer or `None`. The upgrade the tile carries,
     ///   finished or under construction, and `None` for a tile that carries
-    ///   none. A road is zero and a terrace is one.
+    ///   none. A road is zero, a terrace is one, a wonder is two and a store
+    ///   is three.
     /// - `upgrade_progress`, an integer. The work that has gone into that
     ///   upgrade, and zero for a tile that carries none. The number never
     ///   rises above the work its kind asks for.[^2]
@@ -2864,10 +2881,11 @@ impl PyWorld {
     /// ended.
     ///
     /// The keys are `winner`, an integer naming the faction; `path`, a `str`
-    /// naming the way it won, which is `territory` today; and `tick`, the
-    /// tick the reader fired on. **The record is written once.** After it
-    /// the controller emits nothing and every other pass continues, so the
-    /// world keeps stepping and the picture keeps moving.[^1]
+    /// naming the way it won, one of `domination`, `territory`,
+    /// `wealth_or_wonder` and `renown`; and `tick`, the tick the reader
+    /// fired on. **The record is written once.** After it the controller
+    /// emits nothing and every other pass continues, so the world keeps
+    /// stepping and the picture keeps moving.[^1]
     ///
     /// # References
     ///
@@ -2901,6 +2919,38 @@ impl PyWorld {
         self.lock()
             .score(FactionId(faction))
             .ok_or_else(|| VerbError::new_err(format!("{faction} names no faction of this world")))
+    }
+
+    /// Returns the running value of one faction on each win path, as a
+    /// `dict`.
+    ///
+    /// The keys are `held_tiles`, the tiles the faction holds; `seats_held`,
+    /// the seats it holds, its own and every rival's; `store_total`, the sum
+    /// of every store of every settlement of the faction **as a raw Q16.16
+    /// integer**; `best_renown`, the highest renown of any live character of
+    /// the faction, **as a raw Q16.16 integer**; and `wonder_progress`, the
+    /// most work any wonder on ground the faction holds has reached. Each
+    /// value is the one the matching reader compares, so a caller can watch
+    /// a path approach its end.[^1]
+    ///
+    /// # Errors
+    ///
+    /// Raises `VerbError` when the number names no faction of this world.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0148, a game end is recorded once and stops the controllers, decision D1. `docs/adrs/accepted/adr-0148-a-game-end-is-recorded-once-and-stops-the-controllers.md`
+    fn standing<'py>(&self, python: Python<'py>, faction: u16) -> PyResult<Bound<'py, PyDict>> {
+        let standing = self.lock().standing(FactionId(faction)).ok_or_else(|| {
+            VerbError::new_err(format!("{faction} names no faction of this world"))
+        })?;
+        let report = PyDict::new(python);
+        report.set_item("held_tiles", standing.held_tiles)?;
+        report.set_item("seats_held", standing.seats_held)?;
+        report.set_item("store_total", standing.store_total)?;
+        report.set_item("best_renown", standing.best_renown)?;
+        report.set_item("wonder_progress", standing.wonder_progress)?;
+        Ok(report)
     }
 
     /// Returns what one faction feels toward another, as an integer.

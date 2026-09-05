@@ -8882,6 +8882,28 @@ pub const SUBSYSTEM_CENSUS: &[CensusRow] = &[
         },
     },
     CensusRow {
+        name: "wonders_complete",
+        read: |world| {
+            world
+                .upgrades
+                .sites()
+                .iter()
+                .filter(|site| site.kind == UpgradeKind::Wonder && site.is_complete())
+                .count() as i64
+        },
+    },
+    CensusRow {
+        name: "stores_built",
+        read: |world| {
+            world
+                .upgrades
+                .sites()
+                .iter()
+                .filter(|site| site.kind == UpgradeKind::Store && site.is_complete())
+                .count() as i64
+        },
+    },
+    CensusRow {
         name: "luxury_tiles",
         read: |world| world.luxuries.len() as i64,
     },
@@ -9572,30 +9594,352 @@ impl World {
 
     /// Runs the game end readers, while the record is empty.
     ///
-    /// Only the territory reader exists in this pass. It fires at the tick
-    /// limit, and the faction with the most held tiles wins. A tie resolves
-    /// by the lowest faction identifier.[^1]
+    /// The readers run in the fixed order domination, territory, wealth or
+    /// wonder, renown. The first that fires writes the record, and the
+    /// record is written once.[^1] Each reader is a pure function of the
+    /// world, and each resolves a tie by the lowest faction identifier,
+    /// because it visits the factions in ascending order and stops at the
+    /// first that fires.[^2]
     ///
     /// # References
     ///
-    /// [^1]: ADR-0148, a game end is recorded once and stops the controllers, decision D3. `docs/adrs/accepted/adr-0148-a-game-end-is-recorded-once-and-stops-the-controllers.md`
+    /// [^1]: ADR-0148, a game end is recorded once and stops the controllers, decisions D2 and D3. `docs/adrs/accepted/adr-0148-a-game-end-is-recorded-once-and-stops-the-controllers.md`
+    /// [^2]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
     fn check_game_end(&mut self) {
         if self.controller.game_end().is_set() {
             return;
         }
-        if self.tick.0 < self.controller.tick_limit() {
-            return;
-        }
-        let count = self.config.faction_count.max(1);
-        let held = (0..count).map(|index| {
-            let faction = FactionId(index);
-            (faction, self.holding.holding_of(faction))
-        });
-        if let Some(winner) = controller::territory_winner(held) {
-            self.controller
-                .record_end(self.tick, winner, WinPath::Territory);
+        // The order of this table is a rule of the game and not a balance
+        // value. A path that has no reader is absent from it.
+        let readers: [(GameEndReader, WinPath); 4] = [
+            (Self::domination_winner, WinPath::Domination),
+            (Self::territory_winner, WinPath::Territory),
+            (Self::wealth_or_wonder_winner, WinPath::WealthOrWonder),
+            (Self::renown_winner, WinPath::Renown),
+        ];
+        for (reader, path) in readers {
+            if let Some(winner) = reader(self) {
+                self.controller.record_end(self.tick, winner, path);
+                return;
+            }
         }
     }
+
+    /// The factions of the world, in ascending identifier order.
+    fn factions(&self) -> impl Iterator<Item = FactionId> {
+        (0..self.config.faction_count.max(1)).map(FactionId)
+    }
+
+    /// Returns the faction that holds the seat of a faction, or `None` when
+    /// the faction has no seat or nobody holds it.
+    fn seat_holder(&self, faction: FactionId) -> Option<FactionId> {
+        let seat = self.controller.row(faction).and_then(FactionRow::seat)?;
+        self.grid
+            .address_of(seat)
+            .and_then(|address| self.holding.holder(address))
+            .and_then(Holder::faction)
+    }
+
+    /// The domination reader: one faction holds every seat, or every other
+    /// faction has no units.
+    ///
+    /// A seat is the tile of the first founding of a faction, and the
+    /// controller keeps it as one tile for each faction. The reader reads the
+    /// holder of each seat tile, one lookup for each faction, and reads the
+    /// live count of each faction, which the soldier arena keeps as a running
+    /// total. It walks no unit and no tile.[^1]
+    ///
+    /// **A faction alone has dominated nothing.** The seat clause needs a
+    /// rival seat to hold, so it fires only when the winner holds the seat of
+    /// at least one other faction. The unit clause needs a rival to have
+    /// lost, so it fires only in a world of two or more factions and only
+    /// for a faction that still has a unit. Without both guards an empty
+    /// world, or a world of one faction, would end on the first tick.
+    ///
+    /// A tie resolves by the lowest faction identifier: the walk is in
+    /// ascending order and stops at the first faction that fires.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0148, a game end is recorded once and stops the controllers, decision D3. `docs/adrs/accepted/adr-0148-a-game-end-is-recorded-once-and-stops-the-controllers.md`
+    fn domination_winner(&self) -> Option<FactionId> {
+        if self.config.faction_count < 2 {
+            return None;
+        }
+        let population = self.soldiers.population_by_faction();
+        self.factions().find(|candidate| {
+            let mut rival_seats = 0u32;
+            let mut holds_every_seat = true;
+            let mut every_rival_is_empty = true;
+            for other in self.factions() {
+                if self
+                    .controller
+                    .row(other)
+                    .and_then(FactionRow::seat)
+                    .is_some()
+                {
+                    if other != *candidate {
+                        rival_seats += 1;
+                    }
+                    holds_every_seat &= self.seat_holder(other) == Some(*candidate);
+                }
+                if other != *candidate && population[usize::from(other.0)] > 0 {
+                    every_rival_is_empty = false;
+                }
+            }
+            let by_seats = rival_seats > 0 && holds_every_seat;
+            let by_units = every_rival_is_empty && population[usize::from(candidate.0)] > 0;
+            by_seats || by_units
+        })
+    }
+
+    /// The territory reader: at the tick limit, the faction with the most
+    /// held tiles. The held count is a running total the holding keeps.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0053, a faction is a bit in a mask, and a relation is a plane, decision D4. `docs/adrs/accepted/adr-0053-a-faction-is-a-bit-in-a-mask-and-a-relation-is-a-plane.md`
+    fn territory_winner(&self) -> Option<FactionId> {
+        if self.tick.0 < self.controller.tick_limit() {
+            return None;
+        }
+        let held = self
+            .factions()
+            .map(|faction| (faction, self.holding.holding_of(faction)));
+        controller::territory_winner(held)
+    }
+
+    /// Returns the seats a faction holds: the seat tiles, its own and every
+    /// rival's, whose holder is the faction.
+    fn seats_held_by(&self, faction: FactionId) -> i64 {
+        self.factions()
+            .filter(|other| self.seat_holder(*other) == Some(faction))
+            .count() as i64
+    }
+
+    /// Returns the stock total of every faction, by faction number.
+    ///
+    /// The total sums every commodity of every live settlement of the
+    /// faction, as raw Q16.16 quantities, in a 64-bit accumulator. The
+    /// walk is over the settlement arena in slot order, and it is not a walk
+    /// over the population or the tiles.[^1] [^2]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0148, a game end is recorded once and stops the controllers, decision D3. `docs/adrs/accepted/adr-0148-a-game-end-is-recorded-once-and-stops-the-controllers.md`
+    /// [^2]: ADR-0023, an aggregate combines exactly, in any order, decision D1. `docs/adrs/accepted/adr-0023-an-aggregate-combines-exactly-in-any-order.md`
+    fn stock_totals(&self) -> Vec<Accum> {
+        let mut totals = vec![Accum(0); usize::from(self.config.faction_count.max(1))];
+        let live = self.settlements.live_column();
+        let factions = self.settlements.faction_column();
+        for (slot, store) in self.settlements.store_column().iter().enumerate() {
+            if live[slot] == 0 {
+                continue;
+            }
+            let Some(total) = totals.get_mut(usize::from(factions[slot].0)) else {
+                continue;
+            };
+            for commodity in 0..COMMODITY_COUNT {
+                let quantity = store
+                    .quantity(CommodityId(commodity as u16))
+                    .expect("the commodity index is below the count");
+                *total = sim_math::combine(*total, Accum(i64::from(quantity.0)));
+            }
+        }
+        totals
+    }
+
+    /// Returns the most work any wonder on ground a faction holds has
+    /// reached, for every faction by faction number.
+    ///
+    /// The walk is over the sparse upgrade map, which holds one entry for
+    /// each improved tile and nothing else, so it is not a walk over the
+    /// tiles.[^1] A wonder on ground nobody holds counts for nobody.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0090, a tile upgrade is stored sparsely, as the difference from the generated world, decision D1. `docs/adrs/draft/adr-0090-a-tile-upgrade-is-stored-sparsely.md`
+    fn wonder_progress(&self) -> Vec<i64> {
+        let mut best = vec![0i64; usize::from(self.config.faction_count.max(1))];
+        for site in self.upgrades.sites() {
+            if site.kind != UpgradeKind::Wonder {
+                continue;
+            }
+            let holder = self
+                .grid
+                .address_of(site.tile)
+                .and_then(|address| self.holding.holder(address))
+                .and_then(Holder::faction);
+            if let Some(slot) = holder.and_then(|faction| best.get_mut(usize::from(faction.0))) {
+                *slot = (*slot).max(site.progress.0);
+            }
+        }
+        best
+    }
+
+    /// The wealth-or-wonder reader: a stock total reaches the stock target,
+    /// or a wonder completes on ground the faction holds.
+    ///
+    /// The target is a balance value.[^1] A tie resolves by the lowest
+    /// faction identifier.
+    ///
+    /// # References
+    ///
+    /// [^1]: Balance register, the stock target. `docs/reference/balance.md`
+    fn wealth_or_wonder_winner(&self) -> Option<FactionId> {
+        let totals = self.stock_totals();
+        let wonders = self.wonder_progress();
+        self.factions().find(|faction| {
+            let at = usize::from(faction.0);
+            totals[at].0 >= STOCK_TARGET || wonders[at] >= UpgradeKind::Wonder.work()
+        })
+    }
+
+    /// Returns the highest renown of any live character of every faction, by
+    /// faction number, as raw Q16.16 values.
+    ///
+    /// The walk is over the character arena in slot order. It is not a walk
+    /// over the units or the tiles.
+    fn best_renown(&self) -> Vec<i64> {
+        let mut best = vec![0i64; usize::from(self.config.faction_count.max(1))];
+        for entity in self.characters.iter() {
+            let (Some(faction), Some(renown)) = (
+                self.characters.faction(entity),
+                self.characters.renown(entity),
+            ) else {
+                continue;
+            };
+            if let Some(slot) = best.get_mut(usize::from(faction.0)) {
+                *slot = (*slot).max(i64::from(renown.0));
+            }
+        }
+        best
+    }
+
+    /// The renown reader: a character of the faction reaches the renown
+    /// target.
+    ///
+    /// **No pass in the engine writes renown.** The column rises only when
+    /// the control plane writes it, so this reader fires only in a game that
+    /// makes its own renown rule outside the engine. The blocker that governs
+    /// the rule is open, and the target is a balance value under it.[^1] [^2]
+    /// A tie resolves by the lowest faction identifier.
+    ///
+    /// # References
+    ///
+    /// [^1]: Blockers register, BLK-150. `docs/BLOCKERS.md`
+    /// [^2]: Balance register, the renown target. `docs/reference/balance.md`
+    fn renown_winner(&self) -> Option<FactionId> {
+        let best = self.best_renown();
+        self.factions()
+            .find(|faction| best[usize::from(faction.0)] >= i64::from(RENOWN_TARGET))
+    }
+
+    /// Returns the running value of one faction on each win path.
+    ///
+    /// Returns `None` when the world has no such faction. The values are the
+    /// ones the readers compare, so a caller can watch a path approach its
+    /// end.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0148, a game end is recorded once and stops the controllers, decision D1. `docs/adrs/accepted/adr-0148-a-game-end-is-recorded-once-and-stops-the-controllers.md`
+    #[must_use]
+    pub fn standing(&self, faction: FactionId) -> Option<Standing> {
+        if faction.0 >= self.config.faction_count.max(1) {
+            return None;
+        }
+        let at = usize::from(faction.0);
+        Some(Standing {
+            held_tiles: self.holding.holding_of(faction),
+            seats_held: self.seats_held_by(faction),
+            store_total: self.stock_totals()[at].0,
+            best_renown: self.best_renown()[at],
+            wonder_progress: self.wonder_progress()[at],
+        })
+    }
+
+    /// Returns how much the finished stores on or beside the tile of a
+    /// settlement raise its store capacity, as a raw Q16.16 quantity.
+    ///
+    /// **This is the one place that states the "on or beside" rule.** A
+    /// finished store on the tile of the settlement, or on one of its six
+    /// neighbours, adds its raise. The raise of one kind is a catalogue
+    /// row.[^1]
+    ///
+    /// **Nothing in the engine reads this.** The engine holds no store
+    /// capacity, so the sum is a reading for the control plane and it changes
+    /// no pass. Returns `None` when the identity names no live settlement.
+    ///
+    /// # References
+    ///
+    /// [^1]: Balance register, the store capacity raise. `docs/reference/balance.md`
+    #[must_use]
+    pub fn store_capacity_raise(&self, settlement: Entity) -> Option<i64> {
+        let address = self.settlements.address(settlement)?;
+        let mut raise = Accum(0);
+        for place in core::iter::once(Some(address)).chain(self.grid.neighbours(address)) {
+            let Some(kind) = place.and_then(|near| self.finished_upgrade(near)) else {
+                continue;
+            };
+            raise = sim_math::combine(raise, Accum(kind.store_capacity_raise()));
+        }
+        Some(raise.0)
+    }
+}
+
+/// One game end reader: a pure function of the world that names the faction
+/// that wins on its path, or nobody.
+type GameEndReader = fn(&World) -> Option<FactionId>;
+
+/// The stock total at which the wealth-or-wonder reader fires, as a raw
+/// Q16.16 quantity summed over every commodity of every settlement of the
+/// faction.
+///
+/// A provisional value of 4096 whole units. The balance register holds the
+/// row and the derivation.[^1]
+///
+/// # References
+///
+/// [^1]: Balance register, the stock target. `docs/reference/balance.md`
+pub const STOCK_TARGET: i64 = 4096 << 16;
+
+/// The renown at which the renown reader fires, as a raw Q16.16 value.
+///
+/// A provisional value of 100 whole units, under the blocker that asks what
+/// raises renown.[^1] [^2]
+///
+/// # References
+///
+/// [^1]: Balance register, the renown target. `docs/reference/balance.md`
+/// [^2]: Blockers register, BLK-150. `docs/BLOCKERS.md`
+pub const RENOWN_TARGET: i32 = 100 << 16;
+
+/// The running value of one faction on each win path.
+///
+/// Every field is the value the matching reader compares against its
+/// target, so a caller that reads it watches the path the reader
+/// watches.[^1]
+///
+/// # References
+///
+/// [^1]: ADR-0148, a game end is recorded once and stops the controllers, decision D1. `docs/adrs/accepted/adr-0148-a-game-end-is-recorded-once-and-stops-the-controllers.md`
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+pub struct Standing {
+    /// The tiles the faction holds. The territory reader compares it.
+    pub held_tiles: i64,
+    /// The seats the faction holds, its own and every rival's. The
+    /// domination reader compares it against the seat count.
+    pub seats_held: i64,
+    /// The sum of every store of every settlement of the faction, as a raw
+    /// Q16.16 quantity. The wealth reader compares it.
+    pub store_total: i64,
+    /// The highest renown of any live character of the faction, as a raw
+    /// Q16.16 value. The renown reader compares it.
+    pub best_renown: i64,
+    /// The most work any wonder on ground the faction holds has reached. The
+    /// wonder reader compares it against the wonder work.
+    pub wonder_progress: i64,
 }
 
 #[cfg(test)]

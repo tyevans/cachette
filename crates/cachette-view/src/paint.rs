@@ -56,10 +56,12 @@ use crate::text;
 
 /// The colour each kind of upgrade tints its tile with, by kind ordinal.
 ///
-/// A road is ochre and a terrace is green. The table is indexed by the
-/// ordinal the core gives each kind, so a kind that joins the core without a
-/// row here fails to compile rather than drawing in a colour nobody chose.
-const UPGRADE_COLOURS: [u32; UPGRADE_KIND_COUNT] = [0x00c8_9a4a, 0x0052_b86a];
+/// A road is ochre, a terrace is green, a wonder is pale gold and a store is
+/// dark brown. The table is indexed by the ordinal the core gives each kind,
+/// so a kind that joins the core without a row here fails to compile rather
+/// than drawing in a colour nobody chose.
+const UPGRADE_COLOURS: [u32; UPGRADE_KIND_COUNT] =
+    [0x00c8_9a4a, 0x0052_b86a, 0x00f0_e0a0, 0x0078_5030];
 
 /// How much of the upgrade colour covers a tile whose build has just begun.
 const UPGRADE_WEIGHT_FLOOR: i64 = 56;

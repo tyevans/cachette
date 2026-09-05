@@ -312,6 +312,7 @@ class SiteEconomy(TypedDict):
     store: int
     production: int
     upkeep: int
+    store_capacity_raise: int
     rationed: bool
     demanded: int | None
     granted: int | None
@@ -432,12 +433,25 @@ class GameEnd(TypedDict):
     """How a game ended: the winner, the path and the tick.
 
     The record is written once, at the first tick a reader fires. The path is
-    ``territory`` today.
+    one of ``domination``, ``territory``, ``wealth_or_wonder`` and ``renown``.
     """
 
     winner: int
     path: str
     tick: int
+
+class Standing(TypedDict):
+    """The running value of one faction on each win path.
+
+    The store total and the best renown are Q16.16 values as their raw
+    integers. Each value is the one the matching reader compares.
+    """
+
+    held_tiles: int
+    seats_held: int
+    store_total: int
+    best_renown: int
+    wonder_progress: int
 
 class FrameReading(TypedDict):
     """What the drawing pass read while it filled a frame."""
@@ -747,6 +761,7 @@ class World:
     def set_tick_limit(self, tick_limit: int) -> None: ...
     def game_end(self) -> GameEnd | None: ...
     def score(self, faction: int) -> int: ...
+    def standing(self, faction: int) -> Standing: ...
     def subsystem_census(self) -> dict[str, int]: ...
     def relation(self, from_faction: int, to_faction: int) -> int: ...
     def relation_band(self, from_faction: int, to_faction: int) -> int: ...

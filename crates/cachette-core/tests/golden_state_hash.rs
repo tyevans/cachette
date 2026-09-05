@@ -24,7 +24,8 @@ use cachette_core::site::CommodityId;
 use cachette_core::terrain::TileKind;
 use cachette_core::types::{FactionId, Fix32};
 use cachette_core::unit_type::{UnitTypeId, UnitTypeRow, WORKER_ROW};
-use cachette_core::{Axial, World, WorldConfig};
+use cachette_core::upgrade::UpgradeKind;
+use cachette_core::{Axial, WinPath, World, WorldConfig};
 
 /// Returns a worker row that fights with the given attack and armour.
 ///
@@ -46,6 +47,13 @@ const FRAMES: u64 = 32;
 /// The value only has to outlast the frames the scenario runs, so that the
 /// people of the site keep the need they were spawned with.
 const STOCKED: Fix32 = Fix32(2000 << 16);
+
+/// The number of frames that the wonder scenario runs.
+///
+/// The builders finish the wonder inside these frames, and the file covers
+/// the frames after the game end as well, so it moves when a pass stops
+/// running after the end.
+const WONDER_FRAMES: u64 = 40;
 
 /// The number of frames that a wide scenario runs.
 ///
@@ -201,6 +209,18 @@ const SCENARIOS: &[(&str, WorldConfig, Population, u64)] = &[
         Population::Founded,
         WIDE_FRAMES,
     ),
+    (
+        "wonder",
+        WorldConfig {
+            width: 192,
+            height: 192,
+            seed: 102,
+            faction_count: 2,
+            unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
+        },
+        Population::Wonder,
+        WONDER_FRAMES,
+    ),
 ];
 
 /// How a scenario fills its world.
@@ -280,6 +300,61 @@ enum Population {
     /// [^1]: ADR-0120, a unit carries a type, and the type is an index into a table the world is built with, decision D1. `docs/adrs/draft/adr-0120-a-unit-carries-a-type-that-indexes-a-table.md`
     /// [^2]: Testing rules, section 2a. `.claude/rules/testing.md`
     Contested,
+    /// A tile of builders that finish a wonder, and one rival unit elsewhere.
+    ///
+    /// No other scenario completes a wonder, so no other scenario ends a game
+    /// on the wealth-or-wonder path, and no other file moves when that reader
+    /// changes. The rival unit keeps the domination reader quiet, so the file
+    /// records the wonder and not the absence of a rival.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: Testing rules, section 2a. `.claude/rules/testing.md`
+    Wonder,
+}
+
+/// Puts a tile of builders on an island and tells them to build a wonder.
+///
+/// An island is an open tile whose every neighbour refuses a unit, so the
+/// builders never move and the work runs to the end. The scenario asserts
+/// after the run that the wonder completed and the game ended on it.
+fn wonder(world: &mut World) {
+    world
+        .set_choice_schedule(cachette_core::choose::PERIOD_LOG2_CEILING)
+        .expect("the exponent is inside the range");
+    let grid = world.grid();
+    let open: Vec<Axial> = (0..grid.tile_count())
+        .map(|index| Axial::new((index % grid.width()) as i32, (index / grid.width()) as i32))
+        .filter(|address| world.admits_a_unit(*address))
+        .collect();
+    let site = open
+        .iter()
+        .copied()
+        .find(|address| {
+            world
+                .grid()
+                .neighbours(*address)
+                .iter()
+                .all(|side| side.is_none_or(|next| !world.admits_a_unit(next)))
+        })
+        .expect("the wonder scenario found no island");
+    let room = world
+        .tile_capacity(site)
+        .expect("the island is inside the world");
+    for _ in 0..room {
+        let unit = world
+            .spawn_soldier(site, FactionId(0))
+            .expect("the island admits a unit");
+        assert!(world.order_build(unit, UpgradeKind::Wonder));
+    }
+    let elsewhere = open
+        .iter()
+        .copied()
+        .find(|address| *address != site)
+        .expect("the wonder scenario found no second open tile");
+    world
+        .spawn_soldier(elsewhere, FactionId(1))
+        .expect("the ground admits a unit");
 }
 
 /// Puts gatherers on deposits and makes the deposits recover fast.
@@ -635,6 +710,7 @@ fn hash_sequence(config: WorldConfig, population: Population, frames: u64) -> St
         Population::Founded => found(&mut world),
         Population::Gathering => gather(&mut world),
         Population::Contested => contest(&mut world),
+        Population::Wonder => wonder(&mut world),
     }
     // The count before the first frame. The contested scenario asserts
     // against it, so the assertion never restates a number the fixture owns.
@@ -671,6 +747,20 @@ fn hash_sequence(config: WorldConfig, population: Population, frames: u64) -> St
             !world.characters().is_empty(),
             "the gathering scenario promoted nobody"
         );
+    }
+    if population == Population::Wonder {
+        // The file must cover what it claims to cover. A run in which the
+        // wonder never completed would record a file that moves for every
+        // reason except the wonder reader.[^1]
+        //
+        // [^1]: Testing rules, section 2a. `.claude/rules/testing.md`
+        let end = world.game_end();
+        assert_eq!(
+            end.win_path(),
+            Some(WinPath::WealthOrWonder),
+            "the wonder scenario did not end on the wonder"
+        );
+        assert!(end.tick.0 < frames, "the file holds no frame after the end");
     }
     if population == Population::Contested {
         // The file must cover what it claims to cover. A run in which nobody

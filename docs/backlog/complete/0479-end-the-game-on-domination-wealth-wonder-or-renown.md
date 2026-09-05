@@ -1,7 +1,7 @@
 ---
 id: 0479
 title: End the game on domination, wealth, wonder or renown
-status: refined
+status: complete
 created: 2026-09-05
 implements: [ADR-0148 D1, ADR-0148 D2, ADR-0148 D3, ADR-0148 D4, ADR-0090 D1, ADR-0090 D2, ADR-0002 D1, ADR-0002 D3, ADR-0004 D1, ADR-0001 D4]
 changes: []
@@ -113,7 +113,42 @@ The register row holds the derivation and the commit.
 
 ## Outcome
 
-Filled in when the item moves to `complete/`.
+**Four readers now end a game, and the record still holds one end.** The
+readers run in the fixed order of the record: domination, territory, wealth
+or wonder, renown. A table in the game end check holds that order, and a
+comment states that the order is a rule of the game and not a balance value.
+Each reader is a pure function of the world. None walks the units or the
+tiles.
+
+**The domination reader carries two guards that the design did not state.**
+A faction alone has dominated nothing, so the seat clause fires only when the
+winner holds the seat of at least one rival, and the unit clause fires only in
+a world of two or more factions and only for a faction that still holds a
+unit. Without the guards an empty world ends on its first tick.
+
+**Two upgrade kinds joined the catalogue.** The wonder has a large work value
+and no other effect. The store states a store capacity raise. The engine holds
+no store capacity, so nothing reads the raise: the world sums it for a site and
+the boundary reports the sum, and both doc comments say that nothing in the
+engine reads it. The world reader is the one place that states the rule that a
+store counts on the tile of a settlement or on one of its six neighbours.
+
+**The wall kind waits for pass 4**, because a wall needs the condition that
+pass 4 adds.
+
+**Every value is provisional and the register holds its derivation**: the
+stock target, the renown target, the wonder work, the store work and the
+store capacity raise. The renown reader ships behind the open blocker on
+renown, because no pass in the engine writes the column.
+
+**A later record changes how these kinds are stored.** A draft record turns
+the upgrade kind into a table of category and level rows. The wonder and the
+store stay enumeration variants until then, and a separate item migrates
+them.[^7] [^8]
+
+**Three defects were put back, and each turned a test red**: the wealth or
+wonder reader dropped, the reader order reversed, and the once-only guard
+removed from both the check and the record write.
 
 ## References
 
@@ -123,3 +158,5 @@ Filled in when the item moves to `complete/`.
 [^4]: Blockers register, BLK-150, BLK-050 and BLK-007. `docs/BLOCKERS.md`
 [^5]: Findings register, FND-320. `docs/FINDINGS.md`
 [^6]: ADR-0090, a tile upgrade is stored sparsely, decision D1. `docs/adrs/draft/adr-0090-a-tile-upgrade-is-stored-sparsely.md`
+[^7]: ADR-0151, the upgrade kind is a table of category and level rows. `docs/adrs/draft/`
+[^8]: Item 0486, migrate the upgrade kinds to the table. `docs/backlog/proposed/`

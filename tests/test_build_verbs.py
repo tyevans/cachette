@@ -22,6 +22,9 @@ import cachette
 # The upgrade kinds the engine holds, as `order_build` takes them.
 ROAD = 0
 TERRACE = 1
+# One past the last kind. The catalogue holds the road, the terrace, the
+# wonder and the store, so this number names nothing.
+NO_SUCH_KIND = 4
 
 # A build takes several steps, and no test here states how many. Each loop
 # below stops when the tile reports the build finished, and fails when this
@@ -95,7 +98,7 @@ def test_an_upgrade_kind_the_engine_does_not_hold_is_refused(seed: int) -> None:
     address = _open_address(world)
     units = world.spawn_soldiers([address], faction=0)
     with pytest.raises(cachette.VerbError):
-        world.order_build(units, 2)
+        world.order_build(units, NO_SUCH_KIND)
     assert world.build_order(int(units[0])) is None
 
 

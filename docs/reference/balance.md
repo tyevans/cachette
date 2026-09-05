@@ -63,8 +63,8 @@ BLK-150, which asks what raises and lowers renown.[^6]
 | Value | Read by | Set | Blocker | Derivation |
 |---|---|---|---|---|
 | Tick limit | The territory reader | unset, pass 10 | BLK-007 | Provisional default of 2000 written by pass 1, so that a run of the demonstration world ends inside a few minutes and no determinism scenario reaches it. Pass 10 measures it. |
-| Stock target | The wealth-or-wonder reader | unset, pass 10 | — | |
-| Renown target | The renown reader | unset, pass 10 | BLK-150 | |
+| Stock target | The wealth-or-wonder reader | unset, pass 10 | — | Provisional default of 4096 whole units, as a raw Q16.16 sum over every commodity of every settlement of the faction, written by pass 8. The demonstration store climbs to hundreds by the tick limit, so the value sits above any stock a run reaches today and the path fires only when a caller writes a store. Pass 10 measures it. |
+| Renown target | The renown reader | unset, pass 10 | BLK-150 | Provisional default of 100 whole units, as a raw Q16.16 value, written by pass 8. No pass writes renown, so the reader fires only when the control plane writes the column. The value is a placeholder under the blocker and not a choice. Pass 10 measures it. |
 | Census tick count, the ticks the gate drives before it reads the census | The census gate | unset, pass 10 | BLK-007 | |
 
 ## The holding
@@ -104,9 +104,9 @@ rows say nothing that one does not.
 | Wall work | The build pass | unset, pass 10 | BLK-007 | |
 | Wall harm absorption | The contest pass | unset, pass 10 | — | |
 | Wall move cost raise for a unit whose faction does not hold the tile | The movement pass | unset, pass 10 | — | |
-| Wonder work | The build pass | unset, pass 10 | BLK-007 | |
-| Store work | The build pass | unset, pass 10 | BLK-007 | |
-| Store capacity raise | The site store | unset, pass 10 | — | |
+| Wonder work | The build pass | unset, pass 10 | BLK-007 | Provisional default of 240, ten times the terrace, written by pass 8, so that one builder cannot finish a wonder inside a lifetime and a tile of builders takes tens of ticks. Pass 10 measures it. |
+| Store work | The build pass | unset, pass 10 | BLK-007 | Provisional default of 48, twice the terrace, written by pass 8. Pass 10 measures it. |
+| Store capacity raise | The site store | unset, pass 10 | — | Provisional default of 64 whole units, as a raw Q16.16 quantity, written by pass 8. The engine holds no store capacity, so nothing reads the raise yet and the boundary exposes the sum for a site. Pass 10 measures it. |
 
 ## Weather
 
