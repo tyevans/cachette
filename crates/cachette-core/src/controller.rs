@@ -36,6 +36,7 @@
 
 use bytemuck::{Pod, Zeroable};
 
+use crate::campaign::wants_campaign;
 use crate::hash::StateHash;
 use crate::resource::{ResourceKind, RESOURCE_KIND_COUNT};
 use crate::rng;
@@ -283,6 +284,10 @@ pub const COMMAND_BUILD: u8 = 1;
 /// another faction.
 pub const COMMAND_RELATION: u8 = 2;
 
+/// The kind of command the controller emitted: a campaign raised against a
+/// faction at war. The argument is the objective kind.
+pub const COMMAND_CAMPAIGN: u8 = 3;
+
 /// The step the controller moves a relation by when its draw says so. It is
 /// one step toward war, and the drift is what brings the pair back.[^1]
 ///
@@ -327,6 +332,13 @@ pub enum Choice {
     Build(UpgradeKind),
     /// Move the relation of the faction toward another by one step.
     Relation(FactionId),
+    /// Raise a campaign of one objective kind against one tile.
+    Campaign {
+        /// The objective kind, as the campaign module numbers it.
+        kind: u8,
+        /// The objective tile.
+        tile: TileIdx,
+    },
 }
 
 impl Choice {
@@ -334,13 +346,15 @@ impl Choice {
     ///
     /// The argument of a relation move is the other faction. The faction
     /// ceiling is below the range of the column, so the narrowing loses
-    /// nothing.
+    /// nothing. The argument of a campaign is the objective kind, and the
+    /// campaign log holds the tile.
     #[must_use]
     pub const fn numbers(self) -> (u8, u8) {
         match self {
             Self::Gather(kind) => (COMMAND_GATHER, kind.to_u8()),
             Self::Build(kind) => (COMMAND_BUILD, kind.to_u8()),
             Self::Relation(other) => (COMMAND_RELATION, other.0 as u8),
+            Self::Campaign { kind, .. } => (COMMAND_CAMPAIGN, kind),
         }
     }
 }
@@ -606,17 +620,25 @@ impl Controller {
     /// faction exists. A faction with a rival draws once more, at the index
     /// past the evaluations, and the draw decides whether it moves.[^3]
     ///
+    /// The objectives list holds, for each faction, the objective kind and
+    /// the tile it would march on, or `None` when no pair it belongs to is at
+    /// war, when no enemy site exists, or when it holds a live campaign. A
+    /// faction with an objective draws once more, at the index past the
+    /// relation draw, and the draw decides whether it raises.[^4]
+    ///
     /// # References
     ///
     /// [^1]: ADR-0004, iteration order is explicit, decision D4. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
     /// [^2]: ADR-0148, a game end is recorded once and stops the controllers, decision D4. `docs/adrs/accepted/adr-0148-a-game-end-is-recorded-once-and-stops-the-controllers.md`
     /// [^3]: ADR-0146, a faction relation is one signed integer per ordered pair, and a pass reads a threshold, decision D5. `docs/adrs/draft/adr-0146-a-faction-relation-is-one-signed-integer-per-ordered-pair-and-a-pass-reads-a-threshold.md`
+    /// [^4]: ADR-0144, a faction controller runs inside the step and acts only through the caller's verbs, decision D4. `docs/adrs/accepted/adr-0144-a-faction-controller-runs-inside-the-step-and-acts-only-through-the-callers-verbs.md`
     #[must_use]
     pub fn plan(
         &self,
         seed: u64,
         tick: Tick,
         rivals: &[Option<FactionId>],
+        objectives: &[Option<(u8, TileIdx)>],
     ) -> Vec<(FactionId, u32, Choice)> {
         let mut commands = Vec::new();
         if self.game_end.is_set() {
@@ -631,12 +653,17 @@ impl Controller {
                 let choice = evaluate(seed, tick, faction, draw, row.weights);
                 commands.push((faction, draw, choice));
             }
-            let Some(Some(rival)) = rivals.get(usize::from(index)).copied() else {
-                continue;
-            };
-            let draw = self.relation_draw_index();
-            if wants_relation_move(seed, tick, faction, draw, row.weights) {
-                commands.push((faction, draw, Choice::Relation(rival)));
+            if let Some(Some(rival)) = rivals.get(usize::from(index)).copied() {
+                let draw = self.relation_draw_index();
+                if wants_relation_move(seed, tick, faction, draw, row.weights) {
+                    commands.push((faction, draw, Choice::Relation(rival)));
+                }
+            }
+            if let Some(Some((kind, tile))) = objectives.get(usize::from(index)).copied() {
+                let draw = self.campaign_draw_index();
+                if wants_campaign(seed, tick, faction, draw, row.weights) {
+                    commands.push((faction, draw, Choice::Campaign { kind, tile }));
+                }
             }
         }
         // The visit order above is fixed, and the sort is what makes the
@@ -652,6 +679,13 @@ impl Controller {
     #[must_use]
     pub const fn relation_draw_index(&self) -> u32 {
         self.evaluations
+    }
+
+    /// Returns the draw index of the campaign draw: one past the relation
+    /// draw, so it collides with no other.
+    #[must_use]
+    pub const fn campaign_draw_index(&self) -> u32 {
+        self.evaluations + 1
     }
 
     /// Returns the rows in ascending faction order.

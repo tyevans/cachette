@@ -222,6 +222,32 @@ class Demo:
             verb = "declares war on" if declared else "makes peace with"
             print(f"tick {tick}: faction {speaker} {verb} faction {other}")
 
+    def announce_campaigns(self) -> None:
+        """Say who marched on what, and who took what, on the last step.
+
+        **The control plane reads one log and walks no entity.** The engine
+        writes one event when a campaign is raised and one when it closes.
+        A raise prints the objective and the cohort. A win prints the
+        objective. A loss and an end print nothing, because a watcher wants
+        the moment and not the bookkeeping.
+        """
+        columns = self.world.campaign_log_columns()
+        for row in range(len(columns["tick"])):
+            tick = int(columns["tick"][row])
+            faction = int(columns["faction"][row])
+            kind = int(columns["kind"][row])
+            q = int(columns["objective_q"][row])
+            r = int(columns["objective_r"][row])
+            place = f"({q}, {r})"
+            if kind == 0:
+                cohort = int(columns["cohort_size"][row])
+                print(
+                    f"tick {tick}: faction {faction} marches on {place} "
+                    f"with {cohort} soldiers"
+                )
+            elif kind == 1:
+                print(f"tick {tick}: faction {faction} takes {place}")
+
     def announce_end(self) -> GameEnd | None:
         """Say who won, once, when the game end record first appears.
 
@@ -274,6 +300,7 @@ class Demo:
         for _ in range(self.clock.ticks_due()):
             self.world.step(self.threads)
             self.announce_relations()
+            self.announce_campaigns()
         self.announce_end()
         reading = self.world.draw(
             self.camera,
@@ -489,6 +516,7 @@ def _run_to_end(demo: Demo) -> int:
     while end is None and demo.world.tick < limit:
         demo.world.step(demo.threads)
         demo.announce_relations()
+        demo.announce_campaigns()
         end = demo.announce_end()
     if end is None:
         print(f"no game ended by the tick limit of {limit}")

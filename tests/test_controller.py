@@ -46,6 +46,8 @@ CENSUS_NAMES = [
     "game_ended",
     "relation_moves",
     "wars_declared",
+    "campaigns_raised",
+    "campaigns_won",
 ]
 
 
