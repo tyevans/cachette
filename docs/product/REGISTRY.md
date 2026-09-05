@@ -68,6 +68,12 @@ documents cite it.
 | 0045 | A god knows its congregation by name | Shaped | Game developer | `shaped/prd-0045-a-god-knows-its-congregation-by-name.md` |
 | 0046 | A god raises somebody up | Shaped | Game developer | `shaped/prd-0046-a-god-raises-somebody-up.md` |
 | 0040 | A god inflicts weather on a place | Shaped | Game developer | `shaped/prd-0040-a-god-inflicts-weather-on-a-place.md` |
+| 0048 | A developer watches factions play a game to an end | Shaped | Game developer | `shaped/prd-0048-a-developer-watches-factions-play-a-game-to-an-end.md` |
+| 0049 | A god declares war and makes peace | Shaped | Game developer | `shaped/prd-0049-a-god-declares-war-and-makes-peace.md` |
+| 0050 | A god advertises what it will trade | Shaped | Game developer | `shaped/prd-0050-a-god-advertises-what-it-will-trade.md` |
+| 0051 | A god trades land | Shaped | Game developer | `shaped/prd-0051-a-god-trades-land.md` |
+| 0052 | An upgrade wears and a worker repairs it | Shaped | Game developer | `shaped/prd-0052-an-upgrade-wears-and-a-worker-repairs-it.md` |
+| 0053 | A game is balanced across seeds | Shaped | Game developer | `shaped/prd-0053-a-game-is-balanced-across-seeds.md` |
 
 ## What does not belong in a record
 
