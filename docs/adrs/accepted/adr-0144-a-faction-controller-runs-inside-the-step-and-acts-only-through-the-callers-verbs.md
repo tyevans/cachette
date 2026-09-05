@@ -87,7 +87,7 @@ controller that asks for the impossible is visible.
 For each faction the controller makes a fixed number of evaluations. Each
 evaluation draws once, keyed on the controller system, the tick, the faction
 and the draw index.[^7] The evaluation count is a balance value and lives in
-the reference tables.[^8]
+the reference tables.[^12]
 
 There is no convergence test and no time budget. A controller that ran until
 it was satisfied would give a different answer under a different load.[^6]
@@ -179,3 +179,4 @@ not the verbs.
 [^9]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
 [^10]: Project orientation, the design principles. `CLAUDE.md`
 [^11]: Blockers register, BLK-007. `docs/BLOCKERS.md`
+[^12]: Balance register. `docs/reference/balance.md`

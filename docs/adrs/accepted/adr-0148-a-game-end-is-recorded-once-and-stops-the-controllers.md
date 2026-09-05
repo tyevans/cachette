@@ -131,6 +131,6 @@ thread-count test and the golden hash test therefore run unchanged.[^2]
 [^2]: Testing Rules, section 1. `.agents/rules/testing.md`
 [^3]: ADR-0001, one binary gives one answer at any thread count, decision D4. `docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
 [^4]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
-[^5]: Budgets and costs. `docs/reference/budgets.md`
+[^5]: Balance register. `docs/reference/balance.md`
 [^6]: ADR-0053, a faction is a bit in a mask, and a relation is a plane, decision D4. `docs/adrs/accepted/adr-0053-a-faction-is-a-bit-in-a-mask-and-a-relation-is-a-plane.md`
 [^7]: ADR-0023, an aggregate combines exactly, in any order, decision D1. `docs/adrs/accepted/adr-0023-an-aggregate-combines-exactly-in-any-order.md`
