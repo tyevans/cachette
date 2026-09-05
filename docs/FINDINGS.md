@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-483**
+**Next number: FND-484**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -751,6 +751,50 @@ meeting.[^22] The work that bound the ten write knobs published no reader
 for the three, and pointed the doc comment of each write at the report that
 already answers it. A caller therefore has one place to read a rate and one
 place to write it.
+
+### FND-483 — A zero in the seat census was read as empty positions, and it means that no position exists
+
+**Believed.** The demonstration world at tick 200 held 32 ranked positions with
+16 of them filled, and a zero `seats_filled` at the end of a game meant that
+positions stood open with no holder. Item 0278 states the first figure, and it
+is now stale.[^F483A]
+
+**True.** Every position that exists has a holder at every measured tick. This
+holds in a run with the controller on, and in a run where every faction is
+externally controlled. The census row `seats_filled` counts the positions that
+exist and have a holder, summed over the sites.[^F483B] A zero in it means that
+no position exists.
+
+A site opens positions in proportion to what it lacks. The share function
+subtracts the store from the target for each kind of work, and it opens nothing
+when no kind is short.[^F483C] Every site starts with the default preference,
+which is 65536 raw, or 1.0 in Q16.16, for every kind.[^F483D] Stores climb to
+hundreds, so a site that lacks nothing opens nothing. All three kinds of work
+map to commodity 0, so one surplus closes every kind at once.[^F483E]
+
+**Evidence.** A read-only probe on 5 September 2026, on one development machine
+(ty001-ubuntu), with seed 81985529216486895, extent 256, four factions, and
+four threads. The probe script lived outside the tree and is not kept. With the
+controller on, the seat count over ticks 0 to 2000 read 0, 16, 16, 8, 8, 0, 0,
+0, 0. With every faction external, it read 0, 24, 24, 16, 16, 8, 8, 8, 0. At
+every sample the count of positions equalled the count of holders. Two of the
+four sites held no position by tick 200 at this seed. This is one
+development-machine run, and it says nothing about the target platform.
+
+**Follows.** Three things.
+
+The census cannot tell "no position opened" from "a position opened and stands
+empty". A `seats_open` row beside `seats_filled` would, and the census is a
+reader, so the row is a reader change.
+
+The seeding layer sets no store target, so the default of 1.0 governs a site of
+64 people. Whether a site keeps its positions open once its store passes the
+target is a behaviour decision. It belongs to the record that governs the
+position pass, and not to a reader.[^F483F] Backlog item 0483 holds the work.
+
+The figure in item 0278 is stale, which is defect shape 2: a document names a
+measured figure, and nothing fails when the tree moves past it.[^F483G] The item
+is not edited here, because its argument does not depend on the figure.
 
 
 ## C. Defects found in specified rules
@@ -11526,3 +11570,10 @@ itself rather than merely underspecified.
 [^F452A]: ADR-0072, a tile stock is generated, and only what was taken is stored, decision D5. `docs/adrs/accepted/adr-0072-a-tile-stock-is-generated-and-only-what-was-taken-is-stored.md`
 [^F482A]: Commit 7c4b722, restore the three trade records that a number collision dropped.
 [^F482B]: ADR Registry, status vocabulary. `docs/adrs/REGISTRY.md`
+[^F483A]: Backlog item 0278, say what the demonstration world never produced. `docs/backlog/proposed/0278-say-what-the-demonstration-world-never-produced.md`
+[^F483B]: The `seats_filled` row of the subsystem census. `crates/cachette-core/src/world.rs`
+[^F483C]: The share function of a site. `crates/cachette-core/src/position.rs`
+[^F483D]: The default site preference. `crates/cachette-core/src/position.rs`
+[^F483E]: The work table, which maps each kind of work onto a commodity. `crates/cachette-core/src/position.rs`
+[^F483F]: ADR-0099, a site fills its positions by one sort and one scan. `docs/adrs/draft/adr-0099-a-site-fills-its-positions-by-one-sort-and-one-scan.md`
+[^F483G]: Recurring Defect Shapes, shape 2. `.agents/rules/recurring-defects.md`
