@@ -13,7 +13,7 @@ References
 ----------
 [^1]: ADR-0144, a faction controller runs inside the step and acts only through
 the caller's verbs.
-``docs/adrs/draft/adr-0144-a-faction-controller-runs-inside-the-step-and-acts-only-through-the-callers-verbs.md``
+``docs/adrs/accepted/adr-0144-a-faction-controller-runs-inside-the-step-and-acts-only-through-the-callers-verbs.md``
 
 [^2]: Recurring Defect Shapes, shape 1. ``.agents/rules/recurring-defects.md``
 """

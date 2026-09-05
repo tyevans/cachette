@@ -2,11 +2,12 @@
 
 ## Context
 
-No run of this engine ends. A watcher sees motion and sees no game, because
-nothing in the world can win.[^1] The game layer adds four win paths:
-domination, territory at a tick limit, wealth or wonder, and renown. Each is a
-reader over aggregates the engine already keeps or that the game layer
-adds.[^1]
+Before this record no run of this engine ended. A watcher saw motion and saw
+no game, because nothing in the world could win.[^1] The design names the win
+paths: domination, territory at a tick limit, wealth or wonder, and renown.
+Each path is a reader over aggregates the engine already keeps or that the
+game layer adds.[^1] The design names every path at once. The code adds one
+reader at a time, so at any moment some paths have a reader and some do not.
 
 The question this record answers is what happens at the tick a reader fires.
 
@@ -40,8 +41,9 @@ The record holds the winning faction, the win path and the tick. It is
 simulated state and enters the state hash.[^3] A world with no game end holds
 an empty record, and the hash covers the empty record the same way.
 
-Two readers exist at the boundary. One returns the four running values for a
-faction. The other returns the game end record or nothing.
+The boundary exposes the record, or nothing while the record is empty. The
+boundary also exposes the running value of a faction on each path that has a
+reader, so a caller can watch a path approach its end.
 
 ### D2. The record is written once, and nothing rewrites it
 
@@ -52,17 +54,28 @@ nothing writes the record again.
 A reviewer finds a violation when a later tick can change the winner, the path
 or the tick.
 
-### D3. The readers run in a fixed order, and a tie resolves by the lowest identifier
+### D3. Every reader satisfies one constraint, and the readers run in a fixed order
 
-The controller stage checks the readers directly before it evaluates, in the
-order domination, territory, wealth or wonder, renown. Two readers that fire on
-one tick resolve by that order. Two factions that tie on one reader resolve by
-the lowest faction identifier.[^4]
+Every reader, present or later, satisfies this constraint. It runs at the
+controller stage, directly before the controller evaluates, and only while the
+record is empty. It reads aggregates the engine already keeps, and it starts no
+pass over the units or the tiles. A reader that totals a value totals it in a
+64-bit accumulator.[^7] A tie between two factions on one reader resolves by
+the lowest faction identifier.[^4] Every threshold a reader compares against is
+a balance value and lives in the reference tables.[^5]
 
-The tick limit and every target are balance values and live in the reference
-tables.[^5] The held tile count is a running total the engine already
-keeps.[^6] The stock total sums the stores of the own sites in a 64-bit
-accumulator.[^7]
+The readers run in the order domination, territory, wealth or wonder, renown.
+Two readers that fire on one tick resolve by that order. A path that has no
+reader yet is skipped, and the order of the others does not change.
+
+**One reader exists today, and it is the territory reader.** It fires at the
+tick limit, and the faction with the most held tiles wins. The held tile count
+is a running total the engine already keeps.[^6] A path that gains a reader
+later takes its place in the order above and changes nothing in this record.
+
+A reviewer finds a violation when a reader runs at another stage, when a
+reader starts a pass, or when a reader breaks a tie by anything other than the
+lowest identifier.
 
 ### D4. After the game end the controllers emit nothing, and every other pass continues
 
@@ -99,8 +112,9 @@ accompany the record, and the record is the thing that stops the controllers.
 demonstration names the winner and the path, and under a flag it stops
 stepping. Without the flag it keeps drawing.
 
-**The golden hash moves when the record is added.** The record is simulated
-state, so every stored hash changes. The commit records the change.
+**The golden hash covers the record.** The record is simulated state, so a
+change to its shape moves every stored hash. The commit that changes the shape
+records the new hash.
 
 **A second win is not recorded.** A faction that would have won on a later tick
 by a different path wins nothing. That is the meaning of once.

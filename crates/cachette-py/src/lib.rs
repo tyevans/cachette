@@ -2793,7 +2793,7 @@ impl PyWorld {
     ///
     /// # References
     ///
-    /// [^1]: ADR-0144, a faction controller runs inside the step and acts only through the caller's verbs, decision D6. `docs/adrs/draft/adr-0144-a-faction-controller-runs-inside-the-step-and-acts-only-through-the-callers-verbs.md`
+    /// [^1]: ADR-0144, a faction controller runs inside the step and acts only through the caller's verbs, decision D6. `docs/adrs/accepted/adr-0144-a-faction-controller-runs-inside-the-step-and-acts-only-through-the-callers-verbs.md`
     fn set_externally_controlled(&self, faction: u16, controlled: bool) -> PyResult<()> {
         let mut world = self.lock();
         if !world.set_externally_controlled(FactionId(faction), controlled) {
@@ -2869,7 +2869,7 @@ impl PyWorld {
     ///
     /// # References
     ///
-    /// [^1]: ADR-0148, a game end is recorded once and stops the controllers, decisions D2 and D4. `docs/adrs/draft/adr-0148-a-game-end-is-recorded-once-and-stops-the-controllers.md`
+    /// [^1]: ADR-0148, a game end is recorded once and stops the controllers, decisions D2 and D4. `docs/adrs/accepted/adr-0148-a-game-end-is-recorded-once-and-stops-the-controllers.md`
     fn game_end<'py>(&self, python: Python<'py>) -> PyResult<Option<Bound<'py, PyDict>>> {
         let end = self.lock().game_end();
         let Some(path) = end.win_path() else {

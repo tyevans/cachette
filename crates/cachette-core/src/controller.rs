@@ -28,8 +28,8 @@
 //!
 //! # References
 //!
-//! [^1]: ADR-0144, a faction controller runs inside the step and acts only through the caller's verbs. `docs/adrs/draft/adr-0144-a-faction-controller-runs-inside-the-step-and-acts-only-through-the-callers-verbs.md`
-//! [^2]: ADR-0148, a game end is recorded once and stops the controllers, decision D1. `docs/adrs/draft/adr-0148-a-game-end-is-recorded-once-and-stops-the-controllers.md`
+//! [^1]: ADR-0144, a faction controller runs inside the step and acts only through the caller's verbs. `docs/adrs/accepted/adr-0144-a-faction-controller-runs-inside-the-step-and-acts-only-through-the-callers-verbs.md`
+//! [^2]: ADR-0148, a game end is recorded once and stops the controllers, decision D1. `docs/adrs/accepted/adr-0148-a-game-end-is-recorded-once-and-stops-the-controllers.md`
 //! [^3]: ADR-0003, every random draw is keyed, never stateful, decision D1. `docs/adrs/accepted/adr-0003-every-random-draw-is-keyed-never-stateful.md`
 //! [^4]: ADR-0004, iteration order is explicit, decision D4. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
 //! [^5]: ADR-0002, simulated and aggregated state holds no floating point number, decision D1. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
@@ -157,7 +157,7 @@ pub struct FactionRow {
     ///
     /// # References
     ///
-    /// [^1]: ADR-0144, a faction controller runs inside the step and acts only through the caller's verbs, decision D6. `docs/adrs/draft/adr-0144-a-faction-controller-runs-inside-the-step-and-acts-only-through-the-callers-verbs.md`
+    /// [^1]: ADR-0144, a faction controller runs inside the step and acts only through the caller's verbs, decision D6. `docs/adrs/accepted/adr-0144-a-faction-controller-runs-inside-the-step-and-acts-only-through-the-callers-verbs.md`
     pub externally_controlled: u8,
     /// Declared padding, always zero.
     pub padding: [u8; 3],
@@ -231,7 +231,7 @@ impl WinPath {
 ///
 /// # References
 ///
-/// [^1]: ADR-0148, a game end is recorded once and stops the controllers, decisions D1 and D2. `docs/adrs/draft/adr-0148-a-game-end-is-recorded-once-and-stops-the-controllers.md`
+/// [^1]: ADR-0148, a game end is recorded once and stops the controllers, decisions D1 and D2. `docs/adrs/accepted/adr-0148-a-game-end-is-recorded-once-and-stops-the-controllers.md`
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Pod, Zeroable)]
 pub struct GameEnd {
@@ -367,7 +367,7 @@ pub fn evaluate(
 ///
 /// # References
 ///
-/// [^1]: ADR-0148, a game end is recorded once and stops the controllers, decision D3. `docs/adrs/draft/adr-0148-a-game-end-is-recorded-once-and-stops-the-controllers.md`
+/// [^1]: ADR-0148, a game end is recorded once and stops the controllers, decision D3. `docs/adrs/accepted/adr-0148-a-game-end-is-recorded-once-and-stops-the-controllers.md`
 #[must_use]
 pub fn territory_winner(held: impl Iterator<Item = (FactionId, i64)>) -> Option<FactionId> {
     let mut leader: Option<(FactionId, i64)> = None;
@@ -485,7 +485,7 @@ impl Controller {
     ///
     /// # References
     ///
-    /// [^1]: ADR-0148, a game end is recorded once and stops the controllers, decision D2. `docs/adrs/draft/adr-0148-a-game-end-is-recorded-once-and-stops-the-controllers.md`
+    /// [^1]: ADR-0148, a game end is recorded once and stops the controllers, decision D2. `docs/adrs/accepted/adr-0148-a-game-end-is-recorded-once-and-stops-the-controllers.md`
     pub fn record_end(&mut self, tick: Tick, winner: FactionId, path: WinPath) -> bool {
         if self.game_end.is_set() {
             return false;
@@ -511,7 +511,7 @@ impl Controller {
     ///
     /// # References
     ///
-    /// [^1]: ADR-0144, a faction controller runs inside the step and acts only through the caller's verbs, decision D3. `docs/adrs/draft/adr-0144-a-faction-controller-runs-inside-the-step-and-acts-only-through-the-callers-verbs.md`
+    /// [^1]: ADR-0144, a faction controller runs inside the step and acts only through the caller's verbs, decision D3. `docs/adrs/accepted/adr-0144-a-faction-controller-runs-inside-the-step-and-acts-only-through-the-callers-verbs.md`
     #[must_use]
     pub const fn refused(&self) -> u32 {
         self.refused
@@ -549,7 +549,7 @@ impl Controller {
     /// # References
     ///
     /// [^1]: ADR-0004, iteration order is explicit, decision D4. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
-    /// [^2]: ADR-0148, a game end is recorded once and stops the controllers, decision D4. `docs/adrs/draft/adr-0148-a-game-end-is-recorded-once-and-stops-the-controllers.md`
+    /// [^2]: ADR-0148, a game end is recorded once and stops the controllers, decision D4. `docs/adrs/accepted/adr-0148-a-game-end-is-recorded-once-and-stops-the-controllers.md`
     #[must_use]
     pub fn plan(&self, seed: u64, tick: Tick) -> Vec<(FactionId, u32, Choice)> {
         let mut commands = Vec::new();

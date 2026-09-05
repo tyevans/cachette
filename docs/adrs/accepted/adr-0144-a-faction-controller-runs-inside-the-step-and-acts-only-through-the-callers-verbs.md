@@ -45,12 +45,23 @@ Python caller can call.**
 
 The controller runs as a stage of the step, after the derived structures of
 the frame are settled. It runs in the core crate, so no Python code runs while
-it runs.[^4] It takes no thread count, because its cost follows the faction
-count and never the population.
+it runs.[^4] It takes no thread count.
+
+**The cost constraint binds the evaluation, not the verb.** The evaluation
+cost follows the faction count and the evaluation count, and never the
+population. A command then applies through a verb. A verb costs what it costs
+any caller that names the same set. The stage resolves the set of one faction
+in one scan of the unit arena, in slot order. The bridge resolves a selector
+for a Python caller in the same way. That scan follows the population, and so
+does the verb it feeds. An index by faction would move the scan and not the
+verb. The population term therefore belongs to the command, not to the
+controller.
 
 A reviewer finds a violation when a controller decision is taken in Python
-between two steps, or when the controller runs at a place in the step where a
-derived structure it reads is not yet rebuilt.
+between two steps. A reviewer finds a violation when the controller runs at a
+place in the step where a derived structure it reads is not yet rebuilt. A
+reviewer finds a violation when the evaluation of one faction starts a pass
+over the units or the tiles.
 
 ### D2. The controller emits commands only through verbs that a caller can also call
 
@@ -88,12 +99,33 @@ to a list. The list is sorted by faction and then by draw index before any
 command applies.[^9] The result never depends on the visit order or on any
 thread.
 
+The draw index is the one ordinal a command carries. It is the fourth field of
+the key of the draw that produced the command, and it is the second field of
+the sort key. This record uses no other name for it.
+
 ### D6. A faction under external control receives no evaluation
 
 Each faction carries one flag that says an external caller controls it. A
 faction whose flag is set is skipped. Nothing in this work sets the flag. It
 exists so that a later player hook has a place to stand, and so that a test
 can prove the controller leaves such a faction alone.
+
+### D7. A faction with no seat receives no evaluation
+
+A seat is the tile of the first founding of a faction. The controller plans
+around the seat, and it reads the aggregates around the seat.[^1] A faction
+that founded nothing has no seat, so it has nothing to plan around, and the
+controller skips it.
+
+The force is the test corpus. A test that spawns units by hand and founds
+nothing builds a world with no seat. Without this decision the controller
+orders those units on the first tick. Every such test then measures the
+controller instead of the thing it was written to measure. With this decision
+a world that founded nothing runs no controller. A test that wants the
+controller founds a settlement first.
+
+A reviewer finds a violation when a faction with no seat emits a command, or
+when a test that founds nothing reads a controller command.
 
 ## The alternatives this rejects
 
@@ -121,11 +153,14 @@ the verb. That is a cost, and it is the cost that keeps one rule set.
 
 **The controller cannot read the world.** It reads a bounded set of aggregates,
 and a reading the engine does not expose is a reading the controller does not
-have. Adding a reading is engine work.
+have. Adding a reading is engine work. The one scan the stage makes resolves
+the set a verb takes. It is not a reading, and no evaluation depends on it.
 
-**The controller cost follows the factions and the seats.** No term follows the
-unit count or the tile count. The figure is derived and lives in the reference
-tables until the target platform measures it.[^8] [^11]
+**The evaluation cost follows the factions and the seats, and the command cost
+follows the set.** No evaluation term follows the unit count or the tile count.
+A command costs what the same command costs a Python caller. The figures are
+derived and live in the reference tables until the target platform measures
+them.[^8] [^11]
 
 **A refused command is a silent no.** The controller does not learn why. A
 game that wants a smarter controller reads the census and changes the weights,
