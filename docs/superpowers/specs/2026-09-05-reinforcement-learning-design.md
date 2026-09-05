@@ -121,15 +121,57 @@ controller plans around the seat and the seat is a row the engine already
 holds.[^1] A later pass may widen the window to the bounding box of every
 site the faction holds.
 
-**Fog.** The product record says a faction sees only what its own units
-observe.[^13] Nothing in the engine implements that record today. Every
-reader returns the truth for every faction. `observe` therefore returns the
-truth in this design. The map block reads a level 1 cell, and the product
-record says a level 1 answer must not leak what its tiles would hide, so a
-fog-honouring `observe` is one masking step on the map block when the
-observation plane lands. That is a later record. This document does not
-answer it, and it states that a policy trained on `observe` today trains
-with full information.
+**Fog. The owner has ruled: the harness exposes to a learner only what a
+player of that faction could see.** The product record says a faction sees a
+tile when one of its own units observes it, that a faction reads nothing
+about a tile it has never observed, and that a level 1 answer must not leak
+what its tiles would hide.[^13] `observe(faction)` honours that record from
+its first version. The observation plane is therefore a prerequisite of the
+harness and not a later record. A policy trained on `observe` never trains
+with full information, and no version of the reader returns the truth to a
+learner.
+
+**What fog does to each block.** The standing, the relation, the board and
+the weights are what a player of the faction reads from their own screen.
+The standing of the faction on each path is its own. The relation row is the
+faction's own row. The board is public by the record that defines it.[^31]
+The weights are the faction's own. These four blocks pass without a mask.
+The census block changes. The census reader today counts every subsystem
+over the whole world, and a world-wide count tells a faction about a storm
+or a treaty it never saw. The census block therefore holds the counts of the
+faction's own events only, and the reader gains a per-faction form. The map
+block changes. A cell the faction has never observed reads zero in every
+field and carries one flag that says unobserved. A cell the faction observed
+and left reads what it last saw and carries one flag that says remembered.
+The flag is a sixth field per cell. Both masks are applied inside the engine,
+so a caller cannot ask for more than the faction sees.
+
+**What the engine exposes today toward this.** Every reader returns the
+truth for every faction, and no reader takes a viewing faction. Four things
+exist that a fog-honouring reader will build on. The presence relation
+records which factions stand on ground each faction holds, as one bit per
+faction pair, and it is derived at the end of the step.[^34] The tile holder
+plane records which faction holds each tile.[^35] The level 1 summary holds
+the per-cell totals the map block reads.[^11] The unit-to-tile bridge rebuilds
+at the barrier and says which tiles hold units of which faction.[^36] Those
+four say where a faction's units are and what the cells hold. Together they
+are the input to a sight rule, and not the sight rule itself.
+
+**What is missing.** Three things. A sight rule: which tiles a unit observes,
+which the product record leaves to a separate need and which no record
+holds. An observed set per faction, with storage that grows with the area
+observed and not with the product of the faction count and the tile count,
+which the product record requires.[^13] And a remembered reading per
+observed cell, so a faction that moved away reads what it last saw. The
+observation plane is the work that adds these three, and the registry
+allocates its record number when it is written.[^16] `observe` reads the
+observed set and the remembered readings. It adds no rule of its own.
+
+**Order.** The harness passes in section 13 that touch the map block wait
+for the observation plane. The four blocks fog does not change do not wait.
+The per-faction census needs no plane, only a faction column on the counts.
+Pass 3 in section 13 is therefore the first pass that depends on the plane,
+and it lands after the plane and not before.
 
 **Type and bounds.** The array is a signed 64-bit integer array. Every field
 is a whole number or a Q16.16 value as its raw integer.[^14] No field is a
@@ -142,7 +184,8 @@ Python.
 **Cost shape.** The cost follows the cell count of the window, the faction
 ceiling and the board size. No term follows the unit count or the tile
 count. The reader starts no pass over the world. It reads the level 1 cells
-the pyramid already rebuilt at the barrier.[^11]
+the pyramid already rebuilt at the barrier, and the observed set the
+observation plane holds for the faction.[^11]
 
 ## 5 Action
 
@@ -415,9 +458,10 @@ pass 6.
 
 ## 14 Open questions for the owner
 
-1. **Does `observe` honour fog from the first pass, or later?** Recommendation:
-   later. Nothing implements fog today, and a fog-honouring reader before the
-   observation plane exists would be a capability nothing invokes.
+1. **Does `observe` honour fog from the first pass, or later?** Answered.
+   The owner ruled that the harness exposes to a learner only what a player
+   of that faction could see. Section 4 holds the ruling and what it costs
+   in order.
 2. **Which mode is the default cadence?** Recommendation: suppressed, for the
    reasons in section 6.
 3. **Does the learner's faction get a seat?** The controller skips a faction
@@ -486,3 +530,6 @@ the code.
 [^31]: ADR-0149, a faction's trade board is simulated state that any faction may read. `docs/adrs/draft/adr-0149-a-factions-trade-board-is-simulated-state-that-any-faction-may-read.md`
 [^32]: ADR-0145, a unit type is a row of capability columns, and zero means cannot. `docs/adrs/accepted/adr-0145-a-unit-type-is-a-row-of-capability-columns-and-zero-means-cannot.md`
 [^33]: Decision Record Scope, section 4.1. `.agents/rules/adr-scope.md`
+[^34]: ADR-0111, the presence relation is derived at the end of the step and never stored as a fact. `docs/adrs/draft/adr-0111-the-presence-relation-is-derived-at-the-end-of-the-step.md`
+[^35]: ADR-0053, a faction is a bit in a mask, and a relation is a plane. `docs/adrs/accepted/adr-0053-a-faction-is-a-bit-in-a-mask-and-a-relation-is-a-plane.md`
+[^36]: ADR-0018, the unit-to-tile bridge is derived, and it rebuilds at the barrier. `docs/adrs/accepted/adr-0018-the-unit-to-tile-bridge-is-derived-and-rebuilds-at-the-barrier.md`
