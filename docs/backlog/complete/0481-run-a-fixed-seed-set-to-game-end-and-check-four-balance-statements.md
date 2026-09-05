@@ -1,7 +1,7 @@
 ---
 id: 0481
 title: Run a fixed seed set to game end and check four balance statements
-status: refined
+status: complete
 created: 2026-09-05
 implements: [ADR-0148, ADR-0040 D1, ADR-0040 D2, ADR-0001 D4]
 changes: []
@@ -112,7 +112,41 @@ no reader, so the stub does not change.
 
 ## Outcome
 
-Filled in when the item moves to `complete/`.
+The harness landed as one Python package with a command line entry point and
+one recipe, `just balance`. It reads the four share rows of the balance
+register from the markdown table, so the register is the one declaration site.
+Every share is unset, so every statement reports and passes. No value column
+changed. The observed shares are in the derivation column.
+
+The harness ran once on 2026-09-05 on one development machine, ty001-ubuntu,
+an x86-64 laptop. This is one run on a development machine and it says
+nothing about the target platform. The output follows.
+
+```
+balance: extent 256, 4 factions, tick limit 2000, 8 seeds
+
+                seed  winner  path          tick  census
+   81985529216486895       3  territory     2000  units=246 settlements=4 seats_filled=0 characters=235 upgrades_complete=4218 luxury_tiles=8 storms_raised=1 contracts=0 controller_commands=0 controller_refused=0 game_ended=1
+11482700348539685380       0  territory     2000  units=193 settlements=4 seats_filled=0 characters=226 upgrades_complete=3784 luxury_tiles=8 storms_raised=1 contracts=0 controller_commands=0 controller_refused=0 game_ended=1
+ 4436671094153332249       2  territory     2000  units=196 settlements=4 seats_filled=0 characters=163 upgrades_complete=2469 luxury_tiles=8 storms_raised=1 contracts=0 controller_commands=0 controller_refused=0 game_ended=1
+15837385913476530734       0  territory     2000  units=200 settlements=4 seats_filled=0 characters=246 upgrades_complete=4439 luxury_tiles=8 storms_raised=1 contracts=0 controller_commands=0 controller_refused=0 game_ended=1
+ 8791356659090177603       1  territory     2000  units=216 settlements=4 seats_filled=0 characters=228 upgrades_complete=4585 luxury_tiles=8 storms_raised=1 contracts=0 controller_commands=0 controller_refused=0 game_ended=1
+ 1745327404703824472       1  territory     2000  units=186 settlements=4 seats_filled=8 characters=173 upgrades_complete=2682 luxury_tiles=8 storms_raised=1 contracts=0 controller_commands=0 controller_refused=0 game_ended=1
+13146042224027022957       1  territory     2000  units=233 settlements=4 seats_filled=0 characters=215 upgrades_complete=3780 luxury_tiles=8 storms_raised=1 contracts=0 controller_commands=0 controller_refused=0 game_ended=1
+ 6100012969640669826       2  territory     2000  units=213 settlements=4 seats_filled=0 characters=234 upgrades_complete=4142 luxury_tiles=8 storms_raised=1 contracts=0 controller_commands=0 controller_refused=0 game_ended=1
+
+statement 1, Win-path share (unset): unset: reporting only; territory 8/8
+statement 2, Seat share (unset): unset: reporting only; 0 2/8, 1 3/8, 2 2/8, 3 1/8
+statement 3, End share (unset): unset: reporting only; ended before the tick limit 0/8
+statement 4, Seed set (unset): unset: reporting only; zero in every game: contracts, controller_commands, controller_refused
+```
+
+Two things the run showed, and this item did not act on. The seat count
+`seats_filled` was zero at the end of seven games and eight in one, so the
+seats empty during a long game. The controller counts are per tick, so they
+are zero at every game end by construction of the game end record, and the
+census statement will name them in every run until a reader counts them over
+the whole game.
 
 ## References
 
