@@ -128,7 +128,7 @@ pub const fn scale_by_count(rate: Fix32, count: u32) -> Accum {
 ///
 /// # References
 ///
-/// [^1]: ADR-0145, a unit type is a row of capability columns, and zero means cannot, decision D1. `docs/adrs/draft/adr-0145-a-unit-type-is-a-row-of-capability-columns-and-zero-means-cannot.md`
+/// [^1]: ADR-0145, a unit type is a row of capability columns, and zero means cannot, decision D1. `docs/adrs/accepted/adr-0145-a-unit-type-is-a-row-of-capability-columns-and-zero-means-cannot.md`
 #[must_use]
 pub const fn scale_amount(amount: u32, scale: Fix32) -> u32 {
     if scale.0 <= 0 {
@@ -155,7 +155,7 @@ pub const fn scale_amount(amount: u32, scale: Fix32) -> u32 {
 ///
 /// # References
 ///
-/// [^1]: ADR-0145, a unit type is a row of capability columns, and zero means cannot, decision D1. `docs/adrs/draft/adr-0145-a-unit-type-is-a-row-of-capability-columns-and-zero-means-cannot.md`
+/// [^1]: ADR-0145, a unit type is a row of capability columns, and zero means cannot, decision D1. `docs/adrs/accepted/adr-0145-a-unit-type-is-a-row-of-capability-columns-and-zero-means-cannot.md`
 #[must_use]
 pub const fn scale_work(work: i64, scale: Fix32) -> i64 {
     if scale.0 <= 0 {

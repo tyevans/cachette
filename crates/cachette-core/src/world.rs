@@ -979,7 +979,7 @@ impl World {
             // The world is built with the default table, so a unit that
             // nothing typed is a worker and gathers, builds and carries.[^1]
             //
-            // [^1]: ADR-0145, a unit type is a row of capability columns, and zero means cannot, decision D4. `docs/adrs/draft/adr-0145-a-unit-type-is-a-row-of-capability-columns-and-zero-means-cannot.md`
+            // [^1]: ADR-0145, a unit type is a row of capability columns, and zero means cannot, decision D4. `docs/adrs/accepted/adr-0145-a-unit-type-is-a-row-of-capability-columns-and-zero-means-cannot.md`
             unit_types: DEFAULT_UNIT_TYPE_TABLE,
             fell_plane: DeathPlane::new(),
             fell_log: Vec::new(),
@@ -2201,7 +2201,7 @@ impl World {
     /// # References
     ///
     /// [^1]: ADR-0120, a unit carries a type, and the type is an index into a table the world is built with, decision D2. `docs/adrs/draft/adr-0120-a-unit-carries-a-type-that-indexes-a-table.md`
-    /// [^2]: ADR-0145, a unit type is a row of capability columns, and zero means cannot, decisions D1 and D2. `docs/adrs/draft/adr-0145-a-unit-type-is-a-row-of-capability-columns-and-zero-means-cannot.md`
+    /// [^2]: ADR-0145, a unit type is a row of capability columns, and zero means cannot, decisions D1 and D2. `docs/adrs/accepted/adr-0145-a-unit-type-is-a-row-of-capability-columns-and-zero-means-cannot.md`
     #[must_use]
     pub const fn unit_types(&self) -> &UnitTypeTable {
         &self.unit_types
@@ -2225,7 +2225,7 @@ impl World {
     ///
     /// # References
     ///
-    /// [^1]: ADR-0145, a unit type is a row of capability columns, and zero means cannot, decision D5. `docs/adrs/draft/adr-0145-a-unit-type-is-a-row-of-capability-columns-and-zero-means-cannot.md`
+    /// [^1]: ADR-0145, a unit type is a row of capability columns, and zero means cannot, decision D5. `docs/adrs/accepted/adr-0145-a-unit-type-is-a-row-of-capability-columns-and-zero-means-cannot.md`
     /// [^2]: Decision Record Scope, section 4.1. `.claude/rules/adr-scope.md`
     pub fn define_unit_type(
         &mut self,
@@ -6328,7 +6328,7 @@ impl World {
                 // at once; the pass is what holds when the caller is the
                 // engine.
                 //
-                // [^4]: ADR-0145, a unit type is a row of capability columns, and zero means cannot, decisions D1 and D2. `docs/adrs/draft/adr-0145-a-unit-type-is-a-row-of-capability-columns-and-zero-means-cannot.md`
+                // [^4]: ADR-0145, a unit type is a row of capability columns, and zero means cannot, decisions D1 and D2. `docs/adrs/accepted/adr-0145-a-unit-type-is-a-row-of-capability-columns-and-zero-means-cannot.md`
                 let row = self.unit_types.row(intent.unit_type);
                 let unit_rate = sim_math::scale_amount(rate, row.gather_rate);
                 let held = self
@@ -6431,7 +6431,7 @@ impl World {
             // cannot build keeps its order and moves no site. The sum is
             // integer addition, so it is the same in any order.[^5]
             //
-            // [^5]: ADR-0145, a unit type is a row of capability columns, and zero means cannot, decisions D1 and D2. `docs/adrs/draft/adr-0145-a-unit-type-is-a-row-of-capability-columns-and-zero-means-cannot.md`
+            // [^5]: ADR-0145, a unit type is a row of capability columns, and zero means cannot, decisions D1 and D2. `docs/adrs/accepted/adr-0145-a-unit-type-is-a-row-of-capability-columns-and-zero-means-cannot.md`
             let work = order[at..end]
                 .iter()
                 .map(|position| intents[*position as usize])

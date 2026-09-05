@@ -15,7 +15,7 @@
 //!
 //! # References
 //!
-//! [^1]: ADR-0145, a unit type is a row of capability columns, and zero means cannot, decisions D1 and D2. `docs/adrs/draft/adr-0145-a-unit-type-is-a-row-of-capability-columns-and-zero-means-cannot.md`
+//! [^1]: ADR-0145, a unit type is a row of capability columns, and zero means cannot, decisions D1 and D2. `docs/adrs/accepted/adr-0145-a-unit-type-is-a-row-of-capability-columns-and-zero-means-cannot.md`
 //! [^2]: Testing rules, section 5. `.agents/rules/testing.md`
 //! [^3]: Testing rules, section 2a. `.agents/rules/testing.md`
 

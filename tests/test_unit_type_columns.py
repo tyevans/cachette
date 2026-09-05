@@ -15,7 +15,7 @@ References
 
 [^2]: ADR-0145, a unit type is a row of capability columns, and zero means
 cannot, decisions D2 and D5.
-``docs/adrs/draft/adr-0145-a-unit-type-is-a-row-of-capability-columns-and-zero-means-cannot.md``
+``docs/adrs/accepted/adr-0145-a-unit-type-is-a-row-of-capability-columns-and-zero-means-cannot.md``
 """
 
 from __future__ import annotations
