@@ -1,7 +1,7 @@
 ---
 id: 0474
 title: Grade a faction relation and gate the contest on war
-status: refined
+status: complete
 created: 2026-09-05
 implements: [ADR-0146, ADR-0121 D1, ADR-0144 D2, ADR-0144 D3, ADR-0144 D4, ADR-0144 D5, ADR-0145 D3, ADR-0133 D1, ADR-0001 D4, ADR-0002 D1, ADR-0003 D1, ADR-0004 D1, ADR-0004 D4, ADR-0006 D1]
 changes: [ADR-0121 D1]
@@ -149,11 +149,56 @@ reader edits the stub by hand in the same commit.[^4]
 
 ## Outcome
 
-Filled in when the item moves to `complete/`.
+Built. The world holds one signed integer for each ordered faction pair, in a
+dense matrix that enters the state hash with its rules. The rules are one
+struct: the three band edges, the conversion edge, the guest edge, the six
+steps, the drift schedule and the verb bound. Every value is a provisional
+default, and the balance register holds the derivation of each.
+
+The contest resolves a meeting only when one of the two factions is in the war
+band toward the other, and it reports which faction lost units to which. The
+killer is the faction that delivered the most harm to the group, and a tie goes
+to the lowest identifier. Conversion converts a unit only when the leader is
+below the conversion edge toward its faction. Admission refuses a guest onto
+held ground when the holder is below the guest edge toward it. The rule for
+each gate is stated once, in the relation module, and the pass asks it.
+
+Four causes are wired. A delivered contract raises both directions and a
+failed contract lowers the party that was owed, each from the settle path with
+a one-line call. A fallen unit lowers the victim toward the killer from the
+contest apply, and a converted unit lowers its old faction toward the leader
+from the conversion apply. The drift is one new stage before the controller.
+The storm cause is a row and a field and nothing reads it, because a god
+inflicts weather only on ground its own faction holds and the cause has no
+source before pass 5.
+
+The verb moves the relation of the speaker's faction by a bounded step and
+refuses a speaker whose type has a command reach of zero. The controller draws
+once more for each faction with a speaker, at the index past the evaluations,
+and moves the relation toward the other faction with the most held tiles
+through the same verb. A crossing of the war edge writes one plain-data event,
+and the demonstration prints a declaration or a peace from that log.
+
+Two decisions this item made and the record does not hold. The band number is
+a count of the edges at or below the value, and the event and the Python
+reader carry it as an integer, so a caller that wants a name supplies its own.
+The rival of a faction is the other faction with the most held tiles, with a
+tie to the lowest identifier, in the shape of the territory winner.
+
+Left undone. The offer refusal across a war pair is not wired, because the
+error variant it needs lives in the trade module that pass 6 holds. The
+relation module holds the predicate for it. The storm cause waits for pass 5.
+The trade causes have no test through the settle path, because no fixture in
+the tree carries a contract to delivery, and the hooks are exercised by the
+unit tests of the relation module alone.
+
+Every new test was put back to red once. The commit body of the test commit
+names each defect and the test that caught it.
 
 ## References
 
 [^1]: Design: the living world game layer, sections 3 and 13. `docs/superpowers/specs/2026-09-05-living-world-game-layer-design.md`
 [^2]: Balance register. `docs/reference/balance.md`
 [^3]: ADR Registry. `docs/adrs/REGISTRY.md`
-[^4]: Findings register, FND-320. `docs/FINDINGS.md`
+[^4]: Findings register, FND-048, FND-051 and FND-320. `docs/FINDINGS.md`
+[^5]: Blockers register, BLK-007, BLK-080 and BLK-130. `docs/BLOCKERS.md`

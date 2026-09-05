@@ -396,6 +396,13 @@ another.[^BLK80C] Until a seed set exists, nothing can drive the case.
 unknown is how often a running world reaches a contested tile, which changes how
 much a contest costs and not where it resolves.
 
+**The question narrowed on 5 September 2026.** The contest now resolves a
+meeting only when one of the two factions is in the war band toward the other,
+and a holder below the guest edge refuses a guest onto the ground it holds. A
+running world therefore reaches a fight only across a pair the controller or a
+caller has moved to war, and a measurement of how often that happens must count
+the wars as well as the contacts.
+
 **What closes this.** Somebody drives two factions together through the movement
 pass, with a seed set the control plane named, and reports how many tiles hold
 two factions.

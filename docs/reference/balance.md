@@ -42,19 +42,19 @@ BLK-150, which asks what raises and lowers renown.[^6]
 
 | Value | Read by | Set | Blocker | Derivation |
 |---|---|---|---|---|
-| Alliance edge | Every reader of a band | unset, pass 10 | — | |
-| Peace edge | Every reader of a band | unset, pass 10 | — | |
-| War edge | Every reader of a band, and the declaration event | unset, pass 10 | — | |
-| Step on a contract delivered in full | The delivery pass | unset, pass 10 | — | |
-| Step on a contract that fails | The delivery pass at a deadline | unset, pass 10 | — | |
-| Step when a unit falls to the other side | The contest pass | unset, pass 10 | — | |
-| Step when a unit converts away | The conversion pass | unset, pass 10 | — | |
-| Step when a storm falls on the ground of the other | The weather verb | unset, pass 10 | BLK-130 | |
-| Drift step toward peace | The drift | unset, pass 10 | — | |
-| Drift schedule, period and phase | The drift | unset, pass 10 | — | |
-| Bound on one `move_relation` step | The relation verb | unset, pass 10 | — | |
-| Permitted bands for a conversion | The conversion pass | unset, pass 10 | — | |
-| Band below which a holder refuses a guest | The movement pass | unset, pass 10 | — | |
+| Alliance edge | Every reader of a band | unset, pass 10 | — | Provisional default of 8 written by pass 3, the same distance above the peace edge as the war edge is below it, so the drift takes equal time back from either side. Pass 10 measures it. |
+| Peace edge | Every reader of a band | unset, pass 10 | — | Provisional default of 0 written by pass 3. Every entry of a new world holds it, so two factions that never met are at peace and the contest resolves nothing between them. Pass 10 measures it. |
+| War edge | Every reader of a band, and the declaration event | unset, pass 10 | — | Provisional default of -8 written by pass 3: eight controller moves of one step from peace declare a war, and eight drift periods end it. Pass 10 measures it. |
+| Step on a contract delivered in full | The delivery pass | unset, pass 10 | — | Provisional default of 2 written by pass 3, twice the fallen step, so one honoured contract outweighs one skirmish casualty. Both directions move. Pass 10 measures it. |
+| Step on a contract that fails | The delivery pass at a deadline | unset, pass 10 | — | Provisional default of 2 written by pass 3, equal to the delivered step, so a default undoes one delivery. Only the party that was owed moves. Pass 10 measures it. |
+| Step when a unit falls to the other side | The contest pass | unset, pass 10 | — | Provisional default of 1 for each unit written by pass 3, the smallest whole step, because a battle of many units already sums to a large move. The victim moves toward the faction that delivered the most harm. Pass 10 measures it. |
+| Step when a unit converts away | The conversion pass | unset, pass 10 | — | Provisional default of 1 for each unit written by pass 3, for the reason the fallen step has. The old faction moves toward the leader. Pass 10 measures it. |
+| Step when a storm falls on the ground of the other | The weather verb | unset, pass 10 | BLK-130 | Unset and unwired. The rules struct holds the field at zero and nothing reads it. A god inflicts weather only on ground its own faction holds, so no source for the cause exists before pass 5. |
+| Drift step toward peace | The drift | unset, pass 10 | — | Provisional default of 1 written by pass 3, the smallest whole step. An entry below the peace edge moves up and stops at it. An entry at or above the alliance edge moves down and stops one below it. Pass 10 measures it. |
+| Drift schedule, period and phase | The drift | unset, pass 10 | — | Provisional default of period 10 and phase 0 written by pass 3, the economy schedule default, so the drift and the rates share a cadence. Pass 10 measures it. |
+| Bound on one `move_relation` step | The relation verb | unset, pass 10 | — | Provisional default of 4 written by pass 3, half the distance from peace to war, so a leader needs two declarations to reach war from peace and one drift period undoes a quarter of one. Pass 10 measures it. |
+| Permitted bands for a conversion | The conversion pass | unset, pass 10 | — | Provisional default written by pass 3: the leader converts only below the peace edge, which is the tension band and the war band. A leader at peace with a faction converts none of its units. The code holds it as one edge equal to the peace edge. Pass 10 measures it. |
+| Band below which a holder refuses a guest | The movement pass | unset, pass 10 | — | Provisional default written by pass 3: a holder refuses a guest it is below the peace edge toward, so a border in tension or at war closes and a border at peace stays open. The code holds it as one edge equal to the peace edge. Pass 10 measures it. |
 
 ## The game end
 
