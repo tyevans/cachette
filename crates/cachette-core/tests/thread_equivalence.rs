@@ -115,6 +115,51 @@ fn the_event_log_is_identical_at_every_thread_count() {
     }
 }
 
+/// Runs a seeded world, in which every faction has a seat and the controller
+/// emits on every tick, and returns its log and its hash.
+fn run_seeded(threads: usize) -> (Vec<u8>, u64) {
+    let config = WorldConfig {
+        width: 64,
+        height: 64,
+        seed: 0x0cac_4e77_0472,
+        faction_count: 4,
+        unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
+    };
+    let mut world = World::new(config).expect("the extent must describe a world");
+    let outcomes = world.seed_world().expect("a fresh world seeds once");
+    assert!(
+        outcomes.iter().any(|outcome| outcome.founding().is_some()),
+        "the scenario must seat a faction, or the controller has nothing to do"
+    );
+    // A short limit, so the run crosses the game end and the world keeps
+    // stepping past it at every thread count.
+    world.set_tick_limit(6);
+    for _ in 0..8 {
+        world.step(threads).expect("the step must run");
+    }
+    assert!(world.game_end().is_set(), "the run must cross the game end");
+    (
+        world.event_log_bytes().to_vec(),
+        world.state_hash().finish(),
+    )
+}
+
+#[test]
+fn a_seeded_world_with_the_controller_gives_one_answer_at_every_thread_count() {
+    let (expected_log, expected_hash) = run_seeded(THREAD_COUNTS[0]);
+    for threads in &THREAD_COUNTS[1..] {
+        let (log, hash) = run_seeded(*threads);
+        assert_eq!(
+            log, expected_log,
+            "the seeded event log differs at {threads} threads"
+        );
+        assert_eq!(
+            hash, expected_hash,
+            "the seeded state hash differs at {threads} threads"
+        );
+    }
+}
+
 #[test]
 fn the_log_is_not_empty_for_a_large_scenario() {
     // A test that compares two empty logs proves nothing. This test fails

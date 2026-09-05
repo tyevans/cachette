@@ -92,5 +92,5 @@ Filled in when the item moves to `complete/`.
 [^4]: Testing rules, section 5. `.claude/rules/testing.md`
 [^5]: Recurring Defect Shapes, shape 1. `.claude/rules/recurring-defects.md`
 [^6]: Design: the living world game layer, section 10.1. `docs/superpowers/specs/2026-09-05-living-world-game-layer-design.md`
-[^7]: Backlog item 0472, run a faction controller inside the step and end the game on territory. `docs/backlog/refined/0472-run-a-faction-controller-inside-the-step-and-end-the-game-on-territory.md`
+[^7]: Backlog item 0472, run a faction controller inside the step and end the game on territory. `docs/backlog/complete/0472-run-a-faction-controller-inside-the-step-and-end-the-game-on-territory.md`
 [^8]: Balance register. `docs/reference/balance.md`

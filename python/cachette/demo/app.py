@@ -43,7 +43,7 @@ if TYPE_CHECKING:
     # These describe the shape of a dictionary the engine returns. They live
     # in the stub beside the compiled module and not in the module itself, so
     # importing them at run time would fail.
-    from cachette._core import FoundingReport, FrameReading
+    from cachette._core import FoundingReport, FrameReading, GameEnd
 from cachette.demo.clock import SPEEDS, Clock
 from cachette.demo.settings import Settings
 from cachette.demo.surface import Surface
@@ -58,9 +58,6 @@ WORLD_WIDTH = 256
 WORLD_HEIGHT = 256
 WORLD_SEED = 0x0123_4567_89AB_CDEF
 FACTION_COUNT = 4
-
-# The number of people each faction founds with.
-GROUP = 64
 
 # The height a picture of the whole panel starts at.
 #
@@ -103,6 +100,7 @@ class Demo:
     """
 
     __slots__ = (
+        "announced_end",
         "camera",
         "clock",
         "panels",
@@ -141,15 +139,19 @@ class Demo:
         # The tile the watcher pointed at, in axial coordinates. The engine
         # has no cursor, so the control plane supplies one.
         self.pointer: tuple[int, int] | None = None
+        # Whether the game end was printed. The record is written once, and
+        # the line is printed once.
+        self.announced_end = False
 
-    def found(self) -> list[FoundingReport]:
-        """Found one run for every faction, and give back what each got.
+    def seed(self) -> list[FoundingReport]:
+        """Seed the world from its seed, and give back what each faction got.
 
-        One call seats every faction, because a founding keeps its distance
-        from the foundings before it. The engine keeps the report for the
-        panel, and the caller gets a summary to print.
+        **The demonstration calls no seeding verb.** The engine founds every
+        faction and places the luxuries from the seed in one call that takes
+        nothing. The engine keeps the report for the panel, and the caller
+        gets a summary to print.
         """
-        return self.world.found_run_for_every_faction(GROUP)
+        return self.world.seed_world()
 
     def open_on(self, place: tuple[int, int]) -> None:
         """Point the camera at a place and hold it inside the world.
@@ -200,6 +202,19 @@ class Demo:
             f"became {what}{earned}, {reading['characters']} in the world"
         )
 
+    def announce_end(self) -> GameEnd | None:
+        """Say who won, once, when the game end record first appears.
+
+        The record is engine state, and the world keeps stepping after it.
+        This reads one record and prints one line the first time it is set.
+        """
+        end = self.world.game_end()
+        if end is None or self.announced_end:
+            return end
+        self.announced_end = True
+        print(f"tick {end['tick']}: faction {end['winner']} wins by {end['path']}")
+        return end
+
     def toggle_panel(self, name: str) -> None:
         """Add a panel of the deck to the frame, or take it off.
 
@@ -238,6 +253,7 @@ class Demo:
         """
         for _ in range(self.clock.ticks_due()):
             self.world.step(self.threads)
+        self.announce_end()
         reading = self.world.draw(
             self.camera,
             self.surface.width,
@@ -252,14 +268,31 @@ class Demo:
         return reading
 
 
-def build_world() -> World:
-    """Build the world the demonstration runs."""
+def build_world(extent: int = 0, factions: int = FACTION_COUNT) -> World:
+    """Build the world the demonstration runs.
+
+    The extent is the side of the world in tiles. Zero takes the default
+    world, which is the one a watcher opens.
+    """
+    side = extent if extent > 0 else WORLD_WIDTH
     return World(
-        width=WORLD_WIDTH,
-        height=WORLD_HEIGHT,
+        width=side,
+        height=side if extent > 0 else WORLD_HEIGHT,
         seed=WORLD_SEED,
-        faction_count=FACTION_COUNT,
+        faction_count=factions,
     )
+
+
+def print_census(world: World) -> None:
+    """Print what every subsystem produced, one line each.
+
+    The engine holds the list of subsystems in one table, and this walks the
+    dictionary that table produced. No name is written here.
+    """
+    census = world.subsystem_census()
+    print(f"census at tick {world.tick}")
+    for name, count in census.items():
+        print(f"  {name}: {count}")
 
 
 def report(foundings: list[FoundingReport]) -> tuple[int, int]:
@@ -288,11 +321,11 @@ def report(foundings: list[FoundingReport]) -> tuple[int, int]:
         )
         if founding["carries_its_group"]:
             carried += 1
-            print(f"  this ground carries its group of {GROUP}")
+            print(f"  this ground carries its group of {founding['people']}")
         else:
             print(
                 f"  this ground carries {founding['food']} of its group "
-                f"of {GROUP}, and the rest go short"
+                f"of {founding['people']}, and the rest go short"
             )
     # A fixture that produces one condition everywhere measures itself. This
     # says which way the run came out rather than assuming the split.
@@ -348,6 +381,32 @@ def main(argv: list[str] | None = None) -> int:
             "first promotions to appear"
         ),
     )
+    parser.add_argument(
+        "--run-to-end",
+        action="store_true",
+        help=(
+            "open no window; step until the game ends or the tick limit "
+            "passes, then print the winner, the path, the tick and the census"
+        ),
+    )
+    parser.add_argument(
+        "--tick-limit",
+        type=int,
+        default=0,
+        help="the tick at which the territory reader fires; zero keeps the default",
+    )
+    parser.add_argument(
+        "--extent",
+        type=int,
+        default=0,
+        help="the side of the world in tiles; zero keeps the default world",
+    )
+    parser.add_argument(
+        "--factions",
+        type=int,
+        default=FACTION_COUNT,
+        help="how many factions the world holds",
+    )
     arguments = parser.parse_args(argv)
 
     # The panel holds every section and is taller than a window a person
@@ -355,20 +414,27 @@ def main(argv: list[str] | None = None) -> int:
     # sections and say so, which is honest and still less than was asked for.
     default_height = PICTURE_HEIGHT if arguments.picture else WINDOW_HEIGHT
     demo = Demo(
-        build_world(),
+        build_world(arguments.extent, arguments.factions),
         width=arguments.width,
         height=arguments.height or default_height,
         threads=arguments.threads,
     )
-    foundings = demo.found()
+    if arguments.tick_limit > 0:
+        demo.world.set_tick_limit(arguments.tick_limit)
+    foundings = demo.seed()
     seated, _ = report(foundings)
     if seated == 0:
         print("no faction found a place, so there is nothing to watch")
         return 1
     demo.open_on(opening_place(foundings))
 
+    if arguments.run_to_end:
+        return _run_to_end(demo)
+
     if arguments.picture:
-        return _write_picture(demo, arguments.picture, arguments.ticks)
+        status = _write_picture(demo, arguments.picture, arguments.ticks)
+        print_census(demo.world)
+        return status
 
     print(
         f"cachette: {demo.world.width} by {demo.world.height} tiles, "
@@ -384,7 +450,33 @@ def main(argv: list[str] | None = None) -> int:
     print("click a tile to point at it")
     print("close the window or press escape to stop")
 
-    return _run_window(demo, arguments.frames)
+    status = _run_window(demo, arguments.frames)
+    print_census(demo.world)
+    return status
+
+
+def _run_to_end(demo: Demo) -> int:
+    """Step the world until the game ends, then print the end and the census.
+
+    This presenter needs no window library and no display. It drives no
+    verb: the world seeds itself, the controller inside the step plays, and
+    this reads the record when it appears. The tick limit bounds the run, so
+    a game that no reader ends stops at the limit and says so.
+    """
+    limit = demo.world.tick_limit
+    end = None
+    while end is None and demo.world.tick < limit:
+        demo.world.step(demo.threads)
+        end = demo.announce_end()
+    if end is None:
+        print(f"no game ended by the tick limit of {limit}")
+    else:
+        print(
+            f"the game ended at tick {end['tick']}: faction {end['winner']} "
+            f"won by {end['path']}, holding {demo.world.score(end['winner'])} tiles"
+        )
+    print_census(demo.world)
+    return 0
 
 
 def _write_picture(demo: Demo, path: str, frames: int) -> int:

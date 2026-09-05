@@ -117,7 +117,7 @@ def test_the_faction_population_answers_once_for_every_faction() -> None:
     assert len(counts) == FACTIONS
     assert all(count == 0 for count in counts)
 
-    demo.found()
+    demo.seed()
     counts = demo.world.faction_population()
     assert sum(counts) == demo.world.soldier_count
     assert any(count > 0 for count in counts)

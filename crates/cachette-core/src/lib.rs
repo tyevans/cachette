@@ -20,6 +20,7 @@ pub mod character;
 pub mod choose;
 pub mod cohort;
 pub mod contest;
+pub mod controller;
 pub mod conversion;
 pub mod descent;
 pub mod event;
@@ -66,6 +67,10 @@ pub use cohort::{
     SiteRationed, UnitStarved, COHORTS_PER_SITE,
 };
 pub use contest::{ContestError, UnitFell};
+pub use controller::{
+    Choice, ControllerCommand, FactionRow, FactionWeights, GameEnd, WinPath, COMMAND_BUILD,
+    COMMAND_GATHER, EVALUATIONS_DEFAULT, TICK_LIMIT_DEFAULT, WEIGHT_HIGH, WEIGHT_LOW,
+};
 pub use conversion::{ConversionError, Convert, UnitConverted};
 pub use descent::{
     Descent, DescentError, DescentId, HouseId, Parents, DESCENT_CEILING, RELATION_DEPTH,
@@ -116,4 +121,7 @@ pub use weather::{
     Drops, Storm, WeatherError, WeatherField, COOLDOWN_TICKS, PLACES_CEILING, STRENGTH_CEILING,
     WET_MARK,
 };
-pub use world::{ConvertError, IdentityError, StepError, World, WorldConfig, WorldError};
+pub use world::{
+    CensusRow, ConvertError, IdentityError, StepError, World, WorldConfig, WorldError,
+    FOUNDING_GROUP_DEFAULT, LUXURY_DEPOSITS_DEFAULT, SUBSYSTEM_CENSUS,
+};

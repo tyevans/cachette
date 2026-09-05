@@ -177,6 +177,7 @@ declare_stages! {
     Convert,                  "convert",                    true,  1, false;
     WeatherSolve,             "weather_solve",              true,  1, false;
     PresenceFold,             "presence_fold",              true,  1, false;
+    Controller,               "controller",                 false, 1, false;
 }
 
 /// What one stage cost, and how many times the step ran it.

@@ -38,6 +38,9 @@ use crate::cohort::{
     UnitStarved,
 };
 use crate::contest::{self, ContestError, UnitFell};
+use crate::controller::{
+    self, Choice, Controller, ControllerCommand, FactionRow, FactionWeights, GameEnd, WinPath,
+};
 use crate::conversion::{self, ConversionError, Convert, UnitConverted};
 use crate::descent::{DescentId, Parents};
 use crate::event::{ResourceTaken, TileChanged, CHANGE_KIND_LOWERED, CHANGE_KIND_RAISED};
@@ -897,6 +900,16 @@ pub struct World {
     /// [^1]: ADR-0140, weather is a field over the level 1 cell lattice, decision D1. `docs/adrs/draft/adr-0140-weather-is-a-field-over-the-level-1-cell-lattice.md`
     /// [^2]: ADR-0001, one binary gives one answer at any thread count, decision D4. `docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
     weather: WeatherField,
+    /// The faction controller: one row for each faction, the two parameters
+    /// the step reads on every tick, and the game end record.
+    ///
+    /// Every value in it is state that a later frame reads, so the whole of
+    /// it enters the hash.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0148, a game end is recorded once and stops the controllers, decision D1. `docs/adrs/draft/adr-0148-a-game-end-is-recorded-once-and-stops-the-controllers.md`
+    controller: Controller,
 }
 
 impl World {
@@ -966,6 +979,7 @@ impl World {
             luxuries_seeded: false,
             influence: InfluenceField::new(cell_lattice, config.faction_count)?,
             weather: WeatherField::new(cell_lattice, config.faction_count)?,
+            controller: Controller::new(config.seed, config.faction_count),
             schedule: RateSchedule::DEFAULT,
             rates: RateTable::new(),
             rate_ledger: RateLedger::ZERO,
@@ -1657,6 +1671,7 @@ impl World {
         let place = chosen.address();
         let (settlement, people) = self.settle_group(place, group, faction)?;
         self.provision_site(settlement, chosen.provision().food);
+        self.record_seat(faction, place);
         Ok(Founding::new(place, settlement, people, survey))
     }
 
@@ -1686,6 +1701,7 @@ impl World {
             .ok_or(FoundingError::NoPlaceFound(survey.drawn()))?;
         let (settlement, people) = self.settle_group(address, group, faction)?;
         self.provision_site(settlement, chosen.provision().food);
+        self.record_seat(faction, address);
         Ok(Founding::new(chosen.address(), settlement, people, survey))
     }
 
@@ -3438,6 +3454,14 @@ impl World {
         //
         // [^16]: ADR-0126, a trade negotiation is engine state and the words are not, decision D1. `docs/adrs/draft/adr-0126-a-trade-negotiation-is-engine-state.md`
         let hash = self.trade.hash_into(hash);
+        // The controller rows, its two parameters and the game end record are
+        // each read by a later frame. The evaluation count and the tick limit
+        // enter for the reason the recovery rules do: a value the step reads
+        // on every tick and that the hash does not cover lets two worlds hash
+        // the same and diverge on the next tick.[^18]
+        //
+        // [^18]: ADR-0148, a game end is recorded once and stops the controllers, decision D1. `docs/adrs/draft/adr-0148-a-game-end-is-recorded-once-and-stops-the-controllers.md`
+        let hash = self.controller.hash_into(hash);
         // The water in the air and on the ground is state that a later frame
         // reads: the next solve starts from the field this one left. Two
         // worlds that hold the same tiles and different weather must
@@ -4572,6 +4596,17 @@ impl World {
             let _span = stage::open(Stage::PresenceFold);
             self.presence
                 .rebuild(&self.soldiers, &self.holding, threads)?;
+        }
+        // The controller runs last, after every derived structure of the
+        // frame describes the frame. It takes no thread count. It checks the
+        // game end readers first, and it emits nothing once the record is
+        // written.[^23] [^24]
+        //
+        // [^23]: ADR-0144, a faction controller runs inside the step and acts only through the caller's verbs, decision D1. `docs/adrs/draft/adr-0144-a-faction-controller-runs-inside-the-step-and-acts-only-through-the-callers-verbs.md`
+        // [^24]: ADR-0148, a game end is recorded once and stops the controllers, decision D4. `docs/adrs/draft/adr-0148-a-game-end-is-recorded-once-and-stops-the-controllers.md`
+        {
+            let _span = stage::open(Stage::Controller);
+            self.run_controller();
         }
         Ok(&self.log)
     }
@@ -8022,6 +8057,453 @@ fn update_range(tick: Tick, seed: u64, mut chunk: TileValueChunk<'_>) -> ChunkRe
     }
     result.changed = chunk.changed();
     result
+}
+
+/// The number of people each faction founds with when the seeding layer
+/// founds the run.
+///
+/// **This is a provisional value and not a measured one.** The balance
+/// register holds the row, marks it unset, and records how this value was
+/// chosen.[^1]
+///
+/// # References
+///
+/// [^1]: Balance register, the founding group. `docs/reference/balance.md`
+pub const FOUNDING_GROUP_DEFAULT: u32 = 64;
+
+/// The number of luxury deposits the seeding layer places.
+///
+/// **This is a provisional value and not a measured one.** The balance
+/// register holds the row, marks it unset, and records how this value was
+/// chosen.[^1]
+///
+/// # References
+///
+/// [^1]: Balance register, the luxury deposits. `docs/reference/balance.md`
+pub const LUXURY_DEPOSITS_DEFAULT: u32 = 8;
+
+/// One row of the subsystem census: a name and the reader that counts it.
+///
+/// **This table is the only declaration of the list.** A caller that prints
+/// the census, and a test that checks it, both read this table. A list
+/// written anywhere else would be a second declaration site, and nothing
+/// would fail when the two disagreed.[^1]
+///
+/// # References
+///
+/// [^1]: Recurring Defect Shapes, shape 1. `.claude/rules/recurring-defects.md`
+#[derive(Clone, Copy)]
+pub struct CensusRow {
+    /// The name of the subsystem, as the census prints it.
+    pub name: &'static str,
+    /// The reader that counts what the subsystem produced.
+    pub read: fn(&World) -> i64,
+}
+
+impl std::fmt::Debug for CensusRow {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("CensusRow")
+            .field("name", &self.name)
+            .finish()
+    }
+}
+
+/// The subsystem census, one row for each subsystem.
+///
+/// The order is the order the census prints. Every reader is a whole count
+/// in a 64-bit accumulator, so no count depends on the margin of a narrower
+/// type.[^1]
+///
+/// # References
+///
+/// [^1]: ADR-0002, simulated and aggregated state holds no floating point number, decision D3. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
+pub const SUBSYSTEM_CENSUS: &[CensusRow] = &[
+    CensusRow {
+        name: "units",
+        read: |world| i64::from(world.soldiers.len()),
+    },
+    CensusRow {
+        name: "settlements",
+        read: |world| i64::from(world.settlements.len()),
+    },
+    CensusRow {
+        name: "seats_filled",
+        read: |world| {
+            world
+                .positions
+                .rows()
+                .iter()
+                .filter(|seat| seat.exists() && seat.holder_bits() != 0)
+                .count() as i64
+        },
+    },
+    CensusRow {
+        name: "characters",
+        read: |world| world.characters.iter().count() as i64,
+    },
+    CensusRow {
+        name: "upgrades_complete",
+        read: |world| {
+            world
+                .upgrades
+                .sites()
+                .iter()
+                .filter(|site| site.is_complete())
+                .count() as i64
+        },
+    },
+    CensusRow {
+        name: "luxury_tiles",
+        read: |world| world.luxuries.len() as i64,
+    },
+    // A storm is counted as one while the raised total is above zero. A
+    // later pass counts the storms themselves.
+    CensusRow {
+        name: "storms_raised",
+        read: |world| i64::from(world.weather.raised() > 0),
+    },
+    CensusRow {
+        name: "contracts",
+        read: |world| {
+            world
+                .trade
+                .rows()
+                .iter()
+                .filter(|row| row.is_bound())
+                .count() as i64
+        },
+    },
+    CensusRow {
+        name: "controller_commands",
+        read: |world| i64::from(world.controller.applied()),
+    },
+    CensusRow {
+        name: "controller_refused",
+        read: |world| i64::from(world.controller.refused()),
+    },
+    CensusRow {
+        name: "game_ended",
+        read: |world| i64::from(world.controller.game_end().is_set()),
+    },
+];
+
+impl World {
+    /// Seeds the world: founds one run for every faction and places the
+    /// luxuries, both from the seed.
+    ///
+    /// **This takes no parameter.** The founding group and the deposit count
+    /// are provisional values that the balance register holds, so a caller
+    /// that builds a world from a seed calls this once and names nothing.[^1]
+    /// The founding draws as the founding verb draws, and the luxuries are
+    /// placed by a keyed draw on the deposit index at frame zero.[^2]
+    ///
+    /// Returns what each faction got, in faction order.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the world was seeded before. A world is seeded
+    /// once.
+    ///
+    /// # References
+    ///
+    /// [^1]: Balance register, the founding group and the luxury deposits. `docs/reference/balance.md`
+    /// [^2]: ADR-0003, every random draw is keyed, never stateful, decision D1. `docs/adrs/accepted/adr-0003-every-random-draw-is-keyed-never-stateful.md`
+    pub fn seed_world(&mut self) -> Result<Vec<FoundingOutcome>, LuxuryError> {
+        if self.luxuries_seeded {
+            return Err(LuxuryError::AlreadySeeded);
+        }
+        let outcomes = self.found_run_for_every_faction(FOUNDING_GROUP_DEFAULT);
+        let tiles = u64::from(self.grid.tile_count());
+        let mut placements = Vec::with_capacity(LUXURY_DEPOSITS_DEFAULT as usize);
+        for deposit in 0..LUXURY_DEPOSITS_DEFAULT {
+            let tile = rng::draw_below(
+                self.config.seed,
+                rng::SYSTEM_LUXURY,
+                0,
+                u64::from(deposit),
+                0,
+                tiles,
+            );
+            let luxury = LuxuryId((deposit % u32::from(crate::luxury::LUXURY_CEILING)) as u8);
+            placements.push((TileIdx(tile as u32), luxury));
+        }
+        self.seed_luxuries(&placements)?;
+        Ok(outcomes)
+    }
+
+    /// Gives every soldier in the set the order to gather one kind.
+    ///
+    /// **This is the set form, and it is the one path a caller and the
+    /// controller share.** The Python binding resolves its identities and
+    /// calls this. The controller calls this. A verb that only one of them
+    /// reached would be a capability that nothing tests from the
+    /// boundary.[^1]
+    ///
+    /// Returns how many entities the arena refused, because they name no
+    /// live soldier.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0144, a faction controller runs inside the step and acts only through the caller's verbs, decision D2. `docs/adrs/draft/adr-0144-a-faction-controller-runs-inside-the-step-and-acts-only-through-the-callers-verbs.md`
+    pub fn order_gather_set(&mut self, units: &[Entity], kind: ResourceKind) -> usize {
+        let mut refused = 0usize;
+        for entity in units {
+            if !self.order_gather(*entity, kind) {
+                refused += 1;
+            }
+        }
+        refused
+    }
+
+    /// Gives every soldier in the set the order to build one kind.
+    ///
+    /// The set form, shared by the binding and the controller, as the gather
+    /// order is.[^1] Returns how many entities the arena refused.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0144, a faction controller runs inside the step and acts only through the caller's verbs, decision D2. `docs/adrs/draft/adr-0144-a-faction-controller-runs-inside-the-step-and-acts-only-through-the-callers-verbs.md`
+    pub fn order_build_set(&mut self, units: &[Entity], kind: UpgradeKind) -> usize {
+        let mut refused = 0usize;
+        for entity in units {
+            if !self.order_build(*entity, kind) {
+                refused += 1;
+            }
+        }
+        refused
+    }
+
+    /// Gives every soldier in the set one unit type.
+    ///
+    /// The set form, shared by the binding and any engine caller, as the
+    /// gather order is.[^1] Returns how many entities the arena refused.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0144, a faction controller runs inside the step and acts only through the caller's verbs, decision D2. `docs/adrs/draft/adr-0144-a-faction-controller-runs-inside-the-step-and-acts-only-through-the-callers-verbs.md`
+    pub fn set_unit_type_set(&mut self, units: &[Entity], unit_type: UnitTypeId) -> usize {
+        let mut refused = 0usize;
+        for entity in units {
+            if !self.set_unit_type(*entity, unit_type) {
+                refused += 1;
+            }
+        }
+        refused
+    }
+
+    /// Returns the weight vector of one faction, or `None` when the world
+    /// has no such faction.
+    #[must_use]
+    pub fn faction_weights(&self, faction: FactionId) -> Option<FactionWeights> {
+        self.controller.row(faction).map(|row| row.weights)
+    }
+
+    /// Sets the flag that says an external caller controls a faction.
+    ///
+    /// A faction under external control receives no evaluation from the
+    /// controller.[^1] Returns `false` when the world has no such faction.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0144, a faction controller runs inside the step and acts only through the caller's verbs, decision D6. `docs/adrs/draft/adr-0144-a-faction-controller-runs-inside-the-step-and-acts-only-through-the-callers-verbs.md`
+    pub fn set_externally_controlled(&mut self, faction: FactionId, controlled: bool) -> bool {
+        self.controller
+            .set_externally_controlled(faction, controlled)
+    }
+
+    /// Returns whether an external caller controls a faction.
+    ///
+    /// Returns `None` when the world has no such faction.
+    #[must_use]
+    pub fn is_externally_controlled(&self, faction: FactionId) -> Option<bool> {
+        self.controller
+            .row(faction)
+            .map(|row| row.externally_controlled != 0)
+    }
+
+    /// Returns how many evaluations the controller makes for one faction on
+    /// one tick.
+    #[must_use]
+    pub const fn controller_evaluations(&self) -> u32 {
+        self.controller.evaluations()
+    }
+
+    /// Sets how many evaluations the controller makes for one faction on one
+    /// tick.
+    ///
+    /// The count is a balance value, and the register holds the row.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: Balance register, the controller evaluations per faction per tick. `docs/reference/balance.md`
+    pub const fn set_controller_evaluations(&mut self, evaluations: u32) {
+        self.controller.set_evaluations(evaluations);
+    }
+
+    /// Returns the tick at which the territory reader fires.
+    #[must_use]
+    pub const fn tick_limit(&self) -> u64 {
+        self.controller.tick_limit()
+    }
+
+    /// Sets the tick at which the territory reader fires.
+    ///
+    /// The limit is a balance value, and the register holds the row.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: Balance register, the tick limit. `docs/reference/balance.md`
+    pub const fn set_tick_limit(&mut self, tick_limit: u64) {
+        self.controller.set_tick_limit(tick_limit);
+    }
+
+    /// Returns the game end record. It is empty until a reader fires.
+    #[must_use]
+    pub const fn game_end(&self) -> GameEnd {
+        self.controller.game_end()
+    }
+
+    /// Returns the score of one faction on the territory path: the tiles it
+    /// holds.
+    ///
+    /// The count is the running total the holding keeps, so this starts no
+    /// pass.[^1] Returns `None` when the world has no such faction.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0053, a faction is a bit in a mask, and a relation is a plane, decision D4. `docs/adrs/accepted/adr-0053-a-faction-is-a-bit-in-a-mask-and-a-relation-is-a-plane.md`
+    #[must_use]
+    pub fn score(&self, faction: FactionId) -> Option<i64> {
+        if faction.0 >= self.config.faction_count.max(1) {
+            return None;
+        }
+        Some(self.holding.holding_of(faction))
+    }
+
+    /// Returns the commands the controller emitted on the last step, in the
+    /// order they applied.
+    #[must_use]
+    pub fn controller_log(&self) -> &[ControllerCommand] {
+        self.controller.log()
+    }
+
+    /// Returns the subsystem census: one count for each row of the one
+    /// table, in table order.
+    #[must_use]
+    pub fn subsystem_census(&self) -> Vec<(&'static str, i64)> {
+        SUBSYSTEM_CENSUS
+            .iter()
+            .map(|row| (row.name, (row.read)(self)))
+            .collect()
+    }
+
+    /// Records the seat of a faction: the tile of its first founding.
+    ///
+    /// A later founding of the same faction leaves the seat where it is. The
+    /// controller plans around the seat, so a faction with no seat receives
+    /// no evaluation.
+    fn record_seat(&mut self, faction: FactionId, place: Axial) {
+        if let Some(tile) = self.grid.index_of(place) {
+            self.controller.set_seat(faction, tile);
+        }
+    }
+
+    /// Returns the seat of a faction: the tile of its first founding, or
+    /// `None` when the faction founded nothing.
+    #[must_use]
+    pub fn seat(&self, faction: FactionId) -> Option<TileIdx> {
+        self.controller.row(faction).and_then(FactionRow::seat)
+    }
+
+    /// Runs the controller stage.
+    ///
+    /// The readers run first, while the record is empty. Then the controller
+    /// plans the commands of the tick, the plan is sorted by faction and
+    /// sequence, and each command applies through the set form of the verb
+    /// a Python caller uses.[^1] [^2]
+    ///
+    /// The unit set of a faction is read once for each faction that emitted
+    /// a command, in one scan of the arena in slot order. That scan follows
+    /// the population, as the verb it feeds does when a Python caller names
+    /// the same set.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0148, a game end is recorded once and stops the controllers, decisions D2 and D4. `docs/adrs/draft/adr-0148-a-game-end-is-recorded-once-and-stops-the-controllers.md`
+    /// [^2]: ADR-0144, a faction controller runs inside the step and acts only through the caller's verbs, decisions D2, D4 and D5. `docs/adrs/draft/adr-0144-a-faction-controller-runs-inside-the-step-and-acts-only-through-the-callers-verbs.md`
+    fn run_controller(&mut self) {
+        self.controller.clear_log();
+        self.check_game_end();
+        let tick = self.tick;
+        let plan = self.controller.plan(self.config.seed, tick);
+        if plan.is_empty() {
+            return;
+        }
+        // One scan of the arena, in slot order, buckets the live units by
+        // faction. Only a faction that emitted a command gets a bucket.
+        let factions = usize::from(self.config.faction_count.max(1));
+        let mut wanted = vec![false; factions];
+        for (faction, _, _) in &plan {
+            wanted[usize::from(faction.0)] = true;
+        }
+        let mut sets: Vec<Vec<Entity>> = vec![Vec::new(); factions];
+        for entity in self.soldiers.iter() {
+            let Some(faction) = self.soldiers.faction(entity) else {
+                continue;
+            };
+            let index = usize::from(faction.0);
+            if index < factions && wanted[index] {
+                sets[index].push(entity);
+            }
+        }
+        for (faction, sequence, choice) in plan {
+            let set = std::mem::take(&mut sets[usize::from(faction.0)]);
+            let refused = match choice {
+                Choice::Gather(kind) => self.order_gather_set(&set, kind),
+                Choice::Build(kind) => self.order_build_set(&set, kind),
+            };
+            let applied = u8::from(refused < set.len());
+            sets[usize::from(faction.0)] = set;
+            let (kind, argument) = choice.numbers();
+            self.controller.push(ControllerCommand {
+                tick,
+                faction,
+                kind,
+                argument,
+                sequence,
+                applied,
+                padding: [0; 7],
+            });
+        }
+    }
+
+    /// Runs the game end readers, while the record is empty.
+    ///
+    /// Only the territory reader exists in this pass. It fires at the tick
+    /// limit, and the faction with the most held tiles wins. A tie resolves
+    /// by the lowest faction identifier.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0148, a game end is recorded once and stops the controllers, decision D3. `docs/adrs/draft/adr-0148-a-game-end-is-recorded-once-and-stops-the-controllers.md`
+    fn check_game_end(&mut self) {
+        if self.controller.game_end().is_set() {
+            return;
+        }
+        if self.tick.0 < self.controller.tick_limit() {
+            return;
+        }
+        let count = self.config.faction_count.max(1);
+        let held = (0..count).map(|index| {
+            let faction = FactionId(index);
+            (faction, self.holding.holding_of(faction))
+        });
+        if let Some(winner) = controller::territory_winner(held) {
+            self.controller
+                .record_end(self.tick, winner, WinPath::Territory);
+        }
+    }
 }
 
 #[cfg(test)]

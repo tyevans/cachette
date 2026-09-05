@@ -1,7 +1,7 @@
 ---
 id: 0472
 title: Run a faction controller inside the step and end the game on territory
-status: refined
+status: complete
 created: 2026-09-05
 implements: [ADR-0144, ADR-0148, ADR-0040 D1, ADR-0040 D2, ADR-0003 D1, ADR-0004 D4, ADR-0001 D4, ADR-0053 D4, ADR-0075 D2, ADR-0076 D2]
 changes: []
@@ -142,7 +142,49 @@ the stub by hand in the same commit.[^7]
 
 ## Outcome
 
-Filled in when the item moves to `complete/`.
+Built. A world seeds itself in one engine call that takes nothing: it founds
+every faction with the default group and places the luxuries by a keyed draw
+on the deposit index. The demonstration calls that one call and no other
+seeding verb. The founding verb and the luxury verb still serve a caller that
+wants its own.
+
+The controller is one stage, the last of the step, declared as taking no
+thread count. It visits the factions in identifier order, skips a faction under
+external control and a faction with no seat, and makes a fixed number of
+evaluations, each one draw keyed on the controller system, the tick, the
+faction and the draw index. The plan is sorted by faction and then by sequence
+before any command applies. Every command applies through the set form of the
+gather verb or the build verb, and the Python binding calls the same set forms,
+so no loop over entities remains in the binding. A command the verb refuses
+outright is dropped and counted.
+
+The seat is a decision this item made and the records do not hold. A faction
+plans around the tile of its first founding, and a faction that founded nothing
+receives no evaluation. Without it the controller ordered every unit of every
+laboratory fixture and thirty tests measured the controller instead of the pass
+they were written for. A reviewer should decide whether the seat belongs in the
+controller record.
+
+The territory reader fires at the tick limit, the faction with the most held
+tiles wins, a tie goes to the lowest identifier, and the record of winner, path
+and tick is written once and enters the hash. After it the controller emits
+nothing and the world keeps stepping. The two parameters the step reads on
+every tick, the evaluation count and the tick limit, enter the hash too.
+
+The subsystem census is one Rust table of name and reader, and the Python
+reader walks it. The demonstration prints the census at its end in every mode,
+prints the winner once when the record first appears, and under a flag runs
+headless to the end.
+
+Left undone. The gate that drives the demonstration world for the census tick
+count and asserts every count nonzero is not written, because two rows,
+contracts and storms, need verbs this pass does not emit, so the gate would
+fail on the fixture and not on the engine. The balance register still marks
+every value unset, and the provisional defaults this pass wrote are in its
+derivation column.
+
+Every new test was put back to red once. The commit body of each test commit
+names the defect and the test that caught it.
 
 ## References
 

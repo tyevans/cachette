@@ -982,12 +982,13 @@ impl PyWorld {
             }
             resolved.push(entity);
         }
-        for entity in resolved {
-            assert!(
-                world.order_gather(entity, kind),
-                "a resolved identity must name a soldier the arena can order"
-            );
-        }
+        // The set form is the one path the controller takes too, so one loop
+        // serves both callers.
+        let refused = world.order_gather_set(&resolved, kind);
+        assert_eq!(
+            refused, 0,
+            "a resolved identity must name a soldier the arena can order"
+        );
         Ok(())
     }
 
@@ -1137,12 +1138,11 @@ impl PyWorld {
         for unit in &units {
             resolved.push(resolve(&world, *unit)?);
         }
-        for entity in resolved {
-            assert!(
-                world.set_unit_type(entity, kind),
-                "a resolved identity must name a soldier the arena can write"
-            );
-        }
+        let refused = world.set_unit_type_set(&resolved, kind);
+        assert_eq!(
+            refused, 0,
+            "a resolved identity must name a soldier the arena can write"
+        );
         Ok(())
     }
 
@@ -1612,12 +1612,13 @@ impl PyWorld {
             }
             resolved.push(entity);
         }
-        for entity in resolved {
-            assert!(
-                world.order_build(entity, kind),
-                "a resolved identity must name a soldier the arena can order"
-            );
-        }
+        // The set form is the one path the controller takes too, so one loop
+        // serves both callers.
+        let refused = world.order_build_set(&resolved, kind);
+        assert_eq!(
+            refused, 0,
+            "a resolved identity must name a soldier the arena can order"
+        );
         Ok(())
     }
 
@@ -2704,46 +2705,221 @@ impl PyWorld {
             let mut world = self.lock();
             world.found_run_for_every_faction(group)
         };
-        if !outcomes.iter().any(FoundingOutcome::is_seated) {
-            return Err(VerbError::new_err(
-                "no faction found a place, so the run has nothing in it".to_string(),
-            ));
-        }
+        founding_reports(self, python, outcomes, group)
+    }
 
-        let mut reports = Vec::with_capacity(outcomes.len());
-        for outcome in &outcomes {
-            let report = PyDict::new(python);
-            report.set_item("faction", outcome.faction().0)?;
-            match outcome.result() {
-                Ok(founding) => {
-                    let place = founding.place();
-                    report.set_item("seated", true)?;
-                    report.set_item("q", place.q)?;
-                    report.set_item("r", place.r)?;
-                    report.set_item("people", founding.people().len())?;
-                    report.set_item("considered", founding.survey().considered())?;
-                    if let Some(chosen) = founding.survey().chosen() {
-                        let reached = chosen.provision();
-                        report.set_item("food", reached.food.0)?;
-                        report.set_item("wood", reached.wood.0)?;
-                        report.set_item("stone", reached.stone.0)?;
-                        report.set_item("open_ground", reached.open_ground)?;
-                        report.set_item("water_edge", reached.water_edge)?;
-                        // The food the survey reached is the number of people
-                        // the site can carry, because the production rate and
-                        // the ration are both a sixteenth and the two cancel.
-                        report.set_item("carries_its_group", reached.food.0 >= group)?;
-                    }
-                }
-                Err(error) => {
-                    report.set_item("seated", false)?;
-                    report.set_item("refusal", error.to_string())?;
-                }
-            }
-            reports.push(report);
+    /// Seeds the world from its seed: founds one run for every faction and
+    /// places the luxuries. Takes nothing.
+    ///
+    /// **A caller that builds a world from a seed calls this once and names
+    /// no group and no place.** The founding group and the deposit count are
+    /// values in the balance register, and the engine holds them.[^1] The
+    /// founding is the one `found_run_for_every_faction` makes with the
+    /// default group, and the luxuries are placed by a keyed draw on the
+    /// deposit index, so two worlds with one seed seed alike.[^2]
+    ///
+    /// Returns the same `list` of founding reports that
+    /// `found_run_for_every_faction` returns, and keeps the report for the
+    /// panel in the same way.
+    ///
+    /// # Errors
+    ///
+    /// Raises `VerbError` when the world was seeded before, or when no
+    /// faction was seated.
+    ///
+    /// # References
+    ///
+    /// [^1]: Balance register, the founding group and the luxury deposits. `docs/reference/balance.md`
+    /// [^2]: ADR-0003, every random draw is keyed, never stateful, decision D1. `docs/adrs/accepted/adr-0003-every-random-draw-is-keyed-never-stateful.md`
+    fn seed_world<'py>(&self, python: Python<'py>) -> PyResult<Vec<Bound<'py, PyDict>>> {
+        let outcomes = {
+            let mut world = self.lock();
+            world
+                .seed_world()
+                .map_err(|error| VerbError::new_err(error.to_string()))?
+        };
+        founding_reports(
+            self,
+            python,
+            outcomes,
+            cachette_core::FOUNDING_GROUP_DEFAULT,
+        )
+    }
+
+    /// Returns the weight vector of one faction, as a `dict`.
+    ///
+    /// The faction is a number. The keys are `war`, `trade`, `build` and
+    /// `renown`, and every value is a whole number inside the range the
+    /// balance register holds.[^1] The vector is drawn from the seed when the
+    /// world is built, so two worlds with one seed hold one vector. Only the
+    /// build weight is read today: it biases the controller toward a build
+    /// order over a gather order.
+    ///
+    /// # Errors
+    ///
+    /// Raises `VerbError` when the number names no faction of this world.
+    ///
+    /// # References
+    ///
+    /// [^1]: Balance register, the weight vector range. `docs/reference/balance.md`
+    fn faction_weights<'py>(
+        &self,
+        python: Python<'py>,
+        faction: u16,
+    ) -> PyResult<Bound<'py, PyDict>> {
+        let world = self.lock();
+        let weights = world.faction_weights(FactionId(faction)).ok_or_else(|| {
+            VerbError::new_err(format!("{faction} names no faction of this world"))
+        })?;
+        let report = PyDict::new(python);
+        report.set_item("war", weights.war)?;
+        report.set_item("trade", weights.trade)?;
+        report.set_item("build", weights.build)?;
+        report.set_item("renown", weights.renown)?;
+        Ok(report)
+    }
+
+    /// Says whether an external caller controls a faction.
+    ///
+    /// **A faction under external control receives no evaluation from the
+    /// controller.** The flag is off for every faction of a new world, and
+    /// nothing in the engine sets it. It exists so that a later player hook
+    /// has a place to stand, and so that a test can prove the controller
+    /// leaves such a faction alone.[^1]
+    ///
+    /// # Errors
+    ///
+    /// Raises `VerbError` when the number names no faction of this world.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0144, a faction controller runs inside the step and acts only through the caller's verbs, decision D6. `docs/adrs/draft/adr-0144-a-faction-controller-runs-inside-the-step-and-acts-only-through-the-callers-verbs.md`
+    fn set_externally_controlled(&self, faction: u16, controlled: bool) -> PyResult<()> {
+        let mut world = self.lock();
+        if !world.set_externally_controlled(FactionId(faction), controlled) {
+            return Err(VerbError::new_err(format!(
+                "{faction} names no faction of this world"
+            )));
         }
-        self.presenter().outcomes = outcomes;
-        Ok(reports)
+        Ok(())
+    }
+
+    /// Returns whether an external caller controls a faction, as a `bool`.
+    ///
+    /// # Errors
+    ///
+    /// Raises `VerbError` when the number names no faction of this world.
+    fn is_externally_controlled(&self, faction: u16) -> PyResult<bool> {
+        self.lock()
+            .is_externally_controlled(FactionId(faction))
+            .ok_or_else(|| VerbError::new_err(format!("{faction} names no faction of this world")))
+    }
+
+    /// The number of evaluations the controller makes for one faction on one
+    /// tick, as an integer.
+    ///
+    /// The count is a value in the balance register.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: Balance register, the controller evaluations per faction per tick. `docs/reference/balance.md`
+    #[getter]
+    fn controller_evaluations(&self) -> u32 {
+        self.lock().controller_evaluations()
+    }
+
+    /// Sets how many evaluations the controller makes for one faction on one
+    /// tick.
+    ///
+    /// Zero silences the controller. The count is state that every tick
+    /// reads, so two worlds that differ in it hash differently.
+    fn set_controller_evaluations(&self, evaluations: u32) {
+        self.lock().set_controller_evaluations(evaluations);
+    }
+
+    /// The tick at which the territory reader fires, as an integer.
+    ///
+    /// The limit is a value in the balance register.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: Balance register, the tick limit. `docs/reference/balance.md`
+    #[getter]
+    fn tick_limit(&self) -> u64 {
+        self.lock().tick_limit()
+    }
+
+    /// Sets the tick at which the territory reader fires.
+    ///
+    /// At that tick the faction that holds the most tiles wins, and a tie
+    /// goes to the lowest faction number. The limit is state that every tick
+    /// reads, so two worlds that differ in it hash differently.
+    fn set_tick_limit(&self, tick_limit: u64) {
+        self.lock().set_tick_limit(tick_limit);
+    }
+
+    /// Returns the game end record, as a `dict`, or `None` while no game has
+    /// ended.
+    ///
+    /// The keys are `winner`, an integer naming the faction; `path`, a `str`
+    /// naming the way it won, which is `territory` today; and `tick`, the
+    /// tick the reader fired on. **The record is written once.** After it
+    /// the controller emits nothing and every other pass continues, so the
+    /// world keeps stepping and the picture keeps moving.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0148, a game end is recorded once and stops the controllers, decisions D2 and D4. `docs/adrs/draft/adr-0148-a-game-end-is-recorded-once-and-stops-the-controllers.md`
+    fn game_end<'py>(&self, python: Python<'py>) -> PyResult<Option<Bound<'py, PyDict>>> {
+        let end = self.lock().game_end();
+        let Some(path) = end.win_path() else {
+            return Ok(None);
+        };
+        let report = PyDict::new(python);
+        report.set_item("winner", end.winner.0)?;
+        report.set_item("path", path.name())?;
+        report.set_item("tick", end.tick.0)?;
+        Ok(Some(report))
+    }
+
+    /// Returns the score of one faction on the territory path, as an
+    /// integer: the tiles it holds.
+    ///
+    /// The count is the running total the engine keeps, so this starts no
+    /// pass.[^1]
+    ///
+    /// # Errors
+    ///
+    /// Raises `VerbError` when the number names no faction of this world.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0053, a faction is a bit in a mask, and a relation is a plane, decision D4. `docs/adrs/accepted/adr-0053-a-faction-is-a-bit-in-a-mask-and-a-relation-is-a-plane.md`
+    fn score(&self, faction: u16) -> PyResult<i64> {
+        self.lock()
+            .score(FactionId(faction))
+            .ok_or_else(|| VerbError::new_err(format!("{faction} names no faction of this world")))
+    }
+
+    /// Returns the subsystem census, as a `dict` from a subsystem name to a
+    /// count.
+    ///
+    /// **One Rust table declares the list.** Each row names a subsystem and
+    /// the reader that counts what it produced, and this call walks that
+    /// table. Nothing else declares the names, so a name here is a name the
+    /// engine holds.[^1] The counts of the controller are counts of the last
+    /// step.
+    ///
+    /// # References
+    ///
+    /// [^1]: Recurring Defect Shapes, shape 1. `.claude/rules/recurring-defects.md`
+    fn subsystem_census<'py>(&self, python: Python<'py>) -> PyResult<Bound<'py, PyDict>> {
+        let census = self.lock().subsystem_census();
+        let report = PyDict::new(python);
+        for (name, count) in census {
+            report.set_item(name, count)?;
+        }
+        Ok(report)
     }
 
     /// Fills the caller's pixels with one frame of this world.
@@ -5447,6 +5623,56 @@ impl PyCamera {
             self.inner.tile_width, self.inner.tile_height, self.inner.origin_x, self.inner.origin_y
         )
     }
+}
+
+/// Turns founding outcomes into the reports a caller prints, and keeps the
+/// outcomes for the panel.
+fn founding_reports<'py>(
+    world: &PyWorld,
+    python: Python<'py>,
+    outcomes: Vec<FoundingOutcome>,
+    group: u32,
+) -> PyResult<Vec<Bound<'py, PyDict>>> {
+    if !outcomes.iter().any(FoundingOutcome::is_seated) {
+        return Err(VerbError::new_err(
+            "no faction found a place, so the run has nothing in it".to_string(),
+        ));
+    }
+
+    let mut reports = Vec::with_capacity(outcomes.len());
+    for outcome in &outcomes {
+        let report = PyDict::new(python);
+        report.set_item("faction", outcome.faction().0)?;
+        match outcome.result() {
+            Ok(founding) => {
+                let place = founding.place();
+                report.set_item("seated", true)?;
+                report.set_item("q", place.q)?;
+                report.set_item("r", place.r)?;
+                report.set_item("people", founding.people().len())?;
+                report.set_item("considered", founding.survey().considered())?;
+                if let Some(chosen) = founding.survey().chosen() {
+                    let reached = chosen.provision();
+                    report.set_item("food", reached.food.0)?;
+                    report.set_item("wood", reached.wood.0)?;
+                    report.set_item("stone", reached.stone.0)?;
+                    report.set_item("open_ground", reached.open_ground)?;
+                    report.set_item("water_edge", reached.water_edge)?;
+                    // The food the survey reached is the number of people
+                    // the site can carry, because the production rate and
+                    // the ration are both a sixteenth and the two cancel.
+                    report.set_item("carries_its_group", reached.food.0 >= group)?;
+                }
+            }
+            Err(error) => {
+                report.set_item("seated", false)?;
+                report.set_item("refusal", error.to_string())?;
+            }
+        }
+        reports.push(report);
+    }
+    world.presenter().outcomes = outcomes;
+    Ok(reports)
 }
 
 /// Resolves an identity that Python handed back, or raises.

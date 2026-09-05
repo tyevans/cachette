@@ -147,3 +147,34 @@ pub const SYSTEM_CONTEST: SystemId = 8;
 /// [^1]: ADR-0003, every random draw is keyed, never stateful, decision D1. `docs/adrs/accepted/adr-0003-every-random-draw-is-keyed-never-stateful.md`
 pub const SYSTEM_CONVERSION: SystemId = 9;
 pub const SYSTEM_WEATHER: SystemId = 10;
+
+/// The system identifier of the faction controller.
+///
+/// The controller owns this identifier alone. It does not share the
+/// identifier of the founding, because two systems that share an identifier
+/// draw the same value from the same frame, entity and draw index. The first
+/// choice of a faction would then follow the place it was founded on.[^1]
+///
+/// The seeding layer draws the weight vector of a faction under this
+/// identifier too, at frame zero. The controller itself never draws at frame
+/// zero, because the first step raises the tick to one before any stage
+/// opens, so the two uses of the identifier cannot meet on one key.
+///
+/// # References
+///
+/// [^1]: ADR-0003, every random draw is keyed, never stateful, decision D1. `docs/adrs/accepted/adr-0003-every-random-draw-is-keyed-never-stateful.md`
+pub const SYSTEM_CONTROLLER: SystemId = 11;
+
+/// The system identifier of the luxury placement.
+///
+/// The seeding layer places the luxuries of a world under this identifier,
+/// at frame zero, keyed on the deposit index. It does not share the
+/// identifier of the resource field, because two systems that share an
+/// identifier draw the same value from the same frame, entity and draw index,
+/// and a deposit would then sit exactly where the stock of the first tiles
+/// says.[^1]
+///
+/// # References
+///
+/// [^1]: ADR-0003, every random draw is keyed, never stateful, decision D1. `docs/adrs/accepted/adr-0003-every-random-draw-is-keyed-never-stateful.md`
+pub const SYSTEM_LUXURY: SystemId = 12;

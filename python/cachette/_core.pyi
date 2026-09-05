@@ -415,6 +415,30 @@ class FoundingReport(TypedDict, total=False):
     carries_its_group: bool
     refusal: str
 
+class FactionWeights(TypedDict):
+    """The four weights that bias the choices of one faction.
+
+    Every value is a whole number inside the range the balance register
+    holds. The vector is drawn from the seed when the world is built. Only the
+    build weight is read today.
+    """
+
+    war: int
+    trade: int
+    build: int
+    renown: int
+
+class GameEnd(TypedDict):
+    """How a game ended: the winner, the path and the tick.
+
+    The record is written once, at the first tick a reader fires. The path is
+    ``territory`` today.
+    """
+
+    winner: int
+    path: str
+    tick: int
+
 class FrameReading(TypedDict):
     """What the drawing pass read while it filled a frame."""
 
@@ -634,6 +658,19 @@ class World:
     def check_invariants(self) -> bool: ...
     def step(self, threads: int) -> int: ...
     def found_run_for_every_faction(self, group: int = ...) -> list[FoundingReport]: ...
+    def seed_world(self) -> list[FoundingReport]: ...
+    def faction_weights(self, faction: int) -> FactionWeights: ...
+    def set_externally_controlled(self, faction: int, controlled: bool) -> None: ...
+    def is_externally_controlled(self, faction: int) -> bool: ...
+    @property
+    def controller_evaluations(self) -> int: ...
+    def set_controller_evaluations(self, evaluations: int) -> None: ...
+    @property
+    def tick_limit(self) -> int: ...
+    def set_tick_limit(self, tick_limit: int) -> None: ...
+    def game_end(self) -> GameEnd | None: ...
+    def score(self, faction: int) -> int: ...
+    def subsystem_census(self) -> dict[str, int]: ...
     def draw(
         self,
         camera: Camera,

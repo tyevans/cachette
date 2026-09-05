@@ -106,7 +106,9 @@ determinism:
 # also scans the choice options from the top of the set, so a tie goes to the
 # highest option index rather than the lowest, and it scans the six directions
 # of the exit field the same way, so a tie between two equal neighbouring cells
-# goes to the highest direction index.
+# goes to the highest direction index. It also visits the factions and the
+# draws of the controller backwards, which the sort by (faction, sequence)
+# repairs, so the controller order test must pass under it.
 # Each test binary below must then fail, and the probe binary, which asserts
 # that every perturbation is visible, must pass. Both determinism tests of
 # ADR-0001 D4 are in the list, because ADR-0001 D5 asks both to be able to
@@ -124,6 +126,10 @@ probe:
     ! cargo test --package cachette-core --features probe-nondeterminism --test starvation
     ! cargo test --package cachette-core --features probe-nondeterminism --test influence
     cargo test --package cachette-core --features probe-nondeterminism --test determinism_probe
+    # The probe build visits the factions and the draws of the controller
+    # backwards. The sort by (faction, sequence) is what restores the order,
+    # so this test must pass under the probe and fails when the sort goes.
+    cargo test --package cachette-core --features probe-nondeterminism --test controller the_commands_apply_in_faction_then_sequence_order
 
 # Check the unsafe code with Miri. ADR-0097 D4.
 #

@@ -135,6 +135,11 @@ fn the_same_group_starves_when_the_rate_is_taken_away() {
         world
             .set_production_rate(founding.settlement(), CommodityId(0), Fix32::ZERO)
             .expect("the rate is at or above zero");
+        // This test measures the site rate alone. A founded faction has a
+        // seat, so the controller would order its people to gather and the
+        // group would feed itself. The flag says an external caller controls
+        // the faction, and the controller then leaves it alone.
+        assert!(world.set_externally_controlled(outcome.faction(), true));
     }
 
     for _ in 0..TICKS {
