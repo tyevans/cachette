@@ -138,6 +138,6 @@ and this record decides none of them.[^7]
 [^6]: ADR-0002, simulated and aggregated state holds no floating point number, decision D1. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
 [^7]: Budgets and costs. `docs/reference/budgets.md`
 [^8]: ADR-0133, a unit converts to the faction that leads the influence field at its cell. `docs/adrs/draft/adr-0133-a-unit-converts-to-the-faction-that-leads-the-field.md`
-[^9]: ADR-0145, a unit type is a row of capability columns, and zero means cannot, decision D3. `docs/adrs/draft/adr-0145-a-unit-type-is-a-row-of-capability-columns-and-zero-means-cannot.md`
+[^9]: ADR-0145, a unit type is a row of capability columns, and zero means cannot, decision D3. `docs/adrs/accepted/adr-0145-a-unit-type-is-a-row-of-capability-columns-and-zero-means-cannot.md`
 [^10]: ADR-0006, an event is plain data and applying it is pure, decision D1. `docs/adrs/accepted/adr-0006-an-event-is-plain-data-and-applying-it-is-pure.md`
 [^11]: Recurring Defect Shapes, shape 1. `.agents/rules/recurring-defects.md`

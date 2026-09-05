@@ -964,7 +964,7 @@ impl PyWorld {
     /// # References
     ///
     /// [^1]: Decisions register, DEC-120. `docs/DECISIONS.md`
-    /// [^2]: ADR-0145, a unit type is a row of capability columns, and zero means cannot, decision D2. `docs/adrs/draft/adr-0145-a-unit-type-is-a-row-of-capability-columns-and-zero-means-cannot.md`
+    /// [^2]: ADR-0145, a unit type is a row of capability columns, and zero means cannot, decision D2. `docs/adrs/accepted/adr-0145-a-unit-type-is-a-row-of-capability-columns-and-zero-means-cannot.md`
     fn order_gather(&self, units: Vec<u64>, kind: u8) -> PyResult<()> {
         let mut world = self.lock();
         let kind = ResourceKind::from_u8(kind)
@@ -1060,7 +1060,7 @@ impl PyWorld {
     ///
     /// [^1]: ADR-0120, a unit carries a type, and the type is an index into a table the world is built with, decisions D1 and D2. `docs/adrs/draft/adr-0120-a-unit-carries-a-type-that-indexes-a-table.md`
     /// [^2]: ADR-0122, an attacker whose attack does not exceed the defender's armour contributes exactly zero, decision D1. `docs/adrs/draft/adr-0122-an-attacker-below-the-armour-contributes-exactly-zero.md`
-    /// [^3]: ADR-0145, a unit type is a row of capability columns, and zero means cannot, decisions D2 and D5. `docs/adrs/draft/adr-0145-a-unit-type-is-a-row-of-capability-columns-and-zero-means-cannot.md`
+    /// [^3]: ADR-0145, a unit type is a row of capability columns, and zero means cannot, decisions D2 and D5. `docs/adrs/accepted/adr-0145-a-unit-type-is-a-row-of-capability-columns-and-zero-means-cannot.md`
     #[pyo3(signature = (
         unit_type,
         attack,
@@ -1214,7 +1214,7 @@ impl PyWorld {
     /// [^2]: ADR-0044, what copies and what does not is declared at the call site. `docs/adrs/REGISTRY.md`
     /// [^3]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`
     /// [^4]: Decision Record Scope, section 4.1. `.claude/rules/adr-scope.md`
-    /// [^5]: ADR-0145, a unit type is a row of capability columns, and zero means cannot, decisions D2 and D4. `docs/adrs/draft/adr-0145-a-unit-type-is-a-row-of-capability-columns-and-zero-means-cannot.md`
+    /// [^5]: ADR-0145, a unit type is a row of capability columns, and zero means cannot, decisions D2 and D4. `docs/adrs/accepted/adr-0145-a-unit-type-is-a-row-of-capability-columns-and-zero-means-cannot.md`
     fn unit_type_table<'py>(&self, python: Python<'py>) -> PyResult<Bound<'py, PyDict>> {
         let world = self.lock();
         let rows = world.unit_types().rows();
@@ -1594,7 +1594,7 @@ impl PyWorld {
     /// [^2]: ADR-0023, an aggregate combines exactly, in any order, decision D1. `docs/adrs/accepted/adr-0023-an-aggregate-combines-exactly-in-any-order.md`
     /// [^3]: Findings register, FND-352. `docs/FINDINGS.md`
     /// [^4]: Findings register, FND-380. `docs/FINDINGS.md`
-    /// [^5]: ADR-0145, a unit type is a row of capability columns, and zero means cannot, decision D2. `docs/adrs/draft/adr-0145-a-unit-type-is-a-row-of-capability-columns-and-zero-means-cannot.md`
+    /// [^5]: ADR-0145, a unit type is a row of capability columns, and zero means cannot, decision D2. `docs/adrs/accepted/adr-0145-a-unit-type-is-a-row-of-capability-columns-and-zero-means-cannot.md`
     fn order_build(&self, units: Vec<u64>, kind: u8) -> PyResult<()> {
         let mut world = self.lock();
         let kind = UpgradeKind::from_u8(kind)

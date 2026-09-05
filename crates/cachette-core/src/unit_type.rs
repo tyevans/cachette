@@ -23,7 +23,7 @@
 //!
 //! [^1]: ADR-0120, a unit carries a type, and the type is an index into a table the world is built with, decision D1. `docs/adrs/draft/adr-0120-a-unit-carries-a-type-that-indexes-a-table.md`
 //! [^2]: ADR-0002, simulated and aggregated state holds no floating point number, decision D1. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
-//! [^3]: ADR-0145, a unit type is a row of capability columns, and zero means cannot, decisions D1 and D2. `docs/adrs/draft/adr-0145-a-unit-type-is-a-row-of-capability-columns-and-zero-means-cannot.md`
+//! [^3]: ADR-0145, a unit type is a row of capability columns, and zero means cannot, decisions D1 and D2. `docs/adrs/accepted/adr-0145-a-unit-type-is-a-row-of-capability-columns-and-zero-means-cannot.md`
 //! [^4]: Recurring Defect Shapes, shape 1. `.agents/rules/recurring-defects.md`
 
 use bytemuck::{Pod, Zeroable};
@@ -164,7 +164,7 @@ impl ColumnValue for u32 {
 ///
 /// # References
 ///
-/// [^1]: ADR-0145, a unit type is a row of capability columns, and zero means cannot, decision D4. `docs/adrs/draft/adr-0145-a-unit-type-is-a-row-of-capability-columns-and-zero-means-cannot.md`
+/// [^1]: ADR-0145, a unit type is a row of capability columns, and zero means cannot, decision D4. `docs/adrs/accepted/adr-0145-a-unit-type-is-a-row-of-capability-columns-and-zero-means-cannot.md`
 macro_rules! declare_unit_type_row {
     ($( $(#[$meta:meta])* $column:ident : $kind:ty ),* $(,)?) => {
         /// One row of the unit type table.
@@ -194,7 +194,7 @@ macro_rules! declare_unit_type_row {
         /// # References
         ///
         /// [^1]: ADR-0006, an event is plain data and applying it is pure, decision D1. `docs/adrs/accepted/adr-0006-an-event-is-plain-data-and-applying-it-is-pure.md`
-        /// [^2]: ADR-0145, a unit type is a row of capability columns, and zero means cannot, decisions D1 and D2. `docs/adrs/draft/adr-0145-a-unit-type-is-a-row-of-capability-columns-and-zero-means-cannot.md`
+        /// [^2]: ADR-0145, a unit type is a row of capability columns, and zero means cannot, decisions D1 and D2. `docs/adrs/accepted/adr-0145-a-unit-type-is-a-row-of-capability-columns-and-zero-means-cannot.md`
         /// [^3]: Recurring Defect Shapes, shape 3. `.agents/rules/recurring-defects.md`
         #[repr(C)]
         #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Pod, Zeroable)]
@@ -402,7 +402,7 @@ pub const LEADER_ROW: UnitTypeRow = UnitTypeRow {
 ///
 /// # References
 ///
-/// [^1]: ADR-0145, a unit type is a row of capability columns, and zero means cannot, decision D4. `docs/adrs/draft/adr-0145-a-unit-type-is-a-row-of-capability-columns-and-zero-means-cannot.md`
+/// [^1]: ADR-0145, a unit type is a row of capability columns, and zero means cannot, decision D4. `docs/adrs/accepted/adr-0145-a-unit-type-is-a-row-of-capability-columns-and-zero-means-cannot.md`
 pub const DEFAULT_UNIT_TYPE_TABLE: UnitTypeTable = {
     let mut rows = [UnitTypeRow::NONE; UNIT_TYPE_COUNT];
     rows[WORKER.index()] = WORKER_ROW;
@@ -463,7 +463,7 @@ impl UnitTypeTable {
     ///
     /// # References
     ///
-    /// [^1]: ADR-0145, a unit type is a row of capability columns, and zero means cannot, decision D5. `docs/adrs/draft/adr-0145-a-unit-type-is-a-row-of-capability-columns-and-zero-means-cannot.md`
+    /// [^1]: ADR-0145, a unit type is a row of capability columns, and zero means cannot, decision D5. `docs/adrs/accepted/adr-0145-a-unit-type-is-a-row-of-capability-columns-and-zero-means-cannot.md`
     pub fn define(&mut self, unit_type: u8, row: UnitTypeRow) -> Result<(), UnitTypeError> {
         let Some(index) = UnitTypeId::from_u8(unit_type) else {
             return Err(UnitTypeError::TypeAboveCeiling(unit_type));

@@ -3,9 +3,9 @@
 ## Context
 
 A unit carries a type, and the type is an index into a shared table that the
-world is built with. The table holds data and never code.[^1] Today a row holds
-two values, an attack and an armour, and the contest is the only pass that
-reads it.
+world is built with. The table holds data and never code.[^1] Before this
+record a row held an attack and an armour, and the contest was the only pass
+that read it.
 
 The game layer needs more from a type. A merchant carries a load under a
 contract and a worker does not. A leader may move a relation and a worker may
@@ -17,8 +17,8 @@ shape: can this type do that, and how much.[^2]
 merchant" reads a name and takes a branch. The project already refused that
 shape for the type itself, because an enumeration of kinds is code that a game
 cannot extend.[^1] The refusal is not visible in the table, though. A
-contributor who reads a two-column row sees nothing that says a third question
-must be a third column and not a branch.
+contributor who reads a row of contest values sees nothing that says a new
+question must be a new column and not a branch.
 
 **The second shortest path is a flag column.** A row would hold a bit that says
 "can carry" beside a number that says how much. Two columns then hold one fact,
@@ -50,8 +50,8 @@ or when a row gains a field that is not a number.
 
 A column at zero means the type cannot do what the column names. A carry
 capacity of zero means the unit never carries. A gather rate of zero means the
-unit takes nothing from a tile. A command reach of zero means the unit may not
-move a relation.
+unit takes nothing from a tile. A build rate of zero means the unit adds no
+work to a site.
 
 One number therefore answers both questions, whether and how much. No row holds
 a flag beside a rate.
@@ -69,25 +69,29 @@ the gate reads the type column of the units the faction holds. It reads no
 separate per-faction flag, because a flag would be a second copy of a fact that
 the unit columns already hold.[^4]
 
-Two verbs take this gate. A faction moves a relation only while it holds a unit
-whose command reach is above zero. A faction inflicts weather only while it
-holds a unit whose weather reach is above zero.[^5]
+The row holds a command reach column and a weather reach column for this
+gate. No verb reads either column yet. A verb that gates a faction power on one
+of them must read the column of the units the faction holds, and the record
+that defines the verb cites this decision for the gate. A column that no
+verb reads is a declared capability that nothing invokes, and the record that
+defines the verb closes that gap or removes the column.[^4]
 
 ### D4. The default table is one constant, and every other listing derives from it
 
-One constant in the core crate holds the default table. The seeding fills the
-world from it. The panel labels and the generated Python reference derive from
-the same constant, and a check fails when a hand-written list and the constant
-disagree.[^4]
+One constant in the core crate holds the default table, and the seeding fills
+the world from it. The row is declared once, and the column names and the
+column reader derive from that declaration. A hand-written copy of the column
+list, such as the Python type stub, is permitted only when a test compares it
+to the declaration and fails when the two disagree.[^4]
 
 The values of each row are balance values. They live in the reference tables
-and never in this record.[^6]
+and never in this record.[^5]
 
 ### D5. The verb that defines a type takes the whole row
 
-One verb defines a type and it takes every column. There is no two-column form
-and no partial form. A caller that gave two columns would leave the rest at
-zero, which under D2 defines a unit that fights and does nothing else, and
+One verb defines a type and it takes every column. There is no partial form. A
+caller that gave part of a row would leave the rest at zero, which under D2
+defines a unit that cannot do what the missing columns name, and the caller
 would not know it had done so.
 
 ## The alternatives this rejects
@@ -116,7 +120,7 @@ capability that nothing invokes.[^4]
 
 **The resolution cost still follows the square of the type count.** This
 record adds columns and not rows, so the bound that ADR-0120 D2 states is
-unchanged.[^7]
+unchanged.[^6]
 
 **A caller cannot define a type in part.** The whole-row verb is the only
 verb, so every caller that defined a type moves when a column is added. The
@@ -137,6 +141,5 @@ the change.
 [^2]: Design, the living world game layer, section 2. `docs/superpowers/specs/2026-09-05-living-world-game-layer-design.md`
 [^3]: ADR-0002, simulated and aggregated state holds no floating point number, decision D1. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
 [^4]: Recurring Defect Shapes, shapes 1 and 3. `.agents/rules/recurring-defects.md`
-[^5]: ADR-0142, a god inflicts weather only on ground its own faction holds, decision D1. `docs/adrs/draft/adr-0142-a-god-inflicts-weather-only-on-ground-it-holds.md`
-[^6]: Budgets and costs. `docs/reference/budgets.md`
-[^7]: ADR-0121, a meeting between two factions resolves at the tile, never at a level 1 cell, decision D3. `docs/adrs/draft/adr-0121-a-meeting-between-two-factions-resolves-at-the-tile.md`
+[^5]: Budgets and costs. `docs/reference/budgets.md`
+[^6]: ADR-0121, a meeting between two factions resolves at the tile, never at a level 1 cell, decision D3. `docs/adrs/draft/adr-0121-a-meeting-between-two-factions-resolves-at-the-tile.md`
