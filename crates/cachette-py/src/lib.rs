@@ -21,6 +21,7 @@ use cachette_core::luxury::{LuxuryId, LUXURY_CEILING};
 use cachette_core::unit_type::{UnitTypeId, UnitTypeRow};
 use cachette_core::upgrade::UpgradeKind;
 use cachette_core::TileIdx;
+use cachette_core::{Advert, Consideration, KIND_LAND, KIND_RELATION, KIND_RESOURCE};
 use cachette_core::{
     Axial, CommodityId, Entity, FactionId, Fix32, Holder, Influence, ResourceKind,
     World as CoreWorld, WorldConfig,
@@ -3703,8 +3704,42 @@ impl PyWorld {
     ///
     /// # References
     ///
+    /// **Each side is a tagged consideration.** The tag is zero for a
+    /// resource, one for land and two for a relation step. Both tags are zero
+    /// when the call names none, so every call that states two resources
+    /// keeps working.
+    ///
+    /// A land side names `give_cell` or `take_cell`, an address `(q, r)` whose
+    /// level 1 cell is the set, or `give_tiles` or `take_tiles`, a list of
+    /// addresses, or both. The kind and the amount of a land side are ignored,
+    /// because the amount is the tile count. Every tile must be held by the
+    /// party that owes it, and no tile may carry an upgrade while the question
+    /// of what happens to the upgrade is open.[^2]
+    ///
+    /// A relation side keeps its kind and its amount. It is stored, and it
+    /// delivers as a logged no-op until the relation matrix exists.
+    ///
+    /// # References
+    ///
     /// [^1]: ADR-0126, a trade negotiation is engine state and the words are not, decision D3. `docs/adrs/draft/adr-0126-a-trade-negotiation-is-engine-state.md`
+    /// [^2]: Blockers register, BLK-036. `docs/BLOCKERS.md`
     #[allow(clippy::too_many_arguments)]
+    #[pyo3(signature = (
+        proposer,
+        responder,
+        give_kind,
+        give_amount,
+        take_kind,
+        take_amount,
+        term,
+        *,
+        give_tag = 0,
+        take_tag = 0,
+        give_tiles = None,
+        take_tiles = None,
+        give_cell = None,
+        take_cell = None,
+    ))]
     fn offer_trade(
         &self,
         proposer: u16,
@@ -3714,18 +3749,32 @@ impl PyWorld {
         take_kind: u8,
         take_amount: u32,
         term: u32,
+        give_tag: u8,
+        take_tag: u8,
+        give_tiles: Option<Vec<(i32, i32)>>,
+        take_tiles: Option<Vec<(i32, i32)>>,
+        give_cell: Option<(i32, i32)>,
+        take_cell: Option<(i32, i32)>,
     ) -> PyResult<()> {
         let mut world = self.lock();
+        let give = consideration_of(
+            &world,
+            give_tag,
+            give_kind,
+            give_amount,
+            give_tiles,
+            give_cell,
+        )?;
+        let take = consideration_of(
+            &world,
+            take_tag,
+            take_kind,
+            take_amount,
+            take_tiles,
+            take_cell,
+        )?;
         world
-            .offer_trade(
-                FactionId(proposer),
-                FactionId(responder),
-                give_kind,
-                give_amount,
-                take_kind,
-                take_amount,
-                term,
-            )
+            .offer_consideration(FactionId(proposer), FactionId(responder), give, take, term)
             .map_err(trade_refusal)
     }
 
@@ -3748,6 +3797,26 @@ impl PyWorld {
     /// party has not answered yet, when a kind names no resource, when a
     /// quantity is zero, or when the speaker has no unit on the other party's
     /// ground.
+    ///
+    /// The tag and the target keyword arguments are those of `offer_trade`.
+    /// A land side on the give side is checked against the party that opened
+    /// the pair, and one on the take side against the other party.
+    #[allow(clippy::too_many_arguments)]
+    #[pyo3(signature = (
+        speaker,
+        other,
+        give_kind,
+        give_amount,
+        take_kind,
+        take_amount,
+        *,
+        give_tag = 0,
+        take_tag = 0,
+        give_tiles = None,
+        take_tiles = None,
+        give_cell = None,
+        take_cell = None,
+    ))]
     fn counter_trade(
         &self,
         speaker: u16,
@@ -3756,17 +3825,32 @@ impl PyWorld {
         give_amount: u32,
         take_kind: u8,
         take_amount: u32,
+        give_tag: u8,
+        take_tag: u8,
+        give_tiles: Option<Vec<(i32, i32)>>,
+        take_tiles: Option<Vec<(i32, i32)>>,
+        give_cell: Option<(i32, i32)>,
+        take_cell: Option<(i32, i32)>,
     ) -> PyResult<()> {
         let mut world = self.lock();
+        let give = consideration_of(
+            &world,
+            give_tag,
+            give_kind,
+            give_amount,
+            give_tiles,
+            give_cell,
+        )?;
+        let take = consideration_of(
+            &world,
+            take_tag,
+            take_kind,
+            take_amount,
+            take_tiles,
+            take_cell,
+        )?;
         world
-            .counter_trade(
-                FactionId(speaker),
-                FactionId(other),
-                give_kind,
-                give_amount,
-                take_kind,
-                take_amount,
-            )
+            .counter_consideration(FactionId(speaker), FactionId(other), give, take)
             .map_err(trade_refusal)
     }
 
@@ -3883,8 +3967,13 @@ impl PyWorld {
     ///   deadline passed with a debt.
     /// - `turn`, an integer or `None`. Which faction answers next. It is
     ///   `None` when nobody is waiting on an answer.
-    /// - `give_kind` and `give_amount`. What the proposer owes.
+    /// - `give_tag` and `take_tag`. The kind of each side: zero a resource,
+    ///   one land, two a relation step.
+    /// - `give_kind` and `give_amount`. What the proposer owes. For land the
+    ///   amount is the tile count.
     /// - `take_kind` and `take_amount`. What the responder owes.
+    /// - `give_tiles` and `take_tiles`, `numpy.uint32`. The tile indices of a
+    ///   land side, ascending. Empty for the other kinds.
     /// - `given` and `taken`. What each party has already delivered.
     /// - `opened`, the step the negotiation opened at.
     /// - `deadline`, the step a bound contract fails at. Zero until it binds.
@@ -3927,6 +4016,20 @@ impl PyWorld {
         let entries = PyDict::new(python);
         entries.set_item("status", row.status)?;
         entries.set_item("turn", turn)?;
+        entries.set_item("give_tag", row.give_tag)?;
+        entries.set_item("take_tag", row.take_tag)?;
+        let give_tiles: Vec<u32> = world
+            .trade_land(FactionId(proposer), FactionId(responder), false)
+            .iter()
+            .map(|tile| tile.0)
+            .collect();
+        let take_tiles: Vec<u32> = world
+            .trade_land(FactionId(proposer), FactionId(responder), true)
+            .iter()
+            .map(|tile| tile.0)
+            .collect();
+        entries.set_item("give_tiles", give_tiles.to_pyarray(python))?;
+        entries.set_item("take_tiles", take_tiles.to_pyarray(python))?;
         entries.set_item("give_kind", row.give_kind)?;
         entries.set_item("give_amount", row.give_amount)?;
         entries.set_item("take_kind", row.take_kind)?;
@@ -3950,6 +4053,7 @@ impl PyWorld {
     ///
     /// - `proposer` and `responder`, `numpy.uint16`. The ordered pair.
     /// - `status`, `numpy.uint8`. The same numbering `trade_status` states.
+    /// - `give_tag`, `take_tag`, `numpy.uint8`. The kind of each side.
     /// - `give_kind`, `take_kind`, `numpy.uint8`.
     /// - `give_amount`, `take_amount`, `given`, `taken`, `term`,
     ///   `numpy.uint32`.
@@ -3993,6 +4097,8 @@ impl PyWorld {
         let proposer: Vec<u16> = chosen.iter().map(|entry| entry.0).collect();
         let responder: Vec<u16> = chosen.iter().map(|entry| entry.1).collect();
         let status: Vec<u8> = chosen.iter().map(|entry| entry.2.status).collect();
+        let give_tag: Vec<u8> = chosen.iter().map(|entry| entry.2.give_tag).collect();
+        let take_tag: Vec<u8> = chosen.iter().map(|entry| entry.2.take_tag).collect();
         let give_kind: Vec<u8> = chosen.iter().map(|entry| entry.2.give_kind).collect();
         let take_kind: Vec<u8> = chosen.iter().map(|entry| entry.2.take_kind).collect();
         let give_amount: Vec<u32> = chosen.iter().map(|entry| entry.2.give_amount).collect();
@@ -4007,6 +4113,8 @@ impl PyWorld {
         columns.set_item("proposer", proposer.to_pyarray(python))?;
         columns.set_item("responder", responder.to_pyarray(python))?;
         columns.set_item("status", status.to_pyarray(python))?;
+        columns.set_item("give_tag", give_tag.to_pyarray(python))?;
+        columns.set_item("take_tag", take_tag.to_pyarray(python))?;
         columns.set_item("give_kind", give_kind.to_pyarray(python))?;
         columns.set_item("take_kind", take_kind.to_pyarray(python))?;
         columns.set_item("give_amount", give_amount.to_pyarray(python))?;
@@ -4031,7 +4139,8 @@ impl PyWorld {
     /// - `proposer` and `responder`, `numpy.uint16`. The ordered pair.
     /// - `act`, `numpy.uint8`. Zero is an offer, one a counteroffer, two an
     ///   acceptance, three a refusal, four a terminal refusal, five an
-    ///   opening, six a settlement and seven a default.
+    ///   opening, six a settlement, seven a default, eight a land transfer
+    ///   and nine a relation step.
     /// - `status`, `numpy.uint8`. What the pair held after the act.
     ///
     /// This method copies each column.[^2]
@@ -4055,6 +4164,143 @@ impl PyWorld {
         columns.set_item("act", act.to_pyarray(python))?;
         columns.set_item("status", status.to_pyarray(python))?;
         Ok(columns)
+    }
+
+    /// Replaces the whole board of one faction.
+    ///
+    /// A board says what a faction offers and what it wants. Each row is a
+    /// tuple `(good, quantity, wants, asking_good, asking_quantity)`. The good
+    /// and the asking good are resource kinds. `wants` is zero when the
+    /// faction offers the good and one when it wants the good. The quantities
+    /// are whole numbers.
+    ///
+    /// The call replaces every row the faction had. An empty list clears the
+    /// board. Posting is a statement and not a speech act, so it passes no
+    /// presence gate and costs no standing.
+    ///
+    /// # Errors
+    ///
+    /// Raises `VerbError` when the number names no faction of this world, when
+    /// the list holds more rows than `board_rows()`, when a good names no
+    /// resource kind, or when `wants` is neither zero nor one. No row changes
+    /// on an error.
+    fn advertise(&self, faction: u16, rows: Vec<(u8, u32, u8, u8, u32)>) -> PyResult<()> {
+        let mut world = self.lock();
+        let rows: Vec<Advert> = rows
+            .into_iter()
+            .map(|(good, quantity, wants, asking_good, asking_quantity)| {
+                Advert::new(good, quantity, wants, asking_good, asking_quantity)
+            })
+            .collect();
+        world
+            .advertise(FactionId(faction), &rows)
+            .map_err(trade_refusal)
+    }
+
+    /// Returns the board of any faction, as columns.
+    ///
+    /// Every array has one entry for each row that says something, and every
+    /// array is the same length. A faction that never advertised has an empty
+    /// board, and so does a faction that posted an empty list.
+    ///
+    /// - `good`, `numpy.uint8`. The resource kind the row is about.
+    /// - `quantity`, `numpy.uint32`. How much of it.
+    /// - `wants`, `numpy.uint8`. Zero when the faction offers the good, one
+    ///   when it wants the good.
+    /// - `asking_good`, `numpy.uint8`. The resource kind asked in return.
+    /// - `asking_quantity`, `numpy.uint32`. How much of that.
+    ///
+    /// Reading a board costs nothing and moves no relation. This method
+    /// copies each column.[^1]
+    ///
+    /// # Errors
+    ///
+    /// Raises `ViewError` when the number names no faction of this world.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0044, what copies and what does not is declared at the call site. `docs/adrs/REGISTRY.md`
+    fn market<'py>(&self, python: Python<'py>, faction: u16) -> PyResult<Bound<'py, PyDict>> {
+        let world = self.lock();
+        if faction >= world.faction_count() {
+            return Err(ViewError::new_err(format!(
+                "{faction} names no faction of this world"
+            )));
+        }
+        let rows: Vec<Advert> = world
+            .market(FactionId(faction))
+            .iter()
+            .copied()
+            .filter(|row| !row.is_empty())
+            .collect();
+        let columns = PyDict::new(python);
+        let good: Vec<u8> = rows.iter().map(|row| row.good).collect();
+        let quantity: Vec<u32> = rows.iter().map(|row| row.quantity).collect();
+        let wants: Vec<u8> = rows.iter().map(|row| row.wants).collect();
+        let asking_good: Vec<u8> = rows.iter().map(|row| row.asking_good).collect();
+        let asking_quantity: Vec<u32> = rows.iter().map(|row| row.asking_quantity).collect();
+        columns.set_item("good", good.to_pyarray(python))?;
+        columns.set_item("quantity", quantity.to_pyarray(python))?;
+        columns.set_item("wants", wants.to_pyarray(python))?;
+        columns.set_item("asking_good", asking_good.to_pyarray(python))?;
+        columns.set_item("asking_quantity", asking_quantity.to_pyarray(python))?;
+        Ok(columns)
+    }
+
+    /// Returns how many rows one faction's board holds.
+    ///
+    /// The value is a balance parameter and the register calls it unset. The
+    /// engine holds a stand-in until a caller sets one.
+    fn board_rows(&self) -> u16 {
+        self.lock().board_rows()
+    }
+
+    /// Sets how many rows one faction's board holds.
+    ///
+    /// The change empties every board, because the table is laid out by the
+    /// bound.
+    fn set_board_rows(&self, rows: u16) {
+        self.lock().set_board_rows(rows);
+    }
+
+    /// Returns the most tiles one land side of a contract may name.
+    ///
+    /// The value is a balance parameter and the register calls it unset. The
+    /// engine holds a stand-in until a caller sets one.
+    fn land_list_bound(&self) -> u32 {
+        self.lock().land_list_bound()
+    }
+
+    /// Sets the most tiles one land side of a contract may name.
+    fn set_land_list_bound(&self, bound: u32) {
+        self.lock().set_land_list_bound(bound);
+    }
+
+    /// Returns every tile index of the level 1 cell that covers one address,
+    /// ascending, as `numpy.uint32`.
+    ///
+    /// A cell on the world edge is partial, and the array holds the tiles
+    /// that exist. This is the set a land side names when it names a cell.
+    ///
+    /// # Errors
+    ///
+    /// Raises `ViewError` when the address lies outside the world.
+    fn cell_tiles<'py>(
+        &self,
+        python: Python<'py>,
+        q: i32,
+        r: i32,
+    ) -> PyResult<Bound<'py, PyArray1<u32>>> {
+        let world = self.lock();
+        let tiles: Vec<u32> = world
+            .cell_tiles(Axial::new(q, r))
+            .map_err(|_| {
+                ViewError::new_err(format!("the address ({q}, {r}) lies outside the world"))
+            })?
+            .iter()
+            .map(|tile| tile.0)
+            .collect();
+        Ok(tiles.to_pyarray(python))
     }
 
     /// Reports whether the speaker has a unit on the ground the listener
@@ -5888,6 +6134,50 @@ impl PyWorld {
 /// # References
 ///
 /// [^1]: ADR-0127, a terminal refusal closes an ordered pair until a named tick, decision D3. `docs/adrs/draft/adr-0127-a-terminal-refusal-closes-a-pair-until-a-named-tick.md`
+/// Builds one side of a contract from the keyword arguments of a trade verb.
+///
+/// A land side takes its tiles from the cell, from the list, or from both.
+/// The other kinds keep the kind and the amount and hold no tile.
+fn consideration_of(
+    world: &cachette_core::World,
+    tag: u8,
+    kind: u8,
+    amount: u32,
+    tiles: Option<Vec<(i32, i32)>>,
+    cell: Option<(i32, i32)>,
+) -> PyResult<Consideration> {
+    match tag {
+        KIND_RESOURCE => Ok(Consideration::resource(kind, amount)),
+        KIND_RELATION => Ok(Consideration::relation(kind, amount)),
+        KIND_LAND => {
+            let mut set: Vec<TileIdx> = Vec::new();
+            if let Some((q, r)) = cell {
+                let found = world.cell_tiles(Axial::new(q, r)).map_err(|_| {
+                    VerbError::new_err(format!(
+                        "the address ({q}, {r}) lies outside the world, so it names no cell"
+                    ))
+                })?;
+                set.extend(found);
+            }
+            for (q, r) in tiles.unwrap_or_default() {
+                let tile = world.grid().index_of(Axial::new(q, r)).ok_or_else(|| {
+                    VerbError::new_err(format!("the address ({q}, {r}) lies outside the world"))
+                })?;
+                set.push(tile);
+            }
+            if set.is_empty() {
+                return Err(VerbError::new_err(
+                    "a land side names a cell, a list of tiles, or both",
+                ));
+            }
+            Ok(Consideration::land(set))
+        }
+        other => Err(VerbError::new_err(format!(
+            "{other} names no consideration kind: zero is a resource, one is land and two is a relation step"
+        ))),
+    }
+}
+
 fn trade_refusal(error: cachette_core::TradeError) -> PyErr {
     use cachette_core::TradeError as Refusal;
     let said = match error {
@@ -5922,6 +6212,28 @@ fn trade_refusal(error: cachette_core::TradeError) -> PyErr {
         Refusal::NoDuration => {
             "a terminal refusal closes the direction for a number of steps above zero".to_string()
         }
+        Refusal::NoSuchTag(tag) => format!(
+            "{tag} names no consideration kind: zero is a resource, one is land and two is a relation step"
+        ),
+        Refusal::NoSuchTile => "a land side names a tile that lies outside the world".to_string(),
+        Refusal::NoSuchCell => "a land side names a cell that lies outside the world".to_string(),
+        Refusal::LandNotHeld(tile) => format!(
+            "the party that owes the land does not hold tile {}",
+            tile.0
+        ),
+        Refusal::UpgradeOnLand(tile) => format!(
+            "tile {} carries an upgrade, and whether an upgrade changes hands with the ground is open under BLK-036, so the engine refuses the trade until it is answered",
+            tile.0
+        ),
+        Refusal::TooMuchLand(count, bound) => format!(
+            "a land side names {count} tiles, and the bound is {bound}"
+        ),
+        Refusal::NoSuchSide(wants) => format!(
+            "{wants} names neither offers, which is zero, nor wants, which is one"
+        ),
+        Refusal::BoardOverfull(count, bound) => format!(
+            "the board holds {bound} rows, and the write names {count}"
+        ),
     };
     VerbError::new_err(said)
 }
