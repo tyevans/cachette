@@ -31,6 +31,7 @@ A record here is a need, not a plan. The backlog says what work answers it.[^3]
 
 | No. | Why it sits here |
 |---|---|
+| 0054 | A god's ground is the ground around its cities. **The project owner asked for it now.** Today a holding spreads from wherever a unit stands and grows until something stops it, so a god cannot lose ground by losing a city and cannot gain ground by founding one. It sits first under `Next` because it changes the meaning of every held tile that 0031, 0040, 0048 and 0051 read, and those records are cheaper to judge once the ground means something. BLK-050 governs how far a city reaches. |
 | 0013 | Consumption. Nothing makes a resource matter until something needs it. |
 | 0014 | Housing. It bounds the population that 0011 will grow. |
 | 0017 | Work assigned to the people who can do it. |
