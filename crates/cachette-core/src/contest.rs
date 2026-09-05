@@ -546,13 +546,22 @@ mod tests {
     /// A table in which the bowman cannot reach the tank, and the tank ends
     /// four units of anything in one resolution.
     fn tank_and_bowman() -> UnitTypeTable {
+        use crate::unit_type::UnitTypeRow;
         let mut table = UnitTypeTable::empty();
+        let bowman = UnitTypeRow {
+            attack: Fix32::from_int(1),
+            armour: Fix32::ZERO,
+            ..UnitTypeRow::NONE
+        };
+        let tank = UnitTypeRow {
+            attack: Fix32::from_int(4),
+            armour: Fix32::from_int(2),
+            ..UnitTypeRow::NONE
+        };
         table
-            .define(0, Fix32::from_int(1), Fix32::ZERO)
+            .define(0, bowman)
             .expect("the row is inside the table");
-        table
-            .define(1, Fix32::from_int(4), Fix32::from_int(2))
-            .expect("the row is inside the table");
+        table.define(1, tank).expect("the row is inside the table");
         table
     }
 

@@ -108,7 +108,8 @@ pub use trade::{
 };
 pub use types::{Accum, Entity, FactionId, Fix32, Tick, TileIdx};
 pub use unit_type::{
-    UnitTypeError, UnitTypeId, UnitTypeRow, UnitTypeTable, DEFAULT_UNIT_TYPE, UNIT_TYPE_COUNT,
+    UnitTypeError, UnitTypeId, UnitTypeRow, UnitTypeTable, DEFAULT_UNIT_TYPE,
+    DEFAULT_UNIT_TYPE_TABLE, UNIT_TYPE_COLUMN_COUNT, UNIT_TYPE_COUNT,
 };
 pub use upgrade::{UpgradeKind, UpgradeMap, UpgradeSite, UPGRADE_KIND_COUNT};
 pub use weather::{

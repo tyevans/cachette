@@ -76,7 +76,9 @@ use crate::trade::{
     TRADE_DEFAULTED, TRADE_IDLE, TRADE_OFFERED, TRADE_SETTLED,
 };
 use crate::types::{Accum, Entity, FactionId, Fix32, Tick, TileIdx, FACTION_CEILING};
-use crate::unit_type::{UnitTypeError, UnitTypeId, UnitTypeTable};
+use crate::unit_type::{
+    UnitTypeError, UnitTypeId, UnitTypeRow, UnitTypeTable, DEFAULT_UNIT_TYPE_TABLE,
+};
 use crate::upgrade::{self, UpgradeKind, UpgradeMap, UpgradeSite};
 use crate::weather::{Ground, Storm, WeatherError, WeatherField};
 
@@ -974,7 +976,11 @@ impl World {
             rationed_log: Vec::new(),
             death_plane: DeathPlane::new(),
             starved_log: Vec::new(),
-            unit_types: UnitTypeTable::empty(),
+            // The world is built with the default table, so a unit that
+            // nothing typed is a worker and gathers, builds and carries.[^1]
+            //
+            // [^1]: ADR-0145, a unit type is a row of capability columns, and zero means cannot, decision D4. `docs/adrs/draft/adr-0145-a-unit-type-is-a-row-of-capability-columns-and-zero-means-cannot.md`
+            unit_types: DEFAULT_UNIT_TYPE_TABLE,
             fell_plane: DeathPlane::new(),
             fell_log: Vec::new(),
             convert_marks: Vec::new(),
@@ -2188,12 +2194,14 @@ impl World {
 
     /// Returns the shared table that a unit type indexes.
     ///
-    /// The table holds one row for each type. A row states the attack of the
-    /// type and the armour of the type, in the project fixed-point scale.[^1]
+    /// The table holds one row for each type. A row is a set of capability
+    /// columns, each a whole number or a fixed-point value, and a zero in a
+    /// column means that the type cannot do what the column names.[^1] [^2]
     ///
     /// # References
     ///
     /// [^1]: ADR-0120, a unit carries a type, and the type is an index into a table the world is built with, decision D2. `docs/adrs/draft/adr-0120-a-unit-carries-a-type-that-indexes-a-table.md`
+    /// [^2]: ADR-0145, a unit type is a row of capability columns, and zero means cannot, decisions D1 and D2. `docs/adrs/draft/adr-0145-a-unit-type-is-a-row-of-capability-columns-and-zero-means-cannot.md`
     #[must_use]
     pub const fn unit_types(&self) -> &UnitTypeTable {
         &self.unit_types
@@ -2201,10 +2209,10 @@ impl World {
 
     /// Writes one row of the unit type table.
     ///
-    /// The attack is the harm that one unit of the type delivers in one
-    /// resolution, as a whole number of casualties in the fixed-point scale.
-    /// The armour is the attack that an attacker must exceed to reach a unit
-    /// of the type.[^1]
+    /// The caller gives the whole row. There is no two-column form, because
+    /// a caller that gave two columns would leave the rest at zero and would
+    /// define a unit that fights and does nothing else without knowing
+    /// it.[^1]
     ///
     /// **The values are content and not a budget.** No record holds one,
     /// because a record may hold no number that a content choice can
@@ -2212,26 +2220,40 @@ impl World {
     ///
     /// # Errors
     ///
-    /// Returns an error when the number names no row of the table, when the
-    /// attack is below zero, or when the armour is below zero.
+    /// Returns an error when the number names no row of the table, or when a
+    /// fixed-point column of the row is below zero.
     ///
     /// # References
     ///
-    /// [^1]: ADR-0122, an attacker whose attack does not exceed the defender's armour contributes exactly zero, decision D1. `docs/adrs/draft/adr-0122-an-attacker-below-the-armour-contributes-exactly-zero.md`
+    /// [^1]: ADR-0145, a unit type is a row of capability columns, and zero means cannot, decision D5. `docs/adrs/draft/adr-0145-a-unit-type-is-a-row-of-capability-columns-and-zero-means-cannot.md`
     /// [^2]: Decision Record Scope, section 4.1. `.claude/rules/adr-scope.md`
-    pub const fn define_unit_type(
+    pub fn define_unit_type(
         &mut self,
         unit_type: u8,
-        attack: Fix32,
-        armour: Fix32,
+        row: UnitTypeRow,
     ) -> Result<(), UnitTypeError> {
-        self.unit_types.define(unit_type, attack, armour)
+        self.unit_types.define(unit_type, row)
     }
 
     /// Returns the type of one unit, or `None` when the identity is dead.
     #[must_use]
     pub fn unit_type(&self, entity: Entity) -> Option<UnitTypeId> {
         self.soldiers.unit_type(entity)
+    }
+
+    /// Returns the row of the table that one unit indexes, or `None` when the
+    /// identity is dead.
+    ///
+    /// The unit carries the index and never a copy of the row, so this is two
+    /// indexed reads and it returns what the table holds now.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0120, a unit carries a type, and the type is an index into a table the world is built with, decision D3. `docs/adrs/draft/adr-0120-a-unit-carries-a-type-that-indexes-a-table.md`
+    #[must_use]
+    pub fn unit_type_row(&self, entity: Entity) -> Option<UnitTypeRow> {
+        let unit_type = self.soldiers.unit_type(entity)?;
+        Some(self.unit_types.row(unit_type))
     }
 
     /// Sets the type of one unit, and reports whether it wrote.
@@ -6294,7 +6316,31 @@ impl World {
                     break;
                 }
                 let intent = intents[*position as usize];
-                let amount = rate.min(left);
+                // The type of the unit scales the tile rate and caps the
+                // load. A gather rate of zero takes nothing, and a load at
+                // the carry capacity takes nothing more.[^4]
+                //
+                // **A unit that cannot gather keeps its order and takes
+                // nothing.** The order is not refused here, because the
+                // choice pass writes the same column from inside the step,
+                // and a type can change after an order is given. The boundary
+                // verb refuses the order for such a unit, so a caller learns
+                // at once; the pass is what holds when the caller is the
+                // engine.
+                //
+                // [^4]: ADR-0145, a unit type is a row of capability columns, and zero means cannot, decisions D1 and D2. `docs/adrs/draft/adr-0145-a-unit-type-is-a-row-of-capability-columns-and-zero-means-cannot.md`
+                let row = self.unit_types.row(intent.unit_type);
+                let unit_rate = sim_math::scale_amount(rate, row.gather_rate);
+                let held = self
+                    .soldiers
+                    .carry(intent.unit)
+                    .map_or(0i64, |load| load.total().0);
+                let room = i64::from(row.carry_capacity).saturating_sub(held);
+                let room = u32::try_from(room).unwrap_or(0);
+                let amount = unit_rate.min(left).min(room);
+                if amount == 0 {
+                    continue;
+                }
                 left -= amount;
                 granted += amount;
                 let added = self
@@ -6326,8 +6372,9 @@ impl World {
     ///
     /// The builders of one tile are gathered into one contribution and the
     /// map is merged once, in ascending tile order. The contribution is a
-    /// count of builders times a whole-number rate, so it is the same
-    /// whatever order the threads produced the intents in.[^2] [^3]
+    /// sum over the builders of a whole-number rate scaled by the build rate
+    /// of each builder's type, so it is the same whatever order the threads
+    /// produced the intents in.[^2] [^3]
     ///
     /// **A tile carries one upgrade.** When builders on one tile name
     /// different kinds, the kind already standing there wins. A tile that
@@ -6379,12 +6426,22 @@ impl World {
             }
             let held = self.upgrades.at(tile).map(|site| site.kind);
             let winner = held.unwrap_or(intents[order[at] as usize].kind);
-            let builders = order[at..end]
+            // Each builder adds the builder rate scaled by the build rate of
+            // its type. A build rate of zero adds nothing, so a unit that
+            // cannot build keeps its order and moves no site. The sum is
+            // integer addition, so it is the same in any order.[^5]
+            //
+            // [^5]: ADR-0145, a unit type is a row of capability columns, and zero means cannot, decisions D1 and D2. `docs/adrs/draft/adr-0145-a-unit-type-is-a-row-of-capability-columns-and-zero-means-cannot.md`
+            let work = order[at..end]
                 .iter()
-                .filter(|position| intents[**position as usize].kind == winner)
-                .count() as i64;
-            if builders > 0 {
-                run.push((tile, winner, builders * upgrade::BUILD_RATE));
+                .map(|position| intents[*position as usize])
+                .filter(|intent| intent.kind == winner)
+                .fold(0i64, |total, intent| {
+                    let scale = self.unit_types.row(intent.unit_type).build_rate;
+                    total.saturating_add(sim_math::scale_work(upgrade::BUILD_RATE, scale))
+                });
+            if work > 0 {
+                run.push((tile, winner, work));
             }
             at = end;
         }
@@ -6894,6 +6951,9 @@ struct GatherIntent {
     tile: TileIdx,
     /// The kind that the unit gathers.
     kind: ResourceKind,
+    /// The type of the unit. The resolve reads the gather rate and the carry
+    /// capacity of the row it indexes.
+    unit_type: UnitTypeId,
 }
 
 /// Returns the order in which the resolve reads the gather intents.
@@ -6978,10 +7038,12 @@ fn gather_intents(soldiers: &SoldierArena, threads: usize) -> Result<Vec<GatherI
                     .filter_map(|unit| {
                         let kind = soldiers.gather_order(*unit)??;
                         let tile = soldiers.tile(*unit)?;
+                        let unit_type = soldiers.unit_type(*unit)?;
                         Some(GatherIntent {
                             unit: *unit,
                             tile,
                             kind,
+                            unit_type,
                         })
                     })
                     .collect();
@@ -7004,6 +7066,9 @@ struct BuildIntent {
     tile: TileIdx,
     /// The kind that the unit builds.
     kind: UpgradeKind,
+    /// The type of the unit. The advance reads the build rate of the row it
+    /// indexes.
+    unit_type: UnitTypeId,
 }
 
 /// Returns the order in which the advance reads the build intents.
@@ -7063,10 +7128,12 @@ fn build_intents(soldiers: &SoldierArena, threads: usize) -> Result<Vec<BuildInt
                     .filter_map(|unit| {
                         let kind = soldiers.build_order(*unit)??;
                         let tile = soldiers.tile(*unit)?;
+                        let unit_type = soldiers.unit_type(*unit)?;
                         Some(BuildIntent {
                             unit: *unit,
                             tile,
                             kind,
+                            unit_type,
                         })
                     })
                     .collect();

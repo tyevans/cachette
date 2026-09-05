@@ -37,8 +37,20 @@
 //! [^5]: Findings register, FND-402. `docs/FINDINGS.md`
 
 use cachette_core::contest::casualties;
-use cachette_core::unit_type::UnitTypeId;
+use cachette_core::unit_type::{UnitTypeId, UnitTypeRow, WORKER_ROW};
 use cachette_core::{Accum, Axial, Entity, FactionId, Fix32, World, WorldConfig};
+
+/// Returns a worker row that fights with the given attack and armour.
+///
+/// The other columns are the worker's, so the row differs from the default
+/// in the two columns the contest reads and in nothing else.
+const fn fighter(attack: Fix32, armour: Fix32) -> UnitTypeRow {
+    UnitTypeRow {
+        attack,
+        armour,
+        ..WORKER_ROW
+    }
+}
 
 /// The thread counts that every test in this file runs at.
 ///
@@ -83,10 +95,10 @@ fn one_tile_world(unit_capacity: u32) -> World {
         "the fixture needs ground that admits a unit"
     );
     world
-        .define_unit_type(BOWMAN, Fix32::from_int(1), Fix32::ZERO)
+        .define_unit_type(BOWMAN, fighter(Fix32::from_int(1), Fix32::ZERO))
         .expect("the bowman row is inside the table");
     world
-        .define_unit_type(TANK, Fix32::from_int(4), Fix32::from_int(2))
+        .define_unit_type(TANK, fighter(Fix32::from_int(4), Fix32::from_int(2)))
         .expect("the tank row is inside the table");
     world
 }
@@ -183,10 +195,10 @@ fn a_pair_that_both_reach_takes_losses_on_both_sides() {
     for threads in THREAD_COUNTS {
         let mut world = one_tile_world(64);
         world
-            .define_unit_type(BOWMAN, Fix32::from_int(2), Fix32::from_int(1))
+            .define_unit_type(BOWMAN, fighter(Fix32::from_int(2), Fix32::from_int(1)))
             .expect("the row is inside the table");
         world
-            .define_unit_type(TANK, Fix32::from_int(3), Fix32::from_int(1))
+            .define_unit_type(TANK, fighter(Fix32::from_int(3), Fix32::from_int(1)))
             .expect("the row is inside the table");
         spawn(&mut world, Axial::new(0, 0), 0, BOWMAN, 8);
         spawn(&mut world, Axial::new(0, 0), 1, TANK, 2);
@@ -234,10 +246,10 @@ fn the_frame_is_in_the_draw_key() {
     // One half of a whole unit, in the project fixed-point scale. The whole
     // part of the harm is zero, so every casualty comes from the remainder.
     world
-        .define_unit_type(BOWMAN, Fix32(Fix32::ONE.0 / 2), Fix32::ZERO)
+        .define_unit_type(BOWMAN, fighter(Fix32(Fix32::ONE.0 / 2), Fix32::ZERO))
         .expect("the row is inside the table");
     world
-        .define_unit_type(TANK, Fix32::ZERO, Fix32::ZERO)
+        .define_unit_type(TANK, fighter(Fix32::ZERO, Fix32::ZERO))
         .expect("the row is inside the table");
     spawn(&mut world, Axial::new(0, 0), 0, BOWMAN, 1);
     spawn(&mut world, Axial::new(0, 0), 1, TANK, 64);
@@ -305,10 +317,10 @@ fn the_tile_is_in_the_draw_key() {
     // whether anybody falls. The tank carries no attack, so it never harms
     // the bowman beside it and the fixture keeps its shape.
     world
-        .define_unit_type(BOWMAN, Fix32(Fix32::ONE.0 / 2), Fix32::ZERO)
+        .define_unit_type(BOWMAN, fighter(Fix32(Fix32::ONE.0 / 2), Fix32::ZERO))
         .expect("the row is inside the table");
     world
-        .define_unit_type(TANK, Fix32::ZERO, Fix32::ZERO)
+        .define_unit_type(TANK, fighter(Fix32::ZERO, Fix32::ZERO))
         .expect("the row is inside the table");
     for address in [left, right] {
         spawn(&mut world, address, 0, BOWMAN, 1);
@@ -367,10 +379,10 @@ fn a_unit_reaches_the_tile_beside_it() {
     })
     .expect("a world of three tiles is a world");
     world
-        .define_unit_type(BOWMAN, Fix32::from_int(1), Fix32::ZERO)
+        .define_unit_type(BOWMAN, fighter(Fix32::from_int(1), Fix32::ZERO))
         .expect("the row is inside the table");
     world
-        .define_unit_type(TANK, Fix32::from_int(4), Fix32::from_int(2))
+        .define_unit_type(TANK, fighter(Fix32::from_int(4), Fix32::from_int(2)))
         .expect("the row is inside the table");
     spawn(&mut world, Axial::new(0, 0), 0, BOWMAN, 4);
     spawn(&mut world, Axial::new(1, 0), 1, TANK, 1);
@@ -404,7 +416,7 @@ fn a_unit_reaches_no_tile_two_steps_away() {
     })
     .expect("a world of three tiles is a world");
     world
-        .define_unit_type(BOWMAN, Fix32::from_int(4), Fix32::ZERO)
+        .define_unit_type(BOWMAN, fighter(Fix32::from_int(4), Fix32::ZERO))
         .expect("the row is inside the table");
     spawn(&mut world, Axial::new(0, 0), 0, BOWMAN, 4);
     spawn(&mut world, Axial::new(2, 0), 1, BOWMAN, 4);
