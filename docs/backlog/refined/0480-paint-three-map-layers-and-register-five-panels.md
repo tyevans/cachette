@@ -16,8 +16,10 @@ blocked-by: [BLK-007]
 holds them after passes 3 to 8, and the window shows none. This item is pass 9
 of the living world game layer.[^1]
 
-The item has two halves. **This refinement covers the first half only.** The
-second half waits for passes 3, 6 and 8, and the section below says so.
+The item has two halves. The first half paints the layers and registers the
+weather panel. The second half registers the market, the economy and the score
+panels, and it is done. **The relations panel is the one panel that remains**,
+and the section below says why.
 
 The first half paints three layers on the map and registers one panel.
 
@@ -40,21 +42,33 @@ derives from it, so the new panel appears with no Python edit.
 engine and no reader to the core crate. Every value it paints comes from a
 reader the core crate already exposes.
 
-## What is missing before the second half is refined
+## The second half
 
-**The second half is not done, and this item does not claim it.** It holds
-four panels: relations, market, economy and score. Each waits for a pass.
+The market, the economy and the score panels are registered. Each reads
+through a reader the core crate already exposed, and none was added for it.
+The impact review below states what each one reads.
 
-- The relations panel waits for pass 3, which gives the engine a relation
-  between two factions.
-- The market panel waits for pass 6, which gives the engine a board.
-- The economy and score panels wait for pass 8, which gives the engine a
-  score.
+- Market. For each faction, the rows of its board: the good, the quantity,
+  whether the faction offers or wants it, the asking good and the asking
+  quantity. Below the board, the count of live negotiations and contracts
+  that name the faction. With a pointer set, the faction that holds the
+  pointed tile comes first.
+- Economy. For each settlement, its address and faction, its store, its
+  production rate, its upkeep rate, and how many of its seats a live unit
+  holds. The panel shows a fixed number of settlements and says how many more
+  stand. With a pointer set, the settlement on the pointed tile comes first.
+- Score. The tick, the tick limit and the ticks that remain, and whether the
+  game has ended. When it has, the winner, the path and the tick. For each
+  faction, its territory score and its four weights. With a pointer set, the
+  faction that holds the pointed tile comes first.
 
-Each of those panels needs its own impact review, in the shape of the one
-below. The review must say which reader the panel reads and that none was
-added for it, and it must state the address count each panel reads. When the
-passes land far apart, split the second half into one item per panel.
+## What is missing
+
+**The relations panel is not done, and this item does not claim it.** It
+waits for pass 3, which gives the engine a relation between two factions. It
+needs its own impact review, in the shape of the one below. The review must
+say which reader the panel reads and that none was added for it, and it must
+state the address count the panel reads.
 
 ## Impact review
 
@@ -83,9 +97,23 @@ pass. ADR-0140 D1 holds that a tile is answered from the cell that covers it,
 so two tiles of one cell take the same weather tint, and the picture shows the
 lattice.
 
+**The second half under the same records.** The market panel reads the board
+of each faction and the negotiation plane. A board holds a fixed number of
+rows. The plane holds one row for each ordered pair of factions, and the
+faction ceiling bounds the pairs. The economy panel walks the settlement arena
+for a fixed number of sites and stops. For each site it reads the address, the
+faction, the store, two rates and the positions, and it reads the arena length
+once for the count it did not show. The score panel reads the tick, the tick
+limit, the game end record, and one score and one weight vector for each
+faction. Every one of these is a stored field or a walk bounded by the faction
+ceiling, so no panel starts a pass over a tile or a unit, which ADR-0070 D1
+requires. Each pointer costs one holder read or one settlement read. Every
+value crosses as an integer, and the one fixed-point conversion happens in the
+viewer, which ADR-0067 D3 permits. No reader was added to the core crate.
+
 **Changes.** None.
 
-**Creates.** None. The layers and the panel add no decision. The panel
+**Creates.** None. The layers and the panels add no decision. The panel
 standard already states how a panel registers.[^2]
 
 **Blockers.** BLK-007 governs the draw cost.[^3] The upgrade layer and the
@@ -122,6 +150,17 @@ The first half is done when every statement below is true.
 - The panel names the five totals. No line is cut at the worst plausible
   numbers. With a pointer set, the panel names the air and the ground at the
   pointed cell.
+- The market, the economy and the score panels register with the deck, and
+  `World.panel_names()` names each with no Python edit.
+- The market panel names each advertised good, its quantity and its asking
+  price, and the count of live contracts of each faction. The economy panel
+  names the store, the rates and the housing of a settlement, and counts the
+  settlements it did not show. The score panel names the ticks remaining while
+  the game runs, and the winner, the path and the tick when it has ended.
+- With a pointer set, each of the three panels puts the pointed faction or the
+  pointed settlement first, and a test asserts it for each.
+- No line of the three panels is cut at the worst plausible numbers. A test
+  for each panel, made to return no lines, fails.
 - This pass adds no keyed draw, so the per-field statement of item 0472 does
   not apply. The item says so rather than omitting it.
 - The whole check command runs green.

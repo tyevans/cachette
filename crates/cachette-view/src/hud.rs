@@ -471,7 +471,7 @@ const SITE_ROWS: usize = 6;
 /// # References
 ///
 /// [^1]: ADR-0070, the head-up display reports what the drawing pass read, decision D1. `docs/adrs/accepted/adr-0070-the-head-up-display-reports-what-the-drawing-pass-read.md`
-fn seats_of(world: &World, site: Entity) -> (u32, u32) {
+pub(crate) fn seats_of(world: &World, site: Entity) -> (u32, u32) {
     let Some(rows) = world.site_positions(site) else {
         return (0, 0);
     };
