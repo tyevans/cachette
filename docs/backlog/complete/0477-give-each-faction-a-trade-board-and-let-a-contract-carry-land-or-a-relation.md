@@ -1,7 +1,7 @@
 ---
 id: 0477
 title: Give each faction a trade board and let a contract carry land or a relation
-status: refined
+status: complete
 created: 2026-09-05
 implements: [ADR-0147 D1, ADR-0147 D3, ADR-0147 D4, ADR-0147 D5, ADR-0126 D1, ADR-0126 D2, ADR-0127 D1, ADR-0128 D2, ADR-0128 D4, ADR-0002 D1, ADR-0004 D1, ADR-0001 D4]
 changes: [ADR-0128 D1]
@@ -122,7 +122,59 @@ trades land.[^6]
 
 ## Outcome
 
-Filled in when the item moves to `complete/`.
+**Done.** Each faction holds one fixed block of advertisement rows. The block
+is lazy, it enters the state hash, and a world parameter with a setter bounds
+it. `advertise(faction, rows)` replaces the whole board and refuses a write
+above the bound with no row changed. `market(faction)` returns the rows that
+say something, as columns. Each side of a contract carries a tag, and the tag
+set is resource, land and relation. A land side names a level 1 cell, a list
+of tiles, or both. The engine refuses a land side whose tiles the debtor does
+not hold, whose count passes the bound, or whose tiles carry an upgrade, and
+the upgrade refusal names BLK-036 in its text. On full delivery of the other
+side, every tile of a land set changes holder to the creditor, in ascending
+tile index, in the settle pass after the carriers of the tick and before the
+deadline check, in pair order. A carrier pays only a resource side. At the
+deadline only a carried side owes, so the party that offered land keeps its
+direction when the resource side is short.
+
+**The relation kind is inert on purpose, for one pass.** The engine stores the
+kind and the amount, and delivery logs one event and moves nothing, because
+the relation matrix arrives with pass 3. This is recurring defect shape 3,
+accepted here and named in the code comment. Pass 3 replaces the no-op arm
+with the move.
+
+**What changed from the plan.** The item was split. The controller half is
+item 0482. A cell target and a list target share one bound, so a whole cell of
+the default block size is above the stand-in bound until a caller raises it.
+The Python verbs derive the amount of a land side from the tile count and
+ignore the amount the caller passed for that side.
+
+**Defects put back and caught.** Twelve. Skip the holder check, skip the
+upgrade check, skip the land bound, skip the board bound, leave the board out
+of the hash, keep old rows on a board write, apply a relation step without a
+log entry, drop the last listed tile, move one unlisted tile, apply land
+before its price, close the land side's direction at a default, and let a
+carrier pay a land debt. Each turned its test red and passed again when
+restored. The commit body holds the pairs.
+
+**Where ADR-0147 and the code disagree.** The record stays at `Draft`. D1
+says nothing about a kind lives outside the row; the tile list of a land side
+sits beside the row in the same plane, indexed by the row, because a row is
+plain data and a list has no fixed size. D1 says a relation step is a signed
+step; the code stores an unsigned amount and a kind byte and reads neither.
+D3 says a side applies directly after the transfer that closed the debt; the
+code applies after every carrier transfer of the tick, in pair order, in the
+same pass, and nothing reads the plane between the two. D3 says a relation
+step moves the relation entry; the code logs a no-op. D4 says the engine
+refuses a tile held by another faction; the code refuses any tile the debtor
+does not hold, so a tile nobody holds is refused too. D4 cites the budgets
+register for the list bound; the row is in the balance register. The design
+names `advertise(faction, row)`; the verb takes the whole board.
+
+**Registers.** No blocker opened or closed. BLK-036 stays open and the
+refusal is written so that one commit removes it. The balance rows for the
+board size and the land list bound stay unset; the code holds stand-ins with
+setters. No finding was added.
 
 ## References
 
