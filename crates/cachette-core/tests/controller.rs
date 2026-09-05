@@ -46,23 +46,32 @@ fn seat(world: &mut World, seated: u16) {
     let mut taken: Vec<Axial> = Vec::new();
     for faction in 0..seated {
         let mut founded = false;
-        for index in 0..grid.tile_count() {
-            let address = Axial::new((index % grid.width()) as i32, (index / grid.width()) as i32);
-            if !world.admits_a_unit(address) {
-                continue;
+        // The first pass keeps the seats apart. The second takes any place
+        // the survey accepts, because the probe build perturbs the survey
+        // and a fixture that depends on the spacing would fail there for a
+        // reason that is not the controller.
+        for spacing in [12, 0] {
+            for index in 0..grid.tile_count() {
+                let address =
+                    Axial::new((index % grid.width()) as i32, (index / grid.width()) as i32);
+                if !world.admits_a_unit(address) {
+                    continue;
+                }
+                if taken.iter().any(|place| {
+                    (place.q - address.q).abs() < spacing || (place.r - address.r).abs() < spacing
+                }) {
+                    continue;
+                }
+                if world
+                    .found_group_at(address, GROUP, FactionId(faction))
+                    .is_ok()
+                {
+                    taken.push(address);
+                    founded = true;
+                    break;
+                }
             }
-            if taken
-                .iter()
-                .any(|place| (place.q - address.q).abs() < 12 || (place.r - address.r).abs() < 12)
-            {
-                continue;
-            }
-            if world
-                .found_group_at(address, GROUP, FactionId(faction))
-                .is_ok()
-            {
-                taken.push(address);
-                founded = true;
+            if founded {
                 break;
             }
         }
