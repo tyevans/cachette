@@ -615,6 +615,42 @@ class RelationCrossedColumns(TypedDict):
     band_before: npt.NDArray[np.uint8]
     band_after: npt.NDArray[np.uint8]
 
+class CampaignColumns(TypedDict):
+    """One column for each field of a campaign row.
+
+    An entry is one row of the register of one faction, in slot order. A row
+    whose state is zero holds no campaign. The objective kind is zero for a
+    take, one for a relief and two for a wear. The state is zero for empty,
+    one for live, two for won, three for lost and four for ended by a holder
+    change to a third party. The holder at the raise is the largest value
+    when nobody held the objective.
+    """
+
+    raised_at_tick: npt.NDArray[np.uint64]
+    objective_q: npt.NDArray[np.int32]
+    objective_r: npt.NDArray[np.int32]
+    cohort_size: npt.NDArray[np.uint32]
+    holder_at_raise: npt.NDArray[np.uint16]
+    objective_kind: npt.NDArray[np.uint8]
+    state: npt.NDArray[np.uint8]
+
+class CampaignEventColumns(TypedDict):
+    """One column for each field of a campaign event.
+
+    An entry names one thing that happened to a campaign on the last step.
+    The kind is zero for a raise, one for a win, two for a loss and three for
+    an end by a holder change to a third party. The log covers the last step
+    alone, and a raise from this side lands in it until the next step.
+    """
+
+    tick: npt.NDArray[np.uint64]
+    faction: npt.NDArray[np.uint16]
+    kind: npt.NDArray[np.uint8]
+    objective_kind: npt.NDArray[np.uint8]
+    objective_q: npt.NDArray[np.int32]
+    objective_r: npt.NDArray[np.int32]
+    cohort_size: npt.NDArray[np.uint32]
+
 class UnitConvertedColumns(TypedDict):
     """One column for each field of a conversion event.
 
@@ -719,6 +755,14 @@ class World:
     def relation_log_columns(self) -> RelationCrossedColumns: ...
     @property
     def relation_crossed_count(self) -> int: ...
+    def raise_campaign(
+        self, faction: int, objective_q: int, objective_r: int, cohort: int
+    ) -> None: ...
+    def campaigns(self, faction: int) -> CampaignColumns: ...
+    def campaign_log_columns(self) -> CampaignEventColumns: ...
+    @property
+    def campaign_cohort_size(self) -> int: ...
+    def set_campaign_cohort_size(self, cohort: int) -> None: ...
     def draw(
         self,
         camera: Camera,

@@ -28,6 +28,7 @@
 //! [^5]: ADR-0002, simulated and aggregated state holds no floating point number, decision D2. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
 
 use crate::bridge::{BlockLayout, BridgeError, UnitTileBridge, BLOCK_BITS_DEFAULT};
+use crate::campaign::{self, CampaignEvent, CampaignRegister, CampaignRow};
 use crate::character::{CharacterArena, CharacterError};
 use crate::choose::{
     self, CarryClass, ChoiceError, ChoiceExplanation, ChoiceSchedule, NeedBuckets, Ranked,
@@ -83,7 +84,7 @@ use crate::trade::{
 };
 use crate::types::{Accum, Entity, FactionId, Fix32, Tick, TileIdx, FACTION_CEILING};
 use crate::unit_type::{
-    UnitTypeError, UnitTypeId, UnitTypeRow, UnitTypeTable, DEFAULT_UNIT_TYPE_TABLE,
+    UnitTypeError, UnitTypeId, UnitTypeRow, UnitTypeTable, DEFAULT_UNIT_TYPE_TABLE, SOLDIER,
 };
 use crate::upgrade::{self, UpgradeKind, UpgradeMap, UpgradeSite};
 use crate::weather::{Ground, Storm, WeatherError, WeatherField};
@@ -213,6 +214,54 @@ impl core::fmt::Display for MoveRelationError {
 }
 
 impl std::error::Error for MoveRelationError {}
+
+/// Why a campaign was not raised.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum CampaignError {
+    /// The number names no faction of this world.
+    NoSuchFaction(u16),
+    /// The objective address is outside the world.
+    OutsideWorld(Axial),
+    /// The cohort size is zero.
+    EmptyCohort,
+    /// The faction holds a live campaign.
+    LiveCampaign,
+    /// The faction has no idle unit to take.
+    NoIdleUnit,
+    /// The world holds no destination plane for the faction.
+    NoPlane(u16),
+    /// The send verb refused.
+    Send(SendError),
+}
+
+impl core::fmt::Display for CampaignError {
+    fn fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            Self::NoSuchFaction(faction) => {
+                write!(formatter, "{faction} names no faction of this world")
+            }
+            Self::OutsideWorld(address) => {
+                write!(formatter, "the objective {address:?} is outside the world")
+            }
+            Self::EmptyCohort => write!(formatter, "a cohort of zero raises nothing"),
+            Self::LiveCampaign => write!(formatter, "the faction holds a live campaign"),
+            Self::NoIdleUnit => write!(formatter, "the faction has no idle unit"),
+            Self::NoPlane(plane) => write!(
+                formatter,
+                "the world holds no destination plane {plane} for the faction"
+            ),
+            Self::Send(error) => error.fmt(formatter),
+        }
+    }
+}
+
+impl std::error::Error for CampaignError {}
+
+impl From<SendError> for CampaignError {
+    fn from(error: SendError) -> Self {
+        Self::Send(error)
+    }
+}
 
 impl core::fmt::Display for ConvertError {
     fn fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
@@ -970,6 +1019,13 @@ pub struct World {
     ///
     /// [^1]: ADR-0148, a game end is recorded once and stops the controllers, decision D1. `docs/adrs/accepted/adr-0148-a-game-end-is-recorded-once-and-stops-the-controllers.md`
     controller: Controller,
+    /// The campaign register: what each faction marches on, and with how
+    /// many. A later frame reads it, so it enters the hash.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0001, one binary gives one answer at any thread count, decision D4. `docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
+    campaigns: CampaignRegister,
 }
 
 impl World {
@@ -1040,6 +1096,7 @@ impl World {
             influence: InfluenceField::new(cell_lattice, config.faction_count)?,
             weather: WeatherField::new(cell_lattice, config.faction_count)?,
             controller: Controller::new(config.seed, config.faction_count),
+            campaigns: CampaignRegister::new(config.faction_count),
             schedule: RateSchedule::DEFAULT,
             rates: RateTable::new(),
             rate_ledger: RateLedger::ZERO,
@@ -3637,6 +3694,10 @@ impl World {
         //
         // [^18]: ADR-0148, a game end is recorded once and stops the controllers, decision D1. `docs/adrs/accepted/adr-0148-a-game-end-is-recorded-once-and-stops-the-controllers.md`
         let hash = self.controller.hash_into(hash);
+        // What each faction marches on is state that a later frame reads: the
+        // stage closes a campaign against the holder it recorded at the
+        // raise, and the raise refuses while one is live.
+        let hash = self.campaigns.hash_into(hash);
         // What each faction advertises is state that a controller reads. The
         // table holds no row until somebody advertises, and it then folds
         // nothing, so a world with no board hashes as it did before.
@@ -8873,6 +8934,16 @@ pub const SUBSYSTEM_CENSUS: &[CensusRow] = &[
         name: "wars_declared",
         read: |world| world.relations.declarations(),
     },
+    // The campaigns raised on the last tick, by the controller or by a
+    // caller, and the campaigns whose objective passed to the campaigner.
+    CensusRow {
+        name: "campaigns_raised",
+        read: |world| world.campaigns.count(campaign::EVENT_RAISED),
+    },
+    CensusRow {
+        name: "campaigns_won",
+        read: |world| world.campaigns.count(campaign::EVENT_WON),
+    },
 ];
 
 impl World {
@@ -8977,6 +9048,153 @@ impl World {
             }
         }
         refused
+    }
+
+    /// Raises a campaign: takes the idle units of a faction, makes them
+    /// soldiers and sends them at an objective tile.
+    ///
+    /// **This is the one path the controller and a Python caller share.**
+    /// The raise acts through the set form of the type verb and through the
+    /// send verb, and it writes one row of the campaign register.[^1]
+    ///
+    /// An idle unit is a live unit of the faction that nobody has sent
+    /// anywhere. The cohort is the lowest identities among them, up to the
+    /// count asked for, so two runs over one arena take one cohort. The scan
+    /// that finds them follows the population, as the verbs it feeds do.
+    ///
+    /// The cohort is sent on the destination plane whose number is the
+    /// faction number. A caller that sends its own set on that plane re-aims
+    /// the cohort.
+    ///
+    /// The objective kind is read from the tile: a settlement of the faction
+    /// itself makes a relief, and anything else makes a take. The holder of
+    /// the tile at the raise is recorded, and the campaign closes when the
+    /// holder changes.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the number names no faction, when the address is
+    /// outside the world, when the cohort size is zero, when the faction holds
+    /// a live campaign, when it has no idle unit, when the world holds no
+    /// destination plane for it, and when the send verb refuses.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0144, a faction controller runs inside the step and acts only through the caller's verbs, decision D2. `docs/adrs/accepted/adr-0144-a-faction-controller-runs-inside-the-step-and-acts-only-through-the-callers-verbs.md`
+    pub fn raise_campaign(
+        &mut self,
+        faction: FactionId,
+        objective: Axial,
+        cohort: u32,
+    ) -> Result<CampaignRow, CampaignError> {
+        if faction.0 >= self.config.faction_count.max(1) {
+            return Err(CampaignError::NoSuchFaction(faction.0));
+        }
+        let tile = self
+            .grid
+            .index_of(objective)
+            .ok_or(CampaignError::OutsideWorld(objective))?;
+        if cohort == 0 {
+            return Err(CampaignError::EmptyCohort);
+        }
+        if self.campaigns.live(faction).is_some() {
+            return Err(CampaignError::LiveCampaign);
+        }
+        let plane = faction.0;
+        if plane >= self.destinations.plane_count() {
+            return Err(CampaignError::NoPlane(plane));
+        }
+        // The lowest identities among the idle units. The arena walks in
+        // slot order, and the sort puts the generation above the slot, so
+        // the choice is a property of the identities and not of the slots.
+        let mut idle: Vec<Entity> = self
+            .soldiers
+            .iter_faction(faction)
+            .filter(|unit| self.soldiers.sent(*unit) == Some(None))
+            .collect();
+        if idle.is_empty() {
+            return Err(CampaignError::NoIdleUnit);
+        }
+        idle.sort_unstable_by_key(|unit| unit.to_bits());
+        idle.truncate(cohort as usize);
+        let objective_kind = if self
+            .settlements
+            .on_tile(objective)
+            .and_then(|site| self.settlements.faction(site))
+            == Some(faction)
+        {
+            campaign::OBJECTIVE_RELIEVE_SITE
+        } else {
+            campaign::OBJECTIVE_TAKE_SITE
+        };
+        let holder_at_raise = self
+            .holding
+            .holder(objective)
+            .and_then(Holder::faction)
+            .map_or(campaign::NO_HOLDER, |holder| holder.0);
+        self.set_unit_type_set(&idle, SOLDIER);
+        self.send_units_to(&idle, &[objective], plane)?;
+        let row = CampaignRow {
+            raised_at: self.tick,
+            objective_tile: tile.0,
+            cohort_size: idle.len() as u32,
+            faction,
+            holder_at_raise,
+            objective_kind,
+            state: campaign::STATE_LIVE,
+            padding: [0; 2],
+        };
+        assert!(
+            self.campaigns.open(row),
+            "the faction exists and holds no live campaign, so the register takes the row"
+        );
+        self.campaigns.push(CampaignEvent {
+            tick: self.tick,
+            objective_tile: tile.0,
+            cohort_size: row.cohort_size,
+            faction,
+            kind: campaign::EVENT_RAISED,
+            objective_kind,
+            padding: [0; 4],
+        });
+        Ok(row)
+    }
+
+    /// Returns the campaign rows of one faction, in slot order. Empty when the
+    /// world has no such faction.
+    #[must_use]
+    pub fn campaigns_of(&self, faction: FactionId) -> &[CampaignRow] {
+        self.campaigns.rows_of(faction)
+    }
+
+    /// Returns what happened to the campaigns on the last step, in the order
+    /// it happened.
+    #[must_use]
+    pub fn campaign_log(&self) -> &[CampaignEvent] {
+        self.campaigns.log()
+    }
+
+    /// Returns the campaign log as bytes, for the byte comparison the
+    /// thread-count test makes.
+    #[must_use]
+    pub fn campaign_log_bytes(&self) -> &[u8] {
+        self.campaigns.log_bytes()
+    }
+
+    /// Returns how many units the controller takes when it raises a
+    /// campaign.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: Balance register, the campaign cohort size. `docs/reference/balance.md`
+    #[must_use]
+    pub const fn campaign_cohort_size(&self) -> u32 {
+        self.campaigns.cohort_size()
+    }
+
+    /// Sets how many units the controller takes when it raises a campaign.
+    pub const fn set_campaign_cohort_size(&mut self, cohort: u32) {
+        self.campaigns.set_cohort_size(cohort);
     }
 
     /// Returns the weight vector of one faction, or `None` when the world
@@ -9121,6 +9339,7 @@ impl World {
     /// [^2]: ADR-0144, a faction controller runs inside the step and acts only through the caller's verbs, decisions D2, D4 and D5. `docs/adrs/accepted/adr-0144-a-faction-controller-runs-inside-the-step-and-acts-only-through-the-callers-verbs.md`
     fn run_controller(&mut self) {
         self.controller.clear_log();
+        self.campaigns.clear_log();
         self.check_game_end();
         let tick = self.tick;
         let factions = usize::from(self.config.faction_count.max(1));
@@ -9128,8 +9347,13 @@ impl World {
         // faction: its lowest-slot live unit whose type has command reach.
         // The gate reads the type column of the units and no flag.[^3]
         //
+        // The same scan gathers the cohort of each faction: the live units
+        // sent on the plane whose number is the faction number. No second
+        // scan is made for it.
+        //
         // [^3]: ADR-0145, a unit type is a row of capability columns, and zero means cannot, decision D3. `docs/adrs/accepted/adr-0145-a-unit-type-is-a-row-of-capability-columns-and-zero-means-cannot.md`
         let mut speakers: Vec<Option<Entity>> = vec![None; factions];
+        let mut cohorts: Vec<Vec<Entity>> = vec![Vec::new(); factions];
         for entity in self.soldiers.iter() {
             let (Some(faction), Some(unit_type)) = (
                 self.soldiers.faction(entity),
@@ -9138,13 +9362,18 @@ impl World {
                 continue;
             };
             let index = usize::from(faction.0);
-            if index < factions
-                && speakers[index].is_none()
-                && self.unit_types.row(unit_type).command_reach > 0
-            {
+            if index >= factions {
+                continue;
+            }
+            if speakers[index].is_none() && self.unit_types.row(unit_type).command_reach > 0 {
                 speakers[index] = Some(entity);
             }
+            if self.soldiers.sent(entity) == Some(Some(faction.0)) {
+                cohorts[index].push(entity);
+            }
         }
+        self.close_campaigns(&cohorts);
+        let objectives = self.campaign_objectives();
         // The rival of a faction is the other faction with the most held
         // tiles. A faction with no speaker has no rival, because the verb
         // would refuse it.
@@ -9157,7 +9386,9 @@ impl World {
                 controller::rival_of(FactionId(index as u16), held.iter().copied())
             })
             .collect();
-        let plan = self.controller.plan(self.config.seed, tick, &rivals);
+        let plan = self
+            .controller
+            .plan(self.config.seed, tick, &rivals, &objectives);
         if plan.is_empty() {
             return;
         }
@@ -9194,6 +9425,16 @@ impl World {
                             .is_ok()
                     })
                 }
+                // The raise goes through the one core function a caller
+                // uses. The cohort size is a balance value.[^5]
+                //
+                // [^5]: Balance register, the campaign cohort size. `docs/reference/balance.md`
+                Choice::Campaign { tile, .. } => {
+                    let cohort = self.campaigns.cohort_size();
+                    self.grid.address_of(tile).is_some_and(|address| {
+                        self.raise_campaign(faction, address, cohort).is_ok()
+                    })
+                }
             };
             let applied = u8::from(applied);
             sets[usize::from(faction.0)] = set;
@@ -9208,6 +9449,125 @@ impl World {
                 padding: [0; 7],
             });
         }
+    }
+
+    /// Closes every live campaign whose objective changed holder or whose
+    /// cohort fell, and stops sending the survivors.
+    ///
+    /// The cohorts are the units sent on the plane of each faction, as the
+    /// one scan of the stage found them. A campaign whose objective passed to
+    /// the campaigner is won. One whose objective passed to anyone else has
+    /// ended. One whose cohort is empty is lost. The survivors go back to the
+    /// option they chose for themselves, through the stop verb a caller has.
+    fn close_campaigns(&mut self, cohorts: &[Vec<Entity>]) {
+        let tick = self.tick;
+        for (index, cohort) in cohorts.iter().enumerate() {
+            let faction = FactionId(index as u16);
+            let Some(row) = self.campaigns.live(faction) else {
+                continue;
+            };
+            let holder = self
+                .grid
+                .address_of(TileIdx(row.objective_tile))
+                .and_then(|address| self.holding.holder(address))
+                .and_then(Holder::faction)
+                .map_or(campaign::NO_HOLDER, |holder| holder.0);
+            let (state, kind) = if holder != row.holder_at_raise {
+                if holder == faction.0 {
+                    (campaign::STATE_WON, campaign::EVENT_WON)
+                } else {
+                    (campaign::STATE_ENDED, campaign::EVENT_ENDED)
+                }
+            } else if cohort.is_empty() {
+                (campaign::STATE_LOST, campaign::EVENT_LOST)
+            } else {
+                continue;
+            };
+            self.campaigns.close(faction, state);
+            // Every survivor is live, because the scan found it live on this
+            // tick, so the stop verb refuses nothing.
+            let _ = self.stop_sending(cohort);
+            self.campaigns.push(CampaignEvent {
+                tick,
+                objective_tile: row.objective_tile,
+                cohort_size: row.cohort_size,
+                faction,
+                kind,
+                objective_kind: row.objective_kind,
+                padding: [0; 4],
+            });
+        }
+    }
+
+    /// Chooses, for each faction, the objective it would march on.
+    ///
+    /// A faction with no seat, with a live campaign, or with no pair in the
+    /// war band gets none.[^1] Otherwise an own settlement whose ground a
+    /// faction at war holds is a relief, and the nearest enemy settlement is
+    /// a take. The relief comes first. Nearest is the hex distance from the
+    /// seat, and a tie goes to the lowest settlement slot. The scan walks the
+    /// settlements and no unit, so it follows the site count.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0146, a faction relation is one signed integer per ordered pair, and a pass reads a threshold, decision D2. `docs/adrs/draft/adr-0146-a-faction-relation-is-one-signed-integer-per-ordered-pair-and-a-pass-reads-a-threshold.md`
+    fn campaign_objectives(&self) -> Vec<Option<(u8, TileIdx)>> {
+        let count = self.config.faction_count.max(1);
+        let sites: Vec<(u32, FactionId, TileIdx)> = self
+            .settlements
+            .iter()
+            .filter_map(|site| {
+                Some((
+                    self.settlements.slot_of(site)?,
+                    self.settlements.faction(site)?,
+                    self.settlements.tile(site)?,
+                ))
+            })
+            .collect();
+        (0..count)
+            .map(|index| {
+                let faction = FactionId(index);
+                let seat = self.seat(faction)?;
+                if self.campaigns.live(faction).is_some() {
+                    return None;
+                }
+                let at_war = |other: FactionId| {
+                    other != faction && self.relations.war_between(faction, other)
+                };
+                if !(0..count).any(|other| at_war(FactionId(other))) {
+                    return None;
+                }
+                let seat = self.grid.address_of(seat)?;
+                let distance = |tile: TileIdx| {
+                    self.grid
+                        .address_of(tile)
+                        .map_or(u32::MAX, |address| seat.distance(address))
+                };
+                let holder_at_war = |tile: TileIdx| {
+                    self.grid
+                        .address_of(tile)
+                        .and_then(|address| self.holding.holder(address))
+                        .and_then(Holder::faction)
+                        .is_some_and(at_war)
+                };
+                let relief = campaign::nearest_site(
+                    sites
+                        .iter()
+                        .filter(|(_, owner, tile)| *owner == faction && holder_at_war(*tile))
+                        .map(|(slot, _, tile)| (distance(*tile), *slot, *tile)),
+                );
+                if let Some(tile) = relief {
+                    return Some((campaign::OBJECTIVE_RELIEVE_SITE, tile));
+                }
+                campaign::nearest_site(
+                    sites
+                        .iter()
+                        .filter(|(_, owner, _)| at_war(*owner))
+                        .map(|(slot, _, tile)| (distance(*tile), *slot, *tile)),
+                )
+                .map(|tile| (campaign::OBJECTIVE_TAKE_SITE, tile))
+            })
+            .collect()
     }
 
     /// Runs the game end readers, while the record is empty.

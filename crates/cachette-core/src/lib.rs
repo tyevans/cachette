@@ -15,6 +15,7 @@
 //! [^3]: ADR-0002, simulated and aggregated state holds no floating point number, decision D1. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
 
 pub mod bridge;
+pub mod campaign;
 pub mod census;
 pub mod character;
 pub mod choose;
@@ -70,8 +71,8 @@ pub use cohort::{
 pub use contest::{ContestError, Grievance, UnitFell};
 pub use controller::{
     Choice, ControllerCommand, FactionRow, FactionWeights, GameEnd, WinPath, COMMAND_BUILD,
-    COMMAND_GATHER, COMMAND_RELATION, EVALUATIONS_DEFAULT, TICK_LIMIT_DEFAULT, WEIGHT_HIGH,
-    WEIGHT_LOW,
+    COMMAND_CAMPAIGN, COMMAND_GATHER, COMMAND_RELATION, EVALUATIONS_DEFAULT, TICK_LIMIT_DEFAULT,
+    WEIGHT_HIGH, WEIGHT_LOW,
 };
 pub use conversion::{ConversionError, Convert, UnitConverted};
 pub use descent::{
@@ -128,6 +129,6 @@ pub use weather::{
     WET_MARK,
 };
 pub use world::{
-    CensusRow, ConvertError, IdentityError, MoveRelationError, StepError, World, WorldConfig,
-    WorldError, FOUNDING_GROUP_DEFAULT, LUXURY_DEPOSITS_DEFAULT, SUBSYSTEM_CENSUS,
+    CampaignError, CensusRow, ConvertError, IdentityError, MoveRelationError, StepError, World,
+    WorldConfig, WorldError, FOUNDING_GROUP_DEFAULT, LUXURY_DEPOSITS_DEFAULT, SUBSYSTEM_CENSUS,
 };

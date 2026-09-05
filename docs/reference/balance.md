@@ -36,7 +36,9 @@ BLK-150, which asks what raises and lowers renown.[^6]
 | Advertisement schedule, period and phase | The controller, when it writes its board | unset, pass 10 | — | |
 | Surplus mark, the store above which a site offers | The controller pricing rule | unset, pass 10 | — | |
 | Land list bound, the most tiles in one land consideration | The trade verbs, when they refuse a land offer | unset, pass 10 | — | |
-| Campaign register size per faction | The campaign register | unset, pass 10 | — | |
+| Campaign register size per faction | The campaign register | unset, pass 10 | — | Provisional default of 2 written by pass 7: one row for the live campaign, and one so that the last closed campaign stays readable after the next raise. A faction holds at most one live campaign, so one row would serve and two keeps the outcome. Pass 10 measures it. |
+| Campaign cohort size, the units one raise takes | The controller, when it raises a campaign | unset, pass 10 | BLK-050 | Provisional default of 4 written by pass 7, half the default founding group of a test fixture, so a raise leaves the site peopled. The rules of the downstream game are not written down, so BLK-050 governs it. A caller sets it with `set_campaign_cohort_size`. Pass 10 measures it. |
+| Campaign cadence, the draw that raises one | The controller, when it draws for a campaign | unset, pass 10 | BLK-050 | Provisional shape written by pass 7: one keyed draw for each faction on each tick at war, yes with probability war weight over the weight range top plus the war weight, the shape the relation move already uses. No separate period exists. BLK-050 governs it. Pass 10 measures it. |
 
 ## The relation
 
