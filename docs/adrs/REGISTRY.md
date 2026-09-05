@@ -406,6 +406,8 @@ without stating a constraint is worse than no record.
 | 0148 | A game end is recorded once and stops the controllers | Accepted | 0001, 0004, 0023, 0053, 0144 | `accepted/adr-0148-a-game-end-is-recorded-once-and-stops-the-controllers.md` |
 | 0149 | A faction's trade board is simulated state that any faction may read | Draft | 0002, 0004, 0144, 0147 | `draft/adr-0149-a-factions-trade-board-is-simulated-state-that-any-faction-may-read.md` |
 | 0150 | Held ground is the ground within reach of a city its faction owns, and upgrades extend the reach to a bound. Supersedes ADR-0053 D5 and D6, the spread rule; the other decisions of ADR-0053 stand | Draft | 0002, 0004, 0053, 0090, 0111, 0144, 0145, 0147 | `draft/adr-0150-held-ground-is-the-ground-within-reach-of-a-city-its-faction-owns.md` |
+| 0151 | An upgrade is a category with a ground fit and a level, and a build order names the category | Draft | 0002, 0004, 0088, 0090, 0144, 0145 | `draft/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md` |
+| 0152 | A faction plans its roads and zones with one solver, and a unit builds only what the plan zones | Draft | 0001, 0004, 0005, 0090, 0144, 0151 | `draft/adr-0152-a-faction-plans-its-roads-and-zones-with-one-solver.md` |
 
 ### Retired numbers
 
