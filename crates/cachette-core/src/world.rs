@@ -74,9 +74,11 @@ use crate::stage::{self, Stage};
 use crate::terrain::{Terrain, TerrainTile, TileKind};
 use crate::tile_value::{TileValueChunk, TileValues};
 use crate::trade::{
-    self, TradeError, TradeRow, TradeSpoken, TradeTable, ACT_ACCEPT, ACT_CLOSE, ACT_COUNTER,
-    ACT_DEFAULT, ACT_OFFER, ACT_REFUSE, ACT_REOPEN, ACT_SETTLE, TRADE_BOUND, TRADE_COUNTERED,
-    TRADE_DEFAULTED, TRADE_IDLE, TRADE_OFFERED, TRADE_SETTLED,
+    self, Advert, Consideration, MarketTable, TradeError, TradeRow, TradeSpoken, TradeTable,
+    ACT_ACCEPT, ACT_CLOSE, ACT_COUNTER, ACT_DEFAULT, ACT_OFFER, ACT_REFUSE, ACT_REOPEN, ACT_SETTLE,
+    ACT_STEP_RELATION, ACT_TRANSFER_LAND, DEFAULT_BOARD_ROWS, DEFAULT_LAND_LIST_BOUND, KIND_LAND,
+    KIND_RELATION, KIND_RESOURCE, TRADE_BOUND, TRADE_COUNTERED, TRADE_DEFAULTED, TRADE_IDLE,
+    TRADE_OFFERED, TRADE_SETTLED,
 };
 use crate::types::{Accum, Entity, FactionId, Fix32, Tick, TileIdx, FACTION_CEILING};
 use crate::unit_type::{
@@ -888,6 +890,25 @@ pub struct World {
     trade: TradeTable,
     /// What the last step said about trade.
     trade_log: Vec<TradeSpoken>,
+    /// What each faction offers and wants, one fixed block of rows for each.
+    ///
+    /// The table holds nothing until a faction advertises. It is simulated
+    /// state and it enters the hash, because a controller of a later pass
+    /// reads it inside the step.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0126, a trade negotiation is engine state and the words are not, decision D1. `docs/adrs/draft/adr-0126-a-trade-negotiation-is-engine-state.md`
+    market: MarketTable,
+    /// The most tiles one land consideration names.
+    ///
+    /// The bound is a balance value and the register calls it unset.[^1] The
+    /// value here is a stand-in that a caller replaces.
+    ///
+    /// # References
+    ///
+    /// [^1]: Balance register, land list bound. `docs/reference/balance.md`
+    land_list_bound: u32,
     /// The water in the air and on the ground, over the level 1 cells.
     ///
     /// The field is a plane over the level 1 cell lattice and it is not a
@@ -1010,6 +1031,8 @@ impl World {
             store_account: [Accum(0); COMMODITY_COUNT],
             trade: TradeTable::new(config.faction_count),
             trade_log: Vec::new(),
+            market: MarketTable::new(config.faction_count, DEFAULT_BOARD_ROWS),
+            land_list_bound: DEFAULT_LAND_LIST_BOUND,
         };
         // A world that has never stepped still answers a question about a
         // region. A level that nothing rebuilt would describe an empty world
@@ -3462,6 +3485,10 @@ impl World {
         //
         // [^18]: ADR-0148, a game end is recorded once and stops the controllers, decision D1. `docs/adrs/accepted/adr-0148-a-game-end-is-recorded-once-and-stops-the-controllers.md`
         let hash = self.controller.hash_into(hash);
+        // What each faction advertises is state that a controller reads. The
+        // table holds no row until somebody advertises, and it then folds
+        // nothing, so a world with no board hashes as it did before.
+        let hash = self.market.hash_into(hash);
         // The water in the air and on the ground is state that a later frame
         // reads: the next solve starts from the field this one left. Two
         // worlds that hold the same tiles and different weather must
@@ -3632,6 +3659,10 @@ impl World {
             return false;
         }
         if self.trade.factions() != self.config.faction_count {
+            return false;
+        }
+        // The board is either empty or one block for each faction.
+        if !self.market.check_invariants() {
             return false;
         }
         if !self.check_store_conservation() {
@@ -5669,12 +5700,54 @@ impl World {
         take_amount: u32,
         term: u32,
     ) -> Result<(), TradeError> {
+        self.offer_consideration(
+            proposer,
+            responder,
+            Consideration::resource(give_kind, give_amount),
+            Consideration::resource(take_kind, take_amount),
+            term,
+        )
+    }
+
+    /// Opens a negotiation from one faction toward another, with a tagged
+    /// consideration on each side.
+    ///
+    /// **Each side is one tag and the content the tag names.**[^1] A resource
+    /// side is a kind and a quantity, and a unit carries it. A land side is a
+    /// list of tiles that the debtor holds, and the holder changes when the
+    /// other side is delivered in full. A relation side is stored and applies
+    /// as a logged no-op until the relation matrix exists.
+    ///
+    /// The give side is what the proposer owes and the take side is what the
+    /// responder owes. A land side is checked against its debtor: every tile
+    /// of the give side must be held by the proposer, and every tile of the
+    /// take side by the responder.[^2] A land side whose tiles carry an
+    /// upgrade is refused while the question of what happens to the upgrade
+    /// is open.[^3]
+    ///
+    /// # Errors
+    ///
+    /// Returns every error the resource verb returns, and also an error when
+    /// a tag names no kind, when a land side is empty or names more tiles than
+    /// the bound, when a tile lies outside the world, when the debtor does not
+    /// hold a tile, or when a tile carries an upgrade.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0147, a contract consideration is a tagged kind, decision D1. `docs/adrs/draft/adr-0147-a-contract-consideration-is-a-tagged-kind.md`
+    /// [^2]: ADR-0147, a contract consideration is a tagged kind, decision D4. `docs/adrs/draft/adr-0147-a-contract-consideration-is-a-tagged-kind.md`
+    /// [^3]: Blockers register, BLK-036. `docs/BLOCKERS.md`
+    pub fn offer_consideration(
+        &mut self,
+        proposer: FactionId,
+        responder: FactionId,
+        give: Consideration,
+        take: Consideration,
+        term: u32,
+    ) -> Result<(), TradeError> {
         self.check_pair(proposer, responder)?;
-        let give = trade::kind_of(give_kind)?;
-        let take = trade::kind_of(take_kind)?;
-        if give_amount == 0 || take_amount == 0 {
-            return Err(TradeError::EmptyTerms);
-        }
+        let give = self.check_consideration(proposer, give)?;
+        let take = self.check_consideration(responder, take)?;
         if term == 0 {
             return Err(TradeError::NoDeadline);
         }
@@ -5692,21 +5765,205 @@ impl World {
             return Err(TradeError::NoPresence);
         }
         let tick = self.tick;
+        let index = self
+            .trade
+            .index_of(proposer, responder)
+            .ok_or(TradeError::NoSuchFaction(proposer))?;
         let entry = self
             .trade
             .row_mut(proposer, responder)
             .ok_or(TradeError::NoSuchFaction(proposer))?;
         entry.clear();
         entry.opened = tick;
-        entry.give_kind = give.to_u8();
-        entry.take_kind = take.to_u8();
-        entry.give_amount = give_amount;
-        entry.take_amount = take_amount;
+        entry.give_tag = give.tag;
+        entry.give_kind = give.kind;
+        entry.give_amount = give.amount;
+        entry.take_tag = take.tag;
+        entry.take_kind = take.kind;
+        entry.take_amount = take.amount;
         entry.term = term;
         entry.status = TRADE_OFFERED;
         entry.rounds = 1;
+        self.trade.set_land(index, false, give.tiles);
+        self.trade.set_land(index, true, take.tiles);
         self.say(proposer, responder, ACT_OFFER, TRADE_OFFERED);
         Ok(())
+    }
+
+    /// Checks one side of a contract against its debtor and returns it in
+    /// the form the plane stores.
+    ///
+    /// A land side comes back sorted and without a repeated tile, and its
+    /// amount is the tile count. The other kinds come back as given.
+    fn check_consideration(
+        &self,
+        debtor: FactionId,
+        mut side: Consideration,
+    ) -> Result<Consideration, TradeError> {
+        match side.tag {
+            KIND_RESOURCE => {
+                trade::kind_of(side.kind)?;
+                if side.amount == 0 {
+                    return Err(TradeError::EmptyTerms);
+                }
+                side.tiles.clear();
+            }
+            KIND_LAND => {
+                side.tiles.sort_unstable();
+                side.tiles.dedup();
+                if side.tiles.is_empty() {
+                    return Err(TradeError::EmptyTerms);
+                }
+                let count = u32::try_from(side.tiles.len()).unwrap_or(u32::MAX);
+                if count > self.land_list_bound {
+                    return Err(TradeError::TooMuchLand(count, self.land_list_bound));
+                }
+                let holders = self.holding.holders();
+                let wanted = Holder::of(debtor);
+                for tile in &side.tiles {
+                    let Some(holder) = holders.get(tile.0 as usize) else {
+                        return Err(TradeError::NoSuchTile);
+                    };
+                    if *holder != wanted {
+                        return Err(TradeError::LandNotHeld(*tile));
+                    }
+                    // Whether an upgrade goes with the ground is open, and
+                    // the project owner holds the question. The engine
+                    // refuses the trade until it is answered. The commit that
+                    // answers it removes this check and the error variant,
+                    // and it searches the tree for the blocker number.[^1]
+                    //
+                    // [^1]: Blockers register, BLK-036. `docs/BLOCKERS.md`
+                    if self.upgrades.at(*tile).is_some() {
+                        return Err(TradeError::UpgradeOnLand(*tile));
+                    }
+                }
+                side.kind = 0;
+                side.amount = count;
+            }
+            KIND_RELATION => {
+                if side.amount == 0 {
+                    return Err(TradeError::EmptyTerms);
+                }
+                side.tiles.clear();
+            }
+            other => return Err(TradeError::NoSuchTag(other)),
+        }
+        Ok(side)
+    }
+
+    /// Returns every tile of the level 1 cell that covers one address, in
+    /// ascending tile index.
+    ///
+    /// A cell on the world edge is partial, and the call returns the tiles
+    /// that exist. This is the set a land side names when it names a cell.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the address lies outside the world.
+    pub fn cell_tiles(&self, address: Axial) -> Result<Vec<TileIdx>, TradeError> {
+        let layout = self.pyramid.layout();
+        let tile = self.grid.index_of(address).ok_or(TradeError::NoSuchCell)?;
+        let key = layout.key_of(tile).ok_or(TradeError::NoSuchCell)?;
+        let block = layout.block_of_key(key);
+        let edge = layout.block_edge();
+        let across = block % layout.blocks_wide();
+        let down = block / layout.blocks_wide();
+        let first_q = across * edge;
+        let last_q = (first_q + edge).min(self.grid.width());
+        let first_r = down * edge;
+        let last_r = (first_r + edge).min(self.grid.height());
+        let mut tiles = Vec::with_capacity((edge * edge) as usize);
+        for r in first_r..last_r {
+            for q in first_q..last_q {
+                let here = Axial::new(
+                    i32::try_from(q).map_err(|_| TradeError::NoSuchCell)?,
+                    i32::try_from(r).map_err(|_| TradeError::NoSuchCell)?,
+                );
+                tiles.push(self.grid.index_of(here).ok_or(TradeError::NoSuchCell)?);
+            }
+        }
+        Ok(tiles)
+    }
+
+    /// Returns the tiles of one side of one ordered pair. The give side is
+    /// `false` and the take side is `true`.
+    ///
+    /// A side that is not land answers an empty slice, and so does a pair
+    /// that names no faction.
+    #[must_use]
+    pub fn trade_land(
+        &self,
+        proposer: FactionId,
+        responder: FactionId,
+        take_side: bool,
+    ) -> &[TileIdx] {
+        match self.trade.index_of(proposer, responder) {
+            Some(index) => self.trade.land_of(index, take_side),
+            None => &[],
+        }
+    }
+
+    /// Returns the most tiles one land consideration may name.
+    #[must_use]
+    pub const fn land_list_bound(&self) -> u32 {
+        self.land_list_bound
+    }
+
+    /// Sets the most tiles one land consideration may name.
+    ///
+    /// The bound is a balance value and not a budget.[^1] A bound of zero
+    /// refuses every land side.
+    ///
+    /// # References
+    ///
+    /// [^1]: Balance register, land list bound. `docs/reference/balance.md`
+    pub fn set_land_list_bound(&mut self, bound: u32) {
+        self.land_list_bound = bound;
+    }
+
+    /// Returns how many advertisement rows one faction's board holds.
+    #[must_use]
+    pub const fn board_rows(&self) -> u16 {
+        self.market.bound()
+    }
+
+    /// Sets how many advertisement rows one faction's board holds.
+    ///
+    /// The row count is a balance value and not a budget.[^1] A change
+    /// empties every board, because the table is laid out by the bound.
+    ///
+    /// # References
+    ///
+    /// [^1]: Balance register, board size. `docs/reference/balance.md`
+    pub fn set_board_rows(&mut self, rows: u16) {
+        self.market.set_bound(rows);
+    }
+
+    /// Replaces the whole board of one faction.
+    ///
+    /// A board says what a faction offers and wants. It is a statement and
+    /// not a speech act, so it passes no presence gate and costs no standing.
+    /// A reader of another faction's board learns what that faction posted
+    /// and nothing else.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the faction names no faction of this world, when
+    /// the rows outnumber the bound, when a good names no resource kind, or
+    /// when a row names neither offers nor wants. No row changes on an error.
+    pub fn advertise(&mut self, faction: FactionId, rows: &[Advert]) -> Result<(), TradeError> {
+        self.check_faction(faction)?;
+        self.market.advertise(faction, rows)
+    }
+
+    /// Returns the board of one faction, empty rows included.
+    ///
+    /// The slice is empty for a faction that never advertised and for a
+    /// number that names no faction.
+    #[must_use]
+    pub fn market(&self, faction: FactionId) -> &[Advert] {
+        self.market.board(faction)
     }
 
     /// Restates the terms of a live negotiation.
@@ -5730,13 +5987,37 @@ impl World {
         take_kind: u8,
         take_amount: u32,
     ) -> Result<(), TradeError> {
+        self.counter_consideration(
+            speaker,
+            other,
+            Consideration::resource(give_kind, give_amount),
+            Consideration::resource(take_kind, take_amount),
+        )
+    }
+
+    /// Restates the terms of a live negotiation, with a tagged consideration
+    /// on each side.
+    ///
+    /// The terms are stated in the orientation of the row, whoever speaks.
+    /// The give side is what the party that opened the pair owes, and a land
+    /// side is checked against that party. The take side is what the other
+    /// party owes, and a land side is checked against it.
+    ///
+    /// # Errors
+    ///
+    /// Returns every error the resource verb returns, and every error the
+    /// tagged offer returns for a side.
+    pub fn counter_consideration(
+        &mut self,
+        speaker: FactionId,
+        other: FactionId,
+        give: Consideration,
+        take: Consideration,
+    ) -> Result<(), TradeError> {
         self.check_pair(speaker, other)?;
-        let give = trade::kind_of(give_kind)?;
-        let take = trade::kind_of(take_kind)?;
-        if give_amount == 0 || take_amount == 0 {
-            return Err(TradeError::EmptyTerms);
-        }
         let (proposer, responder) = self.live_orientation(speaker, other)?;
+        let give = self.check_consideration(proposer, give)?;
+        let take = self.check_consideration(responder, take)?;
         let row = self
             .trade
             .row(proposer, responder)
@@ -5755,16 +6036,24 @@ impl World {
         } else {
             TRADE_OFFERED
         };
+        let index = self
+            .trade
+            .index_of(proposer, responder)
+            .ok_or(TradeError::NothingOpen)?;
         let entry = self
             .trade
             .row_mut(proposer, responder)
             .ok_or(TradeError::NothingOpen)?;
-        entry.give_kind = give.to_u8();
-        entry.take_kind = take.to_u8();
-        entry.give_amount = give_amount;
-        entry.take_amount = take_amount;
+        entry.give_tag = give.tag;
+        entry.give_kind = give.kind;
+        entry.give_amount = give.amount;
+        entry.take_tag = take.tag;
+        entry.take_kind = take.kind;
+        entry.take_amount = take.amount;
         entry.status = status;
         entry.rounds = entry.rounds.saturating_add(1);
+        self.trade.set_land(index, false, give.tiles);
+        self.trade.set_land(index, true, take.tiles);
         self.say(proposer, responder, ACT_COUNTER, status);
         Ok(())
     }
@@ -5834,11 +6123,16 @@ impl World {
         if !self.stands_in_territory_of(speaker, other) {
             return Err(TradeError::NoPresence);
         }
+        let index = self
+            .trade
+            .index_of(proposer, responder)
+            .ok_or(TradeError::NothingOpen)?;
         let entry = self
             .trade
             .row_mut(proposer, responder)
             .ok_or(TradeError::NothingOpen)?;
         entry.clear();
+        self.trade.clear_land(index);
         self.say(proposer, responder, ACT_REFUSE, TRADE_IDLE);
         Ok(())
     }
@@ -5891,11 +6185,16 @@ impl World {
             return Err(TradeError::NoPresence);
         }
         let until = Tick(self.tick.0.saturating_add(u64::from(ticks)));
+        let index = self
+            .trade
+            .index_of(proposer, responder)
+            .ok_or(TradeError::NothingOpen)?;
         let entry = self
             .trade
             .row_mut(proposer, responder)
             .ok_or(TradeError::NothingOpen)?;
         entry.clear();
+        self.trade.clear_land(index);
         // The closure sits on the row the other party would open, which is
         // the pair with the other party first. Writing it on the live row
         // would close the speaker's own door and leave the other party free
@@ -5986,8 +6285,103 @@ impl World {
             return Ok(());
         }
         self.carry_contract_loads(threads)?;
+        self.apply_priced_sides(threads);
         self.fail_overdue_contracts();
         Ok(())
+    }
+
+    /// Applies every land set and every relation step whose price has
+    /// arrived.
+    ///
+    /// **A side that no unit carries applies when the other side is delivered
+    /// in full.**[^1] A land set applies by giving every tile in it to the
+    /// creditor, in ascending tile index. A relation step applies as a logged
+    /// no-op, because the relation matrix arrives with a later pass; the log
+    /// entry is the record that the side was delivered, and nothing else
+    /// moves. When neither side is carried, both apply on the first pass
+    /// after the contract binds.
+    ///
+    /// The walk is over the plane in pair order, after the carriers of this
+    /// tick have delivered and before the deadline check, so a contract whose
+    /// resource side settles this tick delivers its land this tick. The order
+    /// between two land sets that name one tile is the pair order, and no
+    /// thread and no hash order enters it.[^2]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0147, a contract consideration is a tagged kind, decision D3. `docs/adrs/draft/adr-0147-a-contract-consideration-is-a-tagged-kind.md`
+    /// [^2]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
+    fn apply_priced_sides(&mut self, threads: usize) {
+        let count = self.trade.rows().len();
+        for index in 0..count {
+            let Some(row) = self.trade.row_at(index) else {
+                continue;
+            };
+            if !row.is_bound() {
+                continue;
+            }
+            let (proposer, responder) = self.pair_of(index);
+            let responder_done = row.owed_by_responder() == 0 || !row.responder_side_is_carried();
+            let proposer_done = row.owed_by_proposer() == 0 || !row.proposer_side_is_carried();
+            let mut applied = false;
+            if !row.proposer_side_is_carried() && row.owed_by_proposer() > 0 && responder_done {
+                self.apply_side(index, false, responder, row.give_tag, threads);
+                applied = true;
+            }
+            if !row.responder_side_is_carried() && row.owed_by_responder() > 0 && proposer_done {
+                self.apply_side(index, true, proposer, row.take_tag, threads);
+                applied = true;
+            }
+            if !applied {
+                continue;
+            }
+            let paid = self.trade.row_at_mut(index).is_some_and(|entry| {
+                if entry.is_paid() {
+                    entry.status = TRADE_SETTLED;
+                    true
+                } else {
+                    false
+                }
+            });
+            if paid {
+                self.say(proposer, responder, ACT_SETTLE, TRADE_SETTLED);
+            }
+        }
+    }
+
+    /// Applies one side that no unit carries, and marks it delivered.
+    fn apply_side(
+        &mut self,
+        index: usize,
+        take_side: bool,
+        creditor: FactionId,
+        tag: u8,
+        threads: usize,
+    ) {
+        let act = match tag {
+            KIND_LAND => {
+                let tiles = self.trade.land_of(index, take_side).to_vec();
+                self.holding.transfer(&tiles, Holder::of(creditor), threads);
+                ACT_TRANSFER_LAND
+            }
+            KIND_RELATION => {
+                // The relation matrix does not exist yet. The step is stored
+                // and logged, and it moves nothing. A later pass replaces this
+                // arm with the move, and until then this side is inert on
+                // purpose.
+                ACT_STEP_RELATION
+            }
+            _ => return,
+        };
+        if let Some(entry) = self.trade.row_at_mut(index) {
+            if take_side {
+                entry.taken = entry.take_amount;
+            } else {
+                entry.given = entry.give_amount;
+            }
+        }
+        let (proposer, responder) = self.pair_of(index);
+        self.say(proposer, responder, act, TRADE_BOUND);
     }
 
     /// Returns every delivery a bound contract admits this tick, in slot
@@ -6041,6 +6435,18 @@ impl World {
                 continue;
             }
             let owes_as_proposer = faction == proposer;
+            // Only a resource is carried. A land set and a relation step
+            // apply in the pass that follows the carriers, and a load
+            // delivered against either would pay a debt that no unit can
+            // pay.
+            let carried = if owes_as_proposer {
+                row.proposer_side_is_carried()
+            } else {
+                row.responder_side_is_carried()
+            };
+            if !carried {
+                continue;
+            }
             let (kind, owed) = if owes_as_proposer {
                 (row.give_kind, row.owed_by_proposer())
             } else {
@@ -6184,10 +6590,13 @@ impl World {
             if !row.is_bound() || row.deadline.0 > tick.0 {
                 continue;
             }
+            // A side that no unit carries cannot be short on its own. It
+            // waits on the other side, so only a carried side owes at the
+            // deadline.
             failed.push((
                 index,
-                row.owed_by_proposer() > 0,
-                row.owed_by_responder() > 0,
+                row.owed_by_proposer() > 0 && row.proposer_side_is_carried(),
+                row.owed_by_responder() > 0 && row.responder_side_is_carried(),
                 row.term,
             ));
         }
