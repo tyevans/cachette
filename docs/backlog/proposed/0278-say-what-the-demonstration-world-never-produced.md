@@ -47,32 +47,38 @@ it.[^4] For the improvement the answer is the engine, and the engine does not.
 
 ## What is missing before this is refined
 
-- The impact review.
-- **Where the census lives.** The figures come from public readers of the
-  engine, so any caller can take them. Whether the demonstration prints them,
-  whether a command writes them, or whether both read one function is an
-  arrangement question, and the item must say which serves the guard rather
-  than describing a module move.
-- **What the list of subsystems is, and what keeps it current.** A hand-written
-  list of things to count is a second declaration site for what the engine
-  holds, and it goes stale the next time a subsystem lands.[^5] The item must
-  say what fails when the two disagree, or say plainly that nothing does and
-  why that is acceptable here.
-- **Whether a zero fails or reports.** A zero is correct today for the
-  improvement, so a gate that failed on one would be red from the first commit.
-  A report that nobody reads is the defect this item is about. The item must
-  choose, and the choice is the substance of it.
-- **Whether the guard reports a count or a zero.** Two of the three zeros
-  closed between the audit and this measurement, and a guard that reported only
-  zeros would have stayed silent through both. Reporting the count costs the
-  same and says more.
-- Whether the count belongs to the demonstration or to the engine. "How many
-  positions does a unit hold" is a fact about the world. Item 0241 raises the
-  same question for the founding report and neither should answer it alone.
+**The open questions are answered.** The design of the living world game layer
+answered each one on 5 September 2026, and item 0472 holds the work.[^6] [^7]
+
+- **Where the census lives.** In the engine, as a reader named
+  `subsystem_census()`. The demonstration prints it at its end, and the gate
+  reads the same reader. The name `census` was taken three times, so the reader
+  carries the longer name.
+- **What the list of subsystems is, and what keeps it current.** One Rust table.
+  Each row names the subsystem and the reader that counts it. The reader
+  derives from the table, so a list written by hand does not exist and nothing
+  can disagree with it.[^5]
+- **Whether a zero fails or reports.** Both, at two sites. The reader reports a
+  count. A gate drives the demonstration world for a tick count that the
+  balance register holds and asserts that every count is nonzero.[^8] The gate
+  is not red from the first commit, because pass 1 of the game layer makes a
+  faction build, so the improvement count is nonzero when the gate lands.
+- **Whether the guard reports a count or a zero.** A count.
+- **Whether the count belongs to the demonstration or to the engine.** The
+  engine. A count of what the world holds is a fact about the world.
+
+**What keeps this item in `proposed/`.** Item 0472 delivers the census as one
+of its five parts, and its impact review and its checkable statements cover it.
+A second refined item for the same deliverable would be one fact in two places,
+and the two would drift. This item closes when 0472 closes. If 0472 is split
+and the census falls out of it, this item takes the census and is refined then.
 
 ## Done when
 
-Stated when the item is refined.
+- Item 0472 is complete, and its outcome names the census.
+- The demonstration prints one count per subsystem at its end.
+- The gate asserts that every count is nonzero on the demonstration world after
+  the census tick count.
 
 ## Outcome
 
@@ -85,3 +91,6 @@ Filled in when the item moves to `complete/`.
 [^3]: Findings register, FND-232. `docs/FINDINGS.md`
 [^4]: Testing rules, section 5. `.claude/rules/testing.md`
 [^5]: Recurring Defect Shapes, shape 1. `.claude/rules/recurring-defects.md`
+[^6]: Design: the living world game layer, section 10.1. `docs/superpowers/specs/2026-09-05-living-world-game-layer-design.md`
+[^7]: Backlog item 0472, run a faction controller inside the step and end the game on territory. `docs/backlog/refined/0472-run-a-faction-controller-inside-the-step-and-end-the-game-on-territory.md`
+[^8]: Balance register. `docs/reference/balance.md`
