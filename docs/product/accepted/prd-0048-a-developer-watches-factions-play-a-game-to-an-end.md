@@ -1,7 +1,7 @@
 ---
 id: 0048
 title: A developer watches factions play a game to an end
-status: Shaped
+status: Accepted
 created: 2026-09-05
 ---
 
@@ -29,7 +29,7 @@ This has three costs.
 
 The developer cannot judge the engine as a game. Every mechanism the engine
 holds is visible only as motion. The developer cannot tell whether trade,
-weather, contest and building add up to a contest that somebody can win.
+weather, contest and building add up to a game that somebody can win.
 
 The developer cannot tell whether a mechanism ever fires. A subsystem that
 nothing drives stays quiet, and a quiet subsystem looks the same as a working
@@ -43,10 +43,10 @@ is nothing.
 
 Each statement below can be checked.
 
-- Every faction in a run acts on its own. No Python code chooses for it.
+- Every faction in a run acts on its own. No caller chooses for it.
 - A faction acts only through the acts a caller can make. A watcher can name
   the act a faction made, and a caller could have made the same act.
-- A faction works toward a win. The engine names at least four ways to win,
+- A faction works toward a win. The engine holds more than one way to win,
   and a run can end by each of them.
 - A run ends. A reader states the winner, the way it won and the tick it won
   on. Before the end, the reader states that the run has not ended.
@@ -55,11 +55,12 @@ Each statement below can be checked.
 - A watcher sees the game as it happens. A declaration, a deal, a storm, a
   repair and the end each appear when they happen. Each names the faction it
   concerns.
-- A reader states the standing of one faction toward each way to win.
+- A reader states how far one faction is from each way to win.
 - A reader states, for each mechanism the engine holds, how many times it
   fired in the run. A count of zero is a fact a developer can act on.
-- No faction is a player. A faction can be marked as controlled from outside,
-  and nothing sets the mark in this work.
+- No faction is a player. A caller can set a faction aside for outside
+  control. A faction set aside makes no act of its own. Nothing sets a
+  faction aside in this work.
 - The same seed gives the same game and the same winner, at every thread
   count, on every run.
 
@@ -69,8 +70,11 @@ Each statement below can be checked.
   This record asks only for the place where that hook will stand.
 - It does not make a faction clever. A faction that acts on its own and acts
   badly satisfies this record. Balance is a separate need.
-- It does not name the four ways to win. Which acts count toward a win is a
-  rule of the downstream game, and the rule is not written.
+- It does not name the ways to win. How many there are is a rule of the
+  downstream game. Which acts count toward each is too. That rule is not
+  written.
+- It does not say whether the game is fair. A run that one seat always wins
+  satisfies this record. Fairness across seeds is a separate need.[^1]
 - It does not decide how a faction chooses. That is an architectural question,
   and it belongs in a decision record.
 - It does not stop the world at the end. A watcher may keep watching.
@@ -98,24 +102,29 @@ Three properties follow. A solution must have all three.
 
 No cost figure appears here. One blocker governs every cost figure this
 project holds, and it says which figures are measured and which are
-derived.[^1]
+derived.[^2]
 
 ## Which blockers govern this
 
-- **One blocker governs every cost figure here.**[^1] Every cost statement
+- **One blocker governs every cost figure here.**[^2] Every cost statement
   above states a shape and not a number.
-- **One blocker holds the rules of the downstream game.**[^2] What a faction
+- **One blocker holds the rules of the downstream game.**[^3] What a faction
   wants, what counts as a win, and how long a game lasts are rules of that
   game. The engine holds a value for each, and the blocker says that no owner
   chose them. This record states none of them.
+- **One blocker holds what raises and lowers renown.**[^4] A way to win that
+  rests on renown cannot fire until it closes. This record does not require
+  that way.
 
-This record depends on three needs that exist. A faction holds ground.[^3] A
-faction deals with another faction.[^4] The world holds weather.[^5]
+This record depends on three needs that exist. A faction holds ground.[^5] A
+faction deals with another faction.[^6] The world holds weather.[^7]
 
 ## References
 
-[^1]: Blockers register, BLK-007. `docs/BLOCKERS.md`
-[^2]: Blockers register, BLK-050. `docs/BLOCKERS.md`
-[^3]: PRD-0006, a place belongs to somebody. `docs/product/accepted/prd-0006-a-place-belongs-to-somebody.md`
-[^4]: PRD-0034, two players hold each other to a future delivery. `docs/product/shaped/prd-0034-two-players-hold-each-other-to-a-future-delivery.md`
-[^5]: PRD-0004, the world has weather that a watcher can read. `docs/product/accepted/prd-0004-the-world-has-weather-that-a-watcher-can-read.md`
+[^1]: PRD-0053, a game is balanced across seeds. `docs/product/accepted/prd-0053-a-game-is-balanced-across-seeds.md`
+[^2]: Blockers register, BLK-007. `docs/BLOCKERS.md`
+[^3]: Blockers register, BLK-050. `docs/BLOCKERS.md`
+[^4]: Blockers register, BLK-150. `docs/BLOCKERS.md`
+[^5]: PRD-0006, a place belongs to somebody. `docs/product/accepted/prd-0006-a-place-belongs-to-somebody.md`
+[^6]: PRD-0034, two players hold each other to a future delivery. `docs/product/shaped/prd-0034-two-players-hold-each-other-to-a-future-delivery.md`
+[^7]: PRD-0004, the world has weather that a watcher can read. `docs/product/accepted/prd-0004-the-world-has-weather-that-a-watcher-can-read.md`

@@ -1,7 +1,7 @@
 ---
 id: 0052
 title: An upgrade wears and a worker repairs it
-status: Shaped
+status: Accepted
 created: 2026-09-05
 ---
 
@@ -43,10 +43,10 @@ Each statement below can be checked.
 - Every built thing has a condition. A new build is in full condition.
 - Weather wears a built thing. A built thing on wet ground loses condition
   each tick the ground stays wet.
-- An enemy wears a built thing. A unit whose faction is at war with the
-  holder, standing on the tile, loses the thing condition each tick.
-- A built thing at zero condition is gone. It leaves the world by the same
-  path as a thing destroyed on purpose. A watcher cannot tell the two apart
+- An enemy wears a built thing. A unit at war with the holder stands on the
+  tile. The thing loses condition each tick the unit stands there.[^1]
+- A built thing at zero condition is gone. It leaves the world in the same
+  way as a thing destroyed on purpose. A watcher cannot tell the two apart
   afterwards.
 - A worker repairs a built thing. The order to build on a tile that already
   holds a built thing raises its condition. Full condition is the ceiling.
@@ -54,8 +54,6 @@ Each statement below can be checked.
   faster.
 - A watcher reads the condition of a built thing on the map. The watcher can
   tell a worn thing from a new one.
-- The engine holds a built thing that slows an enemy. It holds a built thing
-  that stores more goods. It holds a built thing whose completion is a win.
 - The same seed gives the same wear and the same repairs, at every thread
   count, on every run.
 
@@ -69,9 +67,14 @@ Each statement below can be checked.
   the tile holds the thing.
 - It does not decide how condition is stored. That is an architectural
   question, and it belongs in a decision record.
-- It does not add a repair act. Repair is the build act on a built tile.
+- It does not ask a worker to know the difference. A worker told to build on
+  a worn thing repairs it.
 - It does not make wear a choice. A faction cannot wear a thing faster by
   wanting to.
+- It does not add kinds of built thing. Which kinds exist, and whether one of
+  them is a way to win, are rules of the downstream game.[^2]
+- It does not make weather harm anything other than a built thing. What
+  weather does to a store, a unit or a site is a separate need.
 
 ## What it costs at the target scale
 
@@ -86,34 +89,39 @@ Three properties follow. A solution must have all three.
 
 - The wear pass costs the built things under a condition that wears them. A
   built thing under a clear sky and no enemy costs nothing.
-- Condition is one small value per built thing. The storage grows with the
-  count of built things and with nothing else.
+- What the world remembers about a built thing grows with the count of built
+  things and with nothing else.
 - Removal at zero costs what a destroy costs today, because it is one.
 
 No cost figure appears here. One blocker governs every cost figure this
 project holds, and it says which figures are measured and which are
-derived.[^1]
+derived.[^3]
 
 ## Which blockers govern this
 
-- **One blocker governs every cost figure here.**[^1] Every cost statement
+- **One blocker governs every cost figure here.**[^3] Every cost statement
   above states a shape and not a number.
 - **One blocker holds whether a built thing changes hands with the ground under
-  it.**[^2] The project owner holds it. This record states that the holder of
+  it.**[^4] The project owner holds it. This record states that the holder of
   the tile holds the thing. It states nothing about the moment the holder
   changes.
-- **One blocker holds the rules of the downstream game.**[^3] Every rate of
-  wear is a rule of that game. So are the full condition of each kind and the
-  work each kind takes. The engine holds a value for each, and this record
-  states none of them.
+- **One blocker holds the rules of the downstream game.**[^2] The rate at
+  which an enemy wears a thing is a rule of that game. So are the full
+  condition of each kind and the work each kind takes. The engine holds a
+  value for each, and this record states none of them.
+- **One blocker holds what weather is worth.**[^5] How fast wet ground wears a
+  built thing is one of the values it governs. This record states no rate.
 
-This record depends on a unit changing the ground it stands on, and on the
-world holding weather. Both exist.[^4] [^5]
+This record depends on three needs. A unit changes the ground it stands on.
+The world holds weather. Two factions can be at war. The first two exist, and
+the third is a need beside this one.[^6] [^7] [^1]
 
 ## References
 
-[^1]: Blockers register, BLK-007. `docs/BLOCKERS.md`
-[^2]: Blockers register, BLK-036. `docs/BLOCKERS.md`
-[^3]: Blockers register, BLK-050. `docs/BLOCKERS.md`
-[^4]: PRD-0008, a unit changes the ground it stands on. `docs/product/accepted/prd-0008-a-unit-changes-the-ground-it-stands-on.md`
-[^5]: PRD-0004, the world has weather that a watcher can read. `docs/product/accepted/prd-0004-the-world-has-weather-that-a-watcher-can-read.md`
+[^1]: PRD-0049, a god declares war and makes peace. `docs/product/accepted/prd-0049-a-god-declares-war-and-makes-peace.md`
+[^2]: Blockers register, BLK-050. `docs/BLOCKERS.md`
+[^3]: Blockers register, BLK-007. `docs/BLOCKERS.md`
+[^4]: Blockers register, BLK-036. `docs/BLOCKERS.md`
+[^5]: Blockers register, BLK-130. `docs/BLOCKERS.md`
+[^6]: PRD-0008, a unit changes the ground it stands on. `docs/product/accepted/prd-0008-a-unit-changes-the-ground-it-stands-on.md`
+[^7]: PRD-0004, the world has weather that a watcher can read. `docs/product/accepted/prd-0004-the-world-has-weather-that-a-watcher-can-read.md`
