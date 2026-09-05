@@ -738,6 +738,35 @@ impl Holding {
         candidates
     }
 
+    /// Gives a set of tiles to one holder, and repairs the derived parts.
+    ///
+    /// **This is the path a land contract takes.** No unit carries a tile, so
+    /// a land set changes holder by agreement when the other side of the
+    /// contract is delivered in full.[^1] The tiles are written in ascending
+    /// tile index, whatever order the caller gave them in, so the write names
+    /// no thread and depends on no caller order.[^2] A tile outside the world
+    /// is skipped.
+    ///
+    /// The call runs on the calling thread and takes the thread count only
+    /// for the merge that rebuilds the held list.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0147, a contract consideration is a tagged kind, decision D3. `docs/adrs/draft/adr-0147-a-contract-consideration-is-a-tagged-kind.md`
+    /// [^2]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
+    pub fn transfer(&mut self, tiles: &[TileIdx], to: Holder, threads: usize) {
+        let ceiling = self.holders.len();
+        let mut changes: Vec<(TileIdx, Holder)> = tiles
+            .iter()
+            .copied()
+            .filter(|tile| (tile.0 as usize) < ceiling)
+            .map(|tile| (tile, to))
+            .collect();
+        changes.sort_unstable_by_key(|(tile, _)| *tile);
+        changes.dedup();
+        self.apply(&changes, threads);
+    }
+
     /// Writes the decided changes and repairs the three derived parts.
     ///
     /// The write is one scattered store for each change, and it runs on the

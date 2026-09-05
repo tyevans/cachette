@@ -509,10 +509,18 @@ class TradeStatus(TypedDict):
     The closed entry is what separates a refusal from a terminal refusal. It
     is zero when nothing closed the direction, and it is otherwise the step at
     which the direction opens again.
+
+    Each side carries a tag. Zero is a resource, one is land and two is a
+    relation step. For land the amount is the tile count and the tiles entry
+    holds the tile indices, ascending.
     """
 
     status: int
     turn: int | None
+    give_tag: int
+    take_tag: int
+    give_tiles: npt.NDArray[np.uint32]
+    take_tiles: npt.NDArray[np.uint32]
     give_kind: int
     give_amount: int
     take_kind: int
@@ -531,6 +539,8 @@ class TradeBookColumns(TypedDict):
     proposer: npt.NDArray[np.uint16]
     responder: npt.NDArray[np.uint16]
     status: npt.NDArray[np.uint8]
+    give_tag: npt.NDArray[np.uint8]
+    take_tag: npt.NDArray[np.uint8]
     give_kind: npt.NDArray[np.uint8]
     take_kind: npt.NDArray[np.uint8]
     give_amount: npt.NDArray[np.uint32]
@@ -548,7 +558,8 @@ class TradeSpokenColumns(TypedDict):
 
     The act is a small integer. Zero is an offer, one a counteroffer, two an
     acceptance, three a refusal, four a terminal refusal, five an opening, six
-    a settlement and seven a default.
+    a settlement, seven a default, eight a land transfer and nine a relation
+    step.
     """
 
     tick: npt.NDArray[np.uint64]
@@ -556,6 +567,19 @@ class TradeSpokenColumns(TypedDict):
     responder: npt.NDArray[np.uint16]
     act: npt.NDArray[np.uint8]
     status: npt.NDArray[np.uint8]
+
+class MarketColumns(TypedDict):
+    """One column for each field of a board row that says something.
+
+    ``wants`` is zero when the faction offers the good and one when it wants
+    the good.
+    """
+
+    good: npt.NDArray[np.uint8]
+    quantity: npt.NDArray[np.uint32]
+    wants: npt.NDArray[np.uint8]
+    asking_good: npt.NDArray[np.uint8]
+    asking_quantity: npt.NDArray[np.uint32]
 
 class UnitFellColumns(TypedDict):
     """One column for each field of the fallen event.
@@ -788,6 +812,13 @@ class World:
         take_kind: int,
         take_amount: int,
         term: int,
+        *,
+        give_tag: int = ...,
+        take_tag: int = ...,
+        give_tiles: Sequence[tuple[int, int]] | None = ...,
+        take_tiles: Sequence[tuple[int, int]] | None = ...,
+        give_cell: tuple[int, int] | None = ...,
+        take_cell: tuple[int, int] | None = ...,
     ) -> None: ...
     def counter_trade(
         self,
@@ -797,6 +828,13 @@ class World:
         give_amount: int,
         take_kind: int,
         take_amount: int,
+        *,
+        give_tag: int = ...,
+        take_tag: int = ...,
+        give_tiles: Sequence[tuple[int, int]] | None = ...,
+        take_tiles: Sequence[tuple[int, int]] | None = ...,
+        give_cell: tuple[int, int] | None = ...,
+        take_cell: tuple[int, int] | None = ...,
     ) -> None: ...
     def accept_trade(self, speaker: int, other: int) -> None: ...
     def refuse_trade(self, speaker: int, other: int) -> None: ...
@@ -805,6 +843,15 @@ class World:
     def trade_status(self, proposer: int, responder: int) -> TradeStatus: ...
     def trade_book(self, faction: int) -> TradeBookColumns: ...
     def trade_log_columns(self) -> TradeSpokenColumns: ...
+    def advertise(
+        self, faction: int, rows: Sequence[tuple[int, int, int, int, int]]
+    ) -> None: ...
+    def market(self, faction: int) -> MarketColumns: ...
+    def board_rows(self) -> int: ...
+    def set_board_rows(self, rows: int) -> None: ...
+    def land_list_bound(self) -> int: ...
+    def set_land_list_bound(self, bound: int) -> None: ...
+    def cell_tiles(self, q: int, r: int) -> npt.NDArray[np.uint32]: ...
     def stands_in_territory_of(self, speaker: int, listener: int) -> bool: ...
     def window_census(self, q: int, r: int, radius: int = ...) -> WindowCensus: ...
     def seed_luxuries(self, placements: Sequence[tuple[int, int]]) -> None: ...
