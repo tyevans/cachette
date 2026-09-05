@@ -79,13 +79,13 @@ Each statement below can be checked.
 
 - It does not decide wear. Whether a level falls when nobody keeps it is the
   need beside this one.[^1]
-- It does not decide territory. Who holds a tile is a need beside this one,
-  written at the same time as this record. What happens to an upgrade when
-  the holder changes is a blocker the project owner holds.[^2]
+- It does not decide territory. Who holds a tile is a need beside this
+  one.[^2] What happens to an upgrade when the holder changes is a blocker the
+  project owner holds.[^3]
 - It does not decide what a road costs to cross. A road changes how many
   units cross a tile. What it does to the pace of a unit is a movement need.
 - It does not name the upgrades. Which categories exist, how many levels each
-  has and which ground each suits are rules of the downstream game.[^3]
+  has and which ground each suits are rules of the downstream game.[^4]
 - It does not name the colours or the shapes. That the map tells two things
   apart is the need. How it tells them apart is a view choice.
 - It does not make a plan clever. A plan that follows what the faction lacks
@@ -115,29 +115,30 @@ Four properties follow. A solution must have all four.
 
 No cost figure appears here. One blocker governs every cost figure this
 project holds, and it says which figures are measured and which are
-derived.[^4]
+derived.[^5]
 
 ## Which blockers govern this
 
-- **One blocker governs every cost figure here.**[^4] Every cost statement
+- **One blocker governs every cost figure here.**[^5] Every cost statement
   above states a shape and not a number.
-- **One blocker holds the rules of the downstream game.**[^3] The categories,
+- **One blocker holds the rules of the downstream game.**[^4] The categories,
   the level count of each, the ground each suits, the work each level takes
   and what each level raises are values of that game. The engine holds a value
   for each, and this record states none of them.
 - **One blocker holds whether an upgrade changes hands with the ground under
-  it.**[^2] The project owner holds it. A level on a tile whose holder changes
+  it.**[^3] The project owner holds it. A level on a tile whose holder changes
   is one instance of that question, and this record states nothing about it.
 
 This record extends one accepted need, that a unit changes the ground it
-stands on.[^5] That need rejected a catalogue. This record asks for one, as
+stands on.[^6] That need rejected a catalogue. This record asks for one, as
 data of the downstream game, and it asks that the ground and the level shape
 what the catalogue holds.
 
 ## References
 
 [^1]: PRD-0052, an upgrade wears and a worker repairs it. `docs/product/accepted/prd-0052-an-upgrade-wears-and-a-worker-repairs-it.md`
-[^2]: Blockers register, BLK-036. `docs/BLOCKERS.md`
-[^3]: Blockers register, BLK-050. `docs/BLOCKERS.md`
-[^4]: Blockers register, BLK-007. `docs/BLOCKERS.md`
-[^5]: PRD-0008, a unit changes the ground it stands on. `docs/product/accepted/prd-0008-a-unit-changes-the-ground-it-stands-on.md`
+[^2]: PRD-0054, a god's ground is the ground around its cities. `docs/product/shaped/prd-0054-a-gods-ground-is-the-ground-around-its-cities.md`
+[^3]: Blockers register, BLK-036. `docs/BLOCKERS.md`
+[^4]: Blockers register, BLK-050. `docs/BLOCKERS.md`
+[^5]: Blockers register, BLK-007. `docs/BLOCKERS.md`
+[^6]: PRD-0008, a unit changes the ground it stands on. `docs/product/accepted/prd-0008-a-unit-changes-the-ground-it-stands-on.md`
