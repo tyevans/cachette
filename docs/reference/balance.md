@@ -30,8 +30,8 @@ BLK-150, which asks what raises and lowers renown.[^6]
 
 | Value | Read by | Set | Blocker | Derivation |
 |---|---|---|---|---|
-| Controller evaluations per faction per tick | The controller stage | unset, pass 10 | BLK-007 | |
-| Weight vector range, the lowest and highest weight | The seeding layer, when it draws a faction vector | unset, pass 10 | — | |
+| Controller evaluations per faction per tick | The controller stage | unset, pass 10 | BLK-007 | Provisional default of 2 written by pass 1, the smallest count at which the draw index has a second value to differ from. Pass 10 measures it. |
+| Weight vector range, the lowest and highest weight | The seeding layer, when it draws a faction vector | unset, pass 10 | — | Provisional range of 1 to 8 written by pass 1. The build weight over the range top plus the build weight gives a build order a share between one ninth and one half, so every faction both gathers and builds. Pass 10 measures it. |
 | Board size, the advertisement rows per faction | The trade board | unset, pass 10 | — | |
 | Advertisement schedule, period and phase | The controller, when it writes its board | unset, pass 10 | — | |
 | Surplus mark, the store above which a site offers | The controller pricing rule | unset, pass 10 | — | |
@@ -60,10 +60,17 @@ BLK-150, which asks what raises and lowers renown.[^6]
 
 | Value | Read by | Set | Blocker | Derivation |
 |---|---|---|---|---|
-| Tick limit | The territory reader | unset, pass 10 | BLK-007 | |
+| Tick limit | The territory reader | unset, pass 10 | BLK-007 | Provisional default of 2000 written by pass 1, so that a run of the demonstration world ends inside a few minutes and no determinism scenario reaches it. Pass 10 measures it. |
 | Stock target | The wealth-or-wonder reader | unset, pass 10 | — | |
 | Renown target | The renown reader | unset, pass 10 | BLK-150 | |
 | Census tick count, the ticks the gate drives before it reads the census | The census gate | unset, pass 10 | BLK-007 | |
+
+## The seeding layer
+
+| Value | Read by | Set | Blocker | Derivation |
+|---|---|---|---|---|
+| Founding group, the people each faction founds with | The seeding layer, when it founds the run | unset, pass 10 | — | Provisional default of 64 written by pass 1, the constant the demonstration passed to the founding verb before the seeding moved into the engine. Pass 10 measures it. |
+| Luxury deposits, the tiles the seeding layer places a luxury on | The seeding layer, when it places the luxuries | unset, pass 10 | — | Provisional default of 8 written by pass 1, two deposits for each faction of the demonstration world. Pass 10 measures it. |
 
 ## Unit types
 

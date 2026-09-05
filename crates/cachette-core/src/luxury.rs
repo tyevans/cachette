@@ -23,11 +23,12 @@
 //! group of tiles gives one answer whatever the order and whatever the
 //! grouping.[^6]
 //!
-//! **The control plane seeds the field once, and the field never changes
-//! after that.** A placement is authored content and not a draw, so nothing
-//! here reads the counter-based generator.[^7] The field is simulated state
-//! all the same, because two worlds that carry different luxuries are
-//! different worlds, so the field enters the state hash.[^8]
+//! **The field is seeded once, and it never changes after that.** A caller
+//! may author every placement, or the seeding layer of the world may place
+//! the deposits by a keyed draw on the deposit index at frame zero.[^7]
+//! Nothing in this module draws: it takes placements and stores them. The
+//! field is simulated state, because two worlds that carry different
+//! luxuries are different worlds, so the field enters the state hash.[^8]
 //!
 //! **Nothing in the engine consumes the variety score.** This module answers
 //! a read and it modifies no pass. The register holds that decision, and it
