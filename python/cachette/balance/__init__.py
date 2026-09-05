@@ -37,7 +37,7 @@ Balance register. ``docs/reference/balance.md``
 Blockers register, BLK-050. ``docs/BLOCKERS.md``
 
 ADR-0040, Python is a control plane, not a data plane.
-``docs/adrs/accepted/adr-0040-python-is-a-control-plane-not-a-data-plane.md``
+``docs/adrs/draft/adr-0040-python-is-a-control-plane-not-a-data-plane.md``
 
 ADR-0001, one binary gives one answer at any thread count.
 ``docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md``
