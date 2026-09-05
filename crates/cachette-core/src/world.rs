@@ -4602,7 +4602,7 @@ impl World {
         // game end readers first, and it emits nothing once the record is
         // written.[^23] [^24]
         //
-        // [^23]: ADR-0144, a faction controller runs inside the step and acts only through the caller's verbs, decision D1. `docs/adrs/draft/adr-0144-a-faction-controller-runs-inside-the-step-and-acts-only-through-the-callers-verbs.md`
+        // [^23]: ADR-0144, a faction controller runs inside the step and acts only through the caller's verbs, decision D1. `docs/adrs/accepted/adr-0144-a-faction-controller-runs-inside-the-step-and-acts-only-through-the-callers-verbs.md`
         // [^24]: ADR-0148, a game end is recorded once and stops the controllers, decision D4. `docs/adrs/draft/adr-0148-a-game-end-is-recorded-once-and-stops-the-controllers.md`
         {
             let _span = stage::open(Stage::Controller);
@@ -8245,7 +8245,7 @@ impl World {
     ///
     /// # References
     ///
-    /// [^1]: ADR-0144, a faction controller runs inside the step and acts only through the caller's verbs, decision D2. `docs/adrs/draft/adr-0144-a-faction-controller-runs-inside-the-step-and-acts-only-through-the-callers-verbs.md`
+    /// [^1]: ADR-0144, a faction controller runs inside the step and acts only through the caller's verbs, decision D2. `docs/adrs/accepted/adr-0144-a-faction-controller-runs-inside-the-step-and-acts-only-through-the-callers-verbs.md`
     pub fn order_gather_set(&mut self, units: &[Entity], kind: ResourceKind) -> usize {
         let mut refused = 0usize;
         for entity in units {
@@ -8263,7 +8263,7 @@ impl World {
     ///
     /// # References
     ///
-    /// [^1]: ADR-0144, a faction controller runs inside the step and acts only through the caller's verbs, decision D2. `docs/adrs/draft/adr-0144-a-faction-controller-runs-inside-the-step-and-acts-only-through-the-callers-verbs.md`
+    /// [^1]: ADR-0144, a faction controller runs inside the step and acts only through the caller's verbs, decision D2. `docs/adrs/accepted/adr-0144-a-faction-controller-runs-inside-the-step-and-acts-only-through-the-callers-verbs.md`
     pub fn order_build_set(&mut self, units: &[Entity], kind: UpgradeKind) -> usize {
         let mut refused = 0usize;
         for entity in units {
@@ -8281,7 +8281,7 @@ impl World {
     ///
     /// # References
     ///
-    /// [^1]: ADR-0144, a faction controller runs inside the step and acts only through the caller's verbs, decision D2. `docs/adrs/draft/adr-0144-a-faction-controller-runs-inside-the-step-and-acts-only-through-the-callers-verbs.md`
+    /// [^1]: ADR-0144, a faction controller runs inside the step and acts only through the caller's verbs, decision D2. `docs/adrs/accepted/adr-0144-a-faction-controller-runs-inside-the-step-and-acts-only-through-the-callers-verbs.md`
     pub fn set_unit_type_set(&mut self, units: &[Entity], unit_type: UnitTypeId) -> usize {
         let mut refused = 0usize;
         for entity in units {
@@ -8306,7 +8306,7 @@ impl World {
     ///
     /// # References
     ///
-    /// [^1]: ADR-0144, a faction controller runs inside the step and acts only through the caller's verbs, decision D6. `docs/adrs/draft/adr-0144-a-faction-controller-runs-inside-the-step-and-acts-only-through-the-callers-verbs.md`
+    /// [^1]: ADR-0144, a faction controller runs inside the step and acts only through the caller's verbs, decision D6. `docs/adrs/accepted/adr-0144-a-faction-controller-runs-inside-the-step-and-acts-only-through-the-callers-verbs.md`
     pub fn set_externally_controlled(&mut self, faction: FactionId, controlled: bool) -> bool {
         self.controller
             .set_externally_controlled(faction, controlled)
@@ -8431,7 +8431,7 @@ impl World {
     /// # References
     ///
     /// [^1]: ADR-0148, a game end is recorded once and stops the controllers, decisions D2 and D4. `docs/adrs/draft/adr-0148-a-game-end-is-recorded-once-and-stops-the-controllers.md`
-    /// [^2]: ADR-0144, a faction controller runs inside the step and acts only through the caller's verbs, decisions D2, D4 and D5. `docs/adrs/draft/adr-0144-a-faction-controller-runs-inside-the-step-and-acts-only-through-the-callers-verbs.md`
+    /// [^2]: ADR-0144, a faction controller runs inside the step and acts only through the caller's verbs, decisions D2, D4 and D5. `docs/adrs/accepted/adr-0144-a-faction-controller-runs-inside-the-step-and-acts-only-through-the-callers-verbs.md`
     fn run_controller(&mut self) {
         self.controller.clear_log();
         self.check_game_end();

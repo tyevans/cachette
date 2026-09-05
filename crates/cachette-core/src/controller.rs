@@ -28,7 +28,7 @@
 //!
 //! # References
 //!
-//! [^1]: ADR-0144, a faction controller runs inside the step and acts only through the caller's verbs. `docs/adrs/draft/adr-0144-a-faction-controller-runs-inside-the-step-and-acts-only-through-the-callers-verbs.md`
+//! [^1]: ADR-0144, a faction controller runs inside the step and acts only through the caller's verbs. `docs/adrs/accepted/adr-0144-a-faction-controller-runs-inside-the-step-and-acts-only-through-the-callers-verbs.md`
 //! [^2]: ADR-0148, a game end is recorded once and stops the controllers, decision D1. `docs/adrs/draft/adr-0148-a-game-end-is-recorded-once-and-stops-the-controllers.md`
 //! [^3]: ADR-0003, every random draw is keyed, never stateful, decision D1. `docs/adrs/accepted/adr-0003-every-random-draw-is-keyed-never-stateful.md`
 //! [^4]: ADR-0004, iteration order is explicit, decision D4. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
@@ -157,7 +157,7 @@ pub struct FactionRow {
     ///
     /// # References
     ///
-    /// [^1]: ADR-0144, a faction controller runs inside the step and acts only through the caller's verbs, decision D6. `docs/adrs/draft/adr-0144-a-faction-controller-runs-inside-the-step-and-acts-only-through-the-callers-verbs.md`
+    /// [^1]: ADR-0144, a faction controller runs inside the step and acts only through the caller's verbs, decision D6. `docs/adrs/accepted/adr-0144-a-faction-controller-runs-inside-the-step-and-acts-only-through-the-callers-verbs.md`
     pub externally_controlled: u8,
     /// Declared padding, always zero.
     pub padding: [u8; 3],
@@ -511,7 +511,7 @@ impl Controller {
     ///
     /// # References
     ///
-    /// [^1]: ADR-0144, a faction controller runs inside the step and acts only through the caller's verbs, decision D3. `docs/adrs/draft/adr-0144-a-faction-controller-runs-inside-the-step-and-acts-only-through-the-callers-verbs.md`
+    /// [^1]: ADR-0144, a faction controller runs inside the step and acts only through the caller's verbs, decision D3. `docs/adrs/accepted/adr-0144-a-faction-controller-runs-inside-the-step-and-acts-only-through-the-callers-verbs.md`
     #[must_use]
     pub const fn refused(&self) -> u32 {
         self.refused

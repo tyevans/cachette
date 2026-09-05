@@ -2793,7 +2793,7 @@ impl PyWorld {
     ///
     /// # References
     ///
-    /// [^1]: ADR-0144, a faction controller runs inside the step and acts only through the caller's verbs, decision D6. `docs/adrs/draft/adr-0144-a-faction-controller-runs-inside-the-step-and-acts-only-through-the-callers-verbs.md`
+    /// [^1]: ADR-0144, a faction controller runs inside the step and acts only through the caller's verbs, decision D6. `docs/adrs/accepted/adr-0144-a-faction-controller-runs-inside-the-step-and-acts-only-through-the-callers-verbs.md`
     fn set_externally_controlled(&self, faction: u16, controlled: bool) -> PyResult<()> {
         let mut world = self.lock();
         if !world.set_externally_controlled(FactionId(faction), controlled) {
