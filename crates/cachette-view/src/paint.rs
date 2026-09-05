@@ -49,9 +49,50 @@ use cachette_core::founding::FoundingOutcome;
 use cachette_core::hex::NEIGHBOURS;
 use cachette_core::resource::{ResourceKind, RESOURCE_KIND_COUNT};
 use cachette_core::terrain::{TileKind, KIND_COUNT};
+use cachette_core::upgrade::{UpgradeSite, UPGRADE_KIND_COUNT};
 use cachette_core::{Axial, BridgeError, Entity, FactionId, Holder, World};
 
 use crate::text;
+
+/// The colour each kind of upgrade tints its tile with, by kind ordinal.
+///
+/// A road is ochre and a terrace is green. The table is indexed by the
+/// ordinal the core gives each kind, so a kind that joins the core without a
+/// row here fails to compile rather than drawing in a colour nobody chose.
+const UPGRADE_COLOURS: [u32; UPGRADE_KIND_COUNT] = [0x00c8_9a4a, 0x0052_b86a];
+
+/// How much of the upgrade colour covers a tile whose build has just begun.
+const UPGRADE_WEIGHT_FLOOR: i64 = 56;
+
+/// How much of the upgrade colour covers a tile whose build is finished.
+///
+/// The progress sets the depth between the floor and this ceiling, so a
+/// watcher reads a site under construction as paler than a finished one.
+const UPGRADE_WEIGHT_CEILING: i64 = 200;
+
+/// The colour of the water in the air, mixed over the tile under it.
+const AIR_COLOUR: u32 = 0x00d8_e8f8;
+
+/// The drops of water in the air at which the overlay stops deepening.
+///
+/// The unit is drops, and a drop is a whole number in the engine. This is a
+/// viewer's choice of where the shade saturates, in the same way the food
+/// shade saturates at a stock the viewer chose. It is not the engine's
+/// figure for a storm, and nothing here reads back into the engine.[^1]
+///
+/// # References
+///
+/// [^1]: ADR-0067, the viewer reads the world and never writes to it, decision D2. `docs/adrs/accepted/adr-0067-the-viewer-reads-the-world-and-never-writes-to-it.md`
+const AIR_AT_FULL_SHADE: i64 = 4096;
+
+/// How much of the air colour covers a tile at the full shade.
+const AIR_WEIGHT_CEILING: i64 = 150;
+
+/// The brightness taken from every channel of a tile on wet ground.
+const WET_SHADE: i32 = 34;
+
+/// The colour of the mark on a tile that holds a luxury.
+const LUXURY_MARK: u32 = 0x00ff_5ad2;
 
 /// The colour of the space outside the world.
 ///
@@ -1470,6 +1511,8 @@ pub fn kind_colour(kind: TileKind) -> u32 {
 /// [^4]: ADR-0053, a faction is a bit in a mask, and a relation is a plane, decision D2. `docs/adrs/accepted/adr-0053-a-faction-is-a-bit-in-a-mask-and-a-relation-is-a-plane.md`
 /// [^5]: ADR-0072, a tile stock is generated, and only what was taken is stored, decision D4. `docs/adrs/accepted/adr-0072-a-tile-stock-is-generated-and-only-what-was-taken-is-stored.md`
 /// [^6]: ADR-0072, a tile stock is generated, and only what was taken is stored, decision D1. `docs/adrs/accepted/adr-0072-a-tile-stock-is-generated-and-only-what-was-taken-is-stored.md`
+/// [^7]: ADR-0140, weather is a field over the level 1 cell lattice, decision D1. `docs/adrs/draft/adr-0140-weather-is-a-field-over-the-level-1-cell-lattice.md`
+/// [^8]: ADR-0090, a tile upgrade is stored sparsely, as the difference from the generated world, decision D1. `docs/adrs/draft/adr-0090-a-tile-upgrade-is-stored-sparsely.md`
 pub fn draw(world: &World, camera: Camera, canvas: &mut Canvas) -> Result<(), BridgeError> {
     canvas.clear();
     let grid = world.grid();
@@ -1478,15 +1521,20 @@ pub fn draw(world: &World, camera: Camera, canvas: &mut Canvas) -> Result<(), Br
     // A sweep of the whole world every frame is what the record calls a
     // design mistake.[^2]
     let terrain = world.terrain();
+    // Three switches, read once for each frame, so a world in which nothing
+    // has happened pays nothing for the layers that would show it.
+    let dry = world.weather().is_dry();
+    let any_upgrade = !world.upgrade_sites().is_empty();
+    let any_luxury = !world.luxuries().is_empty();
 
     let (first_row, last_row) = camera.visible_rows(world, canvas);
     for row in first_row..last_row {
         let (first_column, last_column) = camera.visible_columns(row, world, canvas);
         for column in first_column..last_column {
             let address = Axial::new(column as i32, row as i32);
-            if grid.index_of(address).is_none() {
+            let Some(tile) = grid.index_of(address) else {
                 continue;
-            }
+            };
             // The ground of the tile. This is the one generation of the
             // ground that the drawing of a tile pays for, and the counter
             // stands at the site that pays it.[^3]
@@ -1508,7 +1556,15 @@ pub fn draw(world: &World, camera: Camera, canvas: &mut Canvas) -> Result<(), Br
             else {
                 continue;
             };
-            let ground_colour = tile_colour(ground.kind, ground.height.0, food.0);
+            let mut ground_colour = tile_colour(ground.kind, ground.height.0, food.0);
+            // Wet ground draws darker than dry ground. The field answers a
+            // tile from the cell that covers it, so every tile of one cell
+            // darkens together and the picture shows the lattice.[^7] The
+            // read costs one array read through the cell of the tile, and a
+            // dry world skips it.
+            if !dry && world.ground_is_wet(address) == Some(true) {
+                ground_colour = darkened(ground_colour, WET_SHADE);
+            }
             let (left, top, wide, tall) = tile_rect(camera, address);
 
             // The holder of this tile, read at the tile that is being
@@ -1544,6 +1600,37 @@ pub fn draw(world: &World, camera: Camera, canvas: &mut Canvas) -> Result<(), Br
                             mix(ground_colour, held, EDGE_WEIGHT),
                         );
                     }
+                }
+            }
+            // The upgrade on this tile, read at the tile that is being
+            // painted. The map is a sorted table of the improved tiles, so
+            // the read is one binary search, and a world nobody built in
+            // skips it.[^8]
+            if any_upgrade {
+                if let Some(site) = world.upgrade_at(address) {
+                    canvas.shade(
+                        left,
+                        top,
+                        wide,
+                        tall,
+                        UPGRADE_COLOURS[site.kind.index()],
+                        upgrade_weight(site),
+                    );
+                }
+            }
+            // The luxuries of this tile. The field is a sorted table of the
+            // tiles that hold one, so the read is one binary search, and a
+            // world with no deposit skips it.
+            if any_luxury && !world.luxuries_at(tile).is_empty() {
+                mark_luxury(canvas, left, top, wide, tall);
+            }
+            // The water in the air over this tile, as an overlay on whatever
+            // was painted under it. The read costs one array read through
+            // the cell of the tile.[^7]
+            if !dry {
+                let air = world.air_at(address).unwrap_or(0);
+                if air > 0 {
+                    canvas.shade(left, top, wide, tall, AIR_COLOUR, air_weight(air));
                 }
             }
             canvas.tiles_painted += 1;
@@ -1638,6 +1725,53 @@ fn on_an_edge(world: &World, address: Axial, holder: Option<Holder>, canvas: &mu
         edge = edge || beside.unwrap_or(Holder::NOBODY) != holder.unwrap_or(Holder::NOBODY);
     }
     edge
+}
+
+/// Returns a colour with the same brightness taken from every channel.
+///
+/// The arithmetic is on whole numbers, and the result goes to a pixel and
+/// nowhere else.[^1]
+///
+/// # References
+///
+/// [^1]: ADR-0067, the viewer reads the world and never writes to it, decision D3. `docs/adrs/accepted/adr-0067-the-viewer-reads-the-world-and-never-writes-to-it.md`
+fn darkened(colour: u32, shade: i32) -> u32 {
+    let channel = |offset: u32| (((colour >> offset) & 0xff) as i32 - shade).clamp(0, 0xff) as u32;
+    (channel(16) << 16) | (channel(8) << 8) | channel(0)
+}
+
+/// Returns how much of the upgrade colour covers a tile, from its progress.
+///
+/// A site that has just begun draws at the floor and a finished site at the
+/// ceiling. The progress is a whole number of work units and the work of a
+/// kind is a whole number too, so the depth is exact.
+fn upgrade_weight(site: UpgradeSite) -> u8 {
+    let work = site.kind.work().max(1);
+    let done = site.progress.0.clamp(0, work);
+    let weight =
+        UPGRADE_WEIGHT_FLOOR + (UPGRADE_WEIGHT_CEILING - UPGRADE_WEIGHT_FLOOR) * done / work;
+    u8::try_from(weight.clamp(0, 255)).unwrap_or(u8::MAX)
+}
+
+/// Returns how much of the air colour covers a tile, from the drops over it.
+///
+/// The shade saturates at the drops the viewer chose, so a storm above that
+/// draws the same as a storm at it.
+fn air_weight(drops: i64) -> u8 {
+    let held = drops.clamp(0, AIR_AT_FULL_SHADE);
+    u8::try_from(held * AIR_WEIGHT_CEILING / AIR_AT_FULL_SHADE).unwrap_or(u8::MAX)
+}
+
+/// Paints the mark of a luxury in the middle of a tile.
+///
+/// The mark is a square of one third of the tile, and at least one pixel, so
+/// the ground shows around it and a watcher still finds it at the smallest
+/// zoom.
+fn mark_luxury(canvas: &mut Canvas, left: i32, top: i32, wide: i32, tall: i32) {
+    let side = (wide.min(tall) / 3).max(1);
+    let x = left + (wide - side) / 2;
+    let y = top + (tall - side) / 2;
+    canvas.fill_rect(x, y, side, side, LUXURY_MARK);
 }
 
 /// Draws a one pixel border inside a rectangle.
