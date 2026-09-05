@@ -157,7 +157,7 @@ fn good(kind: u8) -> String {
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use cachette_core::types::FACTION_CEILING;
     use cachette_core::{Advert, Axial, FactionId, World, WorldConfig};
 

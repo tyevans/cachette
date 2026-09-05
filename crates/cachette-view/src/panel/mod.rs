@@ -48,9 +48,11 @@
 
 pub mod characters;
 pub mod determinism;
+pub mod economy;
 pub mod events;
 pub mod inspector;
 pub mod market;
+pub mod score;
 pub mod statistics;
 pub mod weather;
 
@@ -430,6 +432,8 @@ pub fn registered() -> &'static [&'static (dyn Panel + 'static)] {
         &determinism::Determinism,
         &weather::Weather,
         &market::Market,
+        &economy::Economy,
+        &score::Score,
     ]
 }
 
