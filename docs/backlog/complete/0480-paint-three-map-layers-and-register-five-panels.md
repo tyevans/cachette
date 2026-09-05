@@ -1,7 +1,7 @@
 ---
 id: 0480
 title: Paint three map layers and register five panels
-status: refined
+status: complete
 created: 2026-09-05
 implements: [ADR-0067 D1, ADR-0067 D2, ADR-0067 D3, ADR-0070 D1, ADR-0070 D2, ADR-0093 D1, ADR-0093 D5, ADR-0094 D1, ADR-0094 D5, ADR-0140 D1]
 changes: []
@@ -16,10 +16,11 @@ blocked-by: [BLK-007]
 holds them after passes 3 to 8, and the window shows none. This item is pass 9
 of the living world game layer.[^1]
 
-The item has two halves. The first half paints the layers and registers the
-weather panel. The second half registers the market, the economy and the score
-panels, and it is done. **The relations panel is the one panel that remains**,
-and the section below says why.
+The item has three parts. The first part paints the layers and registers the
+weather panel. The second part registers the market, the economy and the score
+panels. The third part registers the relations panel, which waited for pass 3
+to give the engine a relation between two factions. Every panel the design
+names is registered.
 
 The first half paints three layers on the map and registers one panel.
 
@@ -62,13 +63,23 @@ The impact review below states what each one reads.
   faction, its territory score and its four weights. With a pointer set, the
   faction that holds the pointed tile comes first.
 
-## What is missing
+## The third part
 
-**The relations panel is not done, and this item does not claim it.** It
-waits for pass 3, which gives the engine a relation between two factions. It
-needs its own impact review, in the shape of the one below. The review must
-say which reader the panel reads and that none was added for it, and it must
-state the address count the panel reads.
+The relations panel is registered. It reads through readers the core crate
+already exposed, and none was added for it.
+
+- Relations. For each ordered pair of factions, the relation value and the
+  band it sits in as a word. The panel shows a fixed number of pairs and says
+  how many more there are. Below the pairs, the crossings of the war edge on
+  the last tick, most recent first: which faction declared war on which, and
+  which made peace with which. With a pointer set, the rows of the faction
+  that holds the pointed tile come first.
+
+**The band word comes from the world and not from a copy.** The panel reads
+the band number the world returns, which counts the edges at or below the
+value. The viewer holds the four words and no edge. A world with other edges
+changes the word with no edit to the panel, and a test moves every edge and
+checks that the word follows.
 
 ## Impact review
 
@@ -110,6 +121,19 @@ ceiling, so no panel starts a pass over a tile or a unit, which ADR-0070 D1
 requires. Each pointer costs one holder read or one settlement read. Every
 value crosses as an integer, and the one fixed-point conversion happens in the
 viewer, which ADR-0067 D3 permits. No reader was added to the core crate.
+
+**The third part under the same records.** The relations panel reads the
+relation value and the band number of each ordered pair through the same two
+readers the Python `relation` verb reads, and it reads the relation log of the
+last step through the reader the thread-count test compares. The matrix holds
+one entry for each ordered pair, and the faction ceiling bounds the pairs, so
+the walk costs the same at any population and at any world size. The panel
+stops at a fixed row count and states the count it did not show, which
+ADR-0070 D2 requires of a number the panel cannot afford. The log is one slice
+the step empties before it runs, so a crossing appears on the tick it happened
+and on no other, which is what ADR-0093 D1 asks of a quantity in the window.
+Each pointer costs one holder read. Every value crosses as an integer. No
+reader was added to the core crate.
 
 **Changes.** None.
 
@@ -167,7 +191,23 @@ The first half is done when every statement below is true.
 
 ## Outcome
 
-Filled in when the item moves to `complete/`.
+Built, in three parts. The first part painted the upgrade, the weather and the
+luxury layers and registered the weather panel. The second part registered the
+market, the economy and the score panels. The third part registered the
+relations panel, once pass 3 had given the engine a graded relation.
+
+The relations panel changed from the plan in one respect. The design named a
+matrix, and the panel shows one line for each ordered pair instead, bounded to
+a fixed row count with the rest counted. A matrix of sixty-three columns does
+not fit the panel width, and a line a watcher can read is worth more than a
+grid a watcher cannot.
+
+Every panel the design names is registered, and `World.panel_names()` derives
+each with no Python edit. The demonstration binds panels to the function keys
+F1 to F9 only, so the tenth panel has a name and no key. That is a Python
+edit outside this item, and it stands as an observation.
+
+No register entry moved. No reader was added to the core crate for any panel.
 
 ## References
 
