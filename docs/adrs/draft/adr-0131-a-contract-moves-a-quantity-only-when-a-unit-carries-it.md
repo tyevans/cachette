@@ -1,5 +1,7 @@
 # ADR-0131: A contract moves a quantity only when a unit carries it onto the ground of the other party
 
+**This file is a copy of ADR-0128.** A number collision restored the three trade records under a second set of numbers, thirty-nine minutes after the first set. The registry names ADR-0128 as the record that replaces this one. Cite ADR-0128. This file stays because the registry keeps the file of a replaced record.
+
 ## Context
 
 A contract between two factions binds each of them to deliver a quantity of a
@@ -138,7 +140,7 @@ because the plane holds no row and the pass returns at once.[^11]
 [^5]: ADR-0004, iteration order is explicit, decisions D1, D3 and D4. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
 [^6]: ADR-0062, production and upkeep are rates attached to a site, decision D5. `docs/adrs/accepted/adr-0062-production-and-upkeep-are-rates-attached-to-a-site.md`
 [^7]: ADR-0063, a need is a rate with a threshold, and crossing it is a fact, decision D5. `docs/adrs/accepted/adr-0063-a-need-is-a-rate-with-a-threshold-and-crossing-it-is-a-fact.md`
-[^8]: ADR-0130, a terminal refusal closes an ordered pair until a named tick, decision D1. `docs/adrs/draft/adr-0130-a-terminal-refusal-closes-a-pair-until-a-named-tick.md`
+[^8]: ADR-0127, a terminal refusal closes an ordered pair until a named tick, decision D1. `docs/adrs/draft/adr-0127-a-terminal-refusal-closes-a-pair-until-a-named-tick.md`
 [^9]: Blockers register, BLK-120. `docs/BLOCKERS.md`
 [^10]: Decisions register, DEC-212. `docs/DECISIONS.md`
-[^11]: ADR-0129, a trade negotiation is engine state, and the words are not, decision D1. `docs/adrs/draft/adr-0129-a-trade-negotiation-is-engine-state.md`
+[^11]: ADR-0126, a trade negotiation is engine state, and the words are not, decision D1. `docs/adrs/draft/adr-0126-a-trade-negotiation-is-engine-state.md`

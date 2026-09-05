@@ -1,5 +1,7 @@
 # ADR-0129: A trade negotiation is engine state, and the words are not
 
+**This file is a copy of ADR-0126.** A number collision restored the three trade records under a second set of numbers, thirty-nine minutes after the first set. The registry names ADR-0126 as the record that replaces this one. Cite ADR-0126. This file stays because the registry keeps the file of a replaced record.
+
 ## Context
 
 A downstream game asks two players to make contractual trades with each other,
