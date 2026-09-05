@@ -116,6 +116,55 @@ pub const fn scale_by_count(rate: Fix32, count: u32) -> Accum {
     Accum((rate.0 as i64).saturating_mul(count as i64))
 }
 
+/// Scales a whole amount by a fixed-point factor.
+///
+/// The product is exact in 64 bits and truncates towards zero, so a scale of
+/// one returns the amount unchanged and a scale of zero returns zero. The
+/// result saturates at the range of the amount. A negative scale has no
+/// meaning for an amount, and it returns zero.
+///
+/// The gather pass uses this to scale the tile rate by the gather rate of a
+/// unit type.[^1]
+///
+/// # References
+///
+/// [^1]: ADR-0145, a unit type is a row of capability columns, and zero means cannot, decision D1. `docs/adrs/draft/adr-0145-a-unit-type-is-a-row-of-capability-columns-and-zero-means-cannot.md`
+#[must_use]
+pub const fn scale_amount(amount: u32, scale: Fix32) -> u32 {
+    if scale.0 <= 0 {
+        return 0;
+    }
+    let wide = (amount as i64) * (scale.0 as i64);
+    let shifted = wide >> FIX_FRACTIONAL_BITS;
+    if shifted > u32::MAX as i64 {
+        u32::MAX
+    } else {
+        shifted as u32
+    }
+}
+
+/// Scales a whole quantity of work by a fixed-point factor.
+///
+/// The product is exact in 128 bits and truncates towards zero, then
+/// saturates at the range of the accumulator. A scale of one returns the work
+/// unchanged and a scale of zero returns zero. A negative scale has no meaning
+/// for work, and it returns zero.
+///
+/// The build pass uses this to scale the builder rate by the build rate of a
+/// unit type.[^1]
+///
+/// # References
+///
+/// [^1]: ADR-0145, a unit type is a row of capability columns, and zero means cannot, decision D1. `docs/adrs/draft/adr-0145-a-unit-type-is-a-row-of-capability-columns-and-zero-means-cannot.md`
+#[must_use]
+pub const fn scale_work(work: i64, scale: Fix32) -> i64 {
+    if scale.0 <= 0 {
+        return 0;
+    }
+    let wide = (work as i128) * (scale.0 as i128);
+    saturate_i64(wide >> FIX_FRACTIONAL_BITS)
+}
+
 /// Returns the part of a total that one share of a whole earns.
 ///
 /// The result truncates `total * part / whole` towards zero. The intermediate

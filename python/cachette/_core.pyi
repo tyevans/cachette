@@ -106,17 +106,27 @@ class ResourceTakenColumns(TypedDict):
     kind: npt.NDArray[np.uint8]
 
 class UnitTypeColumns(TypedDict):
-    """One column for each field of a row of the unit type table.
+    """One column for each capability column of a row of the unit type table.
 
-    Both columns hold one entry for each row of the table, and the length of
-    a column is the number of types the world holds.
+    Every column holds one entry for each row of the table, and the length of
+    a column is the number of types the world holds. The keys are the column
+    names the engine declares, in its order, and a test asserts that this
+    class and the engine agree.
 
-    Both columns carry the Q16.16 fixed-point scale as a raw integer. One
-    whole casualty is 65536. Neither is a floating point number.
+    A fixed-point column carries the Q16.16 scale as a raw integer. One whole
+    casualty is 65536. A whole-count column carries its count. None is a
+    floating point number. A zero in a column means the type cannot do what
+    the column names.
     """
 
-    attack: npt.NDArray[np.int32]
-    armour: npt.NDArray[np.int32]
+    attack: npt.NDArray[np.int64]
+    armour: npt.NDArray[np.int64]
+    gather_rate: npt.NDArray[np.int64]
+    build_rate: npt.NDArray[np.int64]
+    carry_capacity: npt.NDArray[np.int64]
+    move_cost_scale: npt.NDArray[np.int64]
+    command_reach: npt.NDArray[np.int64]
+    weather_reach: npt.NDArray[np.int64]
 
 class UnitStarvedColumns(TypedDict):
     """One column for each field of the starved event.
@@ -654,7 +664,19 @@ class World:
     ) -> npt.NDArray[np.uint64]: ...
     def despawn_soldiers(self, units: Identities) -> None: ...
     def order_gather(self, units: Identities, kind: int) -> None: ...
-    def define_unit_type(self, unit_type: int, attack: int, armour: int) -> None: ...
+    def define_unit_type(
+        self,
+        unit_type: int,
+        attack: int,
+        armour: int,
+        *,
+        gather_rate: int,
+        build_rate: int,
+        carry_capacity: int,
+        move_cost_scale: int,
+        command_reach: int,
+        weather_reach: int,
+    ) -> None: ...
     def set_unit_types(self, units: Identities, unit_type: int) -> None: ...
     def unit_type(self, unit: int) -> int: ...
     def unit_type_table(self) -> UnitTypeColumns: ...

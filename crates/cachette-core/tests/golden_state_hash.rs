@@ -23,8 +23,20 @@ use cachette_core::resource::{Amount, RecoveryRules, ResourceKind};
 use cachette_core::site::CommodityId;
 use cachette_core::terrain::TileKind;
 use cachette_core::types::{FactionId, Fix32};
-use cachette_core::unit_type::UnitTypeId;
+use cachette_core::unit_type::{UnitTypeId, UnitTypeRow, WORKER_ROW};
 use cachette_core::{Axial, World, WorldConfig};
+
+/// Returns a worker row that fights with the given attack and armour.
+///
+/// The other columns are the worker's, so the units of the fixture gather and
+/// build as they did before the row was widened.
+const fn fighter(attack: Fix32, armour: Fix32) -> UnitTypeRow {
+    UnitTypeRow {
+        attack,
+        armour,
+        ..WORKER_ROW
+    }
+}
 
 /// The number of frames that a scenario runs unless its row says otherwise.
 const FRAMES: u64 = 32;
@@ -521,10 +533,10 @@ fn contest(world: &mut World) {
     // heavy type reaches both. One frame therefore covers the threshold that
     // refuses and the exchange that does not.
     world
-        .define_unit_type(0, Fix32::from_int(1), Fix32(Fix32::ONE.0 / 2))
+        .define_unit_type(0, fighter(Fix32::from_int(1), Fix32(Fix32::ONE.0 / 2)))
         .expect("the row is inside the table");
     world
-        .define_unit_type(1, Fix32(Fix32::ONE.0 * 3 / 2), Fix32::from_int(2))
+        .define_unit_type(1, fighter(Fix32(Fix32::ONE.0 * 3 / 2), Fix32::from_int(2)))
         .expect("the row is inside the table");
     let grid = world.grid();
     let patch: Vec<Axial> = (0..grid.tile_count())

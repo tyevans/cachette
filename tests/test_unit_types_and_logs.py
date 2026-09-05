@@ -29,6 +29,23 @@ ONE = 65536
 BOWMAN = 0
 TANK = 1
 
+
+def _worker_columns(world: cachette.World) -> dict[str, int]:
+    """Return the six columns beyond attack and armour, as the worker holds them.
+
+    The worker is row zero of the table a new world is built with. A fighter
+    row that keeps these columns differs from the default in the two columns
+    the contest reads and in nothing else. The values are read from the engine
+    rather than written here, so the test holds no second copy of them.
+    """
+    table = world.unit_type_table()
+    return {
+        name: int(table[name][0])  # type: ignore[literal-required]
+        for name in table
+        if name not in ("attack", "armour")
+    }
+
+
 # How many bowmen stand against the one tank.
 #
 # **The number is the point of the test.** The threshold refuses each bowman
@@ -82,8 +99,8 @@ def _armed_world(seed: int) -> cachette.World:
     the armour of a tank.
     """
     world = cachette.World(width=16, height=16, seed=seed, faction_count=2)
-    world.define_unit_type(BOWMAN, 1 * ONE, 0)
-    world.define_unit_type(TANK, 4 * ONE, 2 * ONE)
+    world.define_unit_type(BOWMAN, 1 * ONE, 0, **_worker_columns(world))
+    world.define_unit_type(TANK, 4 * ONE, 2 * ONE, **_worker_columns(world))
     return world
 
 

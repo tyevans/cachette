@@ -19,8 +19,20 @@ use cachette_core::holding::Holder;
 use cachette_core::resource::{Amount, RecoveryRules, ResourceKind};
 use cachette_core::site::CommodityId;
 use cachette_core::terrain::TileKind;
-use cachette_core::unit_type::UnitTypeId;
+use cachette_core::unit_type::{UnitTypeId, UnitTypeRow, WORKER_ROW};
 use cachette_core::{Axial, Entity, FactionId, Fix32, Influence, World, WorldConfig};
+
+/// Returns a worker row that fights with the given attack and armour.
+///
+/// The other columns are the worker's, so the units of the fixture gather and
+/// build as they did before the row was widened.
+const fn fighter(attack: Fix32, armour: Fix32) -> UnitTypeRow {
+    UnitTypeRow {
+        attack,
+        armour,
+        ..WORKER_ROW
+    }
+}
 
 /// The thread counts that every scenario runs at.
 const THREAD_COUNTS: [usize; 3] = [1, 2, 12];
@@ -1098,10 +1110,10 @@ fn a_world_whose_holdings_contend_is_identical_at_every_thread_count() {
 /// [^3]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
 fn contenders(world: &mut World) -> usize {
     world
-        .define_unit_type(0, Fix32::from_int(1), Fix32(Fix32::ONE.0 / 2))
+        .define_unit_type(0, fighter(Fix32::from_int(1), Fix32(Fix32::ONE.0 / 2)))
         .expect("the row is inside the table");
     world
-        .define_unit_type(1, Fix32(Fix32::ONE.0 * 3 / 2), Fix32::from_int(2))
+        .define_unit_type(1, fighter(Fix32(Fix32::ONE.0 * 3 / 2), Fix32::from_int(2)))
         .expect("the row is inside the table");
     let grid = world.grid();
     let patch: Vec<Axial> = (0..grid.tile_count())

@@ -89,8 +89,14 @@ fn the_fallen_event_declares_every_padding_byte() {
 fn a_unit_type_row_holds_no_padding_at_all() {
     // The table enters the state hash as raw bytes, so a padding byte in a
     // row would put an uninitialised byte into the hash.
-    use cachette_core::unit_type::UnitTypeRow;
-    assert_eq!(size_of::<UnitTypeRow>(), 2 * size_of::<Fix32>());
+    // Every column is four bytes wide, so the size is the column count times
+    // four. The column count comes from the row declaration, so a column
+    // added there is counted here without a second edit.
+    use cachette_core::unit_type::{UnitTypeRow, UNIT_TYPE_COLUMN_COUNT};
+    assert_eq!(
+        size_of::<UnitTypeRow>(),
+        UNIT_TYPE_COLUMN_COUNT * size_of::<Fix32>()
+    );
 }
 
 #[test]
