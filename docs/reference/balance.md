@@ -65,6 +65,14 @@ BLK-150, which asks what raises and lowers renown.[^6]
 | Renown target | The renown reader | unset, pass 10 | BLK-150 | |
 | Census tick count, the ticks the gate drives before it reads the census | The census gate | unset, pass 10 | BLK-007 | |
 
+## The holding
+
+| Value | Read by | Set | Blocker | Derivation |
+|---|---|---|---|---|
+| Base reach, the hex steps a city holds with no finished upgrade | The holding rewrite | unset, pass 10 | BLK-050 | Provisional default of 4 written by item 0484. A disc of radius 4 holds 61 tiles, the smallest disc that nearly holds the founding group of 64, so a founded faction holds about one tile for each person it founded with. Pass 10 measures it. |
+| Upgrades per reach step, the finished upgrades inside the ground that earn one step | The holding rewrite | unset, pass 10 | BLK-050 | Provisional default of 4 written by item 0484, the base reach again, so the first step of growth asks for as many upgrades as the base has steps. Pass 10 measures it. |
+| Reach bound, the reach a city never passes | The holding rewrite | unset, pass 10 | BLK-050 | Provisional default of 8 written by item 0484, twice the base, so upgrades at most double how far a city reaches and a disc of radius 8 holds 217 tiles. Pass 10 measures it. |
+
 ## The seeding layer
 
 | Value | Read by | Set | Blocker | Derivation |
