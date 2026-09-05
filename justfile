@@ -269,6 +269,22 @@ docs-probe:
 mutants:
     cargo mutants --no-shuffle
 
+# The thresholds come from the balance register, and every share row there is
+# unset until the rules of the downstream game are written down (BLK-050).
+# While a row is unset the harness reports the observed share and passes.
+# When a row is set the statement passes or fails, and the exit code says so.
+# The JSON report holds nothing about the machine or the thread count, so
+# one seed set gives one report at every thread count.
+#
+# Not a merge gate, and `just check` does not run it. Run it on demand, and
+# run it before any commit that changes a value in the balance register. A
+# figure it prints is a figure about this machine and this seed set.
+#
+# Run a fixed seed set to game end and check the four balance statements.
+balance *args:
+    uv sync
+    uv run python -m cachette.balance {{args}}
+
 # Check the decision records and the product records.
 records:
     ./scripts/check-adrs.sh
