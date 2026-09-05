@@ -68,9 +68,10 @@ order and no pass over it names a thread.[^8]
 
 ### D2. The terms are engine state. The words are control-plane state
 
-The engine holds the resource kinds, the quantities, the term, the deadline and
-the status. Every one of those is an exact integer, so no term of a contract is
-a floating point number.[^9]
+The engine holds the consideration of each side, the term, the deadline and
+the status. A consideration is a tagged kind, and a resource kind with a
+quantity is one of the kinds.[^11] Every field of every kind is an exact
+integer, so no term of a contract is a floating point number.[^9]
 
 The engine holds no text. There is no channel between two players, no message
 body, no ordering of messages, and no delivery. A player that wants to say why
@@ -159,3 +160,4 @@ row.
 [^8]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
 [^9]: ADR-0002, simulated and aggregated state holds no floating point number, decision D1. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
 [^10]: Blockers register, BLK-121. `docs/BLOCKERS.md`
+[^11]: ADR-0147, a contract consideration is a tagged kind, decision D1. `docs/adrs/draft/adr-0147-a-contract-consideration-is-a-tagged-kind.md`

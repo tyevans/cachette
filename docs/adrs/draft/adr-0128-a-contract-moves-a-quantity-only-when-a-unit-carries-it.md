@@ -42,6 +42,12 @@ No verb and no pass moves a quantity from the store of one settlement into the
 store of another. The only path from one faction's goods to another faction's
 goods is a unit that carries a load.
 
+A side of a contract may also name a thing that no unit can carry, such as a
+set of tiles or a step on the relation between the two factions. A later record
+widens this decision: each side is a tagged consideration, a resource delivers
+as this record states, and a consideration that is not a quantity applies when
+the other side has delivered in full.[^12]
+
 A unit of the debtor that carries the resource the contract names, and that
 stands on the tile of a settlement the creditor holds, delivers what it carries
 against the debt.
@@ -142,3 +148,4 @@ because the plane holds no row and the pass returns at once.[^11]
 [^9]: Blockers register, BLK-120. `docs/BLOCKERS.md`
 [^10]: Decisions register, DEC-212. `docs/DECISIONS.md`
 [^11]: ADR-0126, a trade negotiation is engine state, and the words are not, decision D1. `docs/adrs/draft/adr-0126-a-trade-negotiation-is-engine-state.md`
+[^12]: ADR-0147, a contract consideration is a tagged kind, decisions D2 and D3. `docs/adrs/draft/adr-0147-a-contract-consideration-is-a-tagged-kind.md`
