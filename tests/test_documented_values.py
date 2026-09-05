@@ -264,6 +264,11 @@ def test_one_whole_casualty_is_the_documented_fixed_point_value() -> None:
     defenders = world.spawn_soldiers([(0, 0)] * 5, 1)
     world.set_unit_types(attackers, 0)
     world.set_unit_types(defenders, 0)
+    # The contest fires only when the pair is in the war band, so the fixture
+    # declares war first. The value sits below every edge the register could
+    # set, and it is not a copy of an edge.
+    world.set_relation(0, 1, -(1 << 20))
+    assert world.relation_band(0, 1) == 0
     world.step(2)
     # Each side reaches the other, so each side loses what the other paid for.
     assert world.faction_population()[1] == 3
