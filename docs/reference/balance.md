@@ -111,10 +111,10 @@ rows say nothing that one does not.
 
 | Value | Read by | Set | Blocker | Derivation |
 |---|---|---|---|---|
-| Win-path share, the most seeds one path may win | The balance harness, statement 1 | unset, pass 10 | — | |
-| Seat share, the most seeds one seat may win | The balance harness, statement 2 | unset, pass 10 | — | |
-| End share, the fewest seeds that must end before the tick limit | The balance harness, statement 3 | unset, pass 10 | BLK-007 | |
-| Seed set | The balance harness | unset, pass 10 | — | |
+| Win-path share, the most seeds one path may win | The balance harness, statement 1 | unset, pass 10 | — | Observed on 2026-09-05 by item 0481 over 8 seeds on one development machine (ty001-ubuntu, x86-64), extent 256, four factions, tick limit 2000: territory won 8 of 8, and it is the only path that exists. One development-machine run, and no evidence about the target platform. Value unset under BLK-050. |
+| Seat share, the most seeds one seat may win | The balance harness, statement 2 | unset, pass 10 | — | Observed on 2026-09-05 by item 0481 over 8 seeds on one development machine (ty001-ubuntu, x86-64), extent 256, four factions, tick limit 2000: seat 0 won 2 of 8, seat 1 won 3 of 8, seat 2 won 2 of 8, seat 3 won 1 of 8. One development-machine run, and no evidence about the target platform. Value unset under BLK-050. |
+| End share, the fewest seeds that must end before the tick limit | The balance harness, statement 3 | unset, pass 10 | BLK-007 | Observed on 2026-09-05 by item 0481 over 8 seeds on one development machine (ty001-ubuntu, x86-64), extent 256, four factions, tick limit 2000: 0 of 8 ended before the tick limit, because the territory path fires at the limit. One development-machine run, and no evidence about the target platform. Value unset under BLK-050. |
+| Seed set | The balance harness | unset, pass 10 | — | The harness default is 8 seeds derived from the demonstration seed by one stated rule in the code, and `--seeds` overrides it. The default is a fixture and not a value. Observed on 2026-09-05 by item 0481 over those 8 seeds on one development machine (ty001-ubuntu, x86-64), extent 256, four factions, tick limit 2000: contracts, controller_commands and controller_refused were zero in every game at its end. One development-machine run, and no evidence about the target platform. Value unset under BLK-050. |
 
 ## What belongs here
 
