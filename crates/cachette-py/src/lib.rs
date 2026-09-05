@@ -18,7 +18,7 @@ use cachette_core::descent::{DescentId, DESCENT_CEILING};
 use cachette_core::founding::FoundingOutcome;
 use cachette_core::hex::NEIGHBOURS;
 use cachette_core::luxury::{LuxuryId, LUXURY_CEILING};
-use cachette_core::unit_type::UnitTypeId;
+use cachette_core::unit_type::{UnitTypeId, UnitTypeRow};
 use cachette_core::upgrade::UpgradeKind;
 use cachette_core::TileIdx;
 use cachette_core::{
@@ -948,22 +948,39 @@ impl PyWorld {
     /// **The set is all or nothing.** Every identity resolves, and the kind is
     /// checked, before any order is given.
     ///
+    /// **A unit whose type cannot gather refuses the order.** The gather
+    /// rate of the row the unit indexes is zero, so the unit would keep the
+    /// order and take nothing on every step. The verb refuses instead, so
+    /// the caller learns at once. Read `unit_type_table` for the rate of
+    /// each row.[^2]
+    ///
     /// # Errors
     ///
     /// Raises `ViewError` when an identity names no live soldier. Raises
     /// `VerbError` when the number is three or above, because that names no
-    /// resource kind.
+    /// resource kind. Raises `VerbError` when a unit's type has a gather
+    /// rate of zero.
     ///
     /// # References
     ///
     /// [^1]: Decisions register, DEC-120. `docs/DECISIONS.md`
+    /// [^2]: ADR-0145, a unit type is a row of capability columns, and zero means cannot, decision D2. `docs/adrs/draft/adr-0145-a-unit-type-is-a-row-of-capability-columns-and-zero-means-cannot.md`
     fn order_gather(&self, units: Vec<u64>, kind: u8) -> PyResult<()> {
         let mut world = self.lock();
         let kind = ResourceKind::from_u8(kind)
             .ok_or_else(|| VerbError::new_err(format!("{kind} names no resource kind")))?;
         let mut resolved = Vec::with_capacity(units.len());
         for unit in &units {
-            resolved.push(resolve(&world, *unit)?);
+            let entity = resolve(&world, *unit)?;
+            let row = world
+                .unit_type_row(entity)
+                .expect("a resolved identity names a live soldier");
+            if row.gather_rate == Fix32::ZERO {
+                return Err(VerbError::new_err(format!(
+                    "the unit {unit} is of a type whose gather rate is zero, and it cannot gather"
+                )));
+            }
+            resolved.push(entity);
         }
         for entity in resolved {
             assert!(
@@ -982,7 +999,14 @@ impl PyWorld {
     ///
     /// The `unit_type` is the row number, as a Python integer. The table
     /// holds eight rows, numbered zero to seven. A number of eight or above
-    /// names no row. A new soldier carries row zero.
+    /// names no row. A new soldier carries row zero, which the world builds
+    /// as the worker row.
+    ///
+    /// **The call takes the whole row.** A row is eight capability columns,
+    /// and a zero in a column means that the type cannot do what the column
+    /// names. There is no two-column form, because a caller that gave two
+    /// columns would leave the rest at zero and would define a unit that
+    /// fights and does nothing else without knowing it.[^3]
     ///
     /// The `attack` is the harm that one unit of this type delivers in one
     /// resolution. The value is a Python integer in the project fixed-point
@@ -993,6 +1017,25 @@ impl PyWorld {
     ///
     /// The `armour` is the attack that an attacker must exceed to reach a
     /// unit of this type. The value is in the same scale.
+    ///
+    /// The keyword arguments follow, and each is a Python integer.
+    ///
+    /// - `gather_rate`. The scale on what the unit takes from a tile in one
+    ///   tick, in the same fixed-point scale. 65536 takes the tile rate.
+    ///   Zero takes nothing, and `order_gather` refuses the unit.
+    /// - `build_rate`. The scale on the work the unit adds to an upgrade in
+    ///   one tick, in the fixed-point scale. Zero adds nothing, and
+    ///   `order_build` refuses the unit.
+    /// - `carry_capacity`. The most the unit carries, summed over every
+    ///   kind, as a whole count. A gather never raises a load above it. Zero
+    ///   means the unit never carries, and so never gathers.
+    /// - `move_cost_scale`. The scale on the movement cost the unit pays, in
+    ///   the fixed-point scale. **No pass reads this column yet.**
+    /// - `command_reach`. A whole count. Nonzero means the unit may move a
+    ///   relation. **No pass reads this column yet.**
+    /// - `weather_reach`. A whole count. Nonzero means the faction may
+    ///   inflict weather while it holds the unit. **No pass reads this
+    ///   column yet.**
     ///
     /// **An attacker whose attack does not exceed the defender's armour
     /// contributes exactly zero, however many attackers stand there.** The
@@ -1009,16 +1052,53 @@ impl PyWorld {
     /// # Errors
     ///
     /// Raises `VerbError` when the number names no row of the table. Raises
-    /// `VerbError` when the attack or the armour is below zero.
+    /// `VerbError` when a fixed-point column is below zero. Raises
+    /// `OverflowError` when a whole-count column is below zero or above the
+    /// range of a 32-bit unsigned integer.
     ///
     /// # References
     ///
     /// [^1]: ADR-0120, a unit carries a type, and the type is an index into a table the world is built with, decisions D1 and D2. `docs/adrs/draft/adr-0120-a-unit-carries-a-type-that-indexes-a-table.md`
     /// [^2]: ADR-0122, an attacker whose attack does not exceed the defender's armour contributes exactly zero, decision D1. `docs/adrs/draft/adr-0122-an-attacker-below-the-armour-contributes-exactly-zero.md`
-    fn define_unit_type(&self, unit_type: u8, attack: i32, armour: i32) -> PyResult<()> {
+    /// [^3]: ADR-0145, a unit type is a row of capability columns, and zero means cannot, decisions D2 and D5. `docs/adrs/draft/adr-0145-a-unit-type-is-a-row-of-capability-columns-and-zero-means-cannot.md`
+    #[pyo3(signature = (
+        unit_type,
+        attack,
+        armour,
+        *,
+        gather_rate,
+        build_rate,
+        carry_capacity,
+        move_cost_scale,
+        command_reach,
+        weather_reach,
+    ))]
+    #[allow(clippy::too_many_arguments)]
+    fn define_unit_type(
+        &self,
+        unit_type: u8,
+        attack: i32,
+        armour: i32,
+        gather_rate: i32,
+        build_rate: i32,
+        carry_capacity: u32,
+        move_cost_scale: i32,
+        command_reach: u32,
+        weather_reach: u32,
+    ) -> PyResult<()> {
         let mut world = self.lock();
+        let row = UnitTypeRow {
+            attack: Fix32(attack),
+            armour: Fix32(armour),
+            gather_rate: Fix32(gather_rate),
+            build_rate: Fix32(build_rate),
+            carry_capacity,
+            move_cost_scale: Fix32(move_cost_scale),
+            command_reach,
+            weather_reach,
+        };
         world
-            .define_unit_type(unit_type, Fix32(attack), Fix32(armour))
+            .define_unit_type(unit_type, row)
             .map_err(|error| VerbError::new_err(error.to_string()))
     }
 
@@ -1029,9 +1109,9 @@ impl PyWorld {
     ///
     /// The `unit_type` is a row of the shared table, as a Python integer. The
     /// table holds eight rows, numbered zero to seven. A number of eight or
-    /// above names no row. Write the row with `define_unit_type` before the
-    /// type means anything. A row that nobody wrote holds no attack and no
-    /// armour. A unit of that type therefore reaches nothing.[^1]
+    /// above names no row. The world builds the table with the default rows,
+    /// and `define_unit_type` writes one. A row whose every column is zero
+    /// is a unit that can do nothing.[^1]
     ///
     /// **The set is all or nothing.** Every identity resolves, and the type
     /// is checked, before any soldier is written. One refusal leaves the
@@ -1104,22 +1184,24 @@ impl PyWorld {
     /// A unit type is a row of this table. A soldier carries the row number
     /// alone. The table is data that the world holds, and it is not code.[^1]
     ///
-    /// Both arrays hold one entry for each row. The two arrays are the same
-    /// length. **That length is the number of types the world holds.**
+    /// Every array holds one entry for each row, and every array is the
+    /// same length. **That length is the number of types the world holds.**
     /// Nothing else states the width. A caller reads the width from this
     /// return value, not from a second number that could disagree.[^3]
     ///
-    /// - `attack`, `numpy.int32`. The harm that one unit of the row delivers
-    ///   in one resolution. The value carries the Q16.16 fixed-point scale,
-    ///   so one whole casualty is 65536 and one half casualty is 32768.
-    /// - `armour`, `numpy.int32`. The attack that an attacker must exceed to
-    ///   reach a unit of the row, in the same Q16.16 scale.
+    /// The keys are the column names of the row, in the order the engine
+    /// declares them. Each value is a `numpy.int64` array. The keys and the
+    /// keyword arguments of `define_unit_type` are the same names, and each
+    /// entry carries the value that call took: a fixed-point column keeps
+    /// its raw Q16.16 value, so one whole casualty is 65536, and a whole
+    /// count column keeps its count.
     ///
     /// **The width of the table is fixed, and the values are configurable.**
-    /// The world builds the table with every row at zero.
-    /// `define_unit_type` writes one row. A row that nobody wrote holds zero
-    /// attack and zero armour. A unit of that row reaches nothing, and
-    /// nothing reaches it.[^1]
+    /// The world builds the table with the default rows: a worker, a
+    /// soldier, a merchant, a leader, one open row, and zero above them.
+    /// `define_unit_type` writes one row. A row whose every column is zero
+    /// is a unit that can do nothing: it reaches nothing, nothing reaches
+    /// it, and it gathers, builds and carries nothing.[^1] [^5]
     ///
     /// The values are content. A record may not hold a number that a content
     /// choice can move, so no record holds one.[^4]
@@ -1132,14 +1214,17 @@ impl PyWorld {
     /// [^2]: ADR-0044, what copies and what does not is declared at the call site. `docs/adrs/REGISTRY.md`
     /// [^3]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`
     /// [^4]: Decision Record Scope, section 4.1. `.claude/rules/adr-scope.md`
+    /// [^5]: ADR-0145, a unit type is a row of capability columns, and zero means cannot, decisions D2 and D4. `docs/adrs/draft/adr-0145-a-unit-type-is-a-row-of-capability-columns-and-zero-means-cannot.md`
     fn unit_type_table<'py>(&self, python: Python<'py>) -> PyResult<Bound<'py, PyDict>> {
         let world = self.lock();
         let rows = world.unit_types().rows();
         let columns = PyDict::new(python);
-        let attack: Vec<i32> = rows.iter().map(|row| row.attack.0).collect();
-        let armour: Vec<i32> = rows.iter().map(|row| row.armour.0).collect();
-        columns.set_item("attack", attack.to_pyarray(python))?;
-        columns.set_item("armour", armour.to_pyarray(python))?;
+        // The names and the values both come from the row declaration, so
+        // the dictionary cannot name a column the row does not hold.
+        for (index, name) in UnitTypeRow::COLUMN_NAMES.iter().enumerate() {
+            let column: Vec<i64> = rows.iter().map(|row| row.columns()[index]).collect();
+            columns.set_item(name, column.to_pyarray(python))?;
+        }
         Ok(columns)
     }
 
@@ -1490,11 +1575,18 @@ impl PyWorld {
     /// **The set is all or nothing.** Every identity resolves, and the kind
     /// is checked, before the engine gives any order.
     ///
+    /// **A unit whose type cannot build refuses the order.** The build rate
+    /// of the row the unit indexes is zero, so the unit would keep the order
+    /// and add nothing on every step. The verb refuses instead, so the
+    /// caller learns at once. Read `unit_type_table` for the rate of each
+    /// row.[^5]
+    ///
     /// # Errors
     ///
     /// Raises `ViewError` when an identity names no live soldier. Raises
     /// `VerbError` when the number is two or above, because that names no
-    /// upgrade kind. The message names the number that refused.
+    /// upgrade kind. The message names the number that refused. Raises
+    /// `VerbError` when a unit's type has a build rate of zero.
     ///
     /// # References
     ///
@@ -1502,13 +1594,23 @@ impl PyWorld {
     /// [^2]: ADR-0023, an aggregate combines exactly, in any order, decision D1. `docs/adrs/accepted/adr-0023-an-aggregate-combines-exactly-in-any-order.md`
     /// [^3]: Findings register, FND-352. `docs/FINDINGS.md`
     /// [^4]: Findings register, FND-380. `docs/FINDINGS.md`
+    /// [^5]: ADR-0145, a unit type is a row of capability columns, and zero means cannot, decision D2. `docs/adrs/draft/adr-0145-a-unit-type-is-a-row-of-capability-columns-and-zero-means-cannot.md`
     fn order_build(&self, units: Vec<u64>, kind: u8) -> PyResult<()> {
         let mut world = self.lock();
         let kind = UpgradeKind::from_u8(kind)
             .ok_or_else(|| VerbError::new_err(format!("{kind} names no upgrade kind")))?;
         let mut resolved = Vec::with_capacity(units.len());
         for unit in &units {
-            resolved.push(resolve(&world, *unit)?);
+            let entity = resolve(&world, *unit)?;
+            let row = world
+                .unit_type_row(entity)
+                .expect("a resolved identity names a live soldier");
+            if row.build_rate == Fix32::ZERO {
+                return Err(VerbError::new_err(format!(
+                    "the unit {unit} is of a type whose build rate is zero, and it cannot build"
+                )));
+            }
+            resolved.push(entity);
         }
         for entity in resolved {
             assert!(

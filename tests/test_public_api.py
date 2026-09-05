@@ -434,8 +434,8 @@ def test_one_tank_still_kills_four_bowmen(seed: int) -> None:
     """
     world = cachette.World(width=1, height=1, seed=1, faction_count=2)
     one = 65536
-    world.define_unit_type(0, one, 0)
-    world.define_unit_type(1, 4 * one, 2 * one)
+    world.define_unit_type(0, one, 0, **_worker_columns(world))
+    world.define_unit_type(1, 4 * one, 2 * one, **_worker_columns(world))
     bowmen = world.spawn_soldiers([(0, 0)] * 4, 0)
     tank = world.spawn_soldiers([(0, 0)], 1)
     world.set_unit_types(bowmen, 0)
@@ -453,8 +453,8 @@ def test_ten_thousand_bowmen_also_lose_to_one_tank() -> None:
     crowd = 10_000
     world = cachette.World(width=1, height=1, seed=1, faction_count=2)
     one = 65536
-    world.define_unit_type(0, one, 0)
-    world.define_unit_type(1, 4 * one, 2 * one)
+    world.define_unit_type(0, one, 0, **_worker_columns(world))
+    world.define_unit_type(1, 4 * one, 2 * one, **_worker_columns(world))
     bowmen = world.spawn_soldiers([(0, 0)] * crowd, 0)
     tank = world.spawn_soldiers([(0, 0)], 1)
     world.set_unit_types(bowmen, 0)
@@ -485,7 +485,7 @@ def test_a_refused_unit_type_set_gives_no_type() -> None:
     """
     world = cachette.World(width=1, height=1, seed=1, faction_count=2)
     # Type one reaches. Type zero, which every new soldier carries, does not.
-    world.define_unit_type(1, 65536, 0)
+    world.define_unit_type(1, 65536, 0, **_worker_columns(world))
     attackers = [int(unit) for unit in world.spawn_soldiers([(0, 0)] * 2, 0)]
     world.spawn_soldiers([(0, 0)], 1)
     world.despawn_soldiers([attackers[1]])
@@ -528,6 +528,23 @@ def test_a_unit_type_the_table_does_not_hold_is_refused(seed: int) -> None:
 FALLEN_SEED = 1
 BOWMAN = 0
 TANK = 1
+
+
+def _worker_columns(world: cachette.World) -> dict[str, int]:
+    """Return the six columns beyond attack and armour, as the worker holds them.
+
+    The worker is row zero of the table a new world is built with. The values
+    are read from the engine rather than written here, so the test holds no
+    second copy of them.
+    """
+    table = world.unit_type_table()
+    return {
+        name: int(table[name][0])  # type: ignore[literal-required]
+        for name in table
+        if name not in ("attack", "armour")
+    }
+
+
 BOWMAN_TILE = (0, 0)
 TANK_TILE = (1, 0)
 BOWMAN_FACTION = 1
@@ -543,8 +560,10 @@ def _contested_world() -> tuple[cachette.World, list[int], list[int]]:
     any step. The caller steps it.
     """
     world = cachette.World(width=16, height=16, seed=FALLEN_SEED, faction_count=3)
-    world.define_unit_type(BOWMAN, WHOLE_UNIT, 0)
-    world.define_unit_type(TANK, 4 * WHOLE_UNIT, 2 * WHOLE_UNIT)
+    world.define_unit_type(BOWMAN, WHOLE_UNIT, 0, **_worker_columns(world))
+    world.define_unit_type(
+        TANK, 4 * WHOLE_UNIT, 2 * WHOLE_UNIT, **_worker_columns(world)
+    )
     bowmen = world.spawn_soldiers(BOWMAN_ADDRESSES, BOWMAN_FACTION)
     world.set_unit_types(bowmen, BOWMAN)
     tank = world.spawn_soldiers([TANK_TILE], TANK_FACTION)

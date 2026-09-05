@@ -77,6 +77,21 @@ DOCUMENTED_FIRST_REFUSED_UNIT_TYPE = 8
 DOCUMENTED_FIXED_POINT_ONE = 65536
 
 
+def _worker_columns(world: cachette.World) -> dict[str, int]:
+    """Return the six columns beyond attack and armour, as the worker holds them.
+
+    The worker is row zero of the table a new world is built with. The values
+    are read from the engine rather than written here, so the test holds no
+    second copy of them.
+    """
+    table = world.unit_type_table()
+    return {
+        name: int(table[name][0])  # type: ignore[literal-required]
+        for name in table
+        if name not in ("attack", "armour")
+    }
+
+
 def test_the_constructor_defaults_are_the_documented_ones() -> None:
     default = cachette.World()
     named = cachette.World(
@@ -227,9 +242,13 @@ def test_the_unit_type_table_holds_the_documented_rows() -> None:
     """The table takes every documented row and refuses the first one above."""
     world = cachette.World()
     for unit_type in DOCUMENTED_UNIT_TYPES:
-        world.define_unit_type(unit_type, DOCUMENTED_FIXED_POINT_ONE, 0)
+        world.define_unit_type(
+            unit_type, DOCUMENTED_FIXED_POINT_ONE, 0, **_worker_columns(world)
+        )
     with pytest.raises(cachette.VerbError):
-        world.define_unit_type(DOCUMENTED_FIRST_REFUSED_UNIT_TYPE, 0, 0)
+        world.define_unit_type(
+            DOCUMENTED_FIRST_REFUSED_UNIT_TYPE, 0, 0, **_worker_columns(world)
+        )
 
 
 def test_one_whole_casualty_is_the_documented_fixed_point_value() -> None:
@@ -240,7 +259,7 @@ def test_one_whole_casualty_is_the_documented_fixed_point_value() -> None:
     value end exactly two defenders in one frame.
     """
     world = cachette.World(width=1, height=1, seed=1, faction_count=2)
-    world.define_unit_type(0, DOCUMENTED_FIXED_POINT_ONE, 0)
+    world.define_unit_type(0, DOCUMENTED_FIXED_POINT_ONE, 0, **_worker_columns(world))
     attackers = world.spawn_soldiers([(0, 0), (0, 0)], 0)
     defenders = world.spawn_soldiers([(0, 0)] * 5, 1)
     world.set_unit_types(attackers, 0)
