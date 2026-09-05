@@ -405,6 +405,7 @@ without stating a constraint is worse than no record.
 | 0147 | A contract consideration is a tagged kind | Accepted | 0002, 0111, 0126, 0127, 0128, 0146 | `accepted/adr-0147-a-contract-consideration-is-a-tagged-kind.md` |
 | 0148 | A game end is recorded once and stops the controllers | Accepted | 0001, 0004, 0023, 0053, 0144 | `accepted/adr-0148-a-game-end-is-recorded-once-and-stops-the-controllers.md` |
 | 0149 | A faction's trade board is simulated state that any faction may read | Draft | 0002, 0004, 0144, 0147 | `draft/adr-0149-a-factions-trade-board-is-simulated-state-that-any-faction-may-read.md` |
+| 0150 | Held ground is the ground within reach of a city its faction owns, and upgrades extend the reach to a bound. Supersedes ADR-0053 D5 and D6, the spread rule; the other decisions of ADR-0053 stand | Draft | 0002, 0004, 0053, 0090, 0111, 0144, 0145, 0147 | `draft/adr-0150-held-ground-is-the-ground-within-reach-of-a-city-its-faction-owns.md` |
 
 ### Retired numbers
 
