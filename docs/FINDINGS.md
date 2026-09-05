@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-482**
+**Next number: FND-483**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -3169,6 +3169,46 @@ the scope rule names as recording an intent as a fact.
 
 
 ## G. Process
+
+### FND-482 — Three trade records existed twice under two sets of numbers, and both sets were marked as drafts under review
+
+**Believed.** The registry held one record for each of the three trade claims:
+a negotiation is engine state, a terminal refusal closes a pair until a named
+tick, and a contract moves a quantity only when a unit carries it. Numbers
+0126 to 0128 held them.
+
+**True.** Numbers 0129 to 0131 held the same three files, byte for byte apart
+from the number in the title and in the footnotes that cite each other. A
+commit that restored the three records after a number collision wrote them
+under a second set of numbers, thirty-nine minutes after the first set was
+committed.[^F482A] Both sets carried the status `Draft`, both sets sat in the
+priority index as records waiting for review, and the Python binding cited the
+second set in three doc comments.
+
+**Evidence.** A diff of each pair shows one changed line in the title and one
+or two changed footnote lines, and nothing else. The whole-tree search below
+found every citation of the second set. It found four footnotes in the
+duplicate files themselves, three doc comments in one source file, and the
+three registry rows.
+
+```
+grep -rn "ADR-0129\|adr-0129\|ADR-0130\|adr-0130\|ADR-0131\|adr-0131" --exclude-dir=target --exclude-dir=.claude .
+```
+
+**Follows.** Three things.
+
+The second set is marked `Superseded` by the first, and the registry row names
+the twin. The files stay, because the registry keeps the file of a replaced
+record, and each carries a paragraph that names its twin.[^F482B] Every
+citation of the second set now points at the first.
+
+A restore after a collision is a sweep, and it needs the whole-tree search that
+every sweep needs. The restoring commit searched for the claims and not for the
+numbers, so it did not see that the claims already had numbers.
+
+The record check reports a number used twice only when two files share one
+number. Two numbers that share one claim pass it. A check that compared record
+titles across files would have failed here, and none exists.
 
 ### FND-443 — A test that watches a dead identity refuse does not cover the column that carries the identity
 
@@ -11484,3 +11524,5 @@ itself rather than merely underspecified.
 [^F451A]: The influence field, the self weight and the neighbour weight. `crates/cachette-core/src/influence.rs`
 [^F451B]: PRD-0004, the world has weather that a watcher can read, what good looks like. `docs/product/accepted/prd-0004-the-world-has-weather-that-a-watcher-can-read.md`
 [^F452A]: ADR-0072, a tile stock is generated, and only what was taken is stored, decision D5. `docs/adrs/accepted/adr-0072-a-tile-stock-is-generated-and-only-what-was-taken-is-stored.md`
+[^F482A]: Commit 7c4b722, restore the three trade records that a number collision dropped.
+[^F482B]: ADR Registry, status vocabulary. `docs/adrs/REGISTRY.md`

@@ -3425,7 +3425,7 @@ impl PyWorld {
     ///
     /// # References
     ///
-    /// [^1]: ADR-0129, a trade negotiation is engine state and the words are not, decision D3. `docs/adrs/draft/adr-0129-a-trade-negotiation-is-engine-state.md`
+    /// [^1]: ADR-0126, a trade negotiation is engine state and the words are not, decision D3. `docs/adrs/draft/adr-0126-a-trade-negotiation-is-engine-state.md`
     #[allow(clippy::too_many_arguments)]
     fn offer_trade(
         &self,
@@ -3626,7 +3626,7 @@ impl PyWorld {
     ///
     /// # References
     ///
-    /// [^1]: ADR-0129, a trade negotiation is engine state and the words are not, decision D5. `docs/adrs/draft/adr-0129-a-trade-negotiation-is-engine-state.md`
+    /// [^1]: ADR-0126, a trade negotiation is engine state and the words are not, decision D5. `docs/adrs/draft/adr-0126-a-trade-negotiation-is-engine-state.md`
     fn trade_status<'py>(
         &self,
         python: Python<'py>,
@@ -5559,7 +5559,7 @@ impl PyWorld {
 ///
 /// # References
 ///
-/// [^1]: ADR-0130, a terminal refusal closes an ordered pair until a named tick, decision D3. `docs/adrs/draft/adr-0130-a-terminal-refusal-closes-a-pair-until-a-named-tick.md`
+/// [^1]: ADR-0127, a terminal refusal closes an ordered pair until a named tick, decision D3. `docs/adrs/draft/adr-0127-a-terminal-refusal-closes-a-pair-until-a-named-tick.md`
 fn trade_refusal(error: cachette_core::TradeError) -> PyErr {
     use cachette_core::TradeError as Refusal;
     let said = match error {

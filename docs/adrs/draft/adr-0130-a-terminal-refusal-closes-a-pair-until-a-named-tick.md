@@ -1,5 +1,7 @@
 # ADR-0130: A terminal refusal closes an ordered pair until a named tick
 
+**This file is a copy of ADR-0127.** A number collision restored the three trade records under a second set of numbers, thirty-nine minutes after the first set. The registry names ADR-0127 as the record that replaces this one. Cite ADR-0127. This file stays because the registry keeps the file of a replaced record.
+
 ## Context
 
 The project owner asked for contractual trades with counteroffers, and he named
@@ -109,5 +111,5 @@ did not deliver, and the duration comes from the contract itself.[^2]
 
 ## References
 
-[^1]: ADR-0129, a trade negotiation is engine state, and the words are not, decision D1. `docs/adrs/draft/adr-0129-a-trade-negotiation-is-engine-state.md`
-[^2]: ADR-0131, a contract moves a quantity only when a unit carries it onto the ground of the other party, decision D4. `docs/adrs/draft/adr-0131-a-contract-moves-a-quantity-only-when-a-unit-carries-it.md`
+[^1]: ADR-0126, a trade negotiation is engine state, and the words are not, decision D1. `docs/adrs/draft/adr-0126-a-trade-negotiation-is-engine-state.md`
+[^2]: ADR-0128, a contract moves a quantity only when a unit carries it onto the ground of the other party, decision D4. `docs/adrs/draft/adr-0128-a-contract-moves-a-quantity-only-when-a-unit-carries-it.md`

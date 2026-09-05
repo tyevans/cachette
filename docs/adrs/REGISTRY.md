@@ -389,9 +389,9 @@ without stating a constraint is worse than no record.
 | 0126 | A trade negotiation is engine state, and the words are not | Draft | 0001, 0002, 0004, 0053, 0090 | 21, `draft/adr-0126-a-trade-negotiation-is-engine-state.md` |
 | 0127 | A terminal refusal closes an ordered pair until a named tick | Draft | 0120 | `draft/adr-0127-a-terminal-refusal-closes-a-pair-until-a-named-tick.md` |
 | 0128 | A contract moves a quantity only when a unit carries it onto the ground of the other party | Draft | 0004, 0062, 0063, 0072, 0073, 0120, 0121 | `draft/adr-0128-a-contract-moves-a-quantity-only-when-a-unit-carries-it.md` |
-| 0129 | A trade negotiation is engine state, and the words are not | Draft | 0001, 0002, 0004, 0053, 0090 | 21, `draft/adr-0129-a-trade-negotiation-is-engine-state.md` |
-| 0130 | A terminal refusal closes an ordered pair until a named tick | Draft | 0129 | `draft/adr-0130-a-terminal-refusal-closes-a-pair-until-a-named-tick.md` |
-| 0131 | A contract moves a quantity only when a unit carries it onto the ground of the other party | Draft | 0004, 0062, 0063, 0072, 0073, 0129, 0130 | `draft/adr-0131-a-contract-moves-a-quantity-only-when-a-unit-carries-it.md` |
+| 0129 | A trade negotiation is engine state, and the words are not. Superseded by ADR-0126, the older identical copy | Superseded | 0126 | 21, `draft/adr-0129-a-trade-negotiation-is-engine-state.md` |
+| 0130 | A terminal refusal closes an ordered pair until a named tick. Superseded by ADR-0127, the older identical copy | Superseded | 0127 | `draft/adr-0130-a-terminal-refusal-closes-a-pair-until-a-named-tick.md` |
+| 0131 | A contract moves a quantity only when a unit carries it onto the ground of the other party. Superseded by ADR-0128, the older identical copy | Superseded | 0128 | `draft/adr-0131-a-contract-moves-a-quantity-only-when-a-unit-carries-it.md` |
 | 0132 | Conversion changes the faction of a unit, and adds no second allegiance | Draft | 0014, 0065, 0070, 0072, 0099, 0104, 0111, 0134 | `draft/adr-0132-conversion-changes-the-faction-of-a-unit.md` |
 | 0133 | A unit converts to the faction that leads the influence field at its cell | Draft | 0002, 0003, 0004, 0087, 0096, 0111, 0123, 0128, 0132, 0134 | 09, `draft/adr-0133-a-unit-converts-to-the-faction-that-leads-the-field.md` |
 | 0134 | A god reads conversion as an event log and as the counts it already reads | Draft | 0006, 0064, 0065, 0070, 0132, 0133 | `draft/adr-0134-a-god-reads-conversion-as-an-event-log.md` |
@@ -399,6 +399,11 @@ without stating a constraint is worse than no record.
 | 0141 | A weather pass moves water and never scales it | Draft | 0002, 0004, 0009, 0023, 0072, 0087 | `draft/adr-0141-a-weather-pass-moves-water-and-never-scales-it.md` |
 | 0142 | A god inflicts weather only on ground its own faction holds | Draft | 0004, 0040, 0053, 0111, 0125, 0128, 0140 | `draft/adr-0142-a-god-inflicts-weather-only-on-ground-it-holds.md` |
 | 0143 | Wet ground yields more to a gatherer | Draft | 0056, 0072, 0073, 0140 | `draft/adr-0143-wet-ground-yields-more-to-a-gatherer.md` |
+| 0144 | A faction controller runs inside the step and acts only through the caller's verbs | Draft | 0001, 0003, 0004, 0040, 0042, 0043, 0053 | `draft/adr-0144-a-faction-controller-runs-inside-the-step-and-acts-only-through-the-callers-verbs.md` |
+| 0145 | A unit type is a row of capability columns, and zero means cannot | Draft | 0002, 0011, 0120, 0121, 0142 | `draft/adr-0145-a-unit-type-is-a-row-of-capability-columns-and-zero-means-cannot.md` |
+| 0146 | A faction relation is one signed integer per ordered pair, and a pass reads a threshold | Draft | 0001, 0002, 0004, 0006, 0053, 0121, 0126, 0133, 0145 | `draft/adr-0146-a-faction-relation-is-one-signed-integer-per-ordered-pair-and-a-pass-reads-a-threshold.md` |
+| 0147 | A contract consideration is a tagged kind | Draft | 0002, 0111, 0126, 0127, 0128, 0146 | `draft/adr-0147-a-contract-consideration-is-a-tagged-kind.md` |
+| 0148 | A game end is recorded once and stops the controllers | Draft | 0001, 0004, 0023, 0053, 0144 | `draft/adr-0148-a-game-end-is-recorded-once-and-stops-the-controllers.md` |
 
 ### Retired numbers
 

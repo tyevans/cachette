@@ -38,8 +38,12 @@ The world holds one table. A row of it states the properties that a pass reads
 for a unit of that type. The table holds no function, no closure and no
 dispatch, so a pass that reads it takes the same branches for every type.
 
-A caller fills the rows it wants and leaves the rest at their zero value. A
-world whose table nobody filled behaves as a world with no types at all.
+A caller fills the rows it wants and leaves the rest at their zero value. Every
+value of a row is a capability column, and a zero in a column means that the
+type cannot do what the column names. A later record widens this decision and
+states that rule.[^10] A row that nobody filled is therefore a unit that can do
+nothing, and the default table the world is built with fills the rows a
+demonstration needs.
 
 This is the design principle applied to one table. A verb takes the type as a
 parameter. A verb is not written twice because two types exist.
@@ -114,3 +118,4 @@ content that a caller supplies.
 [^7]: Recurring Defect Shapes, shapes 1 and 3. `.claude/rules/recurring-defects.md`
 [^8]: ADR-0012, tiles are dense columns and units are a generational arena, decision D3. `docs/adrs/accepted/adr-0012-tiles-are-dense-columns-and-units-are-a-generational-arena.md`
 [^9]: ADR-0001, one binary gives one answer at any thread count, decision D4. `docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
+[^10]: ADR-0145, a unit type is a row of capability columns, and zero means cannot, decision D2. `docs/adrs/draft/adr-0145-a-unit-type-is-a-row-of-capability-columns-and-zero-means-cannot.md`

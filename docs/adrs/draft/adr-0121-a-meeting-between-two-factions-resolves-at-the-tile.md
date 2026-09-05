@@ -65,8 +65,11 @@ defender exactly once, in the pass over the tile it stands on, so nothing is
 resolved twice and no unit is counted against itself.
 
 A tile is contested when some unit within reach belongs to a faction that some
-unit on the tile does not. The pass tests that from the group lists it has
-already built, and skips every tile that fails it. The cost of the contest
+unit on the tile does not, and when at least one of the two factions is in the
+war band toward the other. The relation between two factions is one signed
+integer, and a later record states the band and the gate.[^15] The pass tests
+both conditions from the group lists it has already built, and skips every tile
+that fails either. The cost of the contest
 therefore follows the occupied tiles and never the tile count of the world.
 
 ### D2. The pass is a structural change, and it applies after its own barrier
@@ -125,8 +128,9 @@ and no table work at all. A resolution that fired only on co-occupation would
 pay less and would never fire.
 
 **A unit cannot stand out of reach of an enemy that is beside it.** There is no
-posture that refuses a fight, and this record adds none. A decision holds that
-question.[^14]
+posture that refuses a fight, and this record adds none. The relation between
+the two factions is the only thing that refuses one.[^15] A decision holds the
+question of a posture.[^14]
 
 **Level 1 keeps the job it is good at.** It decides where an army goes. This
 record takes nothing from the field that steers movement.[^11]
@@ -150,3 +154,4 @@ method that produced it.[^5]
 [^11]: ADR-0091, movement takes its direction from a per-cell field, never from a per-unit search, decision D1. `docs/adrs/draft/adr-0091-movement-takes-its-direction-from-a-per-cell-field.md`
 [^13]: Findings register, FND-402. `docs/FINDINGS.md`
 [^14]: Decisions register, DEC-146. `docs/DECISIONS.md`
+[^15]: ADR-0146, a faction relation is one signed integer per ordered pair, and a pass reads a threshold, decision D4. `docs/adrs/draft/adr-0146-a-faction-relation-is-one-signed-integer-per-ordered-pair-and-a-pass-reads-a-threshold.md`
