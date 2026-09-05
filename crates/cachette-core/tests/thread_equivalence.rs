@@ -1154,6 +1154,12 @@ fn a_world_whose_holdings_contend_is_identical_at_every_thread_count() {
 /// [^2]: Testing rules, section 2a. `.claude/rules/testing.md`
 /// [^3]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
 fn contenders(world: &mut World) -> usize {
+    // The contest resolves a meeting only across a pair at war, so the
+    // scenario declares one. The edge is read from the world.[^4]
+    //
+    // [^4]: ADR-0146, a faction relation is one signed integer per ordered pair, and a pass reads a threshold, decision D4. `docs/adrs/draft/adr-0146-a-faction-relation-is-one-signed-integer-per-ordered-pair-and-a-pass-reads-a-threshold.md`
+    let war = world.relation_rules().war_edge - 1;
+    assert!(world.set_relation(FactionId(0), FactionId(1), war));
     world
         .define_unit_type(0, fighter(Fix32::from_int(1), Fix32(Fix32::ONE.0 / 2)))
         .expect("the row is inside the table");
@@ -1291,6 +1297,16 @@ fn believers(world: &mut World) -> usize {
         let address = patch[(faction as usize) % patch.len()];
         let strength = Influence(u16::MAX / (faction + 1));
         assert!(world.set_influence_source(FactionId(faction), address, strength));
+    }
+    // A leader at peace with a faction converts none of its units, so every
+    // ordered pair is put in tension. The edge is read from the world.
+    let tension = world.relation_rules().peace_edge - 1;
+    for from in 0..factions {
+        for to in 0..factions {
+            if from != to {
+                assert!(world.set_relation(FactionId(from), FactionId(to), tension));
+            }
+        }
     }
     seated
 }

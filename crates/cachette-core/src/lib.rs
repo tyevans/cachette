@@ -36,6 +36,7 @@ pub mod presence;
 pub mod promotion;
 pub mod pyramid;
 pub mod rates;
+pub mod relation;
 pub mod resource;
 pub mod rng;
 pub mod sim_math;
@@ -66,10 +67,11 @@ pub use cohort::{
     CohortError, CohortRow, CohortTable, DeathPlane, DrawLedger, DrawPass, NeedCondition, NeedRule,
     SiteRationed, UnitStarved, COHORTS_PER_SITE,
 };
-pub use contest::{ContestError, UnitFell};
+pub use contest::{ContestError, Grievance, UnitFell};
 pub use controller::{
     Choice, ControllerCommand, FactionRow, FactionWeights, GameEnd, WinPath, COMMAND_BUILD,
-    COMMAND_GATHER, EVALUATIONS_DEFAULT, TICK_LIMIT_DEFAULT, WEIGHT_HIGH, WEIGHT_LOW,
+    COMMAND_GATHER, COMMAND_RELATION, EVALUATIONS_DEFAULT, TICK_LIMIT_DEFAULT, WEIGHT_HIGH,
+    WEIGHT_LOW,
 };
 pub use conversion::{ConversionError, Convert, UnitConverted};
 pub use descent::{
@@ -93,6 +95,7 @@ pub use pyramid::{CellSummary, ExitField, Pyramid, NO_EXIT};
 pub use rates::{
     RateError, RateLedger, RatePass, RateSchedule, RateTable, SiteRate, SiteShortfall,
 };
+pub use relation::{RelationCrossed, RelationError, RelationMatrix, RelationRules};
 pub use resource::{
     Amount, CarryLoad, DepletionLedger, LedgerEntry, RecoveryRules, ResourceField, ResourceKind,
 };
@@ -125,6 +128,6 @@ pub use weather::{
     WET_MARK,
 };
 pub use world::{
-    CensusRow, ConvertError, IdentityError, StepError, World, WorldConfig, WorldError,
-    FOUNDING_GROUP_DEFAULT, LUXURY_DEPOSITS_DEFAULT, SUBSYSTEM_CENSUS,
+    CensusRow, ConvertError, IdentityError, MoveRelationError, StepError, World, WorldConfig,
+    WorldError, FOUNDING_GROUP_DEFAULT, LUXURY_DEPOSITS_DEFAULT, SUBSYSTEM_CENSUS,
 };
