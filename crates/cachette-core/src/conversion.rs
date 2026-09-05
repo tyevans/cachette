@@ -41,6 +41,7 @@ use bytemuck::{Pod, Zeroable};
 
 use crate::bridge::{BlockLayout, UnitTileBridge};
 use crate::influence::{cell_of_tile, Influence, InfluenceField};
+use crate::relation::RelationMatrix;
 use crate::rng;
 use crate::sim_math;
 use crate::slots::Slots;
@@ -298,8 +299,10 @@ pub fn converts(margin: u16, present: u32, remainder_draw: u64) -> u32 {
 /// [^1]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
 /// [^2]: ADR-0009, parallel stages write disjoint outputs, decision D1. `docs/adrs/accepted/adr-0009-parallel-stages-write-disjoint-outputs.md`
 /// [^3]: ADR-0018, the unit-to-tile bridge is derived, and it rebuilds at the barrier, decision D2. `docs/adrs/accepted/adr-0018-the-unit-to-tile-bridge-is-derived-and-rebuilds-at-the-barrier.md`
+#[allow(clippy::too_many_arguments)]
 pub fn resolve(
     key: DrawKey,
+    relations: &RelationMatrix,
     arena: &SoldierArena,
     bridge: &UnitTileBridge,
     field: &InfluenceField,
@@ -334,7 +337,16 @@ pub fn resolve(
                 let mut reader = CellReader::new(field, layout);
                 let mut groups = Vec::new();
                 for block in start..stop {
-                    resolve_block(key, arena, bridge, block, &mut reader, &mut groups, entry);
+                    resolve_block(
+                        key,
+                        relations,
+                        arena,
+                        bridge,
+                        block,
+                        &mut reader,
+                        &mut groups,
+                        entry,
+                    );
                 }
             });
         }
@@ -422,8 +434,10 @@ impl<'a> CellReader<'a> {
 }
 
 /// Converts the units of one block.
+#[allow(clippy::too_many_arguments)]
 fn resolve_block(
     key: DrawKey,
+    relations: &RelationMatrix,
     arena: &SoldierArena,
     bridge: &UnitTileBridge,
     block: u32,
@@ -466,6 +480,14 @@ fn resolve_block(
 
         for (faction, count) in groups.iter().copied() {
             if faction == leader {
+                continue;
+            }
+            // **A leader at peace with a faction converts none of its
+            // units.** The relation adds one condition to the field, and the
+            // edge it compares against is a register row.[^2]
+            //
+            // [^2]: ADR-0146, a faction relation is one signed integer per ordered pair, and a pass reads a threshold, decision D4. `docs/adrs/draft/adr-0146-a-faction-relation-is-one-signed-integer-per-ordered-pair-and-a-pass-reads-a-threshold.md`
+            if !relations.permits_conversion(leader, faction) {
                 continue;
             }
             let held = reader.reach[faction.0 as usize];

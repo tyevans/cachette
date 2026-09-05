@@ -279,6 +279,18 @@ pub const COMMAND_GATHER: u8 = 0;
 /// The kind of command the controller emitted: a build order.
 pub const COMMAND_BUILD: u8 = 1;
 
+/// The kind of command the controller emitted: a relation move against
+/// another faction.
+pub const COMMAND_RELATION: u8 = 2;
+
+/// The step the controller moves a relation by when its draw says so. It is
+/// one step toward war, and the drift is what brings the pair back.[^1]
+///
+/// # References
+///
+/// [^1]: ADR-0146, a faction relation is one signed integer per ordered pair, and a pass reads a threshold, decision D3. `docs/adrs/draft/adr-0146-a-faction-relation-is-one-signed-integer-per-ordered-pair-and-a-pass-reads-a-threshold.md`
+pub const RELATION_STEP: i32 = -1;
+
 /// One command the controller emitted on the last tick.
 ///
 /// The log is the record of what the controller asked for and whether the
@@ -313,17 +325,60 @@ pub enum Choice {
     Gather(ResourceKind),
     /// Order the units of the faction to build one kind.
     Build(UpgradeKind),
+    /// Move the relation of the faction toward another by one step.
+    Relation(FactionId),
 }
 
 impl Choice {
     /// Returns the kind number and the argument number of the choice.
+    ///
+    /// The argument of a relation move is the other faction. The faction
+    /// ceiling is below the range of the column, so the narrowing loses
+    /// nothing.
     #[must_use]
     pub const fn numbers(self) -> (u8, u8) {
         match self {
             Self::Gather(kind) => (COMMAND_GATHER, kind.to_u8()),
             Self::Build(kind) => (COMMAND_BUILD, kind.to_u8()),
+            Self::Relation(other) => (COMMAND_RELATION, other.0 as u8),
         }
     }
+}
+
+/// Decides whether a faction moves its relation toward its rival this tick.
+///
+/// **This draws exactly once.** The key is the controller system, the tick,
+/// the faction and the draw index, and the index is one past the evaluation
+/// indexes so it collides with none of them.[^1] The war weight biases the
+/// draw: the answer is yes with probability `war / (WEIGHT_HIGH + war)`.
+///
+/// # References
+///
+/// [^1]: ADR-0003, every random draw is keyed, never stateful, decision D1. `docs/adrs/accepted/adr-0003-every-random-draw-is-keyed-never-stateful.md`
+#[must_use]
+pub fn wants_relation_move(
+    seed: u64,
+    tick: Tick,
+    faction: FactionId,
+    draw: u32,
+    weights: FactionWeights,
+) -> bool {
+    let raw = rng::draw(seed, rng::SYSTEM_CONTROLLER, tick.0, faction.0 as u64, draw);
+    let bound = u64::from(WEIGHT_HIGH) + u64::from(weights.war);
+    let roll = ((u128::from(raw) * u128::from(bound)) >> 64) as u64;
+    roll < u64::from(weights.war)
+}
+
+/// Picks the rival of a faction: the other faction with the most held tiles.
+///
+/// **A tie resolves by the lowest faction identifier**, in the way the
+/// territory winner does. Returns `None` when no other faction exists.
+#[must_use]
+pub fn rival_of(
+    faction: FactionId,
+    held: impl Iterator<Item = (FactionId, i64)>,
+) -> Option<FactionId> {
+    territory_winner(held.filter(|(other, _)| *other != faction))
 }
 
 /// Makes one evaluation for one faction.
@@ -546,12 +601,23 @@ impl Controller {
     ///
     /// Returns an empty list when the game end record is written.[^2]
     ///
+    /// The rivals list holds, for each faction, the faction it would move a
+    /// relation against, or `None` when it holds no leader unit or no other
+    /// faction exists. A faction with a rival draws once more, at the index
+    /// past the evaluations, and the draw decides whether it moves.[^3]
+    ///
     /// # References
     ///
     /// [^1]: ADR-0004, iteration order is explicit, decision D4. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
     /// [^2]: ADR-0148, a game end is recorded once and stops the controllers, decision D4. `docs/adrs/accepted/adr-0148-a-game-end-is-recorded-once-and-stops-the-controllers.md`
+    /// [^3]: ADR-0146, a faction relation is one signed integer per ordered pair, and a pass reads a threshold, decision D5. `docs/adrs/draft/adr-0146-a-faction-relation-is-one-signed-integer-per-ordered-pair-and-a-pass-reads-a-threshold.md`
     #[must_use]
-    pub fn plan(&self, seed: u64, tick: Tick) -> Vec<(FactionId, u32, Choice)> {
+    pub fn plan(
+        &self,
+        seed: u64,
+        tick: Tick,
+        rivals: &[Option<FactionId>],
+    ) -> Vec<(FactionId, u32, Choice)> {
         let mut commands = Vec::new();
         if self.game_end.is_set() {
             return commands;
@@ -565,6 +631,13 @@ impl Controller {
                 let choice = evaluate(seed, tick, faction, draw, row.weights);
                 commands.push((faction, draw, choice));
             }
+            let Some(Some(rival)) = rivals.get(usize::from(index)).copied() else {
+                continue;
+            };
+            let draw = self.relation_draw_index();
+            if wants_relation_move(seed, tick, faction, draw, row.weights) {
+                commands.push((faction, draw, Choice::Relation(rival)));
+            }
         }
         // The visit order above is fixed, and the sort is what makes the
         // applied order independent of it. The key is unique, because one
@@ -572,6 +645,13 @@ impl Controller {
         // give one answer here.
         commands.sort_by_key(|(faction, draw, _)| (*faction, *draw));
         commands
+    }
+
+    /// Returns the draw index of the relation move: one past the evaluation
+    /// indexes, so it collides with none of them.
+    #[must_use]
+    pub const fn relation_draw_index(&self) -> u32 {
+        self.evaluations
     }
 
     /// Returns the rows in ascending faction order.

@@ -598,6 +598,23 @@ class UnitFellColumns(TypedDict):
     faction: npt.NDArray[np.uint16]
     unit_type: npt.NDArray[np.uint8]
 
+class RelationCrossedColumns(TypedDict):
+    """One column for each field of a war edge crossing.
+
+    An entry names one ordered pair whose relation crossed the war edge on
+    the last step. A band_after below band_before is a declaration, and a
+    band_after above it is a peace. The band numbers count the edges at or
+    below the value, so zero is the war band.
+
+    The log covers the last step alone. The next step empties it.
+    """
+
+    tick: npt.NDArray[np.uint64]
+    from_faction: npt.NDArray[np.uint16]
+    to_faction: npt.NDArray[np.uint16]
+    band_before: npt.NDArray[np.uint8]
+    band_after: npt.NDArray[np.uint8]
+
 class UnitConvertedColumns(TypedDict):
     """One column for each field of a conversion event.
 
@@ -695,6 +712,13 @@ class World:
     def game_end(self) -> GameEnd | None: ...
     def score(self, faction: int) -> int: ...
     def subsystem_census(self) -> dict[str, int]: ...
+    def relation(self, from_faction: int, to_faction: int) -> int: ...
+    def relation_band(self, from_faction: int, to_faction: int) -> int: ...
+    def set_relation(self, from_faction: int, to_faction: int, value: int) -> None: ...
+    def move_relation(self, speaker: int, faction: int, step: int) -> int: ...
+    def relation_log_columns(self) -> RelationCrossedColumns: ...
+    @property
+    def relation_crossed_count(self) -> int: ...
     def draw(
         self,
         camera: Camera,

@@ -37,7 +37,7 @@ use crate::cohort::{
     self, CohortError, CohortTable, DeathPlane, DrawLedger, NeedCondition, NeedRule, SiteRationed,
     UnitStarved,
 };
-use crate::contest::{self, ContestError, UnitFell};
+use crate::contest::{self, ContestError, Grievance, UnitFell};
 use crate::controller::{
     self, Choice, Controller, ControllerCommand, FactionRow, FactionWeights, GameEnd, WinPath,
 };
@@ -58,6 +58,7 @@ use crate::presence::PresenceRelation;
 use crate::promotion::{self, PromotionError, UnitPromoted};
 use crate::pyramid::{CellSummary, ExitField, Pyramid, ReturnField, SeededField};
 use crate::rates::{RateError, RateLedger, RateSchedule, RateTable, SiteShortfall};
+use crate::relation::{RelationCrossed, RelationError, RelationMatrix, RelationRules};
 use crate::resource::{
     ledger_key, Amount, CarryLoad, DepletionLedger, RecoveryRules, ResourceField, ResourceKind,
     RESOURCE_KIND_COUNT,
@@ -186,6 +187,32 @@ pub enum ConvertError {
     /// An identity names no live soldier.
     DeadUnit(Entity),
 }
+
+/// The reason that the relation verb refused a caller.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum MoveRelationError {
+    /// The speaker identity names no live soldier.
+    DeadUnit(Entity),
+    /// The relation refused the move.
+    Relation(RelationError),
+}
+
+impl From<RelationError> for MoveRelationError {
+    fn from(error: RelationError) -> Self {
+        Self::Relation(error)
+    }
+}
+
+impl core::fmt::Display for MoveRelationError {
+    fn fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            Self::DeadUnit(unit) => write!(formatter, "{unit:?} names no live soldier"),
+            Self::Relation(error) => error.fmt(formatter),
+        }
+    }
+}
+
+impl std::error::Error for MoveRelationError {}
 
 impl core::fmt::Display for ConvertError {
     fn fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
@@ -731,6 +758,18 @@ pub struct World {
     fell_plane: DeathPlane,
     /// The units that a meeting ended at the last resolution, in slot order.
     fell_log: Vec<UnitFell>,
+    /// Which faction lost units to which at the last resolution, summed by
+    /// pair. The relation pass reads it after the contest applies.
+    grievances: Vec<Grievance>,
+    /// What each faction feels toward each other faction.
+    ///
+    /// The matrix is simulated state and enters the hash. The contest, the
+    /// conversion and the admission read it, and the settle path, the
+    /// contest apply, the conversion apply, the drift and the verb write
+    /// it.[^rel]
+    ///
+    /// [^rel]: ADR-0146, a faction relation is one signed integer per ordered pair, and a pass reads a threshold. `docs/adrs/draft/adr-0146-a-faction-relation-is-one-signed-integer-per-ordered-pair-and-a-pass-reads-a-threshold.md`
+    relations: RelationMatrix,
     /// The units that the conversion pass marked this frame, in slot order.
     ///
     /// The buffer is reused across frames, so the pass allocates once rather
@@ -1018,6 +1057,8 @@ impl World {
             unit_types: DEFAULT_UNIT_TYPE_TABLE,
             fell_plane: DeathPlane::new(),
             fell_log: Vec::new(),
+            grievances: Vec::new(),
+            relations: RelationMatrix::new(config.faction_count),
             convert_marks: Vec::new(),
             converted_log: Vec::new(),
             promoted_log: Vec::new(),
@@ -2327,6 +2368,117 @@ impl World {
         bytemuck::cast_slice(&self.fell_log)
     }
 
+    /// Returns what one faction feels toward another, or `None` when a
+    /// number names no faction of this world.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0146, a faction relation is one signed integer per ordered pair, and a pass reads a threshold, decision D1. `docs/adrs/draft/adr-0146-a-faction-relation-is-one-signed-integer-per-ordered-pair-and-a-pass-reads-a-threshold.md`
+    #[must_use]
+    pub fn relation(&self, from: FactionId, to: FactionId) -> Option<i32> {
+        self.relations.get(from, to)
+    }
+
+    /// Returns the band number of what one faction feels toward another: how
+    /// many of the edges lie at or below the value. Zero is the war band.
+    #[must_use]
+    pub fn relation_band(&self, from: FactionId, to: FactionId) -> Option<u8> {
+        self.relations.band(from, to)
+    }
+
+    /// Reports whether either of two factions is in the war band toward the
+    /// other.
+    #[must_use]
+    pub fn at_war(&self, a: FactionId, b: FactionId) -> bool {
+        self.relations.war_between(a, b)
+    }
+
+    /// Writes what one faction feels toward another, outright.
+    ///
+    /// This is the caller's own path and it holds no gate. A crossing of the
+    /// war edge is logged as any other cause logs it. Returns `false` when a
+    /// number names no faction or the pair is one faction.
+    pub fn set_relation(&mut self, from: FactionId, to: FactionId, value: i32) -> bool {
+        self.relations.write(self.tick, from, to, value).is_some()
+    }
+
+    /// Returns the edges and the steps the relation reads.
+    #[must_use]
+    pub const fn relation_rules(&self) -> RelationRules {
+        self.relations.rules()
+    }
+
+    /// Replaces the edges and the steps the relation reads.
+    pub const fn set_relation_rules(&mut self, rules: RelationRules) {
+        self.relations.set_rules(rules);
+    }
+
+    /// Moves what the faction of a speaker unit feels toward another faction
+    /// by a bounded step.
+    ///
+    /// **The verb refuses a speaker whose type has a command reach of zero.**
+    /// The gate reads the type column of the unit and no per-faction
+    /// flag.[^1] It refuses a step above the bound in either direction, and
+    /// the bound is a register row.[^2] A leader may always declare, so the
+    /// verb reads no band before it moves.
+    ///
+    /// Returns the value after the move.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the speaker is dead, when the other number names
+    /// no faction, when the other faction is the speaker's own, when the
+    /// speaker's type has no command reach, and when the step is above the
+    /// bound.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0145, a unit type is a row of capability columns, and zero means cannot, decision D3. `docs/adrs/accepted/adr-0145-a-unit-type-is-a-row-of-capability-columns-and-zero-means-cannot.md`
+    /// [^2]: ADR-0146, a faction relation is one signed integer per ordered pair, and a pass reads a threshold, decision D5. `docs/adrs/draft/adr-0146-a-faction-relation-is-one-signed-integer-per-ordered-pair-and-a-pass-reads-a-threshold.md`
+    pub fn move_relation(
+        &mut self,
+        speaker: Entity,
+        other: FactionId,
+        step: i32,
+    ) -> Result<i32, MoveRelationError> {
+        let (Some(faction), Some(unit_type)) = (
+            self.soldiers.faction(speaker),
+            self.soldiers.unit_type(speaker),
+        ) else {
+            return Err(MoveRelationError::DeadUnit(speaker));
+        };
+        if other.0 >= self.config.faction_count.max(1) {
+            return Err(RelationError::NoSuchFaction(other.0).into());
+        }
+        if other == faction {
+            return Err(RelationError::SameFaction.into());
+        }
+        if self.unit_types.row(unit_type).command_reach == 0 {
+            return Err(RelationError::NoCommandReach.into());
+        }
+        let bound = self.relations.rules().move_bound;
+        if step > bound || step < -bound {
+            return Err(RelationError::StepAboveBound { step, bound }.into());
+        }
+        self.relations
+            .shift(self.tick, faction, other, step)
+            .ok_or(MoveRelationError::Relation(RelationError::SameFaction))
+    }
+
+    /// Returns the crossings of the war edge on the last step, in the order
+    /// they happened.
+    #[must_use]
+    pub fn relation_log(&self) -> &[RelationCrossed] {
+        self.relations.log()
+    }
+
+    /// Returns the relation log as bytes. The thread-count equivalence test
+    /// compares this slice byte for byte.
+    #[must_use]
+    pub fn relation_log_bytes(&self) -> &[u8] {
+        self.relations.log_bytes()
+    }
+
     /// Returns the units that changed faction in the last step.
     ///
     /// The log covers the last step alone. It holds one entry for each unit
@@ -3489,6 +3641,13 @@ impl World {
         // table holds no row until somebody advertises, and it then folds
         // nothing, so a world with no board hashes as it did before.
         let hash = self.market.hash_into(hash);
+        // What each faction feels toward each other is state that a later
+        // frame reads: the next contest fires or not because of it. The edges
+        // and the steps enter with the entries, for the reason the controller
+        // parameters do.[^19]
+        //
+        // [^19]: ADR-0146, a faction relation is one signed integer per ordered pair, and a pass reads a threshold, decision D1. `docs/adrs/draft/adr-0146-a-faction-relation-is-one-signed-integer-per-ordered-pair-and-a-pass-reads-a-threshold.md`
+        let hash = self.relations.hash_into(hash);
         // The water in the air and on the ground is state that a later frame
         // reads: the next solve starts from the field this one left. Two
         // worlds that hold the same tiles and different weather must
@@ -4202,6 +4361,7 @@ impl World {
         }
 
         self.trade_log.clear();
+        self.relations.clear_log();
         self.tick = Tick(self.tick.0.wrapping_add(1));
 
         let tick = self.tick;
@@ -4324,6 +4484,10 @@ impl World {
                 self.terrain,
                 &self.upgrades,
                 self.grid,
+                Guests {
+                    holders: self.holding.holders(),
+                    relations: &self.relations,
+                },
                 threads,
             )?
         };
@@ -4627,6 +4791,17 @@ impl World {
             let _span = stage::open(Stage::PresenceFold);
             self.presence
                 .rebuild(&self.soldiers, &self.holding, threads)?;
+        }
+        // The drift runs after every cause of this frame has written the
+        // relation and before the controller reads it, so the controller
+        // plans against the relation this frame settled on. It takes no
+        // thread count: the matrix follows the square of the faction ceiling
+        // and no term follows the population.[^25]
+        //
+        // [^25]: ADR-0146, a faction relation is one signed integer per ordered pair, and a pass reads a threshold, decision D3. `docs/adrs/draft/adr-0146-a-faction-relation-is-one-signed-integer-per-ordered-pair-and-a-pass-reads-a-threshold.md`
+        {
+            let _span = stage::open(Stage::RelationDrift);
+            self.relations.drift(tick);
         }
         // The controller runs last, after every derived structure of the
         // frame describes the frame. It takes no thread count. It checks the
@@ -5746,6 +5921,14 @@ impl World {
         term: u32,
     ) -> Result<(), TradeError> {
         self.check_pair(proposer, responder)?;
+        // An offer across a pair at war is refused before anything else is
+        // read. The predicate is the relation module's, so the trade verbs
+        // and the contest read one statement of the war band.[^war]
+        //
+        // [^war]: ADR-0146, a faction relation is one signed integer per ordered pair, and a pass reads a threshold, decision D4. `docs/adrs/draft/adr-0146-a-faction-relation-is-one-signed-integer-per-ordered-pair-and-a-pass-reads-a-threshold.md`
+        if !self.relations.permits_offer(proposer, responder) {
+            return Err(TradeError::AtWar);
+        }
         let give = self.check_consideration(proposer, give)?;
         let take = self.check_consideration(responder, take)?;
         if term == 0 {
@@ -6015,6 +6198,11 @@ impl World {
         take: Consideration,
     ) -> Result<(), TradeError> {
         self.check_pair(speaker, other)?;
+        // A counter across a pair at war is refused, as an offer is. A war
+        // declared during a negotiation therefore ends the talking.
+        if !self.relations.permits_offer(speaker, other) {
+            return Err(TradeError::AtWar);
+        }
         let (proposer, responder) = self.live_orientation(speaker, other)?;
         let give = self.check_consideration(proposer, give)?;
         let take = self.check_consideration(responder, take)?;
@@ -6345,6 +6533,10 @@ impl World {
             });
             if paid {
                 self.say(proposer, responder, ACT_SETTLE, TRADE_SETTLED);
+                // A contract delivered in full warms both directions, from
+                // this settle site as from the carried one.
+                self.relations
+                    .on_contract_delivered(self.tick, proposer, responder);
             }
         }
     }
@@ -6562,6 +6754,9 @@ impl World {
             if paid {
                 let (proposer, responder) = self.pair_of(delivery.row);
                 self.say(proposer, responder, ACT_SETTLE, TRADE_SETTLED);
+                // A contract delivered in full warms both directions.
+                self.relations
+                    .on_contract_delivered(self.tick, proposer, responder);
             }
         }
         Ok(())
@@ -6604,6 +6799,13 @@ impl World {
             let (proposer, responder) = self.pair_of(index);
             if let Some(entry) = self.trade.row_at_mut(index) {
                 entry.status = TRADE_DEFAULTED;
+            }
+            // The party that was owed cools toward the party that defaulted.
+            if proposer_owes {
+                self.relations.on_contract_failed(tick, responder, proposer);
+            }
+            if responder_owes {
+                self.relations.on_contract_failed(tick, proposer, responder);
             }
             let until = Tick(tick.0.saturating_add(u64::from(term)));
             // The defaulting party loses the direction it would ask on again,
@@ -7191,6 +7393,7 @@ impl World {
         self.bridge.describes(&self.soldiers)?;
         contest::resolve(
             &self.unit_types,
+            &self.relations,
             contest::DrawKey {
                 seed: self.config.seed,
                 tick: self.tick,
@@ -7198,6 +7401,7 @@ impl World {
             &self.soldiers,
             &self.bridge,
             &mut self.fell_plane,
+            &mut self.grievances,
             threads,
         )?;
         let order = cohort::starved_order(&self.fell_plane, threads)?;
@@ -7205,6 +7409,15 @@ impl World {
             return Ok(());
         }
         let tick = self.tick;
+        // A unit that fell lowers its faction toward the faction that killed
+        // it. The list is summed by pair and sorted on it, so the writes
+        // happen in pair order.[^3]
+        //
+        // [^3]: ADR-0146, a faction relation is one signed integer per ordered pair, and a pass reads a threshold, decision D3. `docs/adrs/draft/adr-0146-a-faction-relation-is-one-signed-integer-per-ordered-pair-and-a-pass-reads-a-threshold.md`
+        for grievance in &self.grievances {
+            self.relations
+                .on_units_fell(tick, grievance.victim, grievance.killer, grievance.count);
+        }
         for slot in order {
             let index = slot as usize;
             let tile = self.soldiers.tile_column()[index];
@@ -7260,6 +7473,7 @@ impl World {
                 seed: self.config.seed,
                 tick: self.tick,
             },
+            &self.relations,
             &self.soldiers,
             &self.bridge,
             &self.influence,
@@ -7335,6 +7549,13 @@ impl World {
                 from,
                 mark.faction,
             ));
+            // The faction that lost the unit lowers toward the faction that
+            // took it. The marks are in slot order, so the writes are
+            // too.[^3]
+            //
+            // [^3]: ADR-0146, a faction relation is one signed integer per ordered pair, and a pass reads a threshold, decision D3. `docs/adrs/draft/adr-0146-a-faction-relation-is-one-signed-integer-per-ordered-pair-and-a-pass-reads-a-threshold.md`
+            self.relations
+                .on_units_converted(tick, from, mark.faction, 1);
         }
         // The cohorts are the units of one faction at one site, so a faction
         // change moves a unit from one row to another. A table left as it was
@@ -8212,6 +8433,7 @@ fn bump(run: &mut Vec<(u32, u32)>, tile: u32) {
 /// [^5]: ADR-0001, one binary gives one answer at any thread count, decision D4. `docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
 /// [^6]: ADR-0068, terrain is generated from the seed and is never stored as a map, decision D1. `docs/adrs/accepted/adr-0068-terrain-is-generated-from-the-seed-and-is-never-stored-as-a-map.md`
 /// [^7]: ADR-0009, parallel stages write disjoint outputs, because the memory model is weak. `docs/adrs/accepted/adr-0009-parallel-stages-write-disjoint-outputs.md`
+#[allow(clippy::too_many_arguments)]
 fn admit(
     intents: &[(Entity, Axial)],
     soldiers: &SoldierArena,
@@ -8219,11 +8441,39 @@ fn admit(
     terrain: Terrain,
     upgrades: &UpgradeMap,
     grid: Grid,
+    guests: Guests<'_>,
     threads: usize,
 ) -> Result<Vec<(Entity, Axial)>, StepError> {
     if intents.is_empty() {
         return Ok(Vec::new());
     }
+
+    // **A holder refuses a guest it is below the guest edge toward.** The
+    // rule is stated once, in the relation module, and this pass asks it for
+    // each intent. The walk is in intent order and it reads the holder column
+    // as the last spread left it, so the answer is the same at any thread
+    // count.[^11]
+    //
+    // [^11]: ADR-0146, a faction relation is one signed integer per ordered pair, and a pass reads a threshold, decision D4. `docs/adrs/draft/adr-0146-a-faction-relation-is-one-signed-integer-per-ordered-pair-and-a-pass-reads-a-threshold.md`
+    let refused: Vec<bool> = intents
+        .iter()
+        .map(|(entity, target)| {
+            let Some(index) = grid.index_of(*target) else {
+                return false;
+            };
+            let Some(holder) = guests
+                .holders
+                .get(index.0 as usize)
+                .and_then(|holder| holder.faction())
+            else {
+                return false;
+            };
+            let Some(guest) = soldiers.faction(*entity) else {
+                return false;
+            };
+            guests.relations.refuses_guest(holder, guest)
+        })
+        .collect();
 
     // The ordering field is the target tile index and the identifier is the
     // entity. One unit writes one intent, so no two identifiers collide.
@@ -8362,7 +8612,7 @@ fn admit(
                     break;
                 }
                 let position = *position as usize;
-                if granted[position] {
+                if granted[position] || refused[position] {
                     continue;
                 }
                 granted[position] = true;
@@ -8393,6 +8643,14 @@ fn admit(
     }
 
     Ok(admitted)
+}
+
+/// What admission reads to refuse a guest: who holds each tile, and what the
+/// holder feels toward the guest.
+#[derive(Clone, Copy)]
+struct Guests<'a> {
+    holders: &'a [Holder],
+    relations: &'a RelationMatrix,
 }
 
 /// What one worker produces from one range of tiles.
@@ -8594,6 +8852,26 @@ pub const SUBSYSTEM_CENSUS: &[CensusRow] = &[
     CensusRow {
         name: "game_ended",
         read: |world| i64::from(world.controller.game_end().is_set()),
+    },
+    // The relation moves the controller made through the verb on the last
+    // tick, and the crossings into the war band on the last tick from any
+    // cause.
+    CensusRow {
+        name: "relation_moves",
+        read: |world| {
+            world
+                .controller
+                .log()
+                .iter()
+                .filter(|command| {
+                    command.kind == controller::COMMAND_RELATION && command.applied != 0
+                })
+                .count() as i64
+        },
+    },
+    CensusRow {
+        name: "wars_declared",
+        read: |world| world.relations.declarations(),
     },
 ];
 
@@ -8845,13 +9123,46 @@ impl World {
         self.controller.clear_log();
         self.check_game_end();
         let tick = self.tick;
-        let plan = self.controller.plan(self.config.seed, tick);
+        let factions = usize::from(self.config.faction_count.max(1));
+        // One scan of the arena, in slot order, finds the speaker of each
+        // faction: its lowest-slot live unit whose type has command reach.
+        // The gate reads the type column of the units and no flag.[^3]
+        //
+        // [^3]: ADR-0145, a unit type is a row of capability columns, and zero means cannot, decision D3. `docs/adrs/accepted/adr-0145-a-unit-type-is-a-row-of-capability-columns-and-zero-means-cannot.md`
+        let mut speakers: Vec<Option<Entity>> = vec![None; factions];
+        for entity in self.soldiers.iter() {
+            let (Some(faction), Some(unit_type)) = (
+                self.soldiers.faction(entity),
+                self.soldiers.unit_type(entity),
+            ) else {
+                continue;
+            };
+            let index = usize::from(faction.0);
+            if index < factions
+                && speakers[index].is_none()
+                && self.unit_types.row(unit_type).command_reach > 0
+            {
+                speakers[index] = Some(entity);
+            }
+        }
+        // The rival of a faction is the other faction with the most held
+        // tiles. A faction with no speaker has no rival, because the verb
+        // would refuse it.
+        let held: Vec<(FactionId, i64)> = (0..factions as u16)
+            .map(|index| (FactionId(index), self.holding.holding_of(FactionId(index))))
+            .collect();
+        let rivals: Vec<Option<FactionId>> = (0..factions)
+            .map(|index| {
+                speakers[index]?;
+                controller::rival_of(FactionId(index as u16), held.iter().copied())
+            })
+            .collect();
+        let plan = self.controller.plan(self.config.seed, tick, &rivals);
         if plan.is_empty() {
             return;
         }
         // One scan of the arena, in slot order, buckets the live units by
         // faction. Only a faction that emitted a command gets a bucket.
-        let factions = usize::from(self.config.faction_count.max(1));
         let mut wanted = vec![false; factions];
         for (faction, _, _) in &plan {
             wanted[usize::from(faction.0)] = true;
@@ -8868,11 +9179,23 @@ impl World {
         }
         for (faction, sequence, choice) in plan {
             let set = std::mem::take(&mut sets[usize::from(faction.0)]);
-            let refused = match choice {
-                Choice::Gather(kind) => self.order_gather_set(&set, kind),
-                Choice::Build(kind) => self.order_build_set(&set, kind),
+            let applied = match choice {
+                Choice::Gather(kind) => self.order_gather_set(&set, kind) < set.len(),
+                Choice::Build(kind) => self.order_build_set(&set, kind) < set.len(),
+                // The relation move goes through the same verb a caller
+                // uses, with the speaker the scan above found. A faction
+                // with no speaker planned no move, so the refusal here is
+                // the verb's own.[^4]
+                //
+                // [^4]: ADR-0144, a faction controller runs inside the step and acts only through the caller's verbs, decisions D2 and D3. `docs/adrs/accepted/adr-0144-a-faction-controller-runs-inside-the-step-and-acts-only-through-the-callers-verbs.md`
+                Choice::Relation(other) => {
+                    speakers[usize::from(faction.0)].is_some_and(|speaker| {
+                        self.move_relation(speaker, other, controller::RELATION_STEP)
+                            .is_ok()
+                    })
+                }
             };
-            let applied = u8::from(refused < set.len());
+            let applied = u8::from(applied);
             sets[usize::from(faction.0)] = set;
             let (kind, argument) = choice.numbers();
             self.controller.push(ControllerCommand {

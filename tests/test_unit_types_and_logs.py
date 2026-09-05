@@ -101,6 +101,11 @@ def _armed_world(seed: int) -> cachette.World:
     world = cachette.World(width=16, height=16, seed=seed, faction_count=2)
     world.define_unit_type(BOWMAN, 1 * ONE, 0, **_worker_columns(world))
     world.define_unit_type(TANK, 4 * ONE, 2 * ONE, **_worker_columns(world))
+    # The contest resolves a meeting only across a pair at war, so the
+    # fixture declares one. The value sits far below any edge, and the band
+    # read proves it landed in the war band.
+    world.set_relation(0, 1, -(1 << 20))
+    assert world.relation_band(0, 1) == 0
     return world
 
 

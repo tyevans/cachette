@@ -46,6 +46,7 @@ use bytemuck::{Pod, Zeroable};
 
 use crate::bridge::UnitTileBridge;
 use crate::cohort::DeathPlane;
+use crate::relation::RelationMatrix;
 use crate::rng;
 use crate::sim_math;
 use crate::slots::Slots;
@@ -169,6 +170,27 @@ impl UnitFell {
     }
 }
 
+/// Units of one faction fell to another in one resolution.
+///
+/// The killer is the faction whose attackers delivered the most harm to the
+/// group that lost the units. A tie goes to the lowest faction identifier, so
+/// the answer never depends on the order the groups were read in.[^1] The
+/// relation pass reads the list and lowers the victim toward the killer.[^2]
+///
+/// # References
+///
+/// [^1]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
+/// [^2]: ADR-0146, a faction relation is one signed integer per ordered pair, and a pass reads a threshold, decision D3. `docs/adrs/draft/adr-0146-a-faction-relation-is-one-signed-integer-per-ordered-pair-and-a-pass-reads-a-threshold.md`
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub struct Grievance {
+    /// The faction that lost the units.
+    pub victim: FactionId,
+    /// The faction that delivered the most harm.
+    pub killer: FactionId,
+    /// How many units fell.
+    pub count: u32,
+}
+
 /// One group of units of one faction and one type, on one tile.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 struct Group {
@@ -228,6 +250,13 @@ pub fn casualties(harm: Accum, present: u32, remainder_draw: u64) -> u32 {
 
 /// Resolves every meeting in the world, and marks the units that fell.
 ///
+/// **The pass resolves a meeting only across a pair at war.** Two factions
+/// that stand beside each other in peace are read and skipped, so a world
+/// whose factions never cross the war edge never fights.[^4]
+///
+/// The grievances of the frame are joined from the threads, sorted on the
+/// pair and summed, so the list is the same at any thread count.[^1]
+///
 /// The pass marks. It ends nothing. The caller applies the marks in ascending
 /// slot order, after the pass, so the deaths never follow a thread.[^1]
 ///
@@ -251,14 +280,19 @@ pub fn casualties(harm: Accum, present: u32, remainder_draw: u64) -> u32 {
 /// [^1]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
 /// [^2]: ADR-0023, an aggregate combines exactly, in any order, decision D1. `docs/adrs/accepted/adr-0023-an-aggregate-combines-exactly-in-any-order.md`
 /// [^3]: ADR-0018, the unit-to-tile bridge is derived, and it rebuilds at the barrier, decision D2. `docs/adrs/accepted/adr-0018-the-unit-to-tile-bridge-is-derived-and-rebuilds-at-the-barrier.md`
+/// [^4]: ADR-0146, a faction relation is one signed integer per ordered pair, and a pass reads a threshold, decision D4. `docs/adrs/draft/adr-0146-a-faction-relation-is-one-signed-integer-per-ordered-pair-and-a-pass-reads-a-threshold.md`
+#[allow(clippy::too_many_arguments)]
 pub fn resolve(
     table: &UnitTypeTable,
+    relations: &RelationMatrix,
     key: DrawKey,
     arena: &SoldierArena,
     bridge: &UnitTileBridge,
     plane: &mut DeathPlane,
+    grievances: &mut Vec<Grievance>,
     threads: usize,
 ) -> Result<(), ContestError> {
+    grievances.clear();
     if threads == 0 {
         return Err(ContestError::ZeroThreads);
     }
@@ -278,17 +312,21 @@ pub fn resolve(
     for entry in planes.entries_mut() {
         entry.cover(slots);
     }
+    let mut lists: Slots<Vec<Grievance>> =
+        Slots::filled(threads, Vec::new()).map_err(|_| ContestError::ZeroThreads)?;
 
     std::thread::scope(|scope| {
         let mut first = 0u32;
-        for entry in planes.entries_mut() {
+        for (entry, list) in planes.entries_mut().iter_mut().zip(lists.entries_mut()) {
             let start = first;
             let stop = (start as usize + block_chunk).min(blocks as usize) as u32;
             first = stop;
             scope.spawn(move || {
                 let mut sides = Sides::default();
                 for block in start..stop {
-                    resolve_block(table, key, arena, bridge, block, entry, &mut sides);
+                    resolve_block(
+                        table, relations, key, arena, bridge, block, entry, list, &mut sides,
+                    );
                 }
             });
         }
@@ -298,6 +336,22 @@ pub fn resolve(
     // associative, so the result does not depend on which thread finished
     // first.[^2]
     plane.union_each(planes.entries());
+
+    // The grievances are joined, sorted on the pair and summed. Addition of
+    // whole numbers does not depend on the order of the terms, so the summed
+    // list is the same at any thread count.[^2]
+    for list in lists.entries() {
+        grievances.extend_from_slice(list);
+    }
+    grievances.sort_unstable_by_key(|grievance| (grievance.victim, grievance.killer));
+    grievances.dedup_by(|later, earlier| {
+        if later.victim == earlier.victim && later.killer == earlier.killer {
+            earlier.count = earlier.count.saturating_add(later.count);
+            true
+        } else {
+            false
+        }
+    });
     Ok(())
 }
 
@@ -305,13 +359,16 @@ pub fn resolve(
 ///
 /// The units of a block lie in one contiguous run, in key order. Equal keys
 /// name one tile, so a run of equal keys is the units of that tile.
+#[allow(clippy::too_many_arguments)]
 fn resolve_block(
     table: &UnitTypeTable,
+    relations: &RelationMatrix,
     key: DrawKey,
     arena: &SoldierArena,
     bridge: &UnitTileBridge,
     block: u32,
     plane: &mut DeathPlane,
+    grievances: &mut Vec<Grievance>,
     sides: &mut Sides,
 ) {
     let (keys, units) = bridge.block_window(block);
@@ -367,18 +424,25 @@ fn resolve_block(
         }
 
         // A tile is contested when some attacker belongs to a faction that
-        // some defender does not. The test costs the product of two small
-        // group counts, and it skips every tile that no fight touches.
+        // some defender does not, and one of the two is in the war band
+        // toward the other. Contact is adjacency, and the war gate is a
+        // condition on the resolution and not on the contact.[^3] The test
+        // costs the product of two small group counts, and it skips every
+        // tile that no fight touches.
+        //
+        // [^3]: ADR-0146, a faction relation is one signed integer per ordered pair, and a pass reads a threshold, decision D4. `docs/adrs/draft/adr-0146-a-faction-relation-is-one-signed-integer-per-ordered-pair-and-a-pass-reads-a-threshold.md`
         let contested = sides.attackers.iter().any(|attacker| {
             sides
                 .defenders
                 .iter()
-                .any(|defender| defender.faction != attacker.faction)
+                .any(|defender| relations.war_between(defender.faction, attacker.faction))
         });
         if !contested {
             continue;
         }
-        resolve_tile(table, key, tile, tile_units, factions, types, sides, plane);
+        resolve_tile(
+            table, relations, key, tile, tile_units, factions, types, sides, plane, grievances,
+        );
     }
 }
 
@@ -434,6 +498,7 @@ fn add_groups(
 #[allow(clippy::too_many_arguments)]
 fn resolve_tile(
     table: &UnitTypeTable,
+    relations: &RelationMatrix,
     key: DrawKey,
     tile: TileIdx,
     tile_units: &[Entity],
@@ -441,7 +506,11 @@ fn resolve_tile(
     types: &[UnitTypeId],
     sides: &Sides,
     plane: &mut DeathPlane,
+    grievances: &mut Vec<Grievance>,
 ) {
+    // The harm each attacking faction delivered to the group that is
+    // resolving, so the grievance names the faction that delivered the most.
+    let mut by_faction: Vec<(FactionId, Accum)> = Vec::new();
     for defender in &sides.defenders {
         // **The threshold applies for each attacker type before the sum.** A
         // group that does not reach adds exactly zero, and zero is the
@@ -449,15 +518,26 @@ fn resolve_tile(
         // count. That is what makes one tank survive any number of bowmen,
         // and it holds without a rate, a cap or a balance figure.[^1]
         let mut harm = Accum(0);
+        by_faction.clear();
         for attacker in &sides.attackers {
-            if attacker.faction == defender.faction {
+            // An attacker of a faction that is not at war with the defender,
+            // in either direction, stands beside it and does nothing.
+            if !relations.war_between(attacker.faction, defender.faction) {
                 continue;
             }
             if !table.penetrates(attacker.unit_type, defender.unit_type) {
                 continue;
             }
             let attack = table.row(attacker.unit_type).attack;
-            harm = sim_math::combine(harm, sim_math::scale_by_count(attack, attacker.count));
+            let part = sim_math::scale_by_count(attack, attacker.count);
+            harm = sim_math::combine(harm, part);
+            match by_faction
+                .iter_mut()
+                .find(|(faction, _)| *faction == attacker.faction)
+            {
+                Some((_, total)) => *total = sim_math::combine(*total, part),
+                None => by_faction.push((attacker.faction, part)),
+            }
         }
         if harm.0 <= 0 {
             continue;
@@ -473,6 +553,25 @@ fn resolve_tile(
         let fallen = casualties(harm, defender.count, remainder_draw);
         if fallen == 0 {
             continue;
+        }
+        // The killer is the faction that delivered the most harm, and a tie
+        // goes to the lowest identifier. The scan replaces the leader only on
+        // a strictly greater harm or an equal harm from a lower identifier,
+        // so the order the attackers were read in never decides it.
+        let mut killer: Option<(FactionId, Accum)> = None;
+        for (faction, total) in &by_faction {
+            match killer {
+                Some((best, best_harm))
+                    if total.0 < best_harm.0 || (total.0 == best_harm.0 && *faction > best) => {}
+                _ => killer = Some((*faction, *total)),
+            }
+        }
+        if let Some((killer, _)) = killer {
+            grievances.push(Grievance {
+                victim: defender.faction,
+                killer,
+                count: fallen,
+            });
         }
         // **The subset is the ordinals of the group, rotated by a keyed
         // offset.** A rotation is a bijection, so exactly as many units fall

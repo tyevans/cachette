@@ -232,3 +232,35 @@ const fn saturate_i64(value: i128) -> i64 {
         value as i64
     }
 }
+
+/// Moves a whole relation value by a whole step, saturating at both ends.
+///
+/// The relation between two factions is a whole signed number and never a
+/// fixed-point value, so this is the one addition the relation pass
+/// makes.[^1] A step that would leave the range stops at the end of it, so no
+/// cause wraps a war into an alliance.
+///
+/// # References
+///
+/// [^1]: ADR-0146, a faction relation is one signed integer per ordered pair, and a pass reads a threshold, decision D1. `docs/adrs/draft/adr-0146-a-faction-relation-is-one-signed-integer-per-ordered-pair-and-a-pass-reads-a-threshold.md`
+#[must_use]
+pub const fn offset(value: i32, step: i32) -> i32 {
+    value.saturating_add(step)
+}
+
+/// Multiplies a relation step by a whole count, saturating.
+///
+/// A cause that fires once for each unit of a group moves the relation by the
+/// step for each unit, so the pass takes the product once rather than adding
+/// the step in a loop.
+#[must_use]
+pub const fn offset_by_count(step: i32, count: u32) -> i32 {
+    let product = (step as i64) * (count as i64);
+    if product > i32::MAX as i64 {
+        i32::MAX
+    } else if product < i32::MIN as i64 {
+        i32::MIN
+    } else {
+        product as i32
+    }
+}

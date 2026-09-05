@@ -529,6 +529,12 @@ fn crowd(world: &mut World) {
 /// [^1]: ADR-0074, a spawn may over-fill a tile, and only admission enforces the capacity. `docs/adrs/accepted/adr-0074-a-spawn-may-over-fill-a-tile-and-only-admission-enforces-the-capacity.md`
 /// [^2]: Decision Record Scope, section 4.1. `.claude/rules/adr-scope.md`
 fn contest(world: &mut World) {
+    // The contest resolves a meeting only across a pair at war, so the
+    // scenario declares one. The edge is read from the world.[^3]
+    //
+    // [^3]: ADR-0146, a faction relation is one signed integer per ordered pair, and a pass reads a threshold, decision D4. `docs/adrs/draft/adr-0146-a-faction-relation-is-one-signed-integer-per-ordered-pair-and-a-pass-reads-a-threshold.md`
+    let war = world.relation_rules().war_edge - 1;
+    assert!(world.set_relation(FactionId(0), FactionId(1), war));
     // The light type reaches the light type and never the heavy one. The
     // heavy type reaches both. One frame therefore covers the threshold that
     // refuses and the exchange that does not.

@@ -75,6 +75,21 @@ const BOWMAN: u8 = 0;
 /// light unit, so the light unit contributes exactly zero against it.
 const TANK: u8 = 1;
 
+/// Puts the two factions of a fixture at war.
+///
+/// **The contest resolves a meeting only across a pair at war.** Every
+/// fixture in this file is about the resolution and not about the gate, so
+/// each one declares the war first. The edge is read from the world and not
+/// restated here.[^1]
+///
+/// # References
+///
+/// [^1]: ADR-0146, a faction relation is one signed integer per ordered pair, and a pass reads a threshold, decision D4. `docs/adrs/draft/adr-0146-a-faction-relation-is-one-signed-integer-per-ordered-pair-and-a-pass-reads-a-threshold.md`
+fn declare_war(world: &mut World) {
+    let war = world.relation_rules().war_edge - 1;
+    assert!(world.set_relation(FactionId(0), FactionId(1), war));
+}
+
 /// Builds a world of one tile, with the tank and bowman table filled.
 ///
 /// The bowman delivers one whole casualty and carries no armour. The tank
@@ -90,6 +105,7 @@ fn one_tile_world(unit_capacity: u32) -> World {
         unit_capacity,
     })
     .expect("a world of one tile is a world");
+    declare_war(&mut world);
     assert!(
         world.admits_a_unit(Axial::new(0, 0)),
         "the fixture needs ground that admits a unit"
@@ -303,6 +319,7 @@ fn the_tile_is_in_the_draw_key() {
         unit_capacity: 512,
     })
     .expect("a world of three tiles is a world");
+    declare_war(&mut world);
     let left = Axial::new(0, 0);
     let middle = Axial::new(1, 0);
     let right = Axial::new(2, 0);
@@ -378,6 +395,7 @@ fn a_unit_reaches_the_tile_beside_it() {
         unit_capacity: 64,
     })
     .expect("a world of three tiles is a world");
+    declare_war(&mut world);
     world
         .define_unit_type(BOWMAN, fighter(Fix32::from_int(1), Fix32::ZERO))
         .expect("the row is inside the table");
@@ -415,6 +433,7 @@ fn a_unit_reaches_no_tile_two_steps_away() {
         unit_capacity: 64,
     })
     .expect("a world of three tiles is a world");
+    declare_war(&mut world);
     world
         .define_unit_type(BOWMAN, fighter(Fix32::from_int(4), Fix32::ZERO))
         .expect("the row is inside the table");
