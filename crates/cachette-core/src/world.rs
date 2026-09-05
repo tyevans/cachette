@@ -5921,6 +5921,14 @@ impl World {
         term: u32,
     ) -> Result<(), TradeError> {
         self.check_pair(proposer, responder)?;
+        // An offer across a pair at war is refused before anything else is
+        // read. The predicate is the relation module's, so the trade verbs
+        // and the contest read one statement of the war band.[^war]
+        //
+        // [^war]: ADR-0146, a faction relation is one signed integer per ordered pair, and a pass reads a threshold, decision D4. `docs/adrs/draft/adr-0146-a-faction-relation-is-one-signed-integer-per-ordered-pair-and-a-pass-reads-a-threshold.md`
+        if !self.relations.permits_offer(proposer, responder) {
+            return Err(TradeError::AtWar);
+        }
         let give = self.check_consideration(proposer, give)?;
         let take = self.check_consideration(responder, take)?;
         if term == 0 {
@@ -6190,6 +6198,11 @@ impl World {
         take: Consideration,
     ) -> Result<(), TradeError> {
         self.check_pair(speaker, other)?;
+        // A counter across a pair at war is refused, as an offer is. A war
+        // declared during a negotiation therefore ends the talking.
+        if !self.relations.permits_offer(speaker, other) {
+            return Err(TradeError::AtWar);
+        }
         let (proposer, responder) = self.live_orientation(speaker, other)?;
         let give = self.check_consideration(proposer, give)?;
         let take = self.check_consideration(responder, take)?;
@@ -6520,6 +6533,10 @@ impl World {
             });
             if paid {
                 self.say(proposer, responder, ACT_SETTLE, TRADE_SETTLED);
+                // A contract delivered in full warms both directions, from
+                // this settle site as from the carried one.
+                self.relations
+                    .on_contract_delivered(self.tick, proposer, responder);
             }
         }
     }

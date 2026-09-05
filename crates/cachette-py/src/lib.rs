@@ -6361,6 +6361,9 @@ fn trade_refusal(error: cachette_core::TradeError) -> PyErr {
         Refusal::NoPresence => {
             "no unit of the speaker stands on ground that the other party holds".to_string()
         }
+        Refusal::AtWar => {
+            "one of the pair is in the war band toward the other, so no offer opens".to_string()
+        }
         Refusal::NoDuration => {
             "a terminal refusal closes the direction for a number of steps above zero".to_string()
         }

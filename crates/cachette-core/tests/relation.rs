@@ -638,3 +638,40 @@ fn the_relation_enters_the_state_hash() {
     one.set_relation_rules(other.relation_rules());
     assert_ne!(moved, one.state_hash().finish(), "the edges enter the hash");
 }
+
+#[test]
+fn an_offer_and_a_counter_are_refused_across_a_pair_at_war() {
+    // The war check runs before the presence check and before the search for
+    // a live negotiation, so a world with no presence and nothing open answers
+    // the war and nothing else. At peace the same calls fall through to the
+    // refusal that comes next, which proves the gate is the war.
+    use cachette_core::trade::{Consideration, TradeError};
+    let mut world = row_world(2, 8);
+    let give = Consideration::resource(0, 1);
+    let take = Consideration::resource(1, 1);
+    assert_eq!(
+        world.offer_consideration(A, B, give.clone(), take.clone(), 4),
+        Err(TradeError::NoPresence),
+        "at peace the offer reaches the presence check"
+    );
+    assert_eq!(
+        world.counter_consideration(A, B, give.clone(), take.clone()),
+        Err(TradeError::NothingOpen),
+        "at peace the counter reaches the search for a negotiation"
+    );
+    // One direction at war is enough, and the direction that is at peace is
+    // refused too.
+    declare_war(&mut world, B, A);
+    assert_eq!(
+        world.offer_consideration(A, B, give.clone(), take.clone(), 4),
+        Err(TradeError::AtWar)
+    );
+    assert_eq!(
+        world.offer_consideration(B, A, give.clone(), take.clone(), 4),
+        Err(TradeError::AtWar)
+    );
+    assert_eq!(
+        world.counter_consideration(A, B, give, take),
+        Err(TradeError::AtWar)
+    );
+}

@@ -185,12 +185,17 @@ reader carry it as an integer, so a caller that wants a name supplies its own.
 The rival of a faction is the other faction with the most held tiles, with a
 tie to the lowest identifier, in the shape of the territory winner.
 
-Left undone. The offer refusal across a war pair is not wired, because the
-error variant it needs lives in the trade module that pass 6 holds. The
-relation module holds the predicate for it. The storm cause waits for pass 5.
-The trade causes have no test through the settle path, because no fixture in
-the tree carries a contract to delivery, and the hooks are exercised by the
-unit tests of the relation module alone.
+Left undone. The storm cause waits for pass 5. The relation step of a treaty
+consideration is stored and logged by pass 6 and moves nothing, because the
+meaning of its kind byte is not decided; a later item wires it through the
+relation module. The trade causes have no test through the settle path,
+because no fixture in the tree carries a contract to delivery, and the hooks
+are exercised by the unit tests of the relation module alone.
+
+The offer refusal across a war pair is wired after the rebase onto pass 6: an
+offer and a counter refuse with one trade error when either direction of the
+pair is in the war band, before the presence check and before the search for a
+live negotiation.
 
 Every new test was put back to red once. The commit body of the test commit
 names each defect and the test that caught it.
