@@ -202,6 +202,26 @@ class Demo:
             f"became {what}{earned}, {reading['characters']} in the world"
         )
 
+    def announce_relations(self) -> None:
+        """Say who declared war on whom, and who made peace, on the last step.
+
+        **The control plane reads one log and walks no entity.** The engine
+        writes one event for each ordered pair whose relation crossed the war
+        edge on the last step. A band after the move below the band before
+        is a declaration, and a band above is a peace. The band numbers
+        count the edges at or below the value, so the line names no edge.
+        """
+        columns = self.world.relation_log_columns()
+        for row in range(len(columns["tick"])):
+            tick = int(columns["tick"][row])
+            speaker = int(columns["from_faction"][row])
+            other = int(columns["to_faction"][row])
+            declared = int(columns["band_after"][row]) < int(
+                columns["band_before"][row]
+            )
+            verb = "declares war on" if declared else "makes peace with"
+            print(f"tick {tick}: faction {speaker} {verb} faction {other}")
+
     def announce_end(self) -> GameEnd | None:
         """Say who won, once, when the game end record first appears.
 
@@ -253,6 +273,7 @@ class Demo:
         """
         for _ in range(self.clock.ticks_due()):
             self.world.step(self.threads)
+            self.announce_relations()
         self.announce_end()
         reading = self.world.draw(
             self.camera,
@@ -467,6 +488,7 @@ def _run_to_end(demo: Demo) -> int:
     end = None
     while end is None and demo.world.tick < limit:
         demo.world.step(demo.threads)
+        demo.announce_relations()
         end = demo.announce_end()
     if end is None:
         print(f"no game ended by the tick limit of {limit}")

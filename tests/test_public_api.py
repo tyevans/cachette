@@ -440,6 +440,9 @@ def test_one_tank_still_kills_four_bowmen(seed: int) -> None:
     tank = world.spawn_soldiers([(0, 0)], 1)
     world.set_unit_types(bowmen, 0)
     world.set_unit_types(tank, 1)
+    # The contest resolves a meeting only across a pair at war.
+    world.set_relation(0, 1, FAR_BELOW_EVERY_EDGE)
+    assert world.relation_band(0, 1) == 0
 
     world.step(threads=2)
 
@@ -459,6 +462,9 @@ def test_ten_thousand_bowmen_also_lose_to_one_tank() -> None:
     tank = world.spawn_soldiers([(0, 0)], 1)
     world.set_unit_types(bowmen, 0)
     world.set_unit_types(tank, 1)
+    # The contest resolves a meeting only across a pair at war.
+    world.set_relation(0, 1, FAR_BELOW_EVERY_EDGE)
+    assert world.relation_band(0, 1) == 0
 
     world.step(threads=2)
 
@@ -528,6 +534,9 @@ def test_a_unit_type_the_table_does_not_hold_is_refused(seed: int) -> None:
 FALLEN_SEED = 1
 BOWMAN = 0
 TANK = 1
+# A relation value below every edge the register could set. It is not a copy
+# of an edge: the fixture asserts the band it lands in.
+FAR_BELOW_EVERY_EDGE = -(1 << 20)
 
 
 def _worker_columns(world: cachette.World) -> dict[str, int]:
@@ -568,6 +577,11 @@ def _contested_world() -> tuple[cachette.World, list[int], list[int]]:
     world.set_unit_types(bowmen, BOWMAN)
     tank = world.spawn_soldiers([TANK_TILE], TANK_FACTION)
     world.set_unit_types(tank, TANK)
+    # The contest resolves a meeting only across a pair at war, so the
+    # fixture declares one. The value sits far below any edge, and the band
+    # read proves it landed in the war band.
+    world.set_relation(BOWMAN_FACTION, TANK_FACTION, FAR_BELOW_EVERY_EDGE)
+    assert world.relation_band(BOWMAN_FACTION, TANK_FACTION) == 0
     return world, [int(unit) for unit in bowmen], [int(unit) for unit in tank]
 
 
@@ -733,6 +747,12 @@ def test_belief_takes_units_and_the_log_says_where_they_went() -> None:
     world.spawn_soldiers(seat, 0)
     world.set_influence_source(1, [seat[0]], 65535)
     assert world.influence(1, seat[0][0], seat[0][1]) == 0, "the field starts empty"
+    # A leader at peace with a faction converts none of its units, so the
+    # source faction is put one band below peace toward the old faction. The
+    # value sits far below the peace edge and the band read proves it is not
+    # in the peace band.
+    world.set_relation(1, 0, FAR_BELOW_EVERY_EDGE)
+    assert world.relation_band(1, 0) < 2
 
     gained = 0
     entries: list[tuple[int, int]] = []

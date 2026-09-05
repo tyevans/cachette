@@ -2902,6 +2902,158 @@ impl PyWorld {
             .ok_or_else(|| VerbError::new_err(format!("{faction} names no faction of this world")))
     }
 
+    /// Returns what one faction feels toward another, as an integer.
+    ///
+    /// The relation is one signed whole number for each ordered pair. The
+    /// entry for `(a, b)` is what `a` feels toward `b`, and `(b, a)` is a
+    /// separate entry. A new world holds every pair at the peace edge. The
+    /// edges that cut the range into bands are rows of the balance
+    /// register.[^1] [^2]
+    ///
+    /// # Errors
+    ///
+    /// Raises `VerbError` when a number names no faction of this world, or
+    /// when the two numbers name one faction.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0146, a faction relation is one signed integer per ordered pair, and a pass reads a threshold, decisions D1 and D2. `docs/adrs/draft/adr-0146-a-faction-relation-is-one-signed-integer-per-ordered-pair-and-a-pass-reads-a-threshold.md`
+    /// [^2]: Balance register, the relation. `docs/reference/balance.md`
+    fn relation(&self, from_faction: u16, to_faction: u16) -> PyResult<i32> {
+        if from_faction == to_faction {
+            return Err(VerbError::new_err(
+                "a faction holds no relation toward itself",
+            ));
+        }
+        self.lock()
+            .relation(FactionId(from_faction), FactionId(to_faction))
+            .ok_or_else(|| VerbError::new_err("a number names no faction of this world"))
+    }
+
+    /// Returns the band of what one faction feels toward another, as an
+    /// integer.
+    ///
+    /// The number counts the edges at or below the value. Zero is below the
+    /// war edge, one is at or above it and below the peace edge, two is at or
+    /// above the peace edge and below the alliance edge, and three is at or
+    /// above the alliance edge. The engine holds no band name.[^1]
+    ///
+    /// # Errors
+    ///
+    /// Raises `VerbError` when a number names no faction of this world, or
+    /// when the two numbers name one faction.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0146, a faction relation is one signed integer per ordered pair, and a pass reads a threshold, decision D2. `docs/adrs/draft/adr-0146-a-faction-relation-is-one-signed-integer-per-ordered-pair-and-a-pass-reads-a-threshold.md`
+    fn relation_band(&self, from_faction: u16, to_faction: u16) -> PyResult<u8> {
+        if from_faction == to_faction {
+            return Err(VerbError::new_err(
+                "a faction holds no relation toward itself",
+            ));
+        }
+        self.lock()
+            .relation_band(FactionId(from_faction), FactionId(to_faction))
+            .ok_or_else(|| VerbError::new_err("a number names no faction of this world"))
+    }
+
+    /// Writes what one faction feels toward another, outright.
+    ///
+    /// **This is the caller's own path and it holds no gate.** A god sets the
+    /// relation a scenario starts from. A crossing of the war edge is logged
+    /// as any other cause logs it. Returns `None`.
+    ///
+    /// # Errors
+    ///
+    /// Raises `VerbError` when a number names no faction of this world, or
+    /// when the two numbers name one faction.
+    fn set_relation(&self, from_faction: u16, to_faction: u16, value: i32) -> PyResult<()> {
+        if !self
+            .lock()
+            .set_relation(FactionId(from_faction), FactionId(to_faction), value)
+        {
+            return Err(VerbError::new_err(
+                "a number names no faction of this world, or the two numbers name one faction",
+            ));
+        }
+        Ok(())
+    }
+
+    /// Moves what the faction of a speaker unit feels toward another faction
+    /// by a bounded step, and returns the value after the move.
+    ///
+    /// **The verb refuses a speaker whose type has a command reach of
+    /// zero.** The gate reads the type column of the unit and no per-faction
+    /// flag.[^1] The step is bounded in either direction, and the bound is a
+    /// row of the balance register.[^2] A leader may always declare, so the
+    /// verb reads no band before it moves.
+    ///
+    /// # Errors
+    ///
+    /// Raises `ViewError` when the identity names no live soldier. Raises
+    /// `VerbError` when the faction number names no faction, when it names
+    /// the speaker's own faction, when the speaker's type has no command
+    /// reach, and when the step is above the bound.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0145, a unit type is a row of capability columns, and zero means cannot, decision D3. `docs/adrs/accepted/adr-0145-a-unit-type-is-a-row-of-capability-columns-and-zero-means-cannot.md`
+    /// [^2]: ADR-0146, a faction relation is one signed integer per ordered pair, and a pass reads a threshold, decision D5. `docs/adrs/draft/adr-0146-a-faction-relation-is-one-signed-integer-per-ordered-pair-and-a-pass-reads-a-threshold.md`
+    fn move_relation(&self, speaker: u64, faction: u16, step: i32) -> PyResult<i32> {
+        let mut world = self.lock();
+        let entity = resolve(&world, speaker)?;
+        world
+            .move_relation(entity, FactionId(faction), step)
+            .map_err(|error| VerbError::new_err(error.to_string()))
+    }
+
+    /// Returns the crossings of the war edge on the last step, as columns.
+    ///
+    /// The result is a `dict` of one-dimensional NumPy arrays. Every array
+    /// holds one entry for each ordered pair whose relation crossed the war
+    /// edge on the last step, in the order the crossings happened. The keys
+    /// are:
+    ///
+    /// - `tick`, `numpy.uint64`. The step it happened at.
+    /// - `from_faction`, `numpy.uint16`. The faction whose feeling moved.
+    /// - `to_faction`, `numpy.uint16`. The faction it feels toward.
+    /// - `band_before`, `numpy.uint8`. The band number before the move.
+    /// - `band_after`, `numpy.uint8`. The band number after the move. A
+    ///   value below `band_before` is a declaration, and a value above it is
+    ///   a peace.
+    ///
+    /// The log covers the last step alone. This method copies each
+    /// column.[^1] [^2]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0146, a faction relation is one signed integer per ordered pair, and a pass reads a threshold, decision D6. `docs/adrs/draft/adr-0146-a-faction-relation-is-one-signed-integer-per-ordered-pair-and-a-pass-reads-a-threshold.md`
+    /// [^2]: ADR-0044, what copies and what does not is declared at the call site. `docs/adrs/REGISTRY.md`
+    fn relation_log_columns<'py>(&self, python: Python<'py>) -> PyResult<Bound<'py, PyDict>> {
+        let world = self.lock();
+        let log = world.relation_log();
+        let columns = PyDict::new(python);
+        let tick: Vec<u64> = log.iter().map(|event| event.tick.0).collect();
+        let from_faction: Vec<u16> = log.iter().map(|event| event.from_faction.0).collect();
+        let to_faction: Vec<u16> = log.iter().map(|event| event.to_faction.0).collect();
+        let band_before: Vec<u8> = log.iter().map(|event| event.band_before).collect();
+        let band_after: Vec<u8> = log.iter().map(|event| event.band_after).collect();
+        columns.set_item("tick", tick.to_pyarray(python))?;
+        columns.set_item("from_faction", from_faction.to_pyarray(python))?;
+        columns.set_item("to_faction", to_faction.to_pyarray(python))?;
+        columns.set_item("band_before", band_before.to_pyarray(python))?;
+        columns.set_item("band_after", band_after.to_pyarray(python))?;
+        Ok(columns)
+    }
+
+    /// The number of relations that crossed the war edge in the last step,
+    /// as an integer. Read the events themselves with
+    /// `relation_log_columns`.
+    #[getter]
+    fn relation_crossed_count(&self) -> usize {
+        self.lock().relation_log().len()
+    }
+
     /// Returns the subsystem census, as a `dict` from a subsystem name to a
     /// count.
     ///

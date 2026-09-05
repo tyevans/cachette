@@ -44,6 +44,8 @@ CENSUS_NAMES = [
     "controller_commands",
     "controller_refused",
     "game_ended",
+    "relation_moves",
+    "wars_declared",
 ]
 
 
