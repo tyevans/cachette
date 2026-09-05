@@ -160,4 +160,4 @@ row.
 [^8]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
 [^9]: ADR-0002, simulated and aggregated state holds no floating point number, decision D1. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
 [^10]: Blockers register, BLK-121. `docs/BLOCKERS.md`
-[^11]: ADR-0147, a contract consideration is a tagged kind, decision D1. `docs/adrs/draft/adr-0147-a-contract-consideration-is-a-tagged-kind.md`
+[^11]: ADR-0147, a contract consideration is a tagged kind, decision D1. `docs/adrs/accepted/adr-0147-a-contract-consideration-is-a-tagged-kind.md`

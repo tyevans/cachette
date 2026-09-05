@@ -752,7 +752,7 @@ impl Holding {
     ///
     /// # References
     ///
-    /// [^1]: ADR-0147, a contract consideration is a tagged kind, decision D3. `docs/adrs/draft/adr-0147-a-contract-consideration-is-a-tagged-kind.md`
+    /// [^1]: ADR-0147, a contract consideration is a tagged kind, decision D3. `docs/adrs/accepted/adr-0147-a-contract-consideration-is-a-tagged-kind.md`
     /// [^2]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
     pub fn transfer(&mut self, tiles: &[TileIdx], to: Holder, threads: usize) {
         let ceiling = self.holders.len();

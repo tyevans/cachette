@@ -5734,8 +5734,8 @@ impl World {
     ///
     /// # References
     ///
-    /// [^1]: ADR-0147, a contract consideration is a tagged kind, decision D1. `docs/adrs/draft/adr-0147-a-contract-consideration-is-a-tagged-kind.md`
-    /// [^2]: ADR-0147, a contract consideration is a tagged kind, decision D4. `docs/adrs/draft/adr-0147-a-contract-consideration-is-a-tagged-kind.md`
+    /// [^1]: ADR-0147, a contract consideration is a tagged kind, decision D1. `docs/adrs/accepted/adr-0147-a-contract-consideration-is-a-tagged-kind.md`
+    /// [^2]: ADR-0147, a contract consideration is a tagged kind, decision D4. `docs/adrs/accepted/adr-0147-a-contract-consideration-is-a-tagged-kind.md`
     /// [^3]: Blockers register, BLK-036. `docs/BLOCKERS.md`
     pub fn offer_consideration(
         &mut self,
@@ -6309,7 +6309,7 @@ impl World {
     ///
     /// # References
     ///
-    /// [^1]: ADR-0147, a contract consideration is a tagged kind, decision D3. `docs/adrs/draft/adr-0147-a-contract-consideration-is-a-tagged-kind.md`
+    /// [^1]: ADR-0147, a contract consideration is a tagged kind, decision D3. `docs/adrs/accepted/adr-0147-a-contract-consideration-is-a-tagged-kind.md`
     /// [^2]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
     fn apply_priced_sides(&mut self, threads: usize) {
         let count = self.trade.rows().len();

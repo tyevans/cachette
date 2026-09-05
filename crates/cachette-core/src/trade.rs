@@ -95,7 +95,7 @@ pub const KIND_RELATION: u8 = 2;
 ///
 /// # References
 ///
-/// [^1]: ADR-0147, a contract consideration is a tagged kind, decision D1. `docs/adrs/draft/adr-0147-a-contract-consideration-is-a-tagged-kind.md`
+/// [^1]: ADR-0147, a contract consideration is a tagged kind, decision D1. `docs/adrs/accepted/adr-0147-a-contract-consideration-is-a-tagged-kind.md`
 pub const CONSIDERATION_KIND_COUNT: u8 = 3;
 
 /// The advertisement rows one faction holds when the caller names no other.
@@ -208,7 +208,7 @@ pub enum TradeError {
 /// # References
 ///
 /// [^1]: ADR-0006, an event is plain data and applying it is pure, decision D1. `docs/adrs/accepted/adr-0006-an-event-is-plain-data-and-applying-it-is-pure.md`
-/// [^2]: ADR-0147, a contract consideration is a tagged kind, decision D1. `docs/adrs/draft/adr-0147-a-contract-consideration-is-a-tagged-kind.md`
+/// [^2]: ADR-0147, a contract consideration is a tagged kind, decision D1. `docs/adrs/accepted/adr-0147-a-contract-consideration-is-a-tagged-kind.md`
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Pod, Zeroable)]
 pub struct TradeRow {
@@ -344,7 +344,7 @@ impl TradeRow {
 ///
 /// # References
 ///
-/// [^1]: ADR-0147, a contract consideration is a tagged kind, decision D1. `docs/adrs/draft/adr-0147-a-contract-consideration-is-a-tagged-kind.md`
+/// [^1]: ADR-0147, a contract consideration is a tagged kind, decision D1. `docs/adrs/accepted/adr-0147-a-contract-consideration-is-a-tagged-kind.md`
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct Consideration {
     /// Which kind this is. One of the kind constants of this module.
@@ -668,7 +668,7 @@ pub struct TradeTable {
     ///
     /// # References
     ///
-    /// [^1]: ADR-0147, a contract consideration is a tagged kind, decision D1. `docs/adrs/draft/adr-0147-a-contract-consideration-is-a-tagged-kind.md`
+    /// [^1]: ADR-0147, a contract consideration is a tagged kind, decision D1. `docs/adrs/accepted/adr-0147-a-contract-consideration-is-a-tagged-kind.md`
     land: Vec<Vec<TileIdx>>,
     /// How many factions the world holds.
     factions: u16,
