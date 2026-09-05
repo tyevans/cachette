@@ -75,6 +75,7 @@ documents cite it.
 | 0052 | An upgrade wears and a worker repairs it | Accepted | Game developer | `accepted/prd-0052-an-upgrade-wears-and-a-worker-repairs-it.md` |
 | 0053 | A game is balanced across seeds | Accepted | Game developer | `accepted/prd-0053-a-game-is-balanced-across-seeds.md` |
 | 0054 | A god's ground is the ground around its cities | Shaped | Game developer | `shaped/prd-0054-a-gods-ground-is-the-ground-around-its-cities.md` |
+| 0055 | A god raises the ground its people hold, and sees what stands there | Shaped | Game developer | `shaped/prd-0055-a-god-raises-the-ground-its-people-hold-and-sees-what-stands-there.md` |
 
 ## What does not belong in a record
 
