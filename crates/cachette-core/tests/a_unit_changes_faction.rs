@@ -131,7 +131,7 @@ fn believers(seed: u64) -> (World, Axial, Vec<Entity>) {
     // fixture puts the leader in tension toward the old faction. The edge is
     // read from the world and not restated here.[^1]
     //
-    // [^1]: ADR-0146, a faction relation is one signed integer per ordered pair, and a pass reads a threshold, decision D4. `docs/adrs/draft/adr-0146-a-faction-relation-is-one-signed-integer-per-ordered-pair-and-a-pass-reads-a-threshold.md`
+    // [^1]: ADR-0146, a faction relation is one signed integer per ordered pair, and a pass reads a threshold, decision D4. `docs/adrs/accepted/adr-0146-a-faction-relation-is-one-signed-integer-per-ordered-pair-and-a-pass-reads-a-threshold.md`
     let tension = world.relation_rules().peace_edge - 1;
     assert!(world.set_relation(NEW, OLD, tension));
     (world, seat, units)

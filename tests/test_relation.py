@@ -11,7 +11,7 @@ References
 ----------
 [^1]: ADR-0146, a faction relation is one signed integer per ordered pair, and
 a pass reads a threshold.
-``docs/adrs/draft/adr-0146-a-faction-relation-is-one-signed-integer-per-ordered-pair-and-a-pass-reads-a-threshold.md``
+``docs/adrs/accepted/adr-0146-a-faction-relation-is-one-signed-integer-per-ordered-pair-and-a-pass-reads-a-threshold.md``
 
 [^2]: Balance register, the relation. ``docs/reference/balance.md``
 """

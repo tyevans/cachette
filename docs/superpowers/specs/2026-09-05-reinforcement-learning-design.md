@@ -482,7 +482,7 @@ the code.
 [^27]: Testing Rules, section 1. `.agents/rules/testing.md`
 [^28]: Decision Record Scope, section 1. `.agents/rules/adr-scope.md`
 [^29]: PRD-0053, a game is balanced across seeds. `docs/product/accepted/prd-0053-a-game-is-balanced-across-seeds.md`
-[^30]: ADR-0146, a faction relation is one signed integer per ordered pair, and a pass reads a threshold. `docs/adrs/draft/adr-0146-a-faction-relation-is-one-signed-integer-per-ordered-pair-and-a-pass-reads-a-threshold.md`
+[^30]: ADR-0146, a faction relation is one signed integer per ordered pair, and a pass reads a threshold. `docs/adrs/accepted/adr-0146-a-faction-relation-is-one-signed-integer-per-ordered-pair-and-a-pass-reads-a-threshold.md`
 [^31]: ADR-0149, a faction's trade board is simulated state that any faction may read. `docs/adrs/draft/adr-0149-a-factions-trade-board-is-simulated-state-that-any-faction-may-read.md`
 [^32]: ADR-0145, a unit type is a row of capability columns, and zero means cannot. `docs/adrs/accepted/adr-0145-a-unit-type-is-a-row-of-capability-columns-and-zero-means-cannot.md`
 [^33]: Decision Record Scope, section 4.1. `.agents/rules/adr-scope.md`

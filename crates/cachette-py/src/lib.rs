@@ -2917,7 +2917,7 @@ impl PyWorld {
     ///
     /// # References
     ///
-    /// [^1]: ADR-0146, a faction relation is one signed integer per ordered pair, and a pass reads a threshold, decisions D1 and D2. `docs/adrs/draft/adr-0146-a-faction-relation-is-one-signed-integer-per-ordered-pair-and-a-pass-reads-a-threshold.md`
+    /// [^1]: ADR-0146, a faction relation is one signed integer per ordered pair, and a pass reads a threshold, decisions D1 and D2. `docs/adrs/accepted/adr-0146-a-faction-relation-is-one-signed-integer-per-ordered-pair-and-a-pass-reads-a-threshold.md`
     /// [^2]: Balance register, the relation. `docs/reference/balance.md`
     fn relation(&self, from_faction: u16, to_faction: u16) -> PyResult<i32> {
         if from_faction == to_faction {
@@ -2945,7 +2945,7 @@ impl PyWorld {
     ///
     /// # References
     ///
-    /// [^1]: ADR-0146, a faction relation is one signed integer per ordered pair, and a pass reads a threshold, decision D2. `docs/adrs/draft/adr-0146-a-faction-relation-is-one-signed-integer-per-ordered-pair-and-a-pass-reads-a-threshold.md`
+    /// [^1]: ADR-0146, a faction relation is one signed integer per ordered pair, and a pass reads a threshold, decision D2. `docs/adrs/accepted/adr-0146-a-faction-relation-is-one-signed-integer-per-ordered-pair-and-a-pass-reads-a-threshold.md`
     fn relation_band(&self, from_faction: u16, to_faction: u16) -> PyResult<u8> {
         if from_faction == to_faction {
             return Err(VerbError::new_err(
@@ -2998,7 +2998,7 @@ impl PyWorld {
     /// # References
     ///
     /// [^1]: ADR-0145, a unit type is a row of capability columns, and zero means cannot, decision D3. `docs/adrs/accepted/adr-0145-a-unit-type-is-a-row-of-capability-columns-and-zero-means-cannot.md`
-    /// [^2]: ADR-0146, a faction relation is one signed integer per ordered pair, and a pass reads a threshold, decision D5. `docs/adrs/draft/adr-0146-a-faction-relation-is-one-signed-integer-per-ordered-pair-and-a-pass-reads-a-threshold.md`
+    /// [^2]: ADR-0146, a faction relation is one signed integer per ordered pair, and a pass reads a threshold, decision D5. `docs/adrs/accepted/adr-0146-a-faction-relation-is-one-signed-integer-per-ordered-pair-and-a-pass-reads-a-threshold.md`
     fn move_relation(&self, speaker: u64, faction: u16, step: i32) -> PyResult<i32> {
         let mut world = self.lock();
         let entity = resolve(&world, speaker)?;
@@ -3027,7 +3027,7 @@ impl PyWorld {
     ///
     /// # References
     ///
-    /// [^1]: ADR-0146, a faction relation is one signed integer per ordered pair, and a pass reads a threshold, decision D6. `docs/adrs/draft/adr-0146-a-faction-relation-is-one-signed-integer-per-ordered-pair-and-a-pass-reads-a-threshold.md`
+    /// [^1]: ADR-0146, a faction relation is one signed integer per ordered pair, and a pass reads a threshold, decision D6. `docs/adrs/accepted/adr-0146-a-faction-relation-is-one-signed-integer-per-ordered-pair-and-a-pass-reads-a-threshold.md`
     /// [^2]: ADR-0044, what copies and what does not is declared at the call site. `docs/adrs/REGISTRY.md`
     fn relation_log_columns<'py>(&self, python: Python<'py>) -> PyResult<Bound<'py, PyDict>> {
         let world = self.lock();

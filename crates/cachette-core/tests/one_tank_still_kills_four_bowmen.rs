@@ -84,7 +84,7 @@ const TANK: u8 = 1;
 ///
 /// # References
 ///
-/// [^1]: ADR-0146, a faction relation is one signed integer per ordered pair, and a pass reads a threshold, decision D4. `docs/adrs/draft/adr-0146-a-faction-relation-is-one-signed-integer-per-ordered-pair-and-a-pass-reads-a-threshold.md`
+/// [^1]: ADR-0146, a faction relation is one signed integer per ordered pair, and a pass reads a threshold, decision D4. `docs/adrs/accepted/adr-0146-a-faction-relation-is-one-signed-integer-per-ordered-pair-and-a-pass-reads-a-threshold.md`
 fn declare_war(world: &mut World) {
     let war = world.relation_rules().war_edge - 1;
     assert!(world.set_relation(FactionId(0), FactionId(1), war));
