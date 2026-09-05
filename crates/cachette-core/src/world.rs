@@ -908,7 +908,7 @@ pub struct World {
     ///
     /// # References
     ///
-    /// [^1]: ADR-0148, a game end is recorded once and stops the controllers, decision D1. `docs/adrs/draft/adr-0148-a-game-end-is-recorded-once-and-stops-the-controllers.md`
+    /// [^1]: ADR-0148, a game end is recorded once and stops the controllers, decision D1. `docs/adrs/accepted/adr-0148-a-game-end-is-recorded-once-and-stops-the-controllers.md`
     controller: Controller,
 }
 
@@ -3460,7 +3460,7 @@ impl World {
         // on every tick and that the hash does not cover lets two worlds hash
         // the same and diverge on the next tick.[^18]
         //
-        // [^18]: ADR-0148, a game end is recorded once and stops the controllers, decision D1. `docs/adrs/draft/adr-0148-a-game-end-is-recorded-once-and-stops-the-controllers.md`
+        // [^18]: ADR-0148, a game end is recorded once and stops the controllers, decision D1. `docs/adrs/accepted/adr-0148-a-game-end-is-recorded-once-and-stops-the-controllers.md`
         let hash = self.controller.hash_into(hash);
         // The water in the air and on the ground is state that a later frame
         // reads: the next solve starts from the field this one left. Two
@@ -4603,7 +4603,7 @@ impl World {
         // written.[^23] [^24]
         //
         // [^23]: ADR-0144, a faction controller runs inside the step and acts only through the caller's verbs, decision D1. `docs/adrs/accepted/adr-0144-a-faction-controller-runs-inside-the-step-and-acts-only-through-the-callers-verbs.md`
-        // [^24]: ADR-0148, a game end is recorded once and stops the controllers, decision D4. `docs/adrs/draft/adr-0148-a-game-end-is-recorded-once-and-stops-the-controllers.md`
+        // [^24]: ADR-0148, a game end is recorded once and stops the controllers, decision D4. `docs/adrs/accepted/adr-0148-a-game-end-is-recorded-once-and-stops-the-controllers.md`
         {
             let _span = stage::open(Stage::Controller);
             self.run_controller();
@@ -8430,7 +8430,7 @@ impl World {
     ///
     /// # References
     ///
-    /// [^1]: ADR-0148, a game end is recorded once and stops the controllers, decisions D2 and D4. `docs/adrs/draft/adr-0148-a-game-end-is-recorded-once-and-stops-the-controllers.md`
+    /// [^1]: ADR-0148, a game end is recorded once and stops the controllers, decisions D2 and D4. `docs/adrs/accepted/adr-0148-a-game-end-is-recorded-once-and-stops-the-controllers.md`
     /// [^2]: ADR-0144, a faction controller runs inside the step and acts only through the caller's verbs, decisions D2, D4 and D5. `docs/adrs/accepted/adr-0144-a-faction-controller-runs-inside-the-step-and-acts-only-through-the-callers-verbs.md`
     fn run_controller(&mut self) {
         self.controller.clear_log();
@@ -8486,7 +8486,7 @@ impl World {
     ///
     /// # References
     ///
-    /// [^1]: ADR-0148, a game end is recorded once and stops the controllers, decision D3. `docs/adrs/draft/adr-0148-a-game-end-is-recorded-once-and-stops-the-controllers.md`
+    /// [^1]: ADR-0148, a game end is recorded once and stops the controllers, decision D3. `docs/adrs/accepted/adr-0148-a-game-end-is-recorded-once-and-stops-the-controllers.md`
     fn check_game_end(&mut self) {
         if self.controller.game_end().is_set() {
             return;

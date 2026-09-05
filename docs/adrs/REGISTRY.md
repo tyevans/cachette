@@ -403,7 +403,7 @@ without stating a constraint is worse than no record.
 | 0145 | A unit type is a row of capability columns, and zero means cannot | Accepted | 0002, 0011, 0120, 0121 | `accepted/adr-0145-a-unit-type-is-a-row-of-capability-columns-and-zero-means-cannot.md` |
 | 0146 | A faction relation is one signed integer per ordered pair, and a pass reads a threshold | Draft | 0001, 0002, 0004, 0006, 0053, 0121, 0126, 0133, 0145 | `draft/adr-0146-a-faction-relation-is-one-signed-integer-per-ordered-pair-and-a-pass-reads-a-threshold.md` |
 | 0147 | A contract consideration is a tagged kind | Draft | 0002, 0111, 0126, 0127, 0128, 0146 | `draft/adr-0147-a-contract-consideration-is-a-tagged-kind.md` |
-| 0148 | A game end is recorded once and stops the controllers | Draft | 0001, 0004, 0023, 0053, 0144 | `draft/adr-0148-a-game-end-is-recorded-once-and-stops-the-controllers.md` |
+| 0148 | A game end is recorded once and stops the controllers | Accepted | 0001, 0004, 0023, 0053, 0144 | `accepted/adr-0148-a-game-end-is-recorded-once-and-stops-the-controllers.md` |
 
 ### Retired numbers
 
