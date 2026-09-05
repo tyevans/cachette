@@ -9170,7 +9170,7 @@ impl World {
                 // with no speaker planned no move, so the refusal here is
                 // the verb's own.[^4]
                 //
-                // [^4]: ADR-0144, a faction controller runs inside the step and acts only through the caller's verbs, decisions D2 and D3. `docs/adrs/draft/adr-0144-a-faction-controller-runs-inside-the-step-and-acts-only-through-the-callers-verbs.md`
+                // [^4]: ADR-0144, a faction controller runs inside the step and acts only through the caller's verbs, decisions D2 and D3. `docs/adrs/accepted/adr-0144-a-faction-controller-runs-inside-the-step-and-acts-only-through-the-callers-verbs.md`
                 Choice::Relation(other) => {
                     speakers[usize::from(faction.0)].is_some_and(|speaker| {
                         self.move_relation(speaker, other, controller::RELATION_STEP)
