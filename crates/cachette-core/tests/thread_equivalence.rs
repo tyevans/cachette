@@ -1204,11 +1204,11 @@ fn run_with_a_contest(config: WorldConfig, frames: u64, threads: usize) -> (Vec<
         (world.soldiers().len() as usize) < seated,
         "the scenario ended nobody"
     );
-    (
-        world.fell_log_bytes().to_vec(),
-        world.state_hash().finish(),
-        fell,
-    )
+    // The relation log of the last frame rides with the fallen log, so a
+    // crossing of the war edge that followed a thread would show here.
+    let mut bytes = world.fell_log_bytes().to_vec();
+    bytes.extend_from_slice(world.relation_log_bytes());
+    (bytes, world.state_hash().finish(), fell)
 }
 
 /// The scenarios in which two factions meet.
