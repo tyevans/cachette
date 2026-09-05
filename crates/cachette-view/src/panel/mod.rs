@@ -51,6 +51,7 @@ pub mod determinism;
 pub mod events;
 pub mod inspector;
 pub mod statistics;
+pub mod weather;
 
 use cachette_core::{Axial, World};
 
@@ -426,6 +427,7 @@ pub fn registered() -> &'static [&'static (dyn Panel + 'static)] {
         &characters::Characters,
         &inspector::Inspector,
         &determinism::Determinism,
+        &weather::Weather,
     ]
 }
 
