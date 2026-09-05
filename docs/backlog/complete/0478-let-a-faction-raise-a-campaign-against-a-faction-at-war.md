@@ -1,7 +1,7 @@
 ---
 id: 0478
 title: Let a faction raise a campaign against a faction at war
-status: refined
+status: complete
 created: 2026-09-05
 implements: [ADR-0144 D1, ADR-0144 D2, ADR-0144 D3, ADR-0144 D4, ADR-0144 D5, ADR-0145 D3, ADR-0146 D2, ADR-0003 D1, ADR-0004 D4, ADR-0001 D4, ADR-0006 D1]
 changes: []
@@ -127,7 +127,49 @@ and a campaign whose objective changes holder.[^3]
 
 ## Outcome
 
-Filled in when the item moves to `complete/`.
+Built. The world holds a campaign register: one bounded block of plain rows for
+each faction, with the tick of the raise, the objective tile, the objective
+kind, the cohort size, the holder of the objective at the raise, and the state.
+The register and its two parameters enter the state hash, so the golden hash
+moved and the commit says so.
+
+The controller draws once more for each faction on each tick, at the index one
+past the relation draw. It draws only when some pair the faction belongs to is
+in the war band and the faction holds no live campaign. The objective takes no
+draw: an own settlement whose ground a faction at war holds is a relief, and
+otherwise the nearest enemy settlement by hex distance from the seat is a take.
+A tie goes to the lowest settlement slot.
+
+The raise is one core function that the controller and the Python binding both
+call. It takes the lowest identities among the idle units of the faction, sets
+them to the soldier row through the set form of the type verb, and sends them
+through the send verb on the destination plane whose number is the faction
+number. A campaign closes when the objective tile changes holder or when every
+unit of the cohort has fallen, and the survivors go back to their own choice
+through the stop verb.
+
+The wear kind is declared and nothing raises it. It waits for the upgrade pass
+to give an upgrade a condition that wears.
+
+The census gained `campaigns_raised` and `campaigns_won`. Python gained
+`raise_campaign`, `campaigns`, `campaign_log_columns` and the cohort size
+parameter, and the type stub was edited by hand in the same commit. The
+demonstration prints a line when a faction marches and a line when it takes its
+objective.
+
+Ten defects were put back one at a time, and each test went red. The commit body
+of the test commit names each defect and the test that caught it.
+
+Two decisions this item made and no record holds. The cohort marches on the
+destination plane whose number is the faction number, so a caller that aims that
+plane re-aims the cohort. A closed row stays in the register until the next
+raise of the same faction reuses it, so a reader sees the last outcome. Both are
+cheap to change, and the scope test says neither needs a record.
+
+Left undone. Nothing wears an upgrade, so one of the three objective kinds is
+declared and inert. The register size is two rows and only one may be live, so
+the extreme of a full register cannot be reached: a raise is refused by the live
+campaign before it is refused by a full block.
 
 ## References
 
