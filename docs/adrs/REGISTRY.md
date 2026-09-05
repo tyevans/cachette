@@ -402,7 +402,7 @@ without stating a constraint is worse than no record.
 | 0144 | A faction controller runs inside the step and acts only through the caller's verbs | Accepted | 0001, 0003, 0004, 0040, 0042, 0043, 0053 | `accepted/adr-0144-a-faction-controller-runs-inside-the-step-and-acts-only-through-the-callers-verbs.md` |
 | 0145 | A unit type is a row of capability columns, and zero means cannot | Accepted | 0002, 0011, 0120, 0121 | `accepted/adr-0145-a-unit-type-is-a-row-of-capability-columns-and-zero-means-cannot.md` |
 | 0146 | A faction relation is one signed integer per ordered pair, and a pass reads a threshold | Draft | 0001, 0002, 0004, 0006, 0053, 0121, 0126, 0133, 0145 | `draft/adr-0146-a-faction-relation-is-one-signed-integer-per-ordered-pair-and-a-pass-reads-a-threshold.md` |
-| 0147 | A contract consideration is a tagged kind | Draft | 0002, 0111, 0126, 0127, 0128, 0146 | `draft/adr-0147-a-contract-consideration-is-a-tagged-kind.md` |
+| 0147 | A contract consideration is a tagged kind | Accepted | 0002, 0111, 0126, 0127, 0128, 0146 | `accepted/adr-0147-a-contract-consideration-is-a-tagged-kind.md` |
 | 0148 | A game end is recorded once and stops the controllers | Accepted | 0001, 0004, 0023, 0053, 0144 | `accepted/adr-0148-a-game-end-is-recorded-once-and-stops-the-controllers.md` |
 
 ### Retired numbers

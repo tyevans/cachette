@@ -148,4 +148,4 @@ because the plane holds no row and the pass returns at once.[^11]
 [^9]: Blockers register, BLK-120. `docs/BLOCKERS.md`
 [^10]: Decisions register, DEC-212. `docs/DECISIONS.md`
 [^11]: ADR-0126, a trade negotiation is engine state, and the words are not, decision D1. `docs/adrs/draft/adr-0126-a-trade-negotiation-is-engine-state.md`
-[^12]: ADR-0147, a contract consideration is a tagged kind, decisions D2 and D3. `docs/adrs/draft/adr-0147-a-contract-consideration-is-a-tagged-kind.md`
+[^12]: ADR-0147, a contract consideration is a tagged kind, decisions D2 and D3. `docs/adrs/accepted/adr-0147-a-contract-consideration-is-a-tagged-kind.md`
