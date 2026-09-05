@@ -111,8 +111,8 @@ pub use unit_type::{
     UnitTypeError, UnitTypeId, UnitTypeRow, UnitTypeTable, DEFAULT_UNIT_TYPE, UNIT_TYPE_COUNT,
 };
 pub use upgrade::{UpgradeKind, UpgradeMap, UpgradeSite, UPGRADE_KIND_COUNT};
-pub use world::{ConvertError, IdentityError, StepError, World, WorldConfig, WorldError};
 pub use weather::{
     Drops, Storm, WeatherError, WeatherField, COOLDOWN_TICKS, PLACES_CEILING, STRENGTH_CEILING,
     WET_MARK,
 };
+pub use world::{ConvertError, IdentityError, StepError, World, WorldConfig, WorldError};

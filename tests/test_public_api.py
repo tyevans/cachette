@@ -650,6 +650,8 @@ def test_the_thread_count_does_not_change_the_fallen_log() -> None:
         columns = world.fell_log_columns()
         logs.append([_named(columns)[name].tolist() for name in sorted(columns)])
     assert logs[0] == logs[1] == logs[2]
+
+
 def _open_ground(world: cachette.World, count: int) -> list[tuple[int, int]]:
     """Find addresses that admit a unit, in row order.
 
