@@ -48,14 +48,21 @@ fn a_world(seed: u64) -> World {
     world
 }
 
-/// Returns every tile one faction holds, in ascending tile index.
+/// Returns every tile one faction holds and that carries no upgrade, in
+/// ascending tile index.
+///
+/// The controller stage raises upgrades on held ground, and the engine
+/// refuses a land side whose tile carries one while BLK-036 is open. The
+/// upgrade refusal has its own test, which builds the upgrade it needs.
 fn tiles_held_by(world: &World, faction: FactionId) -> Vec<TileIdx> {
     let grid = world.grid();
     let mut found = Vec::new();
     for r in 0..grid.height() {
         for q in 0..grid.width() {
             let address = Axial::new(q as i32, r as i32);
-            if world.tile_holder(address) == Some(Holder::of(faction)) {
+            if world.tile_holder(address) == Some(Holder::of(faction))
+                && world.upgrade_at(address).is_none()
+            {
                 found.push(grid.index_of(address).expect("the address is inside"));
             }
         }
