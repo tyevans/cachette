@@ -1,7 +1,7 @@
 ---
 id: 0050
 title: A god advertises what it will trade
-status: Shaped
+status: Accepted
 created: 2026-09-05
 ---
 
@@ -44,10 +44,10 @@ Each statement below can be checked.
   wanted, and what the god asks in return.
 - Any god reads the posts of any other god. Reading is free. It moves no
   standing and costs the reader nothing.
-- A post is bounded. A god holds a fixed number of posts, and a new post past
-  the bound replaces one or is refused.
+- A post is bounded. A god holds a bounded number of posts, and a post past
+  the bound does not raise the count.
 - A faction that acts on its own writes its own posts from what its sites
-  hold. It reads the posts of others before it offers a deal.
+  hold.[^1] It reads the posts of others before it offers a deal.
 - A faction that acts on its own offers a deal only where its own surplus
   meets a posted want.
 - A post makes no promise. A god that posts and then refuses the offer that
@@ -79,32 +79,33 @@ with the population.
 
 Three properties follow. A solution must have all three.
 
-- The storage grows with the faction ceiling times the post bound and with
-  nothing else.
-- A read of one board is a copy of a fixed-size thing. It starts no pass over
+- What the world remembers about posts grows with the faction ceiling times
+  the post bound and with nothing else.
+- Reading the posts of one god costs the post bound. It starts no pass over
   the world.
 - A faction that writes its own posts reads a summary of its own sites. The
   engine already keeps that summary. The faction does not walk its units.
 
 No cost figure appears here. One blocker governs every cost figure this
 project holds, and it says which figures are measured and which are
-derived.[^1]
+derived.[^2]
 
 ## Which blockers govern this
 
-- **One blocker governs every cost figure here.**[^1] Every cost statement
+- **One blocker governs every cost figure here.**[^2] Every cost statement
   above states a shape and not a number.
-- **One blocker holds the rules of the downstream game.**[^2] How many posts a
+- **One blocker holds the rules of the downstream game.**[^3] How many posts a
   god holds and what a surplus is are rules of that game. So is how often a
-  faction rewrites its posts. The engine holds a value for each, and the blocker says
-  that no owner chose them. This record states none of them.
+  faction rewrites its posts. The engine holds a value for each, and the
+  blocker says that no owner chose them. This record states none of them.
 
 This record depends on two players dealing with each other, and on a site
-holding a store. Both exist.[^3] [^4]
+holding a store. Both exist.[^4] [^5]
 
 ## References
 
-[^1]: Blockers register, BLK-007. `docs/BLOCKERS.md`
-[^2]: Blockers register, BLK-050. `docs/BLOCKERS.md`
-[^3]: PRD-0034, two players hold each other to a future delivery. `docs/product/shaped/prd-0034-two-players-hold-each-other-to-a-future-delivery.md`
-[^4]: PRD-0010, a good moves to where it is wanted. `docs/product/accepted/prd-0010-a-good-moves-to-where-it-is-wanted.md`
+[^1]: PRD-0048, a developer watches factions play a game to an end. `docs/product/accepted/prd-0048-a-developer-watches-factions-play-a-game-to-an-end.md`
+[^2]: Blockers register, BLK-007. `docs/BLOCKERS.md`
+[^3]: Blockers register, BLK-050. `docs/BLOCKERS.md`
+[^4]: PRD-0034, two players hold each other to a future delivery. `docs/product/shaped/prd-0034-two-players-hold-each-other-to-a-future-delivery.md`
+[^5]: PRD-0010, a good moves to where it is wanted. `docs/product/accepted/prd-0010-a-good-moves-to-where-it-is-wanted.md`

@@ -136,4 +136,4 @@ Filled in when the item moves to `complete/`.
 [^2]: The panel standard. `crates/cachette-view/src/panel/mod.rs`
 [^3]: Blockers register, BLK-007. `docs/BLOCKERS.md`
 [^4]: Findings register, FND-198 and FND-051. `docs/FINDINGS.md`
-[^5]: PRD-0048, a developer watches factions play a game to an end. `docs/product/shaped/prd-0048-a-developer-watches-factions-play-a-game-to-an-end.md`
+[^5]: PRD-0048, a developer watches factions play a game to an end. `docs/product/accepted/prd-0048-a-developer-watches-factions-play-a-game-to-an-end.md`

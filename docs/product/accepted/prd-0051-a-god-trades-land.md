@@ -1,7 +1,7 @@
 ---
 id: 0051
 title: A god trades land
-status: Shaped
+status: Accepted
 created: 2026-09-05
 ---
 
@@ -49,11 +49,11 @@ Each statement below can be checked.
   ground.
 - A watcher reads the holder of a traded tile before the deal and after it.
   The two readings differ.
-- Units on traded ground are not moved. They stand on ground another god now
-  holds.
-- An offer of ground that carries a built thing is refused. The refusal holds
-  while the question of what happens to that thing is open. When the question
-  closes, the refusal goes.
+- The deal moves no unit. A unit on traded ground stays where it stands, on
+  ground another god now holds.
+- The engine refuses an offer of ground that carries a built thing. The
+  refusal holds while the question of what happens to that thing is
+  open.[^1] When the question closes, the refusal goes.
 - The same seed with the same deals gives the same holders, at every thread
   count, on every run.
 
@@ -71,6 +71,8 @@ Each statement below can be checked.
   question, and it belongs in a decision record.
 - It does not give away ground a god does not hold. A promise of ground to be
   conquered is a separate need.
+- It does not say what a god may offer apart from ground. A step in standing
+  as one side of a deal is a separate need.[^2]
 
 ## What it costs at the target scale
 
@@ -87,31 +89,32 @@ Three properties follow. A solution must have all three.
   offered has a ceiling.
 - What a delivery costs grows with the same ceiling. No unit walks and no
   carrier moves.
-- The running count of ground each faction holds moves by the size of the set.
-  No pass over the world recounts it.
+- The reading of how much ground each faction holds changes by the size of
+  the set. No pass over the world recounts it.
 
 No cost figure appears here. One blocker governs every cost figure this
 project holds, and it says which figures are measured and which are
-derived.[^1]
+derived.[^3]
 
 ## Which blockers govern this
 
-- **One blocker governs every cost figure here.**[^1] Every cost statement
+- **One blocker governs every cost figure here.**[^3] Every cost statement
   above states a shape and not a number.
 - **One blocker holds whether a built thing changes hands with the ground under
-  it.**[^2] The project owner holds it. Until it closes, a deal that names
+  it.**[^1] The project owner holds it. Until it closes, a deal that names
   ground with a built thing on it is refused. This record states no answer.
-- **One blocker holds the rules of the downstream game.**[^3] How much ground
+- **One blocker holds the rules of the downstream game.**[^4] How much ground
   one deal may name is a rule of that game. So is what ground is worth. This
   record states neither.
 
 This record depends on a place belonging to somebody, and on two players
-dealing with each other. Both exist.[^4] [^5]
+dealing with each other. Both exist.[^5] [^6]
 
 ## References
 
-[^1]: Blockers register, BLK-007. `docs/BLOCKERS.md`
-[^2]: Blockers register, BLK-036. `docs/BLOCKERS.md`
-[^3]: Blockers register, BLK-050. `docs/BLOCKERS.md`
-[^4]: PRD-0006, a place belongs to somebody. `docs/product/accepted/prd-0006-a-place-belongs-to-somebody.md`
-[^5]: PRD-0034, two players hold each other to a future delivery. `docs/product/shaped/prd-0034-two-players-hold-each-other-to-a-future-delivery.md`
+[^1]: Blockers register, BLK-036. `docs/BLOCKERS.md`
+[^2]: PRD-0049, a god declares war and makes peace. `docs/product/accepted/prd-0049-a-god-declares-war-and-makes-peace.md`
+[^3]: Blockers register, BLK-007. `docs/BLOCKERS.md`
+[^4]: Blockers register, BLK-050. `docs/BLOCKERS.md`
+[^5]: PRD-0006, a place belongs to somebody. `docs/product/accepted/prd-0006-a-place-belongs-to-somebody.md`
+[^6]: PRD-0034, two players hold each other to a future delivery. `docs/product/shaped/prd-0034-two-players-hold-each-other-to-a-future-delivery.md`

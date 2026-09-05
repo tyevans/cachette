@@ -1,7 +1,7 @@
 ---
 id: 0053
 title: A game is balanced across seeds
-status: Shaped
+status: Accepted
 created: 2026-09-05
 ---
 
@@ -52,8 +52,8 @@ Each statement below can be checked.
   it never fired. That list is empty.
 - The report names the seed set and names every seed that failed a statement.
   A developer can replay the failure.
-- The command does not gate a merge. It runs on the schedule the slow checks
-  run, and before any change to a game value.
+- The command is not a merge gate. The report names the game values it ran
+  against. A reader can then tell whether a change to a value was checked.
 - The same seed set gives the same report, at every thread count, on every
   run.
 
@@ -68,6 +68,9 @@ Each statement below can be checked.
 - It does not measure performance. How long a game takes to play is a
   benchmark, and a benchmark is a separate thing.
 - It does not judge a player. No player exists in this work.
+- It does not count what fired. The count of times each mechanism fired in one
+  run is a reading that the game record asks for. This record only compares
+  that reading across seeds.[^1]
 - It does not decide how the report is produced. That is an architectural
   question, and it belongs in a decision record.
 
@@ -76,36 +79,36 @@ Each statement below can be checked.
 The cost driver is the number of seeds times the length of one game, not
 anything about one step.
 
-One game costs what a run costs. The harness costs that, times the seed count.
-Nothing in the harness adds to the cost of a step.
+One game costs what a run costs. The command costs that, times the seed count.
+Nothing in the command adds to the cost of a step.
 
 Three properties follow. A solution must have all three.
 
 - The cost grows with the seed count and with the tick limit, and with nothing
   else.
-- The harness reads what the engine already reports at the end of a game. It
+- The command reads what the engine already reports at the end of a game. It
   adds no reader that walks the world.
-- The harness is long by design, so it does not gate a merge. A check that
+- The command is long by design, so it is not a merge gate. A check that
   costs a game per seed cannot run on every commit.
 
 No cost figure appears here. One blocker governs every cost figure this
 project holds, and it says which figures are measured and which are
-derived.[^1]
+derived.[^2]
 
 ## Which blockers govern this
 
-- **One blocker governs every cost figure here.**[^1] Every cost statement
+- **One blocker governs every cost figure here.**[^2] Every cost statement
   above states a shape and not a number.
-- **One blocker holds the rules of the downstream game.**[^2] The fair share
+- **One blocker holds the rules of the downstream game.**[^3] The fair share
   of each way to win and of each seat are rules of that game. So are the floor
   on games that end, the tick limit and the seed set. This record states none
   of them.
 
 This record depends on factions playing a game to an end. That need is
-shaped and not yet met.[^3]
+accepted and not yet met.[^1]
 
 ## References
 
-[^1]: Blockers register, BLK-007. `docs/BLOCKERS.md`
-[^2]: Blockers register, BLK-050. `docs/BLOCKERS.md`
-[^3]: PRD-0048, a developer watches factions play a game to an end. `docs/product/shaped/prd-0048-a-developer-watches-factions-play-a-game-to-an-end.md`
+[^1]: PRD-0048, a developer watches factions play a game to an end. `docs/product/accepted/prd-0048-a-developer-watches-factions-play-a-game-to-an-end.md`
+[^2]: Blockers register, BLK-007. `docs/BLOCKERS.md`
+[^3]: Blockers register, BLK-050. `docs/BLOCKERS.md`
