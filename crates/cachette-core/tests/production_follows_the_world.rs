@@ -16,6 +16,12 @@
 //! typical case would supply no extreme, and the assertion would then measure
 //! the fixture.[^3]
 //!
+//! **The weather test holds the other three inputs still by construction,
+//! and then checks that it did.** It seats sites across the world and spawns
+//! no unit, so nothing draws a disc down and nothing builds. A fixture that
+//! searched one run for a matching pair would depend on the seed, and a seed
+//! is not a fixture.
+//!
 //! # References
 //!
 //! [^1]: Backlog item 0136, provision a founded site from the ground it reaches. `docs/backlog/complete/0136-provision-a-founded-site-from-the-ground-it-reaches.md`
@@ -28,7 +34,7 @@ use cachette_core::founding::{disc, SURVEY_RADIUS};
 use cachette_core::hex::Axial;
 use cachette_core::resource::ResourceKind;
 use cachette_core::upgrade::UpgradeCategory;
-use cachette_core::{sim_math, CommodityId, Entity, Fix32, World, WorldConfig};
+use cachette_core::{sim_math, CommodityId, Entity, FactionId, Fix32, World, WorldConfig};
 
 /// The extent of every fixture.
 ///
@@ -58,6 +64,19 @@ const SETTLE: u32 = 30;
 /// The one commodity the world holds.
 const FOOD: CommodityId = CommodityId(0);
 
+/// The spacing of the seats the weather fixture founds.
+///
+/// The weather field answers for a level 1 cell. The spacing is wider than
+/// one cell, so two seats read two cells and the sample spans the world.
+const SEAT_SPACING: usize = 24;
+
+/// The ticks the weather fixture runs.
+///
+/// The field starts dry and fills over the first ticks of a run. The count is
+/// far above that start, so the sample reads the weather the solve settles on
+/// rather than the start it began from.
+const WET_TICKS: u32 = 900;
+
 /// Builds a fixture world.
 fn world(seed: u64) -> World {
     World::new(WorldConfig {
@@ -79,6 +98,23 @@ fn seated(world: &mut World) -> Entity {
         .map(|founding| founding.settlement())
         .next()
         .expect("the fixture world seats at least one group")
+}
+
+/// Seats a site on a lattice across the world, and returns each seat.
+///
+/// The lattice spans the world, so the seats read many weather cells rather
+/// than one. A tile that refuses a seat is skipped.
+fn wet_seats(world: &mut World) -> Vec<(Entity, Axial)> {
+    let mut seats = Vec::new();
+    for r in (0..EXTENT as usize).step_by(SEAT_SPACING) {
+        for q in (0..EXTENT as usize).step_by(SEAT_SPACING) {
+            let address = Axial::new(q as i32, r as i32);
+            if let Ok(site) = world.found_settlement(address, FactionId(0)) {
+                seats.push((site, address));
+            }
+        }
+    }
+    seats
 }
 
 /// Orders every live unit to gather food, so the discs are stripped.
@@ -195,43 +231,80 @@ fn production_falls_as_the_ground_is_drawn_down_and_recovers_when_it_does() {
 
 #[test]
 fn production_rises_when_the_ground_is_wet_and_falls_when_it_dries() {
-    // The engine's own weather solve wets and dries the ground of the site
-    // over a run. The test finds two ticks that agree in every other input
-    // and differ only in the weather, so the weather is the one term left
-    // that can move. That holds the other three still without a verb.
-    let samples = sample_a_run(0x0cac_4e77_5104_0002, 1600);
-    let wet: Vec<&Sample> = samples.iter().filter(|sample| sample.wet).collect();
-    let dry: Vec<&Sample> = samples.iter().filter(|sample| !sample.wet).collect();
+    // The weather field answers for a level 1 cell, so the wet term reads the
+    // cell of the site and nothing else. One site therefore samples one cell,
+    // and a run over one site measures whatever that cell happens to do. This
+    // fixture spans the world instead. It seats a site in each of many cells,
+    // so the sample holds the cells that dry as well as the cells that stay
+    // wet.
+    let mut world = world(0x0cac_4e77_5104_0002);
+    let seats: Vec<(Entity, Axial)> = wet_seats(&mut world);
     assert!(
-        !wet.is_empty() && !dry.is_empty(),
-        "the fixture must hold both a wet tick and a dry tick, or the \
-         assertion below measures nothing. It held {} wet and {} dry",
-        wet.len(),
-        dry.len()
+        seats.len() > 8,
+        "the fixture must seat a site in many cells, but it seated {}",
+        seats.len()
     );
 
-    let mut pairs = 0usize;
-    for soaked in &wet {
-        for parched in &dry {
-            if soaked.taken != parched.taken || soaked.terraces != parched.terraces {
+    // No unit stands in this world. Nobody gathers, so the disc of every site
+    // keeps its whole store, and nobody builds, so no terrace stands. The
+    // ground term and the terrace term are therefore held still by
+    // construction, and the weather is the one term left that can move. The
+    // assertions below check that, rather than assume it.
+    let mut wet: Vec<Vec<Fix32>> = vec![Vec::new(); seats.len()];
+    let mut dry: Vec<Vec<Fix32>> = vec![Vec::new(); seats.len()];
+    for _ in 0..WET_TICKS {
+        world.step(THREADS).expect("the fixture steps");
+        for (index, (site, address)) in seats.iter().enumerate() {
+            let Some(scale) = world.production_scale(*site) else {
                 continue;
-            }
-            pairs += 1;
+            };
             assert_eq!(
-                soaked.scale,
-                sim_math::add(parched.scale, WET_WEIGHT),
-                "wet ground must add exactly the wet weight to the scale"
+                taken_over_the_disc(&world, *address),
+                0,
+                "no unit stands in this world, so nothing may draw the ground \
+                 down"
             );
-            assert!(
-                soaked.scale > parched.scale,
-                "wet ground must give a higher scale than dry ground"
+            assert_eq!(
+                terraces_over_the_disc(&world, *address),
+                0,
+                "no unit stands in this world, so no terrace may stand"
             );
+            if world.ground_is_wet(*address) == Some(true) {
+                wet[index].push(scale);
+            } else {
+                dry[index].push(scale);
+            }
+        }
+    }
+
+    // A cell that holds both a wet tick and a dry tick is the case this test
+    // needs. The count is an assertion about the weather: a field that never
+    // dried anywhere would leave the assertion below with nothing to compare.
+    let mut both = 0usize;
+    for index in 0..seats.len() {
+        if wet[index].is_empty() || dry[index].is_empty() {
+            continue;
+        }
+        both += 1;
+        for soaked in &wet[index] {
+            for parched in &dry[index] {
+                assert_eq!(
+                    *soaked,
+                    sim_math::add(*parched, WET_WEIGHT),
+                    "wet ground must add exactly the wet weight to the scale"
+                );
+                assert!(
+                    *soaked > *parched,
+                    "wet ground must give a higher scale than dry ground"
+                );
+            }
         }
     }
     assert!(
-        pairs > 0,
-        "the fixture must hold a wet tick and a dry tick that agree in every \
-         other input, or the assertion above measures nothing"
+        both > 0,
+        "the weather must both wet and dry the cell of at least one site, or \
+         the assertion above measures nothing. None of {} sites saw both",
+        seats.len()
     );
 }
 
