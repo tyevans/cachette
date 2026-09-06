@@ -78,7 +78,7 @@ const HALF: Fix32 = Fix32(1 << (FIX_FRACTIONAL_BITS - 1));
 const CONTRAST: Fix32 = Fix32(114_688);
 
 /// The height below which a tile holds water.
-const HEIGHT_WATER: Fix32 = Fix32(26_214);
+pub const HEIGHT_WATER: Fix32 = Fix32(26_214);
 
 /// The height below which a tile is level ground.
 const HEIGHT_LEVEL: Fix32 = Fix32(40_632);

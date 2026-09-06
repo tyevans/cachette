@@ -521,17 +521,30 @@ fn cold_ground_takes_more_out_of_the_air_than_warm_ground() {
     for _ in 0..8 {
         world.step(4).expect("the step must run");
     }
-    let mut lowest = i64::MAX;
-    let mut highest = i64::MIN;
-    for cell in 0..world.pyramid().len() as u32 {
-        let Some(summary) = world.pyramid().cell(cell) else {
+    // The ground of each weather cell, folded from the tiles the way the
+    // world folds it. The air met no cooling on the way, so the numerator
+    // reads the cell alone.
+    let mut under = vec![weather::CellGround::EMPTY; world.weather().air_plane().len().max(1)];
+    for address in addresses(&world) {
+        let (Some(tile), Some(index)) = (
+            world.tile_terrain(address),
+            world
+                .grid()
+                .index_of(address)
+                .and_then(|at| world.weather_cell_of(at)),
+        ) else {
             continue;
         };
-        // The air met no cooling on the way, so this reads the cell alone.
-        // The world runs at the level 1 weather pitch, so the ground under a
-        // weather cell is the ground under the level 1 cell of the same
-        // index. The two fold the same three fields over the same tiles.
-        let ground = weather::CellGround::from_summary(summary);
+        if let Some(slot) = under.get_mut(index as usize) {
+            *slot = slot.combine(weather::CellGround::of_tile(tile));
+        }
+    }
+    let mut lowest = i64::MAX;
+    let mut highest = i64::MIN;
+    for ground in under {
+        if ground.tiles() == 0 {
+            continue;
+        }
         let numerator = weather::fall_numerator(weather::heat_of(ground), 0);
         lowest = lowest.min(numerator);
         highest = highest.max(numerator);

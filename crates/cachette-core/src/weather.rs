@@ -101,7 +101,6 @@ use bytemuck::{Pod, Zeroable};
 use crate::hash::StateHash;
 use crate::hex::{Axial, Grid, NEIGHBOURS, NEIGHBOUR_COUNT};
 use crate::holding::FactionMask;
-use crate::pyramid::CellSummary;
 use crate::rng;
 use crate::sim_math;
 use crate::types::{Accum, FactionId, Fix32, Tick, TileIdx, FACTION_CEILING};
@@ -358,6 +357,24 @@ pub struct CellGround {
     ///
     /// [^1]: ADR-0023, an aggregate combines exactly, in any order, decision D3. `docs/adrs/accepted/adr-0023-an-aggregate-combines-exactly-in-any-order.md`
     pub height_total: i64,
+    /// The sum of the heights of the tiles the cell covers that hold water.
+    ///
+    /// **The depth of the water is the one thing the other three fields
+    /// cannot give.** The open tile count says how much of the cell is water
+    /// and says nothing about how deep it is, so a shelf and an abyss read
+    /// alike. The height total mixes the land and the water of one cell into
+    /// one mean, so it cannot answer either question on its own. This field
+    /// separates the two.
+    ///
+    /// The height of a water tile is the depth read the other way round. The
+    /// water mark is the top of the range and zero is the deepest water.[^2]
+    ///
+    /// The accumulator is 64 bits wide, for the reason the height total is.
+    ///
+    /// # References
+    ///
+    /// [^2]: ADR-0162, water enters the air where it is hot, and it falls where the air cools, decision D1. `docs/adrs/accepted/adr-0162-water-enters-the-air-where-it-is-hot-and-falls-where-the-air-cools.md`
+    pub water_height_total: i64,
     /// The tiles the cell covers.
     pub tiles: i32,
     /// The tiles of the cell whose ground admits a unit.
@@ -368,22 +385,10 @@ impl CellGround {
     /// A cell that covers no tile.
     pub const EMPTY: Self = Self {
         height_total: 0,
+        water_height_total: 0,
         tiles: 0,
         open_tiles: 0,
     };
-
-    /// Builds the ground of a cell from a level 1 summary.
-    ///
-    /// A world at the level 1 pitch reads the same three numbers that the
-    /// pyramid already holds, so the two sources cannot disagree there.
-    #[must_use]
-    pub fn from_summary(summary: CellSummary) -> Self {
-        Self {
-            height_total: summary.height_total().0,
-            tiles: summary.tiles().clamp(0, i64::from(i32::MAX)) as i32,
-            open_tiles: summary.open_tiles().clamp(0, i64::from(i32::MAX)) as i32,
-        }
-    }
 
     /// Combines the ground of two cells.
     ///
@@ -398,8 +403,35 @@ impl CellGround {
     pub const fn combine(self, other: Self) -> Self {
         Self {
             height_total: self.height_total.saturating_add(other.height_total),
+            water_height_total: self
+                .water_height_total
+                .saturating_add(other.water_height_total),
             tiles: self.tiles.saturating_add(other.tiles),
             open_tiles: self.open_tiles.saturating_add(other.open_tiles),
+        }
+    }
+
+    /// Builds the ground of one tile.
+    ///
+    /// **Every caller that folds a lattice reads this.** Two callers built
+    /// the record from a tile, and a third field would have had to be added
+    /// to both with nothing to fail when only one of them got it.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: Recurring Defect Shapes, shape 1. `.agents/rules/recurring-defects.md`
+    #[must_use]
+    pub fn of_tile(tile: TerrainTile) -> Self {
+        let height = sim_math::accumulate(Accum(0), tile.height).0;
+        let passable = tile.kind.is_passable();
+        Self {
+            height_total: height,
+            // The water height is the height of the tiles that hold water,
+            // and nothing else. The heat reads it to tell a shallow shelf
+            // from a deep ocean, which the tile count cannot do.
+            water_height_total: if passable { 0 } else { height },
+            tiles: 1,
+            open_tiles: i32::from(passable),
         }
     }
 
@@ -428,6 +460,15 @@ impl CellGround {
         )))
     }
 
+    /// Returns the tiles of the cell that hold water.
+    ///
+    /// Water is the only ground that admits no unit, so the tiles that admit
+    /// none are the water tiles exactly.
+    #[must_use]
+    pub const fn water_tiles(self) -> i64 {
+        (self.tiles - self.open_tiles) as i64
+    }
+
     /// Returns the mean height of the cell.
     ///
     /// Returns `None` when the cell covers no tile.
@@ -437,6 +478,43 @@ impl CellGround {
             return None;
         }
         Some(Fix32(clamp_to_fix(self.height_total / self.tiles())))
+    }
+
+    /// Returns the mean height of the land of the cell.
+    ///
+    /// **The land of a cell is not the cell.** A coastal cell that reads its
+    /// mean height over water and land together reports a height that no tile
+    /// of it holds, and the heat then treats a beach beside an abyss as if it
+    /// were a valley floor.
+    ///
+    /// Returns `None` when the cell holds no land.
+    #[must_use]
+    pub fn mean_land_height(self) -> Option<Fix32> {
+        if self.open_tiles <= 0 {
+            return None;
+        }
+        let land = self.height_total - self.water_height_total;
+        Some(Fix32(clamp_to_fix(land / self.open_tiles())))
+    }
+
+    /// Returns how shallow the water of the cell is, from none to whole.
+    ///
+    /// The answer is whole at the water mark and none at the deepest water.
+    /// **Nothing else in the field can tell a shelf from an abyss**, because
+    /// a tile counts as water when its height falls below one mark and the
+    /// count past that mark carries no depth at all.
+    ///
+    /// Returns `None` when the cell holds no water.
+    #[must_use]
+    pub fn shallowness(self) -> Option<Fix32> {
+        let water = self.water_tiles();
+        if water <= 0 {
+            return None;
+        }
+        let mean = self.water_height_total / water;
+        Some(Fix32(clamp_to_fix(
+            (mean << crate::types::FIX_FRACTIONAL_BITS) / i64::from(HEIGHT_WATER.0),
+        )))
     }
 }
 
@@ -851,14 +929,36 @@ pub const HEAT_CEILING: i32 = 256;
 
 /// What open water adds to the heat of a cell, at the top of its range.
 ///
+/// **The term is graded by depth, and the shallowest water takes all of it.**
+/// Shallow water takes up heat and gives it up over a small column, so it is
+/// a strong source. Deep water spreads the same heat through a large one, so
+/// it takes almost none of this term.
+///
 /// **Water biases the ground warm, and it does not dominate it.** What water
-/// does to the weather is to hold its temperature rather than to raise it,
-/// and the temperature pass states that separately by moving a wet cell more
-/// slowly. Height is the part of the ground that belongs here.
+/// mostly does to the weather is to hold its temperature rather than to raise
+/// it, and the temperature pass states that separately by moving a deep cell
+/// more slowly than a shallow one.
 const HEAT_FROM_WATER: i32 = 64;
+
+/// The height below which a tile holds water, read and not restated.
+///
+/// The terrain declares the mark, and the shallowness of a cell is its mean
+/// water height as a share of it. A second copy here would be a second
+/// declaration of one value, and nothing would fail when the two
+/// disagreed.[^1]
+///
+/// # References
+///
+/// [^1]: Recurring Defect Shapes, shape 1. `.agents/rules/recurring-defects.md`
+use crate::terrain::{TerrainTile, HEIGHT_WATER};
 
 /// What low ground adds to the heat of a cell, at the bottom of the height
 /// range.
+///
+/// **The term reads the height of the land of the cell, and never the height
+/// of its water.** A mean over both put the sea at the bottom of the height
+/// range and therefore at the top of this term, which made every sea hotter
+/// than every coast.
 const HEAT_FROM_LOW_GROUND: i32 = 192;
 
 /// What the ground term is divided by before it drives the temperature.
@@ -937,6 +1037,29 @@ const WARMTH_NUMERATOR: i64 = 1;
 ///
 /// [^1]: ADR-0166, the temperature of a cell is carried state that a season and the sky drive, decision D1. `docs/adrs/draft/adr-0166-the-temperature-of-a-cell-is-carried-state-that-a-season-and-the-sky-drive.md`
 const WARMTH_DENOMINATOR: i64 = 8;
+
+/// What the whole of the part is multiplied by over the deepest water.
+///
+/// **Deep water warms slowly and cools slowly. Land does neither.** A large
+/// column of water takes up the same heat over a greater depth, so its
+/// temperature moves a small part of the way in the time that a field or a
+/// shallow lake moves the whole of it. Shallow water sits between the two,
+/// because the grading runs with the depth and not with the tile count.
+///
+/// **This is what makes a coast interesting.** Two neighbouring cells that
+/// track one driver at one rate hold one temperature, and no wind blows
+/// between them. A land cell that tracks the season while the sea beside it
+/// lags gives a heat difference across the coast, and that difference changes
+/// sign as the season turns. So the coastal wind blows one way in the warm
+/// half of the year and the other way in the cold half.
+///
+/// The doc of the water heat term claimed this behaviour before anything did
+/// it. One share moved every cell at one rate, whatever it held.[^1]
+///
+/// # References
+///
+/// [^1]: Recurring Defect Shapes, shape 3. `.agents/rules/recurring-defects.md`
+const DEEP_WATER_LAG: i64 = 8;
 
 /// The share of a temperature difference that one step of wind carries.
 const CARRY_FOR_EACH_WIND_STEP: i64 = 1;
@@ -1095,16 +1218,22 @@ const GROUND_LIFT_DENOMINATOR: i64 = 8 * HEAT_CEILING as i64;
 /// [^2]: ADR-0166, the temperature of a cell is carried state that a season and the sky drive, decision D2. `docs/adrs/draft/adr-0166-the-temperature-of-a-cell-is-carried-state-that-a-season-and-the-sky-drive.md`
 const LIFT_DROPS: i64 = 448;
 
-/// The water in the air above one cell at which the sea stops lifting.
+/// The water that the air above one cell holds.
 ///
-/// **This is the back pressure on the source.** Without it nothing limits how
-/// much water enters the air, the source overwhelms every sink, and the total
-/// in the air only climbs. A cell lifts what brings its air up to this mark
-/// and no more, so the water the sea can put into the world is bounded by the
-/// mark times the lattice.
+/// **This is the ceiling of the air plane, and every reader of the air uses
+/// it.** The lift raises water only into the room below the mark. The cloud
+/// term reads the air against the mark. The settle pass rains out whatever
+/// stands above it, so the plane holds the mark after every solve.
 ///
-/// A god is not bound by it. A storm is an injection, and the model carries
-/// that water away rather than refusing it.[^1]
+/// Without the mark nothing bounded what the transport delivers into a cell
+/// that several winds converge on. The lift alone was not enough, because it
+/// bounds the source and not the sum of what arrives. A convergence cell then
+/// climbed without a bound, and the plane held a maximum three orders of
+/// magnitude above its own median.[^1]
+///
+/// A god may still put more than this into a cell in one call, because a
+/// storm is an injection and the model carries that water away rather than
+/// refusing it. The next solve rains out what the cell could not hold.[^1]
 ///
 /// # References
 ///
@@ -1272,9 +1401,56 @@ pub fn heat_of(ground: CellGround) -> i32 {
     // that admits none is its water share exactly.
     let open = ground.open_share().map_or(Fix32::ZERO, to_unit);
     let water = Fix32(Fix32::ONE.0 - open.0);
-    let height = ground.mean_height().map_or(Fix32::ZERO, to_unit);
-    let low = Fix32(Fix32::ONE.0 - height.0);
-    part_of(HEAT_FROM_WATER, water) + part_of(HEAT_FROM_LOW_GROUND, low)
+
+    // **The land term reads the height of the land, and not of the cell.**
+    // Low land is warm. A cell that averaged its water in with its land
+    // reported a height that no tile of it held, and a deep sea then read as
+    // the lowest ground in the world and therefore as the hottest. That is
+    // backwards, and it was the whole of the difference between a sea and the
+    // coast beside it: the sea ran warmer than every land cell, the air
+    // leaving it met that step as cooling at the first land it reached, and
+    // it rained out there. No air survived one cell inland.[^2]
+    let land_height = ground.mean_land_height().map_or(Fix32::ZERO, to_unit);
+    let low = Fix32(Fix32::ONE.0 - land_height.0);
+    let land_term = part_of(part_of(HEAT_FROM_LOW_GROUND, low), open);
+
+    // **The water term is graded by depth, and shallow water is the warmer.**
+    // Shallow water takes up heat and gives it up over a small column, so a
+    // shelf or a lake is a strong source. Deep water spreads the same heat
+    // through a large one, so it is a weak one. A cell that counted its water
+    // tiles alone could not tell the two apart, because a tile counts as
+    // water when its height falls below one mark and the count carries no
+    // depth past it.[^2]
+    let shallow = ground.shallowness().map_or(Fix32::ZERO, to_unit);
+    let water_term = part_of(part_of(HEAT_FROM_WATER, shallow), water);
+
+    land_term + water_term
+}
+
+/// Returns what the temperature divisor of a cell is multiplied by.
+///
+/// The answer is one over land and over water at the shoreline mark, and it
+/// rises to the deep-water lag over the deepest water. It is graded by the
+/// mean depth of the water and by the share of the cell that holds any, so a
+/// coastal cell lags less than the open sea beyond it.
+///
+/// **This is public so that a test can move one input and watch the answer
+/// move.**
+#[must_use]
+pub fn lag_of(ground: CellGround) -> i64 {
+    let water = ground.open_share().map_or(Fix32::ZERO, |open| {
+        to_unit(Fix32(Fix32::ONE.0 - open.0))
+    });
+    let shallow = ground.shallowness().map_or(Fix32::ONE, to_unit);
+    let deep = Fix32(Fix32::ONE.0 - shallow.0);
+    // The extra lag is the whole extra multiplied by how deep the water is
+    // and then by how much of the cell is water. A cell with no water gets
+    // none of it, and neither does a cell whose water lies at the mark.
+    let extra = i64::from(part_of(
+        part_of((DEEP_WATER_LAG - 1) as i32, deep),
+        water,
+    ));
+    1 + extra.max(0)
 }
 
 /// Returns a smooth fall from one to zero over a part of a whole.
@@ -2074,10 +2250,16 @@ impl WeatherField {
                 continue;
             };
             let apart = i64::from(asked - *held);
+            // **Deep water holds its temperature, and land does not.** The
+            // divisor grows with the depth of the water the cell holds, so a
+            // deep sea moves a small part of the way toward what the world
+            // asks while the coast beside it moves the whole of it. The two
+            // then part as the season turns, and the coastal wind reverses
+            // with them.[^3]
             let step = narrow(sim_math::share(
                 Accum(apart),
                 Accum(WARMTH_NUMERATOR),
-                Accum(WARMTH_DENOMINATOR),
+                Accum(WARMTH_DENOMINATOR * lag_of(*under)),
             ));
             // The whole degree that takes the last of the difference. It
             // never overshoots, because it is bounded by what is left.
@@ -2288,6 +2470,32 @@ impl WeatherField {
             // away from, and a still cell met no cooling on the way.[^1]
             //
             // [^1]: ADR-0162, water enters the air where it is hot, and it falls where the air cools, decision D2. `docs/adrs/accepted/adr-0162-water-enters-the-air-where-it-is-hot-and-falls-where-the-air-cools.md`
+            // **The air over a cell holds only so much, and it rains out
+            // what it cannot hold.** Two other readers already treat the
+            // saturation mark as the ceiling of the air: the lift refuses to
+            // raise water into a saturated cell, and the cloud term clamps
+            // its reading at the same mark. The transport was the one thing
+            // that could carry a cell past it, because nothing bounded what
+            // several neighbours deliver into one convergence cell. Such a
+            // cell then climbed without a bound, and it held three orders of
+            // magnitude above the median of the plane.[^3]
+            //
+            // The excess leaves the air and lands on the ground of the same
+            // cell. It is an exact integer move, so what the air loses the
+            // ground gains and the account holds.[^4]
+            //
+            // **This is also what ends a storm.** The convergence that builds
+            // one is now the same thing that empties it, so a cell that
+            // gathers water pours the difference out in the tick it gathers
+            // it.
+            //
+            // [^3]: ADR-0162, water enters the air where it is hot, and it falls where the air cools, decision D3. `docs/adrs/accepted/adr-0162-water-enters-the-air-where-it-is-hot-and-falls-where-the-air-cools.md`
+            // [^4]: ADR-0141, a weather pass moves water and never scales it, decision D2. `docs/adrs/draft/adr-0141-a-weather-pass-moves-water-and-never-scales-it.md`
+            let held = self.air[cell];
+            let poured = Drops((held.0 - AIR_SATURATION.0).max(0));
+            self.air[cell] = Drops(held.0 - poured.0);
+            self.ground[cell] = self.ground[cell].combine(poured);
+
             let cooling = self.cooling_at(cell, heat);
             let numerator = fall_numerator(heat, cooling);
             let air = self.air[cell];
@@ -2302,9 +2510,15 @@ impl WeatherField {
             // it was already counted when it first entered the air.[^2]
             //
             // [^2]: ADR-0162, water enters the air where it is hot, and it falls where the air cools, decision D1. `docs/adrs/accepted/adr-0162-water-enters-the-air-where-it-is-hot-and-falls-where-the-air-cools.md`
+            //
+            // The room in the air bounds it, in the same way that the room
+            // bounds what the sea lifts. Every site that adds to the air
+            // reads one ceiling, so the plane holds the mark after the pass
+            // whatever route the water took.
             let wet = self.ground[cell];
             let back = share_of(wet, i64::from(heat), GROUND_LIFT_DENOMINATOR);
-            let back = Drops(back.0.min(wet.0));
+            let room = (AIR_SATURATION.0 - self.air[cell].0).max(0);
+            let back = Drops(back.0.min(wet.0).min(room));
             self.ground[cell] = Drops(wet.0 - back.0);
             self.air[cell] = self.air[cell].combine(back);
 

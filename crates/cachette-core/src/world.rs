@@ -11459,11 +11459,7 @@ fn weather_ground_of(layout: BlockLayout, terrain: Terrain) -> Vec<CellGround> {
             let Some(slot) = ground.get_mut(cell) else {
                 continue;
             };
-            *slot = slot.combine(CellGround {
-                height_total: sim_math::accumulate(Accum(0), tile.height).0,
-                tiles: 1,
-                open_tiles: i32::from(tile.kind.is_passable()),
-            });
+            *slot = slot.combine(CellGround::of_tile(tile));
         }
     }
     ground
