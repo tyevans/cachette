@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-497**
+**Next number: FND-498**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -2009,16 +2009,16 @@ The record states that zero in a column means cannot.[^F486M] The seeding
 reaches one of the four rows, so three of them describe a unit that the
 demonstration never holds. Backlog item 0491 holds the work.[^F486N]
 
-### FND-496 — The window settings were applied in an order the window library refuses, and no test could see it
+### FND-497 — The window settings were applied in an order the window library refuses, and no test could see it
 
 **Believed.** The demonstration applies its video settings to an open window,
 and the settings name what the window could not do rather than failing in
-silence.[^F496A] The order of the three calls did not matter, because each one
+silence.[^F497A] The order of the three calls did not matter, because each one
 sets an independent property.
 
 **True.** The order decides whether the window takes the call at all. The
 window library refuses a size while the window is fullscreen, and it refuses by
-raising.[^F496B] The settings sent the size first, so the key that left
+raising.[^F497B] The settings sent the size first, so the key that left
 fullscreen set the size while the window was still fullscreen. The library
 raised, and the raise passed through the key handler and stopped the change.
 The refusal list never saw it, because the code guarded only against a method
@@ -2032,9 +2032,9 @@ handed it a buffer of the wrong length.
 
 **Evidence.** The project owner reported both faults from a run. The library
 raises from the base window class, before any platform code runs, whenever the
-fullscreen state is on.[^F496B] An existing test drove the settings against a
+fullscreen state is on.[^F497B] An existing test drove the settings against a
 fake window, and it asserted the wrong order as correct, because the fake took
-every call.[^F496C]
+every call.[^F497C]
 
 **Follows.** Three things.
 
@@ -2055,7 +2055,7 @@ the size the window reports after a call is the size it drew at, and that the
 picture reaches the screen. Someone tests those on a machine with a display, or
 in the gate under a virtual display server, by opening the window, pressing the
 two keys and comparing the frame the window drew against the frame the file
-writer wrote for the same world and camera.[^F496D]
+writer wrote for the same world and camera.[^F497D]
 
 ## D. Cost estimates that were wrong
 
@@ -12185,7 +12185,7 @@ stood, and the plan register filled to its bound and stayed there.
 
 The cause is one clause the build rule did not hold. The rule read the plan
 only for a row that asks for no held ground, and it read it to ask whether the
-tile was zoned for that same category.[^F496B] It never asked whether the tile
+tile was zoned for that same category.[^F487D] It never asked whether the tile
 was zoned for **another** category. The demonstration controller draws a
 category for a whole faction and orders every unit to build it where it stands,
 and that draw applies at a lower draw index than the project order.[^F496C] A
@@ -12244,7 +12244,7 @@ readers for it, and the Python boundary hands them out through a call of its
 own. The one census table holds none of them, so the demonstration census lists
 no queue row and a watcher cannot see what the queues produced or refused. The
 table is meant to be the only list, and a second declaration site now answers
-where the table is silent.[^F496K]
+where the table is silent.[^F483A]
 
 **No test could have caught it.** The end-to-end test of the item calls
 `world.set_controller_evaluations(0)` and says in its own comment that it
@@ -12259,7 +12259,7 @@ shipped a chain whose links each passed and whose whole never ran.[^F496F]
 now refuses an order that names one category on a tile the builder's own
 faction zones for another, whatever the row asks for. One typed refusal names
 the plan rather than the tile. The verb and the build intent pass call the one
-function that states the rule.[^F496B]
+function that states the rule.[^F487D]
 
 **A chain needs a test that runs the chain, and over more than one seed.** The
 new test seeds the demonstration world at eight seeds, calls no verb of its
@@ -12270,7 +12270,7 @@ eight with the clause and one of eight without it.[^F496G]
 **A fixture that removes the competing draw measures the fixture.** The
 register already held this shape twice, and this is the third instance. Turning
 a subsystem off to isolate another one hides exactly the defect that the two
-subsystems have together.[^F496H]
+subsystems have together.[^F492B]
 
 **The plan still fills to its bound and drops thousands, and one seed of eight
 still finishes nothing.** The fix closes the loop; it does not make the loop
@@ -12301,16 +12301,13 @@ with the clause and green without it, so it no longer measures the clause.
 
 [^F495A]: The queue of a site, and the bound a world enforces. `crates/cachette-core/src/production.rs`
 [^F496A]: Backlog item 0488, the outcome. `docs/backlog/complete/0488-plan-roads-and-zones-with-a-faction-solver-at-the-controller-stage.md`
-[^F496B]: ADR-0152, a faction plans its roads and zones with one solver, decisions D3 and D4. `docs/adrs/accepted/adr-0152-a-faction-plans-its-roads-and-zones-with-one-solver.md`
 [^F496C]: ADR-0144, a faction controller runs inside the step and acts only through the caller's verbs, decisions D4 and D5. `docs/adrs/accepted/adr-0144-a-faction-controller-runs-inside-the-step-and-acts-only-through-the-callers-verbs.md`
 [^F496D]: ADR-0151, an upgrade is a category with a ground fit and a level, decision D2. `docs/adrs/draft/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
 [^F496E]: Project orientation, the target platform. `CLAUDE.md`
 [^F496J]: ADR-0148, a game end is recorded once and stops the controllers, decision D4. `docs/adrs/accepted/adr-0148-a-game-end-is-recorded-once-and-stops-the-controllers.md`
-[^F496K]: Backlog item 0278, say what the demonstration world never produced. `docs/backlog/proposed/0278-say-what-the-demonstration-world-never-produced.md`
 [^F496L]: ADR-0125, the control plane names the seed set of a destination field, decision D3. `docs/adrs/draft/adr-0125-the-control-plane-names-the-seed-set-of-a-destination-field.md`
 [^F496F]: Testing rules, section 5. `.agents/rules/testing.md`
 [^F496G]: The plan tests. `crates/cachette-core/tests/plan.rs`
-[^F496H]: Testing rules, section 2a. `.agents/rules/testing.md`
 [^F496I]: Backlog item 0502. `docs/backlog/proposed/0502-let-a-faction-re-aim-its-project-order-and-keep-its-plan-live.md`
 [^F494A]: Balance register, the stock target, the wonder work, the tick limit, the founding group and the campaign cohort size. `docs/reference/balance.md`
 [^F494B]: The census row that counts a filled seat. `crates/cachette-core/src/world.rs`
@@ -12322,7 +12319,7 @@ with the clause and green without it, so it no longer measures the clause.
 [^F488B]: ADR-0125, the control plane names the seed set of a destination field. `docs/adrs/draft/adr-0125-the-control-plane-names-the-seed-set-of-a-destination-field.md`
 [^F488C]: ADR-0110, a unit returns by climbing a reach field seeded at every site of its faction. `docs/adrs/draft/adr-0110-a-unit-returns-by-climbing-a-reach-field.md`
 [^F489A]: ADR-0128, a contract moves a quantity only when a unit carries it onto the ground of the other party. `docs/adrs/draft/adr-0128-a-contract-moves-a-quantity-only-when-a-unit-carries-it.md`
-[^F496A]: The video settings and the window they apply to. `python/cachette/demo/settings.py`
-[^F496B]: The pyglet window, `set_size`, which raises while the window is fullscreen. https://pyglet.readthedocs.io/en/latest/modules/window.html
-[^F496C]: The demonstration settings tests. `tests/test_demo_window_settings.py`
-[^F496D]: ADR-0094, the caller owns the camera and the pixels, decision D5. `docs/adrs/draft/adr-0094-the-caller-owns-the-camera-and-the-pixels.md`
+[^F497A]: The video settings and the window they apply to. `python/cachette/demo/settings.py`
+[^F497B]: The pyglet window, `set_size`, which raises while the window is fullscreen. https://pyglet.readthedocs.io/en/latest/modules/window.html
+[^F497C]: The demonstration settings tests. `tests/test_demo_window_settings.py`
+[^F497D]: ADR-0094, the caller owns the camera and the pixels, decision D5. `docs/adrs/draft/adr-0094-the-caller-owns-the-camera-and-the-pixels.md`

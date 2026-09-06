@@ -39,7 +39,7 @@ this project makes, so it fails the first test for a record.
 
 **Blockers.** None.
 
-**Precedent.** FND-496 records the belief this work corrected. The recurring
+**Precedent.** FND-497 records the belief this work corrected. The recurring
 defect rule names the shape: one fact, the size of the surface, was declared in
 the settings, in the surface and in the pitch of the picture, with nothing that
 failed when the three disagreed.
