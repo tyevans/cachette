@@ -74,11 +74,17 @@ def test_a_queued_soldier_arrives_and_can_fight() -> None:
     for _ in range(WORK):
         world.step(threads=1)
 
-    census = world.queue_census()
-    assert census["produced"] == 1
-    assert census["refused_without_a_person"] == 0
-    assert census["refused_without_goods"] == 0
+    census = world.subsystem_census()
+    assert census["queue_produced"] == 1
+    assert census["queue_refused_without_a_person"] == 0
+    assert census["queue_refused_without_goods"] == 0
     assert len(world.site_queue(site)["unit_type"]) == 0
+
+    # The row is a total for the run. It still says what the queue made after
+    # the tick that made it, so a zero in it means that no site ever built.
+    for _ in range(3):
+        world.step(threads=1)
+    assert world.subsystem_census()["queue_produced"] == 1
 
     units = world.faction_units(faction=0)
     types = [world.unit_type(int(unit)) for unit in units["unit"]]
@@ -94,10 +100,10 @@ def test_a_queue_refuses_a_finished_entry_the_site_cannot_pay_for() -> None:
     for _ in range(WORK):
         world.step(threads=1)
 
-    census = world.queue_census()
-    assert census["produced"] == 0
-    assert census["refused_without_goods"] == 1
-    assert census["refused_without_a_person"] == 0, "the two are counted apart"
+    census = world.subsystem_census()
+    assert census["queue_produced"] == 0
+    assert census["queue_refused_without_goods"] == 1
+    assert census["queue_refused_without_a_person"] == 0, "the two are counted apart"
     assert list(world.site_queue(site)["work"]) == [WORK], "the entry stays"
 
 
@@ -106,7 +112,7 @@ def test_the_verb_refuses_a_site_of_another_faction() -> None:
     with pytest.raises(cachette.VerbError):
         world.queue_unit(faction=1, site=site, unit_type=SOLDIER)
     assert len(world.site_queue(site)["unit_type"]) == 0
-    assert world.queue_census()["refused_at_the_verb"] == 1
+    assert world.subsystem_census()["queue_refused_at_the_verb"] == 1
 
 
 def test_a_cleared_entry_leaves_the_order_of_the_entries_behind_it() -> None:
@@ -125,4 +131,4 @@ def test_a_bound_of_zero_turns_the_queue_off() -> None:
         world.queue_unit(faction=0, site=site, unit_type=SOLDIER)
     for _ in range(WORK + 1):
         world.step(threads=1)
-    assert world.queue_census()["produced"] == 0
+    assert world.subsystem_census()["queue_produced"] == 0

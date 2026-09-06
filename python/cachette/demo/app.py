@@ -484,9 +484,13 @@ def print_census(world: World) -> None:
 
     The engine holds the list of subsystems in one table, and this walks the
     dictionary that table produced. No name is written here.
+
+    No count covers one tick. A count says what the world holds now, or what
+    the run has made since it started. A zero of the second kind means that
+    the thing never happened.
     """
     census = world.subsystem_census()
-    print(f"census at tick {world.tick}")
+    print(f"census of the run at tick {world.tick}")
     for name, count in census.items():
         print(f"  {name}: {count}")
 

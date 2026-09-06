@@ -119,19 +119,6 @@ class SiteQueueColumns(TypedDict):
     unit_type: npt.NDArray[np.uint8]
     work: npt.NDArray[np.uint32]
 
-class QueueCensus(TypedDict):
-    """What the build queues of every site did on the last step.
-
-    The two refusals of a finished entry are counted apart. A watcher reading
-    a queue that never moves can then tell a site with no people from a site
-    with no goods. The next step empties every count.
-    """
-
-    produced: int
-    refused_without_a_person: int
-    refused_without_goods: int
-    refused_at_the_verb: int
-
 class UnitTypeColumns(TypedDict):
     """One column for each capability column of a row of the unit type table.
 
@@ -920,7 +907,6 @@ class World:
     def queue_unit(self, faction: int, site: int, unit_type: int) -> None: ...
     def clear_queue_entry(self, faction: int, site: int, position: int) -> None: ...
     def site_queue(self, site: int) -> SiteQueueColumns: ...
-    def queue_census(self) -> QueueCensus: ...
     def define_build_cost(
         self, unit_type: int, work: int, people: int, goods: Sequence[int]
     ) -> None: ...

@@ -460,3 +460,70 @@ fn a_bound_of_zero_turns_the_queue_off() {
     assert_eq!(world.queue_produced(), 0);
     assert_eq!(residents(&world, site), 3);
 }
+
+/// Returns one count of the subsystem census by name.
+fn census(world: &World, name: &str) -> i64 {
+    world
+        .subsystem_census()
+        .into_iter()
+        .find(|(row, _)| *row == name)
+        .expect("the census holds the row")
+        .1
+}
+
+#[test]
+fn the_census_holds_the_queue_and_the_count_stays_after_the_tick_that_made_it() {
+    // The extreme: a run that produces one unit early and then runs on. A
+    // row that read the last tick would say zero here, and a reader would
+    // take that for a queue that never built anything.
+    let (mut world, site, _) = one_site(Fix32::from_int(20), 3);
+    assert_eq!(census(&world, "queue_produced"), 0);
+    world
+        .order_site_queue(OWNER, site, QueueOrder::Push(SOLDIER))
+        .expect("the queue is empty");
+
+    run(&mut world, u64::from(WORK), 1);
+    assert_eq!(census(&world, "queue_produced"), 1, "the row must rise");
+
+    run(&mut world, 6, 1);
+    assert_eq!(
+        world.queue_produced(),
+        0,
+        "the fixture must reach a later tick that produced nothing"
+    );
+    assert_eq!(
+        census(&world, "queue_produced"),
+        1,
+        "the census still says what the run made"
+    );
+}
+
+#[test]
+fn the_census_keeps_the_two_refusals_of_a_finished_entry_apart() {
+    // The extreme: a store that pays every advance and cannot pay the
+    // finished entry. The site holds its residents, so only one of the two
+    // refusal rows may move.
+    let (mut world, site, _) = one_site(Fix32::from_int(WORK as i16), 3);
+    world
+        .order_site_queue(OWNER, site, QueueOrder::Push(SOLDIER))
+        .expect("the queue is empty");
+    run(&mut world, u64::from(WORK), 1);
+
+    assert_eq!(census(&world, "queue_produced"), 0);
+    assert_eq!(census(&world, "queue_refused_without_goods"), 1);
+    assert_eq!(census(&world, "queue_refused_without_a_person"), 0);
+
+    // The verb refusal is a row of its own, and it counts an order that no
+    // advance ever saw.
+    assert_eq!(census(&world, "queue_refused_at_the_verb"), 0);
+    world
+        .order_site_queue(FactionId(1), site, QueueOrder::Push(SOLDIER))
+        .expect_err("the site belongs to another faction");
+    assert_eq!(census(&world, "queue_refused_at_the_verb"), 1);
+    run(&mut world, 3, 1);
+    assert_eq!(
+        census(&world, "queue_refused_at_the_verb"),
+        1,
+        "the count survives the advance that empties the per-tick counter"
+    );
+}
