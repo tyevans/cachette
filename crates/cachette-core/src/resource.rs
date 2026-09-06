@@ -501,6 +501,31 @@ impl RecoveryRules {
     pub const fn period_of(self, kind: ResourceKind) -> Option<u32> {
         self.periods[kind.index()]
     }
+
+    /// Absorbs the rule set into the state hash.
+    ///
+    /// The recovery pass reads a period on every tick, so two worlds that
+    /// hold the same takes and different periods must diverge. A hash that
+    /// wrote the takes and not the periods would report the effect one or
+    /// more ticks after the cause.[^1] [^2]
+    ///
+    /// A kind that does not recover writes a marker rather than a period.
+    /// A period of zero cannot be built, so zero names no rule and the two
+    /// cases stay apart.[^3]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0001, one binary gives one answer at any thread count, decision D4. `docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
+    /// [^2]: Findings register, FND-480. `docs/FINDINGS.md`
+    /// [^3]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`
+    #[must_use]
+    pub fn hash_into(self, hash: StateHash) -> StateHash {
+        let mut running = hash;
+        for period in self.periods {
+            running = running.write_u64(u64::from(period.unwrap_or(0)));
+        }
+        running
+    }
 }
 
 impl Default for RecoveryRules {
@@ -811,6 +836,10 @@ impl DepletionLedger {
     ///
     /// The entries enter in key order, which the ledger holds them in.[^1]
     ///
+    /// The recovery rules enter with the entries. The pass reads a period on
+    /// every tick, so two worlds that hold the same takes and different
+    /// periods must diverge, and the hash must say so before they do.[^3]
+    ///
     /// The total that recovery returned does not enter. It is a sum of the
     /// differences between the entries of one frame and the entries of the
     /// next, and the hash covers those entries on every frame, so a hash that
@@ -820,9 +849,12 @@ impl DepletionLedger {
     ///
     /// [^1]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
     /// [^2]: ADR-0001, one binary gives one answer at any thread count, decision D4. `docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
+    /// [^3]: Findings register, FND-480. `docs/FINDINGS.md`
     #[must_use]
     pub fn hash_into(&self, hash: StateHash) -> StateHash {
-        let mut running = hash.write_u64(self.entries.len() as u64);
+        let mut running = self
+            .rules
+            .hash_into(hash.write_u64(self.entries.len() as u64));
         for entry in &self.entries {
             running = running
                 .write_u64(entry.key)

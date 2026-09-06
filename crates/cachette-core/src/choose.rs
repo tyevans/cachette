@@ -29,6 +29,7 @@
 //! [^5]: ADR-0007, content supplies a key vector, never a comparator, decisions D1 and D3. `docs/adrs/accepted/adr-0007-content-supplies-a-key-vector-never-a-comparator.md`
 
 use crate::cohort::NEED_FULL;
+use crate::hash::StateHash;
 use crate::pyramid::CellSummary;
 use crate::resource::ResourceKind;
 use crate::sim_math;
@@ -417,6 +418,21 @@ impl ChoiceSchedule {
         1u64 << self.period_log2
     }
 
+    /// Absorbs the schedule into the state hash.
+    ///
+    /// The choice pass reads the schedule on every tick, and the schedule
+    /// decides which cells choose on this frame. Two worlds that hold the
+    /// same intents and different schedules diverge at the next frame that
+    /// one of them chooses on, so the hash must tell them apart.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0001, one binary gives one answer at any thread count, decision D4. `docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
+    #[must_use]
+    pub fn hash_into(self, hash: StateHash) -> StateHash {
+        hash.write_u64(u64::from(self.period_log2))
+    }
+
     /// Reports whether a unit in one cell chooses on one frame.
     ///
     /// **The key is the level 1 cell, not the identity of the unit.** A cell
@@ -516,6 +532,30 @@ impl WeightProfile {
         }
         self.weights[option as usize] = weight;
         Ok(())
+    }
+
+    /// Absorbs the profile into the state hash.
+    ///
+    /// The pass reads a weight on every tick, and the weight decides which
+    /// option a unit takes. Two worlds that hold the same intents and
+    /// different weights diverge at the next choice, so the hash covers the
+    /// cause and not the effect alone.[^1] [^2]
+    ///
+    /// The weights enter in ascending option index, which is the order the
+    /// array holds them in.[^3]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0001, one binary gives one answer at any thread count, decision D4. `docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
+    /// [^2]: Findings register, FND-537. `docs/FINDINGS.md`
+    /// [^3]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
+    #[must_use]
+    pub fn hash_into(&self, hash: StateHash) -> StateHash {
+        let mut running = hash;
+        for weight in self.weights {
+            running = running.write(&weight.0.to_le_bytes());
+        }
+        running
     }
 }
 
@@ -844,6 +884,19 @@ impl NeedBuckets {
     #[must_use]
     pub const fn shift(self) -> u32 {
         self.shift
+    }
+
+    /// Absorbs the width into the state hash.
+    ///
+    /// The width decides which two units share one answer, so it decides
+    /// what the choice writes. The pass reads it on every tick.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0001, one binary gives one answer at any thread count, decision D4. `docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
+    #[must_use]
+    pub fn hash_into(self, hash: StateHash) -> StateHash {
+        hash.write_u64(u64::from(self.shift))
     }
 
     /// Returns the number of buckets that the need range holds.

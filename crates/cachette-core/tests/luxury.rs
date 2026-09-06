@@ -171,15 +171,21 @@ fn a_luxury_reaches_the_state_hash() {
     assert_ne!(bare.state_hash(), seeded.state_hash());
 }
 
-/// A seed that places nothing leaves the world where it was.
+/// A seed that places nothing still moves the state hash.
 ///
-/// The flag that says the world took a seed never reaches the hash, so an
-/// empty seed and no seed give one hash.
+/// The field holds no entry in either world, so the field cannot tell the
+/// two apart. The flag can, and it decides what the next seed call does:
+/// one world accepts it and the other refuses it.[^1]
+///
+/// # References
+///
+/// [^1]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`
 #[test]
-fn an_empty_seed_leaves_the_state_hash_alone() {
+fn an_empty_seed_reaches_the_state_hash() {
     let bare = world();
     let seeded = world_with(&[]);
-    assert_eq!(bare.state_hash(), seeded.state_hash());
+    assert_eq!(bare.luxuries().tiles(), seeded.luxuries().tiles());
+    assert_ne!(bare.state_hash(), seeded.state_hash());
     assert!(seeded.luxuries_seeded());
     assert!(!bare.luxuries_seeded());
 }

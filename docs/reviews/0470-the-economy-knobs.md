@@ -309,6 +309,6 @@ the definition of done names them separately.
 [^4]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`
 [^5]: Findings register, FND-481. `docs/FINDINGS.md`
 [^6]: Findings register, FND-480. `docs/FINDINGS.md`
-[^7]: Backlog item 0471, fold the recovery rules into the state hash. `docs/backlog/proposed/0471-fold-the-recovery-rules-into-the-state-hash.md`
+[^7]: Backlog item 0471, fold the recovery rules into the state hash. `docs/backlog/complete/0471-fold-the-recovery-rules-into-the-state-hash.md`
 [^8]: The economy knob tests. `tests/test_economy_knobs.py`
 [^9]: Testing rules, section 2a. `.claude/rules/testing.md`

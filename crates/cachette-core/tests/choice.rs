@@ -434,14 +434,19 @@ fn a_watcher_asks_why_a_unit_chose_what_it_chose() {
 }
 
 #[test]
-fn changing_a_weight_that_the_world_cannot_pay_moves_no_hash() {
-    // A score is transient. Nothing stores it, so a weight that cannot
-    // change any intent must change no byte of the state hash.
+fn a_weight_the_world_cannot_pay_still_moves_the_hash() {
+    // A score is transient, and nothing stores it. The weight itself is
+    // stored, and the choice pass reads it on every tick, so it enters the
+    // state hash. A hash that covered the intent alone would report the
+    // effect and never the cause, one or more ticks late.[^1]
     //
     // The option that reads the unmet need is the second of the set. Every
-    // unit here is at full need, so that option scores zero at any weight.
-    // The test asserts the need rather than assuming it.
-    let hash_of = |weight_of_forage: Fix32, weight_of_climb: Fix32| {
+    // unit here is at full need, so that option scores zero at any weight,
+    // and the two runs below choose the same thing. The test asserts the
+    // need rather than assuming it.
+    //
+    // [^1]: Findings register, FND-537. `docs/FINDINGS.md`
+    let run = |weight_of_forage: Fix32, weight_of_climb: Fix32| {
         let mut world = one_cell_world();
         world
             .set_economy_schedule(1024, 0)
@@ -463,23 +468,35 @@ fn changing_a_weight_that_the_world_cannot_pay_moves_no_hash() {
                 "a unit lost need, so the unmet option is no longer inert"
             );
         }
-        world.state_hash().finish()
+        (
+            world
+                .soldiers()
+                .iter()
+                .map(|unit| world.soldiers().intent(unit))
+                .collect::<Vec<_>>(),
+            world.state_hash().finish(),
+        )
     };
 
-    let plain = hash_of(Fix32::ZERO, Fix32::ONE);
-    let paid = hash_of(Fix32::MAX, Fix32::ONE);
+    let (plain_intents, plain) = run(Fix32::ZERO, Fix32::ONE);
+    let (paid_intents, paid) = run(Fix32::MAX, Fix32::ONE);
     assert_eq!(
+        plain_intents, paid_intents,
+        "the fixture must make the weight inert, or it measures the intent"
+    );
+    assert_ne!(
         plain, paid,
-        "a weight that no unit could act on changed the state"
+        "a weight the world cannot pay must still reach the hash"
     );
 
-    // The fixture reaches the case. A weight the world can pay does move the
-    // hash, so the assertion above is not measuring an inert world.
-    let different = hash_of(Fix32::ZERO, Fix32::MAX);
+    // A weight the world can pay moves the hash as well, and it moves the
+    // intent with it.
+    let (other_intents, different) = run(Fix32::ZERO, Fix32::MAX);
     assert_ne!(
-        plain, different,
+        plain_intents, other_intents,
         "no weight changes this world, so the fixture proves nothing"
     );
+    assert_ne!(plain, different);
 }
 
 /// Runs the fixture at one thread count and returns what it chose.
