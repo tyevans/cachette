@@ -150,8 +150,8 @@ def test_every_video_setting_names_a_method_a_window_has() -> None:
     assert settings.apply_to(window) == []
     width, height = SIZES[settings.video.size_index]
     assert window.asked == [
-        f"size {width} {height}",
         "fullscreen False",
+        f"size {width} {height}",
         "vsync True",
     ]
 
