@@ -2293,11 +2293,12 @@ engine holds no instrumentation and the benchmark added none. Three switches
 exist on the public interface: the economy schedule, the choice interval, and
 the bridge rebuild, which is public and was priced directly.
 
-**A correction inside this finding.** The step calls the bridge refresh three
-times in a frame, and a first reading of that put the bridge at three rebuilds
-and 79 milliseconds. The refresh compares a revision counter and returns when
-the bridge is still accurate, so the frame pays one rebuild and two constant
-checks. The figure is 26 milliseconds, not 79.
+**A correction inside this finding.** The step calls the bridge refresh four
+times in a frame. The step held three refreshes when this was measured, and a
+first reading of that put the bridge at three rebuilds and 79 milliseconds. The
+refresh compares a revision counter and returns when the bridge is still
+accurate, so the measured frame pays one rebuild and the other refreshes are
+constant checks. The figure is 26 milliseconds, not 79.
 
 **Follows:** a stage that cannot be measured from the public interface is a
 stage nobody can prove they improved, and that may be why none of this has
@@ -9869,7 +9870,7 @@ from a thread. What the measurement changes is the premise, not the argument.
 | Rebuild the block ranges | 16,026,693 | 2.4 percent |
 
 **The stage declared that it takes a thread count, and the record says it
-accepts none.** Three stages wrap this one call and all three declared `true`.
+accepts none.** Every stage that wrapped this one call declared `true`.
 Measured at one thread and at twelve on the development machine, at 4,194,304
 tiles and 250,000 units, the stage costs 43,040,085 and 57,165,452 nanoseconds:
 it does not improve, and it may get worse. The declarations are now `false`.

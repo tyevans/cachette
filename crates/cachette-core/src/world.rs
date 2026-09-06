@@ -482,6 +482,46 @@ impl core::fmt::Display for WorldError {
 
 impl std::error::Error for WorldError {}
 
+/// Why the seeding of a world refused.
+///
+/// The seeding founds a run for every faction, and it places the luxuries.
+/// It then leaves the world readable, and that needs a rebuild of the
+/// derived unit structure. Either half can refuse, so the error says which
+/// one did.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum SeedError {
+    /// The luxury field refused the placements.
+    Luxury(LuxuryError),
+    /// The rebuild of the derived unit structure refused to run.
+    Bridge(BridgeError),
+}
+
+impl From<LuxuryError> for SeedError {
+    fn from(error: LuxuryError) -> Self {
+        Self::Luxury(error)
+    }
+}
+
+impl From<BridgeError> for SeedError {
+    fn from(error: BridgeError) -> Self {
+        Self::Bridge(error)
+    }
+}
+
+impl core::fmt::Display for SeedError {
+    fn fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            Self::Luxury(error) => write!(formatter, "the world took no luxuries: {error}"),
+            Self::Bridge(error) => write!(
+                formatter,
+                "the seeded world holds no readable unit structure: {error}"
+            ),
+        }
+    }
+}
+
+impl std::error::Error for SeedError {}
+
 impl From<GridError> for WorldError {
     fn from(error: GridError) -> Self {
         Self::Grid(error)
@@ -10534,7 +10574,20 @@ impl World {
         );
     }
 
-    fn refresh_bridge(&mut self) -> Result<(), StepError> {
+    /// Rebuilds the derived unit structure when the arena has moved past it.
+    ///
+    /// **This is the one place that makes the world readable again.** The
+    /// step calls it at each of its barriers, and a verb that changes the
+    /// arena outside a step calls it before it returns. A second body that
+    /// compared the revisions for itself would be one rule in two places.[^1]
+    ///
+    /// The call returns a bridge error and not a step error, because a verb
+    /// outside a step calls it too and a verb makes no step.
+    ///
+    /// # References
+    ///
+    /// [^1]: Recurring defect shapes, shape 1. `.agents/rules/recurring-defects.md`
+    fn refresh_bridge(&mut self) -> Result<(), BridgeError> {
         if self.bridge.describes(&self.soldiers).is_ok() {
             return Ok(());
         }
@@ -12520,18 +12573,31 @@ impl World {
     ///
     /// Returns what each faction got, in faction order.
     ///
+    /// **The call leaves the world readable.** A founding seats a group and
+    /// spends nothing, and a seated group is a change of the unit arena. The
+    /// derived unit structure counts the changes of the arena and refuses
+    /// every answer once the counts differ, so a reader that drew before the
+    /// first step met a refusal.[^3] The seeding therefore refreshes the
+    /// structure before it returns, in the way a step does at its end.
+    ///
+    /// **The refresh costs one rebuild.** The rebuild runs on one thread, and
+    /// it runs once here, whatever the faction count is.[^4] A world is
+    /// seeded once, so the world pays this at creation and never again.
+    ///
     /// # Errors
     ///
-    /// Returns an error when the world was seeded before. A world is seeded
-    /// once.
+    /// Returns an error when the world was seeded before, and when the
+    /// rebuild of the derived unit structure refuses. A world is seeded once.
     ///
     /// # References
     ///
     /// [^1]: Balance register, the founding group and the luxury deposits. `docs/reference/balance.md`
     /// [^2]: ADR-0003, every random draw is keyed, never stateful, decision D1. `docs/adrs/accepted/adr-0003-every-random-draw-is-keyed-never-stateful.md`
-    pub fn seed_world(&mut self) -> Result<Vec<FoundingOutcome>, LuxuryError> {
+    /// [^3]: ADR-0018, the unit-to-tile bridge is derived, and it rebuilds at the barrier, decisions D3 and D4. `docs/adrs/accepted/adr-0018-the-unit-to-tile-bridge-is-derived-and-rebuilds-at-the-barrier.md`
+    /// [^4]: ADR-0071, the bridge rebuild orders on one thread, decision D2. `docs/adrs/accepted/adr-0071-the-bridge-rebuild-orders-on-one-thread.md`
+    pub fn seed_world(&mut self) -> Result<Vec<FoundingOutcome>, SeedError> {
         if self.luxuries_seeded {
-            return Err(LuxuryError::AlreadySeeded);
+            return Err(SeedError::Luxury(LuxuryError::AlreadySeeded));
         }
         let outcomes = self.found_run_for_every_faction(FOUNDING_GROUP_DEFAULT);
         let tiles = u64::from(self.grid.tile_count());
@@ -12549,6 +12615,13 @@ impl World {
             placements.push((TileIdx(tile as u32), luxury));
         }
         self.seed_luxuries(&placements)?;
+        // **A verb that changes the structure leaves the world readable.**
+        // The foundings above seated a group for every faction, and each
+        // seating changed the unit arena. A caller that drew here before the
+        // first step met a refusal, and the opening refresh of that step was
+        // what repaired it. A reader is not obliged to step first, and the
+        // drawing is not the only reader, so the verb repairs it here.
+        self.refresh_bridge()?;
         Ok(outcomes)
     }
 

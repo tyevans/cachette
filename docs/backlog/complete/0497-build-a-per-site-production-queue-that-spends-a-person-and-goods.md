@@ -249,7 +249,7 @@ holds queued entries.
 [^6]: ADR-0144, a faction controller runs inside the step and acts only through the caller's verbs, decision D2. `docs/adrs/accepted/adr-0144-a-faction-controller-runs-inside-the-step-and-acts-only-through-the-callers-verbs.md`
 [^7]: ADR-0144, a faction controller runs inside the step and acts only through the caller's verbs, decision D3. `docs/adrs/accepted/adr-0144-a-faction-controller-runs-inside-the-step-and-acts-only-through-the-callers-verbs.md`
 [^8]: Balance register, the production queue. `docs/reference/balance.md`
-[^9]: Backlog item 0485. `docs/backlog/proposed/0485-let-a-settler-found-a-city-and-let-the-controller-settle-new-ground.md`
+[^9]: Backlog item 0485. `docs/backlog/complete/0485-let-a-settler-found-a-city-and-let-the-controller-settle-new-ground.md`
 [^10]: Testing Rules, a fixture supplies the input. `.agents/rules/testing.md`
 [^11]: Testing Rules, drive the real caller. `.agents/rules/testing.md`
 [^12]: ADR-0145, a unit type is a row of capability columns, and zero means cannot, decisions D1 and D2. `docs/adrs/accepted/adr-0145-a-unit-type-is-a-row-of-capability-columns-and-zero-means-cannot.md`

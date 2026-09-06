@@ -963,8 +963,8 @@ Backlog item 0298 removed two searches from admission. The passes that grant an
 intent read two count tables with a forward reader rather than a binary search
 for each segment, and the pass that reads how many units stand on a target walks
 the block rather than searching it.[^ITEM298] It also corrected the thread-count
-declaration of the three stages that wrap the bridge rebuild, which claimed a
-thread count that an accepted record refuses them.[^DECL298]
+declaration of every stage that wrapped the bridge rebuild, because each claimed
+a thread count that an accepted record refuses them.[^DECL298]
 
 | Machine C | Value |
 |---|---|
@@ -1034,9 +1034,16 @@ times that budget when the first of these tables was taken.
 it one thread rather than an oversight.[^ADR71298] Sixty-three percent of it is
 the ordering pass.[^DECL298]
 
-**Six stages take no thread count and together they are 24.4 percent of the
+**Seven stages take no thread count and together they are 24.8 percent of the
 frame.** The bridge rebuild is nearly three quarters of that. The rest is the
 holder stamp and the log join.
+
+**The step gained a fourth bridge refresh after this run, and the table does
+not hold it.** The step now refreshes the bridge once more, after the
+controller, so that the step leaves the world readable. The refresh compares a
+revision counter, and it rebuilds only on a frame where the controller changed
+the unit arena. The measured world holds no settlement, so the stage would
+read as a constant check here.
 
 **The residual is 316,804 nanoseconds, which is 0.18 percent of the frame.** It
 was about 12 milliseconds in three runs earlier in the day, and the register
@@ -1316,12 +1323,13 @@ death scan, the part of the level 1 rebuild that reads the units, and the walk
 over every live unit inside the choice pass that the interval does not remove.
 Nothing on the public interface separates them.
 
-**The bridge is one rebuild in a frame, not three.** The step calls the
-refresh three times, and the refresh compares a revision counter and returns
-when the bridge is still accurate. That check is a constant cost. In this
-world one call finds the bridge stale, because movement moved the units, so a
-frame pays one rebuild. A world in which units also die each frame would pay
-two.
+**The bridge is one rebuild in a frame, not one for each refresh.** The step
+calls the refresh four times, and the refresh compares a revision counter and
+returns when the bridge is still accurate. That check is a constant cost. In
+this world one call finds the bridge stale, because movement moved the units,
+so a frame pays one rebuild. A world in which units also die each frame would
+pay two, and a world in which a faction also founds a city on that frame would
+pay three.
 
 **The choice scores about one unit in 32 and costs 71 milliseconds doing it.**
 The interval is 32 ticks, keyed on the level 1 cell, so about 31,000 of the
