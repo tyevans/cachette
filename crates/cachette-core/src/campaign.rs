@@ -102,6 +102,30 @@ pub const STATE_LOST: u8 = 3;
 /// campaigner.
 pub const STATE_ENDED: u8 = 4;
 
+/// The row state: the campaign passed its deadline and reached nothing.
+pub const STATE_EXPIRED: u8 = 5;
+
+/// How many ticks a campaign runs before it expires, when nobody has set
+/// another deadline.
+///
+/// **A campaign that reaches nothing must close, because a faction with a
+/// live campaign raises no other one.** A campaign with no deadline therefore
+/// takes the whole run, and a faction raises about one campaign for the whole
+/// run.[^1]
+///
+/// **This is a provisional value and not a measured one.** It is 2000 ticks.
+/// A cohort crosses the demonstration world at extent 256 in far fewer ticks
+/// than that, and 2000 ticks is a tenth of the tick limit of the balance
+/// harness, so a faction raises about ten campaigns over a run rather than
+/// one.[^2] [^3]
+///
+/// # References
+///
+/// [^1]: Findings register, FND-542. `docs/FINDINGS.md`
+/// [^2]: Blockers register, BLK-050. `docs/BLOCKERS.md`
+/// [^3]: Balance register, the campaign deadline. `docs/reference/balance.md`
+pub const DEADLINE_DEFAULT: Tick = Tick(2000);
+
 /// The holder column value that names no faction.
 pub const NO_HOLDER: u16 = u16::MAX;
 
@@ -152,6 +176,9 @@ pub const EVENT_LOST: u8 = 2;
 
 /// The event kind: the objective changed holder, and not to the campaigner.
 pub const EVENT_ENDED: u8 = 3;
+
+/// The event kind: the campaign passed its deadline and reached nothing.
+pub const EVENT_EXPIRED: u8 = 4;
 
 /// One thing that happened to a campaign on the last tick.
 ///
@@ -233,6 +260,15 @@ pub struct CampaignRegister {
     rows: Vec<CampaignRow>,
     register_size: u32,
     cohort_size: u32,
+    /// How many ticks a campaign runs before it expires. Zero means never.
+    ///
+    /// The close pass reads this on every step, so it enters the state hash
+    /// beside the rows it closes.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0001, one binary gives one answer at any thread count, decision D4. `docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
+    deadline: Tick,
     log: Vec<CampaignEvent>,
 }
 
@@ -245,6 +281,7 @@ impl CampaignRegister {
             rows: vec![CampaignRow::default(); factions * REGISTER_SIZE_DEFAULT as usize],
             register_size: REGISTER_SIZE_DEFAULT,
             cohort_size: COHORT_SIZE_DEFAULT,
+            deadline: DEADLINE_DEFAULT,
             log: Vec::new(),
         }
     }
@@ -262,6 +299,19 @@ impl CampaignRegister {
     }
 
     /// Sets how many units a raise takes.
+    /// Returns how many ticks a campaign runs before it expires.
+    #[must_use]
+    pub const fn deadline(&self) -> Tick {
+        self.deadline
+    }
+
+    /// Sets how many ticks a campaign runs before it expires.
+    ///
+    /// A deadline of zero means that no campaign expires.
+    pub const fn set_deadline(&mut self, deadline: Tick) {
+        self.deadline = deadline;
+    }
+
     pub const fn set_cohort_size(&mut self, cohort_size: u32) {
         self.cohort_size = cohort_size;
     }
@@ -376,5 +426,6 @@ impl CampaignRegister {
             .write(bytemuck::cast_slice(&self.rows))
             .write_u64(u64::from(self.register_size))
             .write_u64(u64::from(self.cohort_size))
+            .write_u64(self.deadline.0)
     }
 }

@@ -50,7 +50,7 @@ use crate::founding::{self, Founding, FoundingError, FoundingOutcome, Survey};
 use crate::growth;
 use crate::hash::StateHash;
 use crate::hex::{Axial, Grid, GridError, NEIGHBOUR_COUNT};
-use crate::holding::{FactionMask, Holder, Holding, ReachRules};
+use crate::holding::{FactionMask, Holder, Holding, LeaseRules, ReachRules};
 use crate::household;
 use crate::influence::{Influence, InfluenceError, InfluenceField};
 use crate::luxury::{LuxuryError, LuxuryField, LuxuryId, LuxurySet, VarietyLevel};
@@ -4957,6 +4957,23 @@ impl World {
         // no unit, so the barrier above stays the barrier of this frame.
         //
         // [^7]: ADR-0150, held ground is the ground within reach of a city its faction owns, decisions D1, D2 and D3. `docs/adrs/draft/adr-0150-held-ground-is-the-ground-within-reach-of-a-city-its-faction-owns.md`
+        // **The lease moves before the holder is decided.** A tile that
+        // carries a unit moves its lease one step toward the faction present,
+        // and the decay then pulls every live lease toward zero on a fixed
+        // schedule. The rewrite below reads the lease this pass wrote.[^21]
+        //
+        // The pass reads the bridge, which the barrier above rebuilt, so it
+        // reads where each unit stands after the movement of this frame. It
+        // writes two tile columns and moves no unit, so the barrier above
+        // stays the barrier of this frame.
+        //
+        // [^21]: ADR-0153, a tile's lease follows the units that stand on it, decisions D2, D3, D4 and D7. `docs/adrs/accepted/adr-0153-a-tiles-lease-follows-the-units-that-stand-on-it.md`
+        {
+            let _span = stage::open(Stage::HoldingLease);
+            let occupancy = self.tile_occupancy(threads)?;
+            self.holding.advance_leases(&occupancy, tick.0);
+        }
+
         {
             let _span = stage::open(Stage::HoldingSpread);
             self.holding
@@ -5556,6 +5573,109 @@ impl World {
         self.presence.rows(&self.soldiers)
     }
 
+    /// Returns one entry for each tile that carries a unit: the tile and the
+    /// faction that has the most units on it.
+    ///
+    /// **The tie goes to the lowest faction identifier.** The units of one
+    /// tile reach this pass in the order the unit index packs them, and that
+    /// order changes when a unit dies, moves or is promoted. A rule that took
+    /// the first faction it found would take the packing, and a packing is
+    /// not a stable key.[^1] [^2]
+    ///
+    /// The tally holds only the factions that stand on one tile, and the
+    /// capacity of the ground bounds how many units that is. It is therefore
+    /// local to one tile, and no stored field is indexed by the faction.[^1]
+    ///
+    /// Each thread reads a contiguous run of blocks and writes its own slot.
+    /// The join reads the slots in slot order, and a block holds a
+    /// contiguous run of tiles in ascending order, so the joined list is in
+    /// ascending tile order at every thread count. Nothing reads which thread
+    /// finished first.[^3]
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the thread count is zero.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0153, a tile's lease follows the units that stand on it, decision D3. `docs/adrs/accepted/adr-0153-a-tiles-lease-follows-the-units-that-stand-on-it.md`
+    /// [^2]: ADR-0004, iteration order is explicit, decisions D1 and D4. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
+    /// [^3]: ADR-0009, parallel stages write disjoint outputs, decisions D1, D2 and D3. `docs/adrs/accepted/adr-0009-parallel-stages-write-disjoint-outputs.md`
+    fn tile_occupancy(&self, threads: usize) -> Result<Vec<(TileIdx, FactionId)>, StepError> {
+        let threads = threads.max(1);
+        let blocks = self.bridge.layout().block_count();
+        if blocks == 0 {
+            return Ok(Vec::new());
+        }
+        let block_chunk = (blocks as usize).div_ceil(threads).max(1);
+        let slot_count = (blocks as usize).div_ceil(block_chunk);
+        let mut slots: Slots<Vec<(TileIdx, FactionId)>> =
+            Slots::filled(slot_count, Vec::new()).map_err(|_| StepError::ZeroThreads)?;
+        let bridge = &self.bridge;
+        let arena = &self.soldiers;
+        std::thread::scope(|scope| {
+            let mut first = 0u32;
+            for slot in slots.entries_mut() {
+                let start = first;
+                let stop = (start as usize + block_chunk).min(blocks as usize) as u32;
+                first = stop;
+                scope.spawn(move || {
+                    let factions = arena.faction_column();
+                    let tiles = arena.tile_column();
+                    let mut tally: Vec<(FactionId, u32)> = Vec::new();
+                    for block in start..stop {
+                        let (keys, units) = bridge.block_window(block);
+                        let mut position = 0usize;
+                        while position < keys.len() {
+                            let mut end = position + 1;
+                            while end < keys.len() && keys[end] == keys[position] {
+                                end += 1;
+                            }
+                            let tile_units = &units[position..end];
+                            position = end;
+                            tally.clear();
+                            for unit in tile_units {
+                                let faction = factions[unit.index() as usize];
+                                match tally.iter_mut().find(|(named, _)| *named == faction) {
+                                    Some((_, count)) => *count += 1,
+                                    None => tally.push((faction, 1)),
+                                }
+                            }
+                            // The most units takes the tick, and a tie goes
+                            // to the lowest faction identifier. Neither test
+                            // reads the packing of the units.
+                            let mut best: Option<(FactionId, u32)> = None;
+                            for (faction, count) in &tally {
+                                let better = match best {
+                                    None => true,
+                                    Some((named, most)) => {
+                                        *count > most || (*count == most && faction.0 < named.0)
+                                    }
+                                };
+                                if better {
+                                    best = Some((*faction, *count));
+                                }
+                            }
+                            if let Some((faction, _)) = best {
+                                let tile = tiles[tile_units[0].index() as usize];
+                                slot.push((tile, faction));
+                            }
+                        }
+                    }
+                });
+            }
+        });
+        let mut occupancy = slots.combine(Vec::new(), |mut joined, slot| {
+            joined.extend_from_slice(slot);
+            joined
+        });
+        // A block holds a contiguous run of tiles, and the slots join in
+        // block order, so the list is already in tile order. The sort is what
+        // makes that a property of the data rather than of the layout.
+        occupancy.sort_unstable_by_key(|(tile, _)| tile.0);
+        Ok(occupancy)
+    }
+
     /// Reports whether a unit of `guest` stands on ground that `host` holds.
     ///
     /// Returns `false` when `guest` and `host` are the same faction, because
@@ -6140,6 +6260,64 @@ impl World {
     /// [^1]: Balance register, the holding. `docs/reference/balance.md`
     pub const fn set_reach_rules(&mut self, rules: ReachRules) {
         self.holding.set_rules(rules);
+    }
+
+    /// Returns how a lease rises, falls and claims.
+    ///
+    /// A lease is one faction and one count for each tile. The count follows
+    /// the units that stand on the tile, and a lease at or above the claim
+    /// threshold holds the tile whatever city reaches it.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0153, a tile's lease follows the units that stand on it, decisions D1 and D5. `docs/adrs/accepted/adr-0153-a-tiles-lease-follows-the-units-that-stand-on-it.md`
+    #[must_use]
+    pub const fn lease_rules(&self) -> LeaseRules {
+        self.holding.lease_rules()
+    }
+
+    /// Sets how a lease rises, falls and claims.
+    ///
+    /// The seven values are balance rows, and one blocker governs each of
+    /// them.[^1] [^2]
+    ///
+    /// # References
+    ///
+    /// [^1]: Balance register, the lease. `docs/reference/balance.md`
+    /// [^2]: Blockers register, BLK-050. `docs/BLOCKERS.md`
+    pub const fn set_lease_rules(&mut self, rules: LeaseRules) {
+        self.holding.set_lease_rules(rules);
+    }
+
+    /// Returns the lease of one tile: the faction it names, and the count.
+    ///
+    /// Returns `None` when the address lies outside the world.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0153, a tile's lease follows the units that stand on it, decision D1. `docs/adrs/accepted/adr-0153-a-tiles-lease-follows-the-units-that-stand-on-it.md`
+    #[must_use]
+    pub fn tile_lease(&self, address: Axial) -> Option<(Holder, i32)> {
+        self.holding.lease(address)
+    }
+
+    /// Returns how many ticks a campaign runs before it expires.
+    ///
+    /// Zero means that no campaign expires. The value is a balance row.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: Balance register, the campaign deadline. `docs/reference/balance.md`
+    #[must_use]
+    pub const fn campaign_deadline(&self) -> Tick {
+        self.campaigns.deadline()
+    }
+
+    /// Sets how many ticks a campaign runs before it expires.
+    ///
+    /// Zero means that no campaign expires.
+    pub const fn set_campaign_deadline(&mut self, deadline: Tick) {
+        self.campaigns.set_deadline(deadline);
     }
 
     /// Returns the factions that hold ground in the block covering a tile.
@@ -10980,10 +11158,28 @@ impl World {
             .iter_faction(faction)
             .filter(|unit| self.soldiers.sent(*unit) == Some(None))
             .collect();
+        idle.sort_unstable_by_key(|unit| unit.to_bits());
+        // **The raise takes the number of units it asks for.** The project
+        // order sends the idle units of a faction on the same destination
+        // plane, so a raise that took the idle units alone found almost none
+        // left and marched a cohort of one.[^2] A faction holds no live
+        // campaign here, so every unit already on its own plane is a project
+        // walker, and the raise re-aims it. The pool is therefore the idle
+        // units first, then the walkers, and both in identity order.
+        //
+        // [^2]: Findings register, FND-542. `docs/FINDINGS.md`
+        if idle.len() < cohort as usize {
+            let mut walking: Vec<Entity> = self
+                .soldiers
+                .iter_faction(faction)
+                .filter(|unit| self.soldiers.sent(*unit) == Some(Some(plane)))
+                .collect();
+            walking.sort_unstable_by_key(|unit| unit.to_bits());
+            idle.extend_from_slice(&walking);
+        }
         if idle.is_empty() {
             return Err(CampaignError::NoIdleUnit);
         }
-        idle.sort_unstable_by_key(|unit| unit.to_bits());
         idle.truncate(cohort as usize);
         let objective_kind = if self
             .settlements
@@ -12158,6 +12354,15 @@ impl World {
                 .and_then(|address| self.holding.holder(address))
                 .and_then(Holder::faction)
                 .map_or(campaign::NO_HOLDER, |holder| holder.0);
+            // **A campaign that reaches nothing closes at its deadline.** A
+            // faction with a live campaign raises no other one, so a campaign
+            // that never closes takes the whole run and the faction marches
+            // once. The deadline is a balance value.[^1] [^2]
+            //
+            // [^1]: Findings register, FND-542. `docs/FINDINGS.md`
+            // [^2]: Balance register, the campaign deadline. `docs/reference/balance.md`
+            let deadline = self.campaigns.deadline();
+            let expired = deadline.0 > 0 && tick.0.saturating_sub(row.raised_at.0) >= deadline.0;
             let (state, kind) = if holder != row.holder_at_raise {
                 if holder == faction.0 {
                     (campaign::STATE_WON, campaign::EVENT_WON)
@@ -12166,6 +12371,8 @@ impl World {
                 }
             } else if cohort.is_empty() {
                 (campaign::STATE_LOST, campaign::EVENT_LOST)
+            } else if expired {
+                (campaign::STATE_EXPIRED, campaign::EVENT_EXPIRED)
             } else {
                 continue;
             };
