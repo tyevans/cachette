@@ -88,4 +88,4 @@ Filled in when the item moves to `complete/`.
 [^3]: ADR-0159, a project order names one category for each unit and one seed set for the faction, decisions D1 and D3. `docs/adrs/accepted/adr-0159-a-project-order-names-one-category-and-one-seed-set.md`
 [^4]: The carrying test. `crates/cachette-core/tests/carrying_a_load_home.rs`
 [^5]: Blockers register, BLK-050. `docs/BLOCKERS.md`
-[^6]: Backlog item 0504. `docs/backlog/proposed/0504-find-why-one-seed-of-eight-finishes-no-project.md`
+[^6]: Backlog item 0504. `docs/backlog/complete/0504-find-why-one-seed-of-eight-finishes-no-project.md`

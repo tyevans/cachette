@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-542**
+**Next number: FND-547**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -12803,6 +12803,141 @@ for a test for each covered value.[^F537E]
 deliberate. A reader who met either one would conclude that the project had
 considered the case and decided it. Neither had been considered against the
 finding that names the shape.
+### FND-544 — The world seeder was suspected of the empty run, and it seats every faction at every seed of the demonstration world
+
+**Believed.** The world seeder makes a run that has nothing in it. The Python
+boundary raises "no faction found a place, so the run has nothing in it", and a
+test raised it once.[^F544A] The demonstration draws a new seed on every run, so
+a seed that seats nobody is a run a watcher sees and learns nothing from.[^F544B]
+
+**True.** The seeder refuses no faction at the extent the demonstration uses. A
+sweep of 200 seeds of that world seated four factions of four at every one of
+the 200. The refusal is real, and it belongs to a small world and not to a seed.
+The seating falls with the extent, because two seats keep a fixed distance and
+the ground of a small world holds few places at that distance.[^60]
+
+| Extent | Mean factions seated | Seeds that seat none | Seeds short of four |
+|---|---|---|---|
+| 8 | 0.72 | 56 | 200 |
+| 16 | 1.29 | 41 | 200 |
+| 24 | 2.31 | 25 | 173 |
+| 32 | 3.10 | 17 | 89 |
+| 48 | 3.69 | 6 | 28 |
+| 64 | 3.90 | 1 | 10 |
+| 96 | 3.98 | 0 | 3 |
+| 128 | 4.00 | 0 | 0 |
+| 192 | 4.00 | 0 | 0 |
+| 256 | 4.00 | 0 | 0 |
+
+**Evidence.** The sweep is an example of the core crate, and the commit body
+holds the command.[^F544D] Each row is 200 seeds, four factions, and the seeding
+alone. The runs were made on the x86-64 development machine and not on the
+target platform.[^F496E]
+
+**A guarantee by construction is not available.** A world of side 16 holds no
+second place at the distance two seats keep, whatever the placement search
+does.[^60] A search that widened its sample until it succeeded would be a
+pass over every tile with extra steps, and the record refuses it.[^F544G] A loop
+that redraws until it succeeds is a convergence test, and the determinism rules
+refuse one.[^F544K]
+
+**Follows.** Three things.
+
+**The seeder may refuse a seed, and the refusal is a named, tested outcome.**
+The engine reports one outcome for each faction, and a refused faction carries
+the typed refusal.[^F544H] Three tests now state what a playable world is and
+check it: every faction seated, every seat on ground that admits a unit, every
+seat holding its group, and every pair of seats at the distance the rule
+asks.[^F544I]
+
+**A test of the seeder needs a world whose ground is scarce.** The demonstration
+extent seats every faction at every seed, so a test built only on that world
+passes with the passable clause of the eligibility removed. A world of side 32
+at one seed seats three factions, and it seats two when that clause goes.[^F544I]
+
+**The demonstration takes an extent from its caller, and a small extent gives a
+watcher an empty world.** The seeding says so, and no caller draws again. That
+is a separate reading and it is not this one.
+
+### FND-545 — A project finishes only when a wandering builder returns to one tile, so one seed in ten finishes none
+
+**Believed.** One seed of eight finishes no project because that world is poor.
+Seven seeds finished between one and thirteen projects in an 800 tick run and
+the eighth finished none, and the reading treated the eighth as a world with
+worse ground.[^F545A]
+
+**True.** The zero is the bottom of a continuous distribution, and it is not a
+class of world. A sweep of 200 seeds of the demonstration world, 800 ticks each,
+finished no project at 19 of them. The seeds that finish none seat the same four
+factions, hold the same four settlements, hold 7.42 units against 7.38, and zone
+156 projects against 164. Nothing else separates them.
+
+| Projects finished | Seeds |
+|---|---|
+| 0 | 19 |
+| 1 to 3 | 52 |
+| 4 to 7 | 55 |
+| 8 to 15 | 60 |
+| 16 or more | 14 |
+
+**The chain from the seed to the zero has five links.** The seeder seats every
+faction. The solver fills the plan of each faction to its bound in the first
+ticks. The controller orders a unit to build only on the tick that the unit
+stands on a tile its own plan zones.[^F545D] The movement pass reads no build
+order, so the unit leaves on the next tick. The first level of a road asks for
+eight work and one builder adds one, so a project finishes only when the walk of
+a unit returns to one tile eight times.[^F545B]
+
+**Evidence.** A run at extent 96 with three factions, at the seed the earlier
+reading named, counted where every unit stood on every tick. The units of one
+faction stood on a tile their own plan zoned for 253 ticks of 800, and 214 of
+those ticks carried the matching build order. That work reached 31 separate
+tiles, and no tile passed seven of the eight a road asks for. The labour was
+enough for eleven roads and it finished none, because it never gathered on one
+tile.
+
+**The plan bound is not the lever.** A sweep of the same 200 seeds at a plan
+bound of 4, in place of the default of 40, finished nothing at 132 of them. A
+smaller plan gives a wandering unit fewer tiles to stand on, so the coincidence
+happens less often. A larger plan spreads the same work over more tiles. No
+value of the bound makes a random walk finish a build.
+
+**Follows.** Three things.
+
+**The cause is a missing rule and not a balance value.** A unit that holds a
+build order must stay on the tile it builds. A new item holds the rule and the
+questions a refiner answers before it is written.[^F545C]
+
+**A run in such a world is still worth watching, and it shows less.** The world
+is founded, the factions gather, the plan zones and the census counts. Nothing
+in it finishes, so a watcher sees no upgrade appear on the ground.
+
+**A reading over eight seeds names a tail as a class.** The eight-seed table put
+one seed at zero and read it as one world in eight. Two hundred seeds show a
+continuous distribution with no gap. Read a spread of eight as a spread, and
+take the count of seeds at the bottom from a larger sweep.
+
+### FND-546 — The room clause of the founding cannot refuse a place at a founding group of two
+
+**Believed.** A founding refuses a place whose ground cannot hold the group that
+settles there. The eligibility of a candidate asks that the open tiles of its
+disc hold the whole group.[^F546A]
+
+**True.** The clause refuses nothing today. A tile of ordinary ground holds
+eight units, and a founding group holds two.[^99] [^F546C] Any one passable
+tile of the disc therefore satisfies the clause, and the disc of a candidate
+whose centre admits a unit always holds one. The clause was written when a
+faction founded with 64 people, and the project owner set the group to 2 on 5
+September 2026.[^F546C]
+
+**Evidence.** The clause was removed from the eligibility and every test of the
+seeding still passed, over the demonstration extent and over two small
+worlds.[^F544I]
+
+**Follows.** Keep the clause and do not read it as a live rule. It states the
+rule the founding needs when the group grows again, and the growth chain will
+grow it. A test cannot reach it at a group of two, so no test asserts that it
+refuses anything.
 
 
 ## References
@@ -12851,3 +12986,16 @@ finding that names the shape.
 [^F538A]: The consumption conservation test. `crates/cachette-core/tests/consumption.rs`
 [^F539A]: Backlog item 0059, the done list. `docs/backlog/complete/0059-give-a-site-a-housing-capacity-and-a-resident-reader.md`
 [^F539B]: ADR-0157, a site's free places are its built housing less the residents the engine counts, decision D1. `docs/adrs/accepted/adr-0157-a-sites-free-places-are-its-built-housing-less-the-residents-the-engine-counts.md`
+[^F544A]: The seeding call of the Python boundary. `crates/cachette-py/src/lib.rs`
+[^F544B]: The demonstration, which draws a seed when the watcher names none. `python/cachette/demo/app.py`
+[^F544D]: The seed sweep example. `crates/cachette-core/examples/seed_sweep.rs`
+[^F544G]: ADR-0075, the founding choice reads a bounded sample of the world, decision D1. `docs/adrs/accepted/adr-0075-the-founding-choice-reads-a-bounded-sample-of-the-world.md`
+[^F544H]: ADR-0076, a founding keeps a fixed distance from the foundings before it, decision D2. `docs/adrs/accepted/adr-0076-a-founding-keeps-a-fixed-distance-from-the-foundings-before-it.md`
+[^F544I]: The tests of a playable seeded world. `crates/cachette-core/tests/a_seeded_world_is_playable.rs`
+[^F544K]: ADR-0005, a solver runs a fixed iteration count, decision D1. `docs/adrs/accepted/adr-0005-a-solver-runs-a-fixed-iteration-count.md`
+[^F545A]: Backlog item 0504. `docs/backlog/complete/0504-find-why-one-seed-of-eight-finishes-no-project.md`
+[^F545B]: Balance register, the road work by level and the build rate. `docs/reference/balance.md`
+[^F545C]: Backlog item 0505. `docs/backlog/proposed/0505-keep-a-builder-on-the-tile-it-builds-until-the-work-is-done.md`
+[^F545D]: ADR-0152, a faction plans its roads and zones with one solver, decision D3. `docs/adrs/accepted/adr-0152-a-faction-plans-its-roads-and-zones-with-one-solver.md`
+[^F546A]: The founding survey and the eligibility of a candidate. `crates/cachette-core/src/founding.rs`
+[^F546C]: Balance register, the founding group. `docs/reference/balance.md`

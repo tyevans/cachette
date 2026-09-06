@@ -1,7 +1,7 @@
 ---
 id: 0504
 title: Find why one seed of eight finishes no project
-status: proposed
+status: complete
 created: 2026-09-05
 implements: [ADR-0152 D3, ADR-0159 D3]
 changes: []
@@ -63,11 +63,46 @@ A refiner answers these before this item leaves `proposed/`.
 
 ## Done when
 
-Not written. Refine the item first.
+This item was a reading, and the reading is done. It answered every question of
+the section above, it named the cause, and it opened the item that repairs it.
 
 ## Outcome
 
-Filled in when the item moves to `complete/`.
+**The zero is the bottom of a continuous distribution, and the world is not
+poor.** A sweep of 200 seeds of the demonstration world, 800 ticks each,
+finished no project at 19 of them, one project at 19 more, and up to 31 at the
+top. No gap separates the zero from the rest. The seeds that finish none seat
+the same four factions, hold the same four settlements, hold 7.42 units against
+7.38, and zone 156 projects against 164.[^5]
+
+**The cause is that nothing keeps a builder on the tile it builds.** The
+controller orders a build only on the tick that a unit stands on a tile its own
+plan zones. The movement pass reads no build order, so the unit leaves on the
+next tick and adds one work. The first level of a road asks for eight. In the
+run this item named, the units of one faction stood on a zoned tile for 253
+ticks of 800, and the work reached 31 tiles and passed seven on none of
+them.[^5]
+
+**The run zones plenty, and it finishes none.** Each of the three plans fills to
+its bound of 40 in the first ticks, so the zoning is not the missing part.
+
+**The tick limit is not the cause.** The work spreads at the same rate whatever
+the bound of the run, and no tile approached the work of a road.
+
+**The plan bound is not the cause either.** The same 200 seeds at a bound of 4
+finished nothing at 132 of them, because a smaller plan gives a wandering unit
+fewer tiles to stand on.[^5]
+
+**A run in such a world is still worth watching, and it shows less.** The world
+founds, the factions gather, the plan zones and the census counts. No upgrade
+appears on the ground.
+
+**The seed stays in the chain test, and the reading now has a wider basis.** The
+sweep is an example anyone can run again, and a separate test states what a
+playable seeded world is over eight seeds of the demonstration world.[^6] [^7]
+
+**The repair is a new item.** It states that a unit holding a build order stays
+on its tile, and it names the questions a refiner answers first.[^8]
 
 ## References
 
@@ -75,3 +110,7 @@ Filled in when the item moves to `complete/`.
 [^2]: Testing Rules, a fixture supplies the input. `.agents/rules/testing.md`
 [^3]: Backlog item 0502. `docs/backlog/proposed/0502-let-a-faction-re-aim-its-project-order-and-keep-its-plan-live.md`
 [^4]: ADR-0152, a faction plans its roads and zones with one solver, decision D3. `docs/adrs/accepted/adr-0152-a-faction-plans-its-roads-and-zones-with-one-solver.md`
+[^5]: Findings register, FND-545. `docs/FINDINGS.md`
+[^6]: The seed sweep example. `crates/cachette-core/examples/seed_sweep.rs`
+[^7]: The tests of a playable seeded world. `crates/cachette-core/tests/a_seeded_world_is_playable.rs`
+[^8]: Backlog item 0505. `docs/backlog/proposed/0505-keep-a-builder-on-the-tile-it-builds-until-the-work-is-done.md`
