@@ -411,14 +411,18 @@ pub const LEADER_ROW: UnitTypeRow = UnitTypeRow {
     water_crossing: 0,
 };
 
-/// The placeholder water crossing of the mariner row. It is the smallest
-/// nonzero value, because the terrain capacity table states the room a water
-/// tile holds and this column states only that the type may take it.[^1]
+/// The placeholder water crossing of the mariner row.
+///
+/// The terrain capacity table states the room a water tile holds, and this
+/// column states only that the type may take it. The value is therefore the
+/// smallest crossing that table admits, read from the table rather than
+/// written again here.[^1] [^2]
 ///
 /// # References
 ///
-/// [^1]: Balance register, unit types, the default table row. `docs/reference/balance.md`
-pub const PLACEHOLDER_WATER_CROSSING: u32 = 1;
+/// [^1]: Recurring defect shapes, shape 1. `.agents/rules/recurring-defects.md`
+/// [^2]: Balance register, unit types, the default table row. `docs/reference/balance.md`
+pub const PLACEHOLDER_WATER_CROSSING: u32 = crate::terrain::SOME_WATER_CROSSING;
 
 /// The mariner row. It crosses open water, and it gathers, builds and carries
 /// as a worker does.

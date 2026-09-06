@@ -260,7 +260,7 @@ pub fn census(world: &World, centre: Axial, radius: u32) -> Result<Census, Censu
             }
             if count > 0
                 && world
-                    .tile_capacity(address)
+                    .tile_capacity_for(address, crate::terrain::SOME_WATER_CROSSING)
                     .is_some_and(|room| count >= room)
             {
                 found.tiles_at_capacity += 1;

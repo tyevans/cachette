@@ -6080,7 +6080,26 @@ impl World {
     /// [^1]: ADR-0090, a tile upgrade is stored sparsely, as the difference from the generated world, decision D3. `docs/adrs/draft/adr-0090-a-tile-upgrade-is-stored-sparsely.md`
     #[must_use]
     pub fn tile_capacity(&self, address: Axial) -> Option<u32> {
-        let ground = self.terrain.kind(address)?.capacity();
+        self.tile_capacity_for(address, crate::terrain::NO_WATER_CROSSING)
+    }
+
+    /// Returns the number of units of a given water crossing that may stand
+    /// on one tile.
+    ///
+    /// The argument is the water crossing column of a unit type row, and zero
+    /// means cannot.[^2] The reader still reads the ground table and the
+    /// upgrade table together, and it still states no rule of its own about
+    /// which ground admits whom.[^1]
+    ///
+    /// Returns `None` when the address lies outside the world.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0090, a tile upgrade is stored sparsely, as the difference from the generated world, decision D3. `docs/adrs/draft/adr-0090-a-tile-upgrade-is-stored-sparsely.md`
+    /// [^2]: ADR-0145, a unit type is a row of capability columns, and zero means cannot, decision D2. `docs/adrs/accepted/adr-0145-a-unit-type-is-a-row-of-capability-columns-and-zero-means-cannot.md`
+    #[must_use]
+    pub fn tile_capacity_for(&self, address: Axial, water_crossing: u32) -> Option<u32> {
+        let ground = self.terrain.kind(address)?.capacity_for(water_crossing);
         Some(upgrade::capacity_with(
             ground,
             self.standing_upgrade_row(address),
@@ -10459,9 +10478,28 @@ struct ContractDelivery {
     owes_as_proposer: bool,
 }
 
-fn step_target(grid: Grid, terrain: Terrain, here: Axial, direction: usize) -> Option<Axial> {
+/// Returns the neighbour a unit steps onto, or nothing when the ground there
+/// refuses it.
+///
+/// **The gate is the capacity table, and this states no rule of its own.**
+/// The `water_crossing` argument is the column of the type of the unit that
+/// is stepping, and zero means cannot. The table takes it and answers the
+/// capacity of the target, and passability is what it always was: a capacity
+/// above zero.[^1] [^2]
+///
+/// # References
+///
+/// [^1]: ADR-0056, movement is tile-discrete and admitted by sort-then-admit, decision D4. `docs/adrs/accepted/adr-0056-movement-is-tile-discrete-and-admitted-by-sort-then-admit.md`
+/// [^2]: ADR-0145, a unit type is a row of capability columns, and zero means cannot, decision D2. `docs/adrs/accepted/adr-0145-a-unit-type-is-a-row-of-capability-columns-and-zero-means-cannot.md`
+fn step_target(
+    grid: Grid,
+    terrain: Terrain,
+    here: Axial,
+    direction: usize,
+    water_crossing: u32,
+) -> Option<Axial> {
     let target = grid.neighbour(here, direction)?;
-    if terrain.kind(target)?.is_passable() {
+    if terrain.kind(target)?.is_passable_for(water_crossing) {
         Some(target)
     } else {
         None
@@ -10821,7 +10859,24 @@ fn soldier_moves(
                         //
                         // [^16]: Findings register, FND-315. `docs/FINDINGS.md`
                         // [^17]: ADR-0091, movement takes its direction from a per-cell field, never from a per-unit search, decision D1. `docs/adrs/draft/adr-0091-movement-takes-its-direction-from-a-per-cell-field.md`
-                        let target = step_target(grid, terrain, here, direction);
+                        // **The crossing of the unit is a column of its own
+                        // type row.** The row is data and the movement pass
+                        // reads it, so a type that crosses water and a type
+                        // that does not take the same code path and differ
+                        // only in the number they hand the capacity
+                        // table.[^24]
+                        //
+                        // A unit whose type the arena cannot answer for
+                        // crosses nothing, which is the answer every type
+                        // gave before the column existed.
+                        //
+                        // [^24]: ADR-0145, a unit type is a row of capability columns, and zero means cannot, decision D2. `docs/adrs/accepted/adr-0145-a-unit-type-is-a-row-of-capability-columns-and-zero-means-cannot.md`
+                        let water_crossing = soldiers
+                            .unit_type(*soldier)
+                            .map_or(0, |unit_type| {
+                                building.unit_types.row(unit_type).water_crossing
+                            });
+                        let target = step_target(grid, terrain, here, direction, water_crossing);
                         let target = match target {
                             Some(target) => target,
                             None => {
@@ -10833,7 +10888,7 @@ fn soldier_moves(
                                     DRAW_MOVE_FALLBACK,
                                     NEIGHBOUR_COUNT as u64,
                                 ) as usize;
-                                step_target(grid, terrain, here, again)?
+                                step_target(grid, terrain, here, again, water_crossing)?
                             }
                         };
                         Some((*soldier, target))
@@ -11221,9 +11276,19 @@ fn admit(
                     // without the upgrade table.[^8]
                     //
                     // [^8]: ADR-0090, a tile upgrade is stored sparsely, as the difference from the generated world, decision D3. `docs/adrs/draft/adr-0090-a-tile-upgrade-is-stored-sparsely.md`
-                    let ground = terrain
-                        .kind(address)
-                        .map_or(0, crate::terrain::TileKind::capacity);
+                    // **The room a target holds is the room it holds for
+                    // the units that asked for it.** Every intent in a
+                    // segment came through the step gate above, so a segment
+                    // on open water holds crossing units alone and a segment
+                    // on any other ground answers the same capacity either
+                    // way. The pass therefore asks the table for the crossing
+                    // capacity, and it states no rule of its own about which
+                    // ground admits whom.[^12]
+                    //
+                    // [^12]: Recurring defect shapes, shape 1. `.agents/rules/recurring-defects.md`
+                    let ground = terrain.kind(address).map_or(0, |kind| {
+                        kind.capacity_for(crate::terrain::SOME_WATER_CROSSING)
+                    });
                     segment.capacity = upgrade::capacity_with(
                         ground,
                         upgrades.standing(TileIdx(segment.tile), table),

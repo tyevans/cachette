@@ -301,6 +301,18 @@ pub const NO_WATER_CROSSING: u32 = 0;
 /// [^1]: Blockers register, BLK-007. `docs/BLOCKERS.md`
 pub const WATER_CAPACITY: u32 = ORDINARY_CAPACITY / 2;
 
+/// A water crossing that admits a unit to open water.
+///
+/// Zero means cannot, so every value above zero admits and the smallest of
+/// them is enough. A caller that must ask the capacity table what a water
+/// tile holds for a unit that crosses passes this, rather than a bare one or
+/// a value it read from a type row.[^1]
+///
+/// # References
+///
+/// [^1]: ADR-0145, a unit type is a row of capability columns, and zero means cannot, decision D2. `docs/adrs/accepted/adr-0145-a-unit-type-is-a-row-of-capability-columns-and-zero-means-cannot.md`
+pub const SOME_WATER_CROSSING: u32 = 1;
+
 /// The number of units that stand on a tile of ordinary ground.
 ///
 /// The value is in the scale constants table, and the register records the
