@@ -402,5 +402,5 @@ each.
 [^18]: ADR-0110, a unit returns by climbing a reach field seeded at every site of its faction, decision D3. `docs/adrs/draft/adr-0110-a-unit-returns-by-climbing-a-reach-field.md`
 [^19]: ADR-0125, the control plane names the seed set of a destination field, decision D3. `docs/adrs/draft/adr-0125-the-control-plane-names-the-seed-set-of-a-destination-field.md`
 [^20]: Project orientation, the design principles. `CLAUDE.md`
-[^21]: ADR-0159, a project order names one category for each unit and one seed set for the faction. `docs/adrs/draft/adr-0159-a-project-order-names-one-category-and-one-seed-set.md`
+[^21]: ADR-0159, a project order names one category for each unit and one seed set for the faction. `docs/adrs/accepted/adr-0159-a-project-order-names-one-category-and-one-seed-set.md`
 [^22]: Findings register, FND-493. `docs/FINDINGS.md`
