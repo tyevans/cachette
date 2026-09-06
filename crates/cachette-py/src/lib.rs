@@ -12,10 +12,14 @@
 //! [^1]: ADR-0041, a crate split enforces the boundary at compile time. `docs/adrs/REGISTRY.md`
 //! [^2]: ADR-0042, the interpreter is released for the whole step. `docs/adrs/REGISTRY.md`
 
+mod columns;
+
+use crate::columns::columns_of;
 use cachette_core::campaign::{CampaignEvent, CampaignRow};
 use cachette_core::census::{census, CensusError};
 use cachette_core::character::CharacterArena;
 use cachette_core::descent::{DescentId, DESCENT_CEILING};
+use cachette_core::event_layout::declared_event_layouts;
 use cachette_core::founding::FoundingOutcome;
 use cachette_core::hex::NEIGHBOURS;
 use cachette_core::luxury::{LuxuryId, LUXURY_CEILING};
@@ -506,6 +510,10 @@ impl PyWorld {
     /// by its name. No caller holds a byte offset, a field width, or a field
     /// order. Those live in the Rust source and nowhere else.[^1]
     ///
+    /// The engine declares the fields of the event in one place, and this
+    /// method builds the columns from that declaration. It names no field of
+    /// its own. Read the declaration with `event_schema`.[^5]
+    ///
     /// This method copies each column. The log of one step is small next to
     /// the world.[^3]
     ///
@@ -515,21 +523,10 @@ impl PyWorld {
     /// [^2]: ADR-0002, simulated and aggregated state holds no floating point number, decision D1. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
     /// [^3]: ADR-0044, what copies and what does not is declared at the call site. `docs/adrs/REGISTRY.md`
     /// [^4]: ADR-0053, a faction is a bit in a mask, and a relation is a plane, decision D2. `docs/adrs/accepted/adr-0053-a-faction-is-a-bit-in-a-mask-and-a-relation-is-a-plane.md`
+    /// [^5]: ADR-0163, an event declares its layout once and the binding derives every column. `docs/adrs/draft/adr-0163-an-event-declares-its-layout-once-and-the-binding-derives-every-column.md`
     fn event_log_columns<'py>(&self, python: Python<'py>) -> PyResult<Bound<'py, PyDict>> {
         let world = self.lock();
-        let log = world.event_log();
-        let columns = PyDict::new(python);
-        let tick: Vec<u64> = log.iter().map(|event| event.tick.0).collect();
-        let tile: Vec<u32> = log.iter().map(|event| event.tile.0).collect();
-        let value: Vec<i32> = log.iter().map(|event| event.value.0).collect();
-        let holder: Vec<u16> = log.iter().map(|event| event.holder.to_bits()).collect();
-        let kind: Vec<u8> = log.iter().map(|event| event.kind).collect();
-        columns.set_item("tick", tick.to_pyarray(python))?;
-        columns.set_item("tile", tile.to_pyarray(python))?;
-        columns.set_item("value", value.to_pyarray(python))?;
-        columns.set_item("holder", holder.to_pyarray(python))?;
-        columns.set_item("kind", kind.to_pyarray(python))?;
-        Ok(columns)
+        columns_of(python, world.event_log())
     }
 
     /// Returns the gather log of the last step, as a `dict` of NumPy arrays.
@@ -562,19 +559,7 @@ impl PyWorld {
     /// [^2]: ADR-0044, what copies and what does not is declared at the call site. `docs/adrs/REGISTRY.md`
     fn gather_log_columns<'py>(&self, python: Python<'py>) -> PyResult<Bound<'py, PyDict>> {
         let world = self.lock();
-        let log = world.gather_log();
-        let columns = PyDict::new(python);
-        let tick: Vec<u64> = log.iter().map(|event| event.tick.0).collect();
-        let unit: Vec<u64> = log.iter().map(|event| event.unit).collect();
-        let tile: Vec<u32> = log.iter().map(|event| event.tile.0).collect();
-        let amount: Vec<u32> = log.iter().map(|event| event.amount).collect();
-        let kind: Vec<u8> = log.iter().map(|event| event.kind).collect();
-        columns.set_item("tick", tick.to_pyarray(python))?;
-        columns.set_item("unit", unit.to_pyarray(python))?;
-        columns.set_item("tile", tile.to_pyarray(python))?;
-        columns.set_item("amount", amount.to_pyarray(python))?;
-        columns.set_item("kind", kind.to_pyarray(python))?;
-        Ok(columns)
+        columns_of(python, world.gather_log())
     }
 
     /// The number of gather events the last step emitted, as an integer.
@@ -647,19 +632,7 @@ impl PyWorld {
     /// [^6]: ADR-0121, a meeting between two factions resolves at the tile, decision D4. `docs/adrs/draft/adr-0121-a-meeting-between-two-factions-resolves-at-the-tile.md`
     fn fell_log_columns<'py>(&self, python: Python<'py>) -> PyResult<Bound<'py, PyDict>> {
         let world = self.lock();
-        let log = world.fell_log();
-        let columns = PyDict::new(python);
-        let tick: Vec<u64> = log.iter().map(|event| event.tick.0).collect();
-        let unit: Vec<u64> = log.iter().map(|event| event.unit).collect();
-        let tile: Vec<u32> = log.iter().map(|event| event.tile.0).collect();
-        let faction: Vec<u16> = log.iter().map(|event| event.faction.0).collect();
-        let unit_type: Vec<u8> = log.iter().map(|event| event.unit_type.0).collect();
-        columns.set_item("tick", tick.to_pyarray(python))?;
-        columns.set_item("unit", unit.to_pyarray(python))?;
-        columns.set_item("tile", tile.to_pyarray(python))?;
-        columns.set_item("faction", faction.to_pyarray(python))?;
-        columns.set_item("unit_type", unit_type.to_pyarray(python))?;
-        Ok(columns)
+        columns_of(python, world.fell_log())
     }
 
     /// The number of units that fell in the last step, as an integer.
@@ -1710,15 +1683,7 @@ impl PyWorld {
     /// [^2]: ADR-0044, what copies and what does not is declared at the call site. `docs/adrs/REGISTRY.md`
     fn starved_log_columns<'py>(&self, python: Python<'py>) -> PyResult<Bound<'py, PyDict>> {
         let world = self.lock();
-        let log = world.starved_log();
-        let columns = PyDict::new(python);
-        let tick: Vec<u64> = log.iter().map(|event| event.tick.0).collect();
-        let unit: Vec<u64> = log.iter().map(|event| event.unit).collect();
-        let deficit: Vec<i32> = log.iter().map(|event| event.deficit.0).collect();
-        columns.set_item("tick", tick.to_pyarray(python))?;
-        columns.set_item("unit", unit.to_pyarray(python))?;
-        columns.set_item("deficit", deficit.to_pyarray(python))?;
-        Ok(columns)
+        columns_of(python, world.starved_log())
     }
 
     /// Gives every settlement the identities name one upkeep rate.
@@ -1835,17 +1800,7 @@ impl PyWorld {
     /// [^2]: ADR-0044, what copies and what does not is declared at the call site. `docs/adrs/REGISTRY.md`
     fn shortfall_log_columns<'py>(&self, python: Python<'py>) -> PyResult<Bound<'py, PyDict>> {
         let world = self.lock();
-        let log = world.shortfall_log();
-        let columns = PyDict::new(python);
-        let tick: Vec<u64> = log.iter().map(|event| event.tick.0).collect();
-        let site: Vec<u64> = log.iter().map(|event| event.site).collect();
-        let amount: Vec<i32> = log.iter().map(|event| event.amount.0).collect();
-        let commodity: Vec<u16> = log.iter().map(|event| event.commodity).collect();
-        columns.set_item("tick", tick.to_pyarray(python))?;
-        columns.set_item("site", site.to_pyarray(python))?;
-        columns.set_item("amount", amount.to_pyarray(python))?;
-        columns.set_item("commodity", commodity.to_pyarray(python))?;
-        Ok(columns)
+        columns_of(python, world.shortfall_log())
     }
 
     /// Returns the rationed log of the last step, as a `dict` of NumPy
@@ -1885,19 +1840,7 @@ impl PyWorld {
     /// [^2]: ADR-0044, what copies and what does not is declared at the call site. `docs/adrs/REGISTRY.md`
     fn rationed_log_columns<'py>(&self, python: Python<'py>) -> PyResult<Bound<'py, PyDict>> {
         let world = self.lock();
-        let log = world.rationed_log();
-        let columns = PyDict::new(python);
-        let tick: Vec<u64> = log.iter().map(|event| event.tick.0).collect();
-        let site: Vec<u64> = log.iter().map(|event| event.site).collect();
-        let demanded: Vec<i64> = log.iter().map(|event| event.demanded.0).collect();
-        let granted: Vec<i64> = log.iter().map(|event| event.granted.0).collect();
-        let commodity: Vec<u16> = log.iter().map(|event| event.commodity).collect();
-        columns.set_item("tick", tick.to_pyarray(python))?;
-        columns.set_item("site", site.to_pyarray(python))?;
-        columns.set_item("demanded", demanded.to_pyarray(python))?;
-        columns.set_item("granted", granted.to_pyarray(python))?;
-        columns.set_item("commodity", commodity.to_pyarray(python))?;
-        Ok(columns)
+        columns_of(python, world.rationed_log())
     }
 
     /// Returns the promotion log of the last step, as a `dict` of NumPy
@@ -1935,19 +1878,7 @@ impl PyWorld {
     /// [^2]: ADR-0044, what copies and what does not is declared at the call site. `docs/adrs/REGISTRY.md`
     fn promoted_log_columns<'py>(&self, python: Python<'py>) -> PyResult<Bound<'py, PyDict>> {
         let world = self.lock();
-        let log = world.promoted_log();
-        let columns = PyDict::new(python);
-        let tick: Vec<u64> = log.iter().map(|event| event.tick.0).collect();
-        let unit: Vec<u64> = log.iter().map(|event| event.unit).collect();
-        let character: Vec<u64> = log.iter().map(|event| event.character).collect();
-        let deeds: Vec<u64> = log.iter().map(|event| event.deeds).collect();
-        let faction: Vec<u16> = log.iter().map(|event| event.faction.0).collect();
-        columns.set_item("tick", tick.to_pyarray(python))?;
-        columns.set_item("unit", unit.to_pyarray(python))?;
-        columns.set_item("character", character.to_pyarray(python))?;
-        columns.set_item("deeds", deeds.to_pyarray(python))?;
-        columns.set_item("faction", faction.to_pyarray(python))?;
-        Ok(columns)
+        columns_of(python, world.promoted_log())
     }
 
     /// Returns the tile that one soldier stands on, as an integer.
@@ -3916,19 +3847,7 @@ impl PyWorld {
     /// [^2]: ADR-0044, what copies and what does not is declared at the call site. `docs/adrs/REGISTRY.md`
     fn relation_log_columns<'py>(&self, python: Python<'py>) -> PyResult<Bound<'py, PyDict>> {
         let world = self.lock();
-        let log = world.relation_log();
-        let columns = PyDict::new(python);
-        let tick: Vec<u64> = log.iter().map(|event| event.tick.0).collect();
-        let from_faction: Vec<u16> = log.iter().map(|event| event.from_faction.0).collect();
-        let to_faction: Vec<u16> = log.iter().map(|event| event.to_faction.0).collect();
-        let band_before: Vec<u8> = log.iter().map(|event| event.band_before).collect();
-        let band_after: Vec<u8> = log.iter().map(|event| event.band_after).collect();
-        columns.set_item("tick", tick.to_pyarray(python))?;
-        columns.set_item("from_faction", from_faction.to_pyarray(python))?;
-        columns.set_item("to_faction", to_faction.to_pyarray(python))?;
-        columns.set_item("band_before", band_before.to_pyarray(python))?;
-        columns.set_item("band_after", band_after.to_pyarray(python))?;
-        Ok(columns)
+        columns_of(python, world.relation_log())
     }
 
     /// The number of relations that crossed the war edge in the last step,
@@ -4049,8 +3968,16 @@ impl PyWorld {
     /// - `kind`, `numpy.uint8`. Zero is a raise, one is a win, two is a loss,
     ///   three is an end by a holder change to a third party.
     /// - `objective_kind`, `numpy.uint8`. As `campaigns` numbers it.
-    /// - `objective_q` and `objective_r`, `numpy.int32`. The objective tile.
+    /// - `objective_tile`, `numpy.uint32`. The objective, as a row-major
+    ///   index.
+    /// - `objective_q` and `objective_r`, `numpy.int32`. The same tile, as an
+    ///   axial address. The engine reads it from the grid, because the event
+    ///   holds no address of its own.
     /// - `cohort_size`, `numpy.uint32`. How many units the raise took.
+    ///
+    /// The engine declares the fields of the event in one place, and this
+    /// method builds every column but the two addresses from that
+    /// declaration.[^2]
     ///
     /// The log covers the last step alone, and a raise from this side lands in
     /// it until the next step. This method copies each column.[^1]
@@ -4058,16 +3985,13 @@ impl PyWorld {
     /// # References
     ///
     /// [^1]: ADR-0044, what copies and what does not is declared at the call site. `docs/adrs/REGISTRY.md`
+    /// [^2]: ADR-0163, an event declares its layout once and the binding derives every column. `docs/adrs/draft/adr-0163-an-event-declares-its-layout-once-and-the-binding-derives-every-column.md`
     fn campaign_log_columns<'py>(&self, python: Python<'py>) -> PyResult<Bound<'py, PyDict>> {
         let world = self.lock();
         let log: Vec<CampaignEvent> = world.campaign_log().to_vec();
         let grid = world.grid();
         let address = |tile: u32| grid.address_of(TileIdx(tile)).unwrap_or(Axial::new(0, 0));
-        let columns = PyDict::new(python);
-        let tick: Vec<u64> = log.iter().map(|event| event.tick.0).collect();
-        let faction: Vec<u16> = log.iter().map(|event| event.faction.0).collect();
-        let kind: Vec<u8> = log.iter().map(|event| event.kind).collect();
-        let objective_kind: Vec<u8> = log.iter().map(|event| event.objective_kind).collect();
+        let columns = columns_of(python, &log)?;
         let q: Vec<i32> = log
             .iter()
             .map(|event| address(event.objective_tile).q)
@@ -4076,14 +4000,8 @@ impl PyWorld {
             .iter()
             .map(|event| address(event.objective_tile).r)
             .collect();
-        let cohort: Vec<u32> = log.iter().map(|event| event.cohort_size).collect();
-        columns.set_item("tick", tick.to_pyarray(python))?;
-        columns.set_item("faction", faction.to_pyarray(python))?;
-        columns.set_item("kind", kind.to_pyarray(python))?;
-        columns.set_item("objective_kind", objective_kind.to_pyarray(python))?;
         columns.set_item("objective_q", q.to_pyarray(python))?;
         columns.set_item("objective_r", r.to_pyarray(python))?;
-        columns.set_item("cohort_size", cohort.to_pyarray(python))?;
         Ok(columns)
     }
 
@@ -4760,19 +4678,7 @@ impl PyWorld {
     /// [^2]: ADR-0044, what copies and what does not is declared at the call site. `docs/adrs/REGISTRY.md`
     fn converted_log_columns<'py>(&self, python: Python<'py>) -> PyResult<Bound<'py, PyDict>> {
         let world = self.lock();
-        let log = world.converted_log();
-        let columns = PyDict::new(python);
-        let tick: Vec<u64> = log.iter().map(|event| event.tick.0).collect();
-        let unit: Vec<u64> = log.iter().map(|event| event.unit).collect();
-        let tile: Vec<u32> = log.iter().map(|event| event.tile.0).collect();
-        let from: Vec<u16> = log.iter().map(|event| event.from.0).collect();
-        let to: Vec<u16> = log.iter().map(|event| event.to.0).collect();
-        columns.set_item("tick", tick.to_pyarray(python))?;
-        columns.set_item("unit", unit.to_pyarray(python))?;
-        columns.set_item("tile", tile.to_pyarray(python))?;
-        columns.set_item("from_faction", from.to_pyarray(python))?;
-        columns.set_item("to_faction", to.to_pyarray(python))?;
-        Ok(columns)
+        columns_of(python, world.converted_log())
     }
 
     /// The number of units that changed faction in the last step, as an
@@ -5559,19 +5465,7 @@ impl PyWorld {
     /// [^2]: ADR-0044, what copies and what does not is declared at the call site. `docs/adrs/REGISTRY.md`
     fn trade_log_columns<'py>(&self, python: Python<'py>) -> PyResult<Bound<'py, PyDict>> {
         let world = self.lock();
-        let log = world.trade_log();
-        let columns = PyDict::new(python);
-        let tick: Vec<u64> = log.iter().map(|event| event.tick.0).collect();
-        let proposer: Vec<u16> = log.iter().map(|event| event.proposer).collect();
-        let responder: Vec<u16> = log.iter().map(|event| event.responder).collect();
-        let act: Vec<u8> = log.iter().map(|event| event.act).collect();
-        let status: Vec<u8> = log.iter().map(|event| event.status).collect();
-        columns.set_item("tick", tick.to_pyarray(python))?;
-        columns.set_item("proposer", proposer.to_pyarray(python))?;
-        columns.set_item("responder", responder.to_pyarray(python))?;
-        columns.set_item("act", act.to_pyarray(python))?;
-        columns.set_item("status", status.to_pyarray(python))?;
-        Ok(columns)
+        columns_of(python, world.trade_log())
     }
 
     /// Replaces the whole board of one faction.
@@ -7649,6 +7543,46 @@ fn trade_refusal(error: cachette_core::TradeError) -> PyErr {
     VerbError::new_err(said)
 }
 
+/// Returns the columns that every event log gives, as a `dict`.
+///
+/// The key is the name of an event. The value is a list of pairs. The first
+/// entry of a pair is the name of a column, and the second is the name of its
+/// NumPy element type. The order is the order the engine declares the fields
+/// in. A padding field crosses nowhere, so it has no pair.
+///
+/// The engine declares the fields of an event in one place, and this function
+/// reports that declaration. A reader that builds a type from it holds no
+/// copy of the layout. The type stub of this module is built from it, and a
+/// check fails when the stub and the engine disagree.[^1]
+///
+/// No element type is a floating point type. A fixed-point column crosses as
+/// its raw integer.[^2]
+///
+/// # Errors
+///
+/// Returns an error when the interpreter refuses to hold the dictionary.
+///
+/// # References
+///
+/// [^1]: ADR-0163, an event declares its layout once and the binding derives every column. `docs/adrs/draft/adr-0163-an-event-declares-its-layout-once-and-the-binding-derives-every-column.md`
+/// [^2]: ADR-0002, simulated and aggregated state holds no floating point number, decision D1. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
+#[pyfunction]
+fn event_schema(python: Python<'_>) -> PyResult<Bound<'_, PyDict>> {
+    let schema = PyDict::new(python);
+    for event in declared_event_layouts() {
+        let fields: Vec<(&str, &str)> = event
+            .fields
+            .iter()
+            .filter_map(|field| match (field.column, field.kind) {
+                (Some(column), Some(kind)) => Some((column, kind.numpy_name())),
+                _ => None,
+            })
+            .collect();
+        schema.set_item(event.name, fields)?;
+    }
+    Ok(schema)
+}
+
 /// Returns the version of the `cachette` package, as a `str`.
 ///
 /// The value is the version of the compiled extension module. The package
@@ -7776,6 +7710,7 @@ fn cachette_core_module(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<PyWorld>()?;
     module.add_class::<PyCamera>()?;
     module.add_function(wrap_pyfunction!(version, module)?)?;
+    module.add_function(wrap_pyfunction!(event_schema, module)?)?;
     add_error::<CachetteError>(module, "CachetteError")?;
     add_error::<StepError>(module, "StepError")?;
     add_error::<FrameError>(module, "FrameError")?;
