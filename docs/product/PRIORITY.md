@@ -54,7 +54,7 @@ A record here is a need, not a plan. The backlog says what work answers it.[^3]
 | 0051 | A god trades land. It sits under 0050 because it widens the deal that 0034 answers, and above 0052 because BLK-036 governs both and this one can ship with a refusal in place of the answer. |
 | 0052 | An upgrade wears and a worker repairs it. It sits under 0051 because it gives an army and a storm something to harm, and neither has a reason to reach a built thing until a faction fights for one. It sits above 0053 because a harness that counts what fired needs the mechanisms to exist first. |
 | 0053 | A game is balanced across seeds. It sits last among the game records because it judges the game that 0048 to 0052 produce, and it cannot run before a run ends. It sits above 0020 because a game that ends unfairly is a game nobody tunes, and tuning is what makes the rest of the list worth playing. |
-| 0056 | A learner plays one faction against the controllers. It sits directly under 0053 because a policy needs the game that 0048 to 0052 build, and it needs the fairness that 0053 judges. It waits for the territory rule, the upgrade table and the standing readers, because each of those changes what a learner would observe and what it would do. |
+| 0056 | A learner plays one faction against the controllers. It sits directly under 0053 because a policy needs the game that 0048 to 0052 build, and it needs the fairness that 0053 judges. It waits for the territory rule and the upgrade table, because each of those changes what a learner would observe and what it would do. The reader of a faction's standing on each way to win already exists. |
 
 ## Later
 
