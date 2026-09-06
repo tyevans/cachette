@@ -302,10 +302,15 @@ fn the_store_falls_by_exactly_what_the_cohorts_received() {
     let produced = world.rate_ledger().produced[0].0;
     let spent = world.rate_ledger().spent[0].0;
     let taken = world.draw_ledger().granted[0].0;
+    // Growth is a fourth term of the statement. It takes food out of a store
+    // to make a person, and neither the rate ledger nor the draw ledger holds
+    // that. A statement that left it out would fail the moment a site grew.
+    let born = world.growth_ledger()[0].0;
     assert!(taken > 0, "the fixture must reach a draw");
+    assert!(born > 0, "the fixture must reach a birth");
     assert_eq!(
         closing.0 - opening.0,
-        produced - spent - taken,
+        produced - spent - taken - born,
         "the world must balance to zero"
     );
     assert!(
