@@ -906,6 +906,32 @@ impl PyWorld {
             .collect()
     }
 
+    /// Gives back the name of every overlay the map can show, in its order.
+    ///
+    /// An overlay is one quantity of the world, drawn over every tile of the
+    /// map as a strength of one colour. The map carries one at a time, and the
+    /// caller names it on the frame command.
+    ///
+    /// **The engine holds the list and this derives from it**, so a caller
+    /// that binds a key to each name binds one key to each overlay for as long
+    /// as the list grows. A second list written here would be one fact in two
+    /// places, with nothing to fail when the copies drift.[^1]
+    ///
+    /// **A presenter chooses among these names. It does not draw.** One
+    /// renderer feeds every presenter, so a caller cannot name an overlay the
+    /// renderer does not hold, and it cannot supply a rule of its own for
+    /// painting one. A name taken from this list is therefore a choice among
+    /// what the one renderer published, and not free text.[^2]
+    ///
+    /// # References
+    ///
+    /// [^1]: Recurring Defect Shapes, shape 1. `.claude/rules/recurring-defects.md`
+    /// [^2]: ADR-0094, the caller owns the camera and the pixels, decision D5. `docs/adrs/draft/adr-0094-the-caller-owns-the-camera-and-the-pixels.md`
+    #[staticmethod]
+    fn overlay_names() -> Vec<&'static str> {
+        cachette_view::overlay::names()
+    }
+
     /// Adds a soldier at each address and returns their identities.
     ///
     /// The addresses are a sequence of `(q, r)` pairs of integers. The
@@ -3519,6 +3545,18 @@ impl PyWorld {
     /// inspector panel of the deck reads that tile. It applies only when
     /// `panels` names a deck.
     ///
+    /// Set `overlay` to the name of one overlay, and the map then shows that
+    /// quantity over every tile as a strength of one colour. Read
+    /// `overlay_names` for the names. A name that no overlay carries is
+    /// refused, and the message names the overlays that exist. **A name from
+    /// that list is a choice among what the one renderer published, and not
+    /// free text**, so a presenter chooses an overlay and never draws one
+    /// itself.[^5]
+    ///
+    /// The colour key names the overlay, the value at which it draws no
+    /// colour, the value at which it draws full colour, and what the drawing
+    /// pass met in the window. An overlay that found nothing says so in words.
+    ///
     /// Set `phase` to the share of the current tick that has elapsed on the
     /// wall clock, from zero up to one. A unit that moved to a neighbouring
     /// tile since the last frame then draws between the two tile centres at
@@ -3594,7 +3632,7 @@ impl PyWorld {
     // [^7]: ADR-0067, the viewer reads the world and never writes to it, decision D3. `docs/adrs/accepted/adr-0067-the-viewer-reads-the-world-and-never-writes-to-it.md`
     #[allow(clippy::disallowed_types)]
     #[allow(clippy::too_many_arguments)]
-    #[pyo3(signature = (camera, width, height, pixels, reference = false, panel = false, panels = None, pointer = None, phase = 0.0, speed_milli = 1000))]
+    #[pyo3(signature = (camera, width, height, pixels, reference = false, panel = false, panels = None, pointer = None, overlay = None, phase = 0.0, speed_milli = 1000))]
     fn draw<'py>(
         &self,
         python: Python<'py>,
@@ -3606,6 +3644,7 @@ impl PyWorld {
         panel: bool,
         panels: Option<Vec<String>>,
         pointer: Option<(i32, i32)>,
+        overlay: Option<String>,
         phase: f32,
         speed_milli: u32,
     ) -> PyResult<Bound<'py, PyDict>> {
@@ -3636,6 +3675,20 @@ impl PyWorld {
                 ))
             })?;
         }
+
+        // The overlay the map shows, by name. A name the renderer did not
+        // publish is refused, and the message names the overlays that exist.
+        // A frame with no wash on it looks the same as a frame the caller
+        // mistyped, so the engine says which happened.
+        let layer = match overlay {
+            None => None,
+            Some(name) => Some(cachette_view::overlay::named(&name).ok_or_else(|| {
+                FrameError::new_err(format!(
+                    "no overlay is called {name:?}; the overlays are {}",
+                    cachette_view::overlay::names().join(", ")
+                ))
+            })?),
+        };
 
         let overlay = if !deck.is_empty() {
             Overlay::Deck {
@@ -3671,6 +3724,7 @@ impl PyWorld {
                 metrics,
                 outcomes,
                 overlay,
+                layer,
                 Pace::new(phase, speed_milli),
                 motion,
                 surface,
@@ -3739,6 +3793,20 @@ impl PyWorld {
         report.set_item("step_mean_micros", readout.step_mean())?;
         report.set_item("draw_mean_micros", readout.draw_mean())?;
         report.set_item("ticks_each_second", readout.rate())?;
+        // The overlay the frame drew, and the scale it drew at. The entry is
+        // `None` when the caller named no overlay, so a caller cannot read a
+        // scale that no picture used.
+        report.set_item(
+            "overlay",
+            readout.overlay().map(|reading| {
+                (
+                    reading.name,
+                    reading.span.low,
+                    reading.span.high,
+                    !reading.found_nothing(),
+                )
+            }),
+        )?;
         Ok(report)
     }
 

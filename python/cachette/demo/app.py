@@ -135,6 +135,32 @@ def panel_keys(key: object) -> list[tuple[int, str]]:
     return free[: len(World.panel_names())]
 
 
+# The name of the key that turns the overlay off.
+#
+# A watcher needs one key that means "show me the map again", and it must not
+# be an overlay itself. The number keys run 1 upward, so 0 is free.
+OVERLAY_OFF_KEY = "0"
+
+
+def overlay_keys(key: object) -> list[tuple[int, str]]:
+    """Give back one key for each overlay the engine registers, in its order.
+
+    The number keys name the overlays. The panel deck holds the function keys,
+    and two actions on one key means a watcher cannot reach the second of them.
+
+    **The list is as long as the overlays the engine registers**, so an overlay
+    that joins the deck gets a key with no edit here.
+
+    Each entry holds the key symbol and the name of the key.
+    """
+    free = [
+        (getattr(key, f"_{number}"), str(number))
+        for number in range(1, 10)
+        if hasattr(key, f"_{number}")
+    ]
+    return free[: len(World.overlay_names())]
+
+
 class Demo:
     """The state the control plane holds between frames.
 
@@ -147,6 +173,7 @@ class Demo:
         "announced_end",
         "camera",
         "clock",
+        "overlay",
         "panels",
         "pointer",
         "reference",
@@ -180,6 +207,10 @@ class Demo:
         # The panels of the deck the frame draws, by name. The engine holds
         # the list of names, so this cannot name one that does not exist.
         self.panels: list[str] = []
+        # The overlay the map shows, by name, or None for the plain map. The
+        # engine holds the list of names, so this cannot name one that does
+        # not exist.
+        self.overlay: str | None = None
         # The tile the watcher pointed at, in axial coordinates. The engine
         # has no cursor, so the control plane supplies one.
         self.pointer: tuple[int, int] | None = None
@@ -341,6 +372,17 @@ class Demo:
         else:
             self.panels.append(name)
 
+    def choose_overlay(self, name: str | None) -> None:
+        """Show one overlay on the map, or show the plain map.
+
+        The engine names the overlays it can draw, so a name that no overlay
+        carries is refused here rather than at the drawing.
+        """
+        if name is not None and name not in World.overlay_names():
+            message = f"no overlay is called {name!r}"
+            raise ValueError(message)
+        self.overlay = name
+
     def point_at(self, x: float, y: float) -> None:
         """Name the tile under a place in the window.
 
@@ -390,6 +432,7 @@ class Demo:
             panel=panel,
             panels=self.panels or None,
             pointer=self.pointer,
+            overlay=self.overlay,
             phase=self.clock.phase,
             speed_milli=self.clock.speed_milli,
         )
@@ -519,6 +562,23 @@ def main(argv: list[str] | None = None) -> int:
         ),
     )
     parser.add_argument(
+        "--tile",
+        type=float,
+        default=0.0,
+        help=(
+            "the size of a tile in pixels; zero keeps the size a watcher "
+            "opens on, and a smaller number shows a wider region"
+        ),
+    )
+    parser.add_argument(
+        "--overlay",
+        default="",
+        help=(
+            "show one overlay on the map; the engine names the overlays it "
+            "can draw, and it refuses a name it did not publish"
+        ),
+    )
+    parser.add_argument(
         "--ticks",
         type=int,
         default=PICTURE_TICKS,
@@ -592,6 +652,13 @@ def main(argv: list[str] | None = None) -> int:
     if arguments.run_to_end:
         return _run_to_end(demo)
 
+    if arguments.tile > 0:
+        demo.camera = Camera(tile_size=arguments.tile)
+        demo.open_on(opening_place(foundings))
+
+    if arguments.overlay:
+        demo.choose_overlay(arguments.overlay)
+
     if arguments.picture:
         status = _write_picture(demo, arguments.picture, arguments.ticks)
         print_census(demo.world)
@@ -610,6 +677,7 @@ def main(argv: list[str] | None = None) -> int:
         f"{SETTINGS_KEYS[2]} window size"
     )
     print(f"the panels are {_panel_key_line()}")
+    print(f"the overlays are {_overlay_key_line()}")
     print("click a tile to point at it")
     print("close the window or press escape to stop")
 
@@ -632,6 +700,22 @@ def _panel_key_line() -> str:
 
     pairs = zip(panel_keys(key), World.panel_names(), strict=True)
     return ", ".join(f"{label} {name}" for (_, label), name in pairs)
+
+
+def _overlay_key_line() -> str:
+    """Give back the line that names the key of each overlay.
+
+    **The line and the keys come from one mapping.** A line written from a
+    second count would name a key that does nothing the moment the deck grows.
+
+    The import is here and not at the top of the module, so a caller that only
+    wants a frame in memory needs no window library.
+    """
+    from pyglet.window import key
+
+    pairs = zip(overlay_keys(key), World.overlay_names(), strict=True)
+    named = ", ".join(f"{label} {name}" for (_, label), name in pairs)
+    return f"{named}, {OVERLAY_OFF_KEY} none"
 
 
 def _run_to_end(demo: Demo) -> int:
@@ -723,6 +807,27 @@ def _toggle_panel_key(demo: Demo, symbol: int, key: object) -> None:
             demo.toggle_panel(names[at])
             shown = ", ".join(demo.panels) if demo.panels else "none"
             print(f"panels: {shown}")
+            return
+
+
+def _choose_overlay_key(demo: Demo, symbol: int, key: object) -> None:
+    """Put one overlay on the map, or take the overlay off.
+
+    The keys come from the one mapping, so the key a watcher reads at the start
+    of a run is the key that works.
+
+    The line names the overlay when it changes. A watcher who switched the map
+    must be told what the map now shows, because the colours alone do not say.
+    """
+    if hasattr(key, "_0") and symbol == key._0:
+        demo.choose_overlay(None)
+        print("overlay: none")
+        return
+    names = World.overlay_names()
+    for at, (bound, _) in enumerate(overlay_keys(key)):
+        if symbol == bound and at < len(names):
+            demo.choose_overlay(names[at])
+            print(f"overlay: {names[at]}")
             return
 
 
@@ -851,6 +956,7 @@ def _run_window(demo: Demo, frame_limit: int) -> int:
             demo.settings.video.next_size()
             _apply_settings(demo, window)
             return
+        _choose_overlay_key(demo, symbol, key)
         _toggle_panel_key(demo, symbol, key)
 
     # The handlers are registered by name rather than by decorator. The

@@ -41,6 +41,7 @@ pub mod frame;
 pub mod glass;
 pub mod hud;
 pub mod metrics;
+pub mod overlay;
 pub mod paint;
 pub mod panel;
 pub mod picture;
@@ -51,6 +52,7 @@ pub use frame::{fill_frame, fill_frame_paced, FrameError, Surface, LATTICE_BOUND
 pub use glass::Overlay;
 pub use hud::{FoundingReport, Readout};
 pub use metrics::{Lap, Metrics};
+pub use overlay::{Layer, Span};
 pub use paint::{Camera, Canvas, Extent, FrameSize};
 pub use tween::{speed_word, Motion, Pace, ONE_TICK_EACH_FRAME, TWEEN_REACH};
 
@@ -110,6 +112,7 @@ pub fn draw_frame(
         metrics,
         outcomes,
         overlay,
+        None,
         Pace::STILL,
         &mut motion,
         canvas,
@@ -133,6 +136,12 @@ pub fn draw_frame(
 /// tick at a time, so a viewer that draws between two ticks must keep its
 /// own record of the first.[^8]
 ///
+/// **The layer is the overlay the caller chose, or nothing.** A caller names
+/// one of the overlays this crate registered, and it cannot name another and
+/// cannot supply a rule of its own for painting one. One renderer feeds every
+/// presenter, and a presenter that carried its own painting rule would be a
+/// second renderer of the same world.[^6]
+///
 /// # Errors
 ///
 /// Returns an error when the engine's spatial structure no longer describes
@@ -150,11 +159,12 @@ pub fn draw_frame_paced(
     metrics: &Metrics,
     outcomes: &[FoundingOutcome],
     overlay: Overlay,
+    layer: Option<&'static dyn Layer>,
     pace: Pace,
     motion: &mut Motion,
     canvas: &mut Canvas<'_>,
 ) -> Result<Readout, BridgeError> {
-    paint::draw_paced(world, camera, canvas, pace, motion)?;
+    paint::draw_paced(world, camera, canvas, pace, motion, layer)?;
     paint::mark_foundings(camera, canvas, outcomes);
     let readout = Readout::of(world, camera, canvas, metrics, outcomes).at_speed(pace.speed_milli);
     match overlay {
