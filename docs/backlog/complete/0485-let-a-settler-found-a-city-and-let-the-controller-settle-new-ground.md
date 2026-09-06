@@ -142,7 +142,49 @@ a draft, and D5 now states that the founding spends the settler and seats the
 group the column names.[^13] A settler that survived would found a city, walk
 past the founding distance, and found again without limit.
 
+### What the rebase added
+
+The branch was cut before a wave of merges, and the work was finished after
+the rebase. Three things changed.
+
+**The settle order reads the arena, not the command set.** The command loop
+hands the first command of a faction the whole unit set, so the settle order,
+which draws last, read an empty set on every tick a faction gathered or built.
+
+**A settler is sent, and it is not left where it was built.** A site builds a
+settler inside the ground its own faction holds, and the verb refuses held
+ground, so a settler that never walks never founds. The order sends the
+settlers at the nearest eligible place of the bounded survey, and founds when
+one arrives. The nearest place is taken and not the best-scoring one, because
+a settler eats on the way and starves before it crosses the world.
+
+**A faction climbs three destination planes.** The send needs a plane, and the
+faction plane is busy: over 400 ticks of one seed the order fired 79 times and
+a campaign held the plane on all 79. The world now builds one plane for each
+faction's campaign, carriers and project order, one for a crossing, and one
+for a settling. That also gives the crossing order the plane it asks for.
+
+**The settler row holds a water crossing.** A settler that cannot cross founds
+only on the ground its own landmass joins.
+
+### What was measured
+
+Over seeds 1 to 8, 400 ticks, four factions, a world of 256 by 256, seven of
+the eight seeds found at least one city after the seeding, and the earliest
+founding is at tick 175. Before this work every seed ended with the
+settlements it started with. The probe is an example of the core crate, and
+the commit body holds the numbers.
+
 ### Left undone
+
+- **An island faction does not settle a second landmass.** The settler crosses
+  water and the controller sends it, which two tests prove. The settling
+  target comes from a bounded sample drawn over the whole world, so for a
+  faction on a small island it names a place on the far mainland, and the lone
+  settler starves at sea after four or five ticks. Closing this needs a target
+  choice that offers the near shore.
+- **A founding publishes no event.** The event definitions are held by another
+  worker. A founding during a run is a thing a watcher wants to see.
 
 - **The census row `settlements_founded` was not added.** The census table is
   held by another worker in this session, and the item forbade the edit. The
