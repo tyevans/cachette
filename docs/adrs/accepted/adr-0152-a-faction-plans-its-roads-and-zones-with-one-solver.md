@@ -2,8 +2,8 @@
 
 ## Context
 
-A road is laid where a unit stands. The build verb takes a set of units and a
-category, and each unit adds work to the tile under it. The demonstration
+A road is laid where a unit stands. The build verb takes a set of units and one
+upgrade to make, and each unit adds work to the tile under it. The demonstration
 controller draws a build order for a whole faction from one keyed draw, so
 every idle unit of the faction builds where it happens to be.[^1] Two sites of
 one faction are joined by a road only by accident, and nothing reads what the
@@ -39,7 +39,7 @@ level.[^7]
 at the controller stage, in a fixed iteration count, from what the faction
 holds and what it lacks. A caller writes a plan through the same verb. A unit
 builds a road only inside a project, and an idle unit takes the nearest project
-through the existing build verb.**
+through the build verb a caller can also call.**
 
 ### D1. A faction holds a bounded plan of zoned projects
 
@@ -64,9 +64,15 @@ written first.
 The solver runs at the controller stage, once for each faction the controller
 evaluates.[^3] It reads three things: the sites the faction holds, the deposits
 the faction knows, and which sites are unconnected. A site is unconnected when
-no finished road joins it to the seat of the faction. Each of those is a
-bounded aggregate that the engine already exposes or derives at the barrier. The
-solver reads no unit and no tile outside the ground it holds.
+no finished road joins it to the seat of the faction. The solver reads no unit
+and no tile outside the ground it holds.
+
+**Each of those three must reach the solver as a bounded read.** A read whose
+cost follows the tile count or the population is refused, whatever it answers.
+**This record does not say that a reader for each one exists.** Where none
+exists, the work that implements this record states what the solver does
+without one, and it states that in the open. It must not open a pass over the
+world to make one, and it must not claim a read that nothing answers.[^16]
 
 The solver makes a fixed number of passes over those aggregates. Each pass
 scores the candidate projects and writes the best into the plan. The pass
@@ -81,8 +87,9 @@ raises the yield of the ground it holds. A faction that lacks nothing plans
 nothing.
 
 A reviewer finds a violation when the solver starts a pass over the units or
-over the tiles, when it stops on a condition, or when the plan of one faction
-depends on the visit order of another.
+over the tiles, when it stops on a condition, when the plan of one faction
+depends on the visit order of another, or when the work states that the solver
+reads something no bounded reader answers.
 
 ### D3. A road project joins two of the faction's places along one deterministic path
 
@@ -94,6 +101,12 @@ lower tile index wins at every branch. The search is bounded by a radius that is
 a balance value, and a pair further apart than the radius yields no
 project.[^8]
 
+**The search runs a fixed pass count.** It relaxes the tiles inside the radius
+a fixed number of times, and it then reads the answer. It never runs until the
+frontier settles, because that is a convergence test under another name.[^4] A
+pass count that the input changes is the same defect. The pass count is a
+balance value.[^8]
+
 Every tile of the path is a project with the road category. No unit lays a road
 outside a project. The build verb refuses a road order on a tile that no plan
 zones, and counts the refusal.[^9]
@@ -103,30 +116,52 @@ neighbour it visited would follow the order of a container, and that order is
 not part of the data.[^5]
 
 A reviewer finds a violation when a road is laid on a tile that no project
-names, when a path search breaks a tie by anything but the tile index, or when a
-search has no radius.
+names, when a path search breaks a tie by anything but the tile index, when a
+search has no radius, or when the number of passes changes with the input.
 
 ### D4. A caller writes a plan through the verb the solver uses
 
 One verb writes a project into a plan. The solver calls it and a Python caller
-calls it. The verb takes a faction, a tile and a category. It refuses a tile the
-faction does not hold, a tile past the plan bound and a category the ground does
-not suit, and it counts each refusal.[^9] [^7]
+calls it. The verb takes a faction, a tile and a category. It refuses a tile
+past the plan bound and a category the ground does not suit. It refuses a tile
+the faction does not hold, unless the category is a road. It counts each
+refusal.[^9] [^7]
+
+**A road is the one category a plan may zone off held ground.** The build rule
+already exempts a road from the own-ground refusal, and it exempts it so that a
+faction can reach ground it does not yet hold.[^17] A plan that could zone only
+held ground would take that reach away, and D3 could then write no road project
+at all, because a path between two places crosses ground the faction does not
+hold.
+
+**The plan is the bound that stops a road sprawling.** A unit lays a road only
+inside a project, so a faction reaches new ground along the one path it planned,
+and not along every path its units walked. The ground rule gives the reach and
+the plan gives the bound. Neither alone is enough.
+
+One function states the ground rule, and every caller reads that one function.
+Two callers that apply two tests are the defect this decision removes.
 
 No verb exists for the solver alone.[^12] A god that zones a project by hand
 puts it in the same list the solver writes to, and a unit cannot tell the two
 apart. A caller may also clear a project, through one verb that both may call.
 
 A reviewer finds a violation when the solver writes a plan by a path the
-boundary does not expose, or when the verb reads who called it.
+boundary does not expose, when the verb reads who called it, when the verb
+refuses a road project on ground the faction does not hold, or when the ground
+rule is written twice.
 
 ### D5. An idle unit takes the nearest project through the build verb
 
 At the controller stage, after the solver has written, the controller issues
-one build order for each faction through the existing build verb. The set is the
-idle units of the faction. The verb sends each unit to the project nearest to
-it by hex distance. When two projects tie, the lower tile index wins. A unit
-that is not idle is not moved.
+one order for each faction through the verbs a caller can also call.[^12] The
+set is the idle units of the faction. Each unit goes to the project nearest to
+it by hex distance, and it builds what that project names. When two projects
+tie, the lower tile index wins. A unit that is not idle is not moved.
+
+**No path exists for the controller alone.** The verbs that move a unit and
+order a build are the verbs a Python caller holds, in the form the controller
+already takes for a campaign.[^12]
 
 The order carries no level and no tile chosen by the unit. The unit builds what
 the project names, and the engine resolves the row from the ground.[^7] A
@@ -177,6 +212,10 @@ the command term the controller record already accepts.[^3]
 player that wants a road where the solver would not lay one writes the project.
 The unit that builds it cannot tell the two apart.
 
+**The ground rule keeps its road exemption, and the plan is the second bound.**
+A road needs both: the exemption lets it cross ground nobody holds, and the
+project says which ground.[^17]
+
 **A road cannot be laid on a whim.** A build order for the road category on an
 unzoned tile is refused. A game that wants a wandering unit to lay road behind
 it must zone the path first.
@@ -196,8 +235,8 @@ ground and not the population. The project already prefers a set-valued
 algorithm over a per-entity loop.[^13] A record that replaced D5 with a field
 would be a later record, and it would need the plan of D1 as its seed set.
 
-**Nothing here names a value.** The plan bound, the pass count and the search
-radius are balance values behind the game rules blocker, and every cost figure
+**Nothing here names a value.** The plan bound, the two pass counts and the
+search radius are balance values behind the game rules blocker, and every cost figure
 is derived and behind the cost blocker.[^14] [^15]
 
 ## References
@@ -217,3 +256,5 @@ is derived and behind the cost blocker.[^14] [^15]
 [^13]: Project orientation, the design principles. `CLAUDE.md`
 [^14]: Blockers register, BLK-050. `docs/BLOCKERS.md`
 [^15]: Blockers register, BLK-007. `docs/BLOCKERS.md`
+[^16]: Findings register, FND-491. `docs/FINDINGS.md`
+[^17]: ADR-0150, held ground is the ground within reach of a city its faction owns, decision D4. `docs/adrs/draft/adr-0150-held-ground-is-the-ground-within-reach-of-a-city-its-faction-owns.md`
