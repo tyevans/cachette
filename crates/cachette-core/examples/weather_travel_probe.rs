@@ -12,7 +12,6 @@
 //! Run it with `cargo run -p cachette-core --release --example
 //! weather_travel_probe`.
 
-use cachette_core::weather::heat_of;
 use cachette_core::{World, WorldConfig};
 
 /// A fingerprint of a plane of whole numbers, so that a reader can see at a
@@ -33,11 +32,29 @@ const FACTIONS: u16 = 4;
 const TICKS: u32 = 400;
 const EVERY: u32 = 20;
 
+/// Returns one command line argument as a whole number, or a default.
+fn argument(position: usize, fallback: u64) -> u64 {
+    std::env::args()
+        .nth(position)
+        .and_then(|text| {
+            text.strip_prefix("0x").map_or_else(
+                || text.parse::<u64>().ok(),
+                |hex| u64::from_str_radix(hex, 16).ok(),
+            )
+        })
+        .unwrap_or(fallback)
+}
+
 fn main() {
+    // The extent, the seed and the tick count may be named on the command
+    // line, so that one probe can read the world a test builds as well as the
+    // world the project owner measured.
+    let extent = argument(1, u64::from(WIDTH)) as u32;
+    let seed = argument(2, SEED);
     let mut world = World::new(WorldConfig {
-        width: WIDTH,
-        height: HEIGHT,
-        seed: SEED,
+        width: extent,
+        height: if extent == WIDTH { HEIGHT } else { extent },
+        seed,
         faction_count: FACTIONS,
         unit_capacity: 1024,
     })
@@ -52,8 +69,10 @@ fn main() {
     let mut wet_ticks = vec![0u32; count];
     let mut stops: Vec<(u32, u32)> = Vec::new();
 
-    println!("tick   total  argmax cell  arg row  arg col  centroid  max     heat     wind");
-    for tick in 1..=TICKS {
+    let ticks = argument(3, u64::from(TICKS)) as u32;
+    let every = argument(4, u64::from(EVERY)) as u32;
+    println!("tick   total  ground   wet  argmax cell  arg row  arg col  centroid  max      warmth     wind");
+    for tick in 1..=ticks {
         world.step(1).expect("the step runs");
         let field = world.weather();
         for cell in 0..count {
@@ -61,7 +80,7 @@ fn main() {
                 wet_ticks[cell] += 1;
             }
         }
-        if tick % EVERY != 0 {
+        if tick % every != 0 {
             continue;
         }
         let air = field.air_plane();
@@ -85,10 +104,10 @@ fn main() {
         // fingerprints hold still cannot move the water it carries.
         let heat = fingerprint(
             world
-                .pyramid()
-                .cells()
+                .weather()
+                .warmth_plane()
                 .iter()
-                .map(|summary| i64::from(heat_of(*summary))),
+                .map(|degrees| i64::from(*degrees)),
         );
         let wind = fingerprint(
             world
@@ -97,8 +116,10 @@ fn main() {
                 .iter()
                 .flat_map(|wind| [i64::from(wind.q), i64::from(wind.r)]),
         );
+        let ground: i64 = world.weather().ground_total().0;
+        let wet = world.weather().wet_cells();
         println!(
-            "{tick:4}  {total:6}  {best:11}  {:7}  {:7}  {:5}.{:02}  {max:5}  {:08x} {:08x}",
+            "{tick:4}  {total:6}  {ground:6}  {wet:4}  {best:11}  {:7}  {:7}  {:5}.{:02}  {max:5}  {:08x} {:08x}",
             best / wide,
             best % wide,
             centroid / 100,
@@ -118,12 +139,12 @@ fn main() {
     }
     println!("argmax moved at {moves} of {} stops", stops.len() - 1);
 
-    let always_wet = wet_ticks.iter().filter(|count| **count == TICKS).count();
+    let always_wet = wet_ticks.iter().filter(|count| **count == ticks).count();
     let never_wet = wet_ticks.iter().filter(|count| **count == 0).count();
     let mean: i64 = wet_ticks.iter().map(|count| i64::from(*count)).sum::<i64>() * 100
-        / (count as i64 * i64::from(TICKS));
-    let low = wet_ticks.iter().copied().min().unwrap_or(0) * 100 / TICKS;
-    let high = wet_ticks.iter().copied().max().unwrap_or(0) * 100 / TICKS;
+        / (count as i64 * i64::from(ticks));
+    let low = wet_ticks.iter().copied().min().unwrap_or(0) * 100 / ticks;
+    let high = wet_ticks.iter().copied().max().unwrap_or(0) * 100 / ticks;
     println!("wet share mean {mean} percent, from {low} to {high}");
     println!("cells wet all run {always_wet}, cells dry all run {never_wet}, of {count}");
 }

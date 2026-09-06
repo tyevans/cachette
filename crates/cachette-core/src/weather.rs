@@ -513,6 +513,104 @@ const HEAT_FROM_WATER: i32 = 128;
 /// range.
 const HEAT_FROM_LOW_GROUND: i32 = 128;
 
+/// What the ground term is divided by before it drives the temperature.
+///
+/// **The ground still biases the temperature, and it must not dominate it.**
+/// The two ground terms above span the whole scale between them. A driver
+/// that took them whole would leave no room for the season and the cloud, and
+/// the field would return to the fixed heat that the season replaces.[^1]
+///
+/// # References
+///
+/// [^1]: ADR-0166, the temperature of a cell is carried state that a season and the sky drive, decision D2. `docs/adrs/draft/adr-0166-the-temperature-of-a-cell-is-carried-state-that-a-season-and-the-sky-drive.md`
+const GROUND_DIVISOR: i64 = 2;
+
+/// The degrees the season adds at the warm centre.
+///
+/// The season takes the same count away at the cold edge of the band, so the
+/// term runs from this above zero to this below it.[^1]
+///
+/// # References
+///
+/// [^1]: ADR-0166, the temperature of a cell is carried state that a season and the sky drive, decision D2. `docs/adrs/draft/adr-0166-the-temperature-of-a-cell-is-carried-state-that-a-season-and-the-sky-drive.md`
+const SEASON_SWING: i32 = 64;
+
+/// The cells from the warm centre of the season to the cold edge of it.
+///
+/// **The reach is a count of cells and not a share of the lattice.** A share
+/// would make the gradient across one cell fall as the lattice grows, so a
+/// large world would feel a season it could not measure. A fixed reach gives
+/// one gradient at every lattice size.
+///
+/// A lattice narrower than twice this takes half its width instead, because
+/// the greatest distance on a wrapped axis is half the width.
+const SEASON_REACH: i64 = 4;
+
+/// The ticks the warm centre of the season takes to move one cell.
+///
+/// The centre travels along the column axis and wraps, so the period of the
+/// season at one cell is this multiplied by the width of the lattice.[^1]
+///
+/// # References
+///
+/// [^1]: ADR-0166, the temperature of a cell is carried state that a season and the sky drive, decision D2. `docs/adrs/draft/adr-0166-the-temperature-of-a-cell-is-carried-state-that-a-season-and-the-sky-drive.md`
+const SEASON_TICKS_FOR_EACH_CELL: u64 = 24;
+
+/// The degrees that a saturated sky takes away from a cell.
+///
+/// **Cloud stands between the ground and the sun.** The term rises with the
+/// water in the air over the cell and it stops at the saturation mark, so it
+/// is bounded whatever a god puts into the sky.[^1]
+///
+/// # References
+///
+/// [^1]: ADR-0166, the temperature of a cell is carried state that a season and the sky drive, decision D2. `docs/adrs/draft/adr-0166-the-temperature-of-a-cell-is-carried-state-that-a-season-and-the-sky-drive.md`
+const CLOUD_SWING: i32 = 48;
+
+/// The part of the way to the asked temperature that one pass moves.
+const WARMTH_NUMERATOR: i64 = 1;
+
+/// The whole of the part that one pass moves.
+///
+/// **The share is what makes the temperature lag its driver**, and the lag is
+/// the whole reason the field carries the temperature rather than deriving
+/// it. A pass that assigned the asked temperature would hold the driver of
+/// the moment, and no warm parcel would outlive the cell it left.[^1]
+///
+/// # References
+///
+/// [^1]: ADR-0166, the temperature of a cell is carried state that a season and the sky drive, decision D1. `docs/adrs/draft/adr-0166-the-temperature-of-a-cell-is-carried-state-that-a-season-and-the-sky-drive.md`
+const WARMTH_DENOMINATOR: i64 = 8;
+
+/// The share of a temperature difference that one step of wind carries.
+const CARRY_FOR_EACH_WIND_STEP: i64 = 1;
+
+/// The whole of the share that one neighbour carries.
+///
+/// **The six shares sum to less than one whole.** The greatest total positive
+/// projection of one wind over the six directions is the projection ceiling
+/// below, and that ceiling divided by this is under one. So the new
+/// temperature lies inside the range of the temperatures the pass read, and
+/// the field cannot run away at any wind and over any number of passes.[^1]
+///
+/// # References
+///
+/// [^1]: ADR-0166, the temperature of a cell is carried state that a season and the sky drive, decision D3. `docs/adrs/draft/adr-0166-the-temperature-of-a-cell-is-carried-state-that-a-season-and-the-sky-drive.md`
+const CARRY_DENOMINATOR: i64 = 32;
+
+// The carry cannot run away. The check is the same shape as the one the
+// transport carries, and it fails the build rather than a test.
+const _: () = assert!(POSITIVE_PROJECTION_CEILING * CARRY_FOR_EACH_WIND_STEP < CARRY_DENOMINATOR);
+
+/// The temperature passes that one solve runs.
+///
+/// The count is fixed. No pass tests whether the field settled.[^1]
+///
+/// # References
+///
+/// [^1]: ADR-0001, one binary gives one answer at any thread count, decision D3. `docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
+pub const WARMTH_PASSES_FOR_EACH_SOLVE: u32 = 1;
+
 /// The heat difference that one step of wind acceleration answers to.
 ///
 /// The acceleration of a cell is the sum, over the six directions, of the
@@ -607,7 +705,13 @@ const GROUND_LIFT_DENOMINATOR: i64 = 8 * HEAT_CEILING as i64;
 /// # References
 ///
 /// [^1]: ADR-0162, water enters the air where it is hot, and it falls where the air cools, decision D1. `docs/adrs/accepted/adr-0162-water-enters-the-air-where-it-is-hot-and-falls-where-the-air-cools.md`
-const LIFT_DROPS: i64 = 256;
+/// **The stored temperature sits lower than the derived heat it replaced**,
+/// because the ground term now takes half the scale and the cloud takes more
+/// away. The lift is proportional to the temperature, so the source rises to
+/// keep the same water in the world.[^2]
+///
+/// [^2]: ADR-0166, the temperature of a cell is carried state that a season and the sky drive, decision D2. `docs/adrs/draft/adr-0166-the-temperature-of-a-cell-is-carried-state-that-a-season-and-the-sky-drive.md`
+const LIFT_DROPS: i64 = 448;
 
 /// The water in the air above one cell at which the sea stops lifting.
 ///
@@ -790,6 +894,106 @@ pub fn heat_of(summary: CellSummary) -> i32 {
     part_of(HEAT_FROM_WATER, water) + part_of(HEAT_FROM_LOW_GROUND, low)
 }
 
+/// Returns the degrees the season adds to one cell at one tick.
+///
+/// **The season is a warm band that crosses the lattice.** The centre of the
+/// band sits on one column, and it moves one column every fixed number of
+/// ticks and wraps. The term is at its top on the centre column, it falls in
+/// whole steps over the reach of the band, and it holds at its bottom outside
+/// the band. So the term traces a triangle at a fixed cell as the centre goes
+/// past, and the period is the width of the lattice multiplied by the ticks
+/// for each cell.[^1]
+///
+/// **A term that added the same degrees everywhere would move nothing.** The
+/// wind answers to the difference between two cells, and one offset added to
+/// every cell cancels in that difference exactly. The band gives a gradient
+/// that travels, and a gradient that travels is what turns the wind.
+///
+/// The term reads the tick and the column. It reads no clock and takes no
+/// draw.[^1]
+///
+/// **This is public so that a test can move one input and watch the answer
+/// move.**
+///
+/// # References
+///
+/// [^1]: ADR-0166, the temperature of a cell is carried state that a season and the sky drive, decision D2. `docs/adrs/draft/adr-0166-the-temperature-of-a-cell-is-carried-state-that-a-season-and-the-sky-drive.md`
+#[must_use]
+pub fn season_at(tick: Tick, column: u32, width: u32) -> i32 {
+    if width == 0 {
+        return 0;
+    }
+    let width = i64::from(width);
+    let centre = (tick.0 / SEASON_TICKS_FOR_EACH_CELL % width as u64) as i64;
+    let apart = (i64::from(column) - centre).abs();
+    // The column axis wraps, so the far way round may be the short way.
+    let apart = apart.min(width - apart);
+    let reach = SEASON_REACH.min((width / 2).max(1));
+    if apart >= reach {
+        return -SEASON_SWING;
+    }
+    let fallen = narrow(sim_math::share(
+        Accum(i64::from(2 * SEASON_SWING)),
+        Accum(apart),
+        Accum(reach),
+    ));
+    SEASON_SWING - fallen
+}
+
+/// Returns the degrees the water in the air over one cell takes away.
+///
+/// **Cloud stands between the ground and the sun.** The term rises with the
+/// air over the cell and it stops at the saturation mark, so a god who fills
+/// the sky cannot drive the temperature below the bound.[^1]
+///
+/// **This is public so that a test can move one input and watch the answer
+/// move.**
+///
+/// # References
+///
+/// [^1]: ADR-0166, the temperature of a cell is carried state that a season and the sky drive, decision D2. `docs/adrs/draft/adr-0166-the-temperature-of-a-cell-is-carried-state-that-a-season-and-the-sky-drive.md`
+#[must_use]
+pub fn cloud_at(air: Drops) -> i32 {
+    let held = air.0.clamp(0, AIR_SATURATION.0);
+    narrow(sim_math::share(
+        Accum(i64::from(CLOUD_SWING)),
+        Accum(held),
+        Accum(AIR_SATURATION.0),
+    ))
+}
+
+/// Returns the temperature that the world asks of one cell.
+///
+/// **Four terms drive it.** The ground term carries the height of the cell
+/// and the water it holds, and a divisor keeps it from filling the scale on
+/// its own. The season adds or takes degrees as the warm band goes past. The
+/// cloud takes degrees where the air holds water. The sum is held inside the
+/// scale.[^1]
+///
+/// The first two terms give a field that varies over the map. The season
+/// gives a field that varies over time. The cloud is what makes the two
+/// interact, because the air over a cell is the output of the transport that
+/// the wind drives.[^1]
+///
+/// **This is public so that a test can move one input and watch the answer
+/// move.**
+///
+/// # References
+///
+/// [^1]: ADR-0166, the temperature of a cell is carried state that a season and the sky drive, decision D2. `docs/adrs/draft/adr-0166-the-temperature-of-a-cell-is-carried-state-that-a-season-and-the-sky-drive.md`
+#[must_use]
+pub fn asked_warmth(ground: i32, season: i32, cloud: i32) -> i32 {
+    let ground = narrow(sim_math::share(
+        Accum(i64::from(ground)),
+        Accum(1),
+        Accum(GROUND_DIVISOR),
+    ));
+    // The ground term now spans the lower half of the scale, so the middle of
+    // the scale is added back and the season swings about it.
+    let base = HEAT_CEILING / 4;
+    (base + ground + season - cloud).clamp(0, HEAT_CEILING)
+}
+
 /// Returns the numerator of the share of the air that falls on one cell.
 ///
 /// **Rain falls where the air cools.** Two terms say so. The first rises as
@@ -878,18 +1082,34 @@ pub struct WeatherField {
     ///
     /// [^1]: ADR-0160, the wind is carried state, and the pressure gradient accelerates it, decision D4. `docs/adrs/accepted/adr-0160-the-wind-is-carried-state-and-the-pressure-gradient-accelerates-it.md`
     wind_scratch: Vec<Wind>,
-    /// The heat of each cell, rebuilt at the head of every solve.
+    /// The temperature of each cell, in cell index order.
     ///
-    /// **This is not state.** The solve fills it from the level 1 summaries
-    /// before it reads it, and no later frame reads what a previous frame
-    /// left. It therefore crosses no tick boundary and it enters no hash. The
-    /// buffer is kept rather than allocated each solve, and that is a
-    /// allocation and not a fact.[^1]
+    /// **This is simulated state and it enters the state hash.** A solve
+    /// moves it a share of the way toward the temperature the world asks for,
+    /// and never assigns that temperature. The share is what gives the
+    /// temperature its own history, and a parcel of warm air that the wind
+    /// carries onto a cold ridge has to remember that it was warm.[^1]
+    ///
+    /// **This changes an earlier decision, which held that the heat is
+    /// derived on every solve and stored nowhere.**[^2]
     ///
     /// # References
     ///
-    /// [^1]: ADR-0160, the wind is carried state, and the pressure gradient accelerates it, decision D1. `docs/adrs/accepted/adr-0160-the-wind-is-carried-state-and-the-pressure-gradient-accelerates-it.md`
-    heat: Vec<i32>,
+    /// [^1]: ADR-0166, the temperature of a cell is carried state that a season and the sky drive, decision D1. `docs/adrs/draft/adr-0166-the-temperature-of-a-cell-is-carried-state-that-a-season-and-the-sky-drive.md`
+    /// [^2]: ADR-0160, the wind is carried state, and the pressure gradient accelerates it, decision D1. `docs/adrs/accepted/adr-0160-the-wind-is-carried-state-and-the-pressure-gradient-accelerates-it.md`
+    warmth: Vec<i32>,
+    /// The write half of one temperature carry pass.
+    ///
+    /// A pass reads the settled plane above and writes this one. It never
+    /// reads a plane the same pass is writing, so the answer does not depend
+    /// on which cells a thread reached first.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0166, the temperature of a cell is carried state that a season and the sky drive, decision D3. `docs/adrs/draft/adr-0166-the-temperature-of-a-cell-is-carried-state-that-a-season-and-the-sky-drive.md`
+    warmth_scratch: Vec<i32>,
+    /// The temperature passes that have run since the field was built.
+    warmth_passes: u64,
     /// The wind passes that have run since the field was built.
     wind_passes: u64,
     /// Every drop that has ever entered the air, from the sea or from a god.
@@ -936,7 +1156,13 @@ impl WeatherField {
             scratch: Vec::new(),
             wind: vec![Wind::STILL; count],
             wind_scratch: vec![Wind::STILL; count],
-            heat: vec![0; count],
+            // **A world starts at the middle of the scale, not at the
+            // bottom.** A field that began at zero would warm from cold over
+            // the first passes, and a reader would take that warming for
+            // weather.
+            warmth: vec![HEAT_CEILING / 2; count],
+            warmth_scratch: vec![HEAT_CEILING / 2; count],
+            warmth_passes: 0,
             wind_passes: 0,
             raised: 0,
             storms: 0,
@@ -982,6 +1208,32 @@ impl WeatherField {
     #[must_use]
     pub fn fastest(&self) -> i32 {
         self.wind.iter().map(|wind| wind.speed()).max().unwrap_or(0)
+    }
+
+    /// Returns the temperature of one cell, from zero to the heat ceiling.
+    ///
+    /// Returns zero when the cell is outside the lattice. The temperature is
+    /// stored state, so it answers what the last solve left rather than what
+    /// the terrain implies.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0166, the temperature of a cell is carried state that a season and the sky drive, decision D1. `docs/adrs/draft/adr-0166-the-temperature-of-a-cell-is-carried-state-that-a-season-and-the-sky-drive.md`
+    #[must_use]
+    pub fn warmth_at(&self, cell: u32) -> i32 {
+        self.warmth.get(cell as usize).copied().unwrap_or(0)
+    }
+
+    /// Returns every entry of the temperature plane, in cell index order.
+    #[must_use]
+    pub fn warmth_plane(&self) -> &[i32] {
+        &self.warmth
+    }
+
+    /// Returns the temperature passes that have run since the field was built.
+    #[must_use]
+    pub const fn warmth_passes(&self) -> u64 {
+        self.warmth_passes
     }
 
     /// Reports whether the field holds no water at all.
@@ -1244,12 +1496,21 @@ impl WeatherField {
         if summaries.len() != self.cells.tile_count() as usize {
             return Err(WeatherError::LatticeMismatch);
         }
-        // The heat of every cell is rebuilt before anything reads it. Three
-        // readers follow: the pressure that drives the wind, the lift, and
-        // the fall.[^1]
+        // The temperature of every cell moves before anything reads it. Four
+        // readers follow: the pressure that drives the wind, the lift, the
+        // fall, and the carry itself.[^1] [^3]
+        //
+        // **The temperature is stored, so it carries its own history.** The
+        // ground and the season drive it, and the wind then carries it, so a
+        // warm parcel outlives the cell it left.[^3]
         //
         // [^1]: ADR-0162, water enters the air where it is hot, and it falls where the air cools. `docs/adrs/accepted/adr-0162-water-enters-the-air-where-it-is-hot-and-falls-where-the-air-cools.md`
-        self.warm(summaries);
+        // [^3]: ADR-0166, the temperature of a cell is carried state that a season and the sky drive, decisions D1, D2 and D3. `docs/adrs/draft/adr-0166-the-temperature-of-a-cell-is-carried-state-that-a-season-and-the-sky-drive.md`
+        for _ in 0..WARMTH_PASSES_FOR_EACH_SOLVE {
+            self.warm(tick, summaries);
+            self.carry(threads);
+            self.warmth_passes = self.warmth_passes.saturating_add(1);
+        }
         // **The wind blows over dry ground too.** The wind passes run before
         // the branch below, so a field holding no water still carries a wind,
         // and the first storm raised into it rides the wind that is already
@@ -1272,19 +1533,89 @@ impl WeatherField {
         Ok(())
     }
 
-    /// Rebuilds the heat of every cell from the level 1 summaries.
+    /// Moves the temperature of every cell toward what the world asks.
+    ///
+    /// **The pass never assigns the asked temperature.** It moves the stored
+    /// one a fixed share of the way, and the share is what makes the field
+    /// lag its driver. It also adds one whole degree of the remaining
+    /// difference, because the share alone truncates to nothing once the two
+    /// are close and the field would then stop short for ever.[^1]
     ///
     /// The pass walks the cells in ascending index order and reads nothing it
-    /// is writing. It stores no fact: the buffer it fills is rewritten at the
-    /// head of the next solve and no frame reads what a previous frame left
-    /// there.[^1]
+    /// is writing.[^2]
     ///
     /// # References
     ///
-    /// [^1]: ADR-0160, the wind is carried state, and the pressure gradient accelerates it, decision D1. `docs/adrs/accepted/adr-0160-the-wind-is-carried-state-and-the-pressure-gradient-accelerates-it.md`
-    fn warm(&mut self, summaries: &[CellSummary]) {
-        self.heat.clear();
-        self.heat.extend(summaries.iter().copied().map(heat_of));
+    /// [^1]: ADR-0166, the temperature of a cell is carried state that a season and the sky drive, decision D1. `docs/adrs/draft/adr-0166-the-temperature-of-a-cell-is-carried-state-that-a-season-and-the-sky-drive.md`
+    /// [^2]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
+    fn warm(&mut self, tick: Tick, summaries: &[CellSummary]) {
+        let width = self.cells.width();
+        for (cell, summary) in summaries.iter().enumerate() {
+            let Some(address) = self.cells.address_of(TileIdx(cell as u32)) else {
+                continue;
+            };
+            // The column of the cell is the first axial part of its address.
+            let column = address.q.max(0) as u32;
+            let air = self.air.get(cell).copied().unwrap_or(Drops::ZERO);
+            let asked = asked_warmth(
+                heat_of(*summary),
+                season_at(tick, column, width),
+                cloud_at(air),
+            );
+            let Some(held) = self.warmth.get_mut(cell) else {
+                continue;
+            };
+            let apart = i64::from(asked - *held);
+            let step = narrow(sim_math::share(
+                Accum(apart),
+                Accum(WARMTH_NUMERATOR),
+                Accum(WARMTH_DENOMINATOR),
+            ));
+            // The whole degree that takes the last of the difference. It
+            // never overshoots, because it is bounded by what is left.
+            let step = (i64::from(step) + apart.signum()).clamp(-apart.abs(), apart.abs());
+            *held = narrow(Some(Accum(i64::from(*held) + step))).clamp(0, HEAT_CEILING);
+        }
+    }
+
+    /// Runs one temperature carry pass over the lattice.
+    ///
+    /// **The wind carries the temperature.** A cell takes, from each
+    /// neighbour, a share of the difference between the two temperatures, and
+    /// the share rises with the part of that neighbour's wind that points
+    /// toward the cell. So a wind off warm water warms the ground it reaches,
+    /// and a wind off a cold ridge cools it.[^1]
+    ///
+    /// **The six shares sum to less than one whole**, so the answer lies
+    /// inside the range of the temperatures the pass read and the field
+    /// cannot run away.[^1]
+    ///
+    /// The temperature is not water and this pass does not conserve it. Two
+    /// cells at one temperature give one temperature and not two, so the
+    /// exact-move rule of the transport does not apply here.[^1]
+    ///
+    /// The pass is a gather. It writes only the cell it is computing, so a
+    /// parallel pass writes disjoint output and needs no atomic
+    /// operation.[^2]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0166, the temperature of a cell is carried state that a season and the sky drive, decision D3. `docs/adrs/draft/adr-0166-the-temperature-of-a-cell-is-carried-state-that-a-season-and-the-sky-drive.md`
+    /// [^2]: ADR-0009, parallel stages write disjoint outputs, because the memory model is weak. `docs/adrs/accepted/adr-0009-parallel-stages-write-disjoint-outputs.md`
+    fn carry(&mut self, threads: usize) {
+        let count = self.warmth.len();
+        if count == 0 {
+            return;
+        }
+        let pass = WarmthPass {
+            cells: self.cells,
+            warmth: &self.warmth,
+            wind: &self.wind,
+        };
+        run_in_chunks(count, threads, &mut self.warmth_scratch, |low, out| {
+            pass.fill(low, out);
+        });
+        self.warmth.copy_from_slice(&self.warmth_scratch);
     }
 
     /// Runs one wind pass over the lattice.
@@ -1317,7 +1648,7 @@ impl WeatherField {
         let pass = WindPass {
             cells: self.cells,
             wind: &self.wind,
-            heat: &self.heat,
+            warmth: &self.warmth,
         };
         run_in_chunks(count, threads, &mut self.wind_scratch, |low, out| {
             pass.fill(low, out);
@@ -1354,7 +1685,7 @@ impl WeatherField {
             // the heat of the cell as a share of the whole heat range.[^1]
             //
             // [^1]: ADR-0162, water enters the air where it is hot, and it falls where the air cools, decision D1. `docs/adrs/accepted/adr-0162-water-enters-the-air-where-it-is-hot-and-falls-where-the-air-cools.md`
-            let heat = self.heat.get(cell).copied().unwrap_or(0);
+            let heat = self.warmth.get(cell).copied().unwrap_or(0);
             let wanted = sim_math::share(
                 Accum(LIFT_DROPS),
                 Accum(i64::from(heat)),
@@ -1446,7 +1777,7 @@ impl WeatherField {
     fn settle(&mut self, summaries: &[CellSummary]) {
         let mut dried = 0i64;
         for cell in 0..summaries.len() {
-            let heat = self.heat.get(cell).copied().unwrap_or(0);
+            let heat = self.warmth.get(cell).copied().unwrap_or(0);
 
             // **Rain falls where the air cools.** The cooling is the heat of
             // the cell the air came from above the heat of this one. The cell
@@ -1516,7 +1847,7 @@ impl WeatherField {
         let Some(at) = self.cells.index_of(upwind) else {
             return 0;
         };
-        let there = self.heat.get(at.0 as usize).copied().unwrap_or(0);
+        let there = self.warmth.get(at.0 as usize).copied().unwrap_or(0);
         (there - heat).max(0)
     }
 
@@ -1536,6 +1867,7 @@ impl WeatherField {
             .write_u64(u64::from(self.faction_count))
             .write_u64(self.passes)
             .write_u64(self.wind_passes)
+            .write_u64(self.warmth_passes)
             .write_u64(self.raised as u64)
             .write_u64(self.evaporated as u64);
         for ready in &self.ready {
@@ -1546,10 +1878,17 @@ impl WeatherField {
         // one are different worlds.[^2]
         //
         // [^2]: ADR-0160, the wind is carried state, and the pressure gradient accelerates it, decision D1. `docs/adrs/accepted/adr-0160-the-wind-is-carried-state-and-the-pressure-gradient-accelerates-it.md`
+        // **The temperature is state that the next step reads, so it enters
+        // the hash.** A world that loads a saved temperature and a world that
+        // recomputes one are different worlds, in the same way that the wind
+        // makes them different.[^3]
+        //
+        // [^3]: ADR-0166, the temperature of a cell is carried state that a season and the sky drive, decision D1. `docs/adrs/draft/adr-0166-the-temperature-of-a-cell-is-carried-state-that-a-season-and-the-sky-drive.md`
         running
             .write(bytemuck::cast_slice(&self.air))
             .write(bytemuck::cast_slice(&self.ground))
             .write(bytemuck::cast_slice(&self.wind))
+            .write(bytemuck::cast_slice(&self.warmth))
     }
 }
 
@@ -1689,6 +2028,69 @@ impl Pass<'_> {
     }
 }
 
+/// What one temperature carry pass reads.
+///
+/// The view holds no mutable state, so every thread of a pass takes a copy of
+/// it and the copies cannot disagree.
+#[derive(Clone, Copy)]
+struct WarmthPass<'a> {
+    cells: Grid,
+    warmth: &'a [i32],
+    wind: &'a [Wind],
+}
+
+impl WarmthPass<'_> {
+    /// Fills one run of the temperature scratch plane.
+    ///
+    /// The run is named by its position in the plane. Nothing in the body
+    /// reads which thread called it.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0009, parallel stages write disjoint outputs, because the memory model is weak. `docs/adrs/accepted/adr-0009-parallel-stages-write-disjoint-outputs.md`
+    fn fill(&self, start: usize, out: &mut [i32]) {
+        for (offset, cell) in out.iter_mut().enumerate() {
+            let index = start + offset;
+            let here = self.warmth.get(index).copied().unwrap_or(0);
+            *cell = here;
+            let Some(address) = self.cells.address_of(TileIdx(index as u32)) else {
+                continue;
+            };
+            let mut moved = 0i64;
+            for direction in 0..NEIGHBOUR_COUNT {
+                let Some(neighbour) = self.cells.neighbour(address, direction) else {
+                    continue;
+                };
+                let Some(at) = self.cells.index_of(neighbour) else {
+                    continue;
+                };
+                let at = at.0 as usize;
+                // The part of that neighbour's wind that points at this cell.
+                // The neighbour faces this cell the other way round, so the
+                // direction is the opposite one.
+                let along = i64::from(
+                    self.wind
+                        .get(at)
+                        .copied()
+                        .unwrap_or(Wind::STILL)
+                        .along(NEIGHBOURS[opposite(direction)])
+                        .max(0),
+                );
+                if along == 0 {
+                    continue;
+                }
+                let there = self.warmth.get(at).copied().unwrap_or(0);
+                moved += i64::from(narrow(sim_math::share(
+                    Accum(i64::from(there - here)),
+                    Accum(along * CARRY_FOR_EACH_WIND_STEP),
+                    Accum(CARRY_DENOMINATOR),
+                )));
+            }
+            *cell = narrow(Some(Accum(i64::from(here) + moved))).clamp(0, HEAT_CEILING);
+        }
+    }
+}
+
 /// What one wind pass reads.
 ///
 /// The view holds no mutable state, so every thread of a pass takes a copy of
@@ -1697,7 +2099,7 @@ impl Pass<'_> {
 struct WindPass<'a> {
     cells: Grid,
     wind: &'a [Wind],
-    heat: &'a [i32],
+    warmth: &'a [i32],
 }
 
 impl WindPass<'_> {
@@ -1717,7 +2119,7 @@ impl WindPass<'_> {
             let Some(address) = self.cells.address_of(TileIdx(index as u32)) else {
                 continue;
             };
-            let here = self.heat.get(index).copied().unwrap_or(0);
+            let here = self.warmth.get(index).copied().unwrap_or(0);
 
             // The acceleration the pressure across this cell asks for. Hot
             // air rises and the pressure falls where it does, so the sum
@@ -1731,7 +2133,7 @@ impl WindPass<'_> {
                 let Some(at) = self.cells.index_of(neighbour) else {
                     continue;
                 };
-                let there = self.heat.get(at.0 as usize).copied().unwrap_or(0);
+                let there = self.warmth.get(at.0 as usize).copied().unwrap_or(0);
                 let pull = i64::from(there - here);
                 asked_q += i64::from(NEIGHBOURS[direction].q) * pull;
                 asked_r += i64::from(NEIGHBOURS[direction].r) * pull;
