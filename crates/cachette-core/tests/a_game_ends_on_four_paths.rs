@@ -15,12 +15,40 @@
 
 use cachette_core::choose;
 use cachette_core::site::CommodityId;
-use cachette_core::upgrade::UpgradeCategory;
+use cachette_core::upgrade::{UpgradeCategory, UpgradeRow};
 use cachette_core::{
     Axial, Entity, FactionId, Fix32, World, WorldConfig, RENOWN_TARGET, STOCK_TARGET,
 };
 
 const THREADS: usize = 2;
+
+/// The work this file asks a wonder for.
+///
+/// **The fixture states its own bar and does not read the balance value.**
+/// The project owner raised the wonder work on 5 September 2026, and a tile
+/// of eight builders now dies before it finishes one.[^1] A fixture that
+/// read the register would measure how long a unit lives and not the
+/// reader. The value is the one the register held before the raise.
+///
+/// # References
+///
+/// [^1]: Balance register, the wonder work. `docs/reference/balance.md`
+const FIXTURE_WONDER_WORK: u32 = 240;
+
+/// The wonder row this file writes, so that the fixture states its own work.
+///
+/// Every other column is the column the default table holds for a wonder: it
+/// stands on any land, it carries a victory claim, and its builder must
+/// stand on ground its own faction holds.
+fn fixture_wonder_row() -> UpgradeRow {
+    UpgradeRow {
+        ground_fit: cachette_core::upgrade::FITS_EVERY_LAND,
+        work: FIXTURE_WONDER_WORK,
+        victory_claim: cachette_core::upgrade::WONDER_VICTORY_CLAIM,
+        own_ground_required: cachette_core::upgrade::OWN_GROUND_REQUIRED,
+        ..UpgradeRow::NONE
+    }
+}
 
 /// The people each founding settles. Small, so a step is cheap.
 const GROUP: u32 = 8;
@@ -305,6 +333,9 @@ fn a_wonder_ends_the_game_on_the_tick_it_completes_and_not_the_tick_before() {
     world
         .set_choice_schedule(choose::PERIOD_LOG2_CEILING)
         .expect("the exponent is inside the range");
+    world
+        .define_upgrade_row(UpgradeCategory::WONDER.to_u8(), 1, fixture_wonder_row())
+        .expect("the category and the level are inside the table");
     let site = island(&world);
     // Every unit on the tile builds, so the work is done long before a unit
     // starves, and faction 0 holds the ground. Near the end all but one stop,
@@ -338,7 +369,9 @@ fn a_wonder_ends_the_game_on_the_tick_it_completes_and_not_the_tick_before() {
     world
         .spawn_soldier(elsewhere, FactionId(1))
         .expect("the ground admits a unit");
-    let work = cachette_core::DEFAULT_UPGRADE_TABLE.work_above(UpgradeCategory::WONDER, 0);
+    // The work comes from the table the world holds, which this fixture
+    // wrote, so the loop and the build read one declaration.
+    let work = world.upgrade_table().work_above(UpgradeCategory::WONDER, 0);
     let mut saw_one_short = false;
     let mut slowed = false;
     for _ in 0..(work as u64 + 8) {

@@ -83,7 +83,7 @@ pub const EVALUATIONS_DEFAULT: u32 = 2;
 /// # References
 ///
 /// [^1]: Balance register, the tick limit. `docs/reference/balance.md`
-pub const TICK_LIMIT_DEFAULT: u64 = 2000;
+pub const TICK_LIMIT_DEFAULT: u64 = 5000;
 
 /// The period of the advertisement schedule, when nobody has set another.
 ///

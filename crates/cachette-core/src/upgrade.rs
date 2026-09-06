@@ -488,11 +488,14 @@ pub const TERRACE_LEVEL_2_WORK: u32 = 72;
 
 /// The work that finishes a wonder.[^1] [^2]
 ///
+/// A provisional value of 2400. The project owner asked for a much higher
+/// bar, and the balance register holds the derivation.[^1]
+///
 /// # References
 ///
 /// [^1]: Balance register, the wonder work. `docs/reference/balance.md`
 /// [^2]: Blockers register, BLK-007. `docs/BLOCKERS.md`
-pub const WONDER_WORK: u32 = 240;
+pub const WONDER_WORK: u32 = 2400;
 
 /// The work that finishes a store.[^1] [^2]
 ///
