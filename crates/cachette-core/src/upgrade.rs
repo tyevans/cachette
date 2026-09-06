@@ -532,28 +532,28 @@ pub const TERRACE_FIT: u32 =
 /// # References
 ///
 /// [^1]: Balance register, the road work by level. `docs/reference/balance.md`
-pub const ROAD_LEVEL_1_WORK: u32 = 8;
+pub const ROAD_LEVEL_1_WORK: u32 = 48;
 
 /// The work that finishes the second level of a road.[^1]
 ///
 /// # References
 ///
 /// [^1]: Balance register, the road work by level. `docs/reference/balance.md`
-pub const ROAD_LEVEL_2_WORK: u32 = 24;
+pub const ROAD_LEVEL_2_WORK: u32 = 144;
 
 /// The work that finishes the first level of a terrace.[^1]
 ///
 /// # References
 ///
 /// [^1]: Balance register, the terrace work by level. `docs/reference/balance.md`
-pub const TERRACE_LEVEL_1_WORK: u32 = 24;
+pub const TERRACE_LEVEL_1_WORK: u32 = 144;
 
 /// The work that finishes the second level of a terrace.[^1]
 ///
 /// # References
 ///
 /// [^1]: Balance register, the terrace work by level. `docs/reference/balance.md`
-pub const TERRACE_LEVEL_2_WORK: u32 = 72;
+pub const TERRACE_LEVEL_2_WORK: u32 = 432;
 
 /// The work that finishes a wonder.[^1] [^2]
 ///
@@ -564,7 +564,7 @@ pub const TERRACE_LEVEL_2_WORK: u32 = 72;
 ///
 /// [^1]: Balance register, the wonder work. `docs/reference/balance.md`
 /// [^2]: Blockers register, BLK-007. `docs/BLOCKERS.md`
-pub const WONDER_WORK: u32 = 2400;
+pub const WONDER_WORK: u32 = 14400;
 
 /// The work that finishes a store.[^1] [^2]
 ///
@@ -572,7 +572,7 @@ pub const WONDER_WORK: u32 = 2400;
 ///
 /// [^1]: Balance register, the store work. `docs/reference/balance.md`
 /// [^2]: Blockers register, BLK-007. `docs/BLOCKERS.md`
-pub const STORE_WORK: u32 = 48;
+pub const STORE_WORK: u32 = 288;
 
 /// The ground that a lodging fits.
 ///
@@ -591,7 +591,7 @@ pub const LODGING_FIT: u32 =
 ///
 /// [^1]: Balance register, the lodging work by level. `docs/reference/balance.md`
 /// [^2]: Blockers register, BLK-050. `docs/BLOCKERS.md`
-pub const LODGING_LEVEL_1_WORK: u32 = 24;
+pub const LODGING_LEVEL_1_WORK: u32 = 144;
 
 /// The work that finishes the second level of a lodging.[^1] [^2]
 ///
@@ -599,7 +599,7 @@ pub const LODGING_LEVEL_1_WORK: u32 = 24;
 ///
 /// [^1]: Balance register, the lodging work by level. `docs/reference/balance.md`
 /// [^2]: Blockers register, BLK-050. `docs/BLOCKERS.md`
-pub const LODGING_LEVEL_2_WORK: u32 = 72;
+pub const LODGING_LEVEL_2_WORK: u32 = 432;
 
 /// The housing that one level of a lodging adds to the settlement on or beside
 /// its tile.
@@ -619,7 +619,7 @@ pub const LODGING_LEVEL_HOUSING: u32 = crate::growth::FOUNDING_HOUSING_DEFAULT /
 ///
 /// [^1]: Balance register, the wall work. `docs/reference/balance.md`
 /// [^2]: Blockers register, BLK-007. `docs/BLOCKERS.md`
-pub const WALL_WORK: u32 = 16;
+pub const WALL_WORK: u32 = 96;
 
 /// The units that stand on a tile that carries the first level of a road.
 ///

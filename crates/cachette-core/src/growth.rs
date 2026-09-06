@@ -92,7 +92,7 @@ pub const HOUSING_PER_PERSON_DEFAULT: u32 = 1;
 /// # References
 ///
 /// [^1]: Balance register, the population, the founding housing row. `docs/reference/balance.md`
-pub const FOUNDING_HOUSING_DEFAULT: u32 = 16;
+pub const FOUNDING_HOUSING_DEFAULT: u32 = 1024;
 
 /// The placeholder store that one birth costs.[^1]
 ///
@@ -106,7 +106,7 @@ pub const FOOD_PER_BIRTH_DEFAULT: [Fix32; COMMODITY_COUNT] = [Fix32::ONE; COMMOD
 /// # References
 ///
 /// [^1]: Balance register, the population, the birth rate row. `docs/reference/balance.md`
-pub const BIRTH_CHANCE_DEFAULT: Fix32 = Fix32(Fix32::ONE.0 / 2);
+pub const BIRTH_CHANCE_DEFAULT: Fix32 = Fix32(Fix32::ONE.0 / 8);
 
 /// The placeholder period of the growth schedule.[^1]
 ///

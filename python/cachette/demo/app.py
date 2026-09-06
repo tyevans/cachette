@@ -164,6 +164,13 @@ def overlay_keys(key: object) -> list[tuple[int, str]]:
         for number in range(1, 10)
         if hasattr(key, f"_{number}")
     ]
+    # Nine digits ran out when the tenth overlay arrived, and 0 already means
+    # "show the map again". These letters carry no other action in the window.
+    free += [
+        (getattr(key, letter.upper()), letter)
+        for letter in ("y", "u", "i", "o", "p")
+        if hasattr(key, letter.upper())
+    ]
     return free[: len(World.overlay_names())]
 
 
@@ -760,8 +767,14 @@ def _overlay_key_line() -> str:
     """
     from pyglet.window import key
 
-    pairs = zip(overlay_keys(key), World.overlay_names(), strict=True)
-    named = ", ".join(f"{label} {name}" for (_, label), name in pairs)
+    keys = overlay_keys(key)
+    names = World.overlay_names()
+    named = ", ".join(f"{label} {name}" for (_, label), name in zip(keys, names))
+    # An overlay past the last free key is still real, and a watcher who cannot
+    # see it named would believe the renderer holds fewer than it does.
+    spare = names[len(keys) :]
+    if spare:
+        named += ", no key for " + ", ".join(spare)
     return f"{named}, {OVERLAY_OFF_KEY} none"
 
 
