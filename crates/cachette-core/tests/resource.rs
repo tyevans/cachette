@@ -1172,11 +1172,18 @@ fn the_default_rules_state_a_period_for_each_kind_in_one_place() {
     assert!(rules.period_of(ResourceKind::Food).is_some());
     assert!(rules.period_of(ResourceKind::Wood).is_some());
     assert_eq!(rules.period_of(ResourceKind::Stone), None);
-    // The period is stated in simulated days and converted to ticks in one
-    // place, so a change to the span of a tick moves every period together.
+    // The rate is stated in units for each simulated day and converted to a
+    // period in ticks in one place, so a change to the span of a tick moves
+    // every period together. The period therefore divides the day, and a
+    // period that did not divide it would name a rate that no table holds.
     for kind in [ResourceKind::Food, ResourceKind::Wood] {
         let period = rules.period_of(kind).expect("the kind recovers");
-        assert_eq!(period % TICKS_IN_A_SIMULATED_DAY, 0);
+        assert!(period > 0, "a period of zero states no rule");
+        assert_eq!(TICKS_IN_A_SIMULATED_DAY % period, 0);
+        assert!(
+            period < TICKS_IN_A_SIMULATED_DAY,
+            "a deposit regains more than one unit in a simulated day"
+        );
     }
     // A period of zero is refused, because it is a second way to say that a
     // deposit was never depleted.
