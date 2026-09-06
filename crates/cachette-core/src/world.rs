@@ -47,7 +47,8 @@ use crate::conversion::{self, ConversionError, Convert, UnitConverted};
 use crate::descent::{DescentId, Parents};
 use crate::event::{
     ResourceTaken, SettlementFounded, TileChanged, UpgradeCollapsed, UpgradeFinished,
-    CHANGE_KIND_LOWERED, CHANGE_KIND_RAISED, WEAR_CAUSE_ARMY, WEAR_CAUSE_BOTH, WEAR_CAUSE_WEATHER,
+    CHANGE_KIND_LOWERED, CHANGE_KIND_RAISED, WEAR_CAUSE_ARMY, WEAR_CAUSE_BOTH, WEAR_CAUSE_ORDERED,
+    WEAR_CAUSE_WEATHER,
 };
 use crate::founding::{self, Founding, FoundingError, FoundingOutcome, Survey};
 use crate::growth;
@@ -6313,7 +6314,28 @@ impl World {
         let Some(tile) = self.grid.index_of(address) else {
             return false;
         };
-        self.upgrades.remove(tile).is_some()
+        let Some(site) = self.upgrades.remove(tile) else {
+            return false;
+        };
+        // **An upgrade has two sinks, and both say so.** The wear pass writes
+        // the same event with a cause of its own. A destruction that wrote
+        // nothing would leave a watcher with a tile that changed and no
+        // reason for it.
+        let holder = self
+            .holding
+            .holders()
+            .get(tile.0 as usize)
+            .copied()
+            .unwrap_or(Holder::NOBODY);
+        self.collapsed_log.push(UpgradeCollapsed::new(
+            self.tick,
+            tile,
+            holder,
+            site.category.0,
+            site.level,
+            WEAR_CAUSE_ORDERED,
+        ));
+        true
     }
 
     /// Writes one project into the plan of one faction.
@@ -8611,9 +8633,9 @@ impl World {
                             .units_on_tile(&mut cursor, tile)
                             .iter()
                             .filter(|unit| {
-                                self.soldiers.faction(**unit).is_some_and(|guest| {
-                                    self.relations.war_between(owner, guest)
-                                })
+                                self.soldiers
+                                    .faction(**unit)
+                                    .is_some_and(|guest| self.relations.war_between(owner, guest))
                             })
                             .count() as i64;
                         hostile.saturating_mul(upgrade::ARMY_WEAR_FOR_EACH_UNIT)
@@ -8630,8 +8652,10 @@ impl World {
             })
             .filter(|(_, taken, _, _)| *taken > 0)
             .collect();
-        let run: Vec<(TileIdx, i64)> =
-            worn.iter().map(|(tile, taken, _, _)| (*tile, *taken)).collect();
+        let run: Vec<(TileIdx, i64)> = worn
+            .iter()
+            .map(|(tile, taken, _, _)| (*tile, *taken))
+            .collect();
         self.upgrades.wear_ascending(&run);
         // **An upgrade that collapsed leaves nothing behind, so the event is
         // the only record of it.** The removed sites come back in ascending

@@ -82,13 +82,13 @@ class TileChangedColumns(TypedDict):
 class UpgradeCollapsedColumns(TypedDict):
     """One column for each field of the upgrade collapse event.
 
-    An upgrade collapses when the weather and a hostile army take the last of
-    its condition. The entry is then removed and the tile returns to the
-    ground the generator made, so this event is the only record that anything
-    stood there.
+    An upgrade has two sinks, and both write this event. The wear pass takes
+    the last of its condition, and a caller orders the destruction. The entry
+    is then removed and the tile returns to the ground the generator made, so
+    this event is the only record that anything stood there.
 
-    The cause column says what took the last of the condition. One is the
-    weather, two is a hostile army, and three is both.
+    The cause column says what ended it. One is the weather, two is a hostile
+    army, three is both, and four is an order from a caller.
 
     The holder column names the faction that held the tile, or 65535 for
     nobody.

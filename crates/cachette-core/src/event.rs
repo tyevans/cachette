@@ -150,7 +150,7 @@ impl TileChanged {
     }
 }
 
-/// What took the last of an upgrade's condition.
+/// What ended an upgrade.
 ///
 /// The type is a one-byte integer and not an enumeration with a hidden
 /// discriminant width, because the event that holds it must be plain
@@ -167,13 +167,16 @@ pub const WEAR_CAUSE_WEATHER: WearCause = 1;
 pub const WEAR_CAUSE_ARMY: WearCause = 2;
 /// The wear of the tick came from the weather and from a hostile army.
 pub const WEAR_CAUSE_BOTH: WearCause = 3;
+/// A caller ordered the destruction. No wear ended it.
+pub const WEAR_CAUSE_ORDERED: WearCause = 4;
 
-/// An upgrade lost the last of its condition and is gone.
+/// An upgrade is gone from its tile.
 ///
-/// **This is the one sink an upgrade has that a caller does not drive by
-/// hand.** The entry is removed and the tile returns to the world the
-/// generator made, so no reader can ask the world afterwards what stood
-/// there. The event is the only record of it.
+/// **An upgrade has two sinks, and both write this event.** The wear pass
+/// takes the last of the condition, and a caller orders the destruction. The
+/// cause column says which. The entry is removed and the tile returns to the
+/// world the generator made, so no reader can ask the world afterwards what
+/// stood there. The event is the only record of it.
 ///
 /// The layout is 8 + 4 + 2 + 1 + 1 + 1 + 7 bytes, which is 24 bytes at an
 /// alignment of 8. The trailing array declares every padding byte, so the
@@ -196,10 +199,10 @@ pub struct UpgradeCollapsed {
     pub holder: Holder,
     /// The category that stood there, as its number.
     pub category: u8,
-    /// The level that stood there. It is never zero, because a site under
-    /// construction carries nothing to wear.
+    /// The level that stood there. Zero means that the first level was still
+    /// under construction, which only an ordered destruction reaches.
     pub level: u8,
-    /// What took the last of the condition.
+    /// What ended it.
     pub cause: WearCause,
     /// The declared padding. Always zero.
     pub padding: [u8; 7],

@@ -579,8 +579,7 @@ impl PyWorld {
     /// [^2]: ADR-0002, simulated and aggregated state holds no floating point number, decision D1. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
     /// [^3]: ADR-0044, what copies and what does not is declared at the call site. `docs/adrs/REGISTRY.md`
     fn log<'py>(&self, python: Python<'py>, name: &str) -> PyResult<Bound<'py, PyDict>> {
-        let entry = log_of(name)
-            .ok_or_else(|| PyValueError::new_err(unknown_log_message(name)))?;
+        let entry = log_of(name).ok_or_else(|| PyValueError::new_err(unknown_log_message(name)))?;
         let world = self.lock();
         (entry.read)(python, &world)
     }
@@ -594,8 +593,7 @@ impl PyWorld {
     ///
     /// Raises `ValueError` when no log has the given name.
     fn log_count(&self, name: &str) -> PyResult<usize> {
-        let entry = log_of(name)
-            .ok_or_else(|| PyValueError::new_err(unknown_log_message(name)))?;
+        let entry = log_of(name).ok_or_else(|| PyValueError::new_err(unknown_log_message(name)))?;
         let world = self.lock();
         Ok((entry.count)(&world))
     }

@@ -12,12 +12,11 @@ at quarter speed and flash past at eight times speed. A paused world runs no
 tick at all, so a toast measured in ticks would never leave. A second is the
 rate a person reads at, and it is the same at every speed.
 
-**Most of these come from an event log the engine already writes.** A log
-covers the last step alone, so the caller reads it after each step. Two come
-from a counter of the census instead, because the engine publishes no log for
-them, and a rise in a cumulative counter between two readings is the event. A
-counter says that a thing happened and it does not say who did it, so those
-two carry no faction colour.
+**Every one of these comes from an event log the engine writes.** A log holds
+what happened since the last step began, so the caller reads it after each
+step and a caller that misses a step misses the events. The engine publishes
+the logs by name, so this module asks for a log by its name and holds no
+method for each one.
 
 **A toast is for a moment, not for a rate.** A thing that happens every few
 ticks in a mature world belongs in the events panel and not over the map. A
@@ -33,6 +32,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from cachette import faction_colours
 from cachette.demo.text import paint_block, paint_text, text_height, text_width
 
 if TYPE_CHECKING:
@@ -41,22 +41,45 @@ if TYPE_CHECKING:
 
 # One colour for each faction, so a watcher tells who without reading.
 #
-# **These are the colours the viewer paints a faction in, and this is a
-# second declaration site for them.** The engine holds the first, in the
-# painting module of the view crate, and it publishes no way to ask for one.
-# The two must agree, and nothing fails when they do not. A method on the
-# world that gave the colour of a faction would remove this copy.
-FACTION_COLOURS: tuple[int, ...] = (
-    0xE85D4A,
-    0x45A0E8,
-    0x6AC46A,
-    0xE8C84A,
-    0xB56AE8,
-    0xE88FC4,
-)
+# **The viewer states these once and this module reads them.** The demo held
+# its own copy of the six numbers, so the table stood in two places and
+# nothing failed when they disagreed.
+FACTION_COLOURS: tuple[int, ...] = tuple(faction_colours())
 
 # The colour of a line that names no faction.
 NEUTRAL_COLOUR = 0xF0E8D8
+
+# The holder value that names nobody. It sits above the faction ceiling, so
+# no faction collides with it.
+NOBODY = 65535
+
+# The upgrade category numbers, as the engine numbers them, and the word a
+# watcher reads for each one.
+CATEGORY_WONDER = 2
+CATEGORY_WORDS: dict[int, str] = {
+    0: "road",
+    1: "terrace",
+    2: "wonder",
+    3: "storehouse",
+    4: "wall",
+    5: "lodging",
+}
+
+# What ended an upgrade, as the engine numbers it.
+CAUSE_WORDS: dict[int, str] = {
+    1: "the weather",
+    2: "an army",
+    3: "the weather and an army",
+    4: "an order",
+}
+
+# The counters a rise is read from, and the words for one and for several.
+#
+# **A subsystem that publishes a log is read from the log, not from here.** A
+# counter says that a thing happened and it does not say who did it or where.
+# This tuple is empty, because every subsystem the deck watches now publishes
+# a log. It stays, so a counter that has no log yet has a home.
+WATCHED_COUNTERS: tuple[tuple[str, str, str], ...] = ()
 
 # The colour behind a line, so the words read over any ground.
 BACKING_COLOUR = 0x101014
@@ -305,6 +328,9 @@ class Announcer:
         self._relations(world, now)
         self._campaigns(world, now)
         self._first_characters(world, now)
+        self._collapses(world, now)
+        self._foundings(world, now)
+        self._wonders(world, now)
 
     def after_frame(self, world: World, now: float) -> None:
         """Read what the counters and the records say after a drawn frame.
@@ -325,7 +351,7 @@ class Announcer:
         the war edge. A band after below the band before is a declaration, and
         a band above is a peace.
         """
-        columns = world.relation_log_columns()
+        columns = world.log("relation_crossed")
         for row in range(len(columns["tick"])):
             speaker = int(columns["from_faction"][row])
             other = int(columns["to_faction"][row])
@@ -346,7 +372,7 @@ class Announcer:
         closes. A close by a holder change to a third party is bookkeeping, so
         it gets no line.
         """
-        columns = world.campaign_log_columns()
+        columns = world.log("campaign_event")
         for row in range(len(columns["tick"])):
             faction = int(columns["faction"][row])
             kind = int(columns["kind"][row])
@@ -372,7 +398,7 @@ class Announcer:
         of everything on the screen. The first is a milestone, and the panel
         and the console report the rest.
         """
-        columns = world.promoted_log_columns()
+        columns = world.log("unit_promoted")
         for row in range(len(columns["faction"])):
             faction = int(columns["faction"][row])
             if faction in self._charactered:
@@ -386,17 +412,88 @@ class Announcer:
                 rank=RANK_MILESTONE,
             )
 
+    def _collapses(self, world: World, now: float) -> None:
+        """Say when an upgrade wore away to nothing.
+
+        An upgrade collapses when the weather and a hostile army take the last
+        of its condition. The entry is then gone and the tile returns to the
+        ground the generator made, so the log is the only record of it.
+
+        A collapse is a moment and not a rate. A world with no storm and no
+        war has none at all.
+        """
+        columns = world.log("upgrade_collapsed")
+        for row in range(len(columns["tick"])):
+            holder = int(columns["holder"][row])
+            category = int(columns["category"][row])
+            cause = int(columns["cause"][row])
+            what = CATEGORY_WORDS.get(category, "upgrade")
+            blame = CAUSE_WORDS.get(cause, "wear")
+            if holder == NOBODY:
+                text = f"A {what} falls to {blame}"
+                colour = NEUTRAL_COLOUR
+            else:
+                text = f"Faction {holder} loses a {what} to {blame}"
+                colour = faction_colour(holder)
+            self.toasts.show(text, colour, now)
+
+    def _foundings(self, world: World, now: float) -> None:
+        """Say who founded a settlement, and where.
+
+        The engine once published a count of the settlements and nothing else.
+        The count falls when a settlement is lost, so a founding and a loss in
+        one tick cancelled and the watcher saw neither.
+        """
+        columns = world.log("settlement_founded")
+        for row in range(len(columns["tick"])):
+            faction = int(columns["faction"][row])
+            self.toasts.show(
+                f"Faction {faction} founds a settlement",
+                faction_colour(faction),
+                now,
+                rank=RANK_MILESTONE,
+            )
+
+    def _wonders(self, world: World, now: float) -> None:
+        """Say when a wonder finishes.
+
+        **Only a wonder gets a line.** A road, a terrace, a store, a wall and
+        a lodging finish every few ticks in a mature world, which is a rate
+        and not a moment. A wonder claims the wealth-or-wonder end, so it is
+        the one level that changes the run.
+        """
+        columns = world.log("upgrade_finished")
+        for row in range(len(columns["tick"])):
+            if int(columns["category"][row]) != CATEGORY_WONDER:
+                continue
+            holder = int(columns["holder"][row])
+            level = int(columns["level"][row])
+            whose = "A" if holder == NOBODY else f"Faction {holder}"
+            verb = "stands" if holder == NOBODY else "finishes"
+            colour = NEUTRAL_COLOUR if holder == NOBODY else faction_colour(holder)
+            self.toasts.show(
+                f"{whose} {verb} a wonder at level {level}",
+                colour,
+                now,
+                rank=RANK_MILESTONE,
+            )
+
     def _counters(self, world: World, now: float) -> None:
         """Say when one of the watched counters rose since the last reading.
 
-        **These two lines carry no faction colour.** A counter says that a
-        thing happened and it does not say who did it. The engine publishes no
-        log for either of them, so the rise is the cheapest honest source.
+        **A line from a counter carries no faction colour.** A counter says
+        that a thing happened and it does not say who did it. A counter is
+        therefore the last source to reach for, and a subsystem that publishes
+        a log is read from the log.
 
         Only a rare counter belongs here. A counter that rises on most ticks
         would write a line on most ticks, and the deck would then hold nothing
         else.
         """
+        if not WATCHED_COUNTERS:
+            # The census reads every row of every subsystem. A deck that
+            # watches no counter must not pay for that on each frame.
+            return
         census = world.subsystem_census()
         was = self._census
         self._census = dict(census)
@@ -405,10 +502,7 @@ class Announcer:
             # was founded with four settlements would otherwise open with a
             # line about four settlements being founded.
             return
-        for name, one, many in (
-            ("settlements", "A new settlement is founded", "new settlements stand"),
-            ("wonders_complete", "A wonder is finished", "wonders are finished"),
-        ):
+        for name, one, many in WATCHED_COUNTERS:
             rise = int(census.get(name, 0)) - int(was.get(name, 0))
             if rise <= 0:
                 continue

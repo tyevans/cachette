@@ -703,7 +703,9 @@ fn the_season_is_keyed_on_the_tick() {
 #[test]
 fn the_season_varies_across_the_lattice_at_one_tick() {
     let width = 16;
-    let readings: Vec<i32> = (0..width).map(|at| weather::season_at(Tick(0), at, width)).collect();
+    let readings: Vec<i32> = (0..width)
+        .map(|at| weather::season_at(Tick(0), at, width))
+        .collect();
     let low = readings.iter().copied().min().unwrap_or(0);
     let high = readings.iter().copied().max().unwrap_or(0);
     assert!(

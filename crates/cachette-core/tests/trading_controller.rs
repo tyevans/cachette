@@ -161,8 +161,14 @@ fn renew_presence(world: &mut World, one: FactionId, other: FactionId) {
 /// in the same way it writes the two stores and the presence.
 fn hold_the_peace(world: &mut World, one: FactionId, other: FactionId) {
     let edge = world.relation_rules().peace_edge;
-    assert!(world.set_relation(one, other, edge), "the pair names factions");
-    assert!(world.set_relation(other, one, edge), "the pair names factions");
+    assert!(
+        world.set_relation(one, other, edge),
+        "the pair names factions"
+    );
+    assert!(
+        world.set_relation(other, one, edge),
+        "the pair names factions"
+    );
 }
 
 /// Founds the two groups a few tiles apart.

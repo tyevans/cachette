@@ -1693,7 +1693,10 @@ fn advanced(
             // The work buys condition and raises no level. The repair is not
             // paid for yet, so the level stays damaged and the next tick
             // carries on with it.
-            let mended = site.condition.0.saturating_add(repair_gain(work, level_work));
+            let mended = site
+                .condition
+                .0
+                .saturating_add(repair_gain(work, level_work));
             return UpgradeSite {
                 condition: Accum(mended.min(CONDITION_FULL)),
                 ..site

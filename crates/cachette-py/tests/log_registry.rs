@@ -10,8 +10,8 @@
 //!
 //! [^1]: Recurring Defect Shapes, shape 1. `.agents/rules/recurring-defects.md`
 
-use cachette_core::event_layout::declared_event_layouts;
 use _core::logs::{log_names, log_of, unknown_log_message, LOGS};
+use cachette_core::event_layout::declared_event_layouts;
 
 #[test]
 fn every_declared_event_has_a_log() {
@@ -74,7 +74,11 @@ fn a_name_no_log_has_is_refused() {
 fn the_new_logs_are_registered() {
     // The three gaps this work closed. A later change that drops one of them
     // fails here rather than in a demonstration.
-    for name in ["upgrade_collapsed", "upgrade_finished", "settlement_founded"] {
+    for name in [
+        "upgrade_collapsed",
+        "upgrade_finished",
+        "settlement_founded",
+    ] {
         assert!(log_of(name).is_some(), "the register lost `{name}`");
     }
 }
