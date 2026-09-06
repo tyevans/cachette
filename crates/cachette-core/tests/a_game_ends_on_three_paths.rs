@@ -1,19 +1,22 @@
-//! Four readers end a game, in one fixed order, once.
+//! Three readers end a game, in one fixed order, once.
 //!
 //! Each reader fires on a fixture at its extreme. Domination fires for a
 //! faction whose rivals hold no unit, and for a faction that holds every
-//! seat while a rival still lives. Wealth fires at the stock bar and not one
-//! raw unit below it, its total survives a sum that overflows a 32-bit
-//! accumulator, and one settlement filled to the ceiling of its store wins
-//! nothing.[^2] The wonder fires on the tick the work completes and
-//! not the tick before. Renown fires at the renown target and not below.
-//! Two paths true on one tick record the earlier path of the fixed order,
-//! and a path that becomes true later changes nothing.[^1]
+//! seat while a rival still lives. Renown fires at the renown target and not
+//! below. Two paths true on one tick record the earlier path of the fixed
+//! order, and a path that becomes true later changes nothing.[^1]
+//!
+//! **The wealth-or-wonder path has no reader, so no fixture here ends a game
+//! on it.**[^2] Three tests hold that rule at the extremes the old reader
+//! fired at: a stock total above the target, a stock total that overflows a
+//! 32-bit accumulator, and a wonder finished on ground its faction holds.
+//! Each of them steps the world and asserts that the record stays empty,
+//! while the standing still reports the quantity.
 //!
 //! # References
 //!
 //! [^1]: ADR-0148, a game end is recorded once and stops the controllers, decisions D2 and D3. `docs/adrs/accepted/adr-0148-a-game-end-is-recorded-once-and-stops-the-controllers.md`
-//! [^2]: ADR-0165, the wealth bar stands above what one settlement can hold, decision D1. `docs/adrs/draft/adr-0165-the-wealth-bar-stands-above-what-one-settlement-can-hold.md`
+//! [^2]: ADR-0173, the wealth or wonder path has no reader, decision D1. `docs/adrs/draft/adr-0173-the-wealth-or-wonder-path-has-no-reader.md`
 
 use cachette_core::choose;
 use cachette_core::sim_math::combine;
@@ -299,7 +302,10 @@ fn one_below_the_bar() -> [i32; 2] {
 }
 
 #[test]
-fn a_stock_total_at_the_target_ends_the_game_and_one_below_does_not() {
+fn a_stock_total_at_the_target_does_not_end_the_game() {
+    // **This is the rule this test states.** The old reader ended the game
+    // here. The path has no reader now, so the fixture that used to win must
+    // lose, and the world must keep running with an empty record.
     let mut world = world(2, 34, 48);
     arm_both_factions(&mut world);
     let amounts = one_below_the_bar();
@@ -307,29 +313,33 @@ fn a_stock_total_at_the_target_ends_the_game_and_one_below_does_not() {
     assert_eq!(put_in, STOCK_TARGET - 1);
     step(&mut world);
     assert!(!world.game_end().is_set(), "one raw unit below the target");
+    // One more raw unit in the second store crosses the bar. Nothing reads
+    // the bar, so nothing happens.
+    world
+        .set_settlement_store(sites[1], CommodityId(0), Fix32(amounts[1] + 1))
+        .expect("the commodity exists");
+    for _ in 0..4 {
+        step(&mut world);
+        assert!(
+            !world.game_end().is_set(),
+            "a stock total at the target ends no game"
+        );
+    }
+    // The quantity is still reported, and it stands at the target.
     assert_eq!(
         world
             .standing(FactionId(1))
             .expect("faction 1 exists")
             .store_total,
-        STOCK_TARGET - 1
+        STOCK_TARGET
     );
-    // One more raw unit in the second store crosses the bar.
-    world
-        .set_settlement_store(sites[1], CommodityId(0), Fix32(amounts[1] + 1))
-        .expect("the commodity exists");
-    step(&mut world);
-    let end = world.game_end();
-    assert!(end.is_set());
-    assert_eq!(end.winner, FactionId(1));
-    assert_eq!(end.win_path(), Some(cachette_core::WinPath::WealthOrWonder));
 }
 
 #[test]
 fn one_settlement_filled_to_the_ceiling_of_its_store_wins_nothing() {
-    // The extreme the old bar could not pass. A store is a `Fix32`, so one
-    // settlement of one commodity stops here however long the world runs.
-    // The bar stands above it, so waiting at one settlement wins nothing.
+    // A store is a `Fix32`, so one settlement of one commodity stops here
+    // however long the world runs. No reader watches the total, so a full
+    // settlement wins nothing whatever the bar is.
     let mut world = world(2, 36, 48);
     arm_both_factions(&mut world);
     let (_, put_in) = settle_and_fill(&mut world, FactionId(1), &[i32::MAX]);
@@ -337,7 +347,6 @@ fn one_settlement_filled_to_the_ceiling_of_its_store_wins_nothing() {
         put_in, STOCK_CEILING_OF_ONE_SETTLEMENT,
         "the fixture stands at the ceiling of one store"
     );
-    const { assert!(STOCK_TARGET > STOCK_CEILING_OF_ONE_SETTLEMENT) };
     for _ in 0..4 {
         step(&mut world);
         assert!(
@@ -355,12 +364,12 @@ fn one_settlement_filled_to_the_ceiling_of_its_store_wins_nothing() {
 }
 
 #[test]
-fn two_settlements_above_the_bar_end_the_game() {
+fn two_settlements_above_the_bar_end_no_game_and_the_total_does_not_wrap() {
     let mut world = world(2, 37, 48);
     arm_both_factions(&mut world);
     // Two stores at the top of the 32-bit range. Their sum wraps to a
-    // negative number in 32 bits and never reaches the bar there. In 64
-    // bits it stands above the bar.
+    // negative number in 32 bits. The reported total is a 64-bit sum, so it
+    // stands above the bar and above the range of one store.
     let (_, put_in) = settle_and_fill(&mut world, FactionId(0), &[i32::MAX, i32::MAX]);
     assert_eq!(put_in, 2 * i64::from(i32::MAX));
     assert!(
@@ -375,11 +384,13 @@ fn two_settlements_above_the_bar_end_the_game() {
             .store_total,
         put_in
     );
-    step(&mut world);
-    let end = world.game_end();
-    assert!(end.is_set());
-    assert_eq!(end.winner, FactionId(0));
-    assert_eq!(end.win_path(), Some(cachette_core::WinPath::WealthOrWonder));
+    for _ in 0..4 {
+        step(&mut world);
+        assert!(
+            !world.game_end().is_set(),
+            "a stock total above the bar ends no game"
+        );
+    }
 }
 
 #[test]
@@ -410,7 +421,7 @@ fn the_stock_total_does_not_saturate_at_the_target_scale() {
 // ---------------------------------------------------------------------------
 
 #[test]
-fn a_wonder_ends_the_game_on_the_tick_it_completes_and_not_the_tick_before() {
+fn a_wonder_finished_on_held_ground_ends_no_game() {
     let mut world = world(2, 102, 192);
     // The choice pass replaces the build order of a unit whose cell chooses
     // on that frame. The fixture keeps the choice away from the run.
@@ -493,14 +504,14 @@ fn a_wonder_ends_the_game_on_the_tick_it_completes_and_not_the_tick_before() {
         Some(FactionId(0)),
         "the builders hold the ground"
     );
-    let end = world.game_end();
-    assert!(
-        end.is_set(),
-        "the wonder completed and the game did not end"
-    );
-    assert_eq!(end.tick, world.tick());
-    assert_eq!(end.winner, FactionId(0));
-    assert_eq!(end.win_path(), Some(cachette_core::WinPath::WealthOrWonder));
+    // **This is the rule this test states.** The wonder completes, on ground
+    // its own faction holds, and the game does not end. The old reader ended
+    // it on this tick.
+    assert!(!world.game_end().is_set(), "a finished wonder ends no game");
+    for _ in 0..4 {
+        step(&mut world);
+        assert!(!world.game_end().is_set(), "and the record stays empty");
+    }
     let census = world.subsystem_census();
     let count = |name: &str| {
         census
@@ -572,31 +583,36 @@ fn two_paths_true_on_one_tick_record_the_earlier_path_of_the_fixed_order() {
     assert_eq!(end.win_path(), Some(cachette_core::WinPath::Domination));
     assert_eq!(end.winner, FactionId(1));
 
-    // Territory before wealth. The limit is the first tick and a store of
-    // faction 1 is at the target. Territory names faction 0, because every
-    // count is zero and the lowest identifier wins the tie.
+    // Territory before renown. The limit is the first tick, both factions
+    // hold a unit so domination stays quiet, and a character of faction 1 is
+    // at the renown target. Territory names faction 0, because every held
+    // count is zero and the lowest identifier wins the tie, so the winner
+    // tells which reader wrote the record.
     let mut second = World::new(config(2, 38, 48)).expect("the extent describes a world");
     arm_both_factions(&mut second);
-    let (_, put_in) = settle_and_fill(&mut second, FactionId(1), &[i32::MAX, i32::MAX]);
-    assert!(put_in > STOCK_TARGET, "the store stands above the bar");
+    let person = second
+        .create_character(FactionId(1))
+        .expect("the arena has room");
+    assert!(second.set_character_renown(person, Fix32(RENOWN_TARGET)));
     second.set_tick_limit(1);
     step(&mut second);
     let end = second.game_end();
     assert_eq!(end.win_path(), Some(cachette_core::WinPath::Territory));
+    assert_eq!(end.winner, FactionId(0));
 
-    // Wealth before renown. A store of faction 1 at the target and a
-    // character of faction 0 at the renown target.
-    let mut third = world(2, 39, 48);
-    arm_both_factions(&mut third);
-    let (_, above) = settle_and_fill(&mut third, FactionId(1), &[i32::MAX, i32::MAX]);
-    assert!(above > STOCK_TARGET, "the store stands above the bar");
-    let person = third
-        .create_character(FactionId(0))
-        .expect("the arena has room");
-    assert!(third.set_character_renown(person, Fix32(RENOWN_TARGET)));
+    // Domination before territory. Only faction 1 holds a unit, and the
+    // limit is the first tick, so both readers fire on that tick. Domination
+    // names faction 1, and territory would name faction 0 on the tie the
+    // case above resolves, so the winner tells which reader wrote it.
+    let mut third = World::new(config(2, 39, 48)).expect("the extent describes a world");
+    let address = open_address(&third);
+    third
+        .spawn_soldier(address, FactionId(1))
+        .expect("the ground admits a unit");
+    third.set_tick_limit(1);
     step(&mut third);
     let end = third.game_end();
-    assert_eq!(end.win_path(), Some(cachette_core::WinPath::WealthOrWonder));
+    assert_eq!(end.win_path(), Some(cachette_core::WinPath::Domination));
     assert_eq!(end.winner, FactionId(1));
 }
 
@@ -619,10 +635,12 @@ fn a_path_that_becomes_true_after_the_end_changes_nothing() {
     assert_eq!(end.win_path(), Some(cachette_core::WinPath::Renown));
     assert_eq!(end.winner, FactionId(1));
 
-    // Faction 0 now reaches the stock target, and would win on an earlier
-    // path if a reader ran. None runs.
-    let (_, above) = settle_and_fill(&mut world, FactionId(0), &[i32::MAX, i32::MAX]);
-    assert!(above > STOCK_TARGET, "the store stands above the bar");
+    // The tick limit now falls behind the tick, so the territory reader
+    // would fire and would name an earlier path with a different winner.
+    // **The later fact must be one a reader watches.** The fixture used a
+    // stock total, and the stock total has no reader, so it would have made
+    // this test compare the record against nothing.
+    world.set_tick_limit(world.tick().0);
     for _ in 0..3 {
         step(&mut world);
         assert_eq!(world.game_end(), end, "the record is written once");
@@ -630,7 +648,7 @@ fn a_path_that_becomes_true_after_the_end_changes_nothing() {
 }
 
 #[test]
-fn the_standing_of_a_faction_names_every_path_and_refuses_a_stranger() {
+fn the_standing_of_a_faction_names_every_running_value_and_refuses_a_stranger() {
     let mut world = world(2, 41, 32);
     assert_eq!(world.standing(FactionId(2)), None);
     let standing = world.standing(FactionId(0)).expect("faction 0 exists");
