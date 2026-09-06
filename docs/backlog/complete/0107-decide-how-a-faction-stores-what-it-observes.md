@@ -81,4 +81,4 @@ see.[^8]
 [^5]: Blockers register, BLK-005. `docs/BLOCKERS.md`
 [^6]: ADR-0059, fog storage grows with observed area. `docs/adrs/accepted/adr-0059-fog-storage-grows-with-observed-area.md`
 [^7]: ADR Registry, rows 0059 and 0154. `docs/adrs/REGISTRY.md`
-[^8]: Backlog item 0108, let a unit observe the tiles around it. `docs/backlog/proposed/0108-let-a-unit-observe-the-tiles-around-it.md`
+[^8]: Backlog item 0108, let a unit observe the tiles around it. `docs/backlog/complete/0108-let-a-unit-observe-the-tiles-around-it.md`

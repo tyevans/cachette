@@ -13119,6 +13119,7 @@ the same change. **A derivation that names a measured share goes stale the next
 time a subsystem is repaired, and nothing fails.** That is the shape the
 recurring-defect rule names, and this is one more local instance of it.[^F483G]
 
+<<<<<<< HEAD
 ### FND-550 — The ceiling that ends every game is in the store, not in the accumulator
 
 **Believed.** Three engine changes could put the wealth path out of reach:
@@ -13165,6 +13166,31 @@ constant and the two scripts. The commit body holds the search command.
 **What follows.** The binding now exposes the bar, and each script reads it.
 One declaration site remains. This is one more local instance of the first
 recurring defect shape.[^F526A]
+=======
+### FND-548 — The offset space of a block is the square of the block edge, and a fixture over interior blocks alone hides that
+
+**Believed.** A block of the lattice holds as many tile offsets as it holds
+tiles. The first observation container therefore sized every scratch bitmap and
+every payload by the tile count of the block.
+
+**True.** The offset of a tile packs the row and the column of that tile
+against the block edge, so the offset space is the square of the block
+edge.[^F548A] A block that the world edge cuts holds fewer tiles than that, and
+the offsets of the tiles it does hold still reach the top of the space. Every
+tile of a cut block above the tile count was dropped in silence.
+
+**Evidence.** The defect reached no interior block, because an interior block
+holds exactly as many tiles as its offset space. A fixture over a world of one
+cut block reported that a faction which saw every tile saw 128 of 256. The
+fixture was built to reach the payload-free form at the top of the density
+range, and it found this instead.
+
+**What follows.** Size a container by the address space of its key, never by
+the population that the world happens to put in it. **A fixture over the
+typical case would never have failed**, because the typical block of a large
+world is not cut. This is one more local instance of the shape the testing rule
+names.[^F492B]
+>>>>>>> worktree-agent-aa08c9949aff3eec8
 
 
 ### FND-548 — The census repair left three rows that still said more than they read
@@ -13332,6 +13358,7 @@ after, on one machine.
 
 ## References
 
+[^F548A]: The unit-to-tile bridge, the block key. `crates/cachette-core/src/bridge.rs`
 [^F494C]: Findings register, FND-486. `docs/FINDINGS.md`
 [^F542C]: ADR-0148, a game end is recorded once and stops the controllers, decision D3. `docs/adrs/accepted/adr-0148-a-game-end-is-recorded-once-and-stops-the-controllers.md`
 [^F542D]: The choice set of the faction controller. `crates/cachette-core/src/controller.rs`

@@ -35,6 +35,7 @@ pub mod holding;
 mod household;
 pub mod influence;
 pub mod luxury;
+pub mod observation;
 pub mod plan;
 pub mod position;
 pub mod presence;
@@ -94,6 +95,10 @@ pub use holding::{FactionMask, Holder, Holding};
 pub use influence::{Conductance, Influence, InfluenceError, InfluenceField};
 pub use luxury::{
     LuxuryError, LuxuryField, LuxuryId, LuxurySet, LuxuryTile, VarietyLevel, LUXURY_CEILING,
+};
+pub use observation::{
+    array_threshold, BlockForm, Observation, SightRules, TileLayer, SIGHT_BLOCKERS_DEFAULT,
+    SIGHT_CEILING, SIGHT_RADIUS_DEFAULT, SIGHT_STEP_DEFAULT,
 };
 pub use plan::{PlanRefusal, PlanRegister, PlanRules, Project};
 pub use position::{
