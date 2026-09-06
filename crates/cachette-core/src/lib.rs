@@ -18,6 +18,7 @@ pub mod bridge;
 pub mod campaign;
 pub mod census;
 pub mod character;
+pub mod climate;
 pub mod choose;
 pub mod cohort;
 pub mod contest;

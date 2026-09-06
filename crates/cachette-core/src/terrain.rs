@@ -25,6 +25,7 @@
 //! [^3]: ADR-0003, every random draw is keyed, never stateful, decision D1. `docs/adrs/accepted/adr-0003-every-random-draw-is-keyed-never-stateful.md`
 //! [^4]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
 
+use crate::climate::Climate;
 use crate::hash::StateHash;
 use crate::hex::{Axial, Grid};
 use crate::rng;
@@ -533,6 +534,38 @@ impl Terrain {
         Some(self.tile(address)?.height)
     }
 
+    /// Returns the tile at an address, under a climate.
+    ///
+    /// **The climate changes the moisture and never the height.** The height
+    /// is what the seed drew, so the water line, the hills and the mountains
+    /// stand where the seed put them and the climate chooses only between the
+    /// kinds that the moisture selects.
+    ///
+    /// That restraint is what breaks the loop between the ground and the
+    /// weather. The weather reads the mean height of a cell and its open water
+    /// share, and neither moves under a climate, so a ground array folded from
+    /// a climate-shaped world equals one folded from the base world.[^1]
+    ///
+    /// The tile is still generated. Nothing here is stored for each tile, and
+    /// the climate field holds one entry for each weather cell rather than one
+    /// for each tile.[^2]
+    ///
+    /// # References
+    ///
+    /// [^1]: The climate field. [`crate::climate`]
+    /// [^2]: ADR-0068, terrain is generated from the seed and is never stored as a map. `docs/adrs/accepted/adr-0068-terrain-is-generated-from-the-seed-and-is-never-stored-as-a-map.md`
+    #[must_use]
+    pub fn tile_under(self, address: Axial, climate: Climate) -> Option<TerrainTile> {
+        let base = self.tile(address)?;
+        Some(under(base, climate))
+    }
+
+    /// Returns the kind of the tile at an address, under a climate.
+    #[must_use]
+    pub fn kind_under(self, address: Axial, climate: Climate) -> Option<TileKind> {
+        Some(self.tile_under(address, climate)?.kind)
+    }
+
     /// Folds every tile of the ground into the state hash.
     ///
     /// The ground is part of the world, and the record hashes the whole
@@ -581,6 +614,53 @@ fn generate(seed: u64, address: Axial) -> TerrainTile {
         height,
         moisture,
         kind: classify(height, moisture),
+    }
+}
+
+/// Returns a generated tile as the climate over it leaves it.
+///
+/// The moisture takes the offset of the climate and stays inside the unit
+/// range. The height passes through unchanged. The kind then follows from the
+/// two fields through the one classifier, so the climate states no rule of its
+/// own about which kind a tile takes.[^1]
+///
+/// A cold cell is dry ground whatever its moisture says, because water that
+/// does not fall as rain grows no forest. So the cold offset is applied to the
+/// moisture as well, and the classifier is still the one place that names a
+/// kind.
+///
+/// # References
+///
+/// [^1]: Recurring defect shapes, shape 1. `.agents/rules/recurring-defects.md`
+#[must_use]
+pub fn under(base: TerrainTile, climate: Climate) -> TerrainTile {
+    let mut offset = climate.moisture_offset;
+    if climate.is_cold() {
+        offset = sim_math::sub(offset, COLD_DRYING);
+    }
+    let moisture = clamp_to_unit(sim_math::add(base.moisture, offset));
+    TerrainTile {
+        height: base.height,
+        moisture,
+        kind: classify(base.height, moisture),
+    }
+}
+
+/// What a cold cell takes from the moisture of the tiles under it.
+///
+/// The value is an eighth of the unit range. Cold ground carries less standing
+/// water than warm ground at the same rainfall, so a cold cell grows less
+/// forest than a temperate cell that is equally wet.
+const COLD_DRYING: Fix32 = Fix32(1 << (FIX_FRACTIONAL_BITS - 3));
+
+/// Holds a field value inside the unit range.
+const fn clamp_to_unit(value: Fix32) -> Fix32 {
+    if value.0 >= Fix32::ONE.0 {
+        Fix32(Fix32::ONE.0 - 1)
+    } else if value.0 < 0 {
+        Fix32::ZERO
+    } else {
+        value
     }
 }
 
