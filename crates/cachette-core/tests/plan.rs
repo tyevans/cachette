@@ -679,7 +679,7 @@ const RUN_TICKS: u32 = 200;
 ///
 /// [^1]: Testing rules, section 5. `.agents/rules/testing.md`
 /// [^2]: Recurring defect shapes, shape 3. `.agents/rules/recurring-defects.md`
-/// [^3]: Findings register, FND-495. `docs/FINDINGS.md`
+/// [^3]: Findings register, FND-496. `docs/FINDINGS.md`
 #[test]
 fn the_demonstration_world_finishes_a_project_and_a_road_stands() {
     let mut world = World::new(WorldConfig {
@@ -733,7 +733,7 @@ fn the_demonstration_world_finishes_a_project_and_a_road_stands() {
 /// # References
 ///
 /// [^1]: ADR-0152, a faction plans its roads and zones with one solver, decisions D3 and D4. `docs/adrs/accepted/adr-0152-a-faction-plans-its-roads-and-zones-with-one-solver.md`
-/// [^2]: Findings register, FND-495. `docs/FINDINGS.md`
+/// [^2]: Findings register, FND-496. `docs/FINDINGS.md`
 #[test]
 fn a_project_refuses_a_build_order_that_names_another_category() {
     let mut world = bare(SEED);

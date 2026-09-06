@@ -8866,7 +8866,7 @@ fn build_order_of(keys: &[BoundedKey], ceiling: u64) -> Result<Vec<u32>, SortErr
 /// [^2]: Recurring defect shapes, shape 1. `.agents/rules/recurring-defects.md`
 /// [^3]: ADR-0151, an upgrade is a category with a ground fit and a level, decision D4. `docs/adrs/draft/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
 /// [^4]: ADR-0152, a faction plans its roads and zones with one solver, decisions D3 and D4. `docs/adrs/accepted/adr-0152-a-faction-plans-its-roads-and-zones-with-one-solver.md`
-/// [^5]: Findings register, FND-495. `docs/FINDINGS.md`
+/// [^5]: Findings register, FND-496. `docs/FINDINGS.md`
 #[must_use]
 const fn build_is_permitted(
     holder: Holder,
