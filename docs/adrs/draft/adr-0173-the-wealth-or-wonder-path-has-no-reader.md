@@ -110,17 +110,17 @@ reader rather than to shape a game.
 
 ## Consequences
 
-**Three paths decide a game, and one of them fires only at the tick limit.**
-Domination needs a faction to remove its rivals or hold every seat. Renown
-needs a column that no pass in the engine writes. So a run that reaches the
-tick limit ends on territory, and a run that does not ends on domination.
-The share each path takes is a reading the balance register holds, and this
-change moves it.[^3]
+**Territory decides most runs, and it fires only at the tick limit.**
+Domination asks a faction to remove its rivals or to hold every seat, and no
+seeded run has done either. The contest writes renown, so the renown reader
+does fire, and it ends a run before the limit when a champion reaches the
+target. The share each path takes is a reading the balance register holds,
+and this change moves it.[^3]
 
-**A run may now reach the tick limit where it did not before.** That is the
+**A run now reaches the tick limit where it did not before.** That is the
 intended shape, because territory at a limit is one of the two paths the
-project wants. It also means the tick limit now decides the length of most
-runs, so the limit is load-bearing where it was not.
+project wants. It also means the tick limit decides the length of most runs,
+so the limit is load-bearing where it was not.
 
 **A finished wonder ends no game.** The build pass, the census row and the
 victory claim column are unchanged. The claim column is read by the reporting

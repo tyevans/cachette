@@ -15138,11 +15138,12 @@ impl World {
     /// The renown reader: a character of the faction reaches the renown
     /// target.
     ///
-    /// **No pass in the engine writes renown.** The column rises only when
-    /// the control plane writes it, so this reader fires only in a game that
-    /// makes its own renown rule outside the engine. The blocker that governs
-    /// the rule is open, and the target is a balance value under it.[^1] [^2]
-    /// A tie resolves by the lowest faction identifier.
+    /// **The contest writes renown, and this reader fires in a seeded
+    /// run.** The killer of each pair earns a share for each unit it felled,
+    /// and the share goes to the champion of the faction. The control plane
+    /// may also write the column. The blocker that governs the wider renown
+    /// rule is open, and the target is a balance value under it.[^1] [^2] A
+    /// tie resolves by the lowest faction identifier.
     ///
     /// # References
     ///

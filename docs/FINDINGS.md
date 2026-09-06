@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-562**
+**Next number: FND-563**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -13602,7 +13602,7 @@ and holds another subject passes. Read the row you cite.
 raised the stock target, each against a measurement, and each reported that the
 path now ended fewer games. The register row held the derivation, and a record
 answered the reachability by standing the bar above the ceiling of one
-settlement.[^F561A] [^F561C]
+settlement.[^F561A] [^F548D]
 
 **True.** The path was a design problem, and the project owner ruled it out as a
 win condition. A stock total is not a claim to victory. The path always fired
@@ -13627,7 +13627,36 @@ and gets repaired. A test that asserted the record does **not** change, on a
 fact that no reader watches any more, stays green and proves nothing. The second
 kind is the one to look for when a reader is removed. One such test was found
 here, and it was found by putting the defect back and watching it stay
-green.[^F561D]
+green.[^F487C]
+### FND-562 — The renown reader's own comment said no pass writes renown, and a pass had been writing it
+
+**Believed.** The renown win path could not fire in a seeded run. The reader
+says so in its own text: no pass in the engine writes renown, the column rises
+only when the control plane writes it, and the reader therefore fires only in a
+game that makes its own renown rule outside the engine.
+
+**True.** The contest writes renown. The killer of each pair earns a share for
+each unit it felled, and the share goes to the champion of the faction. That
+pass says in its own text that it is the one source of renown in the engine,
+and that it was added because a reader touched a quantity nothing wrote. The
+reader's comment was never repaired, so two sites in one file stated opposite
+things.
+
+**Evidence.** A sweep of the 8 default seeds at a tick limit of 5000, on one
+development machine, run after the wealth-or-wonder reader was removed. One
+seed ended on renown at tick 3811. The other seven ran to the limit and ended
+on territory.
+
+**What follows.** **A repair that adds a writer must find every reader that
+said there was none.** The pass that closed an inert-capability defect created
+a stale comment on the reader it fed, which is shape 5 of the recurring defect
+rule turned inside out: the code moved and the comment beside it stayed.[^F562A]
+
+**The finding was found by a measurement and not by a reading.** The sweep was
+run to answer a different question, and it returned a path that a comment said
+could not fire. A consequence written from that comment went into a draft
+record, and the sweep caught it before review. **Run the sweep before you write
+the consequences.**
 ## References
 
 [^F552A]: The unit-to-tile bridge, the block key. `crates/cachette-core/src/bridge.rs`
@@ -13715,8 +13744,7 @@ green.[^F561D]
 [^F549C]: ADR-0168, a build order holds a unit on its tile, and the hold is derived and never stored, decisions D1, D2 and D3. `docs/adrs/draft/adr-0168-a-build-order-holds-a-unit-on-its-tile.md`
 [^F561A]: Findings register, FND-543 and FND-550. `docs/FINDINGS.md`
 [^F561B]: ADR-0173, the wealth or wonder path has no reader. `docs/adrs/draft/adr-0173-the-wealth-or-wonder-path-has-no-reader.md`
-[^F561C]: ADR-0165, the wealth bar stands above what one settlement can hold. `docs/adrs/draft/adr-0165-the-wealth-bar-stands-above-what-one-settlement-can-hold.md`
-[^F561D]: Testing Rules, section 2a. `.agents/rules/testing.md`
+[^F562A]: Recurring defect shapes, shape 5. `.agents/rules/recurring-defects.md`
 
 [^F546A]: The founding survey and the eligibility of a candidate. `crates/cachette-core/src/founding.rs`
 [^F546C]: Balance register, the founding group. `docs/reference/balance.md`
