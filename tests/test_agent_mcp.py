@@ -17,6 +17,9 @@ References
 [^3]: Testing Rules, section 4. ``.claude/rules/testing.md``
 [^4]: Testing Rules, section 2a. ``.claude/rules/testing.md``
 [^5]: Findings register, FND-203. ``docs/FINDINGS.md``
+[^6]: ADR-0163, an event declares its layout once and the binding derives
+    every column.
+    ``docs/adrs/draft/adr-0163-an-event-declares-its-layout-once-and-the-binding-derives-every-column.md``
 """
 
 from __future__ import annotations
@@ -241,8 +244,15 @@ def test_a_client_reads_which_tile_changed() -> None:
     assert report["event_count"] > 0
     assert report["rows_returned"] == min(4, report["event_count"])
     assert len(report["changes"]) == report["rows_returned"]
+    # The engine declares the fields of the event in one place. The server
+    # passes every declared column through under its own name, so the keys of
+    # a row come from the engine and this test writes no field list of its
+    # own.[^6]
+    from cachette import _core
+
+    declared = {column for column, _ in _core.event_schema()["tile_changed"]}
     for row in report["changes"]:
-        assert set(row) == {"tile", "value", "holder", "kind"}
+        assert set(row) == declared
         assert isinstance(row["value"], int)
         assert 0 <= row["tile"] < 64
 
