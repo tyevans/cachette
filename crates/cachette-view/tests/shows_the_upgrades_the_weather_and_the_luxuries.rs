@@ -656,8 +656,30 @@ fn each_kind_of_build_site_draws_its_own_glyph() {
     let bare_camera = camera_at(&world, address, SITE_TILE);
     let bare_corner = corner_of(&drawn_at(&world, address, SITE_TILE), bare_camera, address);
 
+    // The table holds no row for every category on every ground. A category
+    // the ground under the builder does not fit is refused by the engine, and
+    // the open category holds no row at all, so the fixture asks the table
+    // rather than assuming the whole set is buildable.
+    let ground = world
+        .tile_kind(address)
+        .expect("the builder stands on a tile of the world");
+    let buildable: Vec<UpgradeCategory> = UpgradeCategory::ALL
+        .into_iter()
+        .filter(|category| {
+            world
+                .upgrade_table()
+                .row(*category, 1)
+                .is_some_and(|row| row.fits(ground))
+        })
+        .collect();
+    assert!(
+        buildable.len() > 1,
+        "the ground {ground:?} fits fewer than two categories, so this test \
+         compares nothing"
+    );
+
     let mut colours = Vec::new();
-    for kind in UpgradeCategory::ALL {
+    for kind in buildable {
         let mut building = world.clone();
         assert!(building.order_build(builder, kind).is_ok());
         building.step(1).expect("the step must run");
