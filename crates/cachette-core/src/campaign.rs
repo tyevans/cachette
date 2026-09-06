@@ -113,18 +113,27 @@ pub const STATE_EXPIRED: u8 = 5;
 /// takes the whole run, and a faction raises about one campaign for the whole
 /// run.[^1]
 ///
-/// **This is a provisional value and not a measured one.** It is 2000 ticks.
-/// A cohort crosses the demonstration world at extent 256 in far fewer ticks
-/// than that, and 2000 ticks is a tenth of the tick limit of the balance
-/// harness, so a faction raises about ten campaigns over a run rather than
-/// one.[^2] [^3]
+/// **The deadline governs the stuck campaign alone.** A campaign that takes
+/// its objective closes on the tick the holder changes, and a campaign whose
+/// cohort falls closes on the tick the last unit dies. Neither waits for the
+/// deadline. What the deadline ends is a cohort that is walking and arriving
+/// nowhere.
+///
+/// **This is a provisional value and not a measured one.** It is 500 ticks.
+/// The movement pass admits one tile step for each unit on each tick, and the
+/// greatest hex distance across the balance harness world at extent 256 is
+/// below 256 tiles, so 500 ticks is about twice the worst crossing of the
+/// whole world. A cohort that has not reached its objective in twice that
+/// time is stuck and not slow. At 500 ticks the tick limit of the harness
+/// leaves room for about forty raises for each faction, where 2000 left room
+/// for ten.[^2] [^3]
 ///
 /// # References
 ///
 /// [^1]: Findings register, FND-542. `docs/FINDINGS.md`
 /// [^2]: Blockers register, BLK-050. `docs/BLOCKERS.md`
 /// [^3]: Balance register, the campaign deadline. `docs/reference/balance.md`
-pub const DEADLINE_DEFAULT: Tick = Tick(2000);
+pub const DEADLINE_DEFAULT: Tick = Tick(500);
 
 /// The holder column value that names no faction.
 pub const NO_HOLDER: u16 = u16::MAX;

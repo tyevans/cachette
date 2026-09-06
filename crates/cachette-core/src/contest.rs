@@ -51,8 +51,29 @@ use crate::rng;
 use crate::sim_math;
 use crate::slots::Slots;
 use crate::soldier::SoldierArena;
-use crate::types::{Accum, Entity, FactionId, Tick, TileIdx, FACTION_CEILING};
+use crate::types::{Accum, Entity, FactionId, Fix32, Tick, TileIdx, FACTION_CEILING};
 use crate::unit_type::{UnitTypeId, UnitTypeTable, UNIT_TYPE_COUNT};
+
+/// The renown that one felled unit gives the champion of the faction that
+/// felled it.
+///
+/// **This is the one source of renown in the engine.** The renown column was
+/// read by a win path and by the standing reading, and no pass wrote it, so
+/// the path could never fire and the reading never moved. A quantity that
+/// only a reader touches states a capability the engine does not have.[^1]
+///
+/// **This is a provisional value and not a measured one.** It is a quarter of
+/// one point. The renown target is one hundred points, so a champion reaches
+/// it after four hundred enemy units fall to its faction while that champion
+/// lives.[^2] A whole point for each unit would put renown ahead of
+/// domination in most runs, and domination is the path the game is meant to
+/// resolve on. A hundredth of a point would make the source inert again.
+///
+/// # References
+///
+/// [^1]: Recurring defect shapes, shape 3. `.agents/rules/recurring-defects.md`
+/// [^2]: Balance register, the renown target. `docs/reference/balance.md`
+pub const RENOWN_PER_FELL: Fix32 = Fix32(1 << 14);
 
 /// The number of fractional bits of the project fixed-point scale.
 ///
@@ -639,8 +660,6 @@ pub fn harm_of(
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    use crate::types::Fix32;
 
     /// A table in which the bowman cannot reach the tank, and the tank ends
     /// four units of anything in one resolution.

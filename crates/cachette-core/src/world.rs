@@ -92,8 +92,8 @@ use crate::trade::{
 };
 use crate::types::{Accum, Entity, FactionId, Fix32, Tick, TileIdx, FACTION_CEILING};
 use crate::unit_type::{
-    UnitTypeError, UnitTypeId, UnitTypeRow, UnitTypeTable, DEFAULT_UNIT_TYPE_TABLE, SOLDIER,
-    UNIT_TYPE_COUNT,
+    UnitTypeError, UnitTypeId, UnitTypeRow, UnitTypeTable, DEFAULT_UNIT_TYPE_TABLE, LEADER,
+    SOLDIER, UNIT_TYPE_COUNT,
 };
 use crate::upgrade::{
     self, BuildRefusal, UpgradeCategory, UpgradeMap, UpgradeRow, UpgradeSite, UpgradeTable,
@@ -9361,6 +9361,33 @@ impl World {
         );
     }
 
+    /// Reports whether a faction already has a leader on order.
+    ///
+    /// A leader is a unit whose type row carries a command reach above zero.
+    /// The scan walks the queue of every site of the faction, so its cost
+    /// follows the site count and the queue bound, and never the
+    /// population.[^1]
+    ///
+    /// The gate reads the type column and no per-faction flag, in the way
+    /// every other reader of the capability does.[^2]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0096, cost follows the lattice, not the population, decision D1. `docs/adrs/draft/adr-0096-cost-follows-the-lattice-not-the-population.md`
+    /// [^2]: ADR-0145, a unit type is a row of capability columns, and zero means cannot, decision D3. `docs/adrs/accepted/adr-0145-a-unit-type-is-a-row-of-capability-columns-and-zero-means-cannot.md`
+    fn leader_is_on_order(&self, faction: FactionId) -> bool {
+        let sites = self.settlements.faction_column();
+        (0..self.settlements.slot_count()).any(|slot| {
+            self.settlements.entity_at(slot).is_some()
+                && sites[slot as usize] == faction
+                && self
+                    .queues
+                    .entries_of(slot)
+                    .iter()
+                    .any(|entry| self.unit_types.row(entry.unit_type).command_reach > 0)
+        })
+    }
+
     /// Returns the lowest-slot site of one faction whose queue has room.
     ///
     /// The scan walks the settlements in slot order and no unit, so its cost
@@ -9439,6 +9466,107 @@ impl World {
         Ok(())
     }
 
+    /// Gives the champion of each killer faction the renown its units earned.
+    ///
+    /// # Why this exists
+    ///
+    /// **This is the one source of renown in the engine.** A win path reads
+    /// the renown column, and the standing reading reports it, and no pass
+    /// wrote it. The path could therefore never fire and the reading never
+    /// moved. A quantity that only a reader touches states a capability the
+    /// engine does not have.[^1]
+    ///
+    /// # What it does
+    ///
+    /// The contest of this frame states, for each pair, which faction felled
+    /// how many units of which other faction. The killer of each pair earns
+    /// one share of renown for each unit it felled, and the share is a
+    /// balance value.[^2]
+    ///
+    /// **The renown goes to one character and not to the faction.** The
+    /// reader takes the highest renown among the live characters of a
+    /// faction, so renown spread over every character would never reach the
+    /// target and the source would stay inert. The champion of a faction is
+    /// its live character with the highest renown, and a tie goes to the
+    /// lowest identity.
+    ///
+    /// A faction with no live character earns nothing. Renown is a property
+    /// of a person, and a faction that has promoted nobody has no person to
+    /// carry it.
+    ///
+    /// # Determinism
+    ///
+    /// The scan visits the character arena in slot order and replaces the
+    /// champion only on a strictly greater key, so the answer is a property
+    /// of the arena and never of a thread.[^3] The gains are summed into
+    /// 64-bit accumulators, which combine in any order, and every value is a
+    /// fixed-point value or a whole number.[^4] The renown column already
+    /// enters the state hash.
+    ///
+    /// # Cost
+    ///
+    /// The scan walks the character arena, whose ceiling the character tier
+    /// declares, and never the unit population.[^5]
+    ///
+    /// # References
+    ///
+    /// [^1]: Recurring defect shapes, shape 3. `.agents/rules/recurring-defects.md`
+    /// [^2]: Balance register, the renown target. `docs/reference/balance.md`
+    /// [^3]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
+    /// [^4]: ADR-0002, simulated and aggregated state holds no floating point number, decision D1. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
+    /// [^5]: ADR-0054, an entity belongs to one of three tiers, declared at creation, decision D3. `docs/adrs/accepted/adr-0054-an-entity-belongs-to-one-of-three-tiers-declared-at-creation.md`
+    fn award_renown(&mut self) {
+        let factions = usize::from(self.config.faction_count.max(1));
+        let mut earned = vec![Accum(0); factions];
+        let mut any = false;
+        for grievance in &self.grievances {
+            let Some(slot) = earned.get_mut(usize::from(grievance.killer.0)) else {
+                continue;
+            };
+            *slot = sim_math::combine(
+                *slot,
+                sim_math::scale_by_count(contest::RENOWN_PER_FELL, grievance.count),
+            );
+            any = true;
+        }
+        if !any {
+            return;
+        }
+        // The champion of each faction: the live character with the highest
+        // renown, and the lowest identity among equals.
+        let mut champions: Vec<Option<(Fix32, u64, Entity)>> = vec![None; factions];
+        for character in self.characters.iter() {
+            let (Some(faction), Some(renown)) = (
+                self.characters.faction(character),
+                self.characters.renown(character),
+            ) else {
+                continue;
+            };
+            let Some(slot) = champions.get_mut(usize::from(faction.0)) else {
+                continue;
+            };
+            let bits = character.to_bits();
+            let better = match slot {
+                Some((best, best_bits, _)) => (renown.0, *best_bits) > (best.0, bits),
+                None => true,
+            };
+            if better {
+                *slot = Some((renown, bits, character));
+            }
+        }
+        for (index, gain) in earned.iter().copied().enumerate() {
+            if gain.0 == 0 {
+                continue;
+            }
+            let Some(Some((renown, _, champion))) = champions.get(index).copied() else {
+                continue;
+            };
+            let raised = sim_math::add(renown, sim_math::narrow(gain));
+            let wrote = self.characters.set_renown(champion, raised);
+            debug_assert!(wrote, "the scan above found the character live");
+        }
+    }
+
     /// Resolves every meeting of this frame and ends the units that fell.
     ///
     /// The pass marks in parallel and applies in one ascending scan of the
@@ -9484,6 +9612,7 @@ impl World {
             self.relations
                 .on_units_fell(tick, grievance.victim, grievance.killer, grievance.count);
         }
+        self.award_renown();
         for slot in order {
             let index = slot as usize;
             let tile = self.soldiers.tile_column()[index];
@@ -11604,10 +11733,21 @@ impl World {
         // The lowest identities among the idle units. The arena walks in
         // slot order, and the sort puts the generation above the slot, so
         // the choice is a property of the identities and not of the slots.
+        //
+        // **A unit that carries command reach is never taken.** The raise
+        // retypes the cohort to the soldier row, and the soldier row carries
+        // no command reach, so a raise that swept up the one leader of a
+        // faction spent the very unit that lets the faction declare a war.
+        // The faction would then march once and never again.
+        let leads = |unit: &Entity| {
+            self.soldiers
+                .unit_type(*unit)
+                .is_some_and(|unit_type| self.unit_types.row(unit_type).command_reach > 0)
+        };
         let mut idle: Vec<Entity> = self
             .soldiers
             .iter_faction(faction)
-            .filter(|unit| self.soldiers.sent(*unit) == Some(None))
+            .filter(|unit| self.soldiers.sent(*unit) == Some(None) && !leads(unit))
             .collect();
         idle.sort_unstable_by_key(|unit| unit.to_bits());
         // **The raise takes the number of units it asks for.** The project
@@ -11623,7 +11763,7 @@ impl World {
             let mut walking: Vec<Entity> = self
                 .soldiers
                 .iter_faction(faction)
-                .filter(|unit| self.soldiers.sent(*unit) == Some(Some(plane)))
+                .filter(|unit| self.soldiers.sent(*unit) == Some(Some(plane)) && !leads(unit))
                 .collect();
             walking.sort_unstable_by_key(|unit| unit.to_bits());
             idle.extend_from_slice(&walking);
@@ -12712,7 +12852,24 @@ impl World {
                     // A faction that owns no site with room in its queue
                     // queues nothing. The type comes from one keyed draw over
                     // the rows the table fills.[^10]
-                    queue_type: if self.controller_queue_site(faction).is_some() {
+                    //
+                    // **A faction with no speaker queues a leader instead of
+                    // the draw.** Command reach sits on the leader row alone,
+                    // and a faction with no unit that carries it moves no
+                    // relation. It therefore never reaches the war band, never
+                    // gets an objective, and never marches. The draw offers a
+                    // leader one time in four, so a faction could run a whole
+                    // game without one.
+                    //
+                    // The want is not a standing rule. It falls away as soon
+                    // as a leader stands or a leader is on order, so a faction
+                    // that has one queues by the draw again.
+                    queue_type: self.controller_queue_site(faction).and_then(|_| {
+                        if speakers.get(index).copied().flatten().is_none()
+                            && !self.leader_is_on_order(faction)
+                        {
+                            return Some(LEADER);
+                        }
                         controller::queued_type_of(
                             self.config.seed,
                             tick,
@@ -12720,9 +12877,7 @@ impl World {
                             queue_draw,
                             &offered,
                         )
-                    } else {
-                        None
-                    },
+                    }),
                 }
             })
             .collect();
