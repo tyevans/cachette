@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-493**
+**Next number: FND-494**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -11957,8 +11957,88 @@ that resets is not a monotone reading, and a test that treats it as one
 measures the fixture.[^F492B] The rule that a fixture must reach the case is
 about the data; this is the same failure in the assertion.
 
+### FND-493 — The wealth path has an arithmetic ceiling, and domination cannot fire in a seeded run at any bar
+
+**Believed.** The wealth path and the wonder path fired too early, and raising
+the two bars would let domination and territory end most games. The stock
+target row said the demonstration store climbs to hundreds by the tick limit,
+so the bar of 4096 whole units sat above any stock a run reached.[^F493A]
+
+**True.** Three things.
+
+**The stock target derivation was wrong by a factor of about eighty.** The
+store climbs to thousands, not to hundreds, and it climbs by 4.4 to 7.0 whole
+units on each tick. The wealth path therefore ended every game of the default
+seed set.
+
+**The wealth path has a hard ceiling that bounds the bar.** A faction founds
+one settlement, the commodity count is one, and a store is a `Fix32`. The
+stock total of a faction therefore clamps at 32767 whole units, and a target
+above that never fires. The bar can rise by at most a factor of eight, and no
+larger raise exists.
+
+**Domination cannot fire in a seeded run, and no bar changes that.** Two
+independent things stop it. The seat clause asks for a faction that holds the
+seat of a rival, and no faction fills a seat at all.[^F493B] The unit clause
+asks for a faction whose rivals hold no unit, and every founded unit carries
+the worker row, whose attack is zero, so a meeting kills nobody.[^F493C] A
+soldier reaches the field only through a campaign, a campaign is drawn only
+between factions at war, and no war is declared. The founding group is two
+people and the campaign cohort is four, so a raise could not take its cohort
+even if a war began.[^F493A]
+
+**Evidence.** Two runs of the balance harness on one development machine
+(ty001-ubuntu, x86-64), on 5 September 2026, over the 8 default seeds, extent
+256, four factions.
+
+    just balance
+
+Before, at a stock target of 4096 whole units, a wonder work of 240 and a tick
+limit of 2000: wealth or wonder won 8 of 8, at ticks 437, 470, 590, 841, 940,
+1110, 1340 and 950. No game ended on territory, on domination or on renown. No
+wonder finished. The run cost 30 seconds.
+
+After, at a stock target of 28672 whole units, a wonder work of 2400 and a tick
+limit of 5000: territory won 5 of 8 and wealth or wonder won 3 of 8, at ticks
+2960, 3180 and 3980. Domination and renown won none. No wonder finished. The
+run cost 2 minutes 46 seconds.
+
+A third run at a tick limit of 20000 and a stock target of 24576 whole units
+recorded wealth or wonder at 8 of 8, at ticks between 2520 and 7290. The
+project owner then set the horizon to 5000 ticks, so the second run above is
+the one that governs. The 20000-tick run cost 2 minutes 14 seconds.
+
+A probe stepped three seeds to 20000 ticks and read the standing of each
+faction. The stock total reached 32767 whole units by tick 8000 in every one,
+and stayed there. The wonder work done stalled between 18 and 61 units before
+tick 500 and never moved again.
+
+**These are development-machine runs.** They are no evidence about the target
+platform, which is AWS Graviton. Every cost figure in this project is derived
+rather than measured on the target, and the blocker that says so is
+open.[^28] The shares themselves stay unset while the rules of the
+downstream game are unwritten.[^F493F]
+
+**Follows.** Three things.
+
+**Do not raise a bar to reach a share that the mechanism cannot produce.**
+Domination is not a balance problem. It is blocked by a unit table and by a
+relation that never moves, and only code closes it.
+
+**Ask what bounds a value before choosing its multiple.** The stock target has
+an arithmetic ceiling that no register row stated. A row that holds a target
+should hold the ceiling of the quantity it compares.
+
+**A derivation is a claim, and it decays like any other.** The stock target row
+carried a wrong claim about the store from the pass that wrote it, and no check
+could see it. Only a harness run found it.
+
 ## References
 
+[^F493A]: Balance register, the stock target, the wonder work, the tick limit, the founding group and the campaign cohort size. `docs/reference/balance.md`
+[^F493B]: The census row that counts a filled seat. `crates/cachette-core/src/world.rs`
+[^F493C]: Findings register, FND-486. `docs/FINDINGS.md`
+[^F493F]: Blockers register, BLK-050. `docs/BLOCKERS.md`
 [^F492A]: ADR-0151, an upgrade is a category with a ground fit and a level, decision D3. `docs/adrs/draft/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
 [^F492B]: Testing rules, section 2a. `.agents/rules/testing.md`
 [^F488A]: The send verb, which names a seed set and a plane. `crates/cachette-core/src/world.rs`
