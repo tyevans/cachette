@@ -147,7 +147,7 @@ value, its high value and the unit.
 **What does a watcher see when the value is zero everywhere?** The key says so
 in words. The drawing pass records the lowest and the highest value it painted,
 and the key writes that the overlay found nothing in the window when the two are
-zero. An empty overlay and a broken overlay otherwise look the same.
+zero. An empty overlay and a broken overlay otherwise look the same.[^7]
 
 **Which keys does the demonstration bind?** The number keys. The panel deck
 holds the function keys from F1 upward, and two actions on one key means a
