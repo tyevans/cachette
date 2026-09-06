@@ -152,6 +152,19 @@ fn renew_presence(world: &mut World, one: FactionId, other: FactionId) {
     }
 }
 
+/// Holds the pair at the peace edge.
+///
+/// A faction now reaches the war band inside the run of this fixture, and a
+/// pair at war holds no negotiation. A fixture that let the relation fall
+/// would end its run with an empty board, so it would measure the war path
+/// and not the trade path. The fixture writes the relation before every step,
+/// in the same way it writes the two stores and the presence.
+fn hold_the_peace(world: &mut World, one: FactionId, other: FactionId) {
+    let edge = world.relation_rules().peace_edge;
+    assert!(world.set_relation(one, other, edge), "the pair names factions");
+    assert!(world.set_relation(other, one, edge), "the pair names factions");
+}
+
 /// Founds the two groups a few tiles apart.
 ///
 /// **The two sites sit in one level 1 cell.** A destination field holds one
@@ -669,6 +682,7 @@ fn the_trade_is_the_same_at_one_two_and_twelve_threads() {
             set_store(&mut world, ZERO, FULL);
             set_store(&mut world, ONE, Fix32::ZERO);
             renew_presence(&mut world, ZERO, ONE);
+            hold_the_peace(&mut world, ZERO, ONE);
             world.step(threads).expect("the step runs");
         }
         assert!(
