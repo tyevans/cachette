@@ -292,6 +292,26 @@ class Demo:
             elif kind == 1:
                 print(f"tick {tick}: faction {faction} takes {place}")
 
+    def announce_trade(self) -> None:
+        """Say when a contract bound and when one reached full delivery.
+
+        **The control plane reads one log and walks no entity.** The engine
+        writes one entry for each speech act and for each settlement of the
+        last step. An acceptance is act two and a settlement is act six. The
+        line names the two parties and nothing else, because a watcher wants
+        the moment and not the terms.
+        """
+        columns = self.world.trade_log_columns()
+        for row in range(len(columns["tick"])):
+            act = int(columns["act"][row])
+            if act not in (2, 6):
+                continue
+            tick = int(columns["tick"][row])
+            proposer = int(columns["proposer"][row])
+            responder = int(columns["responder"][row])
+            verb = "binds a contract with" if act == 2 else "completes a contract with"
+            print(f"tick {tick}: faction {proposer} {verb} faction {responder}")
+
     def announce_end(self) -> GameEnd | None:
         """Say who won, once, when the game end record first appears.
 
@@ -351,6 +371,7 @@ class Demo:
             self.world.step(self.threads)
             self.announce_relations()
             self.announce_campaigns()
+            self.announce_trade()
         self.announce_end()
         # The pace is the clock's, and the engine holds no clock. The phase
         # is the share of the current tick that has elapsed, and the frame
@@ -627,6 +648,7 @@ def _run_to_end(demo: Demo) -> int:
         demo.world.step(demo.threads)
         demo.announce_relations()
         demo.announce_campaigns()
+        demo.announce_trade()
         end = demo.announce_end()
     if end is None:
         print(f"no game ended by the tick limit of {limit}")

@@ -652,6 +652,20 @@ class CampaignColumns(TypedDict):
     objective_kind: npt.NDArray[np.uint8]
     state: npt.NDArray[np.uint8]
 
+class CarrierColumns(TypedDict):
+    """One column for each field of a carrier the controller assigned.
+
+    A carrier is a unit that the controller sent to the site of the other
+    party of a contract. The row is the index of that contract in the
+    negotiation plane, which is the proposer times the faction count plus the
+    responder. The list is state and not a log: a carrier stays in it until
+    the contract settles or fails.
+    """
+
+    unit: npt.NDArray[np.uint64]
+    row: npt.NDArray[np.uint32]
+    faction: npt.NDArray[np.uint16]
+
 class CampaignEventColumns(TypedDict):
     """One column for each field of a campaign event.
 
@@ -782,6 +796,19 @@ class World:
     @property
     def campaign_cohort_size(self) -> int: ...
     def set_campaign_cohort_size(self, cohort: int) -> None: ...
+    @property
+    def advertisement_schedule(self) -> tuple[int, int]: ...
+    def set_advertisement_schedule(self, period: int, phase: int) -> None: ...
+    @property
+    def surplus_mark(self) -> int: ...
+    def set_surplus_mark(self, mark: int) -> None: ...
+    @property
+    def carriers_per_contract(self) -> int: ...
+    def set_carriers_per_contract(self, carriers: int) -> None: ...
+    @property
+    def contract_term(self) -> int: ...
+    def set_contract_term(self, term: int) -> None: ...
+    def carrier_columns(self) -> CarrierColumns: ...
     def draw(
         self,
         camera: Camera,
