@@ -67,6 +67,15 @@ WINDOW_HEIGHT = 720
 
 # The world the demonstration builds. The engine is the same engine the tests
 # exercise, and these numbers only choose which world it runs.
+# The weather lattice of the demonstration, as the side of one cell in tiles.
+#
+# **The engine default of 32 gives this world an 8 by 8 lattice**, in which the
+# deepest cell sits one cell from water. A watcher then sees no weather inland,
+# because the world holds no inland at that pitch. Eight tiles gives 32 by 32,
+# which carries a coast, an interior and a rain shadow, and costs a few
+# milliseconds a tick. A watcher who wants one cell for each tile asks for it.
+WEATHER_PITCH_DEFAULT = 8
+
 WORLD_WIDTH = 256
 WORLD_HEIGHT = 256
 FACTION_COUNT = 4
@@ -584,7 +593,9 @@ def build_world(
         height=side if extent > 0 else WORLD_HEIGHT,
         seed=seed,
         faction_count=factions,
-        weather_cell_tiles=weather_pitch if weather_pitch > 0 else None,
+        weather_cell_tiles=(
+            weather_pitch if weather_pitch > 0 else WEATHER_PITCH_DEFAULT
+        ),
     )
 
 
@@ -792,7 +803,7 @@ def main(argv: list[str] | None = None) -> int:
         help=(
             "the side of one weather cell in tiles, as a power of two from 1 "
             "to 256; 1 gives each tile its own weather and is slow on a large "
-            "world; zero keeps the default pitch"
+            "world; zero takes the pitch the demonstration chooses"
         ),
     )
     parser.add_argument(
