@@ -57,15 +57,23 @@ tiles observed. Every reader answers for one faction.**
 ### D1. A faction observes from its own live units, and from nothing else
 
 A live unit of a faction observes the tiles inside its sight, and it is the
-only thing that gives that faction sight. A settlement gives no sight. Ground a
-faction holds gives no sight. An upgrade gives no sight. A faction with no live
-unit observes nothing, whatever it holds.
+only thing that gives that faction sight.[^1] A settlement gives no sight.
+Ground a faction holds gives no sight. An upgrade gives no sight. A faction
+with no live unit observes nothing, whatever it holds.
+
+**Reject a settlement, held ground or an upgrade as a source of sight.** A game
+may reasonably want a city to watch its own walls, and a future contributor
+will ask for it. The accepted product record states the checkable rule as the
+units of a faction, and the research this record rests on argues no other
+source.[^1] [^8] A record that widens the rule needs a product record that asks
+for the widening.
 
 The sight of a unit is a whole number of hex steps.[^9] The engine rounds that
 number to one of a fixed set of values before it computes anything, so units
-that stand on one tile at one rounded radius share one answer. The sight of
-each unit type, the rounded set, and the largest sight the engine admits are
-balance rows.[^10] This record states none of them.
+that stand on one tile at one rounded radius share one answer. This record states no
+radius. The sight of each unit type, the rounded set, and the largest sight the
+engine admits are balance values, and the balance register is where a balance
+value belongs.[^10] No record may state one.
 
 Ground blocks sight. The engine computes the tiles a unit observes by a
 shadowcast over the six sextants of the hex grid, so ground that blocks sight
@@ -77,16 +85,20 @@ whole number, or when a unit sees through ground that blocks sight.
 
 ### D2. The record of observation is a block-adaptive tile set, and no layer is a dense bitmap over the world
 
-Each addressable faction carries two layers. One layer names the tiles the
-faction sees now. One layer names the tiles the faction has ever seen.
+Each faction that holds a bit in the faction mask carries two layers.[^4] One
+layer names the tiles the faction sees now. One layer names the tiles the
+faction has ever seen.
 
-Each layer is an array of blocks, one for each level 2 cell of the world, and
-each block holds one of four forms. A block holds no payload when the faction
+Each layer is an array of blocks. The world divides into blocks of a fixed
+size, and a layer holds one entry for each block. The block is the block the
+pyramid aggregates over, so a fog layer and a summary share one lattice.[^5]
+Each block holds one of four forms. A block holds no payload when the faction
 sees no tile in it. A block holds a sorted array of offsets when the faction
 sees few. A block holds a bitmap when the faction sees many. A block holds no
-payload again when the faction sees every tile in it. The population at which
-the array and the bitmap cost the same bytes is the threshold, and it is a
-reference row.[^11] The block order is the block number, and the offsets inside
+payload again when the faction sees every tile in it. The threshold is the
+population at which the array and the bitmap cost the same bytes. It is a
+derived cost figure, so the cost register is where it belongs, and this record
+states no value.[^11] The block order is the block number, and the offsets inside
 a block ascend.
 
 **Reject a dense bitmap over every tile for each faction.** This is the obvious
@@ -127,12 +139,23 @@ derivation returns it. The step adds the tiles seen now into the remembered
 layer and never removes one. The layer therefore only grows, and it is the one
 part of fog that is state.
 
-The record that says level 0 is the only truth still holds. The remembered
-layer is level 0 state, and it is truth about a faction rather than truth about
-the ground.[^5] Every level above it is derived from it, and no pass writes a
-level above it.[^12]
+**The remembered layer does not contradict the record that level 0 is the only
+truth.** That record forbids a fact that lives above level 0, and it asks every
+level above level 0 to be an exact function of the level below.[^5] The
+remembered layer lives at level 0, so the second rule never reaches it. The
+first rule asks that a fact be stored once, and the remembered layer is stored
+once. Nothing in that record asks a level 0 fact to be a function of the
+present frame. A stockpile is not one either.
 
-Three projections are derived from the two layers and stored nowhere else. A
+**A memory is not a derived level, because no level beneath it holds one.** A
+derived level answers from the level below it. No level below the remembered
+layer holds what a faction saw. A rebuild from the ground of level 0 therefore
+returns the ground as it stands now, and never the ground as the faction last
+saw it. That is the whole of the split this decision makes. The fog rebuild is
+the one mechanism that writes the projections below, and no simulation system
+writes one.[^12]
+
+Three projections follow from the two layers, and nothing else holds them. A
 faction mask for each level 1 cell says which factions see that cell. A second
 mask for each level 1 cell says which factions have ever seen it. A mask for
 each unit says which factions see that unit. Each is a union of sets, and a
