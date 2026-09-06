@@ -9510,7 +9510,7 @@ impl World {
     ///
     /// # References
     ///
-    /// [^1]: ADR-0146, a faction relation is one signed integer per ordered pair, and a pass reads a threshold, decision D2. `docs/adrs/draft/adr-0146-a-faction-relation-is-one-signed-integer-per-ordered-pair-and-a-pass-reads-a-threshold.md`
+    /// [^1]: ADR-0146, a faction relation is one signed integer per ordered pair, and a pass reads a threshold, decision D2. `docs/adrs/accepted/adr-0146-a-faction-relation-is-one-signed-integer-per-ordered-pair-and-a-pass-reads-a-threshold.md`
     fn campaign_objectives(&self) -> Vec<Option<(u8, TileIdx)>> {
         let count = self.config.faction_count.max(1);
         let sites: Vec<(u32, FactionId, TileIdx)> = self
