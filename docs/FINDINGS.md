@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-542**
+**Next number: FND-545**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -12865,8 +12865,136 @@ deliberate. A reader who met either one would conclude that the project had
 considered the case and decided it. Neither had been considered against the
 finding that names the shape.
 
+### FND-542 — Domination cannot fire in a seeded run, because a holder is a city distance and a campaign never reaches anything
+
+**Believed.** Domination was unreachable through a chain of five links, and the
+links were about people and types: no seat filled, every founded unit a worker
+with no attack, soldiers only from a campaign, a campaign only at war, and a
+cohort of four impossible from a founding group of two.[^F494C] Three of those
+links have since moved. A campaign types its cohort as soldiers, the queue
+builds typed units, and growth fills a site to sixteen people by tick five
+hundred. The premise was that domination would then become reachable.
+
+**True.** Domination fires in no seed, and the reason is not the people. It is
+the rule that decides who holds a tile. A tile belongs to the faction of the
+nearest city within reach, and the pass reads no unit position.[^F487A] The
+seat of a faction is the tile of its own founding, so its own city stands on it
+at distance zero. No rival city can be nearer. The seat clause of the
+domination reader therefore fires only when the rival city stops
+existing.[^F542C]
+
+**Nothing in a step destroys a settlement, and nothing in a step founds one.**
+The destroy verb has one caller inside the engine, and that caller is the
+rollback of a founding that failed. The controller has no found option in its
+choice set.[^F542D] The settlement count reads four at tick zero and four at
+the end of every seed of the set.
+
+**The unit clause cannot fire either.** It asks that every rival holds no unit.
+The growth stage makes a person at a site, the site never stops existing, and
+the population of every faction reads sixteen from tick five hundred to the end
+of the run.
+
+**Two more links sit below those, and each would stop the chain on its own.**
+
+**A campaign requires war, and war closes the ground the campaign must cross.**
+The controller raises a campaign only against a faction in the war band, and
+the admission pass refuses a guest whose holder is below the peace edge toward
+it.[^F542E] [^F542F] The two edges make the objective unreachable by
+construction: the ground of the objective refuses the cohort exactly when the
+cohort is raised.
+
+**A campaign that reaches nothing never closes, so a faction raises about one
+campaign for the whole run.** The close pass ends a campaign when the objective
+changes holder or when the cohort is empty, and neither happens. A faction with
+a live campaign is refused a new one.[^F542G] Over 32 seeds of 20000 ticks the
+campaigns raised run from 3 to 11 across four factions, and the campaigns won
+run from 0 to 0.
+
+**The cohort is one unit and not four.** The raise takes the idle units of the
+faction and truncates them to the cohort size, and it does not wait for four.
+The project order and the campaign take the same idle units, so almost every
+unit is already sent. The register row of a live campaign reads a cohort size
+of one at every faction that raised one.
+
+**Evidence.** Measured on 5 September 2026 on one development machine
+(ty001-ubuntu, x86-64), and not on the target platform. The command was
+`uv run python scripts/balance_sweep.py --seeds 32 --tick-limit 20000
+--sample 500 --workers 16 --json target/sweep-before.json`, at extent 256 with
+four factions.[^F542H] Every figure came through the public Python interface.
+The march of one cohort was watched for 4000 ticks: the unit came within five
+tiles of its objective once and then drifted back to thirty, and the holder of
+the objective never changed.
+
+**What follows.** No value in the balance register makes domination reachable.
+The chain is closed by three engine rules and not by a number. Backlog item
+0505 holds the work.[^F542I]
+
+### FND-543 — No stock target the engine permits puts the wealth path out of reach
+
+**Believed.** The project owner asked for a wealth bar high enough that
+domination and territory decide a game. A previous pass raised the stock target
+seven times, to seven eighths of the clamp, and recorded that the wealth path
+then ended three of eight games.[^F543A]
+
+**True.** At a horizon of 20000 ticks the wealth-or-wonder path ends 32 of 32
+seeds, and no other path ends any. The store of a faction rises steadily and
+does not level off. It reads a median of 22 percent of the target at tick 2000
+and crosses the target in 29 of the 32 seeds. The other three end earlier on
+the wonder clause.
+
+**The ceiling is close, and the whole distribution is under it.** A faction
+founds one settlement, the commodity count is one, and a store is a `Fix32`, so
+the stock total of a faction clamps just below 32768 whole units. The current
+target of 28672 is seven eighths of that clamp. The highest target the engine
+permits is therefore about one seventh above the current one, and the store
+reaches the clamp, so every legal target is crossed given enough ticks. **The
+register cannot make this path slow, and it cannot make it unreachable.**
+
+**Evidence.** The same 32-seed run as the finding above. The end ticks run from
+1059 to 16850, with quartiles at 4239, 8550 and 12510.
+
+**What follows.** The wealth clause needs an engine change and not a value.
+Three options exist: scale the target by the settlements a faction owns, widen
+the store type, or drop the stock clause from the reader. Backlog item 0506
+holds the work.[^F543B]
+
+### FND-544 — Two derivations in the balance register describe a world that no longer runs
+
+**Believed.** The balance register records that the wonder work does not move.
+Its derivation says the work done stalled between 18 and 61 units before tick
+500 and did not move again by tick 20000, and that the wonder path fires in no
+seed at either value.[^F544A] The win-path share row records that territory won
+5 of 8 and that wealth or wonder won 3 of 8.
+
+**True.** Both readings were taken before the road chain was repaired.[^F544B]
+Over 32 seeds at 20000 ticks the wonder work reaches the bar of 2400 in three
+seeds, and it ends those three games. The work done at the end runs from 24 to
+2400, with a median of 192. Territory ends no game, because the territory
+reader fires only at the tick limit and the wealth clause ends every game
+before it.
+
+**Evidence.** The same 32-seed run as the two findings above.
+
+**What follows.** The two derivations are repaired against this measurement in
+the same change. **A derivation that names a measured share goes stale the next
+time a subsystem is repaired, and nothing fails.** That is the shape the
+recurring-defect rule names, and this is one more local instance of it.[^F483G]
+
 
 ## References
+
+[^F494C]: Findings register, FND-486. `docs/FINDINGS.md`
+[^F542C]: ADR-0148, a game end is recorded once and stops the controllers, decision D3. `docs/adrs/accepted/adr-0148-a-game-end-is-recorded-once-and-stops-the-controllers.md`
+[^F542D]: The choice set of the faction controller. `crates/cachette-core/src/controller.rs`
+[^F542E]: ADR-0146, a faction relation is one signed integer per ordered pair, and a pass reads a threshold, decisions D2 and D4. `docs/adrs/accepted/adr-0146-a-faction-relation-is-one-signed-integer-per-ordered-pair-and-a-pass-reads-a-threshold.md`
+[^F542F]: The admission pass, which refuses a guest below the guest edge. `crates/cachette-core/src/world.rs`
+[^F542G]: The campaign register, and the raise that refuses a second live campaign. `crates/cachette-core/src/campaign.rs`
+[^F542H]: The sweep, which plays a seed set to the tick limit and samples the run. `scripts/balance_sweep.py`
+[^F542I]: Backlog item 0505. `docs/backlog/proposed/0505-let-a-faction-take-the-ground-of-another.md`
+[^F543A]: Balance register, the stock target. `docs/reference/balance.md`
+[^F543B]: Backlog item 0506. `docs/backlog/proposed/0506-put-the-wealth-path-out-of-easy-reach.md`
+[^F544A]: Balance register, the wonder work and the win-path share. `docs/reference/balance.md`
+[^F544B]: Findings register, FND-496. `docs/FINDINGS.md`
 
 [^F498B]: The controller log, the refusal count and the stage that empties them. `crates/cachette-core/src/controller.rs`
 [^F498D]: ADR-0158, a site builds a typed unit from a bounded queue its store pays for, decision D6. `docs/adrs/accepted/adr-0158-a-site-builds-a-typed-unit-from-a-bounded-queue-its-store-pays-for.md`
@@ -12884,7 +13012,6 @@ finding that names the shape.
 [^F496I]: Backlog item 0502. `docs/backlog/proposed/0502-let-a-faction-re-aim-its-project-order-and-keep-its-plan-live.md`
 [^F494A]: Balance register, the stock target, the wonder work, the tick limit, the founding group and the campaign cohort size. `docs/reference/balance.md`
 [^F494B]: The census row that counts a filled seat. `crates/cachette-core/src/world.rs`
-[^F494C]: Findings register, FND-486. `docs/FINDINGS.md`
 [^F494F]: Blockers register, BLK-050. `docs/BLOCKERS.md`
 [^F492A]: ADR-0151, an upgrade is a category with a ground fit and a level, decision D3. `docs/adrs/accepted/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
 [^F492B]: Testing rules, section 2a. `.agents/rules/testing.md`
