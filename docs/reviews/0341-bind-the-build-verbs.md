@@ -245,4 +245,4 @@ would remove it.
 [^5]: Findings register, FND-381. `docs/FINDINGS.md`
 [^6]: Findings register, FND-380. `docs/FINDINGS.md`
 [^7]: Decisions register, DEC-161. `docs/DECISIONS.md`
-[^8]: Backlog item 0370, refuse a build on ground another faction holds. `docs/backlog/proposed/0370-refuse-a-build-on-ground-another-faction-holds.md`
+[^8]: Backlog item 0370, refuse a build on ground another faction holds. `docs/backlog/complete/0370-refuse-a-build-on-ground-another-faction-holds.md`

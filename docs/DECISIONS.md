@@ -4318,7 +4318,7 @@ exactly so that a caller cannot build a wrong one.[^DEC120C]
 [^DEC160A]: ADR-0043, a declared tier enforces the no-loop rule, and the API refuses the loop, decision D1. `docs/adrs/draft/adr-0043-a-declared-tier-enforces-the-no-loop-rule.md`
 [^DEC160C]: Blockers register, BLK-036. `docs/BLOCKERS.md`
 [^DEC161A]: Findings register, FND-380. `docs/FINDINGS.md`
-[^DEC161C]: Backlog item 0370, refuse a build on ground another faction holds. `docs/backlog/proposed/0370-refuse-a-build-on-ground-another-faction-holds.md`
+[^DEC161C]: Backlog item 0370, refuse a build on ground another faction holds. `docs/backlog/complete/0370-refuse-a-build-on-ground-another-faction-holds.md`
 [^DEC161D]: Decision Record Scope, section 4.6. `.claude/rules/adr-scope.md`
 [^DEC144C]: Findings register, FND-390. `docs/FINDINGS.md`
 [^DEC170B]: Findings register, FND-392. `docs/FINDINGS.md`

@@ -1,7 +1,7 @@
 ---
 id: 0370
 title: Refuse a build on ground another faction holds
-status: proposed
+status: complete
 created: 2026-09-03
 implements: []
 changes: []
@@ -38,9 +38,25 @@ rather than from a Rust test alone.[^2]
   and every test of the build verbs builds on such ground. A rule that names
   only the holder would stop a build on empty ground as well.
 
+## Outcome
+
+Closed by item 0484, which refuses a wider set. A build on a tile the
+builder's faction does not hold is refused, whoever holds it and whether
+anybody holds it, unless the kind is a road. One function states the rule, and
+the build verb and the build intent pass both call it, so a build whose ground
+changed hands stops as well.[^5]
+
+The four open questions were answered there. The rule sits in the core, in one
+function that both paths call. A build in progress keeps the work it did, and
+the entry stays, because the blocker that asks whose it becomes is still
+open.[^4] A refused order is dropped and counted where the controller gave it,
+and no event reports it. Unheld ground counts: a unit builds only a road on
+ground nobody holds.
+
 ## References
 
 [^1]: Findings register, FND-380. `docs/FINDINGS.md`
 [^2]: Backlog item 0341, bind the build order and the upgrade removal to the control plane. `docs/backlog/complete/0341-bind-the-build-order-and-the-upgrade-removal-to-the-control-plane.md`
 [^3]: Decisions register, DEC-161. `docs/DECISIONS.md`
 [^4]: Blockers register, BLK-036. `docs/BLOCKERS.md`
+[^5]: Backlog item 0484, hold ground only within reach of an owned city. `docs/backlog/complete/0484-hold-ground-only-within-reach-of-an-owned-city-and-refuse-a-build-outside-it.md`
