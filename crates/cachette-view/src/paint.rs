@@ -82,6 +82,71 @@ const UPGRADE_WEIGHT_FLOOR: i64 = 56;
 /// watcher reads a site under construction as paler than a finished one.
 const UPGRADE_WEIGHT_CEILING: i64 = 200;
 
+/// The shape a build site draws in the middle of its tile.
+///
+/// **The shape is the category channel.** A shape is not a hue, so it does
+/// not compete with the wash that carries the build progress.[^1]
+///
+/// # References
+///
+/// [^1]: Research report 25, defect 1. `docs/research/reports/25-demonstration-readability-upgrades-and-units.md`
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum SiteGlyph {
+    /// One bar across the middle.
+    Bar,
+    /// Two bars, one above the other.
+    TwoBars,
+    /// A diamond.
+    Diamond,
+    /// A solid block inside the square.
+    Block,
+    /// A bar along the bottom with a merlon at each end.
+    Battlement,
+    /// A hollow square.
+    Ring,
+}
+
+/// The shape each category of upgrade draws, by category number.
+///
+/// The table is indexed by the number the core gives each category, so a
+/// category that joins the core without a shape here fails to compile rather
+/// than borrowing the shape of another category.[^1] The record leaves the
+/// choice of a mark to the drawing pass and asks only that no two rows draw
+/// alike.[^2]
+///
+/// # References
+///
+/// [^1]: Recurring Defect Shapes, shape 1. `.agents/rules/recurring-defects.md`
+/// [^2]: ADR-0151, an upgrade is a category with a ground fit and a level, decision D5. `docs/adrs/draft/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
+const UPGRADE_GLYPHS: [SiteGlyph; UPGRADE_CATEGORY_COUNT] = [
+    // A road is a made way: one bar across the tile.
+    SiteGlyph::Bar,
+    // A terrace is worked ground: two bars, one above the other.
+    SiteGlyph::TwoBars,
+    // A wonder is a great work: a diamond.
+    SiteGlyph::Diamond,
+    // A store is a storehouse: a solid block.
+    SiteGlyph::Block,
+    // A wall is a defence: a bar with a merlon at each end.
+    SiteGlyph::Battlement,
+    // The open category: a hollow square.
+    SiteGlyph::Ring,
+];
+
+/// The colour of a level pip.
+///
+/// **The level is a count and not a hue.** A pip is white against the dark
+/// rim it sits on, so it reads over every ground and over every category
+/// colour, and a watcher counts the pips rather than judging a shade. A shade
+/// of the category colour would compete with the wash that carries the build
+/// progress, which is the collision the report measured for the site
+/// colour.[^1]
+///
+/// # References
+///
+/// [^1]: Research report 25, defect 1. `docs/research/reports/25-demonstration-readability-upgrades-and-units.md`
+const LEVEL_PIP_COLOUR: u32 = 0x00ff_f4e0;
+
 /// The colour of the water in the air, mixed over the tile under it.
 const AIR_COLOUR: u32 = 0x00d8_e8f8;
 
@@ -367,6 +432,19 @@ pub const fn shortage_colour() -> u32 {
 #[must_use]
 pub fn upgrade_colour(kind: UpgradeCategory) -> u32 {
     UPGRADE_COLOURS[kind.index()]
+}
+
+/// Returns the colour the viewer draws a level pip in.
+///
+/// The colour key reads this rather than repeating the value, so the pip and
+/// the row that names it have one declaration site.[^1]
+///
+/// # References
+///
+/// [^1]: Recurring Defect Shapes, shape 1. `.agents/rules/recurring-defects.md`
+#[must_use]
+pub const fn level_pip_colour() -> u32 {
+    LEVEL_PIP_COLOUR
 }
 
 /// Returns the colour the viewer draws the pip of one resource in.
@@ -2039,7 +2117,17 @@ pub fn draw_paced(
             // skips it.[^8]
             if any_upgrade {
                 if let Some(site) = world.upgrade_at(address) {
-                    if site.is_complete() || camera.tile_width < SITE_LEAST_TILE {
+                    let close = camera.tile_width >= SITE_LEAST_TILE;
+                    // **A site that stands washes its tile, and a site under
+                    // work does not.** A wash at the weight the progress
+                    // gives is the colour of the ground under it, so a store
+                    // two work units into its forty-eight was absent rather
+                    // than weak.[^17] Below the width at which a glyph
+                    // reads, the wash is the only mark a tile can carry, so
+                    // a site under work washes there too.
+                    //
+                    // [^17]: Research report 25, defect 1. `docs/research/reports/25-demonstration-readability-upgrades-and-units.md`
+                    if site.is_complete() || !close {
                         canvas.shade(
                             left,
                             top,
@@ -2051,15 +2139,14 @@ pub fn draw_paced(
                                 world.upgrade_table().work_above(site.category, site.level),
                             ),
                         );
-                    } else {
-                        // A site under work draws as a glyph and not as a
-                        // wash. A wash at the weight the progress gives is
-                        // the colour of the ground under it, so a store two
-                        // work units into its forty-eight was absent rather
-                        // than weak.[^17]
-                        //
-                        // [^17]: Research report 25, defect 1. `docs/research/reports/25-demonstration-readability-upgrades-and-units.md`
-                        mark_site(canvas, left, top, wide, tall, site.category);
+                    }
+                    // The glyph carries the category and the pips carry the
+                    // level, at every level and whether or not the site
+                    // stands.[^19]
+                    //
+                    // [^19]: ADR-0151, an upgrade is a category with a ground fit and a level, decision D5. `docs/adrs/draft/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
+                    if close {
+                        mark_site(canvas, left, top, wide, tall, site);
                     }
                 }
             }
@@ -2311,22 +2398,24 @@ pub fn luxury_colour(ordinal: u32) -> u32 {
     (red << 16) | (green << 8) | blue
 }
 
-/// Paints the glyph of a build site in the middle of a tile.
+/// Paints the mark of a build site in the middle of a tile.
 ///
-/// Each kind takes a shape of its own, drawn over a dark square, so a watcher
-/// reads a made thing and not a shade of the ground.[^1]
+/// **The category is the shape and the level is a count of pips.** Each
+/// category takes a shape of its own, drawn over a dark square, so a watcher
+/// reads a made thing and not a shade of the ground.[^1] Under the square
+/// stands one pip for each level that stands on the tile, so a watcher tells
+/// a second level of one category from a first level of another at a
+/// glance.[^2]
+///
+/// The two channels are independent. Neither is a shade of the category
+/// colour, so neither cancels against the wash that carries the build
+/// progress.[^1]
 ///
 /// # References
 ///
 /// [^1]: Research report 25, defect 1. `docs/research/reports/25-demonstration-readability-upgrades-and-units.md`
-fn mark_site(
-    canvas: &mut Canvas,
-    left: i32,
-    top: i32,
-    wide: i32,
-    tall: i32,
-    category: UpgradeCategory,
-) {
+/// [^2]: ADR-0151, an upgrade is a category with a ground fit and a level, decision D5. `docs/adrs/draft/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
+fn mark_site(canvas: &mut Canvas, left: i32, top: i32, wide: i32, tall: i32, site: UpgradeSite) {
     // Half the tile. The ground shows around the glyph, so a watcher reads
     // the kind of ground and the thing somebody is making on it at once.
     let side = (wide.min(tall) / 2).max(3);
@@ -2335,39 +2424,72 @@ fn mark_site(
     // The dark square is the rim. It separates every glyph from the ground
     // under it, whatever the ground is.
     canvas.fill_rect(x, y, side, side, UNIT_RIM);
-    let colour = UPGRADE_COLOURS[category.index()];
+    let colour = UPGRADE_COLOURS[site.category.index()];
     let bar = (side / 4).max(1);
-    // The drawing pass chooses a glyph for a category, and the record leaves
-    // that choice to the viewer. A category with no glyph of its own draws
-    // the rim and the colour alone.[^2]
-    //
-    // [^2]: ADR-0151, an upgrade is a category with a ground fit and a level, decision D5. `docs/adrs/draft/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
-    match category {
-        // A made way: one bar across the tile.
-        UpgradeCategory::ROAD => canvas.fill_rect(x, y + (side - bar) / 2, side, bar, colour),
-        // Worked ground: two bars, one above the other.
-        UpgradeCategory::TERRACE => {
+    // The shape comes from the table, so this pass names no category.[^2]
+    match UPGRADE_GLYPHS[site.category.index()] {
+        SiteGlyph::Bar => canvas.fill_rect(x, y + (side - bar) / 2, side, bar, colour),
+        SiteGlyph::TwoBars => {
             canvas.fill_rect(x, y + bar, side, bar, colour);
             canvas.fill_rect(x, y + side - bar * 2, side, bar, colour);
         }
-        // A great work: a diamond.
-        UpgradeCategory::WONDER => {
+        SiteGlyph::Diamond => {
             let half = side / 2;
             for row in 0..side {
                 let reach = half - (row - half).abs();
                 canvas.fill_rect(x + half - reach, y + row, reach * 2 + 1, 1, colour);
             }
         }
-        // A storehouse: a solid block inside the square.
-        UpgradeCategory::STORE => canvas.fill_rect(
+        SiteGlyph::Block => canvas.fill_rect(
             x + bar,
             y + bar,
             (side - bar * 2).max(1),
             (side - bar * 2).max(1),
             colour,
         ),
-        // Every other category: the colour fills the square.
-        _ => canvas.fill_rect(x + bar, y + bar, side - bar, side - bar, colour),
+        SiteGlyph::Battlement => {
+            canvas.fill_rect(x, y + side - bar * 2, side, bar * 2, colour);
+            canvas.fill_rect(x, y + bar, bar, side - bar * 3, colour);
+            canvas.fill_rect(x + side - bar, y + bar, bar, side - bar * 3, colour);
+        }
+        SiteGlyph::Ring => {
+            canvas.fill_rect(x + bar, y + bar, side - bar * 2, bar, colour);
+            canvas.fill_rect(x + bar, y + side - bar * 2, side - bar * 2, bar, colour);
+            canvas.fill_rect(x + bar, y + bar, bar, side - bar * 2, colour);
+            canvas.fill_rect(x + side - bar * 2, y + bar, bar, side - bar * 2, colour);
+        }
+    }
+    mark_level(canvas, x, y, side, top, tall, site.level);
+}
+
+/// Paints one pip under the glyph of a site for each level that stands.
+///
+/// A site at level zero is a first build under construction. Nothing stands
+/// there, so it draws no pip and the empty row is the reading.
+///
+/// The pips take the count and never a shade, so the channel is independent
+/// of the category colour and of the progress wash.[^1]
+///
+/// # References
+///
+/// [^1]: ADR-0151, an upgrade is a category with a ground fit and a level, decision D5. `docs/adrs/draft/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
+fn mark_level(canvas: &mut Canvas, x: i32, y: i32, side: i32, top: i32, tall: i32, level: u8) {
+    if level == 0 {
+        return;
+    }
+    let count = i32::from(level);
+    let pip = (side / 4).max(2);
+    let gap = (pip / 2).max(1);
+    let step = pip + gap;
+    let row_width = count * step - gap;
+    let start = x + (side - row_width) / 2;
+    // The row sits under the square. A tile that is wider than it is tall
+    // leaves less room under the glyph, so the row is held inside the tile.
+    let row = (y + side + gap).min(top + tall - pip - 1).max(top);
+    for index in 0..count {
+        let at = start + index * step;
+        outline(canvas, at - 1, row - 1, pip + 2, pip + 2, UNIT_RIM);
+        canvas.fill_rect(at, row, pip, pip, LEVEL_PIP_COLOUR);
     }
 }
 

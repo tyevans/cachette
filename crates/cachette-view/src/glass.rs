@@ -63,8 +63,8 @@ use crate::hud::{
     ChoiceReadout, Readout, TileReadout,
 };
 use crate::paint::{
-    faction_colour, founding_core_colour, kind_colour, luxury_colour, over_capacity_colour,
-    shortage_colour, upgrade_colour, Canvas, COLOURED_FACTIONS,
+    faction_colour, founding_core_colour, kind_colour, level_pip_colour, luxury_colour,
+    over_capacity_colour, shortage_colour, upgrade_colour, Canvas, COLOURED_FACTIONS,
 };
 use crate::text;
 
@@ -808,6 +808,17 @@ fn colour_card(readout: &Readout) -> Card {
             "a site".to_string(),
         ));
     }
+    // **The key names the level channel as well as the category colours.**
+    // The shape of a mark says which category, and the pips under it say
+    // which level. A reader who is not told that a count of pips is a level
+    // has to guess it from the map.[^5]
+    //
+    // [^5]: ADR-0151, an upgrade is a category with a ground fit and a level, decision D5. `docs/adrs/draft/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
+    rows.push(Row::coloured(
+        level_pip_colour(),
+        "level pip".to_string(),
+        "one for each level".to_string(),
+    ));
     Card {
         heading: "COLOURS IN THE WINDOW",
         rows,
