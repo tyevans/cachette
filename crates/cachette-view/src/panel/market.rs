@@ -194,19 +194,27 @@ pub(crate) mod tests {
         }
     }
 
-    /// Fills a band of the world with one faction, steps until the faction
-    /// holds ground, and returns one tile it holds that admits a unit.
+    /// Founds a city for the faction, steps, and returns one tile the
+    /// faction holds that admits a unit.
+    ///
+    /// A faction holds the ground within reach of a city it owns, and a unit
+    /// standing on a tile gives its faction no claim on it.[^1] The fixture
+    /// wants one thing, a tile whose holder is the named faction, so it
+    /// founds a city and lets the holding pass state the rule. A fixture that
+    /// walked the rule would be a second declaration of it.[^2]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0150, held ground is the ground within reach of a city its faction owns, decision D1. `docs/adrs/draft/adr-0150-held-ground-is-the-ground-within-reach-of-a-city-its-faction-owns.md`
+    /// [^2]: Findings register, FND-487. `docs/FINDINGS.md`
     pub(crate) fn a_held_tile(world: &mut World, faction: FactionId) -> Axial {
-        for row in 20..40 {
-            for column in 20..40 {
-                let at = Axial::new(column, row);
-                if world.admits_a_unit(at) {
-                    world
-                        .spawn_soldier(at, faction)
-                        .expect("the address and the faction are valid");
-                }
-            }
-        }
+        let seat = (20..40)
+            .flat_map(|row| (20..40).map(move |column| Axial::new(column, row)))
+            .find(|at| world.admits_a_unit(*at) && world.settlements().on_tile(*at).is_none())
+            .expect("the band holds open ground with no city on it");
+        world
+            .found_settlement(seat, faction)
+            .expect("the seat admits a city");
         for _ in 0..4 {
             world.step(1).expect("the step must run");
         }
