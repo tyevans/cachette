@@ -25,7 +25,7 @@ grows a holding during a run. The ground grows outward from wherever a unit
 stands, and it keeps growing until it meets another holding, or ground that
 refuses it. A holding therefore has no centre and no reason.
 
-This has four costs.
+The costs follow.
 
 **A god cannot lose ground by losing a city.** The ground a faction holds does
 not depend on anything the faction owns. A faction whose every settlement is
@@ -44,12 +44,22 @@ on ground its own faction holds, and nothing checks it. A unit of one faction
 finishes an improvement on ground another faction holds, or on ground nobody
 holds.
 
+**A god cannot make ground its own by using it.** A faction sends its people
+to the same places outside its own ground, run after run, and holds none of
+it. Use costs the faction and earns it nothing, so a border never moves toward
+the way a god plays.
+
+**A god cannot tidy the ground it has almost surrounded.** A piece of ground
+that one faction rings on every side belongs to nobody. The god sees a hole in
+its own ground, and no act of the game closes it.
+
 ## What good looks like
 
 Each statement below can be checked.
 
 - A tile that is far from every city a faction owns is held by nobody, unless
-  another faction's city is near it.
+  another faction's city is near it, or a faction uses it, or one faction rings
+  it.
 - Ground held by a faction that owns no city is held by nobody after the next
   step.
 - An improvement that is finished inside a faction's ground extends how far
@@ -66,6 +76,15 @@ Each statement below can be checked.
   on every run.
 - A watcher reads the holder of a tile before a city is founded and after it.
   The two readings differ.
+- A faction that sends its people over the same ground, tick after tick, comes
+  to hold that ground. It holds it even where no city it owns is near.
+- Ground that a faction stops visiting is held by nobody again, after a stated
+  number of ticks. A faction cannot keep ground it has abandoned.
+- One unit that crosses a piece of ground far from every city of its faction,
+  once, gives that faction nothing. The reading of the holder is unchanged.
+- A piece of ground that one faction rings on every side comes to belong to
+  that faction. A piece of ground that two factions ring, or that nobody
+  rings, belongs to nobody.
 
 ## What this does not do
 
@@ -81,9 +100,10 @@ Each statement below can be checked.
   separate need.
 - It does not decide what a city is worth or what founding one costs. That is
   a rule of the downstream game.
-- It does not decide how the terrain shapes the ground. The current world
-  refuses a holding on water, and this record keeps that. Whether a hill
-  shortens the reach of a city is a separate question.
+- It does not decide how the terrain shapes the ground, and it does not keep
+  the rule that a faction never holds water. A piece of water that one faction
+  rings on every side is a piece of ground that one faction rings. Whether a
+  hill shortens how far a city reaches is a separate question.
 - It does not decide whether a settler is used up when it founds a city.
 
 ## What it costs at the target scale
@@ -116,11 +136,13 @@ state a shape, not a number.
 
 - **One blocker governs every cost figure here.**[^4] It says which figures
   are measured and which are derived.
-- **One blocker governs the reach of a city and the extension one improvement
-  gives it.**[^5] The rules of the downstream game are one paragraph, and how
-  far a city reaches is a rule of that game. This record states no distance
-  and no extension. The values are parameters, and the balance register holds
-  their rows when a pass writes them.
+- **One blocker governs every quantity this record needs.**[^5] The rules of
+  the downstream game are one paragraph. How far a city reaches, how much one
+  improvement extends it, how long use takes to win ground, how long disuse
+  takes to give it back, and how far a ring reaches into the ground it
+  surrounds are all rules of that game. This record states no distance and no
+  duration. The values are parameters, and the balance register holds their
+  rows when a pass writes them.
 - **One blocker stays untouched.**[^6] It asks whether an improvement changes
   hands when the ground under it does. Traded land that carries an improvement
   is refused while the question is open, and this record does not close it.
