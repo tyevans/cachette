@@ -135,13 +135,15 @@ The wind is state, so a world that loads a saved wind and a world that
 recomputes one are different worlds. Anything that writes the world must write
 the wind.
 
-**The heat of a cell does not change over time, so the wind settles.** Nothing
-in the engine varies the heat with a season or with a time of day. Under a
-fixed terrain the pressure is fixed, so the wind reaches a steady field and
-stays there. The picture a watcher sees still moves, because the source of the
-water is a keyed draw at scattered cells and scattered ticks, and a steady wind
-carries those parcels across the map.[^3] A driving term that varies over time
-would make the wind itself move, and this record does not add one.
+**This consequence held while the heat was fixed, and a later record made the
+heat state.** It said that the heat of a cell does not change over time, so the
+wind settles: under a fixed terrain the pressure is fixed, so the wind reaches a
+steady field and stays there, and only the keyed draw that puts water into the
+sky kept the picture moving.[^3] It also said that a driving term varying over
+time would make the wind itself move, and that this record does not add one.
+**A later record adds one, and the wind therefore does not settle.**[^13] The
+consequence is struck rather than superseded, because it follows from the claim
+that record changes and it is not a claim a reader would cite on its own.
 
 **A wrong ceiling breaks conservation rather than looking untidy.** The
 transport rule depends on the bound this record states, so a later change that
@@ -167,3 +169,4 @@ before.[^12]
 [^10]: ADR-0087, an influence solve runs a fixed iteration count over the whole plane, decision D1. `docs/adrs/draft/adr-0087-an-influence-solve-runs-a-fixed-iteration-count.md`
 [^11]: Blockers register, BLK-007. `docs/BLOCKERS.md`
 [^12]: PRD-0004, the world has weather that a watcher can read, what it costs at the target scale. `docs/product/accepted/prd-0004-the-world-has-weather-that-a-watcher-can-read.md`
+[^13]: ADR-0166, the temperature of a cell is carried state that a season and the sky drive, decisions D1 and D2. `docs/adrs/draft/adr-0166-the-temperature-of-a-cell-is-carried-state-that-a-season-and-the-sky-drive.md`

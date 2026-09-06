@@ -120,4 +120,4 @@ rounding step or the ground that blocks sight, for the same reason.
 [^4]: Backlog item 0495. `docs/backlog/proposed/0495-build-the-observation-plane-and-let-every-reader-answer-for-one-faction.md`
 [^5]: Blockers register, BLK-050 and BLK-007. `docs/BLOCKERS.md`
 [^6]: Testing rules, sections 2 and 2a. `.agents/rules/testing.md`
-[^7]: Findings register, FND-548. `docs/FINDINGS.md`
+[^7]: Findings register, FND-560. `docs/FINDINGS.md`

@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-554**
+**Next number: FND-561**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -13336,6 +13336,266 @@ supports. This work measured both, with one binary built before the edit and one
 after, on one machine.
 
 
+### FND-554 — A file-ownership rule protects a shared register from collision and stops anyone repairing it
+
+**Believed.** Telling every worker which files another worker holds prevents two
+workers editing one file at once. A worker who finds a stale row in a held file
+reports it, and the holder repairs it.
+
+**True.** A shared register that nobody actually holds becomes a register that
+everybody believes somebody else holds. Two commits of one wave each noticed that
+the unit type row of the balance register had gone stale, each wrote in its own
+body that the register "is held by another worker in this session, so the row is
+reported and not edited here", and neither edited it. **Both deferred to a
+phantom owner.** The row stayed wrong through the rest of the wave.
+
+**Evidence.** The row said the default unit type table is five rows by eight
+columns, and it named all thirteen. The table is seven rows by ten columns. It
+gained a water crossing column and a settle group column, and a mariner row and a
+settler row.[^F554A]
+
+**The second of the two commits computed from a stale figure, and its body is now
+wrong for ever.** A third commit had widened the row first and never mentioned
+the register, so the deferring commit wrote "six rows by nine columns" when the
+truth was already seven by ten. A commit message is immutable, so that figure
+cannot be repaired. It can only be contradicted here.[^F554B]
+
+**Follows.** Three things.
+
+**Ownership of a file is not ownership of the repair.** A collision rule must
+name who repairs a shared register, or it turns a collision risk into a certainty
+of decay. The cheapest form is that anyone may edit a register row that names a
+value they changed, whatever else they were told another worker holds.
+
+**A worker who defers must name the holder.** "Another worker in this session" is
+not a name. A deferral to a person can be checked and a deferral to a role cannot.
+
+**Report the figure you measured, and never the figure you derived from a
+register you did not trust.** The second commit read the register, added its own
+column and reported the sum. Counting the columns in the source would have found
+the discrepancy rather than carrying it forward.
+
+### FND-555 — A wave that suspends the record discipline leaves the reference tables behind first
+
+**Believed.** Suspending the record discipline for a wave of fast work costs
+decision records. The registers hold up, because a register row is cheap to edit.
+
+**True.** The registers went first and the records went second. The code compiles
+without a register row, no check reads a derivation column, and a stale row
+states a false thing with the authority of a register while nothing fails. A
+record at least draws attention when somebody reads it against the code.
+
+**Evidence.** Three registers were left stale by one wave of about a hundred and
+thirty commits. The balance register held seven weather rows marked unset with
+empty derivations, while the values sat as constants in the weather module. It
+held a unit type row wrong by two rows and two columns.[^F554A] It held a
+recovery period row and a renown target row that the same wave had made false.
+The target cost register gained no row for the weather stage at all, and a
+measurement of the weather at four lattice pitches was taken and recorded
+nowhere.
+
+**Follows.** Two things.
+
+**The trade was still right, and this is the shape of the debt it creates.** A
+wave that suspends the discipline should expect the reference tables to be the
+largest part of the repair, and not the records. Budget for that.
+
+**A row with a value in the code and an empty derivation in the register is the
+first defect shape and not a gap.** It is one fact in two places, with the
+register holding the emptier copy, and nothing fails when the two disagree.[^F487B]
+
+### FND-556 — A repair charged the whole tick froze every level for ever, at any wear rate above zero
+
+**Believed.** Giving an upgrade a condition, a wear and a repair is a balance
+change. If the numbers come out wrong, a rate can be tuned.
+
+**True.** The first repair spent the whole of a builder's tick whatever the gap
+cost. The wear of one tick then took a small amount back in the same tick, the
+site was damaged again at the start of the next tick, and the whole of every
+later tick went into a repair worth almost nothing. **The steady state was a
+frozen progress and a level that never rose.** It holds at every wear rate above
+zero, so no value fixes it.
+
+**Evidence.** Measured on the island of the upgrade table fixture. The progress
+stopped at tick 15 and had not moved at tick 28. Over a longer run the site did
+not merely stall: it collapsed, the tile returned to the generated world at about
+tick 2088, and nothing built there again for the remaining 7500 ticks. The test
+binary ran for 153 seconds against the deadlock and 4 seconds after the
+repair.[^F556A]
+
+**A repair is a price and not a rate.** A repair now costs the work the gap is
+worth, and the work above that price goes into the level. A gap worth less than
+one unit of work is priced at zero: it is not mended and it is not charged for,
+so the gap stays open and grows until it is worth a unit. Heavy wear still stops
+a build, which is the point of the mechanic. Light wear no longer does.
+
+**Follows.** Two things.
+
+**A sink that charges a fixed price against a variable gap is a deadlock and not
+a balance value.** Ask of any new sink what happens when the gap is small. If the
+answer does not scale with the gap, the mechanic holds a fixed point that no
+tuning moves.
+
+**Three callers shared one function, and that is why the repair was one edit.**
+The order verb, the build pass and the movement hold all ask one function whether
+a repair is due, so none of them can charge for a repair that the pass will not
+do.
+
+### FND-557 — Two tests of one wave were passing under the defect they existed to catch
+
+**Believed.** A test that asserts a field moves proves that the thing driving the
+field works.
+
+**True.** Two tests of one wave stayed green with the defect they existed to
+catch put back. Both were found by putting the defect back, and neither would
+have been found by reading the test.
+
+**Evidence.** The wind test was first written as "the fastest speed is nonzero".
+With a fixed pressure divisor restored, 129 of 2304 cells still moved, so the
+test passed. It now counts moving cells, and it fails at 129 while passing at
+2303. A climate test stayed green with the moisture reach set to zero.[^F557A]
+
+**A third test could not be saved and was deleted.** It stepped one world for
+eight frames and asserted that no two frames hashed alike, as a proof that the
+temperature enters the state hash. It passed with the temperature removed from
+the hash, and again with a counter removed as well, because four other planes
+move on every frame and separate the frames whatever the temperature does. Two
+rewrites failed to isolate it. A dry inland world holds the water planes still
+but not the wind or the counters, and a pair of fields over a one-cell lattice
+would hold everything still but cannot be built through the public interface.
+
+**The other eight tests of the same batch were checked the same way**, and six of
+them failed correctly when the season swing and the cloud swing went back to
+zero.
+
+**Follows.** Three things.
+
+**A test that asserts "something moved" measures the noisiest term and not the
+term it names.** State the assertion against a count or a share, so that a
+partial failure is a failure.
+
+**Nothing now proves that the temperature enters the state hash.** A comment
+stands where the test was, so the next reader does not take the gap for an
+oversight and write the same decoration again. A draft record states the rule and
+no test holds it at that point.[^F537E]
+
+**A world with several moving planes cannot prove that one of them moves.** The
+proof needs a world in which every other plane is still, and the public interface
+offers no constructor that builds one.
+
+### FND-558 — Three fixtures of one wave measured themselves, and each was found by putting the defect back
+
+**Believed.** A fixture built from the demonstration world supplies the input a
+test needs, because the demonstration world is the world the engine runs.
+
+**True.** The demonstration world is chosen to look right and not to produce edge
+values. Three fixtures of one wave supplied no edge at all. This is the third
+subsystem in which the shape has appeared.[^F558A]
+
+**Evidence.** Three cases.
+
+**A production fixture read one site, and that site sits on a cell that never
+dries.** Over 1600 ticks the fixture held 1600 wet ticks and 0 dry ticks, so the
+moisture term was never exercised at both ends. The four sites the seeding gives
+are wet 1581, 1568, 166 and 166 times out of 1600, and the fixture took the
+first. The fixture now seats settlements on a lattice across the whole world, 37
+seats survive, and 29 of them hold both a wet tick and a dry tick.
+
+**A terrace fixture waited 3000 ticks for a terrace that could not be ordered.**
+The founding zones its own disc, so no tile of the fixture accepted a terrace
+order and the test measured the fixture.
+
+**A growth fixture wrote exactly one birth's cost into the store**, and the rate
+pass ran twice before the growth stage read it, so the store held less than the
+cost by the time it mattered.
+
+**Follows.** Two things.
+
+**Ask what distribution the assertion needs, then build the world that produces
+it.** A fixture that seats one thing samples one value of every field the test
+reads.
+
+**A fixture assertion is part of the test.** Each repaired fixture now asserts
+that it reached its case, so a fixture that stops reaching it fails rather than
+passing on nothing.
+
+### FND-559 — A determinism fixture assumed peace, and it had been relying on war being unreachable
+
+**Believed.** A determinism fixture that pins the stores and the presence of two
+factions pins everything the trade depends on.
+
+**True.** It did not pin the relation. The two factions declared war part way
+through the run, a pair at war holds no negotiation, and the trade book was
+therefore empty when the fixture read it. The test failed at its own reach guard
+before any hash comparison ran.
+
+**The fixture had been correct only because war was unreachable.** Command reach
+sits on the leader row alone and no faction held a leader, so no faction could
+move a relation and no pair ever reached the war band. A change that makes a
+faction with no speaker queue a leader made war reachable, and three fixtures
+broke at once.
+
+**Evidence.** Bisected by checking out the core sources at each commit of the
+wave and running the one test. The three failures are the three commits of the
+war chain, and the first of them is the leader queue change. With the reach guard
+removed, the run produced the same state hash at 1, 2 and 12 threads, so the
+engine was not diverging. The comparison was not relaxed: three hashes are still
+compared for equality at three thread counts.
+
+**Two sibling fixtures broke the same way.** A campaign fixture asserted that a
+faction at peace raises no campaign, and left the pair at the value a new world
+gives, which is the peace edge. Both factions built a leader, moved relations and
+crossed the war edge on their own. A relation fixture gave one faction workers
+only and asserted over 200 ticks that it planned no relation move. That faction
+gained a speaker on tick 80 and planned 28 moves across the run.
+
+**Follows.** Three things.
+
+**A fixture that pins some of a precondition pins none of it.** Pin the relation
+the way the fixture already pins the stores, or state plainly that the relation
+is an input the test does not control.
+
+**A reach guard turned a silent wrong answer into a loud failure.** The trade
+fixture would otherwise have compared three hashes of a run in which no trade
+happened, and passed.
+
+**A test that encodes an unreachable world stops being a test the moment the
+world reaches it.** Each of the three was repaired by reading the state per tick
+against what the pass saw, and by counting that the case was reached at all.
+
+### FND-560 — The offset space of a block is the square of the block edge, and two commits cited another finding's number for it
+
+**Believed.** The offset of a tile inside a block runs over the tiles the block
+holds, so a mask indexed by that offset needs one bit for each tile of a block.
+
+**True.** The offset space is the square of the block edge. A cut block holds
+fewer tiles than a whole one while still using the same offset space, so a mask
+sized to the tile count of a block drops every offset above that count.
+
+**Evidence.** Only a cut block differs, so a world whose blocks are all whole
+shows nothing. In a world holding one cut block, a faction that saw the whole of
+that block was reported as seeing 128 of its 256 tiles.[^F560A]
+
+**This entry takes a number of its own because two commits cited FND-548 for it,
+and FND-548 holds another subject.** That entry is about a census repair leaving
+three rows that said more than they read. Two subjects under one number is the
+failure the register check exists to catch, and it caught nothing here, because
+the second subject never became a row at all. The backlog item that carried the
+citation now points here.[^F560B]
+
+**Follows.** Three things.
+
+**Size an index space by the address arithmetic and never by the population.**
+The two agree in the common case, which is what makes the defect quiet.
+
+**A fixture over interior blocks alone cannot see an edge defect.** Build the
+world with a cut block, or the assertion never receives the input that would fail
+it.
+
+**A citation of a number that holds no row is invisible.** The check compares a
+cited number against the rows that exist, so a citation of a number that exists
+and holds another subject passes. Read the row you cite.
+
 ## References
 
 [^F552A]: The unit-to-tile bridge, the block key. `crates/cachette-core/src/bridge.rs`
@@ -13424,3 +13684,10 @@ after, on one machine.
 
 [^F546A]: The founding survey and the eligibility of a candidate. `crates/cachette-core/src/founding.rs`
 [^F546C]: Balance register, the founding group. `docs/reference/balance.md`
+[^F554A]: Balance register, the unit types. `docs/reference/balance.md`
+[^F554B]: Recurring defect shapes, shape 2. `.agents/rules/recurring-defects.md`
+[^F556A]: Backlog item 0475. `docs/backlog/complete/0475-give-an-upgrade-a-condition-that-armies-wear-and-workers-repair.md`
+[^F557A]: Backlog item 0499. `docs/backlog/complete/0499-give-every-level-1-cell-a-wind-that-carries-its-momentum.md`
+[^F558A]: Findings register, FND-051. `docs/FINDINGS.md`
+[^F560A]: Backlog item 0108. `docs/backlog/complete/0108-let-a-unit-observe-the-tiles-around-it.md`
+[^F560B]: Findings register, FND-548. `docs/FINDINGS.md`

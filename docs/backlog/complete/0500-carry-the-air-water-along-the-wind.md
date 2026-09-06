@@ -1,7 +1,7 @@
 ---
 id: 0500
 title: Carry the air water along the wind
-status: proposed
+status: complete
 created: 2026-09-05
 implements: [ADR-0161]
 changes: [ADR-0141]
@@ -100,7 +100,21 @@ count and every cost figure the item states.
 
 ## Outcome
 
-Filled in when the item moves to `complete/`.
+Complete in the engine, and **the property test this item asked for was never
+written**.
+
+**What was built.** The air water rides the wind. A cell sends a share of its
+air along the direction it holds, and every transfer is an exact integer move.
+ADR-0161 holds the record, and it changes the isotropic share of ADR-0141 D1.
+
+**What was never proved.** This item asked for a property test over random winds
+and random air planes, asserting that the air total is unchanged. It also asked
+that the isotropic share be put back and the failure recorded in the commit
+body. The tests present are example tests and not property tests, and no such
+perturbation is recorded anywhere.
+
+**The transport share** carried a value in the weather module and an empty
+derivation in the balance register until the reconciliation filled it.
 
 ## References
 

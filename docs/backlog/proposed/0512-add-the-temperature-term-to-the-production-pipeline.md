@@ -31,4 +31,4 @@ would be an invented value.
 
 ## References
 
-[^1]: Backlog item 0513, make a site production rate follow the world each application. `docs/backlog/refined/0513-make-a-site-production-rate-follow-the-world-each-application.md`
+[^1]: Backlog item 0513, make a site production rate follow the world each application. `docs/backlog/complete/0513-make-a-site-production-rate-follow-the-world-each-application.md`

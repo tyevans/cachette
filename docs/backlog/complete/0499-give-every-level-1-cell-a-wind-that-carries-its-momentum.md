@@ -1,7 +1,7 @@
 ---
 id: 0499
 title: Give every level 1 cell a wind that carries its momentum
-status: proposed
+status: complete
 created: 2026-09-05
 implements: [ADR-0160]
 changes: []
@@ -114,9 +114,29 @@ adds reads the wind this item stores.
 
 ## Outcome
 
-Filled in when the item moves to `complete/`.
+Complete in the engine, and **the two tests this item asked for were never
+written**.
+
+**What was built.** Every weather cell carries a wind. The pressure difference
+across a cell accelerates it by a bounded step, a drag share bleeds it, a
+ceiling bounds the speed, and a deflection turns it so that a circulation forms
+without anyone naming one. The pass count is fixed. ADR-0160 holds the record.
+
+**What was never proved.** This item asked for a test that the wind lags the
+pressure, and a test that drag brings a wind to rest. Neither exists. The tests
+that do exist count moving cells over the map, which is a weaker statement.
+
+**A test passed under its own defect, and that is why the gap matters.** The
+wind test was first written as "the fastest speed is nonzero". Putting the
+defect back, a fixed pressure divisor, left it green: 129 of 2304 cells still
+moved. It now counts moving cells and fails at 129 while passing at 2303.[^C4]
+
+**The register.** Five wind rows carried a value in the weather module and an
+empty derivation in the balance register until the reconciliation filled
+them.
 
 ## References
 
 [^1]: Research report 26, the scale of the weather, sections 4 and 6. `docs/research/reports/26-the-scale-of-the-weather.md`
 [^2]: ADR-0160, the wind is carried state, and the pressure gradient accelerates it. `docs/adrs/accepted/adr-0160-the-wind-is-carried-state-and-the-pressure-gradient-accelerates-it.md`
+[^C4]: Findings register, FND-557. `docs/FINDINGS.md`

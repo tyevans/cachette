@@ -1,7 +1,7 @@
 ---
 id: 0513
 title: Make a site production rate follow the world each application
-status: refined
+status: complete
 created: 2026-09-06
 implements: [ADR-0062 D1, ADR-0062 D2, ADR-0062 D7, ADR-0143 D1, ADR-0164 D2]
 changes: []
@@ -109,6 +109,32 @@ is not touched, because the pass keeps its position and its stage.
 - ADR-0055 is written and the registry row reads `Draft`.
 - The balance register holds one row for each weight, each with a derivation.
 
+## Outcome
+
+Complete. A site production rate now follows the world at each application.
+
+**What was built.** The effective rate module composes four terms and multiplies
+the stored base rate by their sum once: the ground the disc still holds against
+what it held untouched, the moisture of the cell the site sits on, the terraces
+standing in the disc, and the residents. The stored rate stays the base, so the
+founding rule that writes a rate at founding is unchanged.
+
+**Why the terms add and do not multiply.** Addition in the project fixed-point
+scale is exact and saturating, so four added terms carry no truncation. Four
+multiplied factors truncate four times and compound.
+
+**The record this item creates.** ADR-0055, the record that ADR-0062 D7
+reserved. It states the composition rule, that the derived rate stays out of the
+state hash, and that the pipeline draws nothing and tests no condition.
+
+**Left open.** No temperature term. Item 0512 holds it, and it is held by a
+measurement rather than by a choice.
+
+**A fixture defect found inside the item.** The wet-and-dry test read one site,
+and the site it picked sits on a cell that never dries: 1600 wet ticks and 0 dry
+ticks. The fixture now seats settlements across the world, and 29 of 37 seats
+hold both a wet tick and a dry tick.[^C6]
+
 ## References
 
 [^1]: Backlog item 0136, provision a founded site from the ground it reaches. `docs/backlog/complete/0136-provision-a-founded-site-from-the-ground-it-reaches.md`
@@ -117,3 +143,4 @@ is not touched, because the pass keeps its position and its stage.
 [^4]: ADR-0164, every stored value the step reads enters the state hash, decision D2. `docs/adrs/draft/adr-0164-every-stored-value-the-step-reads-enters-the-state-hash.md`
 [^5]: ADR Registry, row 0055. `docs/adrs/REGISTRY.md`
 [^6]: Backlog item 0512, add the temperature term to the production pipeline. `docs/backlog/proposed/0512-add-the-temperature-term-to-the-production-pipeline.md`
+[^C6]: Findings register, FND-558. `docs/FINDINGS.md`

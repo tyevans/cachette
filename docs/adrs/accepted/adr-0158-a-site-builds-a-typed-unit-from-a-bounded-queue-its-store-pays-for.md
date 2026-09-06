@@ -326,5 +326,5 @@ to learn that it is bad.
 [^16]: ADR-0144, a faction controller runs inside the step and acts only through the caller's verbs, decision D3. `docs/adrs/accepted/adr-0144-a-faction-controller-runs-inside-the-step-and-acts-only-through-the-callers-verbs.md`
 [^17]: Backlog item 0485. `docs/backlog/complete/0485-let-a-settler-found-a-city-and-let-the-controller-settle-new-ground.md`
 [^18]: The founded group test. `crates/cachette-core/tests/founded_group_survives.rs`
-[^19]: Backlog item 0498. `docs/backlog/proposed/0498-give-the-upgrade-table-a-housing-category.md`
+[^19]: Backlog item 0498. `docs/backlog/complete/0498-give-the-upgrade-table-a-housing-category.md`
 [^20]: Testing Rules, a fixture supplies the input. `.agents/rules/testing.md`
