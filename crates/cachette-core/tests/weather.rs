@@ -841,32 +841,12 @@ fn the_peak_of_the_air_plane_keeps_moving() {
     );
 }
 
-/// The temperature reaches the state hash.
-///
-/// A world that loads a saved temperature and a world that recomputes one are
-/// different worlds, in the same way that the wind makes them different.
-#[test]
-fn the_temperature_reaches_the_state_hash() {
-    let mut world = coastal_world();
-    let mut hashes = Vec::new();
-    let mut temperatures: Vec<Vec<i32>> = Vec::new();
-    for _ in 0..8 {
-        world.step(4).expect("the step must run");
-        hashes.push(world.state_hash());
-        temperatures.push(world.weather().warmth_plane().to_vec());
-    }
-    // The temperature moved over these frames, so a hash that ignored it
-    // would have to repeat for this test to mean anything.
-    assert!(
-        temperatures.windows(2).any(|pair| pair[0] != pair[1]),
-        "the temperature held still, so this test measures nothing"
-    );
-    let mut seen = hashes.clone();
-    seen.sort();
-    seen.dedup();
-    assert_eq!(
-        seen.len(),
-        hashes.len(),
-        "two frames of different temperature hashed alike"
-    );
-}
+// **There is no test here that the temperature reaches the state hash.** The
+// claim needs two fields whose only difference is the temperature, and this
+// interface cannot build that pair. Every frame moves the pass counts and the
+// wind as well, and the level 1 summary that would hold the ground still has
+// no constructor a test can call. A test that stepped one world and found two
+// unequal hashes would pass with the temperature removed from the hash, and a
+// test that cannot fail is decoration.[^2]
+//
+// [^2]: Testing rules, section 1. `.claude/rules/testing.md`
