@@ -337,7 +337,7 @@ without stating a constraint is worse than no record.
 | 0055 | An effective stat comes from an ordered modifier pipeline | Proposed | 0002, 0054 | 12 |
 | 0056 | Movement is tile-discrete and admitted by sort-then-admit | Accepted | 0004, 0018 | 06, 10 |
 | 0058 | A field update is a flux pair on an edge, so quantity is conserved exactly | Proposed | 0023, 0029 | 13 |
-| 0059 | Fog storage grows with observed area, not with world area | Proposed | 0026, 0053 | 08 |
+| 0059 | Fog storage grows with observed area, not with world area | Draft | 0001, 0002, 0004, 0009, 0022, 0023, 0040, 0053, 0111, 0154 | 08, `draft/adr-0059-fog-storage-grows-with-observed-area.md` |
 | 0060 | An influence map is stored as a shared basis, not one plane per faction | Draft | 0022, 0053 | 09, `draft/adr-0060-an-influence-map-is-stored-as-a-shared-basis.md` |
 | 0061 | Trade solves a flow, never a path for each cart | Proposed | 0049, 0058 | 11 |
 | 0062 | Production and upkeep are rates attached to a site | Accepted | 0055 | 12, `accepted/adr-0062-production-and-upkeep-are-rates-attached-to-a-site.md` |
