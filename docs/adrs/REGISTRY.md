@@ -422,10 +422,14 @@ without stating a constraint is worse than no record.
 | 0163 | An event declares its layout once and the binding derives every column | Draft | 0002, 0006, 0031, 0040, 0044, 0085, 0107 | `draft/adr-0163-an-event-declares-its-layout-once-and-the-binding-derives-every-column.md` |
 | 0164 | Every stored value the step reads enters the state hash, and only a derived value stays out | Draft | 0001, 0004, 0022, 0064, 0072 | `draft/adr-0164-every-stored-value-the-step-reads-enters-the-state-hash.md` |
 <<<<<<< HEAD
+<<<<<<< HEAD
 | 0165 | The wealth bar stands above what one settlement can hold. Changes ADR-0148 D3: a reader threshold may be derived from a structural ceiling and not only from a balance row | Draft | 0002, 0011, 0023, 0148 | `draft/adr-0165-the-wealth-bar-stands-above-what-one-settlement-can-hold.md` |
 =======
 | 0165 | A build order holds a unit on its tile, and the hold is derived and never stored | Draft | 0001, 0004, 0091, 0095, 0125, 0145, 0150, 0151, 0152, 0159 | `draft/adr-0165-a-build-order-holds-a-unit-on-its-tile.md` |
 >>>>>>> worktree-agent-ab533abc07d2f8357
+=======
+| 0165 | War opens the border that tension closes. Changes ADR-0146 D4, the movement clause; the other clauses of ADR-0146 D4 stand | Draft | 0056, 0121, 0146, 0153 | `draft/adr-0165-war-opens-the-border-that-tension-closes.md` |
+>>>>>>> worktree-agent-a6fa30a25c89338ea
 
 ### Retired numbers
 

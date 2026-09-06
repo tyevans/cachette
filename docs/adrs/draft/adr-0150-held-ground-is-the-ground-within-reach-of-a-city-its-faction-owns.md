@@ -61,14 +61,20 @@ Distance is the hex distance between the tile and the city's tile. A tile whose
 ground admits no unit is held by nobody, whatever reaches it, so no faction
 holds water. That consequence of the old rule survives.[^2]
 
-The rule reads no previous holder and no unit position. A faction that owns no
-city therefore holds nothing after the next step, and a unit standing on a tile
-gives its faction no claim on it.
+This rule reads no previous holder and no unit position. A faction that owns no
+city therefore holds nothing from this rule. **A unit standing on a tile does
+give its faction a claim on it, through the lease of a later record.**[^26]
 
-A reviewer finds a violation when a tile is held and no city of its holder
-reaches it, when two cities at one distance resolve by anything other than the
-slot index, or when a tile's holder depends on the tile's holder in the
-previous step.
+**That later record changed the order that gives a tile its holder.** A tile is
+now held by its lease faction at the claim threshold, then by this rule, then
+by nobody. That record states the whole order, and this decision is its second
+test.[^26] It also gives a faction the water it has closed, so the water clause
+above holds for this rule and not for the closure of that one.[^26]
+
+A reviewer finds a violation when a tile is held, no city of its holder reaches
+it and no lease at the claim threshold names its holder, when two cities at one
+distance resolve by anything other than the slot index, or when a tile's holder
+depends on the tile's holder in the previous step.
 
 ### D2. The reach of a city is a base plus an extension that counts finished upgrades, capped at a bound
 
@@ -274,3 +280,4 @@ governs every cost figure in this project.[^25]
 [^23]: PRD-0006, a place belongs to somebody. `docs/product/accepted/prd-0006-a-place-belongs-to-somebody.md`
 [^24]: ADR-0142, a god inflicts weather only on ground its own faction holds, decision D1. `docs/adrs/draft/adr-0142-a-god-inflicts-weather-only-on-ground-it-holds.md`
 [^25]: Blockers register, BLK-007. `docs/BLOCKERS.md`
+[^26]: ADR-0153, a tile's lease follows the units that stand on it, decisions D5 and D6. `docs/adrs/accepted/adr-0153-a-tiles-lease-follows-the-units-that-stand-on-it.md`
