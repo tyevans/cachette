@@ -172,8 +172,15 @@ fn main() {
                     best_span = reach;
                     target = Some(at);
                 }
-            } else if seat.distance(at) >= span && target.is_none() {
-                target = Some(at);
+            } else {
+                // The nearest ground at or beyond the span, in ascending
+                // address order, so a tie takes the lower address and the
+                // answer is a property of the world.
+                let reach = seat.distance(at);
+                if reach >= span && reach < best_span {
+                    best_span = reach;
+                    target = Some(at);
+                }
             }
         }
     }
@@ -194,10 +201,26 @@ fn main() {
         home_land.len()
     );
 
+    // The level 1 cell of the target, so the probe can say when the unit
+    // entered the cell that holds it and how long it stayed there.
+    let layout = world.pyramid().layout();
+    let cell_of = move |at: Axial| -> Option<u32> {
+        let tile = grid.index_of(at)?;
+        Some(layout.block_of_key(layout.key_of(tile)?))
+    };
+    let target_cell = cell_of(target).expect("the target names a cell");
+    println!(
+        "  the target sits in cell {target_cell}, and one cell is {} tiles a side",
+        layout.block_edge()
+    );
+
     let mut walked = 0u32;
     let mut last = seat;
     let mut water_ticks = 0u32;
     let mut furthest = 0u32;
+    let mut in_cell = 0u32;
+    let mut entered = None;
+    let mut arrived = None;
     for tick in 0..ticks {
         world.step(threads).expect("the step runs");
         let Some(at) = world.soldiers().address(unit) else {
@@ -209,6 +232,10 @@ fn main() {
                 "  tick {tick}: the unit is gone. the starved log names it: {starved}. \
                  walked {walked} steps, furthest {furthest}, water ticks {water_ticks}"
             );
+            println!(
+                "  it entered the target cell at {entered:?} and spent {in_cell} ticks in it. \
+                 it stood on the target tile at {arrived:?}"
+            );
             return;
         };
         if at != last {
@@ -216,6 +243,15 @@ fn main() {
             last = at;
         }
         furthest = furthest.max(seat.distance(at));
+        if cell_of(at) == Some(target_cell) {
+            in_cell += 1;
+            if entered.is_none() {
+                entered = Some(tick);
+            }
+        }
+        if at == target && arrived.is_none() {
+            arrived = Some(tick);
+        }
         if world.tile_kind(at) == Some(TileKind::Water) {
             water_ticks += 1;
         }
@@ -233,5 +269,9 @@ fn main() {
     println!(
         "  the unit survived {ticks} ticks. walked {walked} steps, furthest {furthest}, \
          water ticks {water_ticks}"
+    );
+    println!(
+        "  it entered the target cell at {entered:?} and spent {in_cell} ticks in it. \
+         it stood on the target tile at {arrived:?}"
     );
 }

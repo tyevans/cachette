@@ -69,6 +69,7 @@ use crate::holding::Holder;
 use crate::resource::{ledger_key, Amount, DepletionLedger, ResourceField, ResourceKind};
 use crate::sim_math;
 use crate::soldier::SoldierArena;
+use crate::terrain::Terrain;
 use crate::tile_value::TileValues;
 use crate::types::{Accum, FactionId, Fix32, TileIdx};
 
@@ -1420,4 +1421,315 @@ fn conducts(pyramid: &Pyramid, cell: u32, crosses: bool) -> bool {
         return pyramid.cell(cell).is_some();
     }
     admits_a_unit(pyramid, cell)
+}
+
+/// The offset that says a tile is a seed of the plane that reads it.
+///
+/// The value is one past the last direction index, so it names no neighbour
+/// and no caller can mistake it for one. A unit that reads it stands on the
+/// tile it was sent to, and it takes no step.[^1]
+///
+/// # References
+///
+/// [^1]: ADR-0091, movement takes its direction from a per-cell field, never from a per-unit search, decision D1. `docs/adrs/draft/adr-0091-movement-takes-its-direction-from-a-per-cell-field.md`
+pub const AT_SEED: u8 = NEIGHBOUR_COUNT as u8;
+
+/// The passes the approach relaxation makes over one block, for each tile of
+/// the block edge.
+///
+/// A pass carries a reach one tile further, so the edge count reaches every
+/// tile of a block by a straight route. Twice the edge admits a detour of the
+/// same length again, which is what a lake or a ridge inside the block asks
+/// for. **The count is fixed and it is derived from the block edge**, so no
+/// pass tests whether the reach settled.[^1]
+///
+/// A tile the passes do not reach holds no offset. The unit there reads the
+/// coarse field instead, which is what every unit read before this field
+/// existed.
+///
+/// # References
+///
+/// [^1]: ADR-0005, a solver runs a fixed iteration count, decision D1. `docs/adrs/accepted/adr-0005-a-solver-runs-a-fixed-iteration-count.md`
+pub const APPROACH_PASSES_PER_EDGE: u32 = 2;
+
+/// The direction of the nearest seed tile, for each tile of a seeded block.
+///
+/// **A field over level 1 cells steers a unit to a cell and no further.** A
+/// cell is a block of tiles a side, and the cell that holds a seed holds no
+/// direction at all, because the reach of a seed is zero and no neighbour is
+/// nearer. A unit that arrives there falls back to the keyed draw and walks at
+/// random until something else stops it.[^1] [^2]
+///
+/// This field resolves that last block at the pitch of one tile. It holds one
+/// entry for each plane and block that a seed lies in, and nothing at all for
+/// a block that seeds none. A unit reads one entry of it, keyed on its own
+/// tile. It reads no neighbouring tile and it scores no neighbour, so the unit
+/// still searches nothing.[^2]
+///
+/// **The field is derived, and it states no fact of its own.** It is built
+/// again from the seed tiles at every rebuild of level 1, in the way the
+/// coarse field beside it is.[^3]
+///
+/// The relaxation stays inside the block. A tile it cannot reach from a seed
+/// without leaving the block holds no offset, and the unit on it reads the
+/// coarse field, which is the answer it read before this field existed.
+///
+/// # References
+///
+/// [^1]: Findings register, FND-315. `docs/FINDINGS.md`
+/// [^2]: ADR-0091, movement takes its direction from a per-cell field, never from a per-unit search, decision D1. `docs/adrs/draft/adr-0091-movement-takes-its-direction-from-a-per-cell-field.md`
+/// [^3]: ADR-0022, level 0 is the only truth, and every level above it is derived, decision D1. `docs/adrs/accepted/adr-0022-level-0-is-the-only-truth-and-every-level-above-it-is-derived.md`
+#[derive(Clone, Debug)]
+pub struct ApproachField {
+    layout: BlockLayout,
+    /// The plane and the block of each entry, in ascending order.
+    entries: Vec<(u16, u32)>,
+    /// One offset for each entry and each tile of a block, in block order.
+    offsets: Vec<u8>,
+    /// The steps from each tile of one block to the nearest seed tile in it.
+    /// The derivation holds one entry at a time and reuses this for each.
+    reach: Vec<u8>,
+    /// The write half of one relaxation pass.
+    scratch: Vec<u8>,
+    /// Whether each tile of the block the derivation holds admits a unit.
+    /// The derivation asks the terrain once for each tile of an entry rather
+    /// than once for each tile of each pass.
+    admits: Vec<bool>,
+    /// The offset of each neighbour of each tile of the block, or the
+    /// outside marker when the neighbour lies in another block or outside
+    /// the world.
+    ///
+    /// **The derivation builds this once for each entry and every pass reads
+    /// it.** Resolving a neighbour costs an address, a tile index and a
+    /// bridge key, and the passes over one block ask the same question
+    /// hundreds of times. The answer holds for the whole entry, because a
+    /// block does not move.
+    neighbours: Vec<u32>,
+}
+
+/// The neighbour offset that means the neighbour lies outside the block.
+const OUTSIDE_BLOCK: u32 = u32::MAX;
+
+impl ApproachField {
+    /// Builds a field over a block layout, with no entry anywhere.
+    #[must_use]
+    pub fn new(layout: BlockLayout) -> Self {
+        let area = block_area(layout);
+        Self {
+            layout,
+            entries: Vec::new(),
+            offsets: Vec::new(),
+            reach: vec![UNREACHED; area],
+            scratch: vec![UNREACHED; area],
+            admits: vec![false; area],
+            neighbours: vec![OUTSIDE_BLOCK; area * NEIGHBOUR_COUNT],
+        }
+    }
+
+    /// Returns the block layout the field is keyed on.
+    #[must_use]
+    pub const fn layout(&self) -> BlockLayout {
+        self.layout
+    }
+
+    /// Returns the number of blocks the field holds an entry for.
+    #[must_use]
+    pub fn entry_count(&self) -> usize {
+        self.entries.len()
+    }
+
+    /// Returns the offset that one plane holds at one tile.
+    ///
+    /// The answer is nothing when the plane seeds no tile of the block that
+    /// holds the tile, and when the relaxation did not reach the tile. It is
+    /// the seed offset when the tile is a seed of the plane, and otherwise it
+    /// is the direction of the neighbour that is nearer to a seed.
+    #[must_use]
+    pub fn offset(&self, plane: u16, tile: TileIdx) -> Option<u8> {
+        let key = self.layout.key_of(tile)?;
+        let block = self.layout.block_of_key(key);
+        let inside = inside_of_key(self.layout, key);
+        let at = self.entries.binary_search(&(plane, block)).ok()?;
+        let offset = *self.offsets.get(at * block_area(self.layout) + inside)?;
+        if offset == NO_EXIT {
+            None
+        } else {
+            Some(offset)
+        }
+    }
+
+    /// Derives every entry from a set of seed tiles.
+    ///
+    /// A seed is one plane and one tile. The derivation groups the seeds by
+    /// the plane and the block that holds them, and it builds one entry for
+    /// each group. **Several seeds of one group seed it at once**, so the
+    /// entry carries the direction of the nearest seed to each tile of the
+    /// block.
+    ///
+    /// A tile that the ground refuses is not a candidate and it conducts
+    /// nothing, so no unit is steered into a lake inside the block. The rule
+    /// asks the terrain with the crossing of the plane, which is the question
+    /// the movement step asks of the tile it steps onto, so this states no
+    /// second passability rule.[^1]
+    ///
+    /// The walk is over the entries in ascending plane and then ascending
+    /// block, and over the tiles of a block in ascending offset. It runs on
+    /// the calling thread and it names no thread count.[^2]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0056, movement is tile-discrete and admitted by sort-then-admit, decision D4. `docs/adrs/accepted/adr-0056-movement-is-tile-discrete-and-admitted-by-sort-then-admit.md`
+    /// [^2]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
+    pub fn derive(&mut self, terrain: Terrain, seeds: &[(u16, TileIdx)], crossing: &[u8]) {
+        let layout = self.layout;
+        let area = block_area(layout);
+        let passes = layout.block_edge() * APPROACH_PASSES_PER_EDGE;
+        // The entries are the distinct plane and block pairs of the seed set,
+        // in ascending order, so the entry order is a property of the set and
+        // never of the order the caller named the seeds in.
+        let mut entries: Vec<(u16, u32)> = seeds
+            .iter()
+            .filter_map(|(plane, tile)| {
+                let key = layout.key_of(*tile)?;
+                Some((*plane, layout.block_of_key(key)))
+            })
+            .collect();
+        entries.sort_unstable();
+        entries.dedup();
+        self.entries = entries;
+        self.offsets = vec![NO_EXIT; self.entries.len() * area];
+        for index in 0..self.entries.len() {
+            let (plane, block) = self.entries[index];
+            let crosses = u32::from(crossing.get(plane as usize).copied().unwrap_or(0) != 0);
+            for inside in 0..area {
+                let address = block_address(layout, block, inside);
+                self.admits[inside] = address
+                    .and_then(|address| terrain.kind(address))
+                    .is_some_and(|kind| kind.is_passable_for(crosses));
+                for direction in 0..NEIGHBOUR_COUNT {
+                    let at = address
+                        .and_then(|address| layout.grid().neighbour(address, direction))
+                        .and_then(|there| inside_of(layout, block, there));
+                    self.neighbours[inside * NEIGHBOUR_COUNT + direction] =
+                        at.map_or(OUTSIDE_BLOCK, |at| at as u32);
+                }
+            }
+            self.reach.iter_mut().for_each(|tile| *tile = UNREACHED);
+            for (seeded, tile) in seeds {
+                if *seeded != plane {
+                    continue;
+                }
+                let Some(key) = layout.key_of(*tile) else {
+                    continue;
+                };
+                if layout.block_of_key(key) != block {
+                    continue;
+                }
+                let inside = inside_of_key(layout, key);
+                if !self.admits[inside] {
+                    continue;
+                }
+                self.reach[inside] = 0;
+            }
+            for _ in 0..passes {
+                self.relax();
+            }
+            for inside in 0..area {
+                self.offsets[index * area + inside] = self.step_down_inside(inside);
+            }
+        }
+    }
+
+    /// Runs one relaxation pass over the reach of one block.
+    fn relax(&mut self) {
+        for inside in 0..block_area(self.layout) {
+            if !self.admits[inside] {
+                self.scratch[inside] = UNREACHED;
+                continue;
+            }
+            let mut nearest = self.reach[inside];
+            for direction in direction_order() {
+                let at = self.neighbours[inside * NEIGHBOUR_COUNT + direction];
+                if at == OUTSIDE_BLOCK {
+                    continue;
+                }
+                let reach = self.reach[at as usize];
+                if reach < UNREACHED && reach.saturating_add(1) < nearest {
+                    nearest = reach.saturating_add(1);
+                }
+            }
+            self.scratch[inside] = nearest;
+        }
+        self.reach.copy_from_slice(&self.scratch);
+    }
+
+    /// Returns the offset that one tile of a block holds.
+    fn step_down_inside(&self, inside: usize) -> u8 {
+        let here = self.reach[inside];
+        if here == UNREACHED {
+            return NO_EXIT;
+        }
+        if here == 0 {
+            return AT_SEED;
+        }
+        for direction in direction_order() {
+            let at = self.neighbours[inside * NEIGHBOUR_COUNT + direction];
+            if at == OUTSIDE_BLOCK {
+                continue;
+            }
+            if self.admits[at as usize] && self.reach[at as usize] < here {
+                return direction as u8;
+            }
+        }
+        NO_EXIT
+    }
+}
+
+/// Returns the number of tiles in one block of a layout.
+fn block_area(layout: BlockLayout) -> usize {
+    let edge = layout.block_edge() as usize;
+    edge * edge
+}
+
+/// Returns the offset inside a block that a bridge key holds.
+///
+/// The key holds the block above the offset, so the offset is the low part of
+/// it.[^1]
+///
+/// # References
+///
+/// [^1]: ADR-0018, the unit-to-tile bridge is derived, and it rebuilds at the barrier, decision D2. `docs/adrs/accepted/adr-0018-the-unit-to-tile-bridge-is-derived-and-rebuilds-at-the-barrier.md`
+fn inside_of_key(layout: BlockLayout, key: u64) -> usize {
+    let bits = 2 * layout.block_bits();
+    (key & ((1u64 << bits) - 1)) as usize
+}
+
+/// Returns the address of one offset inside one block.
+///
+/// The offset holds the row of the tile inside the block above its column,
+/// and the block holds the row and the column of the block itself, in the
+/// same way.[^1]
+///
+/// # References
+///
+/// [^1]: ADR-0018, the unit-to-tile bridge is derived, and it rebuilds at the barrier, decision D2. `docs/adrs/accepted/adr-0018-the-unit-to-tile-bridge-is-derived-and-rebuilds-at-the-barrier.md`
+fn block_address(layout: BlockLayout, block: u32, inside: usize) -> Option<Axial> {
+    let bits = layout.block_bits();
+    let mask = layout.block_edge() - 1;
+    let inside = inside as u32;
+    let column = ((block % layout.blocks_wide()) << bits) | (inside & mask);
+    let row = ((block / layout.blocks_wide()) << bits) | ((inside >> bits) & mask);
+    let address = Axial::new(column as i32, row as i32);
+    layout.grid().index_of(address).map(|_| address)
+}
+
+/// Returns the offset of an address inside one block, or nothing when the
+/// address lies outside the world or in another block.
+fn inside_of(layout: BlockLayout, block: u32, address: Axial) -> Option<usize> {
+    let tile = layout.grid().index_of(address)?;
+    let key = layout.key_of(tile)?;
+    if layout.block_of_key(key) != block {
+        return None;
+    }
+    Some(inside_of_key(layout, key))
 }
