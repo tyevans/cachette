@@ -137,6 +137,21 @@ inside it. The field holds one direction for a whole block, and which tile a
 unit stands against is not a fact that a block carries. D6 is what answers that
 case.
 
+**A field derived for a set that crosses water refuses no cell at all.** The
+rule above rests on one premise: that a block sent at the ground in front of it
+holds ground the block can never enter. A unit whose type carries a water
+crossing enters that ground, so the premise does not hold for it, and a field
+built for such a set admits every cell the lattice holds.[^28] The default is
+unchanged. A field built for a set that carries no crossing reads the open tile
+count exactly as this decision states, and every field the engine derived before
+the crossing existed derives the same way now.
+
+**A set that mixes a crosser with a unit that cannot cross takes no crossing
+field.** One field holds one direction for each cell, and a direction that
+sends a crosser over water sends every other unit of the set into the water
+beside it. The caller therefore builds the crossing field only when every unit
+it sends carries the crossing, and a mixed set takes the ordinary field.
+
 ### D6. A direction the ground refuses falls back to a keyed draw, and it never freezes a unit
 
 A cell holds one direction for a block of tiles. The ground under one unit of
@@ -270,3 +285,4 @@ depend on a key that carries no meaning.[^19]
 [^24]: ADR-0003, every random draw is keyed, never stateful, decision D1. `docs/adrs/accepted/adr-0003-every-random-draw-is-keyed-never-stateful.md`
 [^25]: Decision Record Scope, section 4.1. `.claude/rules/adr-scope.md`
 [^26]: ADR-0110, a unit returns by climbing a reach field seeded at every site of its faction, decision D1. `docs/adrs/draft/adr-0110-a-unit-returns-by-climbing-a-reach-field.md`
+[^28]: ADR-0145, a unit type is a row of capability columns, and zero means cannot, decisions D1 and D2. `docs/adrs/accepted/adr-0145-a-unit-type-is-a-row-of-capability-columns-and-zero-means-cannot.md`

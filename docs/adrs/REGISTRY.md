@@ -335,7 +335,7 @@ without stating a constraint is worse than no record.
 | 0052 | A selector result may be a range, not only an enumerated set | Draft | 0051, 0028 | `draft/adr-0052-a-selector-result-may-be-a-range.md` |
 | 0053 | A faction is a bit in a mask, and a relation is a plane | Accepted | 0011, 0012, 0023, 0024 | 08 |
 | 0054 | An entity belongs to one of three tiers, declared at creation | Accepted | 0012, 0043 | 14, 15, 16 |
-| 0055 | An effective stat comes from an ordered modifier pipeline | Proposed | 0002, 0054 | 12 |
+| 0055 | A site derives its effective rate from the world at each application, and the stored rate stays the base. Answers the pipeline that ADR-0062 D7 reserves | Draft | 0002, 0003, 0004, 0005, 0054, 0062, 0164 | 12, `draft/adr-0055-a-site-derives-its-effective-rate-from-the-world.md` |
 | 0056 | Movement is tile-discrete and admitted by sort-then-admit | Accepted | 0004, 0018 | 06, 10 |
 | 0058 | A field update is a flux pair on an edge, so quantity is conserved exactly | Proposed | 0023, 0029 | 13 |
 | 0059 | Fog storage grows with observed area, not with world area | Accepted | 0001, 0002, 0004, 0009, 0022, 0023, 0040, 0053, 0111, 0154 | 08, `accepted/adr-0059-fog-storage-grows-with-observed-area.md` |
