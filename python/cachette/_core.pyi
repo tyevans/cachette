@@ -154,6 +154,7 @@ class UnitTypeColumns(TypedDict):
     command_reach: npt.NDArray[np.int64]
     weather_reach: npt.NDArray[np.int64]
     water_crossing: npt.NDArray[np.int64]
+    settle_group: npt.NDArray[np.int64]
 
 class UpgradeColumns(TypedDict):
     """One column for each column of a row of the upgrade table.
@@ -942,6 +943,7 @@ class World:
     ) -> npt.NDArray[np.uint64]: ...
     def despawn_soldiers(self, units: Identities) -> None: ...
     def order_gather(self, units: Identities, kind: int) -> None: ...
+    def order_settle(self, units: Identities) -> int: ...
     def define_unit_type(
         self,
         unit_type: int,
@@ -955,6 +957,7 @@ class World:
         command_reach: int,
         weather_reach: int,
         water_crossing: int,
+        settle_group: int,
     ) -> None: ...
     def set_unit_types(self, units: Identities, unit_type: int) -> None: ...
     def unit_type(self, unit: int) -> int: ...
