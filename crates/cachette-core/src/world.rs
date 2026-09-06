@@ -8465,7 +8465,7 @@ impl World {
             })
             .filter(|(_, taken)| *taken > 0)
             .collect();
-        let _collapsed = self.upgrades.wear_ascending(&run);
+        self.upgrades.wear_ascending(&run);
     }
 
     /// Raises the housing of a settlement for each level that the merge
