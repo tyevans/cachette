@@ -11188,17 +11188,22 @@ const SETTLER_LIFETIME: u32 = 89;
 /// best place in the world.
 ///
 /// The value is half the measured lifetime, because a settler walks one tile
-/// in one tick and it does not walk in a straight line. The field that steers
-/// it holds one direction for each level 1 cell, so the settler wanders
-/// inside the cell that holds its target until it stands on ground the settle
-/// verb admits. Half the lifetime leaves it as many ticks to find that ground
-/// as it spent walking.
+/// in one tick and it does not walk in a straight line. Ground that refuses a
+/// step sends it round, and each detour costs a tick it cannot get back. Half
+/// the lifetime leaves it as many ticks in hand as it spent walking.
+///
+/// **The last cell is no longer part of that margin.** The approach field
+/// resolves the block that holds the target at the pitch of one tile, so a
+/// settler that reaches that block walks at the target rather than wandering
+/// inside it.[^2]
 ///
 /// The two assertions below are floors and not knobs. A reach at or under the
 /// founding distance would leave no place eligible, because the survey
 /// refuses every place nearer than that distance. A reach under the edge of a
 /// level 1 cell would name a target in the cell the settler already stands
-/// in, and a field over cells steers nobody inside one cell.
+/// in, and the coarse field steers nobody inside one cell.
+///
+/// [^2]: Findings register, FND-315. `docs/FINDINGS.md`
 const SETTLER_REACH: u32 = SETTLER_LIFETIME / 2;
 
 const _: () = assert!(

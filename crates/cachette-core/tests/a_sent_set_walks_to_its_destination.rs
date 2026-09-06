@@ -382,6 +382,105 @@ fn a_sent_set_walks_to_the_place_the_caller_named() {
 }
 
 #[test]
+fn a_sent_set_walks_to_the_tile_the_caller_named() {
+    // **The test above asserts the cell, and the cell is not the place the
+    // caller named.** A cell is a block of tiles a side, so a unit that
+    // reached the cell has arrived within a block of its target and not at
+    // it. The coarse field says nothing inside the cell that seeds it,
+    // because the reach of a seed cell is zero, and the unit there fell back
+    // to the uniform draw and walked at random. This asserts the tile.[^1]
+    //
+    // [^1]: Findings register, FND-315. `docs/FINDINGS.md`
+    let mut world = world(EXTENT);
+    let destination = first_open_tile(&world);
+    send(&mut world, &[], destination);
+    let seed_cell = cell_of(&world, destination);
+
+    let starts = starts_a_few_cells_away(&world, seed_cell, 4);
+    let units: Vec<Entity> = starts
+        .iter()
+        .map(|start| {
+            world
+                .spawn_soldier(*start, FactionId(0))
+                .expect("the ground admits the unit")
+        })
+        .collect();
+    for start in &starts {
+        assert_ne!(
+            cell_of(&world, *start),
+            seed_cell,
+            "the unit at {start:?} starts in the destination cell"
+        );
+    }
+
+    send(&mut world, &units, destination);
+
+    // The tile the caller named holds one unit at a time, so the set cannot
+    // all stand on it. The test follows the first unit to the tile and reads
+    // how long every unit spent inside the destination cell, which is the
+    // measurement the defect showed.
+    let mut arrived: Option<u64> = None;
+    let mut entered = vec![None; units.len()];
+    let mut inside = vec![0u64; units.len()];
+    for frame in 0..ARRIVAL_FRAMES {
+        world.step(1).expect("the step must run");
+        for (index, unit) in units.iter().enumerate() {
+            let here = world
+                .soldiers()
+                .address(*unit)
+                .expect("the unit is still alive");
+            if cell_of(&world, here) == seed_cell {
+                inside[index] += 1;
+                if entered[index].is_none() {
+                    entered[index] = Some(frame);
+                }
+            }
+            if here == destination && arrived.is_none() {
+                arrived = Some(frame);
+            }
+        }
+        if arrived.is_some() {
+            break;
+        }
+    }
+    println!("a unit stood on the destination tile at frame {arrived:?}");
+    for (index, start) in starts.iter().enumerate() {
+        println!(
+            "  the unit from {start:?} entered the cell at {:?} and spent {} frames in it",
+            entered[index], inside[index]
+        );
+    }
+    assert!(
+        arrived.is_some(),
+        "no unit stood on the tile the caller named in {ARRIVAL_FRAMES} frames"
+    );
+}
+
+#[test]
+fn a_sent_unit_that_stands_on_its_destination_stays_there() {
+    // **A unit that arrived has nowhere further to be steered.** Before the
+    // approach field, a unit on the tile it was sent to read no direction
+    // from the coarse field and took the uniform draw, so it walked off the
+    // tile it had reached on the very next frame.[^1]
+    //
+    // [^1]: Findings register, FND-315. `docs/FINDINGS.md`
+    let mut world = world(EXTENT);
+    let destination = first_open_tile(&world);
+    let unit = world
+        .spawn_soldier(destination, FactionId(0))
+        .expect("the ground admits the unit");
+    send(&mut world, &[unit], destination);
+    for frame in 0..FRAMES {
+        world.step(1).expect("the step must run");
+        assert_eq!(
+            world.soldiers().address(unit),
+            Some(destination),
+            "the unit left the tile it was sent to on frame {frame}"
+        );
+    }
+}
+
+#[test]
 fn a_sent_unit_the_ground_refuses_leaves_the_tile_it_started_on() {
     // The cell, the plane and the direction all hold from one frame to the
     // next, so a unit that only stayed put would stay put for ever. The
