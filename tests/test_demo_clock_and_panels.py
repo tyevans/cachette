@@ -21,7 +21,7 @@ import pytest
 
 from cachette import World
 from cachette.demo.app import Demo
-from cachette.demo.clock import SPEEDS, Clock
+from cachette.demo.clock import SPEEDS, WHOLE_TICK, Clock
 from cachette.demo.settings import SIZES, Settings
 
 # A world small enough to step many times in a test.
@@ -62,12 +62,16 @@ def test_one_step_runs_exactly_one_tick_while_paused() -> None:
 
 @pytest.mark.parametrize("index", range(len(SPEEDS)))
 def test_each_speed_runs_that_many_ticks_in_one_frame(index: int) -> None:
-    """A speed is the number of ticks a drawn frame runs."""
+    """A speed is the ticks a drawn frame runs, in thousandths of a tick.
+
+    A speed below one whole tick runs no tick on the first frame. It runs one
+    when the frames have owed a whole tick between them.
+    """
     demo = a_demo()
     demo.clock.choose(index)
     before = demo.world.tick
     demo.advance()
-    assert demo.world.tick == before + SPEEDS[index]
+    assert demo.world.tick == before + SPEEDS[index] // WHOLE_TICK
 
 
 def test_a_speed_outside_the_set_is_held_to_the_nearest_end() -> None:

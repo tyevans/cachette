@@ -29,6 +29,9 @@ ADR-0067, the viewer reads the world and never writes to it, decision D4.
 ``docs/adrs/accepted/adr-0067-the-viewer-reads-the-world-and-never-writes-to-it.md``
 
 Findings register, FND-327. ``docs/FINDINGS.md``
+
+ADR-0094, the caller owns the camera and the pixels, decision D5.
+``docs/adrs/draft/adr-0094-the-caller-owns-the-camera-and-the-pixels.md``
 """
 
 from __future__ import annotations
@@ -44,7 +47,7 @@ if TYPE_CHECKING:
     # in the stub beside the compiled module and not in the module itself, so
     # importing them at run time would fail.
     from cachette._core import FoundingReport, FrameReading, GameEnd
-from cachette.demo.clock import SPEEDS, Clock
+from cachette.demo.clock import SPEEDS, Clock, says
 from cachette.demo.settings import Settings
 from cachette.demo.surface import Surface
 
@@ -89,6 +92,35 @@ RESIZES = 4
 
 # The engine steps once for each drawn frame.
 FRAMES_EACH_SECOND = 30
+
+# The function keys the settings hold, by name.
+#
+# A panel never takes one of these. Two actions on one key means a watcher
+# cannot reach the second of them.
+SETTINGS_KEYS = ("F10", "F11", "F12")
+
+# The highest function key the mapping looks for.
+#
+# The window library names the function keys up to this number, so a deck
+# that grows past the keys below it still finds one for each panel.
+LAST_FUNCTION_KEY = 20
+
+
+def panel_keys(key: object) -> list[tuple[int, str]]:
+    """Give back one key for each panel the engine registers, in its order.
+
+    The function keys name the panels, and the keys the settings hold are
+    skipped. **The list is as long as the panels the engine registers**, so a
+    panel that joins the deck gets a key with no edit here.
+
+    Each entry holds the key symbol and the name of the key.
+    """
+    free = [
+        (getattr(key, f"F{number}"), f"F{number}")
+        for number in range(1, LAST_FUNCTION_KEY + 1)
+        if hasattr(key, f"F{number}") and f"F{number}" not in SETTINGS_KEYS
+    ]
+    return free[: len(World.panel_names())]
 
 
 class Demo:
@@ -298,12 +330,24 @@ class Demo:
         The reading names what the last step logged. A frame that runs several
         ticks therefore reports the last of them, and the logs of the earlier
         ticks are gone. A watcher who wants every tick sets the speed to one.
+
+        The frame takes the phase and the speed from the clock. At a speed
+        below one tick for each frame a unit that moved draws between its two
+        tiles, and the frame states the speed beside the tick.
         """
         for _ in range(self.clock.ticks_due()):
             self.world.step(self.threads)
             self.announce_relations()
             self.announce_campaigns()
         self.announce_end()
+        # The pace is the clock's, and the engine holds no clock. The phase
+        # is the share of the current tick that has elapsed, and the frame
+        # draws a unit that moved between its two tiles at that share. The
+        # speed reaches the frame as a number, and the viewer holds the
+        # words, so no text crosses the boundary.[^5]
+        #
+        # The ticks above ran first, so the phase belongs to the tick the
+        # world is now part way through.
         reading = self.world.draw(
             self.camera,
             self.surface.width,
@@ -313,6 +357,8 @@ class Demo:
             panel=panel,
             panels=self.panels or None,
             pointer=self.pointer,
+            phase=self.clock.phase,
+            speed_milli=self.clock.speed_milli,
         )
         self.announce(reading)
         return reading
@@ -493,16 +539,34 @@ def main(argv: list[str] | None = None) -> int:
     print("arrow keys or WASD scroll, minus and equals zoom")
     print("hold tab to name the colours")
     print("space pauses, full stop steps one tick, brackets change the speed")
-    print(f"the speeds are {', '.join(f'x{speed}' for speed in SPEEDS)}")
-    print("F10 opens the settings, F11 fullscreen, F12 window size")
-    keys = ", ".join(f"F{at + 1} {name}" for at, name in enumerate(World.panel_names()))
-    print(f"the panels are {keys}")
+    print(f"the speeds are {', '.join(says(speed) for speed in SPEEDS)}")
+    print(
+        f"{SETTINGS_KEYS[0]} opens the settings, {SETTINGS_KEYS[1]} fullscreen, "
+        f"{SETTINGS_KEYS[2]} window size"
+    )
+    print(f"the panels are {_panel_key_line()}")
     print("click a tile to point at it")
     print("close the window or press escape to stop")
 
     status = _run_window(demo, arguments.frames)
     print_census(demo.world)
     return status
+
+
+def _panel_key_line() -> str:
+    """Give back the line that names the key of each panel.
+
+    **The line and the keys come from one mapping.** A line written from a
+    second count would name a key that does nothing the moment the deck
+    grows.
+
+    The import is here and not at the top of the module, so a caller that
+    only wants a frame in memory needs no window library.
+    """
+    from pyglet.window import key
+
+    pairs = zip(panel_keys(key), World.panel_names(), strict=True)
+    return ", ".join(f"{label} {name}" for (_, label), name in pairs)
 
 
 def _run_to_end(demo: Demo) -> int:
@@ -584,17 +648,16 @@ def _write_picture(demo: Demo, path: str, frames: int) -> int:
 def _toggle_panel_key(demo: Demo, symbol: int, key: object) -> None:
     """Put a panel of the deck on the frame, or take it off.
 
-    The function keys F1 upward name the panels in the order the engine
-    registers them. The engine owns that order, so a panel that joins the deck
-    gets a key with no edit here.
+    The keys come from the one mapping, so the key a watcher reads at the
+    start of a run is the key that works.
     """
     names = World.panel_names()
-    first = getattr(key, "F1", 0)
-    at = symbol - first
-    if 0 <= at < len(names) and at < 9:
-        demo.toggle_panel(names[at])
-        shown = ", ".join(demo.panels) if demo.panels else "none"
-        print(f"panels: {shown}")
+    for at, (bound, _) in enumerate(panel_keys(key)):
+        if symbol == bound and at < len(names):
+            demo.toggle_panel(names[at])
+            shown = ", ".join(demo.panels) if demo.panels else "none"
+            print(f"panels: {shown}")
+            return
 
 
 def _apply_settings(demo: Demo, window: object) -> None:
