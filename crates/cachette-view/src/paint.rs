@@ -2342,24 +2342,34 @@ fn outline(canvas: &mut Canvas, left: i32, top: i32, wide: i32, tall: i32, colou
 /// [^1]: Findings register, FND-207. `docs/FINDINGS.md`
 const TILE_GAP: i32 = 1;
 
-/// Returns the gap to leave under a tile of a given width.
+/// The smallest tile width that carries a gap, in pixels.
 ///
-/// **A separator that covers more of the picture than the thing it separates
-/// is not a separator.** A tile `w` pixels across keeps `w - 1` pixels of
-/// colour in each direction, so the gap takes `1 - ((w - 1) / w)^2` of the
-/// cell. That share reaches one half when `w * (1 - 1 / sqrt(2))` reaches
-/// one, near three and a half pixels. Below that width the drawing leaves the
-/// gap out, and the colour change from one tile to the next is what separates
-/// them.
+/// **A separator that takes a quarter of the cell is the picture.** At eight
+/// pixels a tile the gap covers about a quarter of the area, the rows step by
+/// half a tile, and a watcher reads the stagger of the bricks before the
+/// ground.[^1]
 ///
-/// The bound is derived from that identity. It is not read off a picture, and
-/// it does not depend on the world, the seed or the window.[^1]
+/// The share the gap takes of a cell is `1 - ((w - 1) / w)^2`, which is about
+/// one eighth at this width and about one half near three and a half pixels.
+/// The earlier bound was the width at which the gap takes half the cell,
+/// which is the width at which it is no longer a separator at all. This is
+/// the width at which it stops dominating.
 ///
 /// # References
 ///
-/// [^1]: Findings register, FND-207. `docs/FINDINGS.md`
+/// [^1]: Research report 23, defect 6. `docs/research/reports/23-demonstration-readability-review-1.md`
+const GAP_LEAST_TILE: f32 = 16.0;
+
+/// Returns the gap to leave under a tile of a given width.
+///
+/// Below the least width the drawing leaves the gap out, and the colour
+/// change from one tile to the next is what separates them.[^1]
+///
+/// # References
+///
+/// [^1]: Research report 23, defect 6. `docs/research/reports/23-demonstration-readability-review-1.md`
 fn gap_for(tile_width: f32) -> i32 {
-    if tile_width * (1.0 - std::f32::consts::FRAC_1_SQRT_2) >= 1.0 {
+    if tile_width >= GAP_LEAST_TILE {
         TILE_GAP
     } else {
         0

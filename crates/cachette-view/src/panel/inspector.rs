@@ -31,7 +31,7 @@
 use cachette_core::{Entity, Holder, ResourceKind, World};
 
 use super::{Line, Panel, View};
-use crate::hud::{grouped, name_of, resource_name, TileReadout};
+use crate::hud::{grouped, name_of, resource_name, upgrade_name, TileReadout};
 
 /// What the panel says when the watcher points at nothing.
 const NO_POINTER: &str = "no tile is pointed at.";
@@ -77,6 +77,28 @@ impl Panel for Inspector {
             ),
             Line::row("ground", name_of(tile.kind()).to_string()),
         ];
+
+        // **The upgrade on the tile.** The panel named the address, the
+        // ground, the stocks, the capacity, the holder and the units, and
+        // said nothing about the thing somebody was building there, although
+        // one call answers the kind, the progress and the completion.[^6]
+        //
+        // [^6]: Research report 25, defect 2. `docs/research/reports/25-demonstration-readability-upgrades-and-units.md`
+        if let Some(site) = world.upgrade_at(pointer) {
+            lines.push(Line::row("building", upgrade_name(site.kind).to_string()));
+            lines.push(Line::row(
+                "work done",
+                if site.is_complete() {
+                    "finished".to_string()
+                } else {
+                    format!(
+                        "{} of {}",
+                        grouped(site.progress.0.max(0) as u64),
+                        grouped(site.kind.work().max(0) as u64)
+                    )
+                },
+            ));
+        }
 
         for kind in ResourceKind::ALL {
             lines.push(Line::row(

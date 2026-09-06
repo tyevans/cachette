@@ -54,14 +54,18 @@
 
 use cachette_core::resource::ResourceKind;
 use cachette_core::terrain::KIND_COUNT;
+use cachette_core::upgrade::UpgradeKind;
 use cachette_core::NeedCondition;
 
 use crate::hud::KINDS;
 use crate::hud::{
-    accumulated, fraction, grouped, name_of, option_name, resource_name, ChoiceReadout, Readout,
-    TileReadout,
+    accumulated, fraction, grouped, name_of, option_name, resource_name, upgrade_name,
+    ChoiceReadout, Readout, TileReadout,
 };
-use crate::paint::{faction_colour, kind_colour, Canvas, COLOURED_FACTIONS};
+use crate::paint::{
+    faction_colour, founding_core_colour, kind_colour, luxury_colour, over_capacity_colour,
+    shortage_colour, upgrade_colour, Canvas, COLOURED_FACTIONS,
+};
 use crate::text;
 
 /// The gap between the window edge and a card, in pixels.
@@ -259,6 +263,20 @@ enum Anchor {
 ///
 /// [^1]: Recurring Defect Shapes, shape 1. `.claude/rules/recurring-defects.md`
 fn cards(readout: &Readout, reference: bool) -> Vec<(Anchor, Card)> {
+    // **The three cards become one while the key is off.** Three cards
+    // anchored to the top left covered about a tenth of a fitted map and
+    // close to half of a close-up, and a watcher reads the world through
+    // them.[^13] The rows the collapsed card drops are in the key, and the
+    // key is one press away.
+    //
+    // [^13]: Research report 23, defect 5. `docs/research/reports/23-demonstration-readability-review-1.md`
+    if !reference {
+        let mut cards = vec![(Anchor::TopLeft, watch_card(readout))];
+        if let Some(choice) = readout.choice() {
+            cards.push((Anchor::BottomRight, unit_card(&choice)));
+        }
+        return cards;
+    }
     let mut cards = vec![(Anchor::TopLeft, world_card(readout))];
     // **The card appears only when something is being carried.** A card that
     // said "carrying 0" on every frame of every run would take space from the
@@ -544,6 +562,68 @@ fn character_card(readout: &Readout) -> Card {
     }
 }
 
+/// Returns the one card the window shows while the key is off.
+///
+/// **The card holds what a watcher watches and nothing a watcher checks.**
+/// The tick and the speed say that the world runs and how fast. The
+/// population and the shortage say what is happening to the people. The load
+/// row appears while somebody hauls, and the promotion row while a promotion
+/// is fresh, because neither is true on every frame.[^1] [^2]
+///
+/// The rows this card leaves out are on the key, with the colours and the
+/// camera.[^2]
+///
+/// # References
+///
+/// [^1]: Testing Rules, section 2a. `.claude/rules/testing.md`
+/// [^2]: ADR-0093, the window shows what changes, decisions D1 and D2. `docs/adrs/draft/adr-0093-the-window-shows-what-changes.md`
+fn watch_card(readout: &Readout) -> Card {
+    let mut rows = vec![
+        Row::new("tick", grouped(readout.tick())),
+        Row::new("speed", readout.speed_word()),
+        Row::new(
+            "people in world",
+            grouped(u64::from(readout.soldiers_live())),
+        ),
+        Row::new(SHORT_ROW, grouped(u64::from(readout.units_short()))),
+    ];
+    if readout.units_carrying() > 0 {
+        rows.push(Row::new(
+            "carrying",
+            format!(
+                "{} of {}",
+                readout.units_carrying(),
+                readout.soldiers_painted()
+            ),
+        ));
+    }
+    if let Some((faction, birth)) = readout.newest_character() {
+        if readout.tick().saturating_sub(birth) <= PROMOTION_HOLD {
+            rows.push(Row::new("just promoted", format!("faction {}", faction.0)));
+        }
+    }
+    // The food of the tile at the middle of the window moves as a crowd works
+    // a deposit, as the deposit recovers, and as the watcher scrolls.
+    if let Some(tile) = readout.tile() {
+        rows.push(Row::new("food here", food_of(&tile)));
+    }
+    Card {
+        heading: "THE WORLD",
+        rows,
+    }
+}
+
+/// The label of the row that counts the units a shortage holds.
+///
+/// **The count is of the window and the row sat under a count of the world.**
+/// A watcher read it as a count of the world, and the two differ at every
+/// zoom.[^1]
+///
+/// # References
+///
+/// [^1]: Research report 23, defect 8. `docs/research/reports/23-demonstration-readability-review-1.md`
+const SHORT_ROW: &str = "short in window";
+
 fn world_card(readout: &Readout) -> Card {
     let mut rows = vec![
         Row::new("tick", grouped(readout.tick())),
@@ -558,7 +638,7 @@ fn world_card(readout: &Readout) -> Card {
             grouped(u64::from(readout.soldiers_live())),
         ),
         Row::new("ended", grouped(readout.units_ended() as u64)),
-        Row::new("short", grouped(u64::from(readout.units_short()))),
+        Row::new(SHORT_ROW, grouped(u64::from(readout.units_short()))),
     ];
     if let Some(tile) = readout.tile() {
         rows.push(Row::new("food here", food_of(&tile)));
@@ -674,6 +754,50 @@ fn colour_card(readout: &Readout) -> Card {
             kind_colour(kind),
             name_of(kind).to_string(),
             grouped(u64::from(*count)),
+        ));
+    }
+    // **The key named the factions and the ground and no mark.** A watcher
+    // who saw a white dot in a red disc had no row to look it up in, and the
+    // upgrade colours are the four that most need one, because each of them
+    // is near a ground colour.[^3] [^4]
+    //
+    // [^3]: Research report 23, defect 9. `docs/research/reports/23-demonstration-readability-review-1.md`
+    // [^4]: Research report 25, defect 7. `docs/research/reports/25-demonstration-readability-upgrades-and-units.md`
+    let founded = readout
+        .foundings()
+        .iter()
+        .filter(|report| report.shown())
+        .count();
+    rows.push(Row::coloured(
+        shortage_colour(),
+        "shortage dot".to_string(),
+        grouped(u64::from(readout.units_short())),
+    ));
+    rows.push(Row::coloured(
+        founding_core_colour(),
+        "founding ring".to_string(),
+        grouped(founded as u64),
+    ));
+    rows.push(Row::coloured(
+        faction_colour(cachette_core::FactionId(0)),
+        "edge line".to_string(),
+        "a holding".to_string(),
+    ));
+    rows.push(Row::coloured(
+        luxury_colour(0),
+        "luxury mark".to_string(),
+        "a tile".to_string(),
+    ));
+    rows.push(Row::coloured(
+        over_capacity_colour(),
+        "over capacity".to_string(),
+        grouped(u64::from(readout.tiles_at_capacity())),
+    ));
+    for kind in UpgradeKind::ALL {
+        rows.push(Row::coloured(
+            upgrade_colour(kind),
+            upgrade_name(kind).to_string(),
+            "a site".to_string(),
         ));
     }
     Card {

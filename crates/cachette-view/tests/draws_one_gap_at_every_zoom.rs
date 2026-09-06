@@ -50,7 +50,9 @@ fn world_of(seed: u64, extent: u32) -> World {
 /// The list holds whole widths and fractional ones. A sweep of whole widths
 /// only would pass against the drawing that had the defect, because the defect
 /// needs a fraction to appear.
-const WIDTHS: [f32; 12] = [2.0, 2.5, 3.0, 3.3, 4.0, 4.5, 5.0, 6.5, 8.0, 9.7, 12.0, 13.2];
+const WIDTHS: [f32; 15] = [
+    2.0, 2.5, 3.0, 3.3, 4.0, 4.5, 5.0, 6.5, 8.0, 9.7, 12.0, 13.2, 16.4, 21.7, 32.0,
+];
 
 /// Returns the gaps the drawing leaves along one row of tiles.
 fn gaps_along_a_row(camera: Camera, row: i32, columns: std::ops::Range<i32>) -> BTreeSet<i32> {
@@ -97,26 +99,30 @@ fn the_same_gap_stands_between_two_rows() {
 }
 
 #[test]
-fn a_tile_that_a_gap_would_swamp_is_drawn_with_no_gap() {
-    // At the smallest tile the camera allows, a gap of one pixel would take
-    // three quarters of the cell. The picture would then be mostly the colour
-    // of the space outside the world.
-    let camera = Camera::at_tile_size(2.0);
-    let gaps = gaps_along_a_row(camera, 12, 0..120);
-    assert_eq!(
-        gaps,
-        BTreeSet::from([0]),
-        "the smallest tile the camera allows still gives room to a gap",
-    );
+fn the_gap_stands_only_from_sixteen_pixels_a_tile() {
+    // At the region scale a gap of one pixel takes about a quarter of the
+    // cell, the rows step by half a tile, and a watcher reads the stagger of
+    // the bricks before the ground.[^2]
+    //
+    // [^2]: Research report 23, defect 6. `docs/research/reports/23-demonstration-readability-review-1.md`
+    for width in [2.0, 4.0, 8.0, 12.0, 15.0] {
+        let gaps = gaps_along_a_row(Camera::at_tile_size(width), 12, 0..120);
+        assert_eq!(
+            gaps,
+            BTreeSet::from([0]),
+            "a tile of {width} pixels drew a separator",
+        );
+    }
 
-    // The gap returns once the tile is wide enough to keep half of its cell.
-    let camera = Camera::at_tile_size(8.0);
-    let gaps = gaps_along_a_row(camera, 12, 0..120);
-    assert_eq!(
-        gaps,
-        BTreeSet::from([1]),
-        "a tile of eight pixels drew no separator",
-    );
+    // The gap returns once a tile is wide enough to carry one.
+    for width in [16.0, 24.0, 32.0] {
+        let gaps = gaps_along_a_row(Camera::at_tile_size(width), 12, 0..120);
+        assert_eq!(
+            gaps,
+            BTreeSet::from([1]),
+            "a tile of {width} pixels drew no separator",
+        );
+    }
 }
 
 #[test]
@@ -128,7 +134,9 @@ fn the_grid_a_watcher_sees_holds_one_run_length() {
     let mut canvas = Canvas::new(WINDOW.0, WINDOW.1);
     // A fraction, because the defect needs one. The zoom step multiplies by a
     // fraction, so a person reaches a width like this by pressing the key.
-    let camera = Camera::at_tile_size(6.5);
+    // The width is above the least width that carries a gap, because below
+    // that the drawing leaves the gap out.
+    let camera = Camera::at_tile_size(18.5);
     paint::draw(&world, camera, &mut canvas).expect("the world draws");
 
     let row = WINDOW.1 / 2;

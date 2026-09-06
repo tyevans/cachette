@@ -1837,6 +1837,25 @@ fn tile_lines(tile: Option<&TileReadout>) -> Vec<Line> {
 /// # References
 ///
 /// [^1]: ADR-0070, the head-up display reports what the drawing pass read, decision D2. `docs/adrs/accepted/adr-0070-the-head-up-display-reports-what-the-drawing-pass-read.md`
+/// Returns the word the viewer names one kind of upgrade with.
+///
+/// The engine names no word for a watcher, so the viewer holds one. The panel
+/// and the colour key read this, so the two cannot disagree.[^1] [^2]
+///
+/// # References
+///
+/// [^1]: ADR-0094, the caller owns the camera and the pixels, decision D5. `docs/adrs/draft/adr-0094-the-caller-owns-the-camera-and-the-pixels.md`
+/// [^2]: Recurring Defect Shapes, shape 1. `.claude/rules/recurring-defects.md`
+#[must_use]
+pub const fn upgrade_name(kind: cachette_core::upgrade::UpgradeKind) -> &'static str {
+    match kind {
+        cachette_core::upgrade::UpgradeKind::Road => "road",
+        cachette_core::upgrade::UpgradeKind::Terrace => "terrace",
+        cachette_core::upgrade::UpgradeKind::Wonder => "wonder",
+        cachette_core::upgrade::UpgradeKind::Store => "store",
+    }
+}
+
 /// Returns the name of a resource kind.
 ///
 /// One name for one kind, in one place. A second table of these names would
