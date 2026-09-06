@@ -1502,7 +1502,10 @@ two arenas inside one row would put two claims in one place.
 
 ### DEC-057 — Does a site store its resident count, or read the one the engine keeps?
 
-**Open. The recommendation is to read the count the engine already keeps.**
+**Closed on 5 September 2026. Option 1: read the count the engine already
+keeps.** A record states the constraint, and a reviewer accepted it.[^D57ADR]
+The engine stores no second resident count, and no pass maintains one by the
+change.
 
 Housing needs the number of units that live at a site. A review of the housing
 draft found that the engine answers the question today.[^FND128] The cohort
@@ -1532,8 +1535,9 @@ that compares it against the home column is already public. What option 1 needs
 is a reader that sums the rows of one site, because the table splits the count
 by faction. It needs no new store and no new check.
 
-**What follows either way.** The housing draft states decision D3 as option 2,
-and it must be rewritten against whatever this row decides.[^ADR81]
+**What followed.** The housing draft stated decision D3 as option 2, and a
+review rejected it for that reason.[^ADR81] A replacement record states option 1,
+and it is the record this row closes against.[^D57ADR]
 
 ### DEC-044 — Should the default ration be above the decay?
 
@@ -4156,6 +4160,7 @@ exactly so that a caller cannot build a wrong one.[^DEC120C]
 [^FND128]: Findings register, FND-128. `docs/FINDINGS.md`
 [^FND129]: Findings register, FND-129. `docs/FINDINGS.md`
 [^ADR81]: ADR-0081, a residence is a stored column and occupancy is a maintained count, decision D3. `docs/adrs/draft/adr-0081-a-residence-is-a-stored-column-and-occupancy-is-a-maintained-count.md`
+[^D57ADR]: ADR-0157, a site's free places are its built housing less the residents the engine already counts, decision D2. `docs/adrs/accepted/adr-0157-a-sites-free-places-are-its-built-housing-less-the-residents-the-engine-counts.md`
 [^ADR75]: ADR-0075, the founding choice reads a bounded sample of the world. `docs/adrs/accepted/adr-0075-the-founding-choice-reads-a-bounded-sample-of-the-world.md`
 [^FND106]: Findings register, FND-106. `docs/FINDINGS.md`
 [^DEC44ITEM]: Backlog item 0060. `docs/backlog/refined/0060-grow-the-population-from-the-store-and-the-housing.md`

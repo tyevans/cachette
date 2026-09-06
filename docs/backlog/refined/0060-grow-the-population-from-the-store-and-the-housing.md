@@ -186,10 +186,10 @@ Filled in when the item moves to `complete/`.
 [^3]: ADR-0082, the store sets the rate of a birth and the housing admits it, decision D2. `docs/adrs/draft/adr-0082-the-store-sets-the-rate-of-a-birth-and-the-housing-admits-it.md`
 [^4]: ADR-0082, the store sets the rate of a birth and the housing admits it, decision D3. `docs/adrs/draft/adr-0082-the-store-sets-the-rate-of-a-birth-and-the-housing-admits-it.md`
 [^5]: ADR-0082, the store sets the rate of a birth and the housing admits it, decision D4. `docs/adrs/draft/adr-0082-the-store-sets-the-rate-of-a-birth-and-the-housing-admits-it.md`
-[^6]: ADR-0157, a site's free places are its built housing less the residents the engine already counts, decision D2. `docs/adrs/draft/adr-0157-a-sites-free-places-are-its-built-housing-less-the-residents-the-engine-counts.md`
-[^7]: ADR-0157, a site's free places are its built housing less the residents the engine already counts, decision D4. `docs/adrs/draft/adr-0157-a-sites-free-places-are-its-built-housing-less-the-residents-the-engine-counts.md`
-[^8]: ADR-0157, a site's free places are its built housing less the residents the engine already counts, decision D5. `docs/adrs/draft/adr-0157-a-sites-free-places-are-its-built-housing-less-the-residents-the-engine-counts.md`
-[^9]: ADR-0157, a site's free places are its built housing less the residents the engine already counts, decision D6. `docs/adrs/draft/adr-0157-a-sites-free-places-are-its-built-housing-less-the-residents-the-engine-counts.md`
+[^6]: ADR-0157, a site's free places are its built housing less the residents the engine already counts, decision D2. `docs/adrs/accepted/adr-0157-a-sites-free-places-are-its-built-housing-less-the-residents-the-engine-counts.md`
+[^7]: ADR-0157, a site's free places are its built housing less the residents the engine already counts, decision D4. `docs/adrs/accepted/adr-0157-a-sites-free-places-are-its-built-housing-less-the-residents-the-engine-counts.md`
+[^8]: ADR-0157, a site's free places are its built housing less the residents the engine already counts, decision D5. `docs/adrs/accepted/adr-0157-a-sites-free-places-are-its-built-housing-less-the-residents-the-engine-counts.md`
+[^9]: ADR-0157, a site's free places are its built housing less the residents the engine already counts, decision D6. `docs/adrs/accepted/adr-0157-a-sites-free-places-are-its-built-housing-less-the-residents-the-engine-counts.md`
 [^10]: ADR-0003, every random draw is keyed, never stateful. `docs/adrs/accepted/adr-0003-every-random-draw-is-keyed-never-stateful.md`
 [^11]: ADR-0014, entity identity is an index plus a generation, decision D3. `docs/adrs/accepted/adr-0014-entity-identity-is-an-index-plus-a-generation.md`
 [^12]: ADR-0004, iteration order is explicit, and unordered reductions need slots, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`

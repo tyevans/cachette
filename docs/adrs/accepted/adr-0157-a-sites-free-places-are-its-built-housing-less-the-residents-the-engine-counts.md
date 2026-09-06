@@ -22,10 +22,10 @@ A fourth makes a unit consume, so a new mouth is a cost.[^4]
 **A rejected record already tried to answer this, and its premise was false.**
 That record stated that nothing in the engine answers how many units a site
 holds, and it asked the project to store a per-site occupancy count. The engine
-answers the question today. Two reviews found it, and an open register row
-holds the choice that follows, with a recommendation.[^5] [^6] This record does
-not restate the false premise. It takes the answer the engine already gives and
-states what growth may do with it.
+answers the question today. Two reviews found it, and a register row holds the
+choice that follows.[^5] [^6] This record does not restate the false premise. It
+takes the answer the engine already gives, and it states what growth may do with
+it.
 
 **A record for the growth rule itself already exists.** It holds the rate, the
 admission, the ordering and the draw key.[^7] This record holds what that one
@@ -34,7 +34,7 @@ what the stage may cost. A section below names the boundary between the two.
 
 **The loop this record serves, end to end.** A worker gathers into the store of
 a site. Food and housing grow the population of the site. A per-site queue
-spends one person and goods to make a typed unit.[^8] A settler founds a city,
+spends people and goods to make a typed unit.[^8] A settler founds a city,
 and a city adds reach, housing and a store. Soldiers make a cohort large enough
 to raise, a campaign kills, and domination becomes reachable. People are the
 scarce middle of that loop, so growth is the first link and every later link
@@ -82,8 +82,8 @@ places, and a check between two copies does not guard three.[^10]
 What the read needs is a reader that sums the rows of one site, because the
 table splits the count by faction. That reader adds no store and no check.
 
-This decision takes the first option of the open register row, which is the
-option that row recommends.[^5]
+This decision takes the first option of that register row, which is the option
+the row recommended.[^5]
 
 **A derived count is not a free count.** The sum over the rows of one site
 costs the faction ceiling, which is a structural constant of the project and
@@ -92,7 +92,7 @@ not a population. D4 bounds what the whole stage may cost.
 **The housing is a hard bound, and it is the only bound on the population of a
 site.** A site grows only while it houses fewer people than its housing allows.
 A site at its housing bound grows nobody, however much food it holds. There is
-no third behaviour between the two, so no reader must ask which limit bit.[^21]
+no third behaviour between the two, so no reader must ask which limit bit.[^12]
 
 The bound is not a preference and it is not a slowdown. A contributor who made
 the housing scale the rate rather than stop it would give a site a behaviour
@@ -122,7 +122,7 @@ today, and the work that needs it writes the record that splits the column.
 
 The growth pass opens one stage of the step. It runs on every tick, and a
 schedule decides which ticks it acts on. The interval is a parameter of that
-schedule and never a constant of the kernel.[^12]
+schedule and never a constant of the kernel.[^13]
 
 **The stage visits the sites. It never searches, and it never walks the
 units.** It reads the store and the housing of each site, and it reads the
@@ -133,7 +133,7 @@ new unit.
 The cost of the stage therefore follows the settlements and the faction
 ceiling, and it does not follow the population. This is the rule the project
 already applies: cost follows the lattice and the structure, never the number
-of people.[^13]
+of people.[^14]
 
 A reviewer finds a violation by asking one question of the stage. Does any loop
 in it run once for each unit? If one does, the stage is wrong.
@@ -147,10 +147,12 @@ A birth creates a unit through the same call that every other creation uses.
 The growth kernel writes no column of the unit arena directly, and it holds no
 second creation path.
 
-**Growth adds a person. The per-site production queue is the only thing that
-takes one.**[^8] A queued entry that finishes consumes one resident of the site
-and gives the world a unit of the type the entry named. It adds nobody, so it
-never passes the housing bound of D1 and D2.
+**Growth adds people. The per-site production queue is the only thing that
+takes them.**[^8] A queued entry that finishes takes the people it costs from
+the site. It then gives the world a unit of the type the entry named. It adds
+nobody, so it never passes the housing bound of D1 and D2. This record states no
+count of the people an entry costs, and the balance register holds that
+row.[^11]
 
 There is therefore one source of people, one consumer of them, and one bound
 over how many a site holds at once. A reviewer who meets a second source, or a
@@ -159,20 +161,20 @@ about which bound applies.
 
 **A grown unit carries the type the spawn path gives, and that is the worker
 row.** The worker row holds an attack of zero, and a type row that holds zero in
-a column means the type cannot do what the column names.[^14] The findings
-register holds that reading and its evidence.[^15] This is correct rather than a
+a column means the type cannot do what the column names.[^15] The findings
+register holds that reading and its evidence.[^16] This is correct rather than a
 gap: a grown person is a worker, and the queue is how a faction turns a worker
 into anything else.
 
 A growth kernel that chose a type would hold a rule for a type, and a pass that
-holds a rule for a type is what the type table exists to prevent.[^16] So the
+holds a rule for a type is what the type table exists to prevent.[^17] So the
 growth kernel names no type at all, and the queue names one for each entry.
 
 ### D6. Every growth write is disjoint by site, and everything growth adds enters the state hash
 
 Two sites never write one another's state in the growth stage. The stage
 partitions its work by site, so the disjointness is a property of the partition
-and not a rule that a reviewer must check by reading.[^17]
+and not a rule that a reviewer must check by reading.[^18]
 
 The housing capacity of D1 and every unit the stage creates enter the state
 hash. A value that the step reads on every tick and the hash does not cover
@@ -201,7 +203,7 @@ rate**, because D2 gives the free places their only source, and D1 makes that
 source finite.
 
 The default need rule, and what a grown population can survive under it, are
-content. An open register row holds that choice.[^18]
+content. An open register row holds that choice.[^19]
 
 ## Consequences
 
@@ -243,7 +245,7 @@ build more housing or found another city.
 **Housing therefore becomes a thing worth building, and the upgrade table holds
 no housing category today.** It holds one that raises what a site can store, and
 housing is the same shape. This record does not invent the category. A backlog
-item names it, and it names the column it adds.[^22]
+item names it, and it names the column it adds.[^20]
 
 **A site at its bound that keeps gathering piles up food it cannot use, and this
 record adds no mechanism for that surplus.** The surplus is ordinary stock. It
@@ -258,13 +260,13 @@ consequence. It states no rule that creates it.
 
 **A test cannot prove D2 by watching a healthy world.** The derived count and
 the column agree in every ordinary run. The test that proves the check works
-makes the two disagree and asserts the refusal.[^19]
+makes the two disagree and asserts the refusal.[^21]
 
 **A fixture built from the demonstration world measures the fixture.** Growth
 lives at three extremes: a site at its housing, a site with an empty store, and
 a site with one free place and more than one proposal in one frame. Build the
 world that produces those, put each refusal back, and watch the test stay
-green.[^19]
+green.[^21]
 
 ## References
 
@@ -279,13 +281,13 @@ green.[^19]
 [^9]: ADR-0023, an aggregate combines exactly in any order, decision D2. `docs/adrs/accepted/adr-0023-an-aggregate-combines-exactly-in-any-order.md`
 [^10]: Recurring Defect Shapes, shape 1. `.agents/rules/recurring-defects.md`
 [^11]: Balance register, the population. `docs/reference/balance.md`
-[^12]: ADR-0062, production and upkeep are rates attached to a site, decision D4. `docs/adrs/accepted/adr-0062-production-and-upkeep-are-rates-attached-to-a-site.md`
-[^13]: ADR-0096, cost follows the lattice, not the population, decision D1. `docs/adrs/draft/adr-0096-cost-follows-the-lattice-not-the-population.md`
-[^14]: ADR-0145, a unit type is a row of capability columns, and zero means cannot, decisions D1 and D2. `docs/adrs/accepted/adr-0145-a-unit-type-is-a-row-of-capability-columns-and-zero-means-cannot.md`
-[^15]: Findings register, FND-486. `docs/FINDINGS.md`
-[^16]: ADR-0120, a unit carries a type that indexes a table, decision D1. `docs/adrs/draft/adr-0120-a-unit-carries-a-type-that-indexes-a-table.md`
-[^17]: ADR-0009, parallel stages write disjoint outputs, decision D1. `docs/adrs/accepted/adr-0009-parallel-stages-write-disjoint-outputs.md`
-[^18]: Decisions register, DEC-044. `docs/DECISIONS.md`
-[^19]: Testing Rules, a fixture supplies the input. `.agents/rules/testing.md`
-[^21]: ADR-0082, the store sets the rate of a birth and the housing admits it, decision D2. `docs/adrs/draft/adr-0082-the-store-sets-the-rate-of-a-birth-and-the-housing-admits-it.md`
-[^22]: Backlog item 0498. `docs/backlog/proposed/0498-give-the-upgrade-table-a-housing-category.md`
+[^12]: ADR-0082, the store sets the rate of a birth and the housing admits it, decision D2. `docs/adrs/draft/adr-0082-the-store-sets-the-rate-of-a-birth-and-the-housing-admits-it.md`
+[^13]: ADR-0062, production and upkeep are rates attached to a site, decision D4. `docs/adrs/accepted/adr-0062-production-and-upkeep-are-rates-attached-to-a-site.md`
+[^14]: ADR-0096, cost follows the lattice, not the population, decision D1. `docs/adrs/draft/adr-0096-cost-follows-the-lattice-not-the-population.md`
+[^15]: ADR-0145, a unit type is a row of capability columns, and zero means cannot, decisions D1 and D2. `docs/adrs/accepted/adr-0145-a-unit-type-is-a-row-of-capability-columns-and-zero-means-cannot.md`
+[^16]: Findings register, FND-486. `docs/FINDINGS.md`
+[^17]: ADR-0120, a unit carries a type that indexes a table, decision D1. `docs/adrs/draft/adr-0120-a-unit-carries-a-type-that-indexes-a-table.md`
+[^18]: ADR-0009, parallel stages write disjoint outputs, decision D1. `docs/adrs/accepted/adr-0009-parallel-stages-write-disjoint-outputs.md`
+[^19]: Decisions register, DEC-044. `docs/DECISIONS.md`
+[^20]: Backlog item 0498. `docs/backlog/proposed/0498-give-the-upgrade-table-a-housing-category.md`
+[^21]: Testing Rules, a fixture supplies the input. `.agents/rules/testing.md`
