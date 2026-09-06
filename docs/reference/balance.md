@@ -83,7 +83,7 @@ BLK-150, which asks what raises and lowers renown.[^6]
 
 | Value | Read by | Set | Blocker | Derivation |
 |---|---|---|---|---|
-| Tick limit | The territory reader | unset, pass 10 | BLK-007 | Provisional default of 2000 written by pass 1, so that a run of the demonstration world ends inside a few minutes and no determinism scenario reaches it. Pass 10 measures it. |
+| Tick limit | The territory reader | unset, pass 10 | BLK-007 | Provisional default of 2000 written by pass 1, so that a run of the demonstration world ends inside a few minutes and no determinism scenario reaches it. **The project owner set the game horizon at 5000 ticks on 5 September 2026.** The whole loop must run inside it: gather, grow, queue a settler, found a second city, queue soldiers, raise a cohort, and reach a decision. Every population and queue row below is derived against that horizon. Pass 10 measures it. |
 | Stock target | The wealth-or-wonder reader | unset, pass 10 | — | Provisional default of 4096 whole units, as a raw Q16.16 sum over every commodity of every settlement of the faction, written by pass 8. The demonstration store climbs to hundreds by the tick limit, so the value sits above any stock a run reaches today and the path fires only when a caller writes a store. Pass 10 measures it. |
 | Renown target | The renown reader | unset, pass 10 | BLK-150 | Provisional default of 100 whole units, as a raw Q16.16 value, written by pass 8. No pass writes renown, so the reader fires only when the control plane writes the column. The value is a placeholder under the blocker and not a choice. Pass 10 measures it. |
 | Census tick count, the ticks the gate drives before it reads the census | The census gate | unset, pass 10 | BLK-007 | |
@@ -115,14 +115,30 @@ BLK-150, which asks what raises and lowers renown.[^6]
 
 | Value | Read by | Set | Blocker | Derivation |
 |---|---|---|---|---|
-| Housing capacity, the people one built dwelling holds | The growth stage, when it counts the free places of a site | unset, pass 10 | BLK-050 | |
-| Birth rate, what one site proposes for the store it holds | The growth stage, when it proposes a birth | unset, pass 10 | BLK-050 | |
-| Growth schedule, period and phase | The growth stage, when it decides whether this tick acts | unset, pass 10 | BLK-007 | |
-| Founding housing, the capacity a founded site starts with | The seeding layer, when it founds a site | unset, pass 10 | BLK-050 | |
+| Housing capacity, the people one built dwelling holds | The growth stage, when it counts the free places of a site | unset, pass 10 | BLK-050 | Named by the growth and queue design call of 5 September 2026, which makes housing the bound on the people a site holds at once. The value must let a faction reach a raised cohort well inside the game horizon of the tick limit row. No value is chosen. Pass 10 measures it. |
+| Housing per person, the housing one person takes | The growth stage, when it counts the free places of a site | unset, pass 10 | BLK-050 | Named by the growth and queue design call of 5 September 2026. It is stated apart from the capacity, so that a capacity is a quantity of housing and not a count of people. No value is chosen. Pass 10 measures it. |
+| Food per birth, the store one birth costs | The growth stage, when it proposes a birth | unset, pass 10 | BLK-050 | Named by the growth and queue design call of 5 September 2026, which makes food and housing the two things a site needs to grow. No value is chosen. Pass 10 measures it. |
+| Birth rate, what one site proposes for the store it holds | The growth stage, when it proposes a birth | unset, pass 10 | BLK-050 | Named by the growth and queue design call of 5 September 2026. No value is chosen. Pass 10 measures it. |
+| Growth schedule, period and phase | The growth stage, when it decides whether this tick acts | unset, pass 10 | BLK-007 | Named by the growth and queue design call of 5 September 2026. No value is chosen. Pass 10 measures it. |
+| Founding housing, the housing a founded site starts with | The seeding layer, when it founds a site | unset, pass 10 | BLK-050 | Named by the growth and queue design call of 5 September 2026. A founded site must house the group that founds it, or a run starts crowded. No value is chosen. Pass 10 measures it. |
 
-The four rows above are unset and every one of them is behind a blocker. No
+The six rows above are unset and every one of them is behind a blocker. No
 pass writes a value into them yet. ADR-0157 cites this section and states no
 figure of its own.[^8]
+
+## The production queue
+
+| Value | Read by | Set | Blocker | Derivation |
+|---|---|---|---|---|
+| Queue bound, the entries one site holds | The queue verb, when it refuses an entry | unset, pass 10 | BLK-050 | Named by the growth and queue design call of 5 September 2026. It bounds the cost of the advance stage together with the settlement count. No value is chosen. Pass 10 measures it. |
+| Work to finish a unit, by type | The queue advance, when it finishes an entry | unset, pass 10 | BLK-050 | Named by the growth and queue design call of 5 September 2026. One value for each row of the unit type table, so a settler and a soldier may take different work. No value is chosen. Pass 10 measures it. |
+| Goods to finish a unit, by type and by good | The queue advance, when it charges a finished entry | unset, pass 10 | BLK-050 | Named by the growth and queue design call of 5 September 2026. A settler costs food and a soldier costs the goods that arm it. No value is chosen. Pass 10 measures it. |
+| People to finish a unit, by type | The queue advance, when it takes a resident | unset, pass 10 | BLK-050 | Named by the growth and queue design call of 5 September 2026. The call fixes the value at one person for every type, and the row exists so that a later type may cost more without a change to the record. Pass 10 measures it. |
+| Queue charge, the store one advance costs | The queue advance, when it advances the front entry | unset, pass 10 | BLK-050 | Named by the growth and queue design call of 5 September 2026, which requires that a queue is never free. No value is chosen. Pass 10 measures it. |
+| Queue schedule, period and phase | The queue advance, when it decides whether this tick acts | unset, pass 10 | BLK-007 | Named by the growth and queue design call of 5 September 2026. No value is chosen. Pass 10 measures it. |
+
+The six rows above are unset and every one of them is behind a blocker.
+ADR-0158 cites this section and states no figure of its own.[^9]
 
 ## Unit types
 
@@ -200,3 +216,4 @@ rate, a step, a limit, a target, a share, a schedule, a bound.
 [^6]: Blockers register, BLK-150. `docs/BLOCKERS.md`
 [^7]: Target platform costs. `docs/reference/graviton-costs.md`
 [^8]: ADR-0157, a site's free places are its built housing less the residents the engine already counts. `docs/adrs/draft/adr-0157-a-sites-free-places-are-its-built-housing-less-the-residents-the-engine-counts.md`
+[^9]: ADR-0158, a site builds a typed unit from a bounded queue its store pays for. `docs/adrs/draft/adr-0158-a-site-builds-a-typed-unit-from-a-bounded-queue-its-store-pays-for.md`
