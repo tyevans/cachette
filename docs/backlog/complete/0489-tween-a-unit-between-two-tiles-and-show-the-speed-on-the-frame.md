@@ -1,7 +1,7 @@
 ---
 id: 0489
 title: Tween a unit between two tiles and show the speed on the frame
-status: refined
+status: complete
 created: 2026-09-05
 implements: [ADR-0094 D1, ADR-0094 D2, ADR-0094 D3, ADR-0094 D4, ADR-0094 D5, ADR-0067 D1, ADR-0067 D2, ADR-0067 D3, ADR-0093 D1, ADR-0093 D5]
 changes: []
@@ -115,7 +115,35 @@ no-op fails.[^4]
 
 ## Outcome
 
-Filled in when the item moves to `complete/`.
+Built. The viewer holds the table and the words, the frame command takes the
+phase and the speed as numbers, and the demonstration states both from its
+clock.
+
+Three things changed from the plan.
+
+**The frame command did not change its signature.** Adding two arguments to
+the two existing entry points would have touched every call site in the test
+suite. The paced calls hold the whole implementation, and the older calls
+delegate to them at a still pace, so there is one renderer and not two.
+
+**The demonstration speeds moved to thousandths of a tick for each frame.**
+The set held whole ticks, and a speed below one tick could not be stated in
+it. The clock keeps what the frames owe toward the next tick, and the phase is
+the remainder.
+
+**The keyboard bound nine panels and the deck holds ten.** The relations panel
+had no key. The mapping now walks the function keys, skips the three the
+settings hold, and takes as many as the engine registers. The startup line
+comes from the same mapping.
+
+**One test was not written, and the reason is the reason it would have been
+worthless.** A picture test on the demonstration world cannot see the tween,
+because no unit in that world changes tile between two ticks. Two runs that
+differed only in the phase gave no differing pixel. The pixel proof is in the
+viewer test, on a fixture that moves one unit by the engine's own verb.
+
+No register entry moved. No reader was added to the core crate, and the core
+crate was not edited.
 
 ## References
 
