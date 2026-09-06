@@ -1099,7 +1099,7 @@ pub struct World {
     ///
     /// # References
     ///
-    /// [^1]: Findings register, FND-497. `docs/FINDINGS.md`
+    /// [^1]: Findings register, FND-498. `docs/FINDINGS.md`
     /// [^2]: ADR-0001, one binary gives one answer at any thread count, decision D4. `docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
     census: CensusTotals,
 }
@@ -10078,7 +10078,7 @@ pub struct CensusRow {
 ///
 /// # References
 ///
-/// [^1]: Findings register, FND-497. `docs/FINDINGS.md`
+/// [^1]: Findings register, FND-498. `docs/FINDINGS.md`
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum CensusBasis {
     /// What the world holds at the tick the reader runs. The count falls when
@@ -10113,7 +10113,7 @@ impl std::fmt::Debug for CensusRow {
 /// # References
 ///
 /// [^1]: ADR-0002, simulated and aggregated state holds no floating point number, decision D3. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
-/// [^2]: Findings register, FND-497. `docs/FINDINGS.md`
+/// [^2]: Findings register, FND-498. `docs/FINDINGS.md`
 pub const SUBSYSTEM_CENSUS: &[CensusRow] = &[
     CensusRow {
         name: "units",
@@ -10225,7 +10225,7 @@ pub const SUBSYSTEM_CENSUS: &[CensusRow] = &[
     // no storm.** Its name says more than the reader reads, and a pass that
     // counts the storms themselves must replace it.[^5]
     //
-    // [^5]: Findings register, FND-497. `docs/FINDINGS.md`
+    // [^5]: Findings register, FND-498. `docs/FINDINGS.md`
     CensusRow {
         name: "storms_raised",
         basis: CensusBasis::Held,
@@ -11454,7 +11454,7 @@ impl World {
         // emptied, so a census row says what the run did and not what the
         // last tick did.[^5]
         //
-        // [^5]: Findings register, FND-497. `docs/FINDINGS.md`
+        // [^5]: Findings register, FND-498. `docs/FINDINGS.md`
         self.fold_the_controller_into_the_census();
         self.fold_campaigns_into_the_census();
         self.controller.clear_log();

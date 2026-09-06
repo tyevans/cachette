@@ -4045,7 +4045,7 @@ impl PyWorld {
     /// # References
     ///
     /// [^1]: Recurring Defect Shapes, shape 1. `.claude/rules/recurring-defects.md`
-    /// [^2]: Findings register, FND-497. `docs/FINDINGS.md`
+    /// [^2]: Findings register, FND-498. `docs/FINDINGS.md`
     fn subsystem_census<'py>(&self, python: Python<'py>) -> PyResult<Bound<'py, PyDict>> {
         let census = self.lock().subsystem_census();
         let report = PyDict::new(python);
