@@ -1,0 +1,4 @@
+# The generation loop writes the session tree. The fixture script writes the
+# fixture tree. Neither belongs in the repository.
+sessions/
+fixtures/

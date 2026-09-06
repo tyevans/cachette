@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block title %}direct-die sessions{% endblock %}
+
+{% block main %}
+  <h1>Sessions</h1>
+  {% if not sessions %}
+    <p class="gap">
+      No session is on disk yet. The generation loop writes one when it starts.
+      Run the fixture script to make a session to look at.
+    </p>
+  {% endif %}
+  {% for item in sessions %}
+    <section class="card">
+      <h2>
+        <a href="/s/{{ item.asset }}/{{ item.session_id }}">{{ item.asset }}</a>
+        <span class="sid">{{ item.session_id }}</span>
+      </h2>
+      <dl class="meta">
+        <dt>Created</dt><dd>{{ item.created or "—" }}</dd>
+        <dt>Model</dt><dd>{{ item.model or "—" }}</dd>
+        <dt>Guide</dt><dd>{{ item.guide_version or "—" }}</dd>
+        <dt>Rounds on disk</dt><dd>{{ item.rounds | length }}</dd>
+        <dt>Rounds declared</dt>
+        <dd>
+          {% if item.declared_rounds is none %}—{% else %}{{ item.declared_rounds }}{% endif %}
+        </dd>
+      </dl>
+      {% if item.manifest is none %}
+        <p class="gap">This session has no session.json yet.</p>
+      {% endif %}
+      {% if not item.rounds %}
+        <p class="gap">This session holds no round yet.</p>
+      {% else %}
+        <ul class="rounds">
+          {% for entry in item.rounds %}
+            <li>
+              <a href="/s/{{ item.asset }}/{{ item.session_id }}/{{ entry.name }}">{{ entry.name }}</a>
+              <span class="count">{{ entry.present_variants | length }} variant{{ "" if entry.present_variants | length == 1 else "s" }}</span>
+              {% if entry.feedback is not none %}
+                <span class="tag">
+                  feedback{% if entry.choice %}: {{ entry.choice }}{% endif %}
+                </span>
+              {% endif %}
+            </li>
+          {% endfor %}
+        </ul>
+      {% endif %}
+    </section>
+  {% endfor %}
+{% endblock %}
