@@ -1,7 +1,7 @@
 ---
 id: 0487
 title: Paint each upgrade category and level distinctly
-status: refined
+status: complete
 created: 2026-09-05
 implements: [ADR-0151 D5, ADR-0067 D1, ADR-0093 D1, ADR-0094 D2]
 changes: []
@@ -128,7 +128,56 @@ as the other viewer fixtures do.[^5]
 
 ## Outcome
 
-Filled in when the item moves to `complete/`.
+**The category is the shape and the level is a count of pips.** Each category
+takes a glyph from a table indexed by the category number, so a category added
+to the core fails to compile rather than borrowing the shape of another. The
+wall and the open category gained shapes of their own, which one match arm gave
+them both alike. Under the glyph stands one pip for each level. A pip is white
+against the dark rim, and its count is not a hue, so the level cannot cancel
+against the wash that carries the build progress.
+
+**A site that stands now draws the glyph as well as the wash.** The category was
+readable only while a site was under work, because a site that stood washed its
+tile and drew no mark. The distinction between the two states holds: a site
+under work marks the middle and leaves the corner, and a site that stands washes
+the whole tile. Below the width at which a glyph reads, the wash is still the
+only mark.
+
+**The upgrade overlay read the category ordinal and called it a level.** It now
+reads the level of the entry and scales against the level count of the table.
+The value is the level and one, because a site under work stands at level zero
+and zero is also a tile that carries nothing.
+
+**The colour key names the level channel, and the inspector names the level.**
+The inspector also reads the work against the row above the entry, so a level 1
+road that somebody is raising no longer reads as finished.
+
+**Every new test was seen red with its defect put back.** The commit that landed
+the tests holds the table of defects and the test each one failed. One of them
+matters for the future: the older glyph test compares the pixels of two tiles,
+and every category already draws in a colour of its own, so it stayed green
+while the wall took the shape of the store. The new test compares the set of
+pixels each mark covers, which is the shape alone.
+
+**A fixture that steps two worlds by different tick counts proves nothing.** The
+two worlds would differ in the weather, in the holding and in where every unit
+stands. Both worlds now step the same number of ticks, and each test asserts
+that the two draw the tile alike once the site is destroyed.
+
+**A builder of a viewer fixture dies while it builds.** The first form of the
+fixture stopped with a refusal that named no builder. A build that takes more
+than a few ticks must put a live unit back on the tile and order it again each
+tick. The same holds in the picture example.
+
+**One disagreement with ADR-0151 D5 stands.** The record says that the drawing
+pass reads nothing but the category and the level to choose a drawing. The wash
+also reads the progress toward the next level, which the adjustment pass added
+before this item and which report 25 asked for. The progress is a third channel
+beside the two the record names. The record keeps its text, and this item
+records the tension.
+
+**The pictures are written and not committed.** They land under a build
+directory, in the way the adjustment pictures do.
 
 ## References
 
