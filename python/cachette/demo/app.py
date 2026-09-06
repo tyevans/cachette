@@ -38,6 +38,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import secrets
 from typing import TYPE_CHECKING
 
 from cachette import Camera, World
@@ -59,8 +60,19 @@ WINDOW_HEIGHT = 720
 # exercise, and these numbers only choose which world it runs.
 WORLD_WIDTH = 256
 WORLD_HEIGHT = 256
-WORLD_SEED = 0x0123_4567_89AB_CDEF
 FACTION_COUNT = 4
+
+# The seed of the world the demonstration opens, when the watcher names none.
+#
+# **A watcher gets a different world on every run.** One world seen many
+# times teaches a reader that world rather than the engine, and a defect that
+# one seed never produces stays invisible. The demonstration therefore draws
+# a seed and prints it.
+#
+# The run stays reproducible. The engine gives one answer for one seed at any
+# thread count, so a watcher who saw something worth keeping passes the
+# printed number back with `--seed`.
+WORLD_SEED = 0x0123_4567_89AB_CDEF
 
 # The height a picture of the whole panel starts at.
 #
@@ -364,17 +376,35 @@ class Demo:
         return reading
 
 
-def build_world(extent: int = 0, factions: int = FACTION_COUNT) -> World:
+def draw_seed() -> int:
+    """Give back a seed for a world nobody named.
+
+    The draw is not part of the simulation. It chooses which world runs, and
+    the engine then gives one answer for that world at any thread count. A
+    caller that wants one world names it instead.
+    """
+    return secrets.randbits(64)
+
+
+def build_world(
+    extent: int = 0,
+    factions: int = FACTION_COUNT,
+    seed: int = WORLD_SEED,
+) -> World:
     """Build the world the demonstration runs.
 
     The extent is the side of the world in tiles. Zero takes the default
     world, which is the one a watcher opens.
+
+    The seed chooses which world. It keeps the stated default, so a caller
+    that names no seed gets one world every time. The command line draws a
+    seed before it calls this.
     """
     side = extent if extent > 0 else WORLD_WIDTH
     return World(
         width=side,
         height=side if extent > 0 else WORLD_HEIGHT,
-        seed=WORLD_SEED,
+        seed=seed,
         faction_count=factions,
     )
 
@@ -503,20 +533,34 @@ def main(argv: list[str] | None = None) -> int:
         default=FACTION_COUNT,
         help="how many factions the world holds",
     )
+    parser.add_argument(
+        "--seed",
+        type=lambda given: int(given, 0),
+        default=0,
+        help=(
+            "the seed of the world; zero draws one, and the run prints the "
+            "number it drew so that you can ask for the same world again"
+        ),
+    )
     arguments = parser.parse_args(argv)
+    seed = arguments.seed if arguments.seed else draw_seed()
 
     # The panel holds every section and is taller than a window a person
     # opens. A picture that used the window height would cut the last
     # sections and say so, which is honest and still less than was asked for.
     default_height = PICTURE_HEIGHT if arguments.picture else WINDOW_HEIGHT
     demo = Demo(
-        build_world(arguments.extent, arguments.factions),
+        build_world(arguments.extent, arguments.factions, seed),
         width=arguments.width,
         height=arguments.height or default_height,
         threads=arguments.threads,
     )
     if arguments.tick_limit > 0:
         demo.world.set_tick_limit(arguments.tick_limit)
+    # The seed comes first, before any other line. A run that ends badly is
+    # worth repeating, and the number that repeats it must already be on the
+    # screen when it does.
+    print(f"seed 0x{seed:016x}")
     foundings = demo.seed()
     seated, _ = report(foundings)
     if seated == 0:
