@@ -179,6 +179,7 @@ declare_stages! {
     Convert,                  "convert",                    true,  1, false;
     WeatherSolve,             "weather_solve",              true,  1, false;
     PresenceFold,             "presence_fold",              true,  1, false;
+    Observe,                  "observe",                    true,  1, false;
     RelationDrift,            "relation_drift",             false, 1, false;
     Controller,               "controller",                 false, 1, false;
 }
