@@ -21,6 +21,22 @@ unit behaviour, and PRD-0009 is unit behaviour and refuses it, because
 assigning a job is a decision made for a place and it persists for many
 ticks.[^1] **PRD-0017 now owns it, and this item implements PRD-0017.**
 
+## What the tree already holds
+
+**Four of the five points are built, read on 5 September 2026.** The seating
+pass reads its applicants from the home column, so no second column states where
+a unit lives. It sorts on a stable key of the home and the unit identity, then
+pairs the applicants against the positions in one scan. The step calls it on a
+schedule and returns early when the schedule is not due.[^A1] [^A2]
+
+**One point is missing, and the code says so.** No property of the unit limits
+which position it can take. The doc comment states that plainly and defers the
+choice to ADR-0099 D3, because the unit row carries no such property today.[^A1]
+
+**This item is now that one question.** Refining it means deciding whether the
+unit row gains the property. It is a deferral written into the code and the
+record, not an oversight.
+
 ## What the work does
 
 1. A site gathers the units that live in it and sorts them by a key vector.
@@ -120,3 +136,5 @@ Filled in when the item moves to `complete/`.
 [^7]: ADR Registry. `docs/adrs/REGISTRY.md`
 [^8]: Testing Rules, section 3. `.claude/rules/testing.md`
 [^9]: Findings register, FND-051. `docs/FINDINGS.md`
+[^A1]: The seating pass, its key and its scan. `crates/cachette-core/src/position.rs`
+[^A2]: The seating call and its schedule. `crates/cachette-core/src/world.rs`

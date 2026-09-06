@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-540**
+**Next number: FND-542**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -10934,7 +10934,7 @@ index against the set of open items and never against what an item says.
 [^F168A]: ADR-0084, the world reserves the unit columns at construction, decision D3. `docs/adrs/draft/adr-0084-the-world-reserves-the-unit-columns-at-construction.md`
 [^F168B]: Review 0175, the unit reservation record. `docs/reviews/0175-the-unit-reservation-record.md`
 [^F171A]: Testing rules, sections 2 and 2a. `.claude/rules/testing.md`
-[^F174B]: Backlog item 0179. `docs/backlog/proposed/0179-give-a-golden-scenario-a-build.md`
+[^F174B]: Backlog item 0179. `docs/backlog/complete/0179-give-a-golden-scenario-a-build.md`
 
 [^1]: Findings register, FND-038, in this document.
 [^2]: ADR-0066, entity storage holds four fixed shapes. `docs/adrs/accepted/adr-0066-entity-storage-holds-four-fixed-shapes.md`
@@ -11035,7 +11035,7 @@ index against the set of open items and never against what an item says.
 [^F137A]: The bindings and the event log method. `crates/cachette-py/src/lib.rs`
 [^F137B]: The event types. `crates/cachette-core/src/event.rs`
 [^F137C]: Recurring Defect Shapes, shape 1. `.claude/rules/recurring-defects.md`
-[^F137D]: Backlog item 0153. `docs/backlog/refined/0153-let-python-read-an-event-without-repeating-its-layout.md`
+[^F137D]: Backlog item 0153. `docs/backlog/complete/0153-let-python-read-an-event-without-repeating-its-layout.md`
 [^97]: Development budgets, the gate suite budget. `docs/reference/development-budgets.md`
 [^98]: Testing rules, section 2a. `.claude/rules/testing.md`
 [^99]: Budgets and costs, the scale constants. `docs/reference/budgets.md`
@@ -12043,8 +12043,106 @@ code must satisfy. A reviewer who reads "the engine already exposes" plans work
 that has no ground under it, and nothing fails until an implementer opens the
 file.
 
+### FND-540 — A renumber repairs every citation in a file and cannot repair a commit message
+
+**Believed.** A branch that renumbers its own backlog items repairs the link
+between the work and the item. The sweep searches the whole tree, moves every
+citation, and the checks confirm the result.
+
+**True.** The sweep repairs every mutable citation. It cannot repair a commit
+message, because a commit message is immutable. The commit that did the work
+names the item by its old number, and that number now names a different item.
+Nothing fails. The item stays in `refined/`, and a later worker rebuilds what
+is already built.
+
+**Evidence.** One branch landed the panel standard, the deck and the watcher's
+clock. Its commit body ends with a line that names items 0307, 0308 and
+0309.[^F540A] Thirty-seven minutes later the same branch moved those three
+numbers to 0316, 0317 and 0318, because main had merged a documentation plan
+under the same numbers while the branch ran.[^F540B] The renumber moved nine
+citations in four files and passed five checks. The three items stayed in
+`refined/` until an audit read the code, and the register holds that
+reading.[^F540C] Today the numbers 0307 and 0308 name two documentation items,
+so the commit body points at work it did not do.
+
+**Follows.** Three things.
+
+**The commit message is the wrong side to carry this link.** A commit is fixed
+to one moment, which is why it holds a count and a measured figure well.[^F540D]
+The same property makes it a poor pointer. A number that names one item today
+can name another item tomorrow, and the commit cannot follow.
+
+**Put the commit in the item, rather than the item in the commit.** The item
+file is the mutable side, so it survives a renumber, and a commit hash never
+changes meaning. The stronger reason is not the pointer. A worker who records
+the link must open the item file, and opening the item file is the moment the
+worker moves it. A worker who records the link in the commit body alone never
+opens the item, so nothing prompts the move. The cost is one line in the
+`Outcome` section, written by the worker who closes the item.
+
+**A renumber must ask what work has already landed.** The sweep repairs the
+citations of a number. It says nothing about the state of the item that number
+names. Read the code for each renumbered item before you commit the renumber.
+
+**No check can catch this shape, and none was written.** Three commit bodies in
+1034 carry a trailer of the form the panel commit used, so a check that reads
+the trailer would enforce nothing. Widening it to prose does not help: 480
+commit bodies name an item number, and a reader cannot tell a commit that
+finishes an item from a commit that mentions one. That distinction is an open
+item for record numbers, and it is unsolved there too.[^F192D] A check that
+compared the front matter status against the directory was written instead. It
+catches the adjacent shape, and it found two items that had moved to `complete/`
+and still declared an open status.[^F540F]
+
+### FND-541 — Shape 3 has local instances, and the shape 1 instance is wider than the item that named it
+
+**Believed.** Recurring defect shape 3, inert code that nothing invokes, had no
+local instance. The rule marks its provenance as imported, and an imported
+shape is a prior rather than evidence.[^F498G]
+
+**True.** The engine holds at least two. A backlog audit found them in two
+separate batches, and neither worker was looking for a pattern.
+
+**Evidence.** A public relabel pass walks the descent forest and derives every
+label from the parent edges. Its only caller is its own integration test. The
+step never runs it, so a label the engine answers with is the label the last
+test left.[^F541B] A public resource reader takes a tile, a kind and a tick.
+Nothing calls it, in the engine, in the bindings, or in a test. The live route
+is the same reader without the tick, and that one has six callers.[^F541C]
+
+**Shape 1 has a wider instance than the item that named it.** The engine coerces
+the faction count to at least one at the point of use, rather than once through
+a reader. An item records the shape and names nine call sites. The file it names
+holds seventeen, and the tree holds thirty-one.[^F541D] No reader answers the
+effective count, so each site declares the rule again.
+
+**Follows.** Three things.
+
+**Shape 3 is now local, and the rule says so.** A shape with local evidence
+outranks a prior, and a reviewer who reads "imported" weighs it too lightly.
+
+**A test that drives a mechanism is not evidence that anything reaches it.** The
+relabel pass has tests that pass. They construct the arena and call the pass, so
+they prove the pass works and say nothing about the engine.[^F541E]
+
+**No check was written for shape 3, and the reason is the bindings.** A public
+function with no caller outside its own tests is mechanically detectable in
+Rust. It is not a defect on its own. The binding surface exists to be called
+from outside the tree, and a reader the control plane will call tomorrow is
+correct today. A check that cannot tell those apart would fire on the whole
+public interface, and everyone would learn to ignore it.
+
 ## References
 
+[^F540A]: Commit 79d17eb, give the panel one standard, a deck, and a clock the watcher drives.
+[^F540B]: Commit 54e90a5, renumber what this branch allocated, after main took the same numbers.
+[^F540C]: Findings register, FND-526, in this document.
+[^F540D]: Commit Message Rules, what belongs in the body. `.agents/rules/commits.md`
+[^F540F]: The backlog check script. `scripts/check_backlog.py`
+[^F541B]: Backlog item 0226, give the relabel pass a caller in the step. `docs/backlog/proposed/0226-give-the-relabel-pass-a-caller-in-the-step.md`
+[^F541C]: Backlog item 0135, drive or retire the deposit amount reader. `docs/backlog/proposed/0135-drive-or-retire-the-deposit-amount-reader.md`
+[^F541D]: Backlog item 0145, give the faction count one rule for zero. `docs/backlog/proposed/0145-give-the-faction-count-one-rule-for-zero.md`
+[^F541E]: Testing Rules, section 5. `.agents/rules/testing.md`
 [^F490A]: Balance register, the founding group, the base reach and the campaign cohort size. `docs/reference/balance.md`
 [^F491A]: ADR-0152, a faction plans its roads and zones with one solver, decision D2. `docs/adrs/accepted/adr-0152-a-faction-plans-its-roads-and-zones-with-one-solver.md`
 [^F493A]: ADR-0152, a faction plans its roads and zones with one solver, decision D5. `docs/adrs/accepted/adr-0152-a-faction-plans-its-roads-and-zones-with-one-solver.md`
@@ -12101,7 +12199,7 @@ file.
 [^F452A]: ADR-0072, a tile stock is generated, and only what was taken is stored, decision D5. `docs/adrs/accepted/adr-0072-a-tile-stock-is-generated-and-only-what-was-taken-is-stored.md`
 [^F482A]: Commit 7c4b722, restore the three trade records that a number collision dropped.
 [^F482B]: ADR Registry, status vocabulary. `docs/adrs/REGISTRY.md`
-[^F483A]: Backlog item 0278, say what the demonstration world never produced. `docs/backlog/proposed/0278-say-what-the-demonstration-world-never-produced.md`
+[^F483A]: Backlog item 0278, say what the demonstration world never produced. `docs/backlog/complete/0278-say-what-the-demonstration-world-never-produced.md`
 [^F483B]: The `seats_filled` row of the subsystem census. `crates/cachette-core/src/world.rs`
 [^F483C]: The share function of a site. `crates/cachette-core/src/position.rs`
 [^F483D]: The default site preference. `crates/cachette-core/src/position.rs`

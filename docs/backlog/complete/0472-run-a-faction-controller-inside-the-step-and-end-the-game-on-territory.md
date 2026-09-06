@@ -189,7 +189,7 @@ names the defect and the test that caught it.
 ## References
 
 [^1]: Design: the living world game layer, sections 1, 5, 10, 11 and 13. `docs/superpowers/specs/2026-09-05-living-world-game-layer-design.md`
-[^2]: Backlog item 0278, say what the demonstration world never produced. `docs/backlog/proposed/0278-say-what-the-demonstration-world-never-produced.md`
+[^2]: Backlog item 0278, say what the demonstration world never produced. `docs/backlog/complete/0278-say-what-the-demonstration-world-never-produced.md`
 [^3]: ADR Registry. `docs/adrs/REGISTRY.md`
 [^4]: Recurring Defect Shapes, shape 1. `.agents/rules/recurring-defects.md`
 [^5]: Blockers register, BLK-007. `docs/BLOCKERS.md`

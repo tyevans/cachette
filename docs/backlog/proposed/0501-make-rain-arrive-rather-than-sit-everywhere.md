@@ -33,6 +33,20 @@ build, so the world would fill itself uniformly under a wind that carries the
 uniform result about. A decision record states what the source and the sink
 should read instead.[^3]
 
+## What the tree already holds
+
+**One claim of this item is false, read on 5 September 2026.** The item says
+that there is no balance row for the wet mark today. The row exists, it is
+unset, and BLK-130 governs it. The evaporation share has a row beside it.[^B1]
+
+**No engine work landed.** The wet mark is still a code constant, the bindings
+still re-export it, the lift still raises a fixed quantity on a keyed draw and
+reads no heat, and the settle still takes a share of the air by the mean height
+alone.[^B2] No statement under `Done when` holds.
+
+So the work is untouched, and only the sentence about the balance row needs
+repair before somebody reads it as a reason to add one.
+
 ## What the tree already holds, and what it does not
 
 Read on 5 September 2026.
@@ -120,3 +134,5 @@ Filled in when the item moves to `complete/`.
 [^2]: ADR-0143, wet ground yields more to a gatherer, decision D1. `docs/adrs/draft/adr-0143-wet-ground-yields-more-to-a-gatherer.md`
 [^3]: ADR-0162, water enters the air where it is hot, and it falls where the air cools. `docs/adrs/accepted/adr-0162-water-enters-the-air-where-it-is-hot-and-falls-where-the-air-cools.md`
 [^4]: ADR-0142, a god inflicts weather only on ground its own faction holds, decision D1. `docs/adrs/draft/adr-0142-a-god-inflicts-weather-only-on-ground-it-holds.md`
+[^B1]: Balance register, the wet mark and the evaporation share. `docs/reference/balance.md`
+[^B2]: The weather constants, the lift and the settle. `crates/cachette-core/src/weather.rs`

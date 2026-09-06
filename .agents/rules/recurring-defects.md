@@ -4,10 +4,15 @@ This rule lists the mistake shapes to check for when you write, review, or
 diagnose work in this project.
 
 **Read the provenance before you trust a shape.** Cachette has a foundation
-crate and almost no defect history. Two shapes below have local evidence from this project. Three
-are imported from two sibling projects, where they were derived from an audit of
-about 130 correction commits.[^1] [^2] An imported shape is a prior. It stays a
-prior until someone records a local instance.
+crate and a short defect history. Each shape below states its own provenance,
+and that line is the one to read. An imported shape comes from two sibling
+projects, where it was derived from an audit of about 130 correction
+commits.[^1] [^2] An imported shape is a prior. It stays a prior until someone
+records a local instance.
+
+**This paragraph held a count of each kind, and one edit made it false.** The
+count is gone on purpose. A provenance line sits beside the shape it describes,
+so it cannot go stale without somebody reading it.
 
 Add a local instance under each shape as you find one. A shape with local
 evidence is worth more than a shape without it.
@@ -61,10 +66,15 @@ tree and compares. Do not sweep by hand.
 
 ## 3. Inert code that nothing invokes
 
-**Provenance: imported.**
+**Provenance: local evidence, and imported.**
 
 The project declares a capability, documents it, and never calls it. Its own
 test passes, because the test constructs the mechanism and drives it directly.
+
+Local instances. A backlog audit found a public relabel pass whose only caller
+is its own test, and a public resource reader that nothing calls at all. Two
+workers found them in two batches, and neither was looking for a pattern. The
+findings register holds both, with the paths.[^10]
 
 Imported evidence. One reference project shipped nine inert capabilities in one
 wave. It later wrote a record about a list of telemetry keys that nothing
@@ -143,3 +153,4 @@ Before you claim work is done, check each line.
 [^7]: ADR-0001, one binary gives one answer at any thread count. `docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
 [^8]: Findings, the scope of a decision record. `docs/research/adr-scope-findings.md`
 [^9]: Definition of Done. `.agents/rules/definition-of-done.md`
+[^10]: Findings register, FND-541. `docs/FINDINGS.md`

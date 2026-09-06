@@ -120,7 +120,7 @@ cost.[^10]
 [^2]: Testing Rules, section 5. `.claude/rules/testing.md`
 [^3]: ADR-0001, one binary gives one answer at any thread count, decision D4. `docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
 [^4]: Recurring Defect Shapes, shape 1. `.claude/rules/recurring-defects.md`
-[^5]: Backlog item 0153. `docs/backlog/refined/0153-let-python-read-an-event-without-repeating-its-layout.md`
+[^5]: Backlog item 0153. `docs/backlog/complete/0153-let-python-read-an-event-without-repeating-its-layout.md`
 [^7]: Decisions register, DEC-060. `docs/DECISIONS.md`
 [^8]: ADR-0092, the agent tool surface grows one tool at a time, against a stated need, decision D1. `docs/adrs/draft/adr-0092-the-agent-tool-surface-grows-against-a-stated-need.md`
 [^9]: PRD-0019, an agent can ask the running engine what it holds. `docs/product/shaped/prd-0019-an-agent-can-ask-the-running-engine-what-it-holds.md`

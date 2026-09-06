@@ -29,6 +29,25 @@ fail.** The drawing would ask for the stock through the reader that starts
 from the address alone, the picture would not change, and both counts would
 stay right.
 
+## What the tree already holds
+
+**A counter exists for the value field, read on 5 September 2026.** A
+feature-gated census module counts one generation, reports the total and resets.
+Its own documentation says that it observes a draw rather than feeding one, and
+that it holds one counter for the whole process. That answers two of the open
+questions this item asks: where the counter lives, and whether it can be
+determinism-safe.[^A1] A probe proves that the counter counts.[^A2] The drawing
+layer holds its own count with an assertion beside it.[^A3]
+
+**The terrain generator has no counter at all.** Its readers are uncounted.[^A4]
+
+**Nothing counts one whole frame.** No drawing test enables the feature, so no
+test counts what a frame generates through both layers. The one recipe that
+enables it runs a single test.
+
+**The remaining work is the terrain counter and the frame-level count.** The
+determinism question is already settled by the module that exists.
+
 ## What is missing before this is refined
 
 - The impact review.
@@ -61,3 +80,7 @@ Filled in when the item moves to `complete/`.
 [^3]: Findings register, FND-261. `docs/FINDINGS.md`
 [^4]: ADR-0001, one binary gives one answer at any thread count, decision D1. `docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
 [^5]: Testing Rules, section 3. `.claude/rules/testing.md`
+[^A1]: The generation census module. `crates/cachette-core/src/tile_value.rs`
+[^A2]: The probe that the counter counts. `crates/cachette-core/tests/build_visits_no_tile.rs`
+[^A3]: The drawing layer ground read count. `crates/cachette-view/src/paint.rs`
+[^A4]: The terrain generator readers. `crates/cachette-core/src/terrain.rs`

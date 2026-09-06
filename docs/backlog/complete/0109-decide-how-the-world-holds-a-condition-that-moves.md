@@ -1,7 +1,7 @@
 ---
 id: 0109
 title: Decide how the world holds a condition that moves
-status: proposed
+status: complete
 created: 2026-08-31
 implements: []
 changes: []
@@ -46,7 +46,20 @@ Not yet stated. The item is not refined.
 
 ## Outcome
 
-Filled in when the item moves to `complete/`.
+**Closed as already done. The decision this item asks for is written.** An audit
+read the registry and the records on 5 September 2026.
+
+**The condition is water, and it moves over the level 1 cell lattice.** Two
+records hold that choice: one fixes the field on the lattice, and one states
+that a pass moves the water and never scales it. The registry allocated both
+rows.[^5] [^6]
+
+**This item asked for a decision, and nothing else.** That choice is made, and
+the passes that follow from it exist under items 0110 and 0111.
+
+**Both records are still `Draft`.** Acceptance is a review step, and the record
+priority index holds it. It is not work this item can do, because an author may
+not accept a record.
 
 ## References
 
@@ -54,3 +67,5 @@ Filled in when the item moves to `complete/`.
 [^2]: Decisions register, DEC-006. `docs/DECISIONS.md`
 [^3]: ADR Registry. `docs/adrs/REGISTRY.md`
 [^4]: Blockers register, BLK-007. `docs/BLOCKERS.md`
+[^5]: ADR-0140, weather is a field over the level 1 cell lattice. `docs/adrs/draft/adr-0140-weather-is-a-field-over-the-level-1-cell-lattice.md`
+[^6]: ADR-0141, a weather pass moves water and never scales it. `docs/adrs/draft/adr-0141-a-weather-pass-moves-water-and-never-scales-it.md`

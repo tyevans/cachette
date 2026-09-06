@@ -156,7 +156,7 @@ lost with the channel.
 
 ## References
 
-[^1]: Backlog item 0270, score the option set with integer vector instructions. `docs/backlog/proposed/0270-score-the-option-set-with-integer-vector-instructions.md`
+[^1]: Backlog item 0270, score the option set with integer vector instructions. `docs/backlog/complete/0270-score-the-option-set-with-integer-vector-instructions.md`
 [^2]: ADR-0041, a crate split enforces the boundary at compile time, decision D1. `docs/adrs/draft/adr-0041-a-crate-split-enforces-the-boundary-at-compile-time.md`
 [^3]: ADR-0006, an event is plain data and applying it is pure, decision D1. `docs/adrs/accepted/adr-0006-an-event-is-plain-data-and-applying-it-is-pure.md`
 [^4]: Findings register, FND-284. `docs/FINDINGS.md`

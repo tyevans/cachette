@@ -75,7 +75,7 @@ pub(crate) const NOT_MEASURED: &str = "not measured yet";
 ///
 /// # References
 ///
-/// [^1]: Backlog item 0278, say what the demonstration world never produced. `docs/backlog/proposed/0278-say-what-the-demonstration-world-never-produced.md`
+/// [^1]: Backlog item 0278, say what the demonstration world never produced. `docs/backlog/complete/0278-say-what-the-demonstration-world-never-produced.md`
 pub const OVERLAY_FOUND_NOTHING: &str = "nothing here. not broken.";
 
 /// Returns a mean and a worst in microseconds, or the words that say neither
@@ -911,7 +911,7 @@ impl Readout {
     ///
     /// # References
     ///
-    /// [^1]: Backlog item 0278, say what the demonstration world never produced. `docs/backlog/proposed/0278-say-what-the-demonstration-world-never-produced.md`
+    /// [^1]: Backlog item 0278, say what the demonstration world never produced. `docs/backlog/complete/0278-say-what-the-demonstration-world-never-produced.md`
     /// [^2]: ADR-0070, the head-up display reports what the drawing pass read, decision D1. `docs/adrs/accepted/adr-0070-the-head-up-display-reports-what-the-drawing-pass-read.md`
     #[must_use]
     pub fn overlay_key(&self) -> Vec<(String, String)> {

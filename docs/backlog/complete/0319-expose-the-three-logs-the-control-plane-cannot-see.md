@@ -1,7 +1,7 @@
 ---
 id: 0319
 title: Expose the three logs the control plane cannot see
-status: proposed
+status: complete
 created: 2026-09-03
 implements: []
 changes: []
@@ -47,6 +47,23 @@ offset.
   mints, which is what every other verb takes, or as an index a reader can
   print.[^1]
 
+## Outcome
+
+**Closed as already done. The work landed under other items.** An audit read the
+code on 5 September 2026.
+
+**All three logs cross as column dictionaries.** The bindings expose the starved
+log, the shortfall log and the promoted log, each as named arrays.[^2]
+
+**The type stubs declare all three**, and a Python test reads them through the
+public interface.[^3]
+
+**The priority index said the opposite until this change.** Its row for this
+item stated that the bindings expose none of the three. The row is removed with
+the item.
+
 ## References
 
 [^1]: ADR-0085, an entity crosses to Python as one opaque identity that the engine resolves. `docs/adrs/accepted/adr-0085-an-entity-crosses-to-python-as-one-opaque-identity.md`
+[^2]: The three log column readers. `crates/cachette-py/src/lib.rs`
+[^3]: The unit type and log tests. `tests/test_unit_types_and_logs.py`

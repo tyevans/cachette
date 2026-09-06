@@ -1,7 +1,7 @@
 ---
 id: 0111
 title: Let the weather change a unit and show it in the window
-status: proposed
+status: complete
 created: 2026-08-31
 implements: []
 changes: []
@@ -42,12 +42,23 @@ Not yet stated. The item is not refined.
 
 ## Outcome
 
-Filled in when the item moves to `complete/`.
+**Closed as already done. The work landed under other items.** An audit read the
+code on 5 September 2026.
+
+**Weather changes what a unit gets.** A wet cell raises the yield of a gather,
+through one named bonus in the step.[^6]
+
+**The window draws it, twice.** The overlay paints the ground water and the air
+water as two spans, each with its own colour. A weather panel of the deck shows
+the field as text.[^7] [^8]
 
 ## References
 
 [^1]: Product record PRD-0004. `docs/product/accepted/prd-0004-the-world-has-weather-that-a-watcher-can-read.md`
 [^2]: Recurring Defect Shapes, shape 3. `.claude/rules/recurring-defects.md`
-[^3]: Backlog item 0109. `docs/backlog/proposed/0109-decide-how-the-world-holds-a-condition-that-moves.md`
-[^4]: Backlog item 0110. `docs/backlog/proposed/0110-advance-a-weather-condition-each-tick.md`
+[^3]: Backlog item 0109. `docs/backlog/complete/0109-decide-how-the-world-holds-a-condition-that-moves.md`
+[^4]: Backlog item 0110. `docs/backlog/complete/0110-advance-a-weather-condition-each-tick.md`
 [^5]: Product record PRD-0005. `docs/product/shipped/prd-0005-a-watcher-can-tell-what-is-happening-and-why.md`
+[^6]: The wet cell branch and the wet gather bonus. `crates/cachette-core/src/world.rs`
+[^7]: The moisture and air overlay spans. `crates/cachette-view/src/overlay.rs`
+[^8]: The weather panel. `crates/cachette-view/src/panel/weather.rs`

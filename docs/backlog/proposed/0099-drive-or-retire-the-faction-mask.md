@@ -30,6 +30,23 @@ The mask itself is not inert. A caller reads the masks to ask which blocks a
 faction holds, and that is the query the product record asks for.[^3] The union
 and the reserved bit are the parts nothing reaches.
 
+## What half of this item is already answered
+
+**The faction mask union has an engine caller, read on 5 September 2026.** The
+presence fold unions a mask into each row, in the parallel pass and again in the
+slot join, and the step rebuilds the presence at its end. The tests drive the
+step and read the rows rather than constructing a mask.[^A1] [^A2] So the union
+is driven, and this item does not ask for it any more.
+
+**The overflow bit states why nothing sets it.** Its documentation says that a
+world refuses a faction at or above the ceiling, and that the bit is reserved so
+that a later minor faction does not have to take an addressable slot.[^A1]
+
+**One question is left.** A reserved bit with a written reason is not the same
+as a capability that something invokes. Decide whether the reservation stands,
+or whether the bit goes until a minor faction needs it. That is the whole of
+this item now.
+
 ## What the work does
 
 Answer one question for each part: **who is obligated to invoke this, the user
@@ -61,3 +78,5 @@ the answer, the module must say so rather than leaving a reader to guess.
 [^2]: Backlog item 0072. `docs/backlog/complete/0072-run-the-panel-fit-check-in-the-drawing-pass.md`
 [^3]: PRD-0006, a place belongs to somebody. `docs/product/accepted/prd-0006-a-place-belongs-to-somebody.md`
 [^4]: Testing Rules, section 5. `.claude/rules/testing.md`
+[^A1]: The faction mask, its union and the overflow bit. `crates/cachette-core/src/holding.rs`
+[^A2]: The presence fold and its slot join. `crates/cachette-core/src/presence.rs`

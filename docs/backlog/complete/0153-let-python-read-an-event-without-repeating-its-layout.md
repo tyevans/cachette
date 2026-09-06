@@ -1,7 +1,7 @@
 ---
 id: 0153
 title: Let Python read an event without repeating its layout
-status: refined
+status: complete
 created: 2026-09-01
 implements: [ADR-0002 D1, ADR-0006 D1, ADR-0014 D1, ADR-0014 D2]
 changes: []
@@ -111,7 +111,32 @@ same defect one layer further out.[^6]
 
 ## Outcome
 
-Filled in when the item moves to `complete/`.
+**Closed as already done. The work landed under other items.** Two auditors read
+the code on 5 September 2026, separately, and both found every statement of the
+list above satisfied.
+
+**Both logs cross as named columns.** The event log gives one array for each
+field, and the names are the field names. The gather log does the same, and it
+carries the whole unit identity rather than a slot index.[^17]
+
+**No column holds a float.** The fixed-point value arrives as a signed 32-bit
+integer array.
+
+**No Python file holds a layout.** A search over the package for a buffer read,
+a struct unpack and a structured element type returns nothing. The one event
+entry in the stubs hands over bytes, and no Python code decodes them.
+
+**The bindings resolve an identity that Python hands back**, and the generation
+check refuses a stale one.[^18] A real protocol client drives that refusal.[^19]
+
+**The stubs describe the methods**, and the protocol server answers through the
+columns rather than the bytes.
+
+**ADR-0085 is accepted**, which is stronger than the list asks for.
+
+**One claim stays unverified.** The audit ran no build, so the line about the
+whole check command running green rests on the pipeline rather than on this
+reading.
 
 ## References
 
@@ -130,3 +155,6 @@ Filled in when the item moves to `complete/`.
 [^13]: Decisions register, DEC-063. `docs/DECISIONS.md`
 [^15]: The founded group tests. `crates/cachette-core/tests/founded_group_survives.rs`
 [^16]: Backlog item 0161. `docs/backlog/proposed/0161-let-a-selector-say-where-to-act.md`
+[^17]: The event log and gather log column readers. `crates/cachette-py/src/lib.rs`
+[^18]: The identity resolution tests. `crates/cachette-core/tests/identity_resolution.rs`
+[^19]: The protocol client tests. `tests/test_agent_mcp.py`

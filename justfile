@@ -325,6 +325,7 @@ merge-defects:
 # Prove that the record checks can fail. Each must reject its broken fixture.
 records-probe:
     ! ./scripts/check-adrs.sh tests/fixtures/records-broken
+    ! ./scripts/check-backlog.sh tests/fixtures/backlog-broken
     ! ./scripts/check-prds.sh tests/fixtures/prd-broken
     ! ./scripts/check-citations.sh tests/fixtures/citations-broken
     ! ./scripts/check-conflict-markers.sh tests/fixtures/conflict-broken

@@ -100,6 +100,6 @@ it is the reason two items named one job here.
 [^4]: Backlog item 0133. `docs/backlog/complete/0133-let-a-watcher-reach-a-panel-longer-than-the-window.md`
 [^5]: Project orientation, the design principles. `CLAUDE.md`
 [^6]: Decisions register, DEC-063. `docs/DECISIONS.md`
-[^7]: Backlog item 0153. `docs/backlog/refined/0153-let-python-read-an-event-without-repeating-its-layout.md`
+[^7]: Backlog item 0153. `docs/backlog/complete/0153-let-python-read-an-event-without-repeating-its-layout.md`
 [^8]: The commit that expanded the agent server, `8d94c89`. `python/cachette/agent/server.py`
 [^9]: The agent protocol test, `test_a_client_reaches_every_tool`. `tests/test_agent_mcp.py`

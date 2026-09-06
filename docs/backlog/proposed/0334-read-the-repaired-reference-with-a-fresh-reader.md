@@ -30,6 +30,19 @@ the ones the prose quadrants own: no tutorial, no how-to guide and no
 explanation page exists.[^1] A second round should say plainly which of its
 findings the reference can fix and which need a page that nobody has written.
 
+## What the tree already holds
+
+**The rubric exists, read on 5 September 2026.** The seven-dimension question
+set and its scale are written.[^A1]
+
+**The second graded reading has not run.** The review directory holds the repair
+findings for the first reading and no file that records a re-grade of the
+repaired page.
+
+**So this item is now the reading itself**, and the apparatus it also asked for
+is done.
+
 ## References
 
 [^1]: Backlog item 0308, the documentation plan. `docs/backlog/refined/0308-the-documentation-plan.md`
+[^A1]: The documentation reader rubric. `docs/reviews/documentation-reader-rubric.md`

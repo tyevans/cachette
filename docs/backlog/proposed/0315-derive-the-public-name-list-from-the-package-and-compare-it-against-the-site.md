@@ -27,6 +27,24 @@ nowhere, and the build reports nothing. The record that binds the reference says
 the same shape about prose: a member with no doc comment publishes with no
 prose, and nothing fails.[^4]
 
+## What the tree already holds
+
+**A derived check exists, and it compares prose rather than the name list.**
+Read on 5 September 2026. It derives the members from an import of the compiled
+module, holds no copy of a docstring, and fails when a member's first line of
+prose reaches no page of the built site. The documentation build runs it twice,
+and a probe proves the documentation job can fail.[^A1] [^A2]
+
+**Four things are missing.** The name list itself: a public member with no doc
+comment is printed as a note and does not fail. The reverse direction: nothing
+fails when the site holds a name the package no longer exports. The derivation
+this item asks about is unsettled, because the check reads the compiled module's
+members rather than the package's exported names. And no proof exists that
+either direction can fail.
+
+**So this item is now the name list and its two directions**, not the check
+itself.
+
 ## What the work does
 
 Add a check that reads the exported names from the installed package, reads the
@@ -67,3 +85,5 @@ same set.
 [^6]: Backlog item 0310, write the Rust doc comments for the Python reader. `docs/backlog/complete/0310-write-the-rust-doc-comments-for-the-python-reader.md`
 [^7]: Backlog item 0307, generate the type stub from the compiled module. `docs/backlog/proposed/0307-generate-the-type-stub-from-the-compiled-module.md`
 [^8]: Backlog item 0309, publish the Python reference generated from the compiled module. `docs/backlog/complete/0309-publish-the-python-reference-generated-from-the-compiled-module.md`
+[^A1]: The reference check script. `scripts/check_reference.py`
+[^A2]: The documentation build and its probe. `scripts/build-docs.sh`
