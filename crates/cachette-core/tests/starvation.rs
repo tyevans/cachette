@@ -311,6 +311,10 @@ fn a_dead_identity_never_resolves_to_the_unit_spawned_next_in_its_slot() {
     // starves must never hand its identity to the unit spawned next in that
     // slot.
     let mut world = World::new(CONFIG).expect("the extent must describe a world");
+    // **The fixture turns growth off.** This test is about the arena and the
+    // shortage. A world that grew would take the slots the shortage freed
+    // before the spawn below could, and the test would then measure growth.
+    world.set_birth_chance(Fix32::ZERO);
     let fixture = build(&mut world, NEAR_BOUND);
     let ground = open_ground(&world);
     for _ in 0..FRAMES {
