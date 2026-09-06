@@ -596,6 +596,10 @@ class GameEnd(TypedDict):
 
     The record is written once, at the first tick a reader fires. The path is
     one of ``domination``, ``territory``, ``wealth_or_wonder`` and ``renown``.
+
+    No live run ends on ``wealth_or_wonder``, because that path has no
+    reader. The name stays because a record stored before the path was
+    retired still carries it.
     """
 
     winner: int
@@ -603,10 +607,17 @@ class GameEnd(TypedDict):
     tick: int
 
 class Standing(TypedDict):
-    """The running value of one faction on each win path.
+    """The running value of one faction on each win path, and on the path
+    that no reader watches.
 
     The store total and the best renown are Q16.16 values as their raw
-    integers. Each value is the one the matching reader compares.
+    integers.
+
+    The held tiles, the seats held and the best renown are the values the
+    territory, domination and renown readers compare. The store total and the
+    wonder progress feed no reader, because the wealth-or-wonder path has no
+    reader. The engine reports them so that a caller may watch a faction grow
+    rich or finish a great work. Neither wins a game.
     """
 
     held_tiles: int

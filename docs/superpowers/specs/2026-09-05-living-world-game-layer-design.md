@@ -301,11 +301,17 @@ counter meets its own ask. It never draws for a price.
 
 ### 5.1 The four readers
 
+**A later record retires the wealth-or-wonder reader.** The path decided every
+game of a seeded sweep, and no target could put it out of reach, so the project
+owner ruled that it is not a win condition. The engine holds three readers. The
+row stays in the table below because the path keeps its number, and a stored
+record still names it. The record holds the reasoning.[^22]
+
 | Path | Condition |
 |---|---|
 | Domination | One faction holds every seat, or every other faction has no units |
 | Territory | At the tick limit, the faction with the most held tiles |
-| Wealth or wonder | A faction stock total reaches a target, or a wonder upgrade completes |
+| Wealth or wonder | Retired. No reader, and no game ends on it |
 | Renown | A character of the faction reaches a renown target |
 
 The tick limit and every target are values in the balance table. The held
@@ -587,3 +593,4 @@ the code.
 [^19]: Backlog item 0278, say what the demonstration world never produced. `docs/backlog/complete/0278-say-what-the-demonstration-world-never-produced.md`
 [^20]: Testing Rules, section 1. `.agents/rules/testing.md`
 [^21]: Decision Record Scope, section 1. `.agents/rules/adr-scope.md`
+[^22]: ADR-0173, the wealth or wonder path has no reader. `docs/adrs/draft/adr-0173-the-wealth-or-wonder-path-has-no-reader.md`

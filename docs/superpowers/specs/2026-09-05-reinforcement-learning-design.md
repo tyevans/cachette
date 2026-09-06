@@ -52,10 +52,17 @@ crossing.[^6] None returns the world.
 receives no evaluation from the controller.[^2] This is the hook this design
 stands on.
 
-**Four win paths and a game end record exist.** The step writes the record
-once, at the first tick a reader fires, and the boundary exposes the running
-value of a faction on each path that has a reader.[^8] That is an episode
-boundary and a terminal signal.
+**Four win paths and a game end record exist. Three of them have a
+reader.** The step writes the record once, at the first tick a reader fires,
+and the boundary exposes the running value of a faction on each path.[^8] That
+is an episode boundary and a terminal signal.
+
+**The wealth-or-wonder path has no reader, so no episode ends on it.**[^37] The
+boundary still reports the stock total and the wonder progress, so the standing
+block below keeps its length, and a shaped reward may still use either as a
+term. Neither is a terminal signal. **A run that reaches no other reader now
+runs to the tick limit**, which lengthens an episode and matters for the
+discount.
 
 **A multi-seed runner exists.** The balance harness plays a fixed seed set to
 game end and reports on the set.[^9] It loops over seeds and factions only.
@@ -102,7 +109,7 @@ population. The array holds six blocks, in this order.
 | Block | Content | Length follows |
 |---|---|---|
 | Census | The subsystem census counts | The subsystem table |
-| Standing | The running value of the faction on each win path | The path count |
+| Standing | The running value of the faction on each win path, and on the path that no reader watches | The path count |
 | Relation | The relation entry of the faction toward each other faction | The faction ceiling |
 | Board | The market rows of every faction | The faction ceiling times the board size |
 | Weights | The faction's own weight vector | Four |
@@ -533,3 +540,4 @@ the code.
 [^34]: ADR-0111, the presence relation is derived at the end of the step and never stored as a fact. `docs/adrs/draft/adr-0111-the-presence-relation-is-derived-at-the-end-of-the-step.md`
 [^35]: ADR-0053, a faction is a bit in a mask, and a relation is a plane. `docs/adrs/accepted/adr-0053-a-faction-is-a-bit-in-a-mask-and-a-relation-is-a-plane.md`
 [^36]: ADR-0018, the unit-to-tile bridge is derived, and it rebuilds at the barrier. `docs/adrs/accepted/adr-0018-the-unit-to-tile-bridge-is-derived-and-rebuilds-at-the-barrier.md`
+[^37]: ADR-0173, the wealth or wonder path has no reader. `docs/adrs/draft/adr-0173-the-wealth-or-wonder-path-has-no-reader.md`

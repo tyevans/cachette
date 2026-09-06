@@ -2,7 +2,8 @@
 
 The balance harness reports the end of a game.[^1] This script reports the
 whole run: the population of each faction over time, the counts of the
-subsystems as they rise, and the value of each faction on each win path. It
+subsystems as they rise, and the running value of each faction on each win
+path and on the path that no reader watches. It
 answers whether the world reaches a win condition, and when.
 
 Every figure comes through the public Python interface, which is the interface

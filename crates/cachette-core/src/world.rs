@@ -15154,7 +15154,8 @@ impl World {
             .find(|faction| best[usize::from(faction.0)] >= i64::from(RENOWN_TARGET))
     }
 
-    /// Returns the running value of one faction on each win path.
+    /// Returns the running value of one faction on each win path, and on
+    /// the path that no reader watches.
     ///
     /// Returns `None` when the world has no such faction. The values are the
     /// ones the readers compare, so a caller can watch a path approach its
@@ -15294,7 +15295,11 @@ const _: () = assert!(
 /// [^2]: Blockers register, BLK-150. `docs/BLOCKERS.md`
 pub const RENOWN_TARGET: i32 = 100 << 16;
 
-/// The running value of one faction on each win path.
+/// The running value of one faction on each win path, and on the path that
+/// no reader watches.
+///
+/// Three of these five values feed a reader. The stock total and the wonder
+/// progress feed none, because the wealth-or-wonder path has no reader.
 ///
 /// Every field is the value the matching reader compares against its
 /// target, so a caller that reads it watches the path the reader

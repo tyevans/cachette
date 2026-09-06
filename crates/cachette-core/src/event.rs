@@ -235,9 +235,9 @@ impl UpgradeCollapsed {
 ///
 /// A level one event says that the first level of the category finished, so
 /// something stands on ground that carried nothing. A higher level says that
-/// what stood there grew. The wonder category claims the wealth-or-wonder
-/// end, so a watcher reads a wonder from the category column and needs no
-/// second reader for it.
+/// what stood there grew. A watcher reads a wonder from the category column and
+/// needs no second reader for it. **A finished wonder ends no game**, because
+/// the wealth-or-wonder path has no reader.
 ///
 /// The layout is 8 + 4 + 2 + 1 + 1 bytes, which is 16 bytes at an alignment
 /// of 8. The type needs no padding byte, and it holds none.[^1]

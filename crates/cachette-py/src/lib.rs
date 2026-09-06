@@ -34,8 +34,8 @@ use cachette_core::upgrade::{UpgradeCategory, UpgradeRow};
 use cachette_core::TileIdx;
 use cachette_core::{Advert, Consideration, KIND_LAND, KIND_RELATION, KIND_RESOURCE};
 use cachette_core::{
-    Axial, CommodityId, Entity, FactionId, Fix32, Holder, Influence, ResourceKind,
-    WeatherScale, World as CoreWorld, WorldConfig,
+    Axial, CommodityId, Entity, FactionId, Fix32, Holder, Influence, ResourceKind, WeatherScale,
+    World as CoreWorld, WorldConfig,
 };
 use cachette_view::panel::Set as PanelSet;
 use cachette_view::{
@@ -1302,10 +1302,7 @@ impl PyWorld {
         // The set form is the one path the controller takes too, so one loop
         // serves both callers.
         let outcomes = world.settle_set(&resolved);
-        Ok(outcomes
-            .iter()
-            .filter(|outcome| outcome.founded())
-            .count())
+        Ok(outcomes.iter().filter(|outcome| outcome.founded()).count())
     }
 
     /// Writes one row of the shared unit type table.
@@ -3956,13 +3953,17 @@ impl PyWorld {
     /// The keys are `winner`, an integer naming the faction; `path`, a `str`
     /// naming the way it won, one of `domination`, `territory`,
     /// `wealth_or_wonder` and `renown`; and `tick`, the tick the reader
-    /// fired on. **The record is written once.** After it the controller
+    /// fired on. **No live run ends on `wealth_or_wonder`**, because that
+    /// path has no reader. The name stays because a record stored before the
+    /// path was retired still carries it.[^2] **The record is written
+    /// once.** After it the controller
     /// emits nothing and every other pass continues, so the world keeps
     /// stepping and the picture keeps moving.[^1]
     ///
     /// # References
     ///
     /// [^1]: ADR-0148, a game end is recorded once and stops the controllers, decisions D2 and D4. `docs/adrs/accepted/adr-0148-a-game-end-is-recorded-once-and-stops-the-controllers.md`
+    /// [^2]: ADR-0173, the wealth or wonder path has no reader, decisions D1 and D2. `docs/adrs/draft/adr-0173-the-wealth-or-wonder-path-has-no-reader.md`
     fn game_end<'py>(&self, python: Python<'py>) -> PyResult<Option<Bound<'py, PyDict>>> {
         let end = self.lock().game_end();
         let Some(path) = end.win_path() else {
@@ -3994,17 +3995,22 @@ impl PyWorld {
             .ok_or_else(|| VerbError::new_err(format!("{faction} names no faction of this world")))
     }
 
-    /// Returns the running value of one faction on each win path, as a
-    /// `dict`.
+    /// Returns the running value of one faction on each win path, and on the
+    /// path that no reader watches, as a `dict`.
     ///
     /// The keys are `held_tiles`, the tiles the faction holds; `seats_held`,
     /// the seats it holds, its own and every rival's; `store_total`, the sum
     /// of every store of every settlement of the faction **as a raw Q16.16
     /// integer**; `best_renown`, the highest renown of any live character of
     /// the faction, **as a raw Q16.16 integer**; and `wonder_progress`, the
-    /// most work any wonder on ground the faction holds has reached. Each
-    /// value is the one the matching reader compares, so a caller can watch
-    /// a path approach its end.[^1]
+    /// most work any wonder on ground the faction holds has reached.
+    ///
+    /// `held_tiles`, `seats_held` and `best_renown` are the values the
+    /// territory, domination and renown readers compare, so a caller can
+    /// watch a path approach its end.[^1] **`store_total` and
+    /// `wonder_progress` feed no reader**, because the wealth-or-wonder path
+    /// has no reader. They are reported so that a caller may watch a faction
+    /// grow rich or finish a great work, neither of which wins a game.[^2]
     ///
     /// # Errors
     ///
@@ -7934,11 +7940,13 @@ fn version() -> &'static str {
     env!("CARGO_PKG_VERSION")
 }
 
-/// Returns the stock the wealth reader asks a faction for, as an `int`.
+/// Returns the stock bar of the retired wealth path, as an `int`.
 ///
 /// The value is a raw Q16.16 quantity summed over every commodity of every
-/// settlement of the faction. Divide by 65536 for whole units. It is the
-/// value `standing(faction)["store_total"]` is compared against.
+/// settlement of the faction. Divide by 65536 for whole units. **No reader
+/// compares it.** The wealth-or-wonder path has no reader, so this is a
+/// scale for reading `standing(faction)["store_total"]` and not a bar that
+/// wins a game.[^2]
 ///
 /// **The engine states this bar once, and a caller reads it here.** A script
 /// that wrote its own copy reported a share against a bar the engine no
@@ -7947,6 +7955,7 @@ fn version() -> &'static str {
 /// # References
 ///
 /// [^1]: Findings register, FND-551. `docs/FINDINGS.md`
+/// [^2]: ADR-0173, the wealth or wonder path has no reader, decisions D1 and D3. `docs/adrs/draft/adr-0173-the-wealth-or-wonder-path-has-no-reader.md`
 #[pyfunction]
 fn stock_target() -> i64 {
     cachette_core::STOCK_TARGET
@@ -7956,12 +7965,13 @@ fn stock_target() -> i64 {
 ///
 /// The value is a raw Q16.16 quantity summed over every commodity of one
 /// settlement: the ceiling of a fixed-point store times the commodity count.
-/// A faction that holds one settlement never reports more than this, so the
-/// wealth bar stands above it.[^1]
+/// A faction that holds one settlement never reports more than this. The
+/// ceiling is the reason no bar could put the wealth path out of reach, and
+/// the reason the path has no reader today.[^1]
 ///
 /// # References
 ///
-/// [^1]: ADR-0165, the wealth bar stands above what one settlement can hold, decision D1. `docs/adrs/draft/adr-0165-the-wealth-bar-stands-above-what-one-settlement-can-hold.md`
+/// [^1]: ADR-0173, the wealth or wonder path has no reader, decision D1. `docs/adrs/draft/adr-0173-the-wealth-or-wonder-path-has-no-reader.md`
 #[pyfunction]
 fn stock_ceiling_of_one_settlement() -> i64 {
     cachette_core::STOCK_CEILING_OF_ONE_SETTLEMENT
