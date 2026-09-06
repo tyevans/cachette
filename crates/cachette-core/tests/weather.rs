@@ -264,8 +264,10 @@ fn per_tile_world() -> World {
         water_tiles(&world) > 0,
         "the fixture holds no water, so nothing lifts"
     );
+    // The whole lattice carries a margin that no reader sees, so the count
+    // that must match the world is the count of the inner lattice.
     assert_eq!(
-        world.weather().cells().tile_count(),
+        world.weather().lattice().inner().tile_count(),
         PER_TILE_EXTENT * PER_TILE_EXTENT,
         "the lattice does not hold one cell for each tile"
     );
@@ -349,8 +351,11 @@ fn a_per_tile_field_still_separates_wet_ground_from_dry() {
         "every tile holds the same water, so the field is not a field"
     );
     let wet = world.weather().wet_cells();
+    // The count covers the world, so the ceiling is the cell count of the
+    // world and not the cell count of the whole lattice. The lattice carries
+    // a margin that no reader sees.
     assert!(
-        wet > 0 && wet < world.weather().cells().tile_count(),
+        wet > 0 && wet < world.weather().lattice().inner().tile_count(),
         "the map is wet everywhere or dry everywhere: {wet} cells"
     );
 }
@@ -863,7 +868,14 @@ fn the_temperature_of_one_cell_changes_over_a_run() {
     for tick in 1..=256 {
         world.step(4).expect("the step must run");
         if tick % 16 == 0 {
-            seen.push(world.weather().warmth_at(0));
+            // The reading names the first cell of the world. Cell zero of
+            // the plane is a margin cell, and no watcher sees one.
+            let cell = world
+                .weather()
+                .lattice()
+                .whole_of_inner(0)
+                .expect("the world holds a first cell");
+            seen.push(world.weather().warmth_at(cell));
         }
     }
     let low = seen.iter().copied().min().unwrap_or(0);

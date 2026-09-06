@@ -56,10 +56,14 @@ use bytemuck::{Pod, Zeroable};
 use crate::bridge::BlockLayout;
 use crate::hash::StateHash;
 use crate::hex::{Axial, Grid};
+use crate::padded::PaddedLattice;
 use crate::sim_math;
 use crate::terrain::Terrain;
 use crate::types::{Accum, Fix32, Tick, FIX_FRACTIONAL_BITS};
-use crate::weather::{CellGround, WeatherError, WeatherField, WeatherScale, HEAT_CEILING};
+use crate::weather::{
+    cell_ground_of, ground_over_lattice, CellGround, WeatherError, WeatherField, WeatherScale,
+    HEAT_CEILING,
+};
 
 /// The ticks that the climate spin runs.
 ///
@@ -232,11 +236,19 @@ impl ClimateField {
         let grid = terrain.grid();
         let layout =
             BlockLayout::new(grid, scale.bits()).map_err(|_| WeatherError::LatticeMismatch)?;
-        let lattice = Grid::new(layout.blocks_wide(), layout.blocks_high())
+        let cell_lattice = Grid::new(layout.blocks_wide(), layout.blocks_high())
             .map_err(|_| WeatherError::LatticeMismatch)?;
-        let ground = base_ground_of(layout, terrain);
+        // **The spin runs over the same padded lattice the world runs over.**
+        // A spin over a bare lattice would starve its own border, and the
+        // climate it stored would then hold that starvation as if it were
+        // weather.[^2]
+        //
+        // [^2]: The padded lattice. `crates/cachette-core/src/padded.rs`
+        let lattice = PaddedLattice::new(cell_lattice, scale.margin_cells())
+            .map_err(|_| WeatherError::LatticeMismatch)?;
+        let ground = ground_over_lattice(lattice, layout, terrain);
         let mut weather = WeatherField::new(lattice, scale, 1)?;
-        let mut cells = vec![CellClimate::EMPTY; ground.len()];
+        let mut cells = vec![CellClimate::EMPTY; cell_lattice.tile_count() as usize];
         // The spin walks the ticks in ascending order, and the reading pass
         // walks the cells in ascending index order. Neither order depends on
         // the order in which a thread finished.[^1]
@@ -247,8 +259,14 @@ impl ClimateField {
             if tick <= WARM_UP_TICKS {
                 continue;
             }
+            // The field is one entry for each cell of the world, and the
+            // weather planes hold the margin as well. The reading goes
+            // through the lattice, so no entry of the field reads a margin
+            // cell.
             for (cell, slot) in cells.iter_mut().enumerate() {
-                let index = cell as u32;
+                let Some(index) = lattice.whole_of_inner(cell as u32) else {
+                    continue;
+                };
                 *slot = slot.observe(
                     i64::from(weather.warmth_at(index)),
                     weather.ground_at(index).0,
@@ -466,23 +484,5 @@ pub const COLD_MARK: i32 = HEAT_CEILING / 4;
 /// breaks the loop, and it stays sound only while that stays true.
 #[must_use]
 pub fn base_ground_of(layout: BlockLayout, terrain: Terrain) -> Vec<CellGround> {
-    let grid = layout.grid();
-    let count = (layout.blocks_wide() as usize).saturating_mul(layout.blocks_high() as usize);
-    let mut ground = vec![CellGround::EMPTY; count];
-    for row in 0..grid.height() {
-        for column in 0..grid.width() {
-            let address = Axial::new(column as i32, row as i32);
-            let Some(tile) = terrain.tile(address) else {
-                continue;
-            };
-            let Some(key) = grid.index_of(address).and_then(|at| layout.key_of(at)) else {
-                continue;
-            };
-            let Some(slot) = ground.get_mut(layout.block_of_key(key) as usize) else {
-                continue;
-            };
-            *slot = slot.combine(CellGround::of_tile(tile));
-        }
-    }
-    ground
+    cell_ground_of(layout, terrain)
 }

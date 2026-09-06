@@ -37,6 +37,7 @@ mod household;
 pub mod influence;
 pub mod luxury;
 pub mod observation;
+pub mod padded;
 pub mod plan;
 pub mod position;
 pub mod presence;

@@ -280,7 +280,7 @@ impl Layer for Moisture {
     }
 
     fn span(&self, world: &World) -> Span {
-        Span::new(0, highest(world.weather().ground_plane()))
+        Span::new(0, highest(&world.weather().ground_over_world()))
     }
 
     fn on_cells(&self) -> bool {
@@ -364,7 +364,10 @@ impl Layer for Temperature {
         // The span runs between the coldest and the warmest cell of this
         // frame. A span fixed to the whole scale would wash the map flat
         // whenever the field sits in the middle of it, which it usually does.
-        let plane = world.weather().warmth_plane();
+        // The reading crops the margin away. The lattice is larger than the
+        // world, and a span taken from a cell outside the frame would set the
+        // colour of every cell inside it.
+        let plane = world.weather().warmth_over_world();
         let low = plane.iter().copied().min().unwrap_or(0);
         let high = plane.iter().copied().max().unwrap_or(0);
         // The low sits one degree under the coldest cell, so the coldest cell

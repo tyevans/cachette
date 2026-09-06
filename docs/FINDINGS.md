@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-561**
+**Next number: FND-562**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -795,6 +795,42 @@ position pass, and not to a reader.[^F483F] Backlog item 0483 holds the work.
 The figure in item 0278 is stale, which is defect shape 2: a document names a
 measured figure, and nothing fails when the tree moves past it.[^F483G] The item
 is not edited here, because its argument does not depend on the figure.
+
+
+### FND-561 — The border of the weather lattice was believed to be starved, and it is retentive
+
+**Believed.** The weather lattice is exactly the size of the world, so air
+leaves through one edge and nothing arrives through the other. The cells beside
+an edge are therefore starved of water, and a margin of simulated cells around
+the world will raise the water they hold.
+
+**True.** A bare border holds **more** water in the air than a border with a
+margin, not less. The transport pass skips a direction that names no
+neighbour, and it skips both halves of that direction: the cell does not take
+from the outside, and it also does not give to the outside. So a border cell of
+a bare lattice cannot lose water off the map. It is retentive, and the retention
+is not physics. It is the shape of the loop.
+
+What a bare border lacks is upwind, not water. Nothing carries a mass onto it,
+so the water it holds is the water it lifted, and the field there does not move
+as the field inside moves.
+
+**Evidence.** A probe ran one terrain three times over one padded lattice at
+the per-tile pitch, and changed only the ground under the margin. An empty
+margin gave the lowest border water, a mirror margin gave more, and an ocean
+margin gave the most. A separate probe ran the same world at a range of margin
+widths and read the border water, which fell slightly as the margin widened.
+The commit body holds both tables and the commands that produced them.
+
+**What follows.** Do not measure a border repair by the water the border holds.
+The bare reading is inflated by an artefact, so the repaired field reads lower
+and looks worse. Measure the structure instead: whether every cell a reader can
+see has a full set of neighbours, and whether the field at the edge moves as the
+field inside moves.
+
+A test that asserted more border water after the margin was written and it
+failed. The test in the tree asserts the neighbour property, which is the thing
+the margin buys and which fails at margin zero.
 
 
 ## C. Defects found in specified rules
