@@ -338,11 +338,14 @@ fn the_holder_stays_readable_under_every_overlay() {
     // finished pixel erased it, and that is the defect the report
     // measured.[^1]
     //
-    // The two worlds differ in one thing: the first founded its factions and
-    // the second did not. The seed, the extent and the tick count are the
-    // same, and neither world has stepped, so the ground, the resources and
-    // the weather of the tile are the same in both. A pixel that is equal in
-    // the two worlds therefore carries no holder.
+    // The two worlds differ in the founding: the first founded its factions
+    // and the second did not, so the first holds ground and the second holds
+    // none. The seed, the extent and the tick count are the same, so the
+    // ground, the resources and the weather of the tile are the same in both.
+    // A pixel that is equal in the two worlds therefore carries no holder.
+    // The test asserts below that the holder changes the pixel it reads, so a
+    // tile at which the two worlds agree stops the test rather than passing
+    // it.
     //
     // The height overlay is the strong case. It has a value at every tile of
     // the window, so it paints the widest wash of any overlay here.
@@ -364,6 +367,31 @@ fn the_holder_stays_readable_under_every_overlay() {
             .is_none(),
         "the unfounded world holds ground, so the two worlds differ in more \
          than the holder",
+    );
+
+    // The upgrade overlay paints where a site stands, so the fixture puts one
+    // on ground the faction holds rather than waiting for the controller to
+    // build one. A road takes a tile the faction's plan zones, so the fixture
+    // zones the tile before it orders the build. Without the site the upgrade
+    // overlay paints nothing anywhere held, and the loop below would measure
+    // the fixture rather than the drawing.
+    let builder = held
+        .spawn_soldier(place, FactionId(0))
+        .expect("the held tile admits a unit");
+    held.rebuild_bridge(1).expect("the bridge rebuilds");
+    held.zone_project(FactionId(0), place, UpgradeCategory::ALL[0])
+        .expect("the plan takes the project");
+    held.order_build(builder, UpgradeCategory::ALL[0])
+        .expect("the engine takes the order");
+    // Both worlds step the same count here as well, so the ground of the two
+    // stays the same.
+    for _ in 0..BUILDING_TICKS {
+        held.step(1).expect("the step must run");
+        open.step(1).expect("the step must run");
+    }
+    assert!(
+        held.upgrade_at(place).is_some(),
+        "the fixture built nothing, so the upgrade overlay finds nothing",
     );
     let camera = camera(&held, place);
 

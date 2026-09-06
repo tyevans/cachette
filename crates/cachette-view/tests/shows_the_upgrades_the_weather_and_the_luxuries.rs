@@ -513,6 +513,16 @@ fn a_building_site_changes_the_tile_it_stands_on() {
                 == Some(FactionId(0))
         })
         .expect("a soldier stands on held ground");
+    // A road takes a tile the faction's plan zones, so the fixture zones the
+    // tile the builder stands on. Without a project the engine refuses the
+    // order, and this test would measure the refusal rather than the mark.
+    let stands = building
+        .soldiers()
+        .address(builder)
+        .expect("the builder stands on a tile of the world");
+    building
+        .zone_project(FactionId(0), stands, UpgradeCategory::ROAD)
+        .expect("the plan takes the project");
     assert!(building.order_build(builder, UpgradeCategory::ROAD).is_ok());
     building.step(1).expect("the step must run");
     idle.step(1).expect("the step must run");
@@ -584,6 +594,19 @@ fn a_site_under_work_marks_the_middle_and_a_finished_site_washes_the_tile() {
     let mut begun = world.clone();
     let mut finished = world;
     let builder = a_builder(&begun, &soldiers);
+    // A road takes a tile the faction's plan zones, so each world zones the
+    // tile the builder stands on. Without a project the engine refuses the
+    // order, and this test would measure the refusal rather than the marks.
+    let stands = begun
+        .soldiers()
+        .address(builder)
+        .expect("the builder stands on a tile of the world");
+    begun
+        .zone_project(FactionId(0), stands, UpgradeCategory::ROAD)
+        .expect("the plan takes the project");
+    finished
+        .zone_project(FactionId(0), stands, UpgradeCategory::ROAD)
+        .expect("the plan takes the project");
     assert!(begun.order_build(builder, UpgradeCategory::ROAD).is_ok());
     assert!(finished.order_build(builder, UpgradeCategory::ROAD).is_ok());
     begun.step(1).expect("the step must run");
@@ -681,6 +704,14 @@ fn each_kind_of_build_site_draws_its_own_glyph() {
     let mut colours = Vec::new();
     for kind in buildable {
         let mut building = world.clone();
+        // A category whose row asks for no held ground takes a tile the
+        // faction's plan zones, so the fixture zones this kind on this tile
+        // before it orders the build. A project names one category, so the
+        // loop zones the kind it is about to order rather than one kind for
+        // the whole set.
+        building
+            .zone_project(FactionId(0), address, kind)
+            .expect("the plan takes the project");
         assert!(building.order_build(builder, kind).is_ok());
         building.step(1).expect("the step must run");
         // The builder stands on the site, and its disc is wider than the
