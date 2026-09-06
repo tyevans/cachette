@@ -157,13 +157,15 @@ impl Panel for Weather {
     }
 }
 
-/// Returns a speed in lattice steps as text.
+/// Returns a speed as text.
 ///
-/// The unit is the cell of the level 1 lattice, so a speed of one carries a
-/// front one cell in one pass. The field bounds the speed at a small whole
-/// number.
+/// **The unit is the fine step that the field counts a wind in**, and the
+/// ceiling is named beside the value so that a reader knows what the number
+/// is out of. The field counts a wind more finely than a whole lattice step,
+/// because a term that turns the wind by a part of a step needs somewhere to
+/// put that part.
 fn steps(speed: i64) -> String {
-    format!("{speed} cells")
+    format!("{speed} of {}", cachette_core::weather::SPEED_CEILING)
 }
 
 /// Returns a temperature as text.

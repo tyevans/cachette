@@ -694,6 +694,46 @@ fn drag(wind: Wind) -> Wind {
     }
 }
 
+/// Returns what a deflection adds to one wind.
+///
+/// **The world turns, so a wind that blows is pushed to one side.** The push
+/// is at a right angle to the wind and it rises with the speed, which is what
+/// a rotating planet does to anything that moves over it.
+///
+/// The answer is a share of the wind turned by one sixth of a turn. A sixth
+/// is the only turn the lattice holds exactly: the step `(q, r)` turns into
+/// `(-r, q + r)`, which is integer arithmetic and not an angle. A share of a
+/// sixth is a smaller turn, because the sum of a vector and a small part of
+/// its own sixth-turn points a little to the side of the original.
+///
+/// **The wind is counted in fine steps so that this share is not zero.** A
+/// wind of one whole lattice step is eight fine steps, and a share of a
+/// quarter of that is two, so even a slow wind turns.
+///
+/// **This is what makes a vortex, and nothing here names one.** Air runs
+/// toward a warm cell, the deflection turns it aside, and it arrives running
+/// round the cell rather than into it. A closed circulation is what a
+/// deflected inflow is.
+fn deflect(wind: Wind) -> Wind {
+    // One sixth of a turn on the axial lattice.
+    let turned = Wind {
+        q: -wind.r,
+        r: wind.q + wind.r,
+    };
+    Wind {
+        q: narrow(sim_math::share(
+            Accum(i64::from(turned.q)),
+            Accum(DEFLECT_NUMERATOR),
+            Accum(DEFLECT_DENOMINATOR),
+        )),
+        r: narrow(sim_math::share(
+            Accum(i64::from(turned.r)),
+            Accum(DEFLECT_NUMERATOR),
+            Accum(DEFLECT_DENOMINATOR),
+        )),
+    }
+}
+
 /// The number of spread passes that one solve runs at the reference scale.
 ///
 /// The count is fixed for a given scale. A solve runs it whatever the field
@@ -729,8 +769,22 @@ pub const PASS_CEILING: u32 = 32;
 /// [^1]: ADR-0160, the wind is carried state, and the pressure gradient accelerates it, decision D4. `docs/adrs/accepted/adr-0160-the-wind-is-carried-state-and-the-pressure-gradient-accelerates-it.md`
 pub const WIND_PASSES_FOR_EACH_SOLVE: u32 = 2;
 
+/// The steps of wind that make one whole lattice step of speed.
+///
+/// **The wind is counted finely, and the fine count is what lets it turn.**
+/// A wind whose parts are whole lattice steps holds six directions and a
+/// handful of speeds, so a term that turned it by a part of a step would
+/// truncate to nothing at every speed under the divisor and the field could
+/// hold no rotation at all. Counting the same wind in eighths gives the
+/// deflection room to act without changing what any wind does to the water.
+///
+/// Every denominator that reads a wind carries this factor, so the share of
+/// the air that one wind sends is what it was before the count was made
+/// finer.
+pub const WIND_FINE: i32 = 8;
+
 /// The denominator of every share of the air that a transport pass sends.
-const SEND_DENOMINATOR: i64 = 64;
+const SEND_DENOMINATOR: i64 = 64 * WIND_FINE as i64;
 
 /// The numerator a cell sends to each neighbour whatever its wind.
 ///
@@ -741,7 +795,7 @@ const SEND_DENOMINATOR: i64 = 64;
 /// # References
 ///
 /// [^1]: ADR-0161, water rides the wind, and every transfer is an exact integer move, decision D1. `docs/adrs/accepted/adr-0161-water-rides-the-wind-and-every-transfer-is-an-exact-integer-move.md`
-const SEND_BASE_NUMERATOR: i64 = 1;
+const SEND_BASE_NUMERATOR: i64 = WIND_FINE as i64;
 
 /// The numerator that one step of wind along a direction adds.
 const SEND_FOR_EACH_WIND_STEP: i64 = 1;
@@ -758,7 +812,7 @@ const SEND_FOR_EACH_WIND_STEP: i64 = 1;
 ///
 /// [^1]: ADR-0160, the wind is carried state, and the pressure gradient accelerates it, decision D3. `docs/adrs/accepted/adr-0160-the-wind-is-carried-state-and-the-pressure-gradient-accelerates-it.md`
 /// [^2]: ADR-0161, water rides the wind, and every transfer is an exact integer move, decision D2. `docs/adrs/accepted/adr-0161-water-rides-the-wind-and-every-transfer-is-an-exact-integer-move.md`
-pub const SPEED_CEILING: i32 = 6;
+pub const SPEED_CEILING: i32 = 6 * WIND_FINE;
 
 /// The most the projections of one wind onto the six directions add to, for
 /// the directions the projection is positive on.
@@ -898,7 +952,7 @@ const CARRY_FOR_EACH_WIND_STEP: i64 = 1;
 /// # References
 ///
 /// [^1]: ADR-0166, the temperature of a cell is carried state that a season and the sky drive, decision D3. `docs/adrs/draft/adr-0166-the-temperature-of-a-cell-is-carried-state-that-a-season-and-the-sky-drive.md`
-const CARRY_DENOMINATOR: i64 = 32;
+const CARRY_DENOMINATOR: i64 = 32 * WIND_FINE as i64;
 
 // The carry cannot run away. The check is the same shape as the one the
 // transport carries, and it fails the build rather than a test.
@@ -927,7 +981,7 @@ pub const WARMTH_PASSES_FOR_EACH_SOLVE: u32 = 1;
 /// # References
 ///
 /// [^1]: The pressure divisor of a scale. [`WeatherScale::pressure_divisor`]
-const PRESSURE_DIVISOR_AT_REFERENCE: i64 = 32;
+const PRESSURE_DIVISOR_AT_REFERENCE: i64 = 32 / WIND_FINE as i64;
 
 /// The most the wind of a cell changes in one pass, in lattice steps.
 ///
@@ -939,7 +993,7 @@ const PRESSURE_DIVISOR_AT_REFERENCE: i64 = 32;
 /// # References
 ///
 /// [^1]: ADR-0160, the wind is carried state, and the pressure gradient accelerates it, decision D2. `docs/adrs/accepted/adr-0160-the-wind-is-carried-state-and-the-pressure-gradient-accelerates-it.md`
-const WIND_STEP: i32 = 2;
+const WIND_STEP: i32 = 2 * WIND_FINE;
 
 /// The share of the wind of a cell that drag takes in one pass.
 const DRAG_NUMERATOR: i64 = 1;
@@ -966,6 +1020,23 @@ const DRAG_DENOMINATOR: i64 = 4;
 ///
 /// [^1]: ADR-0160, the wind is carried state, and the pressure gradient accelerates it, decision D4. `docs/adrs/accepted/adr-0160-the-wind-is-carried-state-and-the-pressure-gradient-accelerates-it.md`
 const CAP_SHRINK_STEPS: u32 = 2;
+
+/// The part of a sixth of a turn that the deflection adds to a wind each
+/// pass.
+///
+/// **This is the one term that turns the flow, and nothing else in the field
+/// can.** The pressure gradient points a wind at a warm cell and drag slows
+/// it; neither can make it go round anything. A rotating world pushes a
+/// moving parcel to one side, and that push is what turns an inflow into a
+/// circulation.
+///
+/// The share is small on purpose. A large share would spin every cell
+/// regardless of the flow, which is a stirred field and not a weather field.
+/// A small one bends a wind that already blows and leaves a still cell still.
+const DEFLECT_NUMERATOR: i64 = 1;
+
+/// The whole of the deflection share above.
+const DEFLECT_DENOMINATOR: i64 = 3;
 
 /// The denominator of the share of the air that falls in one solve.
 const FALL_DENOMINATOR: i64 = 64;
@@ -2594,10 +2665,16 @@ impl WindPass<'_> {
                 WIND_STEP,
             );
             let carried = drag(self.wind[index]);
+            // **The world turns, so the wind is pushed to one side.** The
+            // push acts on the wind the cell already carries, which is why a
+            // still cell stays still and a fast one turns hard. A flow that
+            // runs at a warm cell arrives running round it instead, and a
+            // circulation is what that is.
+            let side = deflect(carried);
             *cell = cap(
                 Wind {
-                    q: carried.q + step.q,
-                    r: carried.r + step.r,
+                    q: carried.q + step.q + side.q,
+                    r: carried.r + step.r + side.r,
                 },
                 SPEED_CEILING,
             );

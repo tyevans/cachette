@@ -1071,6 +1071,10 @@ fn the_temperature_stays_inside_its_scale_over_a_long_run() {
 /// cell from tick 41 to the end of a 400 tick run, because the heat was
 /// derived from ground that does not move. The peak must now move, and keep
 /// moving.
+///
+/// **The run covers half a season.** The sun takes 2048 ticks to complete one
+/// swing, and a run shorter than half of that watches one part of the swing
+/// and calls a slow field a pinned one.
 #[test]
 fn the_peak_of_the_air_plane_keeps_moving() {
     let mut world = World::new(WorldConfig {
@@ -1082,7 +1086,7 @@ fn the_peak_of_the_air_plane_keeps_moving() {
     })
     .expect("the extent must describe a world");
     let mut peaks: Vec<usize> = Vec::new();
-    for tick in 1..=400 {
+    for tick in 1..=(weather::SEASON_PERIOD_TICKS / 2) {
         world.step(1).expect("the step must run");
         if tick % 20 != 0 {
             continue;

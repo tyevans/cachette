@@ -125,7 +125,20 @@ fn main() {
 
         let curl = circulation(&world);
         let strongest = curl.iter().copied().map(i64::abs).max().unwrap_or(0);
+        let mut sorted: Vec<i64> = curl.iter().copied().map(i64::abs).collect();
+        sorted.sort_unstable();
+        let at = |share: usize| sorted[sorted.len() * share / 100];
         let turning = curl.iter().filter(|value| value.abs() >= 4).count();
+        let cyclonic = curl.iter().filter(|value| **value > 0).count();
+        let mut air_sorted: Vec<i64> = air.iter().map(|drops| drops.0).collect();
+        air_sorted.sort_unstable();
+        let air_at = |share: usize| {
+            if air_sorted.is_empty() {
+                0
+            } else {
+                air_sorted[air_sorted.len() * share / 100]
+            }
+        };
 
         let air_total: i64 = air.iter().map(|drops| drops.0).sum();
         let air_high = air.iter().map(|drops| drops.0).max().unwrap_or(0);
@@ -143,7 +156,19 @@ fn main() {
             air.len()
         );
         println!("  fastest wind {fastest}, still cells {still} of {}", wind.len());
-        println!("  strongest circulation {strongest}, cells turning {turning}");
+        println!(
+            "  circulation: median {} p90 {} p99 {} strongest {strongest}, turning {turning}, cyclonic {cyclonic}",
+            at(50),
+            at(90),
+            at(99)
+        );
+        println!(
+            "  air: median {} p90 {} p99 {} p999 {} high {air_high}",
+            air_at(50),
+            air_at(90),
+            air_at(99),
+            if air_sorted.is_empty() { 0 } else { air_sorted[air_sorted.len() * 999 / 1000] }
+        );
 
         // The modal wind heading of each column and of each row. A watcher
         // of the wind overlay reads one heading as one colour, so a run of
