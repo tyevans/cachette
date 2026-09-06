@@ -5,17 +5,21 @@
 A learner needs many worlds. It plays one faction, it takes one decision at a
 time, and it learns from the return of a whole game. One world gives one game
 at a time, so a training run wants many worlds running together. A product
-record asks for that learner.[^1] Two design documents work the shape out, and
-each names this record.[^2] [^3]
+record asks for that learner.[^1] Design documents work the shape out, and they
+name this record.[^2] [^3]
 
 The engine already allows many worlds. A process holds one interpreter and many
 worlds, and no mutable process-wide state reaches simulated state.[^4] One
 record already asks that the world interface stay compatible with stepping many
 worlds in one call.[^5] Nothing states what that call must do.
 
+**This record runs ahead of the code, and every decision below is a constraint
+on work that nobody has written.** No batch type exists, and a caller steps one
+world for each call.
+
 The shortest implementation steps one world for each call, and lets Python loop
 over the worlds. A contributor would reach for it, because it needs no new type.
-Two facts refuse it. **The number of crossings would grow with the number of
+The facts below refuse it. **The number of crossings would grow with the number of
 worlds.** The boundary is meant to carry an instruction and an answer, and the
 count of crossings is meant not to follow the size of the thing worked on.[^6]
 A learner that plays a thousand worlds would then cross the boundary a thousand
@@ -156,7 +160,7 @@ it.[^16]
 
 ## References
 
-[^1]: PRD-0056, a learner plays one faction against the controllers. `docs/product/REGISTRY.md`
+[^1]: PRD-0056, a learner plays one faction against the controllers. `docs/product/accepted/prd-0056-a-learner-plays-one-faction-against-the-controllers.md`
 [^2]: Design, a learner plays one faction against the controllers, section 9. `docs/superpowers/specs/2026-09-05-reinforcement-learning-design.md`
 [^3]: Design, one environment core serves every learning stack, section 5. `docs/superpowers/specs/2026-09-05-reinforcement-learning-interfaces-design.md`
 [^4]: ADR-0047, many worlds live in one interpreter, decision D1. `docs/adrs/draft/adr-0047-many-worlds-live-in-one-interpreter.md`
@@ -170,7 +174,7 @@ it.[^16]
 [^12]: ADR-0042, the interpreter is released for the whole step, decision D2. `docs/adrs/draft/adr-0042-the-interpreter-is-released-for-the-whole-step.md`
 [^13]: ADR-0047, many worlds live in one interpreter, decision D2. `docs/adrs/draft/adr-0047-many-worlds-live-in-one-interpreter.md`
 [^14]: ADR-0096, cost follows the lattice, not the population. `docs/adrs/draft/adr-0096-cost-follows-the-lattice-not-the-population.md`
-[^15]: ADR-0154, the observation and the action of a faction are schema-declared bounded tables the engine owns, decision D2. `docs/adrs/draft/adr-0154-the-observation-and-the-action-of-a-faction-are-schema-declared-bounded-tables.md`
+[^15]: ADR-0154, the observation and the action of a faction are schema-declared bounded tables the engine owns, decision D2. `docs/adrs/accepted/adr-0154-the-observation-and-the-action-of-a-faction-are-schema-declared-bounded-tables.md`
 [^16]: Blockers register, BLK-007. `docs/BLOCKERS.md`
 [^17]: Target platform costs. `docs/reference/graviton-costs.md`
 [^18]: Testing Rules, section 1. `.agents/rules/testing.md`
