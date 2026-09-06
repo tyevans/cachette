@@ -121,9 +121,20 @@ fn soldier(world: &mut World, address: Axial) -> Entity {
         .expect("the ground admits a unit")
 }
 
-/// Puts one soldier on a tile and tells it to build one category.
+/// Zones one project, puts one soldier on the tile, and tells it to build.
+///
+/// **The plan comes first.** A category whose row asks for no held ground is
+/// laid only inside a project, so a fixture that ordered the build alone
+/// would measure the refusal. The plan refuses to zone a category that asks
+/// for held ground on ground nobody holds, so the zone call may fail and the
+/// build order then answers for itself.[^1]
+///
+/// # References
+///
+/// [^1]: ADR-0152, a faction plans its roads and zones with one solver, decisions D3 and D4. `docs/adrs/accepted/adr-0152-a-faction-plans-its-roads-and-zones-with-one-solver.md`
 fn builder(world: &mut World, address: Axial, category: UpgradeCategory) -> Entity {
     let unit = soldier(world, address);
+    let _ = world.zone_project(FactionId(0), address, category);
     world
         .order_build(unit, category)
         .expect("the ground fits the category");
@@ -553,6 +564,14 @@ fn raised(threads: usize) -> World {
         .filter(|address| field.tile_kind(*address) == Some(TileKind::Plain))
         .take(60)
         .collect();
+    // The plan zones every open tile, because a road is laid only inside a
+    // project and the builders wander between the tiles.[^2]
+    //
+    // [^2]: ADR-0152, a faction plans its roads and zones with one solver, decision D3. `docs/adrs/accepted/adr-0152-a-faction-plans-its-roads-and-zones-with-one-solver.md`
+    field.set_plan_rules(field.plan_rules().with_bound(open.len() as u32));
+    for address in &open {
+        let _ = field.zone_project(FactionId(0), *address, UpgradeCategory::ROAD);
+    }
     for address in &open {
         for _ in 0..4 {
             let unit = soldier(&mut field, *address);

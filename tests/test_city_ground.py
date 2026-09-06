@@ -81,7 +81,11 @@ def test_a_build_off_the_builders_own_ground_is_refused_and_a_road_is_not(
         world.order_build(guest, TERRACE)
     assert world.build_order(int(guest[0])) is None
 
-    # A road is the one exception, and it is permitted anywhere.
+    # A road asks for no held ground, so the ground rule lets it cross. The
+    # plan is the second bound, and no project zones this tile yet.
+    with pytest.raises(cachette.VerbError):
+        world.order_build(guest, ROAD)
+    world.zone_projects(1, [address], ROAD)
     world.order_build(guest, ROAD)
     assert world.build_order(int(guest[0])) == ROAD
 

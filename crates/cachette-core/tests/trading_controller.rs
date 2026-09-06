@@ -417,7 +417,12 @@ fn no_offer_crosses_a_war_pair() {
     let mut world = a_trading_world(31);
     // The two factions declare war before anybody speaks. The offer verb
     // refuses a pair in the war band, and the controller never asks.
-    let edge = world.relation_rules().war_edge - 1;
+    // One step below the war edge is not enough. The drift lifts an entry
+    // toward peace by one step on every drift period, so a pair set one below
+    // the edge leaves the war band on the first drift and the fixture then
+    // measures a pair at peace. Eight steps below holds the pair inside the
+    // band for the whole loop.
+    let edge = world.relation_rules().war_edge - 8;
     world.set_relation(ZERO, ONE, edge);
     world.set_relation(ONE, ZERO, edge);
     assert!(world.at_war(ZERO, ONE));
@@ -431,7 +436,9 @@ fn no_offer_crosses_a_war_pair() {
         assert_eq!(
             census(&world, "offers_made"),
             0,
-            "a pair at war never receives an offer"
+            "a pair at war never receives an offer: at_war={} relation={:?}",
+            world.at_war(ZERO, ONE),
+            world.relation(ZERO, ONE)
         );
         assert!(
             world

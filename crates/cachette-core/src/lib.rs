@@ -32,6 +32,7 @@ pub mod holding;
 mod household;
 pub mod influence;
 pub mod luxury;
+pub mod plan;
 pub mod position;
 pub mod presence;
 pub mod promotion;
@@ -73,8 +74,9 @@ pub use controller::{
     CarrierAssignment, Choice, ControllerCommand, FactionRow, FactionState, FactionWeights,
     GameEnd, Terms, WinPath, ADVERT_PERIOD_DEFAULT, ADVERT_PHASE_DEFAULT, CARRIER_ASSIGNMENT_BYTES,
     COMMAND_ADVERTISE, COMMAND_BUILD, COMMAND_CAMPAIGN, COMMAND_CARRY, COMMAND_GATHER,
-    COMMAND_RELATION, COMMAND_TRADE, CONTRACT_CARRIERS_DEFAULT, CONTRACT_TERM_DEFAULT,
-    EVALUATIONS_DEFAULT, SURPLUS_MARK_DEFAULT, TICK_LIMIT_DEFAULT, WEIGHT_HIGH, WEIGHT_LOW,
+    COMMAND_PROJECT, COMMAND_RELATION, COMMAND_TRADE, CONTRACT_CARRIERS_DEFAULT,
+    CONTRACT_TERM_DEFAULT, EVALUATIONS_DEFAULT, SURPLUS_MARK_DEFAULT, TICK_LIMIT_DEFAULT,
+    WEIGHT_HIGH, WEIGHT_LOW,
 };
 pub use conversion::{ConversionError, Convert, UnitConverted};
 pub use descent::{
@@ -89,6 +91,7 @@ pub use influence::{Conductance, Influence, InfluenceError, InfluenceField};
 pub use luxury::{
     LuxuryError, LuxuryField, LuxuryId, LuxurySet, LuxuryTile, VarietyLevel, LUXURY_CEILING,
 };
+pub use plan::{PlanRefusal, PlanRegister, PlanRules, Project};
 pub use position::{
     release_the_dead, Position, PositionError, PositionTable, SitePreference, NO_WORK,
     POSITIONS_PER_SITE, WORK_COMMODITY,

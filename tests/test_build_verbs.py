@@ -42,6 +42,20 @@ def _open_address(world: cachette.World) -> tuple[int, int]:
     raise AssertionError(message)
 
 
+def _zone_a_road(world: cachette.World, address: tuple[int, int]) -> None:
+    """Zone a road project for the first faction at one address.
+
+    A category whose row asks for no held ground is laid only inside a
+    project, so a fixture that ordered a road without one would measure the
+    refusal.[^1]
+
+    [^1]: ADR-0152, a faction plans its roads and zones with one solver,
+    decisions D3 and D4.
+    ``docs/adrs/accepted/adr-0152-a-faction-plans-its-roads-and-zones-with-one-solver.md``
+    """
+    world.zone_projects(0, [address], ROAD)
+
+
 def _build_until_complete(
     world: cachette.World, address: tuple[int, int], threads: int = 2
 ) -> int:
@@ -58,6 +72,7 @@ def test_a_soldier_told_to_build_marks_the_ground(seed: int) -> None:
     # The whole path, from the boundary: order, step, and read the tile.
     world = cachette.World(width=16, height=16, seed=seed, faction_count=2)
     address = _open_address(world)
+    _zone_a_road(world, address)
     units = world.spawn_soldiers([address], faction=0)
     before = world.tile_report(*address)
     assert before["upgrade"] is None
@@ -85,6 +100,7 @@ def test_a_terrace_is_a_different_upgrade_from_a_road(seed: int) -> None:
     # would pass the test above.
     world = cachette.World(width=16, height=16, seed=seed, faction_count=2)
     address = _open_address(world)
+    _zone_a_road(world, address)
     # A unit builds anything only on ground its own faction holds, and a
     # faction holds the ground its cities reach. A road needs no city.
     world.found_settlements([address], faction=0)
@@ -100,6 +116,7 @@ def test_an_upgrade_kind_the_engine_does_not_hold_is_refused(seed: int) -> None:
     # ADR-0046: the engine never raises a bare runtime error.
     world = cachette.World(width=16, height=16, seed=seed, faction_count=2)
     address = _open_address(world)
+    _zone_a_road(world, address)
     units = world.spawn_soldiers([address], faction=0)
     with pytest.raises(cachette.VerbError):
         world.order_build(units, NO_SUCH_KIND)
@@ -113,6 +130,7 @@ def test_a_build_order_that_names_a_dead_identity_writes_nothing(
     # must leave every other unit in the set as it was.
     world = cachette.World(width=16, height=16, seed=seed, faction_count=2)
     address = _open_address(world)
+    _zone_a_road(world, address)
     units = world.spawn_soldiers([address, address], faction=0)
     live, dead = int(units[0]), int(units[1])
     world.despawn_soldiers([dead])
@@ -129,6 +147,7 @@ def test_a_build_order_that_names_a_dead_identity_writes_nothing(
 def test_the_build_order_of_a_dead_identity_is_refused(seed: int) -> None:
     world = cachette.World(width=16, height=16, seed=seed, faction_count=2)
     address = _open_address(world)
+    _zone_a_road(world, address)
     units = world.spawn_soldiers([address], faction=0)
     world.despawn_soldiers(units)
     with pytest.raises(cachette.ViewError):
@@ -138,6 +157,7 @@ def test_the_build_order_of_a_dead_identity_is_refused(seed: int) -> None:
 def test_stopping_a_build_keeps_the_work_already_done(seed: int) -> None:
     world = cachette.World(width=16, height=16, seed=seed, faction_count=2)
     address = _open_address(world)
+    _zone_a_road(world, address)
     units = world.spawn_soldiers([address], faction=0)
     world.order_build(units, ROAD)
     world.step(threads=2)
@@ -163,6 +183,7 @@ def test_stopping_a_build_that_names_a_dead_identity_writes_nothing(
 ) -> None:
     world = cachette.World(width=16, height=16, seed=seed, faction_count=2)
     address = _open_address(world)
+    _zone_a_road(world, address)
     units = world.spawn_soldiers([address, address], faction=0)
     world.order_build(units, ROAD)
     live, dead = int(units[0]), int(units[1])
@@ -179,6 +200,7 @@ def test_destroying_an_upgrade_returns_the_tile_to_the_generated_world(
     # ADR-0090 D4: removing the entry is the whole of the return.
     world = cachette.World(width=16, height=16, seed=seed, faction_count=2)
     address = _open_address(world)
+    _zone_a_road(world, address)
     generated = world.tile_report(*address)
     units = world.spawn_soldiers([address], faction=0)
     world.order_build(units, ROAD)
@@ -202,6 +224,7 @@ def test_destroying_an_upgrade_leaves_the_build_order_standing(
     # The removal takes the mark off the ground. It gives no order.
     world = cachette.World(width=16, height=16, seed=seed, faction_count=2)
     address = _open_address(world)
+    _zone_a_road(world, address)
     units = world.spawn_soldiers([address], faction=0)
     world.order_build(units, ROAD)
     world.step(threads=2)
@@ -217,6 +240,7 @@ def test_destroying_at_an_address_outside_the_world_removes_nothing(
     # The all-or-nothing rule, on the address side.
     world = cachette.World(width=16, height=16, seed=seed, faction_count=2)
     address = _open_address(world)
+    _zone_a_road(world, address)
     units = world.spawn_soldiers([address], faction=0)
     world.order_build(units, ROAD)
     _build_until_complete(world, address)
@@ -234,6 +258,7 @@ def test_a_build_gives_one_answer_at_every_thread_count(seed: int) -> None:
     for threads in (1, 2, 12):
         world = cachette.World(width=32, height=32, seed=seed, faction_count=2)
         address = _open_address(world)
+        _zone_a_road(world, address)
         units = world.spawn_soldiers([address] * 8, faction=0)
         world.order_build(units, ROAD)
         for _ in range(4):
@@ -310,6 +335,7 @@ def test_the_verbs_take_the_column_the_engine_gave(seed: int) -> None:
     # never loops over them.
     world = cachette.World(width=16, height=16, seed=seed, faction_count=2)
     address = _open_address(world)
+    _zone_a_road(world, address)
     units = world.spawn_soldiers([address] * 4, faction=0)
     assert units.dtype == np.uint64
     world.order_build(units, ROAD)

@@ -54,12 +54,11 @@ BLK-150, which asks what raises and lowers renown.[^6]
 
 | Value | Read by | Set | Blocker | Derivation |
 |---|---|---|---|---|
-| Plan bound, the projects one faction may hold | The plan register, when a write asks for a row | unset, pass 10 | BLK-050 | |
-| Projects one solver pass writes | The solver, at the controller stage | unset, pass 10 | BLK-050 | |
-| Solver pass count | The solver, at the controller stage | unset, pass 10 | BLK-050 | |
-| Path relaxation pass count | The road path search | unset, pass 10 | BLK-050 | |
-| Road search radius, the hex steps a path may span | The road path search, when it builds its window | unset, pass 10 | BLK-050 | |
-| Road spacing, the fewest hex steps between two roads the solver zones | The solver, when it scores a road project | unset, pass 10 | BLK-050 | |
+| Plan bound, the projects one faction may hold | The plan register, when a write asks for a row | unset, pass 10 | BLK-050 | Provisional default of 40 written by item 0488. A path across the default search radius of 8 spans at most 17 tiles, so one whole path fits twice over and a hand-zoned project still finds a row. A caller sets it with `set_plan_rules`. The rules of the downstream game are not written down, so BLK-050 governs it. Pass 10 measures it. |
+| Projects one solver pass writes | The solver, at the controller stage | unset, pass 10 | BLK-050 | Provisional default of 17 written by item 0488, the longest path the default path pass count resolves exactly, so one pass writes one whole path and never part of one. A caller sets it with `set_plan_rules`. BLK-050 governs it. Pass 10 measures it. |
+| Solver pass count | The solver, at the controller stage | unset, pass 10 | BLK-050 | Provisional default of 2 written by item 0488, the smallest count at which a second pass reads what the first wrote. A caller sets it with `set_plan_rules`. BLK-050 governs it. Pass 10 measures it. |
+| Path relaxation pass count | The road path search | unset, pass 10 | BLK-050 | Provisional default of 17 written by item 0488, twice the default search radius plus one. A pass advances the frontier by at least one step, so every path of that many steps is the cheapest one. A longer detour gives a path that is deterministic and is not the cheapest. A caller sets it with `set_plan_rules`. BLK-050 governs it. Pass 10 measures it. |
+| Road search radius, the hex steps a path may span | The road path search, when it builds its window | unset, pass 10 | BLK-050 | Provisional default of 8 written by item 0488, twice the base reach of a city, so two cities whose ground touches can be joined and a pair further apart yields no project. The window it describes holds 217 tiles. A caller sets it with `set_plan_rules`. BLK-050 governs it. Pass 10 measures it. |
 
 ## The relation
 

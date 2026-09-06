@@ -177,15 +177,25 @@ fn a_faction_with_ground_and_no_city_holds_nothing_after_one_step() {
     assert_eq!(field.city_reach(site), None);
 }
 
-/// Puts one builder on a tile and orders one road.
+/// Zones one road project and puts one builder on the tile.
 ///
-/// The call asserts that the verb took the order, because a refused order
-/// would leave the tile without an upgrade and the test would then measure
-/// the refusal rather than the reach.
+/// **The plan comes first.** A road asks for no held ground, and a category
+/// that asks for no held ground is laid only inside a project, so a fixture
+/// that ordered the build alone would measure the refusal.[^1]
+///
+/// # References
+///
+/// [^1]: ADR-0152, a faction plans its roads and zones with one solver, decisions D3 and D4. `docs/adrs/accepted/adr-0152-a-faction-plans-its-roads-and-zones-with-one-solver.md`
 fn build_a_road(field: &mut World, address: Axial, faction: FactionId) -> Entity {
     let unit = field
         .spawn_soldier(address, faction)
         .expect("the ground admits a unit");
+    assert!(
+        field
+            .zone_project(faction, address, UpgradeCategory::ROAD)
+            .is_ok(),
+        "the plan refused a road project at {address:?}"
+    );
     assert!(
         field.order_build(unit, UpgradeCategory::ROAD).is_ok(),
         "the verb refused a road at {address:?}"
@@ -269,7 +279,7 @@ fn a_finished_upgrade_extends_the_reach_by_one_step_and_never_past_the_cap() {
 }
 
 #[test]
-fn the_verb_refuses_a_build_off_the_builders_own_ground_and_permits_a_road() {
+fn the_verb_refuses_a_build_off_own_ground_and_permits_a_zoned_road() {
     let mut field = world(11, 3, ReachRules::new(2, 1, 4));
     let seat = addresses(&field)
         .into_iter()
@@ -294,9 +304,21 @@ fn the_verb_refuses_a_build_off_the_builders_own_ground_and_permits_a_road() {
         "the verb took a terrace on ground the builder does not hold"
     );
     assert_eq!(field.build_order(guest), Some(None));
+    // A road asks for no held ground, so the ground rule lets it cross. The
+    // plan is the second bound, and no project zones this tile yet.
+    assert!(
+        field.order_build(guest, UpgradeCategory::ROAD).is_err(),
+        "the verb took a road that no project zones"
+    );
+    assert!(
+        field
+            .zone_project(FactionId(1), seat, UpgradeCategory::ROAD)
+            .is_ok(),
+        "the plan refused a road project on ground another faction holds"
+    );
     assert!(
         field.order_build(guest, UpgradeCategory::ROAD).is_ok(),
-        "the verb refused a road, and a road is the exception"
+        "the verb refused a road that the plan zones"
     );
     assert_eq!(field.build_order(guest), Some(Some(UpgradeCategory::ROAD)));
 

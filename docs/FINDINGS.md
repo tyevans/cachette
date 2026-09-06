@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-493**
+**Next number: FND-494**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -11805,6 +11805,7 @@ file.
 
 [^F490A]: Balance register, the founding group, the base reach and the campaign cohort size. `docs/reference/balance.md`
 [^F491A]: ADR-0152, a faction plans its roads and zones with one solver, decision D2. `docs/adrs/accepted/adr-0152-a-faction-plans-its-roads-and-zones-with-one-solver.md`
+[^F493A]: ADR-0152, a faction plans its roads and zones with one solver, decision D5. `docs/adrs/accepted/adr-0152-a-faction-plans-its-roads-and-zones-with-one-solver.md`
 [^F491C]: Decision Record Scope, section 4.6. `.agents/rules/adr-scope.md`
 [^F487A]: ADR-0150, held ground is the ground within reach of a city its faction owns, decision D1. `docs/adrs/draft/adr-0150-held-ground-is-the-ground-within-reach-of-a-city-its-faction-owns.md`
 [^F487B]: Recurring defect shapes, shape 1. `.agents/rules/recurring-defects.md`
@@ -11934,6 +11935,40 @@ no unit in its log, so no reader can tell. A later pass that wants a carrier to
 arrive at a tile needs a field that resolves below the cell, or a verb that
 sends a unit at a site rather than at a tile. That is engine work and it is not
 in this item.
+
+### FND-493 — One faction climbs one destination plane, so a verb cannot send each unit to its own place
+
+**Believed.** ADR-0152 D5 states that the order sends each unit to the project
+nearest to it by hex distance.[^F493A] The statement reads as a per-unit
+destination.
+
+**True.** The engine moves a unit by a destination field, and a field is one
+plane. The plane of a faction is its faction number, and the campaign and the
+carriers already share it. The send verb takes a set of units, a set of seeds
+and one plane, and every unit on that plane climbs toward the nearest seed of
+the whole set. A per-unit destination would need a plane for each unit.
+
+**Evidence.** The send verb is `World::send_units_to` at
+`crates/cachette-core/src/world.rs:1399`, and it writes one seed list for one
+plane. The campaign raise takes the same plane at
+`crates/cachette-core/src/world.rs:9564`, and the carrier assignment takes it
+again. The default world holds four planes.
+
+**Follows.** The assignment rule of D5 decides two things and not three. It
+decides which project a unit takes, which is the category the build order
+names, and it decides the seed set the faction climbs. It does not decide which
+seed a walking unit reaches. A unit whose nearest project by hex distance
+differs from its nearest seed by field distance walks to the second and builds
+what it finds there.
+
+**The rule is still testable, and it is tested where it decides.** The
+assignment is one reader, `World::project_for`, and the controller calls it.
+The test drives that reader rather than the walk, because the walk is the
+field's answer and not the rule's.
+
+**A reviewer of ADR-0152 must decide what D5 states.** The record may say that
+the order seeds the field with the projects the units chose, or a later record
+may replace D5 with the flow field its own consequences already name.[^F493A]
 
 ### FND-492 — A test that reads the work done cannot tell a stopped build from a raised one
 

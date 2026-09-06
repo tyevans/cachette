@@ -49,6 +49,11 @@ CENSUS_NAMES = [
     "carriers_assigned",
     "controller_commands",
     "controller_refused",
+    "projects_zoned",
+    "projects_finished",
+    "projects_dropped",
+    "projects_refused",
+    "plan_passes",
     "game_ended",
     "relation_moves",
     "wars_declared",
@@ -97,7 +102,11 @@ def test_the_externally_controlled_flag_is_off_and_settable() -> None:
     assert world.is_externally_controlled(0) is False
     world.step(1)
     active = world.subsystem_census()["controller_commands"]
-    assert active == FACTIONS * world.controller_evaluations
+    # The stage emits the evaluation commands and, for a faction whose plan
+    # the solver filled, one project order beside them.[^1]
+    #
+    # [^1]: ADR-0152, a faction plans its roads and zones with one solver, decision D5. ``docs/adrs/accepted/adr-0152-a-faction-plans-its-roads-and-zones-with-one-solver.md``
+    assert active >= FACTIONS * world.controller_evaluations
     world.set_externally_controlled(0, True)
     world.set_externally_controlled(1, True)
     assert world.is_externally_controlled(1) is True

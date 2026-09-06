@@ -19,6 +19,7 @@ use cachette_core::descent::{DescentId, DESCENT_CEILING};
 use cachette_core::founding::FoundingOutcome;
 use cachette_core::hex::NEIGHBOURS;
 use cachette_core::luxury::{LuxuryId, LUXURY_CEILING};
+use cachette_core::plan::PlanRules;
 use cachette_core::unit_type::{UnitTypeId, UnitTypeRow};
 use cachette_core::upgrade::{UpgradeCategory, UpgradeRow};
 use cachette_core::TileIdx;
@@ -1972,6 +1973,185 @@ impl PyWorld {
             }
         }
         Ok(removed)
+    }
+
+    /// Zones one project for one faction at each address.
+    ///
+    /// The faction is a faction number of this world. The addresses are a
+    /// sequence of `(q, r)` pairs of integers. The category is an upgrade
+    /// category, as an integer: a road is zero, a terrace is one, a wonder is
+    /// two, a store is three and a wall is four. Returns `None`.
+    ///
+    /// **A plan says where a unit may build.** A category whose row asks for
+    /// no held ground, such as a road, is laid only inside a project. That is
+    /// how a faction reaches ground it does not yet hold, and the plan is the
+    /// bound that stops it spreading everywhere.[^1] [^2]
+    ///
+    /// The solver of the engine writes into the same list, and a unit cannot
+    /// tell a project a caller wrote from one the solver wrote.[^3]
+    ///
+    /// **The set is all or nothing.** Every address resolves before the plan
+    /// takes any project, and the first refusal fails the whole call.
+    ///
+    /// # Errors
+    ///
+    /// Raises `ViewError` when an address lies outside the world. Raises
+    /// `VerbError` when the number names no category, when the plan is full,
+    /// when no row of the table fits the ground, and when the row asks for
+    /// held ground that the faction does not hold.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0152, a faction plans its roads and zones with one solver, decisions D3 and D4. `docs/adrs/accepted/adr-0152-a-faction-plans-its-roads-and-zones-with-one-solver.md`
+    /// [^2]: ADR-0150, held ground is the ground within reach of a city its faction owns, decision D4. `docs/adrs/draft/adr-0150-held-ground-is-the-ground-within-reach-of-a-city-its-faction-owns.md`
+    /// [^3]: ADR-0144, a faction controller runs inside the step and acts only through the caller's verbs, decision D2. `docs/adrs/accepted/adr-0144-a-faction-controller-runs-inside-the-step-and-acts-only-through-the-callers-verbs.md`
+    fn zone_projects(
+        &self,
+        faction: u16,
+        addresses: Vec<(i32, i32)>,
+        category: u8,
+    ) -> PyResult<()> {
+        let mut world = self.lock();
+        let category = UpgradeCategory::from_u8(category)
+            .ok_or_else(|| VerbError::new_err(format!("{category} names no upgrade category")))?;
+        for (q, r) in &addresses {
+            if world.tile_kind(Axial::new(*q, *r)).is_none() {
+                return Err(ViewError::new_err(format!(
+                    "({q}, {r}) lies outside this world"
+                )));
+            }
+        }
+        for (q, r) in &addresses {
+            if let Err(refusal) =
+                world.zone_project(FactionId(faction), Axial::new(*q, *r), category)
+            {
+                return Err(VerbError::new_err(format!(
+                    "the world refused a project at ({q}, {r}): {refusal:?}"
+                )));
+            }
+        }
+        Ok(())
+    }
+
+    /// Sets the values the plan and its solver read.
+    ///
+    /// Every argument is a whole number. The bound is the most projects one
+    /// faction may hold. The solver passes are the passes the solver makes
+    /// over the reads of one faction. The projects per pass are the most
+    /// projects one pass writes. The path passes are the passes the path
+    /// search makes over its window. The radius is the hex steps a path may
+    /// span. Returns `None`.
+    ///
+    /// **The call clears every plan.** The bound decides the size of the
+    /// register, so a register built with another bound holds its rows
+    /// elsewhere. A caller that changes the rules zones again.
+    ///
+    /// **A bound of zero turns the plan off.** The plan then takes no
+    /// project, the solver writes nothing, and no unit is sent to one. A test
+    /// that wants the engine to leave its units alone sets it.
+    ///
+    /// Every value is a balance row, and one blocker governs all of them.[^1]
+    /// [^2]
+    ///
+    /// # References
+    ///
+    /// [^1]: Balance register, the plan. `docs/reference/balance.md`
+    /// [^2]: Blockers register, BLK-050. `docs/BLOCKERS.md`
+    fn set_plan_rules(
+        &self,
+        bound: u32,
+        solver_passes: u32,
+        projects_per_pass: u32,
+        path_passes: u32,
+        radius: u32,
+    ) {
+        let mut world = self.lock();
+        world.set_plan_rules(PlanRules::new(
+            bound,
+            solver_passes,
+            projects_per_pass,
+            path_passes,
+            radius,
+        ));
+    }
+
+    /// Removes the project of one faction at each address.
+    ///
+    /// The faction is a faction number of this world. The addresses are a
+    /// sequence of `(q, r)` pairs of integers. Returns an integer, which
+    /// counts the addresses that carried a project.
+    ///
+    /// The solver and a caller both reach this verb, so a caller may clear a
+    /// project the solver wrote.[^1]
+    ///
+    /// # Errors
+    ///
+    /// Raises `ViewError` when an address lies outside the world.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0152, a faction plans its roads and zones with one solver, decision D4. `docs/adrs/accepted/adr-0152-a-faction-plans-its-roads-and-zones-with-one-solver.md`
+    fn clear_projects(&self, faction: u16, addresses: Vec<(i32, i32)>) -> PyResult<usize> {
+        let mut world = self.lock();
+        for (q, r) in &addresses {
+            if world.tile_kind(Axial::new(*q, *r)).is_none() {
+                return Err(ViewError::new_err(format!(
+                    "({q}, {r}) lies outside this world"
+                )));
+            }
+        }
+        let mut cleared = 0;
+        for (q, r) in addresses {
+            if world.clear_project(FactionId(faction), Axial::new(q, r)) {
+                cleared += 1;
+            }
+        }
+        Ok(cleared)
+    }
+
+    /// Returns the plan of one faction, in ascending tile order.
+    ///
+    /// The faction is a faction number of this world. The result is a list of
+    /// `(q, r, category)` triples of integers. The list is empty when the
+    /// faction has zoned nothing.
+    ///
+    /// The order is the tile order and never the order a caller wrote in, so
+    /// two runs that zoned the same tiles read one list.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0152, a faction plans its roads and zones with one solver, decision D1. `docs/adrs/accepted/adr-0152-a-faction-plans-its-roads-and-zones-with-one-solver.md`
+    fn plan(&self, faction: u16) -> Vec<(i32, i32, u8)> {
+        let world = self.lock();
+        world
+            .plan_of(FactionId(faction))
+            .iter()
+            .filter_map(|project| {
+                let address = world.grid().address_of(project.tile)?;
+                Some((address.q, address.r, project.category.to_u8()))
+            })
+            .collect()
+    }
+
+    /// Returns the category one faction zoned at one address, or `None`.
+    ///
+    /// The faction is a faction number of this world. The address is the pair
+    /// `q` and `r`, as integers. The result is an upgrade category, as an
+    /// integer, or `None` when the faction zoned nothing there.
+    ///
+    /// # Errors
+    ///
+    /// Raises `ViewError` when the address lies outside the world.
+    fn project_at(&self, faction: u16, q: i32, r: i32) -> PyResult<Option<u8>> {
+        let world = self.lock();
+        if world.tile_kind(Axial::new(q, r)).is_none() {
+            return Err(ViewError::new_err(format!(
+                "({q}, {r}) lies outside this world"
+            )));
+        }
+        Ok(world
+            .project_at(FactionId(faction), Axial::new(q, r))
+            .map(UpgradeCategory::to_u8))
     }
 
     /// Returns the direction home for one faction at one address.

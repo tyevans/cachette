@@ -218,6 +218,14 @@ def test_every_upgrade_kind_carries_the_documented_number(
         world.found_settlements([address], faction=0)
         world.step(threads=1)
         units = world.spawn_soldiers([address], faction=0)
+        # A category whose row asks for no held ground is laid only inside a
+        # project, so the plan zones the tile before the order.[^1]
+        #
+        # [^1]: ADR-0152, a faction plans its roads and zones with one solver, decision D3. ``docs/adrs/accepted/adr-0152-a-faction-plans-its-roads-and-zones-with-one-solver.md``
+        try:
+            world.zone_projects(0, [address], kind)
+        except cachette.VerbError:
+            pass
         # A category whose row does not fit the ground under this tile is
         # refused, and the number it carries is still the documented one.
         table = world.upgrade_table()

@@ -49,6 +49,12 @@ WANTS = 1
 def a_world(seed: int = 7) -> World:
     """Build a world in which both factions hold ground and stand somewhere."""
     world = World(width=WIDTH, height=HEIGHT, seed=seed, faction_count=2)
+    # The plan is off. The engine otherwise sends the idle units of a faction
+    # to the projects it zoned, and every unit these tests stand somewhere
+    # would walk away.[^1]
+    #
+    # [^1]: ADR-0152, a faction plans its roads and zones with one solver, decision D5. ``docs/adrs/accepted/adr-0152-a-faction-plans-its-roads-and-zones-with-one-solver.md``
+    world.set_plan_rules(0, 0, 0, 0, 0)
     world.found_run_for_every_faction(24)
     for _ in range(6):
         world.step(threads=1)
@@ -130,10 +136,7 @@ def test_land_for_a_relation_moves_exactly_the_listed_tiles() -> None:
     give_presence(world, 1, 0)
     mine = tiles_held_by(world, 0)
     listed = mine[: min(5, len(mine))]
-    control = World(width=WIDTH, height=HEIGHT, seed=7, faction_count=2)
-    control.found_run_for_every_faction(24)
-    for _ in range(6):
-        control.step(threads=1)
+    control = a_world()
     give_presence(control, 0, 1)
     give_presence(control, 1, 0)
     assert control.state_hash() == world.state_hash(), "the control is not the world"
@@ -224,6 +227,10 @@ def test_an_upgrade_on_traded_ground_is_refused_and_names_the_blocker() -> None:
     mine = tiles_held_by(world, 0)
     site = mine[len(mine) // 2]
     builder = world.spawn_soldiers([site], 0)
+    # The fixture turned the plan off, and a road is laid only inside a
+    # project, so the bound comes back for this one tile.
+    world.set_plan_rules(1, 0, 0, 0, 0)
+    world.zone_projects(0, [site], 0)
     world.order_build(builder, 0)
     for _ in range(12):
         if world.tile_report(*site)["upgrade"] is not None:

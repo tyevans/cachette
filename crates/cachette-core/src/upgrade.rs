@@ -397,6 +397,17 @@ pub enum BuildRefusal {
         /// The category the order named.
         category: UpgradeCategory,
     },
+    /// The row asks for no held ground, and no project of the builder's own
+    /// faction zones the tile. A row that crosses ground nobody holds is laid
+    /// only inside a project, and the plan is the bound on it.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0152, a faction plans its roads and zones with one solver, decisions D3 and D4. `docs/adrs/accepted/adr-0152-a-faction-plans-its-roads-and-zones-with-one-solver.md`
+    NoProject {
+        /// The category the order named.
+        category: UpgradeCategory,
+    },
 }
 
 impl core::fmt::Display for BuildRefusal {
@@ -419,6 +430,10 @@ impl core::fmt::Display for BuildRefusal {
             Self::GroundNotHeld { category } => write!(
                 formatter,
                 "the {category} asks for ground the builder's own faction holds"
+            ),
+            Self::NoProject { category } => write!(
+                formatter,
+                "no project of the builder's own faction zones this tile for the {category}"
             ),
         }
     }
