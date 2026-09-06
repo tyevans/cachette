@@ -418,20 +418,56 @@ pub const fn ledger_key(tile: TileIdx, kind: ResourceKind) -> u64 {
 /// [^1]: Budgets and costs, the scale constants. `docs/reference/budgets.md`
 pub const TICKS_IN_A_SIMULATED_DAY: u32 = 600;
 
-/// How long each kind takes to regain one unit of stock, in simulated days.
+/// How many units of stock one depleted deposit regains in a simulated day.
 ///
 /// A kind that holds `None` does not recover at all. Stone holds `None`,
 /// because stone is not alive and does not grow back.[^1]
 ///
-/// **This is the only declaration of the recovery period.** A caller replaces
+/// **This is the only declaration of the recovery rate.** A caller replaces
 /// the whole rule set rather than one value, so no second site holds a period
 /// and no check is needed to keep two copies in step.[^2]
+///
+/// # Why the rate is stated this way round
+///
+/// The gather rate and the recovery rate must be the same order, or one of
+/// them decides everything. A gatherer takes four units of one tile in one
+/// tick, and the richest food tile the generator makes holds twelve.[^3] A
+/// rate stated as whole days per unit cannot reach that order without
+/// rounding to a period of zero, and a period of zero is a second way of
+/// saying that nothing was ever taken.[^2]
 ///
 /// # References
 ///
 /// [^1]: Decisions register, DEC-049. `docs/DECISIONS.md`
 /// [^2]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`
-const RECOVERY_DAYS: [Option<u32>; RESOURCE_KIND_COUNT] = [Some(1), Some(4), None];
+/// [^3]: ADR-0072, a tile stock is generated, and only what was taken is stored, decision D2. `docs/adrs/accepted/adr-0072-a-tile-stock-is-generated-and-only-what-was-taken-is-stored.md`
+const RECOVERY_UNITS_IN_A_DAY: [Option<u32>; RESOURCE_KIND_COUNT] = [Some(75), Some(25), None];
+
+/// Turns a rate in units for each simulated day into a period in ticks.
+///
+/// The period is the ticks between two recovered units. A rate that does not
+/// divide the day exactly truncates towards zero, and the assertion below
+/// refuses a rate that truncates to nothing.
+const fn recovery_period(units_in_a_day: u32) -> u32 {
+    TICKS_IN_A_SIMULATED_DAY / units_in_a_day
+}
+
+// A rate above the tick rate of the day would give a period of zero, and a
+// period of zero says that nothing was ever taken. The check fails at compile
+// time rather than at the first call of the rule builder.
+const _: () = {
+    let mut index = 0;
+    while index < RESOURCE_KIND_COUNT {
+        if let Some(units) = RECOVERY_UNITS_IN_A_DAY[index] {
+            assert!(units > 0, "a recovery rate of zero units states no rule");
+            assert!(
+                recovery_period(units) > 0,
+                "the recovery rate is above one unit in one tick"
+            );
+        }
+        index += 1;
+    }
+};
 
 /// How fast each kind of deposit recovers.
 ///
@@ -456,8 +492,8 @@ impl RecoveryRules {
         let mut periods = [None; RESOURCE_KIND_COUNT];
         let mut index = 0;
         while index < RESOURCE_KIND_COUNT {
-            periods[index] = match RECOVERY_DAYS[index] {
-                Some(days) => Some(days * TICKS_IN_A_SIMULATED_DAY),
+            periods[index] = match RECOVERY_UNITS_IN_A_DAY[index] {
+                Some(units) => Some(recovery_period(units)),
                 None => None,
             };
             index += 1;
