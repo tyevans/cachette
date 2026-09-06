@@ -3156,6 +3156,58 @@ impl PyWorld {
         self.lock().set_housing_per_person(housing);
     }
 
+    /// Sets how often the growth stage acts, and its offset in the period.
+    ///
+    /// The period is the ticks between two applications. The phase is the
+    /// offset inside the period. Returns `None`.
+    ///
+    /// The schedule is a balance row.[^1]
+    ///
+    /// # Errors
+    ///
+    /// Raises `VerbError` when the period is zero or above the range.
+    ///
+    /// # References
+    ///
+    /// [^1]: Balance register, the population, the growth schedule row. `docs/reference/balance.md`
+    fn set_growth_schedule(&self, period: u32, phase: u32) -> PyResult<()> {
+        let schedule = RateSchedule::new(period, phase).ok_or_else(|| {
+            VerbError::new_err(format!("the period {period} is outside the range"))
+        })?;
+        self.lock().set_growth_schedule(schedule);
+        Ok(())
+    }
+
+    /// Sets the store that one birth costs, for one commodity.
+    ///
+    /// The commodity is a commodity number. The quantity is a raw Q16.16
+    /// integer. Returns `None`.
+    ///
+    /// **A birth is never free.** A site whose store cannot pay makes no
+    /// person. The cost is a balance row.[^1]
+    ///
+    /// # Errors
+    ///
+    /// Raises `VerbError` when the number names no commodity of this world.
+    ///
+    /// # References
+    ///
+    /// [^1]: Balance register, the population, the food per birth row. `docs/reference/balance.md`
+    #[pyo3(signature = (quantity, commodity = 0))]
+    fn set_food_per_birth(&self, quantity: i32, commodity: u16) -> PyResult<()> {
+        let mut world = self.lock();
+        let mut cost = world.food_per_birth();
+        let index = commodity as usize;
+        if index >= cost.len() {
+            return Err(VerbError::new_err(format!(
+                "{commodity} names no commodity of this world"
+            )));
+        }
+        cost[index] = Fix32(quantity);
+        world.set_food_per_birth(cost);
+        Ok(())
+    }
+
     /// Returns why one unit chose the intent it carries, as a `dict`.
     ///
     /// The unit is one soldier identity, as a Python integer.
