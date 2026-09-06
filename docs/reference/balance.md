@@ -37,7 +37,7 @@ BLK-150, which asks what raises and lowers renown.[^6]
 | Surplus mark, the store above which a site offers | The controller pricing rule | unset, pass 10 | — | |
 | Land list bound, the most tiles in one land consideration | The trade verbs, when they refuse a land offer | unset, pass 10 | — | |
 | Campaign register size per faction | The campaign register | unset, pass 10 | — | Provisional default of 2 written by pass 7: one row for the live campaign, and one so that the last closed campaign stays readable after the next raise. A faction holds at most one live campaign, so one row would serve and two keeps the outcome. Pass 10 measures it. |
-| Campaign cohort size, the units one raise takes | The controller, when it raises a campaign | unset, pass 10 | BLK-050 | Provisional default of 4 written by pass 7, half the default founding group of a test fixture, so a raise leaves the site peopled. The rules of the downstream game are not written down, so BLK-050 governs it. A caller sets it with `set_campaign_cohort_size`. Pass 10 measures it. |
+| Campaign cohort size, the units one raise takes | The controller, when it raises a campaign | unset, pass 10 | BLK-050 | Provisional default of 4 written by pass 7. Pass 7 took half the founding group of a test fixture, so that a raise leaves the site peopled. The project owner set the founding group to 2 on 5 September 2026, so a cohort of 4 now takes more units than a faction founds with. The rules of the downstream game are not written down, so BLK-050 governs it. A caller sets it with `set_campaign_cohort_size`. Pass 10 measures it. |
 | Campaign cadence, the draw that raises one | The controller, when it draws for a campaign | unset, pass 10 | BLK-050 | Provisional shape written by pass 7: one keyed draw for each faction on each tick at war, yes with probability war weight over the weight range top plus the war weight, the shape the relation move already uses. No separate period exists. BLK-050 governs it. Pass 10 measures it. |
 
 ## The relation
@@ -71,7 +71,7 @@ BLK-150, which asks what raises and lowers renown.[^6]
 
 | Value | Read by | Set | Blocker | Derivation |
 |---|---|---|---|---|
-| Base reach, the hex steps a city holds with no finished upgrade | The holding rewrite | unset, pass 10 | BLK-050 | Provisional default of 4 written by item 0484. A disc of radius 4 holds 61 tiles, the smallest disc that nearly holds the founding group of 64, so a founded faction holds about one tile for each person it founded with. Pass 10 measures it. |
+| Base reach, the hex steps a city holds with no finished upgrade | The holding rewrite | unset, pass 10 | BLK-050 | Provisional default of 4 written by item 0484. A disc of radius 4 holds 61 tiles. Item 0484 chose the radius against a founding group of 64, so a founded faction held about one tile for each person it founded with. The project owner set the founding group to 2 on 5 September 2026, so that derivation no longer holds and the radius now has no reason behind it. Pass 10 measures it. |
 | Upgrades per reach step, the finished upgrades inside the ground that earn one step | The holding rewrite | unset, pass 10 | BLK-050 | Provisional default of 4 written by item 0484, the base reach again, so the first step of growth asks for as many upgrades as the base has steps. Pass 10 measures it. |
 | Reach bound, the reach a city never passes | The holding rewrite | unset, pass 10 | BLK-050 | Provisional default of 8 written by item 0484, twice the base, so upgrades at most double how far a city reaches and a disc of radius 8 holds 217 tiles. Pass 10 measures it. |
 | Lease raise step, the count one tick of use adds | The lease pass | unset, pass 10 | BLK-050 | |
@@ -87,7 +87,7 @@ BLK-150, which asks what raises and lowers renown.[^6]
 
 | Value | Read by | Set | Blocker | Derivation |
 |---|---|---|---|---|
-| Founding group, the people each faction founds with | The seeding layer, when it founds the run | unset, pass 10 | — | Provisional default of 64 written by pass 1, the constant the demonstration passed to the founding verb before the seeding moved into the engine. Pass 10 measures it. |
+| Founding group, the people each faction founds with | The seeding layer, when it founds the run | unset, pass 10 | — | The project owner set this to 2 on 5 September 2026. The earlier default of 64 came from pass 1. It was the constant the demonstration passed to the founding verb before the seeding moved into the engine. Pass 10 measures it. |
 | Luxury deposits, the tiles the seeding layer places a luxury on | The seeding layer, when it places the luxuries | unset, pass 10 | — | Provisional default of 8 written by pass 1, two deposits for each faction of the demonstration world. Pass 10 measures it. |
 
 ## Unit types
