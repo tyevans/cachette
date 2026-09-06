@@ -437,26 +437,42 @@ class Announcer:
     def _collapses(self, world: World, now: float) -> None:
         """Say when an upgrade wore away to nothing.
 
-        An upgrade collapses when the weather and a hostile army take the last
-        of its condition. The entry is then gone and the tile returns to the
-        ground the generator made, so the log is the only record of it.
+        An upgrade collapses when the weather, an army or an order takes the
+        last of its condition. The entry is then gone and the tile returns to
+        the ground the generator made, so the log is the only record of it.
+
+        **The line names what was lost, where, and to what.** The cause
+        separates weather from an army from an order, and those three read as
+        three different things to a watcher. A line that said only that
+        something fell would leave the interesting part out.
+
+        The level says how much was lost. A wonder at level four is many ticks
+        of work and a road at level one is few.
 
         A collapse is a moment and not a rate. A world with no storm and no
         war has none at all.
         """
         columns = world.log("upgrade_collapsed")
+        width = world.width
         for row in range(len(columns["tick"])):
             holder = int(columns["holder"][row])
             category = int(columns["category"][row])
             cause = int(columns["cause"][row])
+            level = int(columns["level"][row])
+            tile = int(columns["tile"][row])
             what = CATEGORY_WORDS.get(category, "upgrade")
             blame = CAUSE_WORDS.get(cause, "wear")
+            place = self.names.place(tile % width, tile // width)
             if holder == NOBODY:
-                text = f"A {what} falls to {blame}"
+                text = f"A {what} at level {level} near {place} falls to {blame}"
                 colour = NEUTRAL_COLOUR
             else:
-                text = f"Faction {holder} loses a {what} to {blame}"
+                nation = self.names.faction(holder)
+                text = (
+                    f"{nation} loses a {what} at level {level} near {place} to {blame}"
+                )
                 colour = faction_colour(holder)
+            # A collapse is a moment, so it takes the default rank.
             self.toasts.show(text, colour, now)
 
     def _foundings(self, world: World, now: float) -> None:
