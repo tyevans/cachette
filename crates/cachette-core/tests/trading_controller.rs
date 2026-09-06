@@ -319,10 +319,15 @@ fn a_board_is_written_only_on_its_schedule_tick() {
     world
         .set_advertisement_schedule(5, 2)
         .expect("the period is inside the range");
+    // The census row is a total for the run, so the test reads what one tick
+    // added to it and not the row itself.
+    let mut before = census(&world, "boards_written");
     for _ in 0..21 {
         world.step(1).expect("the step runs");
         let tick = world.tick().0;
-        let written = census(&world, "boards_written");
+        let after = census(&world, "boards_written");
+        let written = after - before;
+        before = after;
         if tick % 5 == 2 {
             assert!(written > 0, "tick {tick} is a schedule tick and wrote none");
         } else {
