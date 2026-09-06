@@ -19,6 +19,7 @@ pub mod campaign;
 pub mod census;
 pub mod character;
 pub mod choose;
+pub mod climate;
 pub mod cohort;
 pub mod contest;
 pub mod controller;

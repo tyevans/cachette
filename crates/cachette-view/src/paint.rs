@@ -2007,11 +2007,10 @@ pub fn draw_paced(
 ) -> Result<(), BridgeError> {
     canvas.clear();
     let grid = world.grid();
-    // The ground is a pure function of the seed and the address, so the
-    // viewer computes it for the tiles the window covers and for no other.
-    // A sweep of the whole world every frame is what the record calls a
-    // design mistake.[^2]
-    let terrain = world.terrain();
+    // The ground is a pure function of the seed, the address and the stored
+    // climate field, so the viewer computes it for the tiles the window covers
+    // and for no other. A sweep of the whole world every frame is what the
+    // record calls a design mistake.[^2]
     // Three switches, read once for each frame, so a world in which nothing
     // has happened pays nothing for the layers that would show it.
     let dry = world.weather().is_dry();
@@ -2034,7 +2033,7 @@ pub fn draw_paced(
             // The ground of the tile. This is the one generation of the
             // ground that the drawing of a tile pays for, and the counter
             // stands at the site that pays it.[^3]
-            let Some(ground) = terrain.tile(address) else {
+            let Some(ground) = world.tile_terrain(address) else {
                 continue;
             };
             canvas.ground_reads += 1;

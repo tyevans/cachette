@@ -34,6 +34,7 @@ use crate::choose::{
     self, CarryClass, ChoiceError, ChoiceExplanation, ChoiceSchedule, NeedBuckets, Ranked,
     WeightProfile, OPTIONS,
 };
+use crate::climate::{Climate, ClimateField};
 use crate::cohort::{
     self, CohortError, CohortTable, DeathPlane, DrawLedger, NeedCondition, NeedRule, SiteRationed,
     UnitStarved,
@@ -1315,6 +1316,30 @@ pub struct World {
     /// [^1]: ADR-0068, terrain is generated from the seed and is never stored as a map. `docs/adrs/accepted/adr-0068-terrain-is-generated-from-the-seed-and-is-never-stored-as-a-map.md`
     /// [^2]: ADR-0001, one binary gives one answer at any thread count, decision D4. `docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
     weather_ground: Vec<CellGround>,
+    /// The climate that the weather left over each weather cell.
+    ///
+    /// **The field is quiet unless the caller asked for a spin.** A quiet
+    /// field reads temperate at every address, so a world that asked for no
+    /// spin generates the ground that the seed alone gives.[^1]
+    ///
+    /// The field is stored, and the terrain readers of this world read it, so
+    /// it enters the state hash.[^2]
+    ///
+    /// # References
+    ///
+    /// [^1]: The climate field. [`ClimateField`]
+    /// [^2]: ADR-0001, one binary gives one answer at any thread count, decision D4. `docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
+    climate: ClimateField,
+    /// The mean standing water of the climate field, folded once.
+    ///
+    /// A terrain reader asks the climate over one address, and the climate of
+    /// a cell is a share against the mean over the whole field. Folding the
+    /// field for each tile would make a tile read cost the size of the
+    /// lattice, so the world folds it once here.
+    ///
+    /// **This is derived, and the field is the declaration.** It is refreshed
+    /// only when the field is built, and the field never changes after that.
+    climate_reference: i64,
     /// The faction controller: one row for each faction, the two parameters
     /// the step reads on every tick, and the game end record.
     ///
@@ -1438,6 +1463,47 @@ impl World {
     /// # References
     ///
     /// [^1]: The weather scale. [`WeatherScale`]
+    /// Builds a world whose ground the weather of the world shaped.
+    ///
+    /// **The engine runs the weather forward over an empty world before the
+    /// world starts.** It accumulates the temperature and the standing water
+    /// of every weather cell over a fixed tick count, stores that small field,
+    /// and the terrain readers of the world then read it. A cell that stands
+    /// wetter than the world grows more forest. A cell that stands drier, or
+    /// colder, grows less.
+    ///
+    /// **The spin is not a loop.** The weather reads the mean height of a cell
+    /// and its open water share, and the climate changes neither. The spin
+    /// hands the weather the ground folded from the terrain that the seed
+    /// alone gives, the classification runs once afterwards, and nothing feeds
+    /// back. The tick count is fixed, so there is no convergence test.[^1]
+    ///
+    /// A tick count of zero builds the world that the seed alone gives.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the world refuses to build, and when the weather
+    /// refuses the spin.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0087, an influence solve runs a fixed iteration count over the whole plane, decision D1. `docs/adrs/draft/adr-0087-an-influence-solve-runs-a-fixed-iteration-count.md`
+    pub fn with_climate(
+        config: WorldConfig,
+        weather_scale: WeatherScale,
+        spin_ticks: u64,
+        threads: usize,
+    ) -> Result<Self, WorldError> {
+        let mut world = Self::with_weather_scale(config, weather_scale)?;
+        if spin_ticks == 0 {
+            return Ok(world);
+        }
+        let climate = ClimateField::spin(world.terrain, weather_scale, spin_ticks, threads)?;
+        world.climate_reference = climate.wetness_reference();
+        world.climate = climate;
+        Ok(world)
+    }
+
     pub fn with_weather_scale(
         config: WorldConfig,
         weather_scale: WeatherScale,
@@ -1517,6 +1583,8 @@ impl World {
             weather: WeatherField::new(weather_lattice, weather_scale, config.faction_count)?,
             weather_layout,
             weather_ground: weather_ground_of(weather_layout, terrain),
+            climate: ClimateField::quiet(weather_layout),
+            climate_reference: 0,
             controller: Controller::new(config.seed, config.faction_count),
             campaigns: CampaignRegister::new(config.faction_count),
             plan: PlanRegister::new(config.faction_count, PlanRules::DEFAULT),
@@ -1639,14 +1707,21 @@ impl World {
     /// Returns the terrain of one tile.
     ///
     /// Returns `None` when the address lies outside the world. The call
-    /// computes the tile. It reads no array, so it never goes stale.[^1]
+    /// computes the tile. It reads no array of tiles, so it never goes
+    /// stale.[^1]
+    ///
+    /// **The climate of the world reaches the answer.** A world that asked for
+    /// no spin holds a quiet climate, which reads temperate at every address
+    /// and changes nothing, so the answer is the tile that the seed alone
+    /// gives.[^2]
     ///
     /// # References
     ///
     /// [^1]: ADR-0068, terrain is generated from the seed and is never stored as a map, decision D1. `docs/adrs/accepted/adr-0068-terrain-is-generated-from-the-seed-and-is-never-stored-as-a-map.md`
+    /// [^2]: The climate field. [`ClimateField`]
     #[must_use]
     pub fn tile_terrain(&self, address: Axial) -> Option<TerrainTile> {
-        self.terrain.tile(address)
+        self.terrain.tile_under(address, self.tile_climate(address))
     }
 
     /// Returns the terrain kind of one tile.
@@ -1654,7 +1729,21 @@ impl World {
     /// Returns `None` when the address lies outside the world.
     #[must_use]
     pub fn tile_kind(&self, address: Axial) -> Option<TileKind> {
-        self.terrain.kind(address)
+        Some(self.tile_terrain(address)?.kind)
+    }
+
+    /// Returns the climate over one tile.
+    ///
+    /// A world that asked for no spin answers temperate at every address.
+    #[must_use]
+    pub fn tile_climate(&self, address: Axial) -> Climate {
+        self.climate.at_reference(address, self.climate_reference)
+    }
+
+    /// Returns the climate field of the world.
+    #[must_use]
+    pub const fn climate(&self) -> &ClimateField {
+        &self.climate
     }
 
     /// Returns the resource field of the world.
@@ -4498,7 +4587,11 @@ impl World {
         // diverge.[^17]
         //
         // [^17]: ADR-0001, one binary gives one answer at any thread count, decision D4. `docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
-        self.weather.hash_into(hash)
+        let hash = self.weather.hash_into(hash);
+        // The climate is stored, and the terrain readers of this world read
+        // it, so two worlds that hold the same seed and different climates
+        // must diverge.[^17]
+        self.climate.hash_into(hash)
     }
 
     /// Reports whether the world holds its invariants.
