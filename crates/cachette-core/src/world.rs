@@ -10130,7 +10130,7 @@ pub const SUBSYSTEM_CENSUS: &[CensusRow] = &[
     // different things to a watcher. A watcher then tells a site with no
     // resident to spend from a site whose store cannot pay.[^4]
     //
-    // [^4]: ADR-0158, a site builds a typed unit from a bounded queue its store pays for, decision D6. `docs/adrs/draft/adr-0158-a-site-builds-a-typed-unit-from-a-bounded-queue-its-store-pays-for.md`
+    // [^4]: ADR-0158, a site builds a typed unit from a bounded queue its store pays for, decision D6. `docs/adrs/accepted/adr-0158-a-site-builds-a-typed-unit-from-a-bounded-queue-its-store-pays-for.md`
     CensusRow {
         name: "queue_produced",
         basis: CensusBasis::Total,

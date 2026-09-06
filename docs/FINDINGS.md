@@ -12442,7 +12442,7 @@ the order reads every unit and sends only the idle ones.
 ## References
 
 [^F498B]: The controller log, the refusal count and the stage that empties them. `crates/cachette-core/src/controller.rs`
-[^F498D]: ADR-0158, a site builds a typed unit from a bounded queue its store pays for, decision D6. `docs/adrs/draft/adr-0158-a-site-builds-a-typed-unit-from-a-bounded-queue-its-store-pays-for.md`
+[^F498D]: ADR-0158, a site builds a typed unit from a bounded queue its store pays for, decision D6. `docs/adrs/accepted/adr-0158-a-site-builds-a-typed-unit-from-a-bounded-queue-its-store-pays-for.md`
 [^F498E]: Balance register, the seed set row. `docs/reference/balance.md`
 [^F498F]: Recurring Defect Shapes, shape 1. `.agents/rules/recurring-defects.md`
 [^F498G]: Recurring Defect Shapes, shape 3. `.agents/rules/recurring-defects.md`
