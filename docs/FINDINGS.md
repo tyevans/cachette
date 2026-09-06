@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-498**
+**Next number: FND-527**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -3257,6 +3257,64 @@ cost is recorded so that it is not found again as a mystery.
 **This row's conclusion is wrong, and a later row corrects it.** The residual
 did not follow the allocation. The pass still allocates and the residual is back
 under half a millisecond.[^F277C]
+
+
+### FND-525 — A picture of the whole panel does not repeat, because the panel states the wall clock
+
+**Believed.** The demonstration writes one picture from one seed, and the
+engine gives one answer for one seed at any thread count. Two runs of one seed
+therefore give one picture, and a test may compare two picture files to prove
+that a change reached the frame.
+
+**True.** The whole panel states what the last step and the last frame cost,
+and those costs come from the wall clock.[^F525A] Two runs of one seed
+therefore give two different files, whatever else the runs did. A deck of named
+panels holds no cost row, and two runs of one seed give one file.
+
+**Evidence.** Two runs of one world, at one seed, one extent and one tick
+count, wrote two picture files that differ. The same two runs with a named
+deck wrote two identical files. The commit body holds the commands.
+
+**Follows.** Two things.
+
+**A test that compares two picture files must first assert that one
+configuration repeats.** Without that assertion the test passes on any pair of
+files, so it measures the wall clock rather than the change. Three tests of the
+deck were written that way, and each one stayed green when the wiring under it
+was removed. The repaired tests run the same configuration twice, assert the
+two files are equal, and only then assert that another configuration differs.
+
+**A picture is not simulated state.** The determinism rule binds the world and
+the event log, not the pixels the viewer paints. A cost row in a picture is
+correct and it is not a defect.
+
+### FND-526 — Three refined backlog items described work the tree already held
+
+**Believed.** The backlog held three refined items for the demonstration: one
+panel standard, a clock that separates the engine tick from the wall clock, and
+four panels that show the characters, the statistics, the events and a tile.
+An item in `refined/` states work that nobody has done.
+
+**True.** Every statement under `Done when` in the three items was already
+satisfied. The viewer holds one panel module that declares the geometry, the
+colours and the cut, and one list that registers every panel. The control plane
+holds the clock, the speed set, the pause and the single step. The four panels
+each exist as one file with its own tests.
+
+**Evidence.** The commit that gave the panel one standard, a deck and a clock
+is in the history, and later commits bound every panel to a key. The items
+stayed in `refined/` because nothing moves an item when the work lands under
+another item's number.
+
+**Follows.** Two things.
+
+**Read the tree before you start a refined item.** The item states a need at
+the moment it was written, and the tree is the current statement of what
+exists. Reading the item alone leads to a second implementation of a thing that
+already works, which is one fact in two places.[^F526A]
+
+**An item is not done until it moves.** A directory is a status, and a status
+that nobody sets is a register that decays.
 
 
 ## F. Sourcing
@@ -11243,6 +11301,8 @@ index against the set of open items and never against what an item says.
 [^F287B]: Findings register, FND-282, in this document.
 [^F287C]: The exit locality benchmark, the frame row. `crates/cachette-core/benches/exit_locality.rs`
 [^F285A]: Findings register, FND-269, in this document.
+[^F525A]: The frame and step costs the viewer measures. `crates/cachette-view/src/metrics.rs`
+[^F526A]: Recurring Defect Shapes, shape 1. `.agents/rules/recurring-defects.md`
 [^F286A]: Target platform costs, every stage of a frame after the candidate pass became a bit plane. `docs/reference/graviton-costs.md`
 [^F277B]: Findings register, FND-285, in this document.
 [^F277C]: Findings register, FND-286, in this document.
