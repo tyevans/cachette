@@ -3132,6 +3132,14 @@ count. One tick is a fixed span of simulated time, and the register holds
 that constant.[^SCALE] A period given in ticks alone would go stale if the
 tick span ever moved.
 
+**That paragraph is now reversed, and a record holds the reversal.** The period
+is declared in ticks. The rate the owner asked for is below one unit in a
+simulated day, and a rate expressed as a whole count of units in a day cannot
+reach it without a period of zero, which means never. The risk this paragraph
+named is real and the project accepts it: a change to the span of a tick is a
+change to every period, and every period lives in one declaration, so it is one
+edit and not a sweep.[^DEC049TICKS]
+
 **What holds it back.** Nothing. Work can start under option 1 with the two
 periods as parameters, and the parameters carry the same name in the engine
 and in this row.
@@ -4493,3 +4501,4 @@ exactly so that a caller cannot build a wrong one.[^DEC120C]
 [^DEC273SC]: ADR-0076, a founding keeps a fixed distance from the foundings before it, decision D1. `docs/adrs/accepted/adr-0076-a-founding-keeps-a-fixed-distance-from-the-foundings-before-it.md`
 [^DEC273SD]: ADR-0075, the founding choice reads a bounded sample of the world, decision D1. `docs/adrs/accepted/adr-0075-the-founding-choice-reads-a-bounded-sample-of-the-world.md`
 [^DEC273SF]: Findings register, FND-544. `docs/FINDINGS.md`
+[^DEC049TICKS]: ADR-0170, a recovery period is a base for the kind that the ground and the improvement scale, decision D2. `docs/adrs/draft/adr-0170-a-recovery-period-is-a-base-that-the-ground-and-the-improvement-scale.md`
