@@ -1,4 +1,4 @@
-//! Tile upgrades.
+//! Tile upgrades, and the table a category indexes.
 //!
 //! An upgrade is the mark a unit leaves on a tile. The generator made the
 //! ground and the stock of the world, and neither of those records anything a
@@ -9,10 +9,17 @@
 //! nothing else.** A world in which nobody built holds no entry, so the memory
 //! cost follows the building and not the size of the world.[^3]
 //!
+//! **An upgrade is a row of a table that the world is built with.** A row is
+//! one category at one level. It names the ground it fits, the work it takes
+//! and the columns a pass reads. A category is an index and never a name, and
+//! no pass branches on one.[^7] The table takes the form the unit type table
+//! takes: one macro declares the row, and the column names and the column
+//! reader derive from that declaration.[^8]
+//!
 //! An upgrade under construction holds a progress accumulator. Several units
 //! add to it in one tick and the contributions combine exactly, because every
 //! term is a whole number and the accumulator is 64 bits wide.[^4] [^5] The
-//! accumulator is clamped at the work its kind asks for. An unclamped
+//! accumulator is clamped at the work of the row above the entry. An unclamped
 //! accumulator lets a builder bank surplus it can never spend, and that
 //! overflow reaches the state hash.[^6]
 //!
@@ -26,203 +33,552 @@
 //! [^4]: ADR-0002, simulated and aggregated state holds no floating point number, decision D1. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
 //! [^5]: ADR-0023, an aggregate combines exactly, in any order, decision D1. `docs/adrs/accepted/adr-0023-an-aggregate-combines-exactly-in-any-order.md`
 //! [^6]: Findings register, FND-011. `docs/FINDINGS.md`
+//! [^7]: ADR-0151, an upgrade is a category with a ground fit and a level, decisions D1 and D4. `docs/adrs/draft/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
+//! [^8]: ADR-0145, a unit type is a row of capability columns, and zero means cannot, decision D4. `docs/adrs/accepted/adr-0145-a-unit-type-is-a-row-of-capability-columns-and-zero-means-cannot.md`
+
+use bytemuck::{Pod, Zeroable};
 
 use crate::hash::StateHash;
+use crate::terrain::{TileKind, KIND_COUNT};
 use crate::types::{Accum, TileIdx};
 
-/// The number of upgrade kinds that the catalogue holds.
-pub const UPGRADE_KIND_COUNT: usize = 4;
+/// The number of categories that the upgrade table holds.
+///
+/// **This is the width of the table and not a budget.** The table is dense
+/// and its length never changes, so a world pays for the whole table however
+/// many rows it fills. The number is small because the table is read for each
+/// build order, and it is fixed so that a category is a stable index that a
+/// state hash and a viewer both read.
+///
+/// Five categories are named and one is open. A caller writes the open
+/// category, and a caller may rewrite any other.
+pub const UPGRADE_CATEGORY_COUNT: usize = 6;
 
-/// The kind of an upgrade.
+/// The most levels that one category holds.
 ///
-/// A kind is an index into the tables below. It is not a type, not a trait
-/// and not a verb, so adding a kind adds a row and no code.[^1]
+/// The table holds one row for each pair of a category and a level, so the
+/// row count is the product of this number and the category count. A category
+/// that holds fewer levels leaves the rows above its top empty.
+pub const UPGRADE_LEVEL_COUNT: usize = 2;
+
+/// The number of rows that the table holds.
+pub const UPGRADE_ROW_COUNT: usize = UPGRADE_CATEGORY_COUNT * UPGRADE_LEVEL_COUNT;
+
+/// The level of a tile that carries no upgrade.
+pub const NO_LEVEL: u8 = 0;
+
+/// The category of an upgrade, as an index into the shared table.
 ///
-/// The catalogue began at two kinds, because the two of them change
-/// different properties of a tile. One kind would let a later reader believe
-/// that an upgrade is a scalar on the tile rather than a row in a table.[^1]
+/// The category is one byte, because the table is small and fixed. It is a
+/// newtype, so no other one-byte value substitutes for it in silence.[^1]
+///
+/// A category is not a type, not a trait and not a verb. Adding a category
+/// adds a row and no code.[^2]
 ///
 /// # References
 ///
-/// [^1]: ADR-0072, a tile stock is generated, and only what was taken is stored, decision D3. `docs/adrs/accepted/adr-0072-a-tile-stock-is-generated-and-only-what-was-taken-is-stored.md`
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
-#[repr(u8)]
-pub enum UpgradeKind {
+/// [^1]: ADR-0011, every value type is a newtype with a declared size and alignment. `docs/adrs/REGISTRY.md`
+/// [^2]: ADR-0151, an upgrade is a category with a ground fit and a level, decision D1. `docs/adrs/draft/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
+#[repr(transparent)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Pod, Zeroable)]
+pub struct UpgradeCategory(pub u8);
+
+impl UpgradeCategory {
     /// A made way. More units cross the tile at once.
-    Road = 0,
+    pub const ROAD: Self = Self(0);
     /// Worked ground. A unit takes more from the tile in one tick.
-    Terrace = 1,
+    pub const TERRACE: Self = Self(1);
     /// A great work. Its completion fires the wealth-or-wonder win path for
     /// the faction that holds the ground it stands on.[^1]
     ///
     /// # References
     ///
     /// [^1]: ADR-0148, a game end is recorded once and stops the controllers, decision D3. `docs/adrs/accepted/adr-0148-a-game-end-is-recorded-once-and-stops-the-controllers.md`
-    Wonder = 2,
+    pub const WONDER: Self = Self(2);
     /// A storehouse. It raises the store capacity of the settlement on or
-    /// beside its tile. The world states the "on or beside" rule once, in
-    /// the reader that sums the raise for a site.
-    Store = 3,
-}
+    /// beside its tile.
+    pub const STORE: Self = Self(3);
+    /// A defence. The default table gives it a work and no effect, because
+    /// the condition it wears belongs to a later item.
+    pub const WALL: Self = Self(4);
+    /// The open category. The default table holds no row for it, so a build
+    /// order that names it is refused until a caller writes a row.
+    pub const OPEN: Self = Self(5);
 
-impl UpgradeKind {
-    /// Every kind, in the order of the numbering.
+    /// Every category, in the order of the numbering.
     ///
-    /// A caller that must reason over the whole catalogue reads this rather
-    /// than writing a list of its own. The length is fixed by the kind count,
-    /// so a new kind that is not added here is a compile error.
-    pub const ALL: [Self; UPGRADE_KIND_COUNT] =
-        [Self::Road, Self::Terrace, Self::Wonder, Self::Store];
+    /// A caller that must reason over the whole table reads this rather than
+    /// writing a list of its own. The length is fixed by the category count,
+    /// so a category that is not here is a compile error.
+    pub const ALL: [Self; UPGRADE_CATEGORY_COUNT] = [
+        Self::ROAD,
+        Self::TERRACE,
+        Self::WONDER,
+        Self::STORE,
+        Self::WALL,
+        Self::OPEN,
+    ];
 
-    /// Returns the kind as a small integer.
-    #[must_use]
-    pub const fn to_u8(self) -> u8 {
-        self as u8
-    }
-
-    /// Returns the kind that a small integer names.
+    /// Returns the category that a small integer names.
     ///
-    /// Returns `None` when the number names no kind.
+    /// Returns `None` when the number names no category of the table.
     #[must_use]
     pub const fn from_u8(value: u8) -> Option<Self> {
-        match value {
-            0 => Some(Self::Road),
-            1 => Some(Self::Terrace),
-            2 => Some(Self::Wonder),
-            3 => Some(Self::Store),
-            _ => None,
+        if (value as usize) < UPGRADE_CATEGORY_COUNT {
+            Some(Self(value))
+        } else {
+            None
         }
     }
 
-    /// Returns the position of the kind in a table over the catalogue.
+    /// Returns the category as a small integer.
+    #[must_use]
+    pub const fn to_u8(self) -> u8 {
+        self.0
+    }
+
+    /// Returns the position of the category in a table over the categories.
     #[must_use]
     pub const fn index(self) -> usize {
-        self as usize
+        self.0 as usize
     }
+}
 
-    /// Returns the work that finishes an upgrade of this kind.
-    ///
-    /// The value is content. It sits beside the effect tables below until a
-    /// content pipeline exists, in the same way the ground tables do.[^1] It
-    /// is not a cost figure: it says how much work the world asks for, not
-    /// what the engine spends.[^2]
-    ///
-    /// The value is above the work that one builder adds in one tick, so a
-    /// build takes several ticks and holds state between them. That is the
-    /// whole point of the shape, and a test asserts it.[^3]
-    ///
-    /// The wonder work and the store work are provisional values. The balance
-    /// register holds the rows, the derivation and the blocker.[^4]
-    ///
-    /// # References
-    ///
-    /// [^1]: ADR-0072, a tile stock is generated, and only what was taken is stored, decision D2. `docs/adrs/accepted/adr-0072-a-tile-stock-is-generated-and-only-what-was-taken-is-stored.md`
-    /// [^2]: Blockers register, BLK-007. `docs/BLOCKERS.md`
-    /// [^3]: ADR-0090, a tile upgrade is stored sparsely, as the difference from the generated world, decision D2. `docs/adrs/draft/adr-0090-a-tile-upgrade-is-stored-sparsely.md`
-    /// [^4]: Balance register, the wonder work and the store work. `docs/reference/balance.md`
-    #[must_use]
-    pub const fn work(self) -> i64 {
-        match self {
-            Self::Road => 8,
-            Self::Terrace => 24,
-            Self::Wonder => WONDER_WORK,
-            Self::Store => STORE_WORK,
+impl core::fmt::Display for UpgradeCategory {
+    fn fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(formatter, "category {}", self.0)
+    }
+}
+
+/// Returns the ground fit bit of one ground kind.
+///
+/// The fit is a set of ground kinds held as a bit for each kind. The bit
+/// position is the ground number, which a state hash and a viewer already
+/// read, so no second numbering exists.[^1]
+///
+/// # References
+///
+/// [^1]: Recurring Defect Shapes, shape 1. `.agents/rules/recurring-defects.md`
+#[must_use]
+pub const fn ground_bit(ground: TileKind) -> u32 {
+    1u32 << ground.to_u8()
+}
+
+/// The fit of a row that fits every ground a unit stands on.
+///
+/// Water holds nobody, so no unit ever stands there to build.[^1]
+///
+/// # References
+///
+/// [^1]: ADR-0056, movement is tile-discrete and admitted by sort-then-admit, decision D4. `docs/adrs/accepted/adr-0056-movement-is-tile-discrete-and-admitted-by-sort-then-admit.md`
+pub const FITS_EVERY_LAND: u32 = ground_bit(TileKind::Plain)
+    | ground_bit(TileKind::Forest)
+    | ground_bit(TileKind::Hill)
+    | ground_bit(TileKind::Mountain);
+
+/// A value that one column of a row holds.
+///
+/// The trait exists so that the column reader the macro generates can hand
+/// every column to a caller as one integer type.
+trait ColumnValue: Copy {
+    /// Returns the raw value of the column as a wide integer.
+    fn to_i64(self) -> i64;
+}
+
+impl ColumnValue for u32 {
+    fn to_i64(self) -> i64 {
+        i64::from(self)
+    }
+}
+
+/// Declares the row struct, the column names and the column reader from one
+/// list, so that the row is declared once.[^1]
+///
+/// # References
+///
+/// [^1]: ADR-0145, a unit type is a row of capability columns, and zero means cannot, decision D4. `docs/adrs/accepted/adr-0145-a-unit-type-is-a-row-of-capability-columns-and-zero-means-cannot.md`
+macro_rules! declare_upgrade_row {
+    ($( $(#[$meta:meta])* $column:ident : $kind:ty ),* $(,)?) => {
+        /// One row of the upgrade table: one category at one level.
+        ///
+        /// The row is plain data with a declared layout, so a copy of the
+        /// table enters the state hash byte for byte and carries no
+        /// uninitialised byte.[^1]
+        ///
+        /// Every column is four bytes wide at an alignment of four, so the
+        /// row holds no padding at all. A test asserts the size against the
+        /// column count.
+        ///
+        /// **Zero means does not change.** A column at zero says that the row
+        /// does not change the thing the column names.[^2]
+        ///
+        /// # References
+        ///
+        /// [^1]: ADR-0006, an event is plain data and applying it is pure, decision D1. `docs/adrs/accepted/adr-0006-an-event-is-plain-data-and-applying-it-is-pure.md`
+        /// [^2]: ADR-0151, an upgrade is a category with a ground fit and a level, decision D1. `docs/adrs/draft/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
+        #[repr(C)]
+        #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Pod, Zeroable)]
+        pub struct UpgradeRow {
+            $( $(#[$meta])* pub $column: $kind, )*
         }
-    }
 
-    /// Returns the capacity that a finished upgrade of this kind gives a tile.
-    ///
-    /// Returns `None` when the kind does not change how many units a tile
-    /// holds.
-    ///
-    /// A made way is ground that a unit crosses quickly, and the project
-    /// already holds the capacity of such ground. The value is not restated
-    /// here: the terrain module owns the capacity table and this row reads it
-    /// from there, so no second declaration can disagree with it.[^1] [^2]
-    ///
-    /// # References
-    ///
-    /// [^1]: ADR-0056, movement is tile-discrete and admitted by sort-then-admit, decision D4. `docs/adrs/accepted/adr-0056-movement-is-tile-discrete-and-admitted-by-sort-then-admit.md`
-    /// [^2]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`
-    #[must_use]
-    pub const fn capacity(self) -> Option<u32> {
-        match self {
-            Self::Road => Some(crate::terrain::CROSSING_CAPACITY),
-            Self::Terrace | Self::Wonder | Self::Store => None,
+        /// The number of columns that a row holds.
+        pub const UPGRADE_COLUMN_COUNT: usize = [$(stringify!($column)),*].len();
+
+        impl UpgradeRow {
+            /// The name of every column, in declaration order.
+            ///
+            /// The Python table and the type stub carry these names, and a
+            /// test asserts that the stub agrees.
+            pub const COLUMN_NAMES: [&'static str; UPGRADE_COLUMN_COUNT] =
+                [$(stringify!($column)),*];
+
+            /// Returns every column as a wide integer, in declaration order.
+            ///
+            /// The reader exists for the boundary that copies the table out,
+            /// and no pass calls it.
+            #[must_use]
+            pub fn columns(&self) -> [i64; UPGRADE_COLUMN_COUNT] {
+                [$(ColumnValue::to_i64(self.$column)),*]
+            }
         }
-    }
+    };
+}
 
-    /// Returns how much more a unit takes from the tile in one tick.
+declare_upgrade_row! {
+    /// The ground kinds that the row fits, as one bit for each kind.
     ///
-    /// The row adds to the rate that the gather resolve grants. It does not
-    /// change what the tile started with, which is generated and fixed.[^1]
+    /// **An empty fit is not a row.** The table holds one entry for every
+    /// pair of a category and a level, and the fit says which of those pairs
+    /// the table holds. A row that fits no ground can never be built, so it
+    /// is the absence of a row and nothing states the absence twice.[^1]
     ///
     /// # References
     ///
-    /// [^1]: ADR-0072, a tile stock is generated, and only what was taken is stored, decision D1. `docs/adrs/accepted/adr-0072-a-tile-stock-is-generated-and-only-what-was-taken-is-stored.md`
-    #[must_use]
-    pub const fn gather_bonus(self) -> u32 {
-        match self {
-            Self::Road | Self::Wonder | Self::Store => 0,
-            Self::Terrace => 2,
-        }
-    }
-
-    /// Returns how much a finished upgrade of this kind raises the store
-    /// capacity of a settlement on or beside its tile.
+    /// [^1]: Recurring Defect Shapes, shape 1. `.agents/rules/recurring-defects.md`
+    ground_fit: u32,
+    /// The work that finishes this level.
     ///
-    /// The engine holds no store capacity yet, so no pass reads this row. The
-    /// world sums it for a site and exposes the sum at the boundary, and the
-    /// doc comment of that reader says that nothing in the engine reads it.
-    /// The value is provisional, and the balance register holds the row.[^1]
+    /// The value is content. It is not a cost figure: it says how much work
+    /// the world asks for, not what the engine spends.[^1] It is above the
+    /// work that one builder adds in one tick, so a build takes several ticks
+    /// and holds state between them.
     ///
     /// # References
     ///
-    /// [^1]: Balance register, the store capacity raise. `docs/reference/balance.md`
+    /// [^1]: Blockers register, BLK-007. `docs/BLOCKERS.md`
+    work: u32,
+    /// How much more a unit takes from the tile in one tick.
+    ///
+    /// The column adds to the rate that the gather resolve grants. It does
+    /// not change what the tile started with, which is generated and fixed.
+    yield_change: u32,
+    /// The number of units that stand on the tile once the level stands.
+    ///
+    /// The composition takes the larger of the ground and this column, so a
+    /// column below the ground changes nothing rather than taking room away.
+    /// Zero means that the row does not change how many a tile holds.
+    capacity_change: u32,
+    /// How much the row raises the store capacity of a settlement on or
+    /// beside its tile, as a raw Q16.16 quantity.
+    capacity_of_store_change: u32,
+    /// The claim toward the wealth-or-wonder end that the finished row
+    /// grants the faction that holds its ground.[^1]
+    ///
+    /// Zero means that the row grants no claim.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0148, a game end is recorded once and stops the controllers, decision D3. `docs/adrs/accepted/adr-0148-a-game-end-is-recorded-once-and-stops-the-controllers.md`
+    victory_claim: u32,
+    /// Whether the builder must stand on ground its own faction holds.
+    ///
+    /// Zero means that the row is built anywhere, which is how a faction
+    /// reaches ground it does not yet hold.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0150, held ground is the ground within reach of a city its faction owns, decision D4. `docs/adrs/draft/adr-0150-held-ground-is-the-ground-within-reach-of-a-city-its-faction-owns.md`
+    own_ground_required: u32,
+}
+
+impl UpgradeRow {
+    /// The row that fits no ground. The table holds it where it holds no row.
+    pub const NONE: Self = Self {
+        ground_fit: 0,
+        work: 0,
+        yield_change: 0,
+        capacity_change: 0,
+        capacity_of_store_change: 0,
+        victory_claim: 0,
+        own_ground_required: 0,
+    };
+
+    /// Reports whether the table holds this row.
+    ///
+    /// A row that fits no ground is the absence of a row.
     #[must_use]
-    pub const fn store_capacity_raise(self) -> i64 {
+    pub const fn exists(self) -> bool {
+        self.ground_fit != 0
+    }
+
+    /// Reports whether the row fits one ground kind.
+    #[must_use]
+    pub const fn fits(self, ground: TileKind) -> bool {
+        self.ground_fit & ground_bit(ground) != 0
+    }
+}
+
+/// The reason that the table refused a caller who wrote a row.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum UpgradeTableError {
+    /// The number names no category of the table.
+    CategoryAboveCeiling(u8),
+    /// The number names no level of the table. Level zero is the tile that
+    /// carries no upgrade, so it holds no row.
+    LevelOutsideTable(u8),
+}
+
+impl core::fmt::Display for UpgradeTableError {
+    fn fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
-            Self::Road | Self::Terrace | Self::Wonder => 0,
-            Self::Store => STORE_CAPACITY_RAISE,
+            Self::CategoryAboveCeiling(value) => write!(
+                formatter,
+                "the upgrade category {value} is at or above the ceiling {UPGRADE_CATEGORY_COUNT}"
+            ),
+            Self::LevelOutsideTable(value) => write!(
+                formatter,
+                "the upgrade level {value} is not between 1 and {UPGRADE_LEVEL_COUNT}"
+            ),
         }
     }
 }
 
-/// The work that finishes a wonder.
+impl std::error::Error for UpgradeTableError {}
+
+/// The reason that the engine refused a build order.
 ///
-/// A provisional value, ten times the terrace, so that a wonder takes a
-/// large part of a run and no determinism scenario completes one by
-/// accident. Pass 10 measures it.[^1] [^2]
+/// The refusal names the category and the ground, so a caller learns which
+/// of the two refused it rather than reading a bare no.[^1]
+///
+/// # References
+///
+/// [^1]: ADR-0046, every error is typed. `docs/adrs/draft/adr-0046-every-error-is-typed.md`
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum BuildRefusal {
+    /// The identity names no live soldier, or it stands nowhere.
+    NoSuchBuilder,
+    /// The tile carries an upgrade of another category. A tile carries one
+    /// upgrade.
+    TileHoldsAnother {
+        /// The category that stands on the tile.
+        standing: UpgradeCategory,
+        /// The category the order named.
+        asked: UpgradeCategory,
+    },
+    /// The category holds no row above the level that stands there. The
+    /// category is at its top, or the table holds no row for it at all.
+    CategoryAtTop {
+        /// The category the order named.
+        category: UpgradeCategory,
+        /// The level that stands on the tile.
+        level: u8,
+    },
+    /// The row does not fit the ground under the tile.
+    GroundDoesNotFit {
+        /// The category the order named.
+        category: UpgradeCategory,
+        /// The ground under the tile.
+        ground: TileKind,
+    },
+    /// The builder does not stand on ground its own faction holds, and the
+    /// row asks for it.
+    GroundNotHeld {
+        /// The category the order named.
+        category: UpgradeCategory,
+    },
+}
+
+impl core::fmt::Display for BuildRefusal {
+    fn fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            Self::NoSuchBuilder => write!(formatter, "the identity names no live builder"),
+            Self::TileHoldsAnother { standing, asked } => write!(
+                formatter,
+                "the tile carries {standing} and the order named {asked}"
+            ),
+            Self::CategoryAtTop { category, level } => write!(
+                formatter,
+                "the {category} holds no row above the level {level} that stands there"
+            ),
+            Self::GroundDoesNotFit { category, ground } => write!(
+                formatter,
+                "the {category} does not fit the ground {}",
+                ground.to_u8()
+            ),
+            Self::GroundNotHeld { category } => write!(
+                formatter,
+                "the {category} asks for ground the builder's own faction holds"
+            ),
+        }
+    }
+}
+
+impl std::error::Error for BuildRefusal {}
+
+// ---------------------------------------------------------------------------
+// The default table
+// ---------------------------------------------------------------------------
+//
+// Every value below is provisional. The balance register holds one row for
+// each of them, marked unset, with the derivation that names this item.[^1]
+// Do not tune a value here.
+//
+// [^1]: Balance register, upgrades. `docs/reference/balance.md`
+
+/// The ground that a road fits.
+///
+/// A road is a made way over ground a unit walks. High ground is not it, so a
+/// road stops at the mountain.[^1]
+///
+/// # References
+///
+/// [^1]: Balance register, the road ground fit. `docs/reference/balance.md`
+pub const ROAD_FIT: u32 =
+    ground_bit(TileKind::Plain) | ground_bit(TileKind::Forest) | ground_bit(TileKind::Hill);
+
+/// The ground that a terrace fits.
+///
+/// Worked ground is ground a unit walks and works. High ground is not it, so
+/// a terrace stops at the mountain.[^1]
+///
+/// # References
+///
+/// [^1]: Balance register, the terrace ground fit. `docs/reference/balance.md`
+pub const TERRACE_FIT: u32 =
+    ground_bit(TileKind::Plain) | ground_bit(TileKind::Forest) | ground_bit(TileKind::Hill);
+
+/// The work that finishes the first level of a road.[^1]
+///
+/// # References
+///
+/// [^1]: Balance register, the road work by level. `docs/reference/balance.md`
+pub const ROAD_LEVEL_1_WORK: u32 = 8;
+
+/// The work that finishes the second level of a road.[^1]
+///
+/// # References
+///
+/// [^1]: Balance register, the road work by level. `docs/reference/balance.md`
+pub const ROAD_LEVEL_2_WORK: u32 = 24;
+
+/// The work that finishes the first level of a terrace.[^1]
+///
+/// # References
+///
+/// [^1]: Balance register, the terrace work by level. `docs/reference/balance.md`
+pub const TERRACE_LEVEL_1_WORK: u32 = 24;
+
+/// The work that finishes the second level of a terrace.[^1]
+///
+/// # References
+///
+/// [^1]: Balance register, the terrace work by level. `docs/reference/balance.md`
+pub const TERRACE_LEVEL_2_WORK: u32 = 72;
+
+/// The work that finishes a wonder.[^1] [^2]
 ///
 /// # References
 ///
 /// [^1]: Balance register, the wonder work. `docs/reference/balance.md`
 /// [^2]: Blockers register, BLK-007. `docs/BLOCKERS.md`
-pub const WONDER_WORK: i64 = 240;
+pub const WONDER_WORK: u32 = 240;
 
-/// The work that finishes a store.
-///
-/// A provisional value, twice the terrace. Pass 10 measures it.[^1] [^2]
+/// The work that finishes a store.[^1] [^2]
 ///
 /// # References
 ///
 /// [^1]: Balance register, the store work. `docs/reference/balance.md`
 /// [^2]: Blockers register, BLK-007. `docs/BLOCKERS.md`
-pub const STORE_WORK: i64 = 48;
+pub const STORE_WORK: u32 = 48;
 
-/// The store capacity that one finished store adds, as a raw Q16.16 quantity.
+/// The work that finishes a wall.[^1] [^2]
 ///
-/// A provisional value of 64 whole units. Pass 10 measures it.[^1]
+/// # References
+///
+/// [^1]: Balance register, the wall work. `docs/reference/balance.md`
+/// [^2]: Blockers register, BLK-007. `docs/BLOCKERS.md`
+pub const WALL_WORK: u32 = 16;
+
+/// The units that stand on a tile that carries the first level of a road.
+///
+/// The project already holds the capacity of ground that a unit crosses
+/// quickly. The value is not restated here: this row reads it from the
+/// terrain module, so no second declaration can disagree with it.[^1]
+///
+/// # References
+///
+/// [^1]: Recurring Defect Shapes, shape 1. `.agents/rules/recurring-defects.md`
+pub const ROAD_LEVEL_1_CAPACITY: u32 = crate::terrain::CROSSING_CAPACITY;
+
+/// The units that stand on a tile that carries the second level of a road.
+///
+/// Twice the first level, so a watcher reads the second level from what the
+/// tile holds.[^1]
+///
+/// # References
+///
+/// [^1]: Balance register, the road capacity by level. `docs/reference/balance.md`
+pub const ROAD_LEVEL_2_CAPACITY: u32 = ROAD_LEVEL_1_CAPACITY * 2;
+
+/// How much more a unit takes from a tile that carries the first level of a
+/// terrace.[^1]
+///
+/// # References
+///
+/// [^1]: Balance register, the terrace yield by level. `docs/reference/balance.md`
+pub const TERRACE_LEVEL_1_YIELD: u32 = 2;
+
+/// How much more a unit takes from a tile that carries the second level of a
+/// terrace.[^1]
+///
+/// # References
+///
+/// [^1]: Balance register, the terrace yield by level. `docs/reference/balance.md`
+pub const TERRACE_LEVEL_2_YIELD: u32 = 4;
+
+/// The store capacity that one finished store adds, as a raw Q16.16
+/// quantity.[^1]
 ///
 /// # References
 ///
 /// [^1]: Balance register, the store capacity raise. `docs/reference/balance.md`
-pub const STORE_CAPACITY_RAISE: i64 = 64 << 16;
+pub const STORE_CAPACITY_RAISE: u32 = 64 << 16;
+
+/// The claim toward the wealth-or-wonder end that one finished wonder
+/// grants.[^1]
+///
+/// # References
+///
+/// [^1]: Balance register, the wonder victory claim. `docs/reference/balance.md`
+pub const WONDER_VICTORY_CLAIM: u32 = 1;
+
+/// The value that says a row asks for the builder's own ground.
+///
+/// The column is a whole number and the rule it holds is a yes or a no. The
+/// record asks that the rule be a column rather than a branch on a category,
+/// and it also says that no column is a flag.[^1] The tension is recorded in
+/// the item that wrote the table.
+///
+/// # References
+///
+/// [^1]: ADR-0151, an upgrade is a category with a ground fit and a level, decisions D1 and D4. `docs/adrs/draft/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
+pub const OWN_GROUND_REQUIRED: u32 = 1;
 
 /// The work that one builder adds to a site in one tick.
 ///
 /// The rate is content, and the register holds the open choice of its
-/// value.[^1] It is smaller than the work of every kind, so no build finishes
+/// value.[^1] It is smaller than the work of every row, so no build finishes
 /// in the tick it started.
 ///
 /// # References
@@ -230,40 +586,252 @@ pub const STORE_CAPACITY_RAISE: i64 = 64 << 16;
 /// [^1]: Decisions register, DEC-072. `docs/DECISIONS.md`
 pub const BUILD_RATE: i64 = 1;
 
-/// Returns the largest work that any kind in the catalogue asks for.
+/// The default table that a world is built with.
 ///
-/// The value is folded over the catalogue rather than written down a second
-/// time. A written ceiling is one fact in two places, and nothing fails when
-/// the two disagree.[^1]
-///
-/// This is the bound that the progress accumulator is clamped to, so it is
-/// the bound the overflow property test names.[^2]
+/// It holds the road, the terrace, the wonder, the store and the wall. The
+/// road and the terrace hold two levels each. The open category holds no row,
+/// so a caller writes one.[^1]
 ///
 /// # References
 ///
-/// [^1]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`
-/// [^2]: Testing rules, section 4. `.claude/rules/testing.md`
+/// [^1]: ADR-0151, an upgrade is a category with a ground fit and a level, decisions D1 and D6. `docs/adrs/draft/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
+pub const DEFAULT_UPGRADE_TABLE: UpgradeTable = {
+    let mut rows = [UpgradeRow::NONE; UPGRADE_ROW_COUNT];
+    rows[row_at(UpgradeCategory::ROAD, 1)] = UpgradeRow {
+        ground_fit: ROAD_FIT,
+        work: ROAD_LEVEL_1_WORK,
+        capacity_change: ROAD_LEVEL_1_CAPACITY,
+        ..UpgradeRow::NONE
+    };
+    rows[row_at(UpgradeCategory::ROAD, 2)] = UpgradeRow {
+        ground_fit: ROAD_FIT,
+        work: ROAD_LEVEL_2_WORK,
+        capacity_change: ROAD_LEVEL_2_CAPACITY,
+        ..UpgradeRow::NONE
+    };
+    rows[row_at(UpgradeCategory::TERRACE, 1)] = UpgradeRow {
+        ground_fit: TERRACE_FIT,
+        work: TERRACE_LEVEL_1_WORK,
+        yield_change: TERRACE_LEVEL_1_YIELD,
+        own_ground_required: OWN_GROUND_REQUIRED,
+        ..UpgradeRow::NONE
+    };
+    rows[row_at(UpgradeCategory::TERRACE, 2)] = UpgradeRow {
+        ground_fit: TERRACE_FIT,
+        work: TERRACE_LEVEL_2_WORK,
+        yield_change: TERRACE_LEVEL_2_YIELD,
+        own_ground_required: OWN_GROUND_REQUIRED,
+        ..UpgradeRow::NONE
+    };
+    rows[row_at(UpgradeCategory::WONDER, 1)] = UpgradeRow {
+        ground_fit: FITS_EVERY_LAND,
+        work: WONDER_WORK,
+        victory_claim: WONDER_VICTORY_CLAIM,
+        own_ground_required: OWN_GROUND_REQUIRED,
+        ..UpgradeRow::NONE
+    };
+    rows[row_at(UpgradeCategory::STORE, 1)] = UpgradeRow {
+        ground_fit: FITS_EVERY_LAND,
+        work: STORE_WORK,
+        capacity_of_store_change: STORE_CAPACITY_RAISE,
+        own_ground_required: OWN_GROUND_REQUIRED,
+        ..UpgradeRow::NONE
+    };
+    rows[row_at(UpgradeCategory::WALL, 1)] = UpgradeRow {
+        ground_fit: FITS_EVERY_LAND,
+        work: WALL_WORK,
+        own_ground_required: OWN_GROUND_REQUIRED,
+        ..UpgradeRow::NONE
+    };
+    UpgradeTable { rows }
+};
+
+/// Returns the position of one category at one level in the row array.
+///
+/// The level is the level that stands on the tile, so level one is the first
+/// row. Level zero holds no row and this function is never called with it.
 #[must_use]
-pub const fn largest_work() -> i64 {
-    let mut most = 0i64;
-    let mut at = 0usize;
-    while at < UPGRADE_KIND_COUNT {
-        let work = UpgradeKind::ALL[at].work();
-        if work > most {
-            most = work;
-        }
-        at += 1;
-    }
-    most
+const fn row_at(category: UpgradeCategory, level: u8) -> usize {
+    category.index() * UPGRADE_LEVEL_COUNT + (level as usize - 1)
 }
 
-/// The number of key bits that hold the kind.
+/// The shared table that a category and a level index.
 ///
-/// The width is derived from the catalogue, so a new kind widens the key
-/// rather than colliding inside it.
-const KIND_BITS: u32 = UPGRADE_KIND_COUNT.next_power_of_two().trailing_zeros();
+/// The table is dense and its length never changes. A caller fills the rows
+/// it wants and leaves the rest empty.[^1]
+///
+/// # References
+///
+/// [^1]: ADR-0151, an upgrade is a category with a ground fit and a level, decision D1. `docs/adrs/draft/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct UpgradeTable {
+    rows: [UpgradeRow; UPGRADE_ROW_COUNT],
+}
 
-/// Packs a tile and a kind into one ordering key.
+impl Default for UpgradeTable {
+    fn default() -> Self {
+        DEFAULT_UPGRADE_TABLE
+    }
+}
+
+impl UpgradeTable {
+    /// Builds a table that holds no row.
+    ///
+    /// A world built with this table refuses every build order, because no
+    /// row fits any ground.
+    #[must_use]
+    pub const fn empty() -> Self {
+        Self {
+            rows: [UpgradeRow::NONE; UPGRADE_ROW_COUNT],
+        }
+    }
+
+    /// Returns every row, by category and then by level.
+    #[must_use]
+    pub const fn rows(&self) -> &[UpgradeRow; UPGRADE_ROW_COUNT] {
+        &self.rows
+    }
+
+    /// Returns the row of one category at one level.
+    ///
+    /// Returns `None` when the level is zero, when the level is above the
+    /// table, and when the table holds no row there.
+    #[must_use]
+    pub const fn row(&self, category: UpgradeCategory, level: u8) -> Option<UpgradeRow> {
+        if level == NO_LEVEL || level as usize > UPGRADE_LEVEL_COUNT {
+            return None;
+        }
+        let row = self.rows[row_at(category, level)];
+        if row.exists() {
+            Some(row)
+        } else {
+            None
+        }
+    }
+
+    /// Returns the work that the row above one level asks for.
+    ///
+    /// The value is zero at the top of a category, so a builder there adds
+    /// nothing and banks nothing.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: Findings register, FND-011. `docs/FINDINGS.md`
+    #[must_use]
+    pub const fn work_above(&self, category: UpgradeCategory, level: u8) -> i64 {
+        match self.row(category, level + 1) {
+            Some(row) => row.work as i64,
+            None => 0,
+        }
+    }
+
+    /// Returns the highest level that one category reaches.
+    ///
+    /// Returns zero when the table holds no row for the category. A level
+    /// above a gap is never reached, so the scan stops at the first gap.
+    #[must_use]
+    pub const fn top_level(&self, category: UpgradeCategory) -> u8 {
+        let mut level = 0u8;
+        while (level as usize) < UPGRADE_LEVEL_COUNT {
+            if self.row(category, level + 1).is_none() {
+                return level;
+            }
+            level += 1;
+        }
+        level
+    }
+
+    /// Returns the largest work that any row of the table asks for.
+    ///
+    /// The value is folded over the table rather than written down a second
+    /// time. A written ceiling is one fact in two places, and nothing fails
+    /// when the two disagree.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: Recurring Defect Shapes, shape 1. `.agents/rules/recurring-defects.md`
+    #[must_use]
+    pub const fn largest_work(&self) -> i64 {
+        let mut most = 0i64;
+        let mut at = 0usize;
+        while at < UPGRADE_ROW_COUNT {
+            let work = self.rows[at].work as i64;
+            if work > most {
+                most = work;
+            }
+            at += 1;
+        }
+        most
+    }
+
+    /// Writes one row of the table.
+    ///
+    /// The caller gives the whole row. There is no partial form, because a
+    /// caller that gave two columns would leave the rest at zero and would
+    /// define an upgrade that changes nothing else without knowing it.[^1]
+    ///
+    /// A row whose ground fit is empty removes the row.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the number names no category, and when the level
+    /// is not between one and the level count.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0145, a unit type is a row of capability columns, and zero means cannot, decision D5. `docs/adrs/accepted/adr-0145-a-unit-type-is-a-row-of-capability-columns-and-zero-means-cannot.md`
+    pub fn define(
+        &mut self,
+        category: u8,
+        level: u8,
+        row: UpgradeRow,
+    ) -> Result<(), UpgradeTableError> {
+        let Some(category) = UpgradeCategory::from_u8(category) else {
+            return Err(UpgradeTableError::CategoryAboveCeiling(category));
+        };
+        if level == NO_LEVEL || level as usize > UPGRADE_LEVEL_COUNT {
+            return Err(UpgradeTableError::LevelOutsideTable(level));
+        }
+        self.rows[row_at(category, level)] = row;
+        Ok(())
+    }
+
+    /// Absorbs the table into the state hash.
+    ///
+    /// The table decides what a later frame does, so the whole-world hash
+    /// covers it. Two worlds built with different tables never hash the
+    /// same.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0001, one binary gives one answer at any thread count, decision D4. `docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
+    #[must_use]
+    pub fn hash_into(&self, hash: StateHash) -> StateHash {
+        hash.write(bytemuck::cast_slice(&self.rows))
+    }
+
+    /// Reports whether the table holds its invariants.
+    ///
+    /// A row the table holds fits a ground the numbering names, and it asks
+    /// for work above nothing. A row that asked for no work would finish in
+    /// the tick it started, and a build would then hold no state between
+    /// ticks.
+    #[must_use]
+    pub fn check_invariants(&self) -> bool {
+        let named = (0..KIND_COUNT).fold(0u32, |bits, at| bits | (1u32 << at));
+        self.rows
+            .iter()
+            .all(|row| !row.exists() || (row.ground_fit & !named == 0 && row.work > 0))
+    }
+}
+
+/// The number of key bits that hold the category.
+///
+/// The width is derived from the table, so a new category widens the key
+/// rather than colliding inside it.
+const CATEGORY_BITS: u32 = UPGRADE_CATEGORY_COUNT.next_power_of_two().trailing_zeros();
+
+/// Packs a tile and a category into one ordering key.
 ///
 /// The tile is the high part, so a sort by this key gives ascending tile
 /// order, and the segments of one tile stay together.[^1]
@@ -272,8 +840,8 @@ const KIND_BITS: u32 = UPGRADE_KIND_COUNT.next_power_of_two().trailing_zeros();
 ///
 /// [^1]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
 #[must_use]
-pub const fn site_key(tile: TileIdx, kind: UpgradeKind) -> u64 {
-    ((tile.0 as u64) << KIND_BITS) | (kind.to_u8() as u64)
+pub const fn site_key(tile: TileIdx, category: UpgradeCategory) -> u64 {
+    ((tile.0 as u64) << CATEGORY_BITS) | (category.to_u8() as u64)
 }
 
 /// Returns the largest key that a world of a given tile count produces.
@@ -281,72 +849,87 @@ pub const fn site_key(tile: TileIdx, kind: UpgradeKind) -> u64 {
 pub const fn key_ceiling(tile_count: u32) -> u64 {
     site_key(
         TileIdx(tile_count.saturating_sub(1)),
-        UpgradeKind::ALL[UPGRADE_KIND_COUNT - 1],
+        UpgradeCategory::ALL[UPGRADE_CATEGORY_COUNT - 1],
     )
 }
 
 /// Returns how many units may stand on a tile.
 ///
 /// This is the one function that answers the question. The ground states the
-/// capacity, a finished upgrade may state a larger one, and the larger of the
-/// two wins. The two tables meet in one place, so no caller can read one
-/// without the other.[^1]
+/// capacity, the row that stands on the tile may state a larger one, and the
+/// larger of the two wins. The two tables meet in one place, so no caller can
+/// read one without the other.[^1]
 ///
 /// **Ground that admits nobody stays closed.** An upgrade changes how many a
 /// tile holds. It never changes whether the tile holds anybody, so every
 /// caller that asks only about passability reads the ground and stays
 /// correct.
 ///
-/// The argument is the finished upgrade. A site under construction changes
+/// The argument is the row that stands on the tile. A tile that carries
+/// nothing, and a tile whose first level is still under construction, change
 /// nothing.
+///
+/// The function reads a column and names no category.[^2]
 ///
 /// # References
 ///
 /// [^1]: ADR-0090, a tile upgrade is stored sparsely, as the difference from the generated world, decision D3. `docs/adrs/draft/adr-0090-a-tile-upgrade-is-stored-sparsely.md`
+/// [^2]: ADR-0151, an upgrade is a category with a ground fit and a level, decision D4. `docs/adrs/draft/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
 #[must_use]
-pub const fn capacity_with(ground: u32, finished: Option<UpgradeKind>) -> u32 {
+pub const fn capacity_with(ground: u32, standing: Option<UpgradeRow>) -> u32 {
     if ground == 0 {
         return 0;
     }
-    match finished {
-        Some(kind) => match kind.capacity() {
-            // An upgrade never lowers what a tile holds. The larger of the
-            // two wins, so a kind whose row sits below the ground it stands
-            // on changes nothing rather than taking room away.
-            Some(given) if given > ground => given,
-            _ => ground,
-        },
-        None => ground,
+    match standing {
+        // An upgrade never lowers what a tile holds. The larger of the two
+        // wins, so a row whose column sits below the ground it stands on
+        // changes nothing rather than taking room away.
+        Some(row) if row.capacity_change > ground => row.capacity_change,
+        _ => ground,
     }
 }
 
 /// Returns how much one unit takes from a tile in one tick.
 ///
 /// The base rate is what the gather resolve grants on unimproved ground, and
-/// a finished upgrade adds to it.
+/// the row that stands on the tile adds its yield column.
 #[must_use]
-pub const fn gather_rate_with(base: u32, finished: Option<UpgradeKind>) -> u32 {
-    match finished {
-        Some(kind) => base.saturating_add(kind.gather_bonus()),
+pub const fn gather_rate_with(base: u32, standing: Option<UpgradeRow>) -> u32 {
+    match standing {
+        Some(row) => base.saturating_add(row.yield_change),
         None => base,
     }
 }
 
-/// One upgrade, finished or under construction.
+/// One upgrade: the category that stands on a tile, the level it reached, and
+/// the work toward the next level.
 ///
 /// A tile carries at most one upgrade. Two upgrades on one tile would make
 /// "the tile returns to what it was" a question with more than one answer.
+///
+/// **A level is raised in place.** The entry never gains a sibling, and the
+/// storage of an upgrade does not grow with its level.[^1]
+///
+/// # References
+///
+/// [^1]: ADR-0151, an upgrade is a category with a ground fit and a level, decision D3. `docs/adrs/draft/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct UpgradeSite {
     /// The tile that carries the upgrade.
     pub tile: TileIdx,
     /// What is being built, or what stands there.
-    pub kind: UpgradeKind,
-    /// The work that has gone into it.
+    pub category: UpgradeCategory,
+    /// The level that stands on the tile.
+    ///
+    /// Zero means that the first level is still under construction and that
+    /// nothing stands there yet.
+    pub level: u8,
+    /// The work that has gone into the next level.
     ///
     /// The accumulator is 64 bits wide and every term is a whole number, so
     /// the total is the same in any order.[^1] It never rises above the work
-    /// its kind asks for.[^2]
+    /// of the row above the entry, and it returns to zero when the level
+    /// rises.[^2]
     ///
     /// # References
     ///
@@ -356,16 +939,21 @@ pub struct UpgradeSite {
 }
 
 impl UpgradeSite {
-    /// Reports whether the upgrade is finished.
+    /// Reports whether a level of the upgrade stands on the tile.
+    ///
+    /// A site at level zero is a first build under construction, and it
+    /// changes nothing about the tile.
     #[must_use]
     pub const fn is_complete(self) -> bool {
-        self.progress.0 >= self.kind.work()
+        self.level > NO_LEVEL
     }
 
-    /// Returns the work that the site still asks for.
+    /// Returns the work that the next level still asks for.
+    ///
+    /// Returns zero at the top of the category.
     #[must_use]
-    pub const fn remaining(self) -> i64 {
-        let work = self.kind.work();
+    pub const fn remaining(self, table: &UpgradeTable) -> i64 {
+        let work = table.work_above(self.category, self.level);
         if self.progress.0 >= work {
             0
         } else {
@@ -451,26 +1039,23 @@ impl UpgradeMap {
         }
     }
 
-    /// Returns the finished upgrade on one tile.
+    /// Returns the row that stands on one tile.
     ///
-    /// Returns `None` when the tile carries none, and when the upgrade there
-    /// is still under construction. A site that is not finished changes
-    /// nothing about the tile.
+    /// Returns `None` when the tile carries no upgrade, and when the upgrade
+    /// there has not reached its first level. A site that stands at no level
+    /// changes nothing about the tile.
     #[must_use]
-    pub fn finished(&self, tile: TileIdx) -> Option<UpgradeKind> {
+    pub fn standing(&self, tile: TileIdx, table: &UpgradeTable) -> Option<UpgradeRow> {
         let site = self.at(tile)?;
-        if site.is_complete() {
-            Some(site.kind)
-        } else {
-            None
-        }
+        table.row(site.category, site.level)
     }
 
     /// Removes the upgrade from one tile and returns what stood there.
     ///
-    /// The tile returns to the world the generator made. Nothing else stores
-    /// a property of the tile, so removing the entry is the whole of the
-    /// return, and no second copy can survive it.[^1]
+    /// The tile returns to the world the generator made, at whatever level
+    /// the upgrade stood. Nothing else stores a property of the tile, so
+    /// removing the entry is the whole of the return, and no second copy can
+    /// survive it.[^1]
     ///
     /// # References
     ///
@@ -484,24 +1069,33 @@ impl UpgradeMap {
 
     /// Adds a run of work, given in ascending tile order.
     ///
-    /// Each element names a tile, the kind being built there, and the work
-    /// that this tick added. The caller states the order and the merge relies
-    /// on it: a run out of order would silently produce an unsorted map, and
-    /// every later lookup would then read the wrong tile.
+    /// Each element names a tile, the category being built there, and the
+    /// work that this tick added. The caller states the order and the merge
+    /// relies on it: a run out of order would silently produce an unsorted
+    /// map, and every later lookup would then read the wrong tile.
     ///
-    /// A tile that holds no site gains one. A tile that holds a site of the
-    /// named kind advances it. **A tile that holds a site of another kind is
-    /// left alone**, because a tile carries one upgrade and the one that is
-    /// already there is the one the world holds.
+    /// A tile that holds no site gains one at level zero. A tile that holds a
+    /// site of the named category advances it. **A tile that holds a site of
+    /// another category is left alone**, because a tile carries one upgrade
+    /// and the one that is already there is the one the world holds.
     ///
-    /// The progress is clamped at the work its kind asks for. An unclamped
-    /// accumulator banks surplus that nothing can spend, and that surplus
-    /// reaches the state hash.[^1]
+    /// **A level rises in place.** When the work reaches the work of the row
+    /// above the entry, the level rises by one and the work done returns to
+    /// zero. No second entry is written.[^2]
+    ///
+    /// The work done is clamped at the work of the row above the entry. An
+    /// unclamped accumulator banks surplus that nothing can spend, and that
+    /// surplus reaches the state hash.[^1]
     ///
     /// # References
     ///
     /// [^1]: Findings register, FND-011. `docs/FINDINGS.md`
-    pub fn merge_ascending(&mut self, run: &[(TileIdx, UpgradeKind, i64)]) {
+    /// [^2]: ADR-0151, an upgrade is a category with a ground fit and a level, decision D3. `docs/adrs/draft/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
+    pub fn merge_ascending(
+        &mut self,
+        run: &[(TileIdx, UpgradeCategory, i64)],
+        table: &UpgradeTable,
+    ) {
         debug_assert!(
             run.windows(2).all(|pair| pair[0].0 .0 < pair[1].0 .0),
             "a merged run must be sorted by tile and name each tile once"
@@ -528,10 +1122,10 @@ impl UpgradeMap {
                 self.scratch.push(mine);
                 here += 1;
             } else if theirs.0 .0 < mine.tile.0 {
-                self.scratch.push(fresh_site(theirs));
+                self.scratch.push(fresh_site(theirs, table));
                 there += 1;
             } else {
-                self.scratch.push(advanced(mine, theirs.1, theirs.2));
+                self.scratch.push(advanced(mine, theirs.1, theirs.2, table));
                 here += 1;
                 there += 1;
             }
@@ -540,7 +1134,7 @@ impl UpgradeMap {
         self.scratch.extend_from_slice(&self.sites[here..]);
         for added in &run[there..] {
             visits += 1;
-            self.scratch.push(fresh_site(*added));
+            self.scratch.push(fresh_site(*added, table));
         }
         core::mem::swap(&mut self.sites, &mut self.scratch);
         self.visits = visits;
@@ -549,8 +1143,8 @@ impl UpgradeMap {
     /// Absorbs the map into the state hash.
     ///
     /// The entries enter in tile order, which the map holds them in.[^1] An
-    /// unfinished build is state that the next frame reads, so the progress
-    /// enters as well.[^2]
+    /// unfinished build is state that the next frame reads, so the level and
+    /// the progress enter as well.[^2]
     ///
     /// # References
     ///
@@ -562,7 +1156,7 @@ impl UpgradeMap {
         for site in &self.sites {
             running = running
                 .write(&site.tile.0.to_le_bytes())
-                .write(&[site.kind.to_u8()])
+                .write(&[site.category.to_u8(), site.level])
                 .write(&site.progress.0.to_le_bytes());
         }
         running
@@ -574,9 +1168,10 @@ impl UpgradeMap {
     /// would answer a lookup with the wrong tile, and nothing else would
     /// notice.
     ///
-    /// The progress of every site sits between nothing and the work its kind
-    /// asks for. A site above the work has banked surplus, which is the
-    /// defect the register names.[^1]
+    /// The level of every site is one the table holds, or zero. The progress
+    /// of every site sits between nothing and the work of the row above it. A
+    /// site above that work has banked surplus, which is the defect the
+    /// register names.[^1] At the top of a category the bound is zero.
     ///
     /// Every tile lies inside the world.
     ///
@@ -584,7 +1179,7 @@ impl UpgradeMap {
     ///
     /// [^1]: Findings register, FND-011. `docs/FINDINGS.md`
     #[must_use]
-    pub fn check_invariants(&self, tile_count: u32) -> bool {
+    pub fn check_invariants(&self, tile_count: u32, table: &UpgradeTable) -> bool {
         if !self
             .sites
             .windows(2)
@@ -593,33 +1188,66 @@ impl UpgradeMap {
             return false;
         }
         self.sites.iter().all(|site| {
-            site.tile.0 < tile_count && site.progress.0 >= 0 && site.progress.0 <= site.kind.work()
+            site.tile.0 < tile_count
+                && site.level <= table.top_level(site.category)
+                && site.progress.0 >= 0
+                && site.progress.0 <= table.work_above(site.category, site.level)
         })
     }
 }
 
 /// Builds the site that a first contribution creates.
+///
+/// The site starts at no level, and the contribution may raise it to the
+/// first one at once.
 #[must_use]
-fn fresh_site(added: (TileIdx, UpgradeKind, i64)) -> UpgradeSite {
-    let (tile, kind, work) = added;
-    UpgradeSite {
+fn fresh_site(added: (TileIdx, UpgradeCategory, i64), table: &UpgradeTable) -> UpgradeSite {
+    let (tile, category, work) = added;
+    let start = UpgradeSite {
         tile,
-        kind,
-        progress: Accum(work.clamp(0, kind.work())),
-    }
+        category,
+        level: NO_LEVEL,
+        progress: Accum(0),
+    };
+    advanced(start, category, work, table)
 }
 
 /// Adds work to a site that already stands on the tile.
 ///
-/// A contribution to another kind is dropped. The tile carries one upgrade,
-/// and it is not the one the contributor named.
+/// A contribution to another category is dropped. The tile carries one
+/// upgrade, and it is not the one the contributor named.
+///
+/// The level rises in place when the work reaches the work of the row above
+/// the entry, and the work done then returns to zero.
 #[must_use]
-fn advanced(site: UpgradeSite, kind: UpgradeKind, work: i64) -> UpgradeSite {
-    if site.kind != kind {
+fn advanced(
+    site: UpgradeSite,
+    category: UpgradeCategory,
+    work: i64,
+    table: &UpgradeTable,
+) -> UpgradeSite {
+    if site.category != category {
         return site;
     }
+    let asked = table.work_above(site.category, site.level);
+    if asked == 0 {
+        // The category is at its top. The clamp is zero, so a builder there
+        // adds nothing and banks nothing.
+        return UpgradeSite {
+            progress: Accum(0),
+            ..site
+        };
+    }
+    let total = site.progress.0.saturating_add(work.max(0));
+    if total >= asked {
+        return UpgradeSite {
+            level: site.level + 1,
+            progress: Accum(0),
+            ..site
+        };
+    }
     UpgradeSite {
-        progress: Accum(site.progress.0.saturating_add(work).clamp(0, kind.work())),
+        progress: Accum(total),
         ..site
     }
 }

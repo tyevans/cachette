@@ -44,7 +44,7 @@
 use std::time::Duration;
 
 use cachette_core::terrain::TileKind;
-use cachette_core::upgrade::UpgradeKind;
+use cachette_core::upgrade::UpgradeCategory;
 use cachette_core::{Axial, FactionId, World, WorldConfig};
 use cachette_view::{draw_frame, paint, Camera, Canvas, Metrics, Overlay};
 
@@ -389,7 +389,7 @@ fn a_world_with_a_road() -> (World, Axial) {
         .expect("the ground admits a unit");
     world.rebuild_bridge(1).expect("the rebuild must succeed");
     assert!(
-        world.order_build(builder, UpgradeKind::Road),
+        world.order_build(builder, UpgradeCategory::ROAD).is_ok(),
         "the engine must accept the order"
     );
     for _ in 0..40 {
@@ -402,7 +402,7 @@ fn a_world_with_a_road() -> (World, Axial) {
     }
     assert_eq!(
         world.finished_upgrade(place),
-        Some(UpgradeKind::Road),
+        Some(UpgradeCategory::ROAD),
         "the fixture must finish the road, or it tests nothing"
     );
     assert!(world.despawn_soldier(builder), "the builder must go");

@@ -87,7 +87,10 @@ use crate::types::{Accum, Entity, FactionId, Fix32, Tick, TileIdx, FACTION_CEILI
 use crate::unit_type::{
     UnitTypeError, UnitTypeId, UnitTypeRow, UnitTypeTable, DEFAULT_UNIT_TYPE_TABLE, SOLDIER,
 };
-use crate::upgrade::{self, UpgradeKind, UpgradeMap, UpgradeSite};
+use crate::upgrade::{
+    self, BuildRefusal, UpgradeCategory, UpgradeMap, UpgradeRow, UpgradeSite, UpgradeTable,
+    UpgradeTableError,
+};
 use crate::weather::{Ground, Storm, WeatherError, WeatherField};
 
 /// The reason that a value did not name a live entity.
@@ -796,6 +799,16 @@ pub struct World {
     ///
     /// [^1]: ADR-0120, a unit carries a type, and the type is an index into a table the world is built with, decisions D1 and D2. `docs/adrs/draft/adr-0120-a-unit-carries-a-type-that-indexes-a-table.md`
     unit_types: UnitTypeTable,
+    /// The table that a category and a level index.
+    ///
+    /// **The table is data that the world is built with.** A row is one
+    /// category at one level. It names the ground it fits, the work it takes
+    /// and the columns a pass reads. No pass branches on a category.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0151, an upgrade is a category with a ground fit and a level, decisions D1 and D4. `docs/adrs/draft/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
+    upgrade_table: UpgradeTable,
     /// One bit for each unit that the last meeting ended.
     ///
     /// The plane is the batch of a structural change, in the way the plane of
@@ -1113,6 +1126,11 @@ impl World {
             //
             // [^1]: ADR-0145, a unit type is a row of capability columns, and zero means cannot, decision D4. `docs/adrs/accepted/adr-0145-a-unit-type-is-a-row-of-capability-columns-and-zero-means-cannot.md`
             unit_types: DEFAULT_UNIT_TYPE_TABLE,
+            // The world is built with the default upgrade table, so a build
+            // order names one of the categories that table holds.[^2]
+            //
+            // [^2]: ADR-0151, an upgrade is a category with a ground fit and a level, decision D1. `docs/adrs/draft/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
+            upgrade_table: upgrade::DEFAULT_UPGRADE_TABLE,
             fell_plane: DeathPlane::new(),
             fell_log: Vec::new(),
             grievances: Vec::new(),
@@ -3616,6 +3634,12 @@ impl World {
         // whole-world hash covers it. Two worlds that hold the same units and
         // different tables must diverge at the next meeting.
         let hash = self.unit_types.hash_into(hash);
+        // The upgrade table decides what a build order does and what an
+        // upgrade changes, so the whole-world hash covers it. Two worlds
+        // built with different tables never hash the same.[^5]
+        //
+        // [^5]: ADR-0151, an upgrade is a category with a ground fit and a level, decision D1. `docs/adrs/draft/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
+        let hash = self.upgrade_table.hash_into(hash);
         // A luxury is authored rather than generated, so no input above
         // produces it. Two worlds that carry different luxuries are
         // different worlds, and only the field says so.[^4]
@@ -3752,11 +3776,18 @@ impl World {
         }
 
         // The upgrade map rises, names each tile once, names a tile inside
-        // the world, and banks no progress beyond the work its kind asks
-        // for.[^2]
+        // the world, and banks no progress beyond the work that the row
+        // above each entry asks for.[^2] The table holds a row for every
+        // level an entry stands at.
         //
         // [^2]: Findings register, FND-011. `docs/FINDINGS.md`
-        if !self.upgrades.check_invariants(self.grid.tile_count()) {
+        if !self
+            .upgrades
+            .check_invariants(self.grid.tile_count(), &self.upgrade_table)
+        {
+            return false;
+        }
+        if !self.upgrade_table.check_invariants() {
             return false;
         }
         let ceiling = self.config.faction_count.max(1);
@@ -4545,6 +4576,7 @@ impl World {
                 &self.bridge,
                 self.terrain,
                 &self.upgrades,
+                &self.upgrade_table,
                 self.grid,
                 Guests {
                     holders: self.holding.holders(),
@@ -5235,8 +5267,106 @@ impl World {
     /// is still under construction. An unfinished build changes nothing about
     /// the tile.
     #[must_use]
-    pub fn finished_upgrade(&self, address: Axial) -> Option<UpgradeKind> {
-        self.upgrades.finished(self.grid.index_of(address)?)
+    pub fn finished_upgrade(&self, address: Axial) -> Option<UpgradeCategory> {
+        let site = self.upgrade_at(address)?;
+        if site.is_complete() {
+            Some(site.category)
+        } else {
+            None
+        }
+    }
+
+    /// Returns the level that stands on one tile.
+    ///
+    /// Returns zero when the tile carries no upgrade, and when the upgrade
+    /// there has not reached its first level.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0151, an upgrade is a category with a ground fit and a level, decision D3. `docs/adrs/draft/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
+    #[must_use]
+    pub fn upgrade_level(&self, address: Axial) -> u8 {
+        self.upgrade_at(address)
+            .map_or(upgrade::NO_LEVEL, |site| site.level)
+    }
+
+    /// Returns the row that stands on one tile.
+    ///
+    /// Returns `None` when the tile carries no upgrade, and when the upgrade
+    /// there has not reached its first level. This is how a pass asks what an
+    /// upgrade does: it reads a column of the row, and it names no
+    /// category.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0151, an upgrade is a category with a ground fit and a level, decision D4. `docs/adrs/draft/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
+    #[must_use]
+    pub fn standing_upgrade_row(&self, address: Axial) -> Option<UpgradeRow> {
+        let tile = self.grid.index_of(address)?;
+        self.upgrades.standing(tile, &self.upgrade_table)
+    }
+
+    /// Returns every entry that stands at a level, with the row it indexes.
+    ///
+    /// An entry whose first level is still under construction is not here,
+    /// because it changes nothing about its tile. The walk is over the sparse
+    /// map in tile order, so it is not a walk over the world.[^1]
+    ///
+    /// A pass that asks what the upgrades of a world do reads this and then
+    /// reads a column. It names no category.[^2]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0090, a tile upgrade is stored sparsely, as the difference from the generated world, decision D1. `docs/adrs/draft/adr-0090-a-tile-upgrade-is-stored-sparsely.md`
+    /// [^2]: ADR-0151, an upgrade is a category with a ground fit and a level, decision D4. `docs/adrs/draft/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
+    fn standing_rows(&self) -> impl Iterator<Item = (UpgradeSite, UpgradeRow)> + '_ {
+        self.upgrades.sites().iter().filter_map(|site| {
+            self.upgrade_table
+                .row(site.category, site.level)
+                .map(|row| (*site, row))
+        })
+    }
+
+    /// Returns the table that a category and a level index.
+    ///
+    /// The table holds one row for each pair of a category and a level. A row
+    /// names the ground it fits, the work it takes and the columns a pass
+    /// reads.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0151, an upgrade is a category with a ground fit and a level, decision D1. `docs/adrs/draft/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
+    #[must_use]
+    pub const fn upgrade_table(&self) -> &UpgradeTable {
+        &self.upgrade_table
+    }
+
+    /// Writes one row of the upgrade table.
+    ///
+    /// The caller gives the whole row. There is no partial form, because a
+    /// caller that gave two columns would leave the rest at zero and would
+    /// define an upgrade that changes nothing else without knowing it.[^1]
+    ///
+    /// **The values are content and not a budget.** No record holds one,
+    /// because a record may hold no number that a content choice can
+    /// move.[^2]
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the number names no category, and when the level
+    /// is not one the table holds.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0145, a unit type is a row of capability columns, and zero means cannot, decision D5. `docs/adrs/accepted/adr-0145-a-unit-type-is-a-row-of-capability-columns-and-zero-means-cannot.md`
+    /// [^2]: Decision Record Scope, section 4.1. `.agents/rules/adr-scope.md`
+    pub fn define_upgrade_row(
+        &mut self,
+        category: u8,
+        level: u8,
+        row: UpgradeRow,
+    ) -> Result<(), UpgradeTableError> {
+        self.upgrade_table.define(category, level, row)
     }
 
     /// Returns the number of units that may stand on one tile.
@@ -5255,7 +5385,7 @@ impl World {
         let ground = self.terrain.kind(address)?.capacity();
         Some(upgrade::capacity_with(
             ground,
-            self.finished_upgrade(address),
+            self.standing_upgrade_row(address),
         ))
     }
 
@@ -5279,12 +5409,26 @@ impl World {
     /// that walks away stops adding, and the work it did stays on the
     /// tile.[^1]
     ///
-    /// Returns `false` when the identity is dead.
+    /// **The order names a category and never a level.** The engine resolves
+    /// the row from the ground under the tile and the level that stands
+    /// there, and it refuses when no row fits.[^3]
+    ///
+    /// # Errors
+    ///
+    /// Returns a refusal when the identity is dead, when the tile carries
+    /// another category, when the category is at its top, when the row does
+    /// not fit the ground, and when the row asks for ground that the
+    /// builder's own faction does not hold.
     ///
     /// # References
     ///
     /// [^1]: ADR-0090, a tile upgrade is stored sparsely, as the difference from the generated world, decision D2. `docs/adrs/draft/adr-0090-a-tile-upgrade-is-stored-sparsely.md`
-    pub fn order_build(&mut self, entity: Entity, kind: UpgradeKind) -> bool {
+    /// [^3]: ADR-0151, an upgrade is a category with a ground fit and a level, decision D2. `docs/adrs/draft/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
+    pub fn order_build(
+        &mut self,
+        entity: Entity,
+        category: UpgradeCategory,
+    ) -> Result<(), BuildRefusal> {
         // The verb refuses at the moment of the order, so a caller learns at
         // once. The pass below applies the same test on every step, so a
         // build whose ground changed hands stops.[^2]
@@ -5293,7 +5437,7 @@ impl World {
         let (Some(tile), Some(faction)) =
             (self.soldiers.tile(entity), self.soldiers.faction(entity))
         else {
-            return false;
+            return Err(BuildRefusal::NoSuchBuilder);
         };
         let holder = self
             .holding
@@ -5301,10 +5445,25 @@ impl World {
             .get(tile.0 as usize)
             .copied()
             .unwrap_or(Holder::NOBODY);
-        if !build_is_permitted(holder, faction, kind) {
-            return false;
+        let ground = self
+            .grid
+            .address_of(tile)
+            .and_then(|address| self.terrain.kind(address))
+            .ok_or(BuildRefusal::NoSuchBuilder)?;
+        let row = resolve_build_row(
+            &self.upgrade_table,
+            ground,
+            self.upgrades.at(tile),
+            category,
+        )?;
+        if !build_is_permitted(holder, faction, row) {
+            return Err(BuildRefusal::GroundNotHeld { category });
         }
-        self.soldiers.set_build_order(entity, Some(kind))
+        if self.soldiers.set_build_order(entity, Some(category)) {
+            Ok(())
+        } else {
+            Err(BuildRefusal::NoSuchBuilder)
+        }
     }
 
     /// Tells one soldier to stop building.
@@ -5319,7 +5478,7 @@ impl World {
     /// The outer option reports whether the identity is live. The inner one
     /// reports whether the soldier builds.
     #[must_use]
-    pub fn build_order(&self, entity: Entity) -> Option<Option<UpgradeKind>> {
+    pub fn build_order(&self, entity: Entity) -> Option<Option<UpgradeCategory>> {
         self.soldiers.build_order(entity)
     }
 
@@ -7086,7 +7245,10 @@ impl World {
             // that the segment draws from.[^1]
             //
             // [^1]: ADR-0090, a tile upgrade is stored sparsely, as the difference from the generated world, decision D3. `docs/adrs/draft/adr-0090-a-tile-upgrade-is-stored-sparsely.md`
-            let rate = upgrade::gather_rate_with(GATHER_RATE, self.upgrades.finished(first.tile));
+            let rate = upgrade::gather_rate_with(
+                GATHER_RATE,
+                self.upgrades.standing(first.tile, &self.upgrade_table),
+            );
             // Wet ground yields more. The weather field is read once for the
             // whole segment, beside the deposit and the upgrade rate, and it
             // is read at the level 1 cell that covers the tile because that
@@ -7183,11 +7345,19 @@ impl World {
     /// [^3]: ADR-0002, simulated and aggregated state holds no floating point number, decision D1. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
     /// [^4]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
     fn build(&mut self, threads: usize) -> Result<(), StepError> {
-        let intents = build_intents(&self.soldiers, &self.holding, threads)?;
+        let intents = build_intents(
+            &self.soldiers,
+            &self.holding,
+            self.terrain,
+            self.grid,
+            &self.upgrades,
+            &self.upgrade_table,
+            threads,
+        )?;
         if intents.is_empty() {
             // The merge is still called, so the visit count describes this
             // tick rather than the last one that built anything.
-            self.upgrades.merge_ascending(&[]);
+            self.upgrades.merge_ascending(&[], &self.upgrade_table);
             return Ok(());
         }
 
@@ -7195,7 +7365,7 @@ impl World {
             .iter()
             .map(|intent| {
                 BoundedKey::new(
-                    upgrade::site_key(intent.tile, intent.kind),
+                    upgrade::site_key(intent.tile, intent.category),
                     intent.unit.to_bits(),
                 )
             })
@@ -7205,7 +7375,7 @@ impl World {
 
         // The key packs the tile above the kind, so the sorted order is tile
         // major and every builder of one tile sits in one run.
-        let mut run: Vec<(TileIdx, UpgradeKind, i64)> = Vec::new();
+        let mut run: Vec<(TileIdx, UpgradeCategory, i64)> = Vec::new();
         let mut at = 0usize;
         while at < order.len() {
             let tile = intents[order[at] as usize].tile;
@@ -7213,8 +7383,8 @@ impl World {
             while end < order.len() && intents[order[end] as usize].tile == tile {
                 end += 1;
             }
-            let held = self.upgrades.at(tile).map(|site| site.kind);
-            let winner = held.unwrap_or(intents[order[at] as usize].kind);
+            let held = self.upgrades.at(tile).map(|site| site.category);
+            let winner = held.unwrap_or(intents[order[at] as usize].category);
             // Each builder adds the builder rate scaled by the build rate of
             // its type. A build rate of zero adds nothing, so a unit that
             // cannot build keeps its order and moves no site. The sum is
@@ -7224,7 +7394,7 @@ impl World {
             let work = order[at..end]
                 .iter()
                 .map(|position| intents[*position as usize])
-                .filter(|intent| intent.kind == winner)
+                .filter(|intent| intent.category == winner)
                 .fold(0i64, |total, intent| {
                     let scale = self.unit_types.row(intent.unit_type).build_rate;
                     total.saturating_add(sim_math::scale_work(upgrade::BUILD_RATE, scale))
@@ -7234,7 +7404,7 @@ impl World {
             }
             at = end;
         }
-        self.upgrades.merge_ascending(&run);
+        self.upgrades.merge_ascending(&run, &self.upgrade_table);
         Ok(())
     }
 
@@ -7872,8 +8042,8 @@ struct BuildIntent {
     unit: Entity,
     /// The tile that the unit stands on.
     tile: TileIdx,
-    /// The kind that the unit builds.
-    kind: UpgradeKind,
+    /// The category that the unit builds.
+    category: UpgradeCategory,
     /// The type of the unit. The advance reads the build rate of the row it
     /// indexes.
     unit_type: UnitTypeId,
@@ -7903,37 +8073,80 @@ fn build_order_of(keys: &[BoundedKey], ceiling: u64) -> Result<Vec<u32>, SortErr
     crate::sort::order_bounded(keys, ceiling)
 }
 
-/// Reports whether a builder may build one kind on the ground it stands on.
+/// Reports whether a builder may build one row on the ground it stands on.
 ///
 /// **One function states the rule, and two paths call it.** The verb that
 /// gives a build order calls it at the moment of the order. The pass that
 /// collects the build intents calls it on every step. Two tests that drifted
 /// apart would let a build the verb refused finish anyway.[^1] [^2]
 ///
-/// The holder of the tile must be the builder's own faction. A road is the
-/// one exception, and it is exempt wherever it is built, because a road is
-/// how a faction reaches ground it does not yet hold.[^1]
+/// The holder of the tile must be the builder's own faction when the row asks
+/// for it. A row whose own ground column is zero is built anywhere, because
+/// that is how a faction reaches ground it does not yet hold.[^1]
+///
+/// The rule reads a column of the resolved row. It names no category, so a
+/// row a caller wrote at run time obeys the same rule as a row of the default
+/// table.[^3]
 ///
 /// # References
 ///
 /// [^1]: ADR-0150, held ground is the ground within reach of a city its faction owns, decision D4. `docs/adrs/draft/adr-0150-held-ground-is-the-ground-within-reach-of-a-city-its-faction-owns.md`
-/// [^2]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`
+/// [^2]: Recurring defect shapes, shape 1. `.agents/rules/recurring-defects.md`
+/// [^3]: ADR-0151, an upgrade is a category with a ground fit and a level, decision D4. `docs/adrs/draft/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
 #[must_use]
-fn build_is_permitted(holder: Holder, faction: FactionId, kind: UpgradeKind) -> bool {
-    !kind_needs_own_ground(kind) || holder.faction() == Some(faction)
+const fn build_is_permitted(holder: Holder, faction: FactionId, row: UpgradeRow) -> bool {
+    if row.own_ground_required == 0 {
+        return true;
+    }
+    match holder.faction() {
+        Some(held) => held.0 == faction.0,
+        None => false,
+    }
 }
 
-/// Reports whether a kind of build asks for the builder's own ground.
+/// Resolves the row that a build order names on one tile.
 ///
-/// The road is the one kind that does not. The test is one function here, so
-/// a later table of kinds changes one place rather than every call site.[^1]
+/// **This is the one statement of the resolution, and two paths call it.**
+/// The verb that gives a build order calls it at the moment of the order. The
+/// pass that collects the build intents calls it on every step. Two tests
+/// that drifted apart would let a build the verb refused finish anyway.[^2]
+///
+/// The next level is one when the tile carries no upgrade of the category,
+/// and one above the level that stands there otherwise.[^1]
+///
+/// # Errors
+///
+/// Returns a refusal when the tile carries another category, when the
+/// category holds no row above the level that stands there, and when the row
+/// does not fit the ground.
 ///
 /// # References
 ///
-/// [^1]: ADR-0150, held ground is the ground within reach of a city its faction owns, decision D4. `docs/adrs/draft/adr-0150-held-ground-is-the-ground-within-reach-of-a-city-its-faction-owns.md`
-#[must_use]
-const fn kind_needs_own_ground(kind: UpgradeKind) -> bool {
-    !matches!(kind, UpgradeKind::Road)
+/// [^1]: ADR-0151, an upgrade is a category with a ground fit and a level, decision D2. `docs/adrs/draft/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
+/// [^2]: Recurring defect shapes, shape 1. `.agents/rules/recurring-defects.md`
+fn resolve_build_row(
+    table: &UpgradeTable,
+    ground: crate::terrain::TileKind,
+    standing: Option<UpgradeSite>,
+    category: UpgradeCategory,
+) -> Result<UpgradeRow, BuildRefusal> {
+    let level = match standing {
+        Some(site) if site.category != category => {
+            return Err(BuildRefusal::TileHoldsAnother {
+                standing: site.category,
+                asked: category,
+            })
+        }
+        Some(site) => site.level,
+        None => upgrade::NO_LEVEL,
+    };
+    let row = table
+        .row(category, level + 1)
+        .ok_or(BuildRefusal::CategoryAtTop { category, level })?;
+    if !row.fits(ground) {
+        return Err(BuildRefusal::GroundDoesNotFit { category, ground });
+    }
+    Ok(row)
 }
 
 /// Returns the build intent of each live soldier that carries an order.
@@ -7955,6 +8168,10 @@ const fn kind_needs_own_ground(kind: UpgradeKind) -> bool {
 fn build_intents(
     soldiers: &SoldierArena,
     holding: &Holding,
+    terrain: Terrain,
+    grid: Grid,
+    upgrades: &UpgradeMap,
+    table: &UpgradeTable,
     threads: usize,
 ) -> Result<Vec<BuildIntent>, StepError> {
     let live: Vec<Entity> = soldiers.iter().collect();
@@ -7971,9 +8188,19 @@ fn build_intents(
                 *slot = chunk
                     .iter()
                     .filter_map(|unit| {
-                        let kind = soldiers.build_order(*unit)??;
+                        let category = soldiers.build_order(*unit)??;
                         let tile = soldiers.tile(*unit)?;
                         let unit_type = soldiers.unit_type(*unit)?;
+                        // One function resolves the row, and the verb that
+                        // gives the order calls the same one. A build the
+                        // table no longer holds, and a build whose tile
+                        // gained another category since the order, stop
+                        // here.[^3]
+                        //
+                        // [^3]: ADR-0151, an upgrade is a category with a ground fit and a level, decision D2. `docs/adrs/draft/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
+                        let ground = terrain.kind(grid.address_of(tile)?)?;
+                        let row =
+                            resolve_build_row(table, ground, upgrades.at(tile), category).ok()?;
                         // One function states the ground rule, and the verb
                         // that gives the order calls the same one. A build
                         // whose ground changed hands since the order stops
@@ -7985,13 +8212,13 @@ fn build_intents(
                             .get(tile.0 as usize)
                             .copied()
                             .unwrap_or(Holder::NOBODY);
-                        if !build_is_permitted(holder, soldiers.faction(*unit)?, kind) {
+                        if !build_is_permitted(holder, soldiers.faction(*unit)?, row) {
                             return None;
                         }
                         Some(BuildIntent {
                             unit: *unit,
                             tile,
-                            kind,
+                            category,
                             unit_type,
                         })
                     })
@@ -8634,6 +8861,7 @@ fn admit(
     bridge: &UnitTileBridge,
     terrain: Terrain,
     upgrades: &UpgradeMap,
+    table: &UpgradeTable,
     grid: Grid,
     guests: Guests<'_>,
     threads: usize,
@@ -8754,8 +8982,10 @@ fn admit(
                     let ground = terrain
                         .kind(address)
                         .map_or(0, crate::terrain::TileKind::capacity);
-                    segment.capacity =
-                        upgrade::capacity_with(ground, upgrades.finished(TileIdx(segment.tile)));
+                    segment.capacity = upgrade::capacity_with(
+                        ground,
+                        upgrades.standing(TileIdx(segment.tile), table),
+                    );
                     segment.standing = bridge
                         .units_on_tile(&mut cursor, TileIdx(segment.tile))
                         .len() as u32;
@@ -9019,23 +9249,27 @@ pub const SUBSYSTEM_CENSUS: &[CensusRow] = &[
     },
     CensusRow {
         name: "wonders_complete",
+        // The count reads the victory claim column of the row that stands on
+        // each tile. It names no category.[^1]
+        //
+        // [^1]: ADR-0151, an upgrade is a category with a ground fit and a level, decision D4. `docs/adrs/draft/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
         read: |world| {
             world
-                .upgrades
-                .sites()
-                .iter()
-                .filter(|site| site.kind == UpgradeKind::Wonder && site.is_complete())
+                .standing_rows()
+                .filter(|(_, row)| row.victory_claim > 0)
                 .count() as i64
         },
     },
     CensusRow {
         name: "stores_built",
+        // The count reads the store capacity column of the row that stands on
+        // each tile. It names no category.[^1]
+        //
+        // [^1]: ADR-0151, an upgrade is a category with a ground fit and a level, decision D4. `docs/adrs/draft/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
         read: |world| {
             world
-                .upgrades
-                .sites()
-                .iter()
-                .filter(|site| site.kind == UpgradeKind::Store && site.is_complete())
+                .standing_rows()
+                .filter(|(_, row)| row.capacity_of_store_change > 0)
                 .count() as i64
         },
     },
@@ -9191,22 +9425,39 @@ impl World {
         refused
     }
 
-    /// Gives every soldier in the set the order to build one kind.
+    /// Gives every soldier in the set the order to build one category.
     ///
     /// The set form, shared by the binding and the controller, as the gather
-    /// order is.[^1] Returns how many entities the arena refused.
+    /// order is.[^1] Returns how many entities the engine refused, and the
+    /// first refusal it gave. A caller that reports the reason reads the
+    /// second value, and a caller that counts reads the first.
+    ///
+    /// One loop serves both, so no second loop can apply another rule.[^2]
     ///
     /// # References
     ///
     /// [^1]: ADR-0144, a faction controller runs inside the step and acts only through the caller's verbs, decision D2. `docs/adrs/accepted/adr-0144-a-faction-controller-runs-inside-the-step-and-acts-only-through-the-callers-verbs.md`
-    pub fn order_build_set(&mut self, units: &[Entity], kind: UpgradeKind) -> usize {
+    /// [^2]: Recurring defect shapes, shape 1. `.agents/rules/recurring-defects.md`
+    pub fn order_build_set_reporting(
+        &mut self,
+        units: &[Entity],
+        category: UpgradeCategory,
+    ) -> (usize, Option<BuildRefusal>) {
         let mut refused = 0usize;
+        let mut first = None;
         for entity in units {
-            if !self.order_build(*entity, kind) {
+            if let Err(refusal) = self.order_build(*entity, category) {
                 refused += 1;
+                first = first.or(Some(refusal));
             }
         }
-        refused
+        (refused, first)
+    }
+
+    /// Gives every soldier in the set the order to build one category, and
+    /// returns how many the engine refused.
+    pub fn order_build_set(&mut self, units: &[Entity], category: UpgradeCategory) -> usize {
+        self.order_build_set_reporting(units, category).0
     }
 
     /// Gives every soldier in the set one unit type.
@@ -10453,36 +10704,72 @@ impl World {
         totals
     }
 
-    /// Returns the most work any wonder on ground a faction holds has
-    /// reached, for every faction by faction number.
+    /// Returns the largest victory claim that stands on ground a faction
+    /// holds, for every faction by faction number.
+    ///
+    /// The reader walks the entries that stand at a level and reads the
+    /// victory claim column of each row. It names no category.[^2]
     ///
     /// The walk is over the sparse upgrade map, which holds one entry for
     /// each improved tile and nothing else, so it is not a walk over the
-    /// tiles.[^1] A wonder on ground nobody holds counts for nobody.
+    /// tiles.[^1] A claim on ground nobody holds counts for nobody.
     ///
     /// # References
     ///
     /// [^1]: ADR-0090, a tile upgrade is stored sparsely, as the difference from the generated world, decision D1. `docs/adrs/draft/adr-0090-a-tile-upgrade-is-stored-sparsely.md`
+    /// [^2]: ADR-0151, an upgrade is a category with a ground fit and a level, decision D4. `docs/adrs/draft/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
     fn wonder_progress(&self) -> Vec<i64> {
-        let mut best = vec![0i64; usize::from(self.config.faction_count.max(1))];
+        self.victory_claims()
+            .into_iter()
+            .map(|pair| pair.1)
+            .collect()
+    }
+
+    /// Returns the largest victory claim, and the work toward it, on the
+    /// ground of every faction, by faction number.
+    ///
+    /// The reader walks the sparse upgrade map and reads the victory claim
+    /// column of two rows for each entry: the row that stands there, and the
+    /// row above it. An entry that stands at a row with a claim reports the
+    /// work of that row, and an entry that builds toward one reports the work
+    /// done. It names no category.[^2]
+    ///
+    /// The walk is over one entry for each improved tile, so it is not a walk
+    /// over the tiles.[^1] A claim on ground nobody holds counts for nobody.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0090, a tile upgrade is stored sparsely, as the difference from the generated world, decision D1. `docs/adrs/draft/adr-0090-a-tile-upgrade-is-stored-sparsely.md`
+    /// [^2]: ADR-0151, an upgrade is a category with a ground fit and a level, decision D4. `docs/adrs/draft/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
+    fn victory_claims(&self) -> Vec<(i64, i64)> {
+        let mut best = vec![(0i64, 0i64); usize::from(self.config.faction_count.max(1))];
         for site in self.upgrades.sites() {
-            if site.kind != UpgradeKind::Wonder {
+            let standing = self.upgrade_table.row(site.category, site.level);
+            let next = self.upgrade_table.row(site.category, site.level + 1);
+            let claimed = standing.map_or(0, |row| i64::from(row.victory_claim));
+            let (claim, work) = if claimed > 0 {
+                (claimed, standing.map_or(0, |row| i64::from(row.work)))
+            } else if next.is_some_and(|row| row.victory_claim > 0) {
+                (0, site.progress.0)
+            } else {
                 continue;
-            }
+            };
             let holder = self
                 .grid
                 .address_of(site.tile)
                 .and_then(|address| self.holding.holder(address))
                 .and_then(Holder::faction);
             if let Some(slot) = holder.and_then(|faction| best.get_mut(usize::from(faction.0))) {
-                *slot = (*slot).max(site.progress.0);
+                slot.0 = slot.0.max(claim);
+                slot.1 = slot.1.max(work);
             }
         }
         best
     }
 
     /// The wealth-or-wonder reader: a stock total reaches the stock target,
-    /// or a wonder completes on ground the faction holds.
+    /// or an upgrade that carries a victory claim stands on ground the
+    /// faction holds.
     ///
     /// The target is a balance value.[^1] A tie resolves by the lowest
     /// faction identifier.
@@ -10492,10 +10779,10 @@ impl World {
     /// [^1]: Balance register, the stock target. `docs/reference/balance.md`
     fn wealth_or_wonder_winner(&self) -> Option<FactionId> {
         let totals = self.stock_totals();
-        let wonders = self.wonder_progress();
+        let claims = self.victory_claims();
         self.factions().find(|faction| {
             let at = usize::from(faction.0);
-            totals[at].0 >= STOCK_TARGET || wonders[at] >= UpgradeKind::Wonder.work()
+            totals[at].0 >= STOCK_TARGET || claims[at].0 > 0
         })
     }
 
@@ -10583,10 +10870,10 @@ impl World {
         let address = self.settlements.address(settlement)?;
         let mut raise = Accum(0);
         for place in core::iter::once(Some(address)).chain(self.grid.neighbours(address)) {
-            let Some(kind) = place.and_then(|near| self.finished_upgrade(near)) else {
+            let Some(row) = place.and_then(|near| self.standing_upgrade_row(near)) else {
                 continue;
             };
-            raise = sim_math::combine(raise, Accum(kind.store_capacity_raise()));
+            raise = sim_math::combine(raise, Accum(i64::from(row.capacity_of_store_change)));
         }
         Some(raise.0)
     }

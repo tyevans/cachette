@@ -85,7 +85,10 @@ impl Panel for Inspector {
         //
         // [^6]: Research report 25, defect 2. `docs/research/reports/25-demonstration-readability-upgrades-and-units.md`
         if let Some(site) = world.upgrade_at(pointer) {
-            lines.push(Line::row("building", upgrade_name(site.kind).to_string()));
+            lines.push(Line::row(
+                "building",
+                upgrade_name(site.category).to_string(),
+            ));
             lines.push(Line::row(
                 "work done",
                 if site.is_complete() {
@@ -94,7 +97,12 @@ impl Panel for Inspector {
                     format!(
                         "{} of {}",
                         grouped(site.progress.0.max(0) as u64),
-                        grouped(site.kind.work().max(0) as u64)
+                        grouped(
+                            world
+                                .upgrade_table()
+                                .work_above(site.category, site.level)
+                                .max(0) as u64
+                        )
                     )
                 },
             ));

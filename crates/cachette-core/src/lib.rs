@@ -125,7 +125,10 @@ pub use unit_type::{
     UnitTypeError, UnitTypeId, UnitTypeRow, UnitTypeTable, DEFAULT_UNIT_TYPE,
     DEFAULT_UNIT_TYPE_TABLE, UNIT_TYPE_COLUMN_COUNT, UNIT_TYPE_COUNT,
 };
-pub use upgrade::{UpgradeKind, UpgradeMap, UpgradeSite, UPGRADE_KIND_COUNT};
+pub use upgrade::{
+    UpgradeCategory, UpgradeMap, UpgradeRow, UpgradeSite, UpgradeTable, DEFAULT_UPGRADE_TABLE,
+    UPGRADE_CATEGORY_COUNT, UPGRADE_LEVEL_COUNT,
+};
 pub use weather::{
     Drops, Storm, WeatherError, WeatherField, COOLDOWN_TICKS, PLACES_CEILING, STRENGTH_CEILING,
     WET_MARK,

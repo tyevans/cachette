@@ -27,7 +27,7 @@
 #![allow(clippy::disallowed_types)]
 
 use cachette_core::unit_type::{UnitTypeId, UnitTypeRow, WORKER_ROW};
-use cachette_core::upgrade::UpgradeKind;
+use cachette_core::upgrade::UpgradeCategory;
 use cachette_core::{Axial, FactionId, Fix32, Holder, World, WorldConfig};
 use cachette_view::panel::{self, Set, View};
 use cachette_view::{draw_frame, glass, Camera, Canvas, Metrics, Overlay};
@@ -214,7 +214,7 @@ fn the_tile_panel_names_the_upgrade_under_the_pointer() {
         Some(FactionId(0)),
         "the builder does not hold the ground it stands on"
     );
-    assert!(world.order_build(builder, UpgradeKind::Terrace));
+    assert!(world.order_build(builder, UpgradeCategory::TERRACE).is_ok());
     world.step(1).expect("the step must run");
     let site = world.upgrade_at(place).expect("the order placed a site");
     assert!(!site.is_complete(), "one tick finished the terrace");

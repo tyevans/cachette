@@ -22,7 +22,7 @@
 use cachette_core::choose::{self, ChoiceSchedule};
 use cachette_core::resource::{Amount, ResourceKind};
 use cachette_core::unit_type::{UnitTypeId, UnitTypeRow, WORKER_ROW};
-use cachette_core::upgrade::UpgradeKind;
+use cachette_core::upgrade::UpgradeCategory;
 use cachette_core::{Axial, Entity, FactionId, Fix32, World, WorldConfig};
 
 /// The extent of every fixture world.
@@ -396,12 +396,12 @@ fn a_build_rate_of_zero_adds_nothing_and_a_rate_of_one_adds_something() {
         },
     );
     let idle = spawn(&mut idle_world, address, cannot);
-    assert!(idle_world.order_build(idle, UpgradeKind::Road));
+    assert!(idle_world.order_build(idle, UpgradeCategory::ROAD).is_ok());
     for _ in 0..TICKS {
         idle_world.step(1).expect("the step must run");
         assert_eq!(
             idle_world.build_order(idle),
-            Some(Some(UpgradeKind::Road)),
+            Some(Some(UpgradeCategory::ROAD)),
             "the unit that cannot build keeps its order"
         );
     }
@@ -420,7 +420,7 @@ fn a_build_rate_of_zero_adds_nothing_and_a_rate_of_one_adds_something() {
         },
     );
     let mason = spawn(&mut busy_world, address, can);
-    assert!(busy_world.order_build(mason, UpgradeKind::Road));
+    assert!(busy_world.order_build(mason, UpgradeCategory::ROAD).is_ok());
     busy_world.step(1).expect("the step must run");
     let site = busy_world
         .upgrade_at(address)
@@ -443,7 +443,7 @@ fn a_build_rate_of_two_adds_twice_what_a_rate_of_one_adds() {
         },
     );
     let mason = spawn(&mut single, address, one);
-    assert!(single.order_build(mason, UpgradeKind::Road));
+    assert!(single.order_build(mason, UpgradeCategory::ROAD).is_ok());
     single.step(1).expect("the step must run");
     single.step(1).expect("the step must run");
     let two_ticks_at_one = single
@@ -461,7 +461,7 @@ fn a_build_rate_of_two_adds_twice_what_a_rate_of_one_adds() {
         },
     );
     let mason = spawn(&mut double, address, two);
-    assert!(double.order_build(mason, UpgradeKind::Road));
+    assert!(double.order_build(mason, UpgradeCategory::ROAD).is_ok());
     double.step(1).expect("the step must run");
     let one_tick_at_two = double
         .upgrade_at(address)

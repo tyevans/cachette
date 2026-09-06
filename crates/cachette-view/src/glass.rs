@@ -54,7 +54,7 @@
 
 use cachette_core::resource::ResourceKind;
 use cachette_core::terrain::KIND_COUNT;
-use cachette_core::upgrade::UpgradeKind;
+use cachette_core::upgrade::UpgradeCategory;
 use cachette_core::NeedCondition;
 
 use crate::hud::KINDS;
@@ -801,7 +801,7 @@ fn colour_card(readout: &Readout) -> Card {
         "over capacity".to_string(),
         grouped(u64::from(readout.tiles_at_capacity())),
     ));
-    for kind in UpgradeKind::ALL {
+    for kind in UpgradeCategory::ALL {
         rows.push(Row::coloured(
             upgrade_colour(kind),
             upgrade_name(kind).to_string(),

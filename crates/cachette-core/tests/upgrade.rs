@@ -37,7 +37,8 @@ use cachette_core::holding::ReachRules;
 use cachette_core::resource::{Amount, ResourceKind};
 use cachette_core::terrain::TileKind;
 use cachette_core::upgrade::{
-    capacity_with, gather_rate_with, largest_work, UpgradeKind, UPGRADE_KIND_COUNT,
+    capacity_with, gather_rate_with, UpgradeCategory, UpgradeRow, DEFAULT_UPGRADE_TABLE,
+    UPGRADE_CATEGORY_COUNT,
 };
 use cachette_core::{Axial, Entity, FactionId, World, WorldConfig};
 use proptest::prelude::*;
@@ -162,6 +163,25 @@ fn island(world: &World, width: u32, height: u32) -> Axial {
         .expect("the world must hold an island")
 }
 
+/// Returns the row of the default table at one category and one level.
+///
+/// A test reads a column of the row rather than a method of the category,
+/// because no pass may branch on a category.[^1]
+///
+/// # References
+///
+/// [^1]: ADR-0151, an upgrade is a category with a ground fit and a level, decision D4. `docs/adrs/draft/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
+fn row_of(category: UpgradeCategory, level: u8) -> UpgradeRow {
+    DEFAULT_UPGRADE_TABLE
+        .row(category, level)
+        .expect("the default table holds the row")
+}
+
+/// Returns the work that one level of one category asks for.
+fn work_of(category: UpgradeCategory, level: u8) -> i64 {
+    i64::from(row_of(category, level).work)
+}
+
 /// Returns an island tile that carries a stock of the kind.
 fn island_with_stock(world: &World, kind: ResourceKind) -> Axial {
     addresses(WIDTH, HEIGHT)
@@ -169,7 +189,7 @@ fn island_with_stock(world: &World, kind: ResourceKind) -> Axial {
         .find(|address| {
             world.admits_a_unit(*address)
                 && world.original_stock(*address, kind)
-                    >= Some(Amount(4 + UpgradeKind::Terrace.gather_bonus()))
+                    >= Some(Amount(4 + row_of(UpgradeCategory::TERRACE, 1).yield_change))
                 && world
                     .grid()
                     .neighbours(*address)
@@ -180,11 +200,11 @@ fn island_with_stock(world: &World, kind: ResourceKind) -> Axial {
 }
 
 /// Puts one soldier on a tile and tells it to build.
-fn builder(world: &mut World, address: Axial, kind: UpgradeKind) -> Entity {
+fn builder(world: &mut World, address: Axial, kind: UpgradeCategory) -> Entity {
     let unit = world
         .spawn_soldier(address, FactionId(0))
         .expect("the ground admits a unit");
-    assert!(world.order_build(unit, kind));
+    assert!(world.order_build(unit, kind).is_ok());
     unit
 }
 
@@ -218,7 +238,7 @@ fn one_build_in_a_large_world_stores_one_entry() {
     // The world below holds tens of thousands of tiles and one upgrade.
     let mut field = world(SEED, WIDTH, HEIGHT);
     let address = island(&field, WIDTH, HEIGHT);
-    builder(&mut field, address, UpgradeKind::Road);
+    builder(&mut field, address, UpgradeCategory::ROAD);
     field.step(1).expect("the step must run");
 
     assert_eq!(field.upgrade_sites().len(), 1);
@@ -235,12 +255,12 @@ fn the_advance_reads_the_sites_and_not_the_world() {
         .into_iter()
         .find(|address| small.admits_a_unit(*address))
         .expect("the small world holds open ground");
-    builder(&mut small, small_at, UpgradeKind::Road);
+    builder(&mut small, small_at, UpgradeCategory::ROAD);
     small.step(1).expect("the step must run");
 
     let mut large = world(SEED, WIDTH, HEIGHT);
     let large_at = island(&large, WIDTH, HEIGHT);
-    builder(&mut large, large_at, UpgradeKind::Road);
+    builder(&mut large, large_at, UpgradeCategory::ROAD);
     large.step(1).expect("the step must run");
 
     assert_eq!(small.upgrade_sites().len(), 1);
@@ -274,32 +294,32 @@ fn a_build_does_not_finish_in_the_tick_it_started() {
     // that finished at once would let nothing hold state between ticks.
     let mut field = world(SEED, WIDTH, HEIGHT);
     let address = island(&field, WIDTH, HEIGHT);
-    builder(&mut field, address, UpgradeKind::Road);
+    builder(&mut field, address, UpgradeCategory::ROAD);
     field.step(1).expect("the step must run");
 
     let site = field.upgrade_at(address).expect("one unit built here");
     assert!(
         !site.is_complete(),
         "one tick finished a build that asks for {} work",
-        UpgradeKind::Road.work()
+        work_of(UpgradeCategory::ROAD, 1)
     );
     assert_eq!(field.finished_upgrade(address), None);
-    assert!(site.remaining() > 0);
+    assert!(site.remaining(&DEFAULT_UPGRADE_TABLE) > 0);
 }
 
 #[test]
 fn one_unit_finishes_a_build_after_the_work_the_kind_asks_for() {
     let mut field = world(SEED, WIDTH, HEIGHT);
     let address = island(&field, WIDTH, HEIGHT);
-    builder(&mut field, address, UpgradeKind::Road);
+    builder(&mut field, address, UpgradeCategory::ROAD);
 
-    let ticks = UpgradeKind::Road.work();
+    let ticks = work_of(UpgradeCategory::ROAD, 1);
     for _ in 0..ticks - 1 {
         field.step(1).expect("the step must run");
     }
     assert_eq!(field.finished_upgrade(address), None);
     field.step(1).expect("the step must run");
-    assert_eq!(field.finished_upgrade(address), Some(UpgradeKind::Road));
+    assert_eq!(field.finished_upgrade(address), Some(UpgradeCategory::ROAD));
     assert!(field.check_invariants());
 }
 
@@ -310,7 +330,7 @@ fn two_units_add_their_work_exactly_at_every_thread_count() {
     for threads in [1usize, 2, 12] {
         let mut one = world(SEED, WIDTH, HEIGHT);
         let address = island(&one, WIDTH, HEIGHT);
-        builder(&mut one, address, UpgradeKind::Terrace);
+        builder(&mut one, address, UpgradeCategory::TERRACE);
         one.step(threads).expect("the step must run");
         let single = one
             .upgrade_at(address)
@@ -318,8 +338,8 @@ fn two_units_add_their_work_exactly_at_every_thread_count() {
             .progress;
 
         let mut two = world(SEED, WIDTH, HEIGHT);
-        builder(&mut two, address, UpgradeKind::Terrace);
-        builder(&mut two, address, UpgradeKind::Terrace);
+        builder(&mut two, address, UpgradeCategory::TERRACE);
+        builder(&mut two, address, UpgradeCategory::TERRACE);
         two.step(threads).expect("the step must run");
         let pair = two
             .upgrade_at(address)
@@ -340,9 +360,9 @@ fn the_progress_is_the_same_at_every_thread_count() {
     for threads in [1usize, 2, 12] {
         let mut field = world(SEED, WIDTH, HEIGHT);
         let address = island(&field, WIDTH, HEIGHT);
-        builder(&mut field, address, UpgradeKind::Terrace);
-        builder(&mut field, address, UpgradeKind::Terrace);
-        builder(&mut field, address, UpgradeKind::Terrace);
+        builder(&mut field, address, UpgradeCategory::TERRACE);
+        builder(&mut field, address, UpgradeCategory::TERRACE);
+        builder(&mut field, address, UpgradeCategory::TERRACE);
         for _ in 0..5 {
             field.step(threads).expect("the step must run");
         }
@@ -359,7 +379,7 @@ fn unfinished_work_persists_when_a_unit_stops_and_starts_again() {
     // a long time worth nothing.
     let mut field = world(SEED, WIDTH, HEIGHT);
     let address = island(&field, WIDTH, HEIGHT);
-    let unit = builder(&mut field, address, UpgradeKind::Terrace);
+    let unit = builder(&mut field, address, UpgradeCategory::TERRACE);
 
     field.step(1).expect("the step must run");
     field.step(1).expect("the step must run");
@@ -381,7 +401,7 @@ fn unfinished_work_persists_when_a_unit_stops_and_starts_again() {
     );
 
     // The unit starts again. The work continues from where it stopped.
-    assert!(field.order_build(unit, UpgradeKind::Terrace));
+    assert!(field.order_build(unit, UpgradeCategory::TERRACE).is_ok());
     field.step(1).expect("the step must run");
     let after = field.upgrade_at(address).expect("the site stayed").progress;
     assert!(
@@ -394,7 +414,7 @@ fn unfinished_work_persists_when_a_unit_stops_and_starts_again() {
 fn a_dead_builder_leaves_the_work_it_did() {
     let mut field = world(SEED, WIDTH, HEIGHT);
     let address = island(&field, WIDTH, HEIGHT);
-    let unit = builder(&mut field, address, UpgradeKind::Terrace);
+    let unit = builder(&mut field, address, UpgradeCategory::TERRACE);
     field.step(1).expect("the step must run");
     let partway = field
         .upgrade_at(address)
@@ -416,15 +436,15 @@ fn a_tile_carries_one_upgrade_and_the_first_kind_wins() {
     // a question with more than one answer.
     let mut field = world(SEED, WIDTH, HEIGHT);
     let address = island(&field, WIDTH, HEIGHT);
-    builder(&mut field, address, UpgradeKind::Terrace);
-    builder(&mut field, address, UpgradeKind::Road);
+    builder(&mut field, address, UpgradeCategory::TERRACE);
+    builder(&mut field, address, UpgradeCategory::ROAD);
     field.step(1).expect("the step must run");
 
     let site = field.upgrade_at(address).expect("the units built here");
     assert_eq!(
-        site.kind,
-        UpgradeKind::Road,
-        "the lowest kind takes the tile"
+        site.category,
+        UpgradeCategory::ROAD,
+        "the lowest category takes the tile"
     );
     assert_eq!(field.upgrade_sites().len(), 1);
     // Only the builder of the kind that took the tile contributed.
@@ -436,28 +456,38 @@ fn a_tile_carries_one_upgrade_and_the_first_kind_wins() {
 // ---------------------------------------------------------------------------
 
 #[test]
-fn the_catalogue_holds_more_than_one_kind_and_each_number_names_one() {
-    // The catalogue holds more than one kind. One kind would let a reader
-    // believe an upgrade is a scalar on the tile rather than a row in a
-    // table.
-    assert_eq!(UpgradeKind::ALL.len(), UPGRADE_KIND_COUNT);
-    assert!(UpgradeKind::ALL.len() > 1);
-    for kind in UpgradeKind::ALL {
-        assert_eq!(UpgradeKind::from_u8(kind.to_u8()), Some(kind));
-        assert!(kind.work() > 0);
+fn the_table_holds_more_than_one_category_and_each_number_names_one() {
+    // The table holds more than one category. One category would let a
+    // reader believe an upgrade is a scalar on the tile rather than a row in
+    // a table.
+    assert_eq!(UpgradeCategory::ALL.len(), UPGRADE_CATEGORY_COUNT);
+    assert!(UpgradeCategory::ALL.len() > 1);
+    for category in UpgradeCategory::ALL {
+        assert_eq!(
+            UpgradeCategory::from_u8(category.to_u8()),
+            Some(category),
+            "the number names the category it came from"
+        );
     }
-    assert_eq!(UpgradeKind::from_u8(UPGRADE_KIND_COUNT as u8), None);
-    // Every kind asks for more work than one builder adds in one tick.
-    assert!(UpgradeKind::ALL.iter().all(|kind| kind.work() > 1));
-    // The two kinds change different properties of a tile. One kind would
-    // read as a scalar on the tile rather than a row in a table.
-    assert!(UpgradeKind::ALL
+    assert_eq!(UpgradeCategory::from_u8(UPGRADE_CATEGORY_COUNT as u8), None);
+    // Every row the table holds asks for more work than one builder adds in
+    // one tick.
+    assert!(DEFAULT_UPGRADE_TABLE
+        .rows()
         .iter()
-        .any(|kind| kind.capacity().is_none()));
-    assert!(UpgradeKind::ALL
+        .all(|row| !row.exists() || i64::from(row.work) > cachette_core::upgrade::BUILD_RATE));
+    // The rows change different properties of a tile. One column would read
+    // as a scalar on the tile rather than a row in a table.
+    assert!(DEFAULT_UPGRADE_TABLE
+        .rows()
         .iter()
-        .any(|kind| kind.capacity().is_some()));
-    assert!(UpgradeKind::ALL.iter().any(|kind| kind.gather_bonus() > 0));
+        .any(|row| row.capacity_change > 0));
+    assert!(DEFAULT_UPGRADE_TABLE
+        .rows()
+        .iter()
+        .any(|row| row.yield_change > 0));
+    // The open category holds no row, so a caller writes one.
+    assert_eq!(DEFAULT_UPGRADE_TABLE.top_level(UpgradeCategory::OPEN), 0);
 }
 
 #[test]
@@ -466,8 +496,8 @@ fn ground_that_admits_nobody_stays_closed_under_every_upgrade() {
     // tile holds anybody, so every caller that asks about passability alone
     // stays correct.
     assert_eq!(TileKind::Water.capacity(), 0);
-    for kind in UpgradeKind::ALL {
-        assert_eq!(capacity_with(0, Some(kind)), 0);
+    for row in DEFAULT_UPGRADE_TABLE.rows() {
+        assert_eq!(capacity_with(0, Some(*row)), 0);
     }
 }
 
@@ -481,13 +511,14 @@ fn a_finished_road_raises_what_the_tile_admits() {
         .capacity();
     assert_eq!(field.tile_capacity(address), Some(ground));
 
-    builder(&mut field, address, UpgradeKind::Road);
-    for _ in 0..UpgradeKind::Road.work() {
+    builder(&mut field, address, UpgradeCategory::ROAD);
+    for _ in 0..work_of(UpgradeCategory::ROAD, 1) {
         field.step(1).expect("the step must run");
     }
-    assert_eq!(field.finished_upgrade(address), Some(UpgradeKind::Road));
-    assert_eq!(field.tile_capacity(address), UpgradeKind::Road.capacity());
-    assert!(UpgradeKind::Road.capacity() > Some(ground));
+    assert_eq!(field.finished_upgrade(address), Some(UpgradeCategory::ROAD));
+    let paved = row_of(UpgradeCategory::ROAD, 1).capacity_change;
+    assert_eq!(field.tile_capacity(address), Some(paved));
+    assert!(paved > ground);
 }
 
 #[test]
@@ -498,7 +529,7 @@ fn a_site_under_construction_changes_nothing() {
         .tile_kind(address)
         .expect("the address is inside the world")
         .capacity();
-    builder(&mut field, address, UpgradeKind::Road);
+    builder(&mut field, address, UpgradeCategory::ROAD);
     field.step(1).expect("the step must run");
 
     assert!(field.upgrade_at(address).is_some());
@@ -527,13 +558,13 @@ fn a_finished_terrace_raises_what_a_unit_takes_from_the_tile() {
         .0;
 
     let mut improved = world(SEED, WIDTH, HEIGHT);
-    let mason = builder(&mut improved, address, UpgradeKind::Terrace);
-    for _ in 0..UpgradeKind::Terrace.work() {
+    let mason = builder(&mut improved, address, UpgradeCategory::TERRACE);
+    for _ in 0..work_of(UpgradeCategory::TERRACE, 1) {
         improved.step(1).expect("the step must run");
     }
     assert_eq!(
         improved.finished_upgrade(address),
-        Some(UpgradeKind::Terrace)
+        Some(UpgradeCategory::TERRACE)
     );
     assert!(improved.stop_build(mason));
     let taker = improved
@@ -548,10 +579,10 @@ fn a_finished_terrace_raises_what_a_unit_takes_from_the_tile() {
         .of(kind)
         .0;
 
-    assert!(UpgradeKind::Terrace.gather_bonus() > 0);
+    assert!(row_of(UpgradeCategory::TERRACE, 1).yield_change > 0);
     assert_eq!(
         with,
-        without + UpgradeKind::Terrace.gather_bonus(),
+        without + row_of(UpgradeCategory::TERRACE, 1).yield_change,
         "the finished upgrade did not reach the gather resolve"
     );
 }
@@ -565,8 +596,8 @@ fn destroying_an_upgrade_returns_the_tile_to_the_value_it_had() {
         .expect("the address is inside the world");
     let hash_before = field.state_hash();
 
-    let unit = builder(&mut field, address, UpgradeKind::Road);
-    for _ in 0..UpgradeKind::Road.work() {
+    let unit = builder(&mut field, address, UpgradeCategory::ROAD);
+    for _ in 0..work_of(UpgradeCategory::ROAD, 1) {
         field.step(1).expect("the step must run");
     }
     assert_ne!(field.tile_capacity(address), Some(before));
@@ -611,9 +642,9 @@ proptest! {
     fn the_progress_never_leaves_the_bound(
         crowd in 1usize..12,
         ticks in 1usize..30,
-        kind_at in 0usize..UPGRADE_KIND_COUNT,
+        kind_at in 0usize..UPGRADE_CATEGORY_COUNT - 1,
     ) {
-        let kind = UpgradeKind::ALL[kind_at];
+        let kind = UpgradeCategory::ALL[kind_at];
         let mut field = world(SEED, WIDTH, HEIGHT);
         let address = island(&field, WIDTH, HEIGHT);
         for _ in 0..crowd {
@@ -624,32 +655,34 @@ proptest! {
         }
         let site = field.upgrade_at(address).expect("the crowd built here");
         prop_assert!(site.progress.0 >= 0);
-        prop_assert!(site.progress.0 <= kind.work());
-        prop_assert!(site.progress.0 <= largest_work());
+        // The bound is the work of the row above the entry, and it is zero
+        // at the top of the category.
+        prop_assert!(
+            site.progress.0 <= DEFAULT_UPGRADE_TABLE.work_above(site.category, site.level)
+        );
+        prop_assert!(site.progress.0 <= DEFAULT_UPGRADE_TABLE.largest_work());
         prop_assert!(field.check_invariants());
     }
 }
 
 #[test]
-fn the_bound_is_folded_from_the_catalogue() {
-    let most = UpgradeKind::ALL
+fn the_bound_is_folded_from_the_table() {
+    let most = DEFAULT_UPGRADE_TABLE
+        .rows()
         .iter()
-        .map(|kind| kind.work())
+        .map(|row| i64::from(row.work))
         .max()
-        .expect("the catalogue holds a kind");
-    assert_eq!(largest_work(), most);
+        .expect("the table holds a row");
+    assert_eq!(DEFAULT_UPGRADE_TABLE.largest_work(), most);
 }
 
 #[test]
-fn the_composition_functions_add_the_row_of_the_finished_kind() {
-    for kind in UpgradeKind::ALL {
+fn the_composition_functions_add_the_column_of_the_standing_row() {
+    for row in DEFAULT_UPGRADE_TABLE.rows() {
         assert_eq!(capacity_with(8, None), 8);
-        assert_eq!(
-            capacity_with(8, Some(kind)),
-            kind.capacity().unwrap_or(8).max(8)
-        );
+        assert_eq!(capacity_with(8, Some(*row)), row.capacity_change.max(8));
         assert_eq!(gather_rate_with(4, None), 4);
-        assert_eq!(gather_rate_with(4, Some(kind)), 4 + kind.gather_bonus());
+        assert_eq!(gather_rate_with(4, Some(*row)), 4 + row.yield_change);
     }
 }
 
@@ -680,8 +713,15 @@ fn crowd(threads: usize) -> World {
             .spawn_soldier(*address, FactionId(0))
             .expect("the ground admits a unit");
         // The kind alternates by the column, so the world holds both.
-        let kind = UpgradeKind::ALL[(address.q as usize) % UPGRADE_KIND_COUNT];
-        assert!(field.order_build(unit, kind));
+        // The category alternates by the column, over the categories the
+        // default table holds a row for, so the world holds several.
+        let kind = UpgradeCategory::ALL[(address.q as usize) % (UPGRADE_CATEGORY_COUNT - 1)];
+        if field.order_build(unit, kind).is_err() {
+            // The ground under this unit does not fit the category. The
+            // crowd still builds everywhere else, and the refusal is what
+            // the ground fit is for.
+            continue;
+        }
     }
     for _ in 0..40 {
         field.step(threads).expect("the step must run");
@@ -792,12 +832,7 @@ fn admission_reads_the_capacity_that_a_road_raised() {
         paved > ground,
         "the paved tile held {paved} units, which the ground alone already allows"
     );
-    assert!(
-        paved
-            <= UpgradeKind::Road
-                .capacity()
-                .expect("a road raises the capacity") as usize
-    );
+    assert!(paved <= row_of(UpgradeCategory::ROAD, 1).capacity_change as usize);
 }
 
 /// Crowds one tile and returns the most units that ever stood on it.
@@ -821,7 +856,7 @@ fn crowded_tile(paved: bool) -> usize {
                 .spawn_soldier(*side, FactionId(0))
                 .expect("a spawn may over-fill a tile");
             if paved {
-                assert!(field.order_build(unit, UpgradeKind::Road));
+                assert!(field.order_build(unit, UpgradeCategory::ROAD).is_ok());
             }
         }
     }
@@ -838,7 +873,7 @@ fn crowded_tile(paved: bool) -> usize {
     if paved {
         assert_eq!(
             field.finished_upgrade(target),
-            Some(UpgradeKind::Road),
+            Some(UpgradeCategory::ROAD),
             "the crowd did not pave the tile it crowded"
         );
     } else {

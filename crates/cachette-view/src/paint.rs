@@ -49,21 +49,29 @@ use cachette_core::founding::FoundingOutcome;
 use cachette_core::hex::NEIGHBOURS;
 use cachette_core::resource::{ResourceKind, RESOURCE_KIND_COUNT};
 use cachette_core::terrain::{TileKind, KIND_COUNT};
-use cachette_core::upgrade::{UpgradeKind, UpgradeSite, UPGRADE_KIND_COUNT};
+use cachette_core::upgrade::{UpgradeCategory, UpgradeSite, UPGRADE_CATEGORY_COUNT};
 use cachette_core::{Axial, BridgeError, Entity, FactionId, Holder, World};
 
 use crate::overlay::{self, Layer};
 use crate::text;
 use crate::tween::{between, Motion, Pace};
 
-/// The colour each kind of upgrade tints its tile with, by kind ordinal.
+/// The colour each category of upgrade tints its tile with, by category
+/// number.
 ///
-/// A road is ochre, a terrace is green, a wonder is pale gold and a store is
-/// dark brown. The table is indexed by the ordinal the core gives each kind,
-/// so a kind that joins the core without a row here fails to compile rather
-/// than drawing in a colour nobody chose.
-const UPGRADE_COLOURS: [u32; UPGRADE_KIND_COUNT] =
-    [0x00c8_9a4a, 0x0052_b86a, 0x00f0_e0a0, 0x0078_5030];
+/// A road is ochre, a terrace is green, a wonder is pale gold, a store is
+/// dark brown, a wall is grey and the open category is violet. The table is
+/// indexed by the number the core gives each category, so a category that
+/// joins the core without a row here fails to compile rather than drawing in
+/// a colour nobody chose.
+const UPGRADE_COLOURS: [u32; UPGRADE_CATEGORY_COUNT] = [
+    0x00c8_9a4a,
+    0x0052_b86a,
+    0x00f0_e0a0,
+    0x0078_5030,
+    0x0090_9098,
+    0x00a0_60c0,
+];
 
 /// How much of the upgrade colour covers a tile whose build has just begun.
 const UPGRADE_WEIGHT_FLOOR: i64 = 56;
@@ -357,7 +365,7 @@ pub const fn shortage_colour() -> u32 {
 ///
 /// [^1]: Recurring Defect Shapes, shape 1. `.claude/rules/recurring-defects.md`
 #[must_use]
-pub fn upgrade_colour(kind: UpgradeKind) -> u32 {
+pub fn upgrade_colour(kind: UpgradeCategory) -> u32 {
     UPGRADE_COLOURS[kind.index()]
 }
 
@@ -2037,8 +2045,11 @@ pub fn draw_paced(
                             top,
                             wide,
                             tall,
-                            UPGRADE_COLOURS[site.kind.index()],
-                            upgrade_weight(site),
+                            UPGRADE_COLOURS[site.category.index()],
+                            upgrade_weight(
+                                site,
+                                world.upgrade_table().work_above(site.category, site.level),
+                            ),
                         );
                     } else {
                         // A site under work draws as a glyph and not as a
@@ -2048,7 +2059,7 @@ pub fn draw_paced(
                         // than weak.[^17]
                         //
                         // [^17]: Research report 25, defect 1. `docs/research/reports/25-demonstration-readability-upgrades-and-units.md`
-                        mark_site(canvas, left, top, wide, tall, site.kind);
+                        mark_site(canvas, left, top, wide, tall, site.category);
                     }
                 }
             }
@@ -2220,9 +2231,16 @@ fn on_an_edge(world: &World, address: Axial, holder: Option<Holder>, canvas: &mu
 ///
 /// A site that has just begun draws at the floor and a finished site at the
 /// ceiling. The progress is a whole number of work units and the work of a
-/// kind is a whole number too, so the depth is exact.
-fn upgrade_weight(site: UpgradeSite) -> u8 {
-    let work = site.kind.work().max(1);
+/// row is a whole number too, so the depth is exact.
+///
+/// The caller reads the work of the row above the site from the table, so
+/// this function names no category.[^1]
+///
+/// # References
+///
+/// [^1]: ADR-0151, an upgrade is a category with a ground fit and a level, decision D4. `docs/adrs/draft/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
+fn upgrade_weight(site: UpgradeSite, asked: i64) -> u8 {
+    let work = asked.max(1);
     let done = site.progress.0.clamp(0, work);
     let weight =
         UPGRADE_WEIGHT_FLOOR + (UPGRADE_WEIGHT_CEILING - UPGRADE_WEIGHT_FLOOR) * done / work;
@@ -2301,7 +2319,14 @@ pub fn luxury_colour(ordinal: u32) -> u32 {
 /// # References
 ///
 /// [^1]: Research report 25, defect 1. `docs/research/reports/25-demonstration-readability-upgrades-and-units.md`
-fn mark_site(canvas: &mut Canvas, left: i32, top: i32, wide: i32, tall: i32, kind: UpgradeKind) {
+fn mark_site(
+    canvas: &mut Canvas,
+    left: i32,
+    top: i32,
+    wide: i32,
+    tall: i32,
+    category: UpgradeCategory,
+) {
     // Half the tile. The ground shows around the glyph, so a watcher reads
     // the kind of ground and the thing somebody is making on it at once.
     let side = (wide.min(tall) / 2).max(3);
@@ -2310,18 +2335,23 @@ fn mark_site(canvas: &mut Canvas, left: i32, top: i32, wide: i32, tall: i32, kin
     // The dark square is the rim. It separates every glyph from the ground
     // under it, whatever the ground is.
     canvas.fill_rect(x, y, side, side, UNIT_RIM);
-    let colour = UPGRADE_COLOURS[kind.index()];
+    let colour = UPGRADE_COLOURS[category.index()];
     let bar = (side / 4).max(1);
-    match kind {
+    // The drawing pass chooses a glyph for a category, and the record leaves
+    // that choice to the viewer. A category with no glyph of its own draws
+    // the rim and the colour alone.[^2]
+    //
+    // [^2]: ADR-0151, an upgrade is a category with a ground fit and a level, decision D5. `docs/adrs/draft/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
+    match category {
         // A made way: one bar across the tile.
-        UpgradeKind::Road => canvas.fill_rect(x, y + (side - bar) / 2, side, bar, colour),
+        UpgradeCategory::ROAD => canvas.fill_rect(x, y + (side - bar) / 2, side, bar, colour),
         // Worked ground: two bars, one above the other.
-        UpgradeKind::Terrace => {
+        UpgradeCategory::TERRACE => {
             canvas.fill_rect(x, y + bar, side, bar, colour);
             canvas.fill_rect(x, y + side - bar * 2, side, bar, colour);
         }
         // A great work: a diamond.
-        UpgradeKind::Wonder => {
+        UpgradeCategory::WONDER => {
             let half = side / 2;
             for row in 0..side {
                 let reach = half - (row - half).abs();
@@ -2329,13 +2359,15 @@ fn mark_site(canvas: &mut Canvas, left: i32, top: i32, wide: i32, tall: i32, kin
             }
         }
         // A storehouse: a solid block inside the square.
-        UpgradeKind::Store => canvas.fill_rect(
+        UpgradeCategory::STORE => canvas.fill_rect(
             x + bar,
             y + bar,
             (side - bar * 2).max(1),
             (side - bar * 2).max(1),
             colour,
         ),
+        // Every other category: the colour fills the square.
+        _ => canvas.fill_rect(x + bar, y + bar, side - bar, side - bar, colour),
     }
 }
 
