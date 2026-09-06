@@ -388,6 +388,12 @@ fn a_world_with_a_road() -> (World, Axial) {
         .spawn_soldier(place, FactionId(0))
         .expect("the ground admits a unit");
     world.rebuild_bridge(1).expect("the rebuild must succeed");
+    // A build takes a tile the faction's plan zones, so the fixture zones the
+    // tile it is about to build on. Without a project the engine refuses the
+    // order, and this test would measure the refusal rather than the mark.
+    world
+        .zone_project(FactionId(0), place, UpgradeCategory::ROAD)
+        .expect("the plan takes the project");
     assert!(
         world.order_build(builder, UpgradeCategory::ROAD).is_ok(),
         "the engine must accept the order"
