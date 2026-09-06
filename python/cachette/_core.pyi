@@ -105,6 +105,33 @@ class ResourceTakenColumns(TypedDict):
     amount: npt.NDArray[np.uint32]
     kind: npt.NDArray[np.uint8]
 
+class SiteQueueColumns(TypedDict):
+    """One column for each field of an entry of the build queue of a site.
+
+    Every column holds one entry for each entry the queue holds, in queue
+    position order, and both columns are the same length. That length is the
+    entries the site holds.
+
+    The order is the order the entries were queued. The front entry is the one
+    that advances, and nothing reorders them.
+    """
+
+    unit_type: npt.NDArray[np.uint8]
+    work: npt.NDArray[np.uint32]
+
+class QueueCensus(TypedDict):
+    """What the build queues of every site did on the last step.
+
+    The two refusals of a finished entry are counted apart. A watcher reading
+    a queue that never moves can then tell a site with no people from a site
+    with no goods. The next step empties every count.
+    """
+
+    produced: int
+    refused_without_a_person: int
+    refused_without_goods: int
+    refused_at_the_verb: int
+
 class UnitTypeColumns(TypedDict):
     """One column for each capability column of a row of the unit type table.
 
@@ -890,6 +917,17 @@ class World:
     def set_unit_types(self, units: Identities, unit_type: int) -> None: ...
     def unit_type(self, unit: int) -> int: ...
     def unit_type_table(self) -> UnitTypeColumns: ...
+    def queue_unit(self, faction: int, site: int, unit_type: int) -> None: ...
+    def clear_queue_entry(self, faction: int, site: int, position: int) -> None: ...
+    def site_queue(self, site: int) -> SiteQueueColumns: ...
+    def queue_census(self) -> QueueCensus: ...
+    def define_build_cost(
+        self, unit_type: int, work: int, people: int, goods: Sequence[int]
+    ) -> None: ...
+    def queue_bound(self) -> int: ...
+    def set_queue_bound(self, bound: int) -> None: ...
+    def set_queue_schedule(self, period: int, phase: int) -> None: ...
+    def set_queue_charge(self, commodity: int, quantity: int) -> None: ...
     def spend_at_sites(
         self, sites: Identities, rate: int, commodity: int = ...
     ) -> None: ...
