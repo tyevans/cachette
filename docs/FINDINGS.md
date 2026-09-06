@@ -12517,7 +12517,7 @@ happened.
 **A total is folded where the per-tick count is emptied.** The world adds each
 per-tick count to a run total at the one site that clears it. The per-tick
 counter stays the only place that counts the act, so nothing counts one act
-twice.[^F498F]
+twice.[^F526A]
 
 **One table answers one question.** The queue rows are rows of the census, and
 the second dictionary is gone. Nothing outside its own tests called it, which
@@ -12622,7 +12622,6 @@ the order reads every unit and sends only the idle ones.
 [^F498B]: The controller log, the refusal count and the stage that empties them. `crates/cachette-core/src/controller.rs`
 [^F498D]: ADR-0158, a site builds a typed unit from a bounded queue its store pays for, decision D6. `docs/adrs/accepted/adr-0158-a-site-builds-a-typed-unit-from-a-bounded-queue-its-store-pays-for.md`
 [^F498E]: Balance register, the seed set row. `docs/reference/balance.md`
-[^F498F]: Recurring Defect Shapes, shape 1. `.agents/rules/recurring-defects.md`
 [^F498G]: Recurring Defect Shapes, shape 3. `.agents/rules/recurring-defects.md`
 [^F495A]: The queue of a site, and the bound a world enforces. `crates/cachette-core/src/production.rs`
 [^F496A]: Backlog item 0488, the outcome. `docs/backlog/complete/0488-plan-roads-and-zones-with-a-faction-solver-at-the-controller-stage.md`
