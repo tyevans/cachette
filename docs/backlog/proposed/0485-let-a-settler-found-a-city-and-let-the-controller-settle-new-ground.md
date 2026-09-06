@@ -37,6 +37,25 @@ The census gains one row, `settlements_founded`, which counts the foundings the
 verb made since the last reset. The existing row `settlements` already counts
 the cities that stand.
 
+## What this item owns, and what item 0497 owns
+
+**This item owns what a settler does. Item 0497 owns where a settler comes
+from.** The two were written apart and neither claims the other's work.
+
+- This item adds the settle capability column, the verb that founds a city with
+  a settler, the controller's settle choice, and the census row for the
+  foundings.
+- Item 0497 builds the per-site production queue, and a settler is one of the
+  types that comes off it.[^11]
+
+**Neither item is enough on its own, and this one is not blocked by the other.**
+A test of this item may set a unit's type through the type verb, and that path
+exists today. A faction playing itself cannot settle until both land, because
+nothing else gives it a settler.
+
+The refinement of this item must not plan a way to make a settler. If it needs
+one, it names item 0497.
+
 ## What is missing before this is refined
 
 - The impact review, decision by decision. ADR-0150 is a draft beside this
@@ -85,3 +104,4 @@ Filled in when the item moves to `complete/`.
 [^8]: Recurring Defect Shapes, shape 1. `.agents/rules/recurring-defects.md`
 [^9]: Balance register, the controller. `docs/reference/balance.md`
 [^10]: Findings register, FND-320. `docs/FINDINGS.md`
+[^11]: Backlog item 0497. `docs/backlog/proposed/0497-build-a-per-site-production-queue-that-spends-a-person-and-goods.md`

@@ -261,7 +261,7 @@ review changed nothing in that area.
 [^7]: Blockers register, BLK-007. `docs/BLOCKERS.md`
 [^8]: PRD-0012, a world starts small and grows. `docs/product/accepted/prd-0012-a-world-starts-small-and-grows.md`
 [^9]: Backlog item 0149. `docs/backlog/proposed/0149-state-the-cost-of-recovery-without-the-mechanism.md`
-[^10]: Backlog item 0060. `docs/backlog/proposed/0060-grow-the-population-from-the-store-and-the-housing.md`
+[^10]: Backlog item 0060. `docs/backlog/refined/0060-grow-the-population-from-the-store-and-the-housing.md`
 [^11]: Definition of Done, section 3. `.claude/rules/definition-of-done.md`
 [^12]: Decisions register, DEC-059. `docs/DECISIONS.md`
 [^13]: Backlog item 0150. `docs/backlog/complete/0150-reserve-the-unit-columns-at-construction.md`
