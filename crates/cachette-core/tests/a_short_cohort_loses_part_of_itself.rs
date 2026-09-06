@@ -223,7 +223,6 @@ fn distinct(values: &[Fix32]) -> usize {
     seen.len()
 }
 
-
 #[test]
 fn two_units_of_one_short_cohort_hold_different_needs() {
     // This is the whole claim. An equal split gives one value to every unit of

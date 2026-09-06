@@ -603,7 +603,6 @@ fn what_a_site_produced_minus_what_it_spent_is_what_it_holds() {
     );
 }
 
-
 #[test]
 fn the_totals_of_a_long_run_do_not_depend_on_the_thread_count() {
     let expected = long_run(1);

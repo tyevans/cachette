@@ -334,7 +334,10 @@ mod declarations {
     use crate::cohort::{SiteRationed, UnitStarved};
     use crate::contest::UnitFell;
     use crate::conversion::UnitConverted;
-    use crate::event::{ChangeKind, ResourceTaken, TileChanged};
+    use crate::event::{
+        ChangeKind, ResourceTaken, SettlementFounded, TileChanged, UpgradeCollapsed,
+        UpgradeFinished, WearCause,
+    };
     use crate::holding::Holder;
     use crate::promotion::UnitPromoted;
     use crate::rates::SiteShortfall;
@@ -427,6 +430,32 @@ mod declarations {
             responder: u16 => "responder",
             act: u8 => "act",
             status: u8 => "status",
+            padding: [u8; 2] => pad,
+        };
+
+        UpgradeCollapsed, "upgrade_collapsed", {
+            tick: Tick => "tick",
+            tile: TileIdx => "tile",
+            holder: Holder => "holder",
+            category: u8 => "category",
+            level: u8 => "level",
+            cause: WearCause => "cause",
+            padding: [u8; 7] => pad,
+        };
+
+        UpgradeFinished, "upgrade_finished", {
+            tick: Tick => "tick",
+            tile: TileIdx => "tile",
+            holder: Holder => "holder",
+            category: u8 => "category",
+            level: u8 => "level",
+        };
+
+        SettlementFounded, "settlement_founded", {
+            tick: Tick => "tick",
+            settlement: u64 => "settlement",
+            tile: TileIdx => "tile",
+            faction: FactionId => "faction",
             padding: [u8; 2] => pad,
         };
 

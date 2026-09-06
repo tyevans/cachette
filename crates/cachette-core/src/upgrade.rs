@@ -1286,6 +1286,15 @@ pub struct UpgradeMap {
     scratch: Vec<UpgradeSite>,
     visits: u64,
     collapses: u64,
+    /// The sites the last wear removed, in ascending tile order.
+    ///
+    /// The world turns these into events. They are a diagnostic of the last
+    /// call, in the same way the collapse count is, so no pass reads them and
+    /// they enter no state hash.
+    collapsed: Vec<UpgradeSite>,
+    /// The sites the last merge raised a level on, in ascending tile order,
+    /// as the merge left them. A diagnostic of the last call, as above.
+    raised: Vec<UpgradeSite>,
 }
 
 impl UpgradeMap {
@@ -1297,6 +1306,8 @@ impl UpgradeMap {
             scratch: Vec::new(),
             visits: 0,
             collapses: 0,
+            collapsed: Vec::new(),
+            raised: Vec::new(),
         }
     }
 
@@ -1408,6 +1419,7 @@ impl UpgradeMap {
             "work never runs backwards"
         );
         let mut visits = 0u64;
+        self.raised.clear();
         if run.is_empty() {
             // Nothing was built, so the merge read nothing. It did not walk
             // the sites, and it did not walk the world.
@@ -1428,7 +1440,14 @@ impl UpgradeMap {
                 self.scratch.push(fresh_site(theirs, table));
                 there += 1;
             } else {
-                self.scratch.push(advanced(mine, theirs.1, theirs.2, table));
+                let after = advanced(mine, theirs.1, theirs.2, table);
+                // A level that rose is a moment, and the world publishes it.
+                // The walk is ascending, so the raises are gathered in
+                // ascending tile order and no later sort fixes them.
+                if after.level > mine.level {
+                    self.raised.push(after);
+                }
+                self.scratch.push(after);
                 here += 1;
                 there += 1;
             }
@@ -1475,6 +1494,7 @@ impl UpgradeMap {
             "wear never gives condition back"
         );
         let mut collapsed = 0u64;
+        self.collapsed.clear();
         if run.is_empty() {
             self.collapses = 0;
             return collapsed;
@@ -1500,6 +1520,11 @@ impl UpgradeMap {
             let left = site.condition.0.saturating_sub(taken);
             if left <= 0 {
                 collapsed += 1;
+                // The removed entry is the only record that the upgrade ever
+                // stood there, so it is kept for the world to publish. The
+                // retain walks the sites in ascending tile order, so this
+                // list is in ascending tile order too.
+                self.collapsed.push(*site);
                 return false;
             }
             site.condition = Accum(left);
@@ -1517,6 +1542,30 @@ impl UpgradeMap {
     #[must_use]
     pub const fn last_wear_collapses(&self) -> u64 {
         self.collapses
+    }
+
+    /// Returns the sites the last wear removed, in ascending tile order.
+    ///
+    /// A removed entry is the only record that the upgrade stood there. The
+    /// tile returns to the world the generator made, so a reader that comes
+    /// later can never ask the world what was lost. The world turns these
+    /// into events at the tick that took them.
+    ///
+    /// The list describes one call. No pass reads it and it enters no state
+    /// hash.
+    #[must_use]
+    pub fn last_wear_removed(&self) -> &[UpgradeSite] {
+        &self.collapsed
+    }
+
+    /// Returns the sites the last merge raised a level on, in ascending tile
+    /// order, as the merge left them.
+    ///
+    /// The list describes one call. No pass reads it and it enters no state
+    /// hash.
+    #[must_use]
+    pub fn last_merge_raised(&self) -> &[UpgradeSite] {
+        &self.raised
     }
 
     /// Absorbs the map into the state hash.
@@ -1644,7 +1693,10 @@ fn advanced(
             // The work buys condition and raises no level. The repair is not
             // paid for yet, so the level stays damaged and the next tick
             // carries on with it.
-            let mended = site.condition.0.saturating_add(repair_gain(work, level_work));
+            let mended = site
+                .condition
+                .0
+                .saturating_add(repair_gain(work, level_work));
             return UpgradeSite {
                 condition: Accum(mended.min(CONDITION_FULL)),
                 ..site

@@ -45,7 +45,11 @@ use crate::controller::{
 };
 use crate::conversion::{self, ConversionError, Convert, UnitConverted};
 use crate::descent::{DescentId, Parents};
-use crate::event::{ResourceTaken, TileChanged, CHANGE_KIND_LOWERED, CHANGE_KIND_RAISED};
+use crate::event::{
+    ResourceTaken, SettlementFounded, TileChanged, UpgradeCollapsed, UpgradeFinished,
+    CHANGE_KIND_LOWERED, CHANGE_KIND_RAISED, WEAR_CAUSE_ARMY, WEAR_CAUSE_BOTH, WEAR_CAUSE_ORDERED,
+    WEAR_CAUSE_WEATHER,
+};
 use crate::founding::{self, Founding, FoundingError, FoundingOutcome, Survey};
 use crate::growth;
 use crate::hash::StateHash;
@@ -1136,6 +1140,30 @@ pub struct World {
     trade: TradeTable,
     /// What the last step said about trade.
     trade_log: Vec<TradeSpoken>,
+    /// The upgrades the wear pass removed, since the last step began.
+    ///
+    /// **A removed upgrade leaves nothing behind.** The entry is dropped and
+    /// the tile returns to the world the generator made, so this log is the
+    /// only record that anything stood there. The step clears it before any
+    /// system runs.
+    ///
+    /// The log is written and never read by a pass, so it enters no state
+    /// hash.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0001, one binary gives one answer at any thread count, decision D4. `docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
+    collapsed_log: Vec<UpgradeCollapsed>,
+    /// The upgrade levels that finished, since the last step began.
+    ///
+    /// The step clears it before any system runs, and it enters no state
+    /// hash.
+    finished_log: Vec<UpgradeFinished>,
+    /// The settlements that were founded, since the last step began.
+    ///
+    /// A settlement founded by a caller between two steps lands here and
+    /// stays until the next step clears it. The log enters no state hash.
+    founded_log: Vec<SettlementFounded>,
     /// What each faction offers and wants, one fixed block of rows for each.
     ///
     /// The table holds nothing until a faction advertises. It is simulated
@@ -1388,6 +1416,9 @@ impl World {
             store_account: [Accum(0); COMMODITY_COUNT],
             trade: TradeTable::new(config.faction_count),
             trade_log: Vec::new(),
+            collapsed_log: Vec::new(),
+            finished_log: Vec::new(),
+            founded_log: Vec::new(),
             market: MarketTable::new(config.faction_count, DEFAULT_BOARD_ROWS),
             land_list_bound: DEFAULT_LAND_LIST_BOUND,
         };
@@ -1958,6 +1989,22 @@ impl World {
         // [^5]: ADR-0157, a site's free places are its built housing less the residents the engine counts, decision D1. `docs/adrs/accepted/adr-0157-a-sites-free-places-are-its-built-housing-less-the-residents-the-engine-counts.md`
         self.settlements
             .set_housing(settlement, self.founding_housing);
+        // **This is the one place a settlement comes into existence, so it is
+        // the one place that says so.** Every caller path and the settle
+        // system pass through here. The census row is a count of what stands,
+        // so it falls when a settlement is lost and it hides a founding in
+        // the same tick.
+        //
+        // A founding between two steps stays in the log until the next step
+        // clears it.
+        if let Some(tile) = self.grid.index_of(address) {
+            self.founded_log.push(SettlementFounded::new(
+                self.tick,
+                settlement.to_bits(),
+                tile,
+                faction,
+            ));
+        }
         Ok(settlement)
     }
 
@@ -4848,6 +4895,14 @@ impl World {
         }
 
         self.trade_log.clear();
+        // **These three logs are cleared here, before any system runs.** The
+        // rule for every log in this engine is the same: a log holds what
+        // happened since the last step began, and a reader that misses a step
+        // misses the events. A settlement founded by a caller between two
+        // steps therefore survives to the next read.
+        self.collapsed_log.clear();
+        self.finished_log.clear();
+        self.founded_log.clear();
         self.fold_relations_into_the_census();
         self.relations.clear_log();
         self.tick = Tick(self.tick.0.wrapping_add(1));
@@ -6017,6 +6072,42 @@ impl World {
         self.upgrade_at(address).map(|site| site.condition.0)
     }
 
+    /// Returns the upgrades the wear pass removed since the last step began.
+    ///
+    /// **A removed upgrade leaves nothing behind.** The tile returns to the
+    /// world the generator made, so this log is the only record that anything
+    /// stood there. A reader that misses a step misses the events.
+    ///
+    /// The log is ordered by tile within the tick.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
+    #[must_use]
+    pub fn collapsed_log(&self) -> &[UpgradeCollapsed] {
+        &self.collapsed_log
+    }
+
+    /// Returns the upgrade levels that finished since the last step began.
+    ///
+    /// The log is ordered by tile within the tick. A reader that misses a
+    /// step misses the events.
+    #[must_use]
+    pub fn finished_log(&self) -> &[UpgradeFinished] {
+        &self.finished_log
+    }
+
+    /// Returns the settlements founded since the last step began.
+    ///
+    /// A founding by a caller between two steps lands here and stays until
+    /// the next step clears it. The log is ordered by the order the foundings
+    /// were made in, which no thread fixes: the settle path and every caller
+    /// path are serial.
+    #[must_use]
+    pub fn founded_log(&self) -> &[SettlementFounded] {
+        &self.founded_log
+    }
+
     /// Returns how many upgrades the last wear collapsed.
     ///
     /// The count describes one tick, in the same way the visit count of the
@@ -6292,7 +6383,28 @@ impl World {
         let Some(tile) = self.grid.index_of(address) else {
             return false;
         };
-        self.upgrades.remove(tile).is_some()
+        let Some(site) = self.upgrades.remove(tile) else {
+            return false;
+        };
+        // **An upgrade has two sinks, and both say so.** The wear pass writes
+        // the same event with a cause of its own. A destruction that wrote
+        // nothing would leave a watcher with a tile that changed and no
+        // reason for it.
+        let holder = self
+            .holding
+            .holders()
+            .get(tile.0 as usize)
+            .copied()
+            .unwrap_or(Holder::NOBODY);
+        self.collapsed_log.push(UpgradeCollapsed::new(
+            self.tick,
+            tile,
+            holder,
+            site.category.0,
+            site.level,
+            WEAR_CAUSE_ORDERED,
+        ));
+        true
     }
 
     /// Writes one project into the plan of one faction.
@@ -8484,8 +8596,44 @@ impl World {
             })
             .collect();
         self.upgrades.merge_ascending(&run, &self.upgrade_table);
+        self.publish_the_finished_levels();
         self.lodge_the_finished_levels(&run, &before);
         Ok(())
+    }
+
+    /// Writes one event for each level that the merge just raised.
+    ///
+    /// **A level that finished is a moment, and this is the one place that
+    /// says so.** The census counts how many upgrades stand and how many of
+    /// them claim a wonder. A count says that a thing happened and it does
+    /// not say where, whose it is, or which category rose.
+    ///
+    /// The merge gathers the raises in ascending tile order, so the log is
+    /// ordered by tile within the tick. Nothing here reads a thread
+    /// completion order.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
+    fn publish_the_finished_levels(&mut self) {
+        if self.upgrades.last_merge_raised().is_empty() {
+            return;
+        }
+        let tick = self.tick;
+        let holders = self.holding.holders();
+        let written: Vec<UpgradeFinished> = self
+            .upgrades
+            .last_merge_raised()
+            .iter()
+            .map(|site| {
+                let holder = holders
+                    .get(site.tile.0 as usize)
+                    .copied()
+                    .unwrap_or(Holder::NOBODY);
+                UpgradeFinished::new(tick, site.tile, holder, site.category.0, site.level)
+            })
+            .collect();
+        self.finished_log.extend_from_slice(&written);
     }
 
     /// Takes condition from every upgrade that the weather or an army wears.
@@ -8533,7 +8681,7 @@ impl World {
         let mut cursor = self.bridge.tile_cursor();
         // The sites are held in ascending tile order, so the run this builds
         // is in ascending tile order and the tile reader walks forward.
-        let run: Vec<(TileIdx, i64)> = self
+        let worn: Vec<(TileIdx, i64, u8, Holder)> = self
             .upgrades
             .sites()
             .iter()
@@ -8546,32 +8694,71 @@ impl World {
                     }
                     _ => 0,
                 };
-                let army = match holders
+                let holder = holders
                     .get(tile.0 as usize)
                     .copied()
-                    .unwrap_or(Holder::NOBODY)
-                    .faction()
-                {
+                    .unwrap_or(Holder::NOBODY);
+                let army = match holder.faction() {
                     Some(owner) => {
                         let hostile = self
                             .bridge
                             .units_on_tile(&mut cursor, tile)
                             .iter()
                             .filter(|unit| {
-                                self.soldiers.faction(**unit).is_some_and(|guest| {
-                                    self.relations.war_between(owner, guest)
-                                })
+                                self.soldiers
+                                    .faction(**unit)
+                                    .is_some_and(|guest| self.relations.war_between(owner, guest))
                             })
                             .count() as i64;
                         hostile.saturating_mul(upgrade::ARMY_WEAR_FOR_EACH_UNIT)
                     }
                     None => 0,
                 };
-                (tile, storm.saturating_add(army))
+                let cause = match (storm > 0, army > 0) {
+                    (true, true) => WEAR_CAUSE_BOTH,
+                    (true, false) => WEAR_CAUSE_WEATHER,
+                    (false, true) => WEAR_CAUSE_ARMY,
+                    (false, false) => 0,
+                };
+                (tile, storm.saturating_add(army), cause, holder)
             })
-            .filter(|(_, taken)| *taken > 0)
+            .filter(|(_, taken, _, _)| *taken > 0)
+            .collect();
+        let run: Vec<(TileIdx, i64)> = worn
+            .iter()
+            .map(|(tile, taken, _, _)| (*tile, *taken))
             .collect();
         self.upgrades.wear_ascending(&run);
+        // **An upgrade that collapsed leaves nothing behind, so the event is
+        // the only record of it.** The removed sites come back in ascending
+        // tile order and the run is in ascending tile order, so the two walk
+        // together and the log is ordered by tile within the tick. Nothing
+        // here reads a thread completion order.[^6]
+        //
+        // [^6]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
+        let removed = self.upgrades.last_wear_removed();
+        if !removed.is_empty() {
+            let tick = self.tick;
+            let mut there = 0usize;
+            let mut written = Vec::with_capacity(removed.len());
+            for site in removed {
+                while there < worn.len() && worn[there].0 .0 < site.tile.0 {
+                    there += 1;
+                }
+                let (cause, holder) = worn
+                    .get(there)
+                    .map_or((0, Holder::NOBODY), |entry| (entry.2, entry.3));
+                written.push(UpgradeCollapsed::new(
+                    tick,
+                    site.tile,
+                    holder,
+                    site.category.0,
+                    site.level,
+                    cause,
+                ));
+            }
+            self.collapsed_log.extend_from_slice(&written);
+        }
     }
 
     /// Raises the housing of a settlement for each level that the merge

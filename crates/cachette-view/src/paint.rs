@@ -380,6 +380,24 @@ const HOLDER_WEIGHT: u8 = 96;
 /// [^1]: PRD-0006, a place belongs to somebody. `docs/product/accepted/prd-0006-a-place-belongs-to-somebody.md`
 const EDGE_WEIGHT: u8 = 230;
 
+/// Returns the colours the viewer draws the factions in, in faction order.
+///
+/// **This is the one statement of the table, and a caller reads it here.**
+/// The demonstration wrote its own copy of the six numbers, and nothing
+/// failed when the two disagreed.[^1] A faction beyond the table wraps to a
+/// colour it shares, which is a display limit and not a simulation one.
+///
+/// The colours are the viewer's own. The engine holds none.[^2]
+///
+/// # References
+///
+/// [^1]: Recurring Defect Shapes, shape 1. `.agents/rules/recurring-defects.md`
+/// [^2]: ADR-0067, the viewer reads the world and never writes to it, decision D2. `docs/adrs/accepted/adr-0067-the-viewer-reads-the-world-and-never-writes-to-it.md`
+#[must_use]
+pub const fn faction_colours() -> &'static [u32] {
+    &FACTION_COLOURS
+}
+
 /// Returns the colour the viewer draws a faction in.
 ///
 /// The colour is the viewer's own. The engine holds no colour and never

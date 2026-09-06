@@ -24,8 +24,8 @@
 
 use cachette_core::cohort::NeedRule;
 use cachette_core::growth;
-use cachette_core::sim_math;
 use cachette_core::rates::RateSchedule;
+use cachette_core::sim_math;
 use cachette_core::site::CommodityId;
 use cachette_core::unit_type::WORKER;
 use cachette_core::{
