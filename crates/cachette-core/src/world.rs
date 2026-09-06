@@ -1210,6 +1210,8 @@ struct CensusTotals {
     queue_refused_without_goods: i64,
     /// The orders the queue verb refused, over the run.
     queue_refused_at_the_verb: i64,
+    /// The people the growth stage added, over the run.
+    births: i64,
 }
 
 impl World {
@@ -8620,6 +8622,13 @@ impl World {
         // The count is a census of one tick, and this stage is where the
         // tick starts for it. A world that cannot grow and a world that
         // chose not to both read zero here, and the free places say which.
+        //
+        // The run total is folded here, immediately before the per-tick
+        // count is emptied, because this is the one site that empties
+        // it.[^7]
+        //
+        // [^7]: Findings register, FND-498. `docs/FINDINGS.md`
+        self.census.births += i64::from(self.births);
         self.births = 0;
         if !self.growth_schedule.due(self.tick) {
             return;
@@ -10583,6 +10592,16 @@ pub const SUBSYSTEM_CENSUS: &[CensusRow] = &[
         name: "settlements",
         basis: CensusBasis::Held,
         read: |world| i64::from(world.settlements.len()),
+    },
+    // The people the growth stage added over the run. The stage counts one
+    // tick and clears that count before it acts, so the world folds the tick
+    // into a run total at the site that clears it.[^6]
+    //
+    // [^6]: ADR-0082, the store sets the rate of a birth and the housing admits it, decision D1. `docs/adrs/draft/adr-0082-the-store-sets-the-rate-of-a-birth-and-the-housing-admits-it.md`
+    CensusRow {
+        name: "births",
+        basis: CensusBasis::Total,
+        read: |world| world.census.births + i64::from(world.births),
     },
     // What the build queue of every site has made, and what it has refused.
     // The two refusals of a finished entry stay apart, because they mean

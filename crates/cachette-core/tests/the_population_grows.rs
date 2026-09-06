@@ -27,7 +27,18 @@ use cachette_core::growth;
 use cachette_core::rates::RateSchedule;
 use cachette_core::site::CommodityId;
 use cachette_core::unit_type::WORKER;
-use cachette_core::{Axial, Entity, FactionId, Fix32, World, WorldConfig, FOUNDING_GROUP_DEFAULT};
+use cachette_core::{
+    Axial, Entity, FactionId, Fix32, World, WorldConfig, FOUNDING_GROUP_DEFAULT, SUBSYSTEM_CENSUS,
+};
+
+/// Returns one census count by name.
+fn census(world: &World, name: &str) -> i64 {
+    SUBSYSTEM_CENSUS
+        .iter()
+        .find(|row| row.name == name)
+        .map(|row| (row.read)(world))
+        .expect("the census holds the row")
+}
 
 /// The commodity that every fixture uses.
 const GOOD: CommodityId = CommodityId(0);
@@ -426,6 +437,37 @@ fn one_growth_event_adds_one_person_and_the_reader_follows() {
         residents_by_a_full_pass(&world, site),
         3,
         "the store had nothing left to pay with"
+    );
+}
+
+/// The census row counts the births of the run, and it never falls.
+///
+/// **The row and the per-tick reader are two questions.** The stage clears
+/// the per-tick count before it acts, so a row that read it would fall to
+/// zero on the first quiet tick and a reader could not tell a run that grew
+/// nobody from a run that stopped growing.[^5]
+///
+/// The fixture affords one birth and then runs five quiet ticks, which is the
+/// extreme the row lives at.
+///
+/// # References
+///
+/// [^5]: Findings register, FND-498. `docs/FINDINGS.md`
+#[test]
+fn the_census_counts_the_births_of_the_run_and_never_falls() {
+    let (mut world, _site) = one_site(FOOD, 3, 2);
+    assert_eq!(census(&world, "births"), 0, "the fixture starts at zero");
+    run(&mut world, 1, 1);
+    assert_eq!(world.births(), 1, "the tick reader must report one birth");
+    assert_eq!(census(&world, "births"), 1, "the row must count the birth");
+    // The store paid for the one birth it could afford, so these ticks grow
+    // nobody. The per-tick reader falls and the row does not.
+    run(&mut world, 5, 1);
+    assert_eq!(world.births(), 0, "the tick reader must fall");
+    assert_eq!(
+        census(&world, "births"),
+        1,
+        "the row must still say what the run grew"
     );
 }
 
