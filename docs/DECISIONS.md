@@ -23,7 +23,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^ALLOC]
 
-**Next number: DEC-273**
+**Next number: DEC-274**
 
 ## Open
 
@@ -1821,6 +1821,42 @@ figure is 168 MB. The storage argument for vectors is stronger than the report
 concluded, and it called that argument its weakest.
 
 ## Closed
+
+### DEC-273 — Does the world seeder always give a playable world, or may it refuse a seed?
+
+**Closed. Option B. The seeder may refuse, the refusal is a named and tested
+outcome, and the extent the demonstration uses never reaches it.**
+
+The demonstration draws a new seed on every run, so a seed that gives a world
+with nothing in it is a run a watcher learns nothing from.[^DEC273SA] A seeded
+world is playable when every faction is seated, every seat stands on ground that
+admits a unit, the ground of a seat holds its group, and two seats keep the
+distance the rule asks.[^DEC273SB]
+
+**Option A. The seeder gives a playable world by construction.** The placement
+search retries, or the world generator guarantees enough suitable ground.
+
+**Option B. The seeder may refuse a seed, and the caller draws again.** The
+refusal is typed, one outcome for each faction, and a test states it.
+
+**Why B.** Option A cannot be met. Two seats keep a fixed distance, and a world
+of side 16 holds no second place at that distance, whatever the search
+does.[^DEC273SC] A search that widened its sample until it succeeded would be a
+pass over every tile with extra steps, and the founding record refuses
+it.[^DEC273SD] A loop that redraws until it succeeds is a convergence test, and
+the solver record refuses one.[^FIXEDITER] A bounded retry would also be inert
+code, because the measurement found no seed at the demonstration extent that
+needs one.
+
+**What it costs.** A caller that asks for a small world gets a world that seats
+some of its factions or none of them, and the caller draws again or asks for a
+wider world. The engine does not draw for it.
+
+**What follows.** A sweep of 200 seeds of the demonstration world seated four
+factions of four at every seed, and the seating falls with the extent. The
+findings register holds the table, and three tests hold the
+statements.[^DEC273SF] [^DEC273SB] No retry loop exists anywhere in the seeding.
+
 
 ### DEC-250 — How does a Python caller learn how many unit types the world holds?
 
@@ -3891,7 +3927,7 @@ game rule, and a blocker holds the rules of that game.[^DEC214D]
 content must name the register, by a footnote marker or by a row number.**
 
 **The question.** A check now fails when a document states in prose what a
-register holds.[^DEC272A] A register is the current statement, so a copy of it
+register holds.[^DEC273A] A register is the current statement, so a copy of it
 in prose goes false when the register moves and nothing fails. The check reads
 phrases, and a phrase cannot see the difference between a document that repeats
 a register and a document that cites one. A check that cannot tell them apart
@@ -3912,7 +3948,7 @@ and read a row of a table as a paragraph of its own.**
 day it lands, and a gate nobody can turn green is a gate everybody skips.
 Option B fails on ordinary prose: a writer states a claim in one sentence and
 names the register in the next. The measurement is in the findings
-register.[^DEC272B] Option C keeps the failing set to the documents that give a
+register.[^DEC273B] Option C keeps the failing set to the documents that give a
 reader no route back to the register at all.
 
 **What follows.** The check buys a subset and the script says which subset in
@@ -4135,8 +4171,8 @@ exactly so that a caller cannot build a wrong one.[^DEC120C]
 [^DEC224A]: Review of backlog item 0345, section 10. `docs/reviews/0345-resolve-a-meeting.md`
 [^DEC224B]: Backlog item 0432, decide the lifetime of every log the bindings expose. `docs/backlog/proposed/0432-decide-the-lifetime-of-every-log-the-bindings-expose.md`
 
-[^DEC272A]: The register prose check. `scripts/check_register_prose.py`
-[^DEC272B]: Findings register, FND-532. `docs/FINDINGS.md`
+[^DEC273A]: The register prose check. `scripts/check_register_prose.py`
+[^DEC273B]: Findings register, FND-532. `docs/FINDINGS.md`
 
 [^DEC261A]: ADR-0014, entity identity is an index plus a generation, decision D3. `docs/adrs/accepted/adr-0014-entity-identity-is-an-index-plus-a-generation.md`
 [^DEC261B]: ADR-0085, an entity crosses to Python as one opaque identity that the engine resolves, decision D2. `docs/adrs/accepted/adr-0085-an-entity-crosses-to-python-as-one-opaque-identity.md`
@@ -4423,3 +4459,8 @@ exactly so that a caller cannot build a wrong one.[^DEC120C]
 [^DEC238A]: ADR-0141, a weather pass moves water and never scales it, decision D2. `docs/adrs/draft/adr-0141-a-weather-pass-moves-water-and-never-scales-it.md`
 [^D143A]: ADR-0151, an upgrade is a category with a ground fit and a level, decisions D1 and D6. `docs/adrs/accepted/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
 [^D143B]: Backlog item 0486. `docs/backlog/complete/0486-turn-the-upgrade-kind-into-a-table-of-category-ground-fit-and-level.md`
+[^DEC273SA]: The demonstration, which draws a seed when the watcher names none. `python/cachette/demo/app.py`
+[^DEC273SB]: The tests of a playable seeded world. `crates/cachette-core/tests/a_seeded_world_is_playable.rs`
+[^DEC273SC]: ADR-0076, a founding keeps a fixed distance from the foundings before it, decision D1. `docs/adrs/accepted/adr-0076-a-founding-keeps-a-fixed-distance-from-the-foundings-before-it.md`
+[^DEC273SD]: ADR-0075, the founding choice reads a bounded sample of the world, decision D1. `docs/adrs/accepted/adr-0075-the-founding-choice-reads-a-bounded-sample-of-the-world.md`
+[^DEC273SF]: Findings register, FND-544. `docs/FINDINGS.md`
