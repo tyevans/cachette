@@ -81,6 +81,18 @@ fn declare_war(world: &mut World, from: FactionId, to: FactionId) {
     assert!(world.set_relation(from, to, war));
 }
 
+/// Reports whether a faction holds a live unit whose type carries command
+/// reach. Such a unit is a speaker, and the relation verb refuses a faction
+/// that holds none.
+fn has_speaker(world: &World, faction: FactionId) -> bool {
+    world.soldiers().iter().any(|unit| {
+        world.soldiers().faction(unit) == Some(faction)
+            && world
+                .unit_type_row(unit)
+                .is_some_and(|row| row.command_reach > 0)
+    })
+}
+
 /// Builds the extreme the gate test needs: the largest attack the scale holds
 /// on the tile beside a group with no armour. Nothing but the gate can stop a
 /// casualty here.
@@ -445,9 +457,14 @@ fn the_rival_is_the_largest_other_faction_and_a_tie_goes_low() {
 #[test]
 fn the_controller_moves_a_relation_through_the_verb() {
     // The world seeds itself, so every faction has a seat. Every unit of the
-    // first faction becomes a leader, so the faction has a speaker. The other
-    // faction keeps workers and has none, so it plans no move and the verb
-    // is never asked to refuse it.
+    // first faction becomes a leader, so the faction has a speaker from the
+    // first tick. The other faction starts with none.
+    //
+    // **The second faction does not stay without one.** A faction with no
+    // unit that carries command reach queues a leader outright, so it builds
+    // one and then speaks. The rule under test is therefore read tick by
+    // tick: while a faction holds no speaker, it plans no move, and the entry
+    // it would move stands still.
     let mut world = World::new(WorldConfig {
         width: 64,
         height: 64,
@@ -465,33 +482,51 @@ fn the_controller_moves_a_relation_through_the_verb() {
     }
     let start = world.relation(A, B).expect("the pair exists");
     let mut moves = 0i64;
-    let mut by_b = 0usize;
-    for _ in 0..200 {
+    let mut speechless = 0usize;
+    for tick in 0..200 {
+        // The plan reads the arena at the head of the step, so the state
+        // before the step is the state the plan saw.
+        let spoke = has_speaker(&world, B);
+        let before = world.relation(B, A).expect("the pair exists");
         world.step(4).expect("the step runs");
         moves += world
             .subsystem_census()
             .iter()
             .find(|(name, _)| *name == "relation_moves")
             .map_or(0, |(_, count)| *count);
-        by_b += world
+        let by_b = world
             .controller_log()
             .iter()
             .filter(|command| command.kind == COMMAND_RELATION && command.faction == B)
             .count();
+        if spoke {
+            continue;
+        }
+        speechless += 1;
+        assert_eq!(
+            by_b, 0,
+            "a faction with no speaker planned a move on tick {tick}"
+        );
+        assert_eq!(
+            world.relation(B, A),
+            Some(before),
+            "the faction with no speaker moved the entry on tick {tick}"
+        );
     }
     assert!(
         moves > 0,
         "the controller never moved a relation in 200 ticks"
     );
-    assert_eq!(by_b, 0, "a faction with no speaker plans no move");
+    // The fixture must reach the case it asserts on. A run in which the
+    // second faction speaks from the first tick would pass the loop above on
+    // nothing at all.
+    assert!(
+        speechless > 0,
+        "the second faction held a speaker on every tick, so the rule was never read"
+    );
     assert!(
         world.relation(A, B).expect("the pair exists") <= start,
         "the moves go toward war and the drift cannot outrun them here"
-    );
-    assert_eq!(
-        world.relation(B, A),
-        Some(start),
-        "the faction with no speaker moved nothing"
     );
 }
 
