@@ -12,11 +12,27 @@
 //! A store that never runs low passes a shortfall test that a real shortage
 //! would fail.[^3]
 //!
+//! # The rate the pass applies is derived
+//!
+//! A test here sets a stored rate, and the pass applies the effective rate.
+//! The pipeline scales the stored production rate by what the world holds,
+//! and it adds a share of the store and a share of the ration of each
+//! resident to the stored upkeep.[^4] A test that stated a store literal
+//! would therefore state the whole pipeline, and it would fail on every
+//! change to a weight that these tests do not govern.
+//!
+//! Each test below reads the effective rate from the engine and states the
+//! schedule against it. The schedule is what these tests own: how often the
+//! pass applies, which tick inside the period it applies on, and what the
+//! pass does with a store that cannot hold the production or cannot pay the
+//! bill.
+//!
 //! # References
 //!
 //! [^1]: Testing rules, drive the real caller. `.claude/rules/testing.md`
 //! [^2]: Testing rules, section 2. `.claude/rules/testing.md`
 //! [^3]: Testing rules, section 2a. `.claude/rules/testing.md`
+//! [^4]: ADR-0062, production and upkeep are rates attached to a site, decisions D1 and D7. `docs/adrs/accepted/adr-0062-production-and-upkeep-are-rates-attached-to-a-site.md`
 
 use cachette_core::rates::{RateError, RateSchedule};
 use cachette_core::sim_math;
@@ -55,6 +71,58 @@ fn run(world: &mut World, frames: u64, threads: usize) {
     }
 }
 
+/// Returns what the store of a site holds.
+fn held(world: &World, site: Entity) -> Option<Fix32> {
+    world
+        .settlements()
+        .store(site)
+        .and_then(|store| store.quantity(GOOD))
+}
+
+/// Returns what one application of the production of a site pays.
+///
+/// The pass applies the effective rate, so the fixture reads that rate rather
+/// than the stored one. The two differ by the pipeline, which these tests do
+/// not govern.
+fn earned_each_application(world: &World, site: Entity) -> Fix32 {
+    let rate = world
+        .effective_production_rate(site, GOOD)
+        .expect("the site is live");
+    world.economy_schedule().per_application(rate)
+}
+
+/// Returns what one application of the upkeep of a site charges.
+fn owed_each_application(world: &World, site: Entity) -> Fix32 {
+    let rate = world
+        .effective_upkeep_rate(site, GOOD)
+        .expect("the site is live");
+    world.economy_schedule().per_application(rate)
+}
+
+/// Writes a store that stands a stated number of raw units below the bill
+/// that the next application charges, and returns the bill.
+///
+/// The derived upkeep holds a share of the store itself, so the bill moves
+/// when the store moves, and the store the fixture wants is a fixed point.
+/// The loop finds it and the assertion below states that it did. A fixture
+/// that missed the point would put the store somewhere other than the
+/// boundary, and the boundary is the whole case.
+fn store_below_the_bill(world: &mut World, site: Entity, below: i32) -> Fix32 {
+    let mut written = Fix32::ZERO;
+    for _ in 0..32 {
+        world
+            .set_settlement_store(site, GOOD, written)
+            .expect("the commodity is inside the set");
+        let bill = owed_each_application(world, site);
+        let wanted = Fix32(bill.0 - below);
+        if wanted == written {
+            return bill;
+        }
+        written = wanted;
+    }
+    panic!("the fixture found no store that stands {below} raw units below the bill");
+}
+
 #[test]
 fn a_site_produces_into_its_store_at_the_interval() {
     let (mut world, site) = one_site(2, 0);
@@ -62,24 +130,50 @@ fn a_site_produces_into_its_store_at_the_interval() {
         world.set_production_rate(site, GOOD, Fix32::from_int(3)),
         Ok(true)
     );
-    // The schedule applies at tick 2 and at tick 4. Six frames therefore hold
-    // three applications, and each one pays three units for each of the two
-    // ticks in the period.
-    run(&mut world, 6, 1);
-    let held = world
-        .settlements()
-        .store(site)
-        .and_then(|store| store.quantity(GOOD))
-        .expect("the site is live");
-    assert_eq!(held, Fix32::from_int(3 * 2 * 3));
+    let earned = earned_each_application(&world, site);
+    assert!(
+        earned > Fix32::ZERO,
+        "the fixture must earn something, or it tests nothing"
+    );
+
+    // The schedule applies at tick 2, at tick 4 and at tick 6. The first
+    // frame therefore moves nothing.
+    run(&mut world, 1, 1);
+    assert_eq!(
+        held(&world, site),
+        Some(Fix32::ZERO),
+        "tick one is not an application tick"
+    );
+    run(&mut world, 1, 1);
+    assert_eq!(
+        held(&world, site),
+        Some(earned),
+        "the first application pays one period of the rate"
+    );
+
+    // Six frames hold three applications. The store carries the derived
+    // upkeep as well, so the count of what the pass paid in is the ledger.
+    run(&mut world, 4, 1);
+    assert_eq!(
+        world.rate_ledger().produced[0].0,
+        3 * i64::from(earned.0),
+        "six frames must hold three applications"
+    );
 }
 
 #[test]
 fn a_store_rises_by_the_rate_multiplied_by_the_ticks_that_passed() {
     // The rate is what one tick earns. The period says how often the store
-    // moves, and it does not say how much the store moves over time. Two
+    // moves, and it does not say how much the source pays over time. Two
     // worlds on different periods must therefore agree after a whole number
     // of periods.
+    //
+    // **The reading is the ledger and not the store.** The upkeep now holds a
+    // share of the store itself, and a share of a store is a drain that the
+    // period discretises. Two worlds on different periods hold the store over
+    // different spans, so they pay different amounts to keep it, and their
+    // stores part. What each one earned does not depend on the period, and
+    // that is the claim this test holds.
     let (mut fast, quick_site) = one_site(2, 0);
     let (mut slow, slow_site) = one_site(6, 0);
     assert_eq!(
@@ -90,18 +184,27 @@ fn a_store_rises_by_the_rate_multiplied_by_the_ticks_that_passed() {
         slow.set_production_rate(slow_site, GOOD, Fix32::from_int(5)),
         Ok(true)
     );
+    let rate = fast
+        .effective_production_rate(quick_site, GOOD)
+        .expect("the site is live");
+    assert_eq!(
+        rate,
+        slow.effective_production_rate(slow_site, GOOD)
+            .expect("the site is live"),
+        "the two worlds must hold one rate, or the totals below differ for \
+         another reason"
+    );
+
     run(&mut fast, 12, 1);
     run(&mut slow, 12, 1);
-    let quick = fast
-        .settlements()
-        .store(quick_site)
-        .and_then(|store| store.quantity(GOOD));
-    let sluggish = slow
-        .settlements()
-        .store(slow_site)
-        .and_then(|store| store.quantity(GOOD));
-    assert_eq!(quick, Some(Fix32::from_int(5 * 12)));
+    let quick = fast.rate_ledger().produced[0].0;
+    let sluggish = slow.rate_ledger().produced[0].0;
+    assert_eq!(quick, i64::from(rate.0) * 12, "twelve ticks passed");
     assert_eq!(quick, sluggish);
+    assert!(
+        held(&fast, quick_site).expect("the site is live") > Fix32::ZERO,
+        "the fixture must leave something in the store, or it tests nothing"
+    );
 }
 
 #[test]
@@ -119,18 +222,25 @@ fn the_period_decides_how_often_the_store_moves() {
         slow.set_production_rate(slow_site, GOOD, Fix32::from_int(5)),
         Ok(true)
     );
+    let quick_pays = earned_each_application(&fast, quick_site);
     run(&mut fast, 4, 1);
     run(&mut slow, 4, 1);
     assert_eq!(
-        fast.settlements()
-            .store(quick_site)
-            .and_then(|store| store.quantity(GOOD)),
-        Some(Fix32::from_int(20))
+        fast.rate_ledger().produced[0].0,
+        2 * i64::from(quick_pays.0),
+        "four frames hold two applications of the shorter period"
+    );
+    assert!(
+        held(&fast, quick_site).expect("the site is live") > Fix32::ZERO,
+        "the faster period must have moved the store"
     );
     assert_eq!(
-        slow.settlements()
-            .store(slow_site)
-            .and_then(|store| store.quantity(GOOD)),
+        slow.rate_ledger().produced[0].0,
+        0,
+        "the slower period must not have applied yet"
+    );
+    assert_eq!(
+        held(&slow, slow_site),
         Some(Fix32::ZERO),
         "the slower period must not have applied yet"
     );
@@ -148,23 +258,20 @@ fn the_phase_decides_which_tick_inside_the_period_applies() {
         late.set_production_rate(late_site, GOOD, Fix32::from_int(1)),
         Ok(true)
     );
+    // The store of the late world starts empty, so the first application owes
+    // nothing to keep it and the store afterwards is what the rate paid.
+    let paid = earned_each_application(&late, late_site);
+    assert!(
+        paid > Fix32::ZERO,
+        "the fixture must earn something, or it tests nothing"
+    );
+
     // Three frames reach tick 3. The phase of zero applies at tick 4, so it
     // has not applied. The phase of three applies at tick 3, so it has.
     run(&mut early, 3, 1);
     run(&mut late, 3, 1);
-    assert_eq!(
-        early
-            .settlements()
-            .store(early_site)
-            .and_then(|store| store.quantity(GOOD)),
-        Some(Fix32::ZERO)
-    );
-    assert_eq!(
-        late.settlements()
-            .store(late_site)
-            .and_then(|store| store.quantity(GOOD)),
-        Some(Fix32::from_int(4))
-    );
+    assert_eq!(held(&early, early_site), Some(Fix32::ZERO));
+    assert_eq!(held(&late, late_site), Some(paid));
 }
 
 #[test]
@@ -172,23 +279,27 @@ fn a_site_pays_this_bill_from_these_earnings() {
     // Production runs before upkeep in one application. A site that earns
     // exactly what it owes therefore stays solvent, and it reports no
     // shortfall. The reverse order would make it insolvent every time.
+    //
+    // The upkeep the fixture stores is the rate the pipeline gives the
+    // production, and not the rate the test stored. A site that earns its
+    // bill holds nothing afterwards, so the derived share of the store adds
+    // nothing on any later application and the two sides stay equal.
     let (mut world, site) = one_site(2, 0);
     assert_eq!(
         world.set_production_rate(site, GOOD, Fix32::from_int(4)),
         Ok(true)
     );
+    let earns = world
+        .effective_production_rate(site, GOOD)
+        .expect("the site is live");
+    assert_eq!(world.set_upkeep_rate(site, GOOD, earns), Ok(true));
     assert_eq!(
-        world.set_upkeep_rate(site, GOOD, Fix32::from_int(4)),
-        Ok(true)
+        world.effective_upkeep_rate(site, GOOD),
+        Some(earns),
+        "the fixture must owe exactly what it earns, or it tests nothing"
     );
     run(&mut world, 8, 1);
-    assert_eq!(
-        world
-            .settlements()
-            .store(site)
-            .and_then(|store| store.quantity(GOOD)),
-        Some(Fix32::ZERO)
-    );
+    assert_eq!(held(&world, site), Some(Fix32::ZERO));
     assert_eq!(
         world.rate_ledger().shortfall[0].0,
         0,
@@ -203,26 +314,24 @@ fn a_site_pays_this_bill_from_these_earnings() {
 #[test]
 fn a_store_one_unit_short_stops_at_zero_and_reports_the_shortfall() {
     let (mut world, site) = one_site(2, 0);
-    // The upkeep of one application is two units, because the rate is one
-    // unit each tick and the period is two ticks.
-    let owed = world.economy_schedule().per_application(Fix32::from_int(1));
-    assert_eq!(owed, Fix32::from_int(2));
     assert_eq!(
         world.set_upkeep_rate(site, GOOD, Fix32::from_int(1)),
         Ok(true)
     );
     // The store is one raw unit short of the bill. This is the boundary: a
     // store that could pay proves nothing about the case that cannot.
+    let owed = store_below_the_bill(&mut world, site, 1);
     let short = Fix32(owed.0 - 1);
-    assert_eq!(world.set_settlement_store(site, GOOD, short), Ok(true));
+    assert_eq!(
+        held(&world, site),
+        Some(short),
+        "the fixture must stand one raw unit below the bill"
+    );
 
     run(&mut world, 2, 1);
 
     assert_eq!(
-        world
-            .settlements()
-            .store(site)
-            .and_then(|store| store.quantity(GOOD)),
+        held(&world, site),
         Some(Fix32::ZERO),
         "the store stops at zero and never goes below it"
     );
@@ -241,15 +350,25 @@ fn a_store_that_can_pay_reports_no_shortfall() {
     // The companion of the test above. A fixture that always fell short
     // would pass a shortfall test that never reached the paying case.
     let (mut world, site) = one_site(2, 0);
-    let owed = world.economy_schedule().per_application(Fix32::from_int(1));
     assert_eq!(
         world.set_upkeep_rate(site, GOOD, Fix32::from_int(1)),
         Ok(true)
     );
-    assert_eq!(world.set_settlement_store(site, GOOD, owed), Ok(true));
+    let owed = store_below_the_bill(&mut world, site, 0);
+    assert_eq!(
+        held(&world, site),
+        Some(owed),
+        "the fixture must hold exactly the bill"
+    );
+    assert!(owed > Fix32::ZERO, "the fixture must owe something");
     run(&mut world, 2, 1);
     assert!(world.shortfall_log().is_empty());
     assert_eq!(world.rate_ledger().shortfall[0].0, 0);
+    assert_eq!(
+        world.rate_ledger().spent[0].0,
+        i64::from(owed.0),
+        "the store paid the whole bill"
+    );
 }
 
 #[test]
@@ -266,14 +385,26 @@ fn production_that_the_store_cannot_hold_becomes_a_spill() {
         world.set_production_rate(site, GOOD, Fix32::from_int(100)),
         Ok(true)
     );
+    // The bill a store of this size carries is the share of itself that the
+    // pipeline charges to keep it. Production runs first, so the store
+    // saturates at the ceiling and then pays that bill out of the ceiling.
+    let offered = earned_each_application(&world, site);
+    let bill = owed_each_application(&world, site);
+    assert!(
+        bill > Fix32::ZERO,
+        "a store at the ceiling must owe something to keep"
+    );
     run(&mut world, 2, 1);
+    let after = held(&world, site).expect("the site is live");
+    assert!(
+        after > Fix32::ZERO,
+        "the store saturated at its ceiling and never wrapped, but it holds \
+         {after:?}"
+    );
     assert_eq!(
-        world
-            .settlements()
-            .store(site)
-            .and_then(|store| store.quantity(GOOD)),
-        Some(Fix32::MAX),
-        "the store saturates at its ceiling and never wraps"
+        after,
+        sim_math::sub(Fix32::MAX, bill),
+        "the store reached the ceiling and paid the bill from it"
     );
     assert_eq!(
         world.rate_ledger().produced[0].0,
@@ -284,12 +415,9 @@ fn production_that_the_store_cannot_hold_becomes_a_spill() {
         world.rate_ledger().spilled[0].0 > 0,
         "the fixture must reach the ceiling, or it tests nothing"
     );
-    let scaled = world
-        .economy_schedule()
-        .per_application(Fix32::from_int(100));
     assert_eq!(
         world.rate_ledger().produced[0].0 + world.rate_ledger().spilled[0].0,
-        i64::from(scaled.0),
+        i64::from(offered.0),
         "what landed plus what spilled is what the rate offered"
     );
 }
@@ -474,6 +602,7 @@ fn what_a_site_produced_minus_what_it_spent_is_what_it_holds() {
         "the fixture must reach a site that cannot pay, or it never tests the shortfall"
     );
 }
+
 
 #[test]
 fn the_totals_of_a_long_run_do_not_depend_on_the_thread_count() {
