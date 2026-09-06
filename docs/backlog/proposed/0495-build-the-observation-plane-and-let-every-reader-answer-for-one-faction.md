@@ -118,7 +118,7 @@ Filled in when the item moves to `complete/`.
 [^2]: The world module of the core crate, the subsystem census. `crates/cachette-core/src/world.rs`
 [^3]: PRD-0056, a learner plays one faction against the controllers. `docs/product/accepted/prd-0056-a-learner-plays-one-faction-against-the-controllers.md`
 [^4]: ADR-0154, the observation and the action of a faction are schema-declared bounded tables the engine owns, decision D3. `docs/adrs/accepted/adr-0154-the-observation-and-the-action-of-a-faction-are-schema-declared-bounded-tables.md`
-[^5]: ADR-0059, fog storage grows with observed area, not with world area. `docs/adrs/draft/adr-0059-fog-storage-grows-with-observed-area.md`
+[^5]: ADR-0059, fog storage grows with observed area, not with world area. `docs/adrs/accepted/adr-0059-fog-storage-grows-with-observed-area.md`
 [^6]: Research report 08, fog of war representation. `docs/research/reports/08-fog-of-war-representation.md`
 [^7]: ADR-0111, the presence relation is derived at the end of the step and never stored as a fact, decision D2. `docs/adrs/draft/adr-0111-the-presence-relation-is-derived-at-the-end-of-the-step.md`
 [^8]: Balance register. `docs/reference/balance.md`
