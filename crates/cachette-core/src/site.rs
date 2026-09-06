@@ -2,8 +2,13 @@
 //!
 //! The entity storage holds four fixed shapes, and each shape gets its own
 //! set of columns.[^1] The settlement is the fixed shape. A settlement
-//! carries a generational identity, the tile it stands on, a faction, and a
-//! pooled store.
+//! carries a generational identity, the tile it stands on, a faction, a
+//! pooled store, and the housing that stands there.
+//!
+//! **The housing column is a stored quantity and the ground never sets
+//! it.** It follows from what has been built at the settlement. The column
+//! is named `housing` and never `capacity`, because the arena already uses
+//! that word for the ceiling on the slot index.[^9]
 //!
 //! The shapes do not vary at run time. A shape that is not one of the four
 //! is a compile-time error here, because a column set is a Rust type and
@@ -34,6 +39,7 @@
 //! [^6]: Findings register, FND-040. `docs/FINDINGS.md`
 //! [^7]: ADR-0002, simulated and aggregated state holds no floating point number, decision D1. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
 //! [^8]: Findings register, FND-043. `docs/FINDINGS.md`
+//! [^9]: ADR-0157, a site's free places are its built housing less the residents the engine counts, decision D1. `docs/adrs/accepted/adr-0157-a-sites-free-places-are-its-built-housing-less-the-residents-the-engine-counts.md`
 
 use std::collections::VecDeque;
 
@@ -271,7 +277,17 @@ pub struct SettlementArena {
     /// The shape of the world that holds the settlements.
     grid: Grid,
     /// The largest number of slots that the arena opens.
-    capacity: u32,
+    ///
+    /// **This is a ceiling on the slot index and never a number of
+    /// people.** The housing column holds what a settlement houses. One
+    /// word with two meanings inside one shape is a defect that only a
+    /// reader catches, and nothing fails when a reader takes the wrong
+    /// one.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0157, a site's free places are its built housing less the residents the engine counts, decision D1. `docs/adrs/accepted/adr-0157-a-sites-free-places-are-its-built-housing-less-the-residents-the-engine-counts.md`
+    slot_ceiling: u32,
     /// The generation of each slot. Zero means the slot carries no identity.
     generations: Vec<u32>,
     /// One for a live slot, zero for a free slot or a retired slot.
@@ -282,6 +298,23 @@ pub struct SettlementArena {
     factions: Vec<FactionId>,
     /// The pooled store of each slot.
     stores: Vec<Store>,
+    /// The housing that stands at each slot.
+    ///
+    /// **The housing is stored and the ground never sets it.** It follows
+    /// from what has been built at the settlement, so what a faction builds
+    /// is what limits it.[^1] It is a whole number, so a sum of the housing
+    /// of many settlements combines to the same total in any order.[^2]
+    ///
+    /// It is a quantity of housing and not a count of people. The people it
+    /// holds is that quantity divided by the housing one person takes, and
+    /// the balance register holds both rows.[^3]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0157, a site's free places are its built housing less the residents the engine counts, decision D1. `docs/adrs/accepted/adr-0157-a-sites-free-places-are-its-built-housing-less-the-residents-the-engine-counts.md`
+    /// [^2]: ADR-0023, an aggregate combines exactly in any order, decision D2. `docs/adrs/accepted/adr-0023-an-aggregate-combines-exactly-in-any-order.md`
+    /// [^3]: Balance register, the population. `docs/reference/balance.md`
+    housing: Vec<u32>,
     /// The settlement that stands on each tile, in tile order.
     ///
     /// This column is the tile side of the fact that the tile column of the
@@ -308,23 +341,24 @@ impl SettlementArena {
     /// the range of the index, not a cost budget.
     #[must_use]
     pub fn new(grid: Grid) -> Self {
-        Self::with_capacity(grid, SLOT_INDEX_LIMIT)
+        Self::with_slot_ceiling(grid, SLOT_INDEX_LIMIT)
     }
 
-    /// Builds an arena that opens at most `capacity` slots.
+    /// Builds an arena that opens at most `slot_ceiling` slots.
     ///
-    /// A caller that asks for more settlements than the capacity gets a
-    /// typed refusal.
+    /// A caller that asks for more settlements than the ceiling gets a
+    /// typed refusal. The ceiling counts slots and never people.
     #[must_use]
-    pub fn with_capacity(grid: Grid, capacity: u32) -> Self {
+    pub fn with_slot_ceiling(grid: Grid, slot_ceiling: u32) -> Self {
         Self {
             grid,
-            capacity,
+            slot_ceiling,
             generations: Vec::new(),
             live: Vec::new(),
             tiles: Vec::new(),
             factions: Vec::new(),
             stores: Vec::new(),
+            housing: Vec::new(),
             holders: vec![None; grid.tile_count() as usize],
             free: VecDeque::new(),
             live_count: 0,
@@ -339,9 +373,12 @@ impl SettlementArena {
     }
 
     /// Returns the largest number of slots that the arena opens.
+    ///
+    /// This is a ceiling on the slot index. It is never a number of
+    /// people.
     #[must_use]
-    pub const fn capacity(&self) -> u32 {
-        self.capacity
+    pub const fn slot_ceiling(&self) -> u32 {
+        self.slot_ceiling
     }
 
     /// Returns the number of live settlements.
@@ -417,6 +454,12 @@ impl SettlementArena {
         self.tiles[index] = tile;
         self.factions[index] = faction;
         self.stores[index] = Store::EMPTY;
+        // A founded settlement houses nobody until a caller states its
+        // housing. The seeding layer writes the founding housing row, and
+        // this arena states no value of its own.[^1]
+        //
+        // [^1]: Balance register, the population, the founding housing row. `docs/reference/balance.md`
+        self.housing[index] = 0;
         self.live_count += 1;
         let entity = Entity::new(slot, self.generations[index])
             .expect("a generation of one or more makes the identity non-zero");
@@ -427,7 +470,7 @@ impl SettlementArena {
     /// Opens one new slot and returns its index.
     fn open_slot(&mut self) -> Result<u32, SettlementError> {
         let slot = self.slot_count();
-        if slot >= self.capacity {
+        if slot >= self.slot_ceiling {
             return Err(SettlementError::ArenaFull);
         }
         self.generations.push(NO_GENERATION);
@@ -435,6 +478,7 @@ impl SettlementArena {
         self.tiles.push(TileIdx(0));
         self.factions.push(FactionId(0));
         self.stores.push(Store::EMPTY);
+        self.housing.push(0);
         Ok(slot)
     }
 
@@ -587,6 +631,45 @@ impl SettlementArena {
         Some(self.stores[slot as usize])
     }
 
+    /// Returns the housing that stands at a settlement.
+    ///
+    /// The answer is a quantity of housing and not a count of people.
+    /// Returns `None` when the identity is dead.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0157, a site's free places are its built housing less the residents the engine counts, decision D1. `docs/adrs/accepted/adr-0157-a-sites-free-places-are-its-built-housing-less-the-residents-the-engine-counts.md`
+    #[must_use]
+    pub fn housing(&self, entity: Entity) -> Option<u32> {
+        let slot = self.slot_of(entity)?;
+        Some(self.housing[slot as usize])
+    }
+
+    /// Writes the housing that stands at a settlement.
+    ///
+    /// Returns `false` when the identity is dead. The caller handles the
+    /// absent settlement or skips it.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0014, entity identity is an index plus a generation, decision D2. `docs/adrs/accepted/adr-0014-entity-identity-is-an-index-plus-a-generation.md`
+    pub fn set_housing(&mut self, entity: Entity, housing: u32) -> bool {
+        let Some(slot) = self.slot_of(entity) else {
+            return false;
+        };
+        self.housing[slot as usize] = housing;
+        true
+    }
+
+    /// Returns the whole housing column.
+    ///
+    /// The column holds one entry for each slot, live or not. A pass over
+    /// the settlements reads the live column beside it.
+    #[must_use]
+    pub fn housing_column(&self) -> &[u32] {
+        &self.housing
+    }
+
     /// Writes the quantity of one commodity into the store of a settlement.
     ///
     /// Returns `false` when the identity is dead. The caller handles the
@@ -711,6 +794,7 @@ impl SettlementArena {
             .write(bytemuck::cast_slice(&self.tiles))
             .write(bytemuck::cast_slice(&self.factions))
             .write(bytemuck::cast_slice(&self.stores))
+            .write(bytemuck::cast_slice(&self.housing))
             .write(&self.live);
         for generation in &self.generations {
             hash = hash.write(&generation.to_le_bytes());
@@ -737,6 +821,7 @@ impl SettlementArena {
             || self.tiles.len() != slots
             || self.factions.len() != slots
             || self.stores.len() != slots
+            || self.housing.len() != slots
         {
             return false;
         }
