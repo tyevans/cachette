@@ -1,7 +1,7 @@
 ---
 id: 0318
 title: Show the characters, the statistics, the events and a tile in panels
-status: refined
+status: complete
 created: 2026-09-03
 implements: []
 changes: []
@@ -83,3 +83,43 @@ blocker opens or closes.
 
 [^1]: Recurring Defect Shapes, shape 1. `.claude/rules/recurring-defects.md`
 [^2]: Decision Record Scope, section 1. `.claude/rules/adr-scope.md`
+
+## Outcome
+
+**Four panels of the deck answer the four questions, and each is one file that
+registers with the standard of item 0316.**
+
+**The statistics panel counts the world, not the window.** It states the people
+in the world, then the people of each faction beside its colour, then the tiles
+each faction holds and the number of sites. A faction whose last unit dies now
+falls to zero on a row a watcher can see. The per-faction population is one
+read, because the engine holds the count and maintains it where a unit begins
+and where a unit ends.
+
+**The events panel states what the last tick logged.** It names the promotions,
+the shortages, the rationing and the sites that fell short, newest first, and it
+reads a bounded number of rows. A watcher who pauses reads the moment rather
+than a total that went up.
+
+**The characters panel names the people.** It gives the population, then a
+bounded number of characters with the faction colour and the sex, then one
+focused character with the birth tick, the house and the parents. It states
+nothing that no pass writes.
+
+**The tile panel answers where the watcher pointed.** It gives the address, the
+ground, the food, the wood and the stone left of what the tile admits, the
+faction that holds it and the units on it. A mouse press points at a tile, and
+the command line points at one without a mouse.
+
+**Each panel is bounded, so its cost never follows the world.** No panel starts
+a pass over the tiles or over the units.
+
+Each panel holds its own tests in the viewer. The four together were proved
+outside a window through the command line of the demonstration, which now names
+the panels and the tile.
+
+The work landed under earlier commits and this item was never moved.[^3]
+
+## References
+
+[^3]: Findings register, FND-526. `docs/FINDINGS.md`
