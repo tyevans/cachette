@@ -37,6 +37,15 @@ const BAND: (i32, i32) = (20, 40);
 /// The ticks the fixture runs before the faction holds ground.
 const HOLDING_TICKS: u32 = 4;
 
+/// How far around the city the fixture leaves the ground empty.
+///
+/// A unit covers most of its tile below sixteen pixels a tile, so a unit
+/// standing on a tile decides the colour of that tile's corner at a close
+/// zoom and not at a far one. The tests that read the air compare one tile at
+/// two zooms, and they need ground with nothing standing on it. The tiles
+/// inside this radius are held, because the city reaches further than it.
+const QUIET_RADIUS: u32 = 3;
+
 /// The ticks a storm is given to fall out of the air onto the ground.
 ///
 /// After this many ticks the air over every cell holds too few drops for
@@ -74,14 +83,35 @@ fn settings() -> WorldConfig {
 
 /// Builds a world in which one faction holds a band of ground.
 ///
+/// A faction holds the ground within reach of a city it owns, and a unit
+/// standing on a tile gives its faction no claim on it.[^1] The fixture
+/// therefore founds a city in the middle of the band, and the soldiers of
+/// the band are the units the tests draw and order about. A fixture that
+/// took ground by standing units on it would be a second declaration of the
+/// holding rule.[^2]
+///
 /// Returns the world and the soldiers it spawned, in spawn order.
+///
+/// # References
+///
+/// [^1]: ADR-0150, held ground is the ground within reach of a city its faction owns, decision D1. `docs/adrs/draft/adr-0150-held-ground-is-the-ground-within-reach-of-a-city-its-faction-owns.md`
+/// [^2]: Findings register, FND-487. `docs/FINDINGS.md`
 fn a_held_band() -> (World, Vec<(Entity, Axial)>) {
     let mut world = World::new(settings()).expect("the extent describes a world");
+    let middle = (BAND.0 + BAND.1) / 2;
+    let seat = (BAND.0..BAND.1)
+        .flat_map(|row| (BAND.0..BAND.1).map(move |column| Axial::new(column, row)))
+        .min_by_key(|at| (at.q - middle).abs() + (at.r - middle).abs())
+        .filter(|at| world.admits_a_unit(*at))
+        .expect("the middle of the band admits a city");
+    world
+        .found_settlement(seat, FactionId(0))
+        .expect("the seat admits a city");
     let mut soldiers = Vec::new();
     for row in BAND.0..BAND.1 {
         for column in BAND.0..BAND.1 {
             let at = Axial::new(column, row);
-            if !world.admits_a_unit(at) {
+            if !world.admits_a_unit(at) || at.distance(seat) <= QUIET_RADIUS {
                 continue;
             }
             let soldier = world
@@ -100,15 +130,32 @@ fn a_held_band() -> (World, Vec<(Entity, Axial)>) {
     (world, soldiers)
 }
 
-/// Returns one tile the faction holds.
+/// Returns one held tile that carries nothing, away from the edge.
+///
+/// The picture draws the edge of a holding, a city draws a mark, and a unit
+/// covers most of its tile at a close zoom. Each of the three covers a
+/// different share of a tile at each zoom, and the tests that read the air
+/// compare one tile at two zooms. The tile this returns therefore has six
+/// held neighbours, no city and no unit, so the only layer over its ground is
+/// the one under test.
 fn a_held_tile(world: &World) -> Axial {
-    let held = world
+    let width = world.grid().width();
+    let held_by_the_faction =
+        |at: Axial| world.tile_holder(at).and_then(Holder::faction) == Some(FactionId(0));
+    world
         .holding()
         .tiles_held_by(FactionId(0))
-        .next()
-        .expect("the faction holds a tile");
-    let width = world.grid().width();
-    Axial::new((held.0 % width) as i32, (held.0 / width) as i32)
+        .map(|held| Axial::new((held.0 % width) as i32, (held.0 / width) as i32))
+        .find(|at| {
+            world.settlements().on_tile(*at).is_none()
+                && TileReadout::of(world, *at).and_then(|tile| tile.units()) == Some(0)
+                && world
+                    .grid()
+                    .neighbours(*at)
+                    .into_iter()
+                    .all(|side| side.is_some_and(held_by_the_faction))
+        })
+        .expect("the faction holds an empty tile away from the edge of its holding")
 }
 
 fn address_of(world: &World, index: u32) -> Axial {

@@ -11704,6 +11704,29 @@ least about the test it serves.
 in the engine and in the fixtures. Nothing failed when they disagreed, because
 they only disagreed once the rule moved.
 
+**The viewer crate held the same shape, and it was found later.** Four suites
+of the viewer took ground by standing a band of soldiers on it. The lib tests
+of the panels failed 12, the upgrade and weather suite failed 8, the holder
+suite failed 9, and the card suite failed 1. Every one of the 30 was repaired
+by a founding call, and no assertion was weakened.
+
+    cargo test -p cachette-view --no-fail-fast
+
+**A city changes what else the picture draws, and two fixtures had to say
+more.** A city marks its tile, a unit covers most of its tile at a close zoom,
+and the picture draws the edge of a holding. The old band held ground four
+rings wider than the units, so the tile a fixture picked was plain by accident.
+Under the new rule the ground is a disc around the city, and the same pick
+lands on the edge or under a unit. Two fixtures now state what the tile must
+be: held, with six held neighbours, no city and no unit.
+
+**Two of the repaired tests cannot fail under the defect they name, and the
+fixture is not the reason.** Both compare a held world with a second world
+drawn by the same code, or read the value under test back through the function
+that produces it. A defect in the layer moves both readings together. The
+holding rule did not cause this and the repair did not remove it. Testing rule
+2a names the shape.[^F487C]
+
 ### FND-490 — A faction that founds with two people fills no ranked position, and the world still ends
 
 **Believed.** The founding group is a balance value with no structure behind
@@ -11785,6 +11808,7 @@ file.
 [^F491C]: Decision Record Scope, section 4.6. `.agents/rules/adr-scope.md`
 [^F487A]: ADR-0150, held ground is the ground within reach of a city its faction owns, decision D1. `docs/adrs/draft/adr-0150-held-ground-is-the-ground-within-reach-of-a-city-its-faction-owns.md`
 [^F487B]: Recurring defect shapes, shape 1. `.agents/rules/recurring-defects.md`
+[^F487C]: Testing Rules, section 2a. `.agents/rules/testing.md`
 [^F340A]: Findings register, FND-325, in this document.
 [^F340B]: Backlog item 0330, repair the defects a fresh reader found in the published reference. `docs/backlog/complete/0330-repair-the-defects-a-fresh-reader-found.md`
 [^F340C]: The reference check script. `scripts/check_reference.py`

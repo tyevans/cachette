@@ -192,8 +192,20 @@ fn the_tile_panel_names_the_upgrade_under_the_pointer() {
     let builder = world
         .spawn_soldier(place, FactionId(0))
         .expect("the tile admits a unit");
-    // A unit builds only on ground its own faction holds, so the world runs
-    // until the holding reaches the tile.
+    // A unit builds only on ground its own faction holds, and a faction
+    // holds the ground within reach of a city it owns.[^9] The fixture
+    // therefore founds a city beside the builder, and the builder stands on
+    // ground its own faction holds. Standing on the tile would take no
+    // ground.
+    //
+    // [^9]: ADR-0150, held ground is the ground within reach of a city its faction owns, decisions D1 and D4. `docs/adrs/draft/adr-0150-held-ground-is-the-ground-within-reach-of-a-city-its-faction-owns.md`
+    let seat = (0..24)
+        .flat_map(|row| (0..24).map(move |column| Axial::new(column, row)))
+        .find(|at| *at != place && at.distance(place) <= 2 && world.admits_a_unit(*at))
+        .expect("the world holds open ground beside the builder");
+    world
+        .found_settlement(seat, FactionId(0))
+        .expect("the seat admits a city");
     for _ in 0..4 {
         world.step(1).expect("the step must run");
     }

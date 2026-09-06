@@ -15,15 +15,17 @@
 //! and the picture would be plausible and wrong.[^3]
 //!
 //! Three assertions here catch that defect. The layer must report no held
-//! tile in a world that holds no soldier. The count of held tiles it reports
+//! tile in a world that holds no city. The count of held tiles it reports
 //! must equal the count this test reads back from the holder of the world.
 //! Every held tile must take the colour of the faction that the holder names,
 //! and open water is never held.
 //!
 //! # What the fixtures hold
 //!
-//! The fixture puts two bands of soldiers beside each other and steps the
-//! world, so two holdings grow until they meet. It then reads the holders
+//! The fixture founds one city for each faction, one on each side of a
+//! divide, and puts two bands of soldiers beside each other. A faction holds
+//! the ground within reach of a city it owns, so the two cities give two
+//! holdings that meet at the divide.[^6] The fixture then reads the holders
 //! back and refuses a world in which no two holdings meet.[^4] A fixture with
 //! one holding supplies no edge, and the edge assertion would then measure
 //! the fixture.[^5]
@@ -41,6 +43,7 @@
 //! [^3]: ADR-0070, the head-up display reports what the drawing pass read, decision D2. `docs/adrs/accepted/adr-0070-the-head-up-display-reports-what-the-drawing-pass-read.md`
 //! [^4]: Findings register, FND-061. `docs/FINDINGS.md`
 //! [^5]: Testing Rules, a fixture supplies the input. `.claude/rules/testing.md`
+//! [^6]: ADR-0150, held ground is the ground within reach of a city its faction owns, decision D1. `docs/adrs/draft/adr-0150-held-ground-is-the-ground-within-reach-of-a-city-its-faction-owns.md`
 
 // An integration test is its own crate, so the allowance at the viewer's
 // crate root does not reach it. The reason is the same one: ADR-0067 D3 puts
@@ -76,10 +79,17 @@ const BAND: (i32, i32) = (20, 40);
 /// The column that divides the two bands of soldiers.
 const DIVIDE: i32 = 30;
 
+/// How far each city of the fixture stands from the divide.
+///
+/// The two cities are seven tiles apart, which is inside twice the reach of a
+/// city, so the two holdings meet.
+const SEAT_STEP: i32 = 4;
+
 /// The steps the fixture runs before it draws.
 ///
-/// The holding spreads one ring on each step, so the world must run far
-/// enough for the two holdings to reach each other.
+/// The holder column is rewritten from the cities on every step, so one step
+/// is enough. The fixture runs more, so that the world it draws is a world
+/// that has run.
 const TICKS: u32 = 4;
 
 /// The size of the window the tests draw into.
@@ -96,6 +106,36 @@ const fn settings() -> WorldConfig {
     }
 }
 
+/// Founds one city for each faction, one on each side of the divide.
+///
+/// A faction holds the ground within reach of a city it owns, and a unit
+/// standing on a tile gives its faction no claim on it.[^1] The two cities
+/// stand closer together than twice the reach of a city, so the two holdings
+/// meet at the divide. A fixture that took ground by standing units on it
+/// would be a second declaration of the holding rule.[^2]
+///
+/// # References
+///
+/// [^1]: ADR-0150, held ground is the ground within reach of a city its faction owns, decision D1. `docs/adrs/draft/adr-0150-held-ground-is-the-ground-within-reach-of-a-city-its-faction-owns.md`
+/// [^2]: Findings register, FND-487. `docs/FINDINGS.md`
+fn found_a_city_for_each_faction(world: &mut World) {
+    let middle = (BAND.0 + BAND.1) / 2;
+    for faction in 0..FACTIONS {
+        let wanted = Axial::new(
+            DIVIDE - SEAT_STEP + i32::from(faction) * (SEAT_STEP * 2 - 1),
+            middle,
+        );
+        let seat = every_address(world)
+            .into_iter()
+            .filter(|at| world.admits_a_unit(*at) && world.settlements().on_tile(*at).is_none())
+            .min_by_key(|at| at.distance(wanted))
+            .expect("the world holds open ground");
+        world
+            .found_settlement(seat, FactionId(faction))
+            .expect("the seat admits a city");
+    }
+}
+
 /// Builds a world in which two holdings grow until they meet.
 ///
 /// The fixture asserts its own outcome. It reads the holders back after the
@@ -108,6 +148,7 @@ const fn settings() -> WorldConfig {
 /// [^2]: Testing Rules, a fixture supplies the input. `.claude/rules/testing.md`
 fn two_holdings_that_meet() -> World {
     let mut world = World::new(settings()).expect("the extent describes a world");
+    found_a_city_for_each_faction(&mut world);
     for row in BAND.0..BAND.1 {
         for column in BAND.0..BAND.1 {
             let at = Axial::new(column, row);
@@ -148,11 +189,16 @@ fn two_holdings_that_meet() -> World {
     world
 }
 
-/// Builds the same world with no soldier in it.
+/// Builds the same world with no soldier and no city in it.
 ///
-/// Nobody holds anything here, because a holding starts from the presence of
-/// a unit. The terrain and the tile values are functions of the seed and the
-/// tick, so this world paints the same ground as the fixture above.
+/// Nobody holds anything here, because a faction holds only the ground within
+/// reach of a city it owns, and this world holds no city.[^1] The terrain and
+/// the tile values are functions of the seed and the tick, so this world
+/// paints the same ground as the fixture above.
+///
+/// # References
+///
+/// [^1]: ADR-0150, held ground is the ground within reach of a city its faction owns, decision D1. `docs/adrs/draft/adr-0150-held-ground-is-the-ground-within-reach-of-a-city-its-faction-owns.md`
 fn the_same_world_with_nobody_in_it() -> World {
     let mut world = World::new(settings()).expect("the extent describes a world");
     for _ in 0..TICKS {
@@ -161,7 +207,7 @@ fn the_same_world_with_nobody_in_it() -> World {
     assert_eq!(
         world.holding_of(FactionId(0)) + world.holding_of(FactionId(1)),
         0,
-        "a world with no soldier holds ground",
+        "a world with no city holds ground",
     );
     world
 }
@@ -495,7 +541,7 @@ fn the_layer_reads_the_holder_of_the_world() {
 }
 
 #[test]
-fn a_world_with_no_soldier_draws_no_holding() {
+fn a_world_with_no_city_draws_no_holding() {
     // The strongest reading of the wrong column. A still column names a
     // faction for every tile of every world, so a layer that read it would
     // report held tiles in a world that holds none.
@@ -551,7 +597,9 @@ fn the_layer_touches_the_same_tiles_in_a_small_world_and_a_large_one() {
         })
         .expect("the extent describes a world");
         // The same square of tiles is held in both worlds, so the two
-        // windows differ in the world around them and in nothing else.
+        // windows differ in the world around them and in nothing else. The
+        // cities are what make the ground held.
+        found_a_city_for_each_faction(&mut world);
         for row in BAND.0..BAND.1 {
             for column in BAND.0..BAND.1 {
                 let at = Axial::new(column, row);
