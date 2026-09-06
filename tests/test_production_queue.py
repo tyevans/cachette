@@ -21,6 +21,8 @@ for.
 
 from __future__ import annotations
 
+import numpy as np
+import numpy.typing as npt
 import pytest
 
 import cachette
@@ -43,7 +45,9 @@ PEOPLE = 1
 GROUP = 3
 
 
-def _site_with_a_queue(stock: int) -> tuple[cachette.World, int, int]:
+def _site_with_a_queue(
+    stock: int,
+) -> tuple[cachette.World, int, npt.NDArray[np.uint64]]:
     """Build a world, found one site, home a group at it, and stock its store."""
     world = cachette.World(width=16, height=16, seed=0x0497, faction_count=2)
     world.set_queue_schedule(1, 0)
