@@ -9670,8 +9670,8 @@ impl World {
     ///
     /// # References
     ///
-    /// [^1]: ADR-0149, a faction's trade board is simulated state that any faction may read, decision D5. `docs/adrs/draft/adr-0149-a-factions-trade-board-is-simulated-state-that-any-faction-may-read.md`
-    /// [^2]: ADR-0149, a faction's trade board is simulated state that any faction may read, decision D3. `docs/adrs/draft/adr-0149-a-factions-trade-board-is-simulated-state-that-any-faction-may-read.md`
+    /// [^1]: ADR-0149, a faction's trade board is simulated state that any faction may read, decision D5. `docs/adrs/accepted/adr-0149-a-factions-trade-board-is-simulated-state-that-any-faction-may-read.md`
+    /// [^2]: ADR-0149, a faction's trade board is simulated state that any faction may read, decision D3. `docs/adrs/accepted/adr-0149-a-factions-trade-board-is-simulated-state-that-any-faction-may-read.md`
     fn controller_write_board(&mut self, faction: FactionId, draw: u32) -> bool {
         let stores = self.faction_stores(faction);
         let mark = i64::from(self.controller.surplus_mark());

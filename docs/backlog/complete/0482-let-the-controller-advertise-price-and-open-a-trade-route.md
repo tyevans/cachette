@@ -1,10 +1,10 @@
 ---
 id: 0482
 title: Let the controller advertise, price and open a trade route
-status: refined
+status: complete
 created: 2026-09-05
 implements: [ADR-0144, ADR-0147, ADR-0149, ADR-0146]
-changes: []
+changes: [ADR-0149 D5]
 creates: []
 serves: [PRD-0050, PRD-0051]
 blocked-by: [BLK-007, BLK-036, BLK-050]
@@ -124,12 +124,43 @@ from either.
 - Each defect is put back and the test watched go red.[^7]
 - The balance register holds a row with a filled derivation for the
   advertisement schedule, the surplus mark, the board size, the carrier count
-  and the contract term.
+  and the contract term.[^2]
 - ADR-0149 D5 no longer says that no controller writes a board.
 
 ## Outcome
 
-Filled in when the item moves to `complete/`.
+**The controller trades.** The stage gained three commands, each at a draw
+index past the campaign draw. It rewrites the whole board of its faction on the
+advertisement schedule, from what the sites of that faction hold. It takes at
+most one negotiation step for one faction on one tick, weighted by the trade
+weight. It assigns the carriers of every contract it owes a carried quantity
+on, and releases them when the contract settles or fails. Every act passes a
+verb a Python caller calls.
+
+**Two keyed draws are new.** One decides whether a faction speaks. One breaks a
+tie between two equally lacked goods. Each has one test for each field of its
+key. **No draw decides a price.** The seller counters at the integer midpoint
+of the two asking quantities, and the buyer accepts when the midpoint is at or
+below its own ask.
+
+**Eight defects were put back and every test that must catch one went red.**
+Three of them were green on the first pass. The offer verb refuses a pair at
+war and a second negotiation on its own, so the census could not tell the
+controller guard from the verb, and both tests now read the controller log.
+The third was green because every unit of the fixture could carry, so the
+fixture now gives the lowest identities a type whose carry capacity is zero.
+
+**Two engine facts were learned and recorded.**[^8] A carrier that holds a home
+and a load at the carry mark walks home rather than where it was sent. A unit
+sent to a tile arrives in the level 1 cell of that tile and walks the last
+tiles by its own choice. The end-to-end test therefore seats the two sites in
+one cell, and it proves that the chain from the board to the delivery is not
+inert. **It does not prove that the unit that paid was one of the assigned
+carriers**, because the delivery pass names no unit in its log.
+
+ADR-0149 D5 said that no controller writes a board. That sentence is now false
+and the draft was edited in place. The golden state hash moved, because the
+controller folds the four new parameters and the carrier list into it.
 
 ## References
 
@@ -140,3 +171,4 @@ Filled in when the item moves to `complete/`.
 [^5]: Recurring Defect Shapes, shape 3. `.agents/rules/recurring-defects.md`
 [^6]: Testing Rules, section 2. `.agents/rules/testing.md`
 [^7]: Testing Rules, section 2a. `.agents/rules/testing.md`
+[^8]: Findings register, FND-486 and FND-487. `docs/FINDINGS.md`

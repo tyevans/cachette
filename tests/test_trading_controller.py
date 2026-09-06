@@ -17,7 +17,7 @@ the caller's verbs.
 
 [^3]: ADR-0149, a faction's trade board is simulated state that any faction may
 read.
-``docs/adrs/draft/adr-0149-a-factions-trade-board-is-simulated-state-that-any-faction-may-read.md``
+``docs/adrs/accepted/adr-0149-a-factions-trade-board-is-simulated-state-that-any-faction-may-read.md``
 """
 
 from __future__ import annotations

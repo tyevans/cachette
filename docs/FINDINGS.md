@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-488**
+**Next number: FND-490**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -11774,3 +11774,69 @@ they only disagreed once the rule moved.
 [^F486L]: Testing Rules, rule 2a. `.agents/rules/testing.md`
 [^F486M]: ADR-0145, a unit type is a row of capability columns, and zero means cannot, decision D2. `docs/adrs/accepted/adr-0145-a-unit-type-is-a-row-of-capability-columns-and-zero-means-cannot.md`
 [^F486N]: Backlog item 0491, seed the demonstration world with unit types that can fight, gather and carry. `docs/backlog/proposed/0491-seed-the-demonstration-world-with-unit-types-that-can-fight-gather-and-carry.md`
+
+## H. The trading controller
+
+### FND-488 — A carrier that holds a home walks home rather than where it was sent
+
+**Believed.** A unit that a caller sends to a tile walks toward that tile. The
+send verb says that every unit the call names reads one entry of the plane and
+steps, and the movement pass says that the destination plane wins over the
+option the unit scored for itself.[^F488A] [^F488B] The controller therefore
+gave each carrier a home at the site of its own faction, so that the carrier
+still ate, and sent it to the site of the other party.
+
+**True.** The destination plane wins over the option row, and the return field
+is not an option row. A unit that holds a home site and a load at the carry
+mark is laden, and a laden unit climbs the return field toward its own
+site.[^F488C] A carrier under the default mark therefore gathers on the way,
+crosses the mark, turns round, empties its load into the store of its own
+faction, and starts again. It never arrives.
+
+**Evidence.** The end-to-end test of item 0482 ran 600 ticks with a bound
+contract in flight and no quantity moved on it. A print of every carrier on
+every fiftieth tick showed each one within a few tiles of the site of its own
+faction, with a load, and sent. Raising the carry mark above what a carrier
+picks up on the way made the same fixture deliver.
+
+**Follows.** The carrier rule holds only while the carry mark stays above what
+a carrier gathers on the way. The code says so where it assigns the carriers,
+and the test fixture says so where it raises the mark. **A world whose mark is
+low sends its carriers home instead**, and nothing fails when it does. The
+alternative, a carrier with no home, is worse: the consumption pass serves a
+ration to the residents of a site, so a unit with no home eats nothing.
+
+### FND-489 — A unit sent to a tile arrives in the cell of that tile, and walks the last tiles by itself
+
+**Believed.** A contract moves a quantity when a unit of the debtor stands on
+the site of the other party.[^F489A] The controller sends a carrier at that
+site, so the carrier arrives and pays.
+
+**True.** A destination field holds one direction for each level 1 cell, not
+one for each tile.[^F488B] The send verb takes the cell of each seed tile and
+seeds the plane at the cell. A unit outside that cell climbs toward it. A unit
+inside it reads the seed cell, finds no direction, and walks where its own
+choice takes it. The last tiles of the journey are therefore a walk of the
+unit's own, and the exact tile of the site is one tile of a whole block.
+
+**Evidence.** The end-to-end test seats the two sites in one level 1 cell, and
+a quantity then moves inside a bounded tick count. With the two sites in two
+distant cells the carriers reached the right part of the world and no quantity
+moved on the contract. The unit that paid was not always a carrier the
+controller assigned, because any unit of the debtor that stands on the site of
+the other party with a load pays the contract.
+
+**Follows.** The end-to-end test of item 0482 proves that the chain from the
+board to the delivery is not inert. **It does not prove that the unit that paid
+was one of the carriers the controller assigned**, and the delivery pass names
+no unit in its log, so no reader can tell. A later pass that wants a carrier to
+arrive at a tile needs a field that resolves below the cell, or a verb that
+sends a unit at a site rather than at a tile. That is engine work and it is not
+in this item.
+
+## References
+
+[^F488A]: The send verb, which names a seed set and a plane. `crates/cachette-core/src/world.rs`
+[^F488B]: ADR-0125, the control plane names the seed set of a destination field. `docs/adrs/draft/adr-0125-the-control-plane-names-the-seed-set-of-a-destination-field.md`
+[^F488C]: ADR-0110, a unit returns by climbing a reach field seeded at every site of its faction. `docs/adrs/draft/adr-0110-a-unit-returns-by-climbing-a-reach-field.md`
+[^F489A]: ADR-0128, a contract moves a quantity only when a unit carries it onto the ground of the other party. `docs/adrs/draft/adr-0128-a-contract-moves-a-quantity-only-when-a-unit-carries-it.md`

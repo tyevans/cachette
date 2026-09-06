@@ -402,7 +402,7 @@ pub enum Choice {
     ///
     /// # References
     ///
-    /// [^1]: ADR-0149, a faction's trade board is simulated state that any faction may read, decision D3. `docs/adrs/draft/adr-0149-a-factions-trade-board-is-simulated-state-that-any-faction-may-read.md`
+    /// [^1]: ADR-0149, a faction's trade board is simulated state that any faction may read, decision D3. `docs/adrs/accepted/adr-0149-a-factions-trade-board-is-simulated-state-that-any-faction-may-read.md`
     Advertise,
     /// Take one negotiation step against one other faction.
     ///
@@ -657,7 +657,7 @@ pub fn asking_good_of(
 /// # References
 ///
 /// [^1]: Balance register, the surplus mark. `docs/reference/balance.md`
-/// [^2]: ADR-0149, a faction's trade board is simulated state that any faction may read, decision D2. `docs/adrs/draft/adr-0149-a-factions-trade-board-is-simulated-state-that-any-faction-may-read.md`
+/// [^2]: ADR-0149, a faction's trade board is simulated state that any faction may read, decision D2. `docs/adrs/accepted/adr-0149-a-factions-trade-board-is-simulated-state-that-any-faction-may-read.md`
 #[must_use]
 pub fn board_of(
     seed: u64,
