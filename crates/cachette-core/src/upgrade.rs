@@ -1229,6 +1229,7 @@ pub struct UpgradeMap {
     sites: Vec<UpgradeSite>,
     scratch: Vec<UpgradeSite>,
     visits: u64,
+    collapses: u64,
 }
 
 impl UpgradeMap {
@@ -1239,6 +1240,7 @@ impl UpgradeMap {
             sites: Vec::new(),
             scratch: Vec::new(),
             visits: 0,
+            collapses: 0,
         }
     }
 
@@ -1402,12 +1404,12 @@ impl UpgradeMap {
     /// yet, so there is nothing to wear. A tile the run names that carries no
     /// site is ignored.
     ///
-    /// Returns the tiles that collapsed, in ascending tile order.
+    /// Returns how many sites collapsed on this call.
     ///
     /// # References
     ///
     /// [^1]: ADR-0090, a tile upgrade is stored sparsely, as the difference from the generated world, decision D4. `docs/adrs/draft/adr-0090-a-tile-upgrade-is-stored-sparsely.md`
-    pub fn wear_ascending(&mut self, run: &[(TileIdx, i64)]) -> Vec<TileIdx> {
+    pub fn wear_ascending(&mut self, run: &[(TileIdx, i64)]) -> u64 {
         debug_assert!(
             run.windows(2).all(|pair| pair[0].0 .0 < pair[1].0 .0),
             "a worn run must be sorted by tile and name each tile once"
@@ -1416,8 +1418,9 @@ impl UpgradeMap {
             run.iter().all(|worn| worn.1 >= 0),
             "wear never gives condition back"
         );
-        let mut collapsed = Vec::new();
+        let mut collapsed = 0u64;
         if run.is_empty() {
+            self.collapses = 0;
             return collapsed;
         }
         // One walk over the sites and one over the run, both ascending. The
@@ -1440,13 +1443,24 @@ impl UpgradeMap {
             }
             let left = site.condition.0.saturating_sub(taken);
             if left <= 0 {
-                collapsed.push(site.tile);
+                collapsed += 1;
                 return false;
             }
             site.condition = Accum(left);
             true
         });
+        self.collapses = collapsed;
         collapsed
+    }
+
+    /// Returns how many sites the last wear collapsed.
+    ///
+    /// The count describes one tick. It is a diagnostic and not simulated
+    /// state, in the same way the visit count of the last advance is, so no
+    /// pass reads it and it enters no state hash.
+    #[must_use]
+    pub const fn last_wear_collapses(&self) -> u64 {
+        self.collapses
     }
 
     /// Absorbs the map into the state hash.
