@@ -24,6 +24,7 @@
 
 use cachette_core::cohort::NeedRule;
 use cachette_core::growth;
+use cachette_core::sim_math;
 use cachette_core::rates::RateSchedule;
 use cachette_core::site::CommodityId;
 use cachette_core::unit_type::WORKER;
@@ -145,6 +146,70 @@ fn one_site(stock: Fix32, housing: u32, residents: u32) -> (World, Entity) {
     assert!(
         world.cohorts_describe_the_units(),
         "the fixture must settle the derived resident count"
+    );
+    (world, site)
+}
+
+/// Returns the store that the grow stage of the next tick will read.
+///
+/// **The store column is not that value.** The rate pass runs before the grow
+/// stage in the same tick, and it settles the store towards what the site
+/// earns: it adds the production the world derives and takes the upkeep the
+/// world derives.[^6] A site that holds the cost of one birth in its column
+/// therefore holds a little less than that cost when the grow stage counts
+/// what it can afford.
+///
+/// The two rates come from the readers the pass itself uses, so this states no
+/// second copy of either derivation.[^7] The schedule of these fixtures
+/// applies the rates on every tick with a period of one, so one rate is one
+/// application.
+///
+/// # References
+///
+/// [^6]: ADR-0062, production and upkeep are rates attached to a site, decision D1. `docs/adrs/accepted/adr-0062-production-and-upkeep-are-rates-attached-to-a-site.md`
+/// [^7]: Recurring defect shapes, shape 1. `.agents/rules/recurring-defects.md`
+fn store_at_the_grow_stage(world: &World, site: Entity) -> Fix32 {
+    let held = world
+        .settlements()
+        .store(site)
+        .expect("the site is live")
+        .quantity(GOOD)
+        .expect("the good is in the set");
+    let earned = world
+        .effective_production_rate(site, GOOD)
+        .expect("the site is live");
+    let owed = world
+        .effective_upkeep_rate(site, GOOD)
+        .expect("the site is live");
+    sim_math::sub(sim_math::add(held, earned), owed)
+}
+
+/// Builds a site whose store affords exactly one birth on the next tick.
+///
+/// **The fixture asserts that it reached that extreme.** The store is not the
+/// cost of one birth, because the rate pass takes a share of what the store
+/// holds before the grow stage reads it, and it does so once while this
+/// function settles the resident count and once more on the tick the test
+/// runs. A fixture that wrote the cost of one birth into the column would
+/// hand the grow stage less than one birth, and the test would then measure
+/// the fixture rather than the stage.[^8]
+///
+/// # References
+///
+/// [^8]: Testing rules, section 2a. `.agents/rules/testing.md`
+fn one_birth_site(housing: u32, residents: u32) -> (World, Entity) {
+    // The share that the rate pass leaves behind. Two applications stand
+    // between the store this writes and the grow stage that reads it, so the
+    // store starts above the cost of one birth by that share twice over.
+    let kept = sim_math::sub(Fix32::ONE, cachette_core::effective::HOLDING_SHARE);
+    let once = sim_math::div(FOOD, kept).expect("the share left behind is above zero");
+    let stock = sim_math::div(once, kept).expect("the share left behind is above zero");
+    let (world, site) = one_site(stock, housing, residents);
+    let reaches = store_at_the_grow_stage(&world, site);
+    assert_eq!(
+        growth::proposals(&[reaches], &[FOOD]),
+        1,
+        "the fixture must afford exactly one birth when the grow stage reads it"
     );
     (world, site)
 }
@@ -417,7 +482,7 @@ fn a_site_above_its_housing_reads_no_free_place() {
 /// would fail on the census.
 #[test]
 fn one_growth_event_adds_one_person_and_the_reader_follows() {
-    let (mut world, site) = one_site(FOOD, 3, 2);
+    let (mut world, site) = one_birth_site(3, 2);
     run(&mut world, 1, 1);
     assert_eq!(world.births(), 1, "the census must report one birth");
     assert_eq!(
@@ -455,7 +520,7 @@ fn one_growth_event_adds_one_person_and_the_reader_follows() {
 /// [^5]: Findings register, FND-498. `docs/FINDINGS.md`
 #[test]
 fn the_census_counts_the_births_of_the_run_and_never_falls() {
-    let (mut world, _site) = one_site(FOOD, 3, 2);
+    let (mut world, _site) = one_birth_site(3, 2);
     assert_eq!(census(&world, "births"), 0, "the fixture starts at zero");
     run(&mut world, 1, 1);
     assert_eq!(world.births(), 1, "the tick reader must report one birth");
@@ -474,7 +539,7 @@ fn the_census_counts_the_births_of_the_run_and_never_falls() {
 /// A grown person is a worker, because that is the type the spawn path gives.
 #[test]
 fn a_grown_person_is_a_worker() {
-    let (mut world, site) = one_site(FOOD, 3, 0);
+    let (mut world, site) = one_birth_site(3, 0);
     run(&mut world, 1, 1);
     assert_eq!(world.births(), 1);
     let slot = world.settlements().slot_of(site);
