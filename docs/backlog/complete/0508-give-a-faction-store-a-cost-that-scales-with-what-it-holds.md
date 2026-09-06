@@ -1,7 +1,7 @@
 ---
 id: 0508
 title: Give a faction store a cost that scales with what it holds
-status: proposed
+status: complete
 created: 2026-09-06
 implements: []
 changes: []
@@ -66,7 +66,31 @@ Not done. This item is in `proposed/` and refining it is the work.
 
 ## Outcome
 
-Filled in when the item moves to the finished directory.
+Complete. A faction store now costs a share of itself to keep, so it settles
+instead of climbing to its clamp.
+
+**What was built.** The effective rate module derives an upkeep as well as a
+production. Two terms add to the stored base upkeep: a holding term that is a
+share of what the store holds now, and a resident term that is a share of the
+ration each resident eats. The stored upkeep stays the base and stays settable
+by a caller. Neither term is a negative production rate.
+
+**Why the store settles.** With a production of P a tick and the holding share
+h, the store settles at the net production divided by h. A site that earns more
+settles higher, and a site whose ground is drawn down falls back. The recurrence
+is monotone and it converges at the default period.
+
+**The resident term reads the ration of the need rule** rather than restating
+it, so the food a person costs keeps one declaration site.
+
+**The record.** ADR-0055 states how the terms compose. It is the record that
+ADR-0062 D7 reserved, and D7 named the exact condition that fired here.
+
+**Left open.** Both terms apply to every commodity, and the commodity count is
+one, so this states no rule about which good a person needs.
+
+**Fallout the item created.** Every test that sets a production rate, steps and
+asserts a store quantity now reads a different number.
 
 ## References
 

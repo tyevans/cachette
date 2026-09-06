@@ -265,6 +265,6 @@ which D5 asks for and this item does not do.
 [^8]: ADR-0046, every error is typed. `docs/adrs/draft/adr-0046-every-error-is-typed.md`
 [^9]: ADR-0144, a faction controller runs inside the step and acts only through the caller's verbs, decisions D2 and D3. `docs/adrs/accepted/adr-0144-a-faction-controller-runs-inside-the-step-and-acts-only-through-the-callers-verbs.md`
 [^10]: Findings register, FND-011. `docs/FINDINGS.md`
-[^11]: Backlog item 0475. `docs/backlog/proposed/0475-give-an-upgrade-a-condition-that-armies-wear-and-workers-repair.md`
+[^11]: Backlog item 0475. `docs/backlog/complete/0475-give-an-upgrade-a-condition-that-armies-wear-and-workers-repair.md`
 [^12]: ADR-0151, an upgrade is a category with a ground fit and a level, decision D5. `docs/adrs/accepted/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
 [^13]: Findings register, FND-492. `docs/FINDINGS.md`

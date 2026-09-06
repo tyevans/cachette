@@ -8,6 +8,15 @@ pressure difference accelerates.[^1] One makes the water ride the wind by an
 exact integer move.[^2] One makes water enter the air where it is hot and fall
 where the air cools.[^3]
 
+**This record changes one decision of each of two accepted records, and it
+stales one consequence of a third place.** ADR-0160 D1 and ADR-0162 D1 both
+state that the heat of a cell is a function of the mean height and the open
+water share, and that nothing stores it. Both are changed here, and every other
+decision of both records stands. ADR-0160 also draws a consequence from its own
+claim, that the heat does not change over time and the wind therefore settles.
+That consequence follows from the claim this record changes, so it is struck in
+place rather than superseded.
+
 **All three read a heat, and none of them lets that heat change.** The first
 states that the heat of a cell is a function of the mean height of the cell and
 of the share of it that holds open water, and that nothing stores it.[^1] The
@@ -77,23 +86,47 @@ another.
 1. **The mean height of the cell takes degrees away.** High ground is cold.
 2. **The share of the cell that holds open water adds degrees.** Water is warm,
    and it is the source of the water that the air carries.
-3. **A season cycle adds or takes degrees by the tick.** The cycle is a
-   triangle over a fixed period. It is a whole-number function of the tick, it
-   reads no clock, and it takes no draw.
+3. **A sun that swings adds or takes degrees, by the tick and by the row of
+   the cell.** The sun holds a place on the axis that runs between the two
+   poles, that place swings between two limits over a fixed period, and a cell
+   is warmed by how near the sun stands to it. It is a whole-number function of
+   the tick and of the cell, it reads no clock, and it takes no draw.
 4. **The water in the air over the cell takes degrees away, to a bound.** Cloud
    stands between the ground and the sun.
 
 **The first two are the heat that ADR-0160 already names.** This record keeps
 them and adds the other two. Terms 1 and 2 give a field that varies over space.
-Term 3 gives a field that varies over time. **Term 4 is what makes the two
-interact.** The air over a cell is the output of the transport, which the wind
+Term 3 varies over both space and time at once. **Term 4 is what makes the
+terms interact.** The air over a cell is the output of the transport, which the wind
 drives, which the temperature drives. So a cell that the weather reached is
 colder than a cell it missed, and that difference is not a function of the
 terrain and the tick.
 
-The alternative is the cycle alone. It is rejected because every cell then
-varies in step, and a field that varies in step is one number with a map
-painted on it.
+The alternative is the cycle alone, taken by every cell together. It is
+rejected because every cell then varies in step, and a field that varies in
+step is one number with a map painted on it.
+
+**The season is one oscillation of the sun, and never a band that marches along
+an axis.** A band that stepped and wrapped would jump the whole width of the
+map at every lap, and the field would then hold a seam at the wrap however
+smooth the profile across the band. A sun that swings between two limits never
+wraps, so the field holds no seam. It also slows and reverses at each limit,
+which leaves a quiet gradient that then rebuilds the other way round.
+
+**The swing is smooth and it is not a triangle.** A triangle has a constant
+slope, so the warming across the map is a step function of the row, and the
+pressure that step produces gives two bands of opposite wind rather than a
+circulation. The engine therefore uses a smooth rise and fall, computed in
+whole numbers.
+
+**The cold poles are not a term.** They fall out of the sun's place: a pole is
+the part of the map that the sun is furthest from at every point of the swing,
+so it is cold all year and it is coldest in its own winter. Nothing states a
+pole, and nothing states a latitude band.
+
+**The period is a time and never a distance.** It follows neither the extent of
+the world nor the pitch of the lattice, so a small world and a large one hold
+the same year.
 
 Every quantity in this decision is a value that no measurement has chosen, and
 the balance register holds a row for each.[^7]
@@ -145,11 +178,16 @@ there.
 different worlds.** Anything that writes the world must write the temperature,
 as it must write the wind.
 
-**The season is global, and this record does not give the world a latitude.**
-Every cell takes the same season offset at one tick. The difference between two
-cells at one tick comes from the terrain, from the cloud and from the wind, not
-from where they lie north and south. A latitude would be a separate decision,
-and this record does not make it.
+**The world now has a latitude, and it has one because the sun has a place.**
+Two cells at one tick take different season offsets when they lie at different
+distances from the sun. The engine states no pole, no band and no latitude
+value: the whole of it is the one term that reads how near a cell lies to where
+the sun stands. **A reader who wants a cold pole gets one for free, and a
+reader who wants to remove it cannot, without removing the season.**
+
+**The engine states no rule about what a cold place is.** No pass reads the
+temperature and refuses anything, so a pole today is a reading and not a
+constraint on a unit or on a deposit.
 
 **The temperature is not conserved, so no account reports a defect in it.** The
 water account is the only reader that sees a lost drop, and it says nothing

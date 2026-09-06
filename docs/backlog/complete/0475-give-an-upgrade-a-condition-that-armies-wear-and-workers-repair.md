@@ -1,7 +1,7 @@
 ---
 id: 0475
 title: Give an upgrade a condition that armies wear and workers repair
-status: proposed
+status: complete
 created: 2026-09-05
 implements: [ADR-0145, ADR-0146, ADR-0151 D3, ADR-0151 D6, ADR-0002 D1, ADR-0001 D4]
 changes: []
@@ -66,7 +66,30 @@ Stated when the item is refined.
 
 ## Outcome
 
-Filled in when the item moves to `complete/`.
+Complete. An upgrade entry now holds a condition, two causes take it, a
+worker mends it and a site at nothing is removed.
+
+**What was built.** `UpgradeSite` gained a condition on one scale that every
+category shares. `Stage::UpgradeWear` runs after the build advance and walks the
+sites in ascending tile order, summing a weather cause and a hostile-unit cause.
+`UpgradeMap::wear_ascending` returns the tiles that collapsed, and a collapsed
+site is dropped rather than stored at nothing. `resolve_build_row` gained the
+arm that resolves a damaged site to the row standing there, so a worker can mend
+a top-level upgrade. Two public readers answer the condition and the collapse
+count of a tick.
+
+**A defect found and repaired inside the item.** The repair first spent a whole
+builder tick whatever the gap cost, so a level under any wear at all could never
+rise again and the site collapsed at about tick 2088. The repair is now priced
+at the gap it closes, and a gap worth less than one unit of work is free.[^C1]
+
+**The record this item creates.** No record covered the condition. ADR-0169 now
+does, and it changes ADR-0151 D3, which said that the work reaches the next
+level only from full condition.[^C2]
+
+**Left open.** Neither wear rate reads the category, because no column resists
+wear. A wall and a road therefore wear alike. The balance register holds both
+rates, unset under their blockers.[^C3]
 
 ## References
 
@@ -76,3 +99,6 @@ Filled in when the item moves to `complete/`.
 [^4]: ADR Registry. `docs/adrs/REGISTRY.md`
 [^5]: Blockers register, BLK-036. `docs/BLOCKERS.md`
 [^6]: Findings register, FND-320. `docs/FINDINGS.md`
+[^C1]: Findings register, FND-556. `docs/FINDINGS.md`
+[^C2]: ADR-0169, an upgrade holds a condition that wear takes and work mends. `docs/adrs/draft/adr-0169-an-upgrade-holds-a-condition-that-wear-takes-and-work-mends.md`
+[^C3]: Balance register, the upgrade rows. `docs/reference/balance.md`

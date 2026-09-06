@@ -1,7 +1,7 @@
 ---
 id: 0501
 title: Make rain arrive rather than sit everywhere
-status: proposed
+status: complete
 created: 2026-09-05
 implements: [ADR-0162]
 changes: [ADR-0141]
@@ -126,7 +126,26 @@ travelled.
 
 ## Outcome
 
-Filled in when the item moves to `complete/`.
+Complete in the engine, and **the two tests this item asked for were never
+written**.
+
+**What was built.** Water enters the air where it is hot and falls where the air
+cools, so rain arrives rather than sitting everywhere. ADR-0162 holds the
+record. The wet mark was set against a measured ground plane rather than left at
+the value that made every cell read wet.
+
+**What was never proved.** This item asked for a test that some cells are wet
+and some are dry at the same tick with no storm raised. That statement is the
+exact one the original measurement said was false, so it is the assertion the
+whole item existed to make true, and it does not exist. It also asked for a test
+that the near side of high ground holds more water than the far side. That does
+not exist either.
+
+**A measurement stands in place of the first test.** A 576-tile probe over the
+demonstration world, sampled after 200 warm-up ticks, gives a wet share of 63
+percent on average and 50 to 80 percent per tick: 288 tiles stay wet, 112 stay
+dry and 176 change.[^C5] A probe is not a test. It ran once and nothing repeats
+it.
 
 ## References
 
@@ -136,3 +155,4 @@ Filled in when the item moves to `complete/`.
 [^4]: ADR-0142, a god inflicts weather only on ground its own faction holds, decision D1. `docs/adrs/draft/adr-0142-a-god-inflicts-weather-only-on-ground-it-holds.md`
 [^B1]: Balance register, the wet mark and the evaporation share. `docs/reference/balance.md`
 [^B2]: The weather constants, the lift and the settle. `crates/cachette-core/src/weather.rs`
+[^C5]: Findings register, FND-558. `docs/FINDINGS.md`

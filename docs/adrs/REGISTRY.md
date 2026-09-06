@@ -335,7 +335,7 @@ without stating a constraint is worse than no record.
 | 0052 | A selector result may be a range, not only an enumerated set | Draft | 0051, 0028 | `draft/adr-0052-a-selector-result-may-be-a-range.md` |
 | 0053 | A faction is a bit in a mask, and a relation is a plane | Accepted | 0011, 0012, 0023, 0024 | 08 |
 | 0054 | An entity belongs to one of three tiers, declared at creation | Accepted | 0012, 0043 | 14, 15, 16 |
-| 0055 | An effective stat comes from an ordered modifier pipeline | Proposed | 0002, 0054 | 12 |
+| 0055 | A site derives its effective rate from the world at each application, and the stored rate stays the base. Answers the pipeline that ADR-0062 D7 reserves | Draft | 0002, 0003, 0004, 0005, 0054, 0062, 0164 | 12, `draft/adr-0055-a-site-derives-its-effective-rate-from-the-world.md` |
 | 0056 | Movement is tile-discrete and admitted by sort-then-admit | Accepted | 0004, 0018 | 06, 10 |
 | 0058 | A field update is a flux pair on an edge, so quantity is conserved exactly | Proposed | 0023, 0029 | 13 |
 | 0059 | Fog storage grows with observed area, not with world area | Accepted | 0001, 0002, 0004, 0009, 0022, 0023, 0040, 0053, 0111, 0154 | 08, `accepted/adr-0059-fog-storage-grows-with-observed-area.md` |
@@ -424,7 +424,11 @@ without stating a constraint is worse than no record.
 | 0165 | The wealth bar stands above what one settlement can hold. Changes ADR-0148 D3: a reader threshold may be derived from a structural ceiling and not only from a balance row | Draft | 0002, 0011, 0023, 0148 | `draft/adr-0165-the-wealth-bar-stands-above-what-one-settlement-can-hold.md` |
 | 0168 | A build order holds a unit on its tile, and the hold is derived and never stored | Draft | 0001, 0004, 0091, 0095, 0125, 0145, 0150, 0151, 0152, 0159 | `draft/adr-0168-a-build-order-holds-a-unit-on-its-tile.md` |
 | 0167 | War opens the border that tension closes. Changes ADR-0146 D4, the movement clause; the other clauses of ADR-0146 D4 stand | Draft | 0056, 0121, 0146, 0153 | `draft/adr-0167-war-opens-the-border-that-tension-closes.md` |
-| 0166 | The temperature of a cell is carried state that a season and the sky drive. Changes ADR-0160 D1, which states the heat is not state; the other decisions of ADR-0160 stand | Draft | 0002, 0004, 0009, 0140, 0160, 0161, 0162, 0164 | `draft/adr-0166-the-temperature-of-a-cell-is-carried-state-that-a-season-and-the-sky-drive.md` |
+| 0166 | The temperature of a cell is carried state that a season and the sky drive. Changes ADR-0160 D1 and ADR-0162 D1, which both state the heat is not state, and stales one consequence of ADR-0160; the other decisions of both stand | Draft | 0002, 0004, 0009, 0140, 0160, 0161, 0162, 0164 | `draft/adr-0166-the-temperature-of-a-cell-is-carried-state-that-a-season-and-the-sky-drive.md` |
+| 0169 | An upgrade holds a condition that wear takes and work mends, and a site at nothing is removed. Changes ADR-0151 D3, the clause that a level rises only from full condition; the other decisions of ADR-0151 stand | Draft | 0001, 0002, 0003, 0004, 0009, 0023, 0088, 0090, 0143, 0151, 0164 | `draft/adr-0169-an-upgrade-holds-a-condition-that-wear-takes-and-work-mends.md` |
+| 0170 | A recovery period is a base for the kind that the ground and the improvement scale, and it is stated in ticks. Changes ADR-0080 D5, the one period for each kind and the statement in simulated time; the other decisions of ADR-0080 stand | Draft | 0002, 0003, 0004, 0023, 0072, 0080, 0143, 0151, 0169 | `draft/adr-0170-a-recovery-period-is-a-base-that-the-ground-and-the-improvement-scale.md` |
+| 0172 | A unit reaches its tile by a second field at tile pitch, seeded only where a destination lies. Extends ADR-0091 D1, which every decision of ADR-0091 keeps | Draft | 0004, 0005, 0009, 0022, 0091, 0095, 0096 | `draft/adr-0172-a-unit-reaches-its-tile-by-a-second-field-at-tile-pitch.md` |
+| 0171 | The ground a world generates may be shaped by a climate the world stores, and the shaping is available and not the default. Changes ADR-0068 D1, which states the terrain function reads the seed and the address and nothing else; the other decisions of ADR-0068 stand | Draft | 0001, 0002, 0004, 0005, 0068, 0088, 0140, 0164 | `draft/adr-0171-the-ground-may-be-shaped-by-a-climate-the-world-stores.md` |
 
 ### Retired numbers
 

@@ -29,14 +29,15 @@ refusal leaves the world unchanged.[^5]
 
 The engine holds one derived answer that fits the gate exactly. The holding
 records a mask of the factions that hold ground in each block, and a block is a
-level 1 cell. Reading it is one lookup, and weather already lives on that
-lattice.[^6] [^7]
+level 1 cell. Reading it is one lookup. **The weather lattice takes the level 1
+pitch by default and a caller may state another**, so the gate reads the holding
+of every block the weather cell covers.[^6] [^7]
 
 ## Decision
 
 ### D1. The cell of every place must hold ground of the god's own faction
 
-**A god may put weather on a level 1 cell only when its faction holds at least
+**A god may put weather on a weather cell only when its faction holds at least
 one tile inside that cell.** The engine reads the block mask of the holding and
 refuses when the faction is not in it.
 
@@ -116,9 +117,9 @@ storm needs a second verb, and a decision register row holds the question.[^12]
 [^4]: ADR-0040, Python is a control plane, not a data plane, decisions D1 and D2. `docs/adrs/draft/adr-0040-python-is-a-control-plane-not-a-data-plane.md`
 [^5]: ADR-0125, the control plane names the seed set of a destination field, decision D1. `docs/adrs/draft/adr-0125-the-control-plane-names-the-seed-set-of-a-destination-field.md`
 [^6]: ADR-0053, a faction is a bit in a mask, and a relation is a plane, decision D3. `docs/adrs/accepted/adr-0053-a-faction-is-a-bit-in-a-mask-and-a-relation-is-a-plane.md`
-[^7]: ADR-0140, weather is a field over the level 1 cell lattice, decision D1. `docs/adrs/draft/adr-0140-weather-is-a-field-over-the-level-1-cell-lattice.md`
+[^7]: ADR-0140, weather is a field over a lattice whose pitch is a parameter, decision D1. `docs/adrs/draft/adr-0140-weather-is-a-field-over-the-level-1-cell-lattice.md`
 [^8]: ADR-0111, the presence relation is derived at the end of the step and never stored as a fact, decision D3. `docs/adrs/draft/adr-0111-the-presence-relation-is-derived-at-the-end-of-the-step.md`
 [^9]: Blockers register, BLK-130. `docs/BLOCKERS.md`
 [^10]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
-[^11]: ADR-0140, weather is a field over the level 1 cell lattice, decision D2. `docs/adrs/draft/adr-0140-weather-is-a-field-over-the-level-1-cell-lattice.md`
+[^11]: ADR-0140, weather is a field over a lattice whose pitch is a parameter, decision D2. `docs/adrs/draft/adr-0140-weather-is-a-field-over-the-level-1-cell-lattice.md`
 [^12]: Decisions register, DEC-238. `docs/DECISIONS.md`

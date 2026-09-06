@@ -289,5 +289,5 @@ green.[^21]
 [^17]: ADR-0120, a unit carries a type that indexes a table, decision D1. `docs/adrs/draft/adr-0120-a-unit-carries-a-type-that-indexes-a-table.md`
 [^18]: ADR-0009, parallel stages write disjoint outputs, decision D1. `docs/adrs/accepted/adr-0009-parallel-stages-write-disjoint-outputs.md`
 [^19]: Decisions register, DEC-044. `docs/DECISIONS.md`
-[^20]: Backlog item 0498. `docs/backlog/proposed/0498-give-the-upgrade-table-a-housing-category.md`
+[^20]: Backlog item 0498. `docs/backlog/complete/0498-give-the-upgrade-table-a-housing-category.md`
 [^21]: Testing Rules, a fixture supplies the input. `.agents/rules/testing.md`

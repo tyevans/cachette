@@ -1,7 +1,7 @@
 ---
 id: 0511
 title: Let a worked deposit come back fast enough to be worth returning to
-status: proposed
+status: complete
 created: 2026-09-06
 implements: []
 changes: []
@@ -61,7 +61,30 @@ Not done. This item is in `proposed/` and refining it is the work.
 
 ## Outcome
 
-Filled in when the item moves to the finished directory.
+Complete. A worked deposit now comes back at a rate that the ground and the
+improvement decide, rather than at one rate for the whole kind.
+
+**What was built.** The recovery rate answers to three things inside one
+declaration: the kind, which states a base period in ticks; the moisture, which
+indexes a table of seven bands that scales the period; and the improvement,
+which divides the period by a column of the upgrade row, scaled by the condition
+of the site so that a neglected terrace falls back toward the unimproved rate.
+
+**The declaration moved from units for each day to ticks.** The rate the owner
+asked for is below one unit a day, and a rate stated in units for each day
+cannot reach that without a period of zero.
+
+**The band edges come from a measurement.** A probe walked 2000 ticks of a 192
+by 192 world and sorted the ground plane every 50 ticks. Of 1440 cell samples,
+most held under 32 drops and the tail reached 1395, so even steps would have put
+almost every cell in one band.
+
+**The record.** ADR-0170 states the shape and changes ADR-0080 D5 in two
+clauses. ADR-0080 D5's real constraint, one declaration site for the rule,
+survives.
+
+**One rule, one function.** `World::recovery_period_at` exposes the same rule to
+a caller, so a display and the pass cannot disagree.
 
 ## References
 

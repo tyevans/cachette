@@ -1,7 +1,7 @@
 ---
 id: 0498
 title: Give the upgrade table a housing category
-status: proposed
+status: complete
 created: 2026-09-05
 implements: [ADR-0151, ADR-0157, ADR-0152, ADR-0159]
 changes: []
@@ -99,6 +99,23 @@ and the balance register rows are listed in the outcome below.
 - The thread-count test and the golden state test pass at 1, 2 and 12 threads.
 - No figure appears in the code or in a comment.
 - The whole check command runs green.
+
+## Outcome
+
+Complete. The upgrade table gained a lodging category with two levels, and a
+finished level raises the housing of the site that reaches the tile.
+
+**What was built.** Two lodging rows, a housing column on the upgrade row, and
+the rule that a finished level raises the housing of the site. The map key names
+the lodging, so the fallback word no longer does.
+
+**The name.** The column is named `housing` and not `capacity`. Item 0059 gave
+the settlement arena one meaning for the word `capacity`, and this item did not
+take it back.
+
+**Left open.** The balance register holds no row for the two lodging works or
+for the housing each level gives. The housing row of the register still says
+that no upgrade raises it, and that sentence is now false.
 
 ## References
 

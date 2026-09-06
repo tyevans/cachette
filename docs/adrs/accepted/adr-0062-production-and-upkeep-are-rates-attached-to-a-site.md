@@ -47,9 +47,10 @@ that a kernel holds as a constant cannot take part in that schedule.
 
 **One modifier source exists.** A later record reserves a number for an ordered
 modifier pipeline that turns a base value into an effective one.[^11] That
-record has no file, and nothing in the engine modifies a rate today. A record
-that assumed the pipeline would state an intent as a fact, which is the failure
-that section 4.6 of the record scope rule names.[^12] A backlog item that cites
+record had no file when this one was written, and nothing in the engine modified
+a rate then. A record that assumed the pipeline would have stated an intent as a
+fact, which is the failure that section 4.6 of the record scope rule names.[^12]
+The pipeline record is written now, and D7 says what happened.[^20] A backlog item that cites
 a reserved row as if it were a decision has already cost this project once.[^13]
 
 ## Decision
@@ -145,20 +146,28 @@ The log of sites that fell short is not order-free, because a concatenation
 depends on the order it reads. It takes the slot order, which does not depend
 on the thread count.[^16]
 
-### D7. This record states a base rate, and no modifier pipeline exists
+### D7. This record states a base rate, and a separate record states the modifier pipeline
 
 The rate that a site carries is the base rate, and it is also the effective
 rate, because nothing modifies it.
 
-**No ordered modifier pipeline exists, and this record does not create one.**
-The registry reserves a number for that pipeline, and no file holds it.[^11]
-Do not write it until a second source modifies a rate. With one source there is
-no decision to record, so the first condition of the record scope test
-fails.[^12] A pipeline that nothing invokes would also be a declared capability
-with no caller, which is a defect shape this project already tracks.[^17]
+**This record does not create an ordered modifier pipeline.** It said that no
+such pipeline existed and that the registry reserved a number with no file
+against it.[^11] That was the condition of the registry when this record was
+written, and the registry has moved: a second source now modifies a rate, and
+the reserved record is written.[^20] The sentence is reworded to the condition
+that now holds, which the registry's own rule makes a repair and not an
+amendment.[^21]
 
-When a second source appears, the pipeline record states how the sources
-compose, and this record keeps its claim: the base rate belongs to the site.
+**The condition for writing that record was stated here and it was met.** Do
+not write a pipeline record until a second source modifies a rate. With one
+source there is no decision to record, so the first condition of the record
+scope test fails.[^12] A pipeline that nothing invokes would also be a declared
+capability with no caller, which is a defect shape this project already
+tracks.[^17]
+
+The pipeline record states how the sources compose, and this record keeps its
+claim: the base rate belongs to the site.
 
 ## Consequences
 
@@ -244,3 +253,5 @@ earns over time, and nothing would fail.[^17]
 [^17]: Recurring defect shapes, shapes 1 and 3. `.claude/rules/recurring-defects.md`
 [^18]: Budgets and costs, the scale constants. `docs/reference/budgets.md`
 [^19]: Blockers register, BLK-007. `docs/BLOCKERS.md`
+[^20]: ADR-0055, a site derives its effective rate from the world at each application. `docs/adrs/draft/adr-0055-a-site-derives-its-effective-rate-from-the-world.md`
+[^21]: ADR Registry, repairing a fact a record imported from a register. `docs/adrs/REGISTRY.md`

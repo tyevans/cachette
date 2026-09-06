@@ -86,10 +86,19 @@ its tests.
 **Owner:** the project owner. **Blocks:** wiring the renown column to any
 simulation pass.
 
-Every character carries a renown, and the arena hashes the column. No pass in
-the engine writes it and no pass reads it. The creation sets it to zero, and it
-stays there unless a caller writes it. A finding holds the
-measurement.[^BLK150A]
+Every character carries a renown, and the arena hashes the column. **The
+paragraph that stood here said no pass writes it and no pass reads it, and a
+pass now does both.** The contest gives the champion of a faction a share of
+renown for each unit that faction fells, and the win reader compares the highest
+renown among the live characters of a faction against a target. A finding holds
+the measurement that this row was opened on.[^BLK150A]
+
+**The row stays open, and the engine has moved ahead of it.** A rule was chosen
+under a blocker that says nobody has chosen one, because a win path with no
+source could never fire and a quantity that only a reader touches states a
+capability the engine does not have. The rule and its share are provisional and
+the balance register holds the row. The owner may replace both without
+superseding anything, because a share is a parameter.
 
 Renown is what a game ranks two people by. A record that names somebody in
 charge needs a way to say who matters, and it names a small fixed set of
@@ -101,38 +110,40 @@ rule on records forbids inventing a value that an unanswered question governs,
 so the engine holds the column and changes nothing until this row
 closes.[^BLK110C]
 
-**What the project does meanwhile.** The control plane writes the column and
-reads it back. A game built on this engine makes its own rule from it, outside
-the simulation. The doc comment of the write says that nothing in the engine
-reads the column, so a caller is not told that a mechanism exists.
+**What the project does meanwhile.** The engine writes the column from the
+contest and reads it in the win path, at a provisional share. The control plane
+may still write the column and read it back, and a game built on this engine may
+make its own rule from it. What is still missing is everything the row asks
+beyond a source: what lowers renown, and whether it falls on its own. Nothing
+lowers it today.
 ### BLK-130 — Nobody has said what weather should be worth
 
 **Owner:** the project owner. **Blocks:** every quantity that the weather
 system carries.
 
-The world now makes weather, and a god now puts weather on a place. Eight
-values decide what either one is worth, and no measurement and no owner chose
-any of them.
+The world now makes weather, and a god now puts weather on a place. **This
+paragraph held a count of the values, and the count decayed.** It named eight,
+and the subsystem has since gained a wind, a temperature, a season, a
+deflection and a lattice pitch, each with values of its own. The balance
+register holds one row for each, and the register is the list.[^BLK130D]
 
-The engine holds a value for each. How much water the sea lifts at once, how
-often it lifts, how much of the air falls in one solve, how much of the ground
-dries in one solve, the quantity at which ground counts as wet, how much extra
-a gatherer takes from wet ground, how strong one storm may be, and how long a
-faction waits between storms.[^BLK130A] [^BLK130B]
+No measurement and no owner chose any of them. Each is a named constant in the
+engine beside the rule that reads it.[^BLK130A] [^BLK130B]
 
 **What would close this.** A statement of what the downstream game wants a
 storm to be worth: how long a storm should last in ticks, how much of the map
 one should cover, and how much a wet season should change what a congregation
-gathers. Three numbers close six of the eight.
+gathers. Those three answers reach most of the rows the register holds.
 
-**One of the eight now has a measurement.** A readability report reads the
-ground water of every level 1 cell of the demonstration world at four
-stops.[^BLK130C] Every cell is wet at every reading. The wet mark is 64 drops,
-and the driest cell holds 124 drops before a storm and 251 drops a hundred
-ticks after it. The wet bonus therefore applies everywhere, and wetness
-separates no cell from another. The measurement says what the current mark
-does. It does not say what the mark should be, and that is the question this
-row holds.
+**The wet mark now has a measurement, and the reading this row held is
+stale.** A readability report once found every cell of the demonstration world
+wet at every stop, so the wet bonus applied everywhere and wetness separated no
+cell from another.[^BLK130C] The field was rewritten since: water now rides the
+wind and falls where the air cools, and a probe over the same world finds most
+of a tick's cells wet and a real share of them dry, with a further share
+changing between ticks. The balance register holds the reading. **A measurement
+says what a mark does. It does not say what the mark should be**, and that is
+the question this row holds.
 
 **What the project does meanwhile.** The engine carries the values above as
 named constants beside the rule that reads each one. No decision record states
@@ -733,3 +744,4 @@ normally.
 [^BLK130A]: ADR-0142, a god inflicts weather only on ground its own faction holds, decisions D2 and D4. `docs/adrs/draft/adr-0142-a-god-inflicts-weather-only-on-ground-it-holds.md`
 [^BLK130B]: ADR-0143, wet ground yields more to a gatherer, decision D2. `docs/adrs/draft/adr-0143-wet-ground-yields-more-to-a-gatherer.md`
 [^BLK130C]: Research report 24, demonstration readability, resources and weather, section 2.1. `docs/research/reports/24-demonstration-readability-resources-and-weather.md`
+[^BLK130D]: Balance register, the weather. `docs/reference/balance.md`
