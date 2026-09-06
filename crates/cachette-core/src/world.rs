@@ -15287,14 +15287,14 @@ const _: () = assert!(
 
 /// The renown at which the renown reader fires, as a raw Q16.16 value.
 ///
-/// A provisional value of 100 whole units, under the blocker that asks what
+/// A provisional value of 1000 whole units, under the blocker that asks what
 /// raises renown.[^1] [^2]
 ///
 /// # References
 ///
 /// [^1]: Balance register, the renown target. `docs/reference/balance.md`
 /// [^2]: Blockers register, BLK-150. `docs/BLOCKERS.md`
-pub const RENOWN_TARGET: i32 = 100 << 16;
+pub const RENOWN_TARGET: i32 = 1000 << 16;
 
 /// The running value of one faction on each win path, and on the path that
 /// no reader watches.
