@@ -4856,6 +4856,13 @@ impl World {
                     returns: &self.returns,
                     destinations: &self.destinations,
                 },
+                &Building {
+                    holding: &self.holding,
+                    plan: &self.plan,
+                    unit_types: &self.unit_types,
+                    upgrades: &self.upgrades,
+                    table: &self.upgrade_table,
+                },
                 threads,
             )?
         };
@@ -7960,8 +7967,7 @@ impl World {
                 .map(|position| intents[*position as usize])
                 .filter(|intent| intent.category == winner)
                 .fold(0i64, |total, intent| {
-                    let scale = self.unit_types.row(intent.unit_type).build_rate;
-                    total.saturating_add(sim_math::scale_work(upgrade::BUILD_RATE, scale))
+                    total.saturating_add(build_contribution(self.unit_types.row(intent.unit_type)))
                 });
             if work > 0 {
                 run.push((tile, winner, work));
@@ -9496,6 +9502,127 @@ fn resolve_build_row(
 /// # References
 ///
 /// [^1]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
+/// Returns the build intent of one unit, or `None` when it builds nothing now.
+///
+/// **One function states what a unit builds, and three paths call it.** The
+/// build pass collects the intents. The movement pass asks whether the unit
+/// stands on the work it was ordered to do. The verb that gives the order
+/// calls the two rules inside it directly, at the moment of the order.[^1]
+///
+/// The read is gated on the build order, which is one byte of one column. A
+/// unit that carries no order costs that byte and nothing else, so a
+/// population that does not build pays one column and no lookup.[^2]
+///
+/// # References
+///
+/// [^1]: Recurring defect shapes, shape 1. `.agents/rules/recurring-defects.md`
+/// [^2]: ADR-0096, cost follows the lattice, not the population, and a unit is a reader, decision D1. `docs/adrs/draft/adr-0096-cost-follows-the-lattice-not-the-population.md`
+fn build_intent_of(
+    unit: Entity,
+    soldiers: &SoldierArena,
+    holding: &Holding,
+    ground: plan::Ground<'_>,
+    plan: &PlanRegister,
+) -> Option<BuildIntent> {
+    let plan::Ground {
+        grid,
+        terrain,
+        upgrades,
+        table,
+    } = ground;
+    let category = soldiers.build_order(unit)??;
+    let tile = soldiers.tile(unit)?;
+    let unit_type = soldiers.unit_type(unit)?;
+    // One function resolves the row, and the verb that gives the order calls
+    // the same one. A build the table no longer holds, and a build whose tile
+    // gained another category since the order, stop here.[^3]
+    //
+    // [^3]: ADR-0151, an upgrade is a category with a ground fit and a level, decision D2. `docs/adrs/accepted/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
+    let kind = terrain.kind(grid.address_of(tile)?)?;
+    let row = resolve_build_row(table, kind, upgrades.at(tile), category).ok()?;
+    // One function states the ground rule, and the verb that gives the order
+    // calls the same one. A build whose ground changed hands since the order
+    // stops here.[^2]
+    //
+    // [^2]: ADR-0150, held ground is the ground within reach of a city its faction owns, decision D4. `docs/adrs/draft/adr-0150-held-ground-is-the-ground-within-reach-of-a-city-its-faction-owns.md`
+    let holder = holding
+        .holders()
+        .get(tile.0 as usize)
+        .copied()
+        .unwrap_or(Holder::NOBODY);
+    let faction = soldiers.faction(unit)?;
+    if !build_is_permitted(holder, faction, row, category, plan.zones(faction, tile)) {
+        return None;
+    }
+    Some(BuildIntent {
+        unit,
+        tile,
+        category,
+        unit_type,
+    })
+}
+
+/// Returns the work that one unit of this type adds to a site in one tick.
+///
+/// **This is the one statement of what a builder contributes.** The build
+/// advance sums it, and the movement hold reads it to decide whether the unit
+/// is doing anything by standing still. A second expression of the same
+/// product would let a unit be held for work it never adds.[^1]
+///
+/// A row whose build rate is zero contributes zero, and so does a row whose
+/// rate scales the base work below one. Zero means cannot.[^2]
+///
+/// # References
+///
+/// [^1]: Recurring defect shapes, shape 1. `.agents/rules/recurring-defects.md`
+/// [^2]: ADR-0145, a unit type is a row of capability columns, and zero means cannot, decisions D1 and D2. `docs/adrs/accepted/adr-0145-a-unit-type-is-a-row-of-capability-columns-and-zero-means-cannot.md`
+#[must_use]
+const fn build_contribution(row: crate::unit_type::UnitTypeRow) -> i64 {
+    sim_math::scale_work(upgrade::BUILD_RATE, row.build_rate)
+}
+
+/// Reports whether the tile a unit stands on is work it must stay for.
+///
+/// **A build order is per unit and per tile, and movement takes its direction
+/// from a field over cells.** A hold cannot be written into that field
+/// without pinning every unit of the cell, so the movement pass asks this
+/// question of each unit instead. The record states the rule and the
+/// reasoning.[^1] [^2]
+///
+/// **Nothing stores the answer.** The pass derives it from the order, the
+/// ground, the plan and the type on the tick it reads it, so there is no hold
+/// to clear when the work finishes, when the plan drops the project, or when
+/// the unit dies. A stored hold that outlived one of those three would freeze
+/// a unit for the rest of the run.[^1]
+///
+/// **A unit that adds no work is never held.** The soldier row, the merchant
+/// row and the leader row all build at zero, and the controller orders every
+/// unit of its faction that stands on a zoned tile, whatever its type.[^3] A
+/// hold without this clause would freeze one of them for ever, because no
+/// work would ever finish the site it stands on.
+///
+/// # References
+///
+/// [^1]: ADR-0165, a build order holds a unit on its tile, and the hold is derived, decisions D1, D2 and D3. `docs/adrs/draft/adr-0165-a-build-order-holds-a-unit-on-its-tile.md`
+/// [^2]: ADR-0091, movement takes its direction from a per-cell field, never from a per-unit search, decision D1. `docs/adrs/draft/adr-0091-movement-takes-its-direction-from-a-per-cell-field.md`
+/// [^3]: ADR-0152, a faction plans its roads and zones with one solver, decision D5. `docs/adrs/accepted/adr-0152-a-faction-plans-its-roads-and-zones-with-one-solver.md`
+fn build_holds_unit(
+    unit: Entity,
+    soldiers: &SoldierArena,
+    building: &Building<'_>,
+    ground: plan::Ground<'_>,
+) -> bool {
+    let Building {
+        holding,
+        plan,
+        unit_types,
+        upgrades: _,
+        table: _,
+    } = *building;
+    build_intent_of(unit, soldiers, holding, ground, plan)
+        .is_some_and(|intent| build_contribution(unit_types.row(intent.unit_type)) > 0)
+}
+
 fn build_intents(
     soldiers: &SoldierArena,
     holding: &Holding,
@@ -9523,46 +9650,18 @@ fn build_intents(
                 *slot = chunk
                     .iter()
                     .filter_map(|unit| {
-                        let category = soldiers.build_order(*unit)??;
-                        let tile = soldiers.tile(*unit)?;
-                        let unit_type = soldiers.unit_type(*unit)?;
-                        // One function resolves the row, and the verb that
-                        // gives the order calls the same one. A build the
-                        // table no longer holds, and a build whose tile
-                        // gained another category since the order, stop
-                        // here.[^3]
-                        //
-                        // [^3]: ADR-0151, an upgrade is a category with a ground fit and a level, decision D2. `docs/adrs/accepted/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
-                        let ground = terrain.kind(grid.address_of(tile)?)?;
-                        let row =
-                            resolve_build_row(table, ground, upgrades.at(tile), category).ok()?;
-                        // One function states the ground rule, and the verb
-                        // that gives the order calls the same one. A build
-                        // whose ground changed hands since the order stops
-                        // here.[^2]
-                        //
-                        // [^2]: ADR-0150, held ground is the ground within reach of a city its faction owns, decision D4. `docs/adrs/draft/adr-0150-held-ground-is-the-ground-within-reach-of-a-city-its-faction-owns.md`
-                        let holder = holding
-                            .holders()
-                            .get(tile.0 as usize)
-                            .copied()
-                            .unwrap_or(Holder::NOBODY);
-                        let faction = soldiers.faction(*unit)?;
-                        if !build_is_permitted(
-                            holder,
-                            faction,
-                            row,
-                            category,
-                            plan.zones(faction, tile),
-                        ) {
-                            return None;
-                        }
-                        Some(BuildIntent {
-                            unit: *unit,
-                            tile,
-                            category,
-                            unit_type,
-                        })
+                        build_intent_of(
+                            *unit,
+                            soldiers,
+                            holding,
+                            plan::Ground {
+                                grid,
+                                terrain,
+                                upgrades,
+                                table,
+                            },
+                            plan,
+                        )
                     })
                     .collect();
             });
@@ -9758,6 +9857,24 @@ struct Steering<'a> {
     destinations: &'a SeededField,
 }
 
+/// What the movement pass reads to answer whether a unit is building here.
+///
+/// The three references are the three the build rule needs and that the
+/// steering does not: who holds the ground, what the faction's plan zones,
+/// and what the unit's type can do.
+struct Building<'a> {
+    /// The held-ground column that the build rule reads.
+    holding: &'a Holding,
+    /// The plan register that bounds where a unit may build.
+    plan: &'a PlanRegister,
+    /// The shared type table that states what a unit contributes.
+    unit_types: &'a UnitTypeTable,
+    /// The sparse upgrade map that holds what already stands on a tile.
+    upgrades: &'a UpgradeMap,
+    /// The shared upgrade table that resolves the row a build order names.
+    table: &'a UpgradeTable,
+}
+
 struct UnitWalk<'a> {
     /// The arena that every identity below resolves against.
     soldiers: &'a SoldierArena,
@@ -9771,6 +9888,7 @@ fn soldier_moves(
     terrain: Terrain,
     walk: &UnitWalk<'_>,
     steering: &Steering<'_>,
+    building: &Building<'_>,
     threads: usize,
 ) -> Result<Vec<(Entity, Axial)>, StepError> {
     let UnitWalk { soldiers, live } = *walk;
@@ -9820,6 +9938,43 @@ fn soldier_moves(
                     .iter()
                     .filter_map(|soldier| {
                         let here = soldiers.address(*soldier)?;
+                        // **A unit that stands on the work it was ordered to
+                        // do does not move.** The build advance adds the work
+                        // of a builder to the tile the builder stands on, and
+                        // one level of one upgrade asks for more work than one
+                        // builder adds in one tick. A unit that walked away
+                        // between two ticks therefore spread its labour over
+                        // many tiles and finished none of them.[^22] [^23]
+                        //
+                        // **The hold is derived here and stored nowhere.** The
+                        // question is asked again on every tick, from the
+                        // order, the ground, the plan and the type. It stops
+                        // being true on the tick the work finishes, on the
+                        // tick the plan drops the project, and on the tick the
+                        // ground changes hands. There is no hold to clear, so
+                        // no unit can carry a stale one.[^22]
+                        //
+                        // **The clause sits above the send and above the
+                        // intent**, because a unit the controller sent to a
+                        // project still carries that send when it arrives. A
+                        // send that outranked the hold would walk the builder
+                        // off the tile it was sent to.[^22]
+                        //
+                        // [^22]: ADR-0165, a build order holds a unit on its tile, and the hold is derived, decisions D1, D2 and D3. `docs/adrs/draft/adr-0165-a-build-order-holds-a-unit-on-its-tile.md`
+                        // [^23]: Findings register, FND-545. `docs/FINDINGS.md`
+                        if build_holds_unit(
+                            *soldier,
+                            soldiers,
+                            building,
+                            plan::Ground {
+                                grid,
+                                terrain,
+                                upgrades: building.upgrades,
+                                table: building.table,
+                            },
+                        ) {
+                            return None;
+                        }
                         // **A unit the control plane sent somewhere climbs
                         // the plane it was sent to, and it reads no intent.**
                         // An order from the control plane is not a score, so
