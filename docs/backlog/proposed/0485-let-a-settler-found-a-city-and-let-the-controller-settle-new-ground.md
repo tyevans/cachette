@@ -104,4 +104,4 @@ Filled in when the item moves to `complete/`.
 [^8]: Recurring Defect Shapes, shape 1. `.agents/rules/recurring-defects.md`
 [^9]: Balance register, the controller. `docs/reference/balance.md`
 [^10]: Findings register, FND-320. `docs/FINDINGS.md`
-[^11]: Backlog item 0497. `docs/backlog/proposed/0497-build-a-per-site-production-queue-that-spends-a-person-and-goods.md`
+[^11]: Backlog item 0497. `docs/backlog/complete/0497-build-a-per-site-production-queue-that-spends-a-person-and-goods.md`

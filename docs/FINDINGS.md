@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-495**
+**Next number: FND-496**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -12100,8 +12100,33 @@ should hold the ceiling of the quantity it compares.
 carried a wrong claim about the store from the pass that wrote it, and no check
 could see it. Only a harness run found it.
 
+### FND-495 — A bound test that fills the stored block measures the block and not the bound
+
+**Believed.** A test that pushes one entry past the bound of a queue proves
+that the bound refuses it.
+
+**True.** The queue of a site is a block of a fixed width, and the bound a
+world enforces sits at or below that width. A test that filled the block was
+refused by the block, whatever the bound said. The first form of the test that
+proves the queue bound therefore passed with the bound check removed.[^F495A]
+
+**Evidence.** Written on 5 September 2026, during item 0497. The test pushed
+`QUEUE_BOUND` entries and asserted that the next push was refused. The bound
+check was replaced with a branch that never fires, and the test stayed green,
+because the search for a free position in the block found none. The test now
+sets a bound of two against a stored width of four, and it went red under the
+same defect. A second test covers the width.
+
+**Follows.** **When one limit sits inside another, the fixture must sit
+between them.** A test at the outer limit cannot see the inner one. Ask which
+limit the assertion means, and build the fixture so that only that limit can
+fire.[^F492B] This is the shape of the fixture rule at the assertion rather
+than at the data: the input was extreme, and it was extreme in the wrong
+direction.
+
 ## References
 
+[^F495A]: The queue of a site, and the bound a world enforces. `crates/cachette-core/src/production.rs`
 [^F494A]: Balance register, the stock target, the wonder work, the tick limit, the founding group and the campaign cohort size. `docs/reference/balance.md`
 [^F494B]: The census row that counts a filled seat. `crates/cachette-core/src/world.rs`
 [^F494C]: Findings register, FND-486. `docs/FINDINGS.md`

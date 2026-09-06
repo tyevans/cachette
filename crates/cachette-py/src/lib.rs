@@ -20,6 +20,9 @@ use cachette_core::founding::FoundingOutcome;
 use cachette_core::hex::NEIGHBOURS;
 use cachette_core::luxury::{LuxuryId, LUXURY_CEILING};
 use cachette_core::plan::PlanRules;
+use cachette_core::production::{BuildCostRow, QueueOrder};
+use cachette_core::rates::RateSchedule;
+use cachette_core::site::COMMODITY_COUNT;
 use cachette_core::unit_type::{UnitTypeId, UnitTypeRow};
 use cachette_core::upgrade::{UpgradeCategory, UpgradeRow};
 use cachette_core::TileIdx;
@@ -1254,6 +1257,273 @@ impl PyWorld {
             "a resolved identity must name a soldier the arena can write"
         );
         Ok(())
+    }
+
+    /// Puts one entry at the back of the build queue of one site.
+    ///
+    /// The faction is a faction number of this world. The site is a
+    /// settlement identity, as `found_settlements` returns them. The unit
+    /// type is a row of the shared unit type table, as an integer. Returns
+    /// `None`.
+    ///
+    /// **A site builds a typed unit from its queue, and the store pays.** One
+    /// stage advances the front entry of each site. A finished entry takes
+    /// the residents its cost row names and the goods it costs, and one unit
+    /// of that type then stands at the site.[^1]
+    ///
+    /// **The engine holds no rule about what to queue.** This verb, the
+    /// built-in controller and a learner all reach the same path, and none of
+    /// them is physics.[^2]
+    ///
+    /// # Errors
+    ///
+    /// Raises `VerbError` when the identity names no site that stands, when
+    /// the site belongs to another faction, when the number names no row of
+    /// the unit type table, and when the queue already holds its bound.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0158, a site builds a typed unit from a bounded queue its store pays for, decisions D1, D3 and D4. `docs/adrs/draft/adr-0158-a-site-builds-a-typed-unit-from-a-bounded-queue-its-store-pays-for.md`
+    /// [^2]: ADR-0158, a site builds a typed unit from a bounded queue its store pays for, decision D2. `docs/adrs/draft/adr-0158-a-site-builds-a-typed-unit-from-a-bounded-queue-its-store-pays-for.md`
+    fn queue_unit(&self, faction: u16, site: u64, unit_type: u8) -> PyResult<()> {
+        let mut world = self.lock();
+        let entity = resolve_site(&world, site)?;
+        let kind = UnitTypeId::from_u8(unit_type)
+            .ok_or_else(|| VerbError::new_err(format!("{unit_type} names no unit type")))?;
+        world
+            .order_site_queue(FactionId(faction), entity, QueueOrder::Push(kind))
+            .map_err(|refusal| VerbError::new_err(refusal.to_string()))
+    }
+
+    /// Takes one entry out of the build queue of one site.
+    ///
+    /// The faction is a faction number of this world. The site is a
+    /// settlement identity. The position is the place of the entry in the
+    /// queue, counting from zero. The entries behind it keep their order.
+    /// Returns `None`.
+    ///
+    /// **The work the store already paid for is lost.** The store paid it as
+    /// the entry advanced, and nothing returns a charge.[^1]
+    ///
+    /// This call and `queue_unit` reach one verb of the engine.
+    ///
+    /// # Errors
+    ///
+    /// Raises `VerbError` when the identity names no site that stands, when
+    /// the site belongs to another faction, and when the position holds no
+    /// entry.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0158, a site builds a typed unit from a bounded queue its store pays for, decision D3. `docs/adrs/draft/adr-0158-a-site-builds-a-typed-unit-from-a-bounded-queue-its-store-pays-for.md`
+    fn clear_queue_entry(&self, faction: u16, site: u64, position: u8) -> PyResult<()> {
+        let mut world = self.lock();
+        let entity = resolve_site(&world, site)?;
+        world
+            .order_site_queue(FactionId(faction), entity, QueueOrder::Clear(position))
+            .map_err(|refusal| VerbError::new_err(refusal.to_string()))
+    }
+
+    /// Returns the build queue of one site, as a `dict` of NumPy arrays.
+    ///
+    /// The site is a settlement identity. Every array holds one entry for
+    /// each entry of the queue, in queue position order, and every array is
+    /// the same length. **That length is the entries the site holds.**
+    ///
+    /// - `unit_type`, `numpy.uint8`. The row of the unit type table that the
+    ///   entry names.
+    /// - `work`, `numpy.uint32`. The work done toward that type.
+    ///
+    /// The order is the order the entries were queued, and nothing reorders
+    /// them. The front entry is the one that advances.[^1]
+    ///
+    /// This method copies each column.[^2]
+    ///
+    /// # Errors
+    ///
+    /// Raises `ViewError` when the identity names no site that stands.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0158, a site builds a typed unit from a bounded queue its store pays for, decision D1. `docs/adrs/draft/adr-0158-a-site-builds-a-typed-unit-from-a-bounded-queue-its-store-pays-for.md`
+    /// [^2]: ADR-0044, what copies and what does not is declared at the call site. `docs/adrs/REGISTRY.md`
+    fn site_queue<'py>(&self, python: Python<'py>, site: u64) -> PyResult<Bound<'py, PyDict>> {
+        let world = self.lock();
+        let entity = resolve_site(&world, site)?;
+        let entries = world
+            .site_queue(entity)
+            .ok_or_else(|| ViewError::new_err(format!("the identity {site} names no live site")))?;
+        let columns = PyDict::new(python);
+        let unit_type: Vec<u8> = entries.iter().map(|entry| entry.unit_type.0).collect();
+        let work: Vec<u32> = entries.iter().map(|entry| entry.work).collect();
+        columns.set_item("unit_type", unit_type.to_pyarray(python))?;
+        columns.set_item("work", work.to_pyarray(python))?;
+        Ok(columns)
+    }
+
+    /// Returns what the queues did on the last step, as a `dict` of integers.
+    ///
+    /// The keys are `produced`, `refused_without_a_person`,
+    /// `refused_without_goods` and `refused_at_the_verb`.
+    ///
+    /// **The two refusals of a finished entry are counted apart**, because
+    /// they mean different things to a watcher and to a learner. A watcher
+    /// reading a queue that never moves can then tell a site with no people
+    /// from a site with no goods.[^1]
+    ///
+    /// The counts cover the last step. The next step empties them.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0158, a site builds a typed unit from a bounded queue its store pays for, decision D6. `docs/adrs/draft/adr-0158-a-site-builds-a-typed-unit-from-a-bounded-queue-its-store-pays-for.md`
+    fn queue_census<'py>(&self, python: Python<'py>) -> PyResult<Bound<'py, PyDict>> {
+        let world = self.lock();
+        let counts = PyDict::new(python);
+        counts.set_item("produced", world.queue_produced())?;
+        counts.set_item(
+            "refused_without_a_person",
+            world.queue_refused_without_a_person(),
+        )?;
+        counts.set_item("refused_without_goods", world.queue_refused_without_goods())?;
+        counts.set_item("refused_at_the_verb", world.queue_refused_at_the_verb())?;
+        Ok(counts)
+    }
+
+    /// Writes the build cost of one unit type.
+    ///
+    /// The unit type is a row of the shared unit type table, as an integer.
+    /// The work is the advances the entry takes. The people are the residents
+    /// a finished entry spends. The goods are one quantity for each
+    /// commodity, in commodity order, as raw Q16.16 integers. Returns `None`.
+    ///
+    /// **The costs sit in their own table and not in the unit type row.** A
+    /// unit type row is a set of capability columns, and a zero in one means
+    /// that the type cannot do what the column names.[^1] A build work of
+    /// zero means a type that finishes at once, which is a different meaning
+    /// for one zero.
+    ///
+    /// Every value is a balance row, and one blocker governs all of them.[^2]
+    /// [^3]
+    ///
+    /// # Errors
+    ///
+    /// Raises `VerbError` when the number names no row of the unit type
+    /// table, and when the goods list is not one quantity for each commodity.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0145, a unit type is a row of capability columns, and zero means cannot, decisions D1 and D2. `docs/adrs/accepted/adr-0145-a-unit-type-is-a-row-of-capability-columns-and-zero-means-cannot.md`
+    /// [^2]: Balance register, the production queue. `docs/reference/balance.md`
+    /// [^3]: Blockers register, BLK-050. `docs/BLOCKERS.md`
+    fn define_build_cost(
+        &self,
+        unit_type: u8,
+        work: u32,
+        people: u32,
+        goods: Vec<i32>,
+    ) -> PyResult<()> {
+        let mut world = self.lock();
+        let mut quantities = [Fix32::ZERO; COMMODITY_COUNT];
+        if goods.len() != COMMODITY_COUNT {
+            return Err(VerbError::new_err(format!(
+                "the goods list holds {} quantities and the world holds {COMMODITY_COUNT} commodities",
+                goods.len()
+            )));
+        }
+        for (slot, value) in quantities.iter_mut().zip(goods) {
+            *slot = Fix32(value);
+        }
+        world
+            .define_build_cost(
+                unit_type,
+                BuildCostRow {
+                    work,
+                    people,
+                    goods: quantities,
+                },
+            )
+            .map_err(|refusal| VerbError::new_err(refusal.to_string()))
+    }
+
+    /// Returns the entries one site may hold in its queue, as an integer.
+    fn queue_bound(&self) -> usize {
+        self.lock().queue_bound()
+    }
+
+    /// Sets the entries one site may hold in its queue.
+    ///
+    /// **A bound of zero turns the queue off.** No site then holds an entry,
+    /// and no unit is built. A caller that wants the engine to leave its
+    /// units alone sets it. Returns `None`.
+    ///
+    /// The bound is a balance row.[^1]
+    ///
+    /// # Errors
+    ///
+    /// Raises `VerbError` when the bound is above the width of the stored
+    /// block.
+    ///
+    /// # References
+    ///
+    /// [^1]: Balance register, the production queue, the queue bound row. `docs/reference/balance.md`
+    fn set_queue_bound(&self, bound: usize) -> PyResult<()> {
+        if self.lock().set_queue_bound(bound) {
+            return Ok(());
+        }
+        Err(VerbError::new_err(format!(
+            "the bound {bound} is above the width of the stored block"
+        )))
+    }
+
+    /// Sets how often the queue advance acts, and its offset in the period.
+    ///
+    /// The period is the ticks between two advances. The phase is the offset
+    /// inside the period. Returns `None`.
+    ///
+    /// The schedule is a balance row.[^1]
+    ///
+    /// # Errors
+    ///
+    /// Raises `VerbError` when the period is zero or above the range.
+    ///
+    /// # References
+    ///
+    /// [^1]: Balance register, the production queue, the schedule row. `docs/reference/balance.md`
+    fn set_queue_schedule(&self, period: u32, phase: u32) -> PyResult<()> {
+        let schedule = RateSchedule::new(period, phase).ok_or_else(|| {
+            VerbError::new_err(format!("the period {period} is outside the range"))
+        })?;
+        self.lock().set_queue_schedule(schedule);
+        Ok(())
+    }
+
+    /// Sets the quantity of one good that one advance of a queue costs.
+    ///
+    /// The commodity is a commodity number. The quantity is a raw Q16.16
+    /// integer. Returns `None`.
+    ///
+    /// **A queue is never free.** A site whose store cannot pay the charge
+    /// makes no progress, and its entry stays where it is.[^1] The charge is
+    /// a balance row.[^2]
+    ///
+    /// # Errors
+    ///
+    /// Raises `VerbError` when the commodity is outside the set.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0158, a site builds a typed unit from a bounded queue its store pays for, decision D3. `docs/adrs/draft/adr-0158-a-site-builds-a-typed-unit-from-a-bounded-queue-its-store-pays-for.md`
+    /// [^2]: Balance register, the production queue, the charge row. `docs/reference/balance.md`
+    fn set_queue_charge(&self, commodity: u16, quantity: i32) -> PyResult<()> {
+        if self
+            .lock()
+            .set_queue_charge(CommodityId(commodity), Fix32(quantity))
+        {
+            return Ok(());
+        }
+        Err(VerbError::new_err(format!(
+            "the commodity {commodity} is outside the set"
+        )))
     }
 
     /// Returns the unit type of one soldier, as an integer.

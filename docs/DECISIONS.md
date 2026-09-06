@@ -23,7 +23,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^ALLOC]
 
-**Next number: DEC-271**
+**Next number: DEC-272**
 
 ## Open
 
@@ -3885,6 +3885,33 @@ not could never start.
 
 **What stays open.** Whether the downstream game wants a territorial gate is a
 game rule, and a blocker holds the rules of that game.[^DEC214D]
+### DEC-271 — Where does the build cost of a unit type live?
+
+**Closed on 5 September 2026. Option B. A second table, indexed by the same
+unit type.**
+
+**The question.** A queue entry names a unit type, and it needs three values
+for that type: the work it takes, the residents it spends and the goods it
+costs.[^DEC271A] The unit type table already holds one row for each type.
+
+**Option A. Widen the unit type row.** The row is one place, and a reader of a
+type gets everything about it in one lookup.
+
+**Option B. A second table, indexed by the same type.** The unit type row keeps
+its meaning, and a new table holds the costs.
+
+**Why B.** A unit type row is a set of capability columns, and a zero in one
+means that the type cannot do what the column names.[^DEC271B] A build work of
+zero means a type that finishes on its first advance, which is a second meaning
+for one zero in one row. A reader could not tell the two apart, and no check
+could see the difference. The costs are also a different kind of value: a
+capability says what a unit does after it exists, and a cost says what it takes
+to make one.
+
+**What follows.** Two tables enter the state hash and a caller writes each with
+its own verb. The rule that no pass compares a type index against a constant
+holds for both.[^DEC271C]
+
 ### DEC-270 — Does a caller replace the recovery rules as a whole set, or one kind at a time?
 
 **Closed. Option A. The caller passes the period of every resource kind in one
@@ -4343,6 +4370,9 @@ exactly so that a caller cannot build a wrong one.[^DEC120C]
 [^DEC202A]: ADR-0053, a faction is a bit in a mask, and a relation is a plane, decision D3. `docs/adrs/accepted/adr-0053-a-faction-is-a-bit-in-a-mask-and-a-relation-is-a-plane.md`
 [^DEC202B]: Blockers register, BLK-111. `docs/BLOCKERS.md`
 [^DEC250A]: ADR-0121, a meeting between two factions resolves at the tile, decision D3. `docs/adrs/draft/adr-0121-a-meeting-between-two-factions-resolves-at-the-tile.md`
+[^DEC271A]: ADR-0158, a site builds a typed unit from a bounded queue its store pays for, decision D3. `docs/adrs/draft/adr-0158-a-site-builds-a-typed-unit-from-a-bounded-queue-its-store-pays-for.md`
+[^DEC271B]: ADR-0145, a unit type is a row of capability columns, and zero means cannot, decisions D1 and D2. `docs/adrs/accepted/adr-0145-a-unit-type-is-a-row-of-capability-columns-and-zero-means-cannot.md`
+[^DEC271C]: ADR-0120, a unit carries a type that indexes a table, decision D1. `docs/adrs/draft/adr-0120-a-unit-carries-a-type-that-indexes-a-table.md`
 [^DEC270A]: The recovery rules and the depletion ledger. `crates/cachette-core/src/resource.rs`
 [^DEC235A]: PRD-0004, the world has weather that a watcher can read, what it costs at the target scale. `docs/product/accepted/prd-0004-the-world-has-weather-that-a-watcher-can-read.md`
 [^DEC235B]: ADR-0121, a meeting between two factions resolves at the tile, decision D2. `docs/adrs/draft/adr-0121-a-meeting-between-two-factions-resolves-at-the-tile.md`
