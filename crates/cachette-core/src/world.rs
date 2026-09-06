@@ -5694,6 +5694,28 @@ impl World {
             let _span = stage::open(Stage::Controller);
             self.run_controller();
         }
+        // **A step leaves the world readable.** The controller founds cities,
+        // and a founding seats a group and spends the settler. Both change
+        // the unit arena, so the refresh above no longer describes it. The
+        // derived unit structure counts the changes of the arena and refuses
+        // every answer once the counts differ, so a reader between two steps
+        // met a refusal on each tick a faction founded.[^25]
+        //
+        // The opening refresh of the next step would repair it, so the
+        // simulation carried on and only a reader saw the fault. A reader is
+        // not obliged to check, and the drawing is not the only one, so the
+        // step repairs it here instead.
+        //
+        // **The refresh costs nothing on a tick that founded nothing.** It
+        // compares the two counts and returns, and it rebuilds only when the
+        // controller changed the arena. A tick that changed the arena pays
+        // for one rebuild, and no tick pays for two.
+        //
+        // [^25]: ADR-0018, the unit to tile bridge is derived and rebuilds at the barrier, decisions D3 and D4. `docs/adrs/accepted/adr-0018-the-unit-to-tile-bridge-is-derived-and-rebuilds-at-the-barrier.md`
+        {
+            let _span = stage::open(Stage::BridgeRefreshClosing);
+            self.refresh_bridge()?;
+        }
         Ok(&self.log)
     }
 

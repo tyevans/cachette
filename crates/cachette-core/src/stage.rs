@@ -184,6 +184,7 @@ declare_stages! {
     Observe,                  "observe",                    true,  1, false;
     RelationDrift,            "relation_drift",             false, 1, false;
     Controller,               "controller",                 false, 1, false;
+    BridgeRefreshClosing,     "bridge_refresh_closing",     false, 1, false;
 }
 
 /// What one stage cost, and how many times the step ran it.
