@@ -32,7 +32,7 @@ claim, and this record makes one of them.
 more
 
 **A unit that gathers from a tile inside a wet cell takes more in one tick than
-a unit on dry ground.** The resolve reads whether the level 1 cell that covers
+a unit on dry ground.** The resolve reads whether the weather cell that covers
 the tile holds at least a stated quantity of water on its ground.[^5]
 
 The read happens once for the whole run of units that gather one resource from
@@ -66,12 +66,18 @@ the question of what weather should be worth.[^10]
 
 ### D3. Weather changes nothing else, and the register says so
 
-**No other pass reads the weather field.** Movement, consumption, the choice
-pass and the contest are unchanged.
+**This decision said that no other pass reads the weather field, and three more
+now do.** Movement, consumption, the choice pass and the contest are still
+unchanged, and that is the part that stands. The three that were added since read
+the same wet reading this decision defines, through the same reader, so the
+project holds one statement of what wet ground is: the production pipeline scales
+a site's output by it, the recovery rule scales a period by it, and the upgrade
+wear takes condition on it.[^13] [^14] [^15]
 
-This is stated rather than left implicit, because an unstated intent becomes an
-assumption. A decision register row holds the three passes that could read
-weather and do not, with the recommendation for each.[^11]
+The rule this decision exists to protect is unchanged and it is worth restating.
+**A pass that wants the weather takes this reader and never writes a second
+one.** A decision register row holds the three passes that could read weather and
+do not, with the recommendation for each.[^11]
 
 ## Consequences
 
@@ -99,11 +105,14 @@ after this frame's solve.[^12]
 [^2]: Recurring Defect Shapes, shape 3. `.claude/rules/recurring-defects.md`
 [^3]: Decisions register, DEC-200. `docs/DECISIONS.md`
 [^4]: Blockers register, BLK-110. `docs/BLOCKERS.md`
-[^5]: ADR-0140, weather is a field over the level 1 cell lattice, decision D1. `docs/adrs/draft/adr-0140-weather-is-a-field-over-the-level-1-cell-lattice.md`
+[^5]: ADR-0140, weather is a field over a lattice whose pitch is a parameter, decision D1. `docs/adrs/draft/adr-0140-weather-is-a-field-over-the-level-1-cell-lattice.md`
 [^6]: ADR-0073, gathering is admitted by sort-then-admit against the tile, decision D3. `docs/adrs/accepted/adr-0073-gathering-is-admitted-by-sort-then-admit-against-the-tile.md`
 [^7]: ADR-0056, movement is tile-discrete and admitted by sort-then-admit, decision D4. `docs/adrs/accepted/adr-0056-movement-is-tile-discrete-and-admitted-by-sort-then-admit.md`
 [^8]: PRD-0004, the world has weather that a watcher can read, what this does not do. `docs/product/accepted/prd-0004-the-world-has-weather-that-a-watcher-can-read.md`
 [^9]: ADR-0072, a tile stock is generated, and only what was taken is stored, decision D5. `docs/adrs/accepted/adr-0072-a-tile-stock-is-generated-and-only-what-was-taken-is-stored.md`
 [^10]: Blockers register, BLK-130. `docs/BLOCKERS.md`
 [^11]: Decisions register, DEC-237. `docs/DECISIONS.md`
-[^12]: ADR-0140, weather is a field over the level 1 cell lattice, decision D3. `docs/adrs/draft/adr-0140-weather-is-a-field-over-the-level-1-cell-lattice.md`
+[^12]: ADR-0140, weather is a field over a lattice whose pitch is a parameter, decision D3. `docs/adrs/draft/adr-0140-weather-is-a-field-over-the-level-1-cell-lattice.md`
+[^13]: ADR-0055, a site derives its effective rate from the world at each application, decision D2. `docs/adrs/draft/adr-0055-a-site-derives-its-effective-rate-from-the-world.md`
+[^14]: ADR-0170, a recovery period is a base for the kind that the ground and the improvement scale, decision D3. `docs/adrs/draft/adr-0170-a-recovery-period-is-a-base-that-the-ground-and-the-improvement-scale.md`
+[^15]: ADR-0169, an upgrade holds a condition that wear takes and work mends, decision D2. `docs/adrs/draft/adr-0169-an-upgrade-holds-a-condition-that-wear-takes-and-work-mends.md`
