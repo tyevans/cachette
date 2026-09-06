@@ -43,6 +43,7 @@ import time
 from typing import TYPE_CHECKING, Protocol
 
 from cachette import Camera, World
+from cachette.names import Names
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -112,6 +113,13 @@ RESIZES = 4
 
 # The engine steps once for each drawn frame.
 FRAMES_EACH_SECOND = 30
+
+# How many promoted people the console names on one line.
+#
+# A mature world promotes several people on one tick. A line that named every
+# one of them would run off the screen, and the count beside it already says
+# how many there were.
+NAMED_PROMOTIONS = 2
 
 # The function keys the settings hold, by name.
 #
@@ -189,6 +197,7 @@ class Demo:
         "announcer",
         "camera",
         "clock",
+        "names",
         "overlay",
         "panels",
         "pointer",
@@ -203,12 +212,22 @@ class Demo:
     def __init__(
         self,
         world: World,
+        names: Names,
         width: int = WINDOW_WIDTH,
         height: int = WINDOW_HEIGHT,
         threads: int = 0,
     ) -> None:
-        """Build the state the control plane holds between frames."""
+        """Build the state the control plane holds between frames.
+
+        The namer turns an index, an address and an identity into words. It
+        comes from the caller and not from the world, because the engine
+        publishes no way to ask a world for the seed it was built from. The
+        caller therefore holds the seed twice, once for the world and once for
+        the namer, and it must pass one number to both. A property on the
+        world that gave back its seed would remove that second site.
+        """
         self.world = world
+        self.names = names
         self.surface = Surface(width, height)
         self.threads = threads if threads > 0 else min(os.cpu_count() or 1, 12)
         # The reference layer names the colours while a key is held. It holds
@@ -235,7 +254,7 @@ class Demo:
         # the line is printed once.
         self.announced_end = False
         # The lines that appear over the map, and the reader that makes them.
-        self.announcer = Announcer()
+        self.announcer = Announcer(names)
         # Where the deck reads the wall clock. **A toast lives for a number of
         # seconds and not for a number of ticks**, because a tick lasts
         # thirty-two times longer at the slowest speed than at the fastest,
@@ -280,7 +299,7 @@ class Demo:
         self.camera.clamp(self.world, width, height)
 
     def announce(self, reading: FrameReading) -> None:
-        """Say when a soldier becomes a character, and what earned it.
+        """Say when a soldier becomes a character, and name the person.
 
         **The control plane reacts to one fact the engine reported.** It reads
         the count the frame gave it and prints a line. It walks no entity and
@@ -289,6 +308,11 @@ class Demo:
         A promotion happens on a small share of frames, so the line is rare
         enough to read and it names the moment rather than a total that went
         up.
+
+        The line names the people the promotion log holds, up to a few of
+        them. A mature world promotes several people on one tick, and a line
+        that named every one of them would run off the screen. The count is
+        still there, so a reader knows how many the line did not name.
         """
         if reading["promoted_now"] <= 0:
             return
@@ -301,6 +325,29 @@ class Demo:
             f"tick {reading['tick']}: {reading['promoted_now']} {who} "
             f"became {what}{earned}, {reading['characters']} in the world"
         )
+        named = self._promoted_names()
+        if named:
+            print(f"  they are {named}")
+
+    def _promoted_names(self) -> str:
+        """Give back the names of the people the last step promoted.
+
+        The log covers the last step alone. A step that promoted more people
+        than the line holds ends with a count of the rest.
+        """
+        columns = self.world.promoted_log_columns()
+        rows = len(columns["character"])
+        if rows == 0:
+            return ""
+        shown = [
+            f"{self.names.person(int(columns['character'][row]))} of "
+            f"{self.names.faction(int(columns['faction'][row]))}"
+            for row in range(min(rows, NAMED_PROMOTIONS))
+        ]
+        rest = rows - len(shown)
+        if rest > 0:
+            shown.append(f"and {rest} more")
+        return ", ".join(shown)
 
     def announce_relations(self) -> None:
         """Say who declared war on whom, and who made peace, on the last step.
@@ -320,7 +367,10 @@ class Demo:
                 columns["band_before"][row]
             )
             verb = "declares war on" if declared else "makes peace with"
-            print(f"tick {tick}: faction {speaker} {verb} faction {other}")
+            print(
+                f"tick {tick}: {self.names.faction(speaker)} {verb} "
+                f"{self.names.faction(other)}"
+            )
 
     def announce_campaigns(self) -> None:
         """Say who marched on what, and who took what, on the last step.
@@ -338,15 +388,20 @@ class Demo:
             kind = int(columns["kind"][row])
             q = int(columns["objective_q"][row])
             r = int(columns["objective_r"][row])
-            place = f"({q}, {r})"
+            # **The console keeps the address beside the name.** A watcher
+            # reads a name to follow the story and reads an address to point
+            # the camera, and the console is where the second one belongs.
+            place = f"{self.names.place(q, r)} ({q}, {r})"
+            nation = self.names.faction(faction)
             if kind == 0:
                 cohort = int(columns["cohort_size"][row])
+                army = self.names.faction_adjective(faction)
                 print(
-                    f"tick {tick}: faction {faction} marches on {place} "
+                    f"tick {tick}: a {army} army marches on {place} "
                     f"with {cohort} soldiers"
                 )
             elif kind == 1:
-                print(f"tick {tick}: faction {faction} takes {place}")
+                print(f"tick {tick}: {nation} takes {place}")
 
     def announce_trade(self) -> None:
         """Say when a contract bound and when one reached full delivery.
@@ -366,7 +421,10 @@ class Demo:
             proposer = int(columns["proposer"][row])
             responder = int(columns["responder"][row])
             verb = "binds a contract with" if act == 2 else "completes a contract with"
-            print(f"tick {tick}: faction {proposer} {verb} faction {responder}")
+            print(
+                f"tick {tick}: {self.names.faction(proposer)} {verb} "
+                f"{self.names.faction(responder)}"
+            )
 
     def announce_end(self) -> GameEnd | None:
         """Say who won, once, when the game end record first appears.
@@ -380,7 +438,8 @@ class Demo:
         self.announced_end = True
         # The engine names a path with underscores. A watcher reads words.
         path = end["path"].replace("_", " ")
-        print(f"tick {end['tick']}: faction {end['winner']} wins by {path}")
+        winner = self.names.faction(int(end["winner"]))
+        print(f"tick {end['tick']}: {winner} wins by {path}")
         return end
 
     def toggle_panel(self, name: str) -> None:
@@ -526,22 +585,28 @@ def print_census(world: World) -> None:
         print(f"  {name}: {count}")
 
 
-def report(foundings: list[FoundingReport]) -> tuple[int, int]:
+def report(foundings: list[FoundingReport], names: Names) -> tuple[int, int]:
     """Print what each faction got, and give back how many were seated and fed.
 
     The loop is over factions, of which there are four. It is not a loop over
     entities, and it reads a summary the engine already made.
+
+    **The line keeps the address beside the name.** A watcher reads the name
+    to follow the story and reads the address to point the camera at the
+    place, and this report is where the second one belongs.
     """
     seated = 0
     carried = 0
     for founding in foundings:
         faction = founding["faction"]
+        nation = names.faction(faction)
         if not founding["seated"]:
-            print(f"faction {faction} found no place: {founding['refusal']}")
+            print(f"{nation} found no place: {founding['refusal']}")
             continue
         seated += 1
+        place = names.place(founding["q"], founding["r"])
         print(
-            f"faction {faction} founded at ({founding['q']}, {founding['r']}) "
+            f"{nation} founds {place} at ({founding['q']}, {founding['r']}) "
             f"with {founding['people']} people, "
             f"chosen from {founding['considered']} places"
         )
@@ -704,8 +769,14 @@ def main(argv: list[str] | None = None) -> int:
     # keeps the height of a window.
     tall = bool(arguments.picture) and not panels
     default_height = PICTURE_HEIGHT if tall else WINDOW_HEIGHT
+    # **One number builds the world and names the things in it.** The engine
+    # publishes no way to ask a world for its seed, so the seed reaches the
+    # namer from here rather than from the world. A world built from one seed
+    # and a namer built from another would name a story that did not happen,
+    # and nothing would fail.
     demo = Demo(
         build_world(arguments.extent, arguments.factions, seed),
+        Names(seed),
         width=arguments.width,
         height=arguments.height or default_height,
         threads=arguments.threads,
@@ -717,7 +788,7 @@ def main(argv: list[str] | None = None) -> int:
     # screen when it does.
     print(f"seed 0x{seed:016x}")
     foundings = demo.seed()
-    seated, _ = report(foundings)
+    seated, _ = report(foundings, demo.names)
     if seated == 0:
         print("no faction found a place, so there is nothing to watch")
         return 1
@@ -821,8 +892,9 @@ def _run_to_end(demo: Demo) -> int:
     if end is None:
         print(f"no game ended by the tick limit of {limit}")
     else:
+        winner = demo.names.faction(int(end["winner"]))
         print(
-            f"the game ended at tick {end['tick']}: faction {end['winner']} "
+            f"the game ended at tick {end['tick']}: {winner} "
             f"won by {end['path']}, holding {demo.world.score(end['winner'])} tiles"
         )
     print_census(demo.world)

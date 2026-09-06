@@ -97,6 +97,21 @@ def _pick(table: tuple[str, ...], stem: int, draw: int) -> str:
     return table[_mix(stem ^ (draw & _MASK)) % len(table)]
 
 
+def _repeats(name: str, ending: str, vowels: str) -> bool:
+    """Say whether an ending repeats the sound the name already ends with.
+
+    A name that ends in a hissing sound cannot take an ending whose own first
+    consonant hisses. "Toriashath" and "ish" give "Toriashathish", and a
+    reader stops. "Toriashathian" and "Toriashathic" both read.
+
+    The vowel at the front of the ending is skipped, because the consonant
+    after it is the sound that clashes.
+    """
+    hisses = ("s", "sh", "ch", "th", "x", "z")
+    consonant = ending.lstrip(vowels)
+    return name.endswith(hisses) and consonant.startswith(hisses)
+
+
 def _address(q: int, r: int) -> int:
     """Give back one number for one place on the map.
 
@@ -156,14 +171,22 @@ class Names:
         A toast says that a nation declares war, and another says that its
         army marches. The second needs an adjective.
 
-        The ending follows the last letter of the name, so the two words sound
-        like one language.
+        The ending follows the last letters of the name, so the two words
+        sound like one language. An ending that repeats the sound the name
+        already ends with is dropped first: "Toriashath" with "ish" gives
+        "Toriashathish", which no reader says twice.
         """
         name = self.faction(faction)
-        endings = self._tables.CONSONANT_ADJECTIVES
         vowels = self._tables.VOWEL_LETTERS
         if name[-1] in vowels:
             return name + "n" if name.endswith("a") else name + "an"
+        endings = [
+            ending
+            for ending in self._tables.CONSONANT_ADJECTIVES
+            if not _repeats(name, ending, vowels)
+        ]
+        if not endings:
+            endings = list(self._tables.CONSONANT_ADJECTIVES)
         stem = _stem(self._seed, _KIND_FACTION, faction)
         return name + endings[_mix(stem ^ 0xAD) % len(endings)]
 
