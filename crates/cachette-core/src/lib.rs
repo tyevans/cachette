@@ -156,7 +156,7 @@ pub use weather::{
 };
 pub use world::{
     CampaignError, CensusBasis, CensusRow, ConvertError, IdentityError, MoveRelationError,
-    Standing, StepError, World, WorldConfig, WorldError, FOUNDING_GROUP_DEFAULT,
+    SeedError, Standing, StepError, World, WorldConfig, WorldError, FOUNDING_GROUP_DEFAULT,
     LUXURY_DEPOSITS_DEFAULT, RENOWN_TARGET, STOCK_CEILING_OF_ONE_SETTLEMENT, STOCK_TARGET,
     SUBSYSTEM_CENSUS,
 };

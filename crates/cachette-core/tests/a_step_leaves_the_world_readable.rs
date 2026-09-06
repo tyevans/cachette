@@ -1,4 +1,4 @@
-//! A reader between two steps never meets a stale derived structure.
+//! A reader outside a step never meets a stale derived structure.
 //!
 //! The world holds a bridge from each tile to the units that stand on it. The
 //! bridge counts the changes of the unit arena, and it refuses every answer
@@ -11,6 +11,12 @@
 //! that ends without refreshing the bridge after the controller therefore
 //! leaves the world unreadable, and the next reader is refused.
 //!
+//! **The seeding founds a city for every faction, and it runs before the
+//! first step.** It changes the unit arena in the same way, so the same rule
+//! binds it: a verb that changes the structure leaves the world readable. One
+//! rule holds both, so one file tests both. A second file over the same rule
+//! would be one statement in two places.[^3]
+//!
 //! This test steps and reads in turn, in the way the viewer does. It reads
 //! through the public interface of the crate.[^1] It drives the engine and
 //! not the mechanism, because the engine is what must leave the world
@@ -20,6 +26,7 @@
 //!
 //! [^1]: Testing rules, section 6. `.agents/rules/testing.md`
 //! [^2]: Testing rules, section 5. `.agents/rules/testing.md`
+//! [^3]: Recurring defect shapes, shape 1. `.agents/rules/recurring-defects.md`
 
 use cachette_core::{Axial, FactionId, World, WorldConfig};
 
@@ -56,7 +63,20 @@ fn viewer_world(seed: u64) -> World {
         unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
     })
     .expect("the extent must describe a world");
-    world.seed_world().expect("the world seeds once");
+    let outcomes = world.seed_world().expect("the world seeds once");
+    // The seeding must seat somebody, or the world holds no unit and every
+    // read below asks a bridge that nothing made stale. The fixture would
+    // then measure itself.[^1]
+    //
+    // [^1]: Testing rules, section 2a. `.agents/rules/testing.md`
+    let seated = outcomes
+        .iter()
+        .filter(|outcome| outcome.is_seated())
+        .count();
+    assert!(
+        seated > 0,
+        "seed {seed}: the seeding seated no faction, so the world holds no unit"
+    );
     world
 }
 
@@ -75,11 +95,14 @@ fn draw(world: &World) -> Result<usize, String> {
 fn a_reader_between_two_steps_is_never_refused() {
     for seed in SEEDS {
         let mut world = viewer_world(seed);
-        // **The test reads after each step and not before the first one.**
-        // The seeding call founds a city for every faction, and it leaves the
-        // bridge stale in the same way the controller did. That is a separate
-        // fault of a separate verb, and this test states what a step
-        // promises.
+        // **The test reads before the first step as well as after each one.**
+        // The seeding call founds a city for every faction, and it changed
+        // the unit arena in the same way the controller does. The seeding
+        // refreshes the bridge before it returns, so this read is the case
+        // that proves it.
+        if let Err(error) = draw(&world) {
+            panic!("seed {seed}: the reader was refused before the first step: {error}");
+        }
         for tick in 0..TICKS {
             world.step(THREADS).expect("the step runs");
             if let Err(error) = draw(&world) {
