@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-549**
+**Next number: FND-551**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -13181,6 +13181,103 @@ that no test asserts is a capability nobody invokes wearing another hat, and it
 can stop counting and stay green. None was deleted on this reading, because a
 row may serve the balance harness or the demonstration deck, and a backlog item
 holds the question.[^F548S]
+### FND-549 — The build stall was a movement rule, and holding the builder moved every seed of the sweep
+
+**Believed.** A faction that finishes few projects needs a better balance value.
+The plan bound, the road work and the build rate all looked like the lever, and
+a sweep at a smaller plan bound was run to find it.[^F549A]
+
+**True.** The cause was a missing rule in the movement pass. The build pass adds
+the work of a unit to the tile the unit stands on, and one level of a road asks
+for eight work against the one that a worker adds.[^F545B] The movement pass
+read no build order, so the unit left on the next tick and its labour landed on
+another tile. A unit that stands on the work its own order names now produces no
+movement intent, and the hold is derived on every tick rather than stored.[^F549C]
+
+The reading below is the sweep of 200 seeds of the demonstration world, 800
+ticks each, at the extent and faction count the sweep defaults to. **Every one
+of the 200 seeds finished more projects after the change than before it.**
+
+| Projects finished | Seeds before | Seeds after |
+|---|---|---|
+| 0 | 0 | 0 |
+| 1 to 49 | 0 | 0 |
+| 50 to 99 | 7 | 0 |
+| 100 to 199 | 189 | 2 |
+| 200 to 299 | 4 | 35 |
+| 300 to 399 | 0 | 123 |
+| 400 or more | 0 | 40 |
+
+| Reading | Before | After |
+|---|---|---|
+| Lowest seed | 80 | 167 |
+| Median seed | 147 | 357 |
+| Highest seed | 227 | 503 |
+| Seeds that reach a game end | 1 | 110 |
+
+**Evidence.** The commit body holds both commands and the machine they ran on.
+The two runs differ in one commit of the engine and in nothing else.
+
+**Follows.** Three things.
+
+**A hold that nothing stores cannot leak.** A stored flag needs a rule for the
+work finishing, for the plan dropping the project, for the ground changing
+hands, for the order being revoked, and for the unit dying. A derived answer
+needs none of them, because the answer is asked again on the tick it is
+read.[^F549C]
+
+**A stored flag would also have been one tick late.** The build pass runs after
+the movement pass in the step, and the controller gives the order later still.
+A unit that arrived and took its order at the end of one tick would have walked
+away on the next one. The timing argument was found while the alternative was
+being written, and it is the stronger of the two reasons.
+
+**Three shipped unit type rows build at zero.** The controller orders every unit
+of its faction that stands on a zoned tile, whatever its type.[^F493A] A hold
+that ignored the build rate would have frozen such a unit for the rest of the
+run, because no work would ever finish the site under it. The clause that
+excludes it is the only thing that bounds the hold, and a test goes red when it
+is removed.
+
+### FND-550 — The seed sweep table of FND-545 does not reproduce at the tree that recorded it
+
+**Believed.** A sweep of 200 seeds of the demonstration world, 800 ticks each,
+finished no project at 19 of them, 1 to 3 at 52, 4 to 7 at 55, 8 to 15 at 60,
+and 16 or more at 14. The register holds that table and a backlog item and a
+priority row were written from it.[^F549A]
+
+**True.** The command that the same commit body gives does not produce those
+numbers at the commit that recorded them. The sweep example, run unchanged at
+200 seeds, extent 256, four factions and 800 ticks, finished between 80 and 227
+projects at every seed and none at zero. The median seed finished 147. The
+population of a seed was 64 units, against the 7.4 that the register's text
+gives.
+
+**Evidence.** The run was made from the merge commit that carries FND-545, with
+no edit to the engine. Only two commits touch the core sources between the base
+of that branch and the merge, and both add an event layout module that no pass
+reads. The commit body of this change holds the command and the output. A second
+configuration was tried, at extent 96 with three factions, because the detailed
+reading of FND-545 names it: it gives 101 to 132 projects and 48 units, and it
+does not reproduce the table either.
+
+**The conclusion of FND-545 stands and its table does not.** The chain it
+describes was read from the code and it was correct: the movement pass read no
+build order, so a builder walked away. The repair moved every seed of the
+sweep.[^F549C] Only the distribution table is unreproducible.
+
+**Follows.** Two things.
+
+**A table in a register is a measurement, and a measurement needs the tree it
+was taken on.** The commit body names the command and the machine. It does not
+name the commit, so a reader cannot tell whether a table that will not reproduce
+was taken on another tree or was wrong. Name the commit beside the command.
+
+**Take your own before reading.** A worker who trusts a register's before column
+and measures only the after column reports a change that neither number
+supports. This work measured both, with one binary built before the edit and one
+after, on one machine.
+
 
 ## References
 
@@ -13257,7 +13354,10 @@ holds the question.[^F548S]
 [^F544K]: ADR-0005, a solver runs a fixed iteration count, decision D1. `docs/adrs/accepted/adr-0005-a-solver-runs-a-fixed-iteration-count.md`
 [^F545A]: Backlog item 0504. `docs/backlog/complete/0504-find-why-one-seed-of-eight-finishes-no-project.md`
 [^F545B]: Balance register, the road work by level and the build rate. `docs/reference/balance.md`
-[^F545C]: Backlog item 0505. `docs/backlog/proposed/0505-keep-a-builder-on-the-tile-it-builds-until-the-work-is-done.md`
+[^F545C]: Backlog item 0505. `docs/backlog/complete/0505-keep-a-builder-on-the-tile-it-builds-until-the-work-is-done.md`
 [^F545D]: ADR-0152, a faction plans its roads and zones with one solver, decision D3. `docs/adrs/accepted/adr-0152-a-faction-plans-its-roads-and-zones-with-one-solver.md`
+[^F549A]: Findings register, FND-545. `docs/FINDINGS.md`
+[^F549C]: ADR-0165, a build order holds a unit on its tile, and the hold is derived and never stored, decisions D1, D2 and D3. `docs/adrs/draft/adr-0165-a-build-order-holds-a-unit-on-its-tile.md`
+
 [^F546A]: The founding survey and the eligibility of a candidate. `crates/cachette-core/src/founding.rs`
 [^F546C]: Balance register, the founding group. `docs/reference/balance.md`
