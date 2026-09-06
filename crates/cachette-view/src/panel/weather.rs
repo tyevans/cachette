@@ -100,7 +100,9 @@ impl Panel for Weather {
         // not only as a wash.[^2]
         //
         // [^2]: ADR-0166, the temperature of a cell is carried state that a season and the sky drive, decision D2. `docs/adrs/draft/adr-0166-the-temperature-of-a-cell-is-carried-state-that-a-season-and-the-sky-drive.md`
-        let plane = field.warmth_plane();
+        // The reading crops the margin away, so the panel names a cell that
+        // a watcher can point at.
+        let plane = field.warmth_over_world();
         lines.push(Line::row(
             "coldest cell",
             degrees(plane.iter().copied().min().unwrap_or(0)),

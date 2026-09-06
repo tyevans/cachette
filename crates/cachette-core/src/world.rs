@@ -62,6 +62,7 @@ use crate::household;
 use crate::influence::{Influence, InfluenceError, InfluenceField};
 use crate::luxury::{LuxuryError, LuxuryField, LuxuryId, LuxurySet, VarietyLevel};
 use crate::observation::{Observation, SightRules};
+use crate::padded::PaddedLattice;
 use crate::plan::{self, Needs, PlanRefusal, PlanRegister, PlanRules, Project};
 use crate::position::{
     self, Position, PositionError, PositionTable, SitePreference, WORK_COMMODITY,
@@ -108,7 +109,9 @@ use crate::upgrade::{
     self, BuildRefusal, UpgradeCategory, UpgradeMap, UpgradeRow, UpgradeSite, UpgradeTable,
     UpgradeTableError,
 };
-use crate::weather::{CellGround, Ground, Storm, WeatherError, WeatherField, WeatherScale, Wind};
+use crate::weather::{
+    ground_over_lattice, CellGround, Ground, Storm, WeatherError, WeatherField, WeatherScale, Wind,
+};
 
 /// The reason that a value did not name a live entity.
 ///
@@ -1317,6 +1320,19 @@ pub struct World {
     ///
     /// [^1]: The weather scale. [`WeatherScale`]
     weather_layout: BlockLayout,
+    /// The weather lattice, and the margin of cells around the world that the
+    /// weather solve steps and no reader sees.
+    ///
+    /// **This is the one site that turns a cell of the world into a cell of
+    /// the weather plane.** Every reader of the weather names a tile, the
+    /// reader below turns that tile into a cell, and this adds the margin
+    /// offset. A second site that added the offset could disagree with this
+    /// one, so there is not one.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: Recurring Defect Shapes, shape 1. `.agents/rules/recurring-defects.md`
+    weather_lattice: PaddedLattice,
     /// The ground under each weather cell, in cell index order.
     ///
     /// **The weather reads the ground, and the ground does not change.** The
@@ -1525,6 +1541,39 @@ impl World {
         config: WorldConfig,
         weather_scale: WeatherScale,
     ) -> Result<Self, WorldError> {
+        Self::with_weather_margin(config, weather_scale, weather_scale.margin_cells())
+    }
+
+    /// Builds a world at a stated weather resolution and a stated margin.
+    ///
+    /// **The margin is the ring of weather cells around the world that the
+    /// solve steps and no reader sees.** It exists so that the border of the
+    /// world has real upwind. Without it, air leaves through one edge of the
+    /// lattice and nothing arrives through the other, so the cells beside an
+    /// edge stay starved and a mass can only be born inside the frame.
+    ///
+    /// The scale derives the margin that a world takes when the caller states
+    /// none, from the distance the transport carries air while a mass
+    /// forms.[^1]
+    ///
+    /// **A margin of zero gives the lattice that covers the world and nothing
+    /// more**, which is the field the engine held before the margin existed.
+    /// A test states that the two agree.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the configured extent does not describe a grid,
+    /// when the scale does not describe a lattice over that extent, and when
+    /// the margin makes the lattice too large to index.
+    ///
+    /// # References
+    ///
+    /// [^1]: The margin derivation. [`WeatherScale::margin_cells`]
+    pub fn with_weather_margin(
+        config: WorldConfig,
+        weather_scale: WeatherScale,
+        weather_margin: u32,
+    ) -> Result<Self, WorldError> {
         if config.faction_count > FACTION_CEILING {
             return Err(WorldError::FactionCountAboveCeiling(config.faction_count));
         }
@@ -1552,8 +1601,15 @@ impl World {
         //
         // [^3]: ADR-0068, terrain is generated from the seed and is never stored as a map. `docs/adrs/accepted/adr-0068-terrain-is-generated-from-the-seed-and-is-never-stored-as-a-map.md`
         let weather_layout = BlockLayout::new(grid, weather_scale.bits())?;
-        let weather_lattice =
-            Grid::new(weather_layout.blocks_wide(), weather_layout.blocks_high())?;
+        // **The weather lattice is larger than the world.** The margin is the
+        // ring of cells around it that the solve steps and no reader sees. It
+        // gives the border of the world real upwind: air that arrives at an
+        // edge has crossed ground of the right character rather than arriving
+        // from nothing.[^4]
+        //
+        // [^4]: The margin derivation. [`WeatherScale::margin_cells`]
+        let weather_cells = Grid::new(weather_layout.blocks_wide(), weather_layout.blocks_high())?;
+        let weather_lattice = PaddedLattice::new(weather_cells, weather_margin)?;
         let soldiers = SoldierArena::new(grid, config.unit_capacity);
         let settlements = SettlementArena::new(grid);
         // The character tier states its own ceiling, and the arena checks
@@ -1600,7 +1656,8 @@ impl World {
             influence: InfluenceField::new(cell_lattice, config.faction_count)?,
             weather: WeatherField::new(weather_lattice, weather_scale, config.faction_count)?,
             weather_layout,
-            weather_ground: weather_ground_of(weather_layout, terrain),
+            weather_lattice,
+            weather_ground: ground_over_lattice(weather_lattice, weather_layout, terrain),
             climate: ClimateField::quiet(weather_layout),
             climate_reference: 0,
             controller: Controller::new(config.seed, config.faction_count),
@@ -6204,11 +6261,12 @@ impl World {
         // weather lattice has a pitch of its own. The holder gate below still
         // asks the level 1 holding, because that is where a holder lives.
         let layout = self.weather_layout;
+        let lattice = self.weather_lattice;
         let holding = &self.holding;
         let grid = self.grid;
         let ground = Ground {
             grid,
-            cell_of: &move |tile: TileIdx| Some(layout.block_of_key(layout.key_of(tile)?)),
+            cell_of: &move |tile: TileIdx| weather_cell_of(layout, lattice, tile),
             holders_near: &move |address: Axial| {
                 let tile = grid.index_of(address)?;
                 let key = holding.layout().key_of(tile)?;
@@ -6231,13 +6289,25 @@ impl World {
     /// Every reader of the weather field asks this rather than the level 1
     /// reader, so one fact has one declaration site.[^1]
     ///
+    /// **The weather lattice is larger than the world, and this adds the
+    /// margin offset.** The margin is a ring of cells that the solve steps
+    /// and no reader sees, and the answer here names a cell of the whole
+    /// lattice. So a reader that goes through this reads the world wherever
+    /// the margin stands, and a reader that indexed a weather plane by a
+    /// level 1 cell would read the margin instead.
+    ///
     /// # References
     ///
     /// [^1]: Recurring Defect Shapes, shape 1. `.agents/rules/recurring-defects.md`
     #[must_use]
     pub fn weather_cell_of(&self, tile: TileIdx) -> Option<u32> {
-        let layout = self.weather_layout;
-        Some(layout.block_of_key(layout.key_of(tile)?))
+        weather_cell_of(self.weather_layout, self.weather_lattice, tile)
+    }
+
+    /// Returns the weather lattice, with the margin it carries.
+    #[must_use]
+    pub const fn weather_lattice(&self) -> PaddedLattice {
+        self.weather_lattice
     }
 
     /// Returns the block geometry of the weather lattice.
@@ -11506,28 +11576,21 @@ pub const CARRY_MARK_DEFAULT: Amount = Amount(32);
 /// [^1]: ADR-0068, terrain is generated from the seed and is never stored as a map. `docs/adrs/accepted/adr-0068-terrain-is-generated-from-the-seed-and-is-never-stored-as-a-map.md`
 /// [^2]: ADR-0022, level 0 is the only truth, and every level above it is derived, decision D2. `docs/adrs/accepted/adr-0022-level-0-is-the-only-truth-and-every-level-above-it-is-derived.md`
 /// [^3]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
-fn weather_ground_of(layout: BlockLayout, terrain: Terrain) -> Vec<CellGround> {
-    let grid = layout.grid();
-    let wide = layout.blocks_wide();
-    let count = (wide as usize).saturating_mul(layout.blocks_high() as usize);
-    let mut ground = vec![CellGround::EMPTY; count];
-    for row in 0..grid.height() {
-        for column in 0..grid.width() {
-            let address = Axial::new(column as i32, row as i32);
-            let Some(tile) = terrain.tile(address) else {
-                continue;
-            };
-            let Some(key) = grid.index_of(address).and_then(|at| layout.key_of(at)) else {
-                continue;
-            };
-            let cell = layout.block_of_key(key) as usize;
-            let Some(slot) = ground.get_mut(cell) else {
-                continue;
-            };
-            *slot = slot.combine(CellGround::of_tile(tile));
-        }
-    }
-    ground
+/// Returns the weather cell that covers a tile, margin offset included.
+///
+/// **This is the one site that adds the margin offset.** The block layout
+/// gives the cell of the world, and the lattice turns that into the cell of
+/// the whole plane that the solve steps. Two callers ask it: the reader that
+/// every tile reader goes through, and the god that inflicts weather on a
+/// place.[^1]
+///
+/// Returns `None` when the tile is outside the world.
+///
+/// # References
+///
+/// [^1]: Recurring Defect Shapes, shape 1. `.agents/rules/recurring-defects.md`
+fn weather_cell_of(layout: BlockLayout, lattice: PaddedLattice, tile: TileIdx) -> Option<u32> {
+    lattice.whole_of_inner(layout.block_of_key(layout.key_of(tile)?))
 }
 
 fn carry_class_of(load: CarryLoad, home: u32, mark: Amount) -> CarryClass {

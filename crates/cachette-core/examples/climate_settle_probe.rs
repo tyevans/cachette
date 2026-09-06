@@ -18,11 +18,12 @@
 //! [^1]: ADR-0005, a solver runs a fixed iteration count, decision D1. `docs/adrs/accepted/adr-0005-a-solver-runs-a-fixed-iteration-count.md`
 
 use cachette_core::bridge::BlockLayout;
-use cachette_core::climate::{base_ground_of, CellClimate, Climate, WARM_UP_TICKS};
+use cachette_core::climate::{CellClimate, Climate, WARM_UP_TICKS};
 use cachette_core::hex::Grid;
+use cachette_core::padded::PaddedLattice;
 use cachette_core::terrain::Terrain;
 use cachette_core::types::Tick;
-use cachette_core::weather::{WeatherField, WeatherScale};
+use cachette_core::weather::{ground_over_lattice, WeatherField, WeatherScale};
 
 /// The ticks that the probe runs.
 const TICKS: u64 = 512;
@@ -59,20 +60,25 @@ fn run(width: u32, height: u32, label: &str) {
     let terrain = Terrain::new(SEED, grid);
     let scale = WeatherScale::DEFAULT;
     let layout = BlockLayout::new(grid, scale.bits()).expect("the layout is valid");
-    let lattice =
+    let cell_lattice =
         Grid::new(layout.blocks_wide(), layout.blocks_high()).expect("the lattice is valid");
+    // The probe runs over the padded lattice that the world runs over, so
+    // that what it measures is what the world settles to.
+    let lattice = PaddedLattice::new(cell_lattice, scale.margin_cells())
+        .expect("the padded lattice is valid");
 
-    let ground = base_ground_of(layout, terrain);
+    let ground = ground_over_lattice(lattice, layout, terrain);
+    let world_cells = lattice.inner_cells();
 
     let mut weather = WeatherField::new(lattice, scale, 1).expect("the weather builds");
-    let mut cells = vec![CellClimate::EMPTY; ground.len()];
-    let mut last_warmth = vec![0i64; ground.len()];
-    let mut last_wetness = vec![0i64; ground.len()];
+    let mut cells = vec![CellClimate::EMPTY; world_cells.len()];
+    let mut last_warmth = vec![0i64; world_cells.len()];
+    let mut last_wetness = vec![0i64; world_cells.len()];
     let mut last_offsets: Vec<i32> = Vec::new();
 
     println!(
         "== {label}: {width} by {height} tiles, {} weather cells at pitch {} ==",
-        ground.len(),
+        world_cells.len(),
         scale.side()
     );
     println!(
@@ -92,7 +98,7 @@ fn run(width: u32, height: u32, label: &str) {
         let mut wetness_sum = 0i64;
         let mut wet = 0i64;
         for (cell, slot) in cells.iter_mut().enumerate() {
-            let index = cell as u32;
+            let index = world_cells[cell];
             *slot = slot.observe(
                 i64::from(weather.warmth_at(index)),
                 weather.ground_at(index).0,

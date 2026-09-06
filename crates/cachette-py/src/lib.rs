@@ -255,7 +255,13 @@ produce it.** The binding library catches a panic and raises its own
 /// The cost of the weather stage follows the cell count, and the cell count
 /// is the tile count divided by the square of the pitch. A pitch of one on a
 /// large world therefore costs the frame. Read `weather_cell_count` for how
-/// many cells a built world holds.
+/// many cells of the world a built world holds.
+///
+/// **The engine steps more cells than the world holds.** It simulates a margin
+/// of cells around the world, so that the border of the world has real upwind
+/// rather than an edge that nothing crosses. The margin is a distance, so the
+/// share it adds to the cost falls as the world grows. No reader sees a margin
+/// cell, and every weather array covers the world alone.
 ///
 /// The constructor raises `ConfigError` when the arguments do not describe a
 /// world. A side of zero and a faction count above the ceiling are the two
@@ -473,9 +479,12 @@ impl PyWorld {
 
     /// The number of weather cells in the world, as an integer.
     ///
-    /// The cost of the weather stage follows this count. Read it before a
-    /// long run at a fine pitch, because a fine pitch on a large world holds
-    /// one cell for every tile.
+    /// Read it before a long run at a fine pitch, because a fine pitch on a
+    /// large world holds one cell for every tile.
+    ///
+    /// **The engine steps more cells than this.** It simulates a margin of
+    /// cells around the world, and the cost of the stage follows the count
+    /// with the margin in it. This count is what a weather array holds.
     #[getter]
     fn weather_cell_count(&self) -> u64 {
         let layout = self.lock().weather_layout();
@@ -5149,12 +5158,19 @@ impl PyWorld {
     ///   the world was built.
     /// - `raised`, an integer. The water that has entered the air since the
     ///   world was built, from the sea and from every god.
-    /// - `wet_cells`, an integer. How many level 1 cells hold at least
-    ///   `weather_wet_mark` drops on the ground.
+    /// - `wet_cells`, an integer. How many weather cells of the world hold at
+    ///   least `weather_wet_mark` drops on the ground.
     ///
     /// **The account is exact.** The sum of `air`, `ground` and `evaporated`
     /// equals `raised` at every moment. A pass moves water and never scales
     /// it.[^1]
+    ///
+    /// **`air` and `ground` cover the whole weather lattice, and that lattice
+    /// is larger than the world.** The engine simulates a margin of cells
+    /// around the world so that the border of the world has real upwind. The
+    /// margin holds water, and the account balances only when the totals hold
+    /// it too. `wet_cells` counts the world alone, and so do the weather
+    /// arrays.
     ///
     /// # References
     ///
@@ -5185,9 +5201,12 @@ impl PyWorld {
     /// The array is empty when no water has entered the world yet.
     fn weather_ground<'py>(&self, python: Python<'py>) -> Bound<'py, PyArray1<i64>> {
         let world = self.lock();
+        // **The reading crops the margin away.** The weather lattice is
+        // larger than the world, and a watcher indexes this array by the cell
+        // columns of the world.
         let plane: Vec<i64> = world
             .weather()
-            .ground_plane()
+            .ground_over_world()
             .iter()
             .map(|drops| drops.0)
             .collect();
@@ -5197,9 +5216,10 @@ impl PyWorld {
     /// The water in the air over every level 1 cell, as a NumPy array.
     fn weather_air<'py>(&self, python: Python<'py>) -> Bound<'py, PyArray1<i64>> {
         let world = self.lock();
+        // The reading crops the margin away, as the ground reading does.
         let plane: Vec<i64> = world
             .weather()
-            .air_plane()
+            .air_over_world()
             .iter()
             .map(|drops| drops.0)
             .collect();

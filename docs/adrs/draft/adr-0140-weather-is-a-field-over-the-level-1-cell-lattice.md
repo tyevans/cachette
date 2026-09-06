@@ -84,6 +84,52 @@ follow the cell side. A world that stored one of them beside the pitch would
 hold one fact in two places, with nothing that fails when the two
 disagree.[^10]
 
+### D4. The lattice is larger than the world, and the extra is a margin that no reader sees
+
+**The solve steps a ring of cells outside the world.** The ring is the margin.
+A reader cannot reach a margin cell, and a reader that names a tile always
+reads a cell of the world.
+
+The margin exists because a bounded lattice has no upwind at its border. A
+cell on the edge of a bare lattice has fewer than six neighbours, so it takes
+nothing from the outside and it gives nothing to the outside. It is not a cell
+of the field. It holds what it lifts, nothing carries anything to it, and a
+mass can only form inside the frame. The margin gives every cell of the world
+a full set of neighbours, so no cell a reader can see is one of those.
+
+**The width of the margin is derived from the pitch and from the field, and it
+is never written down.** The width must hold the distance the transport
+carries air while a mass forms. Both quantities are already stated by the
+field, so the width follows from them and no second declaration of it exists.
+
+**A margin cell carries the ground of the cell of the world nearest to it.**
+It stands outside the world, so no tile backs it and it has no ground of its
+own. The mirror continues the character of the edge: a coast stays a coast and
+a ridge stays a ridge just outside the frame, so air that enters the world has
+crossed ground of the right kind.
+
+**A margin of open water is refused.** Water is the only ground that lifts,
+and the heat of a cell rises with the water it holds. A margin of open water
+is therefore an unbounded source of moisture on all four sides at once. It
+does not repair the border alone. It raises the water of the whole world, so
+it replaces the water budget that the terrain gives with one that the margin
+gives.
+
+**The lattice does not wrap.** A wrap would join the east edge of the world to
+the west edge, and give unbounded upwind more cheaply than a margin. The
+terrain is not periodic, so the two edges are unrelated ground, and a wrap
+would put a permanent seam down the map. The seam is a worse defect than the
+border it repairs.
+
+**A margin of zero is legal, and it gives the lattice that covers the world
+and nothing more.** A test states that a world at margin zero reproduces the
+field the engine held before the margin existed.
+
+**A reader that indexes a plane by a cell of the world is wrong.** The index
+space of a plane is the whole lattice. A reader that must hand out a plane
+crops it to the world first, and a reader that must name one cell asks the
+lattice for the index of it.
+
 ### D2. The field allocates nothing until water enters the world
 
 **A world in which nothing has happened stores no weather.** The planes are
@@ -141,6 +187,16 @@ either.[^7]
 The step gains one stage. It costs the lattice on every frame, whatever the
 weather is doing, and the stage cost table can price it.[^8] No measurement
 exists, and one blocker governs every cost figure in this project.[^7]
+
+**The margin costs the field on every frame.** The stage steps the whole
+lattice, and the whole lattice is larger than the world. The share the margin
+adds falls as the world grows, because the margin is a distance and not a
+share, so the cost is worst on a small world. A world that cannot pay it
+states a margin of zero and takes the border defect back.
+
+**A watcher reads two different totals.** The water account covers everything
+the field steps, so it holds the margin, because the account balances only
+when it does. Every other reading covers the world alone.
 
 A world with no water and no god never allocates the field and never spreads
 anything. The cost of a calm inland world is one keyed draw for each cell.

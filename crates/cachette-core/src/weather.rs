@@ -98,9 +98,11 @@
 
 use bytemuck::{Pod, Zeroable};
 
+use crate::bridge::BlockLayout;
 use crate::hash::StateHash;
 use crate::hex::{Axial, Grid, NEIGHBOURS, NEIGHBOUR_COUNT};
 use crate::holding::FactionMask;
+use crate::padded::PaddedLattice;
 use crate::rng;
 use crate::sim_math;
 use crate::types::{Accum, FactionId, Fix32, Tick, TileIdx, FACTION_CEILING};
@@ -294,6 +296,75 @@ impl WeatherScale {
         } else {
             asked
         }
+    }
+
+    /// Returns the cells of margin the lattice carries on each of its four
+    /// sides.
+    ///
+    /// **The lattice is larger than the world, and the margin is the extra.**
+    /// Air leaves the world through one edge and, without a margin, nothing
+    /// arrives through the other. The cells beside an edge are then starved
+    /// of whatever the wind should carry in, and a mass can only be born
+    /// inside the frame. The margin gives the border of the world real
+    /// upwind. No reader sees a margin cell.[^1]
+    ///
+    /// # The derivation
+    ///
+    /// The margin must hold the distance a mass travels while it forms. A
+    /// margin narrower than that delivers air that has not yet become
+    /// anything, and the world border is starved again.
+    ///
+    /// The distance follows from two quantities the field already states.
+    ///
+    /// One transport pass sends a share of the air of a cell to each of the
+    /// six neighbours, and the share rises with the part of the wind that
+    /// points that way. The share is the same in every direction but for that
+    /// wind term, so the net movement of one pass, in cells, is the wind term
+    /// alone over the send denominator. At the speed ceiling that is
+    /// `SPEED_CEILING / SEND_DENOMINATOR`. A solve runs `transport_passes` of
+    /// them, so a solve carries air that many times as far.
+    ///
+    /// A cell fills its air from empty at `LIFT_DROPS` on each tick that it
+    /// lifts, and it stops at `AIR_SATURATION`. So a mass forms in
+    /// `AIR_SATURATION / LIFT_DROPS` ticks, rounded up. This is the time for
+    /// a parcel that lifts on every tick, which is the parcel that crosses a
+    /// run of open sea. A single cell lifts less often than that, and the
+    /// measurement in the commit body says what the margin then leaves
+    /// undone.
+    ///
+    /// The margin is the product of the two, rounded up to whole cells.
+    ///
+    /// **The invariant is a distance in tiles, and the cell count follows.**
+    /// The distance a solve carries air is not the same at every pitch,
+    /// because the pass count runs into its own ceiling below the reference
+    /// pitch. So the margin in tiles is larger at a coarse pitch than at a
+    /// fine one, and that is the model reporting how far it actually carries
+    /// air rather than an inconsistency.
+    ///
+    /// **The pass ceiling bounds this.** The pass count never rises above
+    /// `PASS_CEILING`, so the margin never rises above the value that ceiling
+    /// gives, whatever the pitch and whatever the extent of the world.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0140, weather is a field over the level 1 cell lattice, decision D1. `docs/adrs/draft/adr-0140-weather-is-a-field-over-the-level-1-cell-lattice.md`
+    #[must_use]
+    pub const fn margin_cells(self) -> u32 {
+        // The ticks a cell needs to fill its air from empty, rounded up.
+        let forming = (AIR_SATURATION.0 + LIFT_DROPS - 1) / LIFT_DROPS;
+        let reach = (self.transport_passes() as i64) * (SPEED_CEILING as i64) * forming;
+        ((reach + SEND_DENOMINATOR - 1) / SEND_DENOMINATOR) as u32
+    }
+
+    /// Returns the tiles of margin the lattice carries on each of its four
+    /// sides.
+    ///
+    /// This is the margin in cells multiplied by the cell side. It is the
+    /// distance the margin is worth, and it is what a reader should compare
+    /// against a distance in the world.
+    #[must_use]
+    pub const fn margin_tiles(self) -> u64 {
+        (self.margin_cells() as u64) * (self.side() as u64)
     }
 
     /// Returns what a heat difference across one cell is divided by.
@@ -965,7 +1036,7 @@ const HEAT_FROM_WATER: i32 = 64;
 /// # References
 ///
 /// [^1]: Recurring Defect Shapes, shape 1. `.agents/rules/recurring-defects.md`
-use crate::terrain::{TerrainTile, HEIGHT_WATER};
+use crate::terrain::{Terrain, TerrainTile, HEIGHT_WATER};
 
 /// What low ground adds to the heat of a cell, at the bottom of the height
 /// range.
@@ -1382,6 +1453,87 @@ pub fn cell_lifts(seed: u64, tick: Tick, cell: u32, tiles: i64, open_tiles: i64)
     draw < sea as u64
 }
 
+/// Folds the terrain of the world into one entry for each cell of the world.
+///
+/// The result is in the cell index order of the world, and it holds no
+/// margin. Every field it carries is a pure function of the world seed and
+/// the address, so a caller folds it once when the world is built and never
+/// again.[^1]
+///
+/// # References
+///
+/// [^1]: ADR-0068, terrain is generated from the seed and is never stored as a map. `docs/adrs/accepted/adr-0068-terrain-is-generated-from-the-seed-and-is-never-stored-as-a-map.md`
+#[must_use]
+pub fn cell_ground_of(layout: BlockLayout, terrain: Terrain) -> Vec<CellGround> {
+    let grid = layout.grid();
+    let count = (layout.blocks_wide() as usize).saturating_mul(layout.blocks_high() as usize);
+    let mut ground = vec![CellGround::EMPTY; count];
+    for row in 0..grid.height() {
+        for column in 0..grid.width() {
+            let address = Axial::new(column as i32, row as i32);
+            let Some(tile) = terrain.tile(address) else {
+                continue;
+            };
+            let Some(key) = grid.index_of(address).and_then(|at| layout.key_of(at)) else {
+                continue;
+            };
+            let Some(slot) = ground.get_mut(layout.block_of_key(key) as usize) else {
+                continue;
+            };
+            *slot = slot.combine(CellGround::of_tile(tile));
+        }
+    }
+    ground
+}
+
+/// Folds the terrain of the world into one entry for each cell of the whole
+/// lattice, margin included.
+///
+/// # What ground a margin cell carries
+///
+/// **A margin cell mirrors the cell of the world nearest to it.** It stands
+/// outside the world, so no tile backs it and it has no ground of its own.
+/// The mirror continues the character of the edge it stands beside: a coast
+/// stays a coast and a ridge stays a ridge just outside the frame, so air
+/// that enters the world has already been shaped by ground of the right kind.
+///
+/// **The alternative is open water, and it is wrong here.** Water is the only
+/// ground that lifts, and the heat of a cell rises with the water share it
+/// carries. A margin of open water is therefore an unbounded source of both
+/// moisture and heat on all four sides, pressed against every edge of the
+/// world at once. It would drown the border rather than feed it, and it would
+/// drive a wind inward on every side, which no world has.
+///
+/// **A margin of nothing is wrong for the opposite reason.** An empty cell
+/// carries no tile, so it is cold and it lifts nothing, and a ring of cold
+/// dead cells is the starved border the margin exists to remove.
+///
+/// The mirror copies the whole entry, including the tile count. A cell of the
+/// world at an edge that the cell side does not divide covers fewer tiles
+/// than a full cell, and its mirror then covers as few. That is the intent:
+/// the mirror is a copy of a neighbour, not an invention.
+///
+/// A margin of zero gives the fold of the world alone.
+#[must_use]
+pub fn ground_over_lattice(
+    lattice: PaddedLattice,
+    layout: BlockLayout,
+    terrain: Terrain,
+) -> Vec<CellGround> {
+    let inner = cell_ground_of(layout, terrain);
+    if lattice.is_bare() {
+        return inner;
+    }
+    (0..lattice.whole().tile_count())
+        .map(|cell| {
+            lattice
+                .nearest_inner(cell)
+                .and_then(|at| inner.get(at as usize).copied())
+                .unwrap_or(CellGround::EMPTY)
+        })
+        .collect()
+}
+
 /// Returns a fixed-point fraction held inside zero and one.
 fn to_unit(fraction: Fix32) -> Fix32 {
     if fraction.0 < 0 {
@@ -1753,8 +1905,22 @@ pub struct Storm {
 /// [^1]: PRD-0004, the world has weather that a watcher can read. `docs/product/accepted/prd-0004-the-world-has-weather-that-a-watcher-can-read.md`
 #[derive(Clone, Debug)]
 pub struct WeatherField {
-    /// The cell lattice. It is a hex grid at the pitch the scale states.
-    cells: Grid,
+    /// The cell lattice, and the margin of cells around the world that the
+    /// solve steps and no reader sees.
+    ///
+    /// **The lattice is larger than the world.** The whole lattice is a hex
+    /// grid at the pitch the scale states, widened on all four sides by the
+    /// margin. The inner lattice is the part that covers the world. Every
+    /// plane below is over the whole lattice, and every reader that names a
+    /// cell names one of the whole lattice.[^1]
+    ///
+    /// A margin of zero makes the whole lattice the inner lattice, and the
+    /// field then behaves as it did before the margin existed.
+    ///
+    /// # References
+    ///
+    /// [^1]: The padded lattice. [`PaddedLattice`]
+    lattice: PaddedLattice,
     /// The pitch of the lattice, as the tiles along one cell side.
     ///
     /// **The resolution is a parameter and not a constant.** Three tuned
@@ -1845,11 +2011,19 @@ pub struct WeatherField {
 impl WeatherField {
     /// Builds a field over a cell lattice, holding no water.
     ///
+    /// **The lattice states its own margin, and the field steps the whole of
+    /// it.** The caller decides how wide the margin is. A margin of zero
+    /// gives the field the world and nothing more.
+    ///
     /// # Errors
     ///
     /// Returns an error when the faction count is above the ceiling the
     /// project supports.
-    pub fn new(cells: Grid, scale: WeatherScale, faction_count: u16) -> Result<Self, WeatherError> {
+    pub fn new(
+        lattice: PaddedLattice,
+        scale: WeatherScale,
+        faction_count: u16,
+    ) -> Result<Self, WeatherError> {
         if faction_count > FACTION_CEILING {
             return Err(WeatherError::FactionCountAboveCeiling(faction_count));
         }
@@ -1858,9 +2032,9 @@ impl WeatherField {
         // states that cost and the project owner chose it.[^1]
         //
         // [^1]: ADR-0160, the wind is carried state, and the pressure gradient accelerates it, decision D1. `docs/adrs/accepted/adr-0160-the-wind-is-carried-state-and-the-pressure-gradient-accelerates-it.md`
-        let count = cells.tile_count() as usize;
+        let count = lattice.whole().tile_count() as usize;
         Ok(Self {
-            cells,
+            lattice,
             scale,
             faction_count,
             air: Vec::new(),
@@ -1884,10 +2058,24 @@ impl WeatherField {
         })
     }
 
-    /// Returns the cell lattice the field covers.
+    /// Returns the whole cell lattice that the solve steps.
+    ///
+    /// **This is larger than the world when the field carries a margin.**
+    /// Read [`WeatherField::lattice`] and take the inner lattice for the part
+    /// that covers the world.
     #[must_use]
     pub const fn cells(&self) -> Grid {
-        self.cells
+        self.lattice.whole()
+    }
+
+    /// Returns the lattice, with the margin it carries.
+    ///
+    /// A reader that must turn a cell index into a place in the world goes
+    /// through this, because a cell index names a cell of the whole lattice
+    /// and the world stands inside it.
+    #[must_use]
+    pub const fn lattice(&self) -> PaddedLattice {
+        self.lattice
     }
 
     /// Returns the pitch of the lattice, as the tiles along one cell side.
@@ -2060,25 +2248,99 @@ impl WeatherField {
         self.evaporated
     }
 
-    /// Returns the water in the air over the whole world.
+    /// Returns the water in the air over the whole lattice.
+    ///
+    /// **The total holds the margin as well as the world.** The margin lifts
+    /// water and holds water, and the account that says the field moves water
+    /// and never scales it is an account over everything the field steps. A
+    /// total that dropped the margin would not balance against the water the
+    /// field raised.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0141, a weather pass moves water and never scales it, decision D2. `docs/adrs/draft/adr-0141-a-weather-pass-moves-water-and-never-scales-it.md`
     #[must_use]
     pub fn air_total(&self) -> Accum {
         total_of(&self.air)
     }
 
-    /// Returns the water on the ground over the whole world.
+    /// Returns the water on the ground over the whole lattice.
+    ///
+    /// **The total holds the margin as well as the world**, for the reason
+    /// the air total states.
     #[must_use]
     pub fn ground_total(&self) -> Accum {
         total_of(&self.ground)
     }
 
-    /// Returns the number of cells whose ground is wet.
+    /// Returns the number of cells of the world whose ground is wet.
+    ///
+    /// **The count covers the world and never the margin.** It is a census
+    /// reading that a watcher compares against the cell count of the world,
+    /// and a count that held the margin would stand above that.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: The padded lattice. [`PaddedLattice`]
     #[must_use]
     pub fn wet_cells(&self) -> u32 {
-        self.ground
-            .iter()
-            .filter(|drops| drops.0 >= WET_MARK.0)
+        self.lattice
+            .inner_cells()
+            .into_iter()
+            .filter(|cell| self.ground_at(*cell).0 >= WET_MARK.0)
             .count() as u32
+    }
+
+    /// Returns the water in the air over each cell of the world, in the cell
+    /// index order of the world.
+    ///
+    /// **This crops the margin away.** A watcher indexes the result by the
+    /// cell columns of the world, so the margin must not stand in it. Read
+    /// [`WeatherField::air_plane`] for the whole plane that the solve steps.
+    ///
+    /// The result is empty when no water has entered the world.
+    #[must_use]
+    pub fn air_over_world(&self) -> Vec<Drops> {
+        self.crop(&self.air, Drops::ZERO)
+    }
+
+    /// Returns the water on the ground of each cell of the world, in the cell
+    /// index order of the world.
+    ///
+    /// **This crops the margin away**, in the same way the air reader does.
+    ///
+    /// The result is empty when no water has entered the world.
+    #[must_use]
+    pub fn ground_over_world(&self) -> Vec<Drops> {
+        self.crop(&self.ground, Drops::ZERO)
+    }
+
+    /// Returns the temperature of each cell of the world, in the cell index
+    /// order of the world.
+    ///
+    /// **This crops the margin away.** A drawing that took the coldest and
+    /// the warmest entry of the whole plane could take either from a cell
+    /// that no watcher can point at, and the colour scale of the map would
+    /// then answer to ground outside the frame.
+    #[must_use]
+    pub fn warmth_over_world(&self) -> Vec<i32> {
+        self.crop(&self.warmth, 0)
+    }
+
+    /// Returns the entries of one plane that cover the world, in the cell
+    /// index order of the world.
+    ///
+    /// An empty plane crops to an empty result, because a field that holds no
+    /// water allocates no plane.
+    fn crop<T: Copy>(&self, plane: &[T], absent: T) -> Vec<T> {
+        if plane.is_empty() {
+            return Vec::new();
+        }
+        self.lattice
+            .inner_cells()
+            .into_iter()
+            .map(|cell| plane.get(cell as usize).copied().unwrap_or(absent))
+            .collect()
     }
 
     /// Returns the first tick at which one faction may inflict weather.
@@ -2232,7 +2494,7 @@ impl WeatherField {
         if threads == 0 {
             return Err(WeatherError::ZeroThreads);
         }
-        if ground.len() != self.cells.tile_count() as usize {
+        if ground.len() != self.cells().tile_count() as usize {
             return Err(WeatherError::LatticeMismatch);
         }
         // The temperature of every cell moves before anything reads it. Four
@@ -2294,14 +2556,16 @@ impl WeatherField {
     /// [^1]: ADR-0166, the temperature of a cell is carried state that a season and the sky drive, decision D1. `docs/adrs/draft/adr-0166-the-temperature-of-a-cell-is-carried-state-that-a-season-and-the-sky-drive.md`
     /// [^2]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
     fn warm(&mut self, tick: Tick, ground: &[CellGround]) {
-        let height = self.cells.height();
+        // **The latitude band belongs to the world, not to the whole
+        // lattice.** The row and the height below are the row and the height
+        // of the inner lattice, so the poles of the world stay at the first
+        // and the last row of the world however wide the margin is. A margin
+        // cell beyond a pole reads the pole row.[^3]
+        //
+        // [^3]: The padded lattice. [`PaddedLattice::inner_row_of`]
+        let height = self.lattice.inner().height();
         for (cell, under) in ground.iter().enumerate() {
-            let Some(address) = self.cells.address_of(TileIdx(cell as u32)) else {
-                continue;
-            };
-            // **The latitude of the cell is its row.** The sun swings along
-            // the row axis, so the two poles are the first row and the last.
-            let row = address.r.max(0) as u32;
+            let row = self.lattice.inner_row_of(cell as u32);
             let air = self.air.get(cell).copied().unwrap_or(Drops::ZERO);
             let asked = asked_warmth(
                 heat_of(*under),
@@ -2360,7 +2624,7 @@ impl WeatherField {
             return;
         }
         let pass = WarmthPass {
-            cells: self.cells,
+            cells: self.cells(),
             warmth: &self.warmth,
             wind: &self.wind,
         };
@@ -2398,7 +2662,7 @@ impl WeatherField {
             return;
         }
         let pass = WindPass {
-            cells: self.cells,
+            cells: self.cells(),
             wind: &self.wind,
             warmth: &self.warmth,
             pressure_divisor: self.scale.pressure_divisor(),
@@ -2425,7 +2689,13 @@ impl WeatherField {
     fn lift(&mut self, tick: Tick, seed: u64, ground: &[CellGround]) {
         let mut raised = 0i64;
         for (cell, under) in ground.iter().enumerate() {
-            if !cell_lifts(seed, tick, cell as u32, under.tiles(), under.open_tiles()) {
+            // The key is the one the lattice states, not the raw index. A
+            // cell of the world carries the same key at every margin width,
+            // so widening the margin does not redraw the world.[^2]
+            //
+            // [^2]: The padded lattice. [`PaddedLattice::draw_key`]
+            let key = self.lattice.draw_key(cell as u32);
+            if !cell_lifts(seed, tick, key, under.tiles(), under.open_tiles()) {
                 continue;
             }
             // **A hot sea gives up more than a cold one.** The quantity is
@@ -2465,7 +2735,7 @@ impl WeatherField {
         if !self.air.is_empty() {
             return;
         }
-        let count = self.cells.tile_count() as usize;
+        let count = self.cells().tile_count() as usize;
         self.air = vec![Drops::ZERO; count];
         self.ground = vec![Drops::ZERO; count];
         self.scratch = vec![Drops::ZERO; count];
@@ -2501,7 +2771,7 @@ impl WeatherField {
             return;
         }
         let pass = Pass {
-            cells: self.cells,
+            cells: self.cells(),
             air: &self.air,
             wind: &self.wind,
         };
@@ -2619,13 +2889,13 @@ impl WeatherField {
         let Some(heading) = wind.heading() else {
             return 0;
         };
-        let Some(address) = self.cells.address_of(TileIdx(cell as u32)) else {
+        let Some(address) = self.cells().address_of(TileIdx(cell as u32)) else {
             return 0;
         };
-        let Some(upwind) = self.cells.neighbour(address, opposite(heading)) else {
+        let Some(upwind) = self.cells().neighbour(address, opposite(heading)) else {
             return 0;
         };
-        let Some(at) = self.cells.index_of(upwind) else {
+        let Some(at) = self.cells().index_of(upwind) else {
             return 0;
         };
         let here = ground
@@ -2657,13 +2927,13 @@ impl WeatherField {
         else {
             return 0;
         };
-        let Some(address) = self.cells.address_of(TileIdx(cell as u32)) else {
+        let Some(address) = self.cells().address_of(TileIdx(cell as u32)) else {
             return 0;
         };
-        let Some(upwind) = self.cells.neighbour(address, opposite(heading)) else {
+        let Some(upwind) = self.cells().neighbour(address, opposite(heading)) else {
             return 0;
         };
-        let Some(at) = self.cells.index_of(upwind) else {
+        let Some(at) = self.cells().index_of(upwind) else {
             return 0;
         };
         let there = self.warmth.get(at.0 as usize).copied().unwrap_or(0);
