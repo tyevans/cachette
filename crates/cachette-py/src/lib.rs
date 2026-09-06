@@ -1123,6 +1123,9 @@ impl PyWorld {
     /// - `weather_reach`. A whole count. Nonzero means the faction may
     ///   inflict weather while it holds the unit. **No pass reads this
     ///   column yet.**
+    /// - `water_crossing`. A whole count. Nonzero means the unit may stand on
+    ///   a water tile, and the terrain table states how many such units one
+    ///   water tile holds. Zero refuses the unit at the shoreline.
     ///
     /// **An attacker whose attack does not exceed the defender's armour
     /// contributes exactly zero, however many attackers stand there.** The
@@ -1159,6 +1162,7 @@ impl PyWorld {
         move_cost_scale,
         command_reach,
         weather_reach,
+        water_crossing,
     ))]
     #[allow(clippy::too_many_arguments)]
     fn define_unit_type(
@@ -1172,6 +1176,7 @@ impl PyWorld {
         move_cost_scale: i32,
         command_reach: u32,
         weather_reach: u32,
+        water_crossing: u32,
     ) -> PyResult<()> {
         let mut world = self.lock();
         let row = UnitTypeRow {
@@ -1183,6 +1188,7 @@ impl PyWorld {
             move_cost_scale: Fix32(move_cost_scale),
             command_reach,
             weather_reach,
+            water_crossing,
         };
         world
             .define_unit_type(unit_type, row)

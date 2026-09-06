@@ -153,6 +153,7 @@ class UnitTypeColumns(TypedDict):
     move_cost_scale: npt.NDArray[np.int64]
     command_reach: npt.NDArray[np.int64]
     weather_reach: npt.NDArray[np.int64]
+    water_crossing: npt.NDArray[np.int64]
 
 class UpgradeColumns(TypedDict):
     """One column for each column of a row of the upgrade table.
@@ -953,6 +954,7 @@ class World:
         move_cost_scale: int,
         command_reach: int,
         weather_reach: int,
+        water_crossing: int,
     ) -> None: ...
     def set_unit_types(self, units: Identities, unit_type: int) -> None: ...
     def unit_type(self, unit: int) -> int: ...
