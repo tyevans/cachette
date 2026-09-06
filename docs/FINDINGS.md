@@ -13174,7 +13174,7 @@ recurring defect shape.[^F549C]
 [^F542H]: The sweep, which plays a seed set to the tick limit and samples the run. `scripts/balance_sweep.py`
 [^F542I]: Backlog item 0507. `docs/backlog/proposed/0507-let-a-faction-take-the-ground-of-another.md`
 [^F543A]: Balance register, the stock target. `docs/reference/balance.md`
-[^F543B]: Backlog item 0506. `docs/backlog/proposed/0506-put-the-wealth-path-out-of-easy-reach.md`
+[^F543B]: Backlog item 0506. `docs/backlog/complete/0506-put-the-wealth-path-out-of-easy-reach.md`
 [^F547A]: Balance register, the wonder work and the win-path share. `docs/reference/balance.md`
 [^F547B]: Findings register, FND-496. `docs/FINDINGS.md`
 [^F548A]: Findings register, FND-543. `docs/FINDINGS.md`
