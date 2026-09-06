@@ -277,7 +277,7 @@ green.[^21]
 [^5]: Decisions register, DEC-057. `docs/DECISIONS.md`
 [^6]: Review 0199, the influence, tile field, upgrade and housing records, section 4. `docs/reviews/0199-the-influence-tile-field-upgrade-and-housing-records.md`
 [^7]: ADR-0082, the store sets the rate of a birth and the housing admits it. `docs/adrs/draft/adr-0082-the-store-sets-the-rate-of-a-birth-and-the-housing-admits-it.md`
-[^8]: ADR-0158, a site builds a typed unit from a bounded queue its store pays for. `docs/adrs/draft/adr-0158-a-site-builds-a-typed-unit-from-a-bounded-queue-its-store-pays-for.md`
+[^8]: ADR-0158, a site builds a typed unit from a bounded queue its store pays for. `docs/adrs/accepted/adr-0158-a-site-builds-a-typed-unit-from-a-bounded-queue-its-store-pays-for.md`
 [^9]: ADR-0023, an aggregate combines exactly in any order, decision D2. `docs/adrs/accepted/adr-0023-an-aggregate-combines-exactly-in-any-order.md`
 [^10]: Recurring Defect Shapes, shape 1. `.agents/rules/recurring-defects.md`
 [^11]: Balance register, the population. `docs/reference/balance.md`

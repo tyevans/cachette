@@ -16,7 +16,7 @@ References
 
 [^3]: ADR-0158, a site builds a typed unit from a bounded queue its store pays
 for.
-``docs/adrs/draft/adr-0158-a-site-builds-a-typed-unit-from-a-bounded-queue-its-store-pays-for.md``
+``docs/adrs/accepted/adr-0158-a-site-builds-a-typed-unit-from-a-bounded-queue-its-store-pays-for.md``
 """
 
 from __future__ import annotations

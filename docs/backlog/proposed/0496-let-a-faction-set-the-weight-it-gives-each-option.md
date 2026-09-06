@@ -98,7 +98,7 @@ Filled in when the item moves to `complete/`.
 [^1]: ADR-0064, a unit chooses by scoring a small fixed option set, decision D1. `docs/adrs/accepted/adr-0064-a-unit-chooses-by-scoring-a-small-fixed-option-set.md`
 [^2]: The choice pass of the core crate. `crates/cachette-core/src/choose.rs`
 [^3]: ADR-0154, the observation and the action of a faction are schema-declared bounded tables, decisions D2 and D4. `docs/adrs/accepted/adr-0154-the-observation-and-the-action-of-a-faction-are-schema-declared-bounded-tables.md`
-[^4]: ADR-0156, a faction's option weights are policy, set through one verb. `docs/adrs/draft/adr-0156-a-factions-option-weights-are-policy-set-through-one-verb.md`
+[^4]: ADR-0156, a faction's option weights are policy, set through one verb. `docs/adrs/accepted/adr-0156-a-factions-option-weights-are-policy-set-through-one-verb.md`
 [^5]: Balance register, the choice. `docs/reference/balance.md`
 [^6]: Blockers register, BLK-050. `docs/BLOCKERS.md`
 [^7]: ADR-0109, the choice key holds a bounded class of the unit's own state, decision D3. `docs/adrs/draft/adr-0109-the-choice-key-holds-a-bounded-class-of-the-unit-state.md`

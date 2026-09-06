@@ -39,12 +39,6 @@ game, and wealth and wonder are late paths because of it. A separate work
 stream raises those two bars against a long horizon, and this record states the
 tension rather than the values.
 
-**The code holds this record, and two decisions below were repaired against
-it.** A site holds a queue, one stage advances it, and a finished entry creates
-a unit. D4 and D5 were written before that work, and each stated something the
-implementation could not do. They now state the constraint the implementation
-satisfies.
-
 **The project rejected a queue that consumes nobody.** The author of this
 record argued that a site should make a unit from goods and work alone, because
 a queue that takes a person makes the early game harsher and adds a second
@@ -121,6 +115,13 @@ pass compares a type index against a constant.[^11]
 The accumulator is a whole number and it is clamped at the work the entry needs.
 An unclamped accumulator would let a long build carry credit into the next
 entry, and nothing would fail.
+
+**A caller may take an entry out of the queue, and the charge is not
+returned.** The entries behind it keep their order. The store paid for each
+advance as the entry made it, so nothing that could be returned is held
+anywhere. A refund rule would have to store what each entry had cost, which is
+a second account of a charge the store already took. One verb carries the queue
+order and the take-out order, so no path exists for the controller alone.[^4]
 
 **This record states no work value, no charge and no schedule.** The balance
 register holds those rows.[^9]
@@ -222,7 +223,7 @@ correct and the reason was invisible.[^1] The census therefore gains a row for
 what the queue produced, so a zero there is visible beside the refusals that
 explain it.
 
-### D7. A settler is not redefined here
+### D7. The queue produces a settler in the way it produces any other type
 
 A settler is a unit whose type row holds a settle capability above zero. That
 claim belongs to the record that holds the ground rule, and this record does not
@@ -282,13 +283,11 @@ the store that feeds them. Nothing in the engine prevents it, and nothing
 should: a controller that does it is playing badly, and a learner must be able
 to learn that it is bad.
 
-**Housing becomes a thing worth building, and the project has no housing
-upgrade.** A site whose housing is full stops growing, so a faction that wants
-more people must build more housing. The upgrade table holds categories for a
-road, a terrace, a wonder, a store and a wall, and it holds none for housing.
-**This record does not invent one.** A housing category is work, it belongs with
-the record that says what an upgrade category is, and a backlog item names
-it.[^19]
+**Housing becomes a thing worth building.** A site whose housing is full stops
+growing, so a faction that wants more people must build more housing. A housing
+upgrade is a row of the upgrade table, and **this record does not invent one**.
+A row is work, it belongs with the record that says what an upgrade category
+is, and a backlog item names it.[^19]
 
 **The built-in controller becomes the place where sensible behaviour lives.**
 Anything a reader would call strategy sits in the controller, where a learner
@@ -301,9 +300,11 @@ advance, a full queue, a site whose store cannot pay the goods of a finished
 entry, and a site that holds no spare person when an entry finishes. Put each
 refusal back and watch the test stay green.[^20]
 
-**Cancelling an entry is not decided here.** Nothing removes an entry from the
-queue except finishing it. A caller that wants to cancel one asks for a verb,
-and the work that adds it decides what happens to the work already charged.
+**A faction that changes its mind loses what it spent.** D3 returns no charge,
+so a caller that takes an entry out has paid for every advance that entry made.
+A controller that queues and takes out again and again drains a store and
+builds nothing. Nothing in the engine prevents that, and a learner must be able
+to learn that it is bad.
 
 ## References
 
@@ -316,7 +317,7 @@ and the work that adds it decides what happens to the work already charged.
 [^7]: ADR-0157, a site's free places are its built housing less the residents the engine already counts, decisions D1, D2 and D3. `docs/adrs/accepted/adr-0157-a-sites-free-places-are-its-built-housing-less-the-residents-the-engine-counts.md`
 [^8]: ADR-0004, iteration order is explicit, and unordered reductions need slots, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
 [^9]: Balance register, the production queue. `docs/reference/balance.md`
-[^10]: ADR-0156, a faction's option weights are policy, set through one verb, decisions D3 and D4. `docs/adrs/draft/adr-0156-a-factions-option-weights-are-policy-set-through-one-verb.md`
+[^10]: ADR-0156, a faction's option weights are policy, set through one verb, decisions D3 and D4. `docs/adrs/accepted/adr-0156-a-factions-option-weights-are-policy-set-through-one-verb.md`
 [^11]: ADR-0120, a unit carries a type that indexes a table, decision D1. `docs/adrs/draft/adr-0120-a-unit-carries-a-type-that-indexes-a-table.md`
 [^12]: ADR-0062, production and upkeep are rates attached to a site, decision D4. `docs/adrs/accepted/adr-0062-production-and-upkeep-are-rates-attached-to-a-site.md`
 [^13]: ADR-0096, cost follows the lattice, not the population, decision D1. `docs/adrs/draft/adr-0096-cost-follows-the-lattice-not-the-population.md`

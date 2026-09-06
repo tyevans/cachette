@@ -38,8 +38,8 @@
 //! # References
 //!
 //! [^1]: Findings register, FND-486. `docs/FINDINGS.md`
-//! [^2]: ADR-0158, a site builds a typed unit from a bounded queue its store pays for, decisions D1, D3 and D4. `docs/adrs/draft/adr-0158-a-site-builds-a-typed-unit-from-a-bounded-queue-its-store-pays-for.md`
-//! [^3]: ADR-0158, a site builds a typed unit from a bounded queue its store pays for, decision D2. `docs/adrs/draft/adr-0158-a-site-builds-a-typed-unit-from-a-bounded-queue-its-store-pays-for.md`
+//! [^2]: ADR-0158, a site builds a typed unit from a bounded queue its store pays for, decisions D1, D3 and D4. `docs/adrs/accepted/adr-0158-a-site-builds-a-typed-unit-from-a-bounded-queue-its-store-pays-for.md`
+//! [^3]: ADR-0158, a site builds a typed unit from a bounded queue its store pays for, decision D2. `docs/adrs/accepted/adr-0158-a-site-builds-a-typed-unit-from-a-bounded-queue-its-store-pays-for.md`
 //! [^4]: ADR-0157, a site's free places are its built housing less the residents the engine already counts, decision D5. `docs/adrs/accepted/adr-0157-a-sites-free-places-are-its-built-housing-less-the-residents-the-engine-counts.md`
 //! [^5]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
 //! [^6]: ADR-0002, simulated and aggregated state holds no floating point number, decision D1. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
@@ -64,7 +64,7 @@ use crate::unit_type::{UnitTypeId, UNIT_TYPE_COUNT};
 ///
 /// # References
 ///
-/// [^1]: ADR-0158, a site builds a typed unit from a bounded queue its store pays for, decisions D1 and D5. `docs/adrs/draft/adr-0158-a-site-builds-a-typed-unit-from-a-bounded-queue-its-store-pays-for.md`
+/// [^1]: ADR-0158, a site builds a typed unit from a bounded queue its store pays for, decisions D1 and D5. `docs/adrs/accepted/adr-0158-a-site-builds-a-typed-unit-from-a-bounded-queue-its-store-pays-for.md`
 /// [^2]: Balance register, the production queue, the queue bound row. `docs/reference/balance.md`
 pub const QUEUE_BOUND: usize = 4;
 
@@ -135,7 +135,7 @@ pub const QUEUE_PHASE_DEFAULT: u32 = 0;
 /// # References
 ///
 /// [^1]: ADR-0006, an event is plain data and applying it is pure, decision D1. `docs/adrs/accepted/adr-0006-an-event-is-plain-data-and-applying-it-is-pure.md`
-/// [^2]: ADR-0158, a site builds a typed unit from a bounded queue its store pays for, decision D1. `docs/adrs/draft/adr-0158-a-site-builds-a-typed-unit-from-a-bounded-queue-its-store-pays-for.md`
+/// [^2]: ADR-0158, a site builds a typed unit from a bounded queue its store pays for, decision D1. `docs/adrs/accepted/adr-0158-a-site-builds-a-typed-unit-from-a-bounded-queue-its-store-pays-for.md`
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Pod, Zeroable)]
 pub struct QueueEntry {
@@ -319,7 +319,7 @@ impl BuildCostTable {
 ///
 /// # References
 ///
-/// [^1]: ADR-0158, a site builds a typed unit from a bounded queue its store pays for, decision D6. `docs/adrs/draft/adr-0158-a-site-builds-a-typed-unit-from-a-bounded-queue-its-store-pays-for.md`
+/// [^1]: ADR-0158, a site builds a typed unit from a bounded queue its store pays for, decision D6. `docs/adrs/accepted/adr-0158-a-site-builds-a-typed-unit-from-a-bounded-queue-its-store-pays-for.md`
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum QueueError {
     /// The number names no row of the unit type table.
@@ -377,7 +377,7 @@ impl core::error::Error for QueueError {}
 ///
 /// # References
 ///
-/// [^1]: ADR-0158, a site builds a typed unit from a bounded queue its store pays for, decision D2. `docs/adrs/draft/adr-0158-a-site-builds-a-typed-unit-from-a-bounded-queue-its-store-pays-for.md`
+/// [^1]: ADR-0158, a site builds a typed unit from a bounded queue its store pays for, decision D2. `docs/adrs/accepted/adr-0158-a-site-builds-a-typed-unit-from-a-bounded-queue-its-store-pays-for.md`
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum QueueOrder {
     /// Put one entry of this type at the back of the queue.
@@ -389,7 +389,7 @@ pub enum QueueOrder {
     ///
     /// # References
     ///
-    /// [^1]: ADR-0158, a site builds a typed unit from a bounded queue its store pays for, decision D3. `docs/adrs/draft/adr-0158-a-site-builds-a-typed-unit-from-a-bounded-queue-its-store-pays-for.md`
+    /// [^1]: ADR-0158, a site builds a typed unit from a bounded queue its store pays for, decision D3. `docs/adrs/accepted/adr-0158-a-site-builds-a-typed-unit-from-a-bounded-queue-its-store-pays-for.md`
     Clear(u8),
 }
 
@@ -406,7 +406,7 @@ pub enum QueueOrder {
 ///
 /// # References
 ///
-/// [^1]: ADR-0158, a site builds a typed unit from a bounded queue its store pays for, decision D1. `docs/adrs/draft/adr-0158-a-site-builds-a-typed-unit-from-a-bounded-queue-its-store-pays-for.md`
+/// [^1]: ADR-0158, a site builds a typed unit from a bounded queue its store pays for, decision D1. `docs/adrs/accepted/adr-0158-a-site-builds-a-typed-unit-from-a-bounded-queue-its-store-pays-for.md`
 /// [^2]: ADR-0009, parallel stages write disjoint outputs, decision D1. `docs/adrs/accepted/adr-0009-parallel-stages-write-disjoint-outputs.md`
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct QueueTable {
@@ -681,7 +681,7 @@ impl QueueTable {
     ///
     /// # References
     ///
-    /// [^1]: ADR-0158, a site builds a typed unit from a bounded queue its store pays for, decision D1. `docs/adrs/draft/adr-0158-a-site-builds-a-typed-unit-from-a-bounded-queue-its-store-pays-for.md`
+    /// [^1]: ADR-0158, a site builds a typed unit from a bounded queue its store pays for, decision D1. `docs/adrs/accepted/adr-0158-a-site-builds-a-typed-unit-from-a-bounded-queue-its-store-pays-for.md`
     /// [^2]: ADR-0001, one binary gives one answer at any thread count, decision D4. `docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
     #[must_use]
     pub fn hash_into(&self, hash: StateHash) -> StateHash {

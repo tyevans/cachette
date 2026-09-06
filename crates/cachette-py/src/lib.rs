@@ -1283,8 +1283,8 @@ impl PyWorld {
     ///
     /// # References
     ///
-    /// [^1]: ADR-0158, a site builds a typed unit from a bounded queue its store pays for, decisions D1, D3 and D4. `docs/adrs/draft/adr-0158-a-site-builds-a-typed-unit-from-a-bounded-queue-its-store-pays-for.md`
-    /// [^2]: ADR-0158, a site builds a typed unit from a bounded queue its store pays for, decision D2. `docs/adrs/draft/adr-0158-a-site-builds-a-typed-unit-from-a-bounded-queue-its-store-pays-for.md`
+    /// [^1]: ADR-0158, a site builds a typed unit from a bounded queue its store pays for, decisions D1, D3 and D4. `docs/adrs/accepted/adr-0158-a-site-builds-a-typed-unit-from-a-bounded-queue-its-store-pays-for.md`
+    /// [^2]: ADR-0158, a site builds a typed unit from a bounded queue its store pays for, decision D2. `docs/adrs/accepted/adr-0158-a-site-builds-a-typed-unit-from-a-bounded-queue-its-store-pays-for.md`
     fn queue_unit(&self, faction: u16, site: u64, unit_type: u8) -> PyResult<()> {
         let mut world = self.lock();
         let entity = resolve_site(&world, site)?;
@@ -1315,7 +1315,7 @@ impl PyWorld {
     ///
     /// # References
     ///
-    /// [^1]: ADR-0158, a site builds a typed unit from a bounded queue its store pays for, decision D3. `docs/adrs/draft/adr-0158-a-site-builds-a-typed-unit-from-a-bounded-queue-its-store-pays-for.md`
+    /// [^1]: ADR-0158, a site builds a typed unit from a bounded queue its store pays for, decision D3. `docs/adrs/accepted/adr-0158-a-site-builds-a-typed-unit-from-a-bounded-queue-its-store-pays-for.md`
     fn clear_queue_entry(&self, faction: u16, site: u64, position: u8) -> PyResult<()> {
         let mut world = self.lock();
         let entity = resolve_site(&world, site)?;
@@ -1345,7 +1345,7 @@ impl PyWorld {
     ///
     /// # References
     ///
-    /// [^1]: ADR-0158, a site builds a typed unit from a bounded queue its store pays for, decision D1. `docs/adrs/draft/adr-0158-a-site-builds-a-typed-unit-from-a-bounded-queue-its-store-pays-for.md`
+    /// [^1]: ADR-0158, a site builds a typed unit from a bounded queue its store pays for, decision D1. `docs/adrs/accepted/adr-0158-a-site-builds-a-typed-unit-from-a-bounded-queue-its-store-pays-for.md`
     /// [^2]: ADR-0044, what copies and what does not is declared at the call site. `docs/adrs/REGISTRY.md`
     fn site_queue<'py>(&self, python: Python<'py>, site: u64) -> PyResult<Bound<'py, PyDict>> {
         let world = self.lock();
@@ -1484,7 +1484,7 @@ impl PyWorld {
     ///
     /// # References
     ///
-    /// [^1]: ADR-0158, a site builds a typed unit from a bounded queue its store pays for, decision D3. `docs/adrs/draft/adr-0158-a-site-builds-a-typed-unit-from-a-bounded-queue-its-store-pays-for.md`
+    /// [^1]: ADR-0158, a site builds a typed unit from a bounded queue its store pays for, decision D3. `docs/adrs/accepted/adr-0158-a-site-builds-a-typed-unit-from-a-bounded-queue-its-store-pays-for.md`
     /// [^2]: Balance register, the production queue, the charge row. `docs/reference/balance.md`
     fn set_queue_charge(&self, commodity: u16, quantity: i32) -> PyResult<()> {
         if self
