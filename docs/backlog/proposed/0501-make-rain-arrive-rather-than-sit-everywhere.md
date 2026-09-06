@@ -118,5 +118,5 @@ Filled in when the item moves to `complete/`.
 
 [^1]: Research report 26, the scale of the weather, sections 2, 3 and 6. `docs/research/reports/26-the-scale-of-the-weather.md`
 [^2]: ADR-0143, wet ground yields more to a gatherer, decision D1. `docs/adrs/draft/adr-0143-wet-ground-yields-more-to-a-gatherer.md`
-[^3]: ADR-0162, water enters the air where it is hot, and it falls where the air cools. `docs/adrs/draft/adr-0162-water-enters-the-air-where-it-is-hot-and-falls-where-the-air-cools.md`
+[^3]: ADR-0162, water enters the air where it is hot, and it falls where the air cools. `docs/adrs/accepted/adr-0162-water-enters-the-air-where-it-is-hot-and-falls-where-the-air-cools.md`
 [^4]: ADR-0142, a god inflicts weather only on ground its own faction holds, decision D1. `docs/adrs/draft/adr-0142-a-god-inflicts-weather-only-on-ground-it-holds.md`
