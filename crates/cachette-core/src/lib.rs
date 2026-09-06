@@ -25,6 +25,7 @@ pub mod controller;
 pub mod conversion;
 pub mod descent;
 pub mod event;
+pub mod event_layout;
 pub mod founding;
 pub mod growth;
 pub mod hash;

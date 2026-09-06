@@ -419,6 +419,7 @@ without stating a constraint is worse than no record.
 | 0160 | The wind is carried state on the cell lattice, and the pressure gradient accelerates it | Accepted | 0002, 0004, 0009, 0022, 0087, 0140, 0141, 0161 | `accepted/adr-0160-the-wind-is-carried-state-and-the-pressure-gradient-accelerates-it.md` |
 | 0161 | Water rides the wind, and every transfer is an exact integer move. Changes ADR-0141 D1, the isotropic share; the other decisions of ADR-0141 stand | Accepted | 0001, 0004, 0009, 0140, 0141, 0160 | `accepted/adr-0161-water-rides-the-wind-and-every-transfer-is-an-exact-integer-move.md` |
 | 0162 | Water enters the air where it is hot, and it falls where the air cools. Changes ADR-0141 D1, the fall and the lift; the account of ADR-0141 D2 stands | Accepted | 0140, 0141, 0142, 0143, 0160, 0161 | `accepted/adr-0162-water-enters-the-air-where-it-is-hot-and-falls-where-the-air-cools.md` |
+| 0163 | An event declares its layout once and the binding derives every column | Draft | 0002, 0006, 0031, 0040, 0044, 0085, 0107 | `draft/adr-0163-an-event-declares-its-layout-once-and-the-binding-derives-every-column.md` |
 | 0164 | Every stored value the step reads enters the state hash, and only a derived value stays out | Draft | 0001, 0004, 0022, 0064, 0072 | `draft/adr-0164-every-stored-value-the-step-reads-enters-the-state-hash.md` |
 
 ### Retired numbers

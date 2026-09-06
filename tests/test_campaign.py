@@ -10,6 +10,9 @@ References
 [^1]: ADR-0144, a faction controller runs inside the step and acts only through
 the caller's verbs.
 ``docs/adrs/accepted/adr-0144-a-faction-controller-runs-inside-the-step-and-acts-only-through-the-callers-verbs.md``
+[^2]: ADR-0163, an event declares its layout once and the binding derives
+every column.
+``docs/adrs/draft/adr-0163-an-event-declares-its-layout-once-and-the-binding-derives-every-column.md``
 """
 
 from __future__ import annotations
@@ -88,15 +91,14 @@ def test_the_controller_raises_a_campaign_at_war_and_the_register_shows_it() -> 
     assert world.subsystem_census()["campaigns_raised"] >= 1
     # The soldiers of the cohort are the units sent on the plane of the faction.
     log = world.campaign_log_columns()
-    assert set(log) == {
-        "tick",
-        "faction",
-        "kind",
-        "objective_kind",
-        "objective_q",
-        "objective_r",
-        "cohort_size",
-    }
+    # The engine declares the fields of the event in one place, and the method
+    # gives one column for each of them. The two address columns are the
+    # exception: the event holds an index, and the grid turns it into an
+    # address.[^2]
+    from cachette import _core
+
+    declared = {column for column, _ in _core.event_schema()["campaign_event"]}
+    assert set(log) == declared | {"objective_q", "objective_r"}
 
 
 def test_a_caller_raises_a_campaign_through_the_same_path() -> None:

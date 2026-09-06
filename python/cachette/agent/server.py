@@ -59,7 +59,9 @@ from __future__ import annotations
 
 import base64
 import hashlib
+from collections.abc import Mapping
 from dataclasses import dataclass
+from typing import Any
 
 from mcp.server.mcpserver import MCPServer
 
@@ -71,7 +73,6 @@ __all__ = [
     "ChoiceReport",
     "EventLogReport",
     "FoundingReport",
-    "GatherEvent",
     "GatherReport",
     "InvariantReport",
     "RegionReport",
@@ -80,7 +81,6 @@ __all__ = [
     "SpawnReport",
     "SurveyCandidate",
     "SurveyReport",
-    "TileChange",
     "TileChangeReport",
     "TileReport",
     "UnitReport",
@@ -143,6 +143,19 @@ DEFAULT_MAX_BYTES = 4096
 DEFAULT_MAX_ROWS = 64
 
 
+def _rows(columns: Mapping[str, Any], head: int) -> list[dict[str, int]]:
+    """Turn the head of a column mapping into rows.
+
+    The keys of a row are the keys of the mapping, which are the field names
+    that the engine declares. This function names no field, so a field added
+    to an event reaches the reader without an edit here.
+    """
+    return [
+        {name: int(column[row]) for name, column in columns.items()}
+        for row in range(head)
+    ]
+
+
 @dataclass(frozen=True)
 class WorldReport:
     """What the engine reports about one world."""
@@ -192,18 +205,12 @@ class EventLogReport:
 
 
 @dataclass(frozen=True)
-class TileChange:
-    """One row of the tile change log."""
-
-    tile: int
-    value: int
-    holder: int
-    kind: int
-
-
-@dataclass(frozen=True)
 class TileChangeReport:
     """What a step changed, read from the engine's own columns.
+
+    A row holds one entry for each field of the event. The keys are the field
+    names that the engine declares, so this server names no field of its own
+    and a field added to the event reaches the reader without an edit here.
 
     The value is the raw fixed-point integer of the engine. It is not a
     floating point number, and this server does not scale it.
@@ -217,33 +224,26 @@ class TileChangeReport:
     event_count: int
     rows_returned: int
     truncated: bool
-    changes: list[TileChange]
-
-
-@dataclass(frozen=True)
-class GatherEvent:
-    """One row of the gather log.
-
-    The unit is the whole identity of the unit that took the amount. It is
-    not a slot index. Pass it back; do not take it apart.
-    """
-
-    unit: int
-    tile: int
-    amount: int
-    kind: int
+    changes: list[dict[str, int]]
 
 
 @dataclass(frozen=True)
 class GatherReport:
-    """What the gather resolve granted in the last step."""
+    """What the gather resolve granted in the last step.
+
+    A row holds one entry for each field of the event, under the field names
+    that the engine declares.
+
+    The unit is the whole identity of the unit that took the amount. It is
+    not a slot index. Pass it back; do not take it apart.
+    """
 
     world: str
     tick: int
     event_count: int
     rows_returned: int
     truncated: bool
-    grants: list[GatherEvent]
+    grants: list[dict[str, int]]
 
 
 @dataclass(frozen=True)
@@ -685,15 +685,7 @@ def build_server(store: SessionStore | None = None) -> MCPServer:
         columns = session.world.event_log_columns()
         total = len(columns["tile"])
         head = min(limit, total)
-        rows = [
-            TileChange(
-                tile=int(columns["tile"][row]),
-                value=int(columns["value"][row]),
-                holder=int(columns["holder"][row]),
-                kind=int(columns["kind"][row]),
-            )
-            for row in range(head)
-        ]
+        rows = _rows(columns, head)
         return TileChangeReport(
             world=session.name,
             tick=session.world.tick,
@@ -721,15 +713,7 @@ def build_server(store: SessionStore | None = None) -> MCPServer:
         columns = session.world.gather_log_columns()
         total = len(columns["unit"])
         head = min(limit, total)
-        rows = [
-            GatherEvent(
-                unit=int(columns["unit"][row]),
-                tile=int(columns["tile"][row]),
-                amount=int(columns["amount"][row]),
-                kind=int(columns["kind"][row]),
-            )
-            for row in range(head)
-        ]
+        rows = _rows(columns, head)
         return GatherReport(
             world=session.name,
             tick=session.world.tick,

@@ -2057,6 +2057,67 @@ in the gate under a virtual display server, by opening the window, pressing the
 two keys and comparing the frame the window drew against the frame the file
 writer wrote for the same world and camera.[^F497D]
 
+### FND-520 — A search shaped around how a fact is consumed cannot see a declaration site that restates the fact as types
+
+**Believed.** Item 0153 asks that Python read an event without repeating its
+layout. A read-only audit reported the item done. It searched the Python
+package for the three ways a layout gets repeated, which are a buffer read, a
+structure unpack and a structured array type, and it found none of
+them.[^F526A] It concluded that no second declaration site remained.
+
+**True.** The negative result is correct and the conclusion does not follow.
+No Python module reads a byte of an event, and the runtime path was and is
+sound: the bindings return one array for each field under the field name, the
+fixed-point value crosses as a signed integer, and the identity crosses
+whole.[^F520B] Two declaration sites remained, and neither reads a byte.
+
+**The first is the type stub of the compiled module.** It held one typed
+dictionary for each event log, and each one listed the field names and the
+element widths in declaration order. That is the layout of the event, restated
+as types.[^F520C]
+
+**The second is the binding layer.** Each method that returns the columns of a
+log listed the fields of its event by hand, one line for each column. The copy
+is in Rust rather than in Python, which is why a search of the Python package
+could not reach it.[^F520D]
+
+**The general shape.** A search shaped around how a fact is consumed finds a
+consumer. It does not find a second declaration of the fact in a form that
+consumes nothing. A type annotation, a schema, a fixture and a stub are all
+declarations rather than reads. Search for the fact, not for the operation.
+
+**What follows.** Ask what the fact is, then search for every place it is
+stated, in every language of the tree. The recurring defect rule names one
+fact in more than one place as the through-line of the shapes it lists, and
+this finding is an instance of missing one of the places rather than of the
+shape itself.[^F520E]
+
+**The copies agreed.** No mismatch existed on the day the mechanism was
+written. This is prevention and not repair, and a reader who finds no defect
+in the history must not conclude that the mechanism was pointless.
+
+### FND-521 — The event column classes of the type stub now generate, and the rest of it does not
+
+**Believed.** The register records that nothing in the tree generates the type
+stub of the compiled module, and that no job compares it against the
+module.[^F321A] The stub says the same of itself.
+
+**True as far as it goes, and now narrower.** A class that holds the columns
+of an event carries a marked block of annotations. A script writes that block
+from the field declaration that the engine reports, and a test runs the same
+script in check mode.[^F521B] A field added to an event therefore fails a test
+until the block follows.
+
+**What stays exposed.** Every other declaration in the stub is hand-written.
+Every method signature of the world type and of the camera type, every typed
+dictionary that does not describe an event, and every alias are unchecked
+against the module. A signature there can disagree with the module and nothing
+fails. The earlier row stands for that part.[^F321A]
+
+**Evidence.** Adding a field to an event, and declaring it, leaves the stub
+short. The check prints the missing annotation and exits non-zero, and the
+test that runs it goes red.
+
 ## D. Cost estimates that were wrong
 
 ### FND-222 — A frame at the target scale costs eleven times its budget
@@ -12851,3 +12912,8 @@ finding that names the shape.
 [^F538A]: The consumption conservation test. `crates/cachette-core/tests/consumption.rs`
 [^F539A]: Backlog item 0059, the done list. `docs/backlog/complete/0059-give-a-site-a-housing-capacity-and-a-resident-reader.md`
 [^F539B]: ADR-0157, a site's free places are its built housing less the residents the engine counts, decision D1. `docs/adrs/accepted/adr-0157-a-sites-free-places-are-its-built-housing-less-the-residents-the-engine-counts.md`
+[^F520B]: ADR-0085, an entity crosses to Python as one opaque identity that the engine resolves. `docs/adrs/accepted/adr-0085-an-entity-crosses-to-python-as-one-opaque-identity.md`
+[^F520C]: The type stub of the compiled module. `python/cachette/_core.pyi`
+[^F520D]: The Python bindings. `crates/cachette-py/src/lib.rs`
+[^F520E]: ADR-0163, an event declares its layout once and the binding derives every column. `docs/adrs/draft/adr-0163-an-event-declares-its-layout-once-and-the-binding-derives-every-column.md`
+[^F521B]: The event stub generator. `scripts/generate_event_stubs.py`

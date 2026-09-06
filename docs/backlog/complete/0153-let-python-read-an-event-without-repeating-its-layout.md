@@ -5,7 +5,7 @@ status: complete
 created: 2026-09-01
 implements: [ADR-0002 D1, ADR-0006 D1, ADR-0014 D1, ADR-0014 D2]
 changes: []
-creates: [ADR-0085]
+creates: [ADR-0085, ADR-0163]
 serves: []
 blocked-by: []
 ---
@@ -111,32 +111,52 @@ same defect one layer further out.[^6]
 
 ## Outcome
 
-**Closed as already done. The work landed under other items.** Two auditors read
-the code on 5 September 2026, separately, and both found every statement of the
-list above satisfied.
+**Closed twice, for two different reasons, and both readings stand.** Two
+auditors read the code on 5 September 2026, separately, and both found every
+statement of the list above satisfied. A later worker found two declaration
+sites that the audit could not see, and closed those.
 
-**Both logs cross as named columns.** The event log gives one array for each
-field, and the names are the field names. The gather log does the same, and it
-carries the whole unit identity rather than a slot index.[^17]
+**The reading half was already done.** Both logs cross as named columns. The
+event log gives one array for each field, and the names are the field names.
+The gather log does the same, and it carries the whole unit identity rather
+than a slot index. No column holds a float: the fixed-point value arrives as a
+signed 32-bit integer array. The bindings resolve an identity that Python hands
+back, and the generation check refuses a stale one.[^20] A real protocol client
+drives that refusal.[^21] No Python module reads a byte of an event, unpacks a
+structure or builds a structured element type. ADR-0085 is accepted, which is
+stronger than the list asks for.
 
-**No column holds a float.** The fixed-point value arrives as a signed 32-bit
-integer array.
+**The declaring half was not.** The type stub of the compiled module held one
+typed dictionary for each event log, listing the field names and the element
+widths in declaration order. The binding layer held one method for each log
+that listed the fields by hand. Both restate the layout without consuming it,
+which is why a search for a byte read could not reach them. A finding records
+the general shape, because the precedent is worth more than the item.[^17]
 
-**No Python file holds a layout.** A search over the package for a buffer read,
-a struct unpack and a structured element type returns nothing. The one event
-entry in the stubs hands over bytes, and no Python code decodes them.
+**What implements the item now.** Each event type carries one declaration of
+its fields. The declaration states no offset and no width, because the compiler
+reads both from the type. Every column method builds its arrays from that
+declaration and names no field. The compiled module reports the declaration,
+and a script writes the column classes of the type stub from that report. The
+agent server builds a row from the keys the engine gave, so it names no field
+either. A decision record states the constraint.[^18]
 
-**The bindings resolve an identity that Python hands back**, and the generation
-check refuses a stale one.[^18] A real protocol client drives that refusal.[^19]
+**The failure is loud, and it was proved in both directions.** A field added to
+an event and left out of the declaration compiles, and the layout test goes red
+and names the event and the bytes it does not cover. A field added and declared
+makes the stub check go red until the stub follows.
 
-**The stubs describe the methods**, and the protocol server answers through the
-columns rather than the bytes.
+**The copies agreed when this was written.** The mechanism found no existing
+mismatch. This is prevention, not repair.
 
-**ADR-0085 is accepted**, which is stronger than the list asks for.
+**What the check covers.** It catches a field of the type that the declaration
+omits, including an undeclared padding field, because the declared fields must
+fill the type exactly. It does not need to catch implicit padding in the type,
+because the plain-data derive rejects that at compile time.
 
-**One claim stays unverified.** The audit ran no build, so the line about the
-whole check command running green rests on the pipeline rather than on this
-reading.
+**Left undone.** The type stub generates only its event column classes. Every
+other declaration in it stays hand-written and unchecked against the
+module.[^19]
 
 ## References
 
@@ -155,6 +175,8 @@ reading.
 [^13]: Decisions register, DEC-063. `docs/DECISIONS.md`
 [^15]: The founded group tests. `crates/cachette-core/tests/founded_group_survives.rs`
 [^16]: Backlog item 0161. `docs/backlog/proposed/0161-let-a-selector-say-where-to-act.md`
-[^17]: The event log and gather log column readers. `crates/cachette-py/src/lib.rs`
-[^18]: The identity resolution tests. `crates/cachette-core/tests/identity_resolution.rs`
-[^19]: The protocol client tests. `tests/test_agent_mcp.py`
+[^17]: Findings register, FND-520. `docs/FINDINGS.md`
+[^18]: ADR-0163, an event declares its layout once and the binding derives every column. `docs/adrs/draft/adr-0163-an-event-declares-its-layout-once-and-the-binding-derives-every-column.md`
+[^19]: Findings register, FND-521. `docs/FINDINGS.md`
+[^20]: The identity resolution tests. `crates/cachette-core/tests/identity_resolution.rs`
+[^21]: The protocol client tests. `tests/test_agent_mcp.py`
