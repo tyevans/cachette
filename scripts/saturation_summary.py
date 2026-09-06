@@ -15,6 +15,11 @@ first two percent of the run.
 within five percent of its final value. A quantity with a flat share of 0.95
 is at rest for almost the whole run.
 
+A third number sits beside them. **The last move** is the last sampled tick at
+which the quantity changed at all. Read it against the game end tick in the
+header: a quantity whose last move is the game end stopped because the game
+ended and the controllers stopped, and not because it ran out of room.
+
 A quantity that never moves reports a ninety percent tick of 0 and a flat share
 of 1, and the table marks it as one that never moved.
 
@@ -60,6 +65,15 @@ def reach_tick(ticks: list[int], values: list[int]) -> int:
     return ticks[-1]
 
 
+def last_move(ticks: list[int], values: list[int]) -> int:
+    """Return the last tick at which the value changed from the sample before."""
+    last = ticks[0]
+    for index in range(1, len(values)):
+        if values[index] != values[index - 1]:
+            last = ticks[index]
+    return last
+
+
 def flat_share(values: list[int]) -> int:
     """Return the share in hundredths of samples within a twentieth of the end."""
     final = values[-1]
@@ -79,11 +93,13 @@ def summarise(report: dict) -> list[dict]:
         reaches = []
         shares = []
         finals = []
+        lasts = []
         moved = 0
         for run in runs:
             ticks = [s["tick"] for s in run["samples"]]
             values = [s[name] for s in run["samples"]]
             reaches.append(reach_tick(ticks, values))
+            lasts.append(last_move(ticks, values))
             shares.append(flat_share(values))
             finals.append(values[-1])
             if values[-1] != values[0] or min(values) != max(values):
@@ -96,6 +112,7 @@ def summarise(report: dict) -> list[dict]:
                 "reach_min": min(reaches),
                 "reach_median": quantile(reaches, 1, 2),
                 "reach_max": max(reaches),
+                "last_median": quantile(lasts, 1, 2),
                 "share_min": min(shares),
                 "share_median": quantile(shares, 1, 2),
                 "share_max": max(shares),
@@ -114,7 +131,7 @@ def render(report: dict, rows: list[dict]) -> str:
     named = [end for end in ends if end is not None]
     header = (
         f"{'quantity':<38} {'moved':>5} "
-        f"{'t90 min':>8} {'t90 med':>8} {'t90 max':>8} "
+        f"{'t90 min':>8} {'t90 med':>8} {'t90 max':>8} {'last med':>8} "
         f"{'flat%min':>8} {'flat%med':>8} {'flat%max':>8} "
         f"{'end min':>12} {'end med':>12} {'end max':>12}"
     )
@@ -134,6 +151,7 @@ def render(report: dict, rows: list[dict]) -> str:
         return (
             f"{row['name']:<38} {row['moved_in_seeds']:>2}/{row['seeds']:<2} "
             f"{row['reach_min']:>8} {row['reach_median']:>8} {row['reach_max']:>8} "
+            f"{row['last_median']:>8} "
             f"{row['share_min']:>8} {row['share_median']:>8} {row['share_max']:>8} "
             f"{row['final_min']:>12} {row['final_median']:>12} {row['final_max']:>12}"
         )
