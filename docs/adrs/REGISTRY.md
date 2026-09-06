@@ -360,8 +360,8 @@ without stating a constraint is worse than no record.
 | 0078 | Descent is a bounded record, and a relation is a bounded recursion | Draft | 0002, 0004, 0014, 0054 | 14 |
 | 0079 | Succession is filter, then sort by a key vector, then allocate | Proposed | 0004, 0007, 0014, 0078 | 14 |
 | 0080 | A depleted deposit recovers by ageing the stored take, never by a pass over the world | Accepted | 0002, 0003, 0004, 0072, 0073 | `accepted/adr-0080-a-depleted-deposit-recovers-by-ageing-the-stored-take.md` |
-| 0081 | A residence is a stored column and occupancy is a maintained count | Draft | 0004, 0014, 0018, 0063, 0066, 0074 | `draft/adr-0081-a-residence-is-a-stored-column-and-occupancy-is-a-maintained-count.md` |
-| 0082 | The store sets the rate of a birth and the housing admits it | Draft | 0003, 0014, 0056, 0062, 0063, 0074, 0081 | `draft/adr-0082-the-store-sets-the-rate-of-a-birth-and-the-housing-admits-it.md` |
+| 0081 | A residence is a stored column and occupancy is a maintained count. Rejected by review 0199, which found that the engine already answers the count decision D3 asks the project to store. Replaced by ADR-0157 | Rejected | 0004, 0014, 0018, 0063, 0066, 0074 | `draft/adr-0081-a-residence-is-a-stored-column-and-occupancy-is-a-maintained-count.md` |
+| 0082 | The store sets the rate of a birth and the housing admits it | Draft | 0003, 0014, 0056, 0062, 0063, 0074, 0157 | `draft/adr-0082-the-store-sets-the-rate-of-a-birth-and-the-housing-admits-it.md` |
 | 0083 | The gate build checks every integer overflow | Draft | 0001, 0002 | `draft/adr-0083-the-gate-build-checks-every-integer-overflow.md` |
 | 0084 | The world reserves the unit columns at construction, and a spawn past the reservation is refused | Draft | 0012, 0014, 0066 | `draft/adr-0084-the-world-reserves-the-unit-columns-at-construction.md` |
 | 0088 | A tile field is a generated base and a stored change | Draft | 0002, 0003, 0004, 0009, 0012, 0068, 0072 | `draft/adr-0088-a-tile-field-is-a-generated-base-and-a-stored-change.md` |
@@ -412,6 +412,7 @@ without stating a constraint is worse than no record.
 | 0154 | The observation and the action of a faction are schema-declared bounded tables the engine owns | Accepted | 0002, 0004, 0006, 0022, 0040, 0096, 0111, 0144, 0146, 0148, 0149 | `accepted/adr-0154-the-observation-and-the-action-of-a-faction-are-schema-declared-bounded-tables.md` |
 | 0155 | A batch of worlds steps in one call, in index order | Accepted | 0001, 0004, 0009, 0040, 0042, 0047, 0096, 0154 | `accepted/adr-0155-a-batch-of-worlds-steps-in-one-call-in-index-order.md` |
 | 0156 | A faction's option weights are policy, set through one verb | Draft | 0002, 0003, 0004, 0023, 0040, 0053, 0064, 0096, 0098, 0109, 0144, 0150, 0152, 0153, 0154 | `draft/adr-0156-a-factions-option-weights-are-policy-set-through-one-verb.md` |
+| 0157 | A site's free places are its built housing less the residents the engine already counts. Replaces ADR-0081, which review 0199 rejected | Draft | 0009, 0023, 0062, 0082, 0096, 0120, 0145 | `draft/adr-0157-a-sites-free-places-are-its-built-housing-less-the-residents-the-engine-counts.md` |
 
 ### Retired numbers
 

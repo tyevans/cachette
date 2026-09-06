@@ -111,6 +111,19 @@ BLK-150, which asks what raises and lowers renown.[^6]
 | Founding group, the people each faction founds with | The seeding layer, when it founds the run | unset, pass 10 | — | The project owner set this to 2 on 5 September 2026. The earlier default of 64 came from pass 1. It was the constant the demonstration passed to the founding verb before the seeding moved into the engine. Pass 10 measures it. |
 | Luxury deposits, the tiles the seeding layer places a luxury on | The seeding layer, when it places the luxuries | unset, pass 10 | — | Provisional default of 8 written by pass 1, two deposits for each faction of the demonstration world. Pass 10 measures it. |
 
+## The population
+
+| Value | Read by | Set | Blocker | Derivation |
+|---|---|---|---|---|
+| Housing capacity, the people one built dwelling holds | The growth stage, when it counts the free places of a site | unset, pass 10 | BLK-050 | |
+| Birth rate, what one site proposes for the store it holds | The growth stage, when it proposes a birth | unset, pass 10 | BLK-050 | |
+| Growth schedule, period and phase | The growth stage, when it decides whether this tick acts | unset, pass 10 | BLK-007 | |
+| Founding housing, the capacity a founded site starts with | The seeding layer, when it founds a site | unset, pass 10 | BLK-050 | |
+
+The four rows above are unset and every one of them is behind a blocker. No
+pass writes a value into them yet. ADR-0157 cites this section and states no
+figure of its own.[^8]
+
 ## Unit types
 
 | Value | Read by | Set | Blocker | Derivation |
@@ -186,3 +199,4 @@ rate, a step, a limit, a target, a share, a schedule, a bound.
 [^5]: Blockers register, BLK-130. `docs/BLOCKERS.md`
 [^6]: Blockers register, BLK-150. `docs/BLOCKERS.md`
 [^7]: Target platform costs. `docs/reference/graviton-costs.md`
+[^8]: ADR-0157, a site's free places are its built housing less the residents the engine already counts. `docs/adrs/draft/adr-0157-a-sites-free-places-are-its-built-housing-less-the-residents-the-engine-counts.md`
