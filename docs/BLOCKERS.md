@@ -125,6 +125,15 @@ storm to be worth: how long a storm should last in ticks, how much of the map
 one should cover, and how much a wet season should change what a congregation
 gathers. Three numbers close six of the eight.
 
+**One of the eight now has a measurement.** A readability report reads the
+ground water of every level 1 cell of the demonstration world at four
+stops.[^BLK130C] Every cell is wet at every reading. The wet mark is 64 drops,
+and the driest cell holds 124 drops before a storm and 251 drops a hundred
+ticks after it. The wet bonus therefore applies everywhere, and wetness
+separates no cell from another. The measurement says what the current mark
+does. It does not say what the mark should be, and that is the question this
+row holds.
+
 **What the project does meanwhile.** The engine carries the values above as
 named constants beside the rule that reads each one. No decision record states
 any of them, because the record rule forbids a value that an unanswered
@@ -723,3 +732,4 @@ normally.
 [^BLK123A]: ADR-0132, conversion changes the faction of a unit and adds no second allegiance, decision D2. `docs/adrs/draft/adr-0132-conversion-changes-the-faction-of-a-unit.md`
 [^BLK130A]: ADR-0142, a god inflicts weather only on ground its own faction holds, decisions D2 and D4. `docs/adrs/draft/adr-0142-a-god-inflicts-weather-only-on-ground-it-holds.md`
 [^BLK130B]: ADR-0143, wet ground yields more to a gatherer, decision D2. `docs/adrs/draft/adr-0143-wet-ground-yields-more-to-a-gatherer.md`
+[^BLK130C]: Research report 24, demonstration readability, resources and weather, section 2.1. `docs/research/reports/24-demonstration-readability-resources-and-weather.md`
