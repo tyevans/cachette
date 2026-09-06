@@ -1927,10 +1927,23 @@ fn tile_lines(tile: Option<&TileReadout>) -> Vec<Line> {
 /// The engine names no word for a watcher, so the viewer holds one. The panel
 /// and the colour key read this, so the two cannot disagree.[^1] [^2]
 ///
+/// **The open category is named, and it is not left to the fallback.** The
+/// default upgrade table holds no row for that category, so nothing stands
+/// there and nothing ever will until a caller writes a row.[^3] The fallback
+/// word said "upgrade", and the colour key then drew a line that read as an
+/// upgrade a site holds. A watcher who looked for it on the map found
+/// nothing, and the key gave no reason. The name now says that the category
+/// holds no row, so the line states a fact rather than a promise.
+///
+/// The fallback stays for a number that names no category of the table. It is
+/// unreachable through the category list, and it is what a later category
+/// reaches before someone names it.
+///
 /// # References
 ///
 /// [^1]: ADR-0094, the caller owns the camera and the pixels, decision D5. `docs/adrs/draft/adr-0094-the-caller-owns-the-camera-and-the-pixels.md`
 /// [^2]: Recurring Defect Shapes, shape 1. `.claude/rules/recurring-defects.md`
+/// [^3]: ADR-0151, an upgrade is a category with a ground fit and a level, decision D1. `docs/adrs/draft/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
 #[must_use]
 pub const fn upgrade_name(kind: cachette_core::upgrade::UpgradeCategory) -> &'static str {
     match kind {
@@ -1939,6 +1952,7 @@ pub const fn upgrade_name(kind: cachette_core::upgrade::UpgradeCategory) -> &'st
         cachette_core::upgrade::UpgradeCategory::WONDER => "wonder",
         cachette_core::upgrade::UpgradeCategory::STORE => "store",
         cachette_core::upgrade::UpgradeCategory::WALL => "wall",
+        cachette_core::upgrade::UpgradeCategory::OPEN => "open category, no row",
         _ => "upgrade",
     }
 }

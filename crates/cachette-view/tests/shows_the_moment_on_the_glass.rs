@@ -34,6 +34,7 @@
 
 use cachette_core::resource::ResourceKind;
 use cachette_core::terrain::TileKind;
+use cachette_core::upgrade::UpgradeCategory;
 use cachette_core::{Axial, FactionId, World, WorldConfig};
 use cachette_view::{draw_frame, glass, paint, Camera, Canvas, Metrics, Overlay, Readout};
 
@@ -310,6 +311,42 @@ fn the_key_names_every_colour_the_window_draws() {
             "the key does not name the ground {name}: {legend:?}"
         );
     }
+}
+
+#[test]
+fn the_key_says_that_the_open_category_holds_no_row() {
+    // The colour key draws one line for every upgrade category, and it takes
+    // the word from one place, so the panel and the key cannot disagree.[^1]
+    // The open category had no word of its own and fell to the fallback, so
+    // the key read "upgrade: a site". A watcher then looked on the map for an
+    // upgrade that no site holds, because the default table holds no row for
+    // that category.
+    //
+    // This test drives the key that a watcher reads, and not the naming
+    // function alone, because the key is what showed the wrong words.[^2]
+    //
+    // [^1]: ADR-0094, the caller owns the camera and the pixels, decision D5. `docs/adrs/draft/adr-0094-the-caller-owns-the-camera-and-the-pixels.md`
+    // [^2]: Testing rules, section 5. `.claude/rules/testing.md`
+    let (_, readout, _) = drawn(true);
+    let said = glass::says(&readout, true);
+    let legend = rows_under(&said, "COLOURS IN THE WINDOW");
+
+    assert!(
+        !legend.iter().any(|line| line.starts_with("upgrade: ")),
+        "the key names a category with the fallback word: {legend:?}"
+    );
+
+    let name = cachette_view::hud::upgrade_name(UpgradeCategory::OPEN);
+    assert!(
+        name.contains("no row"),
+        "the open category is named {name:?}, which does not say that it holds no row"
+    );
+    assert!(
+        legend
+            .iter()
+            .any(|line| line.starts_with(&format!("{name}: "))),
+        "the key does not name the open category: {legend:?}"
+    );
 }
 
 #[test]

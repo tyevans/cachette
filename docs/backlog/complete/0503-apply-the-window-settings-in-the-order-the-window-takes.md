@@ -1,5 +1,5 @@
 ---
-id: 0502
+id: 0503
 title: Apply the window settings in the order the window takes
 status: complete
 created: 2026-09-05

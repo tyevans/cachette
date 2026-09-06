@@ -39,8 +39,20 @@ game, and wealth and wonder are late paths because of it. A separate work
 stream raises those two bars against a long horizon, and this record states the
 tension rather than the values.
 
-**No code implements this record.** No site holds a queue, and no stage of the
-step creates a unit. The decisions below state what the work must satisfy.
+**The code holds this record, and two decisions below were repaired against
+it.** A site holds a queue, one stage advances it, and a finished entry creates
+a unit. D4 and D5 were written before that work, and each stated something the
+implementation could not do. They now state the constraint the implementation
+satisfies.
+
+**The project rejected a queue that consumes nobody.** The author of this
+record argued that a site should make a unit from goods and work alone, because
+a queue that takes a person makes the early game harsher and adds a second
+refusal to every build. The project owner overruled that. People must be the
+scarce middle of the economy: a queue that consumes nobody is a sink for goods,
+and growth is then decoration, because the population a faction raises changes
+nothing it can do. The cost of the ruling is the early-game squeeze that the
+consequences state.
 
 ## Decision
 
@@ -113,10 +125,12 @@ entry, and nothing would fail.
 **This record states no work value, no charge and no schedule.** The balance
 register holds those rows.[^9]
 
-### D4. A finished entry consumes one person of the site and the goods it costs
+### D4. A finished entry consumes the residents its cost row names, and the goods it costs
 
 An entry that reaches the work it needs is removed from the front of the queue.
-It takes one resident of the site and the goods the entry costs. One unit of the
+It takes the residents its cost row names, and the goods the entry costs.
+**This record states no number of people.** The balance register holds the row,
+and the pass reads that row and holds no literal of its own.[^9] One unit of the
 entry's type is then created at the site, through the same spawn path that every
 other creation uses, and its residence is the site that built it.
 
@@ -124,10 +138,15 @@ other creation uses, and its residence is the site that built it.
 is not a new person. Organic growth is the only source of people, and the queue
 is the only consumer of them.
 
-The person the entry takes is a resident of the site, chosen by a stable key
-over the residents and never by the order a collection held them.[^8] The
-identity of the unit that leaves and the identity of the unit that arrives are
-distinct, so no reader can confuse the two.
+**The engine keeps no list of the residents of a site, so the arena is the
+stable key.**[^7] A pass over the units is the only route to a resident, and the
+key is the slot a unit holds in that pass. An entry takes the lowest slots of
+its own site, in ascending slot order, and never the order a collection or a
+thread produced.[^8] A key over a roster of residents would ask for a duplicate
+of the home column that the project has decided not to keep.
+
+The identity of the unit that leaves and the identity of the unit that arrives
+are distinct, so no reader can confuse the two.
 
 **A finished entry is refused when the site holds no spare person or cannot pay
 the goods.** It is refused and not discarded: the entry stays at the front of the
@@ -145,24 +164,39 @@ This is the one place where this record and the organic growth record meet.
 Organic growth answers how many people a site has. This record answers what
 those people become. Neither is the other.
 
-### D5. The advance runs at one fixed stage, and its cost follows the sites
+### D5. The advance runs at one fixed stage, and it walks the unit arena at most once for each tick
 
 The advance opens one stage of the step. It runs on every tick, and a schedule
 decides which ticks it acts on. The interval is a parameter of that schedule and
 never a constant of the kernel.[^12]
 
-**The stage visits the sites and the entries. It never searches, and it never
-walks the units.** The cost of the stage therefore follows the number of sites
-times the queue bound of D1, and it does not follow the population.[^13]
+**The stage has two costs, and only one of them follows the sites.** The pass
+that advances the front entries visits the sites and their entries, so its cost
+follows the number of sites times the queue bound of D1.[^13]
+
+**The pass that names the residents walks the unit arena, and it walks that
+arena at most once for each tick.** D4 takes residents of a site, and the
+engine keeps no roster to take them from, so a walk is the only route.[^7] The
+walk is set-valued: one walk serves every site that finishes an entry on the
+same tick, and a tick where nothing finishes walks nothing.[^14] The stage
+therefore holds one term that follows the population, and it pays that term
+once for each tick.
+
+**This is a stated exception to the rule that cost follows the lattice, and not
+a silent one.**[^13] The rule holds for the pass that advances. It cannot hold
+for the pass that names a resident, because the residence of a unit is a column
+of the unit and not a column of the site. A record that claimed the whole stage
+follows the sites would be a record the code contradicts.
 
 Two sites never write one another's state, so the disjointness is a property of
-the partition rather than a rule a reviewer must check by reading.[^14] The
+the partition rather than a rule a reviewer must check by reading.[^15] The
 created units apply in one ordered scan, in site order and then in queue
 position order, so the slot a new unit takes follows from the world and not from
 a thread.[^8]
 
-A reviewer finds a violation by asking one question of the stage. Does any loop
-in it run once for each unit? If one does, the stage is wrong.
+A reviewer finds a violation by asking one question of the stage. Does it walk
+the units more than once in a tick, or once for each site, or once for each
+entry? If it does, the stage is wrong.
 
 ### D6. A refusal is stated at the verb and counted, and nothing is dropped in silence
 
@@ -177,7 +211,7 @@ are counted apart, because they mean different things to a watcher and to a
 learner.
 
 A refused command is dropped and counted in the subsystem census, in the way
-every refused controller command is.[^15] A watcher who reads a queue that never
+every refused controller command is.[^16] A watcher who reads a queue that never
 moves must be able to see whether the verb refused the entries or the store
 could not pay for them, and those are two different counts.
 
@@ -197,7 +231,7 @@ restate it or change it.[^2]
 The queue produces a settler in the way it produces any other type: an entry
 names the type, the store pays, and one unit of that type arrives. What a
 settler then does, and the verb that founds a city with one, are held by that
-other record and by the backlog item that implements it.[^16]
+other record and by the backlog item that implements it.[^17]
 
 ## Consequences
 
@@ -229,6 +263,19 @@ engine states no policy, so a controller that never queues leaves every site
 with an empty queue and a rising population for the whole run. The census row of
 D6 is what makes that visible, and it is not a defect of this record.
 
+**A faction that founds with a very small group pays a person of that group
+for its first entry.** Growth is the only source of people and the queue is the
+only consumer, so until growth runs the queue can only shrink a faction. A
+faction that queues before it grows spends a founder, and the group it founded
+with then gathers less. The evidence is a test: the test that asks whether a
+founded group survives a long span had to turn the queue off, because the first
+entry took a person out of the group the test measures.[^18]
+
+This is a squeeze and not a defect, and it states the order the work must
+arrive in. Growth comes before a queue that a controller uses by default. A
+world that holds the queue and no growth gives a faction one way to spend
+people and no way to make them.
+
 **A faction that queues everything starves its gathering.** Every finished entry
 takes a person, and a site whose people all became soldiers gathers nothing into
 the store that feeds them. Nothing in the engine prevents it, and nothing
@@ -241,7 +288,7 @@ more people must build more housing. The upgrade table holds categories for a
 road, a terrace, a wonder, a store and a wall, and it holds none for housing.
 **This record does not invent one.** A housing category is work, it belongs with
 the record that says what an upgrade category is, and a backlog item names
-it.[^18]
+it.[^19]
 
 **The built-in controller becomes the place where sensible behaviour lives.**
 Anything a reader would call strategy sits in the controller, where a learner
@@ -252,7 +299,7 @@ pays advances every tick, so the refusal never reaches the assertion. The
 fixture needs a site with an empty store, a site with exactly the charge of one
 advance, a full queue, a site whose store cannot pay the goods of a finished
 entry, and a site that holds no spare person when an entry finishes. Put each
-refusal back and watch the test stay green.[^17]
+refusal back and watch the test stay green.[^20]
 
 **Cancelling an entry is not decided here.** Nothing removes an entry from the
 queue except finishing it. A caller that wants to cancel one asks for a verb,
@@ -266,15 +313,17 @@ and the work that adds it decides what happens to the work already charged.
 [^4]: ADR-0144, a faction controller runs inside the step and acts only through the caller's verbs, decision D2. `docs/adrs/accepted/adr-0144-a-faction-controller-runs-inside-the-step-and-acts-only-through-the-callers-verbs.md`
 [^5]: ADR-0154, the observation and the action of a faction are schema-declared bounded tables, decision D4. `docs/adrs/accepted/adr-0154-the-observation-and-the-action-of-a-faction-are-schema-declared-bounded-tables.md`
 [^6]: ADR-0082, the store sets the rate of a birth and the housing admits it. `docs/adrs/draft/adr-0082-the-store-sets-the-rate-of-a-birth-and-the-housing-admits-it.md`
-[^7]: ADR-0157, a site's free places are its built housing less the residents the engine already counts, decisions D1 and D2. `docs/adrs/accepted/adr-0157-a-sites-free-places-are-its-built-housing-less-the-residents-the-engine-counts.md`
+[^7]: ADR-0157, a site's free places are its built housing less the residents the engine already counts, decisions D1, D2 and D3. `docs/adrs/accepted/adr-0157-a-sites-free-places-are-its-built-housing-less-the-residents-the-engine-counts.md`
 [^8]: ADR-0004, iteration order is explicit, and unordered reductions need slots, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
 [^9]: Balance register, the production queue. `docs/reference/balance.md`
 [^10]: ADR-0156, a faction's option weights are policy, set through one verb, decisions D3 and D4. `docs/adrs/draft/adr-0156-a-factions-option-weights-are-policy-set-through-one-verb.md`
 [^11]: ADR-0120, a unit carries a type that indexes a table, decision D1. `docs/adrs/draft/adr-0120-a-unit-carries-a-type-that-indexes-a-table.md`
 [^12]: ADR-0062, production and upkeep are rates attached to a site, decision D4. `docs/adrs/accepted/adr-0062-production-and-upkeep-are-rates-attached-to-a-site.md`
 [^13]: ADR-0096, cost follows the lattice, not the population, decision D1. `docs/adrs/draft/adr-0096-cost-follows-the-lattice-not-the-population.md`
-[^14]: ADR-0009, parallel stages write disjoint outputs, decision D1. `docs/adrs/accepted/adr-0009-parallel-stages-write-disjoint-outputs.md`
-[^15]: ADR-0144, a faction controller runs inside the step and acts only through the caller's verbs, decision D3. `docs/adrs/accepted/adr-0144-a-faction-controller-runs-inside-the-step-and-acts-only-through-the-callers-verbs.md`
-[^16]: Backlog item 0485. `docs/backlog/proposed/0485-let-a-settler-found-a-city-and-let-the-controller-settle-new-ground.md`
-[^17]: Testing Rules, a fixture supplies the input. `.agents/rules/testing.md`
-[^18]: Backlog item 0498. `docs/backlog/proposed/0498-give-the-upgrade-table-a-housing-category.md`
+[^14]: ADR-0144, a faction controller runs inside the step and acts only through the caller's verbs, decision D1. `docs/adrs/accepted/adr-0144-a-faction-controller-runs-inside-the-step-and-acts-only-through-the-callers-verbs.md`
+[^15]: ADR-0009, parallel stages write disjoint outputs, decision D1. `docs/adrs/accepted/adr-0009-parallel-stages-write-disjoint-outputs.md`
+[^16]: ADR-0144, a faction controller runs inside the step and acts only through the caller's verbs, decision D3. `docs/adrs/accepted/adr-0144-a-faction-controller-runs-inside-the-step-and-acts-only-through-the-callers-verbs.md`
+[^17]: Backlog item 0485. `docs/backlog/proposed/0485-let-a-settler-found-a-city-and-let-the-controller-settle-new-ground.md`
+[^18]: The founded group test. `crates/cachette-core/tests/founded_group_survives.rs`
+[^19]: Backlog item 0498. `docs/backlog/proposed/0498-give-the-upgrade-table-a-housing-category.md`
+[^20]: Testing Rules, a fixture supplies the input. `.agents/rules/testing.md`
