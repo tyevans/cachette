@@ -118,6 +118,7 @@ pub use rates::{
 pub use relation::{RelationCrossed, RelationError, RelationMatrix, RelationRules};
 pub use resource::{
     Amount, CarryLoad, DepletionLedger, LedgerEntry, RecoveryRules, ResourceField, ResourceKind,
+    TileGround,
 };
 pub use site::{
     CommodityId, SettlementArena, SettlementError, Store, StoreUpdate, COMMODITY_COUNT,

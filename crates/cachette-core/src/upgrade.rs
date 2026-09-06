@@ -289,6 +289,25 @@ declare_upgrade_row! {
     /// The column adds to the rate that the gather resolve grants. It does
     /// not change what the tile started with, which is generated and fixed.
     yield_change: u32,
+    /// How many times faster the deposits of the tile grow back.
+    ///
+    /// The column is a whole-number speedup of the recovery period, not a
+    /// rate of its own. The recovery rule multiplies the period of the kind
+    /// by the moisture over the tile and divides it by this column, so the
+    /// rate of a kind stays declared in one place and improvement only bends
+    /// it.[^1]
+    ///
+    /// **A worn level bends it less.** The rule scales the speedup by the
+    /// condition of what stands there, so a neglected terrace falls back
+    /// toward the unimproved rate and reaches it exactly at no condition.
+    ///
+    /// Zero and one both mean that the row does not change how fast the
+    /// ground grows back.
+    ///
+    /// # References
+    ///
+    /// [^1]: Recurring Defect Shapes, shape 1. `.agents/rules/recurring-defects.md`
+    recovery_change: u32,
     /// The number of units that stand on the tile once the level stands.
     ///
     /// The composition takes the larger of the ground and this column, so a
@@ -343,6 +362,7 @@ impl UpgradeRow {
         ground_fit: 0,
         work: 0,
         yield_change: 0,
+        recovery_change: 0,
         capacity_change: 0,
         capacity_of_store_change: 0,
         housing_change: 0,
@@ -658,6 +678,29 @@ pub const TERRACE_LEVEL_1_YIELD: u32 = 2;
 /// [^1]: Balance register, the terrace yield by level. `docs/reference/balance.md`
 pub const TERRACE_LEVEL_2_YIELD: u32 = 4;
 
+/// How many times faster a tile grows back under the first level of a
+/// terrace.[^1]
+///
+/// A terrace is worked ground. The ground the generator made grows back too
+/// slowly to feed anybody, and this column is what makes the difference
+/// between ground a faction forages and ground a faction farms.
+///
+/// # References
+///
+/// [^1]: Balance register, the terrace recovery by level. `docs/reference/balance.md`
+pub const TERRACE_LEVEL_1_RECOVERY: u32 = 8;
+
+/// How many times faster a tile grows back under the second level of a
+/// terrace.[^1]
+///
+/// Twice the first level, so a watcher reads the second level from how fast
+/// the ground returns.
+///
+/// # References
+///
+/// [^1]: Balance register, the terrace recovery by level. `docs/reference/balance.md`
+pub const TERRACE_LEVEL_2_RECOVERY: u32 = TERRACE_LEVEL_1_RECOVERY * 2;
+
 /// The store capacity that one finished store adds, as a raw Q16.16
 /// quantity.[^1]
 ///
@@ -828,6 +871,7 @@ pub const DEFAULT_UPGRADE_TABLE: UpgradeTable = {
         ground_fit: TERRACE_FIT,
         work: TERRACE_LEVEL_1_WORK,
         yield_change: TERRACE_LEVEL_1_YIELD,
+        recovery_change: TERRACE_LEVEL_1_RECOVERY,
         own_ground_required: OWN_GROUND_REQUIRED,
         ..UpgradeRow::NONE
     };
@@ -835,6 +879,7 @@ pub const DEFAULT_UPGRADE_TABLE: UpgradeTable = {
         ground_fit: TERRACE_FIT,
         work: TERRACE_LEVEL_2_WORK,
         yield_change: TERRACE_LEVEL_2_YIELD,
+        recovery_change: TERRACE_LEVEL_2_RECOVERY,
         own_ground_required: OWN_GROUND_REQUIRED,
         ..UpgradeRow::NONE
     };

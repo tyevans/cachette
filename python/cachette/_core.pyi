@@ -241,6 +241,7 @@ class UpgradeColumns(TypedDict):
     ground_fit: npt.NDArray[np.int64]
     work: npt.NDArray[np.int64]
     yield_change: npt.NDArray[np.int64]
+    recovery_change: npt.NDArray[np.int64]
     capacity_change: npt.NDArray[np.int64]
     capacity_of_store_change: npt.NDArray[np.int64]
     housing_change: npt.NDArray[np.int64]
@@ -1060,6 +1061,7 @@ class World:
         ground_fit: int,
         work: int,
         yield_change: int,
+        recovery_change: int,
         capacity_change: int,
         capacity_of_store_change: int,
         housing_change: int,
