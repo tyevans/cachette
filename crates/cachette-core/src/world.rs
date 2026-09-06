@@ -800,6 +800,23 @@ pub struct World {
     ///
     /// [^1]: ADR-0110, a unit returns by climbing a reach field seeded at every site of its faction, decision D1. `docs/adrs/draft/adr-0110-a-unit-returns-by-climbing-a-reach-field.md`
     returns: ReturnField,
+    /// The direction of the nearest site tile of a faction, for each tile of
+    /// a seeded block and each faction plane.
+    ///
+    /// **The return field above steers a laden unit to the cell that holds a
+    /// site, and no further.** A delivery reads the tile the unit stands on,
+    /// so a carrier that reached the cell has delivered nothing. This field
+    /// resolves that last cell at the pitch of one tile.[^1] [^2]
+    ///
+    /// It is the same mechanism the destination planes use, keyed on the
+    /// faction instead of the destination. It is seeded from the same set as
+    /// the return field, so it answers wherever the return field led.[^2]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0110, a unit returns by climbing a reach field seeded at every site of its faction, decision D1. `docs/adrs/draft/adr-0110-a-unit-returns-by-climbing-a-reach-field.md`
+    /// [^2]: Findings register, FND-315. `docs/FINDINGS.md`
+    home_approaches: ApproachField,
     /// The direction of the nearest tile of a named destination, for each
     /// level 1 cell and each destination plane.
     ///
@@ -1570,6 +1587,7 @@ impl World {
             pyramid: Pyramid::new(layout, ResourceField::new(terrain))?,
             exits: ExitField::new(cell_lattice),
             returns: ReturnField::new(cell_lattice, config.faction_count),
+            home_approaches: ApproachField::new(layout),
             destinations: SeededField::new(cell_lattice, config.destination_plane_count()),
             approaches: ApproachField::new(layout),
             destination_seeds: vec![Vec::new(); config.destination_plane_count() as usize],
@@ -5425,6 +5443,8 @@ impl World {
                     layout: self.pyramid.layout(),
                     exits: &self.exits,
                     approaches: &self.approaches,
+                    home_approaches: &self.home_approaches,
+                    site_tiles: self.settlements.tile_column(),
                     returns: &self.returns,
                     destinations: &self.destinations,
                 },
@@ -7476,9 +7496,54 @@ impl World {
             threads,
         )?;
         self.exits.derive(&self.pyramid);
-        self.returns.derive(&self.pyramid, &self.site_seeds());
+        self.derive_return_fields();
         self.derive_destination_fields();
         Ok(())
+    }
+
+    /// Derives the coarse and the fine field that steer a unit home.
+    ///
+    /// **This is the one place that derives either of them.** Both come from
+    /// the live sites, and a path that wrote one without the other would
+    /// leave a stale value that nothing fails on.[^1] [^2]
+    ///
+    /// # References
+    ///
+    /// [^1]: Findings register, FND-029. `docs/FINDINGS.md`
+    /// [^2]: Recurring defect shapes, shape 1. `.agents/rules/recurring-defects.md`
+    fn derive_return_fields(&mut self) {
+        self.returns.derive(&self.pyramid, &self.site_seeds());
+        // **No return plane conducts across water**, so every plane takes the
+        // land crossing. The empty slice is how the approach field states
+        // that, in the way the return field states it to the coarse
+        // derivation.[^3]
+        //
+        // [^3]: ADR-0091, movement takes its direction from a per-cell field, never from a per-unit search, decision D5. `docs/adrs/draft/adr-0091-movement-takes-its-direction-from-a-per-cell-field.md`
+        self.home_approaches
+            .derive(self.terrain, &self.site_seed_tiles(), &[]);
+    }
+
+    /// Returns one seed for each live site, as a faction plane and the tile
+    /// that holds the site.
+    ///
+    /// The walk is over the settlement slots in ascending order, so the set
+    /// does not depend on a thread count.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
+    fn site_seed_tiles(&self) -> Vec<(u16, TileIdx)> {
+        let live = self.settlements.live_column();
+        let tiles = self.settlements.tile_column();
+        let factions = self.settlements.faction_column();
+        let mut seeds = Vec::new();
+        for (slot, alive) in live.iter().enumerate() {
+            if *alive == 0 {
+                continue;
+            }
+            seeds.push((factions[slot].0, tiles[slot]));
+        }
+        seeds
     }
 
     /// Returns one seed for each live site, as a faction and the level 1 cell
@@ -11580,6 +11645,25 @@ struct Steering<'a> {
     ///
     /// [^4]: Findings register, FND-315. `docs/FINDINGS.md`
     approaches: &'a ApproachField,
+    /// One direction for each faction plane and each tile of a block that
+    /// holds a site of that faction.
+    ///
+    /// **The return field steers a laden unit to the cell that holds a site
+    /// and no further**, and a delivery reads the tile. This one resolves
+    /// that last cell at the pitch of one tile. It is the same mechanism as
+    /// the approach field above, keyed on the faction.[^4]
+    home_approaches: &'a ApproachField,
+    /// The tile of every settlement slot.
+    ///
+    /// **A unit stops on the tile of its own home and on no other.** The
+    /// field above is seeded at every site of the faction, in the way the
+    /// return field is, so its seed offset says only that the unit stands on
+    /// some site of its faction. A unit that stopped on a site that is not
+    /// its home would hold its load for ever, because a delivery reads the
+    /// home tile.[^5]
+    ///
+    /// [^5]: ADR-0062, production and upkeep are rates attached to a site, decision D2. `docs/adrs/accepted/adr-0062-production-and-upkeep-are-rates-attached-to-a-site.md`
+    site_tiles: &'a [TileIdx],
 }
 
 /// What the movement pass reads to answer whether a unit is building here.
@@ -11623,6 +11707,8 @@ fn soldier_moves(
         returns,
         destinations,
         approaches,
+        home_approaches,
+        site_tiles,
     } = *steering;
     // **The walk is in cell order, not in slot order.** The two hold the same
     // units and differ only in the order. Every read below the filter is a
@@ -11775,6 +11861,38 @@ fn soldier_moves(
                         if approach == Some(AT_SEED) {
                             return None;
                         }
+                        // **The homeward leg reads the same mechanism, keyed
+                        // on the faction.** The return field holds one
+                        // direction for a block of tiles, so it says nothing
+                        // once a laden unit is inside the block that holds a
+                        // site, and the unit fell back to the keyed draw. A
+                        // delivery reads the tile the unit stands on, so a
+                        // carrier that reached the cell delivered nothing,
+                        // which is the defect the sent unit had.[^25]
+                        let homeward = match (sent, option) {
+                            (None, Some(option))
+                                if matches!(OPTIONS[option as usize].ranked, Ranked::Carry) =>
+                            {
+                                home_approaches
+                                    .offset(soldiers.faction(*soldier)?.0, soldiers.tile(*soldier)?)
+                            }
+                            _ => None,
+                        };
+                        // **The unit stops on the tile of its own home and on
+                        // no other.** The field is seeded at every site of
+                        // the faction, so the seed offset says only that the
+                        // unit stands on some site of its faction. A unit
+                        // that stopped on a site that is not its home would
+                        // hold its load for ever. Such a unit keeps the
+                        // answer it had before this field existed.
+                        if homeward == Some(AT_SEED) {
+                            let home = soldiers.home(*soldier)?;
+                            let at_home = home.and_then(|slot| site_tiles.get(slot as usize))
+                                == Some(&soldiers.tile(*soldier)?);
+                            if at_home {
+                                return None;
+                            }
+                        }
                         let steer = match (sent, option) {
                             // **The destination plane wins over the option
                             // row.** A caller that sends a unit somewhere has
@@ -11793,9 +11911,19 @@ fn soldier_moves(
                             },
                             (None, Some(option)) => match OPTIONS[option as usize].ranked {
                                 Ranked::Cell(_) => exits.exit(cell, option),
-                                Ranked::Carry => {
-                                    returns.direction(soldiers.faction(*soldier)?, cell)
-                                }
+                                // **The fine field wins over the coarse
+                                // one**, in the way it does for a sent unit.
+                                // A unit outside every seeded block reads no
+                                // fine entry and takes the coarse answer.
+                                // The seed offset falls through to the coarse
+                                // answer too, because the unit that reached
+                                // its own home already left the walk.[^25]
+                                Ranked::Carry => match homeward {
+                                    Some(direction) if direction != AT_SEED => {
+                                        Some(Some(direction))
+                                    }
+                                    _ => returns.direction(soldiers.faction(*soldier)?, cell),
+                                },
                             },
                             // A unit that holds no intent and no destination
                             // left the walk at the filter above.

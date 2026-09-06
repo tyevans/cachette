@@ -355,7 +355,8 @@ pub const fn sine(phase: i64, period: i64) -> Option<Fix32> {
     // The position in the turn, in table steps with a fixed-point tail. The
     // product is 128 bits wide, so a long period costs no accuracy.
     let fine = 1i64 << FIX_FRACTIONAL_BITS;
-    let scaled = ((turned as i128) * (SINE_STEPS as i128) * (fine as i128) / (period as i128)) as i64;
+    let scaled =
+        ((turned as i128) * (SINE_STEPS as i128) * (fine as i128) / (period as i128)) as i64;
     let step = scaled >> FIX_FRACTIONAL_BITS;
     let part = scaled - (step << FIX_FRACTIONAL_BITS);
     let low = sine_at_step(step) as i64;

@@ -42,7 +42,8 @@ fn circulation(world: &World) -> Vec<i64> {
             // round, so the circulation is the wind there along that step.
             let tangent = NEIGHBOURS[(direction + 2) % NEIGHBOUR_COUNT];
             let there = wind[at.0 as usize];
-            sum += i64::from(there.q) * i64::from(tangent.q) + i64::from(there.r) * i64::from(tangent.r);
+            sum += i64::from(there.q) * i64::from(tangent.q)
+                + i64::from(there.r) * i64::from(tangent.r);
         }
         *slot = sum;
     }
@@ -155,7 +156,10 @@ fn main() {
             "  air total {air_total}, high {air_high}, cells with any {air_cells} of {}, over 64 {air_over_64}, over 256 {air_over_256}",
             air.len()
         );
-        println!("  fastest wind {fastest}, still cells {still} of {}", wind.len());
+        println!(
+            "  fastest wind {fastest}, still cells {still} of {}",
+            wind.len()
+        );
         println!(
             "  circulation: median {} p90 {} p99 {} strongest {strongest}, turning {turning}, cyclonic {cyclonic}",
             at(50),
@@ -167,7 +171,11 @@ fn main() {
             air_at(50),
             air_at(90),
             air_at(99),
-            if air_sorted.is_empty() { 0 } else { air_sorted[air_sorted.len() * 999 / 1000] }
+            if air_sorted.is_empty() {
+                0
+            } else {
+                air_sorted[air_sorted.len() * 999 / 1000]
+            }
         );
 
         // The modal wind heading of each column and of each row. A watcher
