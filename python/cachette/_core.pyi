@@ -479,6 +479,10 @@ class FrameReading(TypedDict):
     crowd_worst: int
     centre: tuple[int, int]
     extent_shown: tuple[int, int]
+    # The ticks each frame runs, in thousandths, and the word the frame
+    # stated for it. Zero is paused.
+    speed_milli: int
+    speed_says: str
     step_mean_micros: float
     draw_mean_micros: float
     ticks_each_second: float
@@ -788,6 +792,8 @@ class World:
         panel: bool = ...,
         panels: Sequence[str] | None = ...,
         pointer: tuple[int, int] | None = ...,
+        phase: float = ...,
+        speed_milli: int = ...,
     ) -> FrameReading: ...
     @staticmethod
     def panel_names() -> list[str]: ...

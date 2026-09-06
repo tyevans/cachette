@@ -28,7 +28,9 @@ use cachette_core::{
     World as CoreWorld, WorldConfig,
 };
 use cachette_view::panel::Set as PanelSet;
-use cachette_view::{fill_frame, Camera, FrameSize, Lap, Metrics, Overlay, Surface};
+use cachette_view::{
+    fill_frame_paced, Camera, FrameSize, Lap, Metrics, Motion, Overlay, Pace, Surface,
+};
 use numpy::{PyArray1, PyReadwriteArray1, ToPyArray};
 use pyo3::create_exception;
 use pyo3::exceptions::PyException;
@@ -264,6 +266,21 @@ struct Presenter {
     metrics: Metrics,
     /// The founding report the caller kept when it founded the run.
     outcomes: Vec<FoundingOutcome>,
+    /// Where each painted unit stood on the last frame.
+    ///
+    /// **The world holds none of this.** A viewer that draws a unit between
+    /// two tiles must remember the first of them, because the world holds one
+    /// tick at a time, and that memory belongs to the caller.[^1] The binding
+    /// is the caller here.
+    ///
+    /// The table holds an entry for a unit painted on the last frame and for
+    /// no other unit, and the frame bounds it by its own pixels. A frame
+    /// cannot show more units than it has pixels.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0067, the viewer reads the world and never writes to it, decision D2. `docs/adrs/accepted/adr-0067-the-viewer-reads-the-world-and-never-writes-to-it.md`
+    motion: Motion,
 }
 
 #[pymethods]
@@ -300,6 +317,10 @@ impl PyWorld {
             presenter: std::sync::Mutex::new(Presenter {
                 metrics: Metrics::start(),
                 outcomes: Vec::new(),
+                // The first frame sizes the table from its own pixels. A
+                // table that records nothing tweens nothing, which is what a
+                // caller that never draws wants.
+                motion: Motion::none(),
             }),
         })
     }
@@ -3321,6 +3342,23 @@ impl PyWorld {
     /// inspector panel of the deck reads that tile. It applies only when
     /// `panels` names a deck.
     ///
+    /// Set `phase` to the share of the current tick that has elapsed on the
+    /// wall clock, from zero up to one. A unit that moved to a neighbouring
+    /// tile since the last frame then draws between the two tile centres at
+    /// that share. A unit new to the frame, and a unit that jumped further
+    /// than a neighbouring tile, draws at its tile. A phase of zero draws
+    /// every unit at its tile, and that is the default.
+    ///
+    /// Set `speed_milli` to the ticks each frame runs, in thousandths. Zero
+    /// means paused. The frame states the speed as a word beside the tick,
+    /// and the viewer holds the words, so the caller sends no text.[^5]
+    ///
+    /// **The engine keeps the table of where each unit was, and the world
+    /// does not.** The world holds one tick at a time, so a frame drawn
+    /// between two ticks needs a record of the first. The binding keeps that
+    /// record beside the timing it already keeps, bounded by the pixels of
+    /// the frame.[^6]
+    ///
     /// Returns a `dict` of what the drawing pass read.[^3] A caller reports
     /// the numbers the picture was made from, and starts no second pass to
     /// find them.
@@ -3329,7 +3367,8 @@ impl PyWorld {
     /// be `None`. `newest_character` is a pair of integers, or `None`.
     /// `centre` and `extent_shown` are pairs of integers. `carried_by_kind`
     /// is a list of one count for each resource kind. The three trailing
-    /// entries are floating point numbers.
+    /// entries are floating point numbers. `speed_says` is the word the
+    /// frame stated for the speed.
     ///
     /// **The three floating point entries measure this machine and not the
     /// simulation.** `step_mean_micros` and `draw_mean_micros` are mean
@@ -3364,10 +3403,21 @@ impl PyWorld {
     /// [^2]: ADR-0094, the caller owns the camera and the pixels, decision D1. `docs/adrs/draft/adr-0094-the-caller-owns-the-camera-and-the-pixels.md`
     /// [^3]: ADR-0070, the head-up display reports what the drawing pass read, decision D1. `docs/adrs/accepted/adr-0070-the-head-up-display-reports-what-the-drawing-pass-read.md`
     /// [^4]: ADR-0094, the caller owns the camera and the pixels, decision D6. `docs/adrs/draft/adr-0094-the-caller-owns-the-camera-and-the-pixels.md`
+    /// [^5]: ADR-0094, the caller owns the camera and the pixels, decision D5. `docs/adrs/draft/adr-0094-the-caller-owns-the-camera-and-the-pixels.md`
+    /// [^6]: ADR-0067, the viewer reads the world and never writes to it, decision D2. `docs/adrs/accepted/adr-0067-the-viewer-reads-the-world-and-never-writes-to-it.md`
     // The arguments are the interface a Python caller types by name, so
     // bundling them would hide the contract rather than simplify it.
+    //
+    // The phase is a float, and the lint that bans the float types protects
+    // simulated state. This value is a viewer value: it reaches the drawing,
+    // it moves a unit between two tile centres, and no value formed from it
+    // returns to the engine. The record that bans the type allows it
+    // there.[^7]
+    //
+    // [^7]: ADR-0067, the viewer reads the world and never writes to it, decision D3. `docs/adrs/accepted/adr-0067-the-viewer-reads-the-world-and-never-writes-to-it.md`
+    #[allow(clippy::disallowed_types)]
     #[allow(clippy::too_many_arguments)]
-    #[pyo3(signature = (camera, width, height, pixels, reference = false, panel = false, panels = None, pointer = None))]
+    #[pyo3(signature = (camera, width, height, pixels, reference = false, panel = false, panels = None, pointer = None, phase = 0.0, speed_milli = 1000))]
     fn draw<'py>(
         &self,
         python: Python<'py>,
@@ -3379,6 +3429,8 @@ impl PyWorld {
         panel: bool,
         panels: Option<Vec<String>>,
         pointer: Option<(i32, i32)>,
+        phase: f32,
+        speed_milli: u32,
     ) -> PyResult<Bound<'py, PyDict>> {
         let mut pixels = pixels;
         let buffer = pixels.as_slice_mut().map_err(|_| {
@@ -3423,13 +3475,27 @@ impl PyWorld {
         let at = Lap::start();
         let readout = {
             let world = self.lock();
-            let presenter = self.presenter();
-            fill_frame(
+            let mut presenter = self.presenter();
+            // The table is bounded by the pixels of the frame, so it follows
+            // the window and never the population. A frame of a new size gets
+            // a table of that size, and the units of the frame before it draw
+            // at their tiles once.
+            if presenter.motion.bound() != width.saturating_mul(height) {
+                presenter.motion = Motion::for_frame(width, height);
+            }
+            let Presenter {
+                metrics,
+                outcomes,
+                motion,
+            } = &mut *presenter;
+            fill_frame_paced(
                 &world,
                 camera.inner,
-                &presenter.metrics,
-                &presenter.outcomes,
+                metrics,
+                outcomes,
                 overlay,
+                Pace::new(phase, speed_milli),
+                motion,
                 surface,
             )
             .map_err(|error| FrameError::new_err(error.to_string()))?
@@ -3488,6 +3554,11 @@ impl PyWorld {
         report.set_item("centre", (centre.q, centre.r))?;
         let (columns, rows) = readout.extent_shown();
         report.set_item("extent_shown", (columns, rows))?;
+        // The speed the caller stated, and the word the viewer renders from
+        // it. The engine holds no clock, so both come back from the number
+        // the caller sent.
+        report.set_item("speed_milli", readout.speed_milli())?;
+        report.set_item("speed_says", readout.speed_word())?;
         report.set_item("step_mean_micros", readout.step_mean())?;
         report.set_item("draw_mean_micros", readout.draw_mean())?;
         report.set_item("ticks_each_second", readout.rate())?;

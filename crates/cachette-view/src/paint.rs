@@ -53,6 +53,7 @@ use cachette_core::upgrade::{UpgradeSite, UPGRADE_KIND_COUNT};
 use cachette_core::{Axial, BridgeError, Entity, FactionId, Holder, World};
 
 use crate::text;
+use crate::tween::{between, Motion, Pace};
 
 /// The colour each kind of upgrade tints its tile with, by kind ordinal.
 ///
@@ -1516,6 +1517,43 @@ pub fn kind_colour(kind: TileKind) -> u32 {
 /// [^7]: ADR-0140, weather is a field over the level 1 cell lattice, decision D1. `docs/adrs/draft/adr-0140-weather-is-a-field-over-the-level-1-cell-lattice.md`
 /// [^8]: ADR-0090, a tile upgrade is stored sparsely, as the difference from the generated world, decision D1. `docs/adrs/draft/adr-0090-a-tile-upgrade-is-stored-sparsely.md`
 pub fn draw(world: &World, camera: Camera, canvas: &mut Canvas) -> Result<(), BridgeError> {
+    let mut motion = Motion::none();
+    draw_paced(world, camera, canvas, Pace::STILL, &mut motion)
+}
+
+/// Draws the world onto the canvas, at a pace the caller sets.
+///
+/// **This is the one drawing pass.** The call above is this call at a still
+/// pace, so there is one renderer and not two.[^9]
+///
+/// The pace says how far the wall clock is through the current tick. A unit
+/// that moved to a neighbouring tile since the table last saw it draws
+/// between the two tile centres at that share. A unit the table does not
+/// hold, and a unit that jumped further than the reach, draws at its tile.
+///
+/// The table is the caller's memory of the last frame. The world holds one
+/// tick at a time, so the memory cannot be the engine's.[^10]
+///
+/// **The order in which units are painted does not change.** The pass visits
+/// the same blocks and the same units in the same order, and the table is
+/// read by key and never iterated.
+///
+/// # Errors
+///
+/// Returns an error when the engine's spatial structure no longer describes
+/// its soldiers.
+///
+/// # References
+///
+/// [^9]: ADR-0094, the caller owns the camera and the pixels, decision D5. `docs/adrs/draft/adr-0094-the-caller-owns-the-camera-and-the-pixels.md`
+/// [^10]: ADR-0067, the viewer reads the world and never writes to it, decision D2. `docs/adrs/accepted/adr-0067-the-viewer-reads-the-world-and-never-writes-to-it.md`
+pub fn draw_paced(
+    world: &World,
+    camera: Camera,
+    canvas: &mut Canvas,
+    pace: Pace,
+    motion: &mut Motion,
+) -> Result<(), BridgeError> {
     canvas.clear();
     let grid = world.grid();
     // The ground is a pure function of the seed and the address, so the
@@ -1641,7 +1679,14 @@ pub fn draw(world: &World, camera: Camera, canvas: &mut Canvas) -> Result<(), Br
     }
 
     let radius = ((camera.tile_width * 0.3) as i32).max(1);
-    draw_soldiers(world, camera, canvas, radius, first_row, last_row)
+    // The table opens before the pass that paints and closes after it, so a
+    // unit the pass did not paint is gone from it when the frame ends.
+    motion.begin();
+    let painted = draw_soldiers(
+        world, camera, canvas, radius, first_row, last_row, pace, motion,
+    );
+    motion.end();
+    painted
 }
 
 /// Marks each place that a faction founded.
@@ -1894,6 +1939,7 @@ pub fn tile_rect(camera: Camera, address: Axial) -> (i32, i32, i32, i32) {
 /// [^2]: ADR-0018, the unit-to-tile bridge is derived, and it rebuilds at the barrier, decision D5. `docs/adrs/accepted/adr-0018-the-unit-to-tile-bridge-is-derived-and-rebuilds-at-the-barrier.md`
 /// [^3]: PRD-0002, a developer watches the world run. `docs/product/shipped/prd-0002-a-developer-watches-the-world-run.md`
 /// [^4]: Recurring Defect Shapes, shape 1. `.claude/rules/recurring-defects.md`
+#[allow(clippy::too_many_arguments)]
 fn draw_soldiers(
     world: &World,
     camera: Camera,
@@ -1901,6 +1947,8 @@ fn draw_soldiers(
     radius: i32,
     first_row: u32,
     last_row: u32,
+    pace: Pace,
+    motion: &mut Motion,
 ) -> Result<(), BridgeError> {
     let arena = world.soldiers();
     let bridge = world.bridge();
@@ -1969,6 +2017,21 @@ fn draw_soldiers(
                 if !canvas.holds(x, y, radius) {
                     continue;
                 }
+                // Where this unit is drawn. A unit that moved to a
+                // neighbouring tile since the last frame draws between the
+                // two tile centres, and every other unit draws at its tile.
+                // The table is the viewer's memory, because the world holds
+                // one tick at a time.[^13]
+                //
+                // The visibility test above reads the tile centre, so the
+                // tween changes what is drawn and never which units are
+                // visited, nor the order they are visited in.
+                //
+                // [^13]: ADR-0067, the viewer reads the world and never writes to it, decision D2. `docs/adrs/accepted/adr-0067-the-viewer-reads-the-world-and-never-writes-to-it.md`
+                let (x, y) = match motion.place(*soldier, address, pace.phase) {
+                    Some(from) => between(camera.centre_of(from), (x, y), pace.phase),
+                    None => (x, y),
+                };
                 let slot = colour_slot(faction);
                 canvas.fill_disc(x as i32, y as i32, radius, FACTION_COLOURS[slot]);
                 canvas.soldiers_painted += 1;

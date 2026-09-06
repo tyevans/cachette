@@ -29,6 +29,7 @@ use crate::glass::Overlay;
 use crate::hud::Readout;
 use crate::metrics::Metrics;
 use crate::paint::{Camera, Canvas};
+use crate::tween::{Motion, Pace};
 
 /// The smallest tile size a frame will draw, in pixels on a side.
 ///
@@ -216,6 +217,55 @@ pub fn fill_frame(
     overlay: Overlay,
     surface: Surface<'_>,
 ) -> Result<Readout, FrameError> {
+    let mut motion = Motion::none();
+    fill_frame_paced(
+        world,
+        camera,
+        metrics,
+        outcomes,
+        overlay,
+        Pace::STILL,
+        &mut motion,
+        surface,
+    )
+}
+
+/// Fills a caller's pixels with one frame, at a pace the caller sets.
+///
+/// **This is the one frame command.** The call above is this call at a still
+/// pace, so there is one renderer and not two.[^4]
+///
+/// The pace carries the share of the current tick that has elapsed and the
+/// ticks each frame runs. The first moves a unit that changed tile between
+/// the two tile centres. The second reaches the overlay as a number, and the
+/// viewer renders the word, so the caller sends no text.[^4]
+///
+/// The table is the caller's memory of where each painted unit stood on the
+/// last frame. It holds an entry for a unit painted on the last frame and
+/// for no other unit, and the frame command bounds it by the pixels of the
+/// frame. The engine keeps no copy of it.[^5]
+///
+/// # Errors
+///
+/// Returns `ScaleBelowLattice` when the camera draws a tile smaller than one
+/// pixel. Returns `Bridge` when the engine's spatial structure no longer
+/// describes its units.
+///
+/// # References
+///
+/// [^4]: ADR-0094, the caller owns the camera and the pixels, decision D5. `docs/adrs/draft/adr-0094-the-caller-owns-the-camera-and-the-pixels.md`
+/// [^5]: ADR-0067, the viewer reads the world and never writes to it, decision D2. `docs/adrs/accepted/adr-0067-the-viewer-reads-the-world-and-never-writes-to-it.md`
+#[allow(clippy::too_many_arguments)]
+pub fn fill_frame_paced(
+    world: &World,
+    camera: Camera,
+    metrics: &Metrics,
+    outcomes: &[FoundingOutcome],
+    overlay: Overlay,
+    pace: Pace,
+    motion: &mut Motion,
+    surface: Surface<'_>,
+) -> Result<Readout, FrameError> {
     // The cost of a frame follows the pixels in the surface. The scale check
     // runs before any pass over the world, so a refused frame reads no tile.
     if camera.tile_width < LATTICE_BOUND || camera.tile_height < LATTICE_BOUND {
@@ -227,6 +277,15 @@ pub fn fill_frame(
 
     let (width, height) = (surface.width, surface.height);
     let mut canvas = Canvas::borrowing(surface.pixels, width, height);
-    crate::draw_frame(world, camera, metrics, outcomes, overlay, &mut canvas)
-        .map_err(FrameError::Bridge)
+    crate::draw_frame_paced(
+        world,
+        camera,
+        metrics,
+        outcomes,
+        overlay,
+        pace,
+        motion,
+        &mut canvas,
+    )
+    .map_err(FrameError::Bridge)
 }

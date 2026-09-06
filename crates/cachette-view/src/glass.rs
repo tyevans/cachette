@@ -547,6 +547,12 @@ fn character_card(readout: &Readout) -> Card {
 fn world_card(readout: &Readout) -> Card {
     let mut rows = vec![
         Row::new("tick", grouped(readout.tick())),
+        // The speed changes when the watcher changes it, and it sits beside
+        // the tick, which changes on every frame that runs one. A watcher who
+        // slows the world can otherwise not see that the world slowed.[^2]
+        //
+        // [^2]: ADR-0093, the window shows what changes, decision D1. `docs/adrs/draft/adr-0093-the-window-shows-what-changes.md`
+        Row::new("speed", readout.speed_word()),
         Row::new(
             "people in world",
             grouped(u64::from(readout.soldiers_live())),

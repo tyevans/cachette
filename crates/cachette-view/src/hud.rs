@@ -42,6 +42,7 @@ use cachette_core::{
 use crate::metrics::Metrics;
 use crate::paint::{faction_colour, kind_colour, Camera, Canvas, Focus, COLOURED_FACTIONS};
 use crate::text;
+use crate::tween::{speed_word, ONE_TICK_EACH_FRAME};
 
 // The panel geometry and the panel colours are declared once, in the panel
 // standard. This module reads them from there. A second copy of the width or
@@ -593,6 +594,17 @@ fn shows(address: Axial, world: &World, camera: Camera, canvas: &Canvas) -> bool
 #[derive(Clone, Debug)]
 pub struct Readout {
     tick: u64,
+    /// The ticks each frame runs, in thousandths. Zero means paused.
+    ///
+    /// **This is the caller's number and not the engine's.** The engine holds
+    /// no clock and no speed, so the caller states it on the frame command and
+    /// the viewer renders the word.[^1] [^2]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0067, the viewer reads the world and never writes to it, decision D2. `docs/adrs/accepted/adr-0067-the-viewer-reads-the-world-and-never-writes-to-it.md`
+    /// [^2]: ADR-0094, the caller owns the camera and the pixels, decision D5. `docs/adrs/draft/adr-0094-the-caller-owns-the-camera-and-the-pixels.md`
+    speed_milli: u32,
     world_width: u32,
     world_height: u32,
     factions: u16,
@@ -680,6 +692,9 @@ impl Readout {
             // keeps no copy of its own, because two counters for one number
             // is one fact in two places.
             tick: world.tick().0,
+            // A caller that says nothing runs one tick for each frame, which
+            // is what every caller did before the speed existed.
+            speed_milli: ONE_TICK_EACH_FRAME,
             world_width: grid.width(),
             world_height: grid.height(),
             factions: world.config().faction_count,
@@ -936,6 +951,35 @@ impl Readout {
     /// # References
     ///
     /// [^1]: ADR-0070, the head-up display reports what the drawing pass read, decision D1. `docs/adrs/accepted/adr-0070-the-head-up-display-reports-what-the-drawing-pass-read.md`
+    /// Returns the reading with the speed the caller stated.
+    ///
+    /// The speed is in thousandths of a tick for each frame, and zero means
+    /// paused. A caller that says nothing runs one tick for each frame.
+    #[must_use]
+    pub const fn at_speed(mut self, speed_milli: u32) -> Self {
+        self.speed_milli = speed_milli;
+        self
+    }
+
+    /// Returns the ticks each frame runs, in thousandths.
+    #[must_use]
+    pub const fn speed_milli(&self) -> u32 {
+        self.speed_milli
+    }
+
+    /// Returns the speed as the word the window shows.
+    ///
+    /// The viewer holds the words. The caller sends a number, so no text
+    /// crosses the boundary.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0094, the caller owns the camera and the pixels, decision D5. `docs/adrs/draft/adr-0094-the-caller-owns-the-camera-and-the-pixels.md`
+    #[must_use]
+    pub fn speed_word(&self) -> String {
+        speed_word(self.speed_milli)
+    }
+
     #[must_use]
     pub fn sites(&self) -> &[SiteReadout] {
         &self.sites
@@ -1345,6 +1389,7 @@ impl Readout {
             Line::Rule,
             Line::Heading("WORLD"),
             Line::Row("tick", grouped(self.tick)),
+            Line::Row("speed", self.speed_word()),
             Line::Row(
                 "extent",
                 format!("{} x {} tiles", self.world_width, self.world_height),
