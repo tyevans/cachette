@@ -50,6 +50,17 @@ fn demonstration() -> World {
 /// there so that a change which slows the loop still fails rather than flaps.
 const TICKS: u64 = 300;
 
+/// The ticks on which the reading of the return field may be attempted.
+///
+/// The controller sends the idle units of a faction to its projects, and it
+/// may send every unit the fixture freed on the tick the fixture reads. The
+/// count bounds a draw and it is not a budget.[^1]
+///
+/// # References
+///
+/// [^1]: Decision Record Scope, section 4.1. `.agents/rules/adr-scope.md`
+const ATTEMPTS: usize = 16;
+
 /// **The engine reaches the delivery, and this is the test that says so.**
 ///
 /// The pass had tests of its own and they passed, because they built the case
@@ -290,60 +301,87 @@ fn the_step_of_a_laden_unit_follows_the_return_field() {
         world.step(2).expect("the step runs");
     }
     let grid = world.grid();
-    // The units this test is about, with the tile each of them must reach.
-    let mut expected: Vec<(cachette_core::types::Entity, Axial, Axial)> = Vec::new();
-    for unit in world.soldiers().iter() {
-        if world.soldier_intent(unit) != Some(Some(DELIVER)) {
+    let mut measured = false;
+    let mut read = 0usize;
+    // **The controller may send every unit the fixture freed on the very next
+    // tick, and then the reading is empty.** The controller chooses one
+    // command for each faction from a keyed draw, so which tick sends whom is
+    // a property of the world and not of the field this test is about.[^5]
+    // The attempt therefore repeats on the next tick, and the assertions
+    // inside it are unchanged. The bound is a bound on a draw and not a
+    // budget.[^6]
+    //
+    // [^5]: ADR-0144, a faction controller runs inside the step and acts only through the caller's verbs, decision D3. `docs/adrs/accepted/adr-0144-a-faction-controller-runs-inside-the-step-and-acts-only-through-the-callers-verbs.md`
+    // [^6]: Decision Record Scope, section 4.1. `.agents/rules/adr-scope.md`
+    for _ in 0..ATTEMPTS {
+        // The units this test is about, with the tile each of them must reach.
+        let mut expected: Vec<(cachette_core::types::Entity, Axial, Axial)> = Vec::new();
+        for unit in world.soldiers().iter() {
+            if world.soldier_intent(unit) != Some(Some(DELIVER)) {
+                continue;
+            }
+            let Some(here) = world.soldiers().address(unit) else {
+                continue;
+            };
+            let Some(faction) = world.soldiers().faction(unit) else {
+                continue;
+            };
+            let Some(Some(direction)) = world.return_direction(faction, here) else {
+                continue;
+            };
+            let Some(there) = grid.neighbour(here, direction as usize) else {
+                continue;
+            };
+            if !world.admits_a_unit(there) {
+                continue;
+            }
+            expected.push((unit, here, there));
+        }
+        if expected.is_empty() {
+            world.step(2).expect("the step runs");
             continue;
         }
-        let Some(here) = world.soldiers().address(unit) else {
-            continue;
-        };
-        let Some(faction) = world.soldiers().faction(unit) else {
-            continue;
-        };
-        let Some(Some(direction)) = world.return_direction(faction, here) else {
-            continue;
-        };
-        let Some(there) = grid.neighbour(here, direction as usize) else {
-            continue;
-        };
-        if !world.admits_a_unit(there) {
-            continue;
+        measured = true;
+        // **A sent unit is steered by its destination plane and not by the
+        // return field.** The move pass reads the plane first and takes the
+        // option row only when the unit is free, so a unit the controller
+        // sent is no evidence about the return field at all.[^3] Every laden
+        // unit of this world is on the plane of its own faction, so the
+        // fixture frees the ones it measures and drops any that the step
+        // sends again.[^4]
+        //
+        // A unit that stands on the work its own build order names does not
+        // move at all, and it is no evidence about the field either.[^7]
+        //
+        // [^3]: ADR-0125, the control plane names the seed set of a destination field, decision D3. `docs/adrs/draft/adr-0125-the-control-plane-names-the-seed-set-of-a-destination-field.md`
+        // [^4]: Findings register, FND-496. `docs/FINDINGS.md`
+        // [^7]: ADR-0165, a build order holds a unit on its tile, and the hold is derived and never stored, decision D1. `docs/adrs/draft/adr-0165-a-build-order-holds-a-unit-on-its-tile.md`
+        let freed: Vec<cachette_core::types::Entity> =
+            expected.iter().map(|(unit, _, _)| *unit).collect();
+        world.stop_sending(&freed).expect("every identity is live");
+        world.step(2).expect("the step runs");
+        for (unit, here, there) in expected {
+            if world.soldiers().sent(unit) != Some(None) {
+                continue;
+            }
+            read += 1;
+            let now = world.soldiers().address(unit).expect("the unit is alive");
+            assert!(
+                now == there || now == here,
+                "a laden unit was sent to {there:?} from {here:?} and it is at {now:?}"
+            );
         }
-        expected.push((unit, here, there));
+        if read > 0 {
+            break;
+        }
     }
     assert!(
-        !expected.is_empty(),
+        measured,
         "the fixture found no laden unit that the field steers, so it measures nothing"
     );
-    // **A sent unit is steered by its destination plane and not by the return
-    // field.** The move pass reads the plane first and takes the option row
-    // only when the unit is free, so a unit the controller sent is no
-    // evidence about the return field at all.[^3] Every laden unit of this
-    // world is on the plane of its own faction, so the fixture frees the ones
-    // it measures and drops any that the step sends again.[^4]
-    //
-    // [^3]: ADR-0125, the control plane names the seed set of a destination field, decision D3. `docs/adrs/draft/adr-0125-the-control-plane-names-the-seed-set-of-a-destination-field.md`
-    // [^4]: Findings register, FND-496. `docs/FINDINGS.md`
-    let freed: Vec<cachette_core::types::Entity> =
-        expected.iter().map(|(unit, _, _)| *unit).collect();
-    world.stop_sending(&freed).expect("every identity is live");
-    world.step(2).expect("the step runs");
-    let mut read = 0usize;
-    for (unit, here, there) in expected {
-        if world.soldiers().sent(unit) != Some(None) {
-            continue;
-        }
-        read += 1;
-        let now = world.soldiers().address(unit).expect("the unit is alive");
-        assert!(
-            now == there || now == here,
-            "a laden unit was sent to {there:?} from {here:?} and it is at {now:?}"
-        );
-    }
     assert!(
         read > 0,
-        "the step sent every unit the fixture freed, so the assertion read none"
+        "the step sent every unit the fixture freed on all {ATTEMPTS} attempts, \
+         so the assertion read none"
     );
 }

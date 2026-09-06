@@ -113,4 +113,4 @@ on its tile, and it names the questions a refiner answers first.[^8]
 [^5]: Findings register, FND-545. `docs/FINDINGS.md`
 [^6]: The seed sweep example. `crates/cachette-core/examples/seed_sweep.rs`
 [^7]: The tests of a playable seeded world. `crates/cachette-core/tests/a_seeded_world_is_playable.rs`
-[^8]: Backlog item 0505. `docs/backlog/proposed/0505-keep-a-builder-on-the-tile-it-builds-until-the-work-is-done.md`
+[^8]: Backlog item 0505. `docs/backlog/complete/0505-keep-a-builder-on-the-tile-it-builds-until-the-work-is-done.md`
