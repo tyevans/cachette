@@ -1822,6 +1822,42 @@ concluded, and it called that argument its weakest.
 
 ## Closed
 
+### DEC-272 — Does the world seeder always give a playable world, or may it refuse a seed?
+
+**Closed. Option B. The seeder may refuse, the refusal is a named and tested
+outcome, and the extent the demonstration uses never reaches it.**
+
+The demonstration draws a new seed on every run, so a seed that gives a world
+with nothing in it is a run a watcher learns nothing from.[^DEC272A] A seeded
+world is playable when every faction is seated, every seat stands on ground that
+admits a unit, the ground of a seat holds its group, and two seats keep the
+distance the rule asks.[^DEC272B]
+
+**Option A. The seeder gives a playable world by construction.** The placement
+search retries, or the world generator guarantees enough suitable ground.
+
+**Option B. The seeder may refuse a seed, and the caller draws again.** The
+refusal is typed, one outcome for each faction, and a test states it.
+
+**Why B.** Option A cannot be met. Two seats keep a fixed distance, and a world
+of side 16 holds no second place at that distance, whatever the search
+does.[^DEC272C] A search that widened its sample until it succeeded would be a
+pass over every tile with extra steps, and the founding record refuses
+it.[^DEC272D] A loop that redraws until it succeeds is a convergence test, and
+the solver record refuses one.[^FIXEDITER] A bounded retry would also be inert
+code, because the measurement found no seed at the demonstration extent that
+needs one.
+
+**What it costs.** A caller that asks for a small world gets a world that seats
+some of its factions or none of them, and the caller draws again or asks for a
+wider world. The engine does not draw for it.
+
+**What follows.** A sweep of 200 seeds of the demonstration world seated four
+factions of four at every seed, and the seating falls with the extent. The
+findings register holds the table, and three tests hold the
+statements.[^DEC272F] [^DEC272B] No retry loop exists anywhere in the seeding.
+
+
 ### DEC-250 — How does a Python caller learn how many unit types the world holds?
 
 **Closed. Option A. The caller reads the length of a column of the type table,
@@ -4423,3 +4459,8 @@ exactly so that a caller cannot build a wrong one.[^DEC120C]
 [^DEC238A]: ADR-0141, a weather pass moves water and never scales it, decision D2. `docs/adrs/draft/adr-0141-a-weather-pass-moves-water-and-never-scales-it.md`
 [^D143A]: ADR-0151, an upgrade is a category with a ground fit and a level, decisions D1 and D6. `docs/adrs/accepted/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
 [^D143B]: Backlog item 0486. `docs/backlog/complete/0486-turn-the-upgrade-kind-into-a-table-of-category-ground-fit-and-level.md`
+[^DEC272A]: The demonstration, which draws a seed when the watcher names none. `python/cachette/demo/app.py`
+[^DEC272B]: The tests of a playable seeded world. `crates/cachette-core/tests/a_seeded_world_is_playable.rs`
+[^DEC272C]: ADR-0076, a founding keeps a fixed distance from the foundings before it, decision D1. `docs/adrs/accepted/adr-0076-a-founding-keeps-a-fixed-distance-from-the-foundings-before-it.md`
+[^DEC272D]: ADR-0075, the founding choice reads a bounded sample of the world, decision D1. `docs/adrs/accepted/adr-0075-the-founding-choice-reads-a-bounded-sample-of-the-world.md`
+[^DEC272F]: Findings register, FND-544. `docs/FINDINGS.md`
