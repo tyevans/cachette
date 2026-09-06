@@ -263,6 +263,13 @@ fn the_presence_relation_stops_calling_a_convert_a_foreigner() {
         .set_choice_schedule(0)
         .expect("the exponent is inside the range");
     let corner = open_ground(&world, PATCH);
+    // The faction holds the patch because it owns a city there. A unit gives
+    // its faction no claim on the tile it stands on.[^1]
+    //
+    // [^1]: ADR-0150, held ground is the ground within reach of a city its faction owns, decision D1. `docs/adrs/draft/adr-0150-held-ground-is-the-ground-within-reach-of-a-city-its-faction-owns.md`
+    world
+        .found_settlement(corner, NEW)
+        .expect("the ground admits a city");
     for row in -PATCH..=PATCH {
         for column in -PATCH..=PATCH {
             let address = Axial::new(corner.q + column, corner.r + row);

@@ -48,7 +48,7 @@ use crate::event::{ResourceTaken, TileChanged, CHANGE_KIND_LOWERED, CHANGE_KIND_
 use crate::founding::{self, Founding, FoundingError, FoundingOutcome, Survey};
 use crate::hash::StateHash;
 use crate::hex::{Axial, Grid, GridError, NEIGHBOUR_COUNT};
-use crate::holding::{FactionMask, Holder, Holding};
+use crate::holding::{FactionMask, Holder, Holding, ReachRules};
 use crate::household;
 use crate::influence::{Influence, InfluenceError, InfluenceField};
 use crate::luxury::{LuxuryError, LuxuryField, LuxuryId, LuxurySet, VarietyLevel};
@@ -4620,16 +4620,21 @@ impl World {
             self.build(threads)?;
         }
 
-        // The holding spreads after the barrier of this frame, because it
-        // reads where each unit stands and the movement above has just moved
-        // them. It writes a tile column, and it moves no unit, so the barrier
-        // above stays the barrier of this frame.[^7]
+        // The cities rewrite the holder column here, after the barrier of
+        // this frame and after the build above. The reach of a city counts
+        // the finished upgrades on the ground it held at the end of the
+        // previous step, so the count reads the column this stage is about to
+        // overwrite.[^7]
         //
-        // [^7]: ADR-0053, a faction is a bit in a mask, and a relation is a plane, decision D4. `docs/adrs/accepted/adr-0053-a-faction-is-a-bit-in-a-mask-and-a-relation-is-a-plane.md`
+        // The pass reads no unit position, so a unit gives its faction no
+        // claim on the ground it stands on. It writes a tile column and moves
+        // no unit, so the barrier above stays the barrier of this frame.
+        //
+        // [^7]: ADR-0150, held ground is the ground within reach of a city its faction owns, decisions D1, D2 and D3. `docs/adrs/draft/adr-0150-held-ground-is-the-ground-within-reach-of-a-city-its-faction-owns.md`
         {
             let _span = stage::open(Stage::HoldingSpread);
             self.holding
-                .advance(self.terrain, &self.soldiers, &self.bridge, threads)?;
+                .rewrite(self.terrain, &self.settlements, &self.upgrades, threads)?;
         }
 
         // The event reports the tile as this frame left it, so the holder is
@@ -5279,6 +5284,25 @@ impl World {
     ///
     /// [^1]: ADR-0090, a tile upgrade is stored sparsely, as the difference from the generated world, decision D2. `docs/adrs/draft/adr-0090-a-tile-upgrade-is-stored-sparsely.md`
     pub fn order_build(&mut self, entity: Entity, kind: UpgradeKind) -> bool {
+        // The verb refuses at the moment of the order, so a caller learns at
+        // once. The pass below applies the same test on every step, so a
+        // build whose ground changed hands stops.[^2]
+        //
+        // [^2]: ADR-0150, held ground is the ground within reach of a city its faction owns, decision D4. `docs/adrs/draft/adr-0150-held-ground-is-the-ground-within-reach-of-a-city-its-faction-owns.md`
+        let (Some(tile), Some(faction)) =
+            (self.soldiers.tile(entity), self.soldiers.faction(entity))
+        else {
+            return false;
+        };
+        let holder = self
+            .holding
+            .holders()
+            .get(tile.0 as usize)
+            .copied()
+            .unwrap_or(Holder::NOBODY);
+        if !build_is_permitted(holder, faction, kind) {
+            return false;
+        }
         self.soldiers.set_build_order(entity, Some(kind))
     }
 
@@ -5340,6 +5364,63 @@ impl World {
     #[must_use]
     pub fn holding_of(&self, faction: FactionId) -> i64 {
         self.holding.holding_of(faction)
+    }
+
+    /// Returns how far one city reaches, in hex steps.
+    ///
+    /// The reach is the base plus one step for each block of finished
+    /// upgrades on the ground the city held at the end of the previous step,
+    /// capped at the bound.[^1] Returns `None` when the identity names no
+    /// live settlement.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0150, held ground is the ground within reach of a city its faction owns, decision D2. `docs/adrs/draft/adr-0150-held-ground-is-the-ground-within-reach-of-a-city-its-faction-owns.md`
+    #[must_use]
+    pub fn city_reach(&self, site: Entity) -> Option<u32> {
+        let slot = self.settlements.slot_of(site)?;
+        self.holding
+            .cities(&self.settlements, &self.upgrades)
+            .into_iter()
+            .find(|city| city.slot == slot)
+            .map(|city| city.reach)
+    }
+
+    /// Reports whether one faction holds one tile.
+    ///
+    /// Returns `None` when the address lies outside the world. The call reads
+    /// the holder column, which the cities rewrite on every step.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0150, held ground is the ground within reach of a city its faction owns, decision D3. `docs/adrs/draft/adr-0150-held-ground-is-the-ground-within-reach-of-a-city-its-faction-owns.md`
+    #[must_use]
+    pub fn holds(&self, faction: FactionId, address: Axial) -> Option<bool> {
+        Some(self.holding.holder(address)?.faction() == Some(faction))
+    }
+
+    /// Returns how far a city reaches, and what extends the reach.
+    ///
+    /// The three values are balance rows, and every value in that register is
+    /// unset until the balance pass measures it.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: Balance register, the holding. `docs/reference/balance.md`
+    #[must_use]
+    pub const fn reach_rules(&self) -> ReachRules {
+        self.holding.rules()
+    }
+
+    /// Sets how far a city reaches, and what extends the reach.
+    ///
+    /// The three values are balance rows.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: Balance register, the holding. `docs/reference/balance.md`
+    pub const fn set_reach_rules(&mut self, rules: ReachRules) {
+        self.holding.set_rules(rules);
     }
 
     /// Returns the factions that hold ground in the block covering a tile.
@@ -7101,7 +7182,7 @@ impl World {
     /// [^3]: ADR-0002, simulated and aggregated state holds no floating point number, decision D1. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
     /// [^4]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
     fn build(&mut self, threads: usize) -> Result<(), StepError> {
-        let intents = build_intents(&self.soldiers, threads)?;
+        let intents = build_intents(&self.soldiers, &self.holding, threads)?;
         if intents.is_empty() {
             // The merge is still called, so the visit count describes this
             // tick rather than the last one that built anything.
@@ -7821,6 +7902,39 @@ fn build_order_of(keys: &[BoundedKey], ceiling: u64) -> Result<Vec<u32>, SortErr
     crate::sort::order_bounded(keys, ceiling)
 }
 
+/// Reports whether a builder may build one kind on the ground it stands on.
+///
+/// **One function states the rule, and two paths call it.** The verb that
+/// gives a build order calls it at the moment of the order. The pass that
+/// collects the build intents calls it on every step. Two tests that drifted
+/// apart would let a build the verb refused finish anyway.[^1] [^2]
+///
+/// The holder of the tile must be the builder's own faction. A road is the
+/// one exception, and it is exempt wherever it is built, because a road is
+/// how a faction reaches ground it does not yet hold.[^1]
+///
+/// # References
+///
+/// [^1]: ADR-0150, held ground is the ground within reach of a city its faction owns, decision D4. `docs/adrs/draft/adr-0150-held-ground-is-the-ground-within-reach-of-a-city-its-faction-owns.md`
+/// [^2]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`
+#[must_use]
+fn build_is_permitted(holder: Holder, faction: FactionId, kind: UpgradeKind) -> bool {
+    !kind_needs_own_ground(kind) || holder.faction() == Some(faction)
+}
+
+/// Reports whether a kind of build asks for the builder's own ground.
+///
+/// The road is the one kind that does not. The test is one function here, so
+/// a later table of kinds changes one place rather than every call site.[^1]
+///
+/// # References
+///
+/// [^1]: ADR-0150, held ground is the ground within reach of a city its faction owns, decision D4. `docs/adrs/draft/adr-0150-held-ground-is-the-ground-within-reach-of-a-city-its-faction-owns.md`
+#[must_use]
+const fn kind_needs_own_ground(kind: UpgradeKind) -> bool {
+    !matches!(kind, UpgradeKind::Road)
+}
+
 /// Returns the build intent of each live soldier that carries an order.
 ///
 /// The soldiers are read in slot order, each thread writes its own output
@@ -7837,7 +7951,11 @@ fn build_order_of(keys: &[BoundedKey], ceiling: u64) -> Result<Vec<u32>, SortErr
 /// # References
 ///
 /// [^1]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
-fn build_intents(soldiers: &SoldierArena, threads: usize) -> Result<Vec<BuildIntent>, StepError> {
+fn build_intents(
+    soldiers: &SoldierArena,
+    holding: &Holding,
+    threads: usize,
+) -> Result<Vec<BuildIntent>, StepError> {
     let live: Vec<Entity> = soldiers.iter().collect();
     if live.is_empty() {
         return Ok(Vec::new());
@@ -7855,6 +7973,20 @@ fn build_intents(soldiers: &SoldierArena, threads: usize) -> Result<Vec<BuildInt
                         let kind = soldiers.build_order(*unit)??;
                         let tile = soldiers.tile(*unit)?;
                         let unit_type = soldiers.unit_type(*unit)?;
+                        // One function states the ground rule, and the verb
+                        // that gives the order calls the same one. A build
+                        // whose ground changed hands since the order stops
+                        // here.[^2]
+                        //
+                        // [^2]: ADR-0150, held ground is the ground within reach of a city its faction owns, decision D4. `docs/adrs/draft/adr-0150-held-ground-is-the-ground-within-reach-of-a-city-its-faction-owns.md`
+                        let holder = holding
+                            .holders()
+                            .get(tile.0 as usize)
+                            .copied()
+                            .unwrap_or(Holder::NOBODY);
+                        if !build_is_permitted(holder, soldiers.faction(*unit)?, kind) {
+                            return None;
+                        }
                         Some(BuildIntent {
                             unit: *unit,
                             tile,

@@ -182,6 +182,20 @@ fn a_faction_that_holds_every_seat_wins_by_domination_while_a_rival_lives() {
             .spawn_soldier(second, FactionId(0))
             .expect("the seat admits a unit");
     }
+    // A faction holds the ground its cities reach, and a unit standing on a
+    // tile gives its faction no claim on it.[^2] Faction 0 therefore takes
+    // the seat of faction 1 by founding a city on it, after the city of
+    // faction 1 goes.
+    //
+    // [^2]: ADR-0150, held ground is the ground within reach of a city its faction owns, decision D1. `docs/adrs/draft/adr-0150-held-ground-is-the-ground-within-reach-of-a-city-its-faction-owns.md`
+    let rival_city = world
+        .settlements()
+        .on_tile(second)
+        .expect("the second founding left a city on the seat");
+    assert!(world.destroy_settlement(rival_city));
+    world
+        .found_settlement(second, FactionId(0))
+        .expect("the seat admits a city");
     let mut ended_on = None;
     for _ in 0..200 {
         step(&mut world);
@@ -296,6 +310,15 @@ fn a_wonder_ends_the_game_on_the_tick_it_completes_and_not_the_tick_before() {
     // starves, and faction 0 holds the ground. Near the end all but one stop,
     // so the progress rises by one each tick and passes through one unit
     // short. A rival unit elsewhere keeps domination quiet.
+    // A unit builds anything but a road only on ground its own faction
+    // holds, and a faction holds the ground its cities reach.[^3] The city
+    // on the island is what makes the wonder buildable there.
+    //
+    // [^3]: ADR-0150, held ground is the ground within reach of a city its faction owns, decisions D1 and D4. `docs/adrs/draft/adr-0150-held-ground-is-the-ground-within-reach-of-a-city-its-faction-owns.md`
+    world
+        .found_settlement(site, FactionId(0))
+        .expect("the island admits a city");
+    world.step(THREADS).expect("the step runs");
     let room = world
         .tile_capacity(site)
         .expect("the island is inside the world");

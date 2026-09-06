@@ -195,6 +195,15 @@ fn run_with_wonder(threads: usize) -> (Vec<u8>, u64) {
                 .all(|side| side.is_none_or(|next| !world.admits_a_unit(next)))
         })
         .expect("the scenario must find an island");
+    // A unit builds anything but a road only on ground its own faction
+    // holds, and a faction holds the ground its cities reach.[^2] The city on
+    // the island is what makes the wonder buildable there.
+    //
+    // [^2]: ADR-0150, held ground is the ground within reach of a city its faction owns, decisions D1 and D4. `docs/adrs/draft/adr-0150-held-ground-is-the-ground-within-reach-of-a-city-its-faction-owns.md`
+    world
+        .found_settlement(site, FactionId(0))
+        .expect("the island admits a city");
+    world.step(1).expect("the step must run");
     let room = world
         .tile_capacity(site)
         .expect("the island is inside the world");
@@ -1108,18 +1117,18 @@ fn the_character_columns_reach_the_state_hash() {
     assert_ne!(early.state_hash(), late.state_hash());
 }
 
-/// Places two rival garrisons far apart, and returns how many it placed.
+/// Founds several cities of two factions, and returns how many it founded.
 ///
-/// The two holdings grow towards each other and meet, so a tile on the border
-/// is claimed by two factions on one tick. Who takes it must come from the
-/// stable key and never from the thread that decided first.[^1]
+/// The cities stand close, so their reaches overlap and a tile lies at one
+/// distance from two of them. Who takes such a tile must come from the
+/// settlement slot and never from the thread that decided first.[^1]
 ///
 /// The caller asserts that the two holdings met. A fixture that only assumed
 /// it would measure itself.[^2]
 ///
 /// # References
 ///
-/// [^1]: ADR-0053, a faction is a bit in a mask, and a relation is a plane, decision D6. `docs/adrs/accepted/adr-0053-a-faction-is-a-bit-in-a-mask-and-a-relation-is-a-plane.md`
+/// [^1]: ADR-0150, held ground is the ground within reach of a city its faction owns, decision D1. `docs/adrs/draft/adr-0150-held-ground-is-the-ground-within-reach-of-a-city-its-faction-owns.md`
 /// [^2]: Findings register, FND-051. `docs/FINDINGS.md`
 fn rivals(world: &mut World) -> usize {
     let grid = world.grid();
@@ -1130,21 +1139,21 @@ fn rivals(world: &mut World) -> usize {
     if open.len() < 8 || world.config().faction_count < 2 {
         return 0;
     }
-    // The two garrisons start a few tiles apart on the same open ground, so
-    // their holdings meet inside the frames that a scenario runs. Garrisons
-    // at opposite ends of a large world never meet, and the border would then
-    // be untested while the test stayed green.
-    let mut placed = 0;
+    // The cities stand a few tiles apart on the same open ground, so their
+    // reaches overlap inside the frames that a scenario runs. Cities at
+    // opposite ends of a large world never meet, and the border would then be
+    // untested while the test stayed green.
+    let mut founded = 0;
     for offset in 0..3 {
-        if world.spawn_soldier(open[offset], FactionId(0)).is_ok() {
-            placed += 1;
+        if world.found_settlement(open[offset], FactionId(0)).is_ok() {
+            founded += 1;
         }
         let rival = offset + 4;
-        if rival < open.len() && world.spawn_soldier(open[rival], FactionId(1)).is_ok() {
-            placed += 1;
+        if rival < open.len() && world.found_settlement(open[rival], FactionId(1)).is_ok() {
+            founded += 1;
         }
     }
-    placed
+    founded
 }
 
 /// Counts the held tiles that touch a tile held by another faction.

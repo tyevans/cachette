@@ -1,7 +1,7 @@
 ---
 id: 0484
 title: Hold ground only within reach of an owned city, and refuse a build outside it
-status: refined
+status: complete
 created: 2026-09-05
 implements: [ADR-0150 D1, ADR-0150 D2, ADR-0150 D3, ADR-0150 D4, ADR-0053 D2, ADR-0053 D4, ADR-0004 D1, ADR-0001 D4]
 changes: [ADR-0053 D5, ADR-0053 D6]
@@ -142,7 +142,49 @@ hold, which is a wider set. Item 0370 closes with this one.[^8]
 
 ## Outcome
 
-Filled in when the item moves to `complete/`.
+Built. The holding stage rewrites the holder column from the settlements. The
+holder of a passable tile is the faction of the nearest city whose reach
+covers it, a tie goes to the lower settlement slot, and a tile no city reaches
+is held by nobody. The reach of a city is the base, plus one step for each
+block of finished upgrades on the ground the city held at the end of the
+previous step, capped at the bound. The three values are one rule struct in
+the holding, and they enter the state hash beside the column they decide.
+
+The pass computes one reach for each city, then decides the candidate tiles in
+contiguous chunks on several threads. Each tile reads the city table and never
+another tile. The candidate list is the tiles the cities reach plus the tiles
+the held list names, in ascending tile order. The write goes through the apply
+path the land transfer uses, so the running total, the block masks and the
+held list repair as before.
+
+**One decision this item made, and the record does not hold it.** A finished
+upgrade counts for the nearest city of the faction that holds its tile, and a
+tie goes to the lower slot. The record says the count reads the ground the
+city held, and the holder column names a faction and not a city, so the
+attribution had to be chosen. A reviewer of ADR-0150 should decide whether
+that rule belongs in D2.
+
+One function states the build rule, and the build verb and the build intent
+pass both call it. A build on a tile the builder's faction does not hold is
+refused unless the kind is a road. The Python binding raises a typed refusal
+instead of asserting, and the controller's own build order is refused through
+the same set verb and counted.
+
+The Python control plane gained `holds(faction, q, r)` and `city_reach(site)`,
+and the type stub was edited by hand.
+
+Nine golden files moved, and the commit body names the command that
+regenerated them. Six tests of the superseded spread rule were deleted with
+their machinery, and the commit body names each one and why. Fifteen fixtures
+took ground by standing units on it, and each founds a city now. That cost is
+recorded as a finding.
+
+Item 0370 asked for a refusal on ground another faction holds. This item
+refuses a wider set, so item 0370 closes with it.
+
+Left undone. The demonstration was not run to the tick limit, because this
+wave forbids the whole check command and the demonstration gate sits inside
+it. ADR-0150 stays a draft, and D5, the settler, belongs to item 0485.
 
 ## References
 
@@ -153,4 +195,4 @@ Filled in when the item moves to `complete/`.
 [^5]: ADR Registry. `docs/adrs/REGISTRY.md`
 [^6]: Balance register. `docs/reference/balance.md`
 [^7]: Findings register, FND-285, FND-320, FND-051 and FND-048. `docs/FINDINGS.md`
-[^8]: Backlog item 0370, refuse a build on ground another faction holds. `docs/backlog/proposed/0370-refuse-a-build-on-ground-another-faction-holds.md`
+[^8]: Backlog item 0370, refuse a build on ground another faction holds. `docs/backlog/complete/0370-refuse-a-build-on-ground-another-faction-holds.md`

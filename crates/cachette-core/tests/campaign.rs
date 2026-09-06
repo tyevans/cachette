@@ -472,14 +472,15 @@ fn a_campaign_is_won_when_the_objective_passes_to_the_campaigner() {
         .expect("two idle units exist");
     world.step(2).expect("the step runs");
     assert!(world.campaigns_of(A)[0].is_live());
-    // A crowd of A arrives at the objective by another road, and the holding
-    // pass gives A the ground. The campaign then closes as won, and the
-    // cohort is released from its order.
-    for _ in 0..8 {
-        if world.spawn_soldier(objective, A).is_err() {
-            break;
-        }
-    }
+    // A founds a city on the objective, and the holding pass gives A the
+    // ground. A unit standing there would give A no claim on it.[^1] The
+    // campaign then closes as won, and the cohort is released from its
+    // order.
+    //
+    // [^1]: ADR-0150, held ground is the ground within reach of a city its faction owns, decision D1. `docs/adrs/draft/adr-0150-held-ground-is-the-ground-within-reach-of-a-city-its-faction-owns.md`
+    world
+        .found_settlement(objective, A)
+        .expect("the objective admits a city");
     let mut won = false;
     for _ in 0..8 {
         world.step(2).expect("the step runs");

@@ -365,6 +365,13 @@ fn a_congregation_on_the_ground() -> (World, Entity, Axial) {
     let unit = world
         .spawn_soldier(address, FactionId(0))
         .expect("the tile admits a unit");
+    // The faction holds the ground because it owns a city there. A unit
+    // gives its faction no claim on the tile it stands on.[^1]
+    //
+    // [^1]: ADR-0150, held ground is the ground within reach of a city its faction owns, decision D1. `docs/adrs/draft/adr-0150-held-ground-is-the-ground-within-reach-of-a-city-its-faction-owns.md`
+    world
+        .found_settlement(address, FactionId(0))
+        .expect("the ground admits a city");
     for _ in 0..16 {
         world.step(1).expect("the step must run");
     }
@@ -378,7 +385,7 @@ fn a_congregation_on_the_ground() -> (World, Entity, Axial) {
         world
             .holders_near(address)
             .is_some_and(|mask| mask.contains(FactionId(0))),
-        "the faction holds no ground in this cell after sixteen frames"
+        "the faction holds no ground in this cell after the founding"
     );
     (world, unit, address)
 }

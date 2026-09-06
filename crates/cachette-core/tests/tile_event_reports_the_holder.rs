@@ -94,17 +94,31 @@ impl Stepped {
     }
 }
 
-/// Fills a patch of open ground with soldiers of one faction.
+/// Founds a city of one faction near an address, and fills the ground around
+/// it with soldiers of that faction.
+///
+/// The city is what gives the faction ground, because a unit gives its
+/// faction no claim on the tile it stands on.[^1] The units are here so that
+/// the step reports tile events at all.
+///
+/// # References
+///
+/// [^1]: ADR-0150, held ground is the ground within reach of a city its faction owns, decision D1. `docs/adrs/draft/adr-0150-held-ground-is-the-ground-within-reach-of-a-city-its-faction-owns.md`
 fn garrison(world: &mut World, faction: FactionId, first: Axial, edge: i32) {
+    let mut founded = false;
     for row in 0..edge {
         for column in 0..edge {
             let address = Axial::new(first.q + column, first.r + row);
             if !world.admits_a_unit(address) {
                 continue;
             }
+            if !founded && world.found_settlement(address, faction).is_ok() {
+                founded = true;
+            }
             let _ = world.spawn_soldier(address, faction);
         }
     }
+    assert!(founded, "the fixture founded no city near {first:?}");
 }
 
 /// Runs a world up to the tick under test, then steps it once more.
@@ -126,6 +140,29 @@ fn step_once() -> Stepped {
     for _ in 0..4 {
         world.step(THREADS).expect("the step must run");
     }
+
+    // A third city is founded here, so the tick under test changes the
+    // holder of every tile it reaches. A world whose cities did not move
+    // would change no holder, and the test of a changed holder would then
+    // have nothing to read.
+    let mut founded = false;
+    for row in 0..12 {
+        for column in 0..12 {
+            let address = Axial::new(20 + column, 20 + row);
+            if world.admits_a_unit(address) && world.found_settlement(address, FactionId(2)).is_ok()
+            {
+                founded = true;
+                break;
+            }
+        }
+        if founded {
+            break;
+        }
+    }
+    assert!(
+        founded,
+        "the fixture founded no city for the tick under test"
+    );
 
     let before = world.holding().holders().to_vec();
     let events = world.step(THREADS).expect("the step must run").to_vec();

@@ -10604,13 +10604,13 @@ exist.[^10]
 ### FND-484 — A relation step for a storm sits in the rules, and no pass reads it
 
 **Believed.** ADR-0146 D3 names a storm on the ground of another faction as a
-cause that moves the relation down by a step.[^F484A] The rules struct carries
+cause that moves the relation down by a step.[^F486A] The rules struct carries
 that step, so a reader takes the cause for a live one.
 
 **True.** The step field of the relation rules holds zero, and no pass reads
 it.[^F484C] ADR-0142 D1 lets a god put weather on a level 1 cell only when its
 own faction holds at least one tile inside that cell, so the engine gives the
-cause no source.[^F484B] The record says so, and the balance row says so.[^F484D]
+cause no source.[^F486B] The record says so, and the balance row says so.[^F484D]
 The register says so now as well, because a declared value that nothing reads
 is a shape this project tracks.[^F484F]
 
@@ -10626,7 +10626,7 @@ balance row for the step is unset and cites the blocker that governs
 it.[^F484D] [^F484E]
 
 **One detail sharpens the cause.** The gate of ADR-0142 D1 is a cell and not a
-tile.[^F484B] A cell is 32 tiles a side, so a cell can hold ground of two
+tile.[^F486B] A cell is 32 tiles a side, so a cell can hold ground of two
 factions. A god that holds one tile of a cell can therefore wet a tile that
 another faction holds. What is missing is a pass that looks for that case, and
 not only the permission.
@@ -10696,8 +10696,8 @@ and to read the value back.[^F485G]
 [^F485E]: The demonstration application, the seeding call. `python/cachette/demo/app.py`
 [^F485F]: Backlog item 0490, let the control plane read the store of a seeded settlement. `docs/backlog/proposed/0490-let-the-control-plane-read-the-store-of-a-seeded-settlement.md`
 [^F485G]: PRD-0047, a game states its own economy. `docs/product/shaped/prd-0047-a-game-states-its-own-economy.md`
-[^F484A]: ADR-0146, a faction relation is one signed integer per ordered pair and a pass reads a threshold, decision D3. `docs/adrs/accepted/adr-0146-a-faction-relation-is-one-signed-integer-per-ordered-pair-and-a-pass-reads-a-threshold.md`
-[^F484B]: ADR-0142, a god inflicts weather only on ground its own faction holds, decision D1. `docs/adrs/draft/adr-0142-a-god-inflicts-weather-only-on-ground-it-holds.md`
+[^F486A]: ADR-0146, a faction relation is one signed integer per ordered pair and a pass reads a threshold, decision D3. `docs/adrs/accepted/adr-0146-a-faction-relation-is-one-signed-integer-per-ordered-pair-and-a-pass-reads-a-threshold.md`
+[^F486B]: ADR-0142, a god inflicts weather only on ground its own faction holds, decision D1. `docs/adrs/draft/adr-0142-a-god-inflicts-weather-only-on-ground-it-holds.md`
 [^F484C]: The relation module, the storm step of the relation rules. `crates/cachette-core/src/relation.rs`
 [^F484D]: Balance register, the step when a storm falls on the ground of the other. `docs/reference/balance.md`
 [^F484E]: Blockers register, BLK-130. `docs/BLOCKERS.md`
@@ -11676,8 +11676,38 @@ already made this decision the other way for an entity, which crosses as one
 opaque identity that Python cannot build, so the interface is inconsistent with
 itself rather than merely underspecified.
 
+### FND-486 — Eleven test fixtures took ground by standing units on it, and each one encoded the rule rather than the need
+
+**Believed.** A fixture that wanted a faction to hold ground put units on that
+ground and ran a few frames. Each fixture said in its own prose that this is
+how a faction takes ground.
+
+**True.** That was the spread rule, and one record superseded it.[^F486A] A
+faction now holds the ground its cities reach, and a unit gives its faction no
+claim on the tile it stands on. Every one of those fixtures then held nothing,
+and eleven Rust test files and four Python test files went red at once. None
+of them was about the spread. Each wanted one thing: a tile whose holder is a
+named faction.
+
+**Evidence.** The rewrite of the holding pass turned the whole suite red in one
+commit, and each repair was one founding call.
+
+    cargo test -p cachette-core --no-fail-fast
+
+**Follows.** A fixture states the need and not the mechanism where it can. The
+cheapest form here is one call that founds a city and one step, and a helper
+that a file states once. A fixture that walks the rule is a second declaration
+of the rule, and it fails the day the rule changes, which is the day it says
+least about the test it serves.
+
+**This is the second declaration shape, in test data.**[^F486B] The rule lived
+in the engine and in the fixtures. Nothing failed when they disagreed, because
+they only disagreed once the rule moved.
+
 ## References
 
+[^F486A]: ADR-0150, held ground is the ground within reach of a city its faction owns, decision D1. `docs/adrs/draft/adr-0150-held-ground-is-the-ground-within-reach-of-a-city-its-faction-owns.md`
+[^F486B]: Recurring defect shapes, shape 1. `.agents/rules/recurring-defects.md`
 [^F340A]: Findings register, FND-325, in this document.
 [^F340B]: Backlog item 0330, repair the defects a fresh reader found in the published reference. `docs/backlog/complete/0330-repair-the-defects-a-fresh-reader-found.md`
 [^F340C]: The reference check script. `scripts/check_reference.py`
@@ -11697,7 +11727,7 @@ itself rather than merely underspecified.
 [^F371A]: ADR-0111, the presence relation is derived at the end of the step and never stored as a fact, decision D1. `docs/adrs/draft/adr-0111-the-presence-relation-is-derived-at-the-end-of-the-step.md`
 [^F372A]: ADR-0053, a faction is a bit in a mask, and a relation is a plane, decision D5. `docs/adrs/accepted/adr-0053-a-faction-is-a-bit-in-a-mask-and-a-relation-is-a-plane.md`
 [^F380A]: Project orientation, the open questions. `CLAUDE.md`
-[^F380C]: Backlog item 0370, refuse a build on ground another faction holds. `docs/backlog/proposed/0370-refuse-a-build-on-ground-another-faction-holds.md`
+[^F380C]: Backlog item 0370, refuse a build on ground another faction holds. `docs/backlog/complete/0370-refuse-a-build-on-ground-another-faction-holds.md`
 [^F380D]: Decisions register, DEC-161. `docs/DECISIONS.md`
 [^F390A]: Blockers register, BLK-052. `docs/BLOCKERS.md`
 [^F390B]: The casualty band harness. `crates/cachette-core/tests/casualty_band.rs`

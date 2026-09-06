@@ -338,6 +338,15 @@ fn wonder(world: &mut World) {
                 .all(|side| side.is_none_or(|next| !world.admits_a_unit(next)))
         })
         .expect("the wonder scenario found no island");
+    // A unit builds anything but a road only on ground its own faction
+    // holds, and a faction holds the ground its cities reach.[^2] The city on
+    // the island is what makes the wonder buildable there.
+    //
+    // [^2]: ADR-0150, held ground is the ground within reach of a city its faction owns, decisions D1 and D4. `docs/adrs/draft/adr-0150-held-ground-is-the-ground-within-reach-of-a-city-its-faction-owns.md`
+    world
+        .found_settlement(site, FactionId(0))
+        .expect("the island admits a city");
+    world.step(1).expect("the step must run");
     let room = world
         .tile_capacity(site)
         .expect("the island is inside the world");

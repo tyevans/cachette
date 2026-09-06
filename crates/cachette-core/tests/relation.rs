@@ -507,6 +507,13 @@ fn a_holder_below_the_guest_edge_refuses_a_guest() {
         world
             .spawn_soldier(Axial::new(1, 0), B)
             .expect("the ground admits a unit");
+        // B holds the second tile because it owns a city on it. A unit gives
+        // its faction no claim on the tile it stands on.[^1]
+        //
+        // [^1]: ADR-0150, held ground is the ground within reach of a city its faction owns, decision D1. `docs/adrs/draft/adr-0150-held-ground-is-the-ground-within-reach-of-a-city-its-faction-owns.md`
+        world
+            .found_settlement(Axial::new(1, 0), B)
+            .expect("the ground admits a city");
         world.step(1).expect("the step runs");
         assert_eq!(
             world
