@@ -22,11 +22,8 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-<<<<<<< HEAD
 **Next number: FND-552**
-=======
 **Next number: FND-551**
->>>>>>> worktree-agent-ab533abc07d2f8357
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -13119,78 +13116,61 @@ the same change. **A derivation that names a measured share goes stale the next
 time a subsystem is repaired, and nothing fails.** That is the shape the
 recurring-defect rule names, and this is one more local instance of it.[^F483G]
 
-<<<<<<< HEAD
 ### FND-550 — The ceiling that ends every game is in the store, not in the accumulator
-
 **Believed.** Three engine changes could put the wealth path out of reach:
 scale the bar by the settlements a faction owns, widen the store type, or drop
 the stock clause.[^F548A] The backlog item repeated them, and a fourth reading
 named a wider accumulator as the smallest change of the three.[^F543B]
-
 **True.** The reader already totals in a 64-bit accumulator, and it already
 sums every commodity of every live settlement.[^F548C] **A wider accumulator
 was never an available answer, because the accumulator was never the narrow
 part.** The narrow part is the store the accumulator reads. A store is a
 fixed-point value of a fixed width, so one settlement of one commodity
 saturates, and the sum of one settlement saturates with it.
-
 **Scaling the bar by the settlements a faction owns is worse than no change.**
 A bar that rises as a faction grows is a bar the faction never approaches, and
 it punishes the expansion a wealth win rewards.
-
 **What follows.** The answer is where the bar stands, and not what the reader
 totals. The bar now stands above the stock one settlement can hold, and a
 compiled assertion stops the build when it does not. A record holds the
 decision.[^F548D] **A wealth win now asks a faction for a second settlement,
 and nothing in the engine founds one, so the stock clause fires in no seeded
 run today.**[^F548E] The wonder clause carries the path.
-
 **The shape.** Two registers and one backlog item named a remedy that the code
 already had. Each writer read the finding above and not the reader. **Read the
 code for the part you mean to change, even when a register names it.**
-
 ### FND-551 — The wealth bar was declared in three places, and two of them were copies
-
 **Believed.** The engine states the wealth bar once, and the balance register
 holds its derivation.[^F543A]
-
 **True.** Two scripts held their own copy of the bar as a whole number, and
 each used its copy to report the share of the bar a faction had reached.[^F542H]
 [^F549B] Nothing compared the copies against the engine. A change to the
 engine constant would have left both scripts reporting a share against a bar
 the engine no longer held, and every gate would have passed.
-
 **Evidence.** A whole-tree search for the value found three sites: the engine
 constant and the two scripts. The commit body holds the search command.
-
 **What follows.** The binding now exposes the bar, and each script reads it.
 One declaration site remains. This is one more local instance of the first
 recurring defect shape.[^F526A]
-=======
 ### FND-548 — The offset space of a block is the square of the block edge, and a fixture over interior blocks alone hides that
-
 **Believed.** A block of the lattice holds as many tile offsets as it holds
 tiles. The first observation container therefore sized every scratch bitmap and
 every payload by the tile count of the block.
-
 **True.** The offset of a tile packs the row and the column of that tile
 against the block edge, so the offset space is the square of the block
 edge.[^F548A] A block that the world edge cuts holds fewer tiles than that, and
 the offsets of the tiles it does hold still reach the top of the space. Every
 tile of a cut block above the tile count was dropped in silence.
-
 **Evidence.** The defect reached no interior block, because an interior block
 holds exactly as many tiles as its offset space. A fixture over a world of one
 cut block reported that a faction which saw every tile saw 128 of 256. The
 fixture was built to reach the payload-free form at the top of the density
 range, and it found this instead.
-
 **What follows.** Size a container by the address space of its key, never by
 the population that the world happens to put in it. **A fixture over the
 typical case would never have failed**, because the typical block of a large
 world is not cut. This is one more local instance of the shape the testing rule
 names.[^F492B]
->>>>>>> worktree-agent-aa08c9949aff3eec8
 
 
 ### FND-548 — The census repair left three rows that still said more than they read

@@ -421,16 +421,10 @@ without stating a constraint is worse than no record.
 | 0162 | Water enters the air where it is hot, and it falls where the air cools. Changes ADR-0141 D1, the fall and the lift; the account of ADR-0141 D2 stands | Accepted | 0140, 0141, 0142, 0143, 0160, 0161 | `accepted/adr-0162-water-enters-the-air-where-it-is-hot-and-falls-where-the-air-cools.md` |
 | 0163 | An event declares its layout once and the binding derives every column | Draft | 0002, 0006, 0031, 0040, 0044, 0085, 0107 | `draft/adr-0163-an-event-declares-its-layout-once-and-the-binding-derives-every-column.md` |
 | 0164 | Every stored value the step reads enters the state hash, and only a derived value stays out | Draft | 0001, 0004, 0022, 0064, 0072 | `draft/adr-0164-every-stored-value-the-step-reads-enters-the-state-hash.md` |
-<<<<<<< HEAD
-<<<<<<< HEAD
 | 0165 | The wealth bar stands above what one settlement can hold. Changes ADR-0148 D3: a reader threshold may be derived from a structural ceiling and not only from a balance row | Draft | 0002, 0011, 0023, 0148 | `draft/adr-0165-the-wealth-bar-stands-above-what-one-settlement-can-hold.md` |
 | 0165 | A build order holds a unit on its tile, and the hold is derived and never stored | Draft | 0001, 0004, 0091, 0095, 0125, 0145, 0150, 0151, 0152, 0159 | `draft/adr-0165-a-build-order-holds-a-unit-on-its-tile.md` |
-=======
 | 0165 | War opens the border that tension closes. Changes ADR-0146 D4, the movement clause; the other clauses of ADR-0146 D4 stand | Draft | 0056, 0121, 0146, 0153 | `draft/adr-0165-war-opens-the-border-that-tension-closes.md` |
->>>>>>> worktree-agent-a6fa30a25c89338ea
-=======
 | 0165 | The temperature of a cell is carried state that a season and the sky drive. Changes ADR-0160 D1, which states the heat is not state; the other decisions of ADR-0160 stand | Draft | 0002, 0004, 0009, 0140, 0160, 0161, 0162, 0164 | `draft/adr-0165-the-temperature-of-a-cell-is-carried-state-that-a-season-and-the-sky-drive.md` |
->>>>>>> worktree-agent-a3da9a2870cd872c8
 
 ### Retired numbers
 
