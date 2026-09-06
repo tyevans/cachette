@@ -40,7 +40,8 @@ use crate::cohort::{
 };
 use crate::contest::{self, ContestError, Grievance, UnitFell};
 use crate::controller::{
-    self, Choice, Controller, ControllerCommand, FactionRow, FactionWeights, GameEnd, WinPath,
+    self, CarrierAssignment, Choice, Controller, ControllerCommand, FactionRow, FactionState,
+    FactionWeights, GameEnd, WinPath,
 };
 use crate::conversion::{self, ConversionError, Convert, UnitConverted};
 use crate::descent::{DescentId, Parents};
@@ -9056,6 +9057,25 @@ pub const SUBSYSTEM_CENSUS: &[CensusRow] = &[
                 .count() as i64
         },
     },
+    // The four rows below are what the trading controller did on the last
+    // tick. Each one counts an act of the stage and not a state of the world,
+    // in the way the controller command row does.
+    CensusRow {
+        name: "boards_written",
+        read: |world| i64::from(world.controller.boards_written()),
+    },
+    CensusRow {
+        name: "offers_made",
+        read: |world| i64::from(world.controller.offers_made()),
+    },
+    CensusRow {
+        name: "contracts_bound",
+        read: |world| i64::from(world.controller.contracts_bound()),
+    },
+    CensusRow {
+        name: "carriers_assigned",
+        read: |world| i64::from(world.controller.carriers_assigned()),
+    },
     CensusRow {
         name: "controller_commands",
         read: |world| i64::from(world.controller.applied()),
@@ -9400,6 +9420,120 @@ impl World {
         self.controller.set_evaluations(evaluations);
     }
 
+    /// Returns the advertisement schedule: how many ticks lie between two
+    /// board writes, and the offset inside that period.
+    #[must_use]
+    pub fn advertisement_schedule(&self) -> (u32, u32) {
+        let schedule = self.controller.advert_schedule();
+        (schedule.period(), schedule.phase())
+    }
+
+    /// Sets the advertisement schedule.
+    ///
+    /// The period and the phase are balance values, and the register holds
+    /// the row.[^1]
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the period is zero, and when the period is above
+    /// the range that the scaling multiply takes.
+    ///
+    /// # References
+    ///
+    /// [^1]: Balance register, the advertisement schedule. `docs/reference/balance.md`
+    pub fn set_advertisement_schedule(&mut self, period: u32, phase: u32) -> Result<(), RateError> {
+        let schedule =
+            RateSchedule::new(period, phase).ok_or(RateError::PeriodOutsideRange(period))?;
+        self.controller.set_advert_schedule(schedule);
+        Ok(())
+    }
+
+    /// Returns the store above which a faction offers a good, and below which
+    /// it wants one.
+    #[must_use]
+    pub const fn surplus_mark(&self) -> u32 {
+        self.controller.surplus_mark()
+    }
+
+    /// Sets the surplus mark.
+    ///
+    /// The mark is a balance value, and the register holds the row.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: Balance register, the surplus mark. `docs/reference/balance.md`
+    pub const fn set_surplus_mark(&mut self, mark: u32) {
+        self.controller.set_surplus_mark(mark);
+    }
+
+    /// Returns how many carriers one faction assigns to one contract.
+    #[must_use]
+    pub const fn carriers_per_contract(&self) -> u32 {
+        self.controller.contract_carriers()
+    }
+
+    /// Sets how many carriers one faction assigns to one contract.
+    ///
+    /// The count is a balance value, and the register holds the row.[^1] A
+    /// count of zero assigns no carrier.
+    ///
+    /// # References
+    ///
+    /// [^1]: Balance register, the carriers per contract. `docs/reference/balance.md`
+    pub const fn set_carriers_per_contract(&mut self, carriers: u32) {
+        self.controller.set_contract_carriers(carriers);
+    }
+
+    /// Returns how many ticks a contract that the controller opens runs for.
+    #[must_use]
+    pub const fn contract_term(&self) -> u32 {
+        self.controller.contract_term()
+    }
+
+    /// Sets how many ticks a contract that the controller opens runs for.
+    ///
+    /// The term is a balance value, and the register holds the row.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: Balance register, the contract term. `docs/reference/balance.md`
+    pub const fn set_contract_term(&mut self, term: u32) {
+        self.controller.set_contract_term(term);
+    }
+
+    /// Returns every carrier the controller has assigned, in faction order
+    /// and then in contract order and then in identity order.
+    ///
+    /// The list is simulated state and not a log of one tick. A carrier stays
+    /// in it until the contract settles or fails.
+    #[must_use]
+    pub fn carrier_assignments(&self) -> &[CarrierAssignment] {
+        self.controller.carriers()
+    }
+
+    /// Returns the identity and the contract of every carrier the controller
+    /// has assigned, in the order the carrier list holds.
+    ///
+    /// The list holds the identity as one integer, because it is plain data.
+    /// This call resolves each one against the arena, so a caller never
+    /// builds an identity of its own.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0085, an entity crosses to Python as one opaque identity that the engine resolves, decision D2. `docs/adrs/accepted/adr-0085-an-entity-crosses-to-python-as-one-opaque-identity.md`
+    #[must_use]
+    pub fn carrier_units(&self) -> Vec<(Entity, u32, FactionId)> {
+        self.controller
+            .carriers()
+            .iter()
+            .filter_map(|entry| {
+                let unit = Entity::from_bits(entry.unit)?;
+                self.soldiers.slot_of(unit)?;
+                Some((unit, entry.row, entry.faction))
+            })
+            .collect()
+    }
+
     /// Returns the tick at which the territory reader fires.
     #[must_use]
     pub const fn tick_limit(&self) -> u64 {
@@ -9475,6 +9609,399 @@ impl World {
         self.controller.row(faction).and_then(FactionRow::seat)
     }
 
+    /// Returns the site that one faction trades from: its live settlement in
+    /// the lowest slot.
+    ///
+    /// The walk is over the settlement slots in slot order, so the answer is
+    /// a property of the storage and of no thread.[^1]
+    ///
+    /// Returns `None` when the faction holds no settlement.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
+    #[must_use]
+    pub fn trading_site_of(&self, faction: FactionId) -> Option<Entity> {
+        self.settlements
+            .iter()
+            .find(|site| self.settlements.faction(*site) == Some(faction))
+    }
+
+    /// Returns what the sites of one faction hold of each good, as whole
+    /// numbers.
+    ///
+    /// **The accumulator is wide.** A store at the ceiling of the scale,
+    /// summed over every site of a faction, passes the range of a narrower
+    /// integer, and an accumulator must not depend on that margin.[^1]
+    ///
+    /// The sites are visited in slot order, and the goods in index order.[^2]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0023, an aggregate combines exactly in any order, decision D2. `docs/adrs/accepted/adr-0023-an-aggregate-combines-exactly-in-any-order.md`
+    /// [^2]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
+    #[must_use]
+    pub fn faction_stores(&self, faction: FactionId) -> [i64; RESOURCE_KIND_COUNT] {
+        let mut totals = [0i64; RESOURCE_KIND_COUNT];
+        for site in self.settlements.iter() {
+            if self.settlements.faction(site) != Some(faction) {
+                continue;
+            }
+            let Some(store) = self.settlements.store(site) else {
+                continue;
+            };
+            for kind in ResourceKind::ALL {
+                let index = kind.index();
+                let Some(held) = store.quantity(WORK_COMMODITY[index]) else {
+                    continue;
+                };
+                totals[index] = totals[index].saturating_add(i64::from(held.to_int_floor()));
+            }
+        }
+        totals
+    }
+
+    /// Rewrites the whole board of one faction from its site economies.
+    ///
+    /// The rows go through the write verb a Python caller calls, and the same
+    /// refusals apply.[^1] The write replaces the whole board.[^2]
+    ///
+    /// Returns whether the verb took the write.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0149, a faction's trade board is simulated state that any faction may read, decision D5. `docs/adrs/draft/adr-0149-a-factions-trade-board-is-simulated-state-that-any-faction-may-read.md`
+    /// [^2]: ADR-0149, a faction's trade board is simulated state that any faction may read, decision D3. `docs/adrs/draft/adr-0149-a-factions-trade-board-is-simulated-state-that-any-faction-may-read.md`
+    fn controller_write_board(&mut self, faction: FactionId, draw: u32) -> bool {
+        let stores = self.faction_stores(faction);
+        let mark = i64::from(self.controller.surplus_mark());
+        let bound = usize::from(self.market.bound());
+        let rows = controller::board_of(
+            self.config.seed,
+            self.tick,
+            faction,
+            draw,
+            &stores,
+            mark,
+            bound,
+        );
+        if self.advertise(faction, &rows).is_err() {
+            return false;
+        }
+        self.controller.count_board();
+        true
+    }
+
+    /// Returns the pair that one faction answers this tick, and the row of
+    /// that pair.
+    ///
+    /// The pair is the live negotiation with the lowest other faction in
+    /// which this faction speaks next. The walk is over the faction
+    /// identifiers in ascending order.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
+    fn controller_answer_due(&self, faction: FactionId) -> Option<(FactionId, TradeRow)> {
+        for index in 0..self.config.faction_count.max(1) {
+            let other = FactionId(index);
+            if other == faction {
+                continue;
+            }
+            let Ok((proposer, responder)) = self.live_orientation(faction, other) else {
+                continue;
+            };
+            let Some(row) = self.trade.row(proposer, responder) else {
+                continue;
+            };
+            if row.is_bound() || Self::turn_of(row, proposer, responder) != Some(faction) {
+                continue;
+            }
+            return Some((other, row));
+        }
+        None
+    }
+
+    /// Returns the faction that one faction opens a negotiation with this
+    /// tick, and the terms it opens with.
+    ///
+    /// The other boards are read in faction order. A pair in the war band and
+    /// a pair that already holds a live negotiation are both passed over,
+    /// because the verb refuses the first and this stage never opens a second
+    /// negotiation with one pair.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0146, a faction relation is one signed integer per ordered pair, and a pass reads a threshold, decision D4. `docs/adrs/draft/adr-0146-a-faction-relation-is-one-signed-integer-per-ordered-pair-and-a-pass-reads-a-threshold.md`
+    fn controller_match_due(&self, faction: FactionId) -> Option<(FactionId, controller::Terms)> {
+        let mine = self.market.board(faction);
+        if mine.is_empty() {
+            return None;
+        }
+        for index in 0..self.config.faction_count.max(1) {
+            let other = FactionId(index);
+            if other == faction || !self.relations.permits_offer(faction, other) {
+                continue;
+            }
+            if self.live_orientation(faction, other).is_ok() {
+                continue;
+            }
+            let Some(terms) = controller::match_boards(mine, self.market.board(other)) else {
+                continue;
+            };
+            if terms.give_amount == 0 || terms.take_amount == 0 {
+                continue;
+            }
+            return Some((other, terms));
+        }
+        None
+    }
+
+    /// Takes the one negotiation step of one faction on one tick.
+    ///
+    /// An answer to a live negotiation comes before a new offer, so a faction
+    /// that owes an answer never opens a second pair while it owes one. Every
+    /// act passes the verb a Python caller calls.[^1]
+    ///
+    /// **The price is the integer midpoint of the two asking quantities.** No
+    /// draw decides it. The faction accepts when the counteroffer asks no
+    /// more than its own board asked, and refuses otherwise.[^2]
+    ///
+    /// Returns whether a verb took the step.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0144, a faction controller runs inside the step and acts only through the caller's verbs, decision D2. `docs/adrs/accepted/adr-0144-a-faction-controller-runs-inside-the-step-and-acts-only-through-the-callers-verbs.md`
+    /// [^2]: Balance register, the surplus mark. `docs/reference/balance.md`
+    fn controller_trade_step(&mut self, faction: FactionId) -> bool {
+        if let Some((other, row)) = self.controller_answer_due(faction) {
+            let own_ask = controller::asking_quantity_of(self.market.board(faction), row.take_kind);
+            let Some(own_ask) = own_ask else {
+                return self.refuse_trade(faction, other).is_ok();
+            };
+            if row.status == TRADE_OFFERED {
+                // This faction answered the offer, so it restates the terms
+                // at the midpoint of the two asks. The take side is restated
+                // as it stands, because a counteroffer names both sides.
+                let amount = controller::midpoint(row.give_amount, own_ask).max(1);
+                let give = Consideration::resource(row.give_kind, amount);
+                let take = Consideration::resource(row.take_kind, row.take_amount);
+                return self
+                    .counter_consideration(faction, other, give, take)
+                    .is_ok();
+            }
+            if controller::accepts(row.give_amount, own_ask) {
+                if self.accept_trade(faction, other).is_ok() {
+                    self.controller.count_bound();
+                    return true;
+                }
+                return false;
+            }
+            return self.refuse_trade(faction, other).is_ok();
+        }
+        let Some((other, terms)) = self.controller_match_due(faction) else {
+            return false;
+        };
+        let term = self.controller.contract_term();
+        let give = Consideration::resource(terms.give_kind, terms.give_amount);
+        let take = Consideration::resource(terms.take_kind, terms.take_amount);
+        if self
+            .offer_consideration(faction, other, give, take, term)
+            .is_err()
+        {
+            return false;
+        }
+        self.controller.count_offer();
+        true
+    }
+
+    /// Returns every contract that one faction owes a carried quantity on,
+    /// and the other party of each.
+    ///
+    /// The walk is over the negotiation plane in pair order.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
+    fn controller_debts_of(&self, faction: FactionId) -> Vec<(u32, FactionId)> {
+        let mut found = Vec::new();
+        for (index, row) in self.trade.rows().iter().enumerate() {
+            if !row.is_bound() {
+                continue;
+            }
+            let (proposer, responder) = self.pair_of(index);
+            let (owes, other) = if proposer == faction {
+                (
+                    row.proposer_side_is_carried() && row.owed_by_proposer() > 0,
+                    responder,
+                )
+            } else if responder == faction {
+                (
+                    row.responder_side_is_carried() && row.owed_by_responder() > 0,
+                    proposer,
+                )
+            } else {
+                continue;
+            };
+            if owes {
+                found.push((index as u32, other));
+            }
+        }
+        found
+    }
+
+    /// Returns how many carriers one faction has on one contract.
+    fn controller_carrier_count(&self, faction: FactionId, row: u32) -> u32 {
+        self.controller
+            .carriers()
+            .iter()
+            .filter(|entry| entry.faction == faction && entry.row == row)
+            .count() as u32
+    }
+
+    /// Reports whether one faction has carrier work this tick.
+    ///
+    /// The answer is yes when it holds a carrier of a contract that ended,
+    /// and yes when it owes a carried quantity on a contract that has fewer
+    /// carriers than the balance row asks for.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: Balance register, the carriers per contract. `docs/reference/balance.md`
+    fn controller_carry_work(&self, faction: FactionId) -> bool {
+        let want = self.controller.contract_carriers();
+        let ended = self.controller.carriers().iter().any(|entry| {
+            entry.faction == faction
+                && !self
+                    .trade
+                    .row_at(entry.row as usize)
+                    .is_some_and(|row| row.is_bound())
+        });
+        if ended {
+            return true;
+        }
+        if want == 0 || self.campaigns.live(faction).is_some() {
+            return false;
+        }
+        self.controller_debts_of(faction)
+            .into_iter()
+            .any(|(row, _)| self.controller_carrier_count(faction, row) < want)
+    }
+
+    /// Assigns the carriers of one faction, and releases the ones it no
+    /// longer needs.
+    ///
+    /// **A carrier is an idle unit whose type carries.** A unit type column
+    /// of zero means that the unit cannot carry, so such a unit is never
+    /// assigned.[^1] The lowest identities are taken, so two runs over one
+    /// arena take one set.
+    ///
+    /// The unit takes the site of its own faction as its home and is sent to
+    /// the site of the other party, through the two verbs a Python caller
+    /// calls.[^2] The delivery pass then moves the quantity when the unit
+    /// stands there with a load.[^3]
+    ///
+    /// **A carrier arrives only while its load stays below the carry mark.**
+    /// A unit that holds a home and a load at the mark is laden, and a laden
+    /// unit walks home rather than where it was sent.[^4] The mark is a world
+    /// parameter that a caller sets, and a world whose mark is below what a
+    /// carrier picks up on the way sends its carriers home instead.
+    ///
+    /// Returns whether the stage assigned or released anything.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0145, a unit type is a row of capability columns, and zero means cannot, decision D1. `docs/adrs/accepted/adr-0145-a-unit-type-is-a-row-of-capability-columns-and-zero-means-cannot.md`
+    /// [^2]: ADR-0144, a faction controller runs inside the step and acts only through the caller's verbs, decision D2. `docs/adrs/accepted/adr-0144-a-faction-controller-runs-inside-the-step-and-acts-only-through-the-callers-verbs.md`
+    /// [^3]: ADR-0147, a contract consideration is a tagged kind, decision D2. `docs/adrs/accepted/adr-0147-a-contract-consideration-is-a-tagged-kind.md`
+    /// [^4]: ADR-0110, a unit returns by climbing a reach field seeded at every site of its faction, decision D1. `docs/adrs/draft/adr-0110-a-unit-returns-by-climbing-a-reach-field.md`
+    fn controller_carriers(&mut self, faction: FactionId) -> bool {
+        let mut kept: Vec<CarrierAssignment> = Vec::new();
+        let mut released: Vec<Entity> = Vec::new();
+        for entry in self.controller.carriers() {
+            let unit = Entity::from_bits(entry.unit);
+            let live = unit.is_some_and(|unit| self.soldiers.slot_of(unit).is_some());
+            let bound = self
+                .trade
+                .row_at(entry.row as usize)
+                .is_some_and(|row| row.is_bound());
+            if entry.faction != faction || (bound && live) {
+                if live {
+                    kept.push(*entry);
+                }
+                continue;
+            }
+            if let (true, Some(unit)) = (live, unit) {
+                released.push(unit);
+            }
+        }
+        let mut acted = !released.is_empty();
+        if !released.is_empty() {
+            // Every unit in the list is live, because the scan above kept
+            // only the live ones, so the stop verb refuses nothing.
+            let _ = self.stop_sending(&released);
+        }
+        let want = self.controller.contract_carriers();
+        let mut assigned = 0u32;
+        // The destination plane of a faction is the faction number, and a
+        // campaign takes the same plane. A faction that holds a live campaign
+        // therefore assigns no carrier, and a faction that holds a carrier
+        // raises no campaign. One plane serves one purpose at a time.
+        if want > 0 && self.campaigns.live(faction).is_none() {
+            let plane = faction.0;
+            for (row, other) in self.controller_debts_of(faction) {
+                let held = kept
+                    .iter()
+                    .filter(|entry| entry.faction == faction && entry.row == row)
+                    .count() as u32;
+                if held >= want {
+                    continue;
+                }
+                let (Some(home), Some(theirs)) =
+                    (self.trading_site_of(faction), self.trading_site_of(other))
+                else {
+                    continue;
+                };
+                let Some(address) = self
+                    .settlements
+                    .tile(theirs)
+                    .and_then(|tile| self.grid.address_of(tile))
+                else {
+                    continue;
+                };
+                let mut idle: Vec<Entity> = self
+                    .soldiers
+                    .iter_faction(faction)
+                    .filter(|unit| self.soldiers.sent(*unit) == Some(None))
+                    .filter(|unit| {
+                        self.soldiers.unit_type(*unit).is_some_and(|unit_type| {
+                            self.unit_types.row(unit_type).carry_capacity > 0
+                        })
+                    })
+                    .collect();
+                idle.sort_unstable_by_key(|unit| unit.to_bits());
+                idle.truncate((want - held) as usize);
+                if idle.is_empty() {
+                    continue;
+                }
+                for unit in &idle {
+                    self.set_home_site(*unit, Some(home));
+                }
+                if self.send_units_to(&idle, &[address], plane).is_err() {
+                    continue;
+                }
+                for unit in &idle {
+                    kept.push(CarrierAssignment::new(*unit, row, faction));
+                }
+                assigned = assigned.saturating_add(idle.len() as u32);
+                acted = true;
+            }
+        }
+        self.controller.set_carriers(kept);
+        self.controller.count_carriers(assigned);
+        acted
+    }
+
     /// Runs the controller stage.
     ///
     /// The readers run first, while the record is empty. Then the controller
@@ -9540,9 +10067,43 @@ impl World {
                 controller::rival_of(FactionId(index as u16), held.iter().copied())
             })
             .collect();
-        let plan = self
-            .controller
-            .plan(self.config.seed, tick, &rivals, &objectives);
+        // A faction that holds a carrier raises no campaign, because the
+        // campaign takes the destination plane the carriers climb.
+        let objectives: Vec<Option<(u8, TileIdx)>> = objectives
+            .into_iter()
+            .enumerate()
+            .map(|(index, objective)| {
+                let faction = FactionId(index as u16);
+                if self
+                    .controller
+                    .carriers()
+                    .iter()
+                    .any(|entry| entry.faction == faction)
+                {
+                    None
+                } else {
+                    objective
+                }
+            })
+            .collect();
+        // The three trade commands are pushed only when there is work. A
+        // faction that has nothing to advertise, nothing to say and no
+        // carrier to move emits nothing, so an idle world costs no command.
+        let due = self.controller.board_due(tick);
+        let states: Vec<FactionState> = (0..factions)
+            .map(|index| {
+                let faction = FactionId(index as u16);
+                FactionState {
+                    rival: rivals.get(index).copied().flatten(),
+                    objective: objectives.get(index).copied().flatten(),
+                    board_due: due && self.trading_site_of(faction).is_some(),
+                    trade_due: self.controller_answer_due(faction).is_some()
+                        || self.controller_match_due(faction).is_some(),
+                    carry_due: self.controller_carry_work(faction),
+                }
+            })
+            .collect();
+        let plan = self.controller.plan(self.config.seed, tick, &states);
         if plan.is_empty() {
             return;
         }
@@ -9589,6 +10150,14 @@ impl World {
                         self.raise_campaign(faction, address, cohort).is_ok()
                     })
                 }
+                // The board write, the negotiation step and the carriers all
+                // pass the verbs a Python caller calls, and each reads the
+                // world as the commands before it in this plan left it.[^6]
+                //
+                // [^6]: ADR-0144, a faction controller runs inside the step and acts only through the caller's verbs, decisions D2 and D5. `docs/adrs/accepted/adr-0144-a-faction-controller-runs-inside-the-step-and-acts-only-through-the-callers-verbs.md`
+                Choice::Advertise => self.controller_write_board(faction, sequence),
+                Choice::Trade => self.controller_trade_step(faction),
+                Choice::Carry => self.controller_carriers(faction),
             };
             let applied = u8::from(applied);
             sets[usize::from(faction.0)] = set;
