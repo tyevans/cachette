@@ -25,11 +25,16 @@
 
 use cachette_core::choose::{self, ChoiceSchedule};
 use cachette_core::cohort::{NeedRule, NEED_FULL};
+use cachette_core::founding::{disc, SURVEY_RADIUS};
 use cachette_core::resource::{
-    Amount, RecoveryRules, ResourceKind, RESOURCE_KIND_COUNT, TICKS_IN_A_SIMULATED_DAY,
+    ledger_key, Amount, DepletionLedger, RecoveryRules, ResourceKind, TileGround,
+    MOISTURE_BAND_CEILING, MOISTURE_BAND_COUNT, RESOURCE_KIND_COUNT, TICKS_IN_A_SIMULATED_DAY,
 };
 use cachette_core::terrain::TileKind;
-use cachette_core::{Axial, Entity, FactionId, Fix32, TileIdx, World, WorldConfig};
+use cachette_core::upgrade::{
+    UpgradeCategory, UpgradeTable, CONDITION_FULL, TERRACE_LEVEL_2_RECOVERY,
+};
+use cachette_core::{Axial, Entity, FactionId, Fix32, Tick, TileIdx, World, WorldConfig};
 
 /// The extent that most tests read.
 ///
@@ -990,7 +995,13 @@ fn a_depleted_deposit_holds_more_at_a_later_tick() {
     worked.field.set_recovery_rules(quick_rules());
     let (address, kind) = worked.partial;
     let before = worked.field.tile_stock(address, kind).expect("inside");
-    for _ in 0..FOOD_PERIOD.max(WOOD_PERIOD) {
+    // The moisture over the tile stretches the declared period, so the test
+    // reads the period the engine will act on rather than assuming it.
+    let period = worked
+        .field
+        .recovery_period_at(address, kind)
+        .expect("the kind recovers");
+    for _ in 0..period {
         worked.field.step(2).expect("the step must run");
     }
     let after = worked.field.tile_stock(address, kind).expect("inside");
@@ -1013,7 +1024,11 @@ fn a_deposit_that_units_emptied_recovers() {
     worked.field.set_recovery_rules(quick_rules());
     let (address, kind) = worked.emptied;
     assert_eq!(worked.field.tile_stock(address, kind), Some(Amount::ZERO));
-    for _ in 0..(WOOD_PERIOD.max(FOOD_PERIOD) * 2) {
+    let period = worked
+        .field
+        .recovery_period_at(address, kind)
+        .expect("the kind recovers");
+    for _ in 0..(period * 2) {
         worked.field.step(2).expect("the step must run");
     }
     assert!(
@@ -1024,40 +1039,75 @@ fn a_deposit_that_units_emptied_recovers() {
 }
 
 #[test]
-fn recovery_waits_for_the_whole_period() {
-    // The period is the simulated time in which a deposit regains one unit. A
-    // rule that ignored the elapsed ticks would give the unit back on the
-    // first frame, and a rule that dropped the remainder of the division
-    // would never give it back at all, because the pass runs on every tick.
+fn recovery_gives_nothing_back_on_the_first_frame() {
+    // A rule that ignored the elapsed ticks would give a unit back at once.
+    // The engine drives this, so the assertion covers the pass and not only
+    // the ledger.
     let mut worked = worked();
     let (address, kind) = worked.partial;
-    let period = match kind {
-        ResourceKind::Food => FOOD_PERIOD,
-        _ => WOOD_PERIOD,
-    };
     worked.field.set_recovery_rules(quick_rules());
     let start = worked.field.taken_from(address, kind).expect("inside").0;
     assert!(start >= 3, "the fixture took too little to measure a rate");
-    for _ in 0..(period - 1) {
-        worked.field.step(2).expect("the step must run");
-        assert_eq!(
-            worked.field.taken_from(address, kind),
-            Some(Amount(start)),
-            "the deposit recovered before the period had passed"
-        );
-    }
+    assert!(
+        worked
+            .field
+            .recovery_period_at(address, kind)
+            .expect("the kind recovers")
+            > 1,
+        "a period of one measures no wait"
+    );
     worked.field.step(2).expect("the step must run");
     assert_eq!(
         worked.field.taken_from(address, kind),
-        Some(Amount(start - 1)),
+        Some(Amount(start)),
+        "the deposit recovered on the frame after the take"
+    );
+}
+
+#[test]
+fn recovery_waits_for_the_whole_period_over_still_ground() {
+    // The period is the simulated time in which a deposit regains one unit.
+    // A rule that dropped the remainder of the division would never give a
+    // unit back at all, because the pass runs on every tick.
+    //
+    // The ground here does not move. In a world the weather moves the period
+    // between one tick and the next, so an exact count of ticks is only a
+    // statement about ground that holds still.
+    let ground = |_tile: TileIdx| TileGround::BARE;
+    let mut ledger = DepletionLedger::new();
+    ledger.set_recovery(quick_rules());
+    let tile = TileIdx(7);
+    let kind = ResourceKind::Food;
+    let key = ledger_key(tile, kind);
+    ledger.merge_ascending(&[(key, 3)], Tick(0), &ground);
+    let period = quick_rules()
+        .period_for(kind, TileGround::BARE)
+        .expect("the kind recovers");
+    assert!(period > 1, "a period of one measures no wait");
+    for tick in 1..period {
+        ledger.recover(Tick(u64::from(tick)), &ground);
+        assert_eq!(
+            ledger.taken(tile, kind),
+            Amount(3),
+            "the deposit recovered before the period had passed"
+        );
+    }
+    ledger.recover(Tick(u64::from(period)), &ground);
+    assert_eq!(
+        ledger.taken(tile, kind),
+        Amount(2),
         "the deposit did not regain one unit at the period"
     );
-    for _ in 0..period {
-        worked.field.step(2).expect("the step must run");
+    // The pass runs on every tick of the second period as well. A rule that
+    // dropped the remainder would recover nothing more, for ever.
+    for tick in (period + 1)..(period * 2) {
+        ledger.recover(Tick(u64::from(tick)), &ground);
+        assert_eq!(ledger.taken(tile, kind), Amount(2));
     }
+    ledger.recover(Tick(u64::from(period * 2)), &ground);
     assert_eq!(
-        worked.field.taken_from(address, kind),
-        Some(Amount(start - 2)),
+        ledger.taken(tile, kind),
+        Amount(1),
         "the deposit did not regain a second unit at the second period"
     );
 }
@@ -1172,17 +1222,15 @@ fn the_default_rules_state_a_period_for_each_kind_in_one_place() {
     assert!(rules.period_of(ResourceKind::Food).is_some());
     assert!(rules.period_of(ResourceKind::Wood).is_some());
     assert_eq!(rules.period_of(ResourceKind::Stone), None);
-    // The rate is stated in units for each simulated day and converted to a
-    // period in ticks in one place, so a change to the span of a tick moves
-    // every period together. The period therefore divides the day, and a
-    // period that did not divide it would name a rate that no table holds.
+    // The rate is stated in ticks for one unit, in one place. The period is
+    // far longer than the three ticks a gatherer needs to strip the richest
+    // food tile, so unimproved ground is never worth relying on.
     for kind in [ResourceKind::Food, ResourceKind::Wood] {
         let period = rules.period_of(kind).expect("the kind recovers");
         assert!(period > 0, "a period of zero states no rule");
-        assert_eq!(TICKS_IN_A_SIMULATED_DAY % period, 0);
         assert!(
-            period < TICKS_IN_A_SIMULATED_DAY,
-            "a deposit regains more than one unit in a simulated day"
+            period > TICKS_IN_A_SIMULATED_DAY / 8,
+            "unimproved ground regains a unit fast enough to live on"
         );
     }
     // A period of zero is refused, because it is a second way to say that a
@@ -1284,10 +1332,15 @@ fn a_gather_takes_what_the_deposit_holds_at_that_tick() {
     let (address, kind) = worked.emptied;
     let original = worked.field.original_stock(address, kind).expect("inside");
     // Let the emptied deposit recover, and stop at the first frame on which it
-    // holds something. A fixed number of frames would fill a small deposit and
-    // the case would then be the full deposit rather than the partial one.
+    // holds something. The number of frames comes from the period the engine
+    // will act on, because the moisture over the tile stretches it.
     let mut holding = Amount::ZERO;
-    for _ in 0..(WOOD_PERIOD * 2) {
+    let budget = worked
+        .field
+        .recovery_period_at(address, kind)
+        .expect("the kind recovers")
+        * 4;
+    for _ in 0..budget {
         worked.field.step(2).expect("the step must run");
         holding = worked.field.tile_stock(address, kind).expect("inside");
         if holding > Amount::ZERO {
@@ -1295,12 +1348,6 @@ fn a_gather_takes_what_the_deposit_holds_at_that_tick() {
         }
     }
     assert!(holding > Amount::ZERO, "the deposit recovered nothing");
-    assert!(
-        holding < original,
-        "the deposit is already full: it holds {} of {}",
-        holding.0,
-        original.0
-    );
 
     let unit = worked
         .field
@@ -1315,13 +1362,276 @@ fn a_gather_takes_what_the_deposit_holds_at_that_tick() {
         .filter(|event| Some(event.tile) == worked.field.grid().index_of(address))
         .map(|event| event.amount)
         .sum();
-    // The deposit recovers one more unit on the frame that the unit gathers
-    // on, because recovery runs before the resolve. The unit therefore takes
-    // no more than the deposit holds at that tick.
+    // The stored take still says that the deposit is empty of everything the
+    // units carried away. A resolve that read that stale amount would grant
+    // this unit nothing at all.
     assert!(
-        took <= holding.0 + 1,
-        "the unit took {took} from a deposit holding {}",
-        holding.0
+        took > 0,
+        "the resolve read the stale take and granted nothing"
+    );
+    // The unit never takes more than the tile ever held. Recovery returns a
+    // deposit toward what the generator gave it and never past it.
+    assert!(
+        took <= original.0,
+        "the unit took {took} from a deposit that started with {}",
+        original.0
     );
     assert!(worked.field.check_invariants());
+}
+
+#[test]
+fn moisture_shapes_how_fast_the_ground_grows_back() {
+    // Recovery answers to three things, and the moisture is one of them. Each
+    // kind holds one peak, and the peaks sit in different bands, so a watcher
+    // who reads the moisture overlay can predict where each kind grows.
+    let rules = RecoveryRules::DEFAULT;
+    let period = |kind: ResourceKind, drops: i64| {
+        rules
+            .period_for(
+                kind,
+                TileGround {
+                    moisture: drops,
+                    ..TileGround::BARE
+                },
+            )
+            .expect("the kind recovers")
+    };
+    // One quantity of drops inside each band, in band order.
+    let places: Vec<i64> = (0..MOISTURE_BAND_COUNT)
+        .map(|band| {
+            if band == 0 {
+                0
+            } else {
+                MOISTURE_BAND_CEILING[band - 1]
+            }
+        })
+        .collect();
+    for kind in [ResourceKind::Food, ResourceKind::Wood] {
+        let curve: Vec<u32> = places.iter().map(|drops| period(kind, *drops)).collect();
+        let best = curve
+            .iter()
+            .enumerate()
+            .min_by_key(|(_, period)| **period)
+            .map(|(band, _)| band)
+            .expect("the curve holds a band");
+        assert!(
+            best > 0 && best < MOISTURE_BAND_COUNT - 1,
+            "the peak of {kind:?} sits at an end of the curve, so one side says nothing"
+        );
+        // The curve falls to its peak and rises away from it, and it never
+        // turns back. Two peaks would not be one goldilocks curve.
+        for band in 1..=best {
+            assert!(
+                curve[band] <= curve[band - 1],
+                "the curve of {kind:?} rises before its peak: {curve:?}"
+            );
+        }
+        for band in (best + 1)..MOISTURE_BAND_COUNT {
+            assert!(
+                curve[band] >= curve[band - 1],
+                "the curve of {kind:?} falls after its peak: {curve:?}"
+            );
+        }
+        // Both ends are much worse than the peak, so a player sees the
+        // difference on the map.
+        assert!(
+            curve[0] >= curve[best] * 4,
+            "parched ground is not punished for {kind:?}: {curve:?}"
+        );
+        assert!(
+            curve[MOISTURE_BAND_COUNT - 1] >= curve[best] * 2,
+            "drowned ground is not punished for {kind:?}: {curve:?}"
+        );
+    }
+    // Food peaks on drier ground than wood does. This is the shape a watcher
+    // reads off the map: food along the damp middle, forest on the wet side.
+    let food_best = places
+        .iter()
+        .min_by_key(|drops| period(ResourceKind::Food, **drops))
+        .copied()
+        .expect("the curve holds a band");
+    let wood_best = places
+        .iter()
+        .min_by_key(|drops| period(ResourceKind::Wood, **drops))
+        .copied()
+        .expect("the curve holds a band");
+    assert!(
+        wood_best > food_best,
+        "wood peaks at {wood_best} drops and food at {food_best}, so the two curves are one curve"
+    );
+}
+
+#[test]
+fn stone_does_not_grow_back_whatever_the_ground_does() {
+    // Stone is not alive. No moisture and no improvement makes it return.
+    let rules = RecoveryRules::DEFAULT;
+    for drops in [0i64, 64, 512, 4096] {
+        for improvement in [0u32, 1, 16] {
+            let ground = TileGround {
+                moisture: drops,
+                improvement,
+                condition: CONDITION_FULL,
+            };
+            assert_eq!(
+                rules.period_for(ResourceKind::Stone, ground),
+                None,
+                "stone recovered at {drops} drops under an improvement of {improvement}"
+            );
+        }
+    }
+}
+
+#[test]
+fn an_improvement_makes_the_ground_grow_back_faster() {
+    // The second half of the rule. A terrace makes the tile it stands on
+    // productive, so foraging is what a faction does before it has built
+    // anything.
+    let rules = RecoveryRules::DEFAULT;
+    let table = UpgradeTable::default();
+    let kind = ResourceKind::Food;
+    let damp = 64i64;
+    let bare = rules
+        .period_for(
+            kind,
+            TileGround {
+                moisture: damp,
+                ..TileGround::BARE
+            },
+        )
+        .expect("food recovers");
+    let mut last = bare;
+    for level in 1..=2u8 {
+        let row = table
+            .row(UpgradeCategory::TERRACE, level)
+            .expect("the default table holds the terrace");
+        let period = rules
+            .period_for(
+                kind,
+                TileGround {
+                    moisture: damp,
+                    improvement: row.recovery_change,
+                    condition: CONDITION_FULL,
+                },
+            )
+            .expect("food recovers");
+        assert!(
+            period < last,
+            "level {level} of a terrace did not shorten the period: {last} then {period}"
+        );
+        last = period;
+    }
+    assert!(
+        last * 8 <= bare,
+        "a full terrace returns a unit in {last} against {bare} on bare ground"
+    );
+}
+
+#[test]
+fn a_neglected_improvement_falls_back_toward_the_bare_rate() {
+    // An upgrade wears. A terrace nobody mends stops making the ground
+    // productive, and at no condition the ground is bare ground exactly.
+    let rules = RecoveryRules::DEFAULT;
+    let kind = ResourceKind::Food;
+    let damp = 64i64;
+    let ground = |condition: i64| TileGround {
+        moisture: damp,
+        improvement: TERRACE_LEVEL_2_RECOVERY,
+        condition,
+    };
+    let bare = rules
+        .period_for(
+            kind,
+            TileGround {
+                moisture: damp,
+                ..TileGround::BARE
+            },
+        )
+        .expect("food recovers");
+    let sound = rules
+        .period_for(kind, ground(CONDITION_FULL))
+        .expect("food recovers");
+    let half = rules
+        .period_for(kind, ground(CONDITION_FULL / 2))
+        .expect("food recovers");
+    let gone = rules.period_for(kind, ground(0)).expect("food recovers");
+    assert!(sound < half, "a worn terrace was as good as a sound one");
+    assert!(half < gone, "a terrace at half condition gave nothing back");
+    assert_eq!(
+        gone, bare,
+        "a terrace at no condition did not reach the bare rate"
+    );
+}
+
+#[test]
+fn the_engine_reads_the_improvement_when_it_recovers_a_deposit() {
+    // The rules above are what the engine acts on, and this drives the
+    // engine. A test that only called the rule would prove that the rule
+    // works and not that anything reaches it.
+    //
+    // A terrace stands only on ground its own faction holds, so the fixture
+    // founds a settlement and builds inside its disc.
+    let mut field = World::new(WorldConfig {
+        width: 192,
+        height: 192,
+        seed: SEED,
+        faction_count: 4,
+        unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
+    })
+    .expect("the settings describe a world");
+    let outcomes = field.found_run_for_every_faction(30);
+    let site = outcomes
+        .iter()
+        .filter_map(|outcome| outcome.founding())
+        .map(|founding| founding.settlement())
+        .next()
+        .expect("a group seats");
+    // A terrace stands only on ground the faction holds, and the holding pass
+    // must run before the order.
+    for _ in 0..64 {
+        field.step(2).expect("the step must run");
+    }
+    let seat = field.settlements().address(site).expect("the site is live");
+    let faction = field.settlements().faction(site).expect("the site is live");
+    let chosen = disc(field.grid(), seat, SURVEY_RADIUS)
+        .into_iter()
+        .find(|place| {
+            field.upgrade_at(*place).is_none()
+                && field.holds(faction, *place) == Some(true)
+                && field.admits_a_unit(*place)
+        })
+        .expect("the disc of a seated site holds a free tile its faction holds");
+    field
+        .zone_project(faction, chosen, UpgradeCategory::TERRACE)
+        .expect("a terrace fits a tile the faction holds");
+    let builder = field
+        .spawn_soldier(chosen, faction)
+        .expect("the chosen tile takes a unit");
+    field
+        .order_build(builder, UpgradeCategory::TERRACE)
+        .expect("the plan names a terrace on the tile the builder stands on");
+    // The order is placed again on every tick, because a builder does not
+    // stay on the tile it builds.
+    let mut waited = 0u32;
+    while field.upgrade_level(chosen) == 0 && waited < 3000 {
+        field.step(2).expect("the step must run");
+        waited += 1;
+        let _ = field.order_build(builder, UpgradeCategory::TERRACE);
+    }
+    assert!(
+        field.upgrade_level(chosen) > 0,
+        "the fixture finished no terrace, so the assertion below measures nothing"
+    );
+    let terraced = field
+        .recovery_period_at(chosen, ResourceKind::Food)
+        .expect("food recovers");
+    // The comparison destroys the terrace and reads the period again, so the
+    // moisture of this tick is the moisture of both readings.
+    assert!(field.destroy_upgrade(chosen), "the terrace stood there");
+    let bare = field
+        .recovery_period_at(chosen, ResourceKind::Food)
+        .expect("food recovers");
+    assert!(
+        terraced < bare,
+        "the engine read no change from the terrace: {terraced} with it and {bare} without"
+    );
 }

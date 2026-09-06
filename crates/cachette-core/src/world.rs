@@ -76,7 +76,7 @@ use crate::rates::{RateError, RateLedger, RateSchedule, RateTable, SiteShortfall
 use crate::relation::{RelationCrossed, RelationError, RelationMatrix, RelationRules};
 use crate::resource::{
     ledger_key, Amount, CarryLoad, DepletionLedger, RecoveryRules, ResourceField, ResourceKind,
-    RESOURCE_KIND_COUNT,
+    TileGround, RESOURCE_KIND_COUNT,
 };
 use crate::rng;
 use crate::sim_math;
@@ -5305,7 +5305,13 @@ impl World {
         // [^14]: ADR-0080, a depleted deposit recovers by ageing the stored take, decisions D1 and D2. `docs/adrs/accepted/adr-0080-a-depleted-deposit-recovers-by-ageing-the-stored-take.md`
         {
             let _span = stage::open(Stage::DepletionRecover);
-            self.depletion.recover(tick);
+            // The ledger comes out of the world for the pass, so that the
+            // pass can read the weather and the upgrade map beside it. It
+            // goes back in the same block, and nothing between the two lines
+            // reads it.
+            let mut depletion = core::mem::take(&mut self.depletion);
+            depletion.recover(tick, &|tile| self.tile_ground(tile));
+            self.depletion = depletion;
         }
 
         {
@@ -5817,6 +5823,30 @@ impl World {
         }
     }
 
+    /// Returns the ticks that one deposit here takes to regain one unit.
+    ///
+    /// **This is the answer the recovery pass acts on.** The reader calls the
+    /// same rule the pass calls, over the same ground, so a caller that shows
+    /// the number and a pass that uses it cannot disagree.[^1]
+    ///
+    /// The answer moves with the weather and with what stands on the tile. A
+    /// caller that asks twice at different ticks gets two answers, and both
+    /// are correct at the tick they were asked at.
+    ///
+    /// Returns `None` when the address lies outside the world, and when the
+    /// kind does not recover at all.
+    ///
+    /// # References
+    ///
+    /// [^1]: Recurring defect shapes, shape 1. `.agents/rules/recurring-defects.md`
+    #[must_use]
+    pub fn recovery_period_at(&self, address: Axial, kind: ResourceKind) -> Option<u32> {
+        let tile = self.grid.index_of(address)?;
+        self.depletion
+            .recovery()
+            .period_for(kind, self.tile_ground(tile))
+    }
+
     /// Returns the weather field of the world.
     ///
     /// The field is a plane over the level 1 cell lattice. It holds the water
@@ -5978,6 +6008,47 @@ impl World {
     #[must_use]
     pub const fn weather_layout(&self) -> BlockLayout {
         self.weather_layout
+    }
+
+    /// Returns what the recovery rule needs to know about one tile.
+    ///
+    /// The reader gathers the moisture over the tile and the upgrade that
+    /// stands on it. It applies neither. The recovery rule holds the whole of
+    /// the arithmetic, so the moisture cannot be read one way here and
+    /// another way there.[^1]
+    ///
+    /// The moisture is the water on the ground of the weather cell that
+    /// covers the tile, which is not the level 1 cell unless the world takes
+    /// the level 1 pitch.[^2] The
+    /// value is the one that the solve of the previous frame left, in the
+    /// same way the gather resolve reads it.
+    ///
+    /// A tile that carries no finished upgrade answers with bare ground.
+    ///
+    /// # References
+    ///
+    /// [^1]: Recurring defect shapes, shape 1. `.agents/rules/recurring-defects.md`
+    /// [^2]: ADR-0140, weather is a field over the level 1 cell lattice, decision D1. `docs/adrs/draft/adr-0140-weather-is-a-field-over-the-level-1-cell-lattice.md`
+    #[must_use]
+    fn tile_ground(&self, tile: TileIdx) -> TileGround {
+        let moisture = self
+            .weather_cell_of(tile)
+            .map_or(0, |cell| self.weather.ground_at(cell).0);
+        let Some(site) = self.upgrades.at(tile) else {
+            return TileGround {
+                moisture,
+                ..TileGround::BARE
+            };
+        };
+        let improvement = self
+            .upgrade_table
+            .row(site.category, site.level)
+            .map_or(0, |row| row.recovery_change);
+        TileGround {
+            moisture,
+            improvement,
+            condition: site.condition.0,
+        }
     }
 
     /// Returns why one soldier chose what it chose.
@@ -8739,7 +8810,12 @@ impl World {
             }
             at = end;
         }
-        self.depletion.merge_ascending(&run, tick);
+        // The ledger comes out of the world for the merge, for the reason the
+        // recovery pass takes it out: the merge ages each entry to this tick
+        // first, and ageing reads the weather and the upgrade map.
+        let mut depletion = core::mem::take(&mut self.depletion);
+        depletion.merge_ascending(&run, tick, &|tile| self.tile_ground(tile));
+        self.depletion = depletion;
         Ok(())
     }
 
