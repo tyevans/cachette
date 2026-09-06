@@ -578,7 +578,7 @@ impl TileGround {
     ///
     /// # References
     ///
-    /// [^1]: ADR-0154, an upgrade wears, and a worker mends it. `docs/adrs/accepted/adr-0154-an-upgrade-wears-and-a-worker-mends-it.md`
+    /// [^1]: The condition of an upgrade site, and the wear that lowers it. `crates/cachette-core/src/upgrade.rs`
     /// [^2]: ADR-0002, simulated and aggregated state holds no floating point number, decision D1. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
     #[must_use]
     pub fn speedup(self) -> u32 {
