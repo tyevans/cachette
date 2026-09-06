@@ -45,12 +45,14 @@ pub mod paint;
 pub mod panel;
 pub mod picture;
 pub mod text;
+pub mod tween;
 
-pub use frame::{fill_frame, FrameError, Surface, LATTICE_BOUND};
+pub use frame::{fill_frame, fill_frame_paced, FrameError, Surface, LATTICE_BOUND};
 pub use glass::Overlay;
 pub use hud::{FoundingReport, Readout};
 pub use metrics::{Lap, Metrics};
 pub use paint::{Camera, Canvas, Extent, FrameSize};
+pub use tween::{speed_word, Motion, Pace, ONE_TICK_EACH_FRAME, TWEEN_REACH};
 
 use cachette_core::founding::FoundingOutcome;
 use cachette_core::{BridgeError, World};
@@ -101,9 +103,60 @@ pub fn draw_frame(
     overlay: Overlay,
     canvas: &mut Canvas<'_>,
 ) -> Result<Readout, BridgeError> {
-    paint::draw(world, camera, canvas)?;
+    let mut motion = Motion::none();
+    draw_frame_paced(
+        world,
+        camera,
+        metrics,
+        outcomes,
+        overlay,
+        Pace::STILL,
+        &mut motion,
+        canvas,
+    )
+}
+
+/// Draws one frame at a pace the caller sets, and remembers where units were.
+///
+/// **This is the one drawing path.** The call above is this call at a still
+/// pace and with a table that records nothing, so there is one renderer and
+/// not two.[^6]
+///
+/// The pace carries two numbers. The phase is the share of the current tick
+/// that has elapsed on the wall clock, and it moves a unit that changed tile
+/// between the two tile centres. The speed is the ticks each frame runs, in
+/// thousandths, and the overlay renders it as a word beside the tick. **No
+/// text crosses from the caller**, because the caller sends a number and the
+/// viewer holds the words.[^7]
+///
+/// The table is the caller's memory of the last frame. The world holds one
+/// tick at a time, so a viewer that draws between two ticks must keep its
+/// own record of the first.[^8]
+///
+/// # Errors
+///
+/// Returns an error when the engine's spatial structure no longer describes
+/// its soldiers.
+///
+/// # References
+///
+/// [^6]: ADR-0094, the caller owns the camera and the pixels, decision D5. `docs/adrs/draft/adr-0094-the-caller-owns-the-camera-and-the-pixels.md`
+/// [^7]: ADR-0093, the window shows what changes, decision D5. `docs/adrs/draft/adr-0093-the-window-shows-what-changes.md`
+/// [^8]: ADR-0067, the viewer reads the world and never writes to it, decision D2. `docs/adrs/accepted/adr-0067-the-viewer-reads-the-world-and-never-writes-to-it.md`
+#[allow(clippy::too_many_arguments)]
+pub fn draw_frame_paced(
+    world: &World,
+    camera: Camera,
+    metrics: &Metrics,
+    outcomes: &[FoundingOutcome],
+    overlay: Overlay,
+    pace: Pace,
+    motion: &mut Motion,
+    canvas: &mut Canvas<'_>,
+) -> Result<Readout, BridgeError> {
+    paint::draw_paced(world, camera, canvas, pace, motion)?;
     paint::mark_foundings(camera, canvas, outcomes);
-    let readout = Readout::of(world, camera, canvas, metrics, outcomes);
+    let readout = Readout::of(world, camera, canvas, metrics, outcomes).at_speed(pace.speed_milli);
     match overlay {
         Overlay::Glass { reference } => glass::draw(&readout, canvas, reference),
         Overlay::Panel => hud::draw(&readout, canvas),
