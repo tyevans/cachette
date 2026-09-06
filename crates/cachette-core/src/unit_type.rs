@@ -66,6 +66,10 @@ pub const MERCHANT: UnitTypeId = UnitTypeId(2);
 /// reach and does nothing else.
 pub const LEADER: UnitTypeId = UnitTypeId(3);
 
+/// The settler row of the default table. It founds a city and does nothing
+/// else.
+pub const SETTLER: UnitTypeId = UnitTypeId(6);
+
 /// The open row of the default table. Every column is zero, and a game fills
 /// it.
 pub const OPEN: UnitTypeId = UnitTypeId(4);
@@ -294,6 +298,20 @@ declare_unit_type_row! {
     /// refused at the shoreline in the way every type was before the column
     /// existed.
     water_crossing: u32,
+    /// The people that a founding by this unit seats at the new city.
+    ///
+    /// Zero means the type cannot found a city, and the settle verb refuses
+    /// the unit. A value above zero is the size of the group the founding
+    /// seats, and the settle verb hands it to the founding path the seeding
+    /// layer uses.[^4]
+    ///
+    /// **The column is a quantity and not a flag.** A settler is spent by
+    /// the founding, so the group is what the new city starts with.
+    ///
+    /// # References
+    ///
+    /// [^4]: ADR-0150, held ground is the ground within reach of a city its faction owns, decision D5. `docs/adrs/draft/adr-0150-held-ground-is-the-ground-within-reach-of-a-city-its-faction-owns.md`
+    settle_group: u32,
 }
 
 impl UnitTypeRow {
@@ -308,6 +326,7 @@ impl UnitTypeRow {
         command_reach: 0,
         weather_reach: 0,
         water_crossing: 0,
+        settle_group: 0,
     };
 }
 
@@ -316,7 +335,7 @@ impl UnitTypeRow {
 // ---------------------------------------------------------------------------
 //
 // Every value below is a placeholder. The balance register holds the row
-// "Default table, five rows by eight columns" as unset, and the balance
+// "Default table, six rows by nine columns" as unset, and the balance
 // harness of pass 10 sets it. Do not tune a value here. A placeholder is
 // chosen so that a world built with the table behaves as the world did
 // before the row was widened: a worker takes the tile rate, adds the builder
@@ -369,6 +388,7 @@ pub const WORKER_ROW: UnitTypeRow = UnitTypeRow {
     command_reach: 0,
     weather_reach: 0,
     water_crossing: 0,
+    settle_group: 0,
 };
 
 /// The soldier row. It fights, and it does nothing else.
@@ -382,6 +402,7 @@ pub const SOLDIER_ROW: UnitTypeRow = UnitTypeRow {
     command_reach: 0,
     weather_reach: 0,
     water_crossing: 0,
+    settle_group: 0,
 };
 
 /// The merchant row. It carries, and it does nothing else.
@@ -395,7 +416,20 @@ pub const MERCHANT_ROW: UnitTypeRow = UnitTypeRow {
     command_reach: 0,
     weather_reach: 0,
     water_crossing: 0,
+    settle_group: 0,
 };
+
+/// The placeholder group that a founding by a settler seats.
+///
+/// It is one: the smallest group the founding path admits, because a survey
+/// refuses a group of nobody. The settler is spent by the founding, so one
+/// person takes its place and the unit count of the faction does not move on
+/// a founding.[^1]
+///
+/// # References
+///
+/// [^1]: Balance register, unit types, the default table row. `docs/reference/balance.md`
+pub const PLACEHOLDER_SETTLE_GROUP: u32 = 1;
 
 /// The leader row. It holds command reach and weather reach, and it does
 /// nothing else.
@@ -409,6 +443,7 @@ pub const LEADER_ROW: UnitTypeRow = UnitTypeRow {
     command_reach: PLACEHOLDER_REACH,
     weather_reach: PLACEHOLDER_REACH,
     water_crossing: 0,
+    settle_group: 0,
 };
 
 /// The placeholder water crossing of the mariner row.
@@ -441,13 +476,28 @@ pub const MARINER_ROW: UnitTypeRow = UnitTypeRow {
     command_reach: 0,
     weather_reach: 0,
     water_crossing: PLACEHOLDER_WATER_CROSSING,
+    settle_group: 0,
+};
+
+/// The settler row. It founds a city, and it does nothing else.
+pub const SETTLER_ROW: UnitTypeRow = UnitTypeRow {
+    attack: Fix32::ZERO,
+    armour: Fix32::ZERO,
+    gather_rate: Fix32::ZERO,
+    build_rate: Fix32::ZERO,
+    carry_capacity: 0,
+    move_cost_scale: PLACEHOLDER_FULL_RATE,
+    command_reach: 0,
+    weather_reach: 0,
+    water_crossing: 0,
+    settle_group: PLACEHOLDER_SETTLE_GROUP,
 };
 
 /// The default table that a world is built with.
 ///
-/// It holds the worker, the soldier, the merchant, the leader, one open row
-/// and the mariner, in that order. Every row above the mariner is zero, so a
-/// caller that wants a seventh type writes it.[^1]
+/// It holds the worker, the soldier, the merchant, the leader, one open
+/// row, the mariner and the settler, in that order. Every row above the
+/// settler is zero, so a caller that wants an eighth type writes it.[^1]
 ///
 /// # References
 ///
@@ -460,6 +510,7 @@ pub const DEFAULT_UNIT_TYPE_TABLE: UnitTypeTable = {
     rows[LEADER.index()] = LEADER_ROW;
     rows[OPEN.index()] = UnitTypeRow::NONE;
     rows[MARINER.index()] = MARINER_ROW;
+    rows[SETTLER.index()] = SETTLER_ROW;
     UnitTypeTable { rows }
 };
 
@@ -674,8 +725,10 @@ mod tests {
             move_cost_scale: Fix32(6),
             command_reach: 7,
             weather_reach: 8,
+            water_crossing: 9,
+            settle_group: 10,
         };
-        assert_eq!(row.columns(), [1, 2, 3, 4, 5, 6, 7, 8]);
+        assert_eq!(row.columns(), [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
         assert_eq!(
             UnitTypeRow::COLUMN_NAMES,
             [
@@ -687,19 +740,23 @@ mod tests {
                 "move_cost_scale",
                 "command_reach",
                 "weather_reach",
+                "water_crossing",
+                "settle_group",
             ]
         );
     }
 
     #[test]
-    fn the_default_table_holds_five_rows_and_zero_above_them() {
+    fn the_default_table_holds_its_rows_and_zero_above_them() {
         let table = DEFAULT_UNIT_TYPE_TABLE;
         assert_eq!(table.row(WORKER), WORKER_ROW);
         assert_eq!(table.row(SOLDIER), SOLDIER_ROW);
         assert_eq!(table.row(MERCHANT), MERCHANT_ROW);
         assert_eq!(table.row(LEADER), LEADER_ROW);
         assert_eq!(table.row(OPEN), UnitTypeRow::NONE);
-        for above in (OPEN.index() + 1)..UNIT_TYPE_COUNT {
+        assert_eq!(table.row(MARINER), MARINER_ROW);
+        assert_eq!(table.row(SETTLER), SETTLER_ROW);
+        for above in (SETTLER.index() + 1)..UNIT_TYPE_COUNT {
             assert_eq!(table.rows()[above], UnitTypeRow::NONE);
         }
         assert!(table.check_invariants());
