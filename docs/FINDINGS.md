@@ -2063,7 +2063,7 @@ writer wrote for the same world and camera.[^F497D]
 layout. A read-only audit reported the item done. It searched the Python
 package for the three ways a layout gets repeated, which are a buffer read, a
 structure unpack and a structured array type, and it found none of
-them.[^F520A] It concluded that no second declaration site remained.
+them.[^F526A] It concluded that no second declaration site remained.
 
 **True.** The negative result is correct and the conclusion does not follow.
 No Python module reads a byte of an event, and the runtime path was and is
@@ -12912,7 +12912,6 @@ finding that names the shape.
 [^F538A]: The consumption conservation test. `crates/cachette-core/tests/consumption.rs`
 [^F539A]: Backlog item 0059, the done list. `docs/backlog/complete/0059-give-a-site-a-housing-capacity-and-a-resident-reader.md`
 [^F539B]: ADR-0157, a site's free places are its built housing less the residents the engine counts, decision D1. `docs/adrs/accepted/adr-0157-a-sites-free-places-are-its-built-housing-less-the-residents-the-engine-counts.md`
-[^F520A]: Recurring Defect Shapes, shape 1. `.agents/rules/recurring-defects.md`
 [^F520B]: ADR-0085, an entity crosses to Python as one opaque identity that the engine resolves. `docs/adrs/accepted/adr-0085-an-entity-crosses-to-python-as-one-opaque-identity.md`
 [^F520C]: The type stub of the compiled module. `python/cachette/_core.pyi`
 [^F520D]: The Python bindings. `crates/cachette-py/src/lib.rs`
