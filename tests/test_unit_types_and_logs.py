@@ -68,6 +68,15 @@ CONTEST_CEILING = 40
 SHORT_EXTENT = 64
 SHORT_FACTIONS = 4
 
+# How many people each faction founds with in the world above.
+#
+# **The fixture asks for this number and does not read the default.** The
+# shortage is the case under test. A faction that founds with the engine
+# default founds too few people to compete for ground, so no site rations and
+# no unit starves. The fixture read the default until the project owner set it
+# to two, and the three log tests then ran to the ceiling and found nothing.
+SHORT_GROUP = 64
+
 # How many steps each log test may take before it gives up.
 #
 # A rationed entry lands on the first scheduled step, a promotion inside the
@@ -117,7 +126,7 @@ def _short_world(seed: int) -> cachette.World:
         seed=seed,
         faction_count=SHORT_FACTIONS,
     )
-    world.found_run_for_every_faction()
+    world.found_run_for_every_faction(SHORT_GROUP)
     return world
 
 
