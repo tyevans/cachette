@@ -240,7 +240,7 @@ table for the demonstration and the balance register holds its rows.[^17]
 [^6]: Backlog item 0348. `docs/backlog/proposed/0348-make-the-upgrade-catalogue-a-table-the-world-is-built-with.md`
 [^7]: PRD-0055, a god raises the ground its people hold, and sees what stands there. `docs/product/shaped/prd-0055-a-god-raises-the-ground-its-people-hold-and-sees-what-stands-there.md`
 [^8]: Backlog item 0475. `docs/backlog/proposed/0475-give-an-upgrade-a-condition-that-armies-wear-and-workers-repair.md`
-[^9]: Backlog item 0479. `docs/backlog/proposed/0479-end-the-game-on-domination-wealth-wonder-or-renown.md`
+[^9]: Backlog item 0479. `docs/backlog/complete/0479-end-the-game-on-domination-wealth-wonder-or-renown.md`
 [^10]: ADR-0068, terrain is generated from the seed and is never stored as a map, decision D1. `docs/adrs/accepted/adr-0068-terrain-is-generated-from-the-seed-and-is-never-stored-as-a-map.md`
 [^11]: ADR-0072, a tile stock is generated, and only what was taken is stored, decision D1. `docs/adrs/accepted/adr-0072-a-tile-stock-is-generated-and-only-what-was-taken-is-stored.md`
 [^12]: ADR-0088, a tile field is a generated base and a stored change, decision D1. `docs/adrs/draft/adr-0088-a-tile-field-is-a-generated-base-and-a-stored-change.md`
