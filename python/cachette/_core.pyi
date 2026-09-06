@@ -53,6 +53,13 @@ import numpy.typing as npt
 # identities passes that. Both are one crossing, so both are allowed.
 Identities = Sequence[int] | npt.NDArray[np.uint64]
 
+# What ``World.log`` gives back for any log the register holds.
+#
+# The keys are the column names of the event. The element type of each array
+# follows the field, and ``event_schema`` states it. A caller that knows which
+# log it asked for narrows this to the typed dictionary of that event.
+EventColumns = dict[str, npt.NDArray[np.generic]]
+
 class TileChangedColumns(TypedDict):
     """One column for each field of the tile change event.
 
@@ -70,6 +77,67 @@ class TileChangedColumns(TypedDict):
     value: npt.NDArray[np.int32]
     holder: npt.NDArray[np.uint16]
     kind: npt.NDArray[np.uint8]
+    # End of the generated block.
+
+class UpgradeCollapsedColumns(TypedDict):
+    """One column for each field of the upgrade collapse event.
+
+    An upgrade collapses when the weather and a hostile army take the last of
+    its condition. The entry is then removed and the tile returns to the
+    ground the generator made, so this event is the only record that anything
+    stood there.
+
+    The cause column says what took the last of the condition. One is the
+    weather, two is a hostile army, and three is both.
+
+    The holder column names the faction that held the tile, or 65535 for
+    nobody.
+    """
+
+    # Generated from the engine by scripts/generate_event_stubs.py.
+    tick: npt.NDArray[np.uint64]
+    tile: npt.NDArray[np.uint32]
+    holder: npt.NDArray[np.uint16]
+    category: npt.NDArray[np.uint8]
+    level: npt.NDArray[np.uint8]
+    cause: npt.NDArray[np.uint8]
+    # End of the generated block.
+
+class UpgradeFinishedColumns(TypedDict):
+    """One column for each field of the upgrade level event.
+
+    The event says that a level of an upgrade finished and now stands on the
+    tile. A level of one means that the first level finished, so something
+    stands on ground that carried nothing.
+
+    The category column carries the category number. A wonder is category
+    two, so a reader finds a finished wonder in this log and needs no second
+    reader for it.
+    """
+
+    # Generated from the engine by scripts/generate_event_stubs.py.
+    tick: npt.NDArray[np.uint64]
+    tile: npt.NDArray[np.uint32]
+    holder: npt.NDArray[np.uint16]
+    category: npt.NDArray[np.uint8]
+    level: npt.NDArray[np.uint8]
+    # End of the generated block.
+
+class SettlementFoundedColumns(TypedDict):
+    """One column for each field of the settlement founding event.
+
+    The settlement column holds the whole identity of the settlement. It is
+    not a slot index.
+
+    A founding made between two steps stays in the log until the next step
+    clears it.
+    """
+
+    # Generated from the engine by scripts/generate_event_stubs.py.
+    tick: npt.NDArray[np.uint64]
+    settlement: npt.NDArray[np.uint64]
+    tile: npt.NDArray[np.uint32]
+    faction: npt.NDArray[np.uint16]
     # End of the generated block.
 
 class Storm(TypedDict):
@@ -934,6 +1002,9 @@ class World:
     def soldier_count(self) -> int: ...
     def event_log_bytes(self) -> bytes: ...
     def event_log_columns(self) -> TileChangedColumns: ...
+    def log_names(self) -> list[str]: ...
+    def log(self, name: str) -> EventColumns: ...
+    def log_count(self, name: str) -> int: ...
     def gather_log_columns(self) -> ResourceTakenColumns: ...
     def tile_values(self) -> npt.NDArray[np.int32]: ...
     def spawn_soldiers(
@@ -1182,3 +1253,4 @@ def version() -> str: ...
 def stock_target() -> int: ...
 def stock_ceiling_of_one_settlement() -> int: ...
 def event_schema() -> dict[str, list[tuple[str, str]]]: ...
+def faction_colours() -> list[int]: ...

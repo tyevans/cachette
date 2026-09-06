@@ -13,8 +13,10 @@
 //! [^2]: ADR-0042, the interpreter is released for the whole step. `docs/adrs/REGISTRY.md`
 
 mod columns;
+pub mod logs;
 
 use crate::columns::columns_of;
+use crate::logs::{log_names, log_of, unknown_log_message};
 use cachette_core::campaign::{CampaignEvent, CampaignRow};
 use cachette_core::census::{census, CensusError};
 use cachette_core::character::CharacterArena;
@@ -41,7 +43,7 @@ use cachette_view::{
 };
 use numpy::{PyArray1, PyReadwriteArray1, ToPyArray};
 use pyo3::create_exception;
-use pyo3::exceptions::PyException;
+use pyo3::exceptions::{PyException, PyValueError};
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 use pyo3::PyTypeInfo;
@@ -527,6 +529,75 @@ impl PyWorld {
     fn event_log_columns<'py>(&self, python: Python<'py>) -> PyResult<Bound<'py, PyDict>> {
         let world = self.lock();
         columns_of(python, world.event_log())
+    }
+
+    /// Returns the name of every event log, as a `list` of `str`.
+    ///
+    /// **This is how a caller finds out what the engine publishes.** A log
+    /// added to the engine appears here with no new method on this class, no
+    /// new entry in the type stub and no new name for a caller to learn. Hand
+    /// any name from this list to `log` and to `log_count`.
+    ///
+    /// The name of a log is the name its event declares, and `event_schema`
+    /// gives the columns of every one of them under the same names.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0163, an event declares its layout once and the binding derives every column. `docs/adrs/draft/adr-0163-an-event-declares-its-layout-once-and-the-binding-derives-every-column.md`
+    fn log_names(&self) -> Vec<&'static str> {
+        log_names()
+    }
+
+    /// Returns one event log, as a `dict` of NumPy arrays.
+    ///
+    /// The name is one of the names `log_names` gives. The keys are the
+    /// column names the event declares, and `event_schema` states them and
+    /// their element types. Every array has one entry for each record, and
+    /// all of them are the same length. That length is `log_count` of the
+    /// same name.
+    ///
+    /// **A log holds what happened since the last step began.** The step
+    /// clears it before any system runs, so a caller reads it after each step
+    /// and a caller that misses a step misses the events. This is the rule for
+    /// every log, and it is not the rule for `subsystem_census`, whose rows
+    /// are marked as a running total or as a count of what stands.
+    ///
+    /// No element type is a floating point type. A fixed-point column crosses
+    /// as its raw integer.[^2]
+    ///
+    /// This method copies each column. The log of one step is small next to
+    /// the world.[^3]
+    ///
+    /// # Errors
+    ///
+    /// Raises `ValueError` when no log has the given name. The message lists
+    /// every name.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0163, an event declares its layout once and the binding derives every column. `docs/adrs/draft/adr-0163-an-event-declares-its-layout-once-and-the-binding-derives-every-column.md`
+    /// [^2]: ADR-0002, simulated and aggregated state holds no floating point number, decision D1. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
+    /// [^3]: ADR-0044, what copies and what does not is declared at the call site. `docs/adrs/REGISTRY.md`
+    fn log<'py>(&self, python: Python<'py>, name: &str) -> PyResult<Bound<'py, PyDict>> {
+        let entry = log_of(name)
+            .ok_or_else(|| PyValueError::new_err(unknown_log_message(name)))?;
+        let world = self.lock();
+        (entry.read)(python, &world)
+    }
+
+    /// Returns how many records one event log holds, as an integer.
+    ///
+    /// The name is one of the names `log_names` gives. The count covers the
+    /// events since the last step began, in the same way `log` does.
+    ///
+    /// # Errors
+    ///
+    /// Raises `ValueError` when no log has the given name.
+    fn log_count(&self, name: &str) -> PyResult<usize> {
+        let entry = log_of(name)
+            .ok_or_else(|| PyValueError::new_err(unknown_log_message(name)))?;
+        let world = self.lock();
+        Ok((entry.count)(&world))
     }
 
     /// Returns the gather log of the last step, as a `dict` of NumPy arrays.
@@ -7658,6 +7729,28 @@ fn event_schema(python: Python<'_>) -> PyResult<Bound<'_, PyDict>> {
     Ok(schema)
 }
 
+/// Returns the colours the viewer paints the factions in, as a `list`.
+///
+/// Each entry is a colour as one integer, red in the highest byte, then
+/// green, then blue. The entry at index `n` is the colour of faction `n`. A
+/// faction beyond the end of the list wraps to a colour it shares, which is
+/// a display limit and not a simulation one.
+///
+/// **The viewer states this table once, and a caller reads it here.** A
+/// script that wrote its own copy painted a faction in a colour the viewer no
+/// longer used, and nothing failed.[^1]
+///
+/// The colours belong to the viewer. The simulated state holds no colour.[^2]
+///
+/// # References
+///
+/// [^1]: Recurring Defect Shapes, shape 1. `.agents/rules/recurring-defects.md`
+/// [^2]: ADR-0067, the viewer reads the world and never writes to it, decision D2. `docs/adrs/accepted/adr-0067-the-viewer-reads-the-world-and-never-writes-to-it.md`
+#[pyfunction]
+fn faction_colours() -> Vec<u32> {
+    cachette_view::paint::faction_colours().to_vec()
+}
+
 /// Returns the version of the `cachette` package, as a `str`.
 ///
 /// The value is the version of the compiled extension module. The package
@@ -7824,6 +7917,7 @@ fn cachette_core_module(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(stock_target, module)?)?;
     module.add_function(wrap_pyfunction!(stock_ceiling_of_one_settlement, module)?)?;
     module.add_function(wrap_pyfunction!(event_schema, module)?)?;
+    module.add_function(wrap_pyfunction!(faction_colours, module)?)?;
     add_error::<CachetteError>(module, "CachetteError")?;
     add_error::<StepError>(module, "StepError")?;
     add_error::<FrameError>(module, "FrameError")?;
