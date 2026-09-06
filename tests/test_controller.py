@@ -38,6 +38,8 @@ CENSUS_NAMES = [
     "seats_filled",
     "characters",
     "upgrades_complete",
+    "wonders_complete",
+    "stores_built",
     "luxury_tiles",
     "storms_raised",
     "contracts",
@@ -165,3 +167,50 @@ def test_the_demonstration_runs_to_the_end_and_prints_the_census(
     assert any(line.startswith("census at tick 4") for line in lines)
     for name in CENSUS_NAMES:
         assert any(line.strip().startswith(f"{name}:") for line in lines), name
+
+
+def test_the_standing_of_a_faction_names_every_path_and_the_paths_are_four() -> None:
+    """One running value per path, and a stranger is refused."""
+    world = seeded_world()
+    world.step(1)
+    standing = world.standing(0)
+    assert list(standing) == [
+        "held_tiles",
+        "seats_held",
+        "store_total",
+        "best_renown",
+        "wonder_progress",
+    ]
+    assert all(isinstance(value, int) for value in standing.values())
+    assert standing["held_tiles"] == world.score(0)
+    with pytest.raises(VerbError):
+        world.standing(FACTIONS)
+    census = world.subsystem_census()
+    assert census["wonders_complete"] == 0
+    assert census["stores_built"] == 0
+
+
+def test_a_character_at_the_renown_target_ends_the_game_by_renown() -> None:
+    """The renown path fires only when a caller writes the column."""
+    world = World(width=EXTENT, height=EXTENT, seed=SEED, faction_count=FACTIONS)
+    world.set_tick_limit(1000)
+    address = next(
+        (q, r)
+        for r in range(EXTENT)
+        for q in range(EXTENT)
+        if world.tile_report(q, r)["passable"]
+    )
+    world.spawn_soldiers([address], faction=0)
+    world.spawn_soldiers([address], faction=1)
+    person = world.create_characters(faction=1, count=1)[0]
+    target = 100 << 16
+    world.set_character_renown([int(person)], target - 1)
+    world.step(1)
+    assert world.game_end() is None
+    assert world.standing(1)["best_renown"] == target - 1
+    world.set_character_renown([int(person)], target)
+    world.step(1)
+    end = world.game_end()
+    assert end is not None
+    assert end["path"] == "renown"
+    assert end["winner"] == 1

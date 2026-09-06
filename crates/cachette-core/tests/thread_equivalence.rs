@@ -20,7 +20,8 @@ use cachette_core::resource::{Amount, RecoveryRules, ResourceKind};
 use cachette_core::site::CommodityId;
 use cachette_core::terrain::TileKind;
 use cachette_core::unit_type::{UnitTypeId, UnitTypeRow, WORKER_ROW};
-use cachette_core::{Axial, Entity, FactionId, Fix32, Influence, World, WorldConfig};
+use cachette_core::upgrade::UpgradeKind;
+use cachette_core::{Axial, Entity, FactionId, Fix32, Influence, WinPath, World, WorldConfig};
 
 /// Returns a worker row that fights with the given attack and armour.
 ///
@@ -156,6 +157,88 @@ fn a_seeded_world_with_the_controller_gives_one_answer_at_every_thread_count() {
         assert_eq!(
             hash, expected_hash,
             "the seeded state hash differs at {threads} threads"
+        );
+    }
+}
+
+/// Runs a world in which a tile of builders finishes a wonder and the game
+/// ends on it, then steps past the end, and returns its log and its hash.
+///
+/// The builders stand on an island, an open tile whose every neighbour
+/// refuses a unit, so they never move. One rival unit elsewhere keeps the
+/// domination reader quiet, so the end this run crosses is the wonder.
+fn run_with_wonder(threads: usize) -> (Vec<u8>, u64) {
+    let config = WorldConfig {
+        width: 192,
+        height: 192,
+        seed: 102,
+        faction_count: 2,
+        unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
+    };
+    let mut world = World::new(config).expect("the extent must describe a world");
+    world
+        .set_choice_schedule(cachette_core::choose::PERIOD_LOG2_CEILING)
+        .expect("the exponent is inside the range");
+    let grid = world.grid();
+    let open: Vec<Axial> = (0..grid.tile_count())
+        .map(|index| Axial::new((index % grid.width()) as i32, (index / grid.width()) as i32))
+        .filter(|address| world.admits_a_unit(*address))
+        .collect();
+    let site = open
+        .iter()
+        .copied()
+        .find(|address| {
+            world
+                .grid()
+                .neighbours(*address)
+                .iter()
+                .all(|side| side.is_none_or(|next| !world.admits_a_unit(next)))
+        })
+        .expect("the scenario must find an island");
+    let room = world
+        .tile_capacity(site)
+        .expect("the island is inside the world");
+    for _ in 0..room {
+        let unit = world
+            .spawn_soldier(site, FactionId(0))
+            .expect("the island admits a unit");
+        assert!(world.order_build(unit, UpgradeKind::Wonder));
+    }
+    let elsewhere = open
+        .iter()
+        .copied()
+        .find(|address| *address != site)
+        .expect("the scenario must find a second open tile");
+    world
+        .spawn_soldier(elsewhere, FactionId(1))
+        .expect("the ground admits a unit");
+    let frames = UpgradeKind::Wonder.work() as u64 / u64::from(room) + 8;
+    for _ in 0..frames {
+        world.step(threads).expect("the step must run");
+    }
+    assert_eq!(
+        world.game_end().win_path(),
+        Some(WinPath::WealthOrWonder),
+        "the run must cross the wonder end"
+    );
+    (
+        world.event_log_bytes().to_vec(),
+        world.state_hash().finish(),
+    )
+}
+
+#[test]
+fn a_world_that_finishes_a_wonder_gives_one_answer_at_every_thread_count() {
+    let (expected_log, expected_hash) = run_with_wonder(THREAD_COUNTS[0]);
+    for threads in &THREAD_COUNTS[1..] {
+        let (log, hash) = run_with_wonder(*threads);
+        assert_eq!(
+            log, expected_log,
+            "the wonder event log differs at {threads} threads"
+        );
+        assert_eq!(
+            hash, expected_hash,
+            "the wonder state hash differs at {threads} threads"
         );
     }
 }

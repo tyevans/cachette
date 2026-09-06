@@ -258,7 +258,9 @@ class Demo:
         if end is None or self.announced_end:
             return end
         self.announced_end = True
-        print(f"tick {end['tick']}: faction {end['winner']} wins by {end['path']}")
+        # The engine names a path with underscores. A watcher reads words.
+        path = end["path"].replace("_", " ")
+        print(f"tick {end['tick']}: faction {end['winner']} wins by {path}")
         return end
 
     def toggle_panel(self, name: str) -> None:

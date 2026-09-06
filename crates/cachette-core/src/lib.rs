@@ -129,6 +129,7 @@ pub use weather::{
     WET_MARK,
 };
 pub use world::{
-    CampaignError, CensusRow, ConvertError, IdentityError, MoveRelationError, StepError, World,
-    WorldConfig, WorldError, FOUNDING_GROUP_DEFAULT, LUXURY_DEPOSITS_DEFAULT, SUBSYSTEM_CENSUS,
+    CampaignError, CensusRow, ConvertError, IdentityError, MoveRelationError, Standing, StepError,
+    World, WorldConfig, WorldError, FOUNDING_GROUP_DEFAULT, LUXURY_DEPOSITS_DEFAULT, RENOWN_TARGET,
+    STOCK_TARGET, SUBSYSTEM_CENSUS,
 };

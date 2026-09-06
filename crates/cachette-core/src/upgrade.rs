@@ -31,14 +31,14 @@ use crate::hash::StateHash;
 use crate::types::{Accum, TileIdx};
 
 /// The number of upgrade kinds that the catalogue holds.
-pub const UPGRADE_KIND_COUNT: usize = 2;
+pub const UPGRADE_KIND_COUNT: usize = 4;
 
 /// The kind of an upgrade.
 ///
 /// A kind is an index into the tables below. It is not a type, not a trait
 /// and not a verb, so adding a kind adds a row and no code.[^1]
 ///
-/// The catalogue starts at two kinds, because the two of them change
+/// The catalogue began at two kinds, because the two of them change
 /// different properties of a tile. One kind would let a later reader believe
 /// that an upgrade is a scalar on the tile rather than a row in a table.[^1]
 ///
@@ -52,6 +52,17 @@ pub enum UpgradeKind {
     Road = 0,
     /// Worked ground. A unit takes more from the tile in one tick.
     Terrace = 1,
+    /// A great work. Its completion fires the wealth-or-wonder win path for
+    /// the faction that holds the ground it stands on.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0148, a game end is recorded once and stops the controllers, decision D3. `docs/adrs/accepted/adr-0148-a-game-end-is-recorded-once-and-stops-the-controllers.md`
+    Wonder = 2,
+    /// A storehouse. It raises the store capacity of the settlement on or
+    /// beside its tile. The world states the "on or beside" rule once, in
+    /// the reader that sums the raise for a site.
+    Store = 3,
 }
 
 impl UpgradeKind {
@@ -60,7 +71,8 @@ impl UpgradeKind {
     /// A caller that must reason over the whole catalogue reads this rather
     /// than writing a list of its own. The length is fixed by the kind count,
     /// so a new kind that is not added here is a compile error.
-    pub const ALL: [Self; UPGRADE_KIND_COUNT] = [Self::Road, Self::Terrace];
+    pub const ALL: [Self; UPGRADE_KIND_COUNT] =
+        [Self::Road, Self::Terrace, Self::Wonder, Self::Store];
 
     /// Returns the kind as a small integer.
     #[must_use]
@@ -76,6 +88,8 @@ impl UpgradeKind {
         match value {
             0 => Some(Self::Road),
             1 => Some(Self::Terrace),
+            2 => Some(Self::Wonder),
+            3 => Some(Self::Store),
             _ => None,
         }
     }
@@ -97,16 +111,22 @@ impl UpgradeKind {
     /// build takes several ticks and holds state between them. That is the
     /// whole point of the shape, and a test asserts it.[^3]
     ///
+    /// The wonder work and the store work are provisional values. The balance
+    /// register holds the rows, the derivation and the blocker.[^4]
+    ///
     /// # References
     ///
     /// [^1]: ADR-0072, a tile stock is generated, and only what was taken is stored, decision D2. `docs/adrs/accepted/adr-0072-a-tile-stock-is-generated-and-only-what-was-taken-is-stored.md`
     /// [^2]: Blockers register, BLK-007. `docs/BLOCKERS.md`
     /// [^3]: ADR-0090, a tile upgrade is stored sparsely, as the difference from the generated world, decision D2. `docs/adrs/draft/adr-0090-a-tile-upgrade-is-stored-sparsely.md`
+    /// [^4]: Balance register, the wonder work and the store work. `docs/reference/balance.md`
     #[must_use]
     pub const fn work(self) -> i64 {
         match self {
             Self::Road => 8,
             Self::Terrace => 24,
+            Self::Wonder => WONDER_WORK,
+            Self::Store => STORE_WORK,
         }
     }
 
@@ -128,7 +148,7 @@ impl UpgradeKind {
     pub const fn capacity(self) -> Option<u32> {
         match self {
             Self::Road => Some(crate::terrain::CROSSING_CAPACITY),
-            Self::Terrace => None,
+            Self::Terrace | Self::Wonder | Self::Store => None,
         }
     }
 
@@ -143,11 +163,61 @@ impl UpgradeKind {
     #[must_use]
     pub const fn gather_bonus(self) -> u32 {
         match self {
-            Self::Road => 0,
+            Self::Road | Self::Wonder | Self::Store => 0,
             Self::Terrace => 2,
         }
     }
+
+    /// Returns how much a finished upgrade of this kind raises the store
+    /// capacity of a settlement on or beside its tile.
+    ///
+    /// The engine holds no store capacity yet, so no pass reads this row. The
+    /// world sums it for a site and exposes the sum at the boundary, and the
+    /// doc comment of that reader says that nothing in the engine reads it.
+    /// The value is provisional, and the balance register holds the row.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: Balance register, the store capacity raise. `docs/reference/balance.md`
+    #[must_use]
+    pub const fn store_capacity_raise(self) -> i64 {
+        match self {
+            Self::Road | Self::Terrace | Self::Wonder => 0,
+            Self::Store => STORE_CAPACITY_RAISE,
+        }
+    }
 }
+
+/// The work that finishes a wonder.
+///
+/// A provisional value, ten times the terrace, so that a wonder takes a
+/// large part of a run and no determinism scenario completes one by
+/// accident. Pass 10 measures it.[^1] [^2]
+///
+/// # References
+///
+/// [^1]: Balance register, the wonder work. `docs/reference/balance.md`
+/// [^2]: Blockers register, BLK-007. `docs/BLOCKERS.md`
+pub const WONDER_WORK: i64 = 240;
+
+/// The work that finishes a store.
+///
+/// A provisional value, twice the terrace. Pass 10 measures it.[^1] [^2]
+///
+/// # References
+///
+/// [^1]: Balance register, the store work. `docs/reference/balance.md`
+/// [^2]: Blockers register, BLK-007. `docs/BLOCKERS.md`
+pub const STORE_WORK: i64 = 48;
+
+/// The store capacity that one finished store adds, as a raw Q16.16 quantity.
+///
+/// A provisional value of 64 whole units. Pass 10 measures it.[^1]
+///
+/// # References
+///
+/// [^1]: Balance register, the store capacity raise. `docs/reference/balance.md`
+pub const STORE_CAPACITY_RAISE: i64 = 64 << 16;
 
 /// The work that one builder adds to a site in one tick.
 ///

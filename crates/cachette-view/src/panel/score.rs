@@ -188,6 +188,20 @@ mod tests {
     fn a_game_end_names_the_winner_the_path_and_the_tick() {
         let mut world = world();
         world.set_tick_limit(2);
+        // Each faction keeps one unit, so the domination reader stays quiet
+        // and the territory reader is the one that fires. A world in which
+        // only one faction holds a unit ends by domination on the first
+        // tick, and this panel would then report a path this test does not
+        // mean to read.
+        for faction in [FactionId(0), FactionId(1)] {
+            let at = (0..20)
+                .flat_map(|row| (0..20).map(move |column| Axial::new(column, row)))
+                .find(|at| world.admits_a_unit(*at))
+                .expect("the world holds open ground away from the held patch");
+            world
+                .spawn_soldier(at, faction)
+                .expect("the address and the faction are valid");
+        }
         a_held_tile(&mut world, FactionId(2));
         let end = world.game_end();
         assert!(end.is_set(), "the territory reader fires at the limit");
