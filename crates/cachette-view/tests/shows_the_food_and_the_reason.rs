@@ -197,7 +197,14 @@ fn a_gather_darkens_the_tile_it_took_from() {
     world.rebuild_bridge(1).expect("the rebuild must succeed");
 
     let mut canvas = Canvas::new(CANVAS.0, CANVAS.1);
-    let camera = Camera::fitting(&world, &canvas);
+    // The camera holds the deposit at a tile wide enough that the corner of
+    // the tile lies outside the disc of the unit standing on it. A unit disc
+    // has a radius floor of three pixels, so a fitted view of this world
+    // covers the corner and the sample reads the unit rather than the
+    // ground.[^2]
+    //
+    // [^2]: Research report 23, defect 1. `docs/research/reports/23-demonstration-readability-review-1.md`
+    let camera = Camera::at_tile_size(32.0).looking_at(deposit, &canvas);
     paint::draw(&world, camera, &mut canvas).expect("the world draws");
     let before = ground_pixel(camera, &canvas, deposit);
     let held_before = world.tile_holder(deposit);

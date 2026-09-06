@@ -259,6 +259,21 @@ pub const fn shortage_colour() -> u32 {
     SHORTAGE
 }
 
+/// Returns the colour of the rim the viewer draws around a unit disc.
+///
+/// The rim is what makes a unit visible over ground its own faction tints,
+/// and below sixteen pixels a tile it is most of the unit.[^1] A test reads
+/// this rather than a literal, so the rim has one declaration site.[^2]
+///
+/// # References
+///
+/// [^1]: Research report 23, defect 1. `docs/research/reports/23-demonstration-readability-review-1.md`
+/// [^2]: Recurring Defect Shapes, shape 1. `.claude/rules/recurring-defects.md`
+#[must_use]
+pub const fn unit_rim_colour() -> u32 {
+    UNIT_RIM
+}
+
 /// Returns the colour the viewer marks a place a faction founded in.
 ///
 /// The founding mark carries the colour of the faction that founded, from the
@@ -348,6 +363,51 @@ const SHORTAGE: u32 = 0x00f2_f0d8;
 /// core is one colour for every faction, so a watcher finds a founding on any
 /// ground and then reads the ring for the faction that took it.
 const FOUNDING_CORE: u32 = 0x0014_0b04;
+
+/// The smallest radius a unit disc takes, in pixels.
+///
+/// A disc of three tenths of the tile is one pixel across at the region
+/// scale, in the colour of the faction, over ground the same faction tints.
+/// A watcher then reads a world of no people. The floor holds the disc above
+/// the ground speckle at every zoom.[^1]
+///
+/// # References
+///
+/// [^1]: Research report 23, defect 1. `docs/research/reports/23-demonstration-readability-review-1.md`
+const UNIT_LEAST_RADIUS: i32 = 3;
+
+/// The colour of the rim around a unit disc.
+///
+/// Every faction colour collides with the ground its own faction holds,
+/// because the tint and the disc carry one colour at two weights. The rim is
+/// darker than any ground colour, so the shape of a unit reads against the
+/// tint under it.[^1]
+///
+/// # References
+///
+/// [^1]: Research report 23, defect 1. `docs/research/reports/23-demonstration-readability-review-1.md`
+const UNIT_RIM: u32 = 0x0008_0a0c;
+
+/// The tile width from which a crowd shows its count as a badge, in pixels.
+///
+/// Above this width a tile has room for a number beside the disc. Below it
+/// the disc grows with the count instead, because a glyph of six pixels does
+/// not fit on a tile of twelve.[^1]
+///
+/// # References
+///
+/// [^1]: Research report 25, defect 4. `docs/research/reports/25-demonstration-readability-upgrades-and-units.md`
+const CROWD_BADGE_TILE: f32 = 24.0;
+
+/// The tile width from which a unit shows where it came from, in pixels.
+///
+/// The line runs from the tile the unit left to the tile it stands on. Below
+/// this width the line is shorter than the disc and reads as noise.[^1]
+///
+/// # References
+///
+/// [^1]: Research report 23, defect 3. `docs/research/reports/23-demonstration-readability-review-1.md`
+const HEADING_TILE: f32 = 24.0;
 
 /// The smallest side a founding mark takes, in pixels.
 ///
@@ -1028,6 +1088,70 @@ impl<'a> Canvas<'a> {
             }
         }
     }
+
+    /// Fills a disc divided into one wedge for each colour, inside a rim.
+    ///
+    /// **A tile that two factions stand on shows both.** The pass used to
+    /// paint one disc for each unit at the same centre, so the last unit the
+    /// structure gave covered every earlier one and the colour of a shared
+    /// tile was the colour of whichever unit came last.[^1]
+    ///
+    /// The wedges run in the order the caller gives, which is ascending
+    /// colour order, so the picture does not depend on the order the units
+    /// arrived in.[^2]
+    ///
+    /// # References
+    ///
+    /// [^1]: Research report 25, defect 5. `docs/research/reports/25-demonstration-readability-upgrades-and-units.md`
+    /// [^2]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
+    fn fill_wedges(&mut self, cx: i32, cy: i32, radius: i32, colours: &[u32], rim: u32) {
+        if colours.is_empty() {
+            return;
+        }
+        let inner = (radius - 1).max(0);
+        for row in -radius..=radius {
+            for column in -radius..=radius {
+                let far = column * column + row * row;
+                if far > radius * radius {
+                    continue;
+                }
+                let colour = if far > inner * inner {
+                    rim
+                } else {
+                    colours[wedge_of(column, row, colours.len())]
+                };
+                self.put(cx + column, cy + row, colour);
+            }
+        }
+    }
+
+    /// Draws a straight line of one pixel between two points.
+    ///
+    /// The step count comes from the longer side, so the line has no gap.
+    fn line(&mut self, from: (f32, f32), to: (f32, f32), colour: u32) {
+        let (across, down) = (to.0 - from.0, to.1 - from.1);
+        let steps = across.abs().max(down.abs()).ceil().max(1.0);
+        let count = steps as i32;
+        for step in 0..=count {
+            let share = step as f32 / steps;
+            self.put(
+                (from.0 + across * share) as i32,
+                (from.1 + down * share) as i32,
+                colour,
+            );
+        }
+    }
+}
+
+/// Returns the wedge that a pixel of a disc falls in.
+///
+/// The angle runs from the direction of the negative horizontal axis, so a
+/// disc of two wedges splits left and right and the split does not depend on
+/// the arithmetic of the caller.
+fn wedge_of(column: i32, row: i32, count: usize) -> usize {
+    let angle = (row as f32).atan2(column as f32);
+    let share = (angle + std::f32::consts::PI) / (2.0 * std::f32::consts::PI);
+    ((share * count as f32) as usize).min(count - 1)
 }
 
 /// Where the world sits on the screen.
@@ -1678,7 +1802,12 @@ pub fn draw_paced(
         }
     }
 
-    let radius = ((camera.tile_width * 0.3) as i32).max(1);
+    // The floor holds a unit visible below sixteen pixels a tile, where a
+    // disc of three tenths of the tile is one pixel of the faction colour
+    // over ground that the same faction tints.[^14]
+    //
+    // [^14]: Research report 23, defect 1. `docs/research/reports/23-demonstration-readability-review-1.md`
+    let radius = ((camera.tile_width * 0.3) as i32).max(UNIT_LEAST_RADIUS);
     // The table opens before the pass that paints and closes after it, so a
     // unit the pass did not paint is gone from it when the frame ends.
     motion.begin();
@@ -2006,6 +2135,9 @@ fn draw_soldiers(
             // [^5]: ADR-0018, the unit-to-tile bridge is derived, and it rebuilds at the barrier, decision D2. `docs/adrs/accepted/adr-0018-the-unit-to-tile-bridge-is-derived-and-rebuilds-at-the-barrier.md`
             // [^6]: ADR-0070, the head-up display reports what the drawing pass read, decision D1. `docs/adrs/accepted/adr-0070-the-head-up-display-reports-what-the-drawing-pass-read.md`
             let mut run: Option<(Axial, u32)> = None;
+            // The units of the tile the run holds, kept until the run closes
+            // so that the crowd draws as one thing.
+            let mut crowd: Vec<Painted> = Vec::new();
             for soldier in units {
                 let Some(address) = arena.address(*soldier) else {
                     continue;
@@ -2028,13 +2160,24 @@ fn draw_soldiers(
                 // visited, nor the order they are visited in.
                 //
                 // [^13]: ADR-0067, the viewer reads the world and never writes to it, decision D2. `docs/adrs/accepted/adr-0067-the-viewer-reads-the-world-and-never-writes-to-it.md`
+                //
+                // The tile the unit stood on at the last frame is also the
+                // tail of the heading line. The table answers by key, so its
+                // order reaches no pixel.[^13]
+                let came_from = motion.moving_from(*soldier).filter(|&from| from != address);
                 let (x, y) = match motion.place(*soldier, address, pace.phase) {
                     Some(from) => between(camera.centre_of(from), (x, y), pace.phase),
                     None => (x, y),
                 };
                 let slot = colour_slot(faction);
-                canvas.fill_disc(x as i32, y as i32, radius, FACTION_COLOURS[slot]);
                 canvas.soldiers_painted += 1;
+                // The disc is drawn when the run of this tile closes, not
+                // here. The count of a tile decides the radius and the badge,
+                // and the factions on it decide the wedges, so nothing can be
+                // painted until the run is whole.[^15]
+                //
+                // [^15]: Research report 25, defects 4 and 5. `docs/research/reports/25-demonstration-readability-upgrades-and-units.md`
+                let mut short = false;
                 // The condition of this unit, read at the unit that is being
                 // painted, on the loop that already runs. The layer starts no
                 // pass of its own.[^7]
@@ -2058,7 +2201,7 @@ fn draw_soldiers(
                     None | Some(NeedCondition::Fed) => {}
                     Some(NeedCondition::Short | NeedCondition::Starved) => {
                         canvas.units_short += 1;
-                        canvas.fill_disc(x as i32, y as i32, (radius / 2).max(1), SHORTAGE);
+                        short = true;
                     }
                 }
                 // What this unit carries and where it lives, read at the
@@ -2115,15 +2258,134 @@ fn draw_soldiers(
                 match run {
                     Some((held, count)) if held == address => run = Some((held, count + 1)),
                     other => {
+                        draw_crowd(canvas, camera, radius, &mut crowd);
                         close_run(canvas, world, camera, other);
                         run = Some((address, 1));
                     }
                 }
+                crowd.push(Painted {
+                    x,
+                    y,
+                    from: came_from.map(|from| camera.centre_of(from)),
+                    slot,
+                    short,
+                });
             }
+            draw_crowd(canvas, camera, radius, &mut crowd);
             close_run(canvas, world, camera, run);
         }
     }
     Ok(())
+}
+
+/// One unit the pass painted, held until its tile's run closes.
+///
+/// The position is where the unit draws, which is its tile centre or a point
+/// between two tile centres. The tail is where the unit stood at the last
+/// frame, when the table held it.
+struct Painted {
+    /// Where the disc draws, across.
+    x: f32,
+    /// Where the disc draws, down.
+    y: f32,
+    /// Where the unit stood at the last frame, when the table held it.
+    from: Option<(f32, f32)>,
+    /// The colour slot of the faction.
+    slot: usize,
+    /// Whether a shortage holds the unit.
+    short: bool,
+}
+
+/// Returns the radius a crowd of this size draws at.
+///
+/// Below the badge width a tile has no room for a number, so the disc carries
+/// the count instead: a full tile is visibly fuller than a single unit.[^1]
+/// The growth is the square root of the count, so the area of the disc
+/// follows the count, and it is held inside the tile.
+///
+/// # References
+///
+/// [^1]: Research report 25, defect 4. `docs/research/reports/25-demonstration-readability-upgrades-and-units.md`
+fn crowd_radius(base: i32, count: u32, tile_width: f32) -> i32 {
+    if count <= 1 {
+        return base;
+    }
+    let grown = (base as f32 * (count as f32).sqrt()) as i32;
+    let ceiling = ((tile_width * 0.5) as i32).max(base + 2);
+    grown.clamp(base, ceiling)
+}
+
+/// Draws the units of one tile, and empties the run.
+///
+/// **The picture of eight units was the picture of one.** Every unit of a
+/// tile takes the centre of that tile, so the discs landed on each other
+/// exactly and the last one drawn won. This pass draws the run as one crowd:
+/// the factions present take a wedge each, the count sets the radius below
+/// the badge width, and a badge states the count above it.[^1]
+///
+/// The heading line runs from the tile the unit left to the point it draws
+/// at, so a watcher sees where a unit came from.[^2]
+///
+/// # References
+///
+/// [^1]: Research report 25, defects 4 and 5. `docs/research/reports/25-demonstration-readability-upgrades-and-units.md`
+/// [^2]: Research report 23, defect 3. `docs/research/reports/23-demonstration-readability-review-1.md`
+fn draw_crowd(canvas: &mut Canvas, camera: Camera, radius: i32, crowd: &mut Vec<Painted>) {
+    if crowd.is_empty() {
+        return;
+    }
+    // The lines sit under the discs, so a disc is never cut by the line of
+    // the unit it belongs to.
+    if camera.tile_width >= HEADING_TILE {
+        for unit in crowd.iter() {
+            if let Some(from) = unit.from {
+                canvas.line(from, (unit.x, unit.y), FACTION_COLOURS[unit.slot]);
+            }
+        }
+    }
+
+    // The factions on the tile, in ascending colour order. The order of the
+    // wedges is therefore the colour table's and never the order the spatial
+    // structure gave the units in.[^3]
+    //
+    // [^3]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
+    let mut slots: Vec<usize> = crowd.iter().map(|unit| unit.slot).collect();
+    slots.sort_unstable();
+    slots.dedup();
+    let shared: Vec<u32> = slots.iter().map(|&slot| FACTION_COLOURS[slot]).collect();
+
+    let count = crowd.len() as u32;
+    let badged = camera.tile_width >= CROWD_BADGE_TILE;
+    let radius = if badged {
+        radius
+    } else {
+        crowd_radius(radius, count, camera.tile_width)
+    };
+    for unit in crowd.iter() {
+        let one = [FACTION_COLOURS[unit.slot]];
+        let colours: &[u32] = if shared.len() > 1 { &shared } else { &one };
+        canvas.fill_wedges(unit.x as i32, unit.y as i32, radius, colours, UNIT_RIM);
+    }
+    for unit in crowd.iter() {
+        if unit.short {
+            canvas.fill_disc(unit.x as i32, unit.y as i32, (radius / 2).max(1), SHORTAGE);
+        }
+    }
+    if badged && count > 1 {
+        let word = count.to_string();
+        let first = &crowd[0];
+        let left = first.x as i32 - text::width_of(&word, 1) / 2;
+        let top = first.y as i32 - radius - text::GLYPH_HEIGHT - 2;
+        canvas.fill_rect(
+            left - 2,
+            top - 1,
+            text::width_of(&word, 1) + 4,
+            text::GLYPH_HEIGHT + 2,
+            UNIT_RIM,
+        );
+        canvas.write(left, top, &word, 1, SHORTAGE);
+    }
+    crowd.clear();
 }
 
 /// Returns the squared distance in pixels from the middle of the canvas.
