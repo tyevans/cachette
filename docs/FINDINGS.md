@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-533**
+**Next number: FND-534**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -10770,6 +10770,398 @@ and to read the value back.[^F485G]
 [^F317D]: Backlog item 0305, give a laden unit a reason to go home. `docs/backlog/complete/0305-give-a-laden-unit-a-reason-to-go-home.md`
 [^F316A]: Backlog item 0279, let a golden scenario reach the position pass. `docs/backlog/proposed/0279-let-a-golden-scenario-reach-the-position-pass.md`
 
+### FND-533 — The documentation plan is the backlog item, and a plan document would be a second declaration site
+
+**Believed.** The item titled the documentation plan asks for a plan document.
+It sits in the refined directory and it names eight items below it, so the work
+of it is to write the plan somewhere.
+
+**True.** The item is the plan. It states the four quadrants, what each holds,
+what each deliberately leaves out, the order of the work and what checks it. It
+says so in its own second paragraph. Writing that content into a second document
+would create two declaration sites for one plan, with nothing that fails when
+they disagree, which is the shape this project names first in its own
+rule.[^F530A]
+
+The item also cannot close. Its own finish line asks for eight items to be
+complete, and five of them are open.
+
+**Evidence.** Two of the eight are in the completed directory. Five are in the
+proposed directory. The item stays open on its own terms.
+
+**Follows.** No plan document is written, and the item stays where it is. A
+reader who wants the documentation plan reads the item. When the last of the
+eight closes, the item closes with an outcome and the plan becomes history,
+which is the correct end for a plan.
+
+**An item that reads like a document request is not always one.** Ask what the
+deliverable is before writing prose. Here the deliverable already existed inside
+the request.
+
+
+**The priority index and the item can hold opposite claims and no check sees
+it.** The index said the project pins a stable toolchain, so the portable vector
+library is out of reach. Item 0270 says the project moved to a dated nightly and
+that the move was made for that item, and the toolchain file agrees with the
+item.[^F329E] Both documents were right when written. The checks compare an
+index against the set of open items and never against what an item says.
+
+
+## References
+
+[^F530A]: Recurring Defect Shapes, shape 1 and shape 2. `.agents/rules/recurring-defects.md`
+[^F532A]: Documentation Rules, section 3. `.agents/rules/documentation.md`
+[^F532B]: The register prose baseline. `scripts/register-prose-baseline.txt`
+
+[^F320A]: The type stub for the compiled module. `python/cachette/_core.pyi`
+[^F320B]: Contributing guide, the opening section. `CONTRIBUTING.md`
+[^F320C]: The Python bindings crate. `crates/cachette-py/src/lib.rs`
+[^F320D]: Research report 19, the documentation toolchain, sections 4.2 and 7. `docs/research/reports/19-documentation-toolchain.md`
+[^F320E]: Recurring Defect Shapes, shape 1, redundant declaration sites. `.claude/rules/recurring-defects.md`
+[^F321A]: Findings register, FND-320, in this document.
+[^F321C]: ADR-0107, the Python reference is generated from the compiled module, decision D3. `docs/adrs/draft/adr-0107-the-python-reference-is-generated-from-the-compiled-module.md`
+[^F321D]: Backlog item 0307, generate the type stub from the compiled module. `docs/backlog/proposed/0307-generate-the-type-stub-from-the-compiled-module.md`
+
+[^F329A]: Backlog guide, the line between proposed and refined. `docs/backlog/README.md`
+[^F329B]: Findings register, FND-315, in this document.
+[^F329C]: Target platform costs, the stage split and where the unit cost goes. `docs/reference/graviton-costs.md`
+[^F329E]: The pinned toolchain. `rust-toolchain.toml`
+
+[^F261B]: The holder count test of the viewer. `crates/cachette-view/tests/shows_who_holds_the_ground.rs`
+[^F261C]: Backlog item 0271, count the ground generations that one frame runs. `docs/backlog/proposed/0271-count-the-ground-generations-that-one-frame-runs.md`
+
+[^F262A]: Backlog item 0238, decide per cell and need rather than per unit. `docs/backlog/complete/0238-decide-per-cell-and-need-rather-than-per-unit.md`
+[^F262B]: ADR-0098, the choice is decided for each cell and each bucket of need, decision D1. `docs/adrs/draft/adr-0098-the-choice-is-decided-for-each-cell-and-each-bucket-of-need.md`
+[^F262D]: Findings register, FND-051 and FND-048, in this document.
+[^F262E]: ADR-0098, the choice is decided for each cell and each bucket of need, the consequences. `docs/adrs/draft/adr-0098-the-choice-is-decided-for-each-cell-and-each-bucket-of-need.md`
+[^F263A]: Review of ADR-0096, correction 1. The review artefact sits on the branch that holds it, so this branch cannot resolve its path and the citation names it instead.
+[^F263B]: Target platform costs, would the choice pass collapse if it decided for each cell. `docs/reference/graviton-costs.md`
+[^F263C]: The need spread measurement. `crates/cachette-core/tests/need_spread.rs`
+[^F263D]: Decisions register, DEC-106. `docs/DECISIONS.md`
+[^F263E]: Budgets and costs, what belongs here. `docs/reference/budgets.md`
+[^F263F]: Findings register, FND-262, in this document.
+[^F226A]: Backlog item 0185, steer a step by the option the unit chose. `docs/backlog/complete/0185-steer-a-step-by-the-option-the-unit-chose.md`
+[^F226B]: Backlog item 0186, let the engine order a gather. `docs/backlog/complete/0186-let-the-engine-order-a-gather.md`
+[^F226C]: ADR-0063, a need is a rate with a threshold, and crossing it is a fact, decision D2. `docs/adrs/accepted/adr-0063-a-need-is-a-rate-with-a-threshold-and-crossing-it-is-a-fact.md`
+[^F226E]: Backlog item 0240, let the demonstration make a unit hungry. `docs/backlog/complete/0240-let-the-demonstration-make-a-unit-hungry.md`
+[^F227B]: Findings register, FND-183, in this document.
+[^F258A]: Findings register, FND-223, in this document.
+[^F258B]: The footnote baseline. `scripts/footnote-baseline.txt`
+[^F258C]: Backlog item 0242. `docs/backlog/complete/0242-fail-a-check-when-a-document-states-a-register-in-its-own-words.md`
+[^F259CHECK]: Backlog item 0244. `docs/backlog/complete/0244-fail-a-check-when-the-two-project-orientations-disagree.md`
+[^F222]: Target platform costs. `docs/reference/graviton-costs.md`
+[^F223C]: ADR Registry, how a record changes. `docs/adrs/REGISTRY.md`
+
+[^F177A]: The founding refuses ground that admits nobody. `crates/cachette-core/src/world.rs`
+[^F177B]: The terrain capacity table. `crates/cachette-core/src/terrain.rs`
+[^F180A]: ADR-0064, a unit chooses by scoring a small fixed option set, decision D3. `docs/adrs/accepted/adr-0064-a-unit-chooses-by-scoring-a-small-fixed-option-set.md`
+[^F180B]: What a unit does in a tick, section 3.1. `docs/research/what-a-unit-does-in-a-tick.md`
+[^F180C]: PRD-0009, a unit acts on the world it can see. `docs/product/accepted/prd-0009-a-unit-acts-on-the-world-it-can-see.md`
+[^F180D]: Backlog item 0064, choose an action by scoring a fixed option set. `docs/backlog/complete/0064-choose-an-action-by-scoring-a-fixed-option-set.md`
+[^309A]: The local benchmark finding of 2 September 2026: a release build served an executable two hours old, and three trees measured the same. It is recorded on the trunk and this branch predates it, so its number is owed here.
+[^309B]: The stage cost measurement, reported on 3 September 2026 and not yet recorded. It gains a number when it lands.
+[^309C]: The per-recipe timing harness. `scripts/gate-times.sh`
+[^309D]: Testing rules, section 2a, a uniform input hides a defect. `.claude/rules/testing.md`
+[^F181B]: Testing Rules, section 5. `.claude/rules/testing.md`
+[^F181C]: Findings register, FND-180, in this document.
+[^F181D]: What a unit does in a tick, section 3.4. `docs/research/what-a-unit-does-in-a-tick.md`
+[^F181E]: What a unit does in a tick, section 6.1. `docs/research/what-a-unit-does-in-a-tick.md`
+[^F182A]: Backlog item 0183, carry the food of a cell into the level 1 summary. `docs/backlog/complete/0183-carry-the-food-of-a-cell-into-the-level-1-summary.md`
+[^F182B]: ADR-0072, a tile stock is generated, and only what was taken is stored, decision D1. `docs/adrs/accepted/adr-0072-a-tile-stock-is-generated-and-only-what-was-taken-is-stored.md`
+[^F182C]: ADR-0072, a tile stock is generated, and only what was taken is stored, decision D4. `docs/adrs/accepted/adr-0072-a-tile-stock-is-generated-and-only-what-was-taken-is-stored.md`
+[^F182D]: ADR-0068, terrain is generated from the seed and is never stored as a map, the consequences. `docs/adrs/accepted/adr-0068-terrain-is-generated-from-the-seed-and-is-never-stored-as-a-map.md`
+[^F182E]: Blockers register, BLK-007, in the blockers register. `docs/BLOCKERS.md`
+[^F183A]: Findings register, FND-181, in this document.
+
+[^F168A]: ADR-0084, the world reserves the unit columns at construction, decision D3. `docs/adrs/draft/adr-0084-the-world-reserves-the-unit-columns-at-construction.md`
+[^F168B]: Review 0175, the unit reservation record. `docs/reviews/0175-the-unit-reservation-record.md`
+[^F171A]: Testing rules, sections 2 and 2a. `.claude/rules/testing.md`
+[^F174B]: Backlog item 0179. `docs/backlog/proposed/0179-give-a-golden-scenario-a-build.md`
+
+[^1]: Findings register, FND-038, in this document.
+[^2]: ADR-0066, entity storage holds four fixed shapes. `docs/adrs/accepted/adr-0066-entity-storage-holds-four-fixed-shapes.md`
+[^3]: Movement timing note. `docs/research/movement-timing.md`
+[^4]: ADR-0001, one binary gives one answer at any thread count. `docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
+[^5]: Findings register, FND-004, in this document.
+[^6]: Record scope research. `docs/research/adr-scope-findings.md`
+[^7]: Decision Record Scope, section 4.5. `.claude/rules/adr-scope.md`
+[^8]: ADR Registry, the retcon window. `docs/adrs/REGISTRY.md`
+[^9]: ADR-0018, the unit-to-tile bridge is derived, and it rebuilds at the barrier, decision D3. `docs/adrs/accepted/adr-0018-the-unit-to-tile-bridge-is-derived-and-rebuilds-at-the-barrier.md`
+[^10]: Decision Record Scope, section 4.6. `.claude/rules/adr-scope.md`
+[^11]: Findings register, FND-051, in this document.
+[^12]: Decision Record Scope, section 4.1. `.claude/rules/adr-scope.md`
+[^13]: Recurring Defect Shapes, shape 1. `.claude/rules/recurring-defects.md`
+[^14]: ADR Registry. `docs/adrs/REGISTRY.md`
+[^15]: Findings register, FND-047, in this document.
+[^16]: Decision Record Scope, section 1. `.claude/rules/adr-scope.md`
+[^17]: Recurring Defect Shapes, shape 2. `.claude/rules/recurring-defects.md`
+[^18]: ADR-0066, entity storage holds four fixed shapes, decision D2. `docs/adrs/accepted/adr-0066-entity-storage-holds-four-fixed-shapes.md`
+[^19]: Findings register, FND-058, in this document.
+[^20]: ADR-0014, entity identity is an index plus a generation, decision D3. `docs/adrs/accepted/adr-0014-entity-identity-is-an-index-plus-a-generation.md`
+[^21]: Testing rules, section 6. `.claude/rules/testing.md`
+[^22]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`
+[^23]: Testing rules, section 2a. `.claude/rules/testing.md`
+[^24]: PRD-0006, a place belongs to somebody. `docs/product/accepted/prd-0006-a-place-belongs-to-somebody.md`
+[^25]: Findings register, FND-022, in this document.
+[^26]: Vector entity representation, sections 9 and 15, decision D155. `docs/research/reports/18-vector-entity-representation.md`
+[^27]: The character graph and inheritance, sections 2.1, 3.3 and 15.3. `docs/research/reports/14-character-graph-and-inheritance.md`
+[^28]: Blockers register, BLK-007. `docs/BLOCKERS.md`
+[^29]: Findings register, FND-056, in this document.
+[^30]: Findings register, FND-072, in this document.
+[^31]: Findings register, FND-050, in this document.
+[^32]: The register check script. `scripts/check_registers.py`
+[^33]: Testing rules, section 2a. `.claude/rules/testing.md`
+[^34]: Findings register, FND-049, in this document.
+[^35]: ADR-0075, the founding choice reads a bounded sample of the world. `docs/adrs/accepted/adr-0075-the-founding-choice-reads-a-bounded-sample-of-the-world.md`
+[^36]: PRD-0012, a world starts small and grows. `docs/product/accepted/prd-0012-a-world-starts-small-and-grows.md`
+[^37]: Recurring defect shapes, shape 3. `.claude/rules/recurring-defects.md`
+[^38]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`
+[^39]: Backlog item 0085. `docs/backlog/complete/0085-show-a-watcher-who-holds-the-ground.md`
+[^40]: ADR-0053, a faction is a bit in a mask, and a relation is a plane, decision D2. `docs/adrs/accepted/adr-0053-a-faction-is-a-bit-in-a-mask-and-a-relation-is-a-plane.md`
+[^41]: PRD-0006, a place belongs to somebody. `docs/product/accepted/prd-0006-a-place-belongs-to-somebody.md`
+[^42]: Backlog item 0084. `docs/backlog/complete/0084-give-a-tile-one-faction-column.md`
+[^43]: Testing Rules, section 2. `.claude/rules/testing.md`
+[^44]: Findings register, FND-075. `docs/FINDINGS.md`
+[^45]: Findings register, FND-078. `docs/FINDINGS.md`
+[^46]: Recurring defect shapes, shape 2. `.claude/rules/recurring-defects.md`
+[^47]: Development budgets, the gate suite budget. `docs/reference/development-budgets.md`
+[^48]: ADR-0008, the primary target is `aarch64-unknown-linux-gnu`, decision D2. `docs/adrs/accepted/adr-0008-the-primary-target-is-aarch64.md`
+[^49]: ADR-0072, a tile stock is generated, and only what was taken is stored. `docs/adrs/accepted/adr-0072-a-tile-stock-is-generated-and-only-what-was-taken-is-stored.md`
+[^50]: PRD-0018, a depleted deposit comes back. `docs/product/shaped/prd-0018-a-depleted-deposit-comes-back.md`
+[^51]: ADR-0014, entity identity is an index plus a generation, decision D1. `docs/adrs/accepted/adr-0014-entity-identity-is-an-index-plus-a-generation.md`
+[^52]: Findings register, FND-023, in this document.
+[^53]: Decision Record Scope, section 4.3. `.claude/rules/adr-scope.md`
+[^54]: Backlog item 0071. `docs/backlog/complete/0071-derive-tile-passability-from-tile-capacity.md`
+[^55]: Testing rules, section 2a. `.claude/rules/testing.md`
+[^56]: ADR-0074, a spawn may over-fill a tile and only admission enforces the capacity, decision D2. `docs/adrs/accepted/adr-0074-a-spawn-may-over-fill-a-tile-and-only-admission-enforces-the-capacity.md`
+[^57]: Commit Message Rules, after a sweep. `.claude/rules/commits.md`
+[^58]: Backlog item 0094. `docs/backlog/complete/0094-decide-how-many-groups-found-a-world.md`
+[^59]: Findings register, FND-093, in this document.
+[^60]: ADR-0076, a founding keeps a fixed distance from the foundings before it, decision D1. `docs/adrs/accepted/adr-0076-a-founding-keeps-a-fixed-distance-from-the-foundings-before-it.md`
+[^61]: PRD-0014, everyone needs somewhere to live. `docs/product/accepted/prd-0014-everyone-needs-somewhere-to-live.md`
+[^62]: ADR-0066, entity storage holds four fixed shapes, decision D1. `docs/adrs/accepted/adr-0066-entity-storage-holds-four-fixed-shapes.md`
+[^63]: Recurring Defect Shapes, shape 1. `.claude/rules/recurring-defects.md`
+[^64]: Findings register, FND-093, in this document.
+[^65]: Recurring Defect Shapes, shape 3. `.claude/rules/recurring-defects.md`
+[^66]: ADR-0063, a need is a rate with a threshold, and crossing it is a fact, decision D3. `docs/adrs/accepted/adr-0063-a-need-is-a-rate-with-a-threshold-and-crossing-it-is-a-fact.md`
+[^67]: Decision Record Scope, section 1, the counter-test. `.claude/rules/adr-scope.md`
+[^68]: Recurring defect shapes, shape 4. `.claude/rules/recurring-defects.md`
+[^69]: ADR-0073, gathering is admitted by sort-then-admit against the tile. `docs/adrs/accepted/adr-0073-gathering-is-admitted-by-sort-then-admit-against-the-tile.md`
+[^70]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`
+[^71]: Testing rules, section 2a. `.claude/rules/testing.md`
+[^72]: Findings register, FND-116, in this document.
+[^73]: Recurring Defect Shapes, shape 1. `.claude/rules/recurring-defects.md`
+[^74]: Product requirement records, what does not belong here. `docs/product/README.md`
+[^75]: Decisions register, DEC-056. `docs/DECISIONS.md`
+[^76]: Documentation Rules, section 3. `.claude/rules/documentation.md`
+[^77]: Findings register, FND-116, in this document.
+[^78]: Findings register, FND-128, in this document.
+[^79]: Review 0143, the housing, growth, founding and recovery records. `docs/reviews/0143-the-housing-growth-founding-and-recovery-records.md`
+[^80]: Commit Message Rules, after a sweep. `.claude/rules/commits.md`
+[^81]: Findings register, FND-080, in this document.
+[^82]: Testing rules, section 1. `.claude/rules/testing.md`
+[^83]: Findings register, FND-133, in this document.
+[^84]: Testing Rules, section 2a. `.claude/rules/testing.md`
+[^85]: Backlog item 0084, give a tile one faction column. `docs/backlog/complete/0084-give-a-tile-one-faction-column.md`
+[^86]: Product requirement records, what does not belong here. `docs/product/README.md`
+[^87]: The product record check. `scripts/check_prds.py`
+[^88]: ADR-0080, a depleted deposit recovers by ageing the stored take. `docs/adrs/accepted/adr-0080-a-depleted-deposit-recovers-by-ageing-the-stored-take.md`
+[^89]: PRD-0012, a world starts small and grows. `docs/product/accepted/prd-0012-a-world-starts-small-and-grows.md`
+[^90]: Blockers register, BLK-007. `docs/BLOCKERS.md`
+[^91]: Definition of Done, section 3. `.claude/rules/definition-of-done.md`
+[^92]: Decisions register, DEC-059. `docs/DECISIONS.md`
+[^93]: Reviews, the founding and deposit product records. `docs/reviews/0149-the-founding-and-deposit-product-records.md`
+[^94]: The record and register checks. `justfile`
+[^95]: Findings register, FND-075, in this document.
+[^96]: Findings register, FND-078, in this document.
+[^F137A]: The bindings and the event log method. `crates/cachette-py/src/lib.rs`
+[^F137B]: The event types. `crates/cachette-core/src/event.rs`
+[^F137C]: Recurring Defect Shapes, shape 1. `.claude/rules/recurring-defects.md`
+[^F137D]: Backlog item 0153. `docs/backlog/refined/0153-let-python-read-an-event-without-repeating-its-layout.md`
+[^97]: Development budgets, the gate suite budget. `docs/reference/development-budgets.md`
+[^98]: Testing rules, section 2a. `.claude/rules/testing.md`
+[^99]: Budgets and costs, the scale constants. `docs/reference/budgets.md`
+[^100]: ADR-0083, the gate build checks every integer overflow, decision D2. `docs/adrs/draft/adr-0083-the-gate-build-checks-every-integer-overflow.md`
+[^F147A]: ADR Registry, row 0043. `docs/adrs/REGISTRY.md`
+[^ORIENT2]: Project orientation, the design principles. `CLAUDE.md`
+[^139]: ADR-0084, the world reserves the unit columns at construction. `docs/adrs/draft/adr-0084-the-world-reserves-the-unit-columns-at-construction.md`
+[^141]: Backlog item 0080. `docs/backlog/proposed/0080-give-the-world-settings-a-constructor.md`
+[^142]: Findings register, FND-064, in this document.
+[^144]: ADR-0014, entity identity is an index plus a generation, decisions D1 and D3. `docs/adrs/accepted/adr-0014-entity-identity-is-an-index-plus-a-generation.md`
+[^101]: Findings register, FND-142, in this document.
+[^102]: Review 0164, the gate build profile record. `docs/reviews/0164-the-gate-build-profile-record.md`
+[^145]: Findings register, FND-130, in this document.
+[^146]: Backlog item 0144. `docs/backlog/complete/0144-check-the-footnotes-of-a-record.md`
+[^147]: Definition of Done, pass the gates. `.claude/rules/definition-of-done.md`
+[^148]: The citation check. `scripts/check_citations.py`
+[^149]: Backlog guide, completing an item. `docs/backlog/README.md`
+[^150]: Backlog item 0163. `docs/backlog/proposed/0163-fail-when-a-merged-item-still-reads-as-open.md`
+[^151]: Findings register, FND-152, in this document.
+[^F162A]: Findings register, FND-086, in this document.
+[^F162B]: Backlog item 0112. `docs/backlog/complete/0112-build-a-world-without-a-pass-over-every-tile.md`
+[^F162D]: Backlog item 0171. `docs/backlog/proposed/0171-build-the-first-level-without-a-pass-over-every-tile.md`
+[^F159A]: Influence maps, section 5.1. `docs/research/reports/09-influence-maps.md`
+[^F159B]: ADR-0060, an influence map is stored as a shared basis, decision D2. `docs/adrs/draft/adr-0060-an-influence-map-is-stored-as-a-shared-basis.md`
+[^F160A]: ADR-0001, one binary gives one answer at any thread count, decision D4. `docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
+[^F160B]: ADR-0009, parallel stages write disjoint outputs, because the memory model is weak. `docs/adrs/accepted/adr-0009-parallel-stages-write-disjoint-outputs.md`
+[^F174A]: Testing rules, section 2. `.claude/rules/testing.md`
+[^F190A]: What a unit does in a tick, section 5. `docs/research/what-a-unit-does-in-a-tick.md`
+[^F190B]: The option score. `crates/cachette-core/src/choose.rs`
+[^F190C]: ADR-0091, movement takes its direction from a per-cell field, never from a per-unit search, decision D4. `docs/adrs/draft/adr-0091-movement-takes-its-direction-from-a-per-cell-field.md`
+[^F191A]: Backlog item 0181, give a kind of work the commodity it fills. `docs/backlog/proposed/0181-give-a-kind-of-work-the-commodity-it-fills.md`
+[^F191B]: The founding provisions a site, and the consumption pass draws a ration. `crates/cachette-core/src/world.rs`
+[^F192A]: ADR Registry, the retired numbers. `docs/adrs/REGISTRY.md`
+[^F192B]: The record check script. `scripts/check_adrs.py`
+[^F192C]: ADR-0091, movement takes its direction from a per-cell field, never from a per-unit search. `docs/adrs/draft/adr-0091-movement-takes-its-direction-from-a-per-cell-field.md`
+[^F192D]: Backlog item 0198, tell a mention of a record number from a citation of it. `docs/backlog/proposed/0198-tell-a-mention-of-a-record-number-from-a-citation.md`
+[^F193A]: The terrain capacity table and its fold. `crates/cachette-core/src/terrain.rs`
+[^F193B]: The composition of the ground and a finished upgrade. `crates/cachette-core/src/upgrade.rs`
+[^F193C]: The capacity that bounds the positions of a site. `crates/cachette-core/src/position.rs`
+[^F193D]: Review 0199, the influence, tile field, upgrade and housing records. `docs/reviews/0199-the-influence-tile-field-upgrade-and-housing-records.md`
+[^F193F]: Decisions register, DEC-081. `docs/DECISIONS.md`
+[^F194C]: Backlog item 0201, scan the tree the check was asked to read. `docs/backlog/proposed/0201-scan-the-tree-the-check-was-asked-to-read.md`
+[^F193G]: The drawing pass counts a tile at its capacity. `crates/cachette-view/src/paint.rs`
+[^F193H]: Review 0204, the two corrected records. `docs/reviews/0204-the-two-corrected-records.md`
+[^F197A]: The citation check script. `scripts/check_citations.py`
+[^F197C]: Decisions register, DEC-083. `docs/DECISIONS.md`
+[^F186A]: The viewer suite for the food and the reason. `crates/cachette-view/tests/shows_the_food_and_the_reason.rs`
+[^F187A]: The viewer suite for the ground. `crates/cachette-view/tests/draws_the_ground.rs`
+[^F187B]: PRD-0003, a developer sees a world worth looking at. `docs/product/accepted/prd-0003-a-developer-sees-a-world-worth-looking-at.md`
+[^F198A]: The panel and the cards. `crates/cachette-view/src/`
+[^F199A]: The agent protocol server. `python/cachette/agent/server.py`
+[^F199B]: Backlog item 0206. `docs/backlog/complete/0206-let-the-agent-tool-read-what-the-panel-reads.md`
+[^F200A]: The viewer suite for the glass. `crates/cachette-view/tests/shows_the_moment_on_the_glass.rs`
+[^F201A]: Findings register, FND-193, in this document.
+[^F201B]: Backlog item 0208. `docs/backlog/complete/0208-draw-the-boundary-of-a-holding-and-not-of-every-tile.md`
+[^F194REF]: Findings register, FND-194, in this document.
+[^F202A]: Backlog item 0152, what is still open. `docs/backlog/complete/0152-let-an-agent-drive-the-engine-through-a-protocol-server.md`
+[^F202B]: PRD-0002, a developer watches the world run. `docs/product/shipped/prd-0002-a-developer-watches-the-world-run.md`
+[^F202C]: PRD-0004, the world has weather that a watcher can read. `docs/product/accepted/prd-0004-the-world-has-weather-that-a-watcher-can-read.md`
+[^F202D]: PRD-0005, a watcher can tell what is happening and why. `docs/product/shipped/prd-0005-a-watcher-can-tell-what-is-happening-and-why.md`
+[^F202E]: Recurring Defect Shapes, shapes 1 and 2. `.claude/rules/recurring-defects.md`
+[^F202F]: ADR-0092, the agent tool surface grows one tool at a time, against a stated need. `docs/adrs/draft/adr-0092-the-agent-tool-surface-grows-against-a-stated-need.md`
+[^F202G]: PRD-0019, an agent can ask the running engine what it holds. `docs/product/shaped/prd-0019-an-agent-can-ask-the-running-engine-what-it-holds.md`
+[^F204C]: Findings register, FND-048, in this document.
+[^F206B]: Findings register, FND-201, in this document.
+[^F206C]: The holder layer of the drawing pass. `crates/cachette-view/src/paint.rs`
+[^F207A]: The tile rectangle of the drawing pass. `crates/cachette-view/src/paint.rs`
+[^F209A]: Findings register, FND-208, in this document.
+[^F209B]: The drawing pass of the viewer. `crates/cachette-view/src/paint.rs`
+[^F209C]: Backlog item 0210, generate the ground of a drawn tile once. `docs/backlog/complete/0210-generate-the-ground-of-a-drawn-tile-once.md`
+[^F207B]: Decisions register, DEC-088. `docs/DECISIONS.md`
+[^F208A]: ADR-0070, the head-up display reports what the drawing pass read, decision D2. `docs/adrs/accepted/adr-0070-the-head-up-display-reports-what-the-drawing-pass-read.md`
+
+[^F214A]: Decision Record Scope, section 5. `.claude/rules/adr-scope.md`
+[^F214B]: ADR-0009, parallel stages write disjoint outputs, decisions D1 and D2. `docs/adrs/accepted/adr-0009-parallel-stages-write-disjoint-outputs.md`
+[^F214D]: ADR-0044, what copies and what does not is declared at the call site. `docs/adrs/draft/adr-0044-what-copies-and-what-does-not-is-declared-at-the-call-site.md`
+[^F215A]: ADR-0043, a declared tier enforces the no-loop rule, and the API refuses the loop, decision D5. `docs/adrs/draft/adr-0043-a-declared-tier-enforces-the-no-loop-rule.md`
+[^F215B]: The shape tier declarations. `crates/cachette-core/src/tier.rs`
+[^F215C]: The bindings. `crates/cachette-py/src/lib.rs`
+[^F215D]: The agent protocol server, the one-unit tool. `python/cachette/agent/server.py`
+[^F215E]: ADR-0040, Python is a control plane, not a data plane, decision D2. `docs/adrs/draft/adr-0040-python-is-a-control-plane-not-a-data-plane.md`
+[^F215F]: Decisions register, DEC-063. `docs/DECISIONS.md`
+[^F215G]: Findings register, FND-147, in this document.
+[^F216A]: ADR-0043, a declared tier enforces the no-loop rule, and the API refuses the loop. `docs/adrs/draft/adr-0043-a-declared-tier-enforces-the-no-loop-rule.md`
+[^F216B]: The character arena ceiling, and the shape tier declarations. `crates/cachette-core/src/tier.rs`
+[^F216D]: Review 0223, the tier record. `docs/reviews/0223-the-tier-record.md`
+[^F217A]: The grid index function. `crates/cachette-core/src/hex.rs`
+[^F217B]: The block layout key. `crates/cachette-core/src/bridge.rs`
+[^F217C]: The block fold of the pyramid. `crates/cachette-core/src/pyramid.rs`
+[^F217D]: ADR-0012, tiles are dense columns and units are a generational arena. `docs/adrs/accepted/adr-0012-tiles-are-dense-columns-and-units-are-a-generational-arena.md`
+[^F217E]: ADR-0017, the world is a rhombus, so a tile index is raw axial, decision D1. `docs/adrs/accepted/adr-0017-the-world-is-a-rhombus-so-a-tile-index-is-raw-axial.md`
+[^F217F]: ADR-0018, the unit-to-tile bridge is derived, and it rebuilds at the barrier. `docs/adrs/accepted/adr-0018-the-unit-to-tile-bridge-is-derived-and-rebuilds-at-the-barrier.md`
+[^F217G]: Review 0223, the selector range record. `docs/reviews/0223-the-selector-range-record.md`
+[^F218D]: ADR Registry, repairing a citation is not an amendment. `docs/adrs/REGISTRY.md`
+[^F218E]: Definition of Done, section 4. `.claude/rules/definition-of-done.md`
+[^F218F]: Findings register, FND-192, in this document.
+[^ALLOC2]: Findings register, FND-219, in this document.
+
+[^237B]: Decision Record Scope, section 6. `.claude/rules/adr-scope.md`
+[^238A]: The gate recipes. `justfile`
+[^238B]: Testing Rules, section 1. `.claude/rules/testing.md`
+[^238C]: Definition of Done, section 5. `.claude/rules/definition-of-done.md`
+[^FND277A]: Target platform costs, every stage of a frame by name, and huge pages. `docs/reference/graviton-costs.md`
+[^FND278A]: Backlog item 0269, map the large arrays with huge pages. `docs/backlog/complete/0269-map-the-large-arrays-with-huge-pages.md`
+[^235A]: The record of descent, the labelled row count. `crates/cachette-core/src/descent.rs`
+[^236A]: Backlog item 0097. `docs/backlog/complete/0097-write-the-layout-record-with-the-descent-columns.md`
+[^236B]: Backlog item 0067, record a parent and walk a line. `docs/backlog/complete/0067-record-a-parent-and-walk-a-line.md`
+[^236D]: ADR-0021, a layout claim names one structure and one pass, and never a tier, decision D1. `docs/adrs/draft/adr-0021-layout-follows-the-access-pattern.md`
+[^37HOME]: Decisions register, DEC-017. `docs/DECISIONS.md`
+[^37NEXT]: Decisions register, DEC-093. `docs/DECISIONS.md`
+
+[^F250A]: ADR-0064, a unit chooses by scoring a small fixed option set, decision D1. `docs/adrs/accepted/adr-0064-a-unit-chooses-by-scoring-a-small-fixed-option-set.md`
+[^F250B]: The choice pass. `crates/cachette-core/src/choose.rs`
+[^F251A]: The world, the weight profile field. `crates/cachette-core/src/world.rs`
+[^F251B]: The choice pass, the cell fields and the option set. `crates/cachette-core/src/choose.rs`
+[^F252A]: ADR-0009, parallel stages write disjoint outputs, decision D1. `docs/adrs/accepted/adr-0009-parallel-stages-write-disjoint-outputs.md`
+[^F252B]: ADR-0009, parallel stages write disjoint outputs, decision D3. `docs/adrs/accepted/adr-0009-parallel-stages-write-disjoint-outputs.md`
+[^F252C]: The choice pass of the world. `crates/cachette-core/src/world.rs`
+[^F252D]: ADR-0064, a unit chooses by scoring a small fixed option set, decision D4. `docs/adrs/accepted/adr-0064-a-unit-chooses-by-scoring-a-small-fixed-option-set.md`
+[^239A]: The footnote check. `scripts/check_footnotes.py`
+[^239B]: The priority check. `scripts/check_priority.py`
+[^F257B]: The merge-defect check. `scripts/check_merge_defects.py`
+[^F231C]: The starvation suite of the core. `crates/cachette-core/tests/starvation.rs`
+[^F234A]: Findings register, FND-233, in this document.
+[^F201C]: Findings register, FND-206, in this document.
+
+[^F281A]: Backlog item 0267, hold the exit direction on the tile. `docs/backlog/complete/0267-hold-the-exit-direction-on-the-tile.md`
+[^F281B]: The exit locality benchmark. `crates/cachette-core/benches/exit_locality.rs`
+[^F281D]: Decisions register, DEC-105. `docs/DECISIONS.md`
+[^F282A]: Backlog item 0268, hold the cell index on the unit. `docs/backlog/complete/0268-hold-the-cell-index-on-the-unit.md`
+[^F282B]: Findings register, FND-252, in this document.
+[^F282C]: The grid address conversion. `crates/cachette-core/src/hex.rs`
+[^F282D]: Backlog priority index. `docs/backlog/PRIORITY.md`
+[^F283A]: Project orientation, hard invariants 2 and 4. `CLAUDE.md`
+[^F283B]: ADR-0041, a crate split enforces the boundary at compile time. `docs/adrs/draft/adr-0041-a-crate-split-enforces-the-boundary-at-compile-time.md`
+[^F283C]: The testing guide, section 3.5. `docs/TESTING.md`
+[^F283D]: The settlement store asserts that it is plain data. `crates/cachette-core/src/site.rs`
+[^F283E]: Recurring defect shapes, inert code that nothing invokes. `.claude/rules/recurring-defects.md`
+[^F283F]: The state-byte gate. `crates/cachette-core/tests/state_bytes_are_initialised.rs`
+[^F284A]: The float ban script. `scripts/check-float-ban.sh`
+[^F284B]: Backlog item 0272, name the reassociating methods in the lint. `docs/backlog/proposed/0293-name-the-reassociating-methods-in-the-lint.md`
+[^F273A]: Backlog item 0266, order the unit arena by cell. `docs/backlog/refined/0266-order-the-unit-arena-by-cell.md`
+[^F273B]: Target platform costs, the packed and scattered rows. `docs/reference/graviton-costs.md`
+[^F273C]: The cost benchmark, the arena order mode. `crates/cachette-core/benches/target_cost.rs`
+[^F274A]: Decisions register, DEC-110. `docs/DECISIONS.md`
+[^F274B]: ADR-0018, the unit-to-tile bridge is derived, and it rebuilds at the barrier, decision D1. `docs/adrs/accepted/adr-0018-the-unit-to-tile-bridge-is-derived-and-rebuilds-at-the-barrier.md`
+[^F274C]: The drifted arena suite of the core. `crates/cachette-core/tests/drifted_arena.rs`
+[^F274D]: ADR-0056, movement is tile-discrete and admitted by sort-then-admit, decision D3. `docs/adrs/accepted/adr-0056-movement-is-tile-discrete-and-admitted-by-sort-then-admit.md`
+[^F287A]: Findings register, FND-281, in this document.
+[^F287B]: Findings register, FND-282, in this document.
+[^F287C]: The exit locality benchmark, the frame row. `crates/cachette-core/benches/exit_locality.rs`
+[^F285A]: Findings register, FND-269, in this document.
+[^F286A]: Target platform costs, every stage of a frame after the candidate pass became a bit plane. `docs/reference/graviton-costs.md`
+[^F277B]: Findings register, FND-285, in this document.
+[^F277C]: Findings register, FND-286, in this document.
+[^F292A]: The world, the stored tile change count. `crates/cachette-core/src/world.rs`
+[^F292B]: The exit locality benchmark, the growth row. `crates/cachette-core/benches/exit_locality.rs`
+[^F292C]: Target platform costs, the stage table. `docs/reference/graviton-costs.md`
+[^F298A]: The cost benchmark, the memory point mode. `crates/cachette-core/benches/target_cost.rs`
+[^F298B]: Findings register, FND-246, in this document.
+[^F299A]: ADR-0068, terrain is generated from the seed and is never stored as a map, decision D1. `docs/adrs/accepted/adr-0068-terrain-is-generated-from-the-seed-and-is-never-stored-as-a-map.md`
+[^F295A]: ADR-0018, the unit-to-tile bridge is derived, and it rebuilds at the barrier, decision D4. `docs/adrs/accepted/adr-0018-the-unit-to-tile-bridge-is-derived-and-rebuilds-at-the-barrier.md`
+[^F296B]: Target platform costs, every stage of a frame after the ground read moved last. `docs/reference/graviton-costs.md`
+[^F296C]: Findings register, FND-290, in this document.
+[^F297A]: The target platform benchmark script. `scripts/graviton-benchmark.sh`
+[^F300A]: Backlog item 0277, hold a thread back when the work will not pay for it. `docs/backlog/proposed/0277-hold-a-thread-back-when-the-work-will-not-pay-for-it.md`
+[^F300B]: The demonstration stage split. `crates/cachette-core/examples/demo_stage_split.rs`
+[^F300C]: ADR-0060, an influence map is stored as a shared basis, not one plane per faction, decision D4. `docs/adrs/draft/adr-0060-an-influence-map-is-stored-as-a-shared-basis.md`
+[^F305A]: Findings register, FND-300, in this document.
+[^F304A]: Findings register, FND-299 and FND-295, in this document.
+[^F301A]: ADR-0071, the bridge rebuild orders on one thread, decision D2. `docs/adrs/accepted/adr-0071-the-bridge-rebuild-orders-on-one-thread.md`
+[^F302A]: Decisions register, DEC-111. `docs/DECISIONS.md`
+[^F307A]: Target platform costs, every stage of a frame after the block masks became counts. `docs/reference/graviton-costs.md`
+[^F307B]: Findings register, FND-292, in this document.
+[^F307C]: The holding suite of the core. `crates/cachette-core/tests/holding.rs`
+[^F313B]: ADR-0103, the tile value field stores a dense delta, never a sparse change list, decision D4. `docs/adrs/draft/adr-0103-the-tile-value-field-stores-a-dense-delta.md`
+[^F314X]: Findings register, FND-297, in this document.
+[^F313A]: The workspace manifest, the release profile. `Cargo.toml`
+[^F306B]: Findings register, FND-313, in this document.
+[^F311A]: Findings register, FND-304, in this document.
+[^F319A]: Project orientation, the Python example. `README.md`
+[^F319B]: Recurring defect shapes, shape 5. `.claude/rules/recurring-defects.md`
+[^F319C]: Product requirement record 0021, a developer can use the control plane without reading its source. `docs/product/accepted/prd-0021-a-developer-can-use-the-control-plane-without-reading-its-source.md`
+
 ### FND-320 — The type stub claims a check that regenerates it, and no generator and no check exist
 
 **Believed.** The type stub for the compiled extension module is a generated
@@ -10940,6 +11332,35 @@ both places.
 **A list of checks is the easiest copy to overlook, because both copies work.**
 Each list ran and each passed. The gap was not a broken check. It was a check
 that never ran, and a passing job that looked like coverage.
+
+### FND-531 — The project orientation is one document under three names, and one of the three was a copy
+
+**Believed.** The orientation is two tracked files and a symlink, and a check
+must compare the two files after a normalisation.[^F322D] The item that holds
+the work states that design, and it states that neither file may be edited.
+
+**True.** Two of the three names were already symlinks to the third. The
+divergence lived in the one name that was still a regular file. A comparison
+between two hand-written files is the weaker instrument, because it lets the
+copies exist and then reports that they disagree. The rule prefers deriving one
+from the other, and this repository already mirrors its rules directory and its
+skills directory that way.[^F530A]
+
+**Evidence.** The orientation file for one harness was a regular file and
+carried an older numbering of its footnotes and an older repository layout
+table. It named neither the canonical rules directory nor the two symlinks
+beside it. The other two names read one file and could not disagree.
+
+**Follows.** The third name is now a symlink as well, so the orientation is one
+document and the copies cannot drift. The check stays, and it earns its place a
+different way: it fails when somebody replaces a symlink with a regular file
+that says something else. A checkout on a filesystem with no symlink must still
+work, so the check compares content and does not demand the link.
+
+**Read the shape before you build the instrument the item asks for.** The item
+asked for a comparison of two hand-written documents. The tree already held the
+better answer for two of the three names, and copying the item's design would
+have preserved the copy it set out to police.
 
 ### FND-532 — A check that reads prose must choose a unit, and the sentence is too small
 
