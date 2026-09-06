@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-491**
+**Next number: FND-492**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -11739,9 +11739,50 @@ that reads as a share hides this, and only a harness run finds it. Run the
 harness at both values before and after a change to a founding number, and
 report what the mechanism did, not only what the share did.
 
+### FND-491 — Two reads a road plan needs have no reader, and a draft record said the engine already had them
+
+**Believed.** ADR-0152 D2 states that the road solver reads the sites a faction
+holds, the deposits it knows and which of its sites are unconnected. It then
+said that each of the three is a bounded aggregate that the engine already
+exposes or derives at the barrier.[^F491A]
+
+**True.** One of the three has readers. Two have none.
+
+The sites of a faction are readable. `SettlementArena` gives `iter`,
+`faction`, `tile` and `address`, and `World::seat` gives the seat of a faction
+at `crates/cachette-core/src/world.rs:9611`.
+
+**Nothing says which sites are unconnected.** No pass derives connectivity, and
+nothing indexes the roads. `World::finished_upgrade` answers for one tile at
+`crates/cachette-core/src/world.rs:5238`, and `World::upgrade_sites` returns
+the sparse entries at `crates/cachette-core/src/world.rs:5219`. Neither joins
+two places.
+
+**Nothing names the deposits of a faction.** A tile stock is generated from the
+seed, and only what was taken is stored.[^F182B] `World::original_stock` and
+`World::tile_stock` answer for one tile at `crates/cachette-core/src/world.rs:1221`
+and `crates/cachette-core/src/world.rs:1246`. No aggregate collects them.
+
+**Evidence.** The whole public surface of the world was listed and read.
+
+    grep -n "pub fn " crates/cachette-core/src/world.rs
+
+**Follows.** The record now states the read as a constraint. It says that each
+of the three must reach the solver as a bounded read, that the record does not
+claim a reader exists, and that the work which implements it states in the open
+what the solver does without one.[^F491A]
+
+**A record that says a reader exists is a capability claim, and the scope rule
+forbids it.**[^F491C] A record states what the code does or the constraint the
+code must satisfy. A reviewer who reads "the engine already exposes" plans work
+that has no ground under it, and nothing fails until an implementer opens the
+file.
+
 ## References
 
 [^F490A]: Balance register, the founding group, the base reach and the campaign cohort size. `docs/reference/balance.md`
+[^F491A]: ADR-0152, a faction plans its roads and zones with one solver, decision D2. `docs/adrs/accepted/adr-0152-a-faction-plans-its-roads-and-zones-with-one-solver.md`
+[^F491C]: Decision Record Scope, section 4.6. `.agents/rules/adr-scope.md`
 [^F487A]: ADR-0150, held ground is the ground within reach of a city its faction owns, decision D1. `docs/adrs/draft/adr-0150-held-ground-is-the-ground-within-reach-of-a-city-its-faction-owns.md`
 [^F487B]: Recurring defect shapes, shape 1. `.agents/rules/recurring-defects.md`
 [^F340A]: Findings register, FND-325, in this document.

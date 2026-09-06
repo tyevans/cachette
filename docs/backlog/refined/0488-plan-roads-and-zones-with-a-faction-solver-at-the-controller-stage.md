@@ -102,18 +102,17 @@ exempt from the own-ground rule. The recommendation is below.
 
 **Registry.** ADR-0152 stays a draft. This item accepts nothing.
 
-### One disagreement inside ADR-0152
+### One disagreement inside ADR-0152, now repaired
 
-**ADR-0152 D3 and ADR-0152 D4 cannot both hold as written.** D3 says a road
-project runs along the path between two places, and that path crosses ground
-the faction does not hold. D4 says the write verb refuses a tile the faction
-does not hold. Under D4 the verb refuses most tiles of every road path.
+**ADR-0152 D3 and ADR-0152 D4 could not both hold as first written.** D3 puts
+a road project along the path between two places, and that path crosses ground
+the faction does not hold. D4 made the write verb refuse a tile the faction
+does not hold. Under that rule the verb refused most tiles of every road path.
 
-Stage two writes the verb so that it refuses a tile the faction does not hold,
-**unless the category is a road**. That is the same exemption ADR-0150 D4
-already states for the build.[^1] The item records the disagreement as a
-finding. A reviewer of ADR-0152 decides whether the exemption belongs in D4.
-This item does not edit either record.
+A reviewer repaired D4 and accepted the record. **The verb now refuses a tile
+the faction does not hold, unless the category is a road.** That is the same
+exemption ADR-0150 D4 states for the build.[^1] One function states the ground
+rule, and every caller reads that one function. ADR-0150 is unchanged.
 
 ### What a project is
 
@@ -141,7 +140,7 @@ for each resource kind. `World::shortfall_log` gives the sites whose upkeep
 could not pay. `World::store_capacity_raise` gives what a store can still hold.
 Each exists today, and each is bounded.
 
-**Which of its places are unconnected.** **No reader exists.** Nothing derives
+**Which of its places are unconnected.** **No reader exists.**[^16] Nothing derives
 connectivity, and nothing indexes the roads. `World::finished_upgrade` answers
 for one tile, and `World::upgrade_sites` returns the sparse entries.
 
@@ -151,7 +150,7 @@ is one read for each tile of that path. It costs the path and never the world.
 This item adds no connectivity index. A union over the sparse road entries at
 the barrier is the alternative, and it stays an open question.
 
-**Where its deposits are.** **No reader exists.** A tile stock is generated
+**Where its deposits are.** **No reader exists.**[^16] A tile stock is generated
 from the seed, and only what was taken is stored.[^15] `World::original_stock`
 and `World::tile_stock` answer for one tile. No aggregate names the deposits of
 a faction.
@@ -240,8 +239,8 @@ The plan is the tighter bound of the two. It says which unheld tiles a road may
 cross, and the exemption only says that unheld tiles are allowed at all.
 Together they answer the owner's complaint without removing the reach.
 
-**This item does not edit ADR-0150.** A reviewer of ADR-0150 and ADR-0152
-decides. The item records the recommendation and the disagreement above.
+**A reviewer accepted this recommendation and repaired ADR-0152 D4.** ADR-0150
+keeps its road exemption and is unchanged.
 
 ### The open questions this item still holds
 
@@ -317,7 +316,7 @@ Filled in when the item moves to `complete/`.
 
 [^1]: ADR-0150, held ground is the ground within reach of a city its faction owns, decision D4. `docs/adrs/draft/adr-0150-held-ground-is-the-ground-within-reach-of-a-city-its-faction-owns.md`
 [^2]: PRD-0055, a god raises the ground its people hold, and sees what stands there. `docs/product/shaped/prd-0055-a-god-raises-the-ground-its-people-hold-and-sees-what-stands-there.md`
-[^3]: ADR-0152, a faction plans its roads and zones with one solver. `docs/adrs/draft/adr-0152-a-faction-plans-its-roads-and-zones-with-one-solver.md`
+[^3]: ADR-0152, a faction plans its roads and zones with one solver. `docs/adrs/accepted/adr-0152-a-faction-plans-its-roads-and-zones-with-one-solver.md`
 [^4]: ADR-0151, an upgrade is a category with a ground fit and a level, decisions D1 and D2. `docs/adrs/draft/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
 [^5]: ADR-0144, a faction controller runs inside the step and acts only through the caller's verbs, decisions D2, D3 and D5. `docs/adrs/accepted/adr-0144-a-faction-controller-runs-inside-the-step-and-acts-only-through-the-callers-verbs.md`
 [^6]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
@@ -330,3 +329,4 @@ Filled in when the item moves to `complete/`.
 [^13]: ADR-0006, an event is plain data and applying it is pure, decision D1. `docs/adrs/accepted/adr-0006-an-event-is-plain-data-and-applying-it-is-pure.md`
 [^14]: ADR-0090, a tile upgrade is stored sparsely, decision D1. `docs/adrs/draft/adr-0090-a-tile-upgrade-is-stored-sparsely.md`
 [^15]: ADR-0072, a tile stock is generated, and only what was taken is stored, decision D1. `docs/adrs/accepted/adr-0072-a-tile-stock-is-generated-and-only-what-was-taken-is-stored.md`
+[^16]: Findings register, FND-491. `docs/FINDINGS.md`
