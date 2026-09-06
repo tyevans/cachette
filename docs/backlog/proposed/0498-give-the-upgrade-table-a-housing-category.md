@@ -107,3 +107,5 @@ and the balance register rows are listed in the outcome below.
 [^3]: PRD-0014, everyone needs somewhere to live. `docs/product/accepted/prd-0014-everyone-needs-somewhere-to-live.md`
 [^4]: Recurring Defect Shapes, shape 1. `.agents/rules/recurring-defects.md`
 [^5]: ADR-0151, an upgrade is a category with a ground fit and a level. `docs/adrs/accepted/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
+[^6]: ADR-0152, a faction plans its roads and zones with one solver. `docs/adrs/accepted/adr-0152-a-faction-plans-its-roads-and-zones-with-one-solver.md`
+[^7]: ADR-0159, a project order names one category and one seed set. `docs/adrs/accepted/adr-0159-a-project-order-names-one-category-and-one-seed-set.md`

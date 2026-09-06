@@ -104,3 +104,4 @@ says so. If they land and it does not, this record ships with them.
 
 [^3]: PRD-0013, a unit consumes to continue.
 `accepted/prd-0013-a-unit-consumes-to-continue.md`
+[^4]: Findings register, FND-549, the saturation sweep. `docs/FINDINGS.md`

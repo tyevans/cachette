@@ -21,7 +21,7 @@
 //! [^1]: Backlog item 0136, provision a founded site from the ground it reaches. `docs/backlog/complete/0136-provision-a-founded-site-from-the-ground-it-reaches.md`
 //! [^2]: Testing rules, section 5. `.agents/rules/testing.md`
 //! [^3]: Testing rules, section 2a. `.agents/rules/testing.md`
-//! [^4]: Backlog item 0505, keep a builder on the tile it builds until the work is done. `docs/backlog/proposed/0505-keep-a-builder-on-the-tile-it-builds-until-the-work-is-done.md`
+//! [^4]: Backlog item 0505, keep a builder on the tile it builds until the work is done. `docs/backlog/complete/0505-keep-a-builder-on-the-tile-it-builds-until-the-work-is-done.md`
 
 use cachette_core::effective::{SCALE_CEILING, SCALE_FLOOR, WET_WEIGHT};
 use cachette_core::founding::{disc, SURVEY_RADIUS};

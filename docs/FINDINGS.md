@@ -13098,7 +13098,7 @@ holds the work.[^F543B]
 **Believed.** The balance register records that the wonder work does not move.
 Its derivation says the work done stalled between 18 and 61 units before tick
 500 and did not move again by tick 20000, and that the wonder path fires in no
-seed at either value.[^F548A] The win-path share row records that territory won
+seed at either value.[^F547A] The win-path share row records that territory won
 5 of 8 and that wealth or wonder won 3 of 8.
 
 **True.** Both readings were taken before the road chain was repaired.[^F548B]
@@ -13118,7 +13118,7 @@ recurring-defect rule names, and this is one more local instance of it.[^F483G]
 ### FND-550 — The ceiling that ends every game is in the store, not in the accumulator
 **Believed.** Three engine changes could put the wealth path out of reach:
 scale the bar by the settlements a faction owns, widen the store type, or drop
-the stock clause.[^F548A] The backlog item repeated them, and a fourth reading
+the stock clause.[^F550A] The backlog item repeated them, and a fourth reading
 named a wider accumulator as the smallest change of the three.[^F543B]
 **True.** The reader already totals in a 64-bit accumulator, and it already
 sums every commodity of every live settlement.[^F548C] **A wider accumulator
@@ -13157,7 +13157,7 @@ tiles. The first observation container therefore sized every scratch bitmap and
 every payload by the tile count of the block.
 **True.** The offset of a tile packs the row and the column of that tile
 against the block edge, so the offset space is the square of the block
-edge.[^F548A] A block that the world edge cuts holds fewer tiles than that, and
+edge.[^F552A] A block that the world edge cuts holds fewer tiles than that, and
 the offsets of the tiles it does hold still reach the top of the space. Every
 tile of a cut block above the tile count was dropped in silence.
 **Evidence.** The defect reached no interior block, because an interior block
@@ -13337,7 +13337,7 @@ after, on one machine.
 
 ## References
 
-[^F548A]: The unit-to-tile bridge, the block key. `crates/cachette-core/src/bridge.rs`
+[^F552A]: The unit-to-tile bridge, the block key. `crates/cachette-core/src/bridge.rs`
 [^F494C]: Findings register, FND-486. `docs/FINDINGS.md`
 [^F542C]: ADR-0148, a game end is recorded once and stops the controllers, decision D3. `docs/adrs/accepted/adr-0148-a-game-end-is-recorded-once-and-stops-the-controllers.md`
 [^F542D]: The choice set of the faction controller. `crates/cachette-core/src/controller.rs`
@@ -13345,10 +13345,11 @@ after, on one machine.
 [^F542F]: The admission pass, which refuses a guest below the guest edge. `crates/cachette-core/src/world.rs`
 [^F542G]: The campaign register, and the raise that refuses a second live campaign. `crates/cachette-core/src/campaign.rs`
 [^F542H]: The sweep, which plays a seed set to the tick limit and samples the run. `scripts/balance_sweep.py`
-[^F542I]: Backlog item 0507. `docs/backlog/proposed/0507-let-a-faction-take-the-ground-of-another.md`
+[^F542I]: Backlog item 0507. `docs/backlog/complete/0507-let-a-faction-take-the-ground-of-another.md`
 [^F543A]: Balance register, the stock target. `docs/reference/balance.md`
 [^F543B]: Backlog item 0506. `docs/backlog/complete/0506-put-the-wealth-path-out-of-easy-reach.md`
-[^F548A]: Balance register, the wonder work and the win-path share. `docs/reference/balance.md`
+[^F547A]: Balance register, the wonder work and the win-path share. `docs/reference/balance.md`
+[^F550A]: Backlog item 0506, the three engine changes it names. `docs/backlog/complete/0506-put-the-wealth-path-out-of-easy-reach.md`
 [^F548B]: Findings register, FND-496. `docs/FINDINGS.md`
 [^F548C]: The stock total of a faction, which the wealth reader compares. `crates/cachette-core/src/world.rs`
 [^F548D]: ADR-0165, the wealth bar stands above what one settlement can hold. `docs/adrs/draft/adr-0165-the-wealth-bar-stands-above-what-one-settlement-can-hold.md`
