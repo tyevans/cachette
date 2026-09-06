@@ -12195,28 +12195,56 @@ category for ever, and no order could raise it.[^F496D]
 
 **Evidence.** The run was
 `uv run python -m cachette.demo --run-to-end --extent 96 --factions 3
---tick-limit 800` at seed `0xf37fd6bdd8b64a3a`, on the x86-64 development
-machine and not on the target platform.[^F496E] Before the fix the census read
-`projects_zoned 120`, `projects_finished 0`, `projects_dropped 4657`,
-`projects_refused 7862` and `upgrades_complete 0`. After the fix the same run
-reads `projects_finished 23` and `upgrades_complete 23`.
+--tick-limit 800`, on the x86-64 development machine and not on the target
+platform.[^F496E]
 
-The zoning count of 120 is three factions at the plan bound of forty. Each plan
-filled once and never changed, because nothing finished and nothing was
-cleared. Every later write was a drop.
+**One seed measures one world, so the reading is a spread.** Eight seeds were
+written down before any of them ran, and each was run for 800 ticks with the
+clause and without it. The count of seeds that finished at least one project
+went from one to seven. The count that also stood a road went from one to four
+at 600 ticks.
+
+| Seed | Finished without the clause | Finished with it |
+|---|---|---|
+| `0xf37fd6bdd8b64a3a` | 0 | 3 |
+| `0xea335e28791d60da` | 1 | 13 |
+| `0x58d024d97012dd6a` | 0 | 2 |
+| `0x0000000000000001` | 0 | 0 |
+| `0x0123456789abcdef` | 0 | 3 |
+| `0xdeadbeefcafef00d` | 0 | 2 |
+| `0x00000000000002a1` | 0 | 1 |
+| `0xffffffffffffffff` | 0 | 2 |
+
+The plan figures barely move. At `0xf37fd6bdd8b64a3a` the run zoned 120 and
+dropped 4680 without the clause, and it zoned 123 and dropped 4677 with it. The
+zoning count of 120 is three factions at the plan bound of forty. Each plan
+fills once and then never changes, because nothing finishes and nothing is
+cleared, so every later write is a drop.
 
 Instrumentation of the controller stage over sixty ticks named the refusal.
 Every project build order gave `TileHoldsAnother`, with a standing category the
 older draw had planted and the project's own category asked for. Not one order
 was ever applied.
 
-**Two counters do not count what their names claim.** `projects_dropped` and
-`projects_refused` are not disjoint: a write past the bound raises both.
-`projects_refused` also holds every build refusal of the world, not only a
-refusal of a plan write, so the two names read as one subsystem and are three
-things. `controller_commands` and `controller_refused` are counts of the last
-tick only, and the log is cleared at the game end, which is why both read zero
-in a run that ended.
+**Four census rows do not count what their names claim.**
+`projects_dropped` and `projects_refused` are not disjoint: a write past the
+bound raises both. `projects_refused` also holds every build refusal of the
+world, not only a refusal of a plan write, so two names read as one subsystem
+and are three things.
+
+`controller_commands` and `controller_refused` are counts of the last tick
+alone. The controller empties its log at the start of every tick, and it plans
+no command once the game end is written, so a run that ended reads zero in both
+rows while `plan_passes` reads 4800.[^F496J] Every other row beside them counts
+the whole run. Two time bases sit in one table and nothing marks which is
+which.
+
+**The production queue registered no census row at all.** The world holds four
+readers for it, and the Python boundary hands them out through a call of its
+own. The one census table holds none of them, so the demonstration census lists
+no queue row and a watcher cannot see what the queues produced or refused. The
+table is meant to be the only list, and a second declaration site now answers
+where the table is silent.[^F496K]
 
 **No test could have caught it.** The end-to-end test of the item calls
 `world.set_controller_evaluations(0)` and says in its own comment that it
@@ -12233,20 +12261,29 @@ faction zones for another, whatever the row asks for. One typed refusal names
 the plan rather than the tile. The verb and the build intent pass call the one
 function that states the rule.[^F496B]
 
-**A chain needs a test that runs the chain.** The new test seeds the
-demonstration world, calls no verb of its own, removes no draw, runs a bounded
-number of ticks, and asserts that a project finished and that a road stands. It
-goes red with the clause removed and green with it in place.[^F496G]
+**A chain needs a test that runs the chain, and over more than one seed.** The
+new test seeds the demonstration world at eight seeds, calls no verb of its
+own, removes no draw, runs each for a bounded number of ticks, and asserts that
+a stated number of them finished a project and stood a road. It reads four of
+eight with the clause and one of eight without it.[^F496G]
 
 **A fixture that removes the competing draw measures the fixture.** The
 register already held this shape twice, and this is the third instance. Turning
 a subsystem off to isolate another one hides exactly the defect that the two
 subsystems have together.[^F496H]
 
-**The plan still fills to its bound and drops thousands.** The fix closes the
-loop; it does not make the plan efficient. Nothing releases a unit from a
-project send, so the seed set the faction climbs is written once and never
-re-aimed. Both stay open.[^F496I]
+**The plan still fills to its bound and drops thousands, and one seed of eight
+still finishes nothing.** The fix closes the loop; it does not make the loop
+reliable. Nothing releases a unit from a project send, so the seed set the
+faction climbs is written once and never re-aimed. Both stay open.[^F496I]
+
+**Every laden unit of the demonstration world is on a destination plane.** A
+probe of the carrying fixture found 117 laden units and not one with a free
+send. The return field therefore steers nobody there, and the test that names
+the return field reads units that a destination field steers. That test passes
+at the world it was written against and fails under any perturbation of it,
+including a plan bound of zero, which makes the clause of this finding inert.
+The test is red on this branch and the open item holds the repair.[^F496I]
 
 
 ## References
@@ -12257,10 +12294,12 @@ re-aimed. Both stay open.[^F496I]
 [^F496C]: ADR-0144, a faction controller runs inside the step and acts only through the caller's verbs, decisions D4 and D5. `docs/adrs/accepted/adr-0144-a-faction-controller-runs-inside-the-step-and-acts-only-through-the-callers-verbs.md`
 [^F496D]: ADR-0151, an upgrade is a category with a ground fit and a level, decision D2. `docs/adrs/draft/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
 [^F496E]: Project orientation, the target platform. `CLAUDE.md`
+[^F496J]: ADR-0148, a game end is recorded once and stops the controllers, decision D4. `docs/adrs/accepted/adr-0148-a-game-end-is-recorded-once-and-stops-the-controllers.md`
+[^F496K]: Backlog item 0278, say what the demonstration world never produced. `docs/backlog/proposed/0278-say-what-the-demonstration-world-never-produced.md`
 [^F496F]: Testing rules, section 5. `.agents/rules/testing.md`
 [^F496G]: The plan tests. `crates/cachette-core/tests/plan.rs`
 [^F496H]: Testing rules, section 2a. `.agents/rules/testing.md`
-[^F496I]: Backlog item 0501. `docs/backlog/proposed/0501-let-a-faction-re-aim-its-project-order-and-keep-its-plan-live.md`
+[^F496I]: Backlog item 0502. `docs/backlog/proposed/0502-let-a-faction-re-aim-its-project-order-and-keep-its-plan-live.md`
 [^F494A]: Balance register, the stock target, the wonder work, the tick limit, the founding group and the campaign cohort size. `docs/reference/balance.md`
 [^F494B]: The census row that counts a filled seat. `crates/cachette-core/src/world.rs`
 [^F494C]: Findings register, FND-486. `docs/FINDINGS.md`

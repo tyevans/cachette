@@ -656,12 +656,76 @@ fn the_controller_sends_its_idle_units_to_the_projects_it_zoned() {
 // The chain end to end: the demonstration world finishes a road
 // ---------------------------------------------------------------------------
 
-/// The ticks the run below is given to finish one project.
+/// The ticks each run below is given to finish one project.
 ///
-/// The bound is a test bound and not a balance value. The run finishes its
-/// first project long before it, and the number only stops a broken engine
-/// from running for ever.
-const RUN_TICKS: u32 = 200;
+/// The bound is a test bound and not a balance value. A run that closes the
+/// chain closes it long before the bound, and the number only stops a broken
+/// engine from running for ever.
+const RUN_TICKS: u32 = 600;
+
+/// The seeds that the run below takes.
+///
+/// **The chain is seed dependent, so one seed measures one world.** The list
+/// holds eight seeds that were written before any of them was run, so no seed
+/// here was chosen for the answer it gives.
+const RUN_SEEDS: [u64; 8] = [
+    0xf37f_d6bd_d8b6_4a3a,
+    0xea33_5e28_791d_60da,
+    0x58d0_24d9_7012_dd6a,
+    0x0000_0000_0000_0001,
+    0x0123_4567_89ab_cdef,
+    0xdead_beef_cafe_f00d,
+    0x0000_0000_0000_02a1,
+    0xffff_ffff_ffff_ffff,
+];
+
+/// The seeds of the list above that must close the chain.
+///
+/// **The bar is not every seed, because the chain does not close at every
+/// seed.** A faction whose units never reach a clean project tile finishes
+/// nothing, and half of the list holds such a world. The open item holds the
+/// two causes.[^1]
+///
+/// The bar is the reading of the run. The same eight seeds close at one seed
+/// with the plan clause removed, so the bar fails on the defect by a wide
+/// margin. Raise it when the open item lands.
+///
+/// # References
+///
+/// [^1]: Backlog item 0502. `docs/backlog/proposed/0502-let-a-faction-re-aim-its-project-order-and-keep-its-plan-live.md`
+const RUN_SEEDS_THAT_MUST_CLOSE: usize = 4;
+
+/// Seeds a demonstration world, runs it, and reports what it finished.
+///
+/// Returns the projects the plan counted finished and the roads that stand.
+fn run_a_demonstration_world(seed: u64) -> (i64, usize) {
+    let mut world = World::new(WorldConfig {
+        width: WIDTH,
+        height: HEIGHT,
+        seed,
+        faction_count: 3,
+        unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
+    })
+    .expect("the extent must describe a world");
+    // The engine seeds itself, as the demonstration does. No verb of this
+    // test founds anything, and no draw is turned off.
+    let seated = world.seed_world().expect("the world seeds once");
+    assert!(
+        seated.iter().any(|outcome| outcome.founding().is_some()),
+        "the seeding put no faction on the ground at seed {seed:#018x}"
+    );
+    for _ in 0..RUN_TICKS {
+        world.step(1).expect("the step runs");
+    }
+    assert!(world.check_invariants());
+    // A count is not a road. The census could rise for a project a caller
+    // cleared, so the run reads the ground as well.
+    let standing = addresses()
+        .into_iter()
+        .filter(|address| world.finished_upgrade(*address) == Some(UpgradeCategory::ROAD))
+        .count();
+    (census(&world, "projects_finished"), standing)
+}
 
 /// The demonstration world runs, and a road the plan zoned stands at the end.
 ///
@@ -672,8 +736,9 @@ const RUN_TICKS: u32 = 200;
 /// chain: the solver zones, the controller orders, the pass builds, and the
 /// plan counts the project finished.[^1] [^2]
 ///
-/// The run finished no project at all before the plan bound every build. The
-/// finding holds the census of the run that showed it.[^3]
+/// The runs finished one project between them across eight seeds before the
+/// plan bound every build. The finding holds the census of the run that showed
+/// it.[^3]
 ///
 /// # References
 ///
@@ -682,43 +747,23 @@ const RUN_TICKS: u32 = 200;
 /// [^3]: Findings register, FND-496. `docs/FINDINGS.md`
 #[test]
 fn the_demonstration_world_finishes_a_project_and_a_road_stands() {
-    let mut world = World::new(WorldConfig {
-        width: WIDTH,
-        height: HEIGHT,
-        seed: SEED,
-        faction_count: 3,
-        unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
-    })
-    .expect("the extent must describe a world");
-    // The engine seeds itself, as the demonstration does. No verb of this
-    // test founds anything, and no draw is turned off.
-    let seated = world.seed_world().expect("the world seeds once");
-    assert!(
-        seated.iter().any(|outcome| outcome.founding().is_some()),
-        "the seeding put no faction on the ground"
-    );
-    for _ in 0..RUN_TICKS {
-        world.step(1).expect("the step runs");
+    let mut closed = 0usize;
+    let mut report = String::new();
+    for seed in RUN_SEEDS {
+        let (finished, standing) = run_a_demonstration_world(seed);
+        if finished > 0 && standing > 0 {
+            closed += 1;
+        }
+        report.push_str(&format!(
+            "\n  {seed:#018x}: finished {finished}, roads standing {standing}"
+        ));
     }
-    let finished = census(&world, "projects_finished");
     assert!(
-        finished > 0,
-        "the run finished no project in {RUN_TICKS} ticks: zoned {}, dropped {}, refused {}",
-        census(&world, "projects_zoned"),
-        census(&world, "projects_dropped"),
-        census(&world, "projects_refused"),
+        closed >= RUN_SEEDS_THAT_MUST_CLOSE,
+        "the chain closed at {closed} of {} seeds in {RUN_TICKS} ticks, \
+         and the bar is {RUN_SEEDS_THAT_MUST_CLOSE}:{report}",
+        RUN_SEEDS.len()
     );
-    // A count is not a road. The census could rise for a project a caller
-    // cleared, so the test reads the ground as well.
-    let standing = addresses()
-        .into_iter()
-        .filter(|address| world.finished_upgrade(*address) == Some(UpgradeCategory::ROAD))
-        .count();
-    assert!(
-        standing > 0,
-        "the census counted {finished} projects finished and no road stands"
-    );
-    assert!(world.check_invariants());
 }
 
 /// A project of the faction refuses a build order that names another

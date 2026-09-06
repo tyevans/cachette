@@ -1,5 +1,5 @@
 ---
-id: 0501
+id: 0502
 title: Let a faction re-aim its project order and keep its plan live
 status: proposed
 created: 2026-09-05
@@ -36,10 +36,24 @@ finished, and it holds a row of the bound for the rest of the run.[^3] After
 200 ticks of the run above, 33 of one faction's 40 projects sat on a tile that
 carried another category.
 
-**Two census rows do not count what their names claim.** A write past the bound
-raises both `projects_dropped` and `projects_refused`, so the two are not
+**Four census rows do not count what their names claim.** A write past the
+bound raises both `projects_dropped` and `projects_refused`, so the two are not
 disjoint. `projects_refused` also counts every build refusal of the world and
-not only a refused plan write. A reader cannot tell the three apart.[^1]
+not only a refused plan write. `controller_commands` and `controller_refused`
+count the last tick alone, because the controller empties its log at the start
+of every tick, and they read zero in a run that ended while `plan_passes` reads
+4800. Every row beside them counts the whole run.[^1]
+
+**The production queue registered no census row.** The world holds four readers
+for it and the Python boundary hands them out through a call of its own, but
+the one census table holds none of them. A watcher of the demonstration sees no
+queue row at all.[^1] [^4]
+
+**One test is red because of this.** The test that names the return field of a
+laden unit reads units that a destination field steers. A probe found 117 laden
+units in the demonstration world and not one with a free send. The test passes
+at the world it was written against and fails under any perturbation of it. It
+cannot assert its subject until a laden unit can be unsent.[^1] [^5]
 
 ## Impact review
 
@@ -55,3 +69,5 @@ Not written. Refine the item first.
 [^1]: Findings register, FND-496. `docs/FINDINGS.md`
 [^2]: ADR-0159, a project order names one category for each unit and one seed set for the faction, decisions D1 and D3. `docs/adrs/draft/adr-0159-a-project-order-names-one-category-and-one-seed-set.md`
 [^3]: ADR-0151, an upgrade is a category with a ground fit and a level, decision D2. `docs/adrs/draft/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
+[^4]: Backlog item 0278, say what the demonstration world never produced. `docs/backlog/proposed/0278-say-what-the-demonstration-world-never-produced.md`
+[^5]: The carrying test. `crates/cachette-core/tests/carrying_a_load_home.rs`
