@@ -41,6 +41,12 @@ field of every row is a whole number.[^4] Every byte of every row enters the
 state hash, in faction order, and a declared padding byte is always zero.[^5]
 The Python read is a copy of the rows and never the store.
 
+**A row names a resource kind on each side.** It names what the faction offers
+or wants, and the resource kind it asks in return. A row carries no tagged
+consideration, so a board states no price in land and no price in a relation
+step. A contract that answers a row may state such a price, because the
+consideration tag set is a property of the contract and not of the board.[^6]
+
 Two worlds that differ in one row of one board have different hashes. A world
 in which no faction has posted hashes as it did before the board existed, so a
 golden file of such a world does not move.
@@ -52,7 +58,8 @@ when a padding byte can hold anything other than zero.
 ### D2. A world parameter bounds the board
 
 One faction holds a fixed number of rows. The row count is a balance value and
-the balance register holds it.[^6] The table holds the row count times the
+the balance register holds it.[^7] A table that no faction has written to
+holds nothing. From the first write onward it holds the row count times the
 faction count and nothing else. It never grows with the population and never
 grows with the number of posts, because a write that names more rows than the
 bound is refused and changes nothing.
@@ -92,7 +99,7 @@ caller. Reading passes no presence gate, moves no relation, and writes no
 event. The engine holds no notion of who is asking.
 
 **A board is not a negotiation.** A negotiation is between two parties, and
-whether a third party may read it is a question the project owner holds.[^7]
+whether a third party may read it is a question the project owner holds.[^8]
 That blocker still governs the negotiation, and this record does not close it.
 A board differs from a negotiation in one way that decides the matter. A
 negotiation names the other party. A board names nobody. A post that only one
@@ -112,11 +119,11 @@ When the faction controller posts a board, it calls the same write verb that a
 Python caller calls, and the same refusals apply.[^3] No write path exists for
 the controller alone.
 
-**No controller writes a board yet.** The design says the controller writes its
-rows from its site economies on a schedule, and the schedule is a balance value
-that nobody has set.[^2] [^6] The write verb exists and Python calls it. The
-controller does not. A reader of the code sees a board that only the control
-plane fills.
+**Nothing inside the engine writes a board.** The control plane is the only
+writer today. This decision does not say that a controller will post; it says
+which path a controller must take when one does, and it says so before the
+path is built, because a write added for the controller alone is the cheapest
+mistake to make and the hardest to see afterwards.[^9]
 
 A reviewer finds a violation when the controller writes a row through any path
 other than the write verb, or when the write verb checks who is calling it.
@@ -133,7 +140,7 @@ and the world would not know which one a controller acted on.
 was posted toward. Rejected because a post toward one faction is an offer, and
 the offer verb already exists. Rejected also because the engine holds no
 notion of who is asking, and a notion of the asker would be an authentication
-model.[^7]
+model.[^8]
 
 **An unbounded list of posts.** A faction would post as many rows as it likes.
 Rejected because the table would then grow with behaviour and not with a
@@ -157,19 +164,20 @@ change the layout writes a record that supersedes this one.
 contract are the only things that bind, and a faction that posts and then
 refuses the offer that answers it has broken nothing. A row names a resource
 kind and a quantity, and a contract that answers it may be priced in any kind
-the consideration tag set names.[^8]
+the consideration tag set names.[^6]
 
 **A change to the bound empties every board.** A game that resets the row
 count mid-run loses every post. That is the price of a layout that holds one
 block for each faction.
 
-**A controller that posts is later work.** The write path is fixed by D5, and
-the schedule waits on a balance value. Until that work arrives, only the
-control plane fills a board.
+**A controller that posts is later work.** D5 fixes the write path for it.
+The register row that would say how often a controller posts is unset, so the
+work waits on a balance value it cannot invent.[^7] Until that work arrives,
+only the control plane fills a board.
 
 **Secrecy is a separate need.** A game in which a player hides a post is a
 different game, and this record does not serve it. The blocker on who may read
-a negotiation stays open and governs the negotiation alone.[^7]
+a negotiation stays open and governs the negotiation alone.[^8]
 
 ## References
 
@@ -178,6 +186,7 @@ a negotiation stays open and governs the negotiation alone.[^7]
 [^3]: ADR-0144, a faction controller runs inside the step and acts only through the caller's verbs, decision D2. `docs/adrs/accepted/adr-0144-a-faction-controller-runs-inside-the-step-and-acts-only-through-the-callers-verbs.md`
 [^4]: ADR-0002, simulated and aggregated state holds no floating point number, decision D1. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
 [^5]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
-[^6]: Balance register, board size and advertisement schedule. `docs/reference/balance.md`
-[^7]: Blockers register, BLK-121. `docs/BLOCKERS.md`
-[^8]: ADR-0147, a contract consideration is a tagged kind, decision D1. `docs/adrs/accepted/adr-0147-a-contract-consideration-is-a-tagged-kind.md`
+[^6]: ADR-0147, a contract consideration is a tagged kind, decision D1. `docs/adrs/accepted/adr-0147-a-contract-consideration-is-a-tagged-kind.md`
+[^7]: Balance register, board size and advertisement schedule. `docs/reference/balance.md`
+[^8]: Blockers register, BLK-121. `docs/BLOCKERS.md`
+[^9]: Recurring Defect Shapes, shape 3. `.agents/rules/recurring-defects.md`

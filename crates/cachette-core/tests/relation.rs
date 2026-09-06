@@ -13,7 +13,7 @@
 //!
 //! # References
 //!
-//! [^1]: ADR-0146, a faction relation is one signed integer per ordered pair, and a pass reads a threshold, decisions D3, D4, D5 and D6. `docs/adrs/draft/adr-0146-a-faction-relation-is-one-signed-integer-per-ordered-pair-and-a-pass-reads-a-threshold.md`
+//! [^1]: ADR-0146, a faction relation is one signed integer per ordered pair, and a pass reads a threshold, decisions D3, D4, D5 and D6. `docs/adrs/accepted/adr-0146-a-faction-relation-is-one-signed-integer-per-ordered-pair-and-a-pass-reads-a-threshold.md`
 //! [^2]: Testing rules, section 2a. `.agents/rules/testing.md`
 //! [^3]: Testing rules, section 2. `.agents/rules/testing.md`
 //! [^4]: Testing policy. `docs/TESTING.md`

@@ -817,7 +817,7 @@ pub struct World {
     /// contest apply, the conversion apply, the drift and the verb write
     /// it.[^rel]
     ///
-    /// [^rel]: ADR-0146, a faction relation is one signed integer per ordered pair, and a pass reads a threshold. `docs/adrs/draft/adr-0146-a-faction-relation-is-one-signed-integer-per-ordered-pair-and-a-pass-reads-a-threshold.md`
+    /// [^rel]: ADR-0146, a faction relation is one signed integer per ordered pair, and a pass reads a threshold. `docs/adrs/accepted/adr-0146-a-faction-relation-is-one-signed-integer-per-ordered-pair-and-a-pass-reads-a-threshold.md`
     relations: RelationMatrix,
     /// The units that the conversion pass marked this frame, in slot order.
     ///
@@ -2430,7 +2430,7 @@ impl World {
     ///
     /// # References
     ///
-    /// [^1]: ADR-0146, a faction relation is one signed integer per ordered pair, and a pass reads a threshold, decision D1. `docs/adrs/draft/adr-0146-a-faction-relation-is-one-signed-integer-per-ordered-pair-and-a-pass-reads-a-threshold.md`
+    /// [^1]: ADR-0146, a faction relation is one signed integer per ordered pair, and a pass reads a threshold, decision D1. `docs/adrs/accepted/adr-0146-a-faction-relation-is-one-signed-integer-per-ordered-pair-and-a-pass-reads-a-threshold.md`
     #[must_use]
     pub fn relation(&self, from: FactionId, to: FactionId) -> Option<i32> {
         self.relations.get(from, to)
@@ -2491,7 +2491,7 @@ impl World {
     /// # References
     ///
     /// [^1]: ADR-0145, a unit type is a row of capability columns, and zero means cannot, decision D3. `docs/adrs/accepted/adr-0145-a-unit-type-is-a-row-of-capability-columns-and-zero-means-cannot.md`
-    /// [^2]: ADR-0146, a faction relation is one signed integer per ordered pair, and a pass reads a threshold, decision D5. `docs/adrs/draft/adr-0146-a-faction-relation-is-one-signed-integer-per-ordered-pair-and-a-pass-reads-a-threshold.md`
+    /// [^2]: ADR-0146, a faction relation is one signed integer per ordered pair, and a pass reads a threshold, decision D5. `docs/adrs/accepted/adr-0146-a-faction-relation-is-one-signed-integer-per-ordered-pair-and-a-pass-reads-a-threshold.md`
     pub fn move_relation(
         &mut self,
         speaker: Entity,
@@ -3707,7 +3707,7 @@ impl World {
         // and the steps enter with the entries, for the reason the controller
         // parameters do.[^19]
         //
-        // [^19]: ADR-0146, a faction relation is one signed integer per ordered pair, and a pass reads a threshold, decision D1. `docs/adrs/draft/adr-0146-a-faction-relation-is-one-signed-integer-per-ordered-pair-and-a-pass-reads-a-threshold.md`
+        // [^19]: ADR-0146, a faction relation is one signed integer per ordered pair, and a pass reads a threshold, decision D1. `docs/adrs/accepted/adr-0146-a-faction-relation-is-one-signed-integer-per-ordered-pair-and-a-pass-reads-a-threshold.md`
         let hash = self.relations.hash_into(hash);
         // The water in the air and on the ground is state that a later frame
         // reads: the next solve starts from the field this one left. Two
@@ -4859,7 +4859,7 @@ impl World {
         // thread count: the matrix follows the square of the faction ceiling
         // and no term follows the population.[^25]
         //
-        // [^25]: ADR-0146, a faction relation is one signed integer per ordered pair, and a pass reads a threshold, decision D3. `docs/adrs/draft/adr-0146-a-faction-relation-is-one-signed-integer-per-ordered-pair-and-a-pass-reads-a-threshold.md`
+        // [^25]: ADR-0146, a faction relation is one signed integer per ordered pair, and a pass reads a threshold, decision D3. `docs/adrs/accepted/adr-0146-a-faction-relation-is-one-signed-integer-per-ordered-pair-and-a-pass-reads-a-threshold.md`
         {
             let _span = stage::open(Stage::RelationDrift);
             self.relations.drift(tick);
@@ -5986,7 +5986,7 @@ impl World {
         // read. The predicate is the relation module's, so the trade verbs
         // and the contest read one statement of the war band.[^war]
         //
-        // [^war]: ADR-0146, a faction relation is one signed integer per ordered pair, and a pass reads a threshold, decision D4. `docs/adrs/draft/adr-0146-a-faction-relation-is-one-signed-integer-per-ordered-pair-and-a-pass-reads-a-threshold.md`
+        // [^war]: ADR-0146, a faction relation is one signed integer per ordered pair, and a pass reads a threshold, decision D4. `docs/adrs/accepted/adr-0146-a-faction-relation-is-one-signed-integer-per-ordered-pair-and-a-pass-reads-a-threshold.md`
         if !self.relations.permits_offer(proposer, responder) {
             return Err(TradeError::AtWar);
         }
@@ -7474,7 +7474,7 @@ impl World {
         // it. The list is summed by pair and sorted on it, so the writes
         // happen in pair order.[^3]
         //
-        // [^3]: ADR-0146, a faction relation is one signed integer per ordered pair, and a pass reads a threshold, decision D3. `docs/adrs/draft/adr-0146-a-faction-relation-is-one-signed-integer-per-ordered-pair-and-a-pass-reads-a-threshold.md`
+        // [^3]: ADR-0146, a faction relation is one signed integer per ordered pair, and a pass reads a threshold, decision D3. `docs/adrs/accepted/adr-0146-a-faction-relation-is-one-signed-integer-per-ordered-pair-and-a-pass-reads-a-threshold.md`
         for grievance in &self.grievances {
             self.relations
                 .on_units_fell(tick, grievance.victim, grievance.killer, grievance.count);
@@ -7614,7 +7614,7 @@ impl World {
             // took it. The marks are in slot order, so the writes are
             // too.[^3]
             //
-            // [^3]: ADR-0146, a faction relation is one signed integer per ordered pair, and a pass reads a threshold, decision D3. `docs/adrs/draft/adr-0146-a-faction-relation-is-one-signed-integer-per-ordered-pair-and-a-pass-reads-a-threshold.md`
+            // [^3]: ADR-0146, a faction relation is one signed integer per ordered pair, and a pass reads a threshold, decision D3. `docs/adrs/accepted/adr-0146-a-faction-relation-is-one-signed-integer-per-ordered-pair-and-a-pass-reads-a-threshold.md`
             self.relations
                 .on_units_converted(tick, from, mark.faction, 1);
         }
@@ -8515,7 +8515,7 @@ fn admit(
     // as the last spread left it, so the answer is the same at any thread
     // count.[^11]
     //
-    // [^11]: ADR-0146, a faction relation is one signed integer per ordered pair, and a pass reads a threshold, decision D4. `docs/adrs/draft/adr-0146-a-faction-relation-is-one-signed-integer-per-ordered-pair-and-a-pass-reads-a-threshold.md`
+    // [^11]: ADR-0146, a faction relation is one signed integer per ordered pair, and a pass reads a threshold, decision D4. `docs/adrs/accepted/adr-0146-a-faction-relation-is-one-signed-integer-per-ordered-pair-and-a-pass-reads-a-threshold.md`
     let refused: Vec<bool> = intents
         .iter()
         .map(|(entity, target)| {

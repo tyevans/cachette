@@ -1157,7 +1157,7 @@ fn contenders(world: &mut World) -> usize {
     // The contest resolves a meeting only across a pair at war, so the
     // scenario declares one. The edge is read from the world.[^4]
     //
-    // [^4]: ADR-0146, a faction relation is one signed integer per ordered pair, and a pass reads a threshold, decision D4. `docs/adrs/draft/adr-0146-a-faction-relation-is-one-signed-integer-per-ordered-pair-and-a-pass-reads-a-threshold.md`
+    // [^4]: ADR-0146, a faction relation is one signed integer per ordered pair, and a pass reads a threshold, decision D4. `docs/adrs/accepted/adr-0146-a-faction-relation-is-one-signed-integer-per-ordered-pair-and-a-pass-reads-a-threshold.md`
     let war = world.relation_rules().war_edge - 1;
     assert!(world.set_relation(FactionId(0), FactionId(1), war));
     world

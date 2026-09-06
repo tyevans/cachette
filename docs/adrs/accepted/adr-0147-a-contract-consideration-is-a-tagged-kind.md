@@ -158,7 +158,7 @@ under an open blocker and not a decision of this record.[^9]
 [^4]: ADR-0128, a contract moves a quantity only when a unit carries it onto the ground of the other party, decision D2. `docs/adrs/draft/adr-0128-a-contract-moves-a-quantity-only-when-a-unit-carries-it.md`
 [^5]: ADR-0126, a trade negotiation is engine state, and the words are not, decision D4. `docs/adrs/draft/adr-0126-a-trade-negotiation-is-engine-state.md`
 [^6]: ADR-0002, simulated and aggregated state holds no floating point number, decision D1. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
-[^7]: ADR-0146, a faction relation is one signed integer per ordered pair, and a pass reads a threshold, decision D3. `docs/adrs/draft/adr-0146-a-faction-relation-is-one-signed-integer-per-ordered-pair-and-a-pass-reads-a-threshold.md`
+[^7]: ADR-0146, a faction relation is one signed integer per ordered pair, and a pass reads a threshold, decision D3. `docs/adrs/accepted/adr-0146-a-faction-relation-is-one-signed-integer-per-ordered-pair-and-a-pass-reads-a-threshold.md`
 [^8]: Balance register, the land list bound. `docs/reference/balance.md`
 [^9]: Blockers register, BLK-036. `docs/BLOCKERS.md`
 [^10]: ADR-0127, a terminal refusal closes an ordered pair until a named tick, decision D1. `docs/adrs/draft/adr-0127-a-terminal-refusal-closes-a-pair-until-a-named-tick.md`

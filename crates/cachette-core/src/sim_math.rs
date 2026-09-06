@@ -242,7 +242,7 @@ const fn saturate_i64(value: i128) -> i64 {
 ///
 /// # References
 ///
-/// [^1]: ADR-0146, a faction relation is one signed integer per ordered pair, and a pass reads a threshold, decision D1. `docs/adrs/draft/adr-0146-a-faction-relation-is-one-signed-integer-per-ordered-pair-and-a-pass-reads-a-threshold.md`
+/// [^1]: ADR-0146, a faction relation is one signed integer per ordered pair, and a pass reads a threshold, decision D1. `docs/adrs/accepted/adr-0146-a-faction-relation-is-one-signed-integer-per-ordered-pair-and-a-pass-reads-a-threshold.md`
 #[must_use]
 pub const fn offset(value: i32, step: i32) -> i32 {
     value.saturating_add(step)

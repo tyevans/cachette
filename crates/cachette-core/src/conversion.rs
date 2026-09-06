@@ -486,7 +486,7 @@ fn resolve_block(
             // units.** The relation adds one condition to the field, and the
             // edge it compares against is a register row.[^2]
             //
-            // [^2]: ADR-0146, a faction relation is one signed integer per ordered pair, and a pass reads a threshold, decision D4. `docs/adrs/draft/adr-0146-a-faction-relation-is-one-signed-integer-per-ordered-pair-and-a-pass-reads-a-threshold.md`
+            // [^2]: ADR-0146, a faction relation is one signed integer per ordered pair, and a pass reads a threshold, decision D4. `docs/adrs/accepted/adr-0146-a-faction-relation-is-one-signed-integer-per-ordered-pair-and-a-pass-reads-a-threshold.md`
             if !relations.permits_conversion(leader, faction) {
                 continue;
             }
