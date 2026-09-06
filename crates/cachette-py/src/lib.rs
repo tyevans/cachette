@@ -4943,6 +4943,18 @@ impl PyWorld {
         plane.to_pyarray(python)
     }
 
+    /// The water in the air over every level 1 cell, as a NumPy array.
+    fn weather_air<'py>(&self, python: Python<'py>) -> Bound<'py, PyArray1<i64>> {
+        let world = self.lock();
+        let plane: Vec<i64> = world
+            .weather()
+            .air_plane()
+            .iter()
+            .map(|drops| drops.0)
+            .collect();
+        plane.to_pyarray(python)
+    }
+
     /// The number of level 1 cells across the world, as an integer.
     ///
     /// A weather array is in cell index order, so a watcher takes
