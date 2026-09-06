@@ -19,7 +19,7 @@
 use bytemuck::{Pod, Zeroable};
 
 use crate::holding::Holder;
-use crate::types::{Fix32, Tick, TileIdx};
+use crate::types::{FactionId, Fix32, Tick, TileIdx};
 
 /// A unit took an amount from a tile.
 ///
@@ -147,5 +147,175 @@ impl TileChanged {
     #[must_use]
     pub const fn sort_key(&self) -> (u64, u32) {
         (self.tick.0, self.tile.0)
+    }
+}
+
+/// What took the last of an upgrade's condition.
+///
+/// The type is a one-byte integer and not an enumeration with a hidden
+/// discriminant width, because the event that holds it must be plain
+/// data.[^1]
+///
+/// # References
+///
+/// [^1]: ADR-0006, an event is plain data and applying it is pure, decision D1. `docs/adrs/accepted/adr-0006-an-event-is-plain-data-and-applying-it-is-pure.md`
+pub type WearCause = u8;
+
+/// The wear of the tick came from the weather alone.
+pub const WEAR_CAUSE_WEATHER: WearCause = 1;
+/// The wear of the tick came from a hostile army alone.
+pub const WEAR_CAUSE_ARMY: WearCause = 2;
+/// The wear of the tick came from the weather and from a hostile army.
+pub const WEAR_CAUSE_BOTH: WearCause = 3;
+
+/// An upgrade lost the last of its condition and is gone.
+///
+/// **This is the one sink an upgrade has that a caller does not drive by
+/// hand.** The entry is removed and the tile returns to the world the
+/// generator made, so no reader can ask the world afterwards what stood
+/// there. The event is the only record of it.
+///
+/// The layout is 8 + 4 + 2 + 1 + 1 + 1 + 7 bytes, which is 24 bytes at an
+/// alignment of 8. The trailing array declares every padding byte, so the
+/// type holds no uninitialised byte.[^1]
+///
+/// # References
+///
+/// [^1]: ADR-0006, an event is plain data and applying it is pure, decision D1. `docs/adrs/accepted/adr-0006-an-event-is-plain-data-and-applying-it-is-pure.md`
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Pod, Zeroable)]
+pub struct UpgradeCollapsed {
+    /// The tick at which the upgrade went.
+    pub tick: Tick,
+    /// The tile that carried it.
+    pub tile: TileIdx,
+    /// Who held the tile as the wear pass read it.
+    ///
+    /// The value names a faction, or nobody. The holder type states the
+    /// value for nobody, and that value sits above the faction ceiling.
+    pub holder: Holder,
+    /// The category that stood there, as its number.
+    pub category: u8,
+    /// The level that stood there. It is never zero, because a site under
+    /// construction carries nothing to wear.
+    pub level: u8,
+    /// What took the last of the condition.
+    pub cause: WearCause,
+    /// The declared padding. Always zero.
+    pub padding: [u8; 7],
+}
+
+impl UpgradeCollapsed {
+    /// Builds an event with zero padding.
+    #[must_use]
+    pub const fn new(
+        tick: Tick,
+        tile: TileIdx,
+        holder: Holder,
+        category: u8,
+        level: u8,
+        cause: WearCause,
+    ) -> Self {
+        Self {
+            tick,
+            tile,
+            holder,
+            category,
+            level,
+            cause,
+            padding: [0; 7],
+        }
+    }
+}
+
+/// An upgrade reached a new level, and that level now stands on the tile.
+///
+/// A level one event says that the first level of the category finished, so
+/// something stands on ground that carried nothing. A higher level says that
+/// what stood there grew. The wonder category claims the wealth-or-wonder
+/// end, so a watcher reads a wonder from the category column and needs no
+/// second reader for it.
+///
+/// The layout is 8 + 4 + 2 + 1 + 1 bytes, which is 16 bytes at an alignment
+/// of 8. The type needs no padding byte, and it holds none.[^1]
+///
+/// # References
+///
+/// [^1]: ADR-0006, an event is plain data and applying it is pure, decision D1. `docs/adrs/accepted/adr-0006-an-event-is-plain-data-and-applying-it-is-pure.md`
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Pod, Zeroable)]
+pub struct UpgradeFinished {
+    /// The tick at which the level finished.
+    pub tick: Tick,
+    /// The tile that carries it.
+    pub tile: TileIdx,
+    /// Who holds the tile as the build pass left it.
+    pub holder: Holder,
+    /// The category that rose, as its number.
+    pub category: u8,
+    /// The level that now stands there. It is never zero.
+    pub level: u8,
+}
+
+impl UpgradeFinished {
+    /// Builds an event.
+    #[must_use]
+    pub const fn new(tick: Tick, tile: TileIdx, holder: Holder, category: u8, level: u8) -> Self {
+        Self {
+            tick,
+            tile,
+            holder,
+            category,
+            level,
+        }
+    }
+}
+
+/// A settlement was founded.
+///
+/// The engine held a count of the settlements and nothing else. A watcher
+/// saw the count rise and could not say whose settlement it was or where it
+/// stood, and a count that falls when a settlement is lost hides a founding
+/// in the same tick.
+///
+/// The layout is 8 + 8 + 4 + 2 + 2 bytes, which is 24 bytes at an alignment
+/// of 8. The trailing array declares every padding byte.[^1]
+///
+/// # References
+///
+/// [^1]: ADR-0006, an event is plain data and applying it is pure, decision D1. `docs/adrs/accepted/adr-0006-an-event-is-plain-data-and-applying-it-is-pure.md`
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Pod, Zeroable)]
+pub struct SettlementFounded {
+    /// The tick at which the settlement was founded.
+    pub tick: Tick,
+    /// The settlement, as its identity in bits.
+    ///
+    /// The value is the whole identity and not a slot index. A slot index
+    /// survives the loss of what it named.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0085, an entity crosses to Python as one opaque identity that the engine resolves, decision D1. `docs/adrs/accepted/adr-0085-an-entity-crosses-to-python-as-one-opaque-identity.md`
+    pub settlement: u64,
+    /// The tile it stands on.
+    pub tile: TileIdx,
+    /// The faction that founded it.
+    pub faction: FactionId,
+    /// The declared padding. Always zero.
+    pub padding: [u8; 2],
+}
+
+impl SettlementFounded {
+    /// Builds an event with zero padding.
+    #[must_use]
+    pub const fn new(tick: Tick, settlement: u64, tile: TileIdx, faction: FactionId) -> Self {
+        Self {
+            tick,
+            settlement,
+            tile,
+            faction,
+            padding: [0; 2],
+        }
     }
 }
