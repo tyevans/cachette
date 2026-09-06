@@ -746,6 +746,23 @@ pub struct World {
     /// [^1]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
     /// [^2]: Findings register, FND-315. `docs/FINDINGS.md`
     destination_seeds: Vec<Vec<u32>>,
+    /// Whether the reach of each destination plane spreads through open
+    /// water.
+    ///
+    /// The send verb writes this, and it writes what the set it was given
+    /// says: a plane conducts through water when every unit sent to it
+    /// crosses water. A plane that carries one unit the water refuses does
+    /// not, because the field would then steer that unit at a coast.[^1]
+    ///
+    /// The entry is simulated state. A later frame derives the field from it,
+    /// so two worlds that hold the same seeds and different conduction must
+    /// diverge.[^2]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0091, movement takes its direction from a per-cell field, never from a per-unit search, decision D5. `docs/adrs/draft/adr-0091-movement-takes-its-direction-from-a-per-cell-field.md`
+    /// [^2]: ADR-0022, level 0 is the only truth, and every level above it is derived, decision D1. `docs/adrs/accepted/adr-0022-level-0-is-the-only-truth-and-every-level-above-it-is-derived.md`
+    destination_crossings: Vec<u8>,
     /// The load at which a unit counts as laden.
     ///
     /// A laden unit takes the option that carries its load home, and a unit
@@ -1306,6 +1323,7 @@ impl World {
             returns: ReturnField::new(cell_lattice, config.faction_count),
             destinations: SeededField::new(cell_lattice, WorldConfig::DEFAULT_DESTINATION_COUNT),
             destination_seeds: vec![Vec::new(); WorldConfig::DEFAULT_DESTINATION_COUNT as usize],
+            destination_crossings: vec![0; WorldConfig::DEFAULT_DESTINATION_COUNT as usize],
             carry_mark: CARRY_MARK_DEFAULT,
             holding: Holding::new(layout),
             luxuries: LuxuryField::new(),
@@ -1658,6 +1676,28 @@ impl World {
         cells.sort_unstable();
         cells.dedup();
         self.destination_seeds[destination as usize] = cells;
+        // **The plane conducts through water when every unit sent to it
+        // crosses water.** The caller states no flag. It states a set, and
+        // the crossing of that set follows from the type of each unit in it,
+        // which is a column of the shared table.[^6]
+        //
+        // A mixed set does not cross. The field is one direction for each
+        // cell, so a plane that crossed for the whole set would steer the
+        // units that the water refuses at a coast, which is the failure the
+        // land rule was written against.[^7]
+        //
+        // An empty set does not cross. A send of no unit steers nobody, and
+        // the safe answer costs nothing.
+        //
+        // [^6]: ADR-0145, a unit type is a row of capability columns, and zero means cannot, decision D2. `docs/adrs/accepted/adr-0145-a-unit-type-is-a-row-of-capability-columns-and-zero-means-cannot.md`
+        // [^7]: ADR-0091, movement takes its direction from a per-cell field, never from a per-unit search, decision D5. `docs/adrs/draft/adr-0091-movement-takes-its-direction-from-a-per-cell-field.md`
+        let crosses = !units.is_empty()
+            && units.iter().all(|unit| {
+                self.soldiers
+                    .unit_type(*unit)
+                    .is_some_and(|unit_type| self.unit_types.row(unit_type).water_crossing > 0)
+            });
+        self.destination_crossings[destination as usize] = u8::from(crosses);
         for unit in units {
             assert!(
                 self.soldiers.set_sent(*unit, Some(destination)),
@@ -1669,8 +1709,11 @@ impl World {
         // leaves stale is a confident wrong answer.[^5]
         //
         // [^5]: Findings register, FND-029. `docs/FINDINGS.md`
-        self.destinations
-            .derive(&self.pyramid, &self.destination_seed_pairs());
+        self.destinations.derive(
+            &self.pyramid,
+            &self.destination_seed_pairs(),
+            &self.destination_crossings,
+        );
         Ok(())
     }
 
@@ -1737,6 +1780,7 @@ impl World {
     pub fn set_destination_count(&mut self, count: u16) {
         self.destinations = SeededField::new(self.destinations.cells(), count);
         self.destination_seeds = vec![Vec::new(); count as usize];
+        self.destination_crossings = vec![0; count as usize];
     }
 
     /// Returns the direction that a unit sent to one destination takes from
@@ -3991,6 +4035,12 @@ impl World {
             for cell in cells {
                 hash = hash.write(&cell.to_le_bytes());
             }
+        }
+        // Whether a plane conducts through water is stored beside its seeds,
+        // and the derivation reads it, so it enters the hash for the reason
+        // the seeds do.
+        for crossing in &self.destination_crossings {
+            hash = hash.write(&crossing.to_le_bytes());
         }
         // A position is state that a later frame reads: a unit that holds
         // one still holds it on the next frame, and the preference decides
@@ -6758,8 +6808,11 @@ impl World {
         )?;
         self.exits.derive(&self.pyramid);
         self.returns.derive(&self.pyramid, &self.site_seeds());
-        self.destinations
-            .derive(&self.pyramid, &self.destination_seed_pairs());
+        self.destinations.derive(
+            &self.pyramid,
+            &self.destination_seed_pairs(),
+            &self.destination_crossings,
+        );
         Ok(())
     }
 
