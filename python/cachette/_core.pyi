@@ -390,6 +390,7 @@ class TileReport(TypedDict):
     value: int
     holder: int | None
     upgrade: int | None
+    upgrade_level: int
     upgrade_progress: int
     upgrade_complete: bool
 
