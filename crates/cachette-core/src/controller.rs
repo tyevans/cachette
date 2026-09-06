@@ -127,12 +127,11 @@ pub const CONTRACT_CARRIERS_DEFAULT: u32 = 2;
 /// [^1]: Balance register, the contract term. `docs/reference/balance.md`
 pub const CONTRACT_TERM_DEFAULT: u32 = 200;
 
-/// The four weights that bias the choices of one faction.
+/// The weights that bias the choices of one faction.
 ///
 /// The vector is drawn from the seed when the world is built, and it is
-/// simulated state. Only the build weight is read in this pass. The other
-/// three exist so that a later pass reads them without a change to the
-/// shape, and so that the hash already covers them.
+/// simulated state. Every weight is one byte, so the vector holds no padding
+/// and the state hash reads its bytes.
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Pod, Zeroable)]
 pub struct FactionWeights {
@@ -144,7 +143,28 @@ pub struct FactionWeights {
     pub build: u8,
     /// How much the faction wants a famous character.
     pub renown: u8,
+    /// How much the faction wants a new city.
+    ///
+    /// **This is a provisional value and not a measured one.** The balance
+    /// register holds the weight vector range, and the draw of this weight
+    /// takes that range.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: Balance register, the weight vector range. `docs/reference/balance.md`
+    pub settle: u8,
 }
+
+/// The number of weights that the vector holds.
+///
+/// The seeding draws one value for each of them, at the draw index of the
+/// weight. The count derives from the size of the vector, so a weight added
+/// to the shape is drawn without a second declaration of the count.[^1]
+///
+/// # References
+///
+/// [^1]: Recurring defect shapes, shape 1. `.agents/rules/recurring-defects.md`
+pub const WEIGHT_COUNT: u32 = core::mem::size_of::<FactionWeights>() as u32;
 
 impl FactionWeights {
     /// Draws the vector of one faction from the seed.
@@ -158,9 +178,9 @@ impl FactionWeights {
     #[must_use]
     pub const fn from_seed(seed: u64, faction: FactionId) -> Self {
         let range = (WEIGHT_HIGH - WEIGHT_LOW) as u64 + 1;
-        let mut drawn = [0u8; 4];
+        let mut drawn = [0u8; WEIGHT_COUNT as usize];
         let mut index = 0u32;
-        while index < 4 {
+        while index < WEIGHT_COUNT {
             let below = rng::draw_below(
                 seed,
                 rng::SYSTEM_CONTROLLER,
@@ -177,6 +197,7 @@ impl FactionWeights {
             trade: drawn[1],
             build: drawn[2],
             renown: drawn[3],
+            settle: drawn[4],
         }
     }
 }
@@ -205,8 +226,17 @@ pub struct FactionRow {
     /// [^1]: ADR-0144, a faction controller runs inside the step and acts only through the caller's verbs, decision D6. `docs/adrs/accepted/adr-0144-a-faction-controller-runs-inside-the-step-and-acts-only-through-the-callers-verbs.md`
     pub externally_controlled: u8,
     /// Declared padding, always zero.
-    pub padding: [u8; 3],
+    ///
+    /// The row is 4 bytes of seat, the weight vector, one flag and this
+    /// array, at an alignment of four. The assertion below fails to compile
+    /// when the array stops filling the row.
+    pub padding: [u8; 6],
 }
+
+/// The size of one controller row, in bytes.
+pub const FACTION_ROW_BYTES: usize = 16;
+
+const _: () = assert!(core::mem::size_of::<FactionRow>() == FACTION_ROW_BYTES);
 
 /// The seat value of a faction that founded nothing.
 pub const NO_SEAT: u32 = u32::MAX;
@@ -353,6 +383,9 @@ pub const COMMAND_QUEUE: u8 = 8;
 
 /// The command number of the crossing order.
 pub const COMMAND_CROSS: u8 = 9;
+/// The command number of the order that founds a city from the settlers of
+/// the faction. The argument is zero, because the verb takes the whole set.
+pub const COMMAND_SETTLE: u8 = 10;
 
 /// The step the controller moves a relation by when its draw says so. It is
 /// one step toward war, and the drift is what brings the pair back.[^1]
@@ -462,6 +495,18 @@ pub enum Choice {
     /// [^1]: ADR-0075, the founding choice reads a bounded sample of the world, decision D1. `docs/adrs/accepted/adr-0075-the-founding-choice-reads-a-bounded-sample-of-the-world.md`
     /// [^2]: ADR-0144, a faction controller runs inside the step and acts only through the caller's verbs, decision D2. `docs/adrs/accepted/adr-0144-a-faction-controller-runs-inside-the-step-and-acts-only-through-the-callers-verbs.md`
     Cross(TileIdx),
+    /// Found a city from every settler of the faction that stands on ground
+    /// a city may take.
+    ///
+    /// The set is the unit set of the faction, and the verb reads the settle
+    /// column of each unit in it. The verb refuses a unit whose column is
+    /// zero, and it refuses a place that breaks the founding distance. A
+    /// refused command is dropped and counted.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0150, held ground is the ground within reach of a city its faction owns, decision D5. `docs/adrs/draft/adr-0150-held-ground-is-the-ground-within-reach-of-a-city-its-faction-owns.md`
+    Settle,
 }
 
 impl Choice {
@@ -487,6 +532,7 @@ impl Choice {
             // the tile does not fit. The command log holds the kind, and the
             // send verb holds the tile.
             Self::Cross(_) => (COMMAND_CROSS, 0),
+            Self::Settle => (COMMAND_SETTLE, 0),
         }
     }
 }
@@ -513,6 +559,35 @@ pub fn wants_relation_move(
     let bound = u64::from(WEIGHT_HIGH) + u64::from(weights.war);
     let roll = ((u128::from(raw) * u128::from(bound)) >> 64) as u64;
     roll < u64::from(weights.war)
+}
+
+/// Decides whether a faction founds a city this tick.
+///
+/// **This draws exactly once.** The key is the controller system, the tick,
+/// the faction and the draw index, and the index is past every other draw of
+/// the stage, so it collides with none of them.[^1] The settle weight biases
+/// the draw: the answer is yes with probability
+/// `settle / (WEIGHT_HIGH + settle)`.
+///
+/// The engine states no rule about when a faction wants a city. The draw is
+/// the whole of the policy, in the way the campaign draw is.[^2]
+///
+/// # References
+///
+/// [^1]: ADR-0003, every random draw is keyed, never stateful, decision D1. `docs/adrs/accepted/adr-0003-every-random-draw-is-keyed-never-stateful.md`
+/// [^2]: ADR-0144, a faction controller runs inside the step and acts only through the caller's verbs, decision D4. `docs/adrs/accepted/adr-0144-a-faction-controller-runs-inside-the-step-and-acts-only-through-the-callers-verbs.md`
+#[must_use]
+pub fn wants_settle(
+    seed: u64,
+    tick: Tick,
+    faction: FactionId,
+    draw: u32,
+    weights: FactionWeights,
+) -> bool {
+    let raw = rng::draw(seed, rng::SYSTEM_CONTROLLER, tick.0, faction.0 as u64, draw);
+    let bound = u64::from(WEIGHT_HIGH) + u64::from(weights.settle);
+    let roll = ((u128::from(raw) * u128::from(bound)) >> 64) as u64;
+    roll < u64::from(weights.settle)
 }
 
 /// Picks the rival of a faction: the other faction with the most held tiles.
@@ -896,6 +971,16 @@ pub struct FactionState {
     ///
     /// [^1]: ADR-0144, a faction controller runs inside the step and acts only through the caller's verbs, decision D1. `docs/adrs/accepted/adr-0144-a-faction-controller-runs-inside-the-step-and-acts-only-through-the-callers-verbs.md`
     pub cross_to: Option<TileIdx>,
+    /// Whether it holds a unit whose type row founds a city.
+    ///
+    /// The world reads the settle column of each unit in the one scan of the
+    /// arena that the stage already makes. A faction that holds no settler
+    /// emits no settle command, so an idle world costs no command.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0145, a unit type is a row of capability columns, and zero means cannot, decision D3. `docs/adrs/accepted/adr-0145-a-unit-type-is-a-row-of-capability-columns-and-zero-means-cannot.md`
+    pub settle_due: bool,
 }
 
 /// The controller state the world holds.
@@ -928,7 +1013,7 @@ impl Controller {
                 seat: NO_SEAT,
                 weights: FactionWeights::from_seed(seed, FactionId(index)),
                 externally_controlled: 0,
-                padding: [0; 3],
+                padding: [0; 6],
             })
             .collect();
         Self {
@@ -1272,6 +1357,12 @@ impl Controller {
             if let Some(tile) = state.cross_to {
                 commands.push((faction, self.cross_draw_index(), Choice::Cross(tile)));
             }
+            if state.settle_due {
+                let draw = self.settle_draw_index();
+                if wants_settle(seed, tick, faction, draw, row.weights) {
+                    commands.push((faction, draw, Choice::Settle));
+                }
+            }
         }
         // The visit order above is fixed, and the sort is what makes the
         // applied order independent of it. The key is unique, because one
@@ -1348,12 +1439,25 @@ impl Controller {
     /// order.
     ///
     /// The crossing order draws nothing, and the index is reserved whether it
-    /// draws or not, so no other draw of this stage ever takes it. The index
-    /// puts the order last, after the queue order that builds the units it
-    /// sends.
+    /// draws or not, so no other draw of this stage ever takes it.
     #[must_use]
     pub const fn cross_draw_index(&self) -> u32 {
         self.evaluations + 7
+    }
+
+    /// Returns the draw index of the settle order: one past the crossing
+    /// order.
+    ///
+    /// The draw that decides whether a faction founds is made at this index,
+    /// and no other draw of this stage takes it. The index puts the settle
+    /// order last, so it reads the world the commands before it left.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0144, a faction controller runs inside the step and acts only through the caller's verbs, decision D5. `docs/adrs/accepted/adr-0144-a-faction-controller-runs-inside-the-step-and-acts-only-through-the-callers-verbs.md`
+    #[must_use]
+    pub const fn settle_draw_index(&self) -> u32 {
+        self.evaluations + 8
     }
 
     /// Reports whether a faction rewrites its board on this tick.

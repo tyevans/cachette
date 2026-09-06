@@ -363,6 +363,7 @@ const fn middling() -> FactionWeights {
         trade: WEIGHT_LOW,
         build: WEIGHT_LOW,
         renown: WEIGHT_LOW,
+        settle: WEIGHT_LOW,
     }
 }
 
