@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-487**
+**Next number: FND-488**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -11676,7 +11676,7 @@ already made this decision the other way for an entity, which crosses as one
 opaque identity that Python cannot build, so the interface is inconsistent with
 itself rather than merely underspecified.
 
-### FND-486 — Eleven test fixtures took ground by standing units on it, and each one encoded the rule rather than the need
+### FND-487 — Eleven test fixtures took ground by standing units on it, and each one encoded the rule rather than the need
 
 **Believed.** A fixture that wanted a faction to hold ground put units on that
 ground and ran a few frames. Each fixture said in its own prose that this is
