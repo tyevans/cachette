@@ -42,7 +42,7 @@ import secrets
 import time
 from typing import TYPE_CHECKING, Protocol
 
-from cachette import Camera, World
+from cachette import Camera, ConfigError, World
 from cachette.names import Names
 
 if TYPE_CHECKING:
@@ -103,6 +103,21 @@ PICTURE_HEIGHT = 1400
 # This is a default and not a bound. `--ticks` takes any count, including 0
 # for a picture of the world as it was founded.
 PICTURE_TICKS = 300
+
+# The weather cell count above which the run warns the watcher.
+#
+# **The cost of the weather stage follows the cell count.** The default pitch
+# gives the demonstration world 64 cells, which costs a small part of a tick.
+# A pitch of one tile gives it one cell for every tile, and that dominates the
+# frame. A watcher who asks for a fine pitch on a large world should read what
+# it costs before the run grinds.
+#
+# The run warns and then proceeds. The pitch is what the watcher asked for,
+# and a demonstration that refused would hide the thing it was asked to show.
+#
+# The number is a mark, not a measurement. No cost figure in this project is
+# measured, so nothing here states one.
+WEATHER_CELL_WARNING = 16384
 
 # How many times the picture may resize before it gives up.
 #
@@ -550,6 +565,7 @@ def build_world(
     extent: int = 0,
     factions: int = FACTION_COUNT,
     seed: int = WORLD_SEED,
+    weather_pitch: int = 0,
 ) -> World:
     """Build the world the demonstration runs.
 
@@ -559,6 +575,10 @@ def build_world(
     The seed chooses which world. It keeps the stated default, so a caller
     that names no seed gets one world every time. The command line draws a
     seed before it calls this.
+
+    The weather pitch is the side of one weather cell in tiles. Zero takes
+    the pitch the engine defaults to, so this function states no default of
+    its own. One gives each tile its own weather cell.
     """
     side = extent if extent > 0 else WORLD_WIDTH
     return World(
@@ -566,7 +586,37 @@ def build_world(
         height=side if extent > 0 else WORLD_HEIGHT,
         seed=seed,
         faction_count=factions,
+        weather_cell_tiles=weather_pitch if weather_pitch > 0 else None,
     )
+
+
+def weather_line(world: World) -> str:
+    """Give back the line that says what pitch the weather runs at.
+
+    **Two runs at two pitches look alike on the map.** A watcher comparing
+    them needs to read which one is on the screen, so the line names the
+    pitch in tiles and the cell count that follows from it.
+    """
+    pitch = world.weather_cell_tiles
+    cells = world.weather_cell_count
+    how = "one cell for each tile" if pitch == 1 else f"{pitch} tiles a side"
+    return f"weather: {how}, {cells} cells"
+
+
+def print_weather_pitch(world: World) -> None:
+    """Print the weather pitch, and warn when the lattice is a costly one.
+
+    The warning states the cell count against the mark and then lets the run
+    proceed. The pitch is what the watcher asked for, and a demonstration
+    that refused would hide the thing it was asked to show.
+    """
+    print(weather_line(world))
+    cells = world.weather_cell_count
+    if cells > WEATHER_CELL_WARNING:
+        print(
+            f"note: {cells} weather cells is above {WEATHER_CELL_WARNING}, "
+            "so the weather stage dominates each tick and the run is slow"
+        )
 
 
 def print_census(world: World) -> None:
@@ -738,6 +788,16 @@ def main(argv: list[str] | None = None) -> int:
         help="how many factions the world holds",
     )
     parser.add_argument(
+        "--weather-pitch",
+        type=int,
+        default=0,
+        help=(
+            "the side of one weather cell in tiles, as a power of two from 1 "
+            "to 256; 1 gives each tile its own weather and is slow on a large "
+            "world; zero keeps the default pitch"
+        ),
+    )
+    parser.add_argument(
         "--seed",
         type=lambda given: int(given, 0),
         default=0,
@@ -774,8 +834,21 @@ def main(argv: list[str] | None = None) -> int:
     # namer from here rather than from the world. A world built from one seed
     # and a namer built from another would name a story that did not happen,
     # and nothing would fail.
+    # The engine holds the rule for what describes a world, and it refuses
+    # here rather than in a traceback. A watcher who typed a weather pitch of
+    # three reads one sentence and tries again.
+    try:
+        world = build_world(
+            arguments.extent,
+            arguments.factions,
+            seed,
+            arguments.weather_pitch,
+        )
+    except ConfigError as refusal:
+        print(f"the engine refused the world: {refusal}")
+        return 2
     demo = Demo(
-        build_world(arguments.extent, arguments.factions, seed),
+        world,
         Names(seed),
         width=arguments.width,
         height=arguments.height or default_height,
@@ -787,6 +860,10 @@ def main(argv: list[str] | None = None) -> int:
     # worth repeating, and the number that repeats it must already be on the
     # screen when it does.
     print(f"seed 0x{seed:016x}")
+    # The pitch comes before the founding, because a run at a fine pitch on a
+    # large world is slow from the first tick and the warning is worth
+    # nothing after it.
+    print_weather_pitch(demo.world)
     foundings = demo.seed()
     seated, _ = report(foundings, demo.names)
     if seated == 0:
