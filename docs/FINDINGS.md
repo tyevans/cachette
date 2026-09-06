@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-540**
+**Next number: FND-541**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -12043,8 +12043,64 @@ code must satisfy. A reviewer who reads "the engine already exposes" plans work
 that has no ground under it, and nothing fails until an implementer opens the
 file.
 
+### FND-540 — A renumber repairs every citation in a file and cannot repair a commit message
+
+**Believed.** A branch that renumbers its own backlog items repairs the link
+between the work and the item. The sweep searches the whole tree, moves every
+citation, and the checks confirm the result.
+
+**True.** The sweep repairs every mutable citation. It cannot repair a commit
+message, because a commit message is immutable. The commit that did the work
+names the item by its old number, and that number now names a different item.
+Nothing fails. The item stays in `refined/`, and a later worker rebuilds what
+is already built.
+
+**Evidence.** One branch landed the panel standard, the deck and the watcher's
+clock. Its commit body ends with a line that names items 0307, 0308 and
+0309.[^F540A] Thirty-seven minutes later the same branch moved those three
+numbers to 0316, 0317 and 0318, because main had merged a documentation plan
+under the same numbers while the branch ran.[^F540B] The renumber moved nine
+citations in four files and passed five checks. The three items stayed in
+`refined/` until an audit read the code, and the register holds that
+reading.[^F540C] Today the numbers 0307 and 0308 name two documentation items,
+so the commit body points at work it did not do.
+
+**Follows.** Three things.
+
+**The commit message is the wrong side to carry this link.** A commit is fixed
+to one moment, which is why it holds a count and a measured figure well.[^F540D]
+The same property makes it a poor pointer. A number that names one item today
+can name another item tomorrow, and the commit cannot follow.
+
+**Put the commit in the item, rather than the item in the commit.** The item
+file is the mutable side, so it survives a renumber, and a commit hash never
+changes meaning. The stronger reason is not the pointer. A worker who records
+the link must open the item file, and opening the item file is the moment the
+worker moves it. A worker who records the link in the commit body alone never
+opens the item, so nothing prompts the move. The cost is one line in the
+`Outcome` section, written by the worker who closes the item.
+
+**A renumber must ask what work has already landed.** The sweep repairs the
+citations of a number. It says nothing about the state of the item that number
+names. Read the code for each renumbered item before you commit the renumber.
+
+**No check can catch this shape, and none was written.** Three commit bodies in
+1034 carry a trailer of the form the panel commit used, so a check that reads
+the trailer would enforce nothing. Widening it to prose does not help: 480
+commit bodies name an item number, and a reader cannot tell a commit that
+finishes an item from a commit that mentions one. That distinction is an open
+item for record numbers, and it is unsolved there too.[^F192D] A check that
+compared the front matter status against the directory was written instead. It
+catches the adjacent shape, and it found two items that had moved to `complete/`
+and still declared an open status.[^F540F]
+
 ## References
 
+[^F540A]: Commit 79d17eb, give the panel one standard, a deck, and a clock the watcher drives.
+[^F540B]: Commit 54e90a5, renumber what this branch allocated, after main took the same numbers.
+[^F540C]: Findings register, FND-526, in this document.
+[^F540D]: Commit Message Rules, what belongs in the body. `.agents/rules/commits.md`
+[^F540F]: The backlog check script. `scripts/check_backlog.py`
 [^F490A]: Balance register, the founding group, the base reach and the campaign cohort size. `docs/reference/balance.md`
 [^F491A]: ADR-0152, a faction plans its roads and zones with one solver, decision D2. `docs/adrs/accepted/adr-0152-a-faction-plans-its-roads-and-zones-with-one-solver.md`
 [^F493A]: ADR-0152, a faction plans its roads and zones with one solver, decision D5. `docs/adrs/accepted/adr-0152-a-faction-plans-its-roads-and-zones-with-one-solver.md`
