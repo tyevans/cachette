@@ -2804,7 +2804,7 @@ impl PyWorld {
     ///
     /// Raises `VerbError` when no faction was seated. A run with no group is
     /// not a run.
-    #[pyo3(signature = (group = 64))]
+    #[pyo3(signature = (group = cachette_core::FOUNDING_GROUP_DEFAULT))]
     fn found_run_for_every_faction<'py>(
         &self,
         python: Python<'py>,

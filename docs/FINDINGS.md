@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-490**
+**Next number: FND-491**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -11704,8 +11704,44 @@ least about the test it serves.
 in the engine and in the fixtures. Nothing failed when they disagreed, because
 they only disagreed once the rule moved.
 
+### FND-490 — A faction that founds with two people fills no ranked position, and the world still ends
+
+**Believed.** The founding group is a balance value with no structure behind
+it. The register marks it unset and holds a provisional number, so a change to
+that number moves shares and nothing else.[^F490A]
+
+**True.** The number gates a mechanism. The project owner set the founding
+group to 2 on 5 September 2026. A faction of two people has almost no
+gatherers, so no site ever reaches the store a ranked position asks for, and
+`seats_filled` is zero in every game. Three Python log tests also went red,
+because the shortage they test needs a crowded world and each read the default
+instead of asking for a group.
+
+**Evidence.** The balance harness ran the same seed at both values.
+
+    just balance --seeds 2
+
+At a founding group of 64 the harness reported `units=256 settlements=4
+seats_filled=16` and a win at tick 69. At a founding group of 2 it reported
+`units=8 settlements=4 seats_filled=0` and a win at tick 449. Both games ended
+before the tick limit, and every faction seated a settlement in both. Statement
+4 of the harness gained `seats_filled` in its list of counts that are zero in
+every game.
+
+**Follows.** The world does not stall, so nothing needs tuning. Two derivations
+in the balance register cited the old number and now state nothing true: the
+base reach of 4 was chosen as the disc that nearly holds 64 people, and the
+campaign cohort of 4 was chosen as half a founding group. Both rows now record
+that the derivation lapsed.[^F490A]
+
+**A balance value that gates a mechanism is not only a share.** A register row
+that reads as a share hides this, and only a harness run finds it. Run the
+harness at both values before and after a change to a founding number, and
+report what the mechanism did, not only what the share did.
+
 ## References
 
+[^F490A]: Balance register, the founding group, the base reach and the campaign cohort size. `docs/reference/balance.md`
 [^F487A]: ADR-0150, held ground is the ground within reach of a city its faction owns, decision D1. `docs/adrs/draft/adr-0150-held-ground-is-the-ground-within-reach-of-a-city-its-faction-owns.md`
 [^F487B]: Recurring defect shapes, shape 1. `.agents/rules/recurring-defects.md`
 [^F340A]: Findings register, FND-325, in this document.
