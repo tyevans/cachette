@@ -153,11 +153,6 @@ fn corner_of(canvas: &Canvas, camera: Camera, address: Axial) -> u32 {
     pixel(canvas, left + 1, top + 1)
 }
 
-/// Returns the sum of the three channels of a pixel.
-fn brightness(colour: u32) -> u32 {
-    ((colour >> 16) & 0xff) + ((colour >> 8) & 0xff) + (colour & 0xff)
-}
-
 /// Asserts that two worlds agree about everything the drawing reads at one
 /// tile, other than the layer under test.
 fn same_ground(one: &World, other: &World, address: Axial) {
@@ -203,7 +198,7 @@ fn a_storm_in_the_air_changes_the_tile_under_it() {
 }
 
 #[test]
-fn wet_ground_draws_darker_than_dry_ground() {
+fn wet_ground_gains_blue_and_holds_its_brightness() {
     let (mut stormy, _) = a_held_band();
     let mut dry = stormy.clone();
     let place = a_held_tile(&stormy);
@@ -248,9 +243,9 @@ fn wet_ground_draws_darker_than_dry_ground() {
             continue;
         }
         // The air over the cell must hold too few drops to show, so the
-        // wet layer is the sole difference. The brightness assertion below
-        // is what proves it: the air overlay brightens and wet ground
-        // darkens, so a pixel that got darker did not get the overlay.
+        // wet layer is the sole difference. The air overlay moves all three
+        // channels toward one pale colour, and the assertion below refuses
+        // that: it holds the red and the green exactly where they were.
         if stormy.air_at(address).unwrap_or(0) > AIR_TOO_THIN_TO_SHOW {
             continue;
         }
@@ -267,9 +262,188 @@ fn wet_ground_draws_darker_than_dry_ground() {
         before, after,
         "wet ground did not change the pixel at {address:?}"
     );
+
+    // **Wet ground moves the blue and nothing else.** The layer used to take
+    // the same number from every channel, which is the number the full food
+    // ramp added, so a wet tile with the most food drew as a dry tile with
+    // none.[^9]
+    //
+    // [^9]: Research report 24, defect 3. `docs/research/reports/24-demonstration-readability-resources-and-weather.md`
+    let channel = |colour: u32, offset: u32| i64::from((colour >> offset) & 0xff);
     assert!(
-        brightness(after) < brightness(before),
-        "wet ground drew brighter than dry ground at {address:?}: {before:06x} then {after:06x}"
+        channel(after, 0) > channel(before, 0),
+        "wet ground must add blue at {address:?}: {before:06x} then {after:06x}"
+    );
+    assert_eq!(
+        channel(after, 16),
+        channel(before, 16),
+        "wet ground must not move the red at {address:?}: {before:06x} then {after:06x}"
+    );
+    assert_eq!(
+        channel(after, 8),
+        channel(before, 8),
+        "wet ground must not move the green at {address:?}: {before:06x} then {after:06x}"
+    );
+}
+
+/// Draws a world at a named tile size over a tile, and returns the canvas.
+fn drawn_at(world: &World, over: Axial, tile: f32) -> Canvas<'static> {
+    let mut canvas = Canvas::new(WINDOW.0, WINDOW.1);
+    paint::draw(world, camera_at(world, over, tile), &mut canvas).expect("the world draws");
+    canvas
+}
+
+/// Returns the camera a picture at a named tile size used.
+fn camera_at(world: &World, over: Axial, tile: f32) -> Camera {
+    let canvas = Canvas::new(WINDOW.0, WINDOW.1);
+    Camera::at_tile_size(tile)
+        .looking_at(over, &canvas)
+        .clamped(world, &canvas)
+}
+
+/// Returns the distance between two colours, as a sum over the channels.
+fn apart(one: u32, other: u32) -> i64 {
+    [16, 8, 0]
+        .iter()
+        .map(|offset| {
+            let channel = |colour: u32| i64::from((colour >> offset) & 0xff);
+            (channel(one) - channel(other)).abs()
+        })
+        .sum()
+}
+
+#[test]
+fn a_storm_keeps_the_faction_that_holds_the_ground() {
+    // The overlay used to cover the finished pixel at a weight near the
+    // holder weight, in a colour no faction uses, so a stormed holding lost
+    // its colour. The air now reaches the ground before the holder takes its
+    // share.[^3]
+    //
+    // [^3]: Research report 24, defect 4. `docs/research/reports/24-demonstration-readability-resources-and-weather.md`
+    let (mut stormy, _) = a_held_band();
+    let dry = stormy.clone();
+    let place = a_held_tile(&stormy);
+    stormy
+        .inflict_weather(FactionId(0), &[place], STRENGTH)
+        .expect("the faction holds the ground it storms");
+    stormy.step(1).expect("the step must run");
+    let mut settled = dry.clone();
+    settled.step(1).expect("the step must run");
+
+    let air = stormy.air_at(place).unwrap_or(0);
+    let weight = paint::air_weight(air);
+    assert!(
+        weight >= paint::air_least_weight(),
+        "the storm must put enough water over the tile to draw: {air} drops"
+    );
+
+    let camera = camera_over(&settled, place);
+    let before = corner_of(&drawn(&settled, place), camera, place);
+    let after = corner_of(&drawn(&stormy, place), camera, place);
+    assert_ne!(before, after, "the storm must change the tile at {place:?}");
+
+    // The colour the old order gave: the overlay mixed over the finished
+    // pixel. The picture must not give it, and it must keep more of the
+    // world than it did.
+    let overlaid = paint::mixed(before, paint::air_colour(), weight);
+    assert_ne!(
+        after, overlaid,
+        "the air must reach the ground before the holder mix at {place:?}"
+    );
+    assert!(
+        apart(after, paint::air_colour()) > apart(overlaid, paint::air_colour()),
+        "a storm must leave more of the holding than an overlay on the \
+         finished pixel: {after:06x} against {overlaid:06x}"
+    );
+}
+
+#[test]
+fn the_air_overlay_is_off_below_eight_pixels_a_tile() {
+    // A layer that covers every tile of the picture carries no information
+    // and costs contrast, so the overlay is off at the region scale.[^4]
+    //
+    // [^4]: Research report 23, defect 2. `docs/research/reports/23-demonstration-readability-review-1.md`
+    let (mut stormy, _) = a_held_band();
+    let mut settled = stormy.clone();
+    let place = a_held_tile(&stormy);
+    stormy
+        .inflict_weather(FactionId(0), &[place], STRENGTH)
+        .expect("the faction holds the ground it storms");
+    stormy.step(1).expect("the step must run");
+    settled.step(1).expect("the step must run");
+    assert!(
+        paint::air_weight(stormy.air_at(place).unwrap_or(0)) >= paint::air_least_weight(),
+        "the storm must put enough water over the tile to draw"
+    );
+
+    let small = 6.0;
+    let large = 10.0;
+    let read = |world: &World, tile: f32| {
+        corner_of(
+            &drawn_at(world, place, tile),
+            camera_at(world, place, tile),
+            place,
+        )
+    };
+    // The ground colour of a tile does not depend on the zoom, so a world
+    // with no storm draws the same colour at both sizes. That is what makes
+    // the difference in the stormed world the overlay and nothing else.
+    assert_eq!(
+        read(&settled, small),
+        read(&settled, large),
+        "a world with no storm must draw one colour at both sizes"
+    );
+    assert_ne!(
+        read(&stormy, small),
+        read(&stormy, large),
+        "the overlay must be off at {small} pixels a tile and on at {large}"
+    );
+}
+
+#[test]
+fn a_cell_at_rest_draws_no_air() {
+    // The air over a cell at rest gives a weight of a few parts in 255. A
+    // cell that still tinted its tiles put an edge on the cell lattice that
+    // followed nothing in the world.[^5]
+    //
+    // [^5]: Research report 24, defect 10. `docs/research/reports/24-demonstration-readability-resources-and-weather.md`
+    let (mut world, _) = a_held_band();
+    let place = a_held_tile(&world);
+    world
+        .inflict_weather(FactionId(0), &[place], STRENGTH)
+        .expect("the faction holds the ground it storms");
+
+    // The air falls tick by tick. The moment this test needs is the one at
+    // which the weight is above zero and below the floor, because that is
+    // the band the floor exists for.
+    let mut found = false;
+    for _ in 0..FALLING_TICKS {
+        world.step(1).expect("the step must run");
+        let weight = paint::air_weight(world.air_at(place).unwrap_or(0));
+        if weight > 0 && weight < paint::air_least_weight() {
+            found = true;
+            break;
+        }
+    }
+    assert!(
+        found,
+        "the fixture must reach a tick at which the air is thin and not gone"
+    );
+
+    // The overlay is off below eight pixels a tile, so the colour there is
+    // the colour of the tile with no air. A large tile must give the same
+    // colour, because a weight under the floor draws nothing.
+    let read = |tile: f32| {
+        corner_of(
+            &drawn_at(&world, place, tile),
+            camera_at(&world, place, tile),
+            place,
+        )
+    };
+    assert_eq!(
+        read(6.0),
+        read(32.0),
+        "a cell at rest must draw no overlay at any zoom"
     );
 }
 

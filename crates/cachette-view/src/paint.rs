@@ -91,8 +91,39 @@ const AIR_AT_FULL_SHADE: i64 = 4096;
 /// How much of the air colour covers a tile at the full shade.
 const AIR_WEIGHT_CEILING: i64 = 150;
 
-/// The brightness taken from every channel of a tile on wet ground.
-const WET_SHADE: i32 = 34;
+/// The blue the viewer adds to a tile on wet ground.
+///
+/// **Wet ground moves the blue channel and never the brightness.** The layer
+/// used to take the same number from every channel, which is the number the
+/// full food ramp added, so the two cancelled exactly.[^1]
+///
+/// # References
+///
+/// [^1]: Research report 24, defect 3. `docs/research/reports/24-demonstration-readability-resources-and-weather.md`
+const WET_BLUE_GAIN: i32 = 44;
+
+/// The smallest tile width at which the viewer draws the air overlay, in
+/// pixels.
+///
+/// A layer that covers every tile of the picture carries no information and
+/// costs contrast. Below this width the overlay is a wash over the whole
+/// window, and a watcher reads a pale world rather than a storm.[^1]
+///
+/// # References
+///
+/// [^1]: Research report 23, defect 2. `docs/research/reports/23-demonstration-readability-review-1.md`
+const AIR_LEAST_TILE: f32 = 8.0;
+
+/// The smallest weight at which the viewer draws the air overlay.
+///
+/// The air over a cell at rest gives a weight of a few parts in 255. A cell
+/// at rest that still tinted its tiles put an edge on the cell lattice that
+/// followed nothing in the world.[^1]
+///
+/// # References
+///
+/// [^1]: Research report 24, defect 10. `docs/research/reports/24-demonstration-readability-resources-and-weather.md`
+const AIR_LEAST_WEIGHT: u8 = 8;
 
 /// The colour of the mark on a tile that holds a luxury.
 const LUXURY_MARK: u32 = 0x00ff_5ad2;
@@ -140,20 +171,24 @@ const KIND_COLOURS: [u32; KIND_COUNT] = [
 /// tall tile of one kind is brighter than a short tile of the same kind.
 const HEIGHT_STEPS: i32 = 56;
 
-/// The number of brightness steps that the food of a tile gives it.
+/// How much a full deposit raises the saturation of a tile, in parts of 255.
 ///
 /// The ground is fixed for the life of a world. The food on it is not: the
 /// ground generates a stock, a gatherer takes from it, and the recovery pass
 /// gives part of it back.[^1] A watcher therefore reads a deposit drain and
 /// recover from the colour of the ground it sits on.
 ///
-/// The range is smaller than the height range, so a full deposit brightens a
-/// tile without hiding the relief under it.
+/// **The food moves the saturation and the height moves the brightness.**
+/// The two used to add into one brightness, and a wet tile with the most food
+/// then drew as the same colour as a dry tile with none, because the wet
+/// shade took the same number from every channel.[^2] Two layers that move
+/// one axis in opposite directions carry no information between them.
 ///
 /// # References
 ///
 /// [^1]: ADR-0072, a tile stock is generated, and only what was taken is stored, decision D4. `docs/adrs/accepted/adr-0072-a-tile-stock-is-generated-and-only-what-was-taken-is-stored.md`
-const FOOD_STEPS: i32 = 34;
+/// [^2]: Research report 24, defects 3 and 9. `docs/research/reports/24-demonstration-readability-resources-and-weather.md`
+const FOOD_SATURATION: i32 = 150;
 
 /// The food at which a tile draws at its brightest.
 ///
@@ -272,6 +307,45 @@ pub const fn shortage_colour() -> u32 {
 #[must_use]
 pub const fn unit_rim_colour() -> u32 {
     UNIT_RIM
+}
+
+/// Returns the smallest weight at which the viewer draws the air overlay.
+///
+/// A test reads this rather than a literal, so the floor has one declaration
+/// site.[^1]
+///
+/// # References
+///
+/// [^1]: Recurring Defect Shapes, shape 1. `.claude/rules/recurring-defects.md`
+#[must_use]
+pub const fn air_least_weight() -> u8 {
+    AIR_LEAST_WEIGHT
+}
+
+/// Returns the colour the viewer mixes over a tile for the water in the air.
+///
+/// A test reads this rather than a literal, so the colour has one
+/// declaration site.[^1]
+///
+/// # References
+///
+/// [^1]: Recurring Defect Shapes, shape 1. `.claude/rules/recurring-defects.md`
+#[must_use]
+pub const fn air_colour() -> u32 {
+    AIR_COLOUR
+}
+
+/// Returns two colours mixed by a weight, one channel at a time.
+///
+/// A test that must state what a layer would have given reads this rather
+/// than repeating the arithmetic.[^1]
+///
+/// # References
+///
+/// [^1]: Recurring Defect Shapes, shape 1. `.claude/rules/recurring-defects.md`
+#[must_use]
+pub fn mixed(under: u32, over: u32, weight: u8) -> u32 {
+    mix(under, over, weight)
 }
 
 /// Returns the colour the viewer marks a place a faction founded in.
@@ -1600,13 +1674,45 @@ fn tile_colour(kind: TileKind, height: i32, food: u32) -> u32 {
     // The height is a fraction of the full range in Q16.16, so the unit is
     // 65536. The shift maps the fraction onto the brightness steps.
     let relief = (height.clamp(0, 0x0001_0000) * HEIGHT_STEPS) >> 16;
-    // The food is a whole number of units. The ramp saturates at the shade
-    // bound, so a tile above it draws the same as a tile at it.
+    let channel = |offset: u32| (((base >> offset) & 0xff) as i32 + relief).clamp(0, 0xff) as u32;
+    let lit = (channel(16) << 16) | (channel(8) << 8) | channel(0);
+    // The food is a whole number of units. The ramp saturates at the bound
+    // the viewer chose, so a tile above it draws the same as a tile at it.
     let stock = food.min(FOOD_AT_FULL_SHADE) as i32;
-    let larder = (stock * FOOD_STEPS) / FOOD_AT_FULL_SHADE as i32;
-    let shade = relief + larder;
-    let channel = |offset: u32| (((base >> offset) & 0xff) as i32 + shade).clamp(0, 0xff) as u32;
-    (channel(16) << 16) | (channel(8) << 8) | channel(0)
+    let share = (stock * FOOD_SATURATION) / FOOD_AT_FULL_SHADE as i32;
+    saturated(lit, share)
+}
+
+/// Returns a colour with its channels moved away from their own mean.
+///
+/// The mean is the brightness of the colour, and it does not move. The share
+/// is in parts of 255, so a share of zero returns the colour unchanged.
+///
+/// The arithmetic is on whole numbers and the result goes to a pixel and
+/// nowhere else.[^1]
+///
+/// # References
+///
+/// [^1]: ADR-0067, the viewer reads the world and never writes to it, decision D3. `docs/adrs/accepted/adr-0067-the-viewer-reads-the-world-and-never-writes-to-it.md`
+fn saturated(colour: u32, share: i32) -> u32 {
+    let channel = |offset: u32| ((colour >> offset) & 0xff) as i32;
+    let (red, green, blue) = (channel(16), channel(8), channel(0));
+    let mean = (red + green + blue) / 3;
+    let moved = |value: i32| (mean + (value - mean) * (255 + share) / 255).clamp(0, 0xff) as u32;
+    (moved(red) << 16) | (moved(green) << 8) | moved(blue)
+}
+
+/// Returns a colour with the blue of wet ground added to it.
+///
+/// The red and the green do not move, so the layer cannot cancel the food
+/// ramp or the relief.[^1]
+///
+/// # References
+///
+/// [^1]: Research report 24, defect 3. `docs/research/reports/24-demonstration-readability-resources-and-weather.md`
+fn wetted(colour: u32, gain: i32) -> u32 {
+    let blue = ((colour & 0xff) as i32 + gain).clamp(0, 0xff) as u32;
+    (colour & 0x00ff_ff00) | blue
 }
 
 /// Returns the colour the viewer draws one kind of ground in, at the middle
@@ -1727,7 +1833,24 @@ pub fn draw_paced(
             // read costs one array read through the cell of the tile, and a
             // dry world skips it.
             if !dry && world.ground_is_wet(address) == Some(true) {
-                ground_colour = darkened(ground_colour, WET_SHADE);
+                ground_colour = wetted(ground_colour, WET_BLUE_GAIN);
+            }
+            // The water in the air over this tile, mixed into the ground
+            // before the holder takes its share. A storm used to cover the
+            // finished pixel at a weight near the holder weight, in a colour
+            // no faction uses, so a stormed holding lost its colour.[^15]
+            //
+            // The overlay is off below a tile width the viewer names, and a
+            // weight under the floor draws nothing, so a resting world shows
+            // no wash and no cell lattice.[^15] [^16]
+            //
+            // [^15]: Research report 24, defects 4 and 10. `docs/research/reports/24-demonstration-readability-resources-and-weather.md`
+            // [^16]: Research report 23, defect 2. `docs/research/reports/23-demonstration-readability-review-1.md`
+            if !dry && camera.tile_width >= AIR_LEAST_TILE {
+                let weight = air_weight(world.air_at(address).unwrap_or(0));
+                if weight >= AIR_LEAST_WEIGHT {
+                    ground_colour = mix(ground_colour, AIR_COLOUR, weight);
+                }
             }
             let (left, top, wide, tall) = tile_rect(camera, address);
 
@@ -1787,15 +1910,6 @@ pub fn draw_paced(
             // world with no deposit skips it.
             if any_luxury && !world.luxuries_at(tile).is_empty() {
                 mark_luxury(canvas, left, top, wide, tall);
-            }
-            // The water in the air over this tile, as an overlay on whatever
-            // was painted under it. The read costs one array read through
-            // the cell of the tile.[^7]
-            if !dry {
-                let air = world.air_at(address).unwrap_or(0);
-                if air > 0 {
-                    canvas.shade(left, top, wide, tall, AIR_COLOUR, air_weight(air));
-                }
             }
             canvas.tiles_painted += 1;
             canvas.painted_by_kind[ground.kind.to_u8() as usize] += 1;
@@ -1903,19 +2017,6 @@ fn on_an_edge(world: &World, address: Axial, holder: Option<Holder>, canvas: &mu
     edge
 }
 
-/// Returns a colour with the same brightness taken from every channel.
-///
-/// The arithmetic is on whole numbers, and the result goes to a pixel and
-/// nowhere else.[^1]
-///
-/// # References
-///
-/// [^1]: ADR-0067, the viewer reads the world and never writes to it, decision D3. `docs/adrs/accepted/adr-0067-the-viewer-reads-the-world-and-never-writes-to-it.md`
-fn darkened(colour: u32, shade: i32) -> u32 {
-    let channel = |offset: u32| (((colour >> offset) & 0xff) as i32 - shade).clamp(0, 0xff) as u32;
-    (channel(16) << 16) | (channel(8) << 8) | channel(0)
-}
-
 /// Returns how much of the upgrade colour covers a tile, from its progress.
 ///
 /// A site that has just begun draws at the floor and a finished site at the
@@ -1933,7 +2034,15 @@ fn upgrade_weight(site: UpgradeSite) -> u8 {
 ///
 /// The shade saturates at the drops the viewer chose, so a storm above that
 /// draws the same as a storm at it.
-fn air_weight(drops: i64) -> u8 {
+///
+/// A test reads this rather than repeating the arithmetic, so the weight has
+/// one declaration site.[^1]
+///
+/// # References
+///
+/// [^1]: Recurring Defect Shapes, shape 1. `.claude/rules/recurring-defects.md`
+#[must_use]
+pub fn air_weight(drops: i64) -> u8 {
     let held = drops.clamp(0, AIR_AT_FULL_SHADE);
     u8::try_from(held * AIR_WEIGHT_CEILING / AIR_AT_FULL_SHADE).unwrap_or(u8::MAX)
 }
