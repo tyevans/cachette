@@ -393,6 +393,15 @@ pub struct WeatherField {
     scratch: Vec<Drops>,
     /// Every drop that has ever entered the air, from the sea or from a god.
     raised: i64,
+    /// The storms a god has raised over the life of the field.
+    ///
+    /// The count is a census reading. No later frame reads it, so it enters
+    /// no hash.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0001, one binary gives one answer at any thread count, decision D4. `docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
+    storms: i64,
     /// Every drop that has ever left the ground.
     evaporated: i64,
     /// The first tick at which each faction may inflict weather again.
@@ -419,6 +428,7 @@ impl WeatherField {
             ground: Vec::new(),
             scratch: Vec::new(),
             raised: 0,
+            storms: 0,
             evaporated: 0,
             ready: vec![Tick(0); faction_count as usize],
             passes: 0,
@@ -500,6 +510,20 @@ impl WeatherField {
     #[must_use]
     pub const fn raised(&self) -> i64 {
         self.raised
+    }
+
+    /// Returns the storms a god has raised over the life of the field.
+    ///
+    /// A storm is one call of the divine power that put water into the air.
+    /// The count never falls, so a zero says that no god ever acted. The
+    /// water it raised dries, and this count does not.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: Findings register, FND-498. `docs/FINDINGS.md`
+    #[must_use]
+    pub const fn storms(&self) -> i64 {
+        self.storms
     }
 
     /// Returns every drop that has ever left the ground.
@@ -637,6 +661,12 @@ impl WeatherField {
             raised = raised.saturating_add(drops);
         }
         self.raised = self.raised.saturating_add(raised);
+        // **One call that put water into the air is one storm.** A call that
+        // named no place raises nothing and is no storm, so the count and
+        // the water agree.
+        if raised > 0 {
+            self.storms = self.storms.saturating_add(1);
+        }
         let ready_at = Tick(tick.0.saturating_add(COOLDOWN_TICKS));
         self.ready[faction.0 as usize] = ready_at;
         Ok(Storm {

@@ -10699,15 +10699,16 @@ pub const SUBSYSTEM_CENSUS: &[CensusRow] = &[
         basis: CensusBasis::Held,
         read: |world| world.luxuries.len() as i64,
     },
-    // A storm stands while the raised total is above zero. **This row counts
-    // no storm.** Its name says more than the reader reads, and a pass that
-    // counts the storms themselves must replace it.[^5]
+    // The storms a god raised over the run. One call of the divine power
+    // that put water into the air is one storm. The row once read whether
+    // the raised total stood above zero, which counted no storm and fell
+    // back to zero when the water dried.[^5]
     //
     // [^5]: Findings register, FND-498. `docs/FINDINGS.md`
     CensusRow {
         name: "storms_raised",
-        basis: CensusBasis::Held,
-        read: |world| i64::from(world.weather.raised() > 0),
+        basis: CensusBasis::Total,
+        read: |world| world.weather.storms(),
     },
     CensusRow {
         name: "contracts",

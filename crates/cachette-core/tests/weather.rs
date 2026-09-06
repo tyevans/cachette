@@ -20,7 +20,16 @@
 use cachette_core::resource::{Amount, RecoveryRules, ResourceKind};
 use cachette_core::terrain::TileKind;
 use cachette_core::weather::{self, WeatherError};
-use cachette_core::{Axial, Entity, FactionId, World, WorldConfig};
+use cachette_core::{Axial, Entity, FactionId, World, WorldConfig, SUBSYSTEM_CENSUS};
+
+/// Returns one census count by name.
+fn census(world: &World, name: &str) -> i64 {
+    SUBSYSTEM_CENSUS
+        .iter()
+        .find(|row| row.name == name)
+        .map(|row| (row.read)(world))
+        .expect("the census holds the row")
+}
 
 /// The thread counts that every equivalence test runs at.
 const THREAD_COUNTS: [usize; 3] = [1, 2, 12];
@@ -486,6 +495,53 @@ fn the_verb_answers_once_for_a_whole_set() {
         .inflict_weather(FactionId(0), &[address, address], 1)
         .expect("the faction holds this ground");
     assert_eq!(storm.cells, 1, "one cell took water twice");
+}
+
+/// The census row counts the storms a god raised, and one call is one storm.
+///
+/// **The row once read whether the raised total stood above zero.** That
+/// reader answers one for a run that raised one storm and one for a run that
+/// raised a hundred, so the fixture raises two and asserts the count. A
+/// refused call raises nothing, and the row must not count it.[^3]
+///
+/// # References
+///
+/// [^3]: Findings register, FND-498. `docs/FINDINGS.md`
+#[test]
+fn the_census_counts_each_storm_a_god_raised() {
+    let (mut world, _unit, address) = a_congregation_on_the_ground();
+    assert_eq!(
+        census(&world, "storms_raised"),
+        0,
+        "a dry world raised none"
+    );
+    let far = Axial::new(DRY_EXTENT as i32 - 1, DRY_EXTENT as i32 - 1);
+    assert!(
+        world.inflict_weather(FactionId(0), &[far], 2).is_err(),
+        "the fixture needs a refusal here"
+    );
+    assert_eq!(
+        census(&world, "storms_raised"),
+        0,
+        "a refused call counted as a storm"
+    );
+    world
+        .inflict_weather(FactionId(0), &[address], 2)
+        .expect("the faction holds this ground");
+    assert_eq!(census(&world, "storms_raised"), 1);
+    // The god waits out its cooldown and strikes again. A row that read
+    // whether any water stands would still say one here.
+    for _ in 0..weather::COOLDOWN_TICKS {
+        world.step(1).expect("the step must run");
+    }
+    world
+        .inflict_weather(FactionId(0), &[address], 2)
+        .expect("the cooldown has run out");
+    assert_eq!(
+        census(&world, "storms_raised"),
+        2,
+        "the row must count each storm and not whether one stands"
+    );
 }
 
 #[test]
