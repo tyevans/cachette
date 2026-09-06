@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-484**
+**Next number: FND-486**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -10537,6 +10537,81 @@ it.[^F473A] The doc comment of the write says plainly that nothing in the
 engine reads the column, rather than implying a mechanism that does not
 exist.[^10]
 
+### FND-484 — A relation step for a storm sits in the rules, and no pass reads it
+
+**Believed.** ADR-0146 D3 names a storm on the ground of another faction as a
+cause that moves the relation down by a step.[^F484A] The rules struct carries
+that step, so a reader takes the cause for a live one.
+
+**True.** The step field of the relation rules holds zero, and no pass reads
+it.[^F484C] ADR-0142 D1 lets a god put weather on a level 1 cell only when its
+own faction holds at least one tile inside that cell, so the engine gives the
+cause no source.[^F484B] The record says so, and the balance row says so.[^F484D]
+The register says so now as well, because a declared value that nothing reads
+is a shape this project tracks.[^F484F]
+
+**Evidence.** The search below finds the name in three places. The relation
+module declares the field and its default. The binding names a storm in the
+weather verb, which reports water and never touches the relation. One view
+test raises a storm. Nothing reads the field.
+
+grep -rn "storm" crates python --include="*.rs" --include="*.py"
+
+The default is zero, and its own doc comment states that nothing reads it. The
+balance row for the step is unset and cites the blocker that governs
+it.[^F484D] [^F484E]
+
+**One detail sharpens the cause.** The gate of ADR-0142 D1 is a cell and not a
+tile.[^F484B] A cell is 32 tiles a side, so a cell can hold ground of two
+factions. A god that holds one tile of a cell can therefore wet a tile that
+another faction holds. What is missing is a pass that looks for that case, and
+not only the permission.
+
+**Follows.** Two paths close this. A later record permits a storm on the ground
+of another faction, and a pass supplies the cause. Or the cause leaves ADR-0146
+D3. BLK-130 governs the value of the step, so nobody invents it.[^F484E]
+
+**No blocker was opened for the wet world that a readability report
+measured.** That report finds every level 1 cell of the demonstration world wet
+at every reading, at a wet mark of 64 drops against a driest cell of 124
+drops.[^F484G] BLK-130 already holds the quantity at which ground counts as
+wet, so the measurement is evidence for that row and not a new question.[^F484E]
+
+
+### FND-485 — A store reader was called with a slot index, and the seeding verb gives no identity
+
+**Believed.** A readability report finds that the site economy reader refuses
+every slot index from 0 to 3 on a seeded world. It concludes that the control
+plane cannot read a store at all.[^F485A]
+
+**True.** The reader is right to refuse. It takes the whole identity of a
+settlement, and it resolves that identity against the arena that minted
+it.[^F485B] A slot index is not an identity. Three calls hand a caller a real
+one. The founding verb that takes addresses returns a column of
+identities.[^F485C] The founding group report carries the identity in its site
+column, and its own text says that the column is not a slot index.[^F485C] The
+shortfall log and the ration log carry it in the same way.[^F485C] A caller
+that holds one of those reads the store.
+
+**The narrower claim is true.** The seeding verb gives back one report for each
+faction, and that report holds the place, the people and the refusal. It holds
+no identity.[^F485D] The demonstration builds its world with that verb and with
+no other.[^F485E] So a world that the seeding built hands the control plane
+nothing that the reader accepts.
+
+**Evidence.** The reader resolves the identity and raises when it names no live
+site.[^F485B] The type stub states the return of the founding verb and the
+meaning of every site column.[^F485C] The report of the seeding verb holds
+thirteen keys and no site key.[^F485D] The demonstration calls the seeding verb
+in one place and calls no founding verb.[^F485E]
+
+**Follows.** The defect the report ranks stands, and its statement narrows. The
+reader is correct, the caller passed the wrong index, and the gap is that the
+seeding verb names no settlement. A backlog item holds the work.[^F485F] It
+serves the product record that asks a developer to set what a settlement holds
+and to read the value back.[^F485G]
+
+
 ## References
 
 [^F443A]: Review of backlog item 0390, section 5. `docs/reviews/0390-the-fallen-log.md`
@@ -10550,6 +10625,20 @@ exist.[^10]
 [^F472A]: ADR-0085, an entity crosses to Python as one opaque identity that the engine resolves, decision D3. `docs/adrs/accepted/adr-0085-an-entity-crosses-to-python-as-one-opaque-identity.md`
 [^F472C]: Decisions register, DEC-266. `docs/DECISIONS.md`
 [^F473A]: Blockers register, BLK-150. `docs/BLOCKERS.md`
+[^F485A]: Research report 24, demonstration readability, resources and weather, section 7. `docs/research/reports/24-demonstration-readability-resources-and-weather.md`
+[^F485B]: The site economy reader of the bindings. `crates/cachette-py/src/lib.rs`
+[^F485C]: The type stub of the compiled module, the founding verbs and the site columns. `python/cachette/_core.pyi`
+[^F485D]: The type stub of the compiled module, the founding report of the seeding verb. `python/cachette/_core.pyi`
+[^F485E]: The demonstration application, the seeding call. `python/cachette/demo/app.py`
+[^F485F]: Backlog item 0490, let the control plane read the store of a seeded settlement. `docs/backlog/proposed/0490-let-the-control-plane-read-the-store-of-a-seeded-settlement.md`
+[^F485G]: PRD-0047, a game states its own economy. `docs/product/shaped/prd-0047-a-game-states-its-own-economy.md`
+[^F484A]: ADR-0146, a faction relation is one signed integer per ordered pair and a pass reads a threshold, decision D3. `docs/adrs/accepted/adr-0146-a-faction-relation-is-one-signed-integer-per-ordered-pair-and-a-pass-reads-a-threshold.md`
+[^F484B]: ADR-0142, a god inflicts weather only on ground its own faction holds, decision D1. `docs/adrs/draft/adr-0142-a-god-inflicts-weather-only-on-ground-it-holds.md`
+[^F484C]: The relation module, the storm step of the relation rules. `crates/cachette-core/src/relation.rs`
+[^F484D]: Balance register, the step when a storm falls on the ground of the other. `docs/reference/balance.md`
+[^F484E]: Blockers register, BLK-130. `docs/BLOCKERS.md`
+[^F484F]: Recurring Defect Shapes, shape 3, inert code that nothing invokes. `.agents/rules/recurring-defects.md`
+[^F484G]: Research report 24, demonstration readability, resources and weather, section 2.1. `docs/research/reports/24-demonstration-readability-resources-and-weather.md`
 [^F411A]: ADR-0125, the control plane names the seed set of a destination field, decision D4. `docs/adrs/draft/adr-0125-the-control-plane-names-the-seed-set-of-a-destination-field.md`
 [^F411B]: ADR-0091, movement takes its direction from a per-cell field, never from a per-unit search, the consequences. `docs/adrs/draft/adr-0091-movement-takes-its-direction-from-a-per-cell-field.md`
 [^F411C]: The sent set test of the core. `crates/cachette-core/tests/a_sent_set_walks_to_its_destination.rs`
