@@ -521,18 +521,31 @@ fn cold_ground_takes_more_out_of_the_air_than_warm_ground() {
     for _ in 0..8 {
         world.step(4).expect("the step must run");
     }
-    let mut lowest = i64::MAX;
-    let mut highest = i64::MIN;
-    for cell in 0..world.pyramid().len() as u32 {
-        let Some(summary) = world.pyramid().cell(cell) else {
+    // The ground of each weather cell, folded from the tiles the way the
+    // world folds it. The air met no cooling on the way, so the numerator
+    // reads the cell alone.
+    let mut under = vec![weather::CellGround::EMPTY; world.weather().air_plane().len().max(1)];
+    for address in addresses(&world) {
+        let (Some(tile), Some(index)) = (
+            world.tile_terrain(address),
+            world
+                .grid()
+                .index_of(address)
+                .and_then(|at| world.weather_cell_of(at)),
+        ) else {
             continue;
         };
-        // The air met no cooling on the way, so this reads the cell alone.
-        // The world runs at the level 1 weather pitch, so the ground under a
-        // weather cell is the ground under the level 1 cell of the same
-        // index. The two fold the same three fields over the same tiles.
-        let ground = weather::CellGround::from_summary(summary);
-        let numerator = weather::fall_numerator(weather::heat_of(ground), 0);
+        if let Some(slot) = under.get_mut(index as usize) {
+            *slot = slot.combine(weather::CellGround::of_tile(tile));
+        }
+    }
+    let mut lowest = i64::MAX;
+    let mut highest = i64::MIN;
+    for ground in under {
+        if ground.tiles() == 0 {
+            continue;
+        }
+        let numerator = weather::fall_numerator(weather::heat_of(ground), 0, 0);
         lowest = lowest.min(numerator);
         highest = highest.max(numerator);
     }
@@ -555,8 +568,8 @@ fn cold_ground_takes_more_out_of_the_air_than_warm_ground() {
 #[test]
 fn air_that_cooled_on_the_way_drops_more_than_air_that_did_not() {
     let cold = cachette_core::HEAT_CEILING / 4;
-    let no_cooling = weather::fall_numerator(cold, 0);
-    let cooled = weather::fall_numerator(cold, cachette_core::HEAT_CEILING / 2);
+    let no_cooling = weather::fall_numerator(cold, 0, 0);
+    let cooled = weather::fall_numerator(cold, cachette_core::HEAT_CEILING / 2, 0);
     assert!(
         cooled > no_cooling,
         "cooling added nothing, so a ridge has no near side and no far side"
@@ -1132,3 +1145,99 @@ fn the_peak_of_the_air_plane_keeps_moving() {
 // test that cannot fail is decoration.[^2]
 //
 // [^2]: Testing rules, section 1. `.claude/rules/testing.md`
+
+/// Air that climbs drops more than air that ran level, and air that
+/// descended drops less.
+///
+/// **This is the one term that couples the height map to the flow.** The flow
+/// is horizontal over a flat lattice, so without it a parcel blown at a range
+/// of hills passes through it and no cloud forms over land.
+#[test]
+fn air_that_climbed_drops_more_than_air_that_ran_level() {
+    let warm = cachette_core::HEAT_CEILING / 2;
+    let level = weather::fall_numerator(warm, 0, 0);
+    let climbed = weather::fall_numerator(warm, 0, cachette_core::Fix32::ONE.0 / 4);
+    let fell = weather::fall_numerator(warm, 0, -cachette_core::Fix32::ONE.0 / 4);
+    assert!(
+        climbed > level,
+        "air that climbed dropped no more than air that ran level, \
+         so the height map does not reach the water"
+    );
+    assert!(
+        fell < level,
+        "air that descended dropped as much as air that ran level, \
+         so the lee of a range is as wet as the windward side"
+    );
+}
+
+/// The air over a cell never stands above the saturation mark after a solve.
+///
+/// **The transport was the one site that could carry a cell past the mark.**
+/// The lift bounds the source and not the sum of what several winds deliver
+/// into one convergence cell, so such a cell climbed without a bound and one
+/// outlier set the top of every ramp that read the plane.
+#[test]
+fn the_air_never_stands_above_the_saturation_mark() {
+    // **The fixture runs at the per-tile pitch on purpose.** The coarse world
+    // holds a lattice a few cells across, so no wind converges on one cell
+    // and the plane never approaches the mark. The test passed against the
+    // defect it exists to catch until the fixture was changed.[^1]
+    //
+    // [^1]: Testing Rules, section 2a. `.agents/rules/testing.md`
+    let mut world = World::with_weather_scale(
+        WorldConfig {
+            width: WET_EXTENT,
+            height: WET_EXTENT,
+            seed: WET_SEED,
+            faction_count: 2,
+            unit_capacity: 1024,
+        },
+        weather::WeatherScale::PER_TILE,
+    )
+    .expect("the extent must describe a world");
+    for _ in 0..20 {
+        world.step(4).expect("the step must run");
+        let highest = world
+            .weather()
+            .air_plane()
+            .iter()
+            .map(|drops| drops.0)
+            .max()
+            .unwrap_or(0);
+        assert!(
+            highest <= weather::AIR_SATURATION.0,
+            "a cell held {highest} drops against a mark of {}",
+            weather::AIR_SATURATION.0
+        );
+    }
+    assert!(
+        world.weather().check_account(),
+        "the rain that left the air is not accounted"
+    );
+}
+
+/// Shallow water is a warmer cell than deep water, and deep water lags.
+///
+/// A tile counts as water when its height falls below one mark, and the count
+/// past that mark carries no depth, so nothing else in the field can tell a
+/// shelf from an abyss.
+#[test]
+fn shallow_water_is_warmer_than_deep_water_and_lags_less() {
+    let mark = i64::from(cachette_core::terrain::HEIGHT_WATER.0);
+    let sea = |height: i64| weather::CellGround {
+        height_total: height * 1024,
+        water_height_total: height * 1024,
+        tiles: 1024,
+        open_tiles: 0,
+    };
+    let shelf = sea(mark - mark / 8);
+    let abyss = sea(mark / 8);
+    assert!(
+        weather::heat_of(shelf) > weather::heat_of(abyss),
+        "a shelf and an abyss hold the same heat, so depth does nothing"
+    );
+    assert!(
+        weather::lag_of(abyss) > weather::lag_of(shelf),
+        "an abyss tracks the season as fast as a shelf does"
+    );
+}

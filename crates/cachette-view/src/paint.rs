@@ -158,15 +158,20 @@ const AIR_COLOUR: u32 = 0x00d8_e8f8;
 
 /// The drops of water in the air at which the overlay stops deepening.
 ///
-/// The unit is drops, and a drop is a whole number in the engine. This is a
-/// viewer's choice of where the shade saturates, in the same way the food
-/// shade saturates at a stock the viewer chose. It is not the engine's
-/// figure for a storm, and nothing here reads back into the engine.[^1]
+/// **This is the engine's own ceiling of the air, read and not restated.**
+/// The engine rains out whatever stands above the mark, so the mark is the
+/// most the plane ever holds and a shade that saturated anywhere else would
+/// either clip the wettest cells together or never reach full shade at all.
+/// A second number here would be a second declaration of one value, and
+/// nothing would fail when the two disagreed.[^1] [^2]
+///
+/// The viewer still only reads. Nothing here writes back into the engine.[^2]
 ///
 /// # References
 ///
-/// [^1]: ADR-0067, the viewer reads the world and never writes to it, decision D2. `docs/adrs/accepted/adr-0067-the-viewer-reads-the-world-and-never-writes-to-it.md`
-const AIR_AT_FULL_SHADE: i64 = 4096;
+/// [^1]: Recurring Defect Shapes, shape 1. `.agents/rules/recurring-defects.md`
+/// [^2]: ADR-0067, the viewer reads the world and never writes to it, decision D2. `docs/adrs/accepted/adr-0067-the-viewer-reads-the-world-and-never-writes-to-it.md`
+const AIR_AT_FULL_SHADE: i64 = cachette_core::weather::AIR_SATURATION.0;
 
 /// How much of the air colour covers a tile at the full shade.
 const AIR_WEIGHT_CEILING: i64 = 150;
