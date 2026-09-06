@@ -70,9 +70,11 @@ pub use cohort::{
 };
 pub use contest::{ContestError, Grievance, UnitFell};
 pub use controller::{
-    Choice, ControllerCommand, FactionRow, FactionWeights, GameEnd, WinPath, COMMAND_BUILD,
-    COMMAND_CAMPAIGN, COMMAND_GATHER, COMMAND_RELATION, EVALUATIONS_DEFAULT, TICK_LIMIT_DEFAULT,
-    WEIGHT_HIGH, WEIGHT_LOW,
+    CarrierAssignment, Choice, ControllerCommand, FactionRow, FactionState, FactionWeights,
+    GameEnd, Terms, WinPath, ADVERT_PERIOD_DEFAULT, ADVERT_PHASE_DEFAULT, CARRIER_ASSIGNMENT_BYTES,
+    COMMAND_ADVERTISE, COMMAND_BUILD, COMMAND_CAMPAIGN, COMMAND_CARRY, COMMAND_GATHER,
+    COMMAND_RELATION, COMMAND_TRADE, CONTRACT_CARRIERS_DEFAULT, CONTRACT_TERM_DEFAULT,
+    EVALUATIONS_DEFAULT, SURPLUS_MARK_DEFAULT, TICK_LIMIT_DEFAULT, WEIGHT_HIGH, WEIGHT_LOW,
 };
 pub use conversion::{ConversionError, Convert, UnitConverted};
 pub use descent::{

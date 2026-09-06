@@ -119,11 +119,11 @@ When the faction controller posts a board, it calls the same write verb that a
 Python caller calls, and the same refusals apply.[^3] No write path exists for
 the controller alone.
 
-**Nothing inside the engine writes a board.** The control plane is the only
-writer today. This decision does not say that a controller will post; it says
-which path a controller must take when one does, and it says so before the
-path is built, because a write added for the controller alone is the cheapest
-mistake to make and the hardest to see afterwards.[^9]
+**The faction controller writes a board, and so does the control plane.** This
+decision does not say what a controller posts; it says which path a controller
+must take, and it said so before the path was built, because a write added for
+the controller alone is the cheapest mistake to make and the hardest to see
+afterwards.[^9]
 
 A reviewer finds a violation when the controller writes a row through any path
 other than the write verb, or when the write verb checks who is calling it.

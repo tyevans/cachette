@@ -38,9 +38,11 @@ use bytemuck::{Pod, Zeroable};
 
 use crate::campaign::wants_campaign;
 use crate::hash::StateHash;
+use crate::rates::RateSchedule;
 use crate::resource::{ResourceKind, RESOURCE_KIND_COUNT};
 use crate::rng;
-use crate::types::{FactionId, Tick, TileIdx};
+use crate::trade::{Advert, ADVERT_OFFERS, ADVERT_WANTS};
+use crate::types::{Entity, FactionId, Tick, TileIdx};
 use crate::upgrade::{UpgradeKind, UPGRADE_KIND_COUNT};
 
 /// The lowest weight the seeding layer draws.
@@ -82,6 +84,47 @@ pub const EVALUATIONS_DEFAULT: u32 = 2;
 ///
 /// [^1]: Balance register, the tick limit. `docs/reference/balance.md`
 pub const TICK_LIMIT_DEFAULT: u64 = 2000;
+
+/// The period of the advertisement schedule, when nobody has set another.
+///
+/// **This is a provisional value and not a measured one.** The balance
+/// register holds the row and marks it unset.[^1]
+///
+/// # References
+///
+/// [^1]: Balance register, the advertisement schedule. `docs/reference/balance.md`
+pub const ADVERT_PERIOD_DEFAULT: u32 = 10;
+
+/// The phase of the advertisement schedule. Provisional, as above.[^1]
+///
+/// # References
+///
+/// [^1]: Balance register, the advertisement schedule. `docs/reference/balance.md`
+pub const ADVERT_PHASE_DEFAULT: u32 = 0;
+
+/// The store above which a faction offers a good, and below which it wants
+/// one. Provisional, as above.[^1]
+///
+/// # References
+///
+/// [^1]: Balance register, the surplus mark. `docs/reference/balance.md`
+pub const SURPLUS_MARK_DEFAULT: u32 = 8;
+
+/// How many carriers one contract takes from one faction. Provisional, as
+/// above.[^1]
+///
+/// # References
+///
+/// [^1]: Balance register, the carriers per contract. `docs/reference/balance.md`
+pub const CONTRACT_CARRIERS_DEFAULT: u32 = 2;
+
+/// How many ticks a contract the controller opens runs for. Provisional, as
+/// above.[^1]
+///
+/// # References
+///
+/// [^1]: Balance register, the contract term. `docs/reference/balance.md`
+pub const CONTRACT_TERM_DEFAULT: u32 = 200;
 
 /// The four weights that bias the choices of one faction.
 ///
@@ -288,6 +331,18 @@ pub const COMMAND_RELATION: u8 = 2;
 /// faction at war. The argument is the objective kind.
 pub const COMMAND_CAMPAIGN: u8 = 3;
 
+/// The kind of command the controller emitted: a whole board written from the
+/// site economies of the faction. The argument is how many rows it wrote.
+pub const COMMAND_ADVERTISE: u8 = 4;
+
+/// The kind of command the controller emitted: one negotiation step against
+/// another faction. The argument is that faction.
+pub const COMMAND_TRADE: u8 = 5;
+
+/// The kind of command the controller emitted: the carriers of every contract
+/// the faction owes a quantity on. The argument is how many units it assigned.
+pub const COMMAND_CARRY: u8 = 6;
+
 /// The step the controller moves a relation by when its draw says so. It is
 /// one step toward war, and the drift is what brings the pair back.[^1]
 ///
@@ -339,6 +394,29 @@ pub enum Choice {
         /// The objective tile.
         tile: TileIdx,
     },
+    /// Rewrite the whole board of the faction from its site economies.
+    ///
+    /// The rows are built when the command applies, so the write reads the
+    /// stores of this tick and not those of the tick the plan was made
+    /// on.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0149, a faction's trade board is simulated state that any faction may read, decision D3. `docs/adrs/accepted/adr-0149-a-factions-trade-board-is-simulated-state-that-any-faction-may-read.md`
+    Advertise,
+    /// Take one negotiation step against one other faction.
+    ///
+    /// The step is chosen when the command applies, for the reason the board
+    /// write is. A faction that finds no step is refused, and the refusal
+    /// counts.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0144, a faction controller runs inside the step and acts only through the caller's verbs, decision D3. `docs/adrs/accepted/adr-0144-a-faction-controller-runs-inside-the-step-and-acts-only-through-the-callers-verbs.md`
+    Trade,
+    /// Assign the carriers of every contract the faction owes a quantity on,
+    /// and release the carriers of every contract that ended.
+    Carry,
 }
 
 impl Choice {
@@ -355,6 +433,9 @@ impl Choice {
             Self::Build(kind) => (COMMAND_BUILD, kind.to_u8()),
             Self::Relation(other) => (COMMAND_RELATION, other.0 as u8),
             Self::Campaign { kind, .. } => (COMMAND_CAMPAIGN, kind),
+            Self::Advertise => (COMMAND_ADVERTISE, 0),
+            Self::Trade => (COMMAND_TRADE, 0),
+            Self::Carry => (COMMAND_CARRY, 0),
         }
     }
 }
@@ -449,6 +530,265 @@ pub fn territory_winner(held: impl Iterator<Item = (FactionId, i64)>) -> Option<
     leader.map(|(faction, _)| faction)
 }
 
+/// One carrier the controller assigned to one contract.
+///
+/// The row is simulated state. A later frame reads it to release the unit
+/// when the contract ends, so every byte of it enters the state hash.[^1]
+///
+/// The layout is 8 + 4 + 2 + 2 bytes, which is 16 bytes at an alignment of 8.
+/// The trailing array declares every padding byte.[^2]
+///
+/// # References
+///
+/// [^1]: ADR-0001, one binary gives one answer at any thread count, decision D4. `docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
+/// [^2]: ADR-0006, an event is plain data and applying it is pure, decision D1. `docs/adrs/accepted/adr-0006-an-event-is-plain-data-and-applying-it-is-pure.md`
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Pod, Zeroable)]
+pub struct CarrierAssignment {
+    /// The identity of the unit, as one integer.
+    pub unit: u64,
+    /// The index of the contract row in the negotiation plane.
+    pub row: u32,
+    /// The faction that assigned the unit.
+    pub faction: FactionId,
+    /// Declared padding, always zero.
+    pub padding: [u8; 2],
+}
+
+/// The size of one carrier row, in bytes.
+pub const CARRIER_ASSIGNMENT_BYTES: usize = 16;
+
+const _: () = assert!(core::mem::size_of::<CarrierAssignment>() == CARRIER_ASSIGNMENT_BYTES);
+
+impl CarrierAssignment {
+    /// Builds a row with zero padding.
+    #[must_use]
+    pub const fn new(unit: Entity, row: u32, faction: FactionId) -> Self {
+        Self {
+            unit: unit.to_bits(),
+            row,
+            faction,
+            padding: [0; 2],
+        }
+    }
+}
+
+/// Decides whether a faction takes its one negotiation step this tick.
+///
+/// **This draws exactly once.** The key is the controller system, the tick,
+/// the faction and the draw index, and the index is past the campaign
+/// draw.[^1] The trade weight biases the draw: the answer is yes with
+/// probability `trade / (WEIGHT_HIGH + trade)`.
+///
+/// # References
+///
+/// [^1]: ADR-0003, every random draw is keyed, never stateful, decision D1. `docs/adrs/accepted/adr-0003-every-random-draw-is-keyed-never-stateful.md`
+#[must_use]
+pub fn wants_trade_step(
+    seed: u64,
+    tick: Tick,
+    faction: FactionId,
+    draw: u32,
+    weights: FactionWeights,
+) -> bool {
+    let raw = rng::draw(seed, rng::SYSTEM_CONTROLLER, tick.0, faction.0 as u64, draw);
+    let bound = u64::from(WEIGHT_HIGH) + u64::from(weights.trade);
+    let roll = ((u128::from(raw) * u128::from(bound)) >> 64) as u64;
+    roll < u64::from(weights.trade)
+}
+
+/// Picks the good that a faction asks for in return for one good.
+///
+/// The answer is the good the faction holds least of, and never the good the
+/// row is about. **The scan draws nothing while one good is lowest.** Two
+/// goods that tie are separated by one keyed draw, because a tie broken by
+/// the index would always name the same good and the board would never ask
+/// for the other.[^1]
+///
+/// # References
+///
+/// [^1]: ADR-0003, every random draw is keyed, never stateful, decision D1. `docs/adrs/accepted/adr-0003-every-random-draw-is-keyed-never-stateful.md`
+#[must_use]
+pub fn asking_good_of(
+    seed: u64,
+    tick: Tick,
+    faction: FactionId,
+    draw: u32,
+    stores: &[i64; RESOURCE_KIND_COUNT],
+    good: u8,
+) -> u8 {
+    let mut lowest = i64::MAX;
+    let mut tied = [0u8; RESOURCE_KIND_COUNT];
+    let mut count = 0usize;
+    for (index, held) in stores.iter().enumerate() {
+        if index as u8 == good {
+            continue;
+        }
+        if *held < lowest {
+            lowest = *held;
+            count = 0;
+        }
+        if *held == lowest {
+            tied[count] = index as u8;
+            count += 1;
+        }
+    }
+    if count == 0 {
+        return good;
+    }
+    if count == 1 {
+        return tied[0];
+    }
+    let raw = rng::draw(seed, rng::SYSTEM_CONTROLLER, tick.0, faction.0 as u64, draw);
+    let picked = ((u128::from(raw) * count as u128) >> 64) as usize;
+    tied[picked.min(count - 1)]
+}
+
+/// Builds the whole board of one faction from what its sites hold.
+///
+/// The goods are visited in index order. A good above the mark becomes an
+/// offer row of the surplus. A good below the mark becomes a want row of the
+/// shortfall. A good at the mark writes no row. The asking quantity equals
+/// the quantity, which is an even swap and not a price.[^1]
+///
+/// The list is truncated to the board bound, because a write past the bound
+/// is refused and changes nothing.[^2]
+///
+/// # References
+///
+/// [^1]: Balance register, the surplus mark. `docs/reference/balance.md`
+/// [^2]: ADR-0149, a faction's trade board is simulated state that any faction may read, decision D2. `docs/adrs/accepted/adr-0149-a-factions-trade-board-is-simulated-state-that-any-faction-may-read.md`
+#[must_use]
+pub fn board_of(
+    seed: u64,
+    tick: Tick,
+    faction: FactionId,
+    draw: u32,
+    stores: &[i64; RESOURCE_KIND_COUNT],
+    mark: i64,
+    bound: usize,
+) -> Vec<Advert> {
+    let mut rows = Vec::with_capacity(RESOURCE_KIND_COUNT);
+    for (index, held) in stores.iter().enumerate() {
+        let good = index as u8;
+        let (side, quantity) = if *held > mark {
+            (ADVERT_OFFERS, held.saturating_sub(mark))
+        } else if *held < mark {
+            (ADVERT_WANTS, mark.saturating_sub(*held))
+        } else {
+            continue;
+        };
+        let quantity = u32::try_from(quantity).unwrap_or(u32::MAX);
+        let asking = asking_good_of(seed, tick, faction, draw, stores, good);
+        rows.push(Advert::new(good, quantity, side, asking, quantity));
+    }
+    rows.truncate(bound);
+    rows
+}
+
+/// The terms of the offer that one faction opens against another.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Terms {
+    /// The good the faction that opens the pair owes.
+    pub give_kind: u8,
+    /// How much of it.
+    pub give_amount: u32,
+    /// The good the other party owes.
+    pub take_kind: u8,
+    /// How much of it.
+    pub take_amount: u32,
+}
+
+/// Matches the wants of one board against the offers of another.
+///
+/// The rows of each board are read in slot order, and the first pair that
+/// names one good is the answer. **The quantity is the smaller of the two**,
+/// so neither side promises more than it posted.
+///
+/// **The buyer names the good it pays with.** The seller states a preference
+/// on its own row, and the two preferences may differ, because each is drawn
+/// against what that faction lacks. A match that asked the two to agree would
+/// wait for two draws to meet.
+///
+/// Returns `None` when no row of the first board meets a row of the second.
+#[must_use]
+pub fn match_boards(mine: &[Advert], theirs: &[Advert]) -> Option<Terms> {
+    for want in mine {
+        if want.is_empty() || want.wants != ADVERT_WANTS {
+            continue;
+        }
+        for offer in theirs {
+            if offer.is_empty() || offer.wants != ADVERT_OFFERS {
+                continue;
+            }
+            if offer.good != want.good || want.asking_good == want.good {
+                continue;
+            }
+            return Some(Terms {
+                give_kind: want.asking_good,
+                give_amount: want.asking_quantity,
+                take_kind: want.good,
+                take_amount: offer.quantity.min(want.quantity),
+            });
+        }
+    }
+    None
+}
+
+/// Returns the quantity a faction asks for one good on its own board, or
+/// `None` when its board says nothing about that good.
+#[must_use]
+pub fn asking_quantity_of(board: &[Advert], good: u8) -> Option<u32> {
+    board
+        .iter()
+        .find(|row| !row.is_empty() && row.good == good)
+        .map(|row| row.asking_quantity)
+}
+
+/// Returns the integer midpoint of two asking quantities.
+///
+/// The sum is taken as a wide integer, so two quantities near the ceiling of
+/// the column give the midpoint and never an overflow. **No draw decides a
+/// price.**
+#[must_use]
+pub const fn midpoint(one: u32, other: u32) -> u32 {
+    ((one as u64 + other as u64) / 2) as u32
+}
+
+/// Returns whether a faction accepts a counteroffer.
+///
+/// The answer is yes when the counter asks no more than the faction posted.
+#[must_use]
+pub const fn accepts(counter: u32, own_ask: u32) -> bool {
+    counter <= own_ask
+}
+
+/// What the world offers one faction when the stage plans its tick.
+///
+/// The stage reads the world once for each faction and hands the answers to
+/// the plan. The plan then draws and orders, and it reads no world of its
+/// own. The rows are in faction order, one for each faction.[^1]
+///
+/// # References
+///
+/// [^1]: ADR-0144, a faction controller runs inside the step and acts only through the caller's verbs, decision D1. `docs/adrs/accepted/adr-0144-a-faction-controller-runs-inside-the-step-and-acts-only-through-the-callers-verbs.md`
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct FactionState {
+    /// The faction it would move a relation against, or `None` when it holds
+    /// no leader unit and when no other faction exists.
+    pub rival: Option<FactionId>,
+    /// The objective kind and the tile it would march on, or `None` when no
+    /// pair it belongs to is at war, when no enemy site exists, when it holds
+    /// a live campaign, and when it holds a carrier.
+    pub objective: Option<(u8, TileIdx)>,
+    /// Whether the advertisement schedule falls due for it on this tick.
+    pub board_due: bool,
+    /// Whether it holds a negotiation step to take.
+    pub trade_due: bool,
+    /// Whether it holds a carrier to assign or to release.
+    pub carry_due: bool,
+}
+
 /// The controller state the world holds.
 #[derive(Clone, Debug)]
 pub struct Controller {
@@ -458,6 +798,15 @@ pub struct Controller {
     game_end: GameEnd,
     log: Vec<ControllerCommand>,
     refused: u32,
+    advert: RateSchedule,
+    surplus_mark: u32,
+    contract_carriers: u32,
+    contract_term: u32,
+    carriers: Vec<CarrierAssignment>,
+    boards_written: u32,
+    offers_made: u32,
+    contracts_bound: u32,
+    carriers_assigned: u32,
 }
 
 impl Controller {
@@ -480,6 +829,16 @@ impl Controller {
             game_end: GameEnd::EMPTY,
             log: Vec::new(),
             refused: 0,
+            advert: RateSchedule::new(ADVERT_PERIOD_DEFAULT, ADVERT_PHASE_DEFAULT)
+                .expect("the default period is inside the range"),
+            surplus_mark: SURPLUS_MARK_DEFAULT,
+            contract_carriers: CONTRACT_CARRIERS_DEFAULT,
+            contract_term: CONTRACT_TERM_DEFAULT,
+            carriers: Vec::new(),
+            boards_written: 0,
+            offers_made: 0,
+            contracts_bound: 0,
+            carriers_assigned: 0,
         }
     }
 
@@ -592,10 +951,125 @@ impl Controller {
         self.log.iter().filter(|entry| entry.applied != 0).count() as u32
     }
 
-    /// Empties the log of the last tick.
+    /// Empties the log of the last tick, and the counts of the last tick.
     pub fn clear_log(&mut self) {
         self.log.clear();
         self.refused = 0;
+        self.boards_written = 0;
+        self.offers_made = 0;
+        self.contracts_bound = 0;
+        self.carriers_assigned = 0;
+    }
+
+    /// Returns the advertisement schedule: how often a faction rewrites its
+    /// board, and the offset inside the period.
+    #[must_use]
+    pub const fn advert_schedule(&self) -> RateSchedule {
+        self.advert
+    }
+
+    /// Sets the advertisement schedule.
+    pub const fn set_advert_schedule(&mut self, schedule: RateSchedule) {
+        self.advert = schedule;
+    }
+
+    /// Returns the store above which a faction offers a good, and below which
+    /// it wants one.
+    #[must_use]
+    pub const fn surplus_mark(&self) -> u32 {
+        self.surplus_mark
+    }
+
+    /// Sets the surplus mark.
+    pub const fn set_surplus_mark(&mut self, mark: u32) {
+        self.surplus_mark = mark;
+    }
+
+    /// Returns how many carriers one faction assigns to one contract.
+    #[must_use]
+    pub const fn contract_carriers(&self) -> u32 {
+        self.contract_carriers
+    }
+
+    /// Sets how many carriers one faction assigns to one contract.
+    pub const fn set_contract_carriers(&mut self, carriers: u32) {
+        self.contract_carriers = carriers;
+    }
+
+    /// Returns how many ticks a contract that the controller opens runs for.
+    #[must_use]
+    pub const fn contract_term(&self) -> u32 {
+        self.contract_term
+    }
+
+    /// Sets how many ticks a contract that the controller opens runs for.
+    pub const fn set_contract_term(&mut self, term: u32) {
+        self.contract_term = term;
+    }
+
+    /// Returns every carrier the controller has assigned, in faction order
+    /// and then in contract order and then in identity order.
+    #[must_use]
+    pub fn carriers(&self) -> &[CarrierAssignment] {
+        &self.carriers
+    }
+
+    /// Replaces the carrier list, and puts it in the one order a reader sees.
+    ///
+    /// The key is the faction, the contract row and the identity of the unit.
+    /// The key is unique, because one unit carries for one contract, so a
+    /// stable sort and an unstable sort give one answer here.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0004, iteration order is explicit, decision D4. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
+    pub fn set_carriers(&mut self, mut carriers: Vec<CarrierAssignment>) {
+        carriers.sort_unstable_by_key(|entry| (entry.faction, entry.row, entry.unit));
+        self.carriers = carriers;
+    }
+
+    /// Counts one board the stage wrote on this tick.
+    pub const fn count_board(&mut self) {
+        self.boards_written = self.boards_written.saturating_add(1);
+    }
+
+    /// Counts one offer the stage opened on this tick.
+    pub const fn count_offer(&mut self) {
+        self.offers_made = self.offers_made.saturating_add(1);
+    }
+
+    /// Counts one contract the stage bound on this tick.
+    pub const fn count_bound(&mut self) {
+        self.contracts_bound = self.contracts_bound.saturating_add(1);
+    }
+
+    /// Counts the carriers the stage assigned on this tick.
+    pub const fn count_carriers(&mut self, count: u32) {
+        self.carriers_assigned = self.carriers_assigned.saturating_add(count);
+    }
+
+    /// Returns how many boards the stage wrote on the last tick.
+    #[must_use]
+    pub const fn boards_written(&self) -> u32 {
+        self.boards_written
+    }
+
+    /// Returns how many offers the stage opened on the last tick.
+    #[must_use]
+    pub const fn offers_made(&self) -> u32 {
+        self.offers_made
+    }
+
+    /// Returns how many contracts the stage bound on the last tick.
+    #[must_use]
+    pub const fn contracts_bound(&self) -> u32 {
+        self.contracts_bound
+    }
+
+    /// Returns how many carriers the stage assigned on the last tick.
+    #[must_use]
+    pub const fn carriers_assigned(&self) -> u32 {
+        self.carriers_assigned
     }
 
     /// Records one command and how the verb answered it.
@@ -615,16 +1089,16 @@ impl Controller {
     ///
     /// Returns an empty list when the game end record is written.[^2]
     ///
-    /// The rivals list holds, for each faction, the faction it would move a
-    /// relation against, or `None` when it holds no leader unit or no other
-    /// faction exists. A faction with a rival draws once more, at the index
-    /// past the evaluations, and the draw decides whether it moves.[^3]
-    ///
-    /// The objectives list holds, for each faction, the objective kind and
-    /// the tile it would march on, or `None` when no pair it belongs to is at
-    /// war, when no enemy site exists, or when it holds a live campaign. A
-    /// faction with an objective draws once more, at the index past the
-    /// relation draw, and the draw decides whether it raises.[^4]
+    /// The states list holds one row for each faction, in faction order. The
+    /// row says what the world offers that faction this tick: the rival it
+    /// would move a relation against, the objective it would march on, and
+    /// whether a board write, a negotiation step or a carrier move is due.
+    /// A faction with a rival draws once more, at the index past the
+    /// evaluations, and the draw decides whether it moves.[^3] A faction with
+    /// an objective draws once more, at the index past that, and the draw
+    /// decides whether it raises.[^4] A faction with a negotiation step due
+    /// draws once more, at the index past the board write, and the draw
+    /// decides whether it speaks.
     ///
     /// # References
     ///
@@ -637,8 +1111,7 @@ impl Controller {
         &self,
         seed: u64,
         tick: Tick,
-        rivals: &[Option<FactionId>],
-        objectives: &[Option<(u8, TileIdx)>],
+        states: &[FactionState],
     ) -> Vec<(FactionId, u32, Choice)> {
         let mut commands = Vec::new();
         if self.game_end.is_set() {
@@ -653,17 +1126,30 @@ impl Controller {
                 let choice = evaluate(seed, tick, faction, draw, row.weights);
                 commands.push((faction, draw, choice));
             }
-            if let Some(Some(rival)) = rivals.get(usize::from(index)).copied() {
+            let state = states.get(usize::from(index)).copied().unwrap_or_default();
+            if let Some(rival) = state.rival {
                 let draw = self.relation_draw_index();
                 if wants_relation_move(seed, tick, faction, draw, row.weights) {
                     commands.push((faction, draw, Choice::Relation(rival)));
                 }
             }
-            if let Some(Some((kind, tile))) = objectives.get(usize::from(index)).copied() {
+            if let Some((kind, tile)) = state.objective {
                 let draw = self.campaign_draw_index();
                 if wants_campaign(seed, tick, faction, draw, row.weights) {
                     commands.push((faction, draw, Choice::Campaign { kind, tile }));
                 }
+            }
+            if state.board_due {
+                commands.push((faction, self.board_draw_index(), Choice::Advertise));
+            }
+            if state.trade_due {
+                let draw = self.trade_draw_index();
+                if wants_trade_step(seed, tick, faction, draw, row.weights) {
+                    commands.push((faction, draw, Choice::Trade));
+                }
+            }
+            if state.carry_due {
+                commands.push((faction, self.carry_draw_index(), Choice::Carry));
             }
         }
         // The visit order above is fixed, and the sort is what makes the
@@ -686,6 +1172,37 @@ impl Controller {
     #[must_use]
     pub const fn campaign_draw_index(&self) -> u32 {
         self.evaluations + 1
+    }
+
+    /// Returns the draw index of the board write: one past the campaign draw.
+    ///
+    /// The board write draws only to break a tie between two equally lacked
+    /// goods. The index is reserved whether it draws or not, so no other
+    /// draw of this stage ever takes it.
+    #[must_use]
+    pub const fn board_draw_index(&self) -> u32 {
+        self.evaluations + 2
+    }
+
+    /// Returns the draw index of the negotiation step: one past the board
+    /// write, so it collides with no other.
+    #[must_use]
+    pub const fn trade_draw_index(&self) -> u32 {
+        self.evaluations + 3
+    }
+
+    /// Returns the draw index of the carrier command: one past the
+    /// negotiation step. The carrier command draws nothing, and the index
+    /// puts it last in the order the commands apply.
+    #[must_use]
+    pub const fn carry_draw_index(&self) -> u32 {
+        self.evaluations + 4
+    }
+
+    /// Reports whether a faction rewrites its board on this tick.
+    #[must_use]
+    pub const fn board_due(&self, tick: Tick) -> bool {
+        self.advert.due(tick)
     }
 
     /// Returns the rows in ascending faction order.
@@ -739,5 +1256,12 @@ impl Controller {
             .write_u64(u64::from(self.evaluations))
             .write_u64(self.tick_limit)
             .write(bytemuck::bytes_of(&self.game_end))
+            .write_u64(u64::from(self.advert.period()))
+            .write_u64(u64::from(self.advert.phase()))
+            .write_u64(u64::from(self.surplus_mark))
+            .write_u64(u64::from(self.contract_carriers))
+            .write_u64(u64::from(self.contract_term))
+            .write_u64(self.carriers.len() as u64)
+            .write(bytemuck::cast_slice(&self.carriers))
     }
 }

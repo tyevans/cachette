@@ -3343,6 +3343,114 @@ impl PyWorld {
         Ok(columns)
     }
 
+    /// How many ticks lie between two board writes, and the offset inside
+    /// that period, as a tuple. The two values are a row of the balance
+    /// register.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: Balance register, the advertisement schedule. `docs/reference/balance.md`
+    #[getter]
+    fn advertisement_schedule(&self) -> (u32, u32) {
+        self.lock().advertisement_schedule()
+    }
+
+    /// Sets how often the controller rewrites the board of a faction, and the
+    /// offset inside the period. Returns `None`.
+    ///
+    /// # Errors
+    ///
+    /// Raises `VerbError` when the period is zero, or above the range that
+    /// the scaling multiply takes.
+    fn set_advertisement_schedule(&self, period: u32, phase: u32) -> PyResult<()> {
+        self.lock()
+            .set_advertisement_schedule(period, phase)
+            .map_err(|error| VerbError::new_err(error.to_string()))
+    }
+
+    /// The store above which a faction offers a good, and below which it
+    /// wants one, as an integer. The value is a row of the balance
+    /// register.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: Balance register, the surplus mark. `docs/reference/balance.md`
+    #[getter]
+    fn surplus_mark(&self) -> u32 {
+        self.lock().surplus_mark()
+    }
+
+    /// Sets the surplus mark. Returns `None`.
+    fn set_surplus_mark(&self, mark: u32) {
+        self.lock().set_surplus_mark(mark);
+    }
+
+    /// How many carriers one faction assigns to one contract, as an integer.
+    /// The value is a row of the balance register.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: Balance register, the carriers per contract. `docs/reference/balance.md`
+    #[getter]
+    fn carriers_per_contract(&self) -> u32 {
+        self.lock().carriers_per_contract()
+    }
+
+    /// Sets how many carriers one faction assigns to one contract. A count of
+    /// zero assigns none. Returns `None`.
+    fn set_carriers_per_contract(&self, carriers: u32) {
+        self.lock().set_carriers_per_contract(carriers);
+    }
+
+    /// How many ticks a contract that the controller opens runs for, as an
+    /// integer. The value is a row of the balance register.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: Balance register, the contract term. `docs/reference/balance.md`
+    #[getter]
+    fn contract_term(&self) -> u32 {
+        self.lock().contract_term()
+    }
+
+    /// Sets how many ticks a contract that the controller opens runs for.
+    /// Returns `None`.
+    fn set_contract_term(&self, term: u32) {
+        self.lock().set_contract_term(term);
+    }
+
+    /// Returns every carrier the controller has assigned, as columns.
+    ///
+    /// A carrier is a unit that the controller sent to the site of the other
+    /// party of a contract. The list is simulated state and not a log of one
+    /// step: a carrier stays in it until the contract settles or fails.
+    ///
+    /// - `unit`, `numpy.uint64`. The identity of the unit, opaque to a
+    ///   caller.[^1]
+    /// - `row`, `numpy.uint32`. The index of the contract in the negotiation
+    ///   plane, which is the proposer times the faction count plus the
+    ///   responder.
+    /// - `faction`, `numpy.uint16`. The faction that assigned the unit.
+    ///
+    /// This method copies each column.[^2]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0085, an entity crosses to Python as one opaque identity that the engine resolves, decision D2. `docs/adrs/accepted/adr-0085-an-entity-crosses-to-python-as-one-opaque-identity.md`
+    /// [^2]: ADR-0044, what copies and what does not is declared at the call site. `docs/adrs/REGISTRY.md`
+    fn carrier_columns<'py>(&self, python: Python<'py>) -> PyResult<Bound<'py, PyDict>> {
+        let world = self.lock();
+        let carriers = world.carrier_assignments();
+        let columns = PyDict::new(python);
+        let unit: Vec<u64> = carriers.iter().map(|entry| entry.unit).collect();
+        let row: Vec<u32> = carriers.iter().map(|entry| entry.row).collect();
+        let faction: Vec<u16> = carriers.iter().map(|entry| entry.faction.0).collect();
+        columns.set_item("unit", unit.to_pyarray(python))?;
+        columns.set_item("row", row.to_pyarray(python))?;
+        columns.set_item("faction", faction.to_pyarray(python))?;
+        Ok(columns)
+    }
+
     /// How many units the controller takes when it raises a campaign, as an
     /// integer. The value is a row of the balance register.[^1]
     ///

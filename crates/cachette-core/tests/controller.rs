@@ -20,7 +20,8 @@ use std::collections::BTreeSet;
 
 use cachette_core::controller::NO_SEAT;
 use cachette_core::{
-    Axial, ControllerCommand, FactionId, GameEnd, WinPath, World, WorldConfig, SUBSYSTEM_CENSUS,
+    Axial, ControllerCommand, FactionId, GameEnd, WinPath, World, WorldConfig, COMMAND_BUILD,
+    COMMAND_GATHER, SUBSYSTEM_CENSUS,
 };
 
 const THREADS: usize = 2;
@@ -81,6 +82,20 @@ fn seat(world: &mut World, seated: u16) {
 
 fn log_of(world: &World) -> Vec<ControllerCommand> {
     world.controller_log().to_vec()
+}
+
+/// Collects the commands of the evaluation draws alone.
+///
+/// The stage also writes a board, takes a negotiation step and moves its
+/// carriers, and each of those carries its own draw index. A test of the
+/// evaluation draw reads the evaluation commands and nothing else.
+fn evaluations_of(world: &World) -> Vec<ControllerCommand> {
+    world
+        .controller_log()
+        .iter()
+        .filter(|entry| entry.kind == COMMAND_GATHER || entry.kind == COMMAND_BUILD)
+        .copied()
+        .collect()
 }
 
 #[test]
@@ -152,7 +167,7 @@ fn the_draw_depends_on_the_tick() {
     let mut seen = BTreeSet::new();
     for _ in 0..24 {
         world.step(THREADS).expect("the step runs");
-        let log = log_of(&world);
+        let log = evaluations_of(&world);
         assert_eq!(log.len(), 1);
         seen.insert(choice(&log[0]));
     }
@@ -174,7 +189,7 @@ fn the_draw_depends_on_the_faction() {
     let mut differed = false;
     for _ in 0..24 {
         world.step(THREADS).expect("the step runs");
-        let log = log_of(&world);
+        let log = evaluations_of(&world);
         assert_eq!(log.len(), 3);
         for kind in [0u8, 1u8] {
             let arguments: BTreeSet<u8> = log
@@ -201,7 +216,7 @@ fn the_draw_depends_on_the_draw_index() {
     let mut differed = false;
     for _ in 0..24 {
         world.step(THREADS).expect("the step runs");
-        let log = log_of(&world);
+        let log = evaluations_of(&world);
         assert_eq!(log.len(), 4);
         let choices: BTreeSet<(u8, u8)> = log.iter().map(choice).collect();
         if choices.len() > 1 {
