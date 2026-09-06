@@ -7592,10 +7592,45 @@ fn version() -> &'static str {
     env!("CARGO_PKG_VERSION")
 }
 
+/// Returns the stock the wealth reader asks a faction for, as an `int`.
+///
+/// The value is a raw Q16.16 quantity summed over every commodity of every
+/// settlement of the faction. Divide by 65536 for whole units. It is the
+/// value `standing(faction)["store_total"]` is compared against.
+///
+/// **The engine states this bar once, and a caller reads it here.** A script
+/// that wrote its own copy reported a share against a bar the engine no
+/// longer held, and nothing failed.[^1]
+///
+/// # References
+///
+/// [^1]: Findings register, FND-551. `docs/FINDINGS.md`
+#[pyfunction]
+fn stock_target() -> i64 {
+    cachette_core::STOCK_TARGET
+}
+
+/// Returns the stock one settlement can hold, as an `int`.
+///
+/// The value is a raw Q16.16 quantity summed over every commodity of one
+/// settlement: the ceiling of a fixed-point store times the commodity count.
+/// A faction that holds one settlement never reports more than this, so the
+/// wealth bar stands above it.[^1]
+///
+/// # References
+///
+/// [^1]: ADR-0165, the wealth bar stands above what one settlement can hold, decision D1. `docs/adrs/draft/adr-0165-the-wealth-bar-stands-above-what-one-settlement-can-hold.md`
+#[pyfunction]
+fn stock_ceiling_of_one_settlement() -> i64 {
+    cachette_core::STOCK_CEILING_OF_ONE_SETTLEMENT
+}
+
 /// The compiled core of the Cachette simulation engine.
 ///
-/// The module holds the `World` class, the `Camera` class, the `version`
-/// function and the error classes. The `cachette` package re-exports all of
+/// The module holds the `World` class, the `Camera` class, the module
+/// functions and the error classes. This sentence does not list them,
+/// because a list here is a second statement of the interface and the
+/// generated reference is the first.[^7] The `cachette` package re-exports
 /// them, so import from `cachette` rather than from here.
 ///
 /// **This module is for a programmer who drives a simulation from Python.**
@@ -7704,12 +7739,15 @@ fn version() -> &'static str {
 /// [^4]: Decisions register, DEC-120. `docs/DECISIONS.md`
 /// [^5]: ADR-0053, a faction is a bit in a mask, and a relation is a plane, decision D2. `docs/adrs/accepted/adr-0053-a-faction-is-a-bit-in-a-mask-and-a-relation-is-a-plane.md`
 /// [^6]: ADR-0040, Python is a control plane, not a data plane, decision D1. `docs/adrs/draft/adr-0040-python-is-a-control-plane-not-a-data-plane.md`
+/// [^7]: ADR-0107, the Python reference is generated from the compiled module, decision D1. `docs/adrs/draft/adr-0107-the-python-reference-is-generated-from-the-compiled-module.md`
 #[pymodule]
 #[pyo3(name = "_core")]
 fn cachette_core_module(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<PyWorld>()?;
     module.add_class::<PyCamera>()?;
     module.add_function(wrap_pyfunction!(version, module)?)?;
+    module.add_function(wrap_pyfunction!(stock_target, module)?)?;
+    module.add_function(wrap_pyfunction!(stock_ceiling_of_one_settlement, module)?)?;
     module.add_function(wrap_pyfunction!(event_schema, module)?)?;
     add_error::<CachetteError>(module, "CachetteError")?;
     add_error::<StepError>(module, "StepError")?;

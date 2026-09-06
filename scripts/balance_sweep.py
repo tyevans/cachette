@@ -24,13 +24,17 @@ import multiprocessing
 import pathlib
 import sys
 
-from cachette import World
+from cachette import World, stock_target
 
 BASE_SEED = 0x0123_4567_89AB_CDEF
 SEED_STRIDE = 0x9E37_79B9_7F4A_7C15
 SEED_MASK = (1 << 64) - 1
-ONE = 1 << 16
-STOCK_TARGET = 28672
+
+# The engine states the wealth bar, and this script reads it. A copy here
+# reported a share against a bar the engine no longer held.[^1]
+#
+# [^1]: Findings register, FND-551. ``docs/FINDINGS.md``
+STOCK_TARGET_RAW = stock_target()
 
 
 def seeds_for(count: int) -> list[int]:
@@ -93,7 +97,7 @@ def render(games: list[dict]) -> str:
         last = game["samples"][-1]
         pop = ",".join(str(p) for p in last["population"])
         held = ",".join(str(h) for h in last["held"])
-        share = max(last["store"]) * 100 // (STOCK_TARGET * ONE)
+        share = max(last["store"]) * 100 // STOCK_TARGET_RAW
         lines.append(
             f"{game['seed']:#018x} {game['tick']:>6} {game['path'] or '-'!s:<10} "
             f"{game['fell']:>5} {pop:>16} {last['settlements']:>5} {held:>18} "

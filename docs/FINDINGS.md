@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-549**
+**Next number: FND-552**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -13115,6 +13115,53 @@ the same change. **A derivation that names a measured share goes stale the next
 time a subsystem is repaired, and nothing fails.** That is the shape the
 recurring-defect rule names, and this is one more local instance of it.[^F483G]
 
+### FND-550 — The ceiling that ends every game is in the store, not in the accumulator
+
+**Believed.** Three engine changes could put the wealth path out of reach:
+scale the bar by the settlements a faction owns, widen the store type, or drop
+the stock clause.[^F548A] The backlog item repeated them, and a fourth reading
+named a wider accumulator as the smallest change of the three.[^F543B]
+
+**True.** The reader already totals in a 64-bit accumulator, and it already
+sums every commodity of every live settlement.[^F548C] **A wider accumulator
+was never an available answer, because the accumulator was never the narrow
+part.** The narrow part is the store the accumulator reads. A store is a
+fixed-point value of a fixed width, so one settlement of one commodity
+saturates, and the sum of one settlement saturates with it.
+
+**Scaling the bar by the settlements a faction owns is worse than no change.**
+A bar that rises as a faction grows is a bar the faction never approaches, and
+it punishes the expansion a wealth win rewards.
+
+**What follows.** The answer is where the bar stands, and not what the reader
+totals. The bar now stands above the stock one settlement can hold, and a
+compiled assertion stops the build when it does not. A record holds the
+decision.[^F548D] **A wealth win now asks a faction for a second settlement,
+and nothing in the engine founds one, so the stock clause fires in no seeded
+run today.**[^F548E] The wonder clause carries the path.
+
+**The shape.** Two registers and one backlog item named a remedy that the code
+already had. Each writer read the finding above and not the reader. **Read the
+code for the part you mean to change, even when a register names it.**
+
+### FND-551 — The wealth bar was declared in three places, and two of them were copies
+
+**Believed.** The engine states the wealth bar once, and the balance register
+holds its derivation.[^F543A]
+
+**True.** Two scripts held their own copy of the bar as a whole number, and
+each used its copy to report the share of the bar a faction had reached.[^F542H]
+[^F549B] Nothing compared the copies against the engine. A change to the
+engine constant would have left both scripts reporting a share against a bar
+the engine no longer held, and every gate would have passed.
+
+**Evidence.** A whole-tree search for the value found three sites: the engine
+constant and the two scripts. The commit body holds the search command.
+
+**What follows.** The binding now exposes the bar, and each script reads it.
+One declaration site remains. This is one more local instance of the first
+recurring defect shape.[^F526A]
+
 
 ### FND-548 — The census repair left three rows that still said more than they read
 
@@ -13193,9 +13240,13 @@ holds the question.[^F548S]
 [^F542H]: The sweep, which plays a seed set to the tick limit and samples the run. `scripts/balance_sweep.py`
 [^F542I]: Backlog item 0507. `docs/backlog/proposed/0507-let-a-faction-take-the-ground-of-another.md`
 [^F543A]: Balance register, the stock target. `docs/reference/balance.md`
-[^F543B]: Backlog item 0506. `docs/backlog/proposed/0506-put-the-wealth-path-out-of-easy-reach.md`
+[^F543B]: Backlog item 0506. `docs/backlog/complete/0506-put-the-wealth-path-out-of-easy-reach.md`
 [^F548A]: Balance register, the wonder work and the win-path share. `docs/reference/balance.md`
 [^F548B]: Findings register, FND-496. `docs/FINDINGS.md`
+[^F548C]: The stock total of a faction, which the wealth reader compares. `crates/cachette-core/src/world.rs`
+[^F548D]: ADR-0165, the wealth bar stands above what one settlement can hold. `docs/adrs/draft/adr-0165-the-wealth-bar-stands-above-what-one-settlement-can-hold.md`
+[^F548E]: Findings register, FND-542. `docs/FINDINGS.md`
+[^F549B]: The sweep summary. `scripts/balance_summary.py`
 
 [^F498B]: The controller log, the refusal count and the stage that empties them. `crates/cachette-core/src/controller.rs`
 [^F498D]: ADR-0158, a site builds a typed unit from a bounded queue its store pays for, decision D6. `docs/adrs/accepted/adr-0158-a-site-builds-a-typed-unit-from-a-bounded-queue-its-store-pays-for.md`
