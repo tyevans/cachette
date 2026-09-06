@@ -1,7 +1,7 @@
 ---
 id: 0317
 title: Separate the engine tick from the wall clock in the demonstration
-status: refined
+status: complete
 created: 2026-09-03
 implements: []
 changes: []
@@ -68,3 +68,37 @@ statement about one number no longer describes the demonstration.
 
 [^1]: ADR-0067, the viewer reads the world and never writes to it, decision D2. `docs/adrs/accepted/adr-0067-the-viewer-reads-the-world-and-never-writes-to-it.md`
 [^2]: Decision Record Scope, section 1. `.claude/rules/adr-scope.md`
+
+## Outcome
+
+**The window draws at its own rate and the world runs at the rate a watcher
+chooses.** The control plane holds a clock. The clock states how many ticks a
+frame owes, in thousandths of a tick for each frame, and the frame runs that
+many. It steps nothing itself, so it names no entity and the engine holds no
+copy of it.
+
+**A watcher drives it from four keys.** The space bar pauses and resumes. The
+full stop runs exactly one tick, whether the world is paused or not. The two
+bracket keys move down and up a set of six speeds, from a quarter of a tick for
+each frame to eight ticks for each frame. The frame states the speed beside the
+tick, and the run prints the whole set before it opens the window.
+
+**A paused world still draws.** The camera still moves, the panel still reads
+and the tile panel still answers, because the drawing does not depend on a
+step.
+
+**The determinism rule is untouched.** The clock changes how many steps a frame
+runs. It changes no step. The engine gives one answer for one seed at any
+thread count, and a run at any speed reaches the same state at the same tick
+count.
+
+**The picture path is unchanged.** It steps a named count and writes one file.
+
+A slower speed than one tick for each frame gives the frame a phase, and the
+frame draws a unit that moved between its two tiles at that share.
+
+The work landed under an earlier commit and this item was never moved.[^3]
+
+## References
+
+[^3]: Findings register, FND-526. `docs/FINDINGS.md`
