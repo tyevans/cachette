@@ -354,12 +354,21 @@ than the ground.
    Nothing in the engine names the deposits of a faction, and this item added
    no index for them.
 
-**One deviation from ADR-0152 D5, recorded as a finding.** The engine moves a
-unit by a destination field, and one faction climbs one plane. The order
-therefore decides which project a unit takes, which is the category its build
-order names, and it decides the seed set the faction climbs. It does not decide
-which seed a walking unit reaches. A reviewer of ADR-0152 must decide what D5
-states.
+**One deviation from ADR-0152 D5, now decided.** The engine moves a unit by a
+destination field, and one faction climbs one plane. The order therefore
+decides which project a unit takes, which is the category its build order
+names, and it decides the seed set the faction climbs. It does not decide which
+seed a walking unit reaches.
+
+A reviewer read D5 against the code and ruled that the record was wrong and the
+code was right. A promise of per-unit routing would need a plane for each unit
+or a search from each unit, and three records forbid that form.[^17] [^18]
+[^19] It would also forbid the cheaper algorithm a set-valued command exists to
+buy.[^20] The retcon window of ADR-0152 was closed, because source files cite
+D5, this item was refined against it, and another record depends on ADR-0152.
+The ruling is therefore ADR-0159, which changes ADR-0152 D5 and leaves the
+other decisions of that record standing.[^21] The finding records the outcome
+rather than the question.[^22]
 
 Five balance rows are new, and every one is unset with a provisional value and
 a filled derivation. The road spacing row that the refinement added was
@@ -389,3 +398,9 @@ each.
 [^14]: ADR-0090, a tile upgrade is stored sparsely, decision D1. `docs/adrs/draft/adr-0090-a-tile-upgrade-is-stored-sparsely.md`
 [^15]: ADR-0072, a tile stock is generated, and only what was taken is stored, decision D1. `docs/adrs/accepted/adr-0072-a-tile-stock-is-generated-and-only-what-was-taken-is-stored.md`
 [^16]: Findings register, FND-491. `docs/FINDINGS.md`
+[^17]: ADR-0091, movement takes its direction from a per-cell field, never from a per-unit search, decision D1. `docs/adrs/draft/adr-0091-movement-takes-its-direction-from-a-per-cell-field.md`
+[^18]: ADR-0110, a unit returns by climbing a reach field seeded at every site of its faction, decision D3. `docs/adrs/draft/adr-0110-a-unit-returns-by-climbing-a-reach-field.md`
+[^19]: ADR-0125, the control plane names the seed set of a destination field, decision D3. `docs/adrs/draft/adr-0125-the-control-plane-names-the-seed-set-of-a-destination-field.md`
+[^20]: Project orientation, the design principles. `CLAUDE.md`
+[^21]: ADR-0159, a project order names one category for each unit and one seed set for the faction. `docs/adrs/draft/adr-0159-a-project-order-names-one-category-and-one-seed-set.md`
+[^22]: Findings register, FND-493. `docs/FINDINGS.md`

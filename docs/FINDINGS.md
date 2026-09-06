@@ -11806,6 +11806,9 @@ file.
 [^F490A]: Balance register, the founding group, the base reach and the campaign cohort size. `docs/reference/balance.md`
 [^F491A]: ADR-0152, a faction plans its roads and zones with one solver, decision D2. `docs/adrs/accepted/adr-0152-a-faction-plans-its-roads-and-zones-with-one-solver.md`
 [^F493A]: ADR-0152, a faction plans its roads and zones with one solver, decision D5. `docs/adrs/accepted/adr-0152-a-faction-plans-its-roads-and-zones-with-one-solver.md`
+[^F493B]: ADR-0091, movement takes its direction from a per-cell field, never from a per-unit search, decision D1. `docs/adrs/draft/adr-0091-movement-takes-its-direction-from-a-per-cell-field.md`
+[^F493D]: ADR-0125, the control plane names the seed set of a destination field, decisions D1 and D3. `docs/adrs/draft/adr-0125-the-control-plane-names-the-seed-set-of-a-destination-field.md`
+[^F493E]: ADR-0159, a project order names one category for each unit and one seed set for the faction. `docs/adrs/draft/adr-0159-a-project-order-names-one-category-and-one-seed-set.md`
 [^F491C]: Decision Record Scope, section 4.6. `.agents/rules/adr-scope.md`
 [^F487A]: ADR-0150, held ground is the ground within reach of a city its faction owns, decision D1. `docs/adrs/draft/adr-0150-held-ground-is-the-ground-within-reach-of-a-city-its-faction-owns.md`
 [^F487B]: Recurring defect shapes, shape 1. `.agents/rules/recurring-defects.md`
@@ -11939,36 +11942,48 @@ in this item.
 ### FND-493 — One faction climbs one destination plane, so a verb cannot send each unit to its own place
 
 **Believed.** ADR-0152 D5 states that the order sends each unit to the project
-nearest to it by hex distance.[^F493A] The statement reads as a per-unit
-destination.
+nearest to it by hex distance.[^F493A] The statement reads as a promise of
+per-unit routing: this unit walks to that project.
 
 **True.** The engine moves a unit by a destination field, and a field is one
 plane. The plane of a faction is its faction number, and the campaign and the
 carriers already share it. The send verb takes a set of units, a set of seeds
 and one plane, and every unit on that plane climbs toward the nearest seed of
-the whole set. A per-unit destination would need a plane for each unit.
+the whole set. A per-unit destination would need a plane for each unit. **The
+code is right and the record was wrong.** The order decides the category a
+unit builds and the seed set the faction climbs. The field decides which seed
+a walking unit reaches.
 
 **Evidence.** The send verb is `World::send_units_to` at
-`crates/cachette-core/src/world.rs:1399`, and it writes one seed list for one
-plane. The campaign raise takes the same plane at
-`crates/cachette-core/src/world.rs:9564`, and the carrier assignment takes it
-again. The default world holds four planes.
+`crates/cachette-core/src/world.rs:1410`, and it writes one seed list for one
+plane. The assignment is `World::project_for` at
+`crates/cachette-core/src/world.rs:5631`, and the controller collects its
+answers into one seed list at `World::controller_take_projects`,
+`crates/cachette-core/src/world.rs:10527`. The campaign raise takes the same
+plane, and the carrier assignment takes it again. Three records state the form
+the engine has: the direction comes from a per-cell field and never from a
+per-unit search, the reach counts cells to the nearest seed, and the caller
+names the plane while the engine allocates none.[^F493B] [^F363A] [^F493D]
 
-**Follows.** The assignment rule of D5 decides two things and not three. It
-decides which project a unit takes, which is the category the build order
-names, and it decides the seed set the faction climbs. It does not decide which
-seed a walking unit reaches. A unit whose nearest project by hex distance
-differs from its nearest seed by field distance walks to the second and builds
-what it finds there.
+**Follows.** ADR-0159 states the assignment, and it changes ADR-0152 D5.[^F493E]
+It says that the order names one category for each unit and one seed set for
+the faction, that the field distributes the units, and that no named unit is
+promised a named project. The reasoning is the design principle: a set-valued
+command buys a cheaper algorithm, and a promise of per-unit routing would
+forbid it.[^ORIENT2]
+
+**The retcon window was closed, so the project superseded rather than amended.**
+The window admits an in-place amendment only when nothing depends on the claim
+being changed. Source files cite ADR-0152 D5, backlog item 0488 was refined
+against it, and the registry row of ADR-0156 depends on ADR-0152. The registry
+also says to assume the window closed when in doubt.[^8] ADR-0152 keeps its
+text and its status, in the form ADR-0146 and ADR-0153 already use for a change
+to one decision of another record.
 
 **The rule is still testable, and it is tested where it decides.** The
 assignment is one reader, `World::project_for`, and the controller calls it.
 The test drives that reader rather than the walk, because the walk is the
 field's answer and not the rule's.
-
-**A reviewer of ADR-0152 must decide what D5 states.** The record may say that
-the order seeds the field with the projects the units chose, or a later record
-may replace D5 with the flow field its own consequences already name.[^F493A]
 
 ### FND-492 — A test that reads the work done cannot tell a stopped build from a raised one
 
