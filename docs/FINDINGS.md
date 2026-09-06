@@ -13120,7 +13120,7 @@ recurring-defect rule names, and this is one more local instance of it.[^F483G]
 **Believed.** Three engine changes could put the wealth path out of reach:
 scale the bar by the settlements a faction owns, widen the store type, or drop
 the stock clause.[^F548A] The backlog item repeated them, and a fourth reading
-named a wider accumulator as the smallest change of the three.[^F548B]
+named a wider accumulator as the smallest change of the three.[^F543B]
 
 **True.** The reader already totals in a 64-bit accumulator, and it already
 sums every commodity of every live settlement.[^F548C] **A wider accumulator
@@ -13150,7 +13150,7 @@ code for the part you mean to change, even when a register names it.**
 holds its derivation.[^F543A]
 
 **True.** Two scripts held their own copy of the bar as a whole number, and
-each used its copy to report the share of the bar a faction had reached.[^F549A]
+each used its copy to report the share of the bar a faction had reached.[^F542H]
 [^F549B] Nothing compared the copies against the engine. A change to the
 engine constant would have left both scripts reporting a share against a bar
 the engine no longer held, and every gate would have passed.
@@ -13160,7 +13160,7 @@ constant and the two scripts. The commit body holds the search command.
 
 **What follows.** The binding now exposes the bar, and each script reads it.
 One declaration site remains. This is one more local instance of the first
-recurring defect shape.[^F549C]
+recurring defect shape.[^F526A]
 
 
 ## References
@@ -13178,13 +13178,10 @@ recurring defect shape.[^F549C]
 [^F547A]: Balance register, the wonder work and the win-path share. `docs/reference/balance.md`
 [^F547B]: Findings register, FND-496. `docs/FINDINGS.md`
 [^F548A]: Findings register, FND-543. `docs/FINDINGS.md`
-[^F548B]: Backlog item 0506. `docs/backlog/complete/0506-put-the-wealth-path-out-of-easy-reach.md`
 [^F548C]: The stock total of a faction, which the wealth reader compares. `crates/cachette-core/src/world.rs`
 [^F548D]: ADR-0165, the wealth bar stands above what one settlement can hold. `docs/adrs/draft/adr-0165-the-wealth-bar-stands-above-what-one-settlement-can-hold.md`
 [^F548E]: Findings register, FND-542. `docs/FINDINGS.md`
-[^F549A]: The sweep, which plays a seed set to the tick limit and samples the run. `scripts/balance_sweep.py`
 [^F549B]: The sweep summary. `scripts/balance_summary.py`
-[^F549C]: Recurring Defect Shapes, shape 1. `.agents/rules/recurring-defects.md`
 
 [^F498B]: The controller log, the refusal count and the stage that empties them. `crates/cachette-core/src/controller.rs`
 [^F498D]: ADR-0158, a site builds a typed unit from a bounded queue its store pays for, decision D6. `docs/adrs/accepted/adr-0158-a-site-builds-a-typed-unit-from-a-bounded-queue-its-store-pays-for.md`
