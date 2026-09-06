@@ -40,9 +40,17 @@ const GROUP: u32 = 8;
 /// [^1]: Findings register, FND-191. `docs/FINDINGS.md`
 const GOODS: CommodityId = WORK_COMMODITY[0];
 
-/// The store the seller holds. It is the ceiling of the scale, which is the
-/// extreme a site can reach.
-const FULL: Fix32 = Fix32::MAX;
+/// The store the seller holds.
+///
+/// **It is far above the mark and below the stock target.** A store at the
+/// ceiling of the scale would pass the target that the wealth reader fires
+/// on, the game would end on the first tick, and the controller would then
+/// emit nothing at all.[^1]
+///
+/// # References
+///
+/// [^1]: ADR-0148, a game end is recorded once and stops the controllers, decision D4. `docs/adrs/accepted/adr-0148-a-game-end-is-recorded-once-and-stops-the-controllers.md`
+const FULL: Fix32 = Fix32::from_int(256);
 
 /// The mark that separates a surplus from a shortfall in these tests.
 const MARK: u32 = 8;

@@ -9732,7 +9732,7 @@ impl World {
     ///
     /// # References
     ///
-    /// [^1]: ADR-0146, a faction relation is one signed integer per ordered pair, and a pass reads a threshold, decision D4. `docs/adrs/draft/adr-0146-a-faction-relation-is-one-signed-integer-per-ordered-pair-and-a-pass-reads-a-threshold.md`
+    /// [^1]: ADR-0146, a faction relation is one signed integer per ordered pair, and a pass reads a threshold, decision D4. `docs/adrs/accepted/adr-0146-a-faction-relation-is-one-signed-integer-per-ordered-pair-and-a-pass-reads-a-threshold.md`
     fn controller_match_due(&self, faction: FactionId) -> Option<(FactionId, controller::Terms)> {
         let mine = self.market.board(faction);
         if mine.is_empty() {
