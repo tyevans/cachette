@@ -12359,7 +12359,7 @@ storms themselves must replace it.
 [^F495A]: The queue of a site, and the bound a world enforces. `crates/cachette-core/src/production.rs`
 [^F496A]: Backlog item 0488, the outcome. `docs/backlog/complete/0488-plan-roads-and-zones-with-a-faction-solver-at-the-controller-stage.md`
 [^F496C]: ADR-0144, a faction controller runs inside the step and acts only through the caller's verbs, decisions D4 and D5. `docs/adrs/accepted/adr-0144-a-faction-controller-runs-inside-the-step-and-acts-only-through-the-callers-verbs.md`
-[^F496D]: ADR-0151, an upgrade is a category with a ground fit and a level, decision D2. `docs/adrs/draft/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
+[^F496D]: ADR-0151, an upgrade is a category with a ground fit and a level, decision D2. `docs/adrs/accepted/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
 [^F496E]: Project orientation, the target platform. `CLAUDE.md`
 [^F496J]: ADR-0148, a game end is recorded once and stops the controllers, decision D4. `docs/adrs/accepted/adr-0148-a-game-end-is-recorded-once-and-stops-the-controllers.md`
 [^F496L]: ADR-0125, the control plane names the seed set of a destination field, decision D3. `docs/adrs/draft/adr-0125-the-control-plane-names-the-seed-set-of-a-destination-field.md`
@@ -12370,7 +12370,7 @@ storms themselves must replace it.
 [^F494B]: The census row that counts a filled seat. `crates/cachette-core/src/world.rs`
 [^F494C]: Findings register, FND-486. `docs/FINDINGS.md`
 [^F494F]: Blockers register, BLK-050. `docs/BLOCKERS.md`
-[^F492A]: ADR-0151, an upgrade is a category with a ground fit and a level, decision D3. `docs/adrs/draft/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
+[^F492A]: ADR-0151, an upgrade is a category with a ground fit and a level, decision D3. `docs/adrs/accepted/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
 [^F492B]: Testing rules, section 2a. `.agents/rules/testing.md`
 [^F488A]: The send verb, which names a seed set and a plane. `crates/cachette-core/src/world.rs`
 [^F488B]: ADR-0125, the control plane names the seed set of a destination field. `docs/adrs/draft/adr-0125-the-control-plane-names-the-seed-set-of-a-destination-field.md`

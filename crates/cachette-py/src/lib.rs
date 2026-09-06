@@ -1601,7 +1601,7 @@ impl PyWorld {
     ///
     /// # References
     ///
-    /// [^1]: ADR-0151, an upgrade is a category with a ground fit and a level, decision D1. `docs/adrs/draft/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
+    /// [^1]: ADR-0151, an upgrade is a category with a ground fit and a level, decision D1. `docs/adrs/accepted/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
     /// [^2]: Recurring defect shapes, shape 1. `.agents/rules/recurring-defects.md`
     /// [^3]: ADR-0044, what copies and what does not is declared at the call site. `docs/adrs/REGISTRY.md`
     fn upgrade_table<'py>(&self, python: Python<'py>) -> PyResult<Bound<'py, PyDict>> {
@@ -2058,7 +2058,7 @@ impl PyWorld {
     /// [^4]: Findings register, FND-380. `docs/FINDINGS.md`
     /// [^5]: ADR-0145, a unit type is a row of capability columns, and zero means cannot, decision D2. `docs/adrs/accepted/adr-0145-a-unit-type-is-a-row-of-capability-columns-and-zero-means-cannot.md`
     /// [^6]: ADR-0148, a game end is recorded once and stops the controllers, decision D3. `docs/adrs/accepted/adr-0148-a-game-end-is-recorded-once-and-stops-the-controllers.md`
-    /// [^7]: ADR-0151, an upgrade is a category with a ground fit and a level, decision D2. `docs/adrs/draft/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
+    /// [^7]: ADR-0151, an upgrade is a category with a ground fit and a level, decision D2. `docs/adrs/accepted/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
     fn order_build(&self, units: Vec<u64>, category: u8) -> PyResult<()> {
         let mut world = self.lock();
         let category = UpgradeCategory::from_u8(category)
@@ -2085,7 +2085,7 @@ impl PyWorld {
         // first refusal, and the boundary turns those into an error rather
         // than a silent partial order.
         //
-        // [^8]: ADR-0151, an upgrade is a category with a ground fit and a level, decision D2. `docs/adrs/draft/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
+        // [^8]: ADR-0151, an upgrade is a category with a ground fit and a level, decision D2. `docs/adrs/accepted/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
         if refused > 0 {
             let reason = reason.map_or_else(String::new, |refusal| refusal.to_string());
             return Err(VerbError::new_err(format!(

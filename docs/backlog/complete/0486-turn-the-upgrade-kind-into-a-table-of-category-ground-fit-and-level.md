@@ -256,7 +256,7 @@ which D5 asks for and this item does not do.
 ## References
 
 [^1]: PRD-0055, a god raises the ground its people hold, and sees what stands there. `docs/product/shaped/prd-0055-a-god-raises-the-ground-its-people-hold-and-sees-what-stands-there.md`
-[^2]: ADR-0151, an upgrade is a category with a ground fit and a level, and a build order names the category. `docs/adrs/draft/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
+[^2]: ADR-0151, an upgrade is a category with a ground fit and a level, and a build order names the category. `docs/adrs/accepted/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
 [^3]: Findings register, FND-320. `docs/FINDINGS.md`
 [^4]: ADR-0145, a unit type is a row of capability columns, and zero means cannot, decision D4. `docs/adrs/accepted/adr-0145-a-unit-type-is-a-row-of-capability-columns-and-zero-means-cannot.md`
 [^5]: Recurring Defect Shapes, shape 1. `.agents/rules/recurring-defects.md`
@@ -266,5 +266,5 @@ which D5 asks for and this item does not do.
 [^9]: ADR-0144, a faction controller runs inside the step and acts only through the caller's verbs, decisions D2 and D3. `docs/adrs/accepted/adr-0144-a-faction-controller-runs-inside-the-step-and-acts-only-through-the-callers-verbs.md`
 [^10]: Findings register, FND-011. `docs/FINDINGS.md`
 [^11]: Backlog item 0475. `docs/backlog/proposed/0475-give-an-upgrade-a-condition-that-armies-wear-and-workers-repair.md`
-[^12]: ADR-0151, an upgrade is a category with a ground fit and a level, decision D5. `docs/adrs/draft/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
+[^12]: ADR-0151, an upgrade is a category with a ground fit and a level, decision D5. `docs/adrs/accepted/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
 [^13]: Findings register, FND-492. `docs/FINDINGS.md`

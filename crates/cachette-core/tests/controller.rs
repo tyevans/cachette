@@ -155,7 +155,7 @@ fn the_controller_emits_only_through_the_set_verbs_and_logs_each_command() {
     // A build order the ground refuses reaches nobody, and the controller
     // learns nothing from it.[^1] A seated faction still orders something.
     //
-    // [^1]: ADR-0151, an upgrade is a category with a ground fit and a level, decision D2. `docs/adrs/draft/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
+    // [^1]: ADR-0151, an upgrade is a category with a ground fit and a level, decision D2. `docs/adrs/accepted/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
     assert!(
         log.iter().any(|entry| entry.applied == 1),
         "a seated faction has units to order"

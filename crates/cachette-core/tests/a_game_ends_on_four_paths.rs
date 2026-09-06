@@ -397,7 +397,7 @@ fn a_wonder_ends_the_game_on_the_tick_it_completes_and_not_the_tick_before() {
         // The level rises in place and the work done returns to zero, so
         // the loop reads the level and not the work done.[^2]
         //
-        // [^2]: ADR-0151, an upgrade is a category with a ground fit and a level, decision D3. `docs/adrs/draft/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
+        // [^2]: ADR-0151, an upgrade is a category with a ground fit and a level, decision D3. `docs/adrs/accepted/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
         if world.finished_upgrade(site) == Some(UpgradeCategory::WONDER) {
             break;
         }

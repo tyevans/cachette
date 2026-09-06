@@ -72,7 +72,7 @@ Filled in when the item moves to `complete/`.
 
 [^1]: Design: the living world game layer, sections 6 and 13. `docs/superpowers/specs/2026-09-05-living-world-game-layer-design.md`
 [^2]: Balance register. `docs/reference/balance.md`
-[^3]: ADR-0151, an upgrade is a category with a ground fit and a level, and a build order names the category, decisions D3 and D6. `docs/adrs/draft/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
+[^3]: ADR-0151, an upgrade is a category with a ground fit and a level, and a build order names the category, decisions D3 and D6. `docs/adrs/accepted/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
 [^4]: ADR Registry. `docs/adrs/REGISTRY.md`
 [^5]: Blockers register, BLK-036. `docs/BLOCKERS.md`
 [^6]: Findings register, FND-320. `docs/FINDINGS.md`

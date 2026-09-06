@@ -105,4 +105,4 @@ Filled in when the item moves to `complete/`.
 [^2]: ADR-0158, a site builds a typed unit from a bounded queue its store pays for, the consequences. `docs/adrs/draft/adr-0158-a-site-builds-a-typed-unit-from-a-bounded-queue-its-store-pays-for.md`
 [^3]: PRD-0014, everyone needs somewhere to live. `docs/product/accepted/prd-0014-everyone-needs-somewhere-to-live.md`
 [^4]: Recurring Defect Shapes, shape 1. `.agents/rules/recurring-defects.md`
-[^5]: ADR-0151, an upgrade is a category with a ground fit and a level. `docs/adrs/draft/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
+[^5]: ADR-0151, an upgrade is a category with a ground fit and a level. `docs/adrs/accepted/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`

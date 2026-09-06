@@ -237,7 +237,7 @@ impl BuildCostRow {
 /// # References
 ///
 /// [^1]: ADR-0120, a unit carries a type that indexes a table, decision D1. `docs/adrs/draft/adr-0120-a-unit-carries-a-type-that-indexes-a-table.md`
-/// [^2]: ADR-0151, an upgrade is a category with a ground fit and a level, decision D1. `docs/adrs/draft/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
+/// [^2]: ADR-0151, an upgrade is a category with a ground fit and a level, decision D1. `docs/adrs/accepted/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct BuildCostTable {
     rows: [BuildCostRow; UNIT_TYPE_COUNT],

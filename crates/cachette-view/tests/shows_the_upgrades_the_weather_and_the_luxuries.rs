@@ -1032,7 +1032,7 @@ fn two_levels_of_one_category_draw_apart() {
     // washes at the same weight as a road at the top of its category, so the
     // two drew one picture.[^7]
     //
-    // [^7]: ADR-0151, an upgrade is a category with a ground fit and a level, decision D5. `docs/adrs/draft/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
+    // [^7]: ADR-0151, an upgrade is a category with a ground fit and a level, decision D5. `docs/adrs/accepted/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
     let (lower, higher, address) = two_sites(
         Target::standing(UpgradeCategory::ROAD, 1),
         Target::standing(UpgradeCategory::ROAD, 2),

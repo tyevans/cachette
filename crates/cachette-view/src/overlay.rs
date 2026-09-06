@@ -437,7 +437,7 @@ impl Layer for HolderLayer {
 /// # References
 ///
 /// [^1]: Recurring Defect Shapes, shape 1. `.agents/rules/recurring-defects.md`
-/// [^2]: ADR-0151, an upgrade is a category with a ground fit and a level, decisions D1 and D5. `docs/adrs/draft/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
+/// [^2]: ADR-0151, an upgrade is a category with a ground fit and a level, decisions D1 and D5. `docs/adrs/accepted/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
 struct Upgrade;
 
 impl Layer for Upgrade {

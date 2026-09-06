@@ -11,7 +11,7 @@
 //!
 //! # References
 //!
-//! [^1]: ADR-0151, an upgrade is a category with a ground fit and a level, decisions D1 to D4. `docs/adrs/draft/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
+//! [^1]: ADR-0151, an upgrade is a category with a ground fit and a level, decisions D1 to D4. `docs/adrs/accepted/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
 //! [^2]: Testing rules, section 6. `.agents/rules/testing.md`
 //! [^3]: Testing rules, section 2a. `.agents/rules/testing.md`
 
@@ -216,7 +216,7 @@ fn the_pass_resolves_the_row_again_on_every_step() {
     // returns to zero at a raise and counts up again, so a build that ran on
     // can show the work it showed before.[^2]
     //
-    // [^1]: ADR-0151, an upgrade is a category with a ground fit and a level, decision D2. `docs/adrs/draft/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
+    // [^1]: ADR-0151, an upgrade is a category with a ground fit and a level, decision D2. `docs/adrs/accepted/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
     // [^2]: Testing rules, section 2a. `.agents/rules/testing.md`
     let mut field = world(SEED);
     let address = island(&field);
@@ -436,7 +436,7 @@ fn the_gather_pass_honours_a_row_that_no_code_names() {
     // in the engine names that category, and no code holds a rule for it. The
     // gather resolve must still add its yield column.[^1]
     //
-    // [^1]: ADR-0151, an upgrade is a category with a ground fit and a level, decision D4. `docs/adrs/draft/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
+    // [^1]: ADR-0151, an upgrade is a category with a ground fit and a level, decision D4. `docs/adrs/accepted/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
     let kind = ResourceKind::Wood;
     let plain = world(SEED);
     let address = island_with_stock(&plain, kind);
