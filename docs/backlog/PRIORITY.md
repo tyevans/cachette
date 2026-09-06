@@ -130,7 +130,7 @@ These are real and none of them blocks anything today.
 | 0225 | The skip that made the record check read nothing from a worktree is repaired, and the two guards this item asked for are not: the check states no source file count, and nothing drives it from a skipped path. So one line of code holds the repair and a later edit can undo it in silence. |
 | 0135 | The deposit amount reader has no caller, and the record now rests on the step order instead. |
 | 0077 | The batched structural path, once its record exists. |
-| 0145 | The faction count states what zero means at the point of use rather than through one reader, so every site declares the rule again. FND-539 holds the reading and the count, which is wider than this row used to claim. Item 0080 may absorb it. |
+| 0145 | The faction count states what zero means at the point of use rather than through one reader, so every site declares the rule again. FND-541 holds the reading and the count, which is wider than this row used to claim. Item 0080 may absorb it. |
 | 0036 | How a watcher reads a count of the whole world. |
 | 0043 | How a level 1 cell is repaired. |
 | 0041 | Read the ground once for each target. |

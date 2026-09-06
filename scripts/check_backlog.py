@@ -23,7 +23,7 @@ that, and the register records what the absence of such a check has cost.[^3]
 
 [^1]: Backlog guide. `docs/backlog/README.md`
 [^2]: Recurring Defect Shapes, shape 1. `.agents/rules/recurring-defects.md`
-[^3]: Findings register, FND-526 and FND-538. `docs/FINDINGS.md`
+[^3]: Findings register, FND-526 and FND-540. `docs/FINDINGS.md`
 """
 
 import re
