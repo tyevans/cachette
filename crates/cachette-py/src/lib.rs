@@ -407,6 +407,33 @@ impl PyWorld {
         self.lock().grid().height()
     }
 
+    /// The seed the world was built from, as an integer.
+    ///
+    /// This is the value the constructor took for `seed`. It never changes.
+    /// The value is an unsigned 64-bit number.
+    ///
+    /// **A run can record which world it ran.** A caller that draws a seed
+    /// held that number twice before this reader existed, once for the world
+    /// and once for whatever else needed it, and nothing failed when the two
+    /// copies disagreed.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: Recurring defect shapes, shape 1. `.agents/rules/recurring-defects.md`
+    #[getter]
+    fn seed(&self) -> u64 {
+        self.lock().config().seed
+    }
+
+    /// The number of factions the world holds, as an integer.
+    ///
+    /// This is the value the constructor took for `faction_count`. It never
+    /// changes. A faction identifier runs from zero to one below it.
+    #[getter]
+    fn faction_count(&self) -> u16 {
+        self.lock().faction_count()
+    }
+
     /// The number of steps the world has run, as an integer.
     ///
     /// A new world is at tick zero. Each `step` call adds one.

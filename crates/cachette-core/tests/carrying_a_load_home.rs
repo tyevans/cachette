@@ -21,9 +21,10 @@
 //! [^4]: Testing rules, sections 1 and 2a. `.claude/rules/testing.md`
 
 use cachette_core::choose::{self, CarryClass};
+use cachette_core::cohort::NeedRule;
 use cachette_core::hex::Axial;
-use cachette_core::resource::Amount;
-use cachette_core::types::{FactionId, Fix32, TileIdx};
+use cachette_core::resource::{Amount, ResourceKind};
+use cachette_core::types::{Entity, FactionId, Fix32, TileIdx};
 use cachette_core::world::{World, WorldConfig};
 
 /// The option index of the row that carries a load home.
@@ -395,4 +396,153 @@ fn the_step_of_a_laden_unit_follows_the_return_field() {
         "the step sent every unit the fixture freed on all {ATTEMPTS} attempts, \
          so the assertion read none"
     );
+}
+
+/// The seeds the last-mile test runs.
+///
+/// The relaxation of the fine field stays inside one block. A world where the
+/// ground between the unit and its home leaves that block holds no offset for
+/// the unit, and the unit there reads the coarse field, which is the answer it
+/// read before the fine field existed. Several seeds keep one such world from
+/// deciding the test.
+const LAST_MILE_SEEDS: [u64; 4] = [1, 2, 5, 7];
+
+/// The ticks the last-mile test gives the unit to fill its carry.
+const LAST_MILE_GATHER: u32 = 4096;
+
+/// The ticks the last-mile test gives the unit to walk home.
+const LAST_MILE_WALK: u32 = 2000;
+
+/// The walk between the unit and its home, in tiles.
+const LAST_MILE_SPAN: u32 = 40;
+
+#[test]
+fn a_laden_unit_reaches_the_tile_of_its_home_and_not_only_the_cell() {
+    // **The delivery reads the tile the unit stands on.** The return field
+    // holds one direction for a block of tiles, so it steers a laden unit to
+    // the cell that holds a site and says nothing inside it. The unit then
+    // drew a direction at random and never stood on the tile, so it never
+    // delivered.[^1]
+    //
+    // The test asserts the delivery, which is the thing the carrier is for.
+    // An assertion on the cell held through the whole defect.[^2]
+    //
+    // [^1]: Findings register, FND-315. `docs/FINDINGS.md`
+    // [^2]: Testing rules, section 2. `.claude/rules/testing.md`
+    let mut delivered = 0;
+    let mut laden = 0;
+    for seed in LAST_MILE_SEEDS {
+        let mut world = World::new(WorldConfig {
+            width: 256,
+            height: 256,
+            seed,
+            faction_count: 2,
+            ..Default::default()
+        })
+        .expect("the world builds");
+        // Nothing starves and nothing eats, so the test measures the walk.
+        world.set_need_rule(
+            NeedRule::new(
+                Fix32::ZERO,
+                Fix32::ZERO,
+                Fix32::ZERO,
+                Fix32::ZERO,
+                Fix32::MAX,
+            )
+            .expect("no rate is below zero"),
+        );
+        let Some(home) = a_tile_that_carries_food(&world) else {
+            continue;
+        };
+        let site = world
+            .found_settlement(home, FactionId(0))
+            .expect("the ground admits a settlement");
+        let away = ground_at(&world, home, LAST_MILE_SPAN);
+        let unit = world
+            .spawn_soldier(away, FactionId(0))
+            .expect("the ground admits the unit");
+        // The unit gathers with no home, so it holds a load when it is given
+        // one. The gather resolve runs before the delivery in a frame.
+        let mark = world.carry_mark().0;
+        for _ in 0..LAST_MILE_GATHER {
+            if carried_food(&world, unit) >= mark {
+                break;
+            }
+            world.order_gather(unit, ResourceKind::Food);
+            world.step(1).expect("the step runs");
+        }
+        // **A unit below the carry mark is free, and the deliver row is worth
+        // nothing to it.** Such a unit roams, and a test that counted it
+        // would measure the roam.[^3]
+        //
+        // [^3]: Testing rules, section 2a. `.claude/rules/testing.md`
+        if carried_food(&world, unit) < mark {
+            continue;
+        }
+        assert!(world.set_home_site(unit, Some(site)), "the unit takes home");
+        laden += 1;
+        for _ in 0..LAST_MILE_WALK {
+            world.step(1).expect("the step runs");
+            if world.soldiers().address(unit).is_none() {
+                break;
+            }
+            if carried_food(&world, unit) == 0 {
+                delivered += 1;
+                break;
+            }
+        }
+    }
+    assert!(
+        laden > 0,
+        "the fixture produced no laden unit, so it measures nothing"
+    );
+    assert_eq!(
+        delivered, laden,
+        "every laden unit must reach the tile of its home and deliver there"
+    );
+}
+
+/// Returns the food that one unit carries.
+fn carried_food(world: &World, unit: Entity) -> u32 {
+    world
+        .soldiers()
+        .carry(unit)
+        .map_or(0, |load| load.of(ResourceKind::Food).0)
+}
+
+/// Returns the first open address that carries food.
+fn a_tile_that_carries_food(world: &World) -> Option<Axial> {
+    let grid = world.grid();
+    for index in 0..grid.tile_count() {
+        let address = Axial::new((index % grid.width()) as i32, (index / grid.width()) as i32);
+        if !world.admits_a_unit(address) {
+            continue;
+        }
+        if world
+            .tile_stock(address, ResourceKind::Food)
+            .is_some_and(|stock| stock.0 > 0)
+        {
+            return Some(address);
+        }
+    }
+    None
+}
+
+/// Returns the nearest open address at or beyond a walk from another.
+fn ground_at(world: &World, from: Axial, span: u32) -> Axial {
+    let grid = world.grid();
+    let mut best: Option<(u32, Axial)> = None;
+    for q in 0..grid.width() as i32 {
+        for r in 0..grid.height() as i32 {
+            let at = Axial::new(q, r);
+            if !world.admits_a_unit(at) {
+                continue;
+            }
+            let reach = from.distance(at);
+            if reach >= span && best.is_none_or(|(held, _)| reach < held) {
+                best = Some((reach, at));
+            }
+        }
+    }
+    best.expect("the world holds ground that far away").1
 }

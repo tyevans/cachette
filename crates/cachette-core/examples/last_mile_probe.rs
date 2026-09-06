@@ -23,6 +23,9 @@ use cachette_core::{Axial, Entity, FactionId, Fix32, World, WorldConfig};
 /// The extent of the probe world.
 const EXTENT: u32 = 256;
 
+/// The ticks the probe gives the unit to fill its carry.
+const GATHER_TICKS: u32 = 4096;
+
 /// Returns the value of a named argument, or the fallback.
 fn number(name: &str, fallback: u64) -> u64 {
     let mut args = std::env::args().skip(1);
@@ -117,7 +120,23 @@ fn main() {
     let unit: Entity = world
         .spawn_soldier(away, FactionId(0))
         .expect("the ground admits the unit");
-    for _ in 0..64 {
+    // **The unit gathers until it is laden, and the probe asserts that it
+    // is.** The deliver option is worth nothing to a unit below the carry
+    // mark, so a unit that gathered a little roams instead of going home,
+    // and the probe then measures the roam. The first draft of this probe
+    // gathered a fixed count, reached twenty against a mark of thirty-two,
+    // and measured nothing.[^2]
+    //
+    // [^2]: Testing rules, section 2a. `.agents/rules/testing.md`
+    let mark = world.carry_mark().0;
+    for _ in 0..GATHER_TICKS {
+        if world
+            .soldiers()
+            .carry(unit)
+            .is_some_and(|load| load.of(ResourceKind::Food).0 >= mark)
+        {
+            break;
+        }
         world.order_gather(unit, ResourceKind::Food);
         world.step(1).expect("the step must run");
     }
@@ -141,8 +160,11 @@ fn main() {
          {} tiles away, carrying {carried}",
         home.distance(at)
     );
-    if carried == 0 {
-        println!("  the unit gathered nothing, so the probe measured nothing");
+    if carried < mark {
+        println!(
+            "  the unit carries {carried} against a mark of {mark}, so it is not laden \
+             and the probe measured nothing"
+        );
         return;
     }
 

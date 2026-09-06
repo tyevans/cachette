@@ -235,11 +235,9 @@ class Demo:
         """Build the state the control plane holds between frames.
 
         The namer turns an index, an address and an identity into words. It
-        comes from the caller and not from the world, because the engine
-        publishes no way to ask a world for the seed it was built from. The
-        caller therefore holds the seed twice, once for the world and once for
-        the namer, and it must pass one number to both. A property on the
-        world that gave back its seed would remove that second site.
+        comes from the caller and not from the world, because a namer holds
+        more than a seed. The caller builds it from the seed of the world,
+        which the world now gives back, so one number reaches both.
         """
         self.world = world
         self.names = names
@@ -829,11 +827,10 @@ def main(argv: list[str] | None = None) -> int:
     # keeps the height of a window.
     tall = bool(arguments.picture) and not panels
     default_height = PICTURE_HEIGHT if tall else WINDOW_HEIGHT
-    # **One number builds the world and names the things in it.** The engine
-    # publishes no way to ask a world for its seed, so the seed reaches the
-    # namer from here rather than from the world. A world built from one seed
-    # and a namer built from another would name a story that did not happen,
-    # and nothing would fail.
+    # **One number builds the world and names the things in it.** The namer
+    # now takes the seed from the world, so the number is declared once. A
+    # world built from one seed and a namer built from another would name a
+    # story that did not happen, and nothing would fail.
     # The engine holds the rule for what describes a world, and it refuses
     # here rather than in a traceback. A watcher who typed a weather pitch of
     # three reads one sentence and tries again.
@@ -849,7 +846,7 @@ def main(argv: list[str] | None = None) -> int:
         return 2
     demo = Demo(
         world,
-        Names(seed),
+        Names(world.seed),
         width=arguments.width,
         height=arguments.height or default_height,
         threads=arguments.threads,
