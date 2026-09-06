@@ -144,7 +144,6 @@ fn a_faction_that_never_settles_still_leaves_the_world_readable() {
     }
     for tick in 0..128 {
         world.step(THREADS).expect("the step runs");
-        draw(&world)
-            .unwrap_or_else(|error| panic!("tick {tick}: the reader was refused: {error}"));
+        draw(&world).unwrap_or_else(|error| panic!("tick {tick}: the reader was refused: {error}"));
     }
 }

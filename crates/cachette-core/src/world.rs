@@ -34,6 +34,7 @@ use crate::choose::{
     self, CarryClass, ChoiceError, ChoiceExplanation, ChoiceSchedule, NeedBuckets, Ranked,
     WeightProfile, OPTIONS,
 };
+use crate::climate::{Climate, ClimateField};
 use crate::cohort::{
     self, CohortError, CohortTable, DeathPlane, DrawLedger, NeedCondition, NeedRule, SiteRationed,
     UnitStarved,
@@ -105,7 +106,6 @@ use crate::upgrade::{
     self, BuildRefusal, UpgradeCategory, UpgradeMap, UpgradeRow, UpgradeSite, UpgradeTable,
     UpgradeTableError,
 };
-use crate::climate::{Climate, ClimateField};
 use crate::weather::{CellGround, Ground, Storm, WeatherError, WeatherField, WeatherScale, Wind};
 
 /// The reason that a value did not name a live entity.

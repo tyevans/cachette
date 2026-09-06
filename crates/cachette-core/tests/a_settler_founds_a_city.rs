@@ -75,7 +75,10 @@ fn settler_at(field: &mut World, address: Axial, faction: FactionId) -> Entity {
     let unit = field
         .spawn_soldier(address, faction)
         .expect("the ground admits a unit");
-    assert!(field.set_unit_type(unit, SETTLER), "the row is in the table");
+    assert!(
+        field.set_unit_type(unit, SETTLER),
+        "the row is in the table"
+    );
     unit
 }
 
@@ -108,7 +111,11 @@ fn a_settler_founds_a_city_and_the_founding_spends_it() {
     let founding = outcomes[0]
         .founding()
         .expect("a settler at the founding distance founds");
-    assert_eq!(founding.place(), place, "the city stands where the unit did");
+    assert_eq!(
+        founding.place(),
+        place,
+        "the city stands where the unit did"
+    );
     assert_eq!(field.settlements().len(), before + 1);
     assert!(
         !field.soldiers().contains(settler),
@@ -138,7 +145,11 @@ fn a_settler_inside_the_founding_distance_is_refused() {
         &Err(SettleError::TooCloseToACity(place)),
         "the refusal names the distance and not the ground"
     );
-    assert_eq!(field.settlements().len(), before, "a refusal changes nothing");
+    assert_eq!(
+        field.settlements().len(),
+        before,
+        "a refusal changes nothing"
+    );
     assert!(
         field.soldiers().contains(settler),
         "a refused settler keeps its life"
@@ -171,8 +182,15 @@ fn a_unit_whose_settle_column_is_zero_is_refused() {
         &Err(SettleError::NotASettler(worker)),
         "the verb reads the settle column and not the type index"
     );
-    assert_eq!(outcomes[1].result(), &Err(SettleError::NotASettler(soldier)));
-    assert_eq!(field.settlements().len(), before, "a refused set founds nothing");
+    assert_eq!(
+        outcomes[1].result(),
+        &Err(SettleError::NotASettler(soldier))
+    );
+    assert_eq!(
+        field.settlements().len(),
+        before,
+        "a refused set founds nothing"
+    );
 }
 
 #[test]

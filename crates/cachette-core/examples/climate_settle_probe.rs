@@ -6,19 +6,16 @@
 //! the tick before. When that movement falls and stays low, the climate has
 //! settled and a spin may stop there.
 //!
-//! The probe also reports the wall time of the run. **The figure is a
-//! measurement on this machine and not on the target platform**, so it
-//! misleads on false sharing and on alignment.[^1] It is reported so that a
-//! reader knows the order of the cost, not the cost.
+//! The probe reads no clock. A time budget makes a result depend on the load
+//! of the machine, and the record bans the clock for that reason.[^1] A reader
+//! who wants the wall time runs the probe under a timing command.
 //!
 //! Run the probe with `cargo run --release -p cachette-core --example
 //! climate_settle_probe`.
 //!
 //! # References
 //!
-//! [^1]: Project orientation, the target platform. `AGENTS.md`
-
-use std::time::Instant;
+//! [^1]: ADR-0005, a solver runs a fixed iteration count, decision D1. `docs/adrs/accepted/adr-0005-a-solver-runs-a-fixed-iteration-count.md`
 
 use cachette_core::bridge::BlockLayout;
 use cachette_core::climate::{base_ground_of, CellClimate, Climate, WARM_UP_TICKS};
@@ -65,9 +62,7 @@ fn run(width: u32, height: u32, label: &str) {
     let lattice =
         Grid::new(layout.blocks_wide(), layout.blocks_high()).expect("the lattice is valid");
 
-    let fold_started = Instant::now();
     let ground = base_ground_of(layout, terrain);
-    let fold_elapsed = fold_started.elapsed();
 
     let mut weather = WeatherField::new(lattice, scale, 1).expect("the weather builds");
     let mut cells = vec![CellClimate::EMPTY; ground.len()];
@@ -84,7 +79,6 @@ fn run(width: u32, height: u32, label: &str) {
         "tick  mean warmth  mean wetness  warmth move  wetness move  wet cells   offset move  flipped"
     );
 
-    let started = Instant::now();
     for tick in 1..=TICKS {
         weather
             .solve(Tick(tick), SEED, &ground, 1)
@@ -149,13 +143,6 @@ fn run(width: u32, height: u32, label: &str) {
             );
         }
     }
-    let elapsed = started.elapsed();
-    println!(
-        "fold {} ms, {TICKS} ticks {} ms, one tick {} us",
-        fold_elapsed.as_millis(),
-        elapsed.as_millis(),
-        elapsed.as_micros() / u128::from(TICKS),
-    );
     let spread: i64 = cells.iter().map(|cell| cell.season_spread()).sum();
     println!(
         "mean season spread {}\n",
