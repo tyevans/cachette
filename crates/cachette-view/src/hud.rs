@@ -67,6 +67,17 @@ use crate::panel::{
 /// [^1]: ADR-0070, the head-up display reports what the drawing pass read, decision D2. `docs/adrs/accepted/adr-0070-the-head-up-display-reports-what-the-drawing-pass-read.md`
 pub(crate) const NOT_MEASURED: &str = "not measured yet";
 
+/// What the key says when the overlay found nothing in the window.
+///
+/// **An empty overlay and a broken overlay draw the same picture.** The key
+/// therefore says which one a watcher is looking at, in words, rather than
+/// leaving the watcher to guess from an unwashed map.[^1]
+///
+/// # References
+///
+/// [^1]: Backlog item 0278, say what the demonstration world never produced. `docs/backlog/proposed/0278-say-what-the-demonstration-world-never-produced.md`
+pub const OVERLAY_FOUND_NOTHING: &str = "nothing here. not broken.";
+
 /// Returns a mean and a worst in microseconds, or the words that say neither
 /// was taken.
 fn pair_of_micros(mean: f64, worst: f64, count: u64) -> String {
@@ -650,6 +661,12 @@ pub struct Readout {
     frames_measured: u64,
     rate: f64,
     busy: f64,
+    /// What the drawing pass painted of the overlay, when a caller chose one.
+    ///
+    /// The key names the overlay, the low and the high it declared, and
+    /// whether the pass found anything. A key that named only the span could
+    /// not tell an empty overlay from a broken one.
+    overlay: Option<crate::overlay::Reading>,
 }
 
 impl Readout {
@@ -715,6 +732,7 @@ impl Readout {
             // window. The camera reports that tile, and the engine reports
             // the cell. Neither number is the viewer's.
             canvas_height: canvas.height(),
+            overlay: canvas.overlay(),
             region: world.summary_covering(
                 camera.tile_at(canvas.width() as f32 / 2.0, canvas.height() as f32 / 2.0),
             ),
@@ -870,6 +888,54 @@ impl Readout {
     #[must_use]
     pub const fn crowd_worst(&self) -> u32 {
         self.crowd_worst
+    }
+
+    /// Returns what the pass painted of the overlay, when a caller chose one.
+    #[must_use]
+    pub const fn overlay(&self) -> Option<crate::overlay::Reading> {
+        self.overlay
+    }
+
+    /// Returns what the key says about the overlay that is on.
+    ///
+    /// **The colour key names what the colours mean while an overlay is on.**
+    /// An overlay states its own scale, so a fixed key would name the wrong
+    /// scale for every overlay but one.
+    ///
+    /// The last row says what the pass met in the window. An overlay that
+    /// found nothing says so in words, because an empty overlay and a broken
+    /// overlay otherwise draw the same picture.[^1]
+    ///
+    /// **Both layouts read this one function**, so the words on the window and
+    /// the words in a written picture cannot disagree.[^2]
+    ///
+    /// # References
+    ///
+    /// [^1]: Backlog item 0278, say what the demonstration world never produced. `docs/backlog/proposed/0278-say-what-the-demonstration-world-never-produced.md`
+    /// [^2]: ADR-0070, the head-up display reports what the drawing pass read, decision D1. `docs/adrs/accepted/adr-0070-the-head-up-display-reports-what-the-drawing-pass-read.md`
+    #[must_use]
+    pub fn overlay_key(&self) -> Vec<(String, String)> {
+        let Some(reading) = self.overlay else {
+            return Vec::new();
+        };
+        let mut rows = vec![
+            ("overlay".to_string(), reading.name.to_string()),
+            ("the unit".to_string(), reading.unit.to_string()),
+            ("no colour at".to_string(), reading.span.low.to_string()),
+            ("full colour at".to_string(), reading.span.high.to_string()),
+        ];
+        rows.push(if reading.found_nothing() {
+            (
+                "in the window".to_string(),
+                OVERLAY_FOUND_NOTHING.to_string(),
+            )
+        } else {
+            (
+                "in the window".to_string(),
+                format!("{} to {}", reading.lowest, reading.highest),
+            )
+        });
+        rows
     }
 
     /// Returns the painted tiles that hold at least as many units as they
@@ -1296,6 +1362,11 @@ enum Line {
     Heading(&'static str),
     /// A label on the left and a value against the right edge.
     Row(&'static str, String),
+    /// A row whose label the panel builds rather than holds.
+    ///
+    /// An overlay states its own name and its own unit, so the label of a row
+    /// that names one is not a constant of this module.
+    Text(String, String),
     /// A colour swatch, the faction it stands for, and its count.
     Legend(usize, u32),
     /// A colour swatch, the kind of ground it stands for, and its count.
@@ -1315,6 +1386,7 @@ impl Line {
             Self::Note(_)
             | Self::Heading(_)
             | Self::Row(_, _)
+            | Self::Text(_, _)
             | Self::Legend(_, _)
             | Self::Ground(_, _)
             | Self::Founded(_, _) => LINE,
@@ -1351,6 +1423,7 @@ pub fn says(readout: &Readout) -> Vec<String> {
             Line::Rule | Line::Bar => None,
             Line::Title(text) | Line::Note(text) | Line::Heading(text) => Some((*text).to_owned()),
             Line::Row(label, value) => Some(format!("{label}: {value}")),
+            Line::Text(label, value) => Some(format!("{label}: {value}")),
             Line::Legend(faction, count) => Some(format!("faction {faction}: {count}")),
             Line::Ground(kind, count) => Some(format!("{}: {count}", name_of(*kind))),
             Line::Founded(faction, value) => Some(format!("faction {}: {value}", faction.0)),
@@ -1587,6 +1660,18 @@ impl Readout {
                 Line::Row("open share", fraction(region.open_share())),
                 Line::Row("mean height", fraction(region.mean_height())),
             ]);
+        }
+
+        // The overlay the caller chose, and the scale it declared. The
+        // section is absent when no overlay is on, because a heading with no
+        // row under it says that something is missing.
+        let overlay_key = self.overlay_key();
+        if !overlay_key.is_empty() {
+            lines.push(Line::Rule);
+            lines.push(Line::Heading("THE OVERLAY ON THE MAP"));
+            for (label, value) in overlay_key {
+                lines.push(Line::Text(label, value));
+            }
         }
 
         lines.push(Line::Rule);
@@ -2279,6 +2364,7 @@ fn paint_line(
             panel::write_fitted(canvas, left, right, pen, name, 1, HEADING);
         }
         Line::Row(label, value) => row(canvas, left, right, pen, label, value),
+        Line::Text(label, value) => row(canvas, left, right, pen, label, value),
         Line::Legend(slot, count) => legend_row(canvas, left, right, pen, *slot, *count),
         Line::Ground(kind, count) => ground_row(canvas, left, right, pen, *kind, *count),
         Line::Founded(faction, value) => founded_row(canvas, left, right, pen, *faction, value),

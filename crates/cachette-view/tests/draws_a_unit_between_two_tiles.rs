@@ -108,7 +108,8 @@ fn move_unit(world: &mut World, unit: Entity, to: Axial) {
 /// Draws one frame at a pace, and returns the canvas.
 fn frame(world: &World, camera: Camera, motion: &mut Motion, pace: Pace) -> Canvas<'static> {
     let mut canvas = Canvas::new(CANVAS, CANVAS);
-    draw_paced(world, camera, &mut canvas, pace, motion).expect("the bridge describes the arena");
+    draw_paced(world, camera, &mut canvas, pace, motion, None)
+        .expect("the bridge describes the arena");
     canvas
 }
 
@@ -336,6 +337,7 @@ fn the_window_and_the_panel_name_each_speed_beside_the_tick() {
                 &metrics,
                 &[],
                 overlay,
+                None,
                 Pace::new(0.0, speed_milli),
                 &mut motion,
                 &mut canvas,

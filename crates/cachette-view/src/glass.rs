@@ -736,6 +736,14 @@ fn best_score(answer: &cachette_core::ChoiceExplanation) -> String {
 /// [^2]: ADR-0070, the head-up display reports what the drawing pass read, decision D1. `docs/adrs/accepted/adr-0070-the-head-up-display-reports-what-the-drawing-pass-read.md`
 fn colour_card(readout: &Readout) -> Card {
     let mut rows = Vec::with_capacity(COLOURED_FACTIONS + KIND_COUNT);
+    // **The overlay speaks first, because it is the layer a watcher just
+    // switched on.** An overlay states its own scale, so a key that named a
+    // fixed set of layers would name the wrong scale for every overlay but
+    // one. The rows come from the readout, so the window and a written
+    // picture say the same words.
+    for (label, value) in readout.overlay_key() {
+        rows.push(Row::new(&label, value));
+    }
     for (slot, count) in readout
         .by_faction()
         .iter()

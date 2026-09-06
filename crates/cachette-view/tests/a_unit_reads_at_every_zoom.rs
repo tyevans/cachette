@@ -266,14 +266,14 @@ fn a_unit_shows_the_tile_it_came_from() {
     let mut canvas = Canvas::new(CANVAS.0, CANVAS.1);
     let camera = Camera::at_tile_size(32.0).looking_at(from, &canvas);
     let mut motion = Motion::for_frame(CANVAS.0, CANVAS.1);
-    paint::draw_paced(&world, camera, &mut canvas, Pace::STILL, &mut motion)
+    paint::draw_paced(&world, camera, &mut canvas, Pace::STILL, &mut motion, None)
         .expect("the first frame draws");
 
     world
         .place_soldier(unit, to)
         .expect("the neighbour admits the unit");
     world.rebuild_bridge(2).expect("the bridge rebuilds");
-    paint::draw_paced(&world, camera, &mut canvas, Pace::STILL, &mut motion)
+    paint::draw_paced(&world, camera, &mut canvas, Pace::STILL, &mut motion, None)
         .expect("the second frame draws");
 
     // The middle of the two tile centres lies on the line and outside both

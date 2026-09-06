@@ -164,6 +164,7 @@ fn write(
             &Metrics::start(),
             outcomes,
             Overlay::Glass { reference },
+            None,
             Pace::STILL,
             motion,
             canvas,

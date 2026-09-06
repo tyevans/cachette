@@ -52,6 +52,7 @@ use cachette_core::terrain::{TileKind, KIND_COUNT};
 use cachette_core::upgrade::{UpgradeKind, UpgradeSite, UPGRADE_KIND_COUNT};
 use cachette_core::{Axial, BridgeError, Entity, FactionId, Holder, World};
 
+use crate::overlay::{self, Layer};
 use crate::text;
 use crate::tween::{between, Motion, Pace};
 
@@ -716,6 +717,10 @@ pub struct Canvas<'a> {
     units_housed: u32,
     foundings_marked: u32,
     focus: Option<Focus>,
+    /// What the pass painted of the overlay the caller chose, when it chose
+    /// one. The key reads this, so the words a watcher sees come from the
+    /// pass that painted the picture and not from a second reading.
+    overlay: Option<overlay::Reading>,
 }
 
 impl<'a> Canvas<'a> {
@@ -752,6 +757,7 @@ impl<'a> Canvas<'a> {
             units_housed: 0,
             foundings_marked: 0,
             focus: None,
+            overlay: None,
         }
     }
 
@@ -809,6 +815,7 @@ impl<'a> Canvas<'a> {
             units_housed: 0,
             foundings_marked: 0,
             focus: None,
+            overlay: None,
         }
     }
 
@@ -1109,6 +1116,20 @@ impl<'a> Canvas<'a> {
         self.focus
     }
 
+    /// Returns what the pass painted of the overlay, when a caller chose one.
+    ///
+    /// The span is what the overlay declared, and the lowest and the highest
+    /// are what the pass met. The key names all three, so an overlay that
+    /// found nothing says so rather than looking broken.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0070, the head-up display reports what the drawing pass read, decision D2. `docs/adrs/accepted/adr-0070-the-head-up-display-reports-what-the-drawing-pass-read.md`
+    #[must_use]
+    pub const fn overlay(&self) -> Option<overlay::Reading> {
+        self.overlay
+    }
+
     pub fn block(&mut self, x: i32, y: i32, width: i32, height: i32, colour: u32) {
         self.fill_rect(x, y, width, height, colour);
     }
@@ -1201,6 +1222,7 @@ impl<'a> Canvas<'a> {
         self.units_housed = 0;
         self.foundings_marked = 0;
         self.focus = None;
+        self.overlay = None;
     }
 
     /// Sets one pixel, and ignores a position outside the canvas.
@@ -1835,7 +1857,7 @@ pub fn kind_colour(kind: TileKind) -> u32 {
 /// [^8]: ADR-0090, a tile upgrade is stored sparsely, as the difference from the generated world, decision D1. `docs/adrs/draft/adr-0090-a-tile-upgrade-is-stored-sparsely.md`
 pub fn draw(world: &World, camera: Camera, canvas: &mut Canvas) -> Result<(), BridgeError> {
     let mut motion = Motion::none();
-    draw_paced(world, camera, canvas, Pace::STILL, &mut motion)
+    draw_paced(world, camera, canvas, Pace::STILL, &mut motion, None)
 }
 
 /// Draws the world onto the canvas, at a pace the caller sets.
@@ -1864,12 +1886,14 @@ pub fn draw(world: &World, camera: Camera, canvas: &mut Canvas) -> Result<(), Br
 ///
 /// [^9]: ADR-0094, the caller owns the camera and the pixels, decision D5. `docs/adrs/draft/adr-0094-the-caller-owns-the-camera-and-the-pixels.md`
 /// [^10]: ADR-0067, the viewer reads the world and never writes to it, decision D2. `docs/adrs/accepted/adr-0067-the-viewer-reads-the-world-and-never-writes-to-it.md`
+#[allow(clippy::too_many_arguments)]
 pub fn draw_paced(
     world: &World,
     camera: Camera,
     canvas: &mut Canvas,
     pace: Pace,
     motion: &mut Motion,
+    layer: Option<&'static dyn Layer>,
 ) -> Result<(), BridgeError> {
     canvas.clear();
     let grid = world.grid();
@@ -1883,6 +1907,11 @@ pub fn draw_paced(
     let dry = world.weather().is_dry();
     let any_upgrade = !world.upgrade_sites().is_empty();
     let any_luxury = !world.luxuries().is_empty();
+    // The overlay the caller chose, and the low and the high it declared for
+    // this frame. The span is asked once here and never for a tile, so its
+    // cost does not follow the window.
+    let chosen = layer.map(|layer| (layer, layer.span(world)));
+    let mut reading = chosen.map(|(layer, span)| overlay::Reading::opening(layer, span));
 
     let (first_row, last_row) = camera.visible_rows(world, canvas);
     for row in first_row..last_row {
@@ -1933,7 +1962,27 @@ pub fn draw_paced(
             //
             // [^15]: Research report 24, defects 4 and 10. `docs/research/reports/24-demonstration-readability-resources-and-weather.md`
             // [^16]: Research report 23, defect 2. `docs/research/reports/23-demonstration-readability-review-1.md`
-            if !dry && camera.tile_width >= AIR_LEAST_TILE {
+            //
+            // **The map carries one overlay at a time, and the caller says
+            // which.** A caller that chose an overlay gets that overlay and
+            // not the resting wash as well, because a picture that carries
+            // two quantities carries neither.[^19]
+            //
+            // The overlay is mixed into the ground here, before the holder
+            // takes its share below, so the holder survives at every overlay
+            // strength.[^15]
+            //
+            // [^19]: Backlog item 0494, register an overlay deck. `docs/backlog/complete/0494-register-an-overlay-deck-and-let-the-watcher-switch-the-map-between-info-views.md`
+            if let Some((layer, span)) = chosen {
+                let value = overlay::value_of(layer, world, address, Some(ground));
+                if let Some(seen) = reading.as_mut() {
+                    seen.saw(value);
+                }
+                let strength = layer.strength(value, span);
+                if strength > 0 {
+                    ground_colour = mix(ground_colour, layer.colour(value), strength);
+                }
+            } else if !dry && camera.tile_width >= AIR_LEAST_TILE {
                 let weight = air_weight(world.air_at(address).unwrap_or(0));
                 if weight >= AIR_LEAST_WEIGHT {
                     ground_colour = mix(ground_colour, AIR_COLOUR, weight);
@@ -2044,6 +2093,11 @@ pub fn draw_paced(
             canvas.painted_by_kind[ground.kind.to_u8() as usize] += 1;
         }
     }
+
+    // What the pass painted of the overlay. The key reads it after this
+    // pass, so the words a watcher sees come from the pass that made the
+    // picture.
+    canvas.overlay = reading;
 
     // The floor holds a unit visible below sixteen pixels a tile, where a
     // disc of three tenths of the tile is one pixel of the faction colour

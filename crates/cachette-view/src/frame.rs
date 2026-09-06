@@ -28,6 +28,7 @@ use cachette_core::{BridgeError, World};
 use crate::glass::Overlay;
 use crate::hud::Readout;
 use crate::metrics::Metrics;
+use crate::overlay::Layer;
 use crate::paint::{Camera, Canvas};
 use crate::tween::{Motion, Pace};
 
@@ -224,6 +225,7 @@ pub fn fill_frame(
         metrics,
         outcomes,
         overlay,
+        None,
         Pace::STILL,
         &mut motion,
         surface,
@@ -234,6 +236,11 @@ pub fn fill_frame(
 ///
 /// **This is the one frame command.** The call above is this call at a still
 /// pace, so there is one renderer and not two.[^4]
+///
+/// **The layer is the overlay the caller chose, or nothing.** The caller names
+/// one of the overlays this crate registered. It cannot name another, and it
+/// cannot supply a rule of its own for painting one, because one renderer
+/// feeds every presenter.[^4]
 ///
 /// The pace carries the share of the current tick that has elapsed and the
 /// ticks each frame runs. The first moves a unit that changed tile between
@@ -262,6 +269,7 @@ pub fn fill_frame_paced(
     metrics: &Metrics,
     outcomes: &[FoundingOutcome],
     overlay: Overlay,
+    layer: Option<&'static dyn Layer>,
     pace: Pace,
     motion: &mut Motion,
     surface: Surface<'_>,
@@ -283,6 +291,7 @@ pub fn fill_frame_paced(
         metrics,
         outcomes,
         overlay,
+        layer,
         pace,
         motion,
         &mut canvas,
