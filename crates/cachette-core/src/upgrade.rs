@@ -771,6 +771,36 @@ pub fn repair_gain(work: i64, level_work: i64) -> i64 {
         .map_or(0, |gained| gained.0)
 }
 
+/// Returns the work that buys back a gap in the condition of a level.
+///
+/// This is the inverse of the repair gain, and it truncates towards zero in
+/// the same way.[^2] The two therefore state one price, and a caller cannot
+/// charge for a repair at one rate and pay for it at another.[^1]
+///
+/// **A gap that costs less than one unit of work costs nothing.** One unit is
+/// the smallest amount a builder adds in a tick, and the wear of a tick is a
+/// very small part of a level. A repair that charged a whole unit for a gap
+/// worth a hundredth of one would take every unit a builder ever added, and
+/// no level on ground that wears at all could ever rise. The gap then stays
+/// open, it grows with the wear, and the repair takes a unit of work as soon
+/// as it is worth one.
+///
+/// Returns zero when the gap is at or below zero, and when the level asks for
+/// no work.
+///
+/// # References
+///
+/// [^1]: Recurring Defect Shapes, shape 1. `.agents/rules/recurring-defects.md`
+/// [^2]: ADR-0002, simulated and aggregated state holds no floating point number, decision D1. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
+#[must_use]
+pub fn repair_work(missing: i64, level_work: i64) -> i64 {
+    if missing <= 0 || level_work <= 0 {
+        return 0;
+    }
+    sim_math::share(Accum(missing), Accum(level_work), Accum(CONDITION_FULL))
+        .map_or(0, |asked| asked.0)
+}
+
 /// The default table that a world is built with.
 ///
 /// It holds the road, the terrace, the wonder, the store, the wall and the
@@ -1193,6 +1223,32 @@ impl UpgradeSite {
         self.is_complete() && self.condition.0 < CONDITION_FULL
     }
 
+    /// Returns the work that mends what stands here back to its full
+    /// condition.
+    ///
+    /// **This is the one statement of whether a repair is due.** The build
+    /// pass spends this work before it raises anything, and the resolution
+    /// that reads a row for a build order asks whether it is above zero. A
+    /// second statement of the question would let a unit be ordered onto a
+    /// repair that the pass then declines to do.[^1]
+    ///
+    /// Returns zero when nothing stands here, when the level is sound, and
+    /// when the gap in the condition is worth less than one unit of work.
+    ///
+    /// # References
+    ///
+    /// [^1]: Recurring Defect Shapes, shape 1. `.agents/rules/recurring-defects.md`
+    #[must_use]
+    pub fn repair_price(self, table: &UpgradeTable) -> i64 {
+        if !self.is_damaged() {
+            return 0;
+        }
+        repair_work(
+            CONDITION_FULL - self.condition.0,
+            table.work_at(self.category, self.level),
+        )
+    }
+
     /// Returns the work that the next level still asks for.
     ///
     /// Returns zero at the top of the category.
@@ -1549,11 +1605,18 @@ fn fresh_site(added: (TileIdx, UpgradeCategory, i64), table: &UpgradeTable) -> U
 /// A contribution to another category is dropped. The tile carries one
 /// upgrade, and it is not the one the contributor named.
 ///
-/// **A repair comes first.** While the level that stands there is damaged,
-/// the work buys condition and raises no level. One worker therefore mends
-/// what stands before it builds on top of it, and no caller has to choose
-/// between the two. The work is the same contribution the build sums, so a
-/// repair and a build run through one mechanism and no second rate exists.[^1]
+/// **A repair comes first, and it takes only the work it is priced at.** The
+/// work buys back the condition the level lost, and the work above that price
+/// goes into the level. One worker therefore mends what stands before it
+/// builds on top of it, and no caller has to choose between the two. The work
+/// is the same contribution the build sums, so a repair and a build run
+/// through one mechanism and no second rate exists.[^1]
+///
+/// **A repair that took the whole tick would stop every build on ground that
+/// wears.** The wear of one tick is a very small part of a level, and the
+/// work of one tick is the smallest amount a builder adds. The price of the
+/// repair is zero until the gap is worth one unit of work, so a level under
+/// light wear still rises and a level under heavy wear does not.
 ///
 /// The level rises in place when the work reaches the work of the row above
 /// the entry, and the work done then returns to zero. A level that has just
@@ -1572,14 +1635,27 @@ fn advanced(
     if site.category != category {
         return site;
     }
-    if site.is_damaged() {
+    let mut site = site;
+    let mut work = work.max(0);
+    let price = site.repair_price(table);
+    if price > 0 {
         let level_work = table.work_at(site.category, site.level);
-        let mended = site
-            .condition
-            .0
-            .saturating_add(repair_gain(work.max(0), level_work));
-        return UpgradeSite {
-            condition: Accum(mended.min(CONDITION_FULL)),
+        if work < price {
+            // The work buys condition and raises no level. The repair is not
+            // paid for yet, so the level stays damaged and the next tick
+            // carries on with it.
+            let mended = site.condition.0.saturating_add(repair_gain(work, level_work));
+            return UpgradeSite {
+                condition: Accum(mended.min(CONDITION_FULL)),
+                ..site
+            };
+        }
+        // The repair takes the work it is priced at, and the work above that
+        // price goes into the level. A repair that took the whole tick
+        // whatever the gap cost would stop every build on ground that wears.
+        work -= price;
+        site = UpgradeSite {
+            condition: Accum(CONDITION_FULL),
             ..site
         };
     }
@@ -1592,7 +1668,7 @@ fn advanced(
             ..site
         };
     }
-    let total = site.progress.0.saturating_add(work.max(0));
+    let total = site.progress.0.saturating_add(work);
     if total >= asked {
         return UpgradeSite {
             level: site.level + 1,
