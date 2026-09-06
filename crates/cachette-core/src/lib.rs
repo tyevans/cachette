@@ -24,6 +24,7 @@ pub mod contest;
 pub mod controller;
 pub mod conversion;
 pub mod descent;
+pub mod effective;
 pub mod event;
 pub mod event_layout;
 pub mod founding;

@@ -3026,6 +3026,62 @@ impl PyWorld {
         Ok(report)
     }
 
+    /// Returns what one settlement produces now, as a `dict`.
+    ///
+    /// The keys are:
+    ///
+    /// - `base`. The stored rate, as its raw Q16.16 integer. The founding
+    ///   writes it once, from the food the survey measured, and nothing else
+    ///   moves it.[^1]
+    /// - `scale`. What the pipeline gives the site now, as its raw Q16.16
+    ///   integer. One is 65536. The pipeline reads the ground the site
+    ///   reaches, the moisture over it, the terraces on it, and the residents
+    ///   in it.
+    /// - `effective`. The base scaled, which is what the next application
+    ///   earns. This is the value that varies over a run.
+    ///
+    /// **The scale and the effective rate are derived.** The engine stores
+    /// neither, and neither enters the state hash. Both are read again from
+    /// the world on every call.[^2]
+    ///
+    /// # Errors
+    ///
+    /// Raises `ViewError` when the identity names no live settlement.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0062, production and upkeep are rates attached to a site, decision D1. `docs/adrs/accepted/adr-0062-production-and-upkeep-are-rates-attached-to-a-site.md`
+    /// [^2]: ADR-0164, every stored value the step reads enters the state hash, decision D2. `docs/adrs/draft/adr-0164-every-stored-value-the-step-reads-enters-the-state-hash.md`
+    #[pyo3(signature = (site, commodity = 0))]
+    fn site_production<'py>(
+        &self,
+        python: Python<'py>,
+        site: u64,
+        commodity: u16,
+    ) -> PyResult<Bound<'py, PyDict>> {
+        let world = self.lock();
+        let entity = resolve_site(&world, site)?;
+        let goods = CommodityId(commodity);
+        let slot = world
+            .settlements()
+            .slot_of(entity)
+            .expect("the identity resolved to a live site above");
+        let base = world.rates().production(slot, goods).ok_or_else(|| {
+            VerbError::new_err(format!("{commodity} names no commodity of this world"))
+        })?;
+        let scale = world
+            .production_scale(entity)
+            .expect("the identity resolved to a live site above");
+        let effective = world
+            .effective_production_rate(entity, goods)
+            .expect("the slot and the commodity both resolved above");
+        let report = PyDict::new(python);
+        report.set_item("base", base.0)?;
+        report.set_item("scale", scale.0)?;
+        report.set_item("effective", effective.0)?;
+        Ok(report)
+    }
+
     /// Writes the housing that stands at a set of settlements.
     ///
     /// Returns `None`.

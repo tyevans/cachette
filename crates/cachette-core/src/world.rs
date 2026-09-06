@@ -771,8 +771,30 @@ pub struct World {
     influence: InfluenceField,
     /// When the site rates apply.
     schedule: RateSchedule,
-    /// The production rate and the upkeep rate of each site.
+    /// The base production rate and the upkeep rate of each site.
+    ///
+    /// This is stored state and it enters the state hash. The founding writes
+    /// the production column of a site once, from the ground the survey
+    /// measured.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0062, production and upkeep are rates attached to a site, decision D1. `docs/adrs/accepted/adr-0062-production-and-upkeep-are-rates-attached-to-a-site.md`
     rates: RateTable,
+    /// The effective rate that the last application read, as scratch.
+    ///
+    /// **This is derived, not stored.** The rate pass fills it again from the
+    /// ground, the moisture, the upgrades and the residents on every
+    /// application, so it holds no fact of its own and it stays out of the
+    /// state hash. Its four inputs are stored and they enter the hash.[^1]
+    ///
+    /// The field exists so that the pass allocates once rather than on every
+    /// application. Nothing outside the pass reads it.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0164, every stored value the step reads enters the state hash, decision D2. `docs/adrs/draft/adr-0164-every-stored-value-the-step-reads-enters-the-state-hash.md`
+    effective_rates: RateTable,
     /// Every rate that has applied since the world was built.
     rate_ledger: RateLedger,
     /// The sites that could not pay at the last application.
@@ -1287,6 +1309,7 @@ impl World {
             census: CensusTotals::default(),
             schedule: RateSchedule::DEFAULT,
             rates: RateTable::new(),
+            effective_rates: RateTable::new(),
             rate_ledger: RateLedger::ZERO,
             shortfall_log: Vec::new(),
             need_rule: NeedRule::DEFAULT,
@@ -8155,18 +8178,39 @@ impl World {
         Ok(())
     }
 
+    /// Runs the rate pass of one frame.
+    ///
+    /// The stored table holds the base rate of each site. The pass derives an
+    /// effective rate from it and from the world, and hands the derived table
+    /// to the apply function. The stored table is not written.[^1]
+    ///
+    /// The derived table is scratch. It holds no fact of its own, so it stays
+    /// out of the state hash, and its four inputs are stored and already
+    /// enter it.[^2]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0062, production and upkeep are rates attached to a site, decisions D1 and D7. `docs/adrs/accepted/adr-0062-production-and-upkeep-are-rates-attached-to-a-site.md`
+    /// [^2]: ADR-0164, every stored value the step reads enters the state hash, decision D2. `docs/adrs/draft/adr-0164-every-stored-value-the-step-reads-enters-the-state-hash.md`
     fn apply_rates(&mut self, threads: usize) -> Result<(), StepError> {
         self.shortfall_log.clear();
         self.rates.open_to(self.settlements.slot_count());
         let schedule = self.schedule;
         let tick = self.tick;
-        let pass = crate::rates::apply(
+        // The table is taken out of the world so that the fill may read the
+        // world, and it is put back below. The take leaves the field empty
+        // for the length of this call and nothing else reads it.
+        let mut effective = core::mem::take(&mut self.effective_rates);
+        self.fill_effective_rates(&mut effective);
+        let outcome = crate::rates::apply(
             schedule,
             tick,
-            &self.rates,
+            &effective,
             self.settlements.store_update(),
             threads,
-        )?;
+        );
+        self.effective_rates = effective;
+        let pass = outcome?;
         for (index, account) in self.store_account.iter_mut().enumerate() {
             let net = pass
                 .ledger
