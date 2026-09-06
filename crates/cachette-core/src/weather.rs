@@ -298,19 +298,34 @@ impl WeatherScale {
 
     /// Returns what a heat difference across one cell is divided by.
     ///
-    /// **A finer lattice holds a smaller temperature difference between two
-    /// neighbours**, because one map gradient is spread over more cells. A
-    /// fixed divisor would leave the wind at rest at a fine pitch, so the
-    /// divisor follows the cell side and one map gradient then gives one wind
-    /// at every resolution.
+    /// **The divisor does not follow the pitch, because the difference it
+    /// reads does not.** It once carried a formula that shifted a reference
+    /// value by the pitch, on the reasoning that a finer lattice spreads one
+    /// map gradient over more cells and therefore holds a smaller difference
+    /// between two neighbours. That reasoning holds for a field that is
+    /// smooth at the pitch. The temperature is not one. The ground term reads
+    /// the water and the height of the cell itself, so a coast holds a step
+    /// of the whole water term between two neighbours at any pitch, and one
+    /// cell for each tile reads the terrain of a single tile.
+    ///
+    /// **A divisor of one made the wind read that step, and the picture then
+    /// held threads one cell wide.** The wind is the stiffest coupling in the
+    /// field: it takes a bounded step toward the pressure on every pass, and
+    /// the water rides it. A wind that answers a tile-scale step tears the
+    /// water into threads that run along the flow, which is the shape that
+    /// pure stretching with no mixing makes.
+    ///
+    /// The formula was in any case inert. It shifted the reference value
+    /// right by the reference pitch before it shifted left by the asked
+    /// pitch, so the first shift took it to zero and the clamp below returned
+    /// one at every pitch. Nothing read the value the doc described.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: Recurring Defect Shapes, shape 1. `.agents/rules/recurring-defects.md`
     #[must_use]
     pub const fn pressure_divisor(self) -> i64 {
-        let asked = (PRESSURE_DIVISOR_AT_REFERENCE >> REFERENCE_BITS) << self.bits;
-        if asked < 1 {
-            1
-        } else {
-            asked
-        }
+        PRESSURE_DIVISOR
     }
 
     /// Returns the tiles along one side of a cell, as a wide number.
@@ -873,7 +888,7 @@ const SEND_DENOMINATOR: i64 = 64 * WIND_FINE as i64;
 /// # References
 ///
 /// [^1]: ADR-0161, water rides the wind, and every transfer is an exact integer move, decision D1. `docs/adrs/accepted/adr-0161-water-rides-the-wind-and-every-transfer-is-an-exact-integer-move.md`
-const SEND_BASE_NUMERATOR: i64 = WIND_FINE as i64;
+const SEND_BASE_NUMERATOR: i64 = 4 * WIND_FINE as i64;
 
 /// The numerator that one step of wind along a direction adds.
 const SEND_FOR_EACH_WIND_STEP: i64 = 1;
@@ -1090,21 +1105,29 @@ const _: () = assert!(POSITIVE_PROJECTION_CEILING * CARRY_FOR_EACH_WIND_STEP < C
 /// [^1]: ADR-0001, one binary gives one answer at any thread count, decision D3. `docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
 pub const WARMTH_PASSES_FOR_EACH_SOLVE: u32 = 1;
 
-/// The heat difference that one step of wind acceleration answers to, at the
-/// reference scale.
+/// The heat difference that one step of wind acceleration answers to.
 ///
 /// The acceleration of a cell is the sum, over the six directions, of the
 /// direction times the heat the neighbour holds above this cell. That sum is
-/// divided by the divisor of the scale before the step ceiling bounds it.
+/// divided by this before the step ceiling bounds it.
 ///
-/// **A finer lattice holds a smaller difference between two neighbours**, so
-/// the divisor a solve uses follows the cell side and a caller reads it from
-/// the scale rather than here.[^1]
+/// **A larger divisor makes a softer wind, and the wind is what tears the
+/// water into threads.** The value is a balance between two things a watcher
+/// wants. A small divisor gives a wind that answers the terrain of one cell,
+/// and the water then holds threads one cell wide. A large divisor gives a
+/// smooth wind and a smooth sky, and it also takes the rotation out of the
+/// field: a probe reports no turning cell at all at twice this.
+///
+/// The value is the same at every pitch, and a caller reads it from the scale
+/// rather than here, so that one site answers the question.[^1] A blocker
+/// holds the question of what the wind should be worth, and no measurement
+/// has chosen this.[^2]
 ///
 /// # References
 ///
 /// [^1]: The pressure divisor of a scale. [`WeatherScale::pressure_divisor`]
-const PRESSURE_DIVISOR_AT_REFERENCE: i64 = 32 / WIND_FINE as i64;
+/// [^2]: Blockers register, BLK-130. `docs/BLOCKERS.md`
+const PRESSURE_DIVISOR: i64 = 16 / WIND_FINE as i64;
 
 /// The most the wind of a cell changes in one pass, in lattice steps.
 ///
@@ -1994,6 +2017,21 @@ impl WeatherField {
     #[must_use]
     pub fn ground_plane(&self) -> &[Drops] {
         &self.ground
+    }
+
+    /// Returns the water that the air above one cell holds when it is full.
+    ///
+    /// A viewer that paints the air reads the ceiling from here rather than
+    /// from the largest cell of a frame, so brightness means the same thing
+    /// in every frame. It reads it from here rather than repeating the
+    /// constant, so the ceiling has one declaration site.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: Recurring Defect Shapes, shape 1. `.agents/rules/recurring-defects.md`
+    #[must_use]
+    pub const fn air_ceiling(&self) -> i64 {
+        AIR_SATURATION.0
     }
 
     /// Returns every drop that has ever entered the air.

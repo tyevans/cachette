@@ -308,8 +308,20 @@ impl Layer for Air {
         at.world.air_at(at.address).unwrap_or(0)
     }
 
+    /// Returns the ramp of the air, which the saturation mark tops.
+    ///
+    /// **The top is a constant of the field, not the largest cell of the
+    /// frame.** A ramp that takes the largest cell moves with that cell. One
+    /// saturated cell then sets the top for the whole map, every other cell
+    /// paints at a small share of it, and the brightness of the whole picture
+    /// changes between one frame and the next as the largest cell moves. A
+    /// watcher reads that as shimmering rather than as weather.
+    ///
+    /// The mark is the ceiling that the field itself holds, so a cell at the
+    /// mark paints white and a cell at half the mark paints half. Brightness
+    /// then means the same thing in every frame and in every world.
     fn span(&self, world: &World) -> Span {
-        Span::new(0, highest(world.weather().air_plane()))
+        Span::new(0, world.weather().air_ceiling())
     }
 
     fn on_cells(&self) -> bool {
@@ -749,8 +761,8 @@ pub fn value_of(
     let down = (address.r as f32 + 0.5) / side - 0.5;
     let left = across.floor();
     let top = down.floor();
-    let share_across = across - left;
-    let share_down = down - top;
+    let share_across = eased(across - left);
+    let share_down = eased(down - top);
     let column = left as i64;
     let row = top as i64;
 
@@ -771,6 +783,33 @@ pub fn value_of(
     let lower = at_centre(column, row + 1) * (1.0 - share_across)
         + at_centre(column + 1, row + 1) * share_across;
     (upper * (1.0 - share_down) + lower * share_down).round() as i64
+}
+
+/// Bends a share so that the reconstruction is smooth at a cell edge.
+///
+/// **A straight share draws a herringbone.** A straight share makes the value
+/// a bilinear surface over each cell of the lattice. Such a surface is
+/// continuous at a cell edge but its slope is not, so the drawing holds a
+/// crease along every edge. The creases meet at the cell corners, and over a
+/// field that changes by much in one cell they read as a repeating pattern of
+/// chevrons at one angle and one period. The pattern covers the whole map,
+/// it does not follow the flow, and it looks the same over water as over
+/// land, because the lattice makes it and not the weather.
+///
+/// This share is zero and one at the same two ends, so the value at a cell
+/// centre is still that cell's own value and nothing is invented. Its slope
+/// is zero at both ends, so the two surfaces that meet at an edge agree in
+/// slope as well as in height and the crease goes.
+///
+/// The arithmetic is the viewer's, not the simulation's. It reads the world
+/// and writes nothing to it.[^1]
+///
+/// # References
+///
+/// [^1]: ADR-0002, simulated and aggregated state holds no floating point number, decision D4. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
+fn eased(share: f32) -> f32 {
+    let share = share.clamp(0.0, 1.0);
+    share * share * (3.0 - 2.0 * share)
 }
 
 /// What the drawing pass painted of one overlay.
