@@ -10173,11 +10173,15 @@ const fn build_is_permitted(
 /// The next level is one when the tile carries no upgrade of the category,
 /// and one above the level that stands there otherwise.[^1]
 ///
-/// **A damaged level resolves to the row that stands there.** The work of a
-/// worker on a damaged site buys condition and raises no level, so the row
-/// the order reads is the row it mends. Without this arm a worker on a
-/// crumbling top-level upgrade would be refused for the category being at its
-/// top, and nothing could ever mend one.
+/// **A level that owes a repair resolves to the row that stands there.** The
+/// work of a worker on such a site buys condition first, so the row the order
+/// reads is the row it mends. Without this arm a worker on a crumbling
+/// top-level upgrade would be refused for the category being at its top, and
+/// nothing could ever mend one.
+///
+/// A level whose gap in condition is worth less than one unit of work owes no
+/// repair, and it resolves to the row above in the usual way. That is what
+/// lets a level under light wear still rise.
 ///
 /// # Errors
 ///
@@ -10206,7 +10210,13 @@ fn resolve_build_row(
         None => upgrade::NO_LEVEL,
     };
     if let Some(site) = standing {
-        if site.is_damaged() {
+        // The price is the one statement of whether a repair is due, and the
+        // build pass spends the same value. A gap worth less than one unit of
+        // work is priced at zero, and the order then reads the row above in
+        // the usual way.[^3]
+        //
+        // [^3]: Recurring defect shapes, shape 1. `.agents/rules/recurring-defects.md`
+        if site.repair_price(table) > 0 {
             if let Some(row) = table.row(category, site.level) {
                 return Ok(row);
             }
