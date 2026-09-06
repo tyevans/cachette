@@ -14,6 +14,28 @@
 //! rate pass applies. The stored rate stays the base rate and stays on the
 //! site, so the founding rule is unchanged.[^3]
 //!
+//! # The upkeep
+//!
+//! The same argument holds on the other side of the ledger. The upkeep table
+//! exists, the rate pass spends from it, and nothing outside a test ever
+//! writes a rate into it, so every site owes zero and the drain is inert
+//! code.[^12] A source with no sink can only climb.
+//!
+//! This module therefore derives an effective upkeep as well. It adds two
+//! terms to the stored base upkeep, and it never takes any away.
+//!
+//! 1. **The holding.** A store costs a share of itself to keep, each tick.
+//!    This is the term that gives the store an equilibrium instead of a
+//!    ceiling: what a site holds settles at its production divided by the
+//!    share, so a site that earns more settles higher and a site whose ground
+//!    is drawn down falls back.
+//! 2. **The residents.** Each resident costs a share of the ration it eats.
+//!    The share reads the ration of the need rule rather than restating it,
+//!    so the project holds one declaration of what a person costs.[^13]
+//!
+//! Neither term is a negative production rate, and neither may take the
+//! stored rate below zero. Upkeep is a rate above zero that subtracts.[^3]
+//!
 //! # The pipeline
 //!
 //! Four terms compose. Each is a share of one. The pipeline adds two terms to
@@ -23,7 +45,7 @@
 //! 1. **The ground.** What the disc of the site still holds of food, against
 //!    what it held untouched. This is the sink. Gatherers draw the ground
 //!    down and the recovery brings it back, so the term rises and falls over
-//!    a period of about one simulated day.[^4]
+//!    a period of a few hundred ticks.[^4]
 //! 2. **The moisture.** Wet ground yields more. The term takes the same
 //!    reader that the gather resolve takes, so the project holds one moisture
 //!    reader and not two, and it stays discontinuous for the reason that
@@ -84,6 +106,8 @@
 //! [^9]: ADR-0164, every stored value the step reads enters the state hash, decision D2. `docs/adrs/draft/adr-0164-every-stored-value-the-step-reads-enters-the-state-hash.md`
 //! [^10]: Balance register, the production pipeline. `docs/reference/balance.md`
 //! [^11]: Backlog item 0512, add the temperature term to the production pipeline. `docs/backlog/proposed/0512-add-the-temperature-term-to-the-production-pipeline.md`
+//! [^12]: Recurring defect shapes, shape 3. `.agents/rules/recurring-defects.md`
+//! [^13]: Recurring defect shapes, shape 1. `.agents/rules/recurring-defects.md`
 
 use crate::founding::{disc, SURVEY_RADIUS};
 use crate::hex::Axial;
@@ -131,6 +155,46 @@ pub const SCALE_FLOOR: Fix32 = Fix32(1 << 14);
 /// The highest scale the pipeline returns.
 pub const SCALE_CEILING: Fix32 = Fix32(2 << 16);
 
+/// The share of its own store that a site pays to keep it, each tick.
+///
+/// This is one sixty-fourth. It is the term that turns the store from a thing
+/// that climbs into a thing that settles: with a production of `P` a tick, the
+/// store settles where the holding cost equals the production, which is at
+/// sixty-four times `P`.
+///
+/// **The size is chosen against the tick and not against the store.** The
+/// share is the reciprocal of a relaxation time, and that time is sixty-four
+/// ticks. The rate pass applies every ten ticks by default, so a store crosses
+/// most of the distance to its settling point in about six applications, and a
+/// watcher sees it move. A share of one sixteenth would settle inside two
+/// applications, so the store would track the production with no lag and would
+/// read as a constant again. A share of one five-hundred-and-twelfth would
+/// still be climbing after a whole simulated day, which is the behaviour this
+/// term exists to remove.
+///
+/// A period long enough that the period times this share passes one would take
+/// the whole store in one application. The rate pass stops at zero and reports
+/// a shortfall, so the outcome is defined, and the default period of ten is
+/// well inside the bound.
+pub const HOLDING_SHARE: Fix32 = Fix32(1 << 10);
+
+/// What one resident costs, as a share of the ration that a resident eats.
+///
+/// A quarter. The ration is the food a person takes from the store each tick,
+/// and it has one declaration in the need rule.[^1] This term reads that
+/// declaration rather than restating it, so the two cannot drift apart.
+///
+/// A quarter says that the overhead of housing a person is a quarter of
+/// feeding one. Together the two take five quarters of the ration, so a site
+/// is over-populated for its land a little before its people are hungry, and
+/// the store falls first. That ordering is what makes the store the early
+/// warning rather than the last one.
+///
+/// # References
+///
+/// [^1]: Recurring defect shapes, shape 1. `.agents/rules/recurring-defects.md`
+pub const RESIDENT_SHARE_OF_RATION: Fix32 = Fix32(1 << 14);
+
 impl World {
     /// Fills a table with the effective production rate of every site.
     ///
@@ -164,7 +228,7 @@ impl World {
                     .rates()
                     .production(slot, commodity)
                     .unwrap_or(Fix32::ZERO);
-                let upkeep = self.rates().upkeep(slot, commodity).unwrap_or(Fix32::ZERO);
+                let upkeep = self.effective_upkeep_at(site, slot, commodity);
                 // One multiply, at the end of the pipeline. Both operands are
                 // at or above zero, so the truncation runs towards zero.
                 let effective = sim_math::mul(base, scale);
@@ -209,6 +273,94 @@ impl World {
         let base = self.rates().production(slot, commodity)?;
         let scale = self.production_scale(site)?;
         Some(sim_math::mul(base, scale))
+    }
+
+    /// Returns the upkeep rate that one site owes now.
+    ///
+    /// The answer is the stored base upkeep, plus the holding term, plus the
+    /// resident term. It is derived, so nothing stores it and it does not
+    /// enter the state hash.[^1]
+    ///
+    /// Returns `None` when the identity names no live site, and when the
+    /// commodity is outside the set.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0164, every stored value the step reads enters the state hash, decision D2. `docs/adrs/draft/adr-0164-every-stored-value-the-step-reads-enters-the-state-hash.md`
+    #[must_use]
+    pub fn effective_upkeep_rate(&self, site: Entity, commodity: CommodityId) -> Option<Fix32> {
+        let slot = self.settlements().slot_of(site)?;
+        if commodity.0 as usize >= COMMODITY_COUNT {
+            return None;
+        }
+        Some(self.effective_upkeep_at(site, slot, commodity))
+    }
+
+    /// Returns the upkeep of one site, one slot and one commodity.
+    ///
+    /// The three terms add. Each one is at or above zero, so the sum is at or
+    /// above zero and the rate table accepts it.[^1]
+    ///
+    /// **Every commodity takes both derived terms.** The commodity set holds
+    /// one member, so no rule here separates them. A second commodity needs a
+    /// decision that nobody has made.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0062, production and upkeep are rates attached to a site, decision D2. `docs/adrs/accepted/adr-0062-production-and-upkeep-are-rates-attached-to-a-site.md`
+    #[must_use]
+    fn effective_upkeep_at(&self, site: Entity, slot: u32, commodity: CommodityId) -> Fix32 {
+        let base = self.rates().upkeep(slot, commodity).unwrap_or(Fix32::ZERO);
+        let with_holding = sim_math::add(base, self.holding_term(site, commodity));
+        sim_math::add(with_holding, self.resident_term(site))
+    }
+
+    /// Returns what a site pays each tick to keep what it holds.
+    ///
+    /// The term is the holding share of the quantity that the store holds
+    /// now. It rises with the store, so a store that grows costs more to keep,
+    /// and the store settles instead of climbing.
+    ///
+    /// An empty store costs nothing. Zero is a real state of a store, and a
+    /// site that holds nothing owes nothing for it.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: Findings register, FND-043. `docs/FINDINGS.md`
+    #[must_use]
+    fn holding_term(&self, site: Entity, commodity: CommodityId) -> Fix32 {
+        let Some(store) = self.settlements().store(site) else {
+            return Fix32::ZERO;
+        };
+        let held = store.quantity(commodity).unwrap_or(Fix32::ZERO);
+        if held.0 <= 0 {
+            return Fix32::ZERO;
+        }
+        sim_math::mul(held, HOLDING_SHARE)
+    }
+
+    /// Returns what the residents of a site cost each tick.
+    ///
+    /// The term is the resident share of the ration, times the people the site
+    /// holds. The ration comes from the need rule, so the food a person eats
+    /// has one declaration site and this term follows it.[^1]
+    ///
+    /// The count is the count that the cohort table derives from the home
+    /// column of the units, so a site whose people left stops paying for
+    /// them.[^2]
+    ///
+    /// # References
+    ///
+    /// [^1]: Recurring defect shapes, shape 1. `.agents/rules/recurring-defects.md`
+    /// [^2]: ADR-0157, a site's free places are its built housing less the residents the engine counts, decision D2. `docs/adrs/accepted/adr-0157-a-sites-free-places-are-its-built-housing-less-the-residents-the-engine-counts.md`
+    #[must_use]
+    fn resident_term(&self, site: Entity) -> Fix32 {
+        let residents = self.site_residents(site).unwrap_or(0);
+        if residents == 0 {
+            return Fix32::ZERO;
+        }
+        let each = sim_math::mul(self.need_rule().ration(), RESIDENT_SHARE_OF_RATION);
+        narrow_rate(sim_math::scale_by_count(each, residents))
     }
 
     /// Returns the scale that the pipeline gives one site, as a Q16.16 value.
@@ -358,6 +510,21 @@ const fn narrow(value: Accum) -> Fix32 {
         Fix32::ZERO
     } else if value.0 >= Fix32::ONE.0 as i64 {
         Fix32::ONE
+    } else {
+        Fix32(value.0 as i32)
+    }
+}
+
+/// Narrows an accumulator that holds a rate into the fixed-point range.
+///
+/// The value saturates at the end of the range and it never wraps. A wrap
+/// would turn a large upkeep into a rate below zero, and the rate table
+/// refuses a rate below zero.
+const fn narrow_rate(value: Accum) -> Fix32 {
+    if value.0 <= 0 {
+        Fix32::ZERO
+    } else if value.0 >= i32::MAX as i64 {
+        Fix32(i32::MAX)
     } else {
         Fix32(value.0 as i32)
     }
