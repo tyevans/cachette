@@ -40,7 +40,7 @@
 //! [^1]: Findings register, FND-486. `docs/FINDINGS.md`
 //! [^2]: ADR-0158, a site builds a typed unit from a bounded queue its store pays for, decisions D1, D3 and D4. `docs/adrs/draft/adr-0158-a-site-builds-a-typed-unit-from-a-bounded-queue-its-store-pays-for.md`
 //! [^3]: ADR-0158, a site builds a typed unit from a bounded queue its store pays for, decision D2. `docs/adrs/draft/adr-0158-a-site-builds-a-typed-unit-from-a-bounded-queue-its-store-pays-for.md`
-//! [^4]: ADR-0157, a site's free places are its built housing less the residents the engine counts, decision D5. `docs/adrs/draft/adr-0157-a-sites-free-places-are-its-built-housing-less-the-residents-the-engine-counts.md`
+//! [^4]: ADR-0157, a site's free places are its built housing less the residents the engine already counts, decision D5. `docs/adrs/accepted/adr-0157-a-sites-free-places-are-its-built-housing-less-the-residents-the-engine-counts.md`
 //! [^5]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
 //! [^6]: ADR-0002, simulated and aggregated state holds no floating point number, decision D1. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
 //! [^7]: Balance register, the production queue. `docs/reference/balance.md`
