@@ -5558,16 +5558,20 @@ impl World {
             self.upgrades.at(tile),
             category,
         )?;
-        let zoned = self.plan.zoned_for(faction, tile, category);
-        if !build_is_permitted(holder, faction, row, zoned) {
+        let zoned = self.plan.zones(faction, tile);
+        if !build_is_permitted(holder, faction, row, category, zoned) {
             self.plan.count_refusal();
-            // The two refusals answer two rules. A row that asks for held
-            // ground met the ground rule. A row that asks for none met the
-            // plan.
-            return Err(if row.own_ground_required == 0 {
-                BuildRefusal::NoProject { category }
-            } else {
-                BuildRefusal::GroundNotHeld { category }
+            // The three refusals answer three rules. A project of another
+            // category met the plan first, because it refuses whatever the
+            // row asks for. A row that asks for held ground then met the
+            // ground rule. A row that asks for none met the plan.
+            return Err(match zoned {
+                Some(held) if held != category => BuildRefusal::ProjectHoldsAnother {
+                    zoned: held,
+                    asked: category,
+                },
+                _ if row.own_ground_required == 0 => BuildRefusal::NoProject { category },
+                _ => BuildRefusal::GroundNotHeld { category },
             });
         }
         if self.soldiers.set_build_order(entity, Some(category)) {
@@ -8845,6 +8849,13 @@ fn build_order_of(keys: &[BoundedKey], ceiling: u64) -> Result<Vec<u32>, SortErr
 /// row is permitted only where the builder's own faction zoned a project of
 /// the same category, so the plan is the bound on the reach.[^4]
 ///
+/// **The plan binds every category and not only the reaching one.** An order
+/// that names one category on a tile the builder's own faction zones for
+/// another is refused, whatever the row asks for. Without that clause a
+/// faction plants an upgrade of one category on a tile its own plan zones for
+/// another, and the tile then carries one category and no order can ever
+/// raise the other.[^4] [^5]
+///
 /// The rule reads a column of the resolved row. It names no category, so a
 /// row a caller wrote at run time obeys the same rule as a row of the default
 /// table.[^3]
@@ -8855,20 +8866,31 @@ fn build_order_of(keys: &[BoundedKey], ceiling: u64) -> Result<Vec<u32>, SortErr
 /// [^2]: Recurring defect shapes, shape 1. `.agents/rules/recurring-defects.md`
 /// [^3]: ADR-0151, an upgrade is a category with a ground fit and a level, decision D4. `docs/adrs/draft/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
 /// [^4]: ADR-0152, a faction plans its roads and zones with one solver, decisions D3 and D4. `docs/adrs/accepted/adr-0152-a-faction-plans-its-roads-and-zones-with-one-solver.md`
+/// [^5]: Findings register, FND-496. `docs/FINDINGS.md`
 #[must_use]
 const fn build_is_permitted(
     holder: Holder,
     faction: FactionId,
     row: UpgradeRow,
-    zoned: bool,
+    category: UpgradeCategory,
+    zoned: Option<UpgradeCategory>,
 ) -> bool {
+    // The plan is read once, and both clauses below read that one answer. A
+    // second lookup would be a second declaration of the same fact.[^6]
+    //
+    // [^6]: Recurring defect shapes, shape 1. `.agents/rules/recurring-defects.md`
+    if let Some(held) = zoned {
+        if held.to_u8() != category.to_u8() {
+            return false;
+        }
+    }
     if row.own_ground_required == 0 {
         // A row that asks for no held ground is how a faction reaches ground
         // it does not hold. The plan is the bound that stops it: a unit lays
         // one only inside a project of its own faction.[^4]
         //
         // [^4]: ADR-0152, a faction plans its roads and zones with one solver, decisions D3 and D4. `docs/adrs/accepted/adr-0152-a-faction-plans-its-roads-and-zones-with-one-solver.md`
-        return zoned;
+        return zoned.is_some();
     }
     match holder.faction() {
         Some(held) => held.0 == faction.0,
@@ -8993,7 +9015,8 @@ fn build_intents(
                             holder,
                             faction,
                             row,
-                            plan.zoned_for(faction, tile, category),
+                            category,
+                            plan.zones(faction, tile),
                         ) {
                             return None;
                         }

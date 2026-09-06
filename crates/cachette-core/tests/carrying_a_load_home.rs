@@ -317,12 +317,33 @@ fn the_step_of_a_laden_unit_follows_the_return_field() {
         !expected.is_empty(),
         "the fixture found no laden unit that the field steers, so it measures nothing"
     );
+    // **A sent unit is steered by its destination plane and not by the return
+    // field.** The move pass reads the plane first and takes the option row
+    // only when the unit is free, so a unit the controller sent is no
+    // evidence about the return field at all.[^3] Every laden unit of this
+    // world is on the plane of its own faction, so the fixture frees the ones
+    // it measures and drops any that the step sends again.[^4]
+    //
+    // [^3]: ADR-0125, the control plane names the seed set of a destination field, decision D3. `docs/adrs/draft/adr-0125-the-control-plane-names-the-seed-set-of-a-destination-field.md`
+    // [^4]: Findings register, FND-496. `docs/FINDINGS.md`
+    let freed: Vec<cachette_core::types::Entity> =
+        expected.iter().map(|(unit, _, _)| *unit).collect();
+    world.stop_sending(&freed).expect("every identity is live");
     world.step(2).expect("the step runs");
+    let mut read = 0usize;
     for (unit, here, there) in expected {
+        if world.soldiers().sent(unit) != Some(None) {
+            continue;
+        }
+        read += 1;
         let now = world.soldiers().address(unit).expect("the unit is alive");
         assert!(
             now == there || now == here,
             "a laden unit was sent to {there:?} from {here:?} and it is at {now:?}"
         );
     }
+    assert!(
+        read > 0,
+        "the step sent every unit the fixture freed, so the assertion read none"
+    );
 }
