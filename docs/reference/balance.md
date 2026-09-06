@@ -42,6 +42,17 @@ BLK-150, which asks what raises and lowers renown.[^6]
 | Campaign cohort size, the units one raise takes | The controller, when it raises a campaign | unset, pass 10 | BLK-050 | Provisional default of 4 written by pass 7. Pass 7 took half the founding group of a test fixture, so that a raise leaves the site peopled. The project owner set the founding group to 2 on 5 September 2026, so a cohort of 4 now takes more units than a faction founds with. The rules of the downstream game are not written down, so BLK-050 governs it. A caller sets it with `set_campaign_cohort_size`. Pass 10 measures it. |
 | Campaign cadence, the draw that raises one | The controller, when it draws for a campaign | unset, pass 10 | BLK-050 | Provisional shape written by pass 7: one keyed draw for each faction on each tick at war, yes with probability war weight over the weight range top plus the war weight, the shape the relation move already uses. No separate period exists. BLK-050 governs it. Pass 10 measures it. |
 
+## The plan
+
+| Value | Read by | Set | Blocker | Derivation |
+|---|---|---|---|---|
+| Plan bound, the projects one faction may hold | The plan register, when a write asks for a row | unset, pass 10 | BLK-050 | |
+| Projects one solver pass writes | The solver, at the controller stage | unset, pass 10 | BLK-050 | |
+| Solver pass count | The solver, at the controller stage | unset, pass 10 | BLK-050 | |
+| Path relaxation pass count | The road path search | unset, pass 10 | BLK-050 | |
+| Road search radius, the hex steps a path may span | The road path search, when it builds its window | unset, pass 10 | BLK-050 | |
+| Road spacing, the fewest hex steps between two roads the solver zones | The solver, when it scores a road project | unset, pass 10 | BLK-050 | |
+
 ## The relation
 
 | Value | Read by | Set | Blocker | Derivation |
