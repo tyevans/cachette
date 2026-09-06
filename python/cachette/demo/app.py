@@ -39,6 +39,7 @@ from __future__ import annotations
 import argparse
 import os
 import secrets
+import time
 from typing import TYPE_CHECKING, Protocol
 
 from cachette import Camera, World
@@ -57,6 +58,7 @@ if TYPE_CHECKING:
 from cachette.demo.clock import SPEEDS, Clock, says
 from cachette.demo.settings import Settings
 from cachette.demo.surface import Surface
+from cachette.demo.toasts import Announcer
 
 # The size of the window in pixels.
 WINDOW_WIDTH = 960
@@ -184,12 +186,14 @@ class Demo:
 
     __slots__ = (
         "announced_end",
+        "announcer",
         "camera",
         "clock",
         "overlay",
         "panels",
         "pointer",
         "reference",
+        "seconds",
         "settings",
         "surface",
         "threads",
@@ -230,6 +234,14 @@ class Demo:
         # Whether the game end was printed. The record is written once, and
         # the line is printed once.
         self.announced_end = False
+        # The lines that appear over the map, and the reader that makes them.
+        self.announcer = Announcer()
+        # Where the deck reads the wall clock. **A toast lives for a number of
+        # seconds and not for a number of ticks**, because a tick lasts
+        # thirty-two times longer at the slowest speed than at the fastest,
+        # and a paused world runs no tick at all. A caller replaces this to
+        # drive the fade from a number it holds.
+        self.seconds: Callable[[], float] = time.monotonic
 
     def seed(self) -> list[FoundingReport]:
         """Seed the world from its seed, and give back what each faction got.
@@ -422,11 +434,16 @@ class Demo:
         below one tick for each frame a unit that moved draws between its two
         tiles, and the frame states the speed beside the tick.
         """
+        now = self.seconds()
         for _ in range(self.clock.ticks_due()):
             self.world.step(self.threads)
             self.announce_relations()
             self.announce_campaigns()
             self.announce_trade()
+            # The logs cover the last step alone, so the deck reads them here
+            # and not after the loop. A frame that ran several ticks would
+            # otherwise keep the last of them only.
+            self.announcer.after_step(self.world, now)
         self.announce_end()
         # The pace is the clock's, and the engine holds no clock. The phase
         # is the share of the current tick that has elapsed, and the frame
@@ -450,6 +467,13 @@ class Demo:
             speed_milli=self.clock.speed_milli,
         )
         self.announce(reading)
+        # The counters and the end record are state, so the deck reads them
+        # once for each drawn frame.
+        self.announcer.after_frame(self.world, now)
+        # **The toasts go on last, over the frame the engine filled.** They
+        # are chrome and not the world: nothing here reads a tile or an
+        # entity, so the two drawing paths cannot disagree about the world.
+        self.announcer.toasts.paint(self.surface, now)
         return reading
 
 
