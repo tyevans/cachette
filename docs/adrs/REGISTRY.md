@@ -415,6 +415,9 @@ without stating a constraint is worse than no record.
 | 0157 | A site's free places are its built housing less the residents the engine already counts. Replaces ADR-0081, which review 0199 rejected. Accepted while no code implements it, which its own context states | Accepted | 0009, 0023, 0062, 0082, 0096, 0120, 0145, 0158 | `accepted/adr-0157-a-sites-free-places-are-its-built-housing-less-the-residents-the-engine-counts.md` |
 | 0158 | A site builds a typed unit from a bounded queue its store pays for | Draft | 0004, 0009, 0040, 0062, 0096, 0120, 0144, 0150, 0154, 0156, 0157 | `draft/adr-0158-a-site-builds-a-typed-unit-from-a-bounded-queue-its-store-pays-for.md` |
 | 0159 | A project order names one category for each unit and one seed set for the faction, and the field decides where a unit arrives. Changes ADR-0152 D5, the per-unit assignment; the other decisions of ADR-0152 stand | Draft | 0001, 0004, 0040, 0091, 0095, 0110, 0125, 0144, 0152 | `draft/adr-0159-a-project-order-names-one-category-and-one-seed-set.md` |
+| 0160 | The wind is carried state on the cell lattice, and the pressure gradient accelerates it | Draft | 0002, 0004, 0009, 0022, 0087, 0140, 0141, 0161 | `draft/adr-0160-the-wind-is-carried-state-and-the-pressure-gradient-accelerates-it.md` |
+| 0161 | Water rides the wind, and every transfer is an exact integer move. Changes ADR-0141 D1, the isotropic share; the other decisions of ADR-0141 stand | Draft | 0001, 0004, 0009, 0140, 0141, 0160 | `draft/adr-0161-water-rides-the-wind-and-every-transfer-is-an-exact-integer-move.md` |
+| 0162 | Water enters the air where it is hot, and it falls where the air cools. Changes ADR-0141 D1, the fall and the lift; the account of ADR-0141 D2 stands | Draft | 0140, 0141, 0142, 0143, 0160, 0161 | `draft/adr-0162-water-enters-the-air-where-it-is-hot-and-falls-where-the-air-cools.md` |
 
 ### Retired numbers
 
