@@ -12,7 +12,7 @@ the value was chosen and mark the value provisional. Do not invent a value, and
 do not leave the derivation column empty when the value column holds a number.
 
 **A cost figure is behind an open blocker.** A row that is a cost in ticks or a
-cost in work is governed by BLK-007, and the blocker column names it.[^4] Two
+cost in work is governed by BLK-007, and the blocker column names it.[^4] Several
 rows are behind BLK-130, which asks what weather is worth.[^5] One row is behind
 BLK-150, which asks what raises and lowers renown.[^6]
 
@@ -181,6 +181,19 @@ rows say nothing that one does not.
 | Spoil share, the integer share of a store lost per tick on a flooded cell | The spoilage | unset, pass 10 | BLK-130 | |
 | Unit-loss draw bound, the most units one draw names per flooded cell | The unit loss draw | unset, pass 10 | BLK-130 | |
 | Move cost step on wet ground | The movement pass | unset, pass 10 | BLK-130 | |
+| Wet mark, the ground water at which a cell counts as wet | The gather resolve | unset, pass 10 | BLK-130 | |
+| Lift quantity, the water one lift raises into the air of a cell | The weather solve | unset, pass 10 | BLK-130 | |
+| Lift period, how rarely a cell of open water lifts | The weather solve | unset, pass 10 | BLK-130 | |
+| Heat weight of the mean height of a cell | The heat of a cell | unset, pass 10 | BLK-130 | |
+| Heat weight of the water share of a cell | The heat of a cell | unset, pass 10 | BLK-130 | |
+| Pressure scale, the pressure one step of heat gives | The wind pass | unset, pass 10 | BLK-130 | |
+| Wind acceleration step, the most the wind of a cell changes in one pass | The wind pass | unset, pass 10 | BLK-130 | |
+| Wind drag share, the share of the speed a cell loses in one pass | The wind pass | unset, pass 10 | BLK-130 | |
+| Wind speed ceiling | The wind pass, and the air transport | unset, pass 10 | BLK-130 | |
+| Wind pass count | The weather solve | unset, pass 10 | BLK-007 | |
+| Transport share, the share of the air a cell sends for each step of wind speed | The air transport | unset, pass 10 | BLK-130 | |
+| Evaporation share by heat, the share of the water of a cell that its heat lifts | The weather solve | unset, pass 10 | BLK-130 | |
+| Rain share by cooling, the share of the air that falls for each step of cooling | The weather solve | unset, pass 10 | BLK-130 | |
 
 ## Balance shares
 
