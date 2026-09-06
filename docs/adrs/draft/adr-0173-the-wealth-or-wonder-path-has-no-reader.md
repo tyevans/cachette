@@ -110,17 +110,27 @@ reader rather than to shape a game.
 
 ## Consequences
 
-**Territory decides most runs, and it fires only at the tick limit.**
-Domination asks a faction to remove its rivals or to hold every seat, and no
-seeded run has done either. The contest writes renown, so the renown reader
-does fire, and it ends a run before the limit when a champion reaches the
-target. The share each path takes is a reading the balance register holds,
-and this change moves it.[^3]
+**Removing this reader does not give the game to territory. It gives the
+game to renown.** The contest writes renown, so the renown reader fires in a
+seeded run, and it fires before the tick limit unless the limit arrives
+first. Domination asks a faction to remove its rivals or to hold every seat,
+and no seeded run has done either. So the order that decides a game is now
+renown, then territory at the limit. The balance register holds the readings
+that show it.[^3]
 
-**A run now reaches the tick limit where it did not before.** That is the
-intended shape, because territory at a limit is one of the two paths the
-project wants. It also means the tick limit decides the length of most runs,
-so the limit is load-bearing where it was not.
+**The tick limit decides which of the two fires.** A limit below the tick a
+champion reaches the target on ends the run on territory. A limit above it
+ends the run on renown. That makes the limit load-bearing where it was not,
+and it means a territory win at the limit is a truncation of a renown win
+rather than a separate outcome.
+
+**This is the shape the ruling objected to, at one remove.** The project
+owner refused a path that ended every game early and arbitrarily. Retiring
+that path moved the problem rather than solving it, because a second path had
+the same property and the first one hid it. **A record that gives renown no
+reader, or that changes what renown costs, is the work this one leaves
+open.** It is not decided here, because the ruling this record carries is
+about wealth.
 
 **A finished wonder ends no game.** The build pass, the census row and the
 victory claim column are unchanged. The claim column is read by the reporting

@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-563**
+**Next number: FND-564**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -13657,6 +13657,38 @@ run to answer a different question, and it returned a path that a comment said
 could not fire. A consequence written from that comment went into a draft
 record, and the sweep caught it before review. **Run the sweep before you write
 the consequences.**
+### FND-563 — Retiring the wealth path gave the game to renown, not to territory
+
+**Believed.** The wealth-or-wonder path ended every game of a seeded sweep, so
+retiring it would let domination and territory decide a game. Those are the two
+paths the project owner named as primary. A first sweep at a tick limit of 5000
+appeared to confirm it: territory ended 7 of 8 and renown ended 1 of 8.
+
+**True.** At a tick limit of 20000 the renown path ends 8 of 8, between tick
+3811 and tick 10617. Territory and domination end none. The two runs agree
+exactly. Every seed that the 20000 run ends on renown above tick 5000 is a seed
+that the 5000 run ends on territory at the limit. **A territory win at 5000 is a
+truncated renown win and not a separate outcome.**
+
+**Evidence.** The 8 default seeds on one development machine (ty001-ubuntu,
+x86-64), extent 256, four factions, with the balance sweep script, run at both
+horizons after the wealth-or-wonder reader was removed. A development-machine
+run, and no evidence about the target platform.
+
+**What follows.** **Removing a reader that always fires reveals the next reader
+that always fires. It does not give the game to the path you want.** The wealth
+path hid renown, because it fired earlier. Renown now holds the property the
+project owner objected to: it ends every game, before the limit, on a quantity a
+watcher did not see move. The contest writes renown, so it rises in every seeded
+run.
+
+**Measure the horizon that the question asks about, not the one that is cheap.**
+The first sweep ran at 5000 ticks because the engine holds that limit, and it
+gave a reassuring answer that the longer horizon reversed. A tick limit does not
+decide which path is strong. It decides which path gets to fire.
+
+**Neither domination nor territory has ended a seeded game at any horizon.** The
+paths the project owner wants are still not the paths that decide a run.
 ## References
 
 [^F552A]: The unit-to-tile bridge, the block key. `crates/cachette-core/src/bridge.rs`
