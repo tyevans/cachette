@@ -789,6 +789,17 @@ pub struct Needs<'a> {
     pub holders: &'a [Holder],
     /// Whether the faction's stores fall short of the mark it offers above.
     pub short_of_stores: bool,
+    /// Whether every site of the faction is short of a free place.
+    ///
+    /// A faction whose sites are all full grows nobody, however much food it
+    /// holds, so the housing is the only thing that moves its
+    /// population.[^1] The solver plans a dwelling first while this is true,
+    /// and it returns to a way and a yield as soon as one site has room.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0157, a site's free places are its built housing less the residents the engine counts, decision D2. `docs/adrs/accepted/adr-0157-a-sites-free-places-are-its-built-housing-less-the-residents-the-engine-counts.md`
+    pub short_of_places: bool,
 }
 
 /// Writes the plan of one faction, in a fixed pass count.
@@ -870,6 +881,11 @@ fn choose_target(
     window: &PathWindow,
     plan: &PlanRegister,
 ) -> Option<Target> {
+    // A faction whose every site is full grows nobody, so a lodging comes
+    // before a way and before a yield while that holds.
+    if let Some(address) = choose_lodging_ground(ground, faction, needs, window, plan) {
+        return Some(Target::Lodging(address));
+    }
     let mut best: Option<(i64, u32, Axial)> = None;
     for site in needs.sites {
         if *site == needs.seat {
@@ -911,6 +927,8 @@ enum Target {
     Join(Axial),
     /// Raise the yield of this tile.
     Raise(Axial),
+    /// Lodge more people at this tile.
+    Lodging(Axial),
 }
 
 /// Reports whether every tile of the path to one place already carries a
@@ -1052,10 +1070,125 @@ fn yield_category(ground: &Ground<'_>, address: Axial) -> Option<UpgradeCategory
     })
 }
 
+/// Returns the category whose first row raises the housing of one ground
+/// kind.
+///
+/// The category is asked of the table and never named, in the same way the
+/// yield category is.[^1]
+///
+/// # References
+///
+/// [^1]: ADR-0151, an upgrade is a category with a ground fit and a level, decision D4. `docs/adrs/accepted/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
+fn lodging_category(ground: &Ground<'_>, address: Axial) -> Option<UpgradeCategory> {
+    let kind = ground.terrain.kind(address)?;
+    UpgradeCategory::ALL.into_iter().find(|category| {
+        ground
+            .table
+            .row(*category, 1)
+            .is_some_and(|row| row.exists() && row.fits(kind) && row.housing_change > 0)
+    })
+}
+
+/// Chooses the held tile that a lodging would house people at.
+///
+/// **A lodging only counts where it reaches a site.** The housing of a
+/// finished level raises the settlement on its own tile or on one of the six
+/// beside it, so the solver zones only a tile that stands on or beside a site
+/// of the faction.[^1] A lodging anywhere else would be built and would
+/// house nobody.
+///
+/// The faction must hold the tile, the tile must carry no upgrade, and the
+/// table must hold a housing row that fits the ground. An empty tile wins
+/// over a tile the plan already names, then the least cost wins, and the
+/// lower tile index breaks a tie.
+///
+/// **A tile the plan already names takes the new category**, which is the
+/// rule the plan register already applies.[^2] A plan full of ways would
+/// otherwise leave a crowded faction with no way to zone the one thing that
+/// moves its population.
+///
+/// The solver zones one lodging at a time. A plan that already names one
+/// returns nothing here, so the solver does its other work until that
+/// lodging stands.
+///
+/// # References
+///
+/// [^1]: ADR-0157, a site's free places are its built housing less the residents the engine counts, decision D1. `docs/adrs/accepted/adr-0157-a-sites-free-places-are-its-built-housing-less-the-residents-the-engine-counts.md`
+/// [^2]: ADR-0152, a faction plans its roads and zones with one solver, decision D1. `docs/adrs/accepted/adr-0152-a-faction-plans-its-roads-and-zones-with-one-solver.md`
+fn choose_lodging_ground(
+    ground: &Ground<'_>,
+    faction: FactionId,
+    needs: &Needs<'_>,
+    window: &PathWindow,
+    plan: &PlanRegister,
+) -> Option<Axial> {
+    if !needs.short_of_places {
+        return None;
+    }
+    // The first part of the key says whether the plan already names the
+    // tile. An empty tile therefore wins over a tile the plan holds, and the
+    // solver takes a held tile only when it has no other choice.
+    let mut best: Option<(u32, i64, u32, Axial)> = None;
+    for cell in 0..window.tile.len() {
+        let index = window.tile[cell];
+        if index == NO_TILE {
+            continue;
+        }
+        let tile = TileIdx(index);
+        if needs
+            .holders
+            .get(index as usize)
+            .and_then(|holder| holder.faction())
+            .map(|held| held.0)
+            != Some(faction.0)
+        {
+            continue;
+        }
+        if ground.upgrades.at(tile).is_some() {
+            continue;
+        }
+        let Some(address) = ground.grid.address_of(tile) else {
+            continue;
+        };
+        if !reaches_a_site(ground, needs, address) {
+            continue;
+        }
+        let Some(category) = lodging_category(ground, address) else {
+            continue;
+        };
+        let zoned = plan.zones(faction, tile);
+        if zoned == Some(category) {
+            // The plan already asks for a lodging here. One is enough, so
+            // the solver returns to its other work until this one stands.
+            return None;
+        }
+        let Some(cost) = window.cost_of(address) else {
+            continue;
+        };
+        let key = (u32::from(zoned.is_some()), cost, index, address);
+        if best.is_none_or(|held| key < held) {
+            best = Some(key);
+        }
+    }
+    best.map(|(_, _, _, address)| address)
+}
+
+/// Reports whether one address stands on a site of the faction or beside one.
+///
+/// The sites arrive in ascending tile order, so the test is a search and not
+/// a scan.
+fn reaches_a_site(ground: &Ground<'_>, needs: &Needs<'_>, address: Axial) -> bool {
+    core::iter::once(Some(address))
+        .chain(ground.grid.neighbours(address))
+        .filter_map(|place| place.and_then(|near| ground.grid.index_of(near)))
+        .any(|tile| needs.sites.binary_search(&tile).is_ok())
+}
+
 /// Writes the projects of one target into the plan.
 ///
 /// A join writes every tile of the path with the joining category. A raise
-/// writes one tile with the yield category. A tile that already carries a
+/// writes one tile with the yield category, and a lodging writes one tile with
+/// the housing category. A tile that already carries a
 /// finished joining upgrade is skipped, and so is a tile the plan already
 /// names. The write stops at the projects one pass may write, and a plan at
 /// its bound drops the rest and counts each drop.[^1]
@@ -1080,7 +1213,7 @@ fn write_path(
             Some(path) => (path, false),
             None => return 0,
         },
-        Target::Raise(address) => match ground.grid.index_of(address) {
+        Target::Raise(address) | Target::Lodging(address) => match ground.grid.index_of(address) {
             Some(tile) => (vec![tile], true),
             None => return 0,
         },
@@ -1095,16 +1228,26 @@ fn write_path(
         if !raise && (tile == needs.seat || ground.joined(tile)) {
             continue;
         }
-        if plan.zones(faction, tile).is_some() {
+        // **A lodging takes a tile the plan already names.** The plan
+        // register replaces the category on such a tile, and a plan full of
+        // ways would otherwise leave a crowded faction unable to zone the
+        // one thing that moves its population.[^2]
+        //
+        // [^2]: ADR-0152, a faction plans its roads and zones with one solver, decision D1. `docs/adrs/accepted/adr-0152-a-faction-plans-its-roads-and-zones-with-one-solver.md`
+        let replaces = matches!(target, Target::Lodging(_));
+        if !replaces && plan.zones(faction, tile).is_some() {
             continue;
         }
-        let category = if raise {
-            ground
+        let category = match target {
+            Target::Join(_) => ground.joining_category(tile),
+            Target::Raise(_) => ground
                 .grid
                 .address_of(tile)
-                .and_then(|address| yield_category(ground, address))
-        } else {
-            ground.joining_category(tile)
+                .and_then(|address| yield_category(ground, address)),
+            Target::Lodging(_) => ground
+                .grid
+                .address_of(tile)
+                .and_then(|address| lodging_category(ground, address)),
         };
         let Some(category) = category else {
             continue;
