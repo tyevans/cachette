@@ -20,8 +20,8 @@ use std::collections::BTreeSet;
 
 use cachette_core::controller::NO_SEAT;
 use cachette_core::{
-    Axial, ControllerCommand, FactionId, GameEnd, WinPath, World, WorldConfig, COMMAND_BUILD,
-    COMMAND_GATHER, SUBSYSTEM_CENSUS,
+    Axial, CensusBasis, ControllerCommand, FactionId, GameEnd, WinPath, World, WorldConfig,
+    COMMAND_BUILD, COMMAND_GATHER, SUBSYSTEM_CENSUS,
 };
 
 const THREADS: usize = 2;
@@ -458,6 +458,60 @@ fn the_census_has_one_declaration_and_every_row_answers() {
     assert!(count("luxury_tiles") > 0);
     assert!(count("controller_commands") > 0);
     assert_eq!(count("game_ended"), 0);
+}
+
+#[test]
+fn a_total_row_never_falls_and_the_game_end_does_not_erase_what_the_run_did() {
+    // The extreme: a run that acts, then ends. The controller emits nothing
+    // after the end, so a row that read the last tick would fall to zero
+    // however busy the run was.
+    let mut world = World::new(config(2, 28)).expect("the extent describes a world");
+    world.seed_world().expect("a fresh world seeds once");
+    world.set_tick_limit(3);
+    let mut highest: Vec<i64> = vec![0; SUBSYSTEM_CENSUS.len()];
+    let mut busy = 0i64;
+    for _ in 0..9 {
+        world.step(THREADS).expect("the step runs");
+        let census = world.subsystem_census();
+        for (index, row) in SUBSYSTEM_CENSUS.iter().enumerate() {
+            let count = census[index].1;
+            if row.basis == CensusBasis::Total {
+                assert!(
+                    count >= highest[index],
+                    "the total row {} fell from {} to {count}",
+                    row.name,
+                    highest[index]
+                );
+                highest[index] = count;
+            }
+        }
+        if world.game_end().is_set() {
+            continue;
+        }
+        busy = census
+            .iter()
+            .find(|(name, _)| *name == "controller_commands")
+            .expect("the row exists")
+            .1;
+    }
+    assert!(busy > 0, "the controller acted before the game ended");
+    assert!(world.game_end().is_set(), "the tick limit ended the game");
+    assert!(
+        world.controller_log().is_empty(),
+        "the controller emits nothing after the end"
+    );
+    let census = world.subsystem_census();
+    let count = |name: &str| {
+        census
+            .iter()
+            .find(|(row, _)| *row == name)
+            .expect("the row exists")
+            .1
+    };
+    assert!(
+        count("controller_commands") >= busy,
+        "the census still says what the run did"
+    );
 }
 
 #[test]

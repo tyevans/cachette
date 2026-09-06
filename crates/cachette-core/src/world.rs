@@ -1084,6 +1084,71 @@ pub struct World {
     ///
     /// [^1]: ADR-0152, a faction plans its roads and zones with one solver, decision D1. `docs/adrs/accepted/adr-0152-a-faction-plans-its-roads-and-zones-with-one-solver.md`
     plan: PlanRegister,
+    /// What the run has produced, for the subsystems that keep a per-tick
+    /// count.
+    ///
+    /// The controller, the campaign register, the relation matrix and the
+    /// queue table each empty their counts when the next tick starts. The
+    /// world folds each count into this total at the one site that empties
+    /// it, so the census reads a total for the whole run and never a reading
+    /// of one tick.[^1]
+    ///
+    /// **This is not simulated state and it does not enter the hash.** No
+    /// frame reads it. It is a derived count of what already happened, in
+    /// the way the per-tick counts it folds are.[^2]
+    ///
+    /// # References
+    ///
+    /// [^1]: Findings register, FND-498. `docs/FINDINGS.md`
+    /// [^2]: ADR-0001, one binary gives one answer at any thread count, decision D4. `docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
+    census: CensusTotals,
+}
+
+/// What the run has produced, for each subsystem that counts one tick at a
+/// time.
+///
+/// Every field is a total since the world was built. A total never falls.
+///
+/// **The world folds a per-tick count into a field here at the one site that
+/// empties that count.** The per-tick counter stays the only place that
+/// counts the act, so this is a fold of one number and not a second place
+/// that counts the same thing.[^1]
+///
+/// # References
+///
+/// [^1]: Recurring Defect Shapes, shape 1. `.claude/rules/recurring-defects.md`
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+struct CensusTotals {
+    /// The commands a verb took, over the run.
+    controller_commands: i64,
+    /// The commands a verb refused, over the run.
+    controller_refused: i64,
+    /// The relation moves the controller made through the verb, over the run.
+    relation_moves: i64,
+    /// The boards the trading stage wrote, over the run.
+    boards_written: i64,
+    /// The offers the trading stage opened, over the run.
+    offers_made: i64,
+    /// The contracts the trading stage bound, over the run.
+    contracts_bound: i64,
+    /// The carriers the trading stage assigned, over the run.
+    carriers_assigned: i64,
+    /// The crossings into the war band, over the run, from any cause.
+    wars_declared: i64,
+    /// The campaigns raised, over the run.
+    campaigns_raised: i64,
+    /// The campaigns whose objective passed to the campaigner, over the run.
+    campaigns_won: i64,
+    /// The units the queues produced, over the run.
+    queue_produced: i64,
+    /// The finished entries an advance refused for want of a resident, over
+    /// the run.
+    queue_refused_without_a_person: i64,
+    /// The finished entries an advance refused for want of goods, over the
+    /// run.
+    queue_refused_without_goods: i64,
+    /// The orders the queue verb refused, over the run.
+    queue_refused_at_the_verb: i64,
 }
 
 impl World {
@@ -1156,6 +1221,7 @@ impl World {
             controller: Controller::new(config.seed, config.faction_count),
             campaigns: CampaignRegister::new(config.faction_count),
             plan: PlanRegister::new(config.faction_count, PlanRules::DEFAULT),
+            census: CensusTotals::default(),
             schedule: RateSchedule::DEFAULT,
             rates: RateTable::new(),
             rate_ledger: RateLedger::ZERO,
@@ -4532,6 +4598,7 @@ impl World {
         }
 
         self.trade_log.clear();
+        self.fold_relations_into_the_census();
         self.relations.clear_log();
         self.tick = Tick(self.tick.0.wrapping_add(1));
 
@@ -8220,7 +8287,9 @@ impl World {
     /// [^7]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
     fn advance_queues(&mut self) {
         // The counts are a census of one tick, and this stage is where the
-        // tick starts for them.
+        // tick starts for them. The run total takes what they hold before
+        // they are emptied.
+        self.fold_queues_into_the_census();
         self.queues.clear_counts();
         if !self.queue_schedule.due(self.tick) {
             return;
@@ -9995,8 +10064,29 @@ pub const LUXURY_DEPOSITS_DEFAULT: u32 = 8;
 pub struct CensusRow {
     /// The name of the subsystem, as the census prints it.
     pub name: &'static str,
+    /// What the count measures: what the world holds, or what the run made.
+    pub basis: CensusBasis,
     /// The reader that counts what the subsystem produced.
     pub read: fn(&World) -> i64,
+}
+
+/// What a census count measures.
+///
+/// **Every row states its basis, so a reader never has to know one.** A table
+/// that held a per-tick row beside a run total would give one zero two
+/// meanings, and a reader could not tell them apart.[^1]
+///
+/// # References
+///
+/// [^1]: Findings register, FND-498. `docs/FINDINGS.md`
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum CensusBasis {
+    /// What the world holds at the tick the reader runs. The count falls when
+    /// the world loses what it counts.
+    Held,
+    /// What the run has made since the world was built. The count never
+    /// falls, so a zero means that the thing never happened.
+    Total,
 }
 
 impl std::fmt::Debug for CensusRow {
@@ -10014,20 +10104,64 @@ impl std::fmt::Debug for CensusRow {
 /// in a 64-bit accumulator, so no count depends on the margin of a narrower
 /// type.[^1]
 ///
+/// **No row reports one tick.** A row states its basis. A held row counts
+/// what the world holds now. A total row counts what the run made since the
+/// world was built, and a zero in it means that the thing never happened.
+/// Two rows once reported the last tick beside rows that reported the run,
+/// and a reader could not tell which was which.[^2]
+///
 /// # References
 ///
 /// [^1]: ADR-0002, simulated and aggregated state holds no floating point number, decision D3. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
+/// [^2]: Findings register, FND-498. `docs/FINDINGS.md`
 pub const SUBSYSTEM_CENSUS: &[CensusRow] = &[
     CensusRow {
         name: "units",
+        basis: CensusBasis::Held,
         read: |world| i64::from(world.soldiers.len()),
     },
     CensusRow {
         name: "settlements",
+        basis: CensusBasis::Held,
         read: |world| i64::from(world.settlements.len()),
+    },
+    // What the build queue of every site has made, and what it has refused.
+    // The two refusals of a finished entry stay apart, because they mean
+    // different things to a watcher. A watcher then tells a site with no
+    // resident to spend from a site whose store cannot pay.[^4]
+    //
+    // [^4]: ADR-0158, a site builds a typed unit from a bounded queue its store pays for, decision D6. `docs/adrs/draft/adr-0158-a-site-builds-a-typed-unit-from-a-bounded-queue-its-store-pays-for.md`
+    CensusRow {
+        name: "queue_produced",
+        basis: CensusBasis::Total,
+        read: |world| world.census.queue_produced + i64::from(world.queues.produced()),
+    },
+    CensusRow {
+        name: "queue_refused_without_a_person",
+        basis: CensusBasis::Total,
+        read: |world| {
+            world.census.queue_refused_without_a_person
+                + i64::from(world.queues.refused_without_a_person())
+        },
+    },
+    CensusRow {
+        name: "queue_refused_without_goods",
+        basis: CensusBasis::Total,
+        read: |world| {
+            world.census.queue_refused_without_goods
+                + i64::from(world.queues.refused_without_goods())
+        },
+    },
+    CensusRow {
+        name: "queue_refused_at_the_verb",
+        basis: CensusBasis::Total,
+        read: |world| {
+            world.census.queue_refused_at_the_verb + i64::from(world.queues.refused_at_the_verb())
+        },
     },
     CensusRow {
         name: "seats_filled",
+        basis: CensusBasis::Held,
         read: |world| {
             world
                 .positions
@@ -10039,10 +10173,12 @@ pub const SUBSYSTEM_CENSUS: &[CensusRow] = &[
     },
     CensusRow {
         name: "characters",
+        basis: CensusBasis::Held,
         read: |world| world.characters.iter().count() as i64,
     },
     CensusRow {
         name: "upgrades_complete",
+        basis: CensusBasis::Held,
         read: |world| {
             world
                 .upgrades
@@ -10054,6 +10190,7 @@ pub const SUBSYSTEM_CENSUS: &[CensusRow] = &[
     },
     CensusRow {
         name: "wonders_complete",
+        basis: CensusBasis::Held,
         // The count reads the victory claim column of the row that stands on
         // each tile. It names no category.[^1]
         //
@@ -10067,6 +10204,7 @@ pub const SUBSYSTEM_CENSUS: &[CensusRow] = &[
     },
     CensusRow {
         name: "stores_built",
+        basis: CensusBasis::Held,
         // The count reads the store capacity column of the row that stands on
         // each tile. It names no category.[^1]
         //
@@ -10080,16 +10218,22 @@ pub const SUBSYSTEM_CENSUS: &[CensusRow] = &[
     },
     CensusRow {
         name: "luxury_tiles",
+        basis: CensusBasis::Held,
         read: |world| world.luxuries.len() as i64,
     },
-    // A storm is counted as one while the raised total is above zero. A
-    // later pass counts the storms themselves.
+    // A storm stands while the raised total is above zero. **This row counts
+    // no storm.** Its name says more than the reader reads, and a pass that
+    // counts the storms themselves must replace it.[^5]
+    //
+    // [^5]: Findings register, FND-498. `docs/FINDINGS.md`
     CensusRow {
         name: "storms_raised",
+        basis: CensusBasis::Held,
         read: |world| i64::from(world.weather.raised() > 0),
     },
     CensusRow {
         name: "contracts",
+        basis: CensusBasis::Held,
         read: |world| {
             world
                 .trade
@@ -10099,32 +10243,40 @@ pub const SUBSYSTEM_CENSUS: &[CensusRow] = &[
                 .count() as i64
         },
     },
-    // The four rows below are what the trading controller did on the last
-    // tick. Each one counts an act of the stage and not a state of the world,
+    // The four rows below are what the trading controller has done over the
+    // run. Each one counts an act of the stage and not a state of the world,
     // in the way the controller command row does.
     CensusRow {
         name: "boards_written",
-        read: |world| i64::from(world.controller.boards_written()),
+        basis: CensusBasis::Total,
+        read: |world| world.census.boards_written + i64::from(world.controller.boards_written()),
     },
     CensusRow {
         name: "offers_made",
-        read: |world| i64::from(world.controller.offers_made()),
+        basis: CensusBasis::Total,
+        read: |world| world.census.offers_made + i64::from(world.controller.offers_made()),
     },
     CensusRow {
         name: "contracts_bound",
-        read: |world| i64::from(world.controller.contracts_bound()),
+        basis: CensusBasis::Total,
+        read: |world| world.census.contracts_bound + i64::from(world.controller.contracts_bound()),
     },
     CensusRow {
         name: "carriers_assigned",
-        read: |world| i64::from(world.controller.carriers_assigned()),
+        basis: CensusBasis::Total,
+        read: |world| {
+            world.census.carriers_assigned + i64::from(world.controller.carriers_assigned())
+        },
     },
     CensusRow {
         name: "controller_commands",
-        read: |world| i64::from(world.controller.applied()),
+        basis: CensusBasis::Total,
+        read: |world| world.census.controller_commands + i64::from(world.controller.applied()),
     },
     CensusRow {
         name: "controller_refused",
-        read: |world| i64::from(world.controller.refused()),
+        basis: CensusBasis::Total,
+        read: |world| world.census.controller_refused + i64::from(world.controller.refused()),
     },
     // What the plans of every faction have taken, finished, dropped and
     // refused. The record asks that a drop and a refusal each be counted.[^3]
@@ -10132,57 +10284,57 @@ pub const SUBSYSTEM_CENSUS: &[CensusRow] = &[
     // [^3]: ADR-0152, a faction plans its roads and zones with one solver, decisions D1, D4 and D5. `docs/adrs/accepted/adr-0152-a-faction-plans-its-roads-and-zones-with-one-solver.md`
     CensusRow {
         name: "projects_zoned",
+        basis: CensusBasis::Total,
         read: |world| world.plan.zoned_count(),
     },
     CensusRow {
         name: "projects_finished",
+        basis: CensusBasis::Total,
         read: |world| world.plan.finished_count(),
     },
     CensusRow {
         name: "projects_dropped",
+        basis: CensusBasis::Total,
         read: |world| world.plan.dropped_count(),
     },
     CensusRow {
         name: "projects_refused",
+        basis: CensusBasis::Total,
         read: |world| world.plan.refused_count(),
     },
     CensusRow {
         name: "plan_passes",
+        basis: CensusBasis::Total,
         read: |world| world.plan.pass_count(),
     },
     CensusRow {
         name: "game_ended",
+        basis: CensusBasis::Total,
         read: |world| i64::from(world.controller.game_end().is_set()),
     },
-    // The relation moves the controller made through the verb on the last
-    // tick, and the crossings into the war band on the last tick from any
-    // cause.
+    // The relation moves the controller made through the verb over the run,
+    // and the crossings into the war band over the run, from any cause.
     CensusRow {
         name: "relation_moves",
-        read: |world| {
-            world
-                .controller
-                .log()
-                .iter()
-                .filter(|command| {
-                    command.kind == controller::COMMAND_RELATION && command.applied != 0
-                })
-                .count() as i64
-        },
+        basis: CensusBasis::Total,
+        read: |world| world.census.relation_moves + world.relation_moves_of_the_log(),
     },
     CensusRow {
         name: "wars_declared",
-        read: |world| world.relations.declarations(),
+        basis: CensusBasis::Total,
+        read: |world| world.census.wars_declared + world.relations.declarations(),
     },
-    // The campaigns raised on the last tick, by the controller or by a
-    // caller, and the campaigns whose objective passed to the campaigner.
+    // The campaigns raised over the run, by the controller or by a caller,
+    // and the campaigns whose objective passed to the campaigner.
     CensusRow {
         name: "campaigns_raised",
-        read: |world| world.campaigns.count(campaign::EVENT_RAISED),
+        basis: CensusBasis::Total,
+        read: |world| world.census.campaigns_raised + world.campaigns.count(campaign::EVENT_RAISED),
     },
     CensusRow {
         name: "campaigns_won",
-        read: |world| world.campaigns.count(campaign::EVENT_WON),
+        basis: CensusBasis::Total,
+        read: |world| world.census.campaigns_won + world.campaigns.count(campaign::EVENT_WON),
     },
 ];
 
@@ -10662,6 +10814,60 @@ impl World {
     #[must_use]
     pub fn controller_log(&self) -> &[ControllerCommand] {
         self.controller.log()
+    }
+
+    /// Returns how many relation moves the controller made through the verb
+    /// on the tick the log holds.
+    fn relation_moves_of_the_log(&self) -> i64 {
+        self.controller
+            .log()
+            .iter()
+            .filter(|command| command.kind == controller::COMMAND_RELATION && command.applied != 0)
+            .count() as i64
+    }
+
+    /// Adds what the controller log holds to the run total.
+    ///
+    /// The caller calls this immediately before it empties the log.
+    fn fold_the_controller_into_the_census(&mut self) {
+        let moves = self.relation_moves_of_the_log();
+        let totals = &mut self.census;
+        totals.controller_commands += i64::from(self.controller.applied());
+        totals.controller_refused += i64::from(self.controller.refused());
+        totals.relation_moves += moves;
+        totals.boards_written += i64::from(self.controller.boards_written());
+        totals.offers_made += i64::from(self.controller.offers_made());
+        totals.contracts_bound += i64::from(self.controller.contracts_bound());
+        totals.carriers_assigned += i64::from(self.controller.carriers_assigned());
+    }
+
+    /// Adds what the campaign log holds to the run total.
+    ///
+    /// The caller calls this immediately before it empties the log.
+    fn fold_campaigns_into_the_census(&mut self) {
+        let raised = self.campaigns.count(campaign::EVENT_RAISED);
+        let won = self.campaigns.count(campaign::EVENT_WON);
+        self.census.campaigns_raised += raised;
+        self.census.campaigns_won += won;
+    }
+
+    /// Adds what the relation log holds to the run total.
+    ///
+    /// The caller calls this immediately before it empties the log.
+    fn fold_relations_into_the_census(&mut self) {
+        let declarations = self.relations.declarations();
+        self.census.wars_declared += declarations;
+    }
+
+    /// Adds what the queue counts hold to the run total.
+    ///
+    /// The caller calls this immediately before it empties the counts.
+    fn fold_queues_into_the_census(&mut self) {
+        let totals = &mut self.census;
+        totals.queue_produced += i64::from(self.queues.produced());
+        totals.queue_refused_without_a_person += i64::from(self.queues.refused_without_a_person());
+        totals.queue_refused_without_goods += i64::from(self.queues.refused_without_goods());
+        totals.queue_refused_at_the_verb += i64::from(self.queues.refused_at_the_verb());
     }
 
     /// Returns the subsystem census: one count for each row of the one
@@ -11244,6 +11450,13 @@ impl World {
     /// [^1]: ADR-0148, a game end is recorded once and stops the controllers, decisions D2 and D4. `docs/adrs/accepted/adr-0148-a-game-end-is-recorded-once-and-stops-the-controllers.md`
     /// [^2]: ADR-0144, a faction controller runs inside the step and acts only through the caller's verbs, decisions D2, D4 and D5. `docs/adrs/accepted/adr-0144-a-faction-controller-runs-inside-the-step-and-acts-only-through-the-callers-verbs.md`
     fn run_controller(&mut self) {
+        // The run total takes what the two logs hold before they are
+        // emptied, so a census row says what the run did and not what the
+        // last tick did.[^5]
+        //
+        // [^5]: Findings register, FND-498. `docs/FINDINGS.md`
+        self.fold_the_controller_into_the_census();
+        self.fold_campaigns_into_the_census();
         self.controller.clear_log();
         self.campaigns.clear_log();
         self.check_game_end();

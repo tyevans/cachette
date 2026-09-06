@@ -69,9 +69,14 @@ def test_the_controller_writes_a_board_on_its_schedule_tick() -> None:
     """
     world = seeded_world()
     world.set_advertisement_schedule(4, 1)
+    # The census row is a total for the run, so the test reads what one tick
+    # added to it and not the row itself.
+    before = world.subsystem_census()["boards_written"]
     for _ in range(13):
         world.step(threads=1)
-        written = world.subsystem_census()["boards_written"]
+        after = world.subsystem_census()["boards_written"]
+        written = after - before
+        before = after
         if world.tick % 4 == 1:
             assert written > 0, f"tick {world.tick} wrote no board"
         else:

@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-498**
+**Next number: FND-499**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -12296,9 +12296,66 @@ The repair was proved twice. The assertion goes red when the expected
 neighbour is turned by one, so the fixture reaches the case. The test is green
 with the clause and green without it, so it no longer measures the clause.
 
+### FND-498 — Two census rows read the last tick, so a busy run reported zero
+
+**Believed.** The subsystem census says what a run produced. Every row of the
+one table shares one time base, so a zero in any row means that the thing
+never happened.[^F483A]
+
+**True.** Two rows read the last tick and not the run. The controller empties
+its log and its refusal count at the top of every controller stage, and the
+command count filters that per-tick log.[^F498B] The trading rows beside them
+did the same, and so did the relation, war and campaign rows. A game end stops
+the controller, so both controller rows read zero at the end of every game,
+however busy the run was.[^F496J] A reader could not tell a run that never
+acted from a run that stopped acting.
+
+The build queue registered no row at all. The queue counted what it made and
+kept its three refusals apart, and the binding layer answered them through a
+second dictionary of its own.[^F498D] One question had two ways to ask it, and
+the one table said nothing about the newest subsystem.
+
+**Evidence.** Written on 5 September 2026, during item 0278. A run of nine
+ticks with a tick limit of three acted on the first two ticks and ended on the
+third. Under the old readers the command row fell from 7 to 5 and then to
+zero, and the new test names the row and the fall. A run that built one unit
+from a queue read one on the tick that built it and zero three ticks later.
+The balance harness recorded the artefact as a fact: it listed the two
+controller rows as zero in every game of an eight-seed set, and the register
+holds that reading.[^F498E]
+
+**Follows.** Four things.
+
+**Every judgement made from the census while these rows were wrong is
+suspect.** That includes the reading that roads were never built and the
+reading that the controller does nothing, and it includes every zero the
+balance harness reported for a row that counted an act.
+
+**A census of a run states the basis of each row.** Each row now says whether
+it counts what the world holds now, or what the run has made since it was
+built. A total never falls, so a zero in it means that the thing never
+happened.
+
+**A total is folded where the per-tick count is emptied.** The world adds each
+per-tick count to a run total at the one site that clears it. The per-tick
+counter stays the only place that counts the act, so nothing counts one act
+twice.[^F498F]
+
+**One table answers one question.** The queue rows are rows of the census, and
+the second dictionary is gone. Nothing outside its own tests called it, which
+is the shape of a capability nobody invokes.[^F498G]
+
+One row still says more than it reads. The storm row reports whether a storm
+stands now, and its name promises a count of storms. A pass that counts the
+storms themselves must replace it.
 
 ## References
 
+[^F498B]: The controller log, the refusal count and the stage that empties them. `crates/cachette-core/src/controller.rs`
+[^F498D]: ADR-0158, a site builds a typed unit from a bounded queue its store pays for, decision D6. `docs/adrs/draft/adr-0158-a-site-builds-a-typed-unit-from-a-bounded-queue-its-store-pays-for.md`
+[^F498E]: Balance register, the seed set row. `docs/reference/balance.md`
+[^F498F]: Recurring Defect Shapes, shape 1. `.agents/rules/recurring-defects.md`
+[^F498G]: Recurring Defect Shapes, shape 3. `.agents/rules/recurring-defects.md`
 [^F495A]: The queue of a site, and the bound a world enforces. `crates/cachette-core/src/production.rs`
 [^F496A]: Backlog item 0488, the outcome. `docs/backlog/complete/0488-plan-roads-and-zones-with-a-faction-solver-at-the-controller-stage.md`
 [^F496C]: ADR-0144, a faction controller runs inside the step and acts only through the caller's verbs, decisions D4 and D5. `docs/adrs/accepted/adr-0144-a-faction-controller-runs-inside-the-step-and-acts-only-through-the-callers-verbs.md`

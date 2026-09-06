@@ -232,9 +232,12 @@ def test_the_seed_set_row_turns_the_census_statement_into_a_check(
     report = json.loads(out.read_text(encoding="utf-8"))
     zero = report["statements"][3]
     assert zero["row"] == SEED_SET_ROW
-    # The controller emits nothing after the game end, so its command count
-    # is zero at the end of every game, and the list is never empty.
-    assert "controller_commands" in report["zero_in_every_game"]
+    # Nothing in a short game makes a unit from a build queue, so that count
+    # is zero in every game and the list is never empty. The controller
+    # command count is not in the list, because the census counts the whole
+    # run and the controller acted before the game ended.
+    assert "queue_produced" in report["zero_in_every_game"]
+    assert "controller_commands" not in report["zero_in_every_game"]
     assert code == 1
     assert zero["verdict"] == "fail"
     assert zero["failing_seeds"] == [1, 2]

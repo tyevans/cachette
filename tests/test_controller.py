@@ -39,6 +39,10 @@ FACTIONS = 2
 CENSUS_NAMES = [
     "units",
     "settlements",
+    "queue_produced",
+    "queue_refused_without_a_person",
+    "queue_refused_without_goods",
+    "queue_refused_at_the_verb",
     "seats_filled",
     "characters",
     "upgrades_complete",
@@ -113,7 +117,9 @@ def test_the_externally_controlled_flag_is_off_and_settable() -> None:
     world.set_externally_controlled(1, True)
     assert world.is_externally_controlled(1) is True
     world.step(1)
-    assert world.subsystem_census()["controller_commands"] == 0
+    # The row is a total for the run, so the silence shows as a count that
+    # stops rising. It does not show as a zero.
+    assert world.subsystem_census()["controller_commands"] == active
     with pytest.raises(VerbError):
         world.set_externally_controlled(FACTIONS, True)
 
@@ -133,12 +139,17 @@ def test_the_game_ends_once_on_territory_and_the_world_keeps_stepping() -> None:
     assert end["winner"] in range(FACTIONS)
     assert isinstance(world.score(end["winner"]), int)
     before = world.state_hash()
+    busy = world.subsystem_census()["controller_commands"]
+    assert busy > 0, "the controller acted before the game ended"
     for _ in range(5):
         world.step(1)
     assert world.game_end() == end
     assert world.tick == 8
     assert world.state_hash() != before
-    assert world.subsystem_census()["controller_commands"] == 0
+    # The controller emits nothing after the end. The census still says what
+    # it did, because the row is a total for the run and not a reading of the
+    # last tick.
+    assert world.subsystem_census()["controller_commands"] == busy
     assert world.subsystem_census()["game_ended"] == 1
     with pytest.raises(VerbError):
         world.score(FACTIONS)
@@ -179,7 +190,7 @@ def test_the_demonstration_runs_to_the_end_and_prints_the_census(
     wins = [line for line in lines if "wins by territory" in line]
     assert wins == ["tick 4: faction " + wins[0].split("faction ")[1]]
     assert any(line.startswith("the game ended at tick 4:") for line in lines)
-    assert any(line.startswith("census at tick 4") for line in lines)
+    assert any(line.startswith("census of the run at tick 4") for line in lines)
     for name in CENSUS_NAMES:
         assert any(line.strip().startswith(f"{name}:") for line in lines), name
 

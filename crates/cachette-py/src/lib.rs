@@ -1361,34 +1361,6 @@ impl PyWorld {
         Ok(columns)
     }
 
-    /// Returns what the queues did on the last step, as a `dict` of integers.
-    ///
-    /// The keys are `produced`, `refused_without_a_person`,
-    /// `refused_without_goods` and `refused_at_the_verb`.
-    ///
-    /// **The two refusals of a finished entry are counted apart**, because
-    /// they mean different things to a watcher and to a learner. A watcher
-    /// reading a queue that never moves can then tell a site with no people
-    /// from a site with no goods.[^1]
-    ///
-    /// The counts cover the last step. The next step empties them.
-    ///
-    /// # References
-    ///
-    /// [^1]: ADR-0158, a site builds a typed unit from a bounded queue its store pays for, decision D6. `docs/adrs/draft/adr-0158-a-site-builds-a-typed-unit-from-a-bounded-queue-its-store-pays-for.md`
-    fn queue_census<'py>(&self, python: Python<'py>) -> PyResult<Bound<'py, PyDict>> {
-        let world = self.lock();
-        let counts = PyDict::new(python);
-        counts.set_item("produced", world.queue_produced())?;
-        counts.set_item(
-            "refused_without_a_person",
-            world.queue_refused_without_a_person(),
-        )?;
-        counts.set_item("refused_without_goods", world.queue_refused_without_goods())?;
-        counts.set_item("refused_at_the_verb", world.queue_refused_at_the_verb())?;
-        Ok(counts)
-    }
-
     /// Writes the build cost of one unit type.
     ///
     /// The unit type is a row of the shared unit type table, as an integer.
@@ -4062,12 +4034,18 @@ impl PyWorld {
     /// **One Rust table declares the list.** Each row names a subsystem and
     /// the reader that counts what it produced, and this call walks that
     /// table. Nothing else declares the names, so a name here is a name the
-    /// engine holds.[^1] The counts of the controller are counts of the last
-    /// step.
+    /// engine holds.[^1]
+    ///
+    /// **No count covers one step.** A count says what the world holds now,
+    /// or what the run has made since the world was built. A count of the
+    /// second kind never falls, so a zero in it means that the thing never
+    /// happened. The build queue counts are rows of this table, and the
+    /// queue has no census of its own.[^2]
     ///
     /// # References
     ///
     /// [^1]: Recurring Defect Shapes, shape 1. `.claude/rules/recurring-defects.md`
+    /// [^2]: Findings register, FND-498. `docs/FINDINGS.md`
     fn subsystem_census<'py>(&self, python: Python<'py>) -> PyResult<Bound<'py, PyDict>> {
         let census = self.lock().subsystem_census();
         let report = PyDict::new(python);
