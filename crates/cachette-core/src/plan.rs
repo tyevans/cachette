@@ -337,20 +337,6 @@ impl PlanRegister {
             .map(|position| projects[position].category)
     }
 
-    /// Reports whether any faction's plan zones one tile for one category.
-    ///
-    /// The build rule asks this, because a unit builds a category that asks
-    /// for no held ground only inside a project.[^1] The cost follows the
-    /// faction count multiplied by the logarithm of the bound.
-    ///
-    /// # References
-    ///
-    /// [^1]: ADR-0152, a faction plans its roads and zones with one solver, decision D3. `docs/adrs/accepted/adr-0152-a-faction-plans-its-roads-and-zones-with-one-solver.md`
-    #[must_use]
-    pub fn zoned_for(&self, faction: FactionId, tile: TileIdx, category: UpgradeCategory) -> bool {
-        self.zones(faction, tile) == Some(category)
-    }
-
     /// Writes one project into the plan of one faction.
     ///
     /// A tile the plan already names takes the new category. A plan at its

@@ -100,9 +100,16 @@ def test_a_terrace_is_a_different_upgrade_from_a_road(seed: int) -> None:
     # would pass the test above.
     world = cachette.World(width=16, height=16, seed=seed, faction_count=2)
     address = _open_address(world)
-    _zone_a_road(world, address)
+    # **No project is zoned here.** The plan binds every category, so a road
+    # project on this tile would refuse the terrace before the ground rule was
+    # read, and the test would then measure the plan.[^1]
+    #
+    # [^1]: ADR-0152, a faction plans its roads and zones with one solver,
+    # decisions D3 and D4.
+    # ``docs/adrs/accepted/adr-0152-a-faction-plans-its-roads-and-zones-with-one-solver.md``
+    #
     # A unit builds anything only on ground its own faction holds, and a
-    # faction holds the ground its cities reach. A road needs no city.
+    # faction holds the ground its cities reach. A terrace needs a city.
     world.found_settlements([address], faction=0)
     world.step(threads=2)
     units = world.spawn_soldiers([address], faction=0)

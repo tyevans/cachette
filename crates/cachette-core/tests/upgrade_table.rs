@@ -389,14 +389,21 @@ fn a_category_at_its_top_refuses_the_next_order() {
 fn a_tile_that_carries_another_category_refuses_the_order() {
     let mut field = world(SEED);
     let address = island(&field);
-    builder(&mut field, address, UpgradeCategory::ROAD);
     let other = soldier(&mut field, address);
     assert_eq!(
         field.order_build(other, UpgradeCategory::TERRACE),
         Ok(()),
         "the tile carries nothing yet"
     );
+    builder(&mut field, address, UpgradeCategory::ROAD);
     field.step(1).expect("the step must run");
+    // **The plan binds every category, so the project is cleared first.** A
+    // tile that a project zones for the road refuses every other category
+    // before the tile is read at all, and the fixture would then measure the
+    // plan instead of the tile.[^1]
+    //
+    // [^1]: ADR-0152, a faction plans its roads and zones with one solver, decisions D3 and D4. `docs/adrs/accepted/adr-0152-a-faction-plans-its-roads-and-zones-with-one-solver.md`
+    field.clear_project(FactionId(0), address);
 
     let asked = soldier(&mut field, address);
     assert_eq!(

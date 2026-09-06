@@ -23,7 +23,7 @@
 
 use cachette_core::holding::ReachRules;
 use cachette_core::plan::PlanRules;
-use cachette_core::upgrade::UpgradeCategory;
+use cachette_core::upgrade::{BuildRefusal, UpgradeCategory};
 use cachette_core::{Axial, Entity, FactionId, Project, World, WorldConfig, SUBSYSTEM_CENSUS};
 
 /// The extent that these tests read.
@@ -649,5 +649,127 @@ fn the_controller_sends_its_idle_units_to_the_projects_it_zoned() {
     assert!(
         took,
         "no unit of the faction ever took the category its project names"
+    );
+}
+
+// ---------------------------------------------------------------------------
+// The chain end to end: the demonstration world finishes a road
+// ---------------------------------------------------------------------------
+
+/// The ticks the run below is given to finish one project.
+///
+/// The bound is a test bound and not a balance value. The run finishes its
+/// first project long before it, and the number only stops a broken engine
+/// from running for ever.
+const RUN_TICKS: u32 = 200;
+
+/// The demonstration world runs, and a road the plan zoned stands at the end.
+///
+/// **This test drives the engine and not the mechanism.** It seeds the world
+/// the demonstration seeds, it calls no verb of its own, and it removes no
+/// draw. Every earlier test of this file either called the build verb by hand
+/// or turned the evaluation draws off, so none of them ever ran the whole
+/// chain: the solver zones, the controller orders, the pass builds, and the
+/// plan counts the project finished.[^1] [^2]
+///
+/// The run finished no project at all before the plan bound every build. The
+/// finding holds the census of the run that showed it.[^3]
+///
+/// # References
+///
+/// [^1]: Testing rules, section 5. `.agents/rules/testing.md`
+/// [^2]: Recurring defect shapes, shape 3. `.agents/rules/recurring-defects.md`
+/// [^3]: Findings register, FND-495. `docs/FINDINGS.md`
+#[test]
+fn the_demonstration_world_finishes_a_project_and_a_road_stands() {
+    let mut world = World::new(WorldConfig {
+        width: WIDTH,
+        height: HEIGHT,
+        seed: SEED,
+        faction_count: 3,
+        unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
+    })
+    .expect("the extent must describe a world");
+    // The engine seeds itself, as the demonstration does. No verb of this
+    // test founds anything, and no draw is turned off.
+    let seated = world.seed_world().expect("the world seeds once");
+    assert!(
+        seated.iter().any(|outcome| outcome.founding().is_some()),
+        "the seeding put no faction on the ground"
+    );
+    for _ in 0..RUN_TICKS {
+        world.step(1).expect("the step runs");
+    }
+    let finished = census(&world, "projects_finished");
+    assert!(
+        finished > 0,
+        "the run finished no project in {RUN_TICKS} ticks: zoned {}, dropped {}, refused {}",
+        census(&world, "projects_zoned"),
+        census(&world, "projects_dropped"),
+        census(&world, "projects_refused"),
+    );
+    // A count is not a road. The census could rise for a project a caller
+    // cleared, so the test reads the ground as well.
+    let standing = addresses()
+        .into_iter()
+        .filter(|address| world.finished_upgrade(*address) == Some(UpgradeCategory::ROAD))
+        .count();
+    assert!(
+        standing > 0,
+        "the census counted {finished} projects finished and no road stands"
+    );
+    assert!(world.check_invariants());
+}
+
+/// A project of the faction refuses a build order that names another
+/// category, whatever the row asks for.
+///
+/// **The plan is the bound on what a unit builds, and not only on where it
+/// reaches.** Without this clause a faction plants one category on a tile its
+/// own plan zones for another. A tile carries one upgrade, so the project can
+/// then never be built, and the plan holds a project that nothing can
+/// finish.[^1] [^2]
+///
+/// # References
+///
+/// [^1]: ADR-0152, a faction plans its roads and zones with one solver, decisions D3 and D4. `docs/adrs/accepted/adr-0152-a-faction-plans-its-roads-and-zones-with-one-solver.md`
+/// [^2]: Findings register, FND-495. `docs/FINDINGS.md`
+#[test]
+fn a_project_refuses_a_build_order_that_names_another_category() {
+    let mut world = bare(SEED);
+    let address = open_from(&world, Axial::new(10, 10));
+    // The faction holds the ground, so the ground rule permits the terrace.
+    // Only the project stands between the order and the tile.
+    world
+        .found_group_at(address, 4, ZERO)
+        .expect("the ground admits a founding");
+    world
+        .zone_project(ZERO, address, UpgradeCategory::ROAD)
+        .expect("the plan takes a road anywhere");
+    let unit = world
+        .spawn_soldier(address, ZERO)
+        .expect("a spawn may over-fill a tile");
+    assert_eq!(
+        world.order_build(unit, UpgradeCategory::TERRACE),
+        Err(BuildRefusal::ProjectHoldsAnother {
+            zoned: UpgradeCategory::ROAD,
+            asked: UpgradeCategory::TERRACE,
+        }),
+        "the project of the faction did not refuse the competing category"
+    );
+    // The category the project names is still permitted, so the clause
+    // refuses the competing order and nothing else.
+    world
+        .order_build(unit, UpgradeCategory::ROAD)
+        .expect("the project zones the road");
+    // The pass applies the same rule, so a build the verb refused finishes
+    // nothing. The tile carries no terrace after the world steps.
+    for _ in 0..4 {
+        world.step(1).expect("the step runs");
+    }
+    assert_ne!(
+        world.upgrade_at(address).map(|site| site.category),
+        Some(UpgradeCategory::TERRACE),
+        "the pass built the category the verb refused"
     );
 }

@@ -408,6 +408,19 @@ pub enum BuildRefusal {
         /// The category the order named.
         category: UpgradeCategory,
     },
+    /// A project of the builder's own faction zones the tile for another
+    /// category. The plan is the bound on what a unit builds, so an order
+    /// that fights a project of its own faction is refused.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0152, a faction plans its roads and zones with one solver, decisions D3 and D4. `docs/adrs/accepted/adr-0152-a-faction-plans-its-roads-and-zones-with-one-solver.md`
+    ProjectHoldsAnother {
+        /// The category the project zones.
+        zoned: UpgradeCategory,
+        /// The category the order named.
+        asked: UpgradeCategory,
+    },
 }
 
 impl core::fmt::Display for BuildRefusal {
@@ -434,6 +447,11 @@ impl core::fmt::Display for BuildRefusal {
             Self::NoProject { category } => write!(
                 formatter,
                 "no project of the builder's own faction zones this tile for the {category}"
+            ),
+            Self::ProjectHoldsAnother { zoned, asked } => write!(
+                formatter,
+                "a project of the builder's own faction zones this tile for {zoned} \
+                 and the order named {asked}"
             ),
         }
     }
