@@ -411,6 +411,7 @@ without stating a constraint is worse than no record.
 | 0153 | A tile's lease follows the units that stand on it, and a lease at the claim threshold outranks the reach of a city. Changes ADR-0150 D1, the order that gives a tile its holder; the other decisions of ADR-0150 stand | Draft | 0002, 0004, 0009, 0053, 0111, 0146, 0150 | `draft/adr-0153-a-tiles-lease-follows-the-units-that-stand-on-it.md` |
 | 0154 | The observation and the action of a faction are schema-declared bounded tables the engine owns | Accepted | 0002, 0004, 0006, 0022, 0040, 0096, 0111, 0144, 0146, 0148, 0149 | `accepted/adr-0154-the-observation-and-the-action-of-a-faction-are-schema-declared-bounded-tables.md` |
 | 0155 | A batch of worlds steps in one call, in index order | Accepted | 0001, 0004, 0009, 0040, 0042, 0047, 0096, 0154 | `accepted/adr-0155-a-batch-of-worlds-steps-in-one-call-in-index-order.md` |
+| 0156 | A faction's option weights are policy, set through one verb | Draft | 0002, 0003, 0004, 0023, 0040, 0053, 0064, 0096, 0098, 0109, 0144, 0150, 0152, 0153, 0154 | `draft/adr-0156-a-factions-option-weights-are-policy-set-through-one-verb.md` |
 
 ### Retired numbers
 

@@ -42,6 +42,14 @@ BLK-150, which asks what raises and lowers renown.[^6]
 | Campaign cohort size, the units one raise takes | The controller, when it raises a campaign | unset, pass 10 | BLK-050 | Provisional default of 4 written by pass 7. Pass 7 took half the founding group of a test fixture, so that a raise leaves the site peopled. The project owner set the founding group to 2 on 5 September 2026, so a cohort of 4 now takes more units than a faction founds with. The rules of the downstream game are not written down, so BLK-050 governs it. A caller sets it with `set_campaign_cohort_size`. Pass 10 measures it. |
 | Campaign cadence, the draw that raises one | The controller, when it draws for a campaign | unset, pass 10 | BLK-050 | Provisional shape written by pass 7: one keyed draw for each faction on each tick at war, yes with probability war weight over the weight range top plus the war weight, the shape the relation move already uses. No separate period exists. BLK-050 governs it. Pass 10 measures it. |
 
+## The choice
+
+| Value | Read by | Set | Blocker | Derivation |
+|---|---|---|---|---|
+| Own-ground weight, what a unit of a faction gives an option on ground its own faction holds | The choice pass, when it scores an option | unset, pass 10 | BLK-050 | Written by the item that implements ADR-0156. The engine states no value, and the built-in controller draws the strength of its preference from the seeded faction weight vector. The rules of the downstream game are not written down, so BLK-050 governs it. Pass 10 measures it. |
+| Rival-ground weight, what a unit of a faction gives an option on ground another faction holds | The choice pass, when it scores an option | unset, pass 10 | BLK-050 | Written by the item that implements ADR-0156. It is the lowest of the three, and it is never zero, because a zero would make the term a fence and ADR-0156 D5 refuses a fence. The rules of the downstream game are not written down, so BLK-050 governs it. Pass 10 measures it. |
+| Unheld-ground weight, what a unit of a faction gives an option on ground nobody holds | The choice pass, when it scores an option | unset, pass 10 | BLK-050 | Written by the item that implements ADR-0156. It sits between the other two, and a cell that names more than one faction takes it as well. The rules of the downstream game are not written down, so BLK-050 governs it. Pass 10 measures it. |
+
 ## The plan
 
 | Value | Read by | Set | Blocker | Derivation |
