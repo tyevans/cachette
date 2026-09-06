@@ -86,6 +86,11 @@ fn distance_from_water(world: &World, water: &[i64]) -> Vec<i32> {
     out
 }
 
+/// Returns the mean height of one weather cell, in the fixed-point unit.
+fn height_of(heights: &[i64], cell: usize) -> i64 {
+    heights.get(cell).copied().unwrap_or(0)
+}
+
 fn mean(values: &[i64]) -> i64 {
     if values.is_empty() {
         0
@@ -124,6 +129,29 @@ fn main() {
         world.weather().warmth_plane().len(),
     );
     let (water, water_height) = water_of(&world, extent, bits, count);
+    // The mean height of every weather cell, folded from the tiles once.
+    let mut world_height = vec![0i64; count];
+    let mut tiles = vec![0i64; count];
+    let grid = world.weather().cells();
+    for row in 0..extent {
+        for column in 0..extent {
+            let address = Axial::new(column as i32, row as i32);
+            let Some(tile) = world.tile_terrain(address) else {
+                continue;
+            };
+            let cell = Axial::new((column >> bits) as i32, (row >> bits) as i32);
+            let Some(at) = grid.index_of(cell) else {
+                continue;
+            };
+            world_height[at.0 as usize] += i64::from(tile.height.0);
+            tiles[at.0 as usize] += 1;
+        }
+    }
+    for (slot, count) in world_height.iter_mut().zip(&tiles) {
+        if *count > 0 {
+            *slot /= count;
+        }
+    }
     let distance = distance_from_water(&world, &water);
     let deepest = distance.iter().copied().max().unwrap_or(0);
     let wet_cells = water.iter().filter(|count| **count > 0).count();
@@ -143,7 +171,51 @@ fn main() {
         let ground = field.ground_plane().to_vec();
         let warmth = field.warmth_plane().to_vec();
         let wind = field.wind_plane().to_vec();
+        // Where the rain lands against the slope the wind climbs. The air
+        // arrived from the cell the wind points away from, so the rise from
+        // that cell to this one is what the parcel climbed.
+        let cells = field.cells();
+        let mut climbing = (0i64, 0i64, 0i64);
+        let mut level = (0i64, 0i64, 0i64);
+        let mut falling = (0i64, 0i64, 0i64);
+        for index in 0..air.len() {
+            let Some(address) = cells.address_of(TileIdx(index as u32)) else {
+                continue;
+            };
+            let rise = wind
+                .get(index)
+                .copied()
+                .unwrap_or_default()
+                .heading()
+                .and_then(|heading| {
+                    let back = (heading + 3) % cachette_core::hex::NEIGHBOUR_COUNT;
+                    let at = cells.index_of(cells.neighbour(address, back)?)?;
+                    Some(height_of(&world_height, index) - height_of(&world_height, at.0 as usize))
+                })
+                .unwrap_or(0);
+            let slot = if rise > 256 {
+                &mut climbing
+            } else if rise < -256 {
+                &mut falling
+            } else {
+                &mut level
+            };
+            slot.0 += 1;
+            slot.1 += air[index].0;
+            slot.2 += ground[index].0;
+        }
         println!("--- tick {tick}");
+        for (name, slot) in [("windward", climbing), ("level", level), ("lee", falling)] {
+            if slot.0 == 0 {
+                continue;
+            }
+            println!(
+                "  {name:<9} cells {:>6}  air mean {:>6}  ground mean {:>6}",
+                slot.0,
+                slot.1 / slot.0,
+                slot.2 / slot.0
+            );
+        }
         println!("  band   cells    air mean  air med  ground mean  warmth mean  wind mean");
         for band in 0..=deepest.min(24) {
             let slots: Vec<usize> = distance

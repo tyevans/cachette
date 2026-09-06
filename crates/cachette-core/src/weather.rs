@@ -1181,6 +1181,25 @@ const FALL_FOR_COLD_GROUND: i64 = 6;
 /// [^1]: ADR-0162, water enters the air where it is hot, and it falls where the air cools, decision D2. `docs/adrs/accepted/adr-0162-water-enters-the-air-where-it-is-hot-and-falls-where-the-air-cools.md`
 const FALL_FOR_COOLING: i64 = 16;
 
+/// What a whole climb of the height range adds to the fall numerator.
+///
+/// **Air that meets rising ground goes up, and rising is what makes cloud.**
+/// The flow is horizontal over a flat lattice, so nothing else in the field
+/// lifts a parcel. Height reached the heat term and reached nothing that
+/// moves water, and a parcel blown at a range of hills therefore passed
+/// through it. This is the one term that couples the height map to the flow.
+///
+/// The term is signed. Air that descends a slope warms and holds its water,
+/// so the numerator falls and the lee of a range is dry. The floor stops it
+/// below zero.
+///
+/// **This is not a third dimension, and it does not need one.** A layered
+/// field would hold a wind and a water plane for each layer, which multiplies
+/// the whole stage by the layer count. One term against the gradient of the
+/// cell the air enters gives orographic rain on the windward slope and a rain
+/// shadow behind it, which is the behaviour a watcher recognises.
+const FALL_FOR_CLIMB: i64 = 24;
+
 /// The share of the water on the ground that leaves the world in one solve.
 const DRY_DIVISOR: i64 = 32;
 
@@ -1669,7 +1688,7 @@ const _: () = assert!(
 ///
 /// [^1]: ADR-0162, water enters the air where it is hot, and it falls where the air cools, decision D2. `docs/adrs/accepted/adr-0162-water-enters-the-air-where-it-is-hot-and-falls-where-the-air-cools.md`
 #[must_use]
-pub fn fall_numerator(heat: i32, cooling: i32) -> i64 {
+pub fn fall_numerator(heat: i32, cooling: i32, climb: i32) -> i64 {
     let cold = i64::from((HEAT_CEILING - heat).clamp(0, HEAT_CEILING));
     let cooled = i64::from(cooling.clamp(0, HEAT_CEILING));
     let whole = Accum(i64::from(HEAT_CEILING));
@@ -1677,7 +1696,15 @@ pub fn fall_numerator(heat: i32, cooling: i32) -> i64 {
         sim_math::share(Accum(cold), Accum(FALL_FOR_COLD_GROUND), whole).map_or(0, |value| value.0);
     let by_cooling =
         sim_math::share(Accum(cooled), Accum(FALL_FOR_COOLING), whole).map_or(0, |value| value.0);
-    FALL_NUMERATOR_FLOOR + by_cold + by_cooling
+    // The climb is signed and it is a share of the whole height range. Air
+    // that rose drops more, and air that descended drops less.
+    let by_climb = sim_math::share(
+        Accum(i64::from(climb)),
+        Accum(FALL_FOR_CLIMB),
+        Accum(i64::from(Fix32::ONE.0)),
+    )
+    .map_or(0, |value| value.0);
+    (FALL_NUMERATOR_FLOOR + by_cold + by_cooling + by_climb).max(FALL_NUMERATOR_FLOOR)
 }
 
 /// What one call to the divine power did.
@@ -2497,7 +2524,14 @@ impl WeatherField {
             self.ground[cell] = self.ground[cell].combine(poured);
 
             let cooling = self.cooling_at(cell, heat);
-            let numerator = fall_numerator(heat, cooling);
+            // **Air that meets rising ground goes up, and rising makes
+            // cloud.** The height map reached the heat term and reached
+            // nothing that moves water, so a parcel blown at a range of hills
+            // passed through it and no cloud formed over land.[^5]
+            //
+            // [^5]: ADR-0162, water enters the air where it is hot, and it falls where the air cools, decision D2. `docs/adrs/accepted/adr-0162-water-enters-the-air-where-it-is-hot-and-falls-where-the-air-cools.md`
+            let climb = self.climb_at(cell, ground);
+            let numerator = fall_numerator(heat, cooling, climb);
             let air = self.air[cell];
             let fallen = share_of(air, numerator, FALL_DENOMINATOR);
             self.air[cell] = Drops(air.0 - fallen.0);
@@ -2545,6 +2579,39 @@ impl WeatherField {
     ///
     /// A still cell met no cooling, and neither did a cell whose upwind
     /// neighbour lies outside the lattice.
+    fn climb_at(&self, cell: usize, ground: &[CellGround]) -> i32 {
+        let wind = self.wind.get(cell).copied().unwrap_or(Wind::STILL);
+        let Some(heading) = wind.heading() else {
+            return 0;
+        };
+        let Some(address) = self.cells.address_of(TileIdx(cell as u32)) else {
+            return 0;
+        };
+        let Some(upwind) = self.cells.neighbour(address, opposite(heading)) else {
+            return 0;
+        };
+        let Some(at) = self.cells.index_of(upwind) else {
+            return 0;
+        };
+        let here = ground
+            .get(cell)
+            .and_then(|under| under.mean_height())
+            .unwrap_or(Fix32::ZERO);
+        let there = ground
+            .get(at.0 as usize)
+            .and_then(|under| under.mean_height())
+            .unwrap_or(Fix32::ZERO);
+        // The rise the parcel made, scaled by how hard the wind pushed it up
+        // the slope. A slow wind rides over a slope and a fast one is forced
+        // up it, so the speed belongs in the term.
+        let rise = i64::from(here.0) - i64::from(there.0);
+        narrow(sim_math::share(
+            Accum(rise),
+            Accum(i64::from(wind.speed().clamp(0, SPEED_CEILING))),
+            Accum(i64::from(SPEED_CEILING)),
+        ))
+    }
+
     fn cooling_at(&self, cell: usize, heat: i32) -> i32 {
         let Some(heading) = self
             .wind
