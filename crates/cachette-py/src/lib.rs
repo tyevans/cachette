@@ -39,7 +39,7 @@ use cachette_view::panel::Set as PanelSet;
 use cachette_view::{
     fill_frame_paced, Camera, FrameSize, Lap, Metrics, Motion, Overlay, Pace, Surface,
 };
-use numpy::{PyArray1, PyArray2, PyReadwriteArray1, ToPyArray};
+use numpy::{PyArray1, PyReadwriteArray1, ToPyArray};
 use pyo3::create_exception;
 use pyo3::exceptions::PyException;
 use pyo3::prelude::*;
@@ -4822,109 +4822,6 @@ impl PyWorld {
         })
     }
 
-    /// The temperature of one place, as an integer.
-    ///
-    /// The place is a tile, as the pair `(q, r)` of integers. The answer is
-    /// the temperature of the level 1 cell that covers that tile, in whole
-    /// degrees on the scale of the engine. The value is not a fixed-point
-    /// number.
-    ///
-    /// The temperature varies over the map and over time. A season cycle and
-    /// the water in the air both drive it, and the wind carries it between
-    /// cells. Read `weather_season_ticks` for the length of one cycle.
-    ///
-    /// # Errors
-    ///
-    /// Raises `VerbError` when the address lies outside the world.
-    fn temperature_at(&self, q: i32, r: i32) -> PyResult<i32> {
-        self.lock().temperature_at(Axial::new(q, r)).ok_or_else(|| {
-            VerbError::new_err(format!("the address ({q}, {r}) is outside the world"))
-        })
-    }
-
-    /// The wind over one place, as a pair of integers.
-    ///
-    /// The place is a tile, as the pair `(q, r)` of integers. The answer is
-    /// the wind of the level 1 cell that covers that tile, as the pair of
-    /// whole components in the two-axis basis of the cell lattice. Neither
-    /// component passes `weather_wind_ceiling` in size.
-    ///
-    /// # Errors
-    ///
-    /// Raises `VerbError` when the address lies outside the world.
-    fn wind_at(&self, q: i32, r: i32) -> PyResult<(i32, i32)> {
-        self.lock().wind_at(Axial::new(q, r)).ok_or_else(|| {
-            VerbError::new_err(format!("the address ({q}, {r}) is outside the world"))
-        })
-    }
-
-    /// The temperature of every level 1 cell, as a NumPy array.
-    ///
-    /// The result is a one-dimensional array of `numpy.int32`, in cell index
-    /// order. Take `index % cells_wide` for the column of a cell and
-    /// `index // cells_wide` for its row.
-    ///
-    /// **This is one crossing, and it replaces a loop.**
-    fn weather_temperature<'py>(&self, python: Python<'py>) -> Bound<'py, PyArray1<i32>> {
-        let world = self.lock();
-        let plane: Vec<i32> = world
-            .weather()
-            .temperature_plane()
-            .iter()
-            .map(|degrees| degrees.0)
-            .collect();
-        plane.to_pyarray(python)
-    }
-
-    /// The water in the air over every level 1 cell, as a NumPy array.
-    ///
-    /// The result is a one-dimensional array of `numpy.int64`, in cell index
-    /// order, and the unit is drops. A drop is a whole number and it is not
-    /// a fixed-point value.
-    ///
-    /// **This is one crossing, and it replaces a loop.**
-    ///
-    /// The array is empty when no water has entered the world yet.
-    fn weather_air<'py>(&self, python: Python<'py>) -> Bound<'py, PyArray1<i64>> {
-        let world = self.lock();
-        let plane: Vec<i64> = world
-            .weather()
-            .air_plane()
-            .iter()
-            .map(|drops| drops.0)
-            .collect();
-        plane.to_pyarray(python)
-    }
-
-    /// The wind of every level 1 cell, as a NumPy array of two columns.
-    ///
-    /// The result is a two-dimensional array of `numpy.int32`. Row `index`
-    /// holds the two components of the wind of cell `index`, in the two-axis
-    /// basis of the cell lattice.
-    ///
-    /// **This is one crossing, and it replaces a loop.**
-    fn weather_wind<'py>(&self, python: Python<'py>) -> Bound<'py, PyArray2<i32>> {
-        let world = self.lock();
-        let plane = world.weather().wind_plane();
-        let mut rows: Vec<Vec<i32>> = Vec::with_capacity(plane.len());
-        for wind in plane {
-            rows.push(vec![wind.q, wind.r]);
-        }
-        PyArray2::from_vec2(python, &rows).expect("every wind row holds two components")
-    }
-
-    /// The ticks of one whole season cycle, as an integer.
-    #[getter]
-    fn weather_season_ticks(&self) -> u64 {
-        cachette_core::SEASON_TICKS
-    }
-
-    /// The largest size that one component of a wind reaches, as an integer.
-    #[getter]
-    fn weather_wind_ceiling(&self) -> i32 {
-        cachette_core::WIND_COMPONENT_CEILING
-    }
-
     /// What the weather of the whole world holds, as a `dict`.
     ///
     /// The water keys are in drops. A drop is a whole number and it is not a
@@ -4977,6 +4874,18 @@ impl PyWorld {
         let plane: Vec<i64> = world
             .weather()
             .ground_plane()
+            .iter()
+            .map(|drops| drops.0)
+            .collect();
+        plane.to_pyarray(python)
+    }
+
+    /// The water in the air over every level 1 cell, as a NumPy array.
+    fn weather_air<'py>(&self, python: Python<'py>) -> Bound<'py, PyArray1<i64>> {
+        let world = self.lock();
+        let plane: Vec<i64> = world
+            .weather()
+            .air_plane()
             .iter()
             .map(|drops| drops.0)
             .collect();
