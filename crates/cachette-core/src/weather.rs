@@ -2301,7 +2301,12 @@ where
     T: Send,
     F: Fn(usize, &mut [T]) + Sync,
 {
-    if count <= threads {
+    // **One thread runs the pass where it stands.** A caller that asked for
+    // one thread and got a spawned one paid for the spawn and gained nothing,
+    // and the spawn cost more than the pass on a small lattice. The answer is
+    // the same either way, because one worker takes one chunk that covers the
+    // whole plane.
+    if threads <= 1 || count <= threads {
         fill(0, out);
         return;
     }

@@ -9,10 +9,18 @@
 //! reader can see whether the map is still separated into wet places and dry
 //! places rather than wetted everywhere alike.
 //!
+//! **The weather resolution is a parameter of the world**, and the probe
+//! takes it as its fifth argument. The argument is the base-two logarithm of
+//! the cell side in tiles, so zero gives one weather cell to each tile and
+//! five gives one to each level 1 block. A finer lattice that stops
+//! travelling is worse than a coarse one that moves, so the probe reports the
+//! same table at every resolution.
+//!
 //! Run it with `cargo run -p cachette-core --release --example
-//! weather_travel_probe`.
+//! weather_travel_probe`. The arguments are the extent, the seed, the ticks,
+//! the interval between stops, and the weather scale.
 
-use cachette_core::{World, WorldConfig};
+use cachette_core::{WeatherScale, World, WorldConfig};
 
 /// A fingerprint of a plane of whole numbers, so that a reader can see at a
 /// glance whether the plane changed between two stops.
@@ -31,6 +39,9 @@ const SEED: u64 = 0x2f;
 const FACTIONS: u16 = 4;
 const TICKS: u32 = 400;
 const EVERY: u32 = 20;
+
+/// The weather scale the probe takes when the caller names none.
+const DEFAULT_BITS: u32 = 5;
 
 /// Returns one command line argument as a whole number, or a default.
 fn argument(position: usize, fallback: u64) -> u64 {
@@ -51,14 +62,27 @@ fn main() {
     // world the project owner measured.
     let extent = argument(1, u64::from(WIDTH)) as u32;
     let seed = argument(2, SEED);
-    let mut world = World::new(WorldConfig {
-        width: extent,
-        height: if extent == WIDTH { HEIGHT } else { extent },
-        seed,
-        faction_count: FACTIONS,
-        unit_capacity: 1024,
-    })
+    // The fifth argument is the weather scale: the base-two logarithm of the
+    // cell side in tiles. Zero gives one weather cell to each tile, and five
+    // gives one to each level 1 block.
+    let bits = argument(5, u64::from(DEFAULT_BITS)) as u32;
+    let scale = WeatherScale::from_bits(bits).expect("the scale describes a lattice");
+    let mut world = World::with_weather_scale(
+        WorldConfig {
+            width: extent,
+            height: if extent == WIDTH { HEIGHT } else { extent },
+            seed,
+            faction_count: FACTIONS,
+            unit_capacity: 1024,
+        },
+        scale,
+    )
     .expect("the settings describe a world");
+    println!(
+        "scale {bits} bits, {} tiles a side, {} transport passes",
+        scale.side(),
+        scale.transport_passes()
+    );
 
     let cells = world.weather().cells();
     let wide = cells.width() as usize;
