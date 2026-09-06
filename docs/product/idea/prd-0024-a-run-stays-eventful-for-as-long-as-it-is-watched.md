@@ -30,6 +30,24 @@ stays where they were placed, so nobody reaches ground that is not yet bare.
 A population that cannot move, standing on ground that cannot recover, has
 nothing left to do.
 
+**A longer measurement holds the same shape, and it names a third behaviour.**
+Sixteen seeds of the demonstration world were each played to twenty thousand
+ticks and sampled every twenty ticks. Almost every quantity a watcher can read
+reaches its final value in the first few hundred ticks and holds it for the
+rest of the run.[^4]
+
+The recovery this record asks for now exists in the engine, and it is far too
+weak to be seen. One person takes four stock from a tile in one tick. A food
+tile gives one unit back every six hundred ticks, a wood tile every two
+thousand four hundred, and a stone tile never. The ground therefore empties
+once and stays empty, which is the behaviour above rather than an answer to
+it.
+
+The third behaviour is the opposite of the first. A store fills at a rate that
+nothing answers, so it reaches its ceiling and stops. **A quantity that fills
+and stops looks the same to a watcher as a quantity that empties and stops.**
+Both are a world that no longer changes.
+
 This has two costs for this audience.
 
 **A study of belief has nothing to study.** An agent that perceives, remembers,

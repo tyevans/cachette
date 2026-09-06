@@ -50,42 +50,26 @@ const DEMO: WorldConfig = WorldConfig {
 
 /// The number of people the demonstration founds its run with.
 ///
+/// **The core declares this number, and this binary reads it.** The window
+/// once declared its own copy of forty-eight. The project owner set the core
+/// default to two, that instruction reached the core and not this file, and
+/// nothing failed when the two copies disagreed. A watcher then could not tell
+/// which of two worlds the window showed.[^1]
+///
+/// A founding of forty-eight people into housing of sixteen leaves no free
+/// place on the first tick, so no birth is possible for the whole run. The
+/// window therefore showed a world whose growth was closed by construction,
+/// and the Python demonstration showed a world whose growth was open.[^2]
+///
 /// The size is an input to a run. It is not the population the world is sized
-/// for, and it is not a value any record or register holds.[^1]
-///
-/// # Why this number
-///
-/// **A site feeds exactly as many people as the food its survey measured.**
-/// That is an identity and not an estimate. The founding sets the production
-/// rate of a site to a sixteenth of the food the survey reached, and a person
-/// draws a ration of a sixteenth of a full need on each application. The two
-/// sixteenths cancel, so the people a site can carry is the number the
-/// founding already prints.[^2] [^3]
-///
-/// At thirty, every founded site fed its whole group forever. Nobody went
-/// short, no unit ever chose to forage, and no tile of the world was ever
-/// gathered from. The demonstration showed a world in which the food layer
-/// decided nothing.[^4]
-///
-/// **The size is chosen so that some ground cannot carry its group and other
-/// ground can.** A watcher then sees both conditions at once, and the choice
-/// a unit makes varies across the map instead of being the same everywhere.
-/// A world where everybody is hungry says as little as one where nobody is.
-///
-/// The split follows the ground and not this number. The number only has to
-/// fall inside the spread of what the four sites reach, and it sits at the
-/// middle of that spread so that a small change in the ground does not push
-/// every site to one side. **The run reports which sites cleared it**, so a
-/// seed that loses the split says so instead of quietly going back to a world
-/// where nothing is hungry.
+/// for, and it is not a value any record or register holds.[^3]
 ///
 /// # References
 ///
-/// [^1]: PRD-0012, a world starts small and grows. `docs/product/accepted/prd-0012-a-world-starts-small-and-grows.md`
-/// [^2]: ADR-0063, a need is a rate with a threshold, and crossing it is a fact. `docs/adrs/accepted/adr-0063-a-need-is-a-rate-with-a-threshold-and-crossing-it-is-a-fact.md`
-/// [^3]: Backlog item 0240, let the demonstration make a unit hungry. `docs/backlog/complete/0240-let-the-demonstration-make-a-unit-hungry.md`
-/// [^4]: Findings register, FND-232. `docs/FINDINGS.md`
-const GROUP: u32 = 48;
+/// [^1]: Recurring defect shapes, shape 1, redundant declaration sites. `.agents/rules/recurring-defects.md`
+/// [^2]: Findings register, FND-549. `docs/FINDINGS.md`
+/// [^3]: PRD-0012, a world starts small and grows. `docs/product/accepted/prd-0012-a-world-starts-small-and-grows.md`
+const GROUP: u32 = cachette_core::FOUNDING_GROUP_DEFAULT;
 
 /// The reason the demonstration stopped.
 #[derive(Debug)]
