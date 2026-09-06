@@ -5005,6 +5005,26 @@ impl World {
             self.build(threads)?;
         }
 
+        // The wear runs after the build of this frame, so a worker mends its
+        // site and the weather then takes from what the worker left. The
+        // other order would let a site collapse in the tick a worker filled
+        // it, and the worker would have bought nothing.
+        //
+        // The pass reads the bridge, which the barrier above rebuilt, so it
+        // reads where each unit stands after the movement of this frame. It
+        // writes the upgrade map and moves no unit, so the barrier above
+        // stays the barrier of this frame.
+        //
+        // The weather solve runs later in this step, so the pass reads the
+        // field the previous step left. That is a fixed order and not a stale
+        // read: every tick reads the field of the tick before it.[^17]
+        //
+        // [^17]: ADR-0140, weather is a field over the level 1 cell lattice, decision D3. `docs/adrs/draft/adr-0140-weather-is-a-field-over-the-level-1-cell-lattice.md`
+        {
+            let _span = stage::open(Stage::UpgradeWear);
+            self.wear_upgrades();
+        }
+
         // The cities rewrite the holder column here, after the barrier of
         // this frame and after the build above. The reach of a city counts
         // the finished upgrades on the ground it held at the end of the
@@ -5897,6 +5917,29 @@ impl World {
     #[must_use]
     pub fn upgrade_at(&self, address: Axial) -> Option<UpgradeSite> {
         self.upgrades.at(self.grid.index_of(address)?)
+    }
+
+    /// Returns how sound the upgrade on one tile is.
+    ///
+    /// The value runs from nothing to the full condition. A level that has
+    /// just been finished stands at the full condition, the weather and a
+    /// hostile army take from it, and a worker on the tile puts it back.
+    ///
+    /// Returns `None` when the tile carries no upgrade. A site under
+    /// construction reports the full condition, because nothing stands on its
+    /// tile for anything to wear.
+    #[must_use]
+    pub fn upgrade_condition(&self, address: Axial) -> Option<i64> {
+        self.upgrade_at(address).map(|site| site.condition.0)
+    }
+
+    /// Returns how many upgrades the last wear collapsed.
+    ///
+    /// The count describes one tick, in the same way the visit count of the
+    /// last build advance does. No pass reads it and it enters no state hash.
+    #[must_use]
+    pub fn upgrade_collapses(&self) -> u64 {
+        self.upgrades.last_wear_collapses()
     }
 
     /// Returns the finished upgrade on one tile.
@@ -8339,6 +8382,92 @@ impl World {
         Ok(())
     }
 
+    /// Takes condition from every upgrade that the weather or an army wears.
+    ///
+    /// **This is the only sink an upgrade has that a caller does not drive by
+    /// hand.** Before it existed the engine removed no upgrade and damaged
+    /// none, so every road, terrace, store and wall ever built stood for the
+    /// rest of the run and the built world only accumulated.
+    ///
+    /// Two causes take condition, and the pass sums them.
+    ///
+    /// A storm over the tile takes a fixed amount for each tick. The pass
+    /// reads the wetness of the level 1 cell that holds the tile, which is
+    /// the reader the gather resolve already uses, so the weather is read in
+    /// one way and not two.[^1] [^2] The weather solve runs later in the
+    /// step, so this pass reads the field the previous step left.
+    ///
+    /// A hostile unit on the tile takes a fixed amount for each unit. A unit
+    /// is hostile when the faction that holds the tile is at war with the
+    /// faction of the unit. An upgrade on ground nobody holds therefore wears
+    /// only from the weather, because no faction owns it to be at war with.
+    ///
+    /// The pass walks the sites and the units on their tiles. It takes no
+    /// grid and no tile count, so a world in which nobody built does no work
+    /// here, at any tile count.[^3]
+    ///
+    /// The walk is serial and it runs in ascending tile order, which the map
+    /// holds its entries in. Nothing here reads a thread completion order,
+    /// and the sum over the units of one tile is integer addition, so it is
+    /// the same in any order.[^4] [^5] The pass makes no random draw: wear is
+    /// a rate and not a chance.
+    ///
+    /// # References
+    ///
+    /// [^1]: Recurring Defect Shapes, shape 1. `.agents/rules/recurring-defects.md`
+    /// [^2]: ADR-0140, weather is a field over the level 1 cell lattice, decision D3. `docs/adrs/draft/adr-0140-weather-is-a-field-over-the-level-1-cell-lattice.md`
+    /// [^3]: ADR-0090, a tile upgrade is stored sparsely, as the difference from the generated world, decision D1. `docs/adrs/draft/adr-0090-a-tile-upgrade-is-stored-sparsely.md`
+    /// [^4]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
+    /// [^5]: ADR-0023, an aggregate combines exactly, in any order, decision D1. `docs/adrs/accepted/adr-0023-an-aggregate-combines-exactly-in-any-order.md`
+    fn wear_upgrades(&mut self) {
+        if self.upgrades.is_empty() {
+            return;
+        }
+        let holders = self.holding.holders();
+        let mut cursor = self.bridge.tile_cursor();
+        // The sites are held in ascending tile order, so the run this builds
+        // is in ascending tile order and the tile reader walks forward.
+        let run: Vec<(TileIdx, i64)> = self
+            .upgrades
+            .sites()
+            .iter()
+            .filter(|site| site.is_complete())
+            .map(|site| {
+                let tile = site.tile;
+                let storm = match self.cell_of(tile) {
+                    Some(cell) if self.weather.cell_is_wet(cell) => {
+                        upgrade::WEATHER_WEAR_FOR_EACH_TICK
+                    }
+                    _ => 0,
+                };
+                let army = match holders
+                    .get(tile.0 as usize)
+                    .copied()
+                    .unwrap_or(Holder::NOBODY)
+                    .faction()
+                {
+                    Some(owner) => {
+                        let hostile = self
+                            .bridge
+                            .units_on_tile(&mut cursor, tile)
+                            .iter()
+                            .filter(|unit| {
+                                self.soldiers.faction(**unit).is_some_and(|guest| {
+                                    self.relations.war_between(owner, guest)
+                                })
+                            })
+                            .count() as i64;
+                        hostile.saturating_mul(upgrade::ARMY_WEAR_FOR_EACH_UNIT)
+                    }
+                    None => 0,
+                };
+                (tile, storm.saturating_add(army))
+            })
+            .filter(|(_, taken)| *taken > 0)
+            .collect();
+        self.upgrades.wear_ascending(&run);
+    }
+
     /// Raises the housing of a settlement for each level that the merge
     /// finished.
     ///
@@ -10027,6 +10156,12 @@ const fn build_is_permitted(
 /// The next level is one when the tile carries no upgrade of the category,
 /// and one above the level that stands there otherwise.[^1]
 ///
+/// **A damaged level resolves to the row that stands there.** The work of a
+/// worker on a damaged site buys condition and raises no level, so the row
+/// the order reads is the row it mends. Without this arm a worker on a
+/// crumbling top-level upgrade would be refused for the category being at its
+/// top, and nothing could ever mend one.
+///
 /// # Errors
 ///
 /// Returns a refusal when the tile carries another category, when the
@@ -10053,6 +10188,13 @@ fn resolve_build_row(
         Some(site) => site.level,
         None => upgrade::NO_LEVEL,
     };
+    if let Some(site) = standing {
+        if site.is_damaged() {
+            if let Some(row) = table.row(category, site.level) {
+                return Ok(row);
+            }
+        }
+    }
     let row = table
         .row(category, level + 1)
         .ok_or(BuildRefusal::CategoryAtTop { category, level })?;

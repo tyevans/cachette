@@ -23,6 +23,13 @@
 //! accumulator lets a builder bank surplus it can never spend, and that
 //! overflow reaches the state hash.[^6]
 //!
+//! **A finished upgrade holds a condition, and the condition is the life of
+//! it.** A level that has just been finished stands at the full condition.
+//! The weather over its tile and a hostile unit on its tile take from it, a
+//! worker on the tile puts it back at the price the build cost, and a site
+//! that reaches nothing is removed. The tile then returns to the world the
+//! generator made.
+//!
 //! No item in this module uses a floating-point type.[^4]
 //!
 //! # References
@@ -39,6 +46,7 @@
 use bytemuck::{Pod, Zeroable};
 
 use crate::hash::StateHash;
+use crate::sim_math;
 use crate::terrain::{TileKind, KIND_COUNT};
 use crate::types::{Accum, TileIdx};
 
@@ -689,6 +697,80 @@ pub const OWN_GROUND_REQUIRED: u32 = 1;
 /// [^1]: Decisions register, DEC-072. `docs/DECISIONS.md`
 pub const BUILD_RATE: i64 = 1;
 
+/// The condition of an upgrade that nothing has worn.
+///
+/// **The scale is fixed and it is the same for every category.** A road and a
+/// wonder both start here and both reach nothing after the same amount of
+/// wear. What differs between them is the price of a repair, because a repair
+/// buys condition with the work that built the level. One statement of the
+/// scale keeps the wear rates readable: a rate is a number of these units for
+/// each tick, and no rate needs a table of its own.[^1]
+///
+/// The number is large so that a repair divides into it without losing much.
+/// A builder that adds one work to a level of 2400 work buys 416 units, and
+/// the exact share is 416.67, so a full repair of the largest row in the
+/// default table costs four ticks more than the build did. A small scale
+/// would round that share to zero and a repair would then never finish.[^2]
+///
+/// # References
+///
+/// [^1]: Recurring Defect Shapes, shape 1. `.agents/rules/recurring-defects.md`
+/// [^2]: ADR-0002, simulated and aggregated state holds no floating point number, decision D1. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
+pub const CONDITION_FULL: i64 = 1_000_000;
+
+/// The condition that a storm takes from what stands under it, in one tick.
+///
+/// **This is a provisional value and not a measured one.** A tile that stands
+/// under an unbroken storm loses its upgrade after 2000 ticks, which is the
+/// deadline of one campaign. Weather is intermittent, so a neglected road
+/// under the weather of the demonstration world lasts several times that.
+///
+/// The rate does not read the category. A wall and a road wear at one rate,
+/// and the row holds no column that resists wear.[^1]
+///
+/// # References
+///
+/// [^1]: Blockers register, BLK-050. `docs/BLOCKERS.md`
+pub const WEATHER_WEAR_FOR_EACH_TICK: i64 = 500;
+
+/// The condition that one hostile unit takes from what it stands on, in one
+/// tick.
+///
+/// **This is a provisional value and not a measured one.** One hostile unit
+/// alone takes 500 ticks to wear an upgrade away, and it is four times as
+/// quick as an unbroken storm. A cohort of four takes 125 ticks, which is
+/// short enough that a raid on a road is worth ordering and long enough that
+/// a unit crossing a tile does almost nothing.
+///
+/// # References
+///
+/// [^1]: Blockers register, BLK-050. `docs/BLOCKERS.md`
+pub const ARMY_WEAR_FOR_EACH_UNIT: i64 = 2_000;
+
+/// Returns the condition that one contribution of work buys.
+///
+/// **A repair buys condition with the work that built the level.** A full
+/// repair of a level therefore costs the same worker ticks the build of that
+/// level cost, whatever the category is. No second rate exists, so a category
+/// cannot become cheap to keep and expensive to raise.[^1]
+///
+/// The share is exact integer arithmetic and it truncates towards zero.[^2]
+/// Returns zero when the level asks for no work, which is a level the table
+/// does not hold.
+///
+/// # References
+///
+/// [^1]: Recurring Defect Shapes, shape 1. `.agents/rules/recurring-defects.md`
+/// [^2]: ADR-0002, simulated and aggregated state holds no floating point number, decision D1. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
+#[must_use]
+pub fn repair_gain(work: i64, level_work: i64) -> i64 {
+    if work <= 0 || level_work <= 0 {
+        return 0;
+    }
+    sim_math::share(Accum(CONDITION_FULL), Accum(work), Accum(level_work))
+        .map_or(0, |gained| gained.0)
+}
+
 /// The default table that a world is built with.
 ///
 /// It holds the road, the terrace, the wonder, the store, the wall and the
@@ -837,6 +919,23 @@ impl UpgradeTable {
     #[must_use]
     pub const fn work_above(&self, category: UpgradeCategory, level: u8) -> i64 {
         match self.row(category, level + 1) {
+            Some(row) => row.work as i64,
+            None => 0,
+        }
+    }
+
+    /// Returns the work that the row standing at one level asked for.
+    ///
+    /// The value is zero at level zero, because nothing stands there. A
+    /// repair reads this, so the price of a repair and the price of the build
+    /// come from one column.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: Recurring Defect Shapes, shape 1. `.agents/rules/recurring-defects.md`
+    #[must_use]
+    pub const fn work_at(&self, category: UpgradeCategory, level: u8) -> i64 {
+        match self.row(category, level) {
             Some(row) => row.work as i64,
             None => 0,
         }
@@ -1053,6 +1152,26 @@ pub struct UpgradeSite {
     /// [^1]: ADR-0023, an aggregate combines exactly, in any order, decision D1. `docs/adrs/accepted/adr-0023-an-aggregate-combines-exactly-in-any-order.md`
     /// [^2]: Findings register, FND-011. `docs/FINDINGS.md`
     pub progress: Accum,
+    /// How much of the level that stands there is still sound.
+    ///
+    /// The value runs from nothing to the full condition, on a scale that
+    /// every category shares. A level that has just been finished stands at
+    /// the full condition, the weather and a hostile army take from it, and a
+    /// worker on the tile puts it back.
+    ///
+    /// **A site at nothing is gone.** The wear pass removes the entry rather
+    /// than storing a zero, so no reader has to ask whether a stored upgrade
+    /// is really there.
+    ///
+    /// The value is a whole number and the wear of one tick is a sum of whole
+    /// numbers, so the total is the same in any order.[^1] It is stored state
+    /// that the next tick reads, so it enters the state hash.[^2]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0023, an aggregate combines exactly, in any order, decision D1. `docs/adrs/accepted/adr-0023-an-aggregate-combines-exactly-in-any-order.md`
+    /// [^2]: ADR-0001, one binary gives one answer at any thread count, decision D4. `docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
+    pub condition: Accum,
 }
 
 impl UpgradeSite {
@@ -1063,6 +1182,15 @@ impl UpgradeSite {
     #[must_use]
     pub const fn is_complete(self) -> bool {
         self.level > NO_LEVEL
+    }
+
+    /// Reports whether the level that stands there has lost condition.
+    ///
+    /// A site under construction is never damaged. Nothing stands on the tile
+    /// yet, so there is nothing for the weather or an army to take.
+    #[must_use]
+    pub const fn is_damaged(self) -> bool {
+        self.is_complete() && self.condition.0 < CONDITION_FULL
     }
 
     /// Returns the work that the next level still asks for.
@@ -1101,6 +1229,7 @@ pub struct UpgradeMap {
     sites: Vec<UpgradeSite>,
     scratch: Vec<UpgradeSite>,
     visits: u64,
+    collapses: u64,
 }
 
 impl UpgradeMap {
@@ -1111,6 +1240,7 @@ impl UpgradeMap {
             sites: Vec::new(),
             scratch: Vec::new(),
             visits: 0,
+            collapses: 0,
         }
     }
 
@@ -1257,11 +1387,88 @@ impl UpgradeMap {
         self.visits = visits;
     }
 
+    /// Takes condition from a run of sites, given in ascending tile order.
+    ///
+    /// Each element names a tile and the condition that this tick took from
+    /// what stands there. The caller states the order and the walk relies on
+    /// it, in the same way the work merge does: a run out of order would leave
+    /// later entries unworn in silence.
+    ///
+    /// **A site that reaches nothing is removed, and the tile returns to the
+    /// world the generator made.** Nothing else stores a property of an
+    /// improved tile, so dropping the entry is the whole of the collapse and
+    /// no second copy can survive it.[^1] This is the only sink an upgrade has
+    /// that a caller does not drive by hand.
+    ///
+    /// A site under construction is left alone. Nothing stands on its tile
+    /// yet, so there is nothing to wear. A tile the run names that carries no
+    /// site is ignored.
+    ///
+    /// Returns how many sites collapsed on this call.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0090, a tile upgrade is stored sparsely, as the difference from the generated world, decision D4. `docs/adrs/draft/adr-0090-a-tile-upgrade-is-stored-sparsely.md`
+    pub fn wear_ascending(&mut self, run: &[(TileIdx, i64)]) -> u64 {
+        debug_assert!(
+            run.windows(2).all(|pair| pair[0].0 .0 < pair[1].0 .0),
+            "a worn run must be sorted by tile and name each tile once"
+        );
+        debug_assert!(
+            run.iter().all(|worn| worn.1 >= 0),
+            "wear never gives condition back"
+        );
+        let mut collapsed = 0u64;
+        if run.is_empty() {
+            self.collapses = 0;
+            return collapsed;
+        }
+        // One walk over the sites and one over the run, both ascending. The
+        // sites are held in tile order and the caller states the run in the
+        // same order, so the two advance together and neither searches.[^1]
+        //
+        // [^1]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
+        let mut there = 0usize;
+        self.sites.retain_mut(|site| {
+            while there < run.len() && run[there].0 .0 < site.tile.0 {
+                there += 1;
+            }
+            if there >= run.len() || run[there].0 .0 != site.tile.0 {
+                return true;
+            }
+            let taken = run[there].1;
+            there += 1;
+            if !site.is_complete() || taken <= 0 {
+                return true;
+            }
+            let left = site.condition.0.saturating_sub(taken);
+            if left <= 0 {
+                collapsed += 1;
+                return false;
+            }
+            site.condition = Accum(left);
+            true
+        });
+        self.collapses = collapsed;
+        collapsed
+    }
+
+    /// Returns how many sites the last wear collapsed.
+    ///
+    /// The count describes one tick. It is a diagnostic and not simulated
+    /// state, in the same way the visit count of the last advance is, so no
+    /// pass reads it and it enters no state hash.
+    #[must_use]
+    pub const fn last_wear_collapses(&self) -> u64 {
+        self.collapses
+    }
+
     /// Absorbs the map into the state hash.
     ///
     /// The entries enter in tile order, which the map holds them in.[^1] An
     /// unfinished build is state that the next frame reads, so the level and
-    /// the progress enter as well.[^2]
+    /// the progress enter as well.[^2] The condition of a standing level is
+    /// state that the next frame reads too, so it enters beside them.[^2]
     ///
     /// # References
     ///
@@ -1274,7 +1481,8 @@ impl UpgradeMap {
             running = running
                 .write(&site.tile.0.to_le_bytes())
                 .write(&[site.category.to_u8(), site.level])
-                .write(&site.progress.0.to_le_bytes());
+                .write(&site.progress.0.to_le_bytes())
+                .write(&site.condition.0.to_le_bytes());
         }
         running
     }
@@ -1309,6 +1517,12 @@ impl UpgradeMap {
                 && site.level <= table.top_level(site.category)
                 && site.progress.0 >= 0
                 && site.progress.0 <= table.work_above(site.category, site.level)
+                // The condition sits above nothing and at or below the full
+                // condition. A site at nothing collapsed and the wear pass
+                // removed it, so a stored zero is a site that outlived its
+                // own collapse.
+                && site.condition.0 > 0
+                && site.condition.0 <= CONDITION_FULL
         })
     }
 }
@@ -1325,6 +1539,7 @@ fn fresh_site(added: (TileIdx, UpgradeCategory, i64), table: &UpgradeTable) -> U
         category,
         level: NO_LEVEL,
         progress: Accum(0),
+        condition: Accum(CONDITION_FULL),
     };
     advanced(start, category, work, table)
 }
@@ -1334,8 +1549,19 @@ fn fresh_site(added: (TileIdx, UpgradeCategory, i64), table: &UpgradeTable) -> U
 /// A contribution to another category is dropped. The tile carries one
 /// upgrade, and it is not the one the contributor named.
 ///
+/// **A repair comes first.** While the level that stands there is damaged,
+/// the work buys condition and raises no level. One worker therefore mends
+/// what stands before it builds on top of it, and no caller has to choose
+/// between the two. The work is the same contribution the build sums, so a
+/// repair and a build run through one mechanism and no second rate exists.[^1]
+///
 /// The level rises in place when the work reaches the work of the row above
-/// the entry, and the work done then returns to zero.
+/// the entry, and the work done then returns to zero. A level that has just
+/// risen stands at the full condition.
+///
+/// # References
+///
+/// [^1]: Recurring Defect Shapes, shape 1. `.agents/rules/recurring-defects.md`
 #[must_use]
 fn advanced(
     site: UpgradeSite,
@@ -1345,6 +1571,17 @@ fn advanced(
 ) -> UpgradeSite {
     if site.category != category {
         return site;
+    }
+    if site.is_damaged() {
+        let level_work = table.work_at(site.category, site.level);
+        let mended = site
+            .condition
+            .0
+            .saturating_add(repair_gain(work.max(0), level_work));
+        return UpgradeSite {
+            condition: Accum(mended.min(CONDITION_FULL)),
+            ..site
+        };
     }
     let asked = table.work_above(site.category, site.level);
     if asked == 0 {
@@ -1360,6 +1597,7 @@ fn advanced(
         return UpgradeSite {
             level: site.level + 1,
             progress: Accum(0),
+            condition: Accum(CONDITION_FULL),
             ..site
         };
     }

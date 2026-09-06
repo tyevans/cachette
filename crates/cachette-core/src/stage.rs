@@ -160,6 +160,7 @@ declare_stages! {
     DepletionRecover,         "depletion_recover",          false, 1, false;
     Gather,                   "gather",                     true,  1, false;
     Build,                    "build",                      true,  1, false;
+    UpgradeWear,              "upgrade_wear",               false, 1, false;
     HoldingLease,             "holding_lease",              true,  1, false;
     HoldingSpread,            "holding_spread",             true,  1, false;
     HoldingCandidates,        "holding_candidates",         true,  1, true;
