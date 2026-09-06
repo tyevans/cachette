@@ -12,7 +12,8 @@ blocked-by: [BLK-007]
 
 The terrain record chooses generation over storage. The reasoning is that the
 saving is arithmetic and the cost of the alternative is the largest
-allocation in the engine. Nobody has measured either side.
+allocation in the engine. BLK-007 governs both figures and says which side has
+a measurement.
 
 The work benchmarks a whole-world read of the generated ground against a
 whole-world read of a stored column, on the target platform, at the target

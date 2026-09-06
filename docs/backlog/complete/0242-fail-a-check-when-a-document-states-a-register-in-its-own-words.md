@@ -1,7 +1,7 @@
 ---
 id: 0242
 title: Fail a check when a document states a register in its own words
-status: refined
+status: complete
 created: 2026-09-03
 implements: []
 changes: []
@@ -87,7 +87,43 @@ have never gone stale.
 
 ## Outcome
 
-Filled in when the item moves to `complete/`.
+Built. One check reads every Markdown document in the tree, joins each
+paragraph into one line, and fails on a phrase of the measurement family that
+no citation reaches. The script header states the rule, and it states what the
+check cannot catch.[^10]
+
+**The rule the check applies is a paragraph rule, not a sentence rule.** A
+paragraph that states a register's content must name the register, by a
+footnote marker or by a row number. A row of a table is a paragraph of its own,
+because one cited row must not excuse every other row. The sentence was tried
+first and it reported thirty-six failures against nineteen for the paragraph,
+and every site the paragraph rule dropped named its register one sentence away.
+The decisions register holds the choice and the findings register holds the
+measurement.[^11] [^12]
+
+**What it cannot catch.** A restatement in a paragraph that cites the register
+passes, and it is still a second declaration site. A family nobody has written
+down is invisible, and one family is implemented. A paraphrase outside the
+family passes. Prose outside Markdown is not read, so the same family in a Rust
+doc comment is untouched.
+
+**Five documents were repaired and thirteen sites were baselined.** The two
+rule files, the record registry and two open backlog items now name BLK-007 in
+the paragraph that states the measurement. The baseline holds the completed
+items, the reviews and the research reports, each of which is a record of a
+moment.[^13]
+
+**The decisions register joined the exempt registers.** An open row such as
+DEC-272 states what nobody has measured about its own options, which is the
+choice itself and not a copy of one.
+
+**The check was proved able to fail on the tree, not only on a fixture.** The
+repaired sentence in the definition of done went back to its stale form, the
+check failed on it, and the sentence was restored.
+
+Two gaps stay open. The Rust doc comments hold the same family and this check
+does not read them. The accepted records hold it under a citation, and item
+0243 still holds that work.
 
 ## References
 
@@ -100,3 +136,7 @@ Filled in when the item moves to `complete/`.
 [^7]: Definition of Done, section 4. `.claude/rules/definition-of-done.md`
 [^8]: Decision Record Scope, section 1. `.claude/rules/adr-scope.md`
 [^9]: Findings register, FND-260. `docs/FINDINGS.md`
+[^10]: The register prose check. `scripts/check_register_prose.py`
+[^11]: Decisions register, DEC-272. `docs/DECISIONS.md`
+[^12]: Findings register, FND-532. `docs/FINDINGS.md`
+[^13]: The register prose baseline. `scripts/register-prose-baseline.txt`

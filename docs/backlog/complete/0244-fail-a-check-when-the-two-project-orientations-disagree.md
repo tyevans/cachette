@@ -1,7 +1,7 @@
 ---
 id: 0244
 title: Fail a check when the two project orientations disagree
-status: refined
+status: complete
 created: 2026-09-03
 implements: []
 changes: []
@@ -75,7 +75,44 @@ The check reports the disagreement; the owner decides which copy is right.
 
 ## Outcome
 
-Filled in when the item moves to `complete/`.
+Built, and the design changed. The item asked for a comparison of two
+hand-written files. Two of the three orientation names were already symlinks to
+the third, so the divergence lived in the one name that was still a regular
+file. Copying the item's design would have preserved the copy it set out to
+police.
+
+**The orientation is now one document under three names.** The third name is a
+symlink as well, which is how this repository already mirrors its rules
+directory and its skills directory. Neither copy was edited into agreement:
+one of them stopped being a copy.
+
+**Each name now holds exactly what the others hold, and that is the point.**
+The layout table of the canonical file already names both directories and both
+symlinks, so a reader of any name reads the same table. The stale copy named
+one directory and neither symlink.
+
+**The check stays, and it earns its place a different way.** It fails when
+somebody replaces a symlink with a regular file that says something else. It
+compares content and does not demand the link, because a checkout on a
+filesystem with no symlink must still work. It reads the rules directory and
+the skills directory the same way, file by file.[^6]
+
+**The normalisation is two rewrites and no more.** It rewrites the canonical
+directory name to the mirror directory name in a path, and it rewrites the name
+of an orientation file. A wider rewrite would make two files compare equal
+while they say different things.
+
+**The check reported the live disagreement before the repair.** It named the
+file and the line, which is what this item asked for. The finding holds what
+the reading changed.[^7]
+
+**It was proved able to fail on the tree, not only on a fixture.** The symlink
+was replaced by a copy that said two million units instead of one million, the
+check failed on that line, and the symlink was restored.
+
+The item said that neither file may be edited by this work. The project owner
+directed the change through the dispatcher, and the change deletes a copy
+rather than editing one.
 
 ## References
 
@@ -84,3 +121,5 @@ Filled in when the item moves to `complete/`.
 [^3]: The gate that proves a check can fail. `justfile`
 [^4]: Decision Record Scope, section 1. `.claude/rules/adr-scope.md`
 [^5]: Findings register, FND-050. `docs/FINDINGS.md`
+[^6]: The orientation check. `scripts/check_orientation.py`
+[^7]: Findings register, FND-531. `docs/FINDINGS.md`

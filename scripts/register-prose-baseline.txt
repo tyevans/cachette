@@ -1,0 +1,39 @@
+# Register prose that already exists in the tree.
+#
+# Each line is a path, a tab, the name of the family, a tab, and the whole
+# sentence with its whitespace collapsed. A line here suppresses one failure
+# from check_register_prose.py. This list may only shrink.
+#
+# The check fails when a line here matches nothing, so this list cannot go
+# stale. Do not add to it. Repair the document instead.
+#
+# Why each group is here.
+#
+# The completed backlog items and the reviews: each is a record of a moment.
+# The sentence was true on the day it was written, and rewriting it changes
+# the record of what the writer saw. Repairing one means editing a document
+# whose value is that nobody edits it.
+#
+# The research reports and the research agenda: the same shape. A report is
+# dated research, and its figures were derived on the day of the report. The
+# blockers register is the current statement of what the target platform has
+# measured since.
+#
+# One completed item and two reviews quote the family rather than assert it.
+# The check reads phrases and not meaning, so it cannot tell a quotation from
+# a claim. Those lines are here for that reason and not because the document
+# is wrong.
+
+docs/backlog/complete/0097-write-the-layout-record-with-the-descent-columns.md	measurement	No measurement exists on the target platform, so nothing demands it.
+docs/backlog/complete/0236-repair-every-record-that-calls-blk-007-open.md	measurement	**The scale was the problem.** Sentences of the form "no measurement exists on the target platform, and every cost figure in this project is derived" appear in accepted records, in draft records, in product records, in the decisions register, in the reference registers, in the research notes, in open and completed backlog items, in reviews, and in doc comments in the engine.
+docs/research/reports/17-group-spatial-dynamics.md	measurement	**Every figure here is derived, not measured.** Benchmark on the target platform before you rely on any of it.
+docs/research/reports/17-group-spatial-dynamics.md	measurement	Every figure here is derived, not measured.
+docs/research/reports/21-what-a-god-needs.md	measurement	The third is whether a fight at this engine's granularity looks like a fight, which nobody has measured.
+docs/research/reports/MERGE-NOTES.md	measurement	**Every figure is derived, not measured.** The research agenda flags benchmarking on the target platform as blocking most conclusions.
+docs/research/research-agenda.md	measurement	It has no measurement of the real query mix, because no game code exists.
+docs/reviews/0199-the-influence-tile-field-upgrade-and-housing-records.md	measurement	It says the growth has a shape and that no measurement exists, and it cites the blocker.
+docs/reviews/0223-the-control-plane-record.md	measurement	It says plainly that it states no cost, because no measurement exists on the target platform.
+docs/reviews/0223-the-influence-storage-record.md	measurement	The record says the copy is the price and that nothing has priced it because no measurement exists on the target platform.
+docs/reviews/0345-resolve-a-meeting.md	measurement	**No measurement of the cost of the new stage exists.** It is a stage of the step and the stage table names it, so a benchmark run on the target platform will price it.
+docs/reviews/0422-conversion.md	measurement	**The cost of the pass is derived, not measured.** The pass opens a stage, so the stage cost table names it, but no benchmark was run on the target platform.
+docs/reviews/0422-conversion.md	measurement	A threshold that decides behaviour would have entered the hash by the precedent of every other world parameter, and every golden file would have had to be recorded again for a value nobody has measured.

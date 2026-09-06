@@ -1,0 +1,2 @@
+# A baseline entry that matches nothing.
+tests/fixtures/register-prose-stale/correct.md	measurement	No measurement exists on the target platform.

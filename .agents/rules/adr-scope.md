@@ -96,9 +96,9 @@ or a percentage in a record. Put it in the reference tables and cite it.
 Records that quote a measured figure churned 4.80 times on average against a
 corpus mean of 2.87.[^3]
 
-Every cost figure in this project is derived, not measured. A derived figure
-changes when a better derivation arrives, which is more often than a decision
-changes.
+BLK-007 says which cost figures in this project are measured and which are
+derived. A derived figure changes when a better derivation arrives, which is
+more often than a decision changes.
 
 A structural constant is not a budget. The cache line size of the target is 64
 bytes, and that is a property of the platform the project chose. State it.

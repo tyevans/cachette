@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-527**
+**Next number: FND-534**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -10828,151 +10828,34 @@ and to read the value back.[^F485G]
 [^F317D]: Backlog item 0305, give a laden unit a reason to go home. `docs/backlog/complete/0305-give-a-laden-unit-a-reason-to-go-home.md`
 [^F316A]: Backlog item 0279, let a golden scenario reach the position pass. `docs/backlog/proposed/0279-let-a-golden-scenario-reach-the-position-pass.md`
 
-### FND-320 — The type stub claims a check that regenerates it, and no generator and no check exist
+### FND-533 — The documentation plan is the backlog item, and a plan document would be a second declaration site
 
-**Believed.** The type stub for the compiled extension module is a generated
-artefact. Its own docstring says that the contributing guide requires the
-continuous integration system to check the stubs, that the build regenerates
-them, and that the job fails when the result differs from the file.[^F320A]
+**Believed.** The item titled the documentation plan asks for a plan document.
+It sits in the refined directory and it names eight items below it, so the work
+of it is to write the plan somewhere.
 
-**True.** No stub generator exists anywhere in the tree. No workflow job
-regenerates the stub, and no job compares it against anything. The stub is
-hand-written. The contributing guide never states the requirement that the
-docstring attributes to it. Its only use of the word "stub" describes the Rust
-crates as unimplemented.[^F320B]
+**True.** The item is the plan. It states the four quadrants, what each holds,
+what each deliberately leaves out, the order of the work and what checks it. It
+says so in its own second paragraph. Writing that content into a second document
+would create two declaration sites for one plan, with nothing that fails when
+they disagree, which is the shape this project names first in its own
+rule.[^F530A]
 
-**The claim is wrong twice.** It names a guide that says something else, and it
-names a mechanism that does not exist. A contributor who changes a binding and
-reads that docstring concludes that a job will catch a stale stub. Nothing will.
+The item also cannot close. Its own finish line asks for eight items to be
+complete, and five of them are open.
 
-**A second half makes the first half expensive.** The stub carries a docstring
-for each typed dictionary and for each exception class. It carries none for any
-method of `World` and none for any method of `Camera`. The Rust bindings crate
-carries that prose, and PyO3 puts it on the compiled objects. So the stub and
-the compiled module are two declaration sites for the public interface, they
-already disagree about the prose, and nothing fails.[^F320C]
+**Evidence.** Two of the eight are in the completed directory. Five are in the
+proposed directory. The item stays open on its own terms.
 
-**Evidence.**
+**Follows.** No plan document is written, and the item stays where it is. A
+reader who wants the documentation plan reads the item. When the last of the
+eight closes, the item closes with an outcome and the plan becomes history,
+which is the correct end for a plan.
 
-```
-grep -rniE "stub|pyi|pyo3-stub-gen" justfile scripts/ .github/ crates/cachette-py/Cargo.toml
-grep -niE "stub|\.pyi" CONTRIBUTING.md
-```
+**An item that reads like a document request is not always one.** Ask what the
+deliverable is before writing prose. Here the deliverable already existed inside
+the request.
 
-The first command finds two matches, and neither generates or compares a stub.
-The second finds one match, and it describes the Rust crates.
-
-A documentation build measured the second half. A site built from the compiled
-module produced a page of 105,348 bytes that held the method prose. The same
-site built with module inspection turned off fell back to the stub, produced
-29,038 bytes, and held no method prose at all.[^F320D]
-
-**Follows.** Repair the stub docstring, or make the claim true with a
-generator. The research report on the documentation toolchain treats the
-Rust doc comment as the single source of the prose for exactly this
-reason.[^F320D] A generator would also remove the second declaration site for
-every signature, which is the shape the recurring defect rule names.[^F320E]
-
-### FND-321 — The stub already carries prose the Rust source owns, and the copy that drifted dropped the paragraph that warns against a copy
-
-**Believed.** The register records that the type stub and the compiled module
-are two declaration sites for the public interface, and that they already
-disagree about the prose.[^F321A] The disagreement it names is an absence: the
-stub carries no docstring for any method of `World` and none for any method of
-`Camera`.
-
-**True, and the sharper half is what the stub does carry.** Nine exception
-classes carry a docstring in the stub. All nine are the same words as the string
-that the Rust macro gives the same exception, character for character.[^F320C]
-The `World` class docstring is a one line copy of the Rust doc comment, and it
-agrees. The `Camera` class docstring is an abridged copy of the Rust doc comment,
-and it does not agree: it keeps the first and the last paragraph and drops two.
-
-**One of the dropped paragraphs is the one that names this defect.** The Rust
-doc comment says that a pan share and a zoom step written on both sides of the
-boundary would be one value in two places, with nothing failing when the copies
-disagreed. The stub is that second place, and the sentence did not survive the
-copy into it.
-
-**Evidence.**
-
-```
-grep -n "create_exception" crates/cachette-py/src/lib.rs
-sed -n '1303,1320p' crates/cachette-py/src/lib.rs
-sed -n '280,336p' python/cachette/_core.pyi
-```
-
-**Follows.** The count of copies is eleven, not zero, and nine of them agree
-today. **An agreeing copy is the worse case**, because it reads as a maintained
-file and gives a contributor no reason to look for the other site. The record on
-the provenance of the documentation prose forbids a docstring on a stub member
-that the compiled module provides, and it names this as a defect it does not
-fix.[^F321C] A backlog item holds the removal and the check.[^F321D]
-### FND-329 — A backlog item decays fastest at the sentence that tells a reader not to take it
-
-**Believed.** A backlog item in `proposed/` is an idea and costs nothing while
-it waits. The guide says an item there may be one sentence, so a stale item is
-a small loss and the priority index carries the judgement that matters.[^F329A]
-
-**True.** An item decays like any other document, and the sentence that decays
-first is the one a reader acts on. An audit of the 89 items in `proposed/` on
-3 September 2026 found the same shape in nine of them, and in three cases the
-stale sentence was the reason nobody had taken the item.
-
-**The worst case is a deferral whose reason is gone.** Item 0039 carried a
-section headed "Do not build this yet". Its reason was that a unit has no plan
-and draws a fresh direction on each frame, so a refused unit does not repeat the
-choice that failed. A unit now takes its direction from the exit of its cell for
-the option it chose, and every input to that holds from one frame to the
-next.[^F329B] The demonstration world was driven for 400 ticks: a unit held its
-tile against a target the ground admits 61 times, and one unit was refused on
-five consecutive frames. **The item said the condition could not arise, and the
-engine produced it 61 times in one run.**
-
-**Two other deferrals had the same shape.** Item 0272 says no measurement exists
-on the target platform. One does, and it names the pass this item is about: the
-choice costs 0.571 milliseconds of a frame of about 836.[^F329C] Item 0270 asks
-for a vector rewrite of that pass and quotes 71.4 milliseconds for it from the
-same register, which marks the figure stale in its own words on another
-page.[^F329C] **One register said both things at once, and two items read the
-half that suited them.**
-
-**A closed premise also makes an item invisible.** Item 0206 states in its own
-first section that another worker closed every gap it names, and asks whoever
-merges the two to close it. It stayed open. The priority index carried a row
-saying "Do not take it", so the index was paying to point at an item that should
-not have existed.
-
-**Four items carried a count that the tree had moved past.** Item 0278 said the
-demonstration world holds no character and that no unit holds a ranked position.
-Driven again, the same world seats 16 of 32 ranked positions and holds 26
-characters at tick 200. Item 0145 said the faction coercion is written at six
-places; there are five in the module and more outside it. Item 0222 said the
-error hierarchy holds seven leaves; it holds eight. Item 0072 said one test
-calls the panel fit check; two do.
-
-**Evidence.** The audit read every item in `proposed/`, then measured the three
-claims above by driving the engine rather than by reading it. The probe built
-the demonstration world, founded a run for every faction, stepped 400 frames and
-printed the counts. The commit body holds the command and the output.
-
-**Follows.** Four things.
-
-**A count in a backlog item rots exactly as a count in a decision record
-does.** The scope rule bans a count from a record and sends it to the commit
-message.[^53] The backlog has no such rule, and it does not need the same
-one, because a count is often the whole argument for an item. It needs the
-weaker rule: **a count in an item is dated evidence, not a current fact, and a
-reader who plans against it derives it again first.**
-
-**A "do not take this yet" section is the highest-value line in the backlog and
-nothing rechecks it.** It stops work. Its reason is a claim about the code, and
-the code moves. **State the reason as a condition that can be tested, not as a
-description of how things are**, so a later reader can run something and find
-out.
-
-**An item that says it is superseded is not closed by saying so.** Item 0206
-said it for a day and the index repeated it. The close is the work.
 
 **The priority index and the item can hold opposite claims and no check sees
 it.** The index said the project pins a stable toolchain, so the portable vector
@@ -10983,6 +10866,10 @@ index against the set of open items and never against what an item says.
 
 
 ## References
+
+[^F530A]: Recurring Defect Shapes, shape 1 and shape 2. `.agents/rules/recurring-defects.md`
+[^F532A]: Documentation Rules, section 3. `.agents/rules/documentation.md`
+[^F532B]: The register prose baseline. `scripts/register-prose-baseline.txt`
 
 [^F320A]: The type stub for the compiled module. `python/cachette/_core.pyi`
 [^F320B]: Contributing guide, the opening section. `CONTRIBUTING.md`
@@ -11018,8 +10905,8 @@ index against the set of open items and never against what an item says.
 [^F227B]: Findings register, FND-183, in this document.
 [^F258A]: Findings register, FND-223, in this document.
 [^F258B]: The footnote baseline. `scripts/footnote-baseline.txt`
-[^F258C]: Backlog item 0242. `docs/backlog/refined/0242-fail-a-check-when-a-document-states-a-register-in-its-own-words.md`
-[^F259CHECK]: Backlog item 0244. `docs/backlog/refined/0244-fail-a-check-when-the-two-project-orientations-disagree.md`
+[^F258C]: Backlog item 0242. `docs/backlog/complete/0242-fail-a-check-when-a-document-states-a-register-in-its-own-words.md`
+[^F259CHECK]: Backlog item 0244. `docs/backlog/complete/0244-fail-a-check-when-the-two-project-orientations-disagree.md`
 [^F222]: Target platform costs. `docs/reference/graviton-costs.md`
 [^F223C]: ADR Registry, how a record changes. `docs/adrs/REGISTRY.md`
 
@@ -11334,6 +11221,237 @@ index against the set of open items and never against what an item says.
 [^F319A]: Project orientation, the Python example. `README.md`
 [^F319B]: Recurring defect shapes, shape 5. `.claude/rules/recurring-defects.md`
 [^F319C]: Product requirement record 0021, a developer can use the control plane without reading its source. `docs/product/accepted/prd-0021-a-developer-can-use-the-control-plane-without-reading-its-source.md`
+
+### FND-320 — The type stub claims a check that regenerates it, and no generator and no check exist
+
+**Believed.** The type stub for the compiled extension module is a generated
+artefact. Its own docstring says that the contributing guide requires the
+continuous integration system to check the stubs, that the build regenerates
+them, and that the job fails when the result differs from the file.[^F320A]
+
+**True.** No stub generator exists anywhere in the tree. No workflow job
+regenerates the stub, and no job compares it against anything. The stub is
+hand-written. The contributing guide never states the requirement that the
+docstring attributes to it. Its only use of the word "stub" describes the Rust
+crates as unimplemented.[^F320B]
+
+**The claim is wrong twice.** It names a guide that says something else, and it
+names a mechanism that does not exist. A contributor who changes a binding and
+reads that docstring concludes that a job will catch a stale stub. Nothing will.
+
+**A second half makes the first half expensive.** The stub carries a docstring
+for each typed dictionary and for each exception class. It carries none for any
+method of `World` and none for any method of `Camera`. The Rust bindings crate
+carries that prose, and PyO3 puts it on the compiled objects. So the stub and
+the compiled module are two declaration sites for the public interface, they
+already disagree about the prose, and nothing fails.[^F320C]
+
+**Evidence.**
+
+```
+grep -rniE "stub|pyi|pyo3-stub-gen" justfile scripts/ .github/ crates/cachette-py/Cargo.toml
+grep -niE "stub|\.pyi" CONTRIBUTING.md
+```
+
+The first command finds two matches, and neither generates or compares a stub.
+The second finds one match, and it describes the Rust crates.
+
+A documentation build measured the second half. A site built from the compiled
+module produced a page of 105,348 bytes that held the method prose. The same
+site built with module inspection turned off fell back to the stub, produced
+29,038 bytes, and held no method prose at all.[^F320D]
+
+**Follows.** Repair the stub docstring, or make the claim true with a
+generator. The research report on the documentation toolchain treats the
+Rust doc comment as the single source of the prose for exactly this
+reason.[^F320D] A generator would also remove the second declaration site for
+every signature, which is the shape the recurring defect rule names.[^F320E]
+
+### FND-321 — The stub already carries prose the Rust source owns, and the copy that drifted dropped the paragraph that warns against a copy
+
+**Believed.** The register records that the type stub and the compiled module
+are two declaration sites for the public interface, and that they already
+disagree about the prose.[^F321A] The disagreement it names is an absence: the
+stub carries no docstring for any method of `World` and none for any method of
+`Camera`.
+
+**True, and the sharper half is what the stub does carry.** Nine exception
+classes carry a docstring in the stub. All nine are the same words as the string
+that the Rust macro gives the same exception, character for character.[^F320C]
+The `World` class docstring is a one line copy of the Rust doc comment, and it
+agrees. The `Camera` class docstring is an abridged copy of the Rust doc comment,
+and it does not agree: it keeps the first and the last paragraph and drops two.
+
+**One of the dropped paragraphs is the one that names this defect.** The Rust
+doc comment says that a pan share and a zoom step written on both sides of the
+boundary would be one value in two places, with nothing failing when the copies
+disagreed. The stub is that second place, and the sentence did not survive the
+copy into it.
+
+**Evidence.**
+
+```
+grep -n "create_exception" crates/cachette-py/src/lib.rs
+sed -n '1303,1320p' crates/cachette-py/src/lib.rs
+sed -n '280,336p' python/cachette/_core.pyi
+```
+
+**Follows.** The count of copies is eleven, not zero, and nine of them agree
+today. **An agreeing copy is the worse case**, because it reads as a maintained
+file and gives a contributor no reason to look for the other site. The record on
+the provenance of the documentation prose forbids a docstring on a stub member
+that the compiled module provides, and it names this as a defect it does not
+fix.[^F321C] A backlog item holds the removal and the check.[^F321D]
+### FND-329 — A backlog item decays fastest at the sentence that tells a reader not to take it
+
+**Believed.** A backlog item in `proposed/` is an idea and costs nothing while
+it waits. The guide says an item there may be one sentence, so a stale item is
+a small loss and the priority index carries the judgement that matters.[^F329A]
+
+**True.** An item decays like any other document, and the sentence that decays
+first is the one a reader acts on. An audit of the 89 items in `proposed/` on
+3 September 2026 found the same shape in nine of them, and in three cases the
+stale sentence was the reason nobody had taken the item.
+
+**The worst case is a deferral whose reason is gone.** Item 0039 carried a
+section headed "Do not build this yet". Its reason was that a unit has no plan
+and draws a fresh direction on each frame, so a refused unit does not repeat the
+choice that failed. A unit now takes its direction from the exit of its cell for
+the option it chose, and every input to that holds from one frame to the
+next.[^F329B] The demonstration world was driven for 400 ticks: a unit held its
+tile against a target the ground admits 61 times, and one unit was refused on
+five consecutive frames. **The item said the condition could not arise, and the
+engine produced it 61 times in one run.**
+
+**Two other deferrals had the same shape.** Item 0272 says no measurement exists
+on the target platform. One does, and it names the pass this item is about: the
+choice costs 0.571 milliseconds of a frame of about 836.[^F329C] Item 0270 asks
+for a vector rewrite of that pass and quotes 71.4 milliseconds for it from the
+same register, which marks the figure stale in its own words on another
+page.[^F329C] **One register said both things at once, and two items read the
+half that suited them.**
+
+**A closed premise also makes an item invisible.** Item 0206 states in its own
+first section that another worker closed every gap it names, and asks whoever
+merges the two to close it. It stayed open. The priority index carried a row
+saying "Do not take it", so the index was paying to point at an item that should
+not have existed.
+
+**Four items carried a count that the tree had moved past.** Item 0278 said the
+demonstration world holds no character and that no unit holds a ranked position.
+Driven again, the same world seats 16 of 32 ranked positions and holds 26
+characters at tick 200. Item 0145 said the faction coercion is written at six
+places; there are five in the module and more outside it. Item 0222 said the
+error hierarchy holds seven leaves; it holds eight. Item 0072 said one test
+calls the panel fit check; two do.
+
+**Evidence.** The audit read every item in `proposed/`, then measured the three
+claims above by driving the engine rather than by reading it. The probe built
+the demonstration world, founded a run for every faction, stepped 400 frames and
+printed the counts. The commit body holds the command and the output.
+
+**Follows.** Four things.
+
+**A count in a backlog item rots exactly as a count in a decision record
+does.** The scope rule bans a count from a record and sends it to the commit
+message.[^53] The backlog has no such rule, and it does not need the same
+one, because a count is often the whole argument for an item. It needs the
+weaker rule: **a count in an item is dated evidence, not a current fact, and a
+reader who plans against it derives it again first.**
+
+**A "do not take this yet" section is the highest-value line in the backlog and
+nothing rechecks it.** It stops work. Its reason is a claim about the code, and
+the code moves. **State the reason as a condition that can be tested, not as a
+description of how things are**, so a later reader can run something and find
+out.
+
+**An item that says it is superseded is not closed by saying so.** Item 0206
+said it for a day and the index repeated it. The close is the work.
+
+### FND-530 — The document checks were declared in two places, and the workflow ran six of the eight
+
+**Believed.** Continuous integration runs the document checks. The command
+runner holds a recipe that names them, and a workflow file holds a job that
+names them, so a check added to the recipe runs on every push.
+
+**True.** The two lists were written by hand and they drifted. The recipe named
+eight checks. The workflow named six. The footnote check and the conflict marker
+check ran on a developer machine and never in continuous integration. The
+workflow also named four probe cases against six in the recipe. Nothing failed,
+because neither list reads the other.
+
+**Evidence.** The work that added two more checks found the gap while wiring
+them in. The commit body holds the difference between the two lists.
+
+**Follows.** This is shape 1 of the recurring defect rule, in the file that
+exists to catch a defect.[^F530A] The fix is the one the rule states: derive,
+do not repeat. The workflow now runs the two recipes and names no check of its
+own, so the recipe is the one declaration site and a check added there runs in
+both places.
+
+**A list of checks is the easiest copy to overlook, because both copies work.**
+Each list ran and each passed. The gap was not a broken check. It was a check
+that never ran, and a passing job that looked like coverage.
+
+### FND-531 — The project orientation is one document under three names, and one of the three was a copy
+
+**Believed.** The orientation is two tracked files and a symlink, and a check
+must compare the two files after a normalisation.[^F322D] The item that holds
+the work states that design, and it states that neither file may be edited.
+
+**True.** Two of the three names were already symlinks to the third. The
+divergence lived in the one name that was still a regular file. A comparison
+between two hand-written files is the weaker instrument, because it lets the
+copies exist and then reports that they disagree. The rule prefers deriving one
+from the other, and this repository already mirrors its rules directory and its
+skills directory that way.[^F530A]
+
+**Evidence.** The orientation file for one harness was a regular file and
+carried an older numbering of its footnotes and an older repository layout
+table. It named neither the canonical rules directory nor the two symlinks
+beside it. The other two names read one file and could not disagree.
+
+**Follows.** The third name is now a symlink as well, so the orientation is one
+document and the copies cannot drift. The check stays, and it earns its place a
+different way: it fails when somebody replaces a symlink with a regular file
+that says something else. A checkout on a filesystem with no symlink must still
+work, so the check compares content and does not demand the link.
+
+**Read the shape before you build the instrument the item asks for.** The item
+asked for a comparison of two hand-written documents. The tree already held the
+better answer for two of the three names, and copying the item's design would
+have preserved the copy it set out to police.
+
+### FND-532 — A check that reads prose must choose a unit, and the sentence is too small
+
+**Believed.** A check for a stale restatement fails on a sentence that states a
+register's content and cites nothing. The sentence is the natural unit, because
+the documentation rule puts a footnote marker directly after the claim it
+supports.[^F532A]
+
+**True.** The sentence is too small a unit in this tree. A writer states a claim
+in one sentence and names the register in the next, which is ordinary prose and
+not a defect. A sentence-level test reported thirty-six failures over the tree.
+A paragraph-level test reported nineteen over the same tree, and every site it
+dropped named its register one sentence away.
+
+A whole table is too large in the other direction. A priority index is one table
+of many rows, and one cited row would excuse every other row. A row is therefore
+a unit of its own.
+
+**Evidence.** Both runs are in the commit body, against the same tree and the
+same phrase family.
+
+**Follows.** The unit is the paragraph, and a row of a table is a paragraph. Say
+in the script what the check cannot catch, rather than widen the check until it
+catches everything. A restatement that cites its register still passes, and it
+is still a second declaration site. The citation only gives a doubting reader
+one hop to the thing that decides it.
+
+**A check over prose buys a subset, and the honest move is to name the subset.**
+Failing every cited site would fail on about forty records that nobody may
+edit.[^F532B] A gate nobody can turn green is a gate everybody learns to skip,
+and the footnote check already carries that reasoning for its ordering test.
 
 ### FND-322 — The document a newcomer reads first sells a pyramid level that nothing writes
 

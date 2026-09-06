@@ -164,7 +164,8 @@ a repair. A register holds the reasoning and the case that raised it.[^DERIVED]
 **A record sometimes states the condition of the project rather than its own
 reasoning.** It says that no measurement exists, or that a question is open, and
 it cites the register that held that condition. The register then moves, and the
-sentence is false through no fault of the record.
+sentence is false through no fault of the record. BLK-007 produced this section,
+and FND-223 holds the scale of it.
 
 This is the sibling of the section above and it is not the same case. A derived
 consequence follows from the record's own claim. An imported fact follows from a

@@ -10,7 +10,7 @@ created: 2026-09-03
 The step now runs a conversion pass on every frame. The pass opens a stage, so
 the stage cost table names it and a benchmark reports it. Nobody has run that
 benchmark on the target platform, so the cost of the pass is derived and not
-measured.
+measured.[^1]
 
 The derivation says the pass costs the occupied tiles multiplied by the faction
 count, plus one read for each unit on those tiles. Two terms of that are worth
