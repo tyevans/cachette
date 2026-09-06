@@ -49,11 +49,12 @@ for it and the Python boundary hands them out through a call of its own, but
 the one census table holds none of them. A watcher of the demonstration sees no
 queue row at all.[^1] [^4]
 
-**One test is red because of this.** The test that names the return field of a
-laden unit reads units that a destination field steers. A probe found 117 laden
-units in the demonstration world and not one with a free send. The test passes
-at the world it was written against and fails under any perturbation of it. It
-cannot assert its subject until a laden unit can be unsent.[^1] [^5]
+**Nothing frees a unit the project order sent, and one fixture depended on
+that.** The test that names the return field of a laden unit read units the
+destination field steers, because the move pass reads the plane of a unit
+before it reads the option row. The fixture now frees the units it measures
+through the stop verb. It should not have to: a unit that has delivered its
+load has no project to walk to, and nothing releases it.[^1] [^5]
 
 ## Impact review
 

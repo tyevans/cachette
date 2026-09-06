@@ -12277,13 +12277,24 @@ still finishes nothing.** The fix closes the loop; it does not make the loop
 reliable. Nothing releases a unit from a project send, so the seed set the
 faction climbs is written once and never re-aimed. Both stay open.[^F496I]
 
-**Every laden unit of the demonstration world is on a destination plane.** A
-probe of the carrying fixture found 117 laden units and not one with a free
-send. The return field therefore steers nobody there, and the test that names
-the return field reads units that a destination field steers. That test passes
-at the world it was written against and fails under any perturbation of it,
-including a plan bound of zero, which makes the clause of this finding inert.
-The test is red on this branch and the open item holds the repair.[^F496I]
+**A fixture that named the return field read units the destination field
+steers.** The move pass reads the destination plane of a unit first, and it
+takes the option row only when the unit is free.[^F496L] The test that names
+the return field never checked whether the unit was free. It found six laden
+units in the world it was written against, and it passed because those six
+walked a destination direction that agreed with the return direction or stayed
+put.
+
+The clause of this finding makes a faction build the roads its plan zoned, so
+far more of its units carry a load. The same test then found 117 laden units,
+every one of them on the plane of its own faction, and the agreement broke.
+**The clause was right and the fixture was wrong.** The fixture now frees the
+units it measures through the stop verb, drops any that the step sends again,
+and asserts that it read some. It reads 113 of 117.
+
+The repair was proved twice. The assertion goes red when the expected
+neighbour is turned by one, so the fixture reaches the case. The test is green
+with the clause and green without it, so it no longer measures the clause.
 
 
 ## References
@@ -12296,6 +12307,7 @@ The test is red on this branch and the open item holds the repair.[^F496I]
 [^F496E]: Project orientation, the target platform. `CLAUDE.md`
 [^F496J]: ADR-0148, a game end is recorded once and stops the controllers, decision D4. `docs/adrs/accepted/adr-0148-a-game-end-is-recorded-once-and-stops-the-controllers.md`
 [^F496K]: Backlog item 0278, say what the demonstration world never produced. `docs/backlog/proposed/0278-say-what-the-demonstration-world-never-produced.md`
+[^F496L]: ADR-0125, the control plane names the seed set of a destination field, decision D3. `docs/adrs/draft/adr-0125-the-control-plane-names-the-seed-set-of-a-destination-field.md`
 [^F496F]: Testing rules, section 5. `.agents/rules/testing.md`
 [^F496G]: The plan tests. `crates/cachette-core/tests/plan.rs`
 [^F496H]: Testing rules, section 2a. `.agents/rules/testing.md`
