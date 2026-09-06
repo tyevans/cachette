@@ -1,0 +1,12 @@
+# The direct-die review server. Install these into any interpreter that meets
+# the minimum version of the repository.
+#
+# The server needs the first three. The fixture script needs CairoSVG. The
+# tests need pytest and httpx.
+fastapi
+jinja2
+uvicorn
+python-multipart
+cairosvg
+pytest
+httpx

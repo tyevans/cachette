@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block title %}{{ session.asset }} · {{ session.session_id }}{% endblock %}
+
+{% block bar %}
+  <span class="crumb">{{ session.asset }} / {{ session.session_id }}</span>
+{% endblock %}
+
+{% block main %}
+  <div class="split">
+    {% include "_sessions.html" %}
+    <div class="body">
+      <h1>{{ session.asset }} <span class="sid">{{ session.session_id }}</span></h1>
+      <dl class="meta">
+        <dt>Created</dt><dd>{{ session.created or "—" }}</dd>
+        <dt>Model</dt><dd>{{ session.model or "—" }}</dd>
+        <dt>Guide</dt><dd>{{ session.guide_version or "—" }}</dd>
+      </dl>
+      {% if session.manifest is none %}
+        <p class="gap">This session has no session.json yet.</p>
+      {% endif %}
+      {% if not session.rounds %}
+        <p class="gap">
+          This session holds no round yet. The generation loop writes the first
+          round directory when it draws.
+        </p>
+      {% else %}
+        <h2>Rounds</h2>
+        <ul class="rounds">
+          {% for entry in session.rounds %}
+            <li>
+              <a href="/s/{{ session.asset }}/{{ session.session_id }}/{{ entry.name }}">{{ entry.name }}</a>
+              <span class="count">{{ entry.present_variants | length }} variant{{ "" if entry.present_variants | length == 1 else "s" }}</span>
+              {% if entry.feedback is not none %}
+                <span class="tag">
+                  feedback{% if entry.choice %}: {{ entry.choice }}{% endif %}
+                </span>
+              {% endif %}
+              {% if entry.prompt_summary %}
+                <span class="summary">{{ entry.prompt_summary }}</span>
+              {% endif %}
+            </li>
+          {% endfor %}
+        </ul>
+      {% endif %}
+    </div>
+  </div>
+{% endblock %}

@@ -1,0 +1,169 @@
+/* The direct-die review pages. One stylesheet, no build step. */
+
+:root {
+  --ink: #14161a;
+  --dim: #6b7280;
+  --line: #d8dbe0;
+  --page: #f6f7f9;
+  --card: #ffffff;
+  --pick: #1f6feb;
+  --warn: #9a6700;
+  --good: #1a7f37;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--page);
+  color: var(--ink);
+  font: 15px/1.5 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+main { padding: 1.25rem 1.5rem 4rem; }
+
+h1 { font-size: 1.4rem; margin: 0 0 .5rem; }
+h2 { font-size: 1.05rem; margin: 1.25rem 0 .5rem; }
+
+a { color: var(--pick); }
+
+/* The top bar. */
+.bar {
+  display: flex;
+  align-items: baseline;
+  gap: 1rem;
+  padding: .6rem 1.5rem;
+  background: var(--card);
+  border-bottom: 1px solid var(--line);
+  position: sticky;
+  top: 0;
+  z-index: 5;
+}
+.bar .home { font-weight: 700; text-decoration: none; letter-spacing: .02em; }
+.crumb { color: var(--dim); font-size: .9rem; }
+
+/* The two-column page: the session switcher and the body. */
+.split { display: grid; grid-template-columns: 15rem minmax(0, 1fr); gap: 1.5rem; }
+@media (max-width: 60rem) { .split { grid-template-columns: 1fr; } }
+
+.sessions { font-size: .88rem; }
+.sessions h2 { margin-top: 0; }
+.sessions ul { list-style: none; margin: 0; padding: 0; }
+.sessions li { padding: .3rem 0; border-bottom: 1px solid var(--line); }
+.sessions li.current { font-weight: 700; }
+.sessions .asset { display: block; }
+.sessions .sid { display: block; color: var(--dim); font-size: .8rem; font-family: ui-monospace, monospace; }
+.sessions .count { display: block; }
+.sessions a { text-decoration: none; }
+
+.card {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: .9rem 1.1rem;
+  margin-bottom: 1rem;
+}
+.card h2 { margin-top: 0; }
+.sid { color: var(--dim); font-weight: 400; font-family: ui-monospace, monospace; font-size: .85rem; }
+
+dl.meta { display: grid; grid-template-columns: 9rem 1fr; gap: .15rem .75rem; margin: .5rem 0 1rem; font-size: .9rem; }
+dl.meta dt { color: var(--dim); }
+dl.meta dd { margin: 0; }
+
+ul.rounds { list-style: none; margin: 0; padding: 0; }
+ul.rounds li { padding: .3rem 0; border-bottom: 1px solid var(--line); display: flex; gap: .6rem; align-items: baseline; flex-wrap: wrap; }
+.count, .summary { color: var(--dim); font-size: .85rem; }
+.tag { background: #eef4ff; color: var(--pick); border-radius: 3px; padding: 0 .35rem; font-size: .78rem; }
+
+/* The round strip across the top of a round page. */
+nav.strip { display: flex; flex-wrap: wrap; gap: .35rem; margin: .75rem 0 1.25rem; }
+nav.strip a {
+  border: 1px solid var(--line);
+  background: var(--card);
+  border-radius: 4px;
+  padding: .2rem .55rem;
+  text-decoration: none;
+  font-size: .85rem;
+  font-family: ui-monospace, monospace;
+}
+nav.strip a.current { background: var(--pick); color: #fff; border-color: var(--pick); }
+
+/* The variants, side by side. */
+.variants {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+  gap: 1rem;
+  align-items: start;
+}
+
+.variant {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: .75rem;
+}
+.variant.picked { border-color: var(--pick); box-shadow: 0 0 0 2px rgba(31, 111, 235, .18); }
+
+.pick { display: flex; align-items: center; gap: .5rem; cursor: pointer; margin-bottom: .5rem; }
+.pick .letter { font-weight: 700; text-transform: uppercase; font-size: 1.05rem; }
+
+/* The display render sits at its own pixel size, so the person sees the
+   asset as it appears in the game. The checker gives a neutral backdrop. */
+.display { display: flex; justify-content: center; padding: .75rem 0; }
+.checker {
+  image-rendering: auto;
+  background-color: #fff;
+  background-image:
+    linear-gradient(45deg, #e6e8ec 25%, transparent 25%, transparent 75%, #e6e8ec 75%),
+    linear-gradient(45deg, #e6e8ec 25%, transparent 25%, transparent 75%, #e6e8ec 75%);
+  background-size: 16px 16px;
+  background-position: 0 0, 8px 8px;
+  border-radius: 3px;
+}
+.checker.large { max-width: 100%; height: auto; display: block; margin: .5rem 0; }
+
+details summary { cursor: pointer; color: var(--dim); font-size: .85rem; }
+
+.critique { margin-top: .6rem; border-top: 1px solid var(--line); padding-top: .5rem; font-size: .88rem; }
+.verdict { margin: 0 0 .35rem; font-weight: 600; }
+.verdict .score { float: right; color: var(--dim); font-weight: 400; font-family: ui-monospace, monospace; }
+ul.faults { margin: .25rem 0 0; padding-left: 1.1rem; color: #3f444d; }
+ul.faults li { margin-bottom: .2rem; }
+
+/* The form footer. */
+.submit {
+  margin-top: 1.25rem;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: .9rem 1.1rem;
+}
+.submit .none { display: flex; align-items: center; gap: .5rem; margin-bottom: .75rem; }
+.submit .text { display: block; font-size: .9rem; color: var(--dim); }
+.submit textarea {
+  display: block;
+  width: 100%;
+  margin-top: .3rem;
+  padding: .5rem;
+  font: inherit;
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  resize: vertical;
+}
+.submit button {
+  margin-top: .75rem;
+  padding: .45rem 1rem;
+  font: inherit;
+  font-weight: 600;
+  color: #fff;
+  background: var(--pick);
+  border: 0;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.written { color: var(--dim); font-size: .85rem; margin: .5rem 0 0; }
+
+/* A gap is a thing the generation loop has not written yet. */
+.gap { color: var(--warn); background: #fff8e6; border-left: 3px solid #e3b341; padding: .35rem .6rem; font-size: .88rem; margin: .4rem 0; }
+.saved { color: var(--good); background: #eaf6ec; border-left: 3px solid var(--good); padding: .4rem .7rem; }
