@@ -5414,6 +5414,41 @@ impl World {
         Some(self.weather.ground_at(self.cell_of(tile)?).0)
     }
 
+    /// Returns the temperature of the cell that covers one tile.
+    ///
+    /// The unit is a whole degree on the scale of the weather field. The
+    /// value is not a fixed-point fraction. Returns `None` when the address
+    /// lies outside the world.
+    ///
+    /// The temperature is carried state. It varies over the map and it
+    /// varies over time, because a season cycle and the water in the air
+    /// both drive it and the wind carries it between cells.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0165, the temperature of a cell is carried state that a season and the sky drive, decisions D1 and D2. `docs/adrs/draft/adr-0165-the-temperature-of-a-cell-is-carried-state-that-a-season-and-the-sky-drive.md`
+    #[must_use]
+    pub fn temperature_at(&self, address: Axial) -> Option<i32> {
+        let tile = self.grid.index_of(address)?;
+        Some(self.weather.temperature_at(self.cell_of(tile)?).0)
+    }
+
+    /// Returns the wind over the cell that covers one tile.
+    ///
+    /// The answer is the pair of whole components in the two-axis basis of
+    /// the cell lattice. Returns `None` when the address lies outside the
+    /// world.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0160, the wind is carried state, and the pressure gradient accelerates it, decision D1. `docs/adrs/accepted/adr-0160-the-wind-is-carried-state-and-the-pressure-gradient-accelerates-it.md`
+    #[must_use]
+    pub fn wind_at(&self, address: Axial) -> Option<(i32, i32)> {
+        let tile = self.grid.index_of(address)?;
+        let wind = self.weather.wind_at(self.cell_of(tile)?);
+        Some((wind.q, wind.r))
+    }
+
     /// Reports whether the ground under one tile is wet.
     ///
     /// A unit that gathers on wet ground takes more in one tick than a unit
