@@ -142,6 +142,22 @@ const LUXURY_HUE_STRIDE: u32 = 37;
 /// [^1]: Research report 24, defect 5. `docs/research/reports/24-demonstration-readability-resources-and-weather.md`
 const PIP_LEAST_TILE: f32 = 16.0;
 
+/// The smallest tile width at which a build site draws its glyph, in pixels.
+///
+/// A glyph needs a few pixels of shape, and a window at the region scale
+/// holds thousands of tiles. Hundreds of small glyphs are speckle, and the
+/// wash is the better mark at that zoom because a field of built tiles reads
+/// as one field.[^1]
+///
+/// The width is the width at which the tile also carries a gap and a deposit
+/// pip, so the close zooms carry every per-tile mark together and the far
+/// zooms carry none of them.
+///
+/// # References
+///
+/// [^1]: Research report 25, defect 1. `docs/research/reports/25-demonstration-readability-upgrades-and-units.md`
+const SITE_LEAST_TILE: f32 = 16.0;
+
 /// The stock at which a deposit pip draws at its largest.
 ///
 /// This is a property of the picture and not of the world, in the same way
@@ -1966,7 +1982,7 @@ pub fn draw_paced(
             // skips it.[^8]
             if any_upgrade {
                 if let Some(site) = world.upgrade_at(address) {
-                    if site.is_complete() {
+                    if site.is_complete() || camera.tile_width < SITE_LEAST_TILE {
                         canvas.shade(
                             left,
                             top,
@@ -2232,7 +2248,9 @@ pub fn luxury_colour(ordinal: u32) -> u32 {
 ///
 /// [^1]: Research report 25, defect 1. `docs/research/reports/25-demonstration-readability-upgrades-and-units.md`
 fn mark_site(canvas: &mut Canvas, left: i32, top: i32, wide: i32, tall: i32, kind: UpgradeKind) {
-    let side = (wide.min(tall) * 2 / 3).max(3);
+    // Half the tile. The ground shows around the glyph, so a watcher reads
+    // the kind of ground and the thing somebody is making on it at once.
+    let side = (wide.min(tall) / 2).max(3);
     let x = left + (wide - side) / 2;
     let y = top + (tall - side) / 2;
     // The dark square is the rim. It separates every glyph from the ground
@@ -2296,7 +2314,9 @@ fn mark_deposits(
     tall: i32,
 ) {
     let margin = (wide.min(tall) / 6).max(1);
-    let most = (wide.min(tall) / 4).max(2);
+    // A pip reaches a sixth of the tile at the stock the viewer chose. A
+    // larger pip crowds a window in which most tiles carry something.
+    let most = (wide.min(tall) / 6).max(2);
     for kind in ResourceKind::ALL {
         let held = if kind == ResourceKind::Food {
             food

@@ -504,7 +504,9 @@ const SITE_TILE: f32 = 32.0;
 /// tile width the site tests draw at.
 fn site_pixel(canvas: &Canvas, camera: Camera, address: Axial) -> u32 {
     let (left, top, wide, tall) = tile_rect(camera, address);
-    pixel(canvas, left + wide / 6, top + tall / 6)
+    // The glyph fills the middle half of the tile, so its corner sits a
+    // quarter of the way in. One pixel further in is inside the glyph.
+    pixel(canvas, left + wide / 4 + 1, top + tall / 4 + 1)
 }
 
 /// Returns the first soldier standing on ground its own faction holds.
@@ -598,6 +600,12 @@ fn each_kind_of_build_site_draws_its_own_glyph() {
         .address(builder)
         .expect("the builder stands somewhere");
 
+    // A tile outside the band, which no unit of the fixture stands on.
+    let aside = (0..EXTENT as i32)
+        .map(|column| Axial::new(column, 0))
+        .find(|at| world.admits_a_unit(*at))
+        .expect("the world holds open ground outside the band");
+
     let bare_camera = camera_at(&world, address, SITE_TILE);
     let bare_corner = corner_of(&drawn_at(&world, address, SITE_TILE), bare_camera, address);
 
@@ -606,6 +614,13 @@ fn each_kind_of_build_site_draws_its_own_glyph() {
         let mut building = world.clone();
         assert!(building.order_build(builder, kind));
         building.step(1).expect("the step must run");
+        // The builder stands on the site, and its disc is wider than the
+        // glyph, so it would cover the mark this test reads. The fixture
+        // moves it aside before the picture is drawn.
+        building
+            .place_soldier(builder, aside)
+            .expect("the tile aside admits the unit");
+        building.rebuild_bridge(1).expect("the bridge rebuilds");
         assert!(
             building
                 .upgrade_at(address)
