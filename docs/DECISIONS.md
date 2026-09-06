@@ -4228,7 +4228,7 @@ exactly so that a caller cannot build a wrong one.[^DEC120C]
 [^D57ADR]: ADR-0157, a site's free places are its built housing less the residents the engine already counts, decision D2. `docs/adrs/accepted/adr-0157-a-sites-free-places-are-its-built-housing-less-the-residents-the-engine-counts.md`
 [^ADR75]: ADR-0075, the founding choice reads a bounded sample of the world. `docs/adrs/accepted/adr-0075-the-founding-choice-reads-a-bounded-sample-of-the-world.md`
 [^FND106]: Findings register, FND-106. `docs/FINDINGS.md`
-[^DEC44ITEM]: Backlog item 0060. `docs/backlog/refined/0060-grow-the-population-from-the-store-and-the-housing.md`
+[^DEC44ITEM]: Backlog item 0060. `docs/backlog/complete/0060-grow-the-population-from-the-store-and-the-housing.md`
 [^SCOPE]: Decision Record Scope, section 4.1. `.claude/rules/adr-scope.md`
 [^FND135]: Findings register, FND-135. `docs/FINDINGS.md`
 [^DOD3]: Definition of Done, section 3. `.claude/rules/definition-of-done.md`

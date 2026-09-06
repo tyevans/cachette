@@ -1,7 +1,7 @@
 ---
 id: 0060
 title: Grow the population from the store and the housing
-status: refined
+status: complete
 created: 2026-08-31
 implements: [ADR-0082 D1, ADR-0082 D2, ADR-0082 D3, ADR-0082 D4, ADR-0157 D2, ADR-0157 D4, ADR-0157 D5, ADR-0157 D6, ADR-0003 D1, ADR-0014 D3, ADR-0004 D1]
 changes: []
@@ -177,7 +177,54 @@ than hiding it.
 
 ## Outcome
 
-Filled in when the item moves to `complete/`.
+**Built.** One stage grows the population, it runs after the shortage scan and
+before the queue advance, and growth is the only source of people.
+
+### The chain closes, and the run says so
+
+A test seeds the demonstration world, runs it, and asserts that a faction
+reaches the campaign cohort size. It drives the seeding the demonstration
+drives, it calls no verb of its own, and it turns no draw off. **A faction
+reached the bar at eight of eight seeds, on the first growth application.** The
+run reads the founding group and the cohort size from the world, so no number
+in the test can drift from the register.
+
+Before this item a faction founded with two people and a raise asked for four,
+so no cohort could be raised, no contest could kill, and domination could never
+fire.
+
+### The values
+
+The growth stage holds no literal. It reads the housing per person, the food
+per birth, the birth chance, the growth schedule and the founding housing from
+the world, and the balance register holds one row for each. Every row is unset
+and behind a blocker, and each now carries a provisional default with a stated
+derivation.
+
+### The census row is written and not registered
+
+The engine counts the births of the tick and a public reader answers it. **The
+subsystem census table was held by another worker while this landed, so the row
+is not in it.** The reader is `births`, and the row must be registered. Nothing
+else is missing.
+
+### What the code and the record disagree about
+
+Nothing. The record states no rate and no value, and the stage states none.
+
+One decision needed a reading rather than a choice. The record requires a keyed
+draw for a birth and it does not say what the draw decides. The store already
+answers how many births a site can pay for, so a draw over affordability would
+be inert. **The draw decides whether a proposal takes**, against a chance that
+the balance register holds, so growth is a rate and not a step. A test asserts
+that a chance below one refuses some proposals, so the draw is not decoration.
+
+### A fourth term of the world conservation statement
+
+Growth takes food out of a store to make a person, and neither the rate ledger
+nor the draw ledger held that. The conservation test failed the moment growth
+landed. The world now holds a growth ledger, and the findings register holds
+the case.
 
 ## References
 
