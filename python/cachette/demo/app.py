@@ -589,6 +589,23 @@ def main(argv: list[str] | None = None) -> int:
         ),
     )
     parser.add_argument(
+        "--panels",
+        default="",
+        help=(
+            "draw these panels of the deck, separated by commas; the engine "
+            "names the panels it can draw, and it refuses a name it did not "
+            "publish"
+        ),
+    )
+    parser.add_argument(
+        "--point",
+        default="",
+        help=(
+            "point at this tile, as two numbers separated by a comma, so that "
+            "the tile panel reads it without a mouse"
+        ),
+    )
+    parser.add_argument(
         "--ticks",
         type=int,
         default=PICTURE_TICKS,
@@ -636,10 +653,26 @@ def main(argv: list[str] | None = None) -> int:
     arguments = parser.parse_args(argv)
     seed = arguments.seed if arguments.seed else draw_seed()
 
+    # The panels a watcher named, and the tile a watcher named. Both are
+    # read before the world is built, so a name that no panel carries stops
+    # the run before it steps.
+    try:
+        panels = chosen_panels(arguments.panels)
+        pointer = chosen_tile(arguments.point)
+    except ValueError as refusal:
+        # A refusal is an answer to the watcher, not a defect in the engine.
+        # The message names what is wrong, and the run stops before it steps.
+        print(refusal)
+        return 2
+
     # The panel holds every section and is taller than a window a person
     # opens. A picture that used the window height would cut the last
     # sections and say so, which is honest and still less than was asked for.
-    default_height = PICTURE_HEIGHT if arguments.picture else WINDOW_HEIGHT
+    #
+    # A deck cuts itself to the frame it is drawn in, so a picture of a deck
+    # keeps the height of a window.
+    tall = bool(arguments.picture) and not panels
+    default_height = PICTURE_HEIGHT if tall else WINDOW_HEIGHT
     demo = Demo(
         build_world(arguments.extent, arguments.factions, seed),
         width=arguments.width,
@@ -668,6 +701,10 @@ def main(argv: list[str] | None = None) -> int:
 
     if arguments.overlay:
         demo.choose_overlay(arguments.overlay)
+
+    for name in panels:
+        demo.toggle_panel(name)
+    demo.pointer = pointer
 
     if arguments.picture:
         status = _write_picture(demo, arguments.picture, arguments.ticks)
@@ -755,13 +792,51 @@ def _run_to_end(demo: Demo) -> int:
     return 0
 
 
+def chosen_panels(named: str) -> list[str]:
+    """Give back the panels a watcher named on the command line.
+
+    The names are separated by commas. An empty text names no panel, and the
+    frame then draws the cards.
+
+    The engine holds the list of panels, so a name that no panel carries is
+    refused here and the message names the panels that exist.
+    """
+    wanted = [name.strip() for name in named.split(",") if name.strip()]
+    known = World.panel_names()
+    for name in wanted:
+        if name not in known:
+            message = f"no panel is called {name!r}; the panels are {', '.join(known)}"
+            raise ValueError(message)
+    return wanted
+
+
+def chosen_tile(named: str) -> tuple[int, int] | None:
+    """Give back the tile a watcher named on the command line.
+
+    The address is two whole numbers separated by a comma. An empty text names
+    no tile, and the tile panel then says that nobody pointed.
+    """
+    if not named.strip():
+        return None
+    parts = named.split(",")
+    if len(parts) != 2:
+        message = f"a tile is two numbers separated by a comma, not {named!r}"
+        raise ValueError(message)
+    return (int(parts[0]), int(parts[1]))
+
+
 def _write_picture(demo: Demo, path: str, frames: int) -> int:
     """Step the world, then write one frame with the whole panel to a file.
 
     This presenter needs no window library and no display. It is the same
     frame command the window uses, so the picture holds what the window would
     have shown, with the sections the cards leave out.
+
+    A watcher who named a deck gets that deck. The deck cuts itself to the
+    frame it is drawn in, so the picture keeps the height it was given and the
+    resize below is for the whole panel only.
     """
+    deck = bool(demo.panels)
     # The world must run before it is worth drawing, and it must be drawn at
     # least once whatever the count. The steps before the last one take the
     # same path the window takes, so a promotion during the run is announced
@@ -778,11 +853,11 @@ def _write_picture(demo: Demo, path: str, frames: int) -> int:
     for _ in range(max(frames, 0)):
         demo.advance()
     demo.surface = written
-    reading = demo.advance(panel=True)
+    reading = demo.advance(panel=not deck)
 
     # Ask the panel how tall it needed to be, and draw again at that height.
     # The loop ends when the picture is tall enough for the panel it drew.
-    for attempt in range(RESIZES):
+    for attempt in range(0 if deck else RESIZES):
         needed = reading["panel_height"]
         if needed <= demo.surface.height:
             break
