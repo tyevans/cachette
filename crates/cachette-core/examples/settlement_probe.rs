@@ -65,6 +65,29 @@ fn settlers_of(world: &World, factions: u16) -> Vec<usize> {
     counts
 }
 
+/// Returns the distance between each pair of cities of one faction.
+///
+/// **This is what the target rule is for.** A faction that founds its cities
+/// on top of each other spreads over no more ground than a faction that
+/// founded once. The walk is over the settlement slots in ascending order, so
+/// the list is a property of the arena.
+fn spread_of(world: &World, faction: FactionId) -> Vec<u32> {
+    let places: Vec<_> = world
+        .settlements()
+        .iter()
+        .filter(|site| world.settlements().faction(*site) == Some(faction))
+        .filter_map(|site| world.settlements().address(site))
+        .collect();
+    let mut spans = Vec::new();
+    for (index, here) in places.iter().enumerate() {
+        for there in places.iter().skip(index + 1) {
+            spans.push(here.distance(*there));
+        }
+    }
+    spans.sort_unstable();
+    spans
+}
+
 /// Returns the tiles each faction holds.
 fn held_of(world: &World, factions: u16) -> Vec<i64> {
     (0..factions)
@@ -133,6 +156,18 @@ fn main() {
                 .map(|(tick, faction)| format!("t{tick}:f{faction}"))
                 .collect();
             println!("  foundings: {}", text.join(" "));
+        }
+        // The spread says whether the cities are better placed, and not only
+        // whether there are more of them.
+        let spreads: Vec<String> = (0..factions)
+            .map(|index| (index, spread_of(&world, FactionId(index))))
+            .filter(|(_, spans)| !spans.is_empty())
+            .map(|(index, spans)| format!("f{index}:{spans:?}"))
+            .collect();
+        if spreads.is_empty() {
+            println!("  spread: no faction holds two cities");
+        } else {
+            println!("  spread: {}", spreads.join(" "));
         }
     }
 }

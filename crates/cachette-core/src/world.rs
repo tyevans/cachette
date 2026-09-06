@@ -11103,6 +11103,54 @@ const CROSSING_SURVEY_GROUP: u32 = 1;
 /// place the smallest group cannot take is a place no settler can found on.
 const SETTLING_SURVEY_GROUP: u32 = 1;
 
+/// The ticks a settler lives away from a site that feeds it.
+///
+/// A settler that walks carries no home, so nothing feeds it and its deficit
+/// grows by a fixed step each tick until it reaches the bound. The value is
+/// measured and not derived: a probe sends one settler at distant ground and
+/// reads the arena after every tick, and the starved log names the unit on
+/// the same tick on every world the probe ran.[^1]
+///
+/// The figure is a property of the need rule and of nothing else. Standing on
+/// water does not change it. The probe measured the same lifetime for a
+/// settler that spent a third of it at sea.
+///
+/// # References
+///
+/// [^1]: The settler range probe. `crates/cachette-core/examples/settler_range_probe.rs`
+const SETTLER_LIFETIME: u32 = 89;
+
+/// How far a settler may be sent from the sites of its faction.
+///
+/// **A settler walks to its target and it eats on the way.** A place on the
+/// far side of the world is a place the settler starves before it reaches, so
+/// the target choice takes the best place inside this reach rather than the
+/// best place in the world.
+///
+/// The value is half the measured lifetime, because a settler walks one tile
+/// in one tick and it does not walk in a straight line. The field that steers
+/// it holds one direction for each level 1 cell, so the settler wanders
+/// inside the cell that holds its target until it stands on ground the settle
+/// verb admits. Half the lifetime leaves it as many ticks to find that ground
+/// as it spent walking.
+///
+/// The two assertions below are floors and not knobs. A reach at or under the
+/// founding distance would leave no place eligible, because the survey
+/// refuses every place nearer than that distance. A reach under the edge of a
+/// level 1 cell would name a target in the cell the settler already stands
+/// in, and a field over cells steers nobody inside one cell.
+const SETTLER_REACH: u32 = SETTLER_LIFETIME / 2;
+
+const _: () = assert!(
+    SETTLER_REACH > founding::MINIMUM_FOUNDING_DISTANCE,
+    "a reach inside the founding distance leaves no place eligible"
+);
+
+const _: () = assert!(
+    SETTLER_REACH > 1 << BLOCK_BITS_DEFAULT,
+    "a reach inside one level 1 cell names a target that steers nobody"
+);
+
 /// Returns the neighbour a unit steps onto, or nothing when the ground there
 /// refuses it.
 ///
@@ -13654,25 +13702,64 @@ impl World {
     /// again when the settler arrives, so a place that became too near while
     /// the settler walked is still refused.[^2]
     ///
-    /// **The order takes the nearest eligible candidate and not the best
-    /// one.** A settler walks to the place, and it eats on the way. A place
-    /// on the far side of the world is a place the settler starves before it
-    /// reaches, so the highest score in the sample is often a place no
-    /// founding ever happens at. The distance is measured from the site of
-    /// the faction nearest to the candidate, and a tie takes the lower tile
-    /// index, so the answer is a property of the sample and not of the draw
-    /// order.[^3]
+    /// **The order takes the best eligible candidate inside the reach of a
+    /// settler.** The rule has three parts, and each part is a filter or an
+    /// order over the sample.
     ///
-    /// The order takes an eligible candidate rather than refusing the sample,
-    /// because the answer names a place to walk to and not a place to seat a
-    /// group. The settle verb ranks the place again when the settler arrives,
-    /// so a place the survey would refuse a group is refused there.
+    /// **Beyond a distance.** A candidate must keep the founding distance
+    /// from every site the faction holds. The survey applies that rule, with
+    /// the sites of the faction as the places taken, and the settle verb
+    /// applies the same rule again when the settler arrives.[^2] The distance
+    /// is the founding distance and not a second one. A second constant would
+    /// be one fact in two places, and the verb would then admit a place the
+    /// target choice refused.[^4]
+    ///
+    /// **Eligible.** A candidate must be what the survey already calls
+    /// eligible: ground that admits a settlement, ground that keeps the
+    /// distance, and ground with room for the group.
+    ///
+    /// **Best.** Among what passes those two, the order takes the highest
+    /// score. A tie takes the lower tile index, so the answer is a property
+    /// of the sample and not of the draw order.[^3]
+    ///
+    /// **The reach is what keeps the settler alive.** A settler carries no
+    /// home, so nothing feeds it and it starves after a measured number of
+    /// ticks. The best place in a world-wide sample is usually a place the
+    /// settler dies before reaching, which is why the order takes the best
+    /// place inside the reach rather than the best place in the world.
+    ///
+    /// **A faction with nothing in reach takes the nearest eligible place
+    /// instead.** The sample is drawn over the whole world, so a faction
+    /// hemmed in by held ground may draw no eligible place inside the reach.
+    /// The order sends the settler at the nearest such place rather than
+    /// keeping it at home, because a settler that never walks founds nothing
+    /// and the walk may still end at a place the settle verb admits.
     ///
     /// # References
     ///
     /// [^1]: ADR-0075, the founding choice reads a bounded sample of the world, decision D1. `docs/adrs/accepted/adr-0075-the-founding-choice-reads-a-bounded-sample-of-the-world.md`
     /// [^2]: ADR-0076, a founding keeps a fixed distance from the foundings before it, decision D1. `docs/adrs/accepted/adr-0076-a-founding-keeps-a-fixed-distance-from-the-foundings-before-it.md`
     /// [^3]: ADR-0004, iteration order is explicit, decision D4. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
+    /// [^4]: Recurring defect shapes, shape 1. `.agents/rules/recurring-defects.md`
+    #[must_use]
+    pub fn settling_target_of(&self, faction: FactionId) -> Option<Axial> {
+        self.settling_target(faction)
+    }
+
+    /// How far a settler may be sent from the sites of its faction.
+    ///
+    /// The reader states the one value the target choice applies. A caller
+    /// that checks the rule reads it here rather than holding a second copy
+    /// of the number.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: Recurring defect shapes, shape 1. `.agents/rules/recurring-defects.md`
+    #[must_use]
+    pub const fn settler_reach() -> u32 {
+        SETTLER_REACH
+    }
+
     fn settling_target(&self, faction: FactionId) -> Option<Axial> {
         // The walk is over the settlement slots in ascending order, so the
         // list of taken places is a property of the arena and not of a visit
@@ -13686,7 +13773,11 @@ impl World {
         let survey = self
             .survey_founding_apart(SETTLING_SURVEY_GROUP, faction, &taken)
             .ok()?;
-        let tile = survey
+        // The eligibility and the founding distance both come from the
+        // survey, so this walk states no rule of its own. It measures the
+        // distance from the site of the faction nearest to the candidate,
+        // because that is the site the settler leaves from.
+        let in_reach: Vec<(u32, Accum, TileIdx, Axial)> = survey
             .candidates()
             .iter()
             .filter(|candidate| candidate.is_eligible())
@@ -13698,11 +13789,26 @@ impl World {
                     .map(|seat| seat.distance(address))
                     .min()
                     .unwrap_or(0);
-                Some((near, tile.0, address))
+                Some((near, candidate.score(), tile, address))
             })
-            .min_by_key(|(near, tile, _)| (*near, *tile))
-            .map(|(_, _, address)| address)?;
-        Some(tile)
+            .collect();
+        // **The best place inside the reach.** The score is the key and the
+        // tile index breaks a tie, so no two keys are equal and the answer
+        // does not depend on the order the candidates were drawn in.
+        let best = in_reach
+            .iter()
+            .filter(|(near, _, _, _)| *near <= SETTLER_REACH)
+            .max_by_key(|(_, score, tile, _)| (score.0, core::cmp::Reverse(tile.0)));
+        if let Some((_, _, _, address)) = best {
+            return Some(*address);
+        }
+        // Nothing eligible lies inside the reach. The nearest eligible place
+        // is the fallback, and the tile index breaks a tie for the same
+        // reason.
+        in_reach
+            .iter()
+            .min_by_key(|(near, _, tile, _)| (*near, tile.0))
+            .map(|(_, _, _, address)| *address)
     }
 
     /// Founds a city from every settler of one faction that stands on ground

@@ -106,9 +106,9 @@ macro_rules! declare_stages {
 
             /// Returns how many times one frame opens this stage.
             ///
-            /// The step calls the bridge refresh three times, at three
-            /// separate positions, and each position is its own stage. Every
-            /// other stage runs once. A test drives one frame and compares
+            /// The step calls the bridge refresh at several separate
+            /// positions, and each position is its own stage. Every other
+            /// stage runs once. A test drives one frame and compares
             /// the table against this column, so a stage that loses its span
             /// fails rather than reporting zero in silence.
             ///
