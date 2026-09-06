@@ -864,11 +864,11 @@ fn the_temperature_of_one_cell_changes_over_a_run() {
 /// The season is in the tick, so one cell answers differently later.
 #[test]
 fn the_season_is_keyed_on_the_tick() {
-    let width = 16;
-    let early = weather::season_at(Tick(0), 0, width, weather::WeatherScale::LEVEL_1);
+    let height = 16;
+    let early = weather::season_at(Tick(0), 0, height, weather::WeatherScale::LEVEL_1);
     let mut moved = false;
     for tick in 1..512u64 {
-        if weather::season_at(Tick(tick), 0, width, weather::WeatherScale::LEVEL_1) != early {
+        if weather::season_at(Tick(tick), 0, height, weather::WeatherScale::LEVEL_1) != early {
             moved = true;
             break;
         }
@@ -876,16 +876,16 @@ fn the_season_is_keyed_on_the_tick() {
     assert!(moved, "the season answers the same at every tick");
 }
 
-/// The season is in the column, so two cells differ at one tick.
+/// The season is in the latitude, so two cells differ at one tick.
 ///
 /// **A term that added the same degrees to every cell would move nothing.**
 /// The wind answers to the difference between two cells, and one offset added
 /// to every cell cancels in that difference exactly.
 #[test]
 fn the_season_varies_across_the_lattice_at_one_tick() {
-    let width = 16;
-    let readings: Vec<i32> = (0..width)
-        .map(|at| weather::season_at(Tick(0), at, width, weather::WeatherScale::LEVEL_1))
+    let height = 16;
+    let readings: Vec<i32> = (0..height)
+        .map(|at| weather::season_at(Tick(0), at, height, weather::WeatherScale::LEVEL_1))
         .collect();
     let low = readings.iter().copied().min().unwrap_or(0);
     let high = readings.iter().copied().max().unwrap_or(0);
@@ -895,29 +895,122 @@ fn the_season_varies_across_the_lattice_at_one_tick() {
     );
 }
 
-/// The warm centre of the season travels across the lattice and wraps.
+/// The sun swings between two limits and it never wraps.
+///
+/// **A wrap is a seam.** A warm band that marched along an axis and wrapped
+/// jumped the whole extent of the map every lap, and the temperature field
+/// held a discontinuity there whatever the shape of the band. The sun that
+/// replaced it turns back at each limit instead, so the largest move it makes
+/// in one tick is small and the field holds no seam.
 #[test]
-fn the_warm_centre_of_the_season_travels_across_the_lattice() {
-    let width = 16;
-    let warmest = |tick: u64| {
-        (0..width)
-            .max_by_key(|at| {
-                weather::season_at(Tick(tick), *at, width, weather::WeatherScale::LEVEL_1)
-            })
-            .unwrap_or(0)
-    };
-    let mut visited: Vec<u32> = Vec::new();
-    for tick in (0..4096u64).step_by(8) {
-        let at = warmest(tick);
-        if !visited.contains(&at) {
-            visited.push(at);
-        }
+fn the_sun_swings_between_two_limits_and_never_wraps() {
+    let height_tiles = 512;
+    let readings: Vec<i64> = (0..2 * weather::SEASON_PERIOD_TICKS as u64)
+        .map(|tick| weather::sun_at(Tick(tick), height_tiles))
+        .collect();
+    let step = readings
+        .windows(2)
+        .map(|pair| (pair[1] - pair[0]).abs())
+        .max()
+        .unwrap_or(0);
+    // The sun crosses the middle fastest. It covers four amplitudes in one
+    // period, so the mean step is small and the largest is a few tiles.
+    assert!(
+        step <= 8,
+        "the sun moved {step} tiles in one tick, so the field holds a seam"
+    );
+    let low = readings.iter().copied().min().unwrap_or(0);
+    let high = readings.iter().copied().max().unwrap_or(0);
+    assert!(
+        high > 0 && low < 0 && high - low > height_tiles / 4,
+        "the sun swung from {low} to {high}, which is no season"
+    );
+}
+
+/// The season falls away from the sun without a step in its slope.
+///
+/// **A step in the slope is what put the vertical bands into the wind.** The
+/// pressure gradient reads the slope of the temperature, so a profile whose
+/// slope jumps at one row gives a wind that reverses along that row and paints
+/// a straight line across the map. The smooth fall has no such row.
+#[test]
+fn the_season_slope_holds_no_step() {
+    let height = 256;
+    let scale = weather::WeatherScale::PER_TILE;
+    for tick in [0u64, 137, 512, 1024, 1500] {
+        let readings: Vec<i32> = (0..height)
+            .map(|at| weather::season_at(Tick(tick), at, height, scale))
+            .collect();
+        // The slope is read over a block of rows, because the truncation of
+        // one row is a whole degree and a single difference is mostly that.
+        const BLOCK: usize = 16;
+        let slopes: Vec<i32> = readings
+            .chunks_exact(BLOCK)
+            .map(|block| block[BLOCK - 1] - block[0])
+            .collect();
+        let bend = slopes
+            .windows(2)
+            .map(|pair| (pair[1] - pair[0]).abs())
+            .max()
+            .unwrap_or(0);
+        // The old profile was a triangle, so its slope ran at one sign over
+        // half the map and the other sign over the rest, and it reversed
+        // between two neighbouring blocks. That reversal is a bend of twice
+        // the block slope, which was about thirty degrees here.
+        assert!(
+            bend <= 8,
+            "the slope of the season bent by {bend} degrees over {BLOCK} rows \
+             at tick {tick}, so it holds a step: {slopes:?}"
+        );
     }
-    assert_eq!(
-        visited.len(),
-        width as usize,
-        "the warm centre reached {} of {width} columns, so the band does not cross the map",
-        visited.len()
+}
+
+/// The poles are cold, and no rule says so.
+///
+/// **One term gives the season and the cold poles together.** The heating of
+/// a cell reads how far it sits from where the sun stands, and the sun never
+/// reaches a pole. So a pole is far from the sun for the whole swing and the
+/// middle of the world is near it for the whole swing. A second rule that
+/// made the poles cold would state the same fact twice.
+#[test]
+fn the_poles_are_colder_than_the_middle_over_a_whole_year() {
+    let height = 64;
+    let scale = weather::WeatherScale::PER_TILE;
+    let over_a_year = |row: u32| -> i64 {
+        (0..weather::SEASON_PERIOD_TICKS as u64)
+            .map(|tick| i64::from(weather::season_at(Tick(tick), row, height, scale)))
+            .sum()
+    };
+    let north = over_a_year(0);
+    let middle = over_a_year(height / 2);
+    let south = over_a_year(height - 1);
+    assert!(
+        middle > north && middle > south,
+        "the middle took {middle} over a year, the poles {north} and {south}"
+    );
+}
+
+/// The sun reaches neither pole, so each of them has a colder half year.
+#[test]
+fn each_pole_holds_its_own_winter() {
+    let height = 64;
+    let scale = weather::WeatherScale::PER_TILE;
+    let reading = |row: u32, tick: u64| weather::season_at(Tick(tick), row, height, scale);
+    let quarter = weather::SEASON_PERIOD_TICKS as u64 / 4;
+    // A quarter turn after the start the sun stands at the limit nearest the
+    // last row, and three quarters after it stands at the limit nearest the
+    // first row. So the two poles hold their summers half a period apart.
+    let first_summer = reading(0, 3 * quarter);
+    let first_winter = reading(0, quarter);
+    let last_summer = reading(height - 1, quarter);
+    let last_winter = reading(height - 1, 3 * quarter);
+    assert!(
+        first_summer > first_winter,
+        "the first row read {first_summer} in summer and {first_winter} in winter"
+    );
+    assert!(
+        last_summer > last_winter,
+        "the last row read {last_summer} in summer and {last_winter} in winter"
     );
 }
 
@@ -978,6 +1071,10 @@ fn the_temperature_stays_inside_its_scale_over_a_long_run() {
 /// cell from tick 41 to the end of a 400 tick run, because the heat was
 /// derived from ground that does not move. The peak must now move, and keep
 /// moving.
+///
+/// **The run covers half a season.** The sun takes 2048 ticks to complete one
+/// swing, and a run shorter than half of that watches one part of the swing
+/// and calls a slow field a pinned one.
 #[test]
 fn the_peak_of_the_air_plane_keeps_moving() {
     let mut world = World::new(WorldConfig {
@@ -989,7 +1086,7 @@ fn the_peak_of_the_air_plane_keeps_moving() {
     })
     .expect("the extent must describe a world");
     let mut peaks: Vec<usize> = Vec::new();
-    for tick in 1..=400 {
+    for tick in 1..=(weather::SEASON_PERIOD_TICKS / 2) {
         world.step(1).expect("the step must run");
         if tick % 20 != 0 {
             continue;

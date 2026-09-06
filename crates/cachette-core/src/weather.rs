@@ -195,10 +195,11 @@ impl std::error::Error for WeatherError {}
 /// lattice was chosen and no measurement has displaced it.
 ///
 /// **Three tuned quantities follow the scale**, because each of them means
-/// something different at a different cell size: the reach and the speed of
-/// the season, the divisor that turns a temperature difference into a wind,
-/// and the transport pass count. Each is derived from the scale by one
-/// formula, so no second declaration of the tuning exists.[^1]
+/// something different at a different cell size: the tiles a cell side spans,
+/// which the insolation reads to turn a cell row into a latitude, the divisor
+/// that turns a temperature difference into a wind, and the transport pass
+/// count. Each is derived from the scale by one formula, so no second
+/// declaration of the tuning exists.[^1]
 ///
 /// # References
 ///
@@ -313,34 +314,13 @@ impl WeatherScale {
         }
     }
 
-    /// Returns the cells from the warm centre of the season to its cold edge.
+    /// Returns the tiles along one side of a cell, as a wide number.
     ///
-    /// **The reach is a fixed distance in tiles, and not a fixed count of
-    /// cells.** A fixed count of cells would make the warm band a stripe four
-    /// tiles wide at the per-tile pitch, and no watcher could read a season
-    /// that narrow.
+    /// The insolation works in tiles, because a latitude in cells means a
+    /// different distance at every pitch.
     #[must_use]
-    pub const fn season_reach(self) -> i64 {
-        let reach = SEASON_REACH_TILES >> self.bits;
-        if reach < 1 {
-            1
-        } else {
-            reach
-        }
-    }
-
-    /// Returns the ticks the warm centre takes to cross one cell.
-    ///
-    /// **The centre travels a fixed distance in tiles for each tick**, so a
-    /// fine lattice does not take thirty-two times as long to show one
-    /// summer. The answer is a ratio, because the centre crosses a fine cell
-    /// in less than one tick.
-    #[must_use]
-    pub const fn season_step(self) -> (i64, i64) {
-        (
-            SEASON_TILES_FOR_EACH_STEP,
-            SEASON_TICKS_FOR_EACH_STEP * self.side() as i64,
-        )
+    pub const fn side_tiles(self) -> i64 {
+        self.side() as i64
     }
 }
 
@@ -714,6 +694,46 @@ fn drag(wind: Wind) -> Wind {
     }
 }
 
+/// Returns what a deflection adds to one wind.
+///
+/// **The world turns, so a wind that blows is pushed to one side.** The push
+/// is at a right angle to the wind and it rises with the speed, which is what
+/// a rotating planet does to anything that moves over it.
+///
+/// The answer is a share of the wind turned by one sixth of a turn. A sixth
+/// is the only turn the lattice holds exactly: the step `(q, r)` turns into
+/// `(-r, q + r)`, which is integer arithmetic and not an angle. A share of a
+/// sixth is a smaller turn, because the sum of a vector and a small part of
+/// its own sixth-turn points a little to the side of the original.
+///
+/// **The wind is counted in fine steps so that this share is not zero.** A
+/// wind of one whole lattice step is eight fine steps, and a share of a
+/// quarter of that is two, so even a slow wind turns.
+///
+/// **This is what makes a vortex, and nothing here names one.** Air runs
+/// toward a warm cell, the deflection turns it aside, and it arrives running
+/// round the cell rather than into it. A closed circulation is what a
+/// deflected inflow is.
+fn deflect(wind: Wind) -> Wind {
+    // One sixth of a turn on the axial lattice.
+    let turned = Wind {
+        q: -wind.r,
+        r: wind.q + wind.r,
+    };
+    Wind {
+        q: narrow(sim_math::share(
+            Accum(i64::from(turned.q)),
+            Accum(DEFLECT_NUMERATOR),
+            Accum(DEFLECT_DENOMINATOR),
+        )),
+        r: narrow(sim_math::share(
+            Accum(i64::from(turned.r)),
+            Accum(DEFLECT_NUMERATOR),
+            Accum(DEFLECT_DENOMINATOR),
+        )),
+    }
+}
+
 /// The number of spread passes that one solve runs at the reference scale.
 ///
 /// The count is fixed for a given scale. A solve runs it whatever the field
@@ -749,8 +769,22 @@ pub const PASS_CEILING: u32 = 32;
 /// [^1]: ADR-0160, the wind is carried state, and the pressure gradient accelerates it, decision D4. `docs/adrs/accepted/adr-0160-the-wind-is-carried-state-and-the-pressure-gradient-accelerates-it.md`
 pub const WIND_PASSES_FOR_EACH_SOLVE: u32 = 2;
 
+/// The steps of wind that make one whole lattice step of speed.
+///
+/// **The wind is counted finely, and the fine count is what lets it turn.**
+/// A wind whose parts are whole lattice steps holds six directions and a
+/// handful of speeds, so a term that turned it by a part of a step would
+/// truncate to nothing at every speed under the divisor and the field could
+/// hold no rotation at all. Counting the same wind in eighths gives the
+/// deflection room to act without changing what any wind does to the water.
+///
+/// Every denominator that reads a wind carries this factor, so the share of
+/// the air that one wind sends is what it was before the count was made
+/// finer.
+pub const WIND_FINE: i32 = 8;
+
 /// The denominator of every share of the air that a transport pass sends.
-const SEND_DENOMINATOR: i64 = 64;
+const SEND_DENOMINATOR: i64 = 64 * WIND_FINE as i64;
 
 /// The numerator a cell sends to each neighbour whatever its wind.
 ///
@@ -761,7 +795,7 @@ const SEND_DENOMINATOR: i64 = 64;
 /// # References
 ///
 /// [^1]: ADR-0161, water rides the wind, and every transfer is an exact integer move, decision D1. `docs/adrs/accepted/adr-0161-water-rides-the-wind-and-every-transfer-is-an-exact-integer-move.md`
-const SEND_BASE_NUMERATOR: i64 = 1;
+const SEND_BASE_NUMERATOR: i64 = WIND_FINE as i64;
 
 /// The numerator that one step of wind along a direction adds.
 const SEND_FOR_EACH_WIND_STEP: i64 = 1;
@@ -778,7 +812,7 @@ const SEND_FOR_EACH_WIND_STEP: i64 = 1;
 ///
 /// [^1]: ADR-0160, the wind is carried state, and the pressure gradient accelerates it, decision D3. `docs/adrs/accepted/adr-0160-the-wind-is-carried-state-and-the-pressure-gradient-accelerates-it.md`
 /// [^2]: ADR-0161, water rides the wind, and every transfer is an exact integer move, decision D2. `docs/adrs/accepted/adr-0161-water-rides-the-wind-and-every-transfer-is-an-exact-integer-move.md`
-pub const SPEED_CEILING: i32 = 6;
+pub const SPEED_CEILING: i32 = 6 * WIND_FINE;
 
 /// The most the projections of one wind onto the six directions add to, for
 /// the directions the projection is positive on.
@@ -816,11 +850,16 @@ const _: () = assert!(
 pub const HEAT_CEILING: i32 = 256;
 
 /// What open water adds to the heat of a cell, at the top of its range.
-const HEAT_FROM_WATER: i32 = 128;
+///
+/// **Water biases the ground warm, and it does not dominate it.** What water
+/// does to the weather is to hold its temperature rather than to raise it,
+/// and the temperature pass states that separately by moving a wet cell more
+/// slowly. Height is the part of the ground that belongs here.
+const HEAT_FROM_WATER: i32 = 64;
 
 /// What low ground adds to the heat of a cell, at the bottom of the height
 /// range.
-const HEAT_FROM_LOW_GROUND: i32 = 128;
+const HEAT_FROM_LOW_GROUND: i32 = 192;
 
 /// What the ground term is divided by before it drives the temperature.
 ///
@@ -832,7 +871,7 @@ const HEAT_FROM_LOW_GROUND: i32 = 128;
 /// # References
 ///
 /// [^1]: ADR-0166, the temperature of a cell is carried state that a season and the sky drive, decision D2. `docs/adrs/draft/adr-0166-the-temperature-of-a-cell-is-carried-state-that-a-season-and-the-sky-drive.md`
-const GROUND_DIVISOR: i64 = 2;
+const GROUND_DIVISOR: i64 = 4;
 
 /// The degrees the season adds at the warm centre.
 ///
@@ -842,41 +881,36 @@ const GROUND_DIVISOR: i64 = 2;
 /// # References
 ///
 /// [^1]: ADR-0166, the temperature of a cell is carried state that a season and the sky drive, decision D2. `docs/adrs/draft/adr-0166-the-temperature-of-a-cell-is-carried-state-that-a-season-and-the-sky-drive.md`
-const SEASON_SWING: i32 = 64;
+const SEASON_SWING: i32 = 80;
 
-/// The tiles from the warm centre of the season to the cold edge of it.
+/// The ticks in which the sun completes one whole swing.
 ///
-/// **The reach is a distance in tiles and not a share of the lattice.** A
-/// share would make the gradient across one cell fall as the lattice grows,
-/// so a large world would feel a season it could not measure. A fixed reach
-/// gives one gradient at every lattice size.
+/// **The season is one oscillation of the sun and not a band that marches.**
+/// A band that stepped along an axis and wrapped would jump the whole width
+/// of the map every lap, and the temperature field would hold a seam at that
+/// wrap however smooth the profile across the band. A sun that swings between
+/// two limits never wraps, so the field holds no seam at all. It also slows
+/// and reverses at each limit, which leaves a quiet gradient that then
+/// rebuilds the other way round.
 ///
-/// It is a distance in tiles rather than a count of cells, because a count of
-/// cells would make the warm band four tiles wide at the per-tile pitch and
-/// one hundred and twenty-eight tiles wide at the level 1 pitch. The season a
-/// watcher sees would then depend on the resolution.
-///
-/// A lattice narrower than twice this takes half its width instead, because
-/// the greatest distance on a wrapped axis is half the width.
-const SEASON_REACH_TILES: i64 = 128;
+/// **The period is a time and not a distance**, so it follows neither the
+/// extent of the world nor the pitch of the lattice. A run of twenty thousand
+/// ticks holds nine and a half of these, so a watcher sees the swing repeat.
+/// One half of it lasts a thousand ticks, which is long enough for a place to
+/// hold a wet part of the year and a dry part.
+pub const SEASON_PERIOD_TICKS: i64 = 2048;
 
-/// The tiles the warm centre of the season moves in the ticks below.
+/// The part of the way from the middle of the world to a pole that the sun
+/// reaches at the top of its swing.
 ///
-/// The centre travels along the column axis and wraps. **The pair states one
-/// speed in tiles for each tick**, so the season crosses one map in one time
-/// whatever the pitch of the weather lattice.[^1]
-///
-/// # References
-///
-/// [^1]: ADR-0166, the temperature of a cell is carried state that a season and the sky drive, decision D2. `docs/adrs/draft/adr-0166-the-temperature-of-a-cell-is-carried-state-that-a-season-and-the-sky-drive.md`
-const SEASON_TILES_FOR_EACH_STEP: i64 = 4;
+/// This is the tilt of the world. The Earth reaches about a quarter of the
+/// way. This world reaches half, because the swing must be readable in a
+/// picture and a larger tilt gives a larger seasonal difference at every
+/// latitude.
+const TILT_NUMERATOR: i64 = 1;
 
-/// The ticks in which the warm centre moves the tiles above.
-///
-/// Four tiles in three ticks is thirty-two tiles in twenty-four ticks, which
-/// is one level 1 cell in twenty-four ticks. The season therefore travels at
-/// the speed it travelled at before the resolution became a parameter.
-const SEASON_TICKS_FOR_EACH_STEP: i64 = 3;
+/// The whole of the tilt above.
+const TILT_DENOMINATOR: i64 = 2;
 
 /// The degrees that a saturated sky takes away from a cell.
 ///
@@ -887,7 +921,7 @@ const SEASON_TICKS_FOR_EACH_STEP: i64 = 3;
 /// # References
 ///
 /// [^1]: ADR-0166, the temperature of a cell is carried state that a season and the sky drive, decision D2. `docs/adrs/draft/adr-0166-the-temperature-of-a-cell-is-carried-state-that-a-season-and-the-sky-drive.md`
-const CLOUD_SWING: i32 = 48;
+const CLOUD_SWING: i32 = 32;
 
 /// The part of the way to the asked temperature that one pass moves.
 const WARMTH_NUMERATOR: i64 = 1;
@@ -918,7 +952,7 @@ const CARRY_FOR_EACH_WIND_STEP: i64 = 1;
 /// # References
 ///
 /// [^1]: ADR-0166, the temperature of a cell is carried state that a season and the sky drive, decision D3. `docs/adrs/draft/adr-0166-the-temperature-of-a-cell-is-carried-state-that-a-season-and-the-sky-drive.md`
-const CARRY_DENOMINATOR: i64 = 32;
+const CARRY_DENOMINATOR: i64 = 32 * WIND_FINE as i64;
 
 // The carry cannot run away. The check is the same shape as the one the
 // transport carries, and it fails the build rather than a test.
@@ -947,7 +981,7 @@ pub const WARMTH_PASSES_FOR_EACH_SOLVE: u32 = 1;
 /// # References
 ///
 /// [^1]: The pressure divisor of a scale. [`WeatherScale::pressure_divisor`]
-const PRESSURE_DIVISOR_AT_REFERENCE: i64 = 32;
+const PRESSURE_DIVISOR_AT_REFERENCE: i64 = 32 / WIND_FINE as i64;
 
 /// The most the wind of a cell changes in one pass, in lattice steps.
 ///
@@ -959,7 +993,7 @@ const PRESSURE_DIVISOR_AT_REFERENCE: i64 = 32;
 /// # References
 ///
 /// [^1]: ADR-0160, the wind is carried state, and the pressure gradient accelerates it, decision D2. `docs/adrs/accepted/adr-0160-the-wind-is-carried-state-and-the-pressure-gradient-accelerates-it.md`
-const WIND_STEP: i32 = 2;
+const WIND_STEP: i32 = 2 * WIND_FINE;
 
 /// The share of the wind of a cell that drag takes in one pass.
 const DRAG_NUMERATOR: i64 = 1;
@@ -986,6 +1020,23 @@ const DRAG_DENOMINATOR: i64 = 4;
 ///
 /// [^1]: ADR-0160, the wind is carried state, and the pressure gradient accelerates it, decision D4. `docs/adrs/accepted/adr-0160-the-wind-is-carried-state-and-the-pressure-gradient-accelerates-it.md`
 const CAP_SHRINK_STEPS: u32 = 2;
+
+/// The part of a sixth of a turn that the deflection adds to a wind each
+/// pass.
+///
+/// **This is the one term that turns the flow, and nothing else in the field
+/// can.** The pressure gradient points a wind at a warm cell and drag slows
+/// it; neither can make it go round anything. A rotating world pushes a
+/// moving parcel to one side, and that push is what turns an inflow into a
+/// circulation.
+///
+/// The share is small on purpose. A large share would spin every cell
+/// regardless of the flow, which is a stirred field and not a weather field.
+/// A small one bends a wind that already blows and leaves a still cell still.
+const DEFLECT_NUMERATOR: i64 = 1;
+
+/// The whole of the deflection share above.
+const DEFLECT_DENOMINATOR: i64 = 3;
 
 /// The denominator of the share of the air that falls in one solve.
 const FALL_DENOMINATOR: i64 = 64;
@@ -1226,22 +1277,89 @@ pub fn heat_of(ground: CellGround) -> i32 {
     part_of(HEAT_FROM_WATER, water) + part_of(HEAT_FROM_LOW_GROUND, low)
 }
 
-/// Returns the degrees the season adds to one cell at one tick.
+/// Returns a smooth fall from one to zero over a part of a whole.
 ///
-/// **The season is a warm band that crosses the lattice.** The centre of the
-/// band sits on one column, and it moves one column every fixed number of
-/// ticks and wraps. The term is at its top on the centre column, it falls in
-/// whole steps over the reach of the band, and it holds at its bottom outside
-/// the band. So the term traces a triangle at a fixed cell as the centre goes
-/// past, and the period is the width of the lattice multiplied by the ticks
-/// for each cell.[^1]
+/// The answer is one when the part is zero, zero when the part reaches the
+/// whole, and it falls between them along the curve `3u^2 - 2u^3` of the
+/// share `u`. **The slope of that curve is zero at both ends**, so a field
+/// built from it holds no kink where the fall begins and none where it ends.
+/// A straight fall has a kink at each end, the pressure gradient reads the
+/// kink as a step, and the wind then holds a straight line across the map.
+///
+/// The answer is in Q16.16. The arithmetic goes through the arithmetic
+/// module and the intermediate product is 128 bits wide, so no input a
+/// lattice holds overflows it.[^1]
+///
+/// **This is public so that a test can move one input and watch the answer
+/// move.**
+///
+/// # References
+///
+/// [^1]: ADR-0002, simulated and aggregated state holds no floating point number, decision D2. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
+#[must_use]
+pub fn smooth_fall(part: i64, whole: i64) -> Fix32 {
+    if whole <= 0 {
+        return Fix32::ZERO;
+    }
+    let part = part.clamp(0, whole);
+    // The share of the way across, in Q16.16.
+    let unit = i64::from(Fix32::ONE.0);
+    let share = sim_math::share(Accum(unit), Accum(part), Accum(whole)).map_or(0, |value| value.0);
+    // 3u^2 - 2u^3, computed as u^2 * (3 - 2u) with one fixed-point shift for
+    // each product.
+    let squared = sim_math::share(Accum(share), Accum(share), Accum(unit)).map_or(0, |v| v.0);
+    let rest = 3 * unit - 2 * share;
+    let risen = sim_math::share(Accum(squared), Accum(rest), Accum(unit)).map_or(0, |v| v.0);
+    Fix32(clamp_to_fix(unit - risen))
+}
+
+/// Returns where the sun stands at one tick, in tiles from the middle row.
+///
+/// **The sun swings and it never wraps.** The position follows a sine of the
+/// tick over the season period, and the amplitude is the tilt of the world
+/// times the distance from the middle row to a pole. So the sun crosses the
+/// middle row twice in a period, rests at each limit, and turns back.[^1]
+///
+/// The answer is in tiles, so it does not follow the pitch of the lattice.
+///
+/// **This is public so that a test can move one input and watch the answer
+/// move.**
+///
+/// # References
+///
+/// [^1]: ADR-0002, simulated and aggregated state holds no floating point number, decision D1. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
+#[must_use]
+pub fn sun_at(tick: Tick, height_tiles: i64) -> i64 {
+    let amplitude = sun_amplitude(height_tiles);
+    let wave = sim_math::sine(tick.0 as i64, SEASON_PERIOD_TICKS).unwrap_or(Fix32::ZERO);
+    sim_math::share(
+        Accum(amplitude),
+        Accum(i64::from(wave.0)),
+        Accum(i64::from(Fix32::ONE.0)),
+    )
+    .map_or(0, |value| value.0)
+}
+
+/// Returns the degrees the sun adds to one cell at one tick.
+///
+/// **One term gives the season and the cold poles together.** The term reads
+/// how far the cell sits from where the sun stands, and the sun swings north
+/// and south over the season period. A cell in the middle of the world is
+/// near the sun for the whole swing, so it is warm all year. A cell at a pole
+/// is near the sun for none of it, so it is cold all year and coldest at the
+/// far end of the swing. Nothing states that a pole is cold. It follows.[^1]
+///
+/// **The fall away from the sun is smooth at both ends.** The reach is the
+/// greatest distance any cell can sit from the sun, so the curve spans its
+/// whole range and its steepest part lands at the middle latitudes. The slope
+/// is zero under the sun and zero at the far pole, and it is largest between
+/// them, which is where a front belongs.
 ///
 /// **A term that added the same degrees everywhere would move nothing.** The
 /// wind answers to the difference between two cells, and one offset added to
-/// every cell cancels in that difference exactly. The band gives a gradient
-/// that travels, and a gradient that travels is what turns the wind.
+/// every cell cancels in that difference exactly.
 ///
-/// The term reads the tick and the column. It reads no clock and takes no
+/// The term reads the tick and the row. It reads no clock and takes no
 /// draw.[^1]
 ///
 /// **This is public so that a test can move one input and watch the answer
@@ -1251,30 +1369,39 @@ pub fn heat_of(ground: CellGround) -> i32 {
 ///
 /// [^1]: ADR-0166, the temperature of a cell is carried state that a season and the sky drive, decision D2. `docs/adrs/draft/adr-0166-the-temperature-of-a-cell-is-carried-state-that-a-season-and-the-sky-drive.md`
 #[must_use]
-pub fn season_at(tick: Tick, column: u32, width: u32, scale: WeatherScale) -> i32 {
-    if width == 0 {
+pub fn season_at(tick: Tick, row: u32, height: u32, scale: WeatherScale) -> i32 {
+    if height == 0 {
         return 0;
     }
-    let width = i64::from(width);
-    // The centre travels a fixed distance in tiles for each tick, so the
-    // ticks it takes to cross one cell follow the cell side.
-    let (tiles, ticks) = scale.season_step();
-    let travelled = sim_math::share(Accum(tick.0 as i64), Accum(tiles), Accum(ticks))
-        .map_or(0, |value| value.0);
-    let centre = travelled.rem_euclid(width);
-    let apart = (i64::from(column) - centre).abs();
-    // The column axis wraps, so the far way round may be the short way.
-    let apart = apart.min(width - apart);
-    let reach = scale.season_reach().min((width / 2).max(1));
-    if apart >= reach {
-        return -SEASON_SWING;
-    }
-    let fallen = narrow(sim_math::share(
+    let side = scale.side_tiles();
+    let height_tiles = i64::from(height) * side;
+    let half = height_tiles / 2;
+    // The latitude of the middle of the cell, in tiles from the middle row.
+    let latitude = i64::from(row) * side + side / 2 - half;
+    let sun = sun_at(tick, height_tiles);
+    let apart = (latitude - sun).abs();
+    // The greatest distance any cell reaches from the sun, which is the pole
+    // furthest from it at the top of the swing. The curve therefore spans its
+    // whole range and nothing clamps flat.
+    let reach = (half + sun_amplitude(height_tiles)).max(1);
+    let warmth = smooth_fall(apart, reach);
+    // The curve runs from one under the sun to zero at the far pole. The
+    // season runs from the swing above zero to the swing below it.
+    narrow(sim_math::share(
         Accum(i64::from(2 * SEASON_SWING)),
-        Accum(apart),
-        Accum(reach),
-    ));
-    SEASON_SWING - fallen
+        Accum(i64::from(warmth.0)),
+        Accum(i64::from(Fix32::ONE.0)),
+    )) - SEASON_SWING
+}
+
+/// Returns the tiles from the middle row that the sun reaches at its limit.
+fn sun_amplitude(height_tiles: i64) -> i64 {
+    sim_math::share(
+        Accum(height_tiles / 2),
+        Accum(TILT_NUMERATOR),
+        Accum(TILT_DENOMINATOR),
+    )
+    .map_or(0, |value| value.0)
 }
 
 /// Returns the degrees the water in the air over one cell takes away.
@@ -1325,11 +1452,25 @@ pub fn asked_warmth(ground: i32, season: i32, cloud: i32) -> i32 {
         Accum(1),
         Accum(GROUND_DIVISOR),
     ));
-    // The ground term now spans the lower half of the scale, so the middle of
-    // the scale is added back and the season swings about it.
-    let base = HEAT_CEILING / 4;
-    (base + ground + season - cloud).clamp(0, HEAT_CEILING)
+    (HEAT_BASE + ground + season - cloud).clamp(0, HEAT_CEILING)
 }
+
+/// The degrees a cell holds before any of the three terms moves it.
+///
+/// **The four terms together span the scale exactly**, so nothing clamps.
+/// A clamp would put a flat region into the temperature field, the pressure
+/// gradient would read the edge of that region as a step, and the wind would
+/// hold a straight line across the map. That is the defect the smooth fall
+/// away from the sun exists to remove, and a clamp would put it back.
+const HEAT_BASE: i32 = 112;
+
+// The four terms reach the bottom of the scale together and the top of it
+// together. The check fails the build rather than a test.
+const _: () = assert!(HEAT_BASE - SEASON_SWING - CLOUD_SWING == 0);
+const _: () = assert!(
+    HEAT_BASE + (HEAT_FROM_WATER + HEAT_FROM_LOW_GROUND) / GROUND_DIVISOR as i32 + SEASON_SWING
+        == HEAT_CEILING
+);
 
 /// Returns the numerator of the share of the air that falls on one cell.
 ///
@@ -1915,17 +2056,18 @@ impl WeatherField {
     /// [^1]: ADR-0166, the temperature of a cell is carried state that a season and the sky drive, decision D1. `docs/adrs/draft/adr-0166-the-temperature-of-a-cell-is-carried-state-that-a-season-and-the-sky-drive.md`
     /// [^2]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
     fn warm(&mut self, tick: Tick, ground: &[CellGround]) {
-        let width = self.cells.width();
+        let height = self.cells.height();
         for (cell, under) in ground.iter().enumerate() {
             let Some(address) = self.cells.address_of(TileIdx(cell as u32)) else {
                 continue;
             };
-            // The column of the cell is the first axial part of its address.
-            let column = address.q.max(0) as u32;
+            // **The latitude of the cell is its row.** The sun swings along
+            // the row axis, so the two poles are the first row and the last.
+            let row = address.r.max(0) as u32;
             let air = self.air.get(cell).copied().unwrap_or(Drops::ZERO);
             let asked = asked_warmth(
                 heat_of(*under),
-                season_at(tick, column, width, self.scale),
+                season_at(tick, row, height, self.scale),
                 cloud_at(air),
             );
             let Some(held) = self.warmth.get_mut(cell) else {
@@ -2523,10 +2665,16 @@ impl WindPass<'_> {
                 WIND_STEP,
             );
             let carried = drag(self.wind[index]);
+            // **The world turns, so the wind is pushed to one side.** The
+            // push acts on the wind the cell already carries, which is why a
+            // still cell stays still and a fast one turns hard. A flow that
+            // runs at a warm cell arrives running round it instead, and a
+            // circulation is what that is.
+            let side = deflect(carried);
             *cell = cap(
                 Wind {
-                    q: carried.q + step.q,
-                    r: carried.r + step.r,
+                    q: carried.q + step.q + side.q,
+                    r: carried.r + step.r + side.r,
                 },
                 SPEED_CEILING,
             );
