@@ -169,6 +169,7 @@ declare_stages! {
     ApplyRates,               "apply_rates",                true,  1, false;
     Consume,                  "consume",                    true,  1, false;
     Reap,                     "reap",                       true,  1, false;
+    Grow,                     "grow",                       false, 1, false;
     QueueAdvance,             "queue_advance",              false, 1, false;
     BridgeRefreshAfterReap,   "bridge_refresh_after_reap",  false, 1, false;
     SettlePositions,          "settle_positions",           true,  1, false;

@@ -26,6 +26,7 @@ pub mod conversion;
 pub mod descent;
 pub mod event;
 pub mod founding;
+pub mod growth;
 pub mod hash;
 pub mod hex;
 pub mod holding;
