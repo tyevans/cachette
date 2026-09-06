@@ -10604,7 +10604,7 @@ exist.[^10]
 ### FND-484 — A relation step for a storm sits in the rules, and no pass reads it
 
 **Believed.** ADR-0146 D3 names a storm on the ground of another faction as a
-cause that moves the relation down by a step.[^F484G] The rules struct carries
+cause that moves the relation down by a step.[^F484J] The rules struct carries
 that step, so a reader takes the cause for a live one.
 
 **True.** The step field of the relation rules holds zero, and no pass reads
@@ -10696,7 +10696,7 @@ and to read the value back.[^F485G]
 [^F485E]: The demonstration application, the seeding call. `python/cachette/demo/app.py`
 [^F485F]: Backlog item 0490, let the control plane read the store of a seeded settlement. `docs/backlog/proposed/0490-let-the-control-plane-read-the-store-of-a-seeded-settlement.md`
 [^F485G]: PRD-0047, a game states its own economy. `docs/product/shaped/prd-0047-a-game-states-its-own-economy.md`
-[^F484G]: ADR-0146, a faction relation is one signed integer per ordered pair and a pass reads a threshold, decision D3. `docs/adrs/accepted/adr-0146-a-faction-relation-is-one-signed-integer-per-ordered-pair-and-a-pass-reads-a-threshold.md`
+[^F484J]: ADR-0146, a faction relation is one signed integer per ordered pair and a pass reads a threshold, decision D3. `docs/adrs/accepted/adr-0146-a-faction-relation-is-one-signed-integer-per-ordered-pair-and-a-pass-reads-a-threshold.md`
 [^F484H]: ADR-0142, a god inflicts weather only on ground its own faction holds, decision D1. `docs/adrs/draft/adr-0142-a-god-inflicts-weather-only-on-ground-it-holds.md`
 [^F484C]: The relation module, the storm step of the relation rules. `crates/cachette-core/src/relation.rs`
 [^F484D]: Balance register, the step when a storm falls on the ground of the other. `docs/reference/balance.md`
