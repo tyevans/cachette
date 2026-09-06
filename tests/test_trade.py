@@ -20,6 +20,10 @@ References
 [^1]: Testing Rules, section 5. ``.claude/rules/testing.md``
 
 [^2]: Testing Rules, section 2a. ``.claude/rules/testing.md``
+
+[^3]: ADR-0152, a faction plans its roads and zones with one solver,
+decision D5.
+``docs/adrs/accepted/adr-0152-a-faction-plans-its-roads-and-zones-with-one-solver.md``
 """
 
 from __future__ import annotations
@@ -58,9 +62,7 @@ def a_world(seed: int = 7) -> World:
     world = World(width=WIDTH, height=HEIGHT, seed=seed, faction_count=2)
     # The plan is off. The engine otherwise zones projects and sends the idle
     # units of a faction to them, and every unit these tests stand somewhere
-    # would walk away.[^1]
-    #
-    # [^1]: ADR-0152, a faction plans its roads and zones with one solver, decision D5. ``docs/adrs/accepted/adr-0152-a-faction-plans-its-roads-and-zones-with-one-solver.md``
+    # would walk away.[^3]
     world.set_plan_rules(0, 0, 0, 0, 0)
     world.found_run_for_every_faction(24)
     for _ in range(6):

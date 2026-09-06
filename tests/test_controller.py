@@ -16,6 +16,10 @@ the caller's verbs.
 ``docs/adrs/accepted/adr-0144-a-faction-controller-runs-inside-the-step-and-acts-only-through-the-callers-verbs.md``
 
 [^2]: Recurring Defect Shapes, shape 1. ``.agents/rules/recurring-defects.md``
+
+[^3]: ADR-0152, a faction plans its roads and zones with one solver,
+decision D5.
+``docs/adrs/accepted/adr-0152-a-faction-plans-its-roads-and-zones-with-one-solver.md``
 """
 
 from __future__ import annotations
@@ -103,9 +107,7 @@ def test_the_externally_controlled_flag_is_off_and_settable() -> None:
     world.step(1)
     active = world.subsystem_census()["controller_commands"]
     # The stage emits the evaluation commands and, for a faction whose plan
-    # the solver filled, one project order beside them.[^1]
-    #
-    # [^1]: ADR-0152, a faction plans its roads and zones with one solver, decision D5. ``docs/adrs/accepted/adr-0152-a-faction-plans-its-roads-and-zones-with-one-solver.md``
+    # the solver filled, one project order beside them.[^3]
     assert active >= FACTIONS * world.controller_evaluations
     world.set_externally_controlled(0, True)
     world.set_externally_controlled(1, True)

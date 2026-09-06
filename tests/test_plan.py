@@ -9,9 +9,13 @@ package.[^2]
 
 References
 ----------
-[^1]: ADR-0152, a faction plans its roads and zones with one solver. ``docs/adrs/accepted/adr-0152-a-faction-plans-its-roads-and-zones-with-one-solver.md``
+[^1]: ADR-0152, a faction plans its roads and zones with one solver.
+``docs/adrs/accepted/adr-0152-a-faction-plans-its-roads-and-zones-with-one-solver.md``
 
-Testing policy. ``docs/TESTING.md``
+[^2]: Testing policy. ``docs/TESTING.md``
+
+[^3]: ADR-0046, every error is typed.
+``docs/adrs/draft/adr-0046-every-error-is-typed.md``
 """
 
 from __future__ import annotations
@@ -107,7 +111,7 @@ def test_a_road_outside_a_project_is_refused_and_a_zoned_road_is_taken(
 
 
 def test_a_category_the_verb_does_not_hold_is_refused(seed: int) -> None:
-    # ADR-0046: the engine never raises a bare runtime error.
+    # The engine never raises a bare runtime error.[^3]
     world = cachette.World(width=16, height=16, seed=seed, faction_count=2)
     address = _open_address(world)
     with pytest.raises(cachette.VerbError):

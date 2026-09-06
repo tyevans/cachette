@@ -18,6 +18,10 @@ decision D2.
 
 [^2]: Recurring Defect Shapes, shape 1, redundant declaration sites.
 ``.claude/rules/recurring-defects.md``
+
+[^3]: ADR-0152, a faction plans its roads and zones with one solver,
+decision D3.
+``docs/adrs/accepted/adr-0152-a-faction-plans-its-roads-and-zones-with-one-solver.md``
 """
 
 from __future__ import annotations
@@ -219,9 +223,7 @@ def test_every_upgrade_kind_carries_the_documented_number(
         world.step(threads=1)
         units = world.spawn_soldiers([address], faction=0)
         # A category whose row asks for no held ground is laid only inside a
-        # project, so the plan zones the tile before the order.[^1]
-        #
-        # [^1]: ADR-0152, a faction plans its roads and zones with one solver, decision D3. ``docs/adrs/accepted/adr-0152-a-faction-plans-its-roads-and-zones-with-one-solver.md``
+        # project, so the plan zones the tile before the order.[^3]
         try:
             world.zone_projects(0, [address], kind)
         except cachette.VerbError:
