@@ -106,5 +106,5 @@ Filled in when the item moves to `complete/`.
 
 [^1]: Research report 26, the scale of the weather, sections 4, 6 and 7. `docs/research/reports/26-the-scale-of-the-weather.md`
 [^2]: Recurring Defect Shapes, shape 3. `.agents/rules/recurring-defects.md`
-[^3]: ADR-0161, water rides the wind, and every transfer is an exact integer move. `docs/adrs/draft/adr-0161-water-rides-the-wind-and-every-transfer-is-an-exact-integer-move.md`
+[^3]: ADR-0161, water rides the wind, and every transfer is an exact integer move. `docs/adrs/accepted/adr-0161-water-rides-the-wind-and-every-transfer-is-an-exact-integer-move.md`
 [^4]: ADR-0141, a weather pass moves water and never scales it, decision D1. `docs/adrs/draft/adr-0141-a-weather-pass-moves-water-and-never-scales-it.md`

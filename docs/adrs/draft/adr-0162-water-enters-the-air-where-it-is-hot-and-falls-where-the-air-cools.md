@@ -137,7 +137,7 @@ record does not make it.
 [^2]: Research report 26, the scale of the weather, sections 2, 3 and 6. `docs/research/reports/26-the-scale-of-the-weather.md`
 [^3]: ADR-0143, wet ground yields more to a gatherer, decisions D1 and D2. `docs/adrs/draft/adr-0143-wet-ground-yields-more-to-a-gatherer.md`
 [^4]: ADR-0160, the wind is carried state, and the pressure gradient accelerates it, decisions D1 and D2. `docs/adrs/accepted/adr-0160-the-wind-is-carried-state-and-the-pressure-gradient-accelerates-it.md`
-[^5]: ADR-0161, water rides the wind, and every transfer is an exact integer move, decisions D1 and D3. `docs/adrs/draft/adr-0161-water-rides-the-wind-and-every-transfer-is-an-exact-integer-move.md`
+[^5]: ADR-0161, water rides the wind, and every transfer is an exact integer move, decisions D1 and D3. `docs/adrs/accepted/adr-0161-water-rides-the-wind-and-every-transfer-is-an-exact-integer-move.md`
 [^6]: Balance register, the weather section. `docs/reference/balance.md`
 [^7]: ADR-0142, a god inflicts weather only on ground its own faction holds, decisions D1 and D2. `docs/adrs/draft/adr-0142-a-god-inflicts-weather-only-on-ground-it-holds.md`
 [^8]: Recurring Defect Shapes, shape 1. `.agents/rules/recurring-defects.md`
