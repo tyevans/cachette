@@ -23,10 +23,18 @@ two carry no faction colour.
 ticks in a mature world belongs in the events panel and not over the map. A
 watcher learns to ignore a screen that always has a line on it.
 
+**A line names a nation, a place and a person. It names no index.** The engine
+publishes an index for a faction, an address for a place and an identity for a
+person, and a namer turns each into words. A watcher forms no attachment to
+faction 0. The words change no outcome and reach no engine method, so a line is
+flavour over a frame the engine already filled.
+
 References
 ----------
 ADR-0067, the viewer reads the world and never writes to it, decision D2.
 ``docs/adrs/accepted/adr-0067-the-viewer-reads-the-world-and-never-writes-to-it.md``
+
+The namer of the control plane. ``python/cachette/names/__init__.py``
 """
 
 from __future__ import annotations
@@ -38,6 +46,7 @@ from cachette.demo.text import paint_block, paint_text, text_height, text_width
 if TYPE_CHECKING:
     from cachette import World
     from cachette.demo.surface import Surface
+    from cachette.names import Names
 
 # One colour for each faction, so a watcher tells who without reading.
 #
@@ -279,10 +288,17 @@ class Announcer:
     run after each step and the frame methods run once for each drawn frame.
     """
 
-    __slots__ = ("_census", "_charactered", "_ended", "_population", "toasts")
+    __slots__ = ("_census", "_charactered", "_ended", "_population", "names", "toasts")
 
-    def __init__(self, toasts: Toasts | None = None) -> None:
-        """Build an announcer with an empty deck and no history."""
+    def __init__(self, names: Names, toasts: Toasts | None = None) -> None:
+        """Build an announcer with an empty deck and no history.
+
+        The namer turns a faction index, a place address and a character
+        identity into words. It is required and has no default, because a
+        default would be a second source of the sentences that nothing
+        exercises.
+        """
+        self.names = names
         self.toasts = toasts if toasts is not None else Toasts()
         # The counters as they were at the last reading. A rise between two
         # readings is the event.
@@ -334,7 +350,7 @@ class Announcer:
             )
             verb = "declares war on" if declared else "makes peace with"
             self.toasts.show(
-                f"Faction {speaker} {verb} faction {other}",
+                f"{self.names.faction(speaker)} {verb} {self.names.faction(other)}",
                 faction_colour(speaker),
                 now,
             )
@@ -352,14 +368,19 @@ class Announcer:
             kind = int(columns["kind"][row])
             q = int(columns["objective_q"][row])
             r = int(columns["objective_r"][row])
-            place = f"({q}, {r})"
+            place = self.names.place(q, r)
+            nation = self.names.faction(faction)
             if kind == 0:
                 cohort = int(columns["cohort_size"][row])
-                text = f"Faction {faction} marches on {place} with {cohort} soldiers"
+                # The adjective names the army rather than the nation, so the
+                # march reads as a thing a nation sent and not as the nation
+                # itself moving.
+                army = self.names.faction_adjective(faction)
+                text = f"A {army} army marches on {place} with {cohort} soldiers"
             elif kind == 1:
-                text = f"Faction {faction} takes {place}"
+                text = f"{nation} takes {place}"
             elif kind == 2:
-                text = f"Faction {faction} is thrown back from {place}"
+                text = f"{nation} is thrown back from {place}"
             else:
                 continue
             self.toasts.show(text, faction_colour(faction), now)
@@ -378,8 +399,9 @@ class Announcer:
             if faction in self._charactered:
                 continue
             self._charactered.add(faction)
+            person = self.names.person(int(columns["character"][row]))
             self.toasts.show(
-                f"Faction {faction} gains its first character",
+                f"{self.names.faction(faction)} raises its first character, {person}",
                 faction_colour(faction),
                 now,
                 key=f"first character {faction}",
@@ -432,7 +454,8 @@ class Announcer:
             if after <= before or after == 0:
                 continue
             self.toasts.show(
-                f"Faction {faction} passes {after * POPULATION_MARK} people",
+                f"{self.names.faction(faction)} passes "
+                f"{after * POPULATION_MARK} people",
                 faction_colour(faction),
                 now,
                 key=f"population {faction}",
@@ -453,7 +476,7 @@ class Announcer:
         # The engine names a path with underscores. A watcher reads words.
         path = end["path"].replace("_", " ")
         self.toasts.show(
-            f"Faction {winner} wins by {path}",
+            f"{self.names.faction(winner)} wins by {path}",
             faction_colour(winner),
             now,
         )
