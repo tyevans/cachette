@@ -71,7 +71,9 @@ use crate::production::{
     QUEUE_PERIOD_DEFAULT, QUEUE_PHASE_DEFAULT, WORK_PER_ADVANCE,
 };
 use crate::promotion::{self, PromotionError, UnitPromoted};
-use crate::pyramid::{CellSummary, ExitField, Pyramid, ReturnField, SeededField};
+use crate::pyramid::{
+    ApproachField, CellSummary, ExitField, Pyramid, ReturnField, SeededField, AT_SEED,
+};
 use crate::rates::{RateError, RateLedger, RateSchedule, RateTable, SiteShortfall};
 use crate::relation::{RelationCrossed, RelationError, RelationMatrix, RelationRules};
 use crate::resource::{
@@ -808,22 +810,39 @@ pub struct World {
     ///
     /// [^1]: ADR-0125, the control plane names the seed set of a destination field, decision D1. `docs/adrs/draft/adr-0125-the-control-plane-names-the-seed-set-of-a-destination-field.md`
     destinations: SeededField,
-    /// The seed cells of each destination plane, in ascending order.
+    /// The seed tiles of each destination plane, in ascending order.
     ///
     /// **The control plane names these, and nothing else writes them.** The
-    /// entry of one plane holds each cell once and in ascending order, so the
+    /// entry of one plane holds each tile once and in ascending order, so the
     /// derivation reads one set whatever order the caller named the tiles
     /// in.[^1]
     ///
-    /// The set holds cells and not tiles. A destination is a place a block
-    /// can be steered at, and a field at block pitch cannot answer a
-    /// tile.[^2]
+    /// **The set holds tiles, and the cell of each is derived from it.** The
+    /// coarse field is at block pitch and it reads the cells. The approach
+    /// field is at tile pitch and it reads the tiles. Storing the cell beside
+    /// the tile would be one fact in two places, and the two would then
+    /// disagree with nothing to fail.[^2] [^3]
     ///
     /// # References
     ///
     /// [^1]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
-    /// [^2]: Findings register, FND-315. `docs/FINDINGS.md`
-    destination_seeds: Vec<Vec<u32>>,
+    /// [^2]: Recurring defect shapes, shape 1. `.agents/rules/recurring-defects.md`
+    /// [^3]: Findings register, FND-315. `docs/FINDINGS.md`
+    destination_seeds: Vec<Vec<TileIdx>>,
+    /// The direction of the nearest seed tile, for each tile of a seeded
+    /// block and each destination plane.
+    ///
+    /// **The coarse field steers a unit to the cell that holds its target,
+    /// and no further.** This one resolves that last cell at the pitch of one
+    /// tile, so a unit sent at a tile arrives at the tile.[^1]
+    ///
+    /// It is derived beside the coarse field, from the same seed set.[^2]
+    ///
+    /// # References
+    ///
+    /// [^1]: Findings register, FND-315. `docs/FINDINGS.md`
+    /// [^2]: ADR-0022, level 0 is the only truth, and every level above it is derived, decision D1. `docs/adrs/accepted/adr-0022-level-0-is-the-only-truth-and-every-level-above-it-is-derived.md`
+    approaches: ApproachField,
     /// Whether the reach of each destination plane spreads through open
     /// water.
     ///
@@ -1486,6 +1505,7 @@ impl World {
             exits: ExitField::new(cell_lattice),
             returns: ReturnField::new(cell_lattice, config.faction_count),
             destinations: SeededField::new(cell_lattice, config.destination_plane_count()),
+            approaches: ApproachField::new(layout),
             destination_seeds: vec![Vec::new(); config.destination_plane_count() as usize],
             destination_crossings: vec![0; config.destination_plane_count() as usize],
             carry_mark: CARRY_MARK_DEFAULT,
@@ -1828,23 +1848,24 @@ impl World {
                 return Err(SendError::DeadUnit(*unit));
             }
         }
-        let mut cells = Vec::with_capacity(seeds.len());
+        let mut tiles = Vec::with_capacity(seeds.len());
         for address in seeds {
             let tile = self
                 .grid
                 .index_of(*address)
                 .ok_or(SendError::AddressOutsideWorld(*address))?;
-            let cell = self
-                .cell_of(tile)
+            // The cell is derived from the tile at every read, and it is
+            // stored nowhere, so the two cannot disagree.
+            self.cell_of(tile)
                 .ok_or(SendError::AddressOutsideWorld(*address))?;
-            cells.push(cell);
+            tiles.push(tile);
         }
         // The set is a set. The sort and the dedup make the stored order a
-        // property of the cells and never of the order the caller named them
+        // property of the tiles and never of the order the caller named them
         // in.[^4]
-        cells.sort_unstable();
-        cells.dedup();
-        self.destination_seeds[destination as usize] = cells;
+        tiles.sort_unstable_by_key(|tile: &TileIdx| tile.0);
+        tiles.dedup();
+        self.destination_seeds[destination as usize] = tiles;
         // **The plane conducts through water when every unit sent to it
         // crosses water.** The caller states no flag. It states a set, and
         // the crossing of that set follows from the type of each unit in it,
@@ -1878,11 +1899,7 @@ impl World {
         // leaves stale is a confident wrong answer.[^5]
         //
         // [^5]: Findings register, FND-029. `docs/FINDINGS.md`
-        self.destinations.derive(
-            &self.pyramid,
-            &self.destination_seed_pairs(),
-            &self.destination_crossings,
-        );
+        self.derive_destination_fields();
         Ok(())
     }
 
@@ -1950,6 +1967,7 @@ impl World {
         self.destinations = SeededField::new(self.destinations.cells(), count);
         self.destination_seeds = vec![Vec::new(); count as usize];
         self.destination_crossings = vec![0; count as usize];
+        self.derive_destination_fields();
     }
 
     /// Returns the direction that a unit sent to one destination takes from
@@ -1995,12 +2013,57 @@ impl World {
     /// [^1]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
     fn destination_seed_pairs(&self) -> Vec<(u16, u32)> {
         let mut seeds = Vec::new();
-        for (plane, cells) in self.destination_seeds.iter().enumerate() {
-            for cell in cells {
-                seeds.push((plane as u16, *cell));
+        for (plane, tiles) in self.destination_seeds.iter().enumerate() {
+            for tile in tiles {
+                let Some(cell) = self.cell_of(*tile) else {
+                    continue;
+                };
+                seeds.push((plane as u16, cell));
             }
         }
         seeds
+    }
+
+    /// Returns one seed for each destination plane and each tile of its set.
+    ///
+    /// The walk is over the planes in ascending order and over the tiles of
+    /// each plane in ascending order, so the set does not depend on a thread
+    /// count.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
+    fn destination_seed_tiles(&self) -> Vec<(u16, TileIdx)> {
+        let mut seeds = Vec::new();
+        for (plane, tiles) in self.destination_seeds.iter().enumerate() {
+            for tile in tiles {
+                seeds.push((plane as u16, *tile));
+            }
+        }
+        seeds
+    }
+
+    /// Derives the coarse and the fine field of every destination plane.
+    ///
+    /// **This is the one place that derives either of them.** Both come from
+    /// one seed set, and a path that wrote one without the other would leave
+    /// a stale value that nothing fails on.[^1] [^2]
+    ///
+    /// # References
+    ///
+    /// [^1]: Findings register, FND-029. `docs/FINDINGS.md`
+    /// [^2]: Recurring defect shapes, shape 1. `.agents/rules/recurring-defects.md`
+    fn derive_destination_fields(&mut self) {
+        self.destinations.derive(
+            &self.pyramid,
+            &self.destination_seed_pairs(),
+            &self.destination_crossings,
+        );
+        self.approaches.derive(
+            self.terrain,
+            &self.destination_seed_tiles(),
+            &self.destination_crossings,
+        );
     }
 
     /// Returns the gather events of the last step.
@@ -4337,10 +4400,10 @@ impl World {
         // arena hash above.[^4]
         //
         // [^4]: ADR-0022, level 0 is the only truth, and every level above it is derived, decision D1. `docs/adrs/accepted/adr-0022-level-0-is-the-only-truth-and-every-level-above-it-is-derived.md`
-        for cells in &self.destination_seeds {
-            hash = hash.write_u64(cells.len() as u64);
-            for cell in cells {
-                hash = hash.write(&cell.to_le_bytes());
+        for tiles in &self.destination_seeds {
+            hash = hash.write_u64(tiles.len() as u64);
+            for tile in tiles {
+                hash = hash.write(&tile.0.to_le_bytes());
             }
         }
         // Whether a plane conducts through water is stored beside its seeds,
@@ -5268,6 +5331,7 @@ impl World {
                 &Steering {
                     layout: self.pyramid.layout(),
                     exits: &self.exits,
+                    approaches: &self.approaches,
                     returns: &self.returns,
                     destinations: &self.destinations,
                 },
@@ -7320,11 +7384,7 @@ impl World {
         )?;
         self.exits.derive(&self.pyramid);
         self.returns.derive(&self.pyramid, &self.site_seeds());
-        self.destinations.derive(
-            &self.pyramid,
-            &self.destination_seed_pairs(),
-            &self.destination_crossings,
-        );
+        self.derive_destination_fields();
         Ok(())
     }
 
@@ -11181,17 +11241,22 @@ const SETTLER_LIFETIME: u32 = 89;
 /// best place in the world.
 ///
 /// The value is half the measured lifetime, because a settler walks one tile
-/// in one tick and it does not walk in a straight line. The field that steers
-/// it holds one direction for each level 1 cell, so the settler wanders
-/// inside the cell that holds its target until it stands on ground the settle
-/// verb admits. Half the lifetime leaves it as many ticks to find that ground
-/// as it spent walking.
+/// in one tick and it does not walk in a straight line. Ground that refuses a
+/// step sends it round, and each detour costs a tick it cannot get back. Half
+/// the lifetime leaves it as many ticks in hand as it spent walking.
+///
+/// **The last cell is no longer part of that margin.** The approach field
+/// resolves the block that holds the target at the pitch of one tile, so a
+/// settler that reaches that block walks at the target rather than wandering
+/// inside it.[^2]
 ///
 /// The two assertions below are floors and not knobs. A reach at or under the
 /// founding distance would leave no place eligible, because the survey
 /// refuses every place nearer than that distance. A reach under the edge of a
 /// level 1 cell would name a target in the cell the settler already stands
-/// in, and a field over cells steers nobody inside one cell.
+/// in, and the coarse field steers nobody inside one cell.
+///
+/// [^2]: Findings register, FND-315. `docs/FINDINGS.md`
 const SETTLER_REACH: u32 = SETTLER_LIFETIME / 2;
 
 const _: () = assert!(
@@ -11412,6 +11477,16 @@ struct Steering<'a> {
     ///
     /// [^3]: ADR-0125, the control plane names the seed set of a destination field, decision D1. `docs/adrs/draft/adr-0125-the-control-plane-names-the-seed-set-of-a-destination-field.md`
     destinations: &'a SeededField,
+    /// One direction for each destination plane and each tile of a seeded
+    /// block.
+    ///
+    /// **The coarse field above steers a unit to the cell that holds its
+    /// target and no further.** This one resolves that last cell at the pitch
+    /// of one tile. A unit reads one entry of it, keyed on its own tile, and
+    /// it reads no neighbouring tile, so it still searches nothing.[^4]
+    ///
+    /// [^4]: Findings register, FND-315. `docs/FINDINGS.md`
+    approaches: &'a ApproachField,
 }
 
 /// What the movement pass reads to answer whether a unit is building here.
@@ -11454,6 +11529,7 @@ fn soldier_moves(
         exits,
         returns,
         destinations,
+        approaches,
     } = *steering;
     // **The walk is in cell order, not in slot order.** The two hold the same
     // units and differ only in the order. Every read below the filter is a
@@ -11584,12 +11660,44 @@ fn soldier_moves(
                         //
                         // [^18]: ADR-0110, a unit returns by climbing a reach field seeded at every site of its faction, decision D1. `docs/adrs/draft/adr-0110-a-unit-returns-by-climbing-a-reach-field.md`
                         // [^19]: ADR-0095, a behavioural strategy arrives as a field over cells, never as a search from a unit, decision D1. `docs/adrs/draft/adr-0095-a-behavioural-strategy-arrives-as-a-field-over-cells.md`
+                        // **A unit that stands on the tile it was sent to
+                        // takes no step.** The coarse field holds one
+                        // direction for a block of tiles, so it says nothing
+                        // once the unit is inside the block that holds its
+                        // target, and the unit fell back to the keyed draw
+                        // and walked away from the tile it had reached. The
+                        // approach field answers at tile pitch, and the seed
+                        // offset is how it says the unit has arrived.[^25]
+                        //
+                        // The clause sits above the steering, because a unit
+                        // that arrived has nowhere further to be steered.
+                        //
+                        // [^25]: Findings register, FND-315. `docs/FINDINGS.md`
+                        let approach = match sent {
+                            Some(destination) => {
+                                approaches.offset(destination, soldiers.tile(*soldier)?)
+                            }
+                            None => None,
+                        };
+                        if approach == Some(AT_SEED) {
+                            return None;
+                        }
                         let steer = match (sent, option) {
                             // **The destination plane wins over the option
                             // row.** A caller that sends a unit somewhere has
                             // said where it goes, and the option the unit
                             // scored for itself says only what it wants.[^20]
-                            (Some(destination), _) => destinations.direction(destination, cell),
+                            // **The fine field wins over the coarse one.**
+                            // The coarse field answers for a block, and the
+                            // fine one answers for a tile of the block that
+                            // holds the target. A unit outside every seeded
+                            // block reads no fine entry and takes the coarse
+                            // answer, which is the answer it read before the
+                            // fine field existed.[^25]
+                            (Some(destination), _) => match approach {
+                                Some(direction) => Some(Some(direction)),
+                                None => destinations.direction(destination, cell),
+                            },
                             (None, Some(option)) => match OPTIONS[option as usize].ranked {
                                 Ranked::Cell(_) => exits.exit(cell, option),
                                 Ranked::Carry => {

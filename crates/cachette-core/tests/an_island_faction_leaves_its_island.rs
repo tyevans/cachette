@@ -289,6 +289,16 @@ struct Run {
     population: u32,
     /// The settlements the faction holds at the last tick.
     settlements: usize,
+    /// The tick a unit of the cohort first stood on the tile it was sent to,
+    /// or nothing when none of them ever did.
+    ///
+    /// **This is the last mile.** The destination field holds one direction
+    /// for each level 1 cell, so a cohort that reached the cell of its target
+    /// had arrived within a block of it and not at it. The approach field
+    /// resolves that block at the pitch of one tile.[^1]
+    ///
+    /// [^1]: Findings register, FND-315. `docs/FINDINGS.md`
+    stood_on_target: Option<u64>,
 }
 
 /// Seats the island faction and returns the world and the seat.
@@ -334,7 +344,8 @@ fn measure(crossing: bool, unit_type: UnitTypeId, island: &BTreeSet<Axial>) -> R
 
     let mut visited = BTreeSet::new();
     let mut on_water = BTreeSet::new();
-    for _ in 0..TICKS {
+    let mut stood_on_target = None;
+    for tick in 0..TICKS {
         world.step(THREADS).expect("the step must run");
         for unit in world.soldiers().iter_faction(ISLAND) {
             let Some(address) = world.soldiers().address(unit) else {
@@ -343,6 +354,9 @@ fn measure(crossing: bool, unit_type: UnitTypeId, island: &BTreeSet<Axial>) -> R
             visited.insert(address);
             if world.tile_kind(address) == Some(TileKind::Water) {
                 on_water.insert(address);
+            }
+            if address == target && stood_on_target.is_none() {
+                stood_on_target = Some(tick);
             }
         }
     }
@@ -360,6 +374,7 @@ fn measure(crossing: bool, unit_type: UnitTypeId, island: &BTreeSet<Axial>) -> R
             .iter()
             .filter(|held| world.settlements().faction(*held) == Some(ISLAND))
             .count(),
+        stood_on_target,
     }
 }
 
@@ -400,12 +415,24 @@ fn a_faction_on_an_island_reaches_ground_beyond_the_water() {
     let after = measure(true, MARINER, &island);
     println!("island {} tiles", island.len());
     println!(
-        "before: visited {}, land beyond {}, on water {}, sites {}, people {}",
-        before.visited, before.land_beyond, before.on_water, before.settlements, before.population
+        "before: visited {}, land beyond {}, on water {}, sites {}, people {}, \
+         stood on the target at {:?}",
+        before.visited,
+        before.land_beyond,
+        before.on_water,
+        before.settlements,
+        before.population,
+        before.stood_on_target
     );
     println!(
-        "after:  visited {}, land beyond {}, on water {}, sites {}, people {}",
-        after.visited, after.land_beyond, after.on_water, after.settlements, after.population
+        "after:  visited {}, land beyond {}, on water {}, sites {}, people {}, \
+         stood on the target at {:?}",
+        after.visited,
+        after.land_beyond,
+        after.on_water,
+        after.settlements,
+        after.population,
+        after.stood_on_target
     );
     assert_eq!(
         before.on_water, 0,
@@ -422,6 +449,17 @@ fn a_faction_on_an_island_reaches_ground_beyond_the_water() {
     assert!(
         after.land_beyond > 0,
         "a cohort of mariners must reach ground beyond its island"
+    );
+    // **The test can now assert arrival, and it could not before.** The
+    // destination field holds one direction for each level 1 cell, so the
+    // cohort reached the cell that held its target and then took the uniform
+    // keyed draw inside it. The approach field resolves that cell at the
+    // pitch of one tile.[^5]
+    //
+    // [^5]: Findings register, FND-315. `docs/FINDINGS.md`
+    assert!(
+        after.stood_on_target.is_some(),
+        "a cohort of mariners must stand on the tile it was sent to"
     );
 }
 

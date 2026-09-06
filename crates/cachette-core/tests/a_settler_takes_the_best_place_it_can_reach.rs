@@ -23,7 +23,8 @@
 //! [^3]: Testing rules, section 5. `.agents/rules/testing.md`
 
 use cachette_core::founding::MINIMUM_FOUNDING_DISTANCE;
-use cachette_core::{Axial, FactionId, World, WorldConfig};
+use cachette_core::unit_type::SETTLER;
+use cachette_core::{Axial, Entity, FactionId, World, WorldConfig};
 
 /// The extent of the world the probe runs.
 const EXTENT: u32 = 256;
@@ -210,4 +211,108 @@ fn a_faction_takes_the_best_place_in_reach_and_not_the_nearest() {
         differed > 0,
         "the engine took the nearest place every time, so it is not taking the best"
     );
+}
+
+/// Returns the level 1 cell that covers one address.
+fn cell_of(world: &World, address: Axial) -> u32 {
+    let layout = world.pyramid().layout();
+    let tile = world
+        .grid()
+        .index_of(address)
+        .expect("the address is inside the world");
+    layout.block_of_key(layout.key_of(tile).expect("the tile is inside the world"))
+}
+
+#[test]
+fn a_settler_sent_at_a_tile_arrives_at_that_tile_and_founds_there() {
+    // **This is the case that found the last mile.** The destination field
+    // holds one direction for each level 1 cell, and a cell is thirty-two
+    // tiles a side. A settler followed the gradient until it entered the cell
+    // that held its target, and the field then had nothing left to say: the
+    // reach of a seed cell is zero, so the settler fell back to the uniform
+    // keyed draw and walked at random inside that cell until it starved.[^1]
+    //
+    // The test asserts the tile and not the cell, because the cell is not the
+    // place the caller named. It reports the tick the settler entered the
+    // cell and the tick it stood on the tile, so a reader sees the last mile
+    // rather than taking the assertion on trust.
+    //
+    // The controller of the faction stands down. The order this test makes is
+    // the order it measures, and the controller would re-aim the settler at a
+    // place of its own choosing on any tick it drew the settle choice.
+    //
+    // [^1]: Findings register, FND-315. `docs/FINDINGS.md`
+    let mut world = probe_world(1);
+    let faction = FactionId(0);
+    world.set_externally_controlled(faction, true);
+    let places = places_of(&world, faction);
+    assert!(!places.is_empty(), "the seeding must seat the faction");
+    let seat = places[0];
+
+    let target = world
+        .settling_target_of(faction)
+        .expect("the faction offers a target");
+    assert!(
+        cell_of(&world, target) != cell_of(&world, seat),
+        "a target in the cell of the seat would be reached without the field"
+    );
+
+    let settler: Entity = world
+        .spawn_soldier(seat, faction)
+        .expect("the seat admits one unit");
+    assert!(
+        world.set_unit_type(settler, SETTLER),
+        "the settler row is in the table"
+    );
+    // The plane is the settling plane of the faction, which is its number
+    // raised by twice the faction count.
+    let plane = 2 * FACTIONS + faction.0;
+    world
+        .send_units_to(&[settler], &[target], plane)
+        .expect("the world holds the plane and the unit is live");
+
+    let mut entered = None;
+    let mut arrived = None;
+    for tick in 0..TICKS {
+        world.step(THREADS).expect("the step runs");
+        let Some(at) = world.soldiers().address(settler) else {
+            break;
+        };
+        if cell_of(&world, at) == cell_of(&world, target) && entered.is_none() {
+            entered = Some(tick);
+        }
+        if at == target {
+            arrived = Some(tick);
+            break;
+        }
+    }
+    println!(
+        "the settler left {seat:?} for {target:?}, {} tiles away. \
+         it entered the target cell at {entered:?} and stood on the target tile at {arrived:?}",
+        seat.distance(target)
+    );
+    let arrived = arrived.expect(
+        "the settler never stood on the tile it was sent to, so the last mile is still open",
+    );
+    assert!(
+        world.soldiers().contains(settler),
+        "the settler must reach its target alive"
+    );
+
+    let before = world.settlements().len();
+    let outcomes = world.settle_set(&[settler]);
+    let founding = outcomes[0]
+        .founding()
+        .expect("a settler on an eligible place founds");
+    assert_eq!(
+        founding.place(),
+        target,
+        "the city must stand on the tile the caller named"
+    );
+    assert_eq!(
+        world.settlements().len(),
+        before + 1,
+        "the founding must add a site"
+    );
+    println!("the settler founded at {target:?} after arriving on tick {arrived}");
 }
