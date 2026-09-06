@@ -4158,7 +4158,7 @@ exactly so that a caller cannot build a wrong one.[^DEC120C]
 [^ADR81]: ADR-0081, a residence is a stored column and occupancy is a maintained count, decision D3. `docs/adrs/draft/adr-0081-a-residence-is-a-stored-column-and-occupancy-is-a-maintained-count.md`
 [^ADR75]: ADR-0075, the founding choice reads a bounded sample of the world. `docs/adrs/accepted/adr-0075-the-founding-choice-reads-a-bounded-sample-of-the-world.md`
 [^FND106]: Findings register, FND-106. `docs/FINDINGS.md`
-[^DEC44ITEM]: Backlog item 0060. `docs/backlog/proposed/0060-grow-the-population-from-the-store-and-the-housing.md`
+[^DEC44ITEM]: Backlog item 0060. `docs/backlog/refined/0060-grow-the-population-from-the-store-and-the-housing.md`
 [^SCOPE]: Decision Record Scope, section 4.1. `.claude/rules/adr-scope.md`
 [^FND135]: Findings register, FND-135. `docs/FINDINGS.md`
 [^DOD3]: Definition of Done, section 3. `.claude/rules/definition-of-done.md`
