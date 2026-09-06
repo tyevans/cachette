@@ -35,6 +35,7 @@ pub mod luxury;
 pub mod plan;
 pub mod position;
 pub mod presence;
+pub mod production;
 pub mod promotion;
 pub mod pyramid;
 pub mod rates;
@@ -74,7 +75,7 @@ pub use controller::{
     CarrierAssignment, Choice, ControllerCommand, FactionRow, FactionState, FactionWeights,
     GameEnd, Terms, WinPath, ADVERT_PERIOD_DEFAULT, ADVERT_PHASE_DEFAULT, CARRIER_ASSIGNMENT_BYTES,
     COMMAND_ADVERTISE, COMMAND_BUILD, COMMAND_CAMPAIGN, COMMAND_CARRY, COMMAND_GATHER,
-    COMMAND_PROJECT, COMMAND_RELATION, COMMAND_TRADE, CONTRACT_CARRIERS_DEFAULT,
+    COMMAND_PROJECT, COMMAND_QUEUE, COMMAND_RELATION, COMMAND_TRADE, CONTRACT_CARRIERS_DEFAULT,
     CONTRACT_TERM_DEFAULT, EVALUATIONS_DEFAULT, SURPLUS_MARK_DEFAULT, TICK_LIMIT_DEFAULT,
     WEIGHT_HIGH, WEIGHT_LOW,
 };
@@ -97,6 +98,11 @@ pub use position::{
     POSITIONS_PER_SITE, WORK_COMMODITY,
 };
 pub use presence::{PresenceRelation, PRESENCE_ROWS};
+pub use production::{
+    BuildCostRow, BuildCostTable, QueueEntry, QueueError, QueueOrder, QueueTable,
+    DEFAULT_BUILD_COST_TABLE, QUEUE_BOUND, QUEUE_ENTRY_BYTES, QUEUE_PERIOD_DEFAULT,
+    QUEUE_PHASE_DEFAULT, WORK_PER_ADVANCE,
+};
 pub use pyramid::{CellSummary, ExitField, Pyramid, NO_EXIT};
 pub use rates::{
     RateError, RateLedger, RatePass, RateSchedule, RateTable, SiteRate, SiteShortfall,

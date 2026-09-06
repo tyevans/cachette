@@ -19,11 +19,13 @@
 use std::path::PathBuf;
 
 use cachette_core::position::WORK_COMMODITY;
+use cachette_core::production::{BuildCostRow, QueueOrder};
+use cachette_core::rates::RateSchedule;
 use cachette_core::resource::{Amount, RecoveryRules, ResourceKind};
 use cachette_core::site::CommodityId;
 use cachette_core::terrain::TileKind;
 use cachette_core::types::{FactionId, Fix32};
-use cachette_core::unit_type::{UnitTypeId, UnitTypeRow, WORKER_ROW};
+use cachette_core::unit_type::{UnitTypeId, UnitTypeRow, SOLDIER, WORKER_ROW};
 use cachette_core::upgrade::{UpgradeCategory, UpgradeRow};
 use cachette_core::{Axial, WinPath, World, WorldConfig};
 
@@ -59,6 +61,20 @@ const WONDER_FRAMES: u64 = 40;
 ///
 /// A tile of builders finishes it inside the frames above.
 const WONDER_WORK_OF_THE_SCENARIO: u32 = 240;
+
+/// The work that one queue entry of the building scenario needs.
+///
+/// The frames of the scenario finish some entries and leave one in flight.
+const QUEUE_WORK_OF_THE_SCENARIO: u32 = 12;
+
+/// The people that the building scenario homes at its site.
+const QUEUE_GROUP_OF_THE_SCENARIO: u32 = 6;
+
+/// The entries that the building scenario pushes.
+///
+/// The count is above the entries the frames finish, so the file covers a
+/// queue that still holds work at the last frame.
+const QUEUE_ENTRIES_OF_THE_SCENARIO: u32 = 4;
 
 /// The number of frames that a wide scenario runs.
 ///
@@ -226,6 +242,18 @@ const SCENARIOS: &[(&str, WorldConfig, Population, u64)] = &[
         Population::Wonder,
         WONDER_FRAMES,
     ),
+    (
+        "building",
+        WorldConfig {
+            width: 24,
+            height: 24,
+            seed: 0x0cac_4e77_0497,
+            faction_count: 2,
+            unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
+        },
+        Population::Building,
+        FRAMES,
+    ),
 ];
 
 /// How a scenario fills its world.
@@ -316,6 +344,72 @@ enum Population {
     ///
     /// [^1]: Testing rules, section 2a. `.claude/rules/testing.md`
     Wonder,
+    /// A site that builds typed units from its queue.
+    ///
+    /// No other scenario holds a queue, so no other scenario spends a
+    /// resident and no other file moves when the advance changes. The site
+    /// holds a store that pays, residents to spend, and more entries than the
+    /// frames finish, so the file covers an entry that finishes and an entry
+    /// that is still in flight.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: Testing rules, section 2a. `.agents/rules/testing.md`
+    Building,
+}
+
+/// Founds one site, homes a group at it, and fills its queue.
+///
+/// **The scenario writes its own cost row and its own schedule.** The default
+/// values are placeholders that the balance harness will change, and a
+/// scenario that read them would record a file that no entry ever
+/// finishes.[^1]
+///
+/// The caller asserts after the run that the queue produced a unit. A run
+/// that produced none would record a file that moves for every reason except
+/// this one.[^2]
+///
+/// # References
+///
+/// [^1]: Balance register, the production queue. `docs/reference/balance.md`
+/// [^2]: Testing rules, section 2a. `.agents/rules/testing.md`
+fn build_units(world: &mut World) {
+    world.set_queue_schedule(RateSchedule::new(1, 0).expect("one is inside the range"));
+    world
+        .define_build_cost(
+            SOLDIER.0,
+            BuildCostRow {
+                work: QUEUE_WORK_OF_THE_SCENARIO,
+                people: 1,
+                goods: [Fix32::from_int(2)],
+            },
+        )
+        .expect("the soldier row is inside the table");
+    let grid = world.grid();
+    let open: Vec<Axial> = (0..grid.tile_count())
+        .map(|index| Axial::new((index % grid.width()) as i32, (index / grid.width()) as i32))
+        .filter(|address| world.admits_a_unit(*address))
+        .collect();
+    let place = *open.first().expect("the world holds open ground");
+    let site = world
+        .found_settlement(place, FactionId(0))
+        .expect("the ground admits a city");
+    world
+        .set_settlement_store(site, CommodityId(0), STOCKED)
+        .expect("the good is in the set");
+    for _ in 0..QUEUE_GROUP_OF_THE_SCENARIO {
+        let unit = world
+            .spawn_soldier(place, FactionId(0))
+            .expect("the ground admits a unit");
+        assert!(world.set_home_site(unit, Some(site)), "the site is live");
+    }
+    // More entries than the frames finish, so the file covers a queue that
+    // still holds work at the last frame.
+    for _ in 0..QUEUE_ENTRIES_OF_THE_SCENARIO {
+        world
+            .order_site_queue(FactionId(0), site, QueueOrder::Push(SOLDIER))
+            .expect("the queue has room");
+    }
 }
 
 /// Puts a tile of builders on an island and tells them to build a wonder.
@@ -748,6 +842,7 @@ fn hash_sequence(config: WorldConfig, population: Population, frames: u64) -> St
         Population::Gathering => gather(&mut world),
         Population::Contested => contest(&mut world),
         Population::Wonder => wonder(&mut world),
+        Population::Building => build_units(&mut world),
     }
     // The count before the first frame. The contested scenario asserts
     // against it, so the assertion never restates a number the fixture owns.
@@ -783,6 +878,28 @@ fn hash_sequence(config: WorldConfig, population: Population, frames: u64) -> St
         assert!(
             !world.characters().is_empty(),
             "the gathering scenario promoted nobody"
+        );
+    }
+    if population == Population::Building {
+        // The file must cover what it claims to cover. A run that produced
+        // nothing would record a file that moves for every reason except the
+        // queue advance.[^1]
+        //
+        // [^1]: Testing rules, section 2a. `.agents/rules/testing.md`
+        assert!(
+            world
+                .settlements()
+                .iter()
+                .filter_map(|site| world.site_queue(site))
+                .any(|queue| !queue.is_empty()),
+            "the building scenario left no entry in flight"
+        );
+        assert!(
+            world
+                .soldiers()
+                .iter()
+                .any(|unit| world.unit_type(unit) == Some(SOLDIER)),
+            "the building scenario produced no typed unit"
         );
     }
     if population == Population::Wonder {

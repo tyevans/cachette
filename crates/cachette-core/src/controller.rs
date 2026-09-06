@@ -43,6 +43,7 @@ use crate::resource::{ResourceKind, RESOURCE_KIND_COUNT};
 use crate::rng;
 use crate::trade::{Advert, ADVERT_OFFERS, ADVERT_WANTS};
 use crate::types::{Entity, FactionId, Tick, TileIdx};
+use crate::unit_type::UnitTypeId;
 use crate::upgrade::{UpgradeCategory, UPGRADE_CATEGORY_COUNT};
 
 /// The lowest weight the seeding layer draws.
@@ -346,6 +347,10 @@ pub const COMMAND_CARRY: u8 = 6;
 /// The command number of the order that takes the zoned projects.
 pub const COMMAND_PROJECT: u8 = 7;
 
+/// The command number of the order that queues one unit at a site. The
+/// argument is the row of the unit type table that the order names.
+pub const COMMAND_QUEUE: u8 = 8;
+
 /// The step the controller moves a relation by when its draw says so. It is
 /// one step toward war, and the drift is what brings the pair back.[^1]
 ///
@@ -430,6 +435,17 @@ pub enum Choice {
     ///
     /// [^1]: ADR-0152, a faction plans its roads and zones with one solver, decision D5. `docs/adrs/accepted/adr-0152-a-faction-plans-its-roads-and-zones-with-one-solver.md`
     Project,
+    /// Put one entry of this unit type into the queue of one site of the
+    /// faction.
+    ///
+    /// The site is chosen when the command applies: the lowest-slot site of
+    /// the faction whose queue has room. **The type is drawn, and no rule
+    /// inside the engine names one.**[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0158, a site builds a typed unit from a bounded queue its store pays for, decision D2. `docs/adrs/draft/adr-0158-a-site-builds-a-typed-unit-from-a-bounded-queue-its-store-pays-for.md`
+    Queue(UnitTypeId),
 }
 
 impl Choice {
@@ -450,6 +466,7 @@ impl Choice {
             Self::Trade => (COMMAND_TRADE, 0),
             Self::Carry => (COMMAND_CARRY, 0),
             Self::Project => (COMMAND_PROJECT, 0),
+            Self::Queue(unit_type) => (COMMAND_QUEUE, unit_type.0),
         }
     }
 }
@@ -520,6 +537,39 @@ pub fn evaluate(
         let index = (high % RESOURCE_KIND_COUNT as u32) as u8;
         Choice::Gather(ResourceKind::from_u8(index).expect("the index is below the count"))
     }
+}
+
+/// Picks the unit type that a faction queues this tick.
+///
+/// **This draws exactly once.** The key is the controller system, the tick,
+/// the faction and the draw index.[^1] The draw picks one of the types the
+/// caller offers, and the caller offers the rows that the unit type table
+/// fills.
+///
+/// **The choice is policy and it is not physics.** The engine states no rule
+/// about what a faction builds, and a learner may decide otherwise.[^2] The
+/// list arrives from the caller, so no rule here names a type.
+///
+/// Returns `None` when the list is empty.
+///
+/// # References
+///
+/// [^1]: ADR-0003, every random draw is keyed, never stateful, decision D1. `docs/adrs/accepted/adr-0003-every-random-draw-is-keyed-never-stateful.md`
+/// [^2]: ADR-0158, a site builds a typed unit from a bounded queue its store pays for, decision D2. `docs/adrs/draft/adr-0158-a-site-builds-a-typed-unit-from-a-bounded-queue-its-store-pays-for.md`
+#[must_use]
+pub fn queued_type_of(
+    seed: u64,
+    tick: Tick,
+    faction: FactionId,
+    draw: u32,
+    offered: &[UnitTypeId],
+) -> Option<UnitTypeId> {
+    if offered.is_empty() {
+        return None;
+    }
+    let raw = rng::draw(seed, rng::SYSTEM_CONTROLLER, tick.0, faction.0 as u64, draw);
+    let picked = ((u128::from(raw) * offered.len() as u128) >> 64) as usize;
+    offered.get(picked.min(offered.len() - 1)).copied()
 }
 
 /// Picks the territory winner: the faction with the most held tiles.
@@ -803,6 +853,17 @@ pub struct FactionState {
     pub carry_due: bool,
     /// Whether its plan holds a project that an idle unit could take.
     pub project_due: bool,
+    /// The unit type it would queue, or `None` when it owns no site whose
+    /// queue has room.
+    ///
+    /// The world draws the type before it plans, in the way it chooses the
+    /// objective of a campaign, because the draw reads the unit type table
+    /// and the plan reads no world of its own.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0144, a faction controller runs inside the step and acts only through the caller's verbs, decision D1. `docs/adrs/accepted/adr-0144-a-faction-controller-runs-inside-the-step-and-acts-only-through-the-callers-verbs.md`
+    pub queue_type: Option<UnitTypeId>,
 }
 
 /// The controller state the world holds.
@@ -1170,6 +1231,9 @@ impl Controller {
             if state.project_due {
                 commands.push((faction, self.project_draw_index(), Choice::Project));
             }
+            if let Some(unit_type) = state.queue_type {
+                commands.push((faction, self.queue_draw_index(), Choice::Queue(unit_type)));
+            }
         }
         // The visit order above is fixed, and the sort is what makes the
         // applied order independent of it. The key is unique, because one
@@ -1231,6 +1295,15 @@ impl Controller {
     #[must_use]
     pub const fn project_draw_index(&self) -> u32 {
         self.evaluations + 5
+    }
+
+    /// Returns the draw index of the queue order: one past the project order.
+    ///
+    /// The draw that picks the type is made by the world, at this index, and
+    /// no other draw of this stage takes it.
+    #[must_use]
+    pub const fn queue_draw_index(&self) -> u32 {
+        self.evaluations + 6
     }
 
     /// Reports whether a faction rewrites its board on this tick.

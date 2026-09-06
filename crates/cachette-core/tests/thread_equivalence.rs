@@ -16,15 +16,29 @@
 //! [^2]: Testing policy. `docs/TESTING.md`
 
 use cachette_core::holding::Holder;
+use cachette_core::production::{BuildCostRow, QueueOrder};
+use cachette_core::rates::RateSchedule;
 use cachette_core::resource::{Amount, RecoveryRules, ResourceKind};
 use cachette_core::site::CommodityId;
 use cachette_core::terrain::TileKind;
-use cachette_core::unit_type::{UnitTypeId, UnitTypeRow, WORKER_ROW};
+use cachette_core::unit_type::{UnitTypeId, UnitTypeRow, SOLDIER, WORKER_ROW};
 use cachette_core::upgrade::{UpgradeCategory, UpgradeRow};
 use cachette_core::{Axial, Entity, FactionId, Fix32, Influence, WinPath, World, WorldConfig};
 
 /// The work the wonder scenario of this file asks a wonder for.
 const WONDER_WORK_OF_THE_SCENARIO: u32 = 240;
+
+/// The work one queue entry of the queue scenario needs.
+const QUEUE_WORK_OF_THE_SCENARIO: u32 = 6;
+
+/// The people the queue scenario homes at its site.
+const QUEUE_GROUP_OF_THE_SCENARIO: u32 = 6;
+
+/// The entries the queue scenario pushes. The frames finish two of them.
+const QUEUE_ENTRIES_OF_THE_SCENARIO: u32 = 4;
+
+/// The frames the queue scenario runs.
+const QUEUE_FRAMES: u64 = 14;
 
 /// Returns a worker row that fights with the given attack and armour.
 ///
@@ -160,6 +174,103 @@ fn a_seeded_world_with_the_controller_gives_one_answer_at_every_thread_count() {
         assert_eq!(
             hash, expected_hash,
             "the seeded state hash differs at {threads} threads"
+        );
+    }
+}
+
+/// Runs a world in which one site builds typed units from its queue, and
+/// returns its log and its hash.
+///
+/// The queue is in flight at the end of the run: the site finishes some
+/// entries and still holds one. A run whose queue emptied would compare two
+/// worlds in which nothing was left to differ.[^1]
+///
+/// **The scenario writes its own cost row and its own schedule.** The default
+/// values are placeholders that the balance harness will change, and a
+/// scenario that read them would compare runs in which no entry ever
+/// finishes.[^2]
+///
+/// # References
+///
+/// [^1]: Testing rules, section 2a. `.agents/rules/testing.md`
+/// [^2]: Balance register, the production queue. `docs/reference/balance.md`
+fn run_with_queue(threads: usize) -> (Vec<u8>, u64) {
+    let config = WorldConfig {
+        width: 24,
+        height: 24,
+        seed: 0x0cac_4e77_0497,
+        faction_count: 2,
+        unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
+    };
+    let mut world = World::new(config).expect("the extent must describe a world");
+    world.set_queue_schedule(RateSchedule::new(1, 0).expect("one is inside the range"));
+    world
+        .define_build_cost(
+            SOLDIER.0,
+            BuildCostRow {
+                work: QUEUE_WORK_OF_THE_SCENARIO,
+                people: 1,
+                goods: [Fix32::from_int(2)],
+            },
+        )
+        .expect("the soldier row is inside the table");
+    let grid = world.grid();
+    let place = (0..grid.tile_count())
+        .map(|index| Axial::new((index % grid.width()) as i32, (index / grid.width()) as i32))
+        .find(|address| world.admits_a_unit(*address))
+        .expect("the world holds open ground");
+    let site = world
+        .found_settlement(place, FactionId(0))
+        .expect("the ground admits a city");
+    world
+        .set_settlement_store(site, CommodityId(0), Fix32(2000 << 16))
+        .expect("the good is in the set");
+    for _ in 0..QUEUE_GROUP_OF_THE_SCENARIO {
+        let unit = world
+            .spawn_soldier(place, FactionId(0))
+            .expect("the ground admits a unit");
+        assert!(world.set_home_site(unit, Some(site)), "the site is live");
+    }
+    for _ in 0..QUEUE_ENTRIES_OF_THE_SCENARIO {
+        world
+            .order_site_queue(FactionId(0), site, QueueOrder::Push(SOLDIER))
+            .expect("the queue has room");
+    }
+    for _ in 0..QUEUE_FRAMES {
+        world.step(threads).expect("the step must run");
+    }
+    assert!(
+        world.queue_produced() > 0
+            || world
+                .soldiers()
+                .iter()
+                .any(|unit| world.unit_type(unit) == Some(SOLDIER)),
+        "the scenario finished no entry, so it compares nothing"
+    );
+    assert!(
+        world
+            .site_queue(site)
+            .is_some_and(|queue| !queue.is_empty()),
+        "the scenario left no entry in flight"
+    );
+    (
+        world.event_log_bytes().to_vec(),
+        world.state_hash().finish(),
+    )
+}
+
+#[test]
+fn a_world_with_a_queue_gives_one_answer_at_every_thread_count() {
+    let (expected_log, expected_hash) = run_with_queue(THREAD_COUNTS[0]);
+    for threads in &THREAD_COUNTS[1..] {
+        let (log, hash) = run_with_queue(*threads);
+        assert_eq!(
+            log, expected_log,
+            "the queue event log differs at {threads} threads"
+        );
+        assert_eq!(
+            hash, expected_hash,
+            "the queue state hash differs at {threads} threads"
         );
     }
 }

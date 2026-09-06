@@ -58,6 +58,10 @@ use crate::position::{
     self, Position, PositionError, PositionTable, SitePreference, WORK_COMMODITY,
 };
 use crate::presence::PresenceRelation;
+use crate::production::{
+    BuildCostRow, BuildCostTable, QueueEntry, QueueError, QueueOrder, QueueTable,
+    QUEUE_PERIOD_DEFAULT, QUEUE_PHASE_DEFAULT, WORK_PER_ADVANCE,
+};
 use crate::promotion::{self, PromotionError, UnitPromoted};
 use crate::pyramid::{CellSummary, ExitField, Pyramid, ReturnField, SeededField};
 use crate::rates::{RateError, RateLedger, RateSchedule, RateTable, SiteShortfall};
@@ -87,6 +91,7 @@ use crate::trade::{
 use crate::types::{Accum, Entity, FactionId, Fix32, Tick, TileIdx, FACTION_CEILING};
 use crate::unit_type::{
     UnitTypeError, UnitTypeId, UnitTypeRow, UnitTypeTable, DEFAULT_UNIT_TYPE_TABLE, SOLDIER,
+    UNIT_TYPE_COUNT,
 };
 use crate::upgrade::{
     self, BuildRefusal, UpgradeCategory, UpgradeMap, UpgradeRow, UpgradeSite, UpgradeTable,
@@ -810,6 +815,35 @@ pub struct World {
     ///
     /// [^1]: ADR-0151, an upgrade is a category with a ground fit and a level, decisions D1 and D4. `docs/adrs/draft/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
     upgrade_table: UpgradeTable,
+    /// The build queue of every site, indexed by the slot of the site.
+    ///
+    /// **A site holds a bounded, ordered queue of plain-data entries.** The
+    /// order is the order the entries were queued, and nothing reorders
+    /// them. The whole table enters the state hash.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0158, a site builds a typed unit from a bounded queue its store pays for, decision D1. `docs/adrs/draft/adr-0158-a-site-builds-a-typed-unit-from-a-bounded-queue-its-store-pays-for.md`
+    queues: QueueTable,
+    /// The shared table that a unit type indexes for its build cost.
+    ///
+    /// **The table is data that the world is built with**, in the way the
+    /// unit type table and the upgrade table are. The work that finishes an
+    /// entry is a value of it, and it is never a constant of the kernel.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0158, a site builds a typed unit from a bounded queue its store pays for, decision D3. `docs/adrs/draft/adr-0158-a-site-builds-a-typed-unit-from-a-bounded-queue-its-store-pays-for.md`
+    build_costs: BuildCostTable,
+    /// When the queue advance acts.
+    ///
+    /// The interval is a parameter of the world and never a constant of the
+    /// stage.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0158, a site builds a typed unit from a bounded queue its store pays for, decision D5. `docs/adrs/draft/adr-0158-a-site-builds-a-typed-unit-from-a-bounded-queue-its-store-pays-for.md`
+    queue_schedule: RateSchedule,
     /// One bit for each unit that the last meeting ended.
     ///
     /// The plane is the batch of a structural change, in the way the plane of
@@ -1137,6 +1171,10 @@ impl World {
             //
             // [^1]: ADR-0145, a unit type is a row of capability columns, and zero means cannot, decision D4. `docs/adrs/accepted/adr-0145-a-unit-type-is-a-row-of-capability-columns-and-zero-means-cannot.md`
             unit_types: DEFAULT_UNIT_TYPE_TABLE,
+            queues: QueueTable::new(),
+            build_costs: BuildCostTable::default(),
+            queue_schedule: RateSchedule::new(QUEUE_PERIOD_DEFAULT, QUEUE_PHASE_DEFAULT)
+                .expect("the default period is inside the range"),
             // The world is built with the default upgrade table, so a build
             // order names one of the categories that table holds.[^2]
             //
@@ -1683,6 +1721,9 @@ impl World {
         // reason. A new slot holds no position and the preference that a
         // site starts with.
         self.positions.open_to(self.settlements.slot_count());
+        // The queue table follows the same slot column, for the same reason.
+        // A new slot holds an empty queue.
+        self.queues.open_to(self.settlements.slot_count());
         Ok(settlement)
     }
 
@@ -2023,6 +2064,10 @@ impl World {
         // so its positions go with it and the settlement founded next in
         // that slot does not inherit a staff it never hired.
         self.positions.clear_slot(slot);
+        // A lost settlement takes its queue with it. A block left as it was
+        // would give the settlement founded next in that slot the orders of
+        // the one before it.
+        self.queues.clear_slot(slot);
         // A unit that drew from the lost site now belongs to no site. A home
         // left behind would name the slot, and the settlement founded next
         // in that slot would feed a population it never took.
@@ -3645,6 +3690,16 @@ impl World {
         // whole-world hash covers it. Two worlds that hold the same units and
         // different tables must diverge at the next meeting.
         let hash = self.unit_types.hash_into(hash);
+        // The queue of every site is state that a later frame reads, and the
+        // cost table decides what a later frame does, so both enter. The
+        // schedule decides which ticks act, so it enters too.[^17]
+        //
+        // [^17]: ADR-0158, a site builds a typed unit from a bounded queue its store pays for, decision D1. `docs/adrs/draft/adr-0158-a-site-builds-a-typed-unit-from-a-bounded-queue-its-store-pays-for.md`
+        let hash = self.queues.hash_into(hash);
+        let hash = self.build_costs.hash_into(hash);
+        let hash = hash
+            .write_u64(u64::from(self.queue_schedule.period()))
+            .write_u64(u64::from(self.queue_schedule.phase()));
         // The upgrade table decides what a build order does and what an
         // upgrade changes, so the whole-world hash covers it. Two worlds
         // built with different tables never hash the same.[^5]
@@ -4194,6 +4249,9 @@ impl World {
     ///
     /// [^1]: ADR-0006, an event is plain data and applying it is pure, decision D1. `docs/adrs/accepted/adr-0006-an-event-is-plain-data-and-applying-it-is-pure.md`
     fn check_contest(&self) -> bool {
+        if !self.queues.check_invariants(self.settlements.slot_count()) {
+            return false;
+        }
         if !self.unit_types.check_invariants() {
             return false;
         }
@@ -4803,6 +4861,30 @@ impl World {
         {
             let _span = stage::open(Stage::Reap);
             self.reap(threads)?;
+        }
+
+        // The queue advance runs after the shortage scan and before the
+        // barrier below it. It reads the store, so it runs after the rate
+        // pass and after the consumption pass, which are what move a
+        // quantity in this frame.[^25] It removes a resident and adds a
+        // typed unit, so it is a structural change, and the refresh below is
+        // the barrier of that change.[^26]
+        //
+        // **It runs after the scan and not before it.** The scan holds a
+        // plane of the slots it ends. A stage that freed a slot and filled it
+        // again before the scan applied would give the scan a live unit that
+        // it never marked.
+        //
+        // The stage takes no thread count. It visits the sites and their
+        // entries, and it walks the units once on a tick where an entry
+        // finishes.[^27]
+        //
+        // [^25]: ADR-0062, production and upkeep are rates attached to a site, decision D5. `docs/adrs/accepted/adr-0062-production-and-upkeep-are-rates-attached-to-a-site.md`
+        // [^26]: ADR-0018, the unit-to-tile bridge is derived, and it rebuilds at the barrier, decision D3. `docs/adrs/accepted/adr-0018-the-unit-to-tile-bridge-is-derived-and-rebuilds-at-the-barrier.md`
+        // [^27]: ADR-0158, a site builds a typed unit from a bounded queue its store pays for, decision D5. `docs/adrs/draft/adr-0158-a-site-builds-a-typed-unit-from-a-bounded-queue-its-store-pays-for.md`
+        {
+            let _span = stage::open(Stage::QueueAdvance);
+            self.advance_queues();
         }
         {
             let _span = stage::open(Stage::BridgeRefreshAfterReap);
@@ -7862,6 +7944,443 @@ impl World {
         Ok(())
     }
 
+    /// Returns the queue of one site, in queue position order.
+    ///
+    /// Returns `None` when the identity names no site that stands. The order
+    /// is the order the entries were queued, and nothing reorders them.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0158, a site builds a typed unit from a bounded queue its store pays for, decision D1. `docs/adrs/draft/adr-0158-a-site-builds-a-typed-unit-from-a-bounded-queue-its-store-pays-for.md`
+    #[must_use]
+    pub fn site_queue(&self, site: Entity) -> Option<&[QueueEntry]> {
+        let slot = self.settlements.slot_of(site)?;
+        Some(self.queues.entries_of(slot))
+    }
+
+    /// Orders the queue of one site.
+    ///
+    /// **This is the one verb that reaches a queue.** A Python caller, the
+    /// built-in controller and a learner all call it, and no other path
+    /// writes an entry.[^1] The engine holds the mechanism, the bound and the
+    /// refusals, and it holds no rule about what to queue.
+    ///
+    /// A push puts one entry of the named type at the back. A clear takes the
+    /// entry at one position out and closes the gap, and the work the store
+    /// already paid for is lost.
+    ///
+    /// **Every refusal is counted.** A refused order changes nothing, and the
+    /// count of the refusals sits beside the count of what the queue
+    /// produced, so a watcher reading a queue that never moves can tell the
+    /// two apart.[^2]
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the identity names no site that stands, when the
+    /// site belongs to another faction, when the number names no row of the
+    /// unit type table, when the queue already holds its bound, and when the
+    /// position holds no entry.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0158, a site builds a typed unit from a bounded queue its store pays for, decision D2. `docs/adrs/draft/adr-0158-a-site-builds-a-typed-unit-from-a-bounded-queue-its-store-pays-for.md`
+    /// [^2]: ADR-0158, a site builds a typed unit from a bounded queue its store pays for, decision D6. `docs/adrs/draft/adr-0158-a-site-builds-a-typed-unit-from-a-bounded-queue-its-store-pays-for.md`
+    pub fn order_site_queue(
+        &mut self,
+        faction: FactionId,
+        site: Entity,
+        order: QueueOrder,
+    ) -> Result<(), QueueError> {
+        let outcome = self.take_queue_order(faction, site, order);
+        if outcome.is_err() {
+            self.queues.count_refused_at_the_verb();
+        }
+        outcome
+    }
+
+    /// Takes one queue order, and states every refusal.
+    ///
+    /// The verb above counts what this refuses. The two are apart so that the
+    /// count sits at one place and no path can refuse without counting.
+    fn take_queue_order(
+        &mut self,
+        faction: FactionId,
+        site: Entity,
+        order: QueueOrder,
+    ) -> Result<(), QueueError> {
+        let (Some(slot), Some(owner)) = (
+            self.settlements.slot_of(site),
+            self.settlements.faction(site),
+        ) else {
+            return Err(QueueError::NoSuchSite(site));
+        };
+        if owner != faction {
+            return Err(QueueError::SiteBelongsToAnother {
+                owner,
+                asked: faction,
+            });
+        }
+        self.queues.open_to(self.settlements.slot_count());
+        match order {
+            QueueOrder::Push(unit_type) => {
+                if UnitTypeId::from_u8(unit_type.0).is_none() {
+                    return Err(QueueError::TypeAboveCeiling(unit_type.0));
+                }
+                self.queues.push(slot, unit_type)
+            }
+            QueueOrder::Clear(position) => self.queues.remove(slot, position).map(|_| ()),
+        }
+    }
+
+    /// Returns the build cost row of one unit type.
+    #[must_use]
+    pub const fn build_cost(&self, unit_type: UnitTypeId) -> BuildCostRow {
+        self.build_costs.row(unit_type)
+    }
+
+    /// Writes the build cost row of one unit type.
+    ///
+    /// The costs are data that the world is built with, in the way the unit
+    /// type table and the upgrade table are.[^1]
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the number names no row of the unit type table.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0158, a site builds a typed unit from a bounded queue its store pays for, decision D3. `docs/adrs/draft/adr-0158-a-site-builds-a-typed-unit-from-a-bounded-queue-its-store-pays-for.md`
+    pub const fn define_build_cost(
+        &mut self,
+        unit_type: u8,
+        row: BuildCostRow,
+    ) -> Result<(), QueueError> {
+        self.build_costs.define(unit_type, row)
+    }
+
+    /// Returns the entries one site may hold in its queue.
+    ///
+    /// The bound is a parameter of the world and never a function of the
+    /// population.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0158, a site builds a typed unit from a bounded queue its store pays for, decision D1. `docs/adrs/draft/adr-0158-a-site-builds-a-typed-unit-from-a-bounded-queue-its-store-pays-for.md`
+    #[must_use]
+    pub const fn queue_bound(&self) -> usize {
+        self.queues.bound()
+    }
+
+    /// Sets the entries one site may hold in its queue.
+    ///
+    /// **A bound of zero turns the queue off.** The verb then refuses every
+    /// push, no site holds an entry, and no unit is built. A test that wants
+    /// the engine to leave its units alone sets it.
+    ///
+    /// Returns `false` when the bound is above the width of the stored block,
+    /// which the balance register holds as a row.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: Balance register, the production queue, the queue bound row. `docs/reference/balance.md`
+    pub const fn set_queue_bound(&mut self, bound: usize) -> bool {
+        self.queues.set_bound(bound)
+    }
+
+    /// Returns when the queue advance acts.
+    #[must_use]
+    pub const fn queue_schedule(&self) -> RateSchedule {
+        self.queue_schedule
+    }
+
+    /// Sets when the queue advance acts.
+    pub const fn set_queue_schedule(&mut self, schedule: RateSchedule) {
+        self.queue_schedule = schedule;
+    }
+
+    /// Sets the quantity of one good that one advance of a queue costs.
+    ///
+    /// Returns `false` when the commodity is outside the set.
+    pub fn set_queue_charge(&mut self, commodity: CommodityId, quantity: Fix32) -> bool {
+        self.queues.set_charge(commodity, quantity)
+    }
+
+    /// Returns how many units the queues produced on the last step.
+    #[must_use]
+    pub const fn queue_produced(&self) -> u32 {
+        self.queues.produced()
+    }
+
+    /// Returns how many finished entries the last advance refused, because
+    /// the site held no resident to spend.
+    #[must_use]
+    pub const fn queue_refused_without_a_person(&self) -> u32 {
+        self.queues.refused_without_a_person()
+    }
+
+    /// Returns how many finished entries the last advance refused, because
+    /// the store could not pay the goods.
+    ///
+    /// The two refusals are counted apart, because they mean different things
+    /// to a watcher and to a learner.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0158, a site builds a typed unit from a bounded queue its store pays for, decision D6. `docs/adrs/draft/adr-0158-a-site-builds-a-typed-unit-from-a-bounded-queue-its-store-pays-for.md`
+    #[must_use]
+    pub const fn queue_refused_without_goods(&self) -> u32 {
+        self.queues.refused_without_goods()
+    }
+
+    /// Returns how many queue orders the verb refused since the last advance.
+    #[must_use]
+    pub const fn queue_refused_at_the_verb(&self) -> u32 {
+        self.queues.refused_at_the_verb()
+    }
+
+    /// Reports whether the store of one slot holds every good of a cost.
+    fn store_holds(&self, slot: u32, goods: &[Fix32; COMMODITY_COUNT]) -> bool {
+        let Some(store) = self.settlements.store_column().get(slot as usize) else {
+            return false;
+        };
+        goods.iter().enumerate().all(|(index, wanted)| {
+            store
+                .quantity(CommodityId(index as u16))
+                .is_some_and(|held| held.0 >= wanted.0)
+        })
+    }
+
+    /// Takes every good of a cost out of the store of one slot.
+    ///
+    /// The caller reads the store first, so no subtract here goes below zero.
+    /// The write goes through the one path that keeps the account of the
+    /// stores, so the conservation check still balances.
+    fn take_from_store(&mut self, slot: u32, goods: &[Fix32; COMMODITY_COUNT]) {
+        for (index, wanted) in goods.iter().enumerate() {
+            let commodity = CommodityId(index as u16);
+            let Some(held) = self
+                .settlements
+                .store_column()
+                .get(slot as usize)
+                .and_then(|store| store.quantity(commodity))
+            else {
+                continue;
+            };
+            self.set_store_quantity(slot, commodity, sim_math::sub(held, *wanted));
+        }
+    }
+
+    /// Advances the front entry of every queue, and applies what finished.
+    ///
+    /// # Where it runs, and why
+    ///
+    /// The stage runs after the shortage scan of this frame and before the
+    /// barrier that follows it. It reads the store, so it runs after the rate
+    /// pass and after the consumption pass, which are what move a quantity
+    /// into and out of a store in this frame.[^1] [^2] It removes units and
+    /// adds units, so it is a structural change, and the barrier below it is
+    /// the barrier of that change.[^3]
+    ///
+    /// **It runs after the shortage scan and not before it.** The scan holds
+    /// a plane of the slots it ends. A stage that freed a slot and filled it
+    /// again before the scan applied would give the scan a live unit that it
+    /// never marked.
+    ///
+    /// # The cost
+    ///
+    /// The first pass visits the sites and their front entries, so its cost
+    /// follows the site count and never the population.[^4] **The second pass
+    /// walks the unit arena once, and only on a tick where an entry
+    /// finishes.** A finished entry must name the residents it takes, the
+    /// residence of a unit is the home column it carries, and the engine
+    /// stores no list of the residents of a site.[^5] One walk for the whole
+    /// tick is the shape the controller stage already uses when it buckets
+    /// the units of a faction for one command.[^6]
+    ///
+    /// # The order
+    ///
+    /// The first pass runs in site slot order. The second walks the units in
+    /// ascending slot order and keeps the lowest slots of each site, so the
+    /// residents an entry takes are fixed by the arena and not by a thread.
+    /// The third applies in site slot order and then in queue position
+    /// order.[^7]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0062, production and upkeep are rates attached to a site, decision D5. `docs/adrs/accepted/adr-0062-production-and-upkeep-are-rates-attached-to-a-site.md`
+    /// [^2]: ADR-0063, a need is a rate with a threshold, and crossing it is a fact, decision D5. `docs/adrs/accepted/adr-0063-a-need-is-a-rate-with-a-threshold-and-crossing-it-is-a-fact.md`
+    /// [^3]: ADR-0018, the unit-to-tile bridge is derived, and it rebuilds at the barrier, decision D3. `docs/adrs/accepted/adr-0018-the-unit-to-tile-bridge-is-derived-and-rebuilds-at-the-barrier.md`
+    /// [^4]: ADR-0096, cost follows the lattice, not the population, decision D1. `docs/adrs/draft/adr-0096-cost-follows-the-lattice-not-the-population.md`
+    /// [^5]: ADR-0157, a site's free places are its built housing less the residents the engine already counts, decision D3. `docs/adrs/accepted/adr-0157-a-sites-free-places-are-its-built-housing-less-the-residents-the-engine-counts.md`
+    /// [^6]: ADR-0144, a faction controller runs inside the step and acts only through the caller's verbs, decision D1. `docs/adrs/accepted/adr-0144-a-faction-controller-runs-inside-the-step-and-acts-only-through-the-callers-verbs.md`
+    /// [^7]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
+    fn advance_queues(&mut self) {
+        // The counts are a census of one tick, and this stage is where the
+        // tick starts for them.
+        self.queues.clear_counts();
+        if !self.queue_schedule.due(self.tick) {
+            return;
+        }
+        self.queues.open_to(self.settlements.slot_count());
+        let charge = *self.queues.charge();
+
+        // Pass one. The sites, in slot order, and one front entry each.
+        let mut finished: Vec<(u32, QueueEntry)> = Vec::new();
+        for slot in 0..self.settlements.slot_count() {
+            if self.settlements.entity_at(slot).is_none() {
+                continue;
+            }
+            let Some(mut entry) = self.queues.front(slot) else {
+                continue;
+            };
+            let work = self.build_costs.row(entry.unit_type).work;
+            if entry.work < work {
+                // **A queue is never free, and the store pays as the entry
+                // advances.** A site whose store cannot pay makes no
+                // progress, and its entry stays where it is. An entry that
+                // has already reached its work costs nothing further,
+                // because only an advance charges.[^8]
+                //
+                // [^8]: ADR-0158, a site builds a typed unit from a bounded queue its store pays for, decision D3. `docs/adrs/draft/adr-0158-a-site-builds-a-typed-unit-from-a-bounded-queue-its-store-pays-for.md`
+                if !self.store_holds(slot, &charge) {
+                    continue;
+                }
+                self.take_from_store(slot, &charge);
+                // The accumulator is a whole number and it is clamped at the
+                // work the entry needs, so a long build carries no credit
+                // into the next entry.
+                entry.work = entry.work.saturating_add(WORK_PER_ADVANCE).min(work);
+                self.queues.set_front(slot, entry);
+            }
+            if entry.work >= work {
+                finished.push((slot, entry));
+            }
+        }
+        if finished.is_empty() {
+            return;
+        }
+
+        // Pass two. One walk of the unit arena for the whole tick, which
+        // buckets the residents of every site that finished an entry.
+        let mut place = vec![usize::MAX; self.settlements.slot_count() as usize];
+        for (index, (slot, _)) in finished.iter().enumerate() {
+            place[*slot as usize] = index;
+        }
+        let mut residents: Vec<Vec<Entity>> = vec![Vec::new(); finished.len()];
+        {
+            let homes = self.soldiers.home_column();
+            let owners = self.soldiers.faction_column();
+            let live = self.soldiers.live_column();
+            let sites = self.settlements.faction_column();
+            for slot in 0..homes.len() {
+                if live[slot] != 1 || homes[slot] == NO_HOME {
+                    continue;
+                }
+                let Some(index) = place.get(homes[slot] as usize).copied() else {
+                    continue;
+                };
+                if index == usize::MAX {
+                    continue;
+                }
+                let (site_slot, entry) = finished[index];
+                if sites[site_slot as usize] != owners[slot] {
+                    continue;
+                }
+                let people = self.build_costs.row(entry.unit_type).people as usize;
+                if residents[index].len() >= people {
+                    continue;
+                }
+                let generation = self.soldiers.generation_of(slot as u32);
+                if let Some(unit) = Entity::new(slot as u32, generation) {
+                    residents[index].push(unit);
+                }
+            }
+        }
+
+        // Pass three. The completions apply in site slot order.
+        for (index, (slot, entry)) in finished.iter().copied().enumerate() {
+            let row = self.build_costs.row(entry.unit_type);
+            // **A finished entry is refused when the site holds no spare
+            // person or cannot pay the goods.** It is refused and not
+            // discarded: the entry stays at the front of the queue. The two
+            // reasons are counted apart.[^9]
+            //
+            // [^9]: ADR-0158, a site builds a typed unit from a bounded queue its store pays for, decisions D4 and D6. `docs/adrs/draft/adr-0158-a-site-builds-a-typed-unit-from-a-bounded-queue-its-store-pays-for.md`
+            if residents[index].len() < row.people as usize {
+                self.queues.count_without_a_person();
+                continue;
+            }
+            if !self.store_holds(slot, &row.goods) {
+                self.queues.count_without_goods();
+                continue;
+            }
+            let Some(site) = self.settlements.entity_at(slot) else {
+                continue;
+            };
+            let (Some(address), Some(faction)) = (
+                self.settlements.address(site),
+                self.settlements.faction(site),
+            ) else {
+                continue;
+            };
+            let taken = std::mem::take(&mut residents[index]);
+            // **The unit that leaves and the unit that arrives hold distinct
+            // identities**, so no reader confuses the two. The world removes
+            // each resident through its own despawn, which accounts for what
+            // the unit carried, so conservation still balances.[^10]
+            //
+            // The despawns run before the spawn, so the arena holds a free
+            // slot whatever its capacity. The spawn can therefore refuse only
+            // when the row takes no person at all, and the balance register
+            // fixes the people of every row above zero.[^11]
+            //
+            // [^10]: ADR-0072, a tile stock is generated, and only what was taken is stored, decision D5. `docs/adrs/accepted/adr-0072-a-tile-stock-is-generated-and-only-what-was-taken-is-stored.md`
+            // [^11]: Balance register, the production queue, the people row. `docs/reference/balance.md`
+            for unit in &taken {
+                self.despawn_soldier(*unit);
+            }
+            let Ok(made) = self.spawn_soldier(address, faction) else {
+                debug_assert!(
+                    taken.is_empty(),
+                    "a despawn frees a slot, so a spawn after one cannot refuse"
+                );
+                continue;
+            };
+            self.soldiers.set_unit_type(made, entry.unit_type);
+            self.set_home_site(made, Some(site));
+            self.take_from_store(slot, &row.goods);
+            let popped = self.queues.remove(slot, 0);
+            debug_assert!(popped.is_ok(), "the front entry was read above");
+            self.queues.count_produced();
+        }
+
+        // The cohort table summarises the home column, and this stage changed
+        // that column. A table left stale would state a headcount that no
+        // unit backs, and the invariant check refuses that state.[^12]
+        //
+        // [^12]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`
+        self.cohorts.rebuild(
+            self.soldiers.home_column(),
+            self.soldiers.faction_column(),
+            self.soldiers.live_column(),
+            self.settlements.slot_count(),
+        );
+    }
+
+    /// Returns the lowest-slot site of one faction whose queue has room.
+    ///
+    /// The scan walks the settlements in slot order and no unit, so its cost
+    /// follows the site count.
+    fn controller_queue_site(&self, faction: FactionId) -> Option<Entity> {
+        (0..self.settlements.slot_count())
+            .find(|slot| {
+                self.settlements.entity_at(*slot).is_some()
+                    && self.settlements.faction_column()[*slot as usize] == faction
+                    && self.queues.len_of(*slot) < self.queues.bound()
+            })
+            .and_then(|slot| self.settlements.entity_at(slot))
+    }
+
     /// Ends every unit that the shortage marked, in ascending slot order.
     ///
     /// The mark pass writes one bit for each unit into a dense plane, and
@@ -10792,6 +11311,16 @@ impl World {
             }
             self.solve_plan(faction);
         }
+        // The rows the unit type table fills. A row whose every column is
+        // zero can do nothing, so the controller does not offer it. The list
+        // is read from the table, and no rule here names a type.[^10]
+        //
+        // [^10]: ADR-0158, a site builds a typed unit from a bounded queue its store pays for, decision D2. `docs/adrs/draft/adr-0158-a-site-builds-a-typed-unit-from-a-bounded-queue-its-store-pays-for.md`
+        let offered: Vec<UnitTypeId> = (0..UNIT_TYPE_COUNT)
+            .map(|index| UnitTypeId(index as u8))
+            .filter(|unit_type| self.unit_types.row(*unit_type) != UnitTypeRow::NONE)
+            .collect();
+        let queue_draw = self.controller.queue_draw_index();
         let due = self.controller.board_due(tick);
         let states: Vec<FactionState> = (0..factions)
             .map(|index| {
@@ -10812,6 +11341,20 @@ impl World {
                     // [^9]: ADR-0152, a faction plans its roads and zones with one solver, decision D5. `docs/adrs/accepted/adr-0152-a-faction-plans-its-roads-and-zones-with-one-solver.md`
                     project_due: !self.plan.projects_of(faction).is_empty()
                         && objectives.get(index).copied().flatten().is_none(),
+                    // A faction that owns no site with room in its queue
+                    // queues nothing. The type comes from one keyed draw over
+                    // the rows the table fills.[^10]
+                    queue_type: if self.controller_queue_site(faction).is_some() {
+                        controller::queued_type_of(
+                            self.config.seed,
+                            tick,
+                            faction,
+                            queue_draw,
+                            &offered,
+                        )
+                    } else {
+                        None
+                    },
                 }
             })
             .collect();
@@ -10871,6 +11414,18 @@ impl World {
                 Choice::Trade => self.controller_trade_step(faction),
                 Choice::Carry => self.controller_carriers(faction),
                 Choice::Project => self.controller_take_projects(faction),
+                // The queue order goes through the one verb a Python caller
+                // calls. The site is the lowest-slot site of the faction
+                // whose queue has room, and the verb counts a refusal.[^11]
+                //
+                // [^11]: ADR-0158, a site builds a typed unit from a bounded queue its store pays for, decisions D2 and D6. `docs/adrs/draft/adr-0158-a-site-builds-a-typed-unit-from-a-bounded-queue-its-store-pays-for.md`
+                Choice::Queue(unit_type) => {
+                    let site = self.controller_queue_site(faction);
+                    site.is_some_and(|site| {
+                        self.order_site_queue(faction, site, QueueOrder::Push(unit_type))
+                            .is_ok()
+                    })
+                }
             };
             let applied = u8::from(applied);
             sets[usize::from(faction.0)] = set;
