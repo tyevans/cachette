@@ -165,8 +165,14 @@ Whether it settles is one of its evaluations, drawn from the keyed generator
 like every other choice it makes.[^19] A settle command the verb refuses is
 dropped and counted.[^18]
 
-The settler survives the founding. Whether founding costs the unit is a game
-value, and a later record may change it without touching the verb.
+The founding spends the settler. The verb removes the unit after the
+settlement stands, and it seats the group the settle column names in its
+place. A settler that survived would found a city, walk past the founding
+distance, and found again without limit, so the cost is what bounds the
+number of cities a faction takes from one unit.
+
+The size of that group is a game value, and the balance register holds the
+row.[^26] A later record may change the value without touching the verb.
 
 The verb that founds a settlement at an address, with no unit, stays for the
 seeding layer. It founds the first city of a faction before any settler exists.

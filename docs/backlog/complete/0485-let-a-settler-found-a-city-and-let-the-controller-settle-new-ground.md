@@ -1,10 +1,10 @@
 ---
 id: 0485
 title: Let a settler found a city and let the controller settle new ground
-status: proposed
+status: complete
 created: 2026-09-05
 implements: [ADR-0150 D5, ADR-0145 D1, ADR-0145 D2, ADR-0144 D2, ADR-0144 D4, ADR-0076 D1, ADR-0003 D1]
-changes: []
+changes: [ADR-0150 D5]
 creates: []
 serves: [PRD-0054, PRD-0012]
 blocked-by: [BLK-050]
@@ -86,11 +86,73 @@ one, it names item 0497.
 
 ## Done when
 
-Stated when the item is refined.
+- The unit type table holds a settle column, and zero in it means the type
+  founds no city.
+- One verb founds a city from a set of units, and every refusal it makes is a
+  named outcome.
+- The controller holds a settle option, and a run of the demonstration world
+  founds cities that the seeding did not.
+- The production queue reaches a settler with no change of its own.
+- The two determinism tests pass at one, two and twelve threads.
 
 ## Outcome
 
-Filled in when the item moves to `complete/`.
+### What was built
+
+**The settle column.** The unit type row gains `settle_group`, a whole number.
+Zero means the type founds no city. A value above zero is the group that a
+founding by a unit of this type seats at the new city. The default table gains
+the settler row at index four, and the open row moves to index five. The row
+goes from eight columns to nine, and it still holds no padding.
+
+**The verb.** `settle_set` takes a set of units and answers each one. For a
+unit whose settle column is above zero it founds a settlement on the tile the
+unit stands on, for the faction of the unit, and it then removes the unit. The
+Python boundary calls it `order_settle`, and the call returns the number of
+cities it founded.
+
+**The refusals**, each a named variant: no such unit, not a settler, outside
+the world, a faction the world does not hold, ground a faction holds, a
+settlement already standing, ground that admits nobody, and a place inside the
+founding distance. A refused unit changes nothing and keeps its life.
+
+**The controller option.** The weight vector gains a fifth weight, settle. The
+choice set gains one command at the draw index past the queue order. A faction
+that holds a settler draws once for it, biased by that weight, and a refused
+command is counted.
+
+**The settlers.** The production queue needed no change. The controller offers
+every filled row of the unit type table to its type draw, and the build cost
+table holds one placeholder row for every type, so the settler row became a
+buildable type the moment the table held it.
+
+### How the founding distance is honoured
+
+The verb derives the place of every settlement that stands and hands the list
+to the survey the seeding uses.[^12] That survey holds the one comparison
+against the minimum founding distance in the tree. The verb reads the
+`separated` flag of the candidate for the distance refusal, so no second copy
+of the rule exists.
+
+### The record that changed
+
+ADR-0150 D5 said that the settler survives the founding, and named the cost as
+a game value. The project owner asked that the founding spend it. The record is
+a draft, and D5 now states that the founding spends the settler and seats the
+group the column names.[^13] A settler that survived would found a city, walk
+past the founding distance, and found again without limit.
+
+### Left undone
+
+- **The census row `settlements_founded` was not added.** The census table is
+  held by another worker in this session, and the item forbade the edit. The
+  count is readable today through the settlement count and through the
+  controller log.
+- **No balance row was written.** The register is held by another worker. Three
+  rows need an edit: the default table row, now six rows by nine columns; the
+  weight vector range, now five weights; and a new row for the settle group.
+- The question of a row named `cities` beside `settlements` is unanswered. The
+  code adds no second count.
 
 ## References
 
@@ -105,3 +167,5 @@ Filled in when the item moves to `complete/`.
 [^9]: Balance register, the controller. `docs/reference/balance.md`
 [^10]: Findings register, FND-320. `docs/FINDINGS.md`
 [^11]: Backlog item 0497. `docs/backlog/complete/0497-build-a-per-site-production-queue-that-spends-a-person-and-goods.md`
+[^12]: The founding survey, and the places a founding keeps its distance from. `crates/cachette-core/src/founding.rs`
+[^13]: ADR-0150, held ground is the ground within reach of a city its faction owns, decision D5. `docs/adrs/draft/adr-0150-held-ground-is-the-ground-within-reach-of-a-city-its-faction-owns.md`
