@@ -8922,14 +8922,17 @@ fn update_range(tick: Tick, seed: u64, mut chunk: TileValueChunk<'_>) -> ChunkRe
 /// The number of people each faction founds with when the seeding layer
 /// founds the run.
 ///
-/// **This is a provisional value and not a measured one.** The balance
-/// register holds the row, marks it unset, and records how this value was
-/// chosen.[^1]
+/// **This is a set value and not a measured one.** The project owner set it.
+/// The balance register holds the row, marks it unset, and records who set
+/// this value and when.[^1]
+///
+/// **The Python binding reads this constant for its own default.** The
+/// binding declares no number of its own, so the two cannot disagree.
 ///
 /// # References
 ///
 /// [^1]: Balance register, the founding group. `docs/reference/balance.md`
-pub const FOUNDING_GROUP_DEFAULT: u32 = 64;
+pub const FOUNDING_GROUP_DEFAULT: u32 = 2;
 
 /// The number of luxury deposits the seeding layer places.
 ///
