@@ -1,7 +1,7 @@
 ---
 id: 0084
 title: Give a tile one faction column
-status: refined
+status: complete
 created: 2026-08-31
 implements: [ADR-0053 D2, ADR-0006 D1, ADR-0011 D3, ADR-0001 D4, ADR-0022 D1]
 changes: []

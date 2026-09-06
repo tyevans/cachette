@@ -1,7 +1,7 @@
 ---
 id: 0088
 title: Promote a soldier into the character tier
-status: proposed
+status: complete
 created: 2026-08-31
 implements: []
 changes: []
