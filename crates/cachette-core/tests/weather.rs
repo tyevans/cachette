@@ -351,7 +351,11 @@ fn cold_ground_takes_more_out_of_the_air_than_warm_ground() {
             continue;
         };
         // The air met no cooling on the way, so this reads the cell alone.
-        let numerator = weather::fall_numerator(weather::heat_of(summary), 0);
+        // The world runs at the level 1 weather pitch, so the ground under a
+        // weather cell is the ground under the level 1 cell of the same
+        // index. The two fold the same three fields over the same tiles.
+        let ground = weather::CellGround::from_summary(summary);
+        let numerator = weather::fall_numerator(weather::heat_of(ground), 0);
         lowest = lowest.min(numerator);
         highest = highest.max(numerator);
     }
@@ -645,7 +649,7 @@ fn the_solve_runs_a_fixed_number_of_passes() {
     }
     assert_eq!(
         world.weather().passes(),
-        frames * u64::from(weather::PASSES_FOR_EACH_SOLVE),
+        frames * u64::from(weather::WeatherScale::LEVEL_1.transport_passes()),
         "the solve did not run the fixed count on every frame"
     );
 }
@@ -684,10 +688,10 @@ fn the_temperature_of_one_cell_changes_over_a_run() {
 #[test]
 fn the_season_is_keyed_on_the_tick() {
     let width = 16;
-    let early = weather::season_at(Tick(0), 0, width);
+    let early = weather::season_at(Tick(0), 0, width, weather::WeatherScale::LEVEL_1);
     let mut moved = false;
     for tick in 1..512u64 {
-        if weather::season_at(Tick(tick), 0, width) != early {
+        if weather::season_at(Tick(tick), 0, width, weather::WeatherScale::LEVEL_1) != early {
             moved = true;
             break;
         }
@@ -704,7 +708,7 @@ fn the_season_is_keyed_on_the_tick() {
 fn the_season_varies_across_the_lattice_at_one_tick() {
     let width = 16;
     let readings: Vec<i32> = (0..width)
-        .map(|at| weather::season_at(Tick(0), at, width))
+        .map(|at| weather::season_at(Tick(0), at, width, weather::WeatherScale::LEVEL_1))
         .collect();
     let low = readings.iter().copied().min().unwrap_or(0);
     let high = readings.iter().copied().max().unwrap_or(0);
@@ -720,7 +724,9 @@ fn the_warm_centre_of_the_season_travels_across_the_lattice() {
     let width = 16;
     let warmest = |tick: u64| {
         (0..width)
-            .max_by_key(|at| weather::season_at(Tick(tick), *at, width))
+            .max_by_key(|at| {
+                weather::season_at(Tick(tick), *at, width, weather::WeatherScale::LEVEL_1)
+            })
             .unwrap_or(0)
     };
     let mut visited: Vec<u32> = Vec::new();

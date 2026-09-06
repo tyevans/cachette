@@ -529,7 +529,10 @@ fn a_faction_that_crossed_can_found_on_the_ground_it_reached() {
     let survey = world
         .survey_places(&[place], GROUP, &[seat])
         .expect("the survey must run");
-    println!("the survey ranks it eligible: {:?}", survey.chosen().is_some());
+    println!(
+        "the survey ranks it eligible: {:?}",
+        survey.chosen().is_some()
+    );
 
     let founded = world.found_settlement(place, ISLAND);
     assert!(
