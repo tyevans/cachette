@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-485**
+**Next number: FND-486**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -10578,6 +10578,40 @@ drops.[^F484G] BLK-130 already holds the quantity at which ground counts as
 wet, so the measurement is evidence for that row and not a new question.[^F484E]
 
 
+### FND-485 — A store reader was called with a slot index, and the seeding verb gives no identity
+
+**Believed.** A readability report finds that the site economy reader refuses
+every slot index from 0 to 3 on a seeded world. It concludes that the control
+plane cannot read a store at all.[^F485A]
+
+**True.** The reader is right to refuse. It takes the whole identity of a
+settlement, and it resolves that identity against the arena that minted
+it.[^F485B] A slot index is not an identity. Three calls hand a caller a real
+one. The founding verb that takes addresses returns a column of
+identities.[^F485C] The founding group report carries the identity in its site
+column, and its own text says that the column is not a slot index.[^F485C] The
+shortfall log and the ration log carry it in the same way.[^F485C] A caller
+that holds one of those reads the store.
+
+**The narrower claim is true.** The seeding verb gives back one report for each
+faction, and that report holds the place, the people and the refusal. It holds
+no identity.[^F485D] The demonstration builds its world with that verb and with
+no other.[^F485E] So a world that the seeding built hands the control plane
+nothing that the reader accepts.
+
+**Evidence.** The reader resolves the identity and raises when it names no live
+site.[^F485B] The type stub states the return of the founding verb and the
+meaning of every site column.[^F485C] The report of the seeding verb holds
+thirteen keys and no site key.[^F485D] The demonstration calls the seeding verb
+in one place and calls no founding verb.[^F485E]
+
+**Follows.** The defect the report ranks stands, and its statement narrows. The
+reader is correct, the caller passed the wrong index, and the gap is that the
+seeding verb names no settlement. A backlog item holds the work.[^F485F] It
+serves the product record that asks a developer to set what a settlement holds
+and to read the value back.[^F485G]
+
+
 ## References
 
 [^F443A]: Review of backlog item 0390, section 5. `docs/reviews/0390-the-fallen-log.md`
@@ -10591,6 +10625,13 @@ wet, so the measurement is evidence for that row and not a new question.[^F484E]
 [^F472A]: ADR-0085, an entity crosses to Python as one opaque identity that the engine resolves, decision D3. `docs/adrs/accepted/adr-0085-an-entity-crosses-to-python-as-one-opaque-identity.md`
 [^F472C]: Decisions register, DEC-266. `docs/DECISIONS.md`
 [^F473A]: Blockers register, BLK-150. `docs/BLOCKERS.md`
+[^F485A]: Research report 24, demonstration readability, resources and weather, section 7. `docs/research/reports/24-demonstration-readability-resources-and-weather.md`
+[^F485B]: The site economy reader of the bindings. `crates/cachette-py/src/lib.rs`
+[^F485C]: The type stub of the compiled module, the founding verbs and the site columns. `python/cachette/_core.pyi`
+[^F485D]: The type stub of the compiled module, the founding report of the seeding verb. `python/cachette/_core.pyi`
+[^F485E]: The demonstration application, the seeding call. `python/cachette/demo/app.py`
+[^F485F]: Backlog item 0490, let the control plane read the store of a seeded settlement. `docs/backlog/proposed/0490-let-the-control-plane-read-the-store-of-a-seeded-settlement.md`
+[^F485G]: PRD-0047, a game states its own economy. `docs/product/shaped/prd-0047-a-game-states-its-own-economy.md`
 [^F484A]: ADR-0146, a faction relation is one signed integer per ordered pair and a pass reads a threshold, decision D3. `docs/adrs/accepted/adr-0146-a-faction-relation-is-one-signed-integer-per-ordered-pair-and-a-pass-reads-a-threshold.md`
 [^F484B]: ADR-0142, a god inflicts weather only on ground its own faction holds, decision D1. `docs/adrs/draft/adr-0142-a-god-inflicts-weather-only-on-ground-it-holds.md`
 [^F484C]: The relation module, the storm step of the relation rules. `crates/cachette-core/src/relation.rs`
