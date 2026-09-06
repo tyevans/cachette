@@ -48,7 +48,7 @@ rate of zero means the unit cannot build.[^12]
 **Changes.** None. No record said what a unit does after it takes a build
 order, so nothing had to be superseded.
 
-**Creates.** ADR-0165, a build order holds a unit on its tile, and the hold is
+**Creates.** ADR-0168, a build order holds a unit on its tile, and the hold is
 derived and never stored. The registry row was allocated before the file was
 written.[^13]
 
@@ -121,6 +121,6 @@ the reading, and FND-550 holds the correction to FND-545.
 [^13]: ADR Registry. `docs/adrs/REGISTRY.md`
 [^14]: Backlog item 0039, a rejected unit is not stuck. `docs/backlog/proposed/0039-a-rejected-unit-is-not-stuck.md`
 [^15]: Recurring defect shapes, shape 1. `.agents/rules/recurring-defects.md`
-[^16]: ADR-0165, a build order holds a unit on its tile, and the hold is derived and never stored, the alternatives. `docs/adrs/draft/adr-0165-a-build-order-holds-a-unit-on-its-tile.md`
+[^16]: ADR-0168, a build order holds a unit on its tile, and the hold is derived and never stored, the alternatives. `docs/adrs/draft/adr-0168-a-build-order-holds-a-unit-on-its-tile.md`
 [^17]: Findings register, FND-549. `docs/FINDINGS.md`
 [^18]: Findings register, FND-550. `docs/FINDINGS.md`

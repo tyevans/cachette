@@ -1,7 +1,7 @@
 ---
 id: 0498
 title: Give the upgrade table a housing category
-status: complete
+status: proposed
 created: 2026-09-05
 implements: [ADR-0151, ADR-0157, ADR-0152, ADR-0159]
 changes: []

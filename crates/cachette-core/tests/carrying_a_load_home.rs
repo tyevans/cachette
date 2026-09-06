@@ -355,7 +355,7 @@ fn the_step_of_a_laden_unit_follows_the_return_field() {
         //
         // [^3]: ADR-0125, the control plane names the seed set of a destination field, decision D3. `docs/adrs/draft/adr-0125-the-control-plane-names-the-seed-set-of-a-destination-field.md`
         // [^4]: Findings register, FND-496. `docs/FINDINGS.md`
-        // [^7]: ADR-0165, a build order holds a unit on its tile, and the hold is derived and never stored, decision D1. `docs/adrs/draft/adr-0165-a-build-order-holds-a-unit-on-its-tile.md`
+        // [^7]: ADR-0168, a build order holds a unit on its tile, and the hold is derived and never stored, decision D1. `docs/adrs/draft/adr-0168-a-build-order-holds-a-unit-on-its-tile.md`
         let freed: Vec<cachette_core::types::Entity> =
             expected.iter().map(|(unit, _, _)| *unit).collect();
         world.stop_sending(&freed).expect("every identity is live");

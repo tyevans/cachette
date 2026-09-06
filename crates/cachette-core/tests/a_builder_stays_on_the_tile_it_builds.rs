@@ -23,7 +23,7 @@
 //! # References
 //!
 //! [^1]: ADR-0151, an upgrade is a category with a ground fit and a level, decisions D1 and D2. `docs/adrs/accepted/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
-//! [^2]: ADR-0165, a build order holds a unit on its tile, and the hold is derived and never stored, decisions D1, D2 and D3. `docs/adrs/draft/adr-0165-a-build-order-holds-a-unit-on-its-tile.md`
+//! [^2]: ADR-0168, a build order holds a unit on its tile, and the hold is derived and never stored, decisions D1, D2 and D3. `docs/adrs/draft/adr-0168-a-build-order-holds-a-unit-on-its-tile.md`
 //! [^3]: Testing rules, section 5. `.agents/rules/testing.md`
 //! [^4]: Testing rules, section 2a. `.agents/rules/testing.md`
 
@@ -290,7 +290,7 @@ fn a_unit_that_adds_no_work_is_never_held() {
     // it.[^2]
     //
     // [^1]: ADR-0152, a faction plans its roads and zones with one solver, decision D5. `docs/adrs/accepted/adr-0152-a-faction-plans-its-roads-and-zones-with-one-solver.md`
-    // [^2]: ADR-0165, a build order holds a unit on its tile, and the hold is derived and never stored, decision D3. `docs/adrs/draft/adr-0165-a-build-order-holds-a-unit-on-its-tile.md`
+    // [^2]: ADR-0168, a build order holds a unit on its tile, and the hold is derived and never stored, decision D3. `docs/adrs/draft/adr-0168-a-build-order-holds-a-unit-on-its-tile.md`
     let tile = a_tile_a_free_unit_leaves();
     let (mut world, unit) = a_worker_on_a_zoned_road(tile);
     assert!(

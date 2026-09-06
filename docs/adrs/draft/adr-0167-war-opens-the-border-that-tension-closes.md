@@ -1,4 +1,4 @@
-# ADR-0165: War opens the border that tension closes
+# ADR-0167: War opens the border that tension closes
 
 ## Context
 

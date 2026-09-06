@@ -24,7 +24,7 @@
 //! # References
 //!
 //! [^1]: ADR-0153, a tile's lease follows the units that stand on it, decisions D1, D2, D3, D4 and D5. `docs/adrs/accepted/adr-0153-a-tiles-lease-follows-the-units-that-stand-on-it.md`
-//! [^2]: ADR-0165, war opens the border that tension closes, decision D1. `docs/adrs/draft/adr-0165-war-opens-the-border-that-tension-closes.md`
+//! [^2]: ADR-0167, war opens the border that tension closes, decision D1. `docs/adrs/draft/adr-0167-war-opens-the-border-that-tension-closes.md`
 //! [^3]: Findings register, FND-542. `docs/FINDINGS.md`
 //! [^4]: Testing rules, section 2a. `.agents/rules/testing.md`
 //! [^5]: Testing rules, section 5. `.agents/rules/testing.md`

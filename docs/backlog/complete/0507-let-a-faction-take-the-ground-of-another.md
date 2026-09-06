@@ -1,7 +1,7 @@
 ---
 id: 0507
 title: Let a faction take the ground of another
-status: proposed
+status: complete
 created: 2026-09-05
 implements: []
 changes: [ADR-0150, ADR-0148, ADR-0146]

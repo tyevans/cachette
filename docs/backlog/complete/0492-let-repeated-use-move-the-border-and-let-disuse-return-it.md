@@ -1,7 +1,7 @@
 ---
 id: 0492
 title: Let repeated use move the border, and let disuse return it
-status: proposed
+status: complete
 created: 2026-09-05
 implements: [ADR-0153 D1, ADR-0153 D2, ADR-0153 D3, ADR-0153 D4, ADR-0153 D5, ADR-0153 D7]
 changes: [ADR-0150 D1]

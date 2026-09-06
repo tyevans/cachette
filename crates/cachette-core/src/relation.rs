@@ -450,7 +450,7 @@ impl RelationMatrix {
     /// # References
     ///
     /// [^1]: Balance register, the band below which a holder refuses a guest. `docs/reference/balance.md`
-    /// [^2]: ADR-0165, war opens the border that tension closes, decision D1. `docs/adrs/draft/adr-0165-war-opens-the-border-that-tension-closes.md`
+    /// [^2]: ADR-0167, war opens the border that tension closes, decision D1. `docs/adrs/draft/adr-0167-war-opens-the-border-that-tension-closes.md`
     #[must_use]
     pub fn refuses_guest(&self, holder: FactionId, guest: FactionId) -> bool {
         if holder == guest {

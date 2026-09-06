@@ -1,5 +1,5 @@
 ---
-id: 0508
+id: 0514
 title: Let a faction found a city and let a city fall
 status: proposed
 created: 2026-09-06

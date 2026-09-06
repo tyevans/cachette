@@ -22,8 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-552**
-**Next number: FND-551**
+**Next number: FND-554**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -13152,7 +13151,7 @@ constant and the two scripts. The commit body holds the search command.
 **What follows.** The binding now exposes the bar, and each script reads it.
 One declaration site remains. This is one more local instance of the first
 recurring defect shape.[^F526A]
-### FND-548 — The offset space of a block is the square of the block edge, and a fixture over interior blocks alone hides that
+### FND-552 — The offset space of a block is the square of the block edge, and a fixture over interior blocks alone hides that
 **Believed.** A block of the lattice holds as many tile offsets as it holds
 tiles. The first observation container therefore sized every scratch bitmap and
 every payload by the tile count of the block.
@@ -13296,7 +13295,7 @@ run, because no work would ever finish the site under it. The clause that
 excludes it is the only thing that bounds the hold, and a test goes red when it
 is removed.
 
-### FND-550 — The seed sweep table of FND-545 does not reproduce at the tree that recorded it
+### FND-553 — The seed sweep table of FND-545 does not reproduce at the tree that recorded it
 
 **Believed.** A sweep of 200 seeds of the demonstration world, 800 ticks each,
 finished no project at 19 of them, 1 to 3 at 52, 4 to 7 at 55, 8 to 15 at 60,
@@ -13419,7 +13418,7 @@ after, on one machine.
 [^F545C]: Backlog item 0505. `docs/backlog/complete/0505-keep-a-builder-on-the-tile-it-builds-until-the-work-is-done.md`
 [^F545D]: ADR-0152, a faction plans its roads and zones with one solver, decision D3. `docs/adrs/accepted/adr-0152-a-faction-plans-its-roads-and-zones-with-one-solver.md`
 [^F549A]: Findings register, FND-545. `docs/FINDINGS.md`
-[^F549C]: ADR-0165, a build order holds a unit on its tile, and the hold is derived and never stored, decisions D1, D2 and D3. `docs/adrs/draft/adr-0165-a-build-order-holds-a-unit-on-its-tile.md`
+[^F549C]: ADR-0168, a build order holds a unit on its tile, and the hold is derived and never stored, decisions D1, D2 and D3. `docs/adrs/draft/adr-0168-a-build-order-holds-a-unit-on-its-tile.md`
 
 [^F546A]: The founding survey and the eligibility of a candidate. `crates/cachette-core/src/founding.rs`
 [^F546C]: Balance register, the founding group. `docs/reference/balance.md`

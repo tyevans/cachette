@@ -10050,7 +10050,7 @@ const fn build_contribution(row: crate::unit_type::UnitTypeRow) -> i64 {
 ///
 /// # References
 ///
-/// [^1]: ADR-0165, a build order holds a unit on its tile, and the hold is derived, decisions D1, D2 and D3. `docs/adrs/draft/adr-0165-a-build-order-holds-a-unit-on-its-tile.md`
+/// [^1]: ADR-0168, a build order holds a unit on its tile, and the hold is derived, decisions D1, D2 and D3. `docs/adrs/draft/adr-0168-a-build-order-holds-a-unit-on-its-tile.md`
 /// [^2]: ADR-0091, movement takes its direction from a per-cell field, never from a per-unit search, decision D1. `docs/adrs/draft/adr-0091-movement-takes-its-direction-from-a-per-cell-field.md`
 /// [^3]: ADR-0152, a faction plans its roads and zones with one solver, decision D5. `docs/adrs/accepted/adr-0152-a-faction-plans-its-roads-and-zones-with-one-solver.md`
 fn build_holds_unit(
@@ -10407,7 +10407,7 @@ fn soldier_moves(
                         // send that outranked the hold would walk the builder
                         // off the tile it was sent to.[^22]
                         //
-                        // [^22]: ADR-0165, a build order holds a unit on its tile, and the hold is derived, decisions D1, D2 and D3. `docs/adrs/draft/adr-0165-a-build-order-holds-a-unit-on-its-tile.md`
+                        // [^22]: ADR-0168, a build order holds a unit on its tile, and the hold is derived, decisions D1, D2 and D3. `docs/adrs/draft/adr-0168-a-build-order-holds-a-unit-on-its-tile.md`
                         // [^23]: Findings register, FND-545. `docs/FINDINGS.md`
                         if build_holds_unit(
                             *soldier,

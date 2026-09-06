@@ -4486,7 +4486,7 @@ exactly so that a caller cannot build a wrong one.[^DEC120C]
 [^DEC238A]: ADR-0141, a weather pass moves water and never scales it, decision D2. `docs/adrs/draft/adr-0141-a-weather-pass-moves-water-and-never-scales-it.md`
 [^D143A]: ADR-0151, an upgrade is a category with a ground fit and a level, decisions D1 and D6. `docs/adrs/accepted/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
 [^D143B]: Backlog item 0486. `docs/backlog/complete/0486-turn-the-upgrade-kind-into-a-table-of-category-ground-fit-and-level.md`
-[^DEC274A]: ADR-0165, a build order holds a unit on its tile, and the hold is derived and never stored, decision D1. `docs/adrs/draft/adr-0165-a-build-order-holds-a-unit-on-its-tile.md`
+[^DEC274A]: ADR-0168, a build order holds a unit on its tile, and the hold is derived and never stored, decision D1. `docs/adrs/draft/adr-0168-a-build-order-holds-a-unit-on-its-tile.md`
 [^DEC274B]: ADR-0063, a need is a rate with a threshold, and crossing it is a fact, decisions D1 and D4. `docs/adrs/accepted/adr-0063-a-need-is-a-rate-with-a-threshold-and-crossing-it-is-a-fact.md`
 [^DEC273SA]: The demonstration, which draws a seed when the watcher names none. `python/cachette/demo/app.py`
 [^DEC273SB]: The tests of a playable seeded world. `crates/cachette-core/tests/a_seeded_world_is_playable.rs`
