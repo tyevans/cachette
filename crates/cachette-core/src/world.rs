@@ -92,8 +92,8 @@ use crate::trade::{
 };
 use crate::types::{Accum, Entity, FactionId, Fix32, Tick, TileIdx, FACTION_CEILING};
 use crate::unit_type::{
-    UnitTypeError, UnitTypeId, UnitTypeRow, UnitTypeTable, DEFAULT_UNIT_TYPE_TABLE, SOLDIER,
-    UNIT_TYPE_COUNT,
+    UnitTypeError, UnitTypeId, UnitTypeRow, UnitTypeTable, DEFAULT_UNIT_TYPE_TABLE, LEADER,
+    SOLDIER, UNIT_TYPE_COUNT,
 };
 use crate::upgrade::{
     self, BuildRefusal, UpgradeCategory, UpgradeMap, UpgradeRow, UpgradeSite, UpgradeTable,
@@ -9361,6 +9361,33 @@ impl World {
         );
     }
 
+    /// Reports whether a faction already has a leader on order.
+    ///
+    /// A leader is a unit whose type row carries a command reach above zero.
+    /// The scan walks the queue of every site of the faction, so its cost
+    /// follows the site count and the queue bound, and never the
+    /// population.[^1]
+    ///
+    /// The gate reads the type column and no per-faction flag, in the way
+    /// every other reader of the capability does.[^2]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0096, cost follows the lattice, not the population, decision D1. `docs/adrs/draft/adr-0096-cost-follows-the-lattice-not-the-population.md`
+    /// [^2]: ADR-0145, a unit type is a row of capability columns, and zero means cannot, decision D3. `docs/adrs/accepted/adr-0145-a-unit-type-is-a-row-of-capability-columns-and-zero-means-cannot.md`
+    fn leader_is_on_order(&self, faction: FactionId) -> bool {
+        let sites = self.settlements.faction_column();
+        (0..self.settlements.slot_count()).any(|slot| {
+            self.settlements.entity_at(slot).is_some()
+                && sites[slot as usize] == faction
+                && self
+                    .queues
+                    .entries_of(slot)
+                    .iter()
+                    .any(|entry| self.unit_types.row(entry.unit_type).command_reach > 0)
+        })
+    }
+
     /// Returns the lowest-slot site of one faction whose queue has room.
     ///
     /// The scan walks the settlements in slot order and no unit, so its cost
@@ -11604,10 +11631,21 @@ impl World {
         // The lowest identities among the idle units. The arena walks in
         // slot order, and the sort puts the generation above the slot, so
         // the choice is a property of the identities and not of the slots.
+        //
+        // **A unit that carries command reach is never taken.** The raise
+        // retypes the cohort to the soldier row, and the soldier row carries
+        // no command reach, so a raise that swept up the one leader of a
+        // faction spent the very unit that lets the faction declare a war.
+        // The faction would then march once and never again.
+        let leads = |unit: &Entity| {
+            self.soldiers
+                .unit_type(*unit)
+                .is_some_and(|unit_type| self.unit_types.row(unit_type).command_reach > 0)
+        };
         let mut idle: Vec<Entity> = self
             .soldiers
             .iter_faction(faction)
-            .filter(|unit| self.soldiers.sent(*unit) == Some(None))
+            .filter(|unit| self.soldiers.sent(*unit) == Some(None) && !leads(unit))
             .collect();
         idle.sort_unstable_by_key(|unit| unit.to_bits());
         // **The raise takes the number of units it asks for.** The project
@@ -11623,7 +11661,7 @@ impl World {
             let mut walking: Vec<Entity> = self
                 .soldiers
                 .iter_faction(faction)
-                .filter(|unit| self.soldiers.sent(*unit) == Some(Some(plane)))
+                .filter(|unit| self.soldiers.sent(*unit) == Some(Some(plane)) && !leads(unit))
                 .collect();
             walking.sort_unstable_by_key(|unit| unit.to_bits());
             idle.extend_from_slice(&walking);
@@ -12712,7 +12750,24 @@ impl World {
                     // A faction that owns no site with room in its queue
                     // queues nothing. The type comes from one keyed draw over
                     // the rows the table fills.[^10]
-                    queue_type: if self.controller_queue_site(faction).is_some() {
+                    //
+                    // **A faction with no speaker queues a leader instead of
+                    // the draw.** Command reach sits on the leader row alone,
+                    // and a faction with no unit that carries it moves no
+                    // relation. It therefore never reaches the war band, never
+                    // gets an objective, and never marches. The draw offers a
+                    // leader one time in four, so a faction could run a whole
+                    // game without one.
+                    //
+                    // The want is not a standing rule. It falls away as soon
+                    // as a leader stands or a leader is on order, so a faction
+                    // that has one queues by the draw again.
+                    queue_type: self.controller_queue_site(faction).and_then(|_| {
+                        if speakers.get(index).copied().flatten().is_none()
+                            && !self.leader_is_on_order(faction)
+                        {
+                            return Some(LEADER);
+                        }
                         controller::queued_type_of(
                             self.config.seed,
                             tick,
@@ -12720,9 +12775,7 @@ impl World {
                             queue_draw,
                             &offered,
                         )
-                    } else {
-                        None
-                    },
+                    }),
                 }
             })
             .collect();
