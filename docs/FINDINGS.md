@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-541**
+**Next number: FND-542**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -12094,6 +12094,44 @@ compared the front matter status against the directory was written instead. It
 catches the adjacent shape, and it found two items that had moved to `complete/`
 and still declared an open status.[^F540F]
 
+### FND-541 — Shape 3 has local instances, and the shape 1 instance is wider than the item that named it
+
+**Believed.** Recurring defect shape 3, inert code that nothing invokes, had no
+local instance. The rule marks its provenance as imported, and an imported
+shape is a prior rather than evidence.[^F498G]
+
+**True.** The engine holds at least two. A backlog audit found them in two
+separate batches, and neither worker was looking for a pattern.
+
+**Evidence.** A public relabel pass walks the descent forest and derives every
+label from the parent edges. Its only caller is its own integration test. The
+step never runs it, so a label the engine answers with is the label the last
+test left.[^F541B] A public resource reader takes a tile, a kind and a tick.
+Nothing calls it, in the engine, in the bindings, or in a test. The live route
+is the same reader without the tick, and that one has six callers.[^F541C]
+
+**Shape 1 has a wider instance than the item that named it.** The engine coerces
+the faction count to at least one at the point of use, rather than once through
+a reader. An item records the shape and names nine call sites. The file it names
+holds seventeen, and the tree holds thirty-one.[^F541D] No reader answers the
+effective count, so each site declares the rule again.
+
+**Follows.** Three things.
+
+**Shape 3 is now local, and the rule says so.** A shape with local evidence
+outranks a prior, and a reviewer who reads "imported" weighs it too lightly.
+
+**A test that drives a mechanism is not evidence that anything reaches it.** The
+relabel pass has tests that pass. They construct the arena and call the pass, so
+they prove the pass works and say nothing about the engine.[^F541E]
+
+**No check was written for shape 3, and the reason is the bindings.** A public
+function with no caller outside its own tests is mechanically detectable in
+Rust. It is not a defect on its own. The binding surface exists to be called
+from outside the tree, and a reader the control plane will call tomorrow is
+correct today. A check that cannot tell those apart would fire on the whole
+public interface, and everyone would learn to ignore it.
+
 ## References
 
 [^F540A]: Commit 79d17eb, give the panel one standard, a deck, and a clock the watcher drives.
@@ -12101,6 +12139,10 @@ and still declared an open status.[^F540F]
 [^F540C]: Findings register, FND-526, in this document.
 [^F540D]: Commit Message Rules, what belongs in the body. `.agents/rules/commits.md`
 [^F540F]: The backlog check script. `scripts/check_backlog.py`
+[^F541B]: Backlog item 0226, give the relabel pass a caller in the step. `docs/backlog/proposed/0226-give-the-relabel-pass-a-caller-in-the-step.md`
+[^F541C]: Backlog item 0135, drive or retire the deposit amount reader. `docs/backlog/proposed/0135-drive-or-retire-the-deposit-amount-reader.md`
+[^F541D]: Backlog item 0145, give the faction count one rule for zero. `docs/backlog/proposed/0145-give-the-faction-count-one-rule-for-zero.md`
+[^F541E]: Testing Rules, section 5. `.agents/rules/testing.md`
 [^F490A]: Balance register, the founding group, the base reach and the campaign cohort size. `docs/reference/balance.md`
 [^F491A]: ADR-0152, a faction plans its roads and zones with one solver, decision D2. `docs/adrs/accepted/adr-0152-a-faction-plans-its-roads-and-zones-with-one-solver.md`
 [^F493A]: ADR-0152, a faction plans its roads and zones with one solver, decision D5. `docs/adrs/accepted/adr-0152-a-faction-plans-its-roads-and-zones-with-one-solver.md`
