@@ -18,9 +18,10 @@
 
 use cachette_core::luxury::LuxuryId;
 use cachette_core::resource::ResourceKind;
-use cachette_core::upgrade::UpgradeCategory;
+use cachette_core::upgrade::{UpgradeCategory, UPGRADE_LEVEL_COUNT};
 use cachette_core::{Axial, Entity, FactionId, Holder, World, WorldConfig};
 use cachette_view::hud::TileReadout;
+use cachette_view::overlay;
 use cachette_view::paint;
 use cachette_view::paint::{tile_rect, Camera, Canvas};
 
@@ -858,5 +859,398 @@ fn a_deposit_marks_the_corner_of_its_tile() {
         read(without),
         paint::resource_pip_colour(ResourceKind::Stone),
         "a tile that carries no stone must mark nothing at {without:?}"
+    );
+}
+
+/// What a fixture builds toward on one tile.
+///
+/// The work is the work that must stand in the entry when the fixture stops.
+/// It separates a site that stands at a level from a site of the same level
+/// that somebody is raising to the next one.
+#[derive(Clone, Copy)]
+struct Target {
+    /// The category the builder is ordered to build.
+    category: UpgradeCategory,
+    /// The level that must stand on the tile.
+    level: u8,
+    /// The work that must stand toward the level above.
+    work: i64,
+}
+
+impl Target {
+    /// Returns a target of one level with no work toward the next.
+    const fn standing(category: UpgradeCategory, level: u8) -> Self {
+        Self {
+            category,
+            level,
+            work: 0,
+        }
+    }
+
+    /// Reports whether a world has reached this target on one tile.
+    fn reached(self, world: &World, address: Axial) -> bool {
+        world.upgrade_at(address).is_some_and(|site| {
+            site.level > self.level || (site.level == self.level && site.progress.0 >= self.work)
+        })
+    }
+}
+
+/// Builds two worlds that differ in one tile and in nothing else.
+///
+/// **Both worlds step the same number of ticks.** A world stopped at an
+/// earlier tick than the other would differ in the weather, in the holding
+/// and in where every unit stands, and the picture of the tile would then
+/// carry those differences as well as the site. Each world stops its own
+/// build when it reaches its target and keeps stepping.
+///
+/// The builder is moved off the tile in both worlds, because the disc of a
+/// unit is wider than the mark of a site and would cover it.
+///
+/// Returns the two worlds and the tile they built on.
+fn two_sites(one: Target, other: Target) -> (World, World, Axial) {
+    let (world, soldiers) = a_held_band();
+    let builder = a_builder(&world, &soldiers);
+    let address = world
+        .soldiers()
+        .address(builder)
+        .expect("the builder stands on a tile of the world");
+    // A tile outside the band, which no unit of the fixture stands on.
+    let aside = (0..EXTENT as i32)
+        .map(|column| Axial::new(column, 0))
+        .find(|at| world.admits_a_unit(*at))
+        .expect("the world holds open ground outside the band");
+    let mut first = world.clone();
+    let mut second = world;
+    let mut builders = [builder, builder];
+    // A plan holds one project for each tile, so each world zones the
+    // category it is about to build and never the other one.
+    for (world, target) in [(&mut first, one), (&mut second, other)] {
+        world
+            .zone_project(FactionId(0), address, target.category)
+            .expect("the plan takes the project");
+    }
+    let mut ticks = 0;
+    loop {
+        let done = [
+            one.reached(&first, address),
+            other.reached(&second, address),
+        ];
+        // **A builder stands on the tile and takes the order each tick.** A
+        // unit that finished a level walks away, a unit that walked away adds
+        // no work, and a unit of this fixture can die of what the band does
+        // to it. A fixture that ordered once therefore waits for ever at the
+        // level it reached.
+        for (index, world) in [&mut first, &mut second].into_iter().enumerate() {
+            if done[index] {
+                world.stop_build(builders[index]);
+                continue;
+            }
+            let target = if index == 0 { one } else { other };
+            builders[index] = press_a_builder(world, builders[index], address, target.category);
+        }
+        if done[0] && done[1] {
+            break;
+        }
+        assert!(ticks < 400, "the fixture never reached both targets");
+        first.step(1).expect("the step must run");
+        second.step(1).expect("the step must run");
+        ticks += 1;
+    }
+    for (index, world) in [&mut first, &mut second].into_iter().enumerate() {
+        world
+            .place_soldier(builders[index], aside)
+            .expect("the tile aside admits the unit");
+        world.rebuild_bridge(1).expect("the bridge rebuilds");
+    }
+    (first, second, address)
+}
+
+/// Puts a live builder of the first faction on one tile and orders the build.
+///
+/// Returns the builder, which is the one the caller named while it lives and
+/// a new unit once it dies.
+fn press_a_builder(
+    world: &mut World,
+    builder: Entity,
+    address: Axial,
+    category: UpgradeCategory,
+) -> Entity {
+    let builder = match world.soldiers().address(builder) {
+        Some(_) => builder,
+        None => world
+            .spawn_soldier(address, FactionId(0))
+            .expect("the tile admits a unit"),
+    };
+    world
+        .place_soldier(builder, address)
+        .expect("the tile admits the builder");
+    world.rebuild_bridge(1).expect("the bridge rebuilds");
+    world
+        .order_build(builder, category)
+        .expect("the engine takes the order");
+    builder
+}
+
+/// Returns every pixel of one tile, in row order.
+fn tile_block(canvas: &Canvas, camera: Camera, address: Axial) -> Vec<u32> {
+    let (left, top, wide, tall) = tile_rect(camera, address);
+    (top..top + tall)
+        .flat_map(|row| (left..left + wide).map(move |column| (column, row)))
+        .map(|(column, row)| pixel(canvas, column, row))
+        .collect()
+}
+
+/// Asserts that two worlds draw one tile apart, and that they draw it alike
+/// when the site is taken off it.
+///
+/// The second half is what makes the first half mean something. Two worlds
+/// that differ anywhere else at that tile would draw it apart whatever the
+/// site did.
+fn the_site_is_the_only_difference(one: &World, other: &World, address: Axial, why: &str) {
+    let camera = camera_at(one, address, SITE_TILE);
+    let mut bare_one = one.clone();
+    let mut bare_other = other.clone();
+    assert!(bare_one.destroy_upgrade(address));
+    assert!(bare_other.destroy_upgrade(address));
+    assert_eq!(
+        tile_block(&drawn_at(&bare_one, address, SITE_TILE), camera, address),
+        tile_block(&drawn_at(&bare_other, address, SITE_TILE), camera, address),
+        "the two worlds differ at {address:?} in more than the site, so {why} \
+         proves nothing"
+    );
+    assert_ne!(
+        tile_block(&drawn_at(one, address, SITE_TILE), camera, address),
+        tile_block(&drawn_at(other, address, SITE_TILE), camera, address),
+        "{why}"
+    );
+}
+
+#[test]
+fn two_levels_of_one_category_draw_apart() {
+    // **The level had no channel of its own.** The wash carries the build
+    // progress, and a road that stands at level 1 with no work toward level 2
+    // washes at the same weight as a road at the top of its category, so the
+    // two drew one picture.[^7]
+    //
+    // [^7]: ADR-0151, an upgrade is a category with a ground fit and a level, decision D5. `docs/adrs/draft/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
+    let (lower, higher, address) = two_sites(
+        Target::standing(UpgradeCategory::ROAD, 1),
+        Target::standing(UpgradeCategory::ROAD, 2),
+    );
+    assert_eq!(
+        lower.upgrade_at(address).map(|site| site.level),
+        Some(1),
+        "the lower world does not stand at level 1"
+    );
+    assert_eq!(
+        higher.upgrade_at(address).map(|site| site.level),
+        Some(2),
+        "the higher world does not stand at level 2"
+    );
+    the_site_is_the_only_difference(
+        &lower,
+        &higher,
+        address,
+        "a level 1 road draws as a level 2 road",
+    );
+}
+
+#[test]
+fn two_categories_at_one_level_draw_apart() {
+    let (road, terrace, address) = two_sites(
+        Target::standing(UpgradeCategory::ROAD, 1),
+        Target::standing(UpgradeCategory::TERRACE, 1),
+    );
+    for (world, category) in [
+        (&road, UpgradeCategory::ROAD),
+        (&terrace, UpgradeCategory::TERRACE),
+    ] {
+        assert_eq!(
+            world
+                .upgrade_at(address)
+                .map(|site| (site.category, site.level)),
+            Some((category, 1)),
+            "the fixture did not stand {category:?} at level 1"
+        );
+    }
+    the_site_is_the_only_difference(
+        &road,
+        &terrace,
+        address,
+        "a level 1 road draws as a level 1 terrace",
+    );
+}
+
+/// The work that stands in an entry that somebody is raising.
+///
+/// It is below the work of the level above, so the entry is still at the
+/// lower level when the fixture stops.
+const WORK_UNDER_WAY: i64 = 4;
+
+#[test]
+fn a_site_under_work_draws_apart_from_one_that_stands_at_the_same_level() {
+    // A site under work and a site that stands are two states of one tile,
+    // and the wash weight is what separates them at a level that stands.
+    let (resting, rising, address) = two_sites(
+        Target::standing(UpgradeCategory::ROAD, 1),
+        Target {
+            category: UpgradeCategory::ROAD,
+            level: 1,
+            work: WORK_UNDER_WAY,
+        },
+    );
+    assert_eq!(
+        resting.upgrade_at(address).map(|site| site.progress.0),
+        Some(0),
+        "the resting world holds work toward the level above"
+    );
+    assert!(
+        rising
+            .upgrade_at(address)
+            .is_some_and(|site| site.level == 1 && site.progress.0 >= WORK_UNDER_WAY),
+        "the rising world does not hold a level 1 road under work"
+    );
+    the_site_is_the_only_difference(
+        &resting,
+        &rising,
+        address,
+        "a road nobody is raising draws as a road somebody is raising",
+    );
+}
+
+#[test]
+fn every_category_the_table_holds_draws_a_shape_of_its_own() {
+    // **A shape and not a colour.** Every category already draws in a colour
+    // of its own, so a test that compares the pixels of two tiles passes
+    // while two categories share one shape. This test compares the set of
+    // pixels each mark covers, which is the shape alone. The wall and the
+    // open category shared one shape under that reading.[^7]
+    let (world, soldiers) = a_held_band();
+    let builder = a_builder(&world, &soldiers);
+    let address = world
+        .soldiers()
+        .address(builder)
+        .expect("the builder stands somewhere");
+    let aside = (0..EXTENT as i32)
+        .map(|column| Axial::new(column, 0))
+        .find(|at| world.admits_a_unit(*at))
+        .expect("the world holds open ground outside the band");
+    let ground = world
+        .tile_kind(address)
+        .expect("the builder stands on a tile of the world");
+    let buildable: Vec<UpgradeCategory> = UpgradeCategory::ALL
+        .into_iter()
+        .filter(|category| {
+            world
+                .upgrade_table()
+                .row(*category, 1)
+                .is_some_and(|row| row.fits(ground))
+        })
+        .collect();
+    assert!(
+        buildable.len() > 1,
+        "the ground {ground:?} fits fewer than two categories, so this test \
+         compares nothing"
+    );
+
+    let camera = camera_at(&world, address, SITE_TILE);
+    let bare = tile_block(&drawn_at(&world, address, SITE_TILE), camera, address);
+    let mut shapes = Vec::new();
+    for category in buildable {
+        let mut building = world.clone();
+        building
+            .zone_project(FactionId(0), address, category)
+            .expect("the plan takes the project");
+        building
+            .order_build(builder, category)
+            .expect("the engine takes the order");
+        building.step(1).expect("the step must run");
+        building
+            .place_soldier(builder, aside)
+            .expect("the tile aside admits the unit");
+        building.rebuild_bridge(1).expect("the bridge rebuilds");
+        assert!(
+            building
+                .upgrade_at(address)
+                .is_some_and(|site| site.category == category),
+            "the order for {category:?} placed no site at {address:?}"
+        );
+        let block = tile_block(&drawn_at(&building, address, SITE_TILE), camera, address);
+        // The shape is where the mark covers the ground, and never which
+        // colour it covers it with.
+        let shape: Vec<bool> = block
+            .iter()
+            .zip(bare.iter())
+            .map(|(mark, ground)| mark != ground)
+            .collect();
+        assert!(
+            shape.iter().any(|covered| *covered),
+            "the mark of {category:?} covered nothing"
+        );
+        shapes.push((category, shape));
+    }
+    for (first, one) in shapes.iter().enumerate() {
+        for other in shapes.iter().skip(first + 1) {
+            assert_ne!(
+                one.1, other.1,
+                "the shape of {:?} draws as the shape of {:?}",
+                one.0, other.0
+            );
+        }
+    }
+}
+
+/// The value the upgrade overlay paints at a tile that carries nothing.
+const NOTHING_BUILT: i64 = 0;
+
+#[test]
+fn the_upgrade_overlay_reads_the_level_and_not_the_category() {
+    // **The overlay called the category ordinal a level.** A road is category
+    // zero and a terrace is category one, so a level 2 road painted as the
+    // first step of the ramp and a level 1 terrace painted as the second. The
+    // overlay named the level in its own key and drew the category.[^7]
+    let (road, terrace, address) = two_sites(
+        Target::standing(UpgradeCategory::ROAD, 2),
+        Target::standing(UpgradeCategory::TERRACE, 1),
+    );
+    let layer = overlay::named("upgrade").expect("the deck registers the upgrade overlay");
+    let value = |world: &World, at: Axial| overlay::value_of(layer, world, at, None);
+
+    assert_eq!(
+        value(&road, address),
+        i64::from(road.upgrade_at(address).expect("a road stands").level) + 1,
+        "the overlay does not read the level of the entry"
+    );
+    assert_eq!(
+        value(&road, address),
+        3,
+        "a level 2 road does not paint at the top of the ramp"
+    );
+    assert_eq!(
+        value(&terrace, address),
+        2,
+        "a level 1 terrace does not paint at the first standing step"
+    );
+    assert!(
+        value(&road, address) > value(&terrace, address),
+        "the overlay does not put a level 2 road above a level 1 terrace"
+    );
+
+    // The span scales against the table and not against the category count.
+    let span = layer.span(&road);
+    assert_eq!(
+        span.high,
+        i64::try_from(UPGRADE_LEVEL_COUNT).expect("the level count is small") + 1,
+        "the overlay does not scale against the level count of the table"
+    );
+
+    // A tile that carries nothing paints nothing, so a watcher tells a bare
+    // tile from a first build.
+    let mut bare = road.clone();
+    assert!(bare.destroy_upgrade(address));
+    assert_eq!(
+        value(&bare, address),
+        NOTHING_BUILT,
+        "the overlay paints a tile that carries no upgrade"
     );
 }
