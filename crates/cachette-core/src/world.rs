@@ -600,6 +600,38 @@ impl WorldConfig {
     ///
     /// [^1]: Blockers register, BLK-007. `docs/BLOCKERS.md`
     pub const DEFAULT_DESTINATION_COUNT: u16 = 4;
+
+    /// The destination planes that one faction climbs at the same time.
+    ///
+    /// A faction climbs three planes, and none of the three may yield to
+    /// another. The first carries its campaign, its carriers and its project
+    /// order, which already take turns among themselves. The second carries a
+    /// crossing, because a faction on an island that waits for its war to end
+    /// waits for a war it cannot reach. The third carries a settling, because
+    /// a faction fights for most of a run and a settler that waits for the
+    /// war to end never founds anything.
+    ///
+    /// **This is a structural property of the controller and not a budget.**
+    /// It counts the purposes the controller sends units for, and each of the
+    /// three is a purpose that stands in the code.
+    pub const PLANES_FOR_ONE_FACTION: u16 = 3;
+
+    /// Returns the destination planes that a world of this shape holds.
+    ///
+    /// The count gives each faction the planes it climbs at the same time,
+    /// and it never falls below the count a caller that states no faction
+    /// gets. A caller may raise it or lower it afterwards.
+    #[must_use]
+    pub const fn destination_plane_count(&self) -> u16 {
+        let wanted = self
+            .faction_count
+            .saturating_mul(Self::PLANES_FOR_ONE_FACTION);
+        if wanted > Self::DEFAULT_DESTINATION_COUNT {
+            wanted
+        } else {
+            Self::DEFAULT_DESTINATION_COUNT
+        }
+    }
 }
 
 impl Default for WorldConfig {
@@ -1323,9 +1355,9 @@ impl World {
             pyramid: Pyramid::new(layout, ResourceField::new(terrain))?,
             exits: ExitField::new(cell_lattice),
             returns: ReturnField::new(cell_lattice, config.faction_count),
-            destinations: SeededField::new(cell_lattice, WorldConfig::DEFAULT_DESTINATION_COUNT),
-            destination_seeds: vec![Vec::new(); WorldConfig::DEFAULT_DESTINATION_COUNT as usize],
-            destination_crossings: vec![0; WorldConfig::DEFAULT_DESTINATION_COUNT as usize],
+            destinations: SeededField::new(cell_lattice, config.destination_plane_count()),
+            destination_seeds: vec![Vec::new(); config.destination_plane_count() as usize],
+            destination_crossings: vec![0; config.destination_plane_count() as usize],
             carry_mark: CARRY_MARK_DEFAULT,
             holding: Holding::new(layout),
             luxuries: LuxuryField::new(),
@@ -10684,6 +10716,14 @@ struct ContractDelivery {
 /// [^1]: ADR-0075, the founding choice reads a bounded sample of the world, decision D1. `docs/adrs/accepted/adr-0075-the-founding-choice-reads-a-bounded-sample-of-the-world.md`
 const CROSSING_SURVEY_GROUP: u32 = 1;
 
+/// The group the settling survey asks a place to hold.
+///
+/// The survey scores a place against the group that would live there, and the
+/// settle verb seats the group the settle column of the type names. The
+/// target choice asks for the smallest group the survey admits, because a
+/// place the smallest group cannot take is a place no settler can found on.
+const SETTLING_SURVEY_GROUP: u32 = 1;
+
 /// Returns the neighbour a unit steps onto, or nothing when the ground there
 /// refuses it.
 ///
@@ -13126,6 +13166,151 @@ impl World {
         self.send_units_to(&set, &[address], plane).is_ok()
     }
 
+    /// Returns the destination plane that one faction settles on.
+    ///
+    /// **The settling takes a plane of its own, and it never shares one.** A
+    /// campaign, a carrier and a project order all climb the plane whose
+    /// number is the faction number, and a crossing climbs the plane above
+    /// those. A settling cannot yield to a campaign: a faction fights for
+    /// most of a run, so a settler that waits for the war to end never founds
+    /// anything, and the capability then ships inert.
+    ///
+    /// The settling plane of a faction is its number raised by twice the
+    /// faction count, so no faction takes the plane of another, no settling
+    /// takes the plane of a march, and no settling takes the plane of a
+    /// crossing. A world with too few planes for that answers nothing, and
+    /// the faction founds only where a settler already stands.
+    ///
+    /// Returns `None` when the world holds no such plane.
+    fn settling_plane_of(&self, faction: FactionId) -> Option<u16> {
+        let above = self.config.faction_count.max(1).checked_mul(2)?;
+        let plane = faction.0.checked_add(above)?;
+        (plane < self.destinations.plane_count()).then_some(plane)
+    }
+
+    /// Returns the settlers of one faction, in a fixed order.
+    ///
+    /// A settler is a unit whose type row holds a settle column above zero.
+    /// The gate reads that column and never a type index, so no rule here
+    /// names a type.[^1]
+    ///
+    /// The walk is over the units of the faction, and the answer is sorted on
+    /// the identity bits, so the order is the same at every thread count.[^2]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0145, a unit type is a row of capability columns, and zero means cannot, decision D2. `docs/adrs/accepted/adr-0145-a-unit-type-is-a-row-of-capability-columns-and-zero-means-cannot.md`
+    /// [^2]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
+    fn settlers_of(&self, faction: FactionId) -> Vec<Entity> {
+        let mut units: Vec<Entity> = self
+            .soldiers
+            .iter_faction(faction)
+            .filter(|unit| {
+                self.soldiers
+                    .unit_type(*unit)
+                    .is_some_and(|unit_type| self.unit_types.row(unit_type).settle_group > 0)
+            })
+            .collect();
+        units.sort_unstable_by_key(|unit| unit.to_bits());
+        units
+    }
+
+    /// Returns the tile that one faction would send its settlers at, or
+    /// nothing.
+    ///
+    /// **The choice reads the same bounded sample the founding choice
+    /// reads.** It draws a fixed number of candidate places and reads a fixed
+    /// number of tiles around each, so its cost does not grow with the
+    /// world.[^1]
+    ///
+    /// The places the faction already holds are the places taken, so the
+    /// sample offers ground at least the founding distance away from every
+    /// site the faction owns. The settle verb applies the same distance rule
+    /// again when the settler arrives, so a place that became too near while
+    /// the settler walked is still refused.[^2]
+    ///
+    /// The order takes the best eligible candidate rather than refusing the
+    /// sample, because the answer names a place to walk to and not a place to
+    /// seat a group. The candidates are ordered on a total key, so the first
+    /// eligible one is a property of the sample and not of the draw
+    /// order.[^3]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0075, the founding choice reads a bounded sample of the world, decision D1. `docs/adrs/accepted/adr-0075-the-founding-choice-reads-a-bounded-sample-of-the-world.md`
+    /// [^2]: ADR-0076, a founding keeps a fixed distance from the foundings before it, decision D1. `docs/adrs/accepted/adr-0076-a-founding-keeps-a-fixed-distance-from-the-foundings-before-it.md`
+    /// [^3]: ADR-0004, iteration order is explicit, decision D4. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
+    fn settling_target(&self, faction: FactionId) -> Option<Axial> {
+        // The walk is over the settlement slots in ascending order, so the
+        // list of taken places is a property of the arena and not of a visit
+        // order.
+        let taken: Vec<Axial> = self
+            .settlements
+            .iter()
+            .filter(|site| self.settlements.faction(*site) == Some(faction))
+            .filter_map(|site| self.settlements.address(site))
+            .collect();
+        let survey = self
+            .survey_founding_apart(SETTLING_SURVEY_GROUP, faction, &taken)
+            .ok()?;
+        let tile = survey
+            .candidates()
+            .iter()
+            .find(|candidate| candidate.is_eligible())
+            .map(|candidate| candidate.tile())?;
+        self.grid.address_of(tile)
+    }
+
+    /// Founds a city from every settler of one faction that stands on ground
+    /// a city may take, and sends the rest at ground worth founding on.
+    ///
+    /// **A settler that never walks is inert.** A site builds a settler
+    /// inside the ground its own faction holds, and the settle verb refuses
+    /// held ground, so a settler that stays where it was built never founds
+    /// anything.[^1] The order therefore does two things, and which one a
+    /// settler gets depends on where it stands.
+    ///
+    /// The founding is tried first, over every settler of the faction, so a
+    /// settler that has arrived founds on the tick it arrives. The order
+    /// sends the settlers only when no founding was made, so a settler that
+    /// stands on a place a city may take is never walked away from it.
+    ///
+    /// **The send goes through the send verb a Python caller calls**, and it
+    /// climbs the destination plane whose number is the faction number, in
+    /// the way a campaign and a project order do.[^2] The send is refused
+    /// when a campaign or a carrier already climbs that plane, which is the
+    /// rule the project order keeps.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0150, held ground is the ground within reach of a city its faction owns, decision D5. `docs/adrs/draft/adr-0150-held-ground-is-the-ground-within-reach-of-a-city-its-faction-owns.md`
+    /// [^2]: ADR-0144, a faction controller runs inside the step and acts only through the caller's verbs, decision D2. `docs/adrs/accepted/adr-0144-a-faction-controller-runs-inside-the-step-and-acts-only-through-the-callers-verbs.md`
+    fn controller_settle(&mut self, faction: FactionId) -> bool {
+        let settlers = self.settlers_of(faction);
+        if settlers.is_empty() {
+            return false;
+        }
+        // The founding is tried over every settler, sent or free, because a
+        // settler that has walked to its target is still climbing the plane
+        // on the tick it arrives.
+        if self
+            .settle_set(&settlers)
+            .iter()
+            .any(super::founding::SettleOutcome::founded)
+        {
+            return true;
+        }
+        // Nothing founded, so every settler stands on ground a city may not
+        // take. The order walks them at ground that a city may.
+        let Some(plane) = self.settling_plane_of(faction) else {
+            return false;
+        };
+        let Some(address) = self.settling_target(faction) else {
+            return false;
+        };
+        self.send_units_to(&settlers, &[address], plane).is_ok()
+    }
+
     fn controller_take_projects(&mut self, faction: FactionId) -> bool {
         let projects: Vec<Project> = self.plan.projects_of(faction).to_vec();
         if projects.is_empty() {
@@ -13572,17 +13757,14 @@ impl World {
                 //
                 // [^12]: ADR-0144, a faction controller runs inside the step and acts only through the caller's verbs, decision D2. `docs/adrs/accepted/adr-0144-a-faction-controller-runs-inside-the-step-and-acts-only-through-the-callers-verbs.md`
                 Choice::Cross(tile) => self.controller_cross(faction, tile),
-                // The settle order goes through the one verb a Python caller
-                // calls. The verb reads the settle column of each unit of the
-                // set, and it refuses every unit that is not a settler and
-                // every place that breaks the founding distance. A command
-                // that founds nothing is counted as a refusal.[^13]
+                // **The settle order reads the arena and not the set above.**
+                // The set is taken by the first command a faction emits, and
+                // the settle order draws last, so it would read an empty set
+                // on every tick a faction gathered or built. The order takes
+                // the settlers of the faction from the arena instead.[^13]
                 //
                 // [^13]: ADR-0150, held ground is the ground within reach of a city its faction owns, decision D5. `docs/adrs/draft/adr-0150-held-ground-is-the-ground-within-reach-of-a-city-its-faction-owns.md`
-                Choice::Settle => self
-                    .settle_set(&set)
-                    .iter()
-                    .any(super::founding::SettleOutcome::founded),
+                Choice::Settle => self.controller_settle(faction),
             };
             let applied = u8::from(applied);
             sets[usize::from(faction.0)] = set;
