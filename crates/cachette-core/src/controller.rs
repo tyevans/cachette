@@ -351,6 +351,9 @@ pub const COMMAND_PROJECT: u8 = 7;
 /// argument is the row of the unit type table that the order names.
 pub const COMMAND_QUEUE: u8 = 8;
 
+/// The command number of the crossing order.
+pub const COMMAND_CROSS: u8 = 9;
+
 /// The step the controller moves a relation by when its draw says so. It is
 /// one step toward war, and the drift is what brings the pair back.[^1]
 ///
@@ -446,6 +449,19 @@ pub enum Choice {
     ///
     /// [^1]: ADR-0158, a site builds a typed unit from a bounded queue its store pays for, decision D2. `docs/adrs/accepted/adr-0158-a-site-builds-a-typed-unit-from-a-bounded-queue-its-store-pays-for.md`
     Queue(UnitTypeId),
+    /// Send the water-crossing units of the faction at one tile of ground
+    /// beyond the water it can reach on foot.
+    ///
+    /// The tile is chosen when the world plans the tick, from the same
+    /// bounded sample the founding choice reads, and the plan draws
+    /// nothing.[^1] The order goes through the send verb a Python caller
+    /// calls.[^2]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0075, the founding choice reads a bounded sample of the world, decision D1. `docs/adrs/accepted/adr-0075-the-founding-choice-reads-a-bounded-sample-of-the-world.md`
+    /// [^2]: ADR-0144, a faction controller runs inside the step and acts only through the caller's verbs, decision D2. `docs/adrs/accepted/adr-0144-a-faction-controller-runs-inside-the-step-and-acts-only-through-the-callers-verbs.md`
+    Cross(TileIdx),
 }
 
 impl Choice {
@@ -467,6 +483,10 @@ impl Choice {
             Self::Carry => (COMMAND_CARRY, 0),
             Self::Project => (COMMAND_PROJECT, 0),
             Self::Queue(unit_type) => (COMMAND_QUEUE, unit_type.0),
+            // The argument column is one byte and a tile index is four, so
+            // the tile does not fit. The command log holds the kind, and the
+            // send verb holds the tile.
+            Self::Cross(_) => (COMMAND_CROSS, 0),
         }
     }
 }
@@ -864,6 +884,18 @@ pub struct FactionState {
     ///
     /// [^1]: ADR-0144, a faction controller runs inside the step and acts only through the caller's verbs, decision D1. `docs/adrs/accepted/adr-0144-a-faction-controller-runs-inside-the-step-and-acts-only-through-the-callers-verbs.md`
     pub queue_type: Option<UnitTypeId>,
+    /// The tile it would send its water-crossing units at, or `None` when it
+    /// holds no idle unit that crosses water, when its destination plane is
+    /// busy, and when the sample it read offers no place.
+    ///
+    /// The world reads the sample before it plans, in the way it chooses the
+    /// objective of a campaign, because the plan reads no world of its
+    /// own.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0144, a faction controller runs inside the step and acts only through the caller's verbs, decision D1. `docs/adrs/accepted/adr-0144-a-faction-controller-runs-inside-the-step-and-acts-only-through-the-callers-verbs.md`
+    pub cross_to: Option<TileIdx>,
 }
 
 /// The controller state the world holds.
@@ -1234,6 +1266,12 @@ impl Controller {
             if let Some(unit_type) = state.queue_type {
                 commands.push((faction, self.queue_draw_index(), Choice::Queue(unit_type)));
             }
+            // The crossing order draws nothing. The world offered a tile only
+            // when the faction holds an idle unit that crosses water, so a
+            // faction with none emits no command.
+            if let Some(tile) = state.cross_to {
+                commands.push((faction, self.cross_draw_index(), Choice::Cross(tile)));
+            }
         }
         // The visit order above is fixed, and the sort is what makes the
         // applied order independent of it. The key is unique, because one
@@ -1304,6 +1342,18 @@ impl Controller {
     #[must_use]
     pub const fn queue_draw_index(&self) -> u32 {
         self.evaluations + 6
+    }
+
+    /// Returns the draw index of the crossing order: one past the queue
+    /// order.
+    ///
+    /// The crossing order draws nothing, and the index is reserved whether it
+    /// draws or not, so no other draw of this stage ever takes it. The index
+    /// puts the order last, after the queue order that builds the units it
+    /// sends.
+    #[must_use]
+    pub const fn cross_draw_index(&self) -> u32 {
+        self.evaluations + 7
     }
 
     /// Reports whether a faction rewrites its board on this tick.

@@ -10531,6 +10531,18 @@ struct ContractDelivery {
     owes_as_proposer: bool,
 }
 
+/// The group that the crossing order surveys for.
+///
+/// The survey scores a place against a group it must feed, and it refuses a
+/// place that cannot.[^1] The crossing order founds nothing and seats nobody.
+/// It names a place to walk to, so it asks for the smallest group the survey
+/// admits and takes the best place that group could live at.
+///
+/// # References
+///
+/// [^1]: ADR-0075, the founding choice reads a bounded sample of the world, decision D1. `docs/adrs/accepted/adr-0075-the-founding-choice-reads-a-bounded-sample-of-the-world.md`
+const CROSSING_SURVEY_GROUP: u32 = 1;
+
 /// Returns the neighbour a unit steps onto, or nothing when the ground there
 /// refuses it.
 ///
@@ -12026,10 +12038,17 @@ impl World {
         // no command reach, so a raise that swept up the one leader of a
         // faction spent the very unit that lets the faction declare a war.
         // The faction would then march once and never again.
+        //
+        // **A unit that carries a water crossing is never taken either**, for
+        // the same reason. The soldier row carries no crossing, so a raise
+        // that swept up the mariners of an island faction spent the very
+        // units that let it leave its island, and it would do so on the tick
+        // each one was built.
         let leads = |unit: &Entity| {
-            self.soldiers
-                .unit_type(*unit)
-                .is_some_and(|unit_type| self.unit_types.row(unit_type).command_reach > 0)
+            self.soldiers.unit_type(*unit).is_some_and(|unit_type| {
+                let row = self.unit_types.row(unit_type);
+                row.command_reach > 0 || row.water_crossing > 0
+            })
         };
         let mut idle: Vec<Entity> = self
             .soldiers
@@ -12831,6 +12850,141 @@ impl World {
     ///
     /// [^1]: ADR-0152, a faction plans its roads and zones with one solver, decision D5. `docs/adrs/accepted/adr-0152-a-faction-plans-its-roads-and-zones-with-one-solver.md`
     /// [^2]: ADR-0144, a faction controller runs inside the step and acts only through the caller's verbs, decision D2. `docs/adrs/accepted/adr-0144-a-faction-controller-runs-inside-the-step-and-acts-only-through-the-callers-verbs.md`
+    /// Returns the destination plane that one faction crosses water on.
+    ///
+    /// **The crossing takes a plane of its own, and it never shares one.** A
+    /// campaign, a carrier and a project order all climb the plane whose
+    /// number is the faction number, so one of those three must yield to
+    /// another. A crossing cannot yield: a faction on an island that waits
+    /// for its war to end waits for a war it cannot reach, and the capability
+    /// then ships inert.
+    ///
+    /// The crossing plane of a faction is its number raised by the faction
+    /// count, so no faction takes the plane of another and no crossing takes
+    /// the plane of a march. A world with too few planes for that answers
+    /// nothing, and the faction takes no crossing order until a caller raises
+    /// the plane count.
+    ///
+    /// Returns `None` when the world holds no such plane.
+    fn crossing_plane_of(&self, faction: FactionId) -> Option<u16> {
+        let plane = faction.0.checked_add(self.config.faction_count.max(1))?;
+        (plane < self.destinations.plane_count()).then_some(plane)
+    }
+
+    /// Returns the water-crossing units of one faction that nobody has sent
+    /// anywhere, in ascending identity order.
+    ///
+    /// The crossing is a column of the shared type table, and zero means
+    /// cannot.[^1] The scan follows the population of the faction and reads
+    /// no tile, so its cost does not grow with the world.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0145, a unit type is a row of capability columns, and zero means cannot, decision D2. `docs/adrs/accepted/adr-0145-a-unit-type-is-a-row-of-capability-columns-and-zero-means-cannot.md`
+    fn idle_crossers_of(&self, faction: FactionId) -> Vec<Entity> {
+        let mut units: Vec<Entity> = self
+            .soldiers
+            .iter_faction(faction)
+            .filter(|unit| self.soldiers.sent(*unit) == Some(None))
+            .filter(|unit| {
+                self.soldiers
+                    .unit_type(*unit)
+                    .is_some_and(|unit_type| self.unit_types.row(unit_type).water_crossing > 0)
+            })
+            .collect();
+        units.sort_unstable_by_key(|unit| unit.to_bits());
+        units
+    }
+
+    /// Returns the tile that one faction would send its water-crossing units
+    /// at, or nothing.
+    ///
+    /// **The choice reads the same bounded sample the founding choice
+    /// reads.** It draws a fixed number of candidate places and reads a fixed
+    /// number of tiles around each, so its cost does not grow with the
+    /// world.[^1] The draw is keyed on the faction and on nothing that
+    /// changes, so the target of a faction is the same tile on every tick and
+    /// the plane does not thrash.[^2]
+    ///
+    /// The places the faction already holds are the places taken, so the
+    /// sample offers ground at least the founding distance away from every
+    /// site the faction owns.[^3] That is ground the faction has not
+    /// settled, on its own landmass or on another.
+    ///
+    /// The answer is nothing when the faction holds no idle unit that crosses
+    /// water, and when a campaign or a carrier already climbs its plane. One
+    /// plane serves one purpose at a time, which is the rule the campaign and
+    /// the carriers already keep.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0075, the founding choice reads a bounded sample of the world, decision D1. `docs/adrs/accepted/adr-0075-the-founding-choice-reads-a-bounded-sample-of-the-world.md`
+    /// [^2]: ADR-0003, every random draw is keyed, never stateful, decision D1. `docs/adrs/accepted/adr-0003-every-random-draw-is-keyed-never-stateful.md`
+    /// [^3]: ADR-0076, a founding keeps a fixed distance from the foundings before it, decision D1. `docs/adrs/accepted/adr-0076-a-founding-keeps-a-fixed-distance-from-the-foundings-before-it.md`
+    fn controller_crossing_target(&self, faction: FactionId) -> Option<TileIdx> {
+        if self.idle_crossers_of(faction).is_empty() {
+            return None;
+        }
+        self.crossing_plane_of(faction)?;
+        // The walk is over the settlement slots in ascending order, so the
+        // list of taken places is a property of the arena and not of a visit
+        // order.
+        let taken: Vec<Axial> = self
+            .settlements
+            .iter()
+            .filter(|site| self.settlements.faction(*site) == Some(faction))
+            .filter_map(|site| self.settlements.address(site))
+            .collect();
+        let survey = self
+            .survey_founding_apart(CROSSING_SURVEY_GROUP, faction, &taken)
+            .ok()?;
+        // **The order takes the best eligible candidate, and not the best
+        // one.** The founding takes the best one and refuses the whole sample
+        // when that place is too near a place already taken, because a
+        // founding that walked down the list would seat a group somewhere
+        // nobody chose. A crossing order names a place to walk to, so it
+        // takes the next place down instead of refusing.
+        //
+        // The candidates are ordered on a total key, so the first eligible
+        // one is a property of the sample and not of the order it was drawn
+        // in.[^4]
+        //
+        // [^4]: ADR-0004, iteration order is explicit, decision D4. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
+        survey
+            .candidates()
+            .iter()
+            .find(|candidate| candidate.is_eligible())
+            .map(|candidate| candidate.tile())
+    }
+
+    /// Sends the idle water-crossing units of one faction at one tile.
+    ///
+    /// **The order goes through the send verb a Python caller calls.**[^1]
+    /// The set holds only units that cross water, so the plane it climbs
+    /// conducts across water and the field steers the set over a strait
+    /// rather than at the near shore of one.[^2]
+    ///
+    /// The faction climbs the destination plane whose number is its own, in
+    /// the way a campaign and a project order do.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0144, a faction controller runs inside the step and acts only through the caller's verbs, decision D2. `docs/adrs/accepted/adr-0144-a-faction-controller-runs-inside-the-step-and-acts-only-through-the-callers-verbs.md`
+    /// [^2]: ADR-0125, the control plane names the seed set of a destination field, decision D1. `docs/adrs/draft/adr-0125-the-control-plane-names-the-seed-set-of-a-destination-field.md`
+    fn controller_cross(&mut self, faction: FactionId, tile: TileIdx) -> bool {
+        let Some(plane) = self.crossing_plane_of(faction) else {
+            return false;
+        };
+        let Some(address) = self.grid.address_of(tile) else {
+            return false;
+        };
+        let set = self.idle_crossers_of(faction);
+        if set.is_empty() {
+            return false;
+        }
+        self.send_units_to(&set, &[address], plane).is_ok()
+    }
+
     fn controller_take_projects(&mut self, faction: FactionId) -> bool {
         let projects: Vec<Project> = self.plan.projects_of(faction).to_vec();
         if projects.is_empty() {
@@ -12863,6 +13017,25 @@ impl World {
                 continue;
             }
             if self.soldiers.sent(unit) != Some(None) {
+                continue;
+            }
+            // **A unit that carries a water crossing takes no project.** The
+            // crossing order is the one order that spends such a unit well,
+            // and it applies after this one, so a project order that swept up
+            // the mariners of an island faction would take them on the tick
+            // each one was built and the faction would never leave its
+            // island. The rule has the shape of the one the campaign keeps
+            // for a unit that carries command reach.
+            //
+            // The unit is not idle in the sense of doing nothing. A mariner
+            // that stands on a project of its faction still takes the build
+            // order above, because that branch reads where the unit stands
+            // and not what it is.
+            if self
+                .soldiers
+                .unit_type(unit)
+                .is_some_and(|unit_type| self.unit_types.row(unit_type).water_crossing > 0)
+            {
                 continue;
             }
             if let Some(project) = self.project_for(faction, unit) {
@@ -13151,6 +13324,11 @@ impl World {
                     // The want is not a standing rule. It falls away as soon
                     // as a leader stands or a leader is on order, so a faction
                     // that has one queues by the draw again.
+                    // **A faction crosses water only when it holds a unit
+                    // that can.** The world asks before it plans, so a
+                    // faction with no mariner reads no sample and the
+                    // bounded survey costs an idle world nothing.
+                    cross_to: self.controller_crossing_target(faction),
                     queue_type: self.controller_queue_site(faction).and_then(|_| {
                         if speakers.get(index).copied().flatten().is_none()
                             && !self.leader_is_on_order(faction)
@@ -13236,6 +13414,12 @@ impl World {
                             .is_ok()
                     })
                 }
+                // The crossing order goes through the send verb a Python
+                // caller calls, with the tile the world chose before it
+                // planned.[^12]
+                //
+                // [^12]: ADR-0144, a faction controller runs inside the step and acts only through the caller's verbs, decision D2. `docs/adrs/accepted/adr-0144-a-faction-controller-runs-inside-the-step-and-acts-only-through-the-callers-verbs.md`
+                Choice::Cross(tile) => self.controller_cross(faction, tile),
             };
             let applied = u8::from(applied);
             sets[usize::from(faction.0)] = set;
