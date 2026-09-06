@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-561**
+**Next number: FND-562**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -13596,6 +13596,38 @@ it.
 cited number against the rows that exist, so a citation of a number that exists
 and holds another subject passes. Read the row you cite.
 
+### FND-561 — A win path that cannot be balanced was retired, and the register row was the wrong instrument all along
+
+**Believed.** The wealth-or-wonder win path was a balance problem. Three passes
+raised the stock target, each against a measurement, and each reported that the
+path now ended fewer games. The register row held the derivation, and a record
+answered the reachability by standing the bar above the ceiling of one
+settlement.[^F561A] [^F561C]
+
+**True.** The path was a design problem, and the project owner ruled it out as a
+win condition. A stock total is not a claim to victory. The path always fired
+early, and the moment it fired was arbitrary to a watcher, because nothing in
+the picture changed when it did. The reader is gone. The variant, its number and
+the reported quantity all stay.[^F561B]
+
+**Evidence.** The sweep of 32 seeds at a 20000 tick horizon: wealth or wonder
+ended 32 of 32, and domination, territory and renown ended none. The sevenfold
+raise of the target bought about fifteen percent more ticks and still ended
+every game. The earlier findings hold both readings.[^F561A]
+
+**What follows.** **Ask whether a value is the right instrument before you spend
+three passes tuning it.** Each raise was a correct answer to the question it was
+given. The question was wrong from the first one, and no measurement of the
+value could say so, because every measurement of a value assumes the value
+decides something. The signal was available early: the path won every seed at
+every setting, and a knob that changes nothing but the tick is not a knob.
+
+**A second shape.** A test that asserted an end on a retired path fails loudly
+and gets repaired. A test that asserted the record does **not** change, on a
+fact that no reader watches any more, stays green and proves nothing. The second
+kind is the one to look for when a reader is removed. One such test was found
+here, and it was found by putting the defect back and watching it stay
+green.[^F561D]
 ## References
 
 [^F552A]: The unit-to-tile bridge, the block key. `crates/cachette-core/src/bridge.rs`
@@ -13681,6 +13713,10 @@ and holds another subject passes. Read the row you cite.
 [^F545D]: ADR-0152, a faction plans its roads and zones with one solver, decision D3. `docs/adrs/accepted/adr-0152-a-faction-plans-its-roads-and-zones-with-one-solver.md`
 [^F549A]: Findings register, FND-545. `docs/FINDINGS.md`
 [^F549C]: ADR-0168, a build order holds a unit on its tile, and the hold is derived and never stored, decisions D1, D2 and D3. `docs/adrs/draft/adr-0168-a-build-order-holds-a-unit-on-its-tile.md`
+[^F561A]: Findings register, FND-543 and FND-550. `docs/FINDINGS.md`
+[^F561B]: ADR-0173, the wealth or wonder path has no reader. `docs/adrs/draft/adr-0173-the-wealth-or-wonder-path-has-no-reader.md`
+[^F561C]: ADR-0165, the wealth bar stands above what one settlement can hold. `docs/adrs/draft/adr-0165-the-wealth-bar-stands-above-what-one-settlement-can-hold.md`
+[^F561D]: Testing Rules, section 2a. `.agents/rules/testing.md`
 
 [^F546A]: The founding survey and the eligibility of a candidate. `crates/cachette-core/src/founding.rs`
 [^F546C]: Balance register, the founding group. `docs/reference/balance.md`
