@@ -39,11 +39,17 @@ from __future__ import annotations
 import argparse
 import os
 import secrets
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Protocol
 
 from cachette import Camera, World
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    # How a caller builds one picture: a width, a height, a byte layout, the
+    # bytes and a pitch.
+    MakePicture = Callable[[int, int, str, bytes, int], "Picture"]
+
     # These describe the shape of a dictionary the engine returns. They live
     # in the stub beside the compiled module and not in the module itself, so
     # importing them at run time would fail.
@@ -831,16 +837,36 @@ def _choose_overlay_key(demo: Demo, symbol: int, key: object) -> None:
             return
 
 
+def window_size(window: object, fallback: tuple[int, int]) -> tuple[int, int]:
+    """Give back the size the window reports, or the fallback size.
+
+    **The size the settings hold is the windowed size, and a fullscreen window
+    is the size of the screen.** A surface built from the setting would then
+    fill a small part of a large window, and the picture would stay small.
+
+    The window library ships no type information, so this reads the two
+    attributes and falls back when either is missing.
+    """
+    width = getattr(window, "width", None)
+    height = getattr(window, "height", None)
+    if type(width) is int and type(height) is int and width > 0 and height > 0:
+        return (width, height)
+    return fallback
+
+
 def _apply_settings(demo: Demo, window: object) -> None:
     """Give the window the video settings, and resize the pixels to match.
 
     The surface is the memory the engine fills. A window of a new size needs a
     surface of that size, so the two are changed together.
+
+    The surface follows the size the window reports, not the size the settings
+    hold. The two differ while the window is fullscreen.
     """
     refused = demo.settings.apply_to(window)
     if refused:
         print(f"the window refused: {', '.join(refused)}")
-    width, height = demo.settings.video.size
+    width, height = window_size(window, demo.settings.video.size)
     if (width, height) != (demo.surface.width, demo.surface.height):
         demo.surface = Surface(width, height)
         demo.camera.clamp(demo.world, width, height)
@@ -871,6 +897,67 @@ def _show_settings(demo: Demo, window: object) -> None:
     _apply_settings(demo, window)
 
 
+class Picture(Protocol):
+    """What the demonstration needs of the picture a window draws.
+
+    The window library ships no type information, so this states the two
+    methods the loop calls rather than naming a class of that library.
+    """
+
+    def set_data(self, layout: str, pitch: int, data: bytes) -> None:
+        """Take a new frame."""
+
+    def blit(self, x: int, y: int) -> None:
+        """Draw the frame at this place in the window."""
+
+
+class WindowPicture:
+    """The picture a window draws, and the surface size it was built for.
+
+    **The size of the surface is declared here once.** The picture holds a
+    width, a height and a pitch, and each follows the size of the surface. A
+    picture that a new surface outgrew takes a buffer of the wrong length, and
+    the window library reports a length it cannot use.
+
+    The engine writes the first row of the frame first, and the window numbers
+    its rows from the bottom. A negative pitch says so.
+
+    The caller passes a maker, because the window library ships no type
+    information and a test has no display to open a window on. The maker takes
+    a width, a height, a format, the bytes and a pitch.
+    """
+
+    __slots__ = ("_make", "image", "pitch", "size")
+
+    image: Picture
+    pitch: int
+    size: tuple[int, int]
+
+    def __init__(self, make: MakePicture, surface: Surface) -> None:
+        """Build the first picture from this surface."""
+        self._make = make
+        self._build(surface)
+
+    def _build(self, surface: Surface) -> None:
+        """Build a picture for the size of this surface."""
+        self.size = (surface.width, surface.height)
+        self.pitch = -surface.width * 4
+        self.image = self._make(
+            surface.width,
+            surface.height,
+            "BGRA",
+            surface.to_bytes(),
+            self.pitch,
+        )
+
+    def update(self, surface: Surface) -> None:
+        """Put the frame in the picture, and rebuild it on a new size."""
+        if (surface.width, surface.height) != self.size:
+            self._build(surface)
+            return
+        self.image.set_data("BGRA", self.pitch, surface.to_bytes())
+
+
 def _run_window(demo: Demo, frame_limit: int) -> int:
     """Drives the window until it closes.
 
@@ -884,16 +971,16 @@ def _run_window(demo: Demo, frame_limit: int) -> int:
         height=demo.surface.height,
         caption="cachette — watch the world run",
     )
-    # The engine writes the first row of the frame first, and the window
-    # numbers its rows from the bottom. A negative pitch says so once.
-    pitch = -demo.surface.width * 4
-    image = pyglet.image.ImageData(
-        demo.surface.width,
-        demo.surface.height,
-        "BGRA",
-        demo.surface.to_bytes(),
-        pitch=pitch,
-    )
+
+    def make_image(
+        width: int, height: int, layout: str, data: bytes, pitch: int
+    ) -> Picture:
+        image: Picture = pyglet.image.ImageData(
+            width, height, layout, data, pitch=pitch
+        )
+        return image
+
+    picture = WindowPicture(make_image, demo.surface)
     keys = pyglet.window.key.KeyStateHandler()
     window.push_handlers(keys)
     counted = [0]
@@ -908,14 +995,14 @@ def _run_window(demo: Demo, frame_limit: int) -> int:
         zoom = int(keys[key.EQUAL]) - int(keys[key.MINUS])
         demo.steer(across, down, zoom)
         demo.advance()
-        image.set_data("BGRA", pitch, demo.surface.to_bytes())
+        picture.update(demo.surface)
         counted[0] += 1
         if frame_limit and counted[0] >= frame_limit:
             pyglet.app.exit()
 
     def on_draw() -> None:
         window.clear()
-        image.blit(0, 0)
+        picture.image.blit(0, 0)
 
     def on_mouse_press(x: int, y: int, _button: int, _modifiers: int) -> None:
         # The window numbers its rows from the bottom and the engine numbers

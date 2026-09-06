@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-496**
+**Next number: FND-497**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -2008,6 +2008,54 @@ whatever the contest pass does.
 The record states that zero in a column means cannot.[^F486M] The seeding
 reaches one of the four rows, so three of them describe a unit that the
 demonstration never holds. Backlog item 0491 holds the work.[^F486N]
+
+### FND-496 — The window settings were applied in an order the window library refuses, and no test could see it
+
+**Believed.** The demonstration applies its video settings to an open window,
+and the settings name what the window could not do rather than failing in
+silence.[^F496A] The order of the three calls did not matter, because each one
+sets an independent property.
+
+**True.** The order decides whether the window takes the call at all. The
+window library refuses a size while the window is fullscreen, and it refuses by
+raising.[^F496B] The settings sent the size first, so the key that left
+fullscreen set the size while the window was still fullscreen. The library
+raised, and the raise passed through the key handler and stopped the change.
+The refusal list never saw it, because the code guarded only against a method
+the window does not have.
+
+**True, second part.** The surface took its size from the setting, and a
+fullscreen window is the size of the screen. The picture therefore stayed the
+size of the windowed surface inside a full screen. The window picture was built
+once from the first surface and held a fixed pitch, so a surface of a new size
+handed it a buffer of the wrong length.
+
+**Evidence.** The project owner reported both faults from a run. The library
+raises from the base window class, before any platform code runs, whenever the
+fullscreen state is on.[^F496B] An existing test drove the settings against a
+fake window, and it asserted the wrong order as correct, because the fake took
+every call.[^F496C]
+
+**Follows.** Three things.
+
+**A fake that accepts every call tests the caller against a window that does
+not exist.** The fake must refuse what the real library refuses. The test that
+covers this now raises from the fake exactly where the library raises.
+
+**Name a refusal that arrives as a raise, not only one that arrives as a
+missing method.** A promise to name what could not be done must cover every way
+the other side says no.
+
+**The window path of the demonstration has no test that opens a window, because
+the gate has no display.** Everything the window path can be tested without a
+window is now tested: the order of the calls, the refusal, the size the surface
+follows, and the rebuild of the picture. What stays untested is the part that
+needs a real window: that the library moves the window to the screen size, that
+the size the window reports after a call is the size it drew at, and that the
+picture reaches the screen. Someone tests those on a machine with a display, or
+in the gate under a virtual display server, by opening the window, pressing the
+two keys and comparing the frame the window drew against the frame the file
+writer wrote for the same world and camera.[^F496D]
 
 ## D. Cost estimates that were wrong
 
@@ -12137,3 +12185,7 @@ direction.
 [^F488B]: ADR-0125, the control plane names the seed set of a destination field. `docs/adrs/draft/adr-0125-the-control-plane-names-the-seed-set-of-a-destination-field.md`
 [^F488C]: ADR-0110, a unit returns by climbing a reach field seeded at every site of its faction. `docs/adrs/draft/adr-0110-a-unit-returns-by-climbing-a-reach-field.md`
 [^F489A]: ADR-0128, a contract moves a quantity only when a unit carries it onto the ground of the other party. `docs/adrs/draft/adr-0128-a-contract-moves-a-quantity-only-when-a-unit-carries-it.md`
+[^F496A]: The video settings and the window they apply to. `python/cachette/demo/settings.py`
+[^F496B]: The pyglet window, `set_size`, which raises while the window is fullscreen. https://pyglet.readthedocs.io/en/latest/modules/window.html
+[^F496C]: The demonstration settings tests. `tests/test_demo_window_settings.py`
+[^F496D]: ADR-0094, the caller owns the camera and the pixels, decision D5. `docs/adrs/draft/adr-0094-the-caller-owns-the-camera-and-the-pixels.md`

@@ -21,6 +21,9 @@ Recurring Defect Shapes, shape 3. ``.claude/rules/recurring-defects.md``
 
 ADR-0094, the caller owns the camera and the pixels, decision D2.
 ``docs/adrs/draft/adr-0094-the-caller-owns-the-camera-and-the-pixels.md``
+
+The pyglet window, ``set_size``, which raises while the window is fullscreen.
+https://pyglet.readthedocs.io/en/latest/modules/window.html
 """
 
 from __future__ import annotations
@@ -130,6 +133,27 @@ class Settings:
         """Give back each section, as a name and its rows."""
         yield ("VIDEO", list(self.video.rows()))
 
+    def _calls(self) -> list[tuple[str, str, tuple[object, ...]]]:
+        """Give back each window call in the order the window accepts them.
+
+        **The fullscreen state goes first, and the size follows it.** A window
+        library refuses a size while the window is fullscreen, because a
+        fullscreen window is the size of the screen.[^4] A run that set the
+        size first therefore failed as it left fullscreen.
+
+        A fullscreen window takes no size at all, so this omits the size call
+        while the fullscreen state is on. The caller reads the size the window
+        reports rather than the size held here.
+        """
+        width, height = self.video.size
+        calls: list[tuple[str, str, tuple[object, ...]]] = [
+            ("fullscreen", "set_fullscreen", (self.video.fullscreen,)),
+        ]
+        if not self.video.fullscreen:
+            calls.append(("window size", "set_size", (width, height)))
+        calls.append(("vertical sync", "set_vsync", (self.video.vsync,)))
+        return calls
+
     def apply_to(self, window: object) -> list[str]:
         """Apply every video setting to an open window.
 
@@ -137,17 +161,19 @@ class Settings:
         window library ships no type information, so this checks for the
         method before it calls it, and it names what it could not do rather
         than failing in silence.
+
+        **A window that raises is a refusal too.** The library refuses a call
+        it holds by raising, and an uncaught raise leaves the window half
+        set and stops the key press that asked for the change.
         """
         refused: list[str] = []
-        width, height = self.video.size
-        for name, method, argument in (
-            ("window size", "set_size", (width, height)),
-            ("fullscreen", "set_fullscreen", (self.video.fullscreen,)),
-            ("vertical sync", "set_vsync", (self.video.vsync,)),
-        ):
+        for name, method, argument in self._calls():
             call = getattr(window, method, None)
             if call is None:
                 refused.append(name)
                 continue
-            call(*argument)
+            try:
+                call(*argument)
+            except Exception:
+                refused.append(name)
         return refused
