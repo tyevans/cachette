@@ -1996,6 +1996,21 @@ impl WeatherField {
         &self.ground
     }
 
+    /// Returns the water that the air above one cell holds when it is full.
+    ///
+    /// A viewer that paints the air reads the ceiling from here rather than
+    /// from the largest cell of a frame, so brightness means the same thing
+    /// in every frame. It reads it from here rather than repeating the
+    /// constant, so the ceiling has one declaration site.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: Recurring Defect Shapes, shape 1. `.agents/rules/recurring-defects.md`
+    #[must_use]
+    pub const fn air_ceiling(&self) -> i64 {
+        AIR_SATURATION.0
+    }
+
     /// Returns every drop that has ever entered the air.
     #[must_use]
     pub const fn raised(&self) -> i64 {
