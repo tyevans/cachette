@@ -81,25 +81,24 @@ Each statement below can be checked.
 The cost driver is the number of places to live and the number of units that
 hold one. It is not the number of tiles.
 
-Two shapes are rejected. A slot for a dwelling on every tile pays the world
-for the ground that holds nobody. A residency query that walks the population
-to count who lives in a place pays the population for one number, and a
-watcher asks for that number often.
+Two costs are refused. A world must not pay for the ground that holds nobody,
+because most ground holds nobody. A watcher must not pay the whole population
+for one number, because a watcher asks for that number often.
 
 These properties follow.
 
-- Occupancy is kept as a count and updated by the change. It is not recomputed
-  by a sweep over the units.
+- A watcher asks how many people live in a place, often, and the answer costs
+  the same whatever the population is.
 - A unit's residence is read at a bounded cost that does not grow with the
   population and does not grow with the size of the world.
 - Storage grows with the number of places that exist, not with the number of
   tiles. A world with no dwellings stores none.
-- Capacity and occupancy are exact integers, so an aggregate over many places
-  combines to the same total in any order.
-- Assignment of units to places, and eviction from them, are ordered by a
-  stable key, never by thread completion order.
-- Losing a place updates every resident of it as one set-valued operation, not
-  as a loop in the control plane.
+- A total over many places is exact, and it is the same total whatever order
+  the places are added in.
+- Who gets a place, and who loses one, is the same for the same world at every
+  thread count and on every run.
+- Losing a place costs the residents of that place, and it does not cost the
+  developer a step for each of them.
 
 No cost figure appears here, because the one measurement this project has was
 taken on a development machine and not on the target.[^1] That measurement
