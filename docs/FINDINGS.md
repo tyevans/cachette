@@ -11727,6 +11727,22 @@ that produces it. A defect in the layer moves both readings together. The
 holding rule did not cause this and the repair did not remove it. Testing rule
 2a names the shape.[^F487C]
 
+**The same shape returned one rule later, at the build order.** A faction now
+lays a road only on a tile its own plan zones.[^F487D] Four viewer tests
+ordered a build and never zoned a project, so the engine refused the order.
+Three of them assert on the mark a build site draws. The fourth reads the
+upgrade overlay, and it took its site from what the controller happened to
+build rather than from a build the fixture asked for. Each repair zones the
+project the order needs, and no assertion was weakened.
+
+    cargo test -p cachette-view --no-fail-fast
+
+**A fixture that waits for the engine to supply its input measures the
+engine.** The overlay test above is the clear case. It ran the world and read
+whatever site appeared, so a rule change that stopped the controller building
+emptied the fixture. The repair spawns a builder, zones the project and orders
+the road, so the test states the input it needs.[^F487C]
+
 ### FND-490 — A faction that founds with two people fills no ranked position, and the world still ends
 
 **Believed.** The founding group is a balance value with no structure behind
@@ -11813,6 +11829,7 @@ file.
 [^F487A]: ADR-0150, held ground is the ground within reach of a city its faction owns, decision D1. `docs/adrs/draft/adr-0150-held-ground-is-the-ground-within-reach-of-a-city-its-faction-owns.md`
 [^F487B]: Recurring defect shapes, shape 1. `.agents/rules/recurring-defects.md`
 [^F487C]: Testing Rules, section 2a. `.agents/rules/testing.md`
+[^F487D]: ADR-0152, a faction plans its roads and zones with one solver, decisions D3 and D4. `docs/adrs/accepted/adr-0152-a-faction-plans-its-roads-and-zones-with-one-solver.md`
 [^F340A]: Findings register, FND-325, in this document.
 [^F340B]: Backlog item 0330, repair the defects a fresh reader found in the published reference. `docs/backlog/complete/0330-repair-the-defects-a-fresh-reader-found.md`
 [^F340C]: The reference check script. `scripts/check_reference.py`
