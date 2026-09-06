@@ -17,9 +17,15 @@ import json
 import pathlib
 import sys
 
-ONE = 1 << 16
-STOCK_TARGET = 28672
+from cachette import stock_target
+
 WONDER_WORK = 2400
+
+# The engine states the wealth bar, and this script reads it. A copy here
+# reported a share against a bar the engine no longer held.[^1]
+#
+# [^1]: Findings register, FND-549. ``docs/FINDINGS.md``
+STOCK_TARGET_RAW = stock_target()
 
 
 def quantiles(values: list[int]) -> tuple[int, int, int, int, int]:
@@ -64,7 +70,7 @@ def main(argv: list[str] | None = None) -> int:
         line("smallest held tiles", [min(s["held"]) for s in last]),
         line(
             "best wealth, percent",
-            [max(s["store"]) * 100 // (STOCK_TARGET * ONE) for s in last],
+            [max(s["store"]) * 100 // STOCK_TARGET_RAW for s in last],
         ),
         line(
             "best wonder, percent",
