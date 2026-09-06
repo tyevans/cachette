@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-534**
+**Next number: FND-538**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -12091,7 +12091,7 @@ file.
 [^F480B]: The depletion ledger fold. `crates/cachette-core/src/resource.rs`
 [^F480C]: The whole-world state hash. `crates/cachette-core/src/world.rs`
 [^F480D]: The recovery pass of the depletion ledger. `crates/cachette-core/src/resource.rs`
-[^F480E]: Backlog item 0471, fold the recovery rules into the state hash. `docs/backlog/proposed/0471-fold-the-recovery-rules-into-the-state-hash.md`
+[^F480E]: Backlog item 0471, fold the recovery rules into the state hash. `docs/backlog/complete/0471-fold-the-recovery-rules-into-the-state-hash.md`
 [^F450A]: ADR-0121, a meeting between two factions resolves at the tile, decision D2. `docs/adrs/draft/adr-0121-a-meeting-between-two-factions-resolves-at-the-tile.md`
 [^F450B]: Findings register, FND-402, in this document.
 [^F450C]: ADR-0087, an influence solve runs a fixed iteration count over the whole plane, decision D1. `docs/adrs/draft/adr-0087-an-influence-solve-runs-a-fixed-iteration-count.md`
@@ -12615,6 +12615,49 @@ would find the two later sentences true and stop.
 **What follows.** Read a summary sentence at the head of a decision as a claim
 that must hold, not as an introduction to the claims below it. D1 now says that
 the order reads every unit and sends only the idle ones.
+### FND-537 — Four choice parameters and three other stored values stood outside the state hash, and two tests said they should
+
+**Believed.** The recovery rules were the one value that the step read on every
+tick and that the whole-world hash did not cover.[^F537A] A weight profile was
+an input to the world rather than a fact the world held, so the intent column
+carried what it decided and the profile itself needed no coverage. A flag that
+said the world had taken a luxury seed stated nothing that the luxury field did
+not.
+
+**True.** Eight stored values stood outside the hash, and each one changes what
+the world does next. The recovery rules are one of them. The choice pass reads
+four more on every tick: the choice schedule, the need bucket width, the weight
+profile and the carry mark.[^F537B] A trade verb reads the land list bound. The
+luxury seed flag decides whether the next seed call is accepted or refused, and
+an empty seed leaves the field exactly as an unseeded world leaves it, so the
+field cannot tell the two worlds apart.
+
+**Two tests asserted the defect.** One asserted that a weight the world could
+not act on moved no byte of the hash. One asserted that an empty luxury seed
+left the hash alone. Both passed, and both stated the hole as a rule.[^F537C]
+
+**Evidence.** Read on 5 September 2026. An audit compared every field of the
+world against the fields the hash function writes. The choice pass takes the
+four parameters into local variables at the top of the pass and reads them for
+every cell.[^F537B] Each of the eight is now folded in, and each fold was
+proved by removing it again and watching a named test go red.[^F537D]
+
+**Follows.** Three things.
+
+**The outcome does not excuse the cause.** The argument that the intent column
+carries what a weight decided is the same argument that left the recovery rules
+out. A hash of the effect reports a changed parameter only after the difference
+has reached a stored value, which is one or more ticks after the change.
+
+**The audit is the unit of work, not the value.** The backlog item named one
+value. Seven more had the same shape, and a hash function that a person writes
+field by field will grow more of them. A record now states the rule and asks
+for a test for each covered value.[^F537E]
+
+**A test that states a hole is worse than no test.** Both tests read as
+deliberate. A reader who met either one would conclude that the project had
+considered the case and decided it. Neither had been considered against the
+finding that names the shape.
 
 
 ## References
@@ -12655,3 +12698,8 @@ the order reads every unit and sends only the idle ones.
 [^F512B]: Research report 26, the scale of the weather. `docs/research/reports/26-the-scale-of-the-weather.md`
 [^F512C]: ADR-0161, water rides the wind, and every transfer is an exact integer move. `docs/adrs/accepted/adr-0161-water-rides-the-wind-and-every-transfer-is-an-exact-integer-move.md`
 [^F513A]: The project order of the controller. `crates/cachette-core/src/world.rs`
+[^F537A]: Findings register, FND-480. `docs/FINDINGS.md`
+[^F537B]: The choice pass, which takes its four parameters before it spawns. `crates/cachette-core/src/world.rs`
+[^F537C]: The choice tests and the luxury tests. `crates/cachette-core/tests/choice.rs`
+[^F537D]: The hash coverage tests. `crates/cachette-core/tests/state_hash_covers_the_step_parameters.rs`
+[^F537E]: ADR-0164, every stored value the step reads enters the state hash. `docs/adrs/draft/adr-0164-every-stored-value-the-step-reads-enters-the-state-hash.md`

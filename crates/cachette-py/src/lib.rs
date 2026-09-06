@@ -6407,7 +6407,7 @@ impl PyWorld {
     ///
     /// [^1]: Decisions register, DEC-270. `docs/DECISIONS.md`
     /// [^2]: Findings register, FND-480. `docs/FINDINGS.md`
-    /// [^3]: Backlog item 0471, fold the recovery rules into the state hash. `docs/backlog/proposed/0471-fold-the-recovery-rules-into-the-state-hash.md`
+    /// [^3]: Backlog item 0471, fold the recovery rules into the state hash. `docs/backlog/complete/0471-fold-the-recovery-rules-into-the-state-hash.md`
     fn set_recovery_rules(&self, periods: Vec<Option<u32>>) -> PyResult<()> {
         if periods.len() != RESOURCE_KIND_COUNT {
             return Err(pyo3::exceptions::PyValueError::new_err(format!(
