@@ -127,6 +127,21 @@ derivation column names which. The growth stage reads every one of them from
 the world and holds no literal of its own. ADR-0157 cites this section and
 states no figure of its own.[^8]
 
+## The ground and what it gives
+
+**This section was missing until item 0508 measured the ground.** Four values
+decide whether a worked tile is a stock that empties once or a flow a faction
+returns to. All four are declared in the core and no register held any of them,
+so the table said nothing about the one part of the world that can renew
+itself.[^17]
+
+| Value | Read by | Set | Blocker | Derivation |
+|---|---|---|---|---|
+| Gather rate, the stock one unit takes from a tile in one tick | The gather resolve | unset, pass 10 | BLK-050 | Provisional default of 4. The core comment states the intent: the rate is high against the stock of a tile, so a full tile of gatherers always empties a deposit. Pass 10 measures it. |
+| Wet gather bonus, the extra stock a unit takes on wet ground | The gather resolve | unset, pass 10 | BLK-130 | Provisional default of 2. Pass 10 measures it. |
+| Recovery period, the ticks one unit of a kind takes to come back | The resource ageing | unset, pass 10 | BLK-050 | Provisional defaults of 600 ticks for food, 2400 for wood and never for stone, written as one simulated day and four simulated days. **The recovery is about six hundred times weaker than the gather that empties the tile**, so a deposit that a single unit empties in one tick takes 600 or 2400 ticks to give back one unit of it. Over a run of 20000 ticks a food tile regains at most 31 units and a wood tile at most 7. The ground is therefore a stock that empties once and not a flow. A caller sets it with `set_recovery_rules`. Pass 10 measures it. |
+| Simulated day, the ticks a recovery period counts in | The resource ageing | unset, pass 10 | BLK-007 | Provisional default of 600 ticks. Pass 10 measures it. |
+
 ## The production queue
 
 | Value | Read by | Set | Blocker | Derivation |
@@ -237,3 +252,4 @@ rate, a step, a limit, a target, a share, a schedule, a bound.
 [^14]: Findings register, FND-542. `docs/FINDINGS.md`
 [^15]: Findings register, FND-543. `docs/FINDINGS.md`
 [^16]: Findings register, FND-547. `docs/FINDINGS.md`
+[^17]: Findings register, FND-549. `docs/FINDINGS.md`

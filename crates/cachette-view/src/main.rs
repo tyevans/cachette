@@ -67,7 +67,7 @@ const DEMO: WorldConfig = WorldConfig {
 /// # References
 ///
 /// [^1]: Recurring defect shapes, shape 1, redundant declaration sites. `.agents/rules/recurring-defects.md`
-/// [^2]: Findings register, FND-548. `docs/FINDINGS.md`
+/// [^2]: Findings register, FND-549. `docs/FINDINGS.md`
 /// [^3]: PRD-0012, a world starts small and grows. `docs/product/accepted/prd-0012-a-world-starts-small-and-grows.md`
 const GROUP: u32 = cachette_core::FOUNDING_GROUP_DEFAULT;
 

@@ -78,10 +78,12 @@ def read(world: World, factions: int) -> dict[str, int]:
     return row
 
 
-def play(job: tuple[int, int, int, int, int]) -> dict:
+def play(job: tuple[int, int, int, int, int, tuple[int | None, ...] | None]) -> dict:
     """Play one seed to the tick limit and sample it at a fixed stride."""
-    seed, extent, factions, limit, sample = job
+    seed, extent, factions, limit, sample, recovery = job
     world = World(extent, extent, seed=seed, faction_count=factions)
+    if recovery is not None:
+        world.set_recovery_rules(list(recovery))
     world.seed_world()
     world.set_tick_limit(limit)
     samples: list[dict[str, int]] = []
@@ -135,10 +137,26 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--json", type=pathlib.Path, default=pathlib.Path("target/saturation.json")
     )
+    parser.add_argument(
+        "--recovery",
+        default=None,
+        help=(
+            "The ticks one unit of each resource kind takes to come back, as "
+            "three comma separated values. A dash means the kind never comes "
+            "back. The engine default stands when this is absent."
+        ),
+    )
     args = parser.parse_args(argv)
 
+    recovery = None
+    if args.recovery is not None:
+        recovery = tuple(
+            None if part.strip() == "-" else int(part)
+            for part in args.recovery.split(",")
+        )
+
     jobs = [
-        (seed, args.extent, args.factions, args.tick_limit, args.sample)
+        (seed, args.extent, args.factions, args.tick_limit, args.sample, recovery)
         for seed in seeds_for(args.seeds)
     ]
     with multiprocessing.Pool(args.workers) as pool:
@@ -151,6 +169,7 @@ def main(argv: list[str] | None = None) -> int:
                 "factions": args.factions,
                 "tick_limit": args.tick_limit,
                 "sample": args.sample,
+                "recovery": list(recovery) if recovery is not None else None,
                 "runs": runs,
             },
             sort_keys=True,
