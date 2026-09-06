@@ -39,6 +39,7 @@ FACTIONS = 2
 CENSUS_NAMES = [
     "units",
     "settlements",
+    "births",
     "queue_produced",
     "queue_refused_without_a_person",
     "queue_refused_without_goods",

@@ -1210,6 +1210,8 @@ struct CensusTotals {
     queue_refused_without_goods: i64,
     /// The orders the queue verb refused, over the run.
     queue_refused_at_the_verb: i64,
+    /// The people the growth stage added, over the run.
+    births: i64,
 }
 
 impl World {
@@ -8620,6 +8622,13 @@ impl World {
         // The count is a census of one tick, and this stage is where the
         // tick starts for it. A world that cannot grow and a world that
         // chose not to both read zero here, and the free places say which.
+        //
+        // The run total is folded here, immediately before the per-tick
+        // count is emptied, because this is the one site that empties
+        // it.[^7]
+        //
+        // [^7]: Findings register, FND-498. `docs/FINDINGS.md`
+        self.census.births += i64::from(self.births);
         self.births = 0;
         if !self.growth_schedule.due(self.tick) {
             return;
@@ -10584,6 +10593,16 @@ pub const SUBSYSTEM_CENSUS: &[CensusRow] = &[
         basis: CensusBasis::Held,
         read: |world| i64::from(world.settlements.len()),
     },
+    // The people the growth stage added over the run. The stage counts one
+    // tick and clears that count before it acts, so the world folds the tick
+    // into a run total at the site that clears it.[^6]
+    //
+    // [^6]: ADR-0082, the store sets the rate of a birth and the housing admits it, decision D1. `docs/adrs/draft/adr-0082-the-store-sets-the-rate-of-a-birth-and-the-housing-admits-it.md`
+    CensusRow {
+        name: "births",
+        basis: CensusBasis::Total,
+        read: |world| world.census.births + i64::from(world.births),
+    },
     // What the build queue of every site has made, and what it has refused.
     // The two refusals of a finished entry stay apart, because they mean
     // different things to a watcher. A watcher then tells a site with no
@@ -10680,15 +10699,16 @@ pub const SUBSYSTEM_CENSUS: &[CensusRow] = &[
         basis: CensusBasis::Held,
         read: |world| world.luxuries.len() as i64,
     },
-    // A storm stands while the raised total is above zero. **This row counts
-    // no storm.** Its name says more than the reader reads, and a pass that
-    // counts the storms themselves must replace it.[^5]
+    // The storms a god raised over the run. One call of the divine power
+    // that put water into the air is one storm. The row once read whether
+    // the raised total stood above zero, which counted no storm and fell
+    // back to zero when the water dried.[^5]
     //
     // [^5]: Findings register, FND-498. `docs/FINDINGS.md`
     CensusRow {
         name: "storms_raised",
-        basis: CensusBasis::Held,
-        read: |world| i64::from(world.weather.raised() > 0),
+        basis: CensusBasis::Total,
+        read: |world| world.weather.storms(),
     },
     CensusRow {
         name: "contracts",
@@ -10740,6 +10760,13 @@ pub const SUBSYSTEM_CENSUS: &[CensusRow] = &[
     // What the plans of every faction have taken, finished, dropped and
     // refused. The record asks that a drop and a refusal each be counted.[^3]
     //
+    // **The drop row and the refusal row are disjoint.** A write the plan
+    // turned away at its bound is a drop and nothing else, and every other
+    // refusal of a write or a build is a refusal and nothing else. A reader
+    // adds the two rows and counts each act once. The two once overlapped,
+    // and the sum double-counted a full plan.[^7]
+    //
+    // [^7]: Findings register, FND-496. `docs/FINDINGS.md`
     // [^3]: ADR-0152, a faction plans its roads and zones with one solver, decisions D1, D4 and D5. `docs/adrs/accepted/adr-0152-a-faction-plans-its-roads-and-zones-with-one-solver.md`
     CensusRow {
         name: "projects_zoned",

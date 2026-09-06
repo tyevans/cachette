@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-548**
+**Next number: FND-549**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -13098,10 +13098,10 @@ holds the work.[^F543B]
 **Believed.** The balance register records that the wonder work does not move.
 Its derivation says the work done stalled between 18 and 61 units before tick
 500 and did not move again by tick 20000, and that the wonder path fires in no
-seed at either value.[^F547A] The win-path share row records that territory won
+seed at either value.[^F548A] The win-path share row records that territory won
 5 of 8 and that wealth or wonder won 3 of 8.
 
-**True.** Both readings were taken before the road chain was repaired.[^F547B]
+**True.** Both readings were taken before the road chain was repaired.[^F548B]
 Over 32 seeds at 20000 ticks the wonder work reaches the bar of 2400 in three
 seeds, and it ends those three games. The work done at the end runs from 24 to
 2400, with a median of 192. Territory ends no game, because the territory
@@ -13116,6 +13116,72 @@ time a subsystem is repaired, and nothing fails.** That is the shape the
 recurring-defect rule names, and this is one more local instance of it.[^F483G]
 
 
+### FND-548 — The census repair left three rows that still said more than they read
+
+**What the project believed.** The census repair gave every row a basis, folded
+each per-tick count into a run total, and put the build queue into the one
+table.[^F548P] The table then said what a run produced, and a reader could add
+the rows that count an act.
+
+**What is true.** Three rows were still wrong when that work merged.
+
+The growth stage landed in the same hour and registered no row at all. The
+engine counts a birth, and one reader answers the count of the last tick.[^F548Q]
+The one table named neither, so a reader of the table could not see the newest
+subsystem in the engine.
+
+The storm row counted no storm. It read whether the raised total stood above
+zero, so it answered one for a run that raised one storm and one for a run that
+raised a hundred. The repair itself recorded this and left it open.[^F548P]
+
+The two project rows were not disjoint. One write past the plan bound raised
+both the drop count and the refusal count, so a reader that added them counted
+that write twice. The earlier finding recorded this and left it open.[^F548B]
+
+**Evidence.** Written on 5 September 2026. Three tests now hold the three
+cases, and each was proved by putting the defect back and watching the named
+test go red. A fixture that affords one birth and then runs five quiet ticks
+reads one in the row and zero in the tick reader. A god that raises two storms
+reads two in the row, and the old reader read one. A plan at its bound raises
+the drop row alone, and the old code raised both.
+
+**The walker over the table caught none of the three.** That test steps a
+seeded world and asserts that no total row falls. Its world grows nobody and
+raises no storm, so both new rows read zero throughout and the walk passed
+under the birth defect. A walk over a table proves a property of the rows the
+fixture exercises, and it says nothing about a row the fixture never moves.
+
+**What follows.** Four things.
+
+**A row that counts an act belongs to the subsystem that acts.** The storm
+count now lives beside the water totals, and the birth total is folded where
+the per-tick count is emptied. Each act is counted in one place.[^F526A]
+
+**Two rows a reader adds must be disjoint.** A drop is now a drop and nothing
+else, and every other refusal is a refusal and nothing else. State the
+partition where the counters are declared, so a later writer sees the rule
+before it adds a third counter.
+
+**A subsystem that lands registers its row in the same change.** The growth
+stage passed every gate and shipped with no row. Nothing fails when the table
+is silent about a subsystem, because the table cannot know what the engine
+holds.
+
+**A count in a census is not a count in a hash.** None of these counters enters
+the state hash, because no later frame reads one.[^F160A] A counter that
+decided anything the simulation reads would be state, and it would have to
+enter the hash.
+
+**A second reading, taken while the three were repaired.** Every row of the
+table reaches Python, because the boundary hands the whole table out as one
+dictionary. Seven rows are named nowhere else in the tree but the Python test
+that asserts the key list: `seats_filled`, `characters`, `upgrades_complete`,
+`contracts`, `controller_refused`, `contracts_bound` and `wars_declared`. A row
+that no test asserts is a capability nobody invokes wearing another hat, and it
+can stop counting and stay green. None was deleted on this reading, because a
+row may serve the balance harness or the demonstration deck, and a backlog item
+holds the question.[^F548S]
+
 ## References
 
 [^F494C]: Findings register, FND-486. `docs/FINDINGS.md`
@@ -13128,8 +13194,8 @@ recurring-defect rule names, and this is one more local instance of it.[^F483G]
 [^F542I]: Backlog item 0507. `docs/backlog/proposed/0507-let-a-faction-take-the-ground-of-another.md`
 [^F543A]: Balance register, the stock target. `docs/reference/balance.md`
 [^F543B]: Backlog item 0506. `docs/backlog/proposed/0506-put-the-wealth-path-out-of-easy-reach.md`
-[^F547A]: Balance register, the wonder work and the win-path share. `docs/reference/balance.md`
-[^F547B]: Findings register, FND-496. `docs/FINDINGS.md`
+[^F548A]: Balance register, the wonder work and the win-path share. `docs/reference/balance.md`
+[^F548B]: Findings register, FND-496. `docs/FINDINGS.md`
 
 [^F498B]: The controller log, the refusal count and the stage that empties them. `crates/cachette-core/src/controller.rs`
 [^F498D]: ADR-0158, a site builds a typed unit from a bounded queue its store pays for, decision D6. `docs/adrs/accepted/adr-0158-a-site-builds-a-typed-unit-from-a-bounded-queue-its-store-pays-for.md`
@@ -13174,6 +13240,9 @@ recurring-defect rule names, and this is one more local instance of it.[^F483G]
 [^F538A]: The consumption conservation test. `crates/cachette-core/tests/consumption.rs`
 [^F539A]: Backlog item 0059, the done list. `docs/backlog/complete/0059-give-a-site-a-housing-capacity-and-a-resident-reader.md`
 [^F539B]: ADR-0157, a site's free places are its built housing less the residents the engine counts, decision D1. `docs/adrs/accepted/adr-0157-a-sites-free-places-are-its-built-housing-less-the-residents-the-engine-counts.md`
+[^F548P]: Findings register, FND-498. `docs/FINDINGS.md`
+[^F548Q]: The growth stage, which counts the people it added on one tick. `crates/cachette-core/src/world.rs`
+[^F548S]: Backlog item 0510. `docs/backlog/proposed/0510-say-which-census-row-answers-a-reader.md`
 [^F520B]: ADR-0085, an entity crosses to Python as one opaque identity that the engine resolves. `docs/adrs/accepted/adr-0085-an-entity-crosses-to-python-as-one-opaque-identity.md`
 [^F520C]: The type stub of the compiled module. `python/cachette/_core.pyi`
 [^F520D]: The Python bindings. `crates/cachette-py/src/lib.rs`
