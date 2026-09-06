@@ -59,24 +59,26 @@ DOCUMENTED_RESOURCE_KINDS = (0, 1, 2)
 DOCUMENTED_FIRST_REFUSED_KIND = 3
 
 # The doc comment of `World.order_build` states that a road is zero, a
-# terrace is one, a wonder is two and a store is three, and that four and
-# above name no upgrade kind. The doc comments of `World.build_order` and
+# terrace is one, a wonder is two, a store is three, a wall is four and a
+# lodging is five. The doc comments of `World.build_order` and
 # `World.tile_report` state the same numbering.
 DOCUMENTED_ROAD = 0
 DOCUMENTED_TERRACE = 1
 DOCUMENTED_WONDER = 2
 DOCUMENTED_STORE = 3
 DOCUMENTED_WALL = 4
+DOCUMENTED_LODGING = 5
 DOCUMENTED_UPGRADE_KINDS = (
     DOCUMENTED_ROAD,
     DOCUMENTED_TERRACE,
     DOCUMENTED_WONDER,
     DOCUMENTED_STORE,
     DOCUMENTED_WALL,
+    DOCUMENTED_LODGING,
 )
-# The table holds one open category above the five the doc comment names, so
+# The table holds one open category above the six the doc comment names, so
 # the first number that names no category is one above that.
-DOCUMENTED_FIRST_REFUSED_UPGRADE_KIND = 6
+DOCUMENTED_FIRST_REFUSED_UPGRADE_KIND = 7
 
 # The doc comment of `World.direction_offsets` states that a tile of this
 # world has this many neighbours.

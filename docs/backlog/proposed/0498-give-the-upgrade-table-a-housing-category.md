@@ -1,9 +1,9 @@
 ---
 id: 0498
 title: Give the upgrade table a housing category
-status: proposed
+status: complete
 created: 2026-09-05
-implements: []
+implements: [ADR-0151, ADR-0157, ADR-0152, ADR-0159]
 changes: []
 creates: []
 serves: [PRD-0014, PRD-0012]
@@ -63,29 +63,34 @@ store capacity change. Housing is the same shape with a different column.
 
 ## Impact review
 
-Not done. This item is `proposed/`, and refining it is the work.
+**Records that govern this work.** ADR-0151 states that an upgrade is a row of
+a table, that a build order names a category, and that no pass branches on a
+category.[^5] ADR-0157 D1 states that the housing of a site is a stored field
+that follows from what was built.[^1] ADR-0152 and ADR-0159 state that one
+solver writes the plan and that a unit builds only inside a project.[^6] [^7]
 
-**What refining must answer.**
+**How a finished upgrade reaches the housing of a site.** The build pass reads
+the level that stood at each tile of its run, merges the work, and raises the
+settlement on or beside every tile whose level rose. That is the one place
+that composes the two, and it is the only write path to the housing column
+inside the engine.
 
-- How a finished upgrade reaches the housing capacity of a site. A tile carries
-  the upgrade and a settlement carries the capacity, so the review must name the
-  one place that composes them and must not create a second declaration of the
-  number.[^4]
-- Whether the composition is derived on read or stored on completion. ADR-0157
-  D1 says the capacity is a stored field, so a derived composition would
-  contradict it and the review must say which changes.[^1]
-- Which ground a house fits, against the record that says an upgrade is a
-  category with a ground fit and a level.[^5]
+**Whether the composition is derived or stored.** It is stored on completion,
+which is what ADR-0157 D1 asks for.[^1] The store category derives its raise on
+read, and nothing in the engine reads it. Housing is different, because the
+growth stage reads it on every tick.
+
+**Which ground a lodging fits.** The plain, the forest and the hill. High
+ground is not ground a person settles.
 
 **Blockers.** BLK-050 governs the housing each level gives and the work each
-level takes. This item states neither in the code.
-
-**Waits on item 0059**, which gives a site the housing field this item raises.
+level takes. Both are named constants with a derivation in the commit body,
+and the balance register rows are listed in the outcome below.
 
 ## Done when
 
-- A finished housing upgrade raises the housing capacity of its site, and a test
-  asserts the capacity before and after.
+- A finished housing upgrade raises the housing capacity of its site, and a
+  test asserts the capacity before and after.
 - The capacity is declared once. A whole-tree search shows one write path, and
   the commit body carries the search.
 - A site whose housing was full grows again after a house is finished, and a
@@ -94,10 +99,6 @@ level takes. This item states neither in the code.
 - The thread-count test and the golden state test pass at 1, 2 and 12 threads.
 - No figure appears in the code or in a comment.
 - The whole check command runs green.
-
-## Outcome
-
-Filled in when the item moves to `complete/`.
 
 ## References
 

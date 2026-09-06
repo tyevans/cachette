@@ -35,7 +35,8 @@ TERRACE = 1
 WONDER = 2
 STORE = 3
 WALL = 4
-OPEN = 5
+LODGING = 5
+OPEN = 6
 
 # The ground numbers that ``World.tile_report`` states.
 WATER = 0
