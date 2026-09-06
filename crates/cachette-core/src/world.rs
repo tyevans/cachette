@@ -14861,27 +14861,31 @@ impl World {
 
     /// Runs the game end readers, while the record is empty.
     ///
-    /// The readers run in the fixed order domination, territory, wealth or
-    /// wonder, renown. The first that fires writes the record, and the
-    /// record is written once.[^1] Each reader is a pure function of the
-    /// world, and each resolves a tie by the lowest faction identifier,
-    /// because it visits the factions in ascending order and stops at the
-    /// first that fires.[^2]
+    /// The readers run in the fixed order domination, territory, renown. The
+    /// first that fires writes the record, and the record is written
+    /// once.[^1] Each reader is a pure function of the world, and each
+    /// resolves a tie by the lowest faction identifier, because it visits
+    /// the factions in ascending order and stops at the first that
+    /// fires.[^2]
+    ///
+    /// **The wealth-or-wonder path has no reader, so no game ends on
+    /// it.**[^3] The path keeps its place in the order and its number, and a
+    /// stored record that names it still resolves.
     ///
     /// # References
     ///
     /// [^1]: ADR-0148, a game end is recorded once and stops the controllers, decisions D2 and D3. `docs/adrs/accepted/adr-0148-a-game-end-is-recorded-once-and-stops-the-controllers.md`
     /// [^2]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
+    /// [^3]: ADR-0173, the wealth or wonder path has no reader, decision D1. `docs/adrs/draft/adr-0173-the-wealth-or-wonder-path-has-no-reader.md`
     fn check_game_end(&mut self) {
         if self.controller.game_end().is_set() {
             return;
         }
         // The order of this table is a rule of the game and not a balance
         // value. A path that has no reader is absent from it.
-        let readers: [(GameEndReader, WinPath); 4] = [
+        let readers: [(GameEndReader, WinPath); 3] = [
             (Self::domination_winner, WinPath::Domination),
             (Self::territory_winner, WinPath::Territory),
-            (Self::wealth_or_wonder_winner, WinPath::WealthOrWonder),
             (Self::renown_winner, WinPath::Renown),
         ];
         for (reader, path) in readers {
@@ -15079,21 +15083,28 @@ impl World {
         best
     }
 
-    /// The wealth-or-wonder reader: a stock total reaches the stock target,
-    /// or an upgrade that carries a victory claim stands on ground the
-    /// faction holds.
+    /// The wealth-or-wonder reader, which the game end table does not call.
+    ///
+    /// **No game ends on this path.** The table of readers omits it, so the
+    /// function decides nothing.[^1] It stays because a caller may still ask
+    /// which faction stands above the stock target or holds a finished
+    /// wonder, and because the quantity behind that question is reported.
     ///
     /// The stock total sums every commodity of every live settlement of the
-    /// faction in a 64-bit accumulator, and the bar stands above what one
-    /// settlement can hold. A faction reaches the bar by holding more
-    /// settlements, and not by waiting at the one it founded.[^1] The share
-    /// one settlement carries is a balance value.[^2] A tie resolves by the
-    /// lowest faction identifier.
+    /// faction in a 64-bit accumulator. A tie resolves by the lowest faction
+    /// identifier. The stock target is a balance value, and its row records
+    /// that no reader compares it.[^2]
     ///
     /// # References
     ///
-    /// [^1]: ADR-0165, the wealth bar stands above what one settlement can hold, decision D1. `docs/adrs/draft/adr-0165-the-wealth-bar-stands-above-what-one-settlement-can-hold.md`
+    /// [^1]: ADR-0173, the wealth or wonder path has no reader, decision D1. `docs/adrs/draft/adr-0173-the-wealth-or-wonder-path-has-no-reader.md`
     /// [^2]: Balance register, the stock target. `docs/reference/balance.md`
+    #[expect(
+        dead_code,
+        reason = "the wealth-or-wonder path has no reader, and the function \
+                  stays so that a stored record still resolves and a caller \
+                  can still read the quantity behind the path"
+    )]
     fn wealth_or_wonder_winner(&self) -> Option<FactionId> {
         let totals = self.stock_totals();
         let claims = self.victory_claims();
@@ -15300,13 +15311,19 @@ pub struct Standing {
     /// domination reader compares it against the seat count.
     pub seats_held: i64,
     /// The sum of every store of every settlement of the faction, as a raw
-    /// Q16.16 quantity. The wealth reader compares it.
+    /// Q16.16 quantity. **No reader compares it**, because the
+    /// wealth-or-wonder path has no reader. It is reported and not read.
     pub store_total: i64,
     /// The highest renown of any live character of the faction, as a raw
     /// Q16.16 value. The renown reader compares it.
     pub best_renown: i64,
-    /// The most work any wonder on ground the faction holds has reached. The
-    /// wonder reader compares it against the wonder work.
+    /// The most work any wonder on ground the faction holds has reached.
+    /// **No reader compares it**, because the wealth-or-wonder path has no
+    /// reader. It is reported and not read.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0173, the wealth or wonder path has no reader, decision D1. `docs/adrs/draft/adr-0173-the-wealth-or-wonder-path-has-no-reader.md`
     pub wonder_progress: i64,
 }
 
