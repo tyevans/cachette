@@ -414,6 +414,7 @@ without stating a constraint is worse than no record.
 | 0156 | A faction's option weights are policy, set through one verb | Draft | 0002, 0003, 0004, 0023, 0040, 0053, 0064, 0096, 0098, 0109, 0144, 0150, 0152, 0153, 0154 | `draft/adr-0156-a-factions-option-weights-are-policy-set-through-one-verb.md` |
 | 0157 | A site's free places are its built housing less the residents the engine already counts. Replaces ADR-0081, which review 0199 rejected | Draft | 0009, 0023, 0062, 0082, 0096, 0120, 0145, 0158 | `draft/adr-0157-a-sites-free-places-are-its-built-housing-less-the-residents-the-engine-counts.md` |
 | 0158 | A site builds a typed unit from a bounded queue its store pays for | Draft | 0004, 0009, 0040, 0062, 0096, 0120, 0144, 0150, 0154, 0156, 0157 | `draft/adr-0158-a-site-builds-a-typed-unit-from-a-bounded-queue-its-store-pays-for.md` |
+| 0159 | A project order names one category for each unit and one seed set for the faction, and the field decides where a unit arrives. Changes ADR-0152 D5, the per-unit assignment; the other decisions of ADR-0152 stand | Draft | 0001, 0004, 0040, 0091, 0095, 0110, 0125, 0144, 0152 | `draft/adr-0159-a-project-order-names-one-category-and-one-seed-set.md` |
 
 ### Retired numbers
 
