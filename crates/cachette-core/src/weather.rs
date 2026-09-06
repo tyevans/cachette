@@ -1282,6 +1282,12 @@ const LIFT_DROPS: i64 = 448;
 /// [^1]: ADR-0162, water enters the air where it is hot, and it falls where the air cools, decision D3. `docs/adrs/accepted/adr-0162-water-enters-the-air-where-it-is-hot-and-falls-where-the-air-cools.md`
 pub const AIR_SATURATION: Drops = Drops(2048);
 
+/// A whole sky, in the unit that the cloud share counts in.
+///
+/// The unit is 255ths, because that is what an overlay paints into one byte
+/// of a channel. A reader that wants a percentage divides.
+pub const CLOUD_SHARE_WHOLE: i64 = 255;
+
 /// How rarely a cell of open water lifts.
 ///
 /// A cell draws once each frame. It lifts when the draw, taken below the tile
@@ -2032,6 +2038,27 @@ impl WeatherField {
     #[must_use]
     pub const fn air_ceiling(&self) -> i64 {
         AIR_SATURATION.0
+    }
+
+    /// Returns the share of the sky over one cell that a watcher sees as
+    /// cloud, from none to [`CLOUD_SHARE_WHOLE`].
+    ///
+    /// **Cloud is the air held against what the air of that cell can hold**,
+    /// and not the air held against a mark that every cell shares. Every
+    /// reader that paints cloud takes this one, so the rule has one
+    /// declaration site.[^1]
+    ///
+    /// Returns none when the cell lies outside the lattice, and when the
+    /// field holds no water at all.
+    ///
+    /// # References
+    ///
+    /// [^1]: Recurring Defect Shapes, shape 1. `.agents/rules/recurring-defects.md`
+    #[must_use]
+    pub fn cloud_share_at(&self, cell: u32) -> i64 {
+        let held = self.air_at(cell).0;
+        let ceiling = self.air_ceiling().max(1);
+        (held * CLOUD_SHARE_WHOLE / ceiling).clamp(0, CLOUD_SHARE_WHOLE)
     }
 
     /// Returns every drop that has ever entered the air.
