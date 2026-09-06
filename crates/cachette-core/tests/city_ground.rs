@@ -373,8 +373,20 @@ fn the_controller_build_order_is_refused_and_counted_when_the_faction_holds_noth
     let founding = field
         .found_group_at(seat, 8, FactionId(0))
         .expect("the ground carries a founding");
-    // The faction keeps its seat and its people, and loses its city. It then
-    // holds no ground, so every build but a road is refused.
+    // The second faction founds as well, and keeps its city. Without it the
+    // domination reader ends the game on the first tick, the controller then
+    // emits nothing, and this test would measure the game end.[^2]
+    //
+    // [^2]: ADR-0148, a game end is recorded once and stops the controllers, decision D3. `docs/adrs/accepted/adr-0148-a-game-end-is-recorded-once-and-stops-the-controllers.md`
+    let rival = addresses(&field)
+        .into_iter()
+        .find(|address| address.distance(seat) > 12 && field.admits_a_unit(*address))
+        .expect("the world holds open ground away from the first seat");
+    field
+        .found_group_at(rival, 8, FactionId(1))
+        .expect("the ground carries a second founding");
+    // The first faction keeps its seat and its people, and loses its city. It
+    // then holds no ground, so every build but a road is refused.
     assert!(field.destroy_settlement(founding.settlement()));
 
     let mut refused_builds = 0u32;

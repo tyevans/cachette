@@ -682,6 +682,11 @@ impl Holding {
         });
         drop(decide_span);
 
+        // The change list is one pair of a tile and the value that tile
+        // takes. A second per-tile column joins the pair rather than opening
+        // a second pass, so the write stays one scattered store for each tile
+        // that moved.
+        //
         // The join and the write are one stage. The join is what fixes the
         // order of the result, and the write is what the order is for.
         let _span = stage::open(Stage::HoldingApply);
@@ -1105,6 +1110,11 @@ pub struct City {
 /// The call reads no holder, so it is a pure function of the tile, the
 /// terrain and the city list. Two threads that decide two tiles therefore
 /// share nothing.[^2]
+///
+/// **This function is the one statement of the holder rule, and the parallel
+/// pass calls it for every candidate tile.** A second source of a claim adds
+/// its argument here and its comparison here. A rule written inline in the
+/// loop would have to be found and moved first.
 ///
 /// # References
 ///
