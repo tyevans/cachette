@@ -1,10 +1,16 @@
 """Type stubs for the compiled extension module.
 
-This file is hand-written. **No generator produces it and no job compares it
-against the module**, so a signature here can disagree with the module and
-nothing fails. An earlier version of this docstring claimed the opposite, and a
-finding records the correction.[^1] A backlog item holds the generator and the
-check.[^2]
+Most of this file is hand-written. **No generator produces the hand-written
+part and no job compares it against the module**, so a signature there can
+disagree with the module and nothing fails. An earlier version of this
+docstring claimed the opposite, and a finding records the correction.[^1] A
+backlog item holds the generator for the rest of the file.[^2]
+
+**One part does generate.** A class that holds the columns of an event carries
+a marked block of annotations. A script writes that block from the field
+declaration that the engine reports, and a test runs the same script in check
+mode.[^5] A field added to an event therefore fails a test until the block
+follows. Do not edit a marked block by hand.
 
 **This file states types. It does not state prose.** A member that the compiled
 module provides carries its prose in the Rust doc comment, and the published
@@ -30,6 +36,8 @@ decisions D2 and D3.
 
 [^4]: Findings register, FND-321.
 ``docs/FINDINGS.md``
+
+[^5]: The event stub generator. ``scripts/generate_event_stubs.py``
 """
 
 from collections.abc import Sequence
@@ -56,11 +64,13 @@ class TileChangedColumns(TypedDict):
     never a floating point number.
     """
 
+    # Generated from the engine by scripts/generate_event_stubs.py.
     tick: npt.NDArray[np.uint64]
     tile: npt.NDArray[np.uint32]
     value: npt.NDArray[np.int32]
     holder: npt.NDArray[np.uint16]
     kind: npt.NDArray[np.uint8]
+    # End of the generated block.
 
 class Storm(TypedDict):
     """What one call to ``World.inflict_weather`` did.
@@ -99,11 +109,13 @@ class ResourceTakenColumns(TypedDict):
     index. Hand a value from it back to ``World.soldier_tile``.
     """
 
+    # Generated from the engine by scripts/generate_event_stubs.py.
     tick: npt.NDArray[np.uint64]
     unit: npt.NDArray[np.uint64]
     tile: npt.NDArray[np.uint32]
     amount: npt.NDArray[np.uint32]
     kind: npt.NDArray[np.uint8]
+    # End of the generated block.
 
 class SiteQueueColumns(TypedDict):
     """One column for each field of an entry of the build queue of a site.
@@ -174,9 +186,11 @@ class UnitStarvedColumns(TypedDict):
     The deficit column carries the Q16.16 fixed-point scale as a raw integer.
     """
 
+    # Generated from the engine by scripts/generate_event_stubs.py.
     tick: npt.NDArray[np.uint64]
     unit: npt.NDArray[np.uint64]
     deficit: npt.NDArray[np.int32]
+    # End of the generated block.
 
 class SiteShortfallColumns(TypedDict):
     """One column for each field of the shortfall event.
@@ -187,10 +201,12 @@ class SiteShortfallColumns(TypedDict):
     The amount column carries the Q16.16 fixed-point scale as a raw integer.
     """
 
+    # Generated from the engine by scripts/generate_event_stubs.py.
     tick: npt.NDArray[np.uint64]
     site: npt.NDArray[np.uint64]
     amount: npt.NDArray[np.int32]
     commodity: npt.NDArray[np.uint16]
+    # End of the generated block.
 
 class SiteRationedColumns(TypedDict):
     """One column for each field of the rationed event.
@@ -202,11 +218,13 @@ class SiteRationedColumns(TypedDict):
     scale as raw integers.
     """
 
+    # Generated from the engine by scripts/generate_event_stubs.py.
     tick: npt.NDArray[np.uint64]
     site: npt.NDArray[np.uint64]
     demanded: npt.NDArray[np.int64]
     granted: npt.NDArray[np.int64]
     commodity: npt.NDArray[np.uint16]
+    # End of the generated block.
 
 class UnitPromotedColumns(TypedDict):
     """One column for each field of the promotion event.
@@ -218,11 +236,13 @@ class UnitPromotedColumns(TypedDict):
     fixed-point scale.
     """
 
+    # Generated from the engine by scripts/generate_event_stubs.py.
     tick: npt.NDArray[np.uint64]
     unit: npt.NDArray[np.uint64]
     character: npt.NDArray[np.uint64]
     deeds: npt.NDArray[np.uint64]
     faction: npt.NDArray[np.uint16]
+    # End of the generated block.
 
 class PositionColumns(TypedDict):
     """One column for each field of a position at a site.
@@ -638,11 +658,13 @@ class TradeSpokenColumns(TypedDict):
     step.
     """
 
+    # Generated from the engine by scripts/generate_event_stubs.py.
     tick: npt.NDArray[np.uint64]
     proposer: npt.NDArray[np.uint16]
     responder: npt.NDArray[np.uint16]
     act: npt.NDArray[np.uint8]
     status: npt.NDArray[np.uint8]
+    # End of the generated block.
 
 class MarketColumns(TypedDict):
     """One column for each field of a board row that says something.
@@ -668,11 +690,13 @@ class UnitFellColumns(TypedDict):
     The log covers the last step alone. The next step empties it.
     """
 
+    # Generated from the engine by scripts/generate_event_stubs.py.
     tick: npt.NDArray[np.uint64]
     unit: npt.NDArray[np.uint64]
     tile: npt.NDArray[np.uint32]
     faction: npt.NDArray[np.uint16]
     unit_type: npt.NDArray[np.uint8]
+    # End of the generated block.
 
 class RelationCrossedColumns(TypedDict):
     """One column for each field of a war edge crossing.
@@ -685,11 +709,13 @@ class RelationCrossedColumns(TypedDict):
     The log covers the last step alone. The next step empties it.
     """
 
+    # Generated from the engine by scripts/generate_event_stubs.py.
     tick: npt.NDArray[np.uint64]
     from_faction: npt.NDArray[np.uint16]
     to_faction: npt.NDArray[np.uint16]
     band_before: npt.NDArray[np.uint8]
     band_after: npt.NDArray[np.uint8]
+    # End of the generated block.
 
 class CampaignColumns(TypedDict):
     """One column for each field of a campaign row.
@@ -731,15 +757,23 @@ class CampaignEventColumns(TypedDict):
     The kind is zero for a raise, one for a win, two for a loss and three for
     an end by a holder change to a third party. The log covers the last step
     alone, and a raise from this side lands in it until the next step.
+
+    The objective tile is the row-major index of the tile. The two address
+    columns give the same tile as an axial address, and the engine reads
+    them from the grid. They sit after the generated block, because the
+    event holds no address of its own.
     """
 
+    # Generated from the engine by scripts/generate_event_stubs.py.
     tick: npt.NDArray[np.uint64]
+    objective_tile: npt.NDArray[np.uint32]
+    cohort_size: npt.NDArray[np.uint32]
     faction: npt.NDArray[np.uint16]
     kind: npt.NDArray[np.uint8]
     objective_kind: npt.NDArray[np.uint8]
+    # End of the generated block.
     objective_q: npt.NDArray[np.int32]
     objective_r: npt.NDArray[np.int32]
-    cohort_size: npt.NDArray[np.uint32]
 
 class UnitConvertedColumns(TypedDict):
     """One column for each field of a conversion event.
@@ -748,11 +782,13 @@ class UnitConvertedColumns(TypedDict):
     keeps its identity, so `unit` names the same unit before and after.
     """
 
+    # Generated from the engine by scripts/generate_event_stubs.py.
     tick: npt.NDArray[np.uint64]
     unit: npt.NDArray[np.uint64]
     tile: npt.NDArray[np.uint32]
     from_faction: npt.NDArray[np.uint16]
     to_faction: npt.NDArray[np.uint16]
+    # End of the generated block.
 
 class CharacterColumns(TypedDict):
     """One column for each field of a living character.
@@ -1141,3 +1177,4 @@ class World:
     def set_character_renown(self, characters: Identities, renown: int) -> None: ...
 
 def version() -> str: ...
+def event_schema() -> dict[str, list[tuple[str, str]]]: ...
