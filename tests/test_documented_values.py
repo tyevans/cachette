@@ -62,13 +62,17 @@ DOCUMENTED_ROAD = 0
 DOCUMENTED_TERRACE = 1
 DOCUMENTED_WONDER = 2
 DOCUMENTED_STORE = 3
+DOCUMENTED_WALL = 4
 DOCUMENTED_UPGRADE_KINDS = (
     DOCUMENTED_ROAD,
     DOCUMENTED_TERRACE,
     DOCUMENTED_WONDER,
     DOCUMENTED_STORE,
+    DOCUMENTED_WALL,
 )
-DOCUMENTED_FIRST_REFUSED_UPGRADE_KIND = 4
+# The table holds one open category above the five the doc comment names, so
+# the first number that names no category is one above that.
+DOCUMENTED_FIRST_REFUSED_UPGRADE_KIND = 6
 
 # The doc comment of `World.direction_offsets` states that a tile of this
 # world has this many neighbours.
@@ -214,6 +218,15 @@ def test_every_upgrade_kind_carries_the_documented_number(
         world.found_settlements([address], faction=0)
         world.step(threads=1)
         units = world.spawn_soldiers([address], faction=0)
+        # A category whose row does not fit the ground under this tile is
+        # refused, and the number it carries is still the documented one.
+        table = world.upgrade_table()
+        ground = world.tile_report(*address)["kind"]
+        levels = len(table["ground_fit"]) // (DOCUMENTED_FIRST_REFUSED_UPGRADE_KIND)
+        if not int(table["ground_fit"][kind * levels]) & (1 << ground):
+            with pytest.raises(cachette.VerbError):
+                world.order_build(units, kind)
+            continue
         world.order_build(units, kind)
         assert world.build_order(int(units[0])) == kind
         world.step(threads=1)
