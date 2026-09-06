@@ -99,7 +99,7 @@ use crate::upgrade::{
     self, BuildRefusal, UpgradeCategory, UpgradeMap, UpgradeRow, UpgradeSite, UpgradeTable,
     UpgradeTableError,
 };
-use crate::weather::{Ground, Storm, WeatherError, WeatherField};
+use crate::weather::{Ground, Storm, WeatherError, WeatherField, Wind};
 
 /// The reason that a value did not name a live entity.
 ///
@@ -5522,6 +5522,23 @@ impl World {
     pub fn ground_water_at(&self, address: Axial) -> Option<i64> {
         let tile = self.grid.index_of(address)?;
         Some(self.weather.ground_at(self.cell_of(tile)?).0)
+    }
+
+    /// Returns the wind over the cell that covers one tile.
+    ///
+    /// The wind is a bounded integer vector over the two axes of the cell
+    /// lattice. It is carried state, so a watcher who reads it reads what the
+    /// next step will read.[^1]
+    ///
+    /// Returns `None` when the address lies outside the world.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0160, the wind is carried state, and the pressure gradient accelerates it, decision D1. `docs/adrs/accepted/adr-0160-the-wind-is-carried-state-and-the-pressure-gradient-accelerates-it.md`
+    #[must_use]
+    pub fn wind_at(&self, address: Axial) -> Option<Wind> {
+        let tile = self.grid.index_of(address)?;
+        Some(self.weather.wind_at(self.cell_of(tile)?))
     }
 
     /// Reports whether the ground under one tile is wet.

@@ -54,6 +54,7 @@
 //! [^5]: ADR-0067, the viewer reads the world and never writes to it, decision D3. `docs/adrs/accepted/adr-0067-the-viewer-reads-the-world-and-never-writes-to-it.md`
 //! [^6]: Blockers register, BLK-007. `docs/BLOCKERS.md`
 
+use cachette_core::hex::NEIGHBOUR_COUNT;
 use cachette_core::resource::ResourceKind;
 use cachette_core::terrain::TerrainTile;
 use cachette_core::upgrade::UPGRADE_LEVEL_COUNT;
@@ -307,6 +308,83 @@ impl Layer for Air {
     }
 }
 
+/// The colour of each of the six wind directions, in the direction order.
+///
+/// **A direction is a thing and not a quantity**, so each one takes its own
+/// colour rather than a strength on one colour. The six run around the colour
+/// wheel in the same order that the six lattice steps run around the cell, so
+/// a watcher reads a turning wind as a turning hue and a front as a band of
+/// one colour crossing the map.[^1]
+///
+/// # References
+///
+/// [^1]: ADR-0160, the wind is carried state, and the pressure gradient accelerates it, decision D1. `docs/adrs/accepted/adr-0160-the-wind-is-carried-state-and-the-pressure-gradient-accelerates-it.md`
+const WIND_COLOURS: [u32; NEIGHBOUR_COUNT] = [
+    0x00ff_6b4a,
+    0x00ff_c94a,
+    0x009b_ff4a,
+    0x004a_d8ff,
+    0x006b_4aff,
+    0x00ff_4ac9,
+];
+
+/// The base the wind overlay packs a speed against.
+///
+/// The value of the overlay carries the speed and the direction together,
+/// because the deck gives one integer for one tile. The base is above the six
+/// directions, so the two never run into each other.
+const WIND_PACK: i64 = 8;
+
+/// Which way the wind blows over the cell that covers each tile, and how fast.
+///
+/// **The colour names the direction and the strength gives the speed.** A
+/// field a watcher cannot see is a field the project owner cannot judge, and
+/// the wind is the quantity that decides whether a storm travels at all.
+///
+/// The overlay reads the cell of the tile flat and does not interpolate. The
+/// value packs a direction, and a direction between two cells is not the mean
+/// of the two numbers that name them.
+struct WindLayer;
+
+impl Layer for WindLayer {
+    fn name(&self) -> &'static str {
+        "wind"
+    }
+
+    fn unit(&self) -> &'static str {
+        "the speed, coloured by direction"
+    }
+
+    fn value(&self, at: At<'_>) -> i64 {
+        let Some(wind) = at.world.wind_at(at.address) else {
+            return 0;
+        };
+        let Some(heading) = wind.heading() else {
+            return 0;
+        };
+        i64::from(wind.speed()) * WIND_PACK + heading as i64
+    }
+
+    fn span(&self, world: &World) -> Span {
+        // The span runs to the fastest cell of this frame, so a slow field
+        // still reads rather than painting one flat wash near nothing.
+        Span::new(0, i64::from(world.weather().fastest()))
+    }
+
+    fn colour(&self, value: i64) -> u32 {
+        WIND_COLOURS[(value % WIND_PACK) as usize % NEIGHBOUR_COUNT]
+    }
+
+    fn strength(&self, value: i64, span: Span) -> u8 {
+        // A still cell paints nothing. Every other cell paints its direction
+        // at the strength of its speed.
+        if value < WIND_PACK {
+            return 0;
+        }
+        span.strength(value / WIND_PACK)
+    }
+}
+
 /// Returns the largest value of a weather plane.
 ///
 /// The scan reads the cell lattice once for a frame. It reads no tile, so its
@@ -507,6 +585,7 @@ pub fn registered() -> &'static [&'static (dyn Layer + 'static)] {
     &[
         &Moisture,
         &Air,
+        &WindLayer,
         &Stock {
             kind: ResourceKind::Food,
             name: "food",

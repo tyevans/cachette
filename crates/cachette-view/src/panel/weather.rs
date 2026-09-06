@@ -20,15 +20,24 @@
 //! reader. A running field for each of the three would remove the pass, and
 //! the field holds none today.
 //!
-//! When the caller sets a pointer, the panel reads the air and the ground at
-//! the cell that covers the pointed tile. Each is one array read through the
-//! cell of the tile.[^3]
+//! **The panel names the fastest wind of the lattice.** The wind is what
+//! decides whether a storm travels, and the water totals alone cannot tell a
+//! field that carries from one that sits. The reading is a scan of the wind
+//! plane, which costs the lattice and not the world.[^4]
+//!
+//! When the caller sets a pointer, the panel reads the air, the ground and
+//! the wind at the cell that covers the pointed tile. Each is one array read
+//! through the cell of the tile.[^3]
 //!
 //! # References
 //!
 //! [^1]: The panel standard. `crates/cachette-view/src/panel/mod.rs`
 //! [^2]: ADR-0070, the head-up display reports what the drawing pass read, decision D1. `docs/adrs/accepted/adr-0070-the-head-up-display-reports-what-the-drawing-pass-read.md`
 //! [^3]: ADR-0140, weather is a field over the level 1 cell lattice, decision D1. `docs/adrs/draft/adr-0140-weather-is-a-field-over-the-level-1-cell-lattice.md`
+//! [^4]: ADR-0160, the wind is carried state, and the pressure gradient accelerates it, decision D1. `docs/adrs/accepted/adr-0160-the-wind-is-carried-state-and-the-pressure-gradient-accelerates-it.md`
+
+use cachette_core::hex::NEIGHBOURS;
+use cachette_core::Wind;
 
 use super::{Line, Panel, View};
 use crate::hud::grouped;
@@ -76,6 +85,14 @@ impl Panel for Weather {
             grouped(u64::from(field.wet_cells())),
         ));
 
+        // **The wind is what decides whether a storm travels.** A watcher who
+        // reads the water totals alone cannot tell a field that carries from
+        // one that sits, so the panel names the fastest cell of the
+        // lattice.[^1]
+        //
+        // [^1]: ADR-0160, the wind is carried state, and the pressure gradient accelerates it, decision D1. `docs/adrs/accepted/adr-0160-the-wind-is-carried-state-and-the-pressure-gradient-accelerates-it.md`
+        lines.push(Line::row("fastest wind", steps(i64::from(field.fastest()))));
+
         lines.push(Line::Rule);
         lines.push(Line::heading("POINTED CELL"));
         match view.pointer {
@@ -96,6 +113,17 @@ impl Panel for Weather {
                             "no"
                         },
                     ));
+                    let wind = world.wind_at(pointer).unwrap_or(Wind::STILL);
+                    lines.push(Line::row("wind", steps(i64::from(wind.speed()))));
+                    lines.push(Line::row(
+                        "blowing",
+                        match wind.heading() {
+                            None => "nowhere".to_string(),
+                            Some(heading) => {
+                                format!("q {}  r {}", NEIGHBOURS[heading].q, NEIGHBOURS[heading].r)
+                            }
+                        },
+                    ));
                 }
                 _ => {
                     lines.push(Line::note("the pointed tile is outside"));
@@ -106,6 +134,15 @@ impl Panel for Weather {
 
         lines
     }
+}
+
+/// Returns a speed in lattice steps as text.
+///
+/// The unit is the cell of the level 1 lattice, so a speed of one carries a
+/// front one cell in one pass. The field bounds the speed at a small whole
+/// number.
+fn steps(speed: i64) -> String {
+    format!("{speed} cells")
 }
 
 /// Returns a count of drops as text.
@@ -122,7 +159,7 @@ fn drops(count: i64) -> String {
 
 #[cfg(test)]
 mod tests {
-    use cachette_core::weather::{PLACES_CEILING, STRENGTH_CEILING};
+    use cachette_core::weather::{PLACES_CEILING, SPEED_CEILING, STRENGTH_CEILING};
     use cachette_core::{Axial, FactionId, World, WorldConfig};
 
     use super::*;
@@ -296,6 +333,11 @@ mod tests {
             Line::row("wet cells", worst_cells),
             Line::row("tile", format!("q {}  r {}", 999_999, 999_999)),
             Line::row("wet", "yes".to_string()),
+            // The speed the engine bounds the wind at, read back from the
+            // engine rather than restated here.
+            Line::row("fastest wind", steps(i64::from(SPEED_CEILING))),
+            Line::row("wind", steps(i64::from(SPEED_CEILING))),
+            Line::row("blowing", "q -1  r  1".to_string()),
         ];
         for line in &lines {
             assert!(!line.is_cut(), "line was cut: {line:?}");
