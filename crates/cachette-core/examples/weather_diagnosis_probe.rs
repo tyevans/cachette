@@ -72,9 +72,8 @@ fn main() {
     let (wide, high) = (cells.width(), cells.height());
     println!("lattice {wide} by {high} cells");
     println!(
-        "season reach {} cells, season step {:?}, pressure divisor {}, transport passes {}",
-        scale.season_reach(),
-        scale.season_step(),
+        "season period {} ticks, pressure divisor {}, transport passes {}",
+        cachette_core::weather::SEASON_PERIOD_TICKS,
         scale.pressure_divisor(),
         scale.transport_passes()
     );
@@ -137,7 +136,7 @@ fn main() {
         let still = wind.iter().filter(|w| w.is_still()).count();
 
         println!("--- tick {tick}");
-        println!("  temperature column means {column_mean:?}");
+        println!("  temperature row means (latitude) {row_mean:?}");
         println!("  largest column jump {jump}, largest row jump {row_jump}");
         println!(
             "  air total {air_total}, high {air_high}, cells with any {air_cells} of {}, over 64 {air_over_64}, over 256 {air_over_256}",
@@ -146,31 +145,38 @@ fn main() {
         println!("  fastest wind {fastest}, still cells {still} of {}", wind.len());
         println!("  strongest circulation {strongest}, cells turning {turning}");
 
-        // The modal wind heading of each column. A watcher of the wind
-        // overlay reads one heading as one colour, so a run of one heading
-        // over many rows and one column is a vertical band.
-        let mut modal = String::new();
-        let mut flips = 0;
-        let mut last = usize::MAX;
-        for column in 0..wide {
-            let mut counts = [0u32; NEIGHBOUR_COUNT + 1];
-            for row in 0..high {
-                if let Some(at) = cells.index_of(Axial::new(column as i32, row as i32)) {
-                    match wind[at.0 as usize].heading() {
-                        None => counts[NEIGHBOUR_COUNT] += 1,
-                        Some(heading) => counts[heading] += 1,
+        // The modal wind heading of each column and of each row. A watcher
+        // of the wind overlay reads one heading as one colour, so a run of
+        // one heading over many cells of one column is a vertical band.
+        for (axis, along, across) in [("column", wide, high), ("row", high, wide)] {
+            let mut modal = String::new();
+            let mut flips = 0;
+            let mut last = usize::MAX;
+            for line in 0..along {
+                let mut counts = [0u32; NEIGHBOUR_COUNT + 1];
+                for other in 0..across {
+                    let address = if axis == "column" {
+                        Axial::new(line as i32, other as i32)
+                    } else {
+                        Axial::new(other as i32, line as i32)
+                    };
+                    if let Some(at) = cells.index_of(address) {
+                        match wind[at.0 as usize].heading() {
+                            None => counts[NEIGHBOUR_COUNT] += 1,
+                            Some(heading) => counts[heading] += 1,
+                        }
                     }
                 }
+                let best = (0..=NEIGHBOUR_COUNT).max_by_key(|k| counts[*k]).unwrap();
+                let share = counts[best] * 100 / across.max(1);
+                if best != last {
+                    flips += 1;
+                    last = best;
+                }
+                modal.push_str(&format!("{best}:{share} "));
             }
-            let best = (0..=NEIGHBOUR_COUNT).max_by_key(|k| counts[*k]).unwrap();
-            let share = counts[best] * 100 / high.max(1);
-            if best != last {
-                flips += 1;
-                last = best;
-            }
-            modal.push_str(&format!("{best}:{share} "));
+            println!("  modal heading of each {axis} ({flips} runs): {modal}");
         }
-        println!("  modal heading of each column ({flips} runs): {modal}");
     }
 }
 
