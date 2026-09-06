@@ -35,7 +35,7 @@ use cachette_core::TileIdx;
 use cachette_core::{Advert, Consideration, KIND_LAND, KIND_RELATION, KIND_RESOURCE};
 use cachette_core::{
     Axial, CommodityId, Entity, FactionId, Fix32, Holder, Influence, ResourceKind,
-    World as CoreWorld, WorldConfig,
+    WeatherScale, World as CoreWorld, WorldConfig,
 };
 use cachette_view::panel::Set as PanelSet;
 use cachette_view::{
@@ -246,6 +246,17 @@ produce it.** The binding library catches a panic and raises its own
 /// reserves as much unit storage as a large one. That reservation is what
 /// `spawn_soldiers` means by a full arena.
 ///
+/// **The weather runs on a lattice of its own, and `weather_cell_tiles`
+/// states its pitch.** The number is the side of one weather cell in tiles.
+/// It must be a power of two from 1 to 256. One gives each tile its own
+/// weather. `None` takes the pitch the engine defaults to, which is the
+/// level 1 block.
+///
+/// The cost of the weather stage follows the cell count, and the cell count
+/// is the tile count divided by the square of the pitch. A pitch of one on a
+/// large world therefore costs the frame. Read `weather_cell_count` for how
+/// many cells a built world holds.
+///
 /// The constructor raises `ConfigError` when the arguments do not describe a
 /// world. A side of zero and a faction count above the ceiling are the two
 /// cases a caller meets first.
@@ -254,6 +265,27 @@ produce it.** The binding library catches a panic and raises its own
 ///
 /// [^1]: ADR-0001, one binary gives one answer at any thread count, decision D1. `docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
 /// [^2]: Findings register, FND-325. `docs/FINDINGS.md`
+/// Turns a weather cell side in tiles into the scale the engine takes.
+///
+/// **A watcher states a pitch in tiles, not as a logarithm.** The engine
+/// carries the base-two logarithm of the side, because the lattice geometry
+/// needs a shift. A caller of the control plane should not have to know that,
+/// so the conversion happens once, here.
+///
+/// # Errors
+///
+/// Raises `ConfigError` when the side is zero, when it is not a power of two,
+/// or when it is above the largest side the engine carries.
+fn scale_of_tiles(tiles: u32) -> PyResult<WeatherScale> {
+    if tiles == 0 || !tiles.is_power_of_two() {
+        return Err(ConfigError::new_err(format!(
+            "the weather cell side {tiles} is not a power of two"
+        )));
+    }
+    WeatherScale::from_bits(tiles.trailing_zeros())
+        .map_err(|error| ConfigError::new_err(error.to_string()))
+}
+
 #[pyclass(name = "World", module = "cachette._core", frozen)]
 pub struct PyWorld {
     inner: std::sync::Mutex<CoreWorld>,
@@ -305,22 +337,46 @@ impl PyWorld {
     /// # Errors
     ///
     /// Raises `ConfigError` when the arguments do not describe a world. A side
-    /// of zero and a faction count above 63 are the two cases a caller meets
-    /// first.
+    /// of zero, a faction count above 63, and a weather pitch that is not a
+    /// power of two are the cases a caller meets first.
     ///
     /// # References
     ///
     /// [^1]: Findings register, FND-325. `docs/FINDINGS.md`
     #[new]
-    #[pyo3(signature = (width = 64, height = 64, seed = 0x0123_4567_89ab_cdef, faction_count = 4))]
-    fn new(width: u32, height: u32, seed: u64, faction_count: u16) -> PyResult<Self> {
-        let world = CoreWorld::new(WorldConfig {
-            width,
-            height,
-            seed,
-            faction_count,
-            unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
-        })
+    #[pyo3(signature = (
+        width = 64,
+        height = 64,
+        seed = 0x0123_4567_89ab_cdef,
+        faction_count = 4,
+        weather_cell_tiles = None,
+    ))]
+    fn new(
+        width: u32,
+        height: u32,
+        seed: u64,
+        faction_count: u16,
+        weather_cell_tiles: Option<u32>,
+    ) -> PyResult<Self> {
+        // **The default lives in the engine and nowhere else.** A caller that
+        // states no pitch gets whatever the engine calls its default, so this
+        // binding holds no second copy of that number.[^3]
+        //
+        // [^3]: Recurring Defect Shapes, shape 1. `.agents/rules/recurring-defects.md`
+        let scale = match weather_cell_tiles {
+            None => WeatherScale::DEFAULT,
+            Some(tiles) => scale_of_tiles(tiles)?,
+        };
+        let world = CoreWorld::with_weather_scale(
+            WorldConfig {
+                width,
+                height,
+                seed,
+                faction_count,
+                unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
+            },
+            scale,
+        )
         .map_err(|error| ConfigError::new_err(error.to_string()))?;
         Ok(Self {
             inner: std::sync::Mutex::new(world),
@@ -365,6 +421,38 @@ impl PyWorld {
     #[getter]
     fn tile_count(&self) -> usize {
         self.lock().tile_count()
+    }
+
+    /// The side of one weather cell in tiles, as an integer.
+    ///
+    /// This is the value the constructor took for `weather_cell_tiles`, or
+    /// the engine default when the caller stated none. One means that each
+    /// tile carries its own weather. It never changes.
+    #[getter]
+    fn weather_cell_tiles(&self) -> u32 {
+        self.lock().weather_layout().block_edge()
+    }
+
+    /// The number of weather cell columns across the world, as an integer.
+    ///
+    /// **A weather array is in weather cell order, not in level 1 cell
+    /// order.** A watcher takes `index % weather_cells_wide` for the column
+    /// of a cell and `index // weather_cells_wide` for its row. The two
+    /// lattices agree only when the world takes the level 1 weather pitch.
+    #[getter]
+    fn weather_cells_wide(&self) -> u32 {
+        self.lock().weather_layout().blocks_wide()
+    }
+
+    /// The number of weather cells in the world, as an integer.
+    ///
+    /// The cost of the weather stage follows this count. Read it before a
+    /// long run at a fine pitch, because a fine pitch on a large world holds
+    /// one cell for every tile.
+    #[getter]
+    fn weather_cell_count(&self) -> u64 {
+        let layout = self.lock().weather_layout();
+        u64::from(layout.blocks_wide()) * u64::from(layout.blocks_high())
     }
 
     /// The number of tile change events the last step emitted, as an integer.
@@ -5084,9 +5172,9 @@ impl PyWorld {
 
     /// The number of level 1 cells across the world, as an integer.
     ///
-    /// A weather array is in cell index order, so a watcher takes
-    /// `index % cells_wide` for the column of a cell and
-    /// `index // cells_wide` for its row.
+    /// **This is the level 1 pitch, and the weather has a pitch of its own.**
+    /// Read `weather_cells_wide` to index a weather array. The two agree only
+    /// when the world takes the level 1 weather pitch.
     #[getter]
     fn cells_wide(&self) -> u32 {
         self.lock().pyramid().layout().blocks_wide()
