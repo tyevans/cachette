@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-561**
+**Next number: FND-564**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -13596,6 +13596,99 @@ it.
 cited number against the rows that exist, so a citation of a number that exists
 and holds another subject passes. Read the row you cite.
 
+### FND-561 — A win path that cannot be balanced was retired, and the register row was the wrong instrument all along
+
+**Believed.** The wealth-or-wonder win path was a balance problem. Three passes
+raised the stock target, each against a measurement, and each reported that the
+path now ended fewer games. The register row held the derivation, and a record
+answered the reachability by standing the bar above the ceiling of one
+settlement.[^F561A] [^F548D]
+
+**True.** The path was a design problem, and the project owner ruled it out as a
+win condition. A stock total is not a claim to victory. The path always fired
+early, and the moment it fired was arbitrary to a watcher, because nothing in
+the picture changed when it did. The reader is gone. The variant, its number and
+the reported quantity all stay.[^F561B]
+
+**Evidence.** The sweep of 32 seeds at a 20000 tick horizon: wealth or wonder
+ended 32 of 32, and domination, territory and renown ended none. The sevenfold
+raise of the target bought about fifteen percent more ticks and still ended
+every game. The earlier findings hold both readings.[^F561A]
+
+**What follows.** **Ask whether a value is the right instrument before you spend
+three passes tuning it.** Each raise was a correct answer to the question it was
+given. The question was wrong from the first one, and no measurement of the
+value could say so, because every measurement of a value assumes the value
+decides something. The signal was available early: the path won every seed at
+every setting, and a knob that changes nothing but the tick is not a knob.
+
+**A second shape.** A test that asserted an end on a retired path fails loudly
+and gets repaired. A test that asserted the record does **not** change, on a
+fact that no reader watches any more, stays green and proves nothing. The second
+kind is the one to look for when a reader is removed. One such test was found
+here, and it was found by putting the defect back and watching it stay
+green.[^F487C]
+### FND-562 — The renown reader's own comment said no pass writes renown, and a pass had been writing it
+
+**Believed.** The renown win path could not fire in a seeded run. The reader
+says so in its own text: no pass in the engine writes renown, the column rises
+only when the control plane writes it, and the reader therefore fires only in a
+game that makes its own renown rule outside the engine.
+
+**True.** The contest writes renown. The killer of each pair earns a share for
+each unit it felled, and the share goes to the champion of the faction. That
+pass says in its own text that it is the one source of renown in the engine,
+and that it was added because a reader touched a quantity nothing wrote. The
+reader's comment was never repaired, so two sites in one file stated opposite
+things.
+
+**Evidence.** A sweep of the 8 default seeds at a tick limit of 5000, on one
+development machine, run after the wealth-or-wonder reader was removed. One
+seed ended on renown at tick 3811. The other seven ran to the limit and ended
+on territory.
+
+**What follows.** **A repair that adds a writer must find every reader that
+said there was none.** The pass that closed an inert-capability defect created
+a stale comment on the reader it fed, which is shape 5 of the recurring defect
+rule turned inside out: the code moved and the comment beside it stayed.[^F562A]
+
+**The finding was found by a measurement and not by a reading.** The sweep was
+run to answer a different question, and it returned a path that a comment said
+could not fire. A consequence written from that comment went into a draft
+record, and the sweep caught it before review. **Run the sweep before you write
+the consequences.**
+### FND-563 — Retiring the wealth path gave the game to renown, not to territory
+
+**Believed.** The wealth-or-wonder path ended every game of a seeded sweep, so
+retiring it would let domination and territory decide a game. Those are the two
+paths the project owner named as primary. A first sweep at a tick limit of 5000
+appeared to confirm it: territory ended 7 of 8 and renown ended 1 of 8.
+
+**True.** At a tick limit of 20000 the renown path ends 8 of 8, between tick
+3811 and tick 10617. Territory and domination end none. The two runs agree
+exactly. Every seed that the 20000 run ends on renown above tick 5000 is a seed
+that the 5000 run ends on territory at the limit. **A territory win at 5000 is a
+truncated renown win and not a separate outcome.**
+
+**Evidence.** The 8 default seeds on one development machine (ty001-ubuntu,
+x86-64), extent 256, four factions, with the balance sweep script, run at both
+horizons after the wealth-or-wonder reader was removed. A development-machine
+run, and no evidence about the target platform.
+
+**What follows.** **Removing a reader that always fires reveals the next reader
+that always fires. It does not give the game to the path you want.** The wealth
+path hid renown, because it fired earlier. Renown now holds the property the
+project owner objected to: it ends every game, before the limit, on a quantity a
+watcher did not see move. The contest writes renown, so it rises in every seeded
+run.
+
+**Measure the horizon that the question asks about, not the one that is cheap.**
+The first sweep ran at 5000 ticks because the engine holds that limit, and it
+gave a reassuring answer that the longer horizon reversed. A tick limit does not
+decide which path is strong. It decides which path gets to fire.
+
+**Neither domination nor territory has ended a seeded game at any horizon.** The
+paths the project owner wants are still not the paths that decide a run.
 ## References
 
 [^F552A]: The unit-to-tile bridge, the block key. `crates/cachette-core/src/bridge.rs`
@@ -13681,6 +13774,9 @@ and holds another subject passes. Read the row you cite.
 [^F545D]: ADR-0152, a faction plans its roads and zones with one solver, decision D3. `docs/adrs/accepted/adr-0152-a-faction-plans-its-roads-and-zones-with-one-solver.md`
 [^F549A]: Findings register, FND-545. `docs/FINDINGS.md`
 [^F549C]: ADR-0168, a build order holds a unit on its tile, and the hold is derived and never stored, decisions D1, D2 and D3. `docs/adrs/draft/adr-0168-a-build-order-holds-a-unit-on-its-tile.md`
+[^F561A]: Findings register, FND-543 and FND-550. `docs/FINDINGS.md`
+[^F561B]: ADR-0173, the wealth or wonder path has no reader. `docs/adrs/draft/adr-0173-the-wealth-or-wonder-path-has-no-reader.md`
+[^F562A]: Recurring defect shapes, shape 5. `.agents/rules/recurring-defects.md`
 
 [^F546A]: The founding survey and the eligibility of a candidate. `crates/cachette-core/src/founding.rs`
 [^F546C]: Balance register, the founding group. `docs/reference/balance.md`

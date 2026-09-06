@@ -96,12 +96,13 @@ impl UpgradeCategory {
     pub const ROAD: Self = Self(0);
     /// Worked ground. A unit takes more from the tile in one tick.
     pub const TERRACE: Self = Self(1);
-    /// A great work. Its completion fires the wealth-or-wonder win path for
-    /// the faction that holds the ground it stands on.[^1]
+    /// A great work. **Its completion ends no game.** The wealth-or-wonder
+    /// path has no reader, so a finished wonder grants a claim that nothing
+    /// compares.[^1]
     ///
     /// # References
     ///
-    /// [^1]: ADR-0148, a game end is recorded once and stops the controllers, decision D3. `docs/adrs/accepted/adr-0148-a-game-end-is-recorded-once-and-stops-the-controllers.md`
+    /// [^1]: ADR-0173, the wealth or wonder path has no reader, decisions D1 and D3. `docs/adrs/draft/adr-0173-the-wealth-or-wonder-path-has-no-reader.md`
     pub const WONDER: Self = Self(2);
     /// A storehouse. It raises the store capacity of the settlement on or
     /// beside its tile.
@@ -339,11 +340,15 @@ declare_upgrade_row! {
     /// The claim toward the wealth-or-wonder end that the finished row
     /// grants the faction that holds its ground.[^1]
     ///
+    /// **No reader compares this column.** The wealth-or-wonder path has no
+    /// reader, so the column is reported and decides no game.[^2]
+    ///
     /// Zero means that the row grants no claim.
     ///
     /// # References
     ///
     /// [^1]: ADR-0148, a game end is recorded once and stops the controllers, decision D3. `docs/adrs/accepted/adr-0148-a-game-end-is-recorded-once-and-stops-the-controllers.md`
+    /// [^2]: ADR-0173, the wealth or wonder path has no reader, decisions D1 and D3. `docs/adrs/draft/adr-0173-the-wealth-or-wonder-path-has-no-reader.md`
     victory_claim: u32,
     /// Whether the builder must stand on ground its own faction holds.
     ///
@@ -712,9 +717,13 @@ pub const STORE_CAPACITY_RAISE: u32 = 64 << 16;
 /// The claim toward the wealth-or-wonder end that one finished wonder
 /// grants.[^1]
 ///
+/// **No reader compares it.** The wealth-or-wonder path has no reader, so a
+/// finished wonder ends no game.[^2]
+///
 /// # References
 ///
 /// [^1]: Balance register, the wonder victory claim. `docs/reference/balance.md`
+/// [^2]: ADR-0173, the wealth or wonder path has no reader, decisions D1 and D3. `docs/adrs/draft/adr-0173-the-wealth-or-wonder-path-has-no-reader.md`
 pub const WONDER_VICTORY_CLAIM: u32 = 1;
 
 /// The value that says a row asks for the builder's own ground.

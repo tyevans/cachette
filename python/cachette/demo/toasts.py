@@ -497,8 +497,9 @@ class Announcer:
 
         **Only a wonder gets a line.** A road, a terrace, a store, a wall and
         a lodging finish every few ticks in a mature world, which is a rate
-        and not a moment. A wonder claims the wealth-or-wonder end, so it is
-        the one level that changes the run.
+        and not a moment. A wonder is the largest thing a faction builds, so
+        it is the one level worth a line. **It ends no game**, because the
+        wealth-or-wonder path has no reader.
         """
         columns = world.log("upgrade_finished")
         for row in range(len(columns["tick"])):

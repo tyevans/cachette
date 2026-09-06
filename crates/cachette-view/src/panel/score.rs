@@ -251,6 +251,9 @@ mod tests {
             Line::row("ticks remaining", worst_tick.clone()),
             Line::row("at tick", worst_tick),
             Line::row("winner", "faction 62".to_string()),
+            // The longest path name. No live run ends on it, because the
+            // path has no reader, but a stored record may carry it and the
+            // panel must show it whole.
             Line::row("path", "wealth_or_wonder".to_string()),
             Line::swatch(0x00ff_00ff, "faction 62", grouped(16_777_216)),
             Line::row("renown", u8::MAX.to_string()),
