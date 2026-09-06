@@ -12480,12 +12480,17 @@ impl World {
     /// or an upgrade that carries a victory claim stands on ground the
     /// faction holds.
     ///
-    /// The target is a balance value.[^1] A tie resolves by the lowest
-    /// faction identifier.
+    /// The stock total sums every commodity of every live settlement of the
+    /// faction in a 64-bit accumulator, and the bar stands above what one
+    /// settlement can hold. A faction reaches the bar by holding more
+    /// settlements, and not by waiting at the one it founded.[^1] The share
+    /// one settlement carries is a balance value.[^2] A tie resolves by the
+    /// lowest faction identifier.
     ///
     /// # References
     ///
-    /// [^1]: Balance register, the stock target. `docs/reference/balance.md`
+    /// [^1]: ADR-0165, the wealth bar stands above what one settlement can hold, decision D1. `docs/adrs/draft/adr-0165-the-wealth-bar-stands-above-what-one-settlement-can-hold.md`
+    /// [^2]: Balance register, the stock target. `docs/reference/balance.md`
     fn wealth_or_wonder_winner(&self) -> Option<FactionId> {
         let totals = self.stock_totals();
         let claims = self.victory_claims();
@@ -12592,21 +12597,77 @@ impl World {
 /// that wins on its path, or nobody.
 type GameEndReader = fn(&World) -> Option<FactionId>;
 
-/// The stock total at which the wealth-or-wonder reader fires, as a raw
-/// Q16.16 quantity summed over every commodity of every settlement of the
-/// faction.
+/// The stock one settlement can hold, as a raw Q16.16 quantity summed over
+/// every commodity.
 ///
-/// A provisional value of 28672 whole units. The project owner asked for a
-/// much higher bar, and the balance register holds the derivation.[^1]
+/// A store holds one `Fix32` for each commodity, and a `Fix32` saturates at
+/// `i32::MAX`. The product of the two is therefore the most stock one
+/// settlement can ever report, whatever it produces and however long it
+/// runs.
 ///
-/// **A store is a `Fix32`, so one settlement of one commodity clamps at
-/// 32767 whole units.** A faction that holds one settlement can therefore
-/// never pass that sum, and a target above it never fires.
+/// **This ceiling is the reason the wealth bar is not a free value.** A bar
+/// below it is crossed by one settlement that only waits, because the store
+/// rises and does not fall. A bar above it asks the faction for a second
+/// settlement.[^1]
+///
+/// # References
+///
+/// [^1]: Findings register, FND-543. `docs/FINDINGS.md`
+pub const STOCK_CEILING_OF_ONE_SETTLEMENT: i64 = (i32::MAX as i64) * (COMMODITY_COUNT as i64);
+
+/// The settlements a wealth win asks a faction to fill.
+///
+/// The bar is this many times the stock one settlement carries toward it, so
+/// a faction that holds fewer settlements than this cannot reach the bar by
+/// filling the ones it holds.
+const SETTLEMENTS_A_WEALTH_WIN_ASKS_FOR: i64 = 2;
+
+/// The stock one settlement carries toward the wealth bar, as a raw Q16.16
+/// quantity summed over every commodity of that settlement.
+///
+/// A provisional value of 28672 whole units, which is seven eighths of what
+/// one settlement of one commodity can hold. The balance register holds the
+/// derivation.[^1]
 ///
 /// # References
 ///
 /// [^1]: Balance register, the stock target. `docs/reference/balance.md`
-pub const STOCK_TARGET: i64 = 28672 << 16;
+const STOCK_TARGET_OF_ONE_SETTLEMENT: i64 = 28672 << 16;
+
+/// The stock total at which the wealth-or-wonder reader fires, as a raw
+/// Q16.16 quantity summed over every commodity of every settlement of the
+/// faction.
+///
+/// **The bar sits above what one settlement can hold.** A faction reaches it
+/// by holding more settlements, and not by waiting at the one it founded.
+/// This is what makes the bar a bar: a stock rises toward the ceiling of its
+/// store, so any bar under that ceiling is crossed given enough ticks, and a
+/// register value cannot change that.[^1] [^2]
+///
+/// The balance register holds the derivation of the per-settlement share.[^3]
+///
+/// # References
+///
+/// [^1]: Findings register, FND-543. `docs/FINDINGS.md`
+/// [^2]: ADR-0165, the wealth bar stands above what one settlement can hold, decision D1. `docs/adrs/draft/adr-0165-the-wealth-bar-stands-above-what-one-settlement-can-hold.md`
+/// [^3]: Balance register, the stock target. `docs/reference/balance.md`
+pub const STOCK_TARGET: i64 = SETTLEMENTS_A_WEALTH_WIN_ASKS_FOR * STOCK_TARGET_OF_ONE_SETTLEMENT;
+
+/// The bar stands above the stock one settlement can hold.
+///
+/// **This is the check, and not a comment.** A bar at or below the ceiling
+/// is reached by one settlement that waits, and the build stops here rather
+/// than shipping a path that ends every game. A rise in the commodity count
+/// raises the ceiling and stops the build until a writer derives the bar
+/// again.[^1]
+///
+/// # References
+///
+/// [^1]: Findings register, FND-543. `docs/FINDINGS.md`
+const _: () = assert!(
+    STOCK_TARGET > STOCK_CEILING_OF_ONE_SETTLEMENT,
+    "the wealth bar must stand above the stock one settlement can hold"
+);
 
 /// The renown at which the renown reader fires, as a raw Q16.16 value.
 ///

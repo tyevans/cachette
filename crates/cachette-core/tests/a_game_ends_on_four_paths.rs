@@ -2,9 +2,10 @@
 //!
 //! Each reader fires on a fixture at its extreme. Domination fires for a
 //! faction whose rivals hold no unit, and for a faction that holds every
-//! seat while a rival still lives. Wealth fires at the stock target and not
-//! one raw unit below it, and its total survives a sum that overflows a
-//! 32-bit accumulator. The wonder fires on the tick the work completes and
+//! seat while a rival still lives. Wealth fires at the stock bar and not one
+//! raw unit below it, its total survives a sum that overflows a 32-bit
+//! accumulator, and one settlement filled to the ceiling of its store wins
+//! nothing.[^2] The wonder fires on the tick the work completes and
 //! not the tick before. Renown fires at the renown target and not below.
 //! Two paths true on one tick record the earlier path of the fixed order,
 //! and a path that becomes true later changes nothing.[^1]
@@ -12,12 +13,15 @@
 //! # References
 //!
 //! [^1]: ADR-0148, a game end is recorded once and stops the controllers, decisions D2 and D3. `docs/adrs/accepted/adr-0148-a-game-end-is-recorded-once-and-stops-the-controllers.md`
+//! [^2]: ADR-0165, the wealth bar stands above what one settlement can hold, decision D1. `docs/adrs/draft/adr-0165-the-wealth-bar-stands-above-what-one-settlement-can-hold.md`
 
 use cachette_core::choose;
+use cachette_core::sim_math::combine;
 use cachette_core::site::CommodityId;
 use cachette_core::upgrade::{UpgradeCategory, UpgradeRow};
 use cachette_core::{
-    Axial, Entity, FactionId, Fix32, World, WorldConfig, RENOWN_TARGET, STOCK_TARGET,
+    Accum, Axial, Entity, FactionId, Fix32, World, WorldConfig, RENOWN_TARGET,
+    STOCK_CEILING_OF_ONE_SETTLEMENT, STOCK_TARGET,
 };
 
 const THREADS: usize = 2;
@@ -249,22 +253,58 @@ fn a_faction_that_holds_every_seat_wins_by_domination_while_a_rival_lives() {
 // Wealth
 // ---------------------------------------------------------------------------
 
-#[test]
-fn a_stock_total_at_the_target_ends_the_game_and_one_below_does_not() {
-    let mut world = world(2, 34, 32);
-    // Both factions keep a unit, so domination stays quiet.
-    let address = open_address(&world);
+/// Founds one settlement of a faction for each amount, and fills its store
+/// with that amount.
+///
+/// Returns the sum the fixture put in. **The sum is computed from the
+/// amounts and is never read back from the reader under test**, so a reader
+/// that lost a settlement fails the assertion rather than agreeing with
+/// itself.
+fn settle_and_fill(world: &mut World, faction: FactionId, amounts: &[i32]) -> (Vec<Entity>, i64) {
+    let mut sites = Vec::new();
+    let mut sum = 0i64;
+    for amount in amounts {
+        let site = settle(world, faction);
+        world
+            .set_settlement_store(site, CommodityId(0), Fix32(*amount))
+            .expect("the commodity exists");
+        sites.push(site);
+        sum += i64::from(*amount);
+    }
+    (sites, sum)
+}
+
+/// Gives each faction a unit, so the domination reader stays quiet.
+fn arm_both_factions(world: &mut World) {
+    let address = open_address(world);
     world
         .spawn_soldier(address, FactionId(0))
         .expect("the ground admits a unit");
     world
         .spawn_soldier(address, FactionId(1))
         .expect("the ground admits a second unit");
-    let site = settle(&mut world, FactionId(1));
-    let below = Fix32(i32::try_from(STOCK_TARGET - 1).expect("the target fits a store"));
-    world
-        .set_settlement_store(site, CommodityId(0), below)
-        .expect("the commodity exists");
+}
+
+/// The store of one settlement, filled to the top, and the rest of the bar.
+///
+/// The first amount is the ceiling of one `Fix32` store. The second is what
+/// the bar asks for beyond it, less one raw unit, so the pair sits one raw
+/// unit below the bar.
+fn one_below_the_bar() -> [i32; 2] {
+    let rest = STOCK_TARGET - 1 - STOCK_CEILING_OF_ONE_SETTLEMENT;
+    [
+        i32::MAX,
+        i32::try_from(rest).expect("the rest of the bar fits one store"),
+    ]
+}
+
+#[test]
+fn a_stock_total_at_the_target_ends_the_game_and_one_below_does_not() {
+    let mut world = world(2, 34, 48);
+    arm_both_factions(&mut world);
+    let amounts = one_below_the_bar();
+    let (sites, put_in) = settle_and_fill(&mut world, FactionId(1), &amounts);
+    assert_eq!(put_in, STOCK_TARGET - 1);
     step(&mut world);
     assert!(!world.game_end().is_set(), "one raw unit below the target");
     assert_eq!(
@@ -274,9 +314,9 @@ fn a_stock_total_at_the_target_ends_the_game_and_one_below_does_not() {
             .store_total,
         STOCK_TARGET - 1
     );
-    let at = Fix32(i32::try_from(STOCK_TARGET).expect("the target fits a store"));
+    // One more raw unit in the second store crosses the bar.
     world
-        .set_settlement_store(site, CommodityId(0), at)
+        .set_settlement_store(sites[1], CommodityId(0), Fix32(amounts[1] + 1))
         .expect("the commodity exists");
     step(&mut world);
     let end = world.game_end();
@@ -286,39 +326,83 @@ fn a_stock_total_at_the_target_ends_the_game_and_one_below_does_not() {
 }
 
 #[test]
-fn the_stock_total_survives_a_sum_that_overflows_a_32_bit_accumulator() {
-    let mut world = world(2, 35, 48);
-    let address = open_address(&world);
-    world
-        .spawn_soldier(address, FactionId(0))
-        .expect("the ground admits a unit");
-    world
-        .spawn_soldier(address, FactionId(1))
-        .expect("the ground admits a second unit");
-    // Two stores at the top of the 32-bit range. Their sum wraps to a
-    // negative number in 32 bits and never reaches the target there. In 64
-    // bits it is above the target.
-    let first = settle(&mut world, FactionId(0));
-    let second = settle(&mut world, FactionId(0));
-    for site in [first, second] {
-        world
-            .set_settlement_store(site, CommodityId(0), Fix32(i32::MAX))
-            .expect("the commodity exists");
+fn one_settlement_filled_to_the_ceiling_of_its_store_wins_nothing() {
+    // The extreme the old bar could not pass. A store is a `Fix32`, so one
+    // settlement of one commodity stops here however long the world runs.
+    // The bar stands above it, so waiting at one settlement wins nothing.
+    let mut world = world(2, 36, 48);
+    arm_both_factions(&mut world);
+    let (_, put_in) = settle_and_fill(&mut world, FactionId(1), &[i32::MAX]);
+    assert_eq!(
+        put_in, STOCK_CEILING_OF_ONE_SETTLEMENT,
+        "the fixture stands at the ceiling of one store"
+    );
+    const { assert!(STOCK_TARGET > STOCK_CEILING_OF_ONE_SETTLEMENT) };
+    for _ in 0..4 {
+        step(&mut world);
+        assert!(
+            !world.game_end().is_set(),
+            "a full settlement that waits wins nothing"
+        );
     }
-    let total = world
-        .standing(FactionId(0))
-        .expect("faction 0 exists")
-        .store_total;
-    assert_eq!(total, 2 * i64::from(i32::MAX));
+    assert_eq!(
+        world
+            .standing(FactionId(1))
+            .expect("faction 1 exists")
+            .store_total,
+        STOCK_CEILING_OF_ONE_SETTLEMENT
+    );
+}
+
+#[test]
+fn two_settlements_above_the_bar_end_the_game() {
+    let mut world = world(2, 37, 48);
+    arm_both_factions(&mut world);
+    // Two stores at the top of the 32-bit range. Their sum wraps to a
+    // negative number in 32 bits and never reaches the bar there. In 64
+    // bits it stands above the bar.
+    let (_, put_in) = settle_and_fill(&mut world, FactionId(0), &[i32::MAX, i32::MAX]);
+    assert_eq!(put_in, 2 * i64::from(i32::MAX));
     assert!(
-        total > i64::from(i32::MAX),
+        put_in > i64::from(i32::MAX),
         "the fixture reaches the overflow"
+    );
+    assert!(put_in > STOCK_TARGET, "the fixture stands above the bar");
+    assert_eq!(
+        world
+            .standing(FactionId(0))
+            .expect("faction 0 exists")
+            .store_total,
+        put_in
     );
     step(&mut world);
     let end = world.game_end();
     assert!(end.is_set());
     assert_eq!(end.winner, FactionId(0));
     assert_eq!(end.win_path(), Some(cachette_core::WinPath::WealthOrWonder));
+}
+
+#[test]
+fn the_stock_total_does_not_saturate_at_the_target_scale() {
+    // The most the reader can ever total: one settlement for each tile of
+    // the target world, each filled to the ceiling of its store. The
+    // accumulator the reader uses must hold that exactly.
+    //
+    // **This test drives the accumulator and not the reader**, because no
+    // fixture builds 16 million settlements. The test above drives the
+    // reader over two settlements and fails when the reader narrows the
+    // accumulator.
+    const TARGET_TILE_COUNT: i64 = 16_777_216;
+    let mut total = Accum(0);
+    for _ in 0..TARGET_TILE_COUNT {
+        total = combine(total, Accum(STOCK_CEILING_OF_ONE_SETTLEMENT));
+    }
+    assert_eq!(
+        total.0,
+        TARGET_TILE_COUNT * STOCK_CEILING_OF_ONE_SETTLEMENT,
+        "the sum is exact, so nothing saturated"
+    );
+    assert!(total.0 < i64::MAX);
 }
 
 // ---------------------------------------------------------------------------
@@ -491,19 +575,10 @@ fn two_paths_true_on_one_tick_record_the_earlier_path_of_the_fixed_order() {
     // Territory before wealth. The limit is the first tick and a store of
     // faction 1 is at the target. Territory names faction 0, because every
     // count is zero and the lowest identifier wins the tie.
-    let mut second = World::new(config(2, 38, 32)).expect("the extent describes a world");
-    let address = open_address(&second);
-    second
-        .spawn_soldier(address, FactionId(0))
-        .expect("the ground admits a unit");
-    second
-        .spawn_soldier(address, FactionId(1))
-        .expect("the ground admits a second unit");
-    let site = settle(&mut second, FactionId(1));
-    let at = Fix32(i32::try_from(STOCK_TARGET).expect("the target fits a store"));
-    second
-        .set_settlement_store(site, CommodityId(0), at)
-        .expect("the commodity exists");
+    let mut second = World::new(config(2, 38, 48)).expect("the extent describes a world");
+    arm_both_factions(&mut second);
+    let (_, put_in) = settle_and_fill(&mut second, FactionId(1), &[i32::MAX, i32::MAX]);
+    assert!(put_in > STOCK_TARGET, "the store stands above the bar");
     second.set_tick_limit(1);
     step(&mut second);
     let end = second.game_end();
@@ -511,18 +586,10 @@ fn two_paths_true_on_one_tick_record_the_earlier_path_of_the_fixed_order() {
 
     // Wealth before renown. A store of faction 1 at the target and a
     // character of faction 0 at the renown target.
-    let mut third = world(2, 39, 32);
-    let address = open_address(&third);
-    third
-        .spawn_soldier(address, FactionId(0))
-        .expect("the ground admits a unit");
-    third
-        .spawn_soldier(address, FactionId(1))
-        .expect("the ground admits a second unit");
-    let site = settle(&mut third, FactionId(1));
-    third
-        .set_settlement_store(site, CommodityId(0), at)
-        .expect("the commodity exists");
+    let mut third = world(2, 39, 48);
+    arm_both_factions(&mut third);
+    let (_, above) = settle_and_fill(&mut third, FactionId(1), &[i32::MAX, i32::MAX]);
+    assert!(above > STOCK_TARGET, "the store stands above the bar");
     let person = third
         .create_character(FactionId(0))
         .expect("the arena has room");
@@ -554,11 +621,8 @@ fn a_path_that_becomes_true_after_the_end_changes_nothing() {
 
     // Faction 0 now reaches the stock target, and would win on an earlier
     // path if a reader ran. None runs.
-    let site = settle(&mut world, FactionId(0));
-    let at = Fix32(i32::try_from(STOCK_TARGET).expect("the target fits a store"));
-    world
-        .set_settlement_store(site, CommodityId(0), at)
-        .expect("the commodity exists");
+    let (_, above) = settle_and_fill(&mut world, FactionId(0), &[i32::MAX, i32::MAX]);
+    assert!(above > STOCK_TARGET, "the store stands above the bar");
     for _ in 0..3 {
         step(&mut world);
         assert_eq!(world.game_end(), end, "the record is written once");
