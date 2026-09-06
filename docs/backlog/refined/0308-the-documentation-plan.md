@@ -37,6 +37,24 @@ documentation job builds the extension before it builds the site, and it fails
 when the import fails.[^3] The plan honours all four, and the impact review
 below takes them one at a time.
 
+## What the tree already holds
+
+**Three of the child items are complete, read on 5 September 2026.** The
+generated reference is published, the Rust doc comments are written for the
+Python reader, and the site is published. The configuration sets the
+documentation directory, the handler and the site address, and two pages
+exist.[^A1]
+
+**Four prose items and the name list check are still proposed.** Items 0311 to
+0315 hold them, and the navigation entries for the three prose quadrants are
+commented out.[^A1]
+
+**Three statements of this plan are therefore unsatisfied.** Items 0309 to 0315
+are not all complete. No check derives the public name list from the package.
+Nothing executes an example on the site and fails.
+
+**This item stays open as the plan, and it closes when its children close.**
+
 ## Impact review
 
 **Governed by.** ADR-0107 D1, D2, D3 and D4.[^3]
@@ -298,3 +316,4 @@ Filled in when the item moves to `complete/`.
 [^18]: Documentation Rules, sections 2 and 3. `.claude/rules/documentation.md`
 [^19]: Research report 19, the documentation toolchain, sections 3.2 and 9. `docs/research/reports/19-documentation-toolchain.md`
 [^20]: Decisions register, DEC-113. `docs/DECISIONS.md`
+[^A1]: The documentation site configuration and its pages. `mkdocs.yml`

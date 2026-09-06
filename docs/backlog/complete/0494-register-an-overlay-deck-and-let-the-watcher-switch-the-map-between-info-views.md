@@ -221,4 +221,4 @@ detail.
 [^4]: The frame command and its type stub. `crates/cachette-py/src/lib.rs`, `python/cachette/_core.pyi`
 [^5]: ADR-0094, the caller owns the camera and the pixels, decision D5. `docs/adrs/draft/adr-0094-the-caller-owns-the-camera-and-the-pixels.md`
 [^6]: ADR-0153, a tile's lease follows the units that stand on it. `docs/adrs/accepted/adr-0153-a-tiles-lease-follows-the-units-that-stand-on-it.md`
-[^7]: Backlog item 0278, say what the demonstration world never produced. `docs/backlog/proposed/0278-say-what-the-demonstration-world-never-produced.md`
+[^7]: Backlog item 0278, say what the demonstration world never produced. `docs/backlog/complete/0278-say-what-the-demonstration-world-never-produced.md`

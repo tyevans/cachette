@@ -1,7 +1,7 @@
 ---
 id: 0270
 title: Score the option set with integer vector instructions
-status: proposed
+status: complete
 created: 2026-09-03
 implements: []
 changes: []
@@ -110,6 +110,26 @@ It does not remove the scattered reads that feed the pass. Three items do
 that, and this one gains little until they land, because a vector unit fed one
 scattered value at a time is a scalar unit with extra steps.[^4]
 
+## Outcome
+
+**Closed unbuilt. The saving this item was written to capture no longer
+exists.** An audit read the code on 5 September 2026.
+
+**Nothing in the tree is vectorised, and this item is not the reason to
+change that.** The item asks for integer vector instructions over the option
+set, because the pass scored every option for every unit. That premise is
+dead. The pass now answers once for each pair of need bucket and carry class,
+and it memoises the answer.[^7] The number of scored option sets in a frame no
+longer follows the number of units, so the work a vector unit would remove is
+already removed.
+
+**This is not a refusal to optimise.** A later measurement may show that the
+memoised pass is itself hot. That is a different item, written against a
+measurement, and the target platform register is where the figure belongs.[^8]
+
+**No code changed under this item.** The option set still holds its scalar loop,
+and the search for a vector implementation over the core crate returns nothing.
+
 ## References
 
 [^1]: ADR-0012, tiles are dense columns and units are a generational arena. `docs/adrs/accepted/adr-0012-tiles-are-dense-columns-and-units-are-a-generational-arena.md`
@@ -118,3 +138,5 @@ scattered value at a time is a scalar unit with extra steps.[^4]
 [^4]: Backlog item 0266, order the unit arena by cell. `docs/backlog/refined/0266-order-the-unit-arena-by-cell.md`
 [^5]: The pinned toolchain. `rust-toolchain.toml`
 [^6]: ADR-0097, the toolchain is a dated nightly. `docs/adrs/draft/adr-0097-the-toolchain-is-a-dated-nightly.md`
+[^7]: The memoised option scoring pass. `crates/cachette-core/src/choose.rs`
+[^8]: Target platform costs. `docs/reference/graviton-costs.md`

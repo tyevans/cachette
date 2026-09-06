@@ -631,7 +631,7 @@ pub fn value_of(
 ///
 /// # References
 ///
-/// [^1]: Backlog item 0278, say what the demonstration world never produced. `docs/backlog/proposed/0278-say-what-the-demonstration-world-never-produced.md`
+/// [^1]: Backlog item 0278, say what the demonstration world never produced. `docs/backlog/complete/0278-say-what-the-demonstration-world-never-produced.md`
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Reading {
     /// The name of the overlay that was on.

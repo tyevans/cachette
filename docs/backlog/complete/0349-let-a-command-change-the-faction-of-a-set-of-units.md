@@ -1,7 +1,7 @@
 ---
 id: 0349
 title: Let a command change the faction of a set of units
-status: proposed
+status: complete
 created: 2026-09-03
 implements: []
 changes: []
@@ -38,7 +38,23 @@ should happen.
 - Whether an event records it. The engine writes a log when a unit starves and
   when a unit is promoted, and the bindings expose neither.[^2]
 
+## Outcome
+
+**Closed as already done. The work landed under other items.** An audit read the
+code on 5 September 2026.
+
+**The command exists end to end.** A Python verb takes a set of units and a
+faction. The core writes the faction column for the set. An event log records
+every change, and the bindings expose that log and its count.[^3] [^4]
+
+**All three of the item's missing bullets are answered.** ADR-0132 and ADR-0133
+are written. The call clears the orders of every unit it converts, and it
+changes the faction of the character a converted unit carries. The log crosses
+to Python.
+
 ## References
 
 [^1]: Blockers register, BLK-050. `docs/BLOCKERS.md`
 [^2]: Backlog priority index, item 0319. `docs/backlog/PRIORITY.md`
+[^3]: The conversion verb, its log and its count in the bindings. `crates/cachette-py/src/lib.rs`
+[^4]: The conversion verb and its log in the core. `crates/cachette-core/src/world.rs`

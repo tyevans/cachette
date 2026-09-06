@@ -4236,7 +4236,7 @@ exactly so that a caller cannot build a wrong one.[^DEC120C]
 [^ITEM0150]: Backlog item 0150. `docs/backlog/complete/0150-reserve-the-unit-columns-at-construction.md`
 [^DEC60A]: The event types. `crates/cachette-core/src/event.rs`
 [^DEC60C]: Findings register, FND-137. `docs/FINDINGS.md`
-[^DEC60D]: Backlog item 0153. `docs/backlog/refined/0153-let-python-read-an-event-without-repeating-its-layout.md`
+[^DEC60D]: Backlog item 0153. `docs/backlog/complete/0153-let-python-read-an-event-without-repeating-its-layout.md`
 [^DEC60E]: The identity type. `crates/cachette-core/src/types.rs`
 [^DEC60F]: ADR-0002, simulated and aggregated state holds no floating point number, decision D1. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
 [^BLK4]: Blockers register, BLK-004. `docs/BLOCKERS.md`

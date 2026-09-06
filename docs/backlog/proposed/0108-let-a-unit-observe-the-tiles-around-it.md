@@ -45,6 +45,6 @@ Filled in when the item moves to `complete/`.
 ## References
 
 [^1]: Product record PRD-0001. `docs/product/accepted/prd-0001-a-faction-sees-only-what-it-observes.md`
-[^2]: Backlog item 0107. `docs/backlog/proposed/0107-decide-how-a-faction-stores-what-it-observes.md`
+[^2]: Backlog item 0107. `docs/backlog/complete/0107-decide-how-a-faction-stores-what-it-observes.md`
 [^3]: Blockers register, BLK-001. `docs/BLOCKERS.md`
 [^4]: Recurring Defect Shapes, shape 4. `.claude/rules/recurring-defects.md`

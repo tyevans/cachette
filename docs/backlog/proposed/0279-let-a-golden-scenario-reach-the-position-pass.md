@@ -32,6 +32,23 @@ The golden state test is one of the two tests the project cannot lose.[^1] A
 scenario set that misses a whole pass is the same weakness that item 0179
 records for the build pass, seen in a second subsystem.[^2]
 
+## What the tree already holds
+
+**The scenario reaches the pass with real applicants, read on 5 September
+2026.** The gathering scenario founds a settlement on a food deposit and homes
+half the units it spawns. With the default schedule period, three ticks of the
+run reach the seating pass, and the homed units are applicants. The scenario
+stocks food only, so positions for the other kinds open and there is somewhere
+to seat.[^A1]
+
+**Nothing asserts that a seat was written.** The scenario reaches the pass and
+then says nothing about the result, so it measures the fixture. No mutation
+proves that the golden file guards the seating.
+
+**That assertion is the whole of the remaining work.** Put the defect back and
+watch the test stay green, because that is the only proof the scenario reaches
+the case.[^A2]
+
 ## The same gap was found and closed for the promotion pass
 
 The promotion work met this exactly. All eight golden files moved when it
@@ -78,6 +95,8 @@ Filled in when the item moves to `complete/`.
 ## References
 
 [^1]: ADR-0001, one binary gives one answer at any thread count, decision D4. `docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
-[^2]: Backlog item 0179, give a golden scenario a build. `docs/backlog/proposed/0179-give-a-golden-scenario-a-build.md`
+[^2]: Backlog item 0179, give a golden scenario a build. `docs/backlog/complete/0179-give-a-golden-scenario-a-build.md`
 [^3]: Development budgets, the gate suite budget. `docs/reference/development-budgets.md`
 [^4]: Findings register, FND-293. `docs/FINDINGS.md`
+[^A1]: The gathering scenario of the golden state hash. `crates/cachette-core/tests/golden_state_hash.rs`
+[^A2]: Testing Rules, section 2a. `.agents/rules/testing.md`

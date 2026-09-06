@@ -529,7 +529,7 @@ fn an_overlay_that_found_nothing_says_so_in_words() {
     // A subsystem that produced no instance and a subsystem that nothing
     // draws look the same on a map. The key says which, in words.[^1]
     //
-    // [^1]: Backlog item 0278, say what the demonstration world never produced. `docs/backlog/proposed/0278-say-what-the-demonstration-world-never-produced.md`
+    // [^1]: Backlog item 0278, say what the demonstration world never produced. `docs/backlog/complete/0278-say-what-the-demonstration-world-never-produced.md`
     let world = World::new(settings()).expect("the extent describes a world");
     assert!(
         world.weather().is_dry(),

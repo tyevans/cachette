@@ -584,6 +584,6 @@ the code.
 [^16]: ADR-0141, a weather pass moves water and never scales it. `docs/adrs/draft/adr-0141-a-weather-pass-moves-water-and-never-scales-it.md`
 [^17]: ADR-0142, a god inflicts weather only on ground it holds. `docs/adrs/draft/adr-0142-a-god-inflicts-weather-only-on-ground-it-holds.md`
 [^18]: ADR-0070, the head-up display reports what the drawing pass read. `docs/adrs/accepted/adr-0070-the-head-up-display-reports-what-the-drawing-pass-read.md`
-[^19]: Backlog item 0278, say what the demonstration world never produced. `docs/backlog/proposed/0278-say-what-the-demonstration-world-never-produced.md`
+[^19]: Backlog item 0278, say what the demonstration world never produced. `docs/backlog/complete/0278-say-what-the-demonstration-world-never-produced.md`
 [^20]: Testing Rules, section 1. `.agents/rules/testing.md`
 [^21]: Decision Record Scope, section 1. `.agents/rules/adr-scope.md`

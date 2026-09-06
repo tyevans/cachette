@@ -380,7 +380,7 @@ structural change. It is a list of the instances.
 [^11]: ADR-0053, a faction is a bit in a mask, and a relation is a plane, decision D3. `docs/adrs/accepted/adr-0053-a-faction-is-a-bit-in-a-mask-and-a-relation-is-a-plane.md`
 [^12]: Decisions register, DEC-040. `docs/DECISIONS.md`
 [^13]: Backlog item 0068, give a faction a ruler and a succession. `docs/backlog/refined/0068-give-a-faction-a-ruler-and-a-succession.md`
-[^14]: Backlog item 0104, carry the writ of a ruler in the influence field. `docs/backlog/refined/0104-carry-the-writ-of-a-ruler-in-the-influence-field.md`
+[^14]: Backlog item 0104, carry the writ of a ruler in the influence field. `docs/backlog/complete/0104-carry-the-writ-of-a-ruler-in-the-influence-field.md`
 [^15]: Backlog item 0169, choose the cadence of the influence solve. `docs/backlog/proposed/0169-choose-the-cadence-of-the-influence-solve.md`
 [^16]: The carry ledger invariant. `crates/cachette-core/src/world.rs`
 [^17]: Testing Rules, section 5. `.claude/rules/testing.md`

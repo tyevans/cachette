@@ -1,7 +1,7 @@
 ---
 id: 0278
 title: Say what the demonstration world never produced
-status: proposed
+status: complete
 created: 2026-09-02
 implements: []
 changes: []
@@ -82,7 +82,19 @@ and the census falls out of it, this item takes the census and is refined then.
 
 ## Outcome
 
-Filled in when the item moves to `complete/`.
+**Closed as already done. The work landed under other items.** An audit read the
+code on 5 September 2026.
+
+**The engine answers the census from one table.** A public reader maps over the
+subsystem census table, so no hand-written list exists anywhere.[^9] The
+bindings expose it and the stubs declare it.
+
+**Two callers read the same reader.** The demonstration prints it, and its own
+doc comment states that no name is written there. The balance harness reads the
+same reader for its gate.[^10] [^11]
+
+**The item's own list of what is missing was already settled.** It matches the
+answers in the tree, point for point.
 
 ## References
 
@@ -94,3 +106,6 @@ Filled in when the item moves to `complete/`.
 [^6]: Design: the living world game layer, section 10.1. `docs/superpowers/specs/2026-09-05-living-world-game-layer-design.md`
 [^7]: Backlog item 0472, run a faction controller inside the step and end the game on territory. `docs/backlog/complete/0472-run-a-faction-controller-inside-the-step-and-end-the-game-on-territory.md`
 [^8]: Balance register. `docs/reference/balance.md`
+[^9]: The subsystem census reader and its table. `crates/cachette-core/src/world.rs`
+[^10]: The demonstration census printer. `python/cachette/demo/app.py`
+[^11]: The balance harness. `python/cachette/balance/__init__.py`

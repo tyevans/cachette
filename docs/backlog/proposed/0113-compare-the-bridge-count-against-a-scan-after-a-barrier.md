@@ -34,6 +34,23 @@ despawning, and it rebuilds the bridge once. No test compares the two after a
 world has stepped with movement in it, which is the only time the rebuild runs
 against a moving population.[^2]
 
+## What the tree already holds
+
+**The comparison exists, and it does not reach the function admission reads.**
+Read on 5 September 2026. One test compares the per-tile query against a scan,
+on a bridge rebuilt directly. No world steps in it. A second test drives the
+engine, but it compares the bridge against itself, and only over the spawn
+tiles.[^A1]
+
+**Three things are missing.** No test steps a world with movement in it and,
+after the barrier, compares the count against an arena scan for every occupied
+tile. No test-only switch perturbs one bridge entry, so no proof exists that the
+comparison can fail. The fixture does not make the units contend, cross a block
+edge, or fill a tile.
+
+**The count on a tile is the function admission reads, and no test compares it
+against a scan.** That is the gap this item now asks for.
+
 ## What to do
 
 Add a property test that steps a world with movement in it and asserts, after
@@ -76,3 +93,4 @@ already make.
 [^1]: Testing rules, section 2. `.claude/rules/testing.md`
 [^2]: Testing rules, section 2a. `.claude/rules/testing.md`
 [^3]: Testing rules, section 1. `.claude/rules/testing.md`
+[^A1]: The unit tile bridge tests. `crates/cachette-core/tests/unit_tile_bridge.rs`

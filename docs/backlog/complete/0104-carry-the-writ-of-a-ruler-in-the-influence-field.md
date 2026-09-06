@@ -1,7 +1,7 @@
 ---
 id: 0104
 title: Carry the writ of a ruler in the influence field
-status: refined
+status: complete
 created: 2026-08-31
 implements: [ADR-0002 D1, ADR-0002 D2, ADR-0004 D1, ADR-0009 D1, ADR-0009 D3, ADR-0023 D1, ADR-0023 D2, ADR-0053 D3]
 changes: []
@@ -150,7 +150,29 @@ the solve is wider than the field it sums.
 
 ## Outcome
 
-Filled in when the item moves to `complete/`.
+**Closed as already done. The work landed under other items.** An audit read the
+code on 5 September 2026 and found every statement of the list above satisfied.
+
+**The field and its solver exist.** The influence field holds its plane, a
+constructor, a reader at a tile, a source writer, a solve and a hash.[^12] The
+public world exposes the reader and the source writer.[^13] The solve runs
+inside the step as its own stage.[^14]
+
+**The solve runs a fixed pass count.** There is no convergence test and no time
+budget, which the determinism rule requires.[^15]
+
+**Every test the item names exists.** They cover the falloff, resistant ground,
+blocked ground, the fixed pass count whatever the input, a field with no source
+falling from the edge inward, and a refusal at no threads. A thread-count
+example and a property sit beside them.[^16] A probe proves that each of them
+can fail, against three perturbed builds behind a test-only switch.[^17]
+
+**This item never asked for the ruler.** The list asks for the field and the
+solver only, and the item text says that item 0068 writes the source term. Item
+0068 stays open, and no ruler exists anywhere in the tree.
+
+**ADR-0060 is still a draft.** Acceptance is a review step, and the record
+priority index holds it rather than this item.
 
 ## References
 
@@ -165,3 +187,9 @@ Filled in when the item moves to `complete/`.
 [^9]: Testing Rules, sections 1 and 2a. `.claude/rules/testing.md`
 [^10]: Influence maps, section 7. `docs/research/reports/09-influence-maps.md`
 [^11]: ADR-0060, an influence map is stored as a shared basis, decision D4. `docs/adrs/draft/adr-0060-an-influence-map-is-stored-as-a-shared-basis.md`
+[^12]: The influence field, its constructor, its readers, its solve and its hash. `crates/cachette-core/src/influence.rs`
+[^13]: The public influence reader and source writer. `crates/cachette-core/src/world.rs`
+[^14]: The influence solve stage. `crates/cachette-core/src/stage.rs`
+[^15]: The fixed pass count of one solve. `crates/cachette-core/src/influence.rs`
+[^16]: The influence tests. `crates/cachette-core/tests/influence.rs`
+[^17]: The determinism probe. `crates/cachette-core/tests/determinism_probe.rs`

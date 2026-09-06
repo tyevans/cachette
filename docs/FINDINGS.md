@@ -10934,7 +10934,7 @@ index against the set of open items and never against what an item says.
 [^F168A]: ADR-0084, the world reserves the unit columns at construction, decision D3. `docs/adrs/draft/adr-0084-the-world-reserves-the-unit-columns-at-construction.md`
 [^F168B]: Review 0175, the unit reservation record. `docs/reviews/0175-the-unit-reservation-record.md`
 [^F171A]: Testing rules, sections 2 and 2a. `.claude/rules/testing.md`
-[^F174B]: Backlog item 0179. `docs/backlog/proposed/0179-give-a-golden-scenario-a-build.md`
+[^F174B]: Backlog item 0179. `docs/backlog/complete/0179-give-a-golden-scenario-a-build.md`
 
 [^1]: Findings register, FND-038, in this document.
 [^2]: ADR-0066, entity storage holds four fixed shapes. `docs/adrs/accepted/adr-0066-entity-storage-holds-four-fixed-shapes.md`
@@ -11035,7 +11035,7 @@ index against the set of open items and never against what an item says.
 [^F137A]: The bindings and the event log method. `crates/cachette-py/src/lib.rs`
 [^F137B]: The event types. `crates/cachette-core/src/event.rs`
 [^F137C]: Recurring Defect Shapes, shape 1. `.claude/rules/recurring-defects.md`
-[^F137D]: Backlog item 0153. `docs/backlog/refined/0153-let-python-read-an-event-without-repeating-its-layout.md`
+[^F137D]: Backlog item 0153. `docs/backlog/complete/0153-let-python-read-an-event-without-repeating-its-layout.md`
 [^97]: Development budgets, the gate suite budget. `docs/reference/development-budgets.md`
 [^98]: Testing rules, section 2a. `.claude/rules/testing.md`
 [^99]: Budgets and costs, the scale constants. `docs/reference/budgets.md`
@@ -12199,7 +12199,7 @@ public interface, and everyone would learn to ignore it.
 [^F452A]: ADR-0072, a tile stock is generated, and only what was taken is stored, decision D5. `docs/adrs/accepted/adr-0072-a-tile-stock-is-generated-and-only-what-was-taken-is-stored.md`
 [^F482A]: Commit 7c4b722, restore the three trade records that a number collision dropped.
 [^F482B]: ADR Registry, status vocabulary. `docs/adrs/REGISTRY.md`
-[^F483A]: Backlog item 0278, say what the demonstration world never produced. `docs/backlog/proposed/0278-say-what-the-demonstration-world-never-produced.md`
+[^F483A]: Backlog item 0278, say what the demonstration world never produced. `docs/backlog/complete/0278-say-what-the-demonstration-world-never-produced.md`
 [^F483B]: The `seats_filled` row of the subsystem census. `crates/cachette-core/src/world.rs`
 [^F483C]: The share function of a site. `crates/cachette-core/src/position.rs`
 [^F483D]: The default site preference. `crates/cachette-core/src/position.rs`

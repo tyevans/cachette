@@ -1,7 +1,7 @@
 ---
 id: 0040
 title: Pin the two call sites that give a change its barrier
-status: refined
+status: complete
 created: 2026-08-31
 implements: [ADR-0018 D3, ADR-0056 D3]
 changes: []
@@ -97,7 +97,31 @@ that error is the mechanism and the test must assert on it.[^5]
 
 ## Outcome
 
-Filled in when the item moves to `complete/`.
+**Closed as already done. The work landed under other items.** An audit read the
+code on 5 September 2026 and found every statement of the list above satisfied.
+
+**Both call sites exist, and each states the barrier it serves.** The step opens
+with a bridge refresh, and the comment there says that a spawn or a despawn made
+between two frames passed no barrier. The rebuild at the end of the step stays
+last, and its comment says that it follows the structural apply. Neither comment
+names the other as the winner.[^6]
+
+**Each call site is its own stage**, so a span that goes missing fails rather
+than reporting zero.[^7]
+
+**A test starts at the public step.** It despawns a unit outside any frame,
+calls the step, and asserts the population and the freshness of the derived
+structure. A second test asserts that no dead identity reaches the unit
+array.[^8]
+
+**DEC-021 is still a register row, and no record was written.** That is what the
+impact review asked for.
+
+**One claim of this item stays unverified.** The item asks that somebody prove
+the test can fail, by removing the call and watching the suite go red, and that
+the commit body name the command and the result. That evidence can live only in
+a commit message, and no check can read one. The audit ran no build. A reader
+who needs the proof must remove the call again.
 
 ## References
 
@@ -106,3 +130,6 @@ Filled in when the item moves to `complete/`.
 [^3]: Backlog item 0030. `docs/backlog/complete/0030-enforce-the-barrier-ordering.md`
 [^4]: Testing Rules, section 5. `.claude/rules/testing.md`
 [^5]: Testing Rules, section 2a. `.claude/rules/testing.md`
+[^6]: The two bridge refresh call sites. `crates/cachette-core/src/world.rs`
+[^7]: The two bridge refresh stages. `crates/cachette-core/src/stage.rs`
+[^8]: The barrier ordering tests. `crates/cachette-core/tests/barrier_ordering.rs`

@@ -73,4 +73,4 @@ Filled in when the item moves to `complete/`.
 [^5]: Blockers register, BLK-050. `docs/BLOCKERS.md`
 [^6]: ADR-0144, a faction controller runs inside the step and acts only through the caller's verbs, decision D2. `docs/adrs/accepted/adr-0144-a-faction-controller-runs-inside-the-step-and-acts-only-through-the-callers-verbs.md`
 [^7]: Findings register, FND-483. `docs/FINDINGS.md`
-[^8]: Backlog item 0278, say what the demonstration world never produced. `docs/backlog/proposed/0278-say-what-the-demonstration-world-never-produced.md`
+[^8]: Backlog item 0278, say what the demonstration world never produced. `docs/backlog/complete/0278-say-what-the-demonstration-world-never-produced.md`

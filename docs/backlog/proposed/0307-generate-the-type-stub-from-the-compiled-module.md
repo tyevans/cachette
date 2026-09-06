@@ -39,6 +39,20 @@ requires that something derives the list of public names from the package
 itself and fails when the two disagree.[^5] A hand-written stub is the opposite
 of that.
 
+## What the tree already holds
+
+**The docstring cleanup landed, read on 5 September 2026.** No docstring in the
+stub copies the Rust source any more. The nine exception copies and the two
+class docstrings are gone, and the stub says so at its head.[^A1]
+
+**The generator and both checks are missing.** No generator produces the stub,
+and no job compares it against the compiled module. Nothing in the gate recipes
+or in the continuous integration workflow generates or compares it. No check
+requires a docstring on a stub member that the module provides.
+
+**So this item is now the generator and the two checks**, and the cleanup it
+also asked for is done.
+
 ## What the work does
 
 Generate the type stub from the compiled module, so that the signatures have one
@@ -95,3 +109,4 @@ decision the product record asks for and no record draws.[^5]
 [^4]: Findings register, FND-320. `docs/FINDINGS.md`
 [^5]: Product requirement record 0021, a developer can use the control plane without reading its source. `docs/product/accepted/prd-0021-a-developer-can-use-the-control-plane-without-reading-its-source.md`
 [^6]: Testing Rules, section 2a. `.claude/rules/testing.md`
+[^A1]: The type stubs of the control plane package. `python/cachette/_core.pyi`

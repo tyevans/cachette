@@ -46,4 +46,4 @@ Filled in when the item moves to `complete/`.
 
 [^1]: Influence maps, section 7. `docs/research/reports/09-influence-maps.md`
 [^2]: Blockers register, BLK-007. `docs/BLOCKERS.md`
-[^3]: Backlog item 0104. `docs/backlog/refined/0104-carry-the-writ-of-a-ruler-in-the-influence-field.md`
+[^3]: Backlog item 0104. `docs/backlog/complete/0104-carry-the-writ-of-a-ruler-in-the-influence-field.md`
