@@ -7,12 +7,12 @@ the lattice holds the water in the air above it and the water on its ground,
 and a tile holds none.[^1] A spread pass hands each neighbour an equal share,
 so the transfer has no direction at all.[^2]
 
-**A measurement shows what that costs.** One storm raised at the strength
-ceiling stays at the cell it was raised on for two ticks, halves each tick, and
-is indistinguishable from a calm world within twenty ticks. The maximum never
-travels. It flattens in place. The same measurement shows that the height and
-the water share of a cell vary strongly across the world, so the terrain a
-model would read has contrast even though the water field has none.[^3]
+**A measurement shows what that costs.** A storm raised at the strength ceiling
+holds its maximum where it was raised, halves away, and soon leaves nothing a
+watcher can find. The maximum never travels. It flattens in place. The same
+measurement shows that the height and the water share of a cell vary strongly
+across the world, so the terrain a model would read has contrast even though
+the water field has none. The report holds the tick counts and the spans.[^3]
 
 The project owner asked on 5 September 2026 for weather that a watcher can
 follow across the map, and for a model of wind, heat and ground rather than a
@@ -163,7 +163,7 @@ before.[^12]
 [^6]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
 [^7]: ADR-0009, parallel stages write disjoint outputs, decisions D1 and D2. `docs/adrs/accepted/adr-0009-parallel-stages-write-disjoint-outputs.md`
 [^8]: Balance register, the weather section. `docs/reference/balance.md`
-[^9]: ADR-0161, water rides the wind, and every transfer is an exact integer move, decision D2. `docs/adrs/draft/adr-0161-water-rides-the-wind-and-every-transfer-is-an-exact-integer-move.md`
+[^9]: ADR-0161, water rides the wind, and every transfer is an exact integer move, decision D2. `docs/adrs/accepted/adr-0161-water-rides-the-wind-and-every-transfer-is-an-exact-integer-move.md`
 [^10]: ADR-0087, an influence solve runs a fixed iteration count over the whole plane, decision D1. `docs/adrs/draft/adr-0087-an-influence-solve-runs-a-fixed-iteration-count.md`
 [^11]: Blockers register, BLK-007. `docs/BLOCKERS.md`
 [^12]: PRD-0004, the world has weather that a watcher can read, what it costs at the target scale. `docs/product/accepted/prd-0004-the-world-has-weather-that-a-watcher-can-read.md`

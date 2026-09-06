@@ -86,7 +86,7 @@ fn a_founded_group_is_alive_after_the_span_that_would_starve_it() {
     // small group, so its first entry takes a person out of that group and
     // this assertion would then report a starvation that never happened.[^3]
     //
-    // [^3]: ADR-0158, a site builds a typed unit from a bounded queue its store pays for, decision D4. `docs/adrs/draft/adr-0158-a-site-builds-a-typed-unit-from-a-bounded-queue-its-store-pays-for.md`
+    // [^3]: ADR-0158, a site builds a typed unit from a bounded queue its store pays for, decision D4. `docs/adrs/accepted/adr-0158-a-site-builds-a-typed-unit-from-a-bounded-queue-its-store-pays-for.md`
     assert!(world.set_queue_bound(0), "zero is inside the block width");
     let outcomes = world.found_run_for_every_faction(GROUP);
     let people: Vec<_> = outcomes

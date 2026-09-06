@@ -117,7 +117,7 @@ enum SiteGlyph {
 /// # References
 ///
 /// [^1]: Recurring Defect Shapes, shape 1. `.agents/rules/recurring-defects.md`
-/// [^2]: ADR-0151, an upgrade is a category with a ground fit and a level, decision D5. `docs/adrs/draft/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
+/// [^2]: ADR-0151, an upgrade is a category with a ground fit and a level, decision D5. `docs/adrs/accepted/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
 const UPGRADE_GLYPHS: [SiteGlyph; UPGRADE_CATEGORY_COUNT] = [
     // A road is a made way: one bar across the tile.
     SiteGlyph::Bar,
@@ -2144,7 +2144,7 @@ pub fn draw_paced(
                     // level, at every level and whether or not the site
                     // stands.[^19]
                     //
-                    // [^19]: ADR-0151, an upgrade is a category with a ground fit and a level, decision D5. `docs/adrs/draft/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
+                    // [^19]: ADR-0151, an upgrade is a category with a ground fit and a level, decision D5. `docs/adrs/accepted/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
                     if close {
                         mark_site(canvas, left, top, wide, tall, site);
                     }
@@ -2325,7 +2325,7 @@ fn on_an_edge(world: &World, address: Axial, holder: Option<Holder>, canvas: &mu
 ///
 /// # References
 ///
-/// [^1]: ADR-0151, an upgrade is a category with a ground fit and a level, decision D4. `docs/adrs/draft/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
+/// [^1]: ADR-0151, an upgrade is a category with a ground fit and a level, decision D4. `docs/adrs/accepted/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
 fn upgrade_weight(site: UpgradeSite, asked: i64) -> u8 {
     let work = asked.max(1);
     let done = site.progress.0.clamp(0, work);
@@ -2414,7 +2414,7 @@ pub fn luxury_colour(ordinal: u32) -> u32 {
 /// # References
 ///
 /// [^1]: Research report 25, defect 1. `docs/research/reports/25-demonstration-readability-upgrades-and-units.md`
-/// [^2]: ADR-0151, an upgrade is a category with a ground fit and a level, decision D5. `docs/adrs/draft/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
+/// [^2]: ADR-0151, an upgrade is a category with a ground fit and a level, decision D5. `docs/adrs/accepted/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
 fn mark_site(canvas: &mut Canvas, left: i32, top: i32, wide: i32, tall: i32, site: UpgradeSite) {
     // Half the tile. The ground shows around the glyph, so a watcher reads
     // the kind of ground and the thing somebody is making on it at once.
@@ -2472,7 +2472,7 @@ fn mark_site(canvas: &mut Canvas, left: i32, top: i32, wide: i32, tall: i32, sit
 ///
 /// # References
 ///
-/// [^1]: ADR-0151, an upgrade is a category with a ground fit and a level, decision D5. `docs/adrs/draft/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
+/// [^1]: ADR-0151, an upgrade is a category with a ground fit and a level, decision D5. `docs/adrs/accepted/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
 fn mark_level(canvas: &mut Canvas, x: i32, y: i32, side: i32, top: i32, tall: i32, level: u8) {
     if level == 0 {
         return;

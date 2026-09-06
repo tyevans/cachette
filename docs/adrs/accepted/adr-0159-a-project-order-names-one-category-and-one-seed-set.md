@@ -41,11 +41,13 @@ named project.**
 
 ### D1. The assignment decides a category and a seed set, and nothing else
 
-The set is the idle units of the faction. A unit that is not idle is not moved.
+The order reads every unit of the faction, and it sends only the idle ones. A
+unit that is not idle is never sent.
 
 A unit that already stands on a project of its own faction takes a build order
-for the category that project names. Every other idle unit joins the set that
-the order sends.
+for the category that project names, whether that unit is idle or not. The
+build verb refuses a tile that no project zones, so the order is safe to give.
+Every other idle unit joins the set that the order sends.
 
 For each unit of that sent set, the assignment takes the project nearest to it
 by hex distance, and the lower tile index wins a tie. That choice decides two
@@ -58,7 +60,7 @@ nothing.[^5] [^13]
 The assignment runs through one reader, and the controller calls that reader.
 
 A reviewer finds a violation when a unit is assigned by anything but hex
-distance and tile index, when a busy unit is reassigned, when the order
+distance and tile index, when a busy unit joins the sent set, when the order
 bypasses the verbs a caller holds, or when the assignment is written twice.
 
 ### D2. The record promises no named unit reaches a named project

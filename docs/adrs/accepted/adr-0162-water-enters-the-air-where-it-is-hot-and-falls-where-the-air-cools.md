@@ -9,15 +9,15 @@ cell that holds open water. A share of the air then falls on every cell in
 every solve, and the share rises with the mean height of the cell. A share of
 the ground water then leaves the world into a running total.[^1]
 
-**A measurement shows that this saturates the world.** Over a thousand ticks of
-the demonstration world, with no storm raised at all, every cell of the lattice
-holds ground water above the wet mark at every tick. The driest cell holds
-nearly twice the mark and the middle cell holds more than four times it. So the
-one reader that a simulation pass takes from the weather answers the same
-everywhere, and the rule that gives a gatherer more on wet ground gives every
-gatherer more.[^2] [^3]
+**A measurement shows that this saturates the world.** In a long run of the
+demonstration world, with no storm raised at all, every cell of the lattice
+holds ground water above the wet mark at every tick, and even the driest cell
+stands well clear of the mark. So the one reader that a simulation pass takes
+from the weather answers the same everywhere, and the rule that gives a
+gatherer more on wet ground gives every gatherer more. The report holds the
+figures.[^2] [^3]
 
-**The ground water itself is not flat.** It runs nearly fourfold from the
+**The ground water itself is not flat.** It runs over a wide range from the
 driest cell to the wettest. The value that hides that range is the mark, and
 the mark is a value rather than a decision.
 
@@ -102,8 +102,8 @@ becomes a difference between places rather than a constant.[^3] A game balanced
 against the constant will change.
 
 **Setting the wet mark is still separate work, and it is not made unnecessary
-by this record.** The measurement shows that the mark alone hides a fourfold
-range in the ground water that exists today.[^2] A model that separates the map
+by this record.** The measurement shows that the mark alone hides a wide range
+in the ground water that exists today.[^2] A model that separates the map
 further does not repair a mark that is far below every value it reads. Both are
 values, and the balance register holds them.[^6]
 
@@ -136,8 +136,8 @@ record does not make it.
 [^1]: ADR-0141, a weather pass moves water and never scales it, decisions D1 and D2. `docs/adrs/draft/adr-0141-a-weather-pass-moves-water-and-never-scales-it.md`
 [^2]: Research report 26, the scale of the weather, sections 2, 3 and 6. `docs/research/reports/26-the-scale-of-the-weather.md`
 [^3]: ADR-0143, wet ground yields more to a gatherer, decisions D1 and D2. `docs/adrs/draft/adr-0143-wet-ground-yields-more-to-a-gatherer.md`
-[^4]: ADR-0160, the wind is carried state, and the pressure gradient accelerates it, decisions D1 and D2. `docs/adrs/draft/adr-0160-the-wind-is-carried-state-and-the-pressure-gradient-accelerates-it.md`
-[^5]: ADR-0161, water rides the wind, and every transfer is an exact integer move, decisions D1 and D3. `docs/adrs/draft/adr-0161-water-rides-the-wind-and-every-transfer-is-an-exact-integer-move.md`
+[^4]: ADR-0160, the wind is carried state, and the pressure gradient accelerates it, decisions D1 and D2. `docs/adrs/accepted/adr-0160-the-wind-is-carried-state-and-the-pressure-gradient-accelerates-it.md`
+[^5]: ADR-0161, water rides the wind, and every transfer is an exact integer move, decisions D1 and D3. `docs/adrs/accepted/adr-0161-water-rides-the-wind-and-every-transfer-is-an-exact-integer-move.md`
 [^6]: Balance register, the weather section. `docs/reference/balance.md`
 [^7]: ADR-0142, a god inflicts weather only on ground its own faction holds, decisions D1 and D2. `docs/adrs/draft/adr-0142-a-god-inflicts-weather-only-on-ground-it-holds.md`
 [^8]: Recurring Defect Shapes, shape 1. `.agents/rules/recurring-defects.md`

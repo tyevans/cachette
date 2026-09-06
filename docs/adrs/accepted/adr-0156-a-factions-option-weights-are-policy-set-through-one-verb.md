@@ -280,7 +280,7 @@ lattice and not the population.[^5]
 [^19]: ADR-0003, every random draw is keyed, never stateful, decision D1. `docs/adrs/accepted/adr-0003-every-random-draw-is-keyed-never-stateful.md`
 [^20]: ADR-0004, iteration order is explicit, and unordered reductions need slots, decisions D1 and D3. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
 [^21]: ADR-0150, held ground is the ground within reach of a city its faction owns, decisions D4 and D5. `docs/adrs/draft/adr-0150-held-ground-is-the-ground-within-reach-of-a-city-its-faction-owns.md`
-[^22]: ADR-0153, a tile's lease follows the units that stand on it, decisions D2 and D5. `docs/adrs/draft/adr-0153-a-tiles-lease-follows-the-units-that-stand-on-it.md`
+[^22]: ADR-0153, a tile's lease follows the units that stand on it, decisions D2 and D5. `docs/adrs/accepted/adr-0153-a-tiles-lease-follows-the-units-that-stand-on-it.md`
 [^23]: ADR-0098, the choice is decided for each cell and each bucket of need, decision D3. `docs/adrs/draft/adr-0098-the-choice-is-decided-for-each-cell-and-each-bucket-of-need.md`
 [^24]: ADR-0040, Python is a control plane, not a data plane, decision D1. `docs/adrs/draft/adr-0040-python-is-a-control-plane-not-a-data-plane.md`
 [^25]: ADR-0109, the choice key holds a bounded class of the unit's own state, decision D4. `docs/adrs/draft/adr-0109-the-choice-key-holds-a-bounded-class-of-the-unit-state.md`

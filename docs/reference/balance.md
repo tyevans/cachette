@@ -230,5 +230,5 @@ rate, a step, a limit, a target, a share, a schedule, a bound.
 [^6]: Blockers register, BLK-150. `docs/BLOCKERS.md`
 [^7]: Target platform costs. `docs/reference/graviton-costs.md`
 [^8]: ADR-0157, a site's free places are its built housing less the residents the engine already counts. `docs/adrs/accepted/adr-0157-a-sites-free-places-are-its-built-housing-less-the-residents-the-engine-counts.md`
-[^9]: ADR-0158, a site builds a typed unit from a bounded queue its store pays for. `docs/adrs/draft/adr-0158-a-site-builds-a-typed-unit-from-a-bounded-queue-its-store-pays-for.md`
+[^9]: ADR-0158, a site builds a typed unit from a bounded queue its store pays for. `docs/adrs/accepted/adr-0158-a-site-builds-a-typed-unit-from-a-bounded-queue-its-store-pays-for.md`
 [^13]: Findings register, FND-498. `docs/FINDINGS.md`

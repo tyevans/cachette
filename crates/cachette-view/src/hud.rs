@@ -1943,7 +1943,7 @@ fn tile_lines(tile: Option<&TileReadout>) -> Vec<Line> {
 ///
 /// [^1]: ADR-0094, the caller owns the camera and the pixels, decision D5. `docs/adrs/draft/adr-0094-the-caller-owns-the-camera-and-the-pixels.md`
 /// [^2]: Recurring Defect Shapes, shape 1. `.claude/rules/recurring-defects.md`
-/// [^3]: ADR-0151, an upgrade is a category with a ground fit and a level, decision D1. `docs/adrs/draft/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
+/// [^3]: ADR-0151, an upgrade is a category with a ground fit and a level, decision D1. `docs/adrs/accepted/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
 #[must_use]
 pub const fn upgrade_name(kind: cachette_core::upgrade::UpgradeCategory) -> &'static str {
     match kind {

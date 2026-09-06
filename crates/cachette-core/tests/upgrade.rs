@@ -170,7 +170,7 @@ fn island(world: &World, width: u32, height: u32) -> Axial {
 ///
 /// # References
 ///
-/// [^1]: ADR-0151, an upgrade is a category with a ground fit and a level, decision D4. `docs/adrs/draft/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
+/// [^1]: ADR-0151, an upgrade is a category with a ground fit and a level, decision D4. `docs/adrs/accepted/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
 fn row_of(category: UpgradeCategory, level: u8) -> UpgradeRow {
     DEFAULT_UPGRADE_TABLE
         .row(category, level)
@@ -846,7 +846,7 @@ fn admission_reads_the_capacity_that_a_road_raised() {
     // that stands, and the fixture reads the level rather than assuming
     // one.[^2]
     //
-    // [^2]: ADR-0151, an upgrade is a category with a ground fit and a level, decision D3. `docs/adrs/draft/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
+    // [^2]: ADR-0151, an upgrade is a category with a ground fit and a level, decision D3. `docs/adrs/accepted/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
     let (paved, level) = crowded_tile(true);
     let ground = TileKind::Plain.capacity() as usize;
 

@@ -179,7 +179,7 @@ fn the_colour_key_names_every_mark_the_map_draws() {
         // pips under it. A reader who is told the colours and not the count
         // has to guess what a second pip means.[^10]
         //
-        // [^10]: ADR-0151, an upgrade is a category with a ground fit and a level, decision D5. `docs/adrs/draft/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
+        // [^10]: ADR-0151, an upgrade is a category with a ground fit and a level, decision D5. `docs/adrs/accepted/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
         "level pip",
     ] {
         assert!(

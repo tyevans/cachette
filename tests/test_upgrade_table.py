@@ -16,7 +16,7 @@ References
 
 [^2]: ADR-0151, an upgrade is a category with a ground fit and a level,
 decisions D1 to D4.
-``docs/adrs/draft/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md``
+``docs/adrs/accepted/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md``
 """
 
 from __future__ import annotations

@@ -94,7 +94,7 @@ impl Panel for Inspector {
             // and a watcher who reads this panel must get one answer.[^7]
             // [^8]
             //
-            // [^7]: ADR-0151, an upgrade is a category with a ground fit and a level, decision D5. `docs/adrs/draft/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
+            // [^7]: ADR-0151, an upgrade is a category with a ground fit and a level, decision D5. `docs/adrs/accepted/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
             // [^8]: ADR-0070, the head-up display reports what the drawing pass read, decision D1. `docs/adrs/accepted/adr-0070-the-head-up-display-reports-what-the-drawing-pass-read.md`
             lines.push(Line::row(
                 "level",

@@ -33,7 +33,7 @@
 //! [^4]: ADR-0002, simulated and aggregated state holds no floating point number, decision D1. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
 //! [^5]: ADR-0023, an aggregate combines exactly, in any order, decision D1. `docs/adrs/accepted/adr-0023-an-aggregate-combines-exactly-in-any-order.md`
 //! [^6]: Findings register, FND-011. `docs/FINDINGS.md`
-//! [^7]: ADR-0151, an upgrade is a category with a ground fit and a level, decisions D1 and D4. `docs/adrs/draft/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
+//! [^7]: ADR-0151, an upgrade is a category with a ground fit and a level, decisions D1 and D4. `docs/adrs/accepted/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
 //! [^8]: ADR-0145, a unit type is a row of capability columns, and zero means cannot, decision D4. `docs/adrs/accepted/adr-0145-a-unit-type-is-a-row-of-capability-columns-and-zero-means-cannot.md`
 
 use bytemuck::{Pod, Zeroable};
@@ -78,7 +78,7 @@ pub const NO_LEVEL: u8 = 0;
 /// # References
 ///
 /// [^1]: ADR-0011, every value type is a newtype with a declared size and alignment. `docs/adrs/REGISTRY.md`
-/// [^2]: ADR-0151, an upgrade is a category with a ground fit and a level, decision D1. `docs/adrs/draft/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
+/// [^2]: ADR-0151, an upgrade is a category with a ground fit and a level, decision D1. `docs/adrs/accepted/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
 #[repr(transparent)]
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Pod, Zeroable)]
 pub struct UpgradeCategory(pub u8);
@@ -215,7 +215,7 @@ macro_rules! declare_upgrade_row {
         /// # References
         ///
         /// [^1]: ADR-0006, an event is plain data and applying it is pure, decision D1. `docs/adrs/accepted/adr-0006-an-event-is-plain-data-and-applying-it-is-pure.md`
-        /// [^2]: ADR-0151, an upgrade is a category with a ground fit and a level, decision D1. `docs/adrs/draft/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
+        /// [^2]: ADR-0151, an upgrade is a category with a ground fit and a level, decision D1. `docs/adrs/accepted/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
         #[repr(C)]
         #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Pod, Zeroable)]
         pub struct UpgradeRow {
@@ -608,7 +608,7 @@ pub const WONDER_VICTORY_CLAIM: u32 = 1;
 ///
 /// # References
 ///
-/// [^1]: ADR-0151, an upgrade is a category with a ground fit and a level, decisions D1 and D4. `docs/adrs/draft/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
+/// [^1]: ADR-0151, an upgrade is a category with a ground fit and a level, decisions D1 and D4. `docs/adrs/accepted/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
 pub const OWN_GROUND_REQUIRED: u32 = 1;
 
 /// The work that one builder adds to a site in one tick.
@@ -630,7 +630,7 @@ pub const BUILD_RATE: i64 = 1;
 ///
 /// # References
 ///
-/// [^1]: ADR-0151, an upgrade is a category with a ground fit and a level, decisions D1 and D6. `docs/adrs/draft/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
+/// [^1]: ADR-0151, an upgrade is a category with a ground fit and a level, decisions D1 and D6. `docs/adrs/accepted/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
 pub const DEFAULT_UPGRADE_TABLE: UpgradeTable = {
     let mut rows = [UpgradeRow::NONE; UPGRADE_ROW_COUNT];
     rows[row_at(UpgradeCategory::ROAD, 1)] = UpgradeRow {
@@ -698,7 +698,7 @@ const fn row_at(category: UpgradeCategory, level: u8) -> usize {
 ///
 /// # References
 ///
-/// [^1]: ADR-0151, an upgrade is a category with a ground fit and a level, decision D1. `docs/adrs/draft/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
+/// [^1]: ADR-0151, an upgrade is a category with a ground fit and a level, decision D1. `docs/adrs/accepted/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct UpgradeTable {
     rows: [UpgradeRow; UPGRADE_ROW_COUNT],
@@ -910,7 +910,7 @@ pub const fn key_ceiling(tile_count: u32) -> u64 {
 /// # References
 ///
 /// [^1]: ADR-0090, a tile upgrade is stored sparsely, as the difference from the generated world, decision D3. `docs/adrs/draft/adr-0090-a-tile-upgrade-is-stored-sparsely.md`
-/// [^2]: ADR-0151, an upgrade is a category with a ground fit and a level, decision D4. `docs/adrs/draft/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
+/// [^2]: ADR-0151, an upgrade is a category with a ground fit and a level, decision D4. `docs/adrs/accepted/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
 #[must_use]
 pub const fn capacity_with(ground: u32, standing: Option<UpgradeRow>) -> u32 {
     if ground == 0 {
@@ -948,7 +948,7 @@ pub const fn gather_rate_with(base: u32, standing: Option<UpgradeRow>) -> u32 {
 ///
 /// # References
 ///
-/// [^1]: ADR-0151, an upgrade is a category with a ground fit and a level, decision D3. `docs/adrs/draft/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
+/// [^1]: ADR-0151, an upgrade is a category with a ground fit and a level, decision D3. `docs/adrs/accepted/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct UpgradeSite {
     /// The tile that carries the upgrade.
@@ -1126,7 +1126,7 @@ impl UpgradeMap {
     /// # References
     ///
     /// [^1]: Findings register, FND-011. `docs/FINDINGS.md`
-    /// [^2]: ADR-0151, an upgrade is a category with a ground fit and a level, decision D3. `docs/adrs/draft/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
+    /// [^2]: ADR-0151, an upgrade is a category with a ground fit and a level, decision D3. `docs/adrs/accepted/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
     pub fn merge_ascending(
         &mut self,
         run: &[(TileIdx, UpgradeCategory, i64)],

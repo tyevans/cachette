@@ -813,7 +813,7 @@ pub struct World {
     ///
     /// # References
     ///
-    /// [^1]: ADR-0151, an upgrade is a category with a ground fit and a level, decisions D1 and D4. `docs/adrs/draft/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
+    /// [^1]: ADR-0151, an upgrade is a category with a ground fit and a level, decisions D1 and D4. `docs/adrs/accepted/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
     upgrade_table: UpgradeTable,
     /// The build queue of every site, indexed by the slot of the site.
     ///
@@ -823,7 +823,7 @@ pub struct World {
     ///
     /// # References
     ///
-    /// [^1]: ADR-0158, a site builds a typed unit from a bounded queue its store pays for, decision D1. `docs/adrs/draft/adr-0158-a-site-builds-a-typed-unit-from-a-bounded-queue-its-store-pays-for.md`
+    /// [^1]: ADR-0158, a site builds a typed unit from a bounded queue its store pays for, decision D1. `docs/adrs/accepted/adr-0158-a-site-builds-a-typed-unit-from-a-bounded-queue-its-store-pays-for.md`
     queues: QueueTable,
     /// The shared table that a unit type indexes for its build cost.
     ///
@@ -833,7 +833,7 @@ pub struct World {
     ///
     /// # References
     ///
-    /// [^1]: ADR-0158, a site builds a typed unit from a bounded queue its store pays for, decision D3. `docs/adrs/draft/adr-0158-a-site-builds-a-typed-unit-from-a-bounded-queue-its-store-pays-for.md`
+    /// [^1]: ADR-0158, a site builds a typed unit from a bounded queue its store pays for, decision D3. `docs/adrs/accepted/adr-0158-a-site-builds-a-typed-unit-from-a-bounded-queue-its-store-pays-for.md`
     build_costs: BuildCostTable,
     /// When the queue advance acts.
     ///
@@ -842,7 +842,7 @@ pub struct World {
     ///
     /// # References
     ///
-    /// [^1]: ADR-0158, a site builds a typed unit from a bounded queue its store pays for, decision D5. `docs/adrs/draft/adr-0158-a-site-builds-a-typed-unit-from-a-bounded-queue-its-store-pays-for.md`
+    /// [^1]: ADR-0158, a site builds a typed unit from a bounded queue its store pays for, decision D5. `docs/adrs/accepted/adr-0158-a-site-builds-a-typed-unit-from-a-bounded-queue-its-store-pays-for.md`
     queue_schedule: RateSchedule,
     /// One bit for each unit that the last meeting ended.
     ///
@@ -1244,7 +1244,7 @@ impl World {
             // The world is built with the default upgrade table, so a build
             // order names one of the categories that table holds.[^2]
             //
-            // [^2]: ADR-0151, an upgrade is a category with a ground fit and a level, decision D1. `docs/adrs/draft/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
+            // [^2]: ADR-0151, an upgrade is a category with a ground fit and a level, decision D1. `docs/adrs/accepted/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
             upgrade_table: upgrade::DEFAULT_UPGRADE_TABLE,
             fell_plane: DeathPlane::new(),
             fell_log: Vec::new(),
@@ -3760,7 +3760,7 @@ impl World {
         // cost table decides what a later frame does, so both enter. The
         // schedule decides which ticks act, so it enters too.[^17]
         //
-        // [^17]: ADR-0158, a site builds a typed unit from a bounded queue its store pays for, decision D1. `docs/adrs/draft/adr-0158-a-site-builds-a-typed-unit-from-a-bounded-queue-its-store-pays-for.md`
+        // [^17]: ADR-0158, a site builds a typed unit from a bounded queue its store pays for, decision D1. `docs/adrs/accepted/adr-0158-a-site-builds-a-typed-unit-from-a-bounded-queue-its-store-pays-for.md`
         let hash = self.queues.hash_into(hash);
         let hash = self.build_costs.hash_into(hash);
         let hash = hash
@@ -3770,7 +3770,7 @@ impl World {
         // upgrade changes, so the whole-world hash covers it. Two worlds
         // built with different tables never hash the same.[^5]
         //
-        // [^5]: ADR-0151, an upgrade is a category with a ground fit and a level, decision D1. `docs/adrs/draft/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
+        // [^5]: ADR-0151, an upgrade is a category with a ground fit and a level, decision D1. `docs/adrs/accepted/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
         let hash = self.upgrade_table.hash_into(hash);
         // A luxury is authored rather than generated, so no input above
         // produces it. Two worlds that carry different luxuries are
@@ -4948,7 +4948,7 @@ impl World {
         //
         // [^25]: ADR-0062, production and upkeep are rates attached to a site, decision D5. `docs/adrs/accepted/adr-0062-production-and-upkeep-are-rates-attached-to-a-site.md`
         // [^26]: ADR-0018, the unit-to-tile bridge is derived, and it rebuilds at the barrier, decision D3. `docs/adrs/accepted/adr-0018-the-unit-to-tile-bridge-is-derived-and-rebuilds-at-the-barrier.md`
-        // [^27]: ADR-0158, a site builds a typed unit from a bounded queue its store pays for, decision D5. `docs/adrs/draft/adr-0158-a-site-builds-a-typed-unit-from-a-bounded-queue-its-store-pays-for.md`
+        // [^27]: ADR-0158, a site builds a typed unit from a bounded queue its store pays for, decision D5. `docs/adrs/accepted/adr-0158-a-site-builds-a-typed-unit-from-a-bounded-queue-its-store-pays-for.md`
         {
             let _span = stage::open(Stage::QueueAdvance);
             self.advance_queues();
@@ -5452,7 +5452,7 @@ impl World {
     ///
     /// # References
     ///
-    /// [^1]: ADR-0151, an upgrade is a category with a ground fit and a level, decision D3. `docs/adrs/draft/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
+    /// [^1]: ADR-0151, an upgrade is a category with a ground fit and a level, decision D3. `docs/adrs/accepted/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
     #[must_use]
     pub fn upgrade_level(&self, address: Axial) -> u8 {
         self.upgrade_at(address)
@@ -5468,7 +5468,7 @@ impl World {
     ///
     /// # References
     ///
-    /// [^1]: ADR-0151, an upgrade is a category with a ground fit and a level, decision D4. `docs/adrs/draft/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
+    /// [^1]: ADR-0151, an upgrade is a category with a ground fit and a level, decision D4. `docs/adrs/accepted/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
     #[must_use]
     pub fn standing_upgrade_row(&self, address: Axial) -> Option<UpgradeRow> {
         let tile = self.grid.index_of(address)?;
@@ -5487,7 +5487,7 @@ impl World {
     /// # References
     ///
     /// [^1]: ADR-0090, a tile upgrade is stored sparsely, as the difference from the generated world, decision D1. `docs/adrs/draft/adr-0090-a-tile-upgrade-is-stored-sparsely.md`
-    /// [^2]: ADR-0151, an upgrade is a category with a ground fit and a level, decision D4. `docs/adrs/draft/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
+    /// [^2]: ADR-0151, an upgrade is a category with a ground fit and a level, decision D4. `docs/adrs/accepted/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
     fn standing_rows(&self) -> impl Iterator<Item = (UpgradeSite, UpgradeRow)> + '_ {
         self.upgrades.sites().iter().filter_map(|site| {
             self.upgrade_table
@@ -5504,7 +5504,7 @@ impl World {
     ///
     /// # References
     ///
-    /// [^1]: ADR-0151, an upgrade is a category with a ground fit and a level, decision D1. `docs/adrs/draft/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
+    /// [^1]: ADR-0151, an upgrade is a category with a ground fit and a level, decision D1. `docs/adrs/accepted/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
     #[must_use]
     pub const fn upgrade_table(&self) -> &UpgradeTable {
         &self.upgrade_table
@@ -5592,7 +5592,7 @@ impl World {
     /// # References
     ///
     /// [^1]: ADR-0090, a tile upgrade is stored sparsely, as the difference from the generated world, decision D2. `docs/adrs/draft/adr-0090-a-tile-upgrade-is-stored-sparsely.md`
-    /// [^3]: ADR-0151, an upgrade is a category with a ground fit and a level, decision D2. `docs/adrs/draft/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
+    /// [^3]: ADR-0151, an upgrade is a category with a ground fit and a level, decision D2. `docs/adrs/accepted/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
     pub fn order_build(
         &mut self,
         entity: Entity,
@@ -8022,7 +8022,7 @@ impl World {
     ///
     /// # References
     ///
-    /// [^1]: ADR-0158, a site builds a typed unit from a bounded queue its store pays for, decision D1. `docs/adrs/draft/adr-0158-a-site-builds-a-typed-unit-from-a-bounded-queue-its-store-pays-for.md`
+    /// [^1]: ADR-0158, a site builds a typed unit from a bounded queue its store pays for, decision D1. `docs/adrs/accepted/adr-0158-a-site-builds-a-typed-unit-from-a-bounded-queue-its-store-pays-for.md`
     #[must_use]
     pub fn site_queue(&self, site: Entity) -> Option<&[QueueEntry]> {
         let slot = self.settlements.slot_of(site)?;
@@ -8054,8 +8054,8 @@ impl World {
     ///
     /// # References
     ///
-    /// [^1]: ADR-0158, a site builds a typed unit from a bounded queue its store pays for, decision D2. `docs/adrs/draft/adr-0158-a-site-builds-a-typed-unit-from-a-bounded-queue-its-store-pays-for.md`
-    /// [^2]: ADR-0158, a site builds a typed unit from a bounded queue its store pays for, decision D6. `docs/adrs/draft/adr-0158-a-site-builds-a-typed-unit-from-a-bounded-queue-its-store-pays-for.md`
+    /// [^1]: ADR-0158, a site builds a typed unit from a bounded queue its store pays for, decision D2. `docs/adrs/accepted/adr-0158-a-site-builds-a-typed-unit-from-a-bounded-queue-its-store-pays-for.md`
+    /// [^2]: ADR-0158, a site builds a typed unit from a bounded queue its store pays for, decision D6. `docs/adrs/accepted/adr-0158-a-site-builds-a-typed-unit-from-a-bounded-queue-its-store-pays-for.md`
     pub fn order_site_queue(
         &mut self,
         faction: FactionId,
@@ -8120,7 +8120,7 @@ impl World {
     ///
     /// # References
     ///
-    /// [^1]: ADR-0158, a site builds a typed unit from a bounded queue its store pays for, decision D3. `docs/adrs/draft/adr-0158-a-site-builds-a-typed-unit-from-a-bounded-queue-its-store-pays-for.md`
+    /// [^1]: ADR-0158, a site builds a typed unit from a bounded queue its store pays for, decision D3. `docs/adrs/accepted/adr-0158-a-site-builds-a-typed-unit-from-a-bounded-queue-its-store-pays-for.md`
     pub const fn define_build_cost(
         &mut self,
         unit_type: u8,
@@ -8136,7 +8136,7 @@ impl World {
     ///
     /// # References
     ///
-    /// [^1]: ADR-0158, a site builds a typed unit from a bounded queue its store pays for, decision D1. `docs/adrs/draft/adr-0158-a-site-builds-a-typed-unit-from-a-bounded-queue-its-store-pays-for.md`
+    /// [^1]: ADR-0158, a site builds a typed unit from a bounded queue its store pays for, decision D1. `docs/adrs/accepted/adr-0158-a-site-builds-a-typed-unit-from-a-bounded-queue-its-store-pays-for.md`
     #[must_use]
     pub const fn queue_bound(&self) -> usize {
         self.queues.bound()
@@ -8197,7 +8197,7 @@ impl World {
     ///
     /// # References
     ///
-    /// [^1]: ADR-0158, a site builds a typed unit from a bounded queue its store pays for, decision D6. `docs/adrs/draft/adr-0158-a-site-builds-a-typed-unit-from-a-bounded-queue-its-store-pays-for.md`
+    /// [^1]: ADR-0158, a site builds a typed unit from a bounded queue its store pays for, decision D6. `docs/adrs/accepted/adr-0158-a-site-builds-a-typed-unit-from-a-bounded-queue-its-store-pays-for.md`
     #[must_use]
     pub const fn queue_refused_without_goods(&self) -> u32 {
         self.queues.refused_without_goods()
@@ -8314,7 +8314,7 @@ impl World {
                 // has already reached its work costs nothing further,
                 // because only an advance charges.[^8]
                 //
-                // [^8]: ADR-0158, a site builds a typed unit from a bounded queue its store pays for, decision D3. `docs/adrs/draft/adr-0158-a-site-builds-a-typed-unit-from-a-bounded-queue-its-store-pays-for.md`
+                // [^8]: ADR-0158, a site builds a typed unit from a bounded queue its store pays for, decision D3. `docs/adrs/accepted/adr-0158-a-site-builds-a-typed-unit-from-a-bounded-queue-its-store-pays-for.md`
                 if !self.store_holds(slot, &charge) {
                     continue;
                 }
@@ -8378,7 +8378,7 @@ impl World {
             // discarded: the entry stays at the front of the queue. The two
             // reasons are counted apart.[^9]
             //
-            // [^9]: ADR-0158, a site builds a typed unit from a bounded queue its store pays for, decisions D4 and D6. `docs/adrs/draft/adr-0158-a-site-builds-a-typed-unit-from-a-bounded-queue-its-store-pays-for.md`
+            // [^9]: ADR-0158, a site builds a typed unit from a bounded queue its store pays for, decisions D4 and D6. `docs/adrs/accepted/adr-0158-a-site-builds-a-typed-unit-from-a-bounded-queue-its-store-pays-for.md`
             if residents[index].len() < row.people as usize {
                 self.queues.count_without_a_person();
                 continue;
@@ -8933,7 +8933,7 @@ fn build_order_of(keys: &[BoundedKey], ceiling: u64) -> Result<Vec<u32>, SortErr
 ///
 /// [^1]: ADR-0150, held ground is the ground within reach of a city its faction owns, decision D4. `docs/adrs/draft/adr-0150-held-ground-is-the-ground-within-reach-of-a-city-its-faction-owns.md`
 /// [^2]: Recurring defect shapes, shape 1. `.agents/rules/recurring-defects.md`
-/// [^3]: ADR-0151, an upgrade is a category with a ground fit and a level, decision D4. `docs/adrs/draft/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
+/// [^3]: ADR-0151, an upgrade is a category with a ground fit and a level, decision D4. `docs/adrs/accepted/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
 /// [^4]: ADR-0152, a faction plans its roads and zones with one solver, decisions D3 and D4. `docs/adrs/accepted/adr-0152-a-faction-plans-its-roads-and-zones-with-one-solver.md`
 /// [^5]: Findings register, FND-496. `docs/FINDINGS.md`
 #[must_use]
@@ -8985,7 +8985,7 @@ const fn build_is_permitted(
 ///
 /// # References
 ///
-/// [^1]: ADR-0151, an upgrade is a category with a ground fit and a level, decision D2. `docs/adrs/draft/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
+/// [^1]: ADR-0151, an upgrade is a category with a ground fit and a level, decision D2. `docs/adrs/accepted/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
 /// [^2]: Recurring defect shapes, shape 1. `.agents/rules/recurring-defects.md`
 fn resolve_build_row(
     table: &UpgradeTable,
@@ -9064,7 +9064,7 @@ fn build_intents(
                         // gained another category since the order, stop
                         // here.[^3]
                         //
-                        // [^3]: ADR-0151, an upgrade is a category with a ground fit and a level, decision D2. `docs/adrs/draft/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
+                        // [^3]: ADR-0151, an upgrade is a category with a ground fit and a level, decision D2. `docs/adrs/accepted/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
                         let ground = terrain.kind(grid.address_of(tile)?)?;
                         let row =
                             resolve_build_row(table, ground, upgrades.at(tile), category).ok()?;
@@ -10130,7 +10130,7 @@ pub const SUBSYSTEM_CENSUS: &[CensusRow] = &[
     // different things to a watcher. A watcher then tells a site with no
     // resident to spend from a site whose store cannot pay.[^4]
     //
-    // [^4]: ADR-0158, a site builds a typed unit from a bounded queue its store pays for, decision D6. `docs/adrs/draft/adr-0158-a-site-builds-a-typed-unit-from-a-bounded-queue-its-store-pays-for.md`
+    // [^4]: ADR-0158, a site builds a typed unit from a bounded queue its store pays for, decision D6. `docs/adrs/accepted/adr-0158-a-site-builds-a-typed-unit-from-a-bounded-queue-its-store-pays-for.md`
     CensusRow {
         name: "queue_produced",
         basis: CensusBasis::Total,
@@ -10194,7 +10194,7 @@ pub const SUBSYSTEM_CENSUS: &[CensusRow] = &[
         // The count reads the victory claim column of the row that stands on
         // each tile. It names no category.[^1]
         //
-        // [^1]: ADR-0151, an upgrade is a category with a ground fit and a level, decision D4. `docs/adrs/draft/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
+        // [^1]: ADR-0151, an upgrade is a category with a ground fit and a level, decision D4. `docs/adrs/accepted/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
         read: |world| {
             world
                 .standing_rows()
@@ -10208,7 +10208,7 @@ pub const SUBSYSTEM_CENSUS: &[CensusRow] = &[
         // The count reads the store capacity column of the row that stands on
         // each tile. It names no category.[^1]
         //
-        // [^1]: ADR-0151, an upgrade is a category with a ground fit and a level, decision D4. `docs/adrs/draft/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
+        // [^1]: ADR-0151, an upgrade is a category with a ground fit and a level, decision D4. `docs/adrs/accepted/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
         read: |world| {
             world
                 .standing_rows()
@@ -11551,7 +11551,7 @@ impl World {
         // zero can do nothing, so the controller does not offer it. The list
         // is read from the table, and no rule here names a type.[^10]
         //
-        // [^10]: ADR-0158, a site builds a typed unit from a bounded queue its store pays for, decision D2. `docs/adrs/draft/adr-0158-a-site-builds-a-typed-unit-from-a-bounded-queue-its-store-pays-for.md`
+        // [^10]: ADR-0158, a site builds a typed unit from a bounded queue its store pays for, decision D2. `docs/adrs/accepted/adr-0158-a-site-builds-a-typed-unit-from-a-bounded-queue-its-store-pays-for.md`
         let offered: Vec<UnitTypeId> = (0..UNIT_TYPE_COUNT)
             .map(|index| UnitTypeId(index as u8))
             .filter(|unit_type| self.unit_types.row(*unit_type) != UnitTypeRow::NONE)
@@ -11654,7 +11654,7 @@ impl World {
                 // calls. The site is the lowest-slot site of the faction
                 // whose queue has room, and the verb counts a refusal.[^11]
                 //
-                // [^11]: ADR-0158, a site builds a typed unit from a bounded queue its store pays for, decisions D2 and D6. `docs/adrs/draft/adr-0158-a-site-builds-a-typed-unit-from-a-bounded-queue-its-store-pays-for.md`
+                // [^11]: ADR-0158, a site builds a typed unit from a bounded queue its store pays for, decisions D2 and D6. `docs/adrs/accepted/adr-0158-a-site-builds-a-typed-unit-from-a-bounded-queue-its-store-pays-for.md`
                 Choice::Queue(unit_type) => {
                     let site = self.controller_queue_site(faction);
                     site.is_some_and(|site| {
@@ -11967,7 +11967,7 @@ impl World {
     /// # References
     ///
     /// [^1]: ADR-0090, a tile upgrade is stored sparsely, as the difference from the generated world, decision D1. `docs/adrs/draft/adr-0090-a-tile-upgrade-is-stored-sparsely.md`
-    /// [^2]: ADR-0151, an upgrade is a category with a ground fit and a level, decision D4. `docs/adrs/draft/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
+    /// [^2]: ADR-0151, an upgrade is a category with a ground fit and a level, decision D4. `docs/adrs/accepted/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
     fn wonder_progress(&self) -> Vec<i64> {
         self.victory_claims()
             .into_iter()
@@ -11990,7 +11990,7 @@ impl World {
     /// # References
     ///
     /// [^1]: ADR-0090, a tile upgrade is stored sparsely, as the difference from the generated world, decision D1. `docs/adrs/draft/adr-0090-a-tile-upgrade-is-stored-sparsely.md`
-    /// [^2]: ADR-0151, an upgrade is a category with a ground fit and a level, decision D4. `docs/adrs/draft/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
+    /// [^2]: ADR-0151, an upgrade is a category with a ground fit and a level, decision D4. `docs/adrs/accepted/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
     fn victory_claims(&self) -> Vec<(i64, i64)> {
         let mut best = vec![(0i64, 0i64); usize::from(self.config.faction_count.max(1))];
         for site in self.upgrades.sites() {

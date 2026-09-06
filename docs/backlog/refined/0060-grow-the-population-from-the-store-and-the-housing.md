@@ -181,7 +181,7 @@ Filled in when the item moves to `complete/`.
 
 ## References
 
-[^1]: ADR-0158, a site builds a typed unit from a bounded queue its store pays for, decision D4. `docs/adrs/draft/adr-0158-a-site-builds-a-typed-unit-from-a-bounded-queue-its-store-pays-for.md`
+[^1]: ADR-0158, a site builds a typed unit from a bounded queue its store pays for, decision D4. `docs/adrs/accepted/adr-0158-a-site-builds-a-typed-unit-from-a-bounded-queue-its-store-pays-for.md`
 [^2]: ADR-0082, the store sets the rate of a birth and the housing admits it, decision D1. `docs/adrs/draft/adr-0082-the-store-sets-the-rate-of-a-birth-and-the-housing-admits-it.md`
 [^3]: ADR-0082, the store sets the rate of a birth and the housing admits it, decision D2. `docs/adrs/draft/adr-0082-the-store-sets-the-rate-of-a-birth-and-the-housing-admits-it.md`
 [^4]: ADR-0082, the store sets the rate of a birth and the housing admits it, decision D3. `docs/adrs/draft/adr-0082-the-store-sets-the-rate-of-a-birth-and-the-housing-admits-it.md`

@@ -4370,7 +4370,7 @@ exactly so that a caller cannot build a wrong one.[^DEC120C]
 [^DEC202A]: ADR-0053, a faction is a bit in a mask, and a relation is a plane, decision D3. `docs/adrs/accepted/adr-0053-a-faction-is-a-bit-in-a-mask-and-a-relation-is-a-plane.md`
 [^DEC202B]: Blockers register, BLK-111. `docs/BLOCKERS.md`
 [^DEC250A]: ADR-0121, a meeting between two factions resolves at the tile, decision D3. `docs/adrs/draft/adr-0121-a-meeting-between-two-factions-resolves-at-the-tile.md`
-[^DEC271A]: ADR-0158, a site builds a typed unit from a bounded queue its store pays for, decision D3. `docs/adrs/draft/adr-0158-a-site-builds-a-typed-unit-from-a-bounded-queue-its-store-pays-for.md`
+[^DEC271A]: ADR-0158, a site builds a typed unit from a bounded queue its store pays for, decision D3. `docs/adrs/accepted/adr-0158-a-site-builds-a-typed-unit-from-a-bounded-queue-its-store-pays-for.md`
 [^DEC271B]: ADR-0145, a unit type is a row of capability columns, and zero means cannot, decisions D1 and D2. `docs/adrs/accepted/adr-0145-a-unit-type-is-a-row-of-capability-columns-and-zero-means-cannot.md`
 [^DEC271C]: ADR-0120, a unit carries a type that indexes a table, decision D1. `docs/adrs/draft/adr-0120-a-unit-carries-a-type-that-indexes-a-table.md`
 [^DEC270A]: The recovery rules and the depletion ledger. `crates/cachette-core/src/resource.rs`
@@ -4383,5 +4383,5 @@ exactly so that a caller cannot build a wrong one.[^DEC120C]
 [^DEC237D]: ADR-0109, the choice key holds a bounded class of the unit's own state, decision D3. `docs/adrs/draft/adr-0109-the-choice-key-holds-a-bounded-class-of-the-unit-state.md`
 [^DEC237E]: PRD-0004, the world has weather that a watcher can read, what good looks like. `docs/product/accepted/prd-0004-the-world-has-weather-that-a-watcher-can-read.md`
 [^DEC238A]: ADR-0141, a weather pass moves water and never scales it, decision D2. `docs/adrs/draft/adr-0141-a-weather-pass-moves-water-and-never-scales-it.md`
-[^D143A]: ADR-0151, an upgrade is a category with a ground fit and a level, decisions D1 and D6. `docs/adrs/draft/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
+[^D143A]: ADR-0151, an upgrade is a category with a ground fit and a level, decisions D1 and D6. `docs/adrs/accepted/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
 [^D143B]: Backlog item 0486. `docs/backlog/complete/0486-turn-the-upgrade-kind-into-a-table-of-category-ground-fit-and-level.md`

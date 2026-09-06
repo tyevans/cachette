@@ -4,18 +4,18 @@
 
 A tile upgrade is the mark a unit leaves on a tile. The engine stores one entry
 for each improved tile and nothing for any other, and a tile carries at most one
-upgrade.[^1] The entry holds a kind and a progress accumulator. The kind is an
+upgrade.[^1] The entry holds a kind and a progress accumulator. The kind was an
 enumeration in the core crate with two variants, a road and a terrace. Each
-variant carries a fixed work, a fixed capacity and a fixed yield bonus, written
+variant carried a fixed work, a fixed capacity and a fixed yield bonus, written
 as a match arm in code.
 
 The project states the opposite rule. Unit types and upgrades are data and not
 code, and types parameterise the verbs rather than multiplying them.[^2] The
 unit type already follows the rule: a type is an index into a table the world is
 built with, a row is numeric capability columns, a zero means cannot, and no
-pass branches on a type name.[^3] [^4] The upgrade kind does not follow it. The
-decisions register holds that gap as an open choice, and a backlog item asks to
-close it.[^5] [^6]
+pass branches on a type name.[^3] [^4] The upgrade kind did not follow it. The
+decisions register held that gap as an open choice, and a backlog item landed
+the table this record states.[^5] [^6]
 
 Three needs now press on the enumeration at once. The product asks that an
 upgrade suit the ground under it, that an upgrade have a level a watcher reads
@@ -24,16 +24,16 @@ wear work adds a wall, and the game end adds a wonder and a store.[^8] [^9]
 Each of those is a new variant, a new match arm in every table, and a new
 branch in the controller that draws a kind from the high bits of one draw.
 
-The ground has five kinds, and every kind is a pure function of the seed and the
-tile index.[^10] A deposit on a tile is generated the same way.[^11] So the
+The ground has a fixed set of kinds, and every kind is a pure function of the
+seed and the tile index.[^10] A deposit on a tile is generated the same way.[^11] So the
 ground a tile offers is known at the moment an order arrives, and the engine
 pays one read for it. The entry is the stored change over that generated base,
 which is the shape every tile field takes.[^12]
 
-**The shortest path adds variants.** Five variants become eight, each table
-gains three arms, and a level becomes a second variant beside the first, so a
-terrace at level two is a kind of its own. A level then multiplies the variants,
-and a category of three levels on two ground kinds is six arms in every table.
+**The shortest path adds a variant for each new upgrade.** Every effect table
+gains an arm for each one. A level then becomes a second variant beside the
+first, so a terrace at level two is a kind of its own. A level multiplies the
+variants, and each product is another arm in every table.
 
 **The second shortest path adds a level to the entry and keeps the enumeration.**
 The entry gains a level field, and every effect table takes the level as a
@@ -195,13 +195,12 @@ set that the controller and the caller could apply differently.[^7] [^18]
 
 ## Consequences
 
-**The golden state hash moves.** The table enters the hash, the entry gains a
-level and the kind becomes a category index. Every stored golden hash changes,
-and the commit that lands the table records the change.
+**Every golden state hash depends on the table.** The table enters the hash, so
+a change to a row changes the hash of every world built with that table.
 
-**The wall, the wonder and the store are designed against rows.** The two items
-that add them write rows and read columns, and neither adds a variant.[^8] [^9]
-The item that adds the wall waits for the table.
+**An upgrade the project adds later is a row.** The wall, the wonder and the
+store are rows, and the items that added them write rows and read columns
+rather than adding a variant.[^8] [^9]
 
 **A category has a top.** The top is the highest level with a row, and nothing
 states it twice. A build order at the top is refused, and the refusal is
@@ -217,13 +216,11 @@ behaviour decision and this record does not make it.
 candidate, because the product asks what a road does to a unit, and a movement
 pass may one day read it. The column arrives with the pass that reads it.[^13]
 
-**The Python type stub gains a category argument and loses a kind.** A caller
-that passed a kind number passes a category index. The commit that lands the
-table searches the tree for every caller and names the search.
+**A caller names a category and never a kind.** The Python boundary carries a
+category index, and no caller passes a kind.
 
-**The decisions register closes its row.** The open choice between a variant
-and a row is answered by this record, and the item that lands the table closes
-the row in the same commit.[^5]
+**The open choice between a variant and a row is answered.** The decisions
+register holds the outcome and the reasoning.[^5]
 
 **Nothing here names a value.** Which categories exist, how many levels each
 has, which ground each fits and what each level changes are rules of the

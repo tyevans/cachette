@@ -8,11 +8,10 @@ computes what it keeps and what each neighbour hands it, and it writes only
 itself.[^1] Every neighbour receives the same share, so the transfer has no
 direction.
 
-**A measurement shows the result.** One storm raised at the strength ceiling
-reaches about a third of the lattice within one tick, holds its maximum at the
-cell it was raised on for two ticks, and leaves nothing a watcher can find by
-the twentieth tick. The maximum flattens where it stands and never
-travels.[^2]
+**A measurement shows the result.** A storm raised at the strength ceiling
+spreads over much of the lattice within one tick, holds its maximum at the cell
+it was raised on, and soon leaves nothing a watcher can find. The maximum
+flattens where it stands and never travels. The report holds the figures.[^2]
 
 A companion record gives each cell a wind, which is carried state that the
 pressure difference accelerates.[^3] This record says what the water does with
@@ -96,8 +95,8 @@ behaviour the project owner asked for, and it is what the present rule cannot
 give at any value.
 
 **The transport share must be smaller than the present one.** The measurement
-shows one storm covering a third of the lattice in one tick under the share and
-pass count that stand today.[^2] A directional transport at that rate would
+shows one storm reaching much of the lattice in one tick, under the share and
+the pass count that stand today.[^2] A directional transport at that rate would
 carry a front off a small map before a watcher saw it. The share and the pass
 count are values, and the balance register holds the rows.[^8]
 
@@ -121,7 +120,7 @@ price of an integer transfer.
 
 [^1]: ADR-0141, a weather pass moves water and never scales it, decisions D1 and D2. `docs/adrs/draft/adr-0141-a-weather-pass-moves-water-and-never-scales-it.md`
 [^2]: Research report 26, the scale of the weather, sections 4 and 7. `docs/research/reports/26-the-scale-of-the-weather.md`
-[^3]: ADR-0160, the wind is carried state, and the pressure gradient accelerates it, decisions D1 and D3. `docs/adrs/draft/adr-0160-the-wind-is-carried-state-and-the-pressure-gradient-accelerates-it.md`
+[^3]: ADR-0160, the wind is carried state, and the pressure gradient accelerates it, decisions D1 and D3. `docs/adrs/accepted/adr-0160-the-wind-is-carried-state-and-the-pressure-gradient-accelerates-it.md`
 [^4]: PRD-0004, the world has weather that a watcher can read, what good looks like. `docs/product/accepted/prd-0004-the-world-has-weather-that-a-watcher-can-read.md`
 [^5]: ADR-0001, one binary gives one answer at any thread count, decision D4. `docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
 [^6]: ADR-0009, parallel stages write disjoint outputs, decisions D1 and D2. `docs/adrs/accepted/adr-0009-parallel-stages-write-disjoint-outputs.md`

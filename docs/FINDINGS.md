@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-499**
+**Next number: FND-514**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -11872,7 +11872,7 @@ file.
 [^F493A]: ADR-0152, a faction plans its roads and zones with one solver, decision D5. `docs/adrs/accepted/adr-0152-a-faction-plans-its-roads-and-zones-with-one-solver.md`
 [^F493B]: ADR-0091, movement takes its direction from a per-cell field, never from a per-unit search, decision D1. `docs/adrs/draft/adr-0091-movement-takes-its-direction-from-a-per-cell-field.md`
 [^F493D]: ADR-0125, the control plane names the seed set of a destination field, decisions D1 and D3. `docs/adrs/draft/adr-0125-the-control-plane-names-the-seed-set-of-a-destination-field.md`
-[^F493E]: ADR-0159, a project order names one category for each unit and one seed set for the faction. `docs/adrs/draft/adr-0159-a-project-order-names-one-category-and-one-seed-set.md`
+[^F493E]: ADR-0159, a project order names one category for each unit and one seed set for the faction. `docs/adrs/accepted/adr-0159-a-project-order-names-one-category-and-one-seed-set.md`
 [^F491C]: Decision Record Scope, section 4.6. `.agents/rules/adr-scope.md`
 [^F487A]: ADR-0150, held ground is the ground within reach of a city its faction owns, decision D1. `docs/adrs/draft/adr-0150-held-ground-is-the-ground-within-reach-of-a-city-its-faction-owns.md`
 [^F487B]: Recurring defect shapes, shape 1. `.agents/rules/recurring-defects.md`
@@ -12349,17 +12349,107 @@ One row still says more than it reads. The storm row reports whether a storm
 stands now, and its name promises a count of storms. A pass that counts the
 storms themselves must replace it.
 
+### FND-510 — A record written ahead of the code states a false context once the code lands, and nothing fails
+
+**What the project believed.** ADR-0151 said that the upgrade kind was an
+enumeration in the core crate with two variants, that each variant carried its
+work and its effect as a match arm, and that the decisions register held the
+choice open. The decision record priority index agreed, and its row said in
+bold that the record ran ahead of the code.
+
+**What is true.** The code implements the record. The core crate holds an
+upgrade table, a row type, a category newtype and a default table with rows for
+the road, the terrace, the wonder, the store and the wall.[^F510A] DEC-143
+closed on 5 September 2026 and names the item that landed it.[^F510B] Both
+statements had been false since that item merged.
+
+**Why nothing caught it.** A record is prose. The record check reads structure,
+volatile material, citations and the registry, and none of those can see a
+context that describes a tree the project has left. The priority row is prose
+too, and it carried the same claim.
+
+**What follows.** A record that runs ahead of the code carries a context in the
+present tense, and that context expires when the work lands. Write the context
+of such a record in the past tense at review, as this review did, so the forces
+survive and the stale description does not. The registry and the priority index
+hold whether a record is implemented; the record itself should not.
+
+### FND-511 — A source file cited a decision number that exists and a rule that does not
+
+**What the project believed.** ADR-0158 said in its consequences that
+cancelling an entry was not decided, and that nothing removed an entry from the
+queue except finishing it.
+
+**What is true.** The engine holds a take-out order, the world routes it to the
+queue, and the Python boundary exposes it.[^F511A] Both the order variant and
+the binding cite ADR-0158 D3 for the rule that the work already charged is
+lost. D3 stated no such rule. It stated only that the store pays as the entry
+advances.
+
+**Why nothing caught it.** The record check verifies that a cited decision
+number names a decision the target record has.[^F192B] D3 existed, so the
+citation passed. The check cannot read whether the cited decision states the
+claim the citing file rests on.
+
+**What follows.** A citation of the form `ADR-NNNN Dn` is checked for
+existence and never for content. When you cite a decision from code, read that
+decision and confirm it states your claim. The repair here put the rule into
+D3, because the code and two call sites already believed it was there.
+
+### FND-512 — The volatile check reads a figure written in digits, and three records wrote theirs in words
+
+**What the project believed.** The record check fails a record that holds a
+version pin, a latency figure, a throughput figure or a percentage, so section
+4.1 of the scope rule is enforced.[^F512A]
+
+**What is true.** Every pattern the check carries matches digits. Three weather
+records argued from a measurement and wrote its results in words: a storm that
+reached about a third of the lattice in one tick, a storm that left nothing by
+the twentieth tick, and ground water that ran nearly fourfold from the driest
+cell to the wettest.[^F512B] The check passed all three.
+
+**Why it matters here rather than in general.** Each figure describes the
+behaviour that its own record sets out to change. The figures would have become
+false on the day the work landed, inside records that state the reason for
+doing the work.
+
+**What follows.** Section 4.1 is a human judgement wherever a figure is spelled
+out. Ask what a figure describes and whether the change the record proposes
+makes it false. The repair keeps the force and drops the number: the maximum
+never travels, it flattens in place, and the research report holds the
+figures.[^F512C]
+
+### FND-513 — A record said the order reads the idle units, and the code tests the plan first
+
+**What the project believed.** ADR-0159 D1 opened with the statement that the
+set is the idle units of the faction.
+
+**What is true.** The controller loop reads every unit of the faction. It tests
+whether the plan zones the tile the unit stands on before it tests whether the
+unit is idle, so a busy unit standing on a zoned tile takes a build order.[^F513A]
+Only the send is restricted to idle units, and the code comment beside the loop
+says so.
+
+**Why nothing caught it.** The rest of D1 was correct, and the wrong sentence
+was the summary rather than a rule. A reviewer who read the decision as a whole
+would find the two later sentences true and stop.
+
+**What follows.** Read a summary sentence at the head of a decision as a claim
+that must hold, not as an introduction to the claims below it. D1 now says that
+the order reads every unit and sends only the idle ones.
+
+
 ## References
 
 [^F498B]: The controller log, the refusal count and the stage that empties them. `crates/cachette-core/src/controller.rs`
-[^F498D]: ADR-0158, a site builds a typed unit from a bounded queue its store pays for, decision D6. `docs/adrs/draft/adr-0158-a-site-builds-a-typed-unit-from-a-bounded-queue-its-store-pays-for.md`
+[^F498D]: ADR-0158, a site builds a typed unit from a bounded queue its store pays for, decision D6. `docs/adrs/accepted/adr-0158-a-site-builds-a-typed-unit-from-a-bounded-queue-its-store-pays-for.md`
 [^F498E]: Balance register, the seed set row. `docs/reference/balance.md`
 [^F498F]: Recurring Defect Shapes, shape 1. `.agents/rules/recurring-defects.md`
 [^F498G]: Recurring Defect Shapes, shape 3. `.agents/rules/recurring-defects.md`
 [^F495A]: The queue of a site, and the bound a world enforces. `crates/cachette-core/src/production.rs`
 [^F496A]: Backlog item 0488, the outcome. `docs/backlog/complete/0488-plan-roads-and-zones-with-a-faction-solver-at-the-controller-stage.md`
 [^F496C]: ADR-0144, a faction controller runs inside the step and acts only through the caller's verbs, decisions D4 and D5. `docs/adrs/accepted/adr-0144-a-faction-controller-runs-inside-the-step-and-acts-only-through-the-callers-verbs.md`
-[^F496D]: ADR-0151, an upgrade is a category with a ground fit and a level, decision D2. `docs/adrs/draft/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
+[^F496D]: ADR-0151, an upgrade is a category with a ground fit and a level, decision D2. `docs/adrs/accepted/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
 [^F496E]: Project orientation, the target platform. `CLAUDE.md`
 [^F496J]: ADR-0148, a game end is recorded once and stops the controllers, decision D4. `docs/adrs/accepted/adr-0148-a-game-end-is-recorded-once-and-stops-the-controllers.md`
 [^F496L]: ADR-0125, the control plane names the seed set of a destination field, decision D3. `docs/adrs/draft/adr-0125-the-control-plane-names-the-seed-set-of-a-destination-field.md`
@@ -12370,7 +12460,7 @@ storms themselves must replace it.
 [^F494B]: The census row that counts a filled seat. `crates/cachette-core/src/world.rs`
 [^F494C]: Findings register, FND-486. `docs/FINDINGS.md`
 [^F494F]: Blockers register, BLK-050. `docs/BLOCKERS.md`
-[^F492A]: ADR-0151, an upgrade is a category with a ground fit and a level, decision D3. `docs/adrs/draft/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
+[^F492A]: ADR-0151, an upgrade is a category with a ground fit and a level, decision D3. `docs/adrs/accepted/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
 [^F492B]: Testing rules, section 2a. `.agents/rules/testing.md`
 [^F488A]: The send verb, which names a seed set and a plane. `crates/cachette-core/src/world.rs`
 [^F488B]: ADR-0125, the control plane names the seed set of a destination field. `docs/adrs/draft/adr-0125-the-control-plane-names-the-seed-set-of-a-destination-field.md`
@@ -12380,3 +12470,11 @@ storms themselves must replace it.
 [^F497B]: The pyglet window, `set_size`, which raises while the window is fullscreen. https://pyglet.readthedocs.io/en/latest/modules/window.html
 [^F497C]: The demonstration settings tests. `tests/test_demo_window_settings.py`
 [^F497D]: ADR-0094, the caller owns the camera and the pixels, decision D5. `docs/adrs/draft/adr-0094-the-caller-owns-the-camera-and-the-pixels.md`
+
+[^F510A]: The upgrade table, the row and the default table. `crates/cachette-core/src/upgrade.rs`
+[^F510B]: Decisions register, DEC-143. `docs/DECISIONS.md`
+[^F511A]: The take-out order of the production queue. `crates/cachette-core/src/production.rs`
+[^F512A]: Decision Record Scope, section 4.1. `.agents/rules/adr-scope.md`
+[^F512B]: Research report 26, the scale of the weather. `docs/research/reports/26-the-scale-of-the-weather.md`
+[^F512C]: ADR-0161, water rides the wind, and every transfer is an exact integer move. `docs/adrs/accepted/adr-0161-water-rides-the-wind-and-every-transfer-is-an-exact-integer-move.md`
+[^F513A]: The project order of the controller. `crates/cachette-core/src/world.rs`

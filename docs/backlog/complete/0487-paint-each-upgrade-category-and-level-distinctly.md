@@ -182,7 +182,7 @@ directory, in the way the adjustment pictures do.
 ## References
 
 [^1]: PRD-0055, a god raises the ground its people hold, and sees what stands there. `docs/product/shaped/prd-0055-a-god-raises-the-ground-its-people-hold-and-sees-what-stands-there.md`
-[^2]: ADR-0151, an upgrade is a category with a ground fit and a level, and a build order names the category, decision D5. `docs/adrs/draft/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
+[^2]: ADR-0151, an upgrade is a category with a ground fit and a level, and a build order names the category, decision D5. `docs/adrs/accepted/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
 [^3]: Research report 25, defect 1. `docs/research/reports/25-demonstration-readability-upgrades-and-units.md`
 [^4]: Testing Rules, section 2a. `.agents/rules/testing.md`
 [^5]: Findings register, FND-487. `docs/FINDINGS.md`

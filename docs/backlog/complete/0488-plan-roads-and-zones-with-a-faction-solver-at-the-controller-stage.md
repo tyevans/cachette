@@ -385,7 +385,7 @@ each.
 [^1]: ADR-0150, held ground is the ground within reach of a city its faction owns, decision D4. `docs/adrs/draft/adr-0150-held-ground-is-the-ground-within-reach-of-a-city-its-faction-owns.md`
 [^2]: PRD-0055, a god raises the ground its people hold, and sees what stands there. `docs/product/shaped/prd-0055-a-god-raises-the-ground-its-people-hold-and-sees-what-stands-there.md`
 [^3]: ADR-0152, a faction plans its roads and zones with one solver. `docs/adrs/accepted/adr-0152-a-faction-plans-its-roads-and-zones-with-one-solver.md`
-[^4]: ADR-0151, an upgrade is a category with a ground fit and a level, decisions D1 and D2. `docs/adrs/draft/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
+[^4]: ADR-0151, an upgrade is a category with a ground fit and a level, decisions D1 and D2. `docs/adrs/accepted/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
 [^5]: ADR-0144, a faction controller runs inside the step and acts only through the caller's verbs, decisions D2, D3 and D5. `docs/adrs/accepted/adr-0144-a-faction-controller-runs-inside-the-step-and-acts-only-through-the-callers-verbs.md`
 [^6]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
 [^7]: ADR-0009, parallel stages write disjoint outputs, decision D1. `docs/adrs/accepted/adr-0009-parallel-stages-write-disjoint-outputs.md`
@@ -402,5 +402,5 @@ each.
 [^18]: ADR-0110, a unit returns by climbing a reach field seeded at every site of its faction, decision D3. `docs/adrs/draft/adr-0110-a-unit-returns-by-climbing-a-reach-field.md`
 [^19]: ADR-0125, the control plane names the seed set of a destination field, decision D3. `docs/adrs/draft/adr-0125-the-control-plane-names-the-seed-set-of-a-destination-field.md`
 [^20]: Project orientation, the design principles. `CLAUDE.md`
-[^21]: ADR-0159, a project order names one category for each unit and one seed set for the faction. `docs/adrs/draft/adr-0159-a-project-order-names-one-category-and-one-seed-set.md`
+[^21]: ADR-0159, a project order names one category for each unit and one seed set for the faction. `docs/adrs/accepted/adr-0159-a-project-order-names-one-category-and-one-seed-set.md`
 [^22]: Findings register, FND-493. `docs/FINDINGS.md`

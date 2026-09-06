@@ -813,7 +813,7 @@ fn colour_card(readout: &Readout) -> Card {
     // which level. A reader who is not told that a count of pips is a level
     // has to guess it from the map.[^5]
     //
-    // [^5]: ADR-0151, an upgrade is a category with a ground fit and a level, decision D5. `docs/adrs/draft/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
+    // [^5]: ADR-0151, an upgrade is a category with a ground fit and a level, decision D5. `docs/adrs/accepted/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
     rows.push(Row::coloured(
         level_pip_colour(),
         "level pip".to_string(),
