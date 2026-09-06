@@ -119,4 +119,4 @@ Filled in when the item moves to `complete/`.
 ## References
 
 [^1]: Research report 26, the scale of the weather, sections 4 and 6. `docs/research/reports/26-the-scale-of-the-weather.md`
-[^2]: ADR-0160, the wind is carried state, and the pressure gradient accelerates it. `docs/adrs/draft/adr-0160-the-wind-is-carried-state-and-the-pressure-gradient-accelerates-it.md`
+[^2]: ADR-0160, the wind is carried state, and the pressure gradient accelerates it. `docs/adrs/accepted/adr-0160-the-wind-is-carried-state-and-the-pressure-gradient-accelerates-it.md`

@@ -7,12 +7,12 @@ the lattice holds the water in the air above it and the water on its ground,
 and a tile holds none.[^1] A spread pass hands each neighbour an equal share,
 so the transfer has no direction at all.[^2]
 
-**A measurement shows what that costs.** One storm raised at the strength
-ceiling stays at the cell it was raised on for two ticks, halves each tick, and
-is indistinguishable from a calm world within twenty ticks. The maximum never
-travels. It flattens in place. The same measurement shows that the height and
-the water share of a cell vary strongly across the world, so the terrain a
-model would read has contrast even though the water field has none.[^3]
+**A measurement shows what that costs.** A storm raised at the strength ceiling
+holds its maximum where it was raised, halves away, and soon leaves nothing a
+watcher can find. The maximum never travels. It flattens in place. The same
+measurement shows that the height and the water share of a cell vary strongly
+across the world, so the terrain a model would read has contrast even though
+the water field has none. The report holds the tick counts and the spans.[^3]
 
 The project owner asked on 5 September 2026 for weather that a watcher can
 follow across the map, and for a model of wind, heat and ground rather than a
