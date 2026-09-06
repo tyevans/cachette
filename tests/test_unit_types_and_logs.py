@@ -2,14 +2,18 @@
 
 Every test here starts at the Python boundary. The core held the type table,
 the five logs and the upkeep rate before any binding read one, and their own
-Rust tests passed the whole time. A test that built the mechanism again would
-prove the same thing again. Each test below drives the installed package.
+Rust tests passed the whole time.[^1] A test that built the mechanism again would
+prove the same thing again. Each test below drives the installed package.[^2]
 
 References
 ----------
 [^1]: Findings register, FND-460 and FND-461. ``docs/FINDINGS.md``
 
-Testing policy. ``docs/TESTING.md``
+[^2]: Testing policy. ``docs/TESTING.md``
+
+[^3]: ADR-0152, a faction plans its roads and zones with one solver,
+decision D5.
+``docs/adrs/accepted/adr-0152-a-faction-plans-its-roads-and-zones-with-one-solver.md``
 """
 
 from __future__ import annotations
@@ -128,9 +132,7 @@ def _short_world(seed: int) -> cachette.World:
     )
     # The plan is off. The engine otherwise sends the idle units of a faction
     # to the projects it zoned, and a unit that walks away from its site
-    # starves on another schedule than the fixture expects.[^1]
-    #
-    # [^1]: ADR-0152, a faction plans its roads and zones with one solver, decision D5. ``docs/adrs/accepted/adr-0152-a-faction-plans-its-roads-and-zones-with-one-solver.md``
+    # starves on another schedule than the fixture expects.[^3]
     world.set_plan_rules(0, 0, 0, 0, 0)
     world.found_run_for_every_faction(SHORT_GROUP)
     return world
