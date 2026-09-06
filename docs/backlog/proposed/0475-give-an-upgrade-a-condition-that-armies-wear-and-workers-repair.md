@@ -17,7 +17,7 @@ repairs it, so a road is a fact and not a possession. This item is pass 4 of
 the living world game layer.[^1]
 
 Each upgrade entry gains an integer condition. Completion sets it to full, and
-the full value per kind is a row in the balance register.[^2] A hostile unit
+the full value of each row is a row of the balance register.[^2] A hostile unit
 standing on the tile wears the upgrade by one integer step per tick. A hostile
 unit is one whose faction is in the war band toward the holder. Condition zero
 means the upgrade is gone, and the engine removes it through the existing
@@ -38,8 +38,9 @@ condition.[^3] The condition and the work done are two fields of one entry.
 
 **This pass touches `fn step` in `world.rs`. Only one worker may hold it at a
 time.** It waits for pass 3 to merge, because a hostile unit is defined by the
-war band. It now waits for item 0486 as well, because the wall is a row of the
-table that item lands.
+war band. Item 0486 is complete, so the table is in place: the wall is a row of
+it with a work and no effect column, and the condition is a second field of the
+entry beside the work done.
 
 ## What is missing before this is refined
 

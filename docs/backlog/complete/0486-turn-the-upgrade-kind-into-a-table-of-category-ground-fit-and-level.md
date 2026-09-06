@@ -1,7 +1,7 @@
 ---
 id: 0486
 title: Turn the upgrade kind into a table of category, ground fit and level
-status: refined
+status: complete
 created: 2026-09-05
 implements: [ADR-0151 D1, ADR-0151 D2, ADR-0151 D3, ADR-0151 D4, ADR-0151 D6, ADR-0145 D4, ADR-0002 D1, ADR-0001 D4]
 changes: []
@@ -204,7 +204,54 @@ commit searches the tree for every caller of the kind and names the search.
 
 ## Outcome
 
-Filled in when the item moves to `complete/`.
+**The table landed and the enumeration is gone.** A whole-tree search for the
+old name returns nothing. The default table holds six categories: the road and
+the terrace at two levels each, the wonder, the store and the wall at one
+level, and one open category with no row. A caller writes any row through the
+boundary.
+
+**The default table differs from the review in one row.** The review gave the
+terrace a fit of plain and hill. The forest island that the build tests stand
+on is forest, and a terrace under trees is worked ground as much as a terrace
+on open ground, so the terrace fits plain, forest and hill. The road fits the
+same three. The refusal that the tests read is therefore high ground, which
+both stop at and which the wonder, the store and the wall do not.
+
+**No pass branches on a category.** The census, the win path, the store
+capacity reader, the capacity composition, the gather resolve and the
+held-ground rule each read a column. The eight places that still name a
+category are the default table constant and the key ceiling, which are the data
+and not a pass. The viewer names five categories to choose a colour and a
+glyph, which the record leaves to the drawing pass.[^12]
+
+**Two disagreements with the record stand, and the record keeps its text.** No
+cross cost column exists, because no pass reads one and the record says a
+column arrives with its pass. The own ground column is a flag in a table whose
+record says that no column is a flag, and the record also asks that the rule
+become a column read.
+
+**The wealth-or-wonder reader changed shape.** It read the work done against
+the work of the wonder. The work done now returns to zero at a raise, so the
+reader reads the victory claim column of the row that stands. The running value
+the boundary reports is the work of that row when it stands, and the work done
+toward it before that.
+
+**The golden hashes moved.** The table enters the whole-world hash and the
+entry gained a level, so every stored sequence changed. The commit that landed
+the table regenerated them.
+
+**Item 0348 is answered and DEC-143 is closed with its option B.** The
+catalogue is a table the world is built with, which is what 0348 asked for, so
+0348 needs no separate work.
+
+**A finding came out of the test work.** A test that reads the work done cannot
+tell a build that stopped from a build that raised, because the work done
+returns to zero and counts up again. The first form of the pass-resolve test
+passed with the defect put back.[^13]
+
+**Item 0475 and item 0487 are unblocked.** The wall is a row with no effect
+column, and the condition it wears belongs to 0475. Item 0487 paints the level,
+which D5 asks for and this item does not do.
 
 ## References
 
@@ -219,3 +266,5 @@ Filled in when the item moves to `complete/`.
 [^9]: ADR-0144, a faction controller runs inside the step and acts only through the caller's verbs, decisions D2 and D3. `docs/adrs/accepted/adr-0144-a-faction-controller-runs-inside-the-step-and-acts-only-through-the-callers-verbs.md`
 [^10]: Findings register, FND-011. `docs/FINDINGS.md`
 [^11]: Backlog item 0475. `docs/backlog/proposed/0475-give-an-upgrade-a-condition-that-armies-wear-and-workers-repair.md`
+[^12]: ADR-0151, an upgrade is a category with a ground fit and a level, decision D5. `docs/adrs/draft/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
+[^13]: Findings register, FND-492. `docs/FINDINGS.md`

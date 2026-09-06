@@ -32,8 +32,9 @@ zones. After the solver has written, the controller sends each idle unit to the
 nearest project through the existing build verb.
 
 **This item touches `controller.rs` and `fn step` in `world.rs`. Only one
-worker may hold it at a time.** It waits for item 0486 to merge, because a
-project names a category that only the upgrade table resolves.
+worker may hold it at a time.** Item 0486 is complete, so the upgrade table
+that resolves the category a project names is in place, and a project names a
+category and no level.
 
 ## Impact review
 

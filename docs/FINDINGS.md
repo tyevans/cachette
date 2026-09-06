@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-492**
+**Next number: FND-493**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -11935,8 +11935,32 @@ arrive at a tile needs a field that resolves below the cell, or a verb that
 sends a unit at a site rather than at a tile. That is engine work and it is not
 in this item.
 
+### FND-492 — A test that reads the work done cannot tell a stopped build from a raised one
+
+**Believed.** A test that watches a build reads the work done on the tile. A
+build that stopped shows the work it had, and a build that ran on shows more.
+
+**True.** The work done returns to zero when the level rises, and it then
+counts up again.[^F492A] A build that ran on for the work of one whole level
+shows the same small number that a stopped build shows. The first form of the
+test that proves the build pass refuses a row the ground no longer fits
+therefore passed with the defect put back, and it measured nothing.
+
+**Evidence.** Written on 5 September 2026, during item 0486. The test ordered a
+road, stepped once, and asserted that the work done stayed at one after eight
+more steps. It passed with the resolution removed from the build pass. A probe
+printed the work done as one at level one, because the level had risen at the
+eighth step and the ninth step had added one.
+
+**Follows.** Assert on the level, and on the work done beside it. A quantity
+that resets is not a monotone reading, and a test that treats it as one
+measures the fixture.[^F492B] The rule that a fixture must reach the case is
+about the data; this is the same failure in the assertion.
+
 ## References
 
+[^F492A]: ADR-0151, an upgrade is a category with a ground fit and a level, decision D3. `docs/adrs/draft/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
+[^F492B]: Testing rules, section 2a. `.agents/rules/testing.md`
 [^F488A]: The send verb, which names a seed set and a plane. `crates/cachette-core/src/world.rs`
 [^F488B]: ADR-0125, the control plane names the seed set of a destination field. `docs/adrs/draft/adr-0125-the-control-plane-names-the-seed-set-of-a-destination-field.md`
 [^F488C]: ADR-0110, a unit returns by climbing a reach field seeded at every site of its faction. `docs/adrs/draft/adr-0110-a-unit-returns-by-climbing-a-reach-field.md`
