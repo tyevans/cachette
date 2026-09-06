@@ -815,8 +815,8 @@ pub fn fall_numerator(heat: i32, cooling: i32) -> i64 {
     let cold = i64::from((HEAT_CEILING - heat).clamp(0, HEAT_CEILING));
     let cooled = i64::from(cooling.clamp(0, HEAT_CEILING));
     let whole = Accum(i64::from(HEAT_CEILING));
-    let by_cold = sim_math::share(Accum(cold), Accum(FALL_FOR_COLD_GROUND), whole)
-        .map_or(0, |value| value.0);
+    let by_cold =
+        sim_math::share(Accum(cold), Accum(FALL_FOR_COLD_GROUND), whole).map_or(0, |value| value.0);
     let by_cooling =
         sim_math::share(Accum(cooled), Accum(FALL_FOR_COOLING), whole).map_or(0, |value| value.0);
     FALL_NUMERATOR_FLOOR + by_cold + by_cooling
@@ -1498,7 +1498,13 @@ impl WeatherField {
     /// A still cell met no cooling, and neither did a cell whose upwind
     /// neighbour lies outside the lattice.
     fn cooling_at(&self, cell: usize, heat: i32) -> i32 {
-        let Some(heading) = self.wind.get(cell).copied().unwrap_or(Wind::STILL).heading() else {
+        let Some(heading) = self
+            .wind
+            .get(cell)
+            .copied()
+            .unwrap_or(Wind::STILL)
+            .heading()
+        else {
             return 0;
         };
         let Some(address) = self.cells.address_of(TileIdx(cell as u32)) else {

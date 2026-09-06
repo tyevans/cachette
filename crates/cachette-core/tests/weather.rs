@@ -339,7 +339,7 @@ fn the_lift_draw_is_keyed_on_the_seed() {
 }
 
 #[test]
-fn high_ground_takes_more_out_of_the_air_than_low_ground() {
+fn cold_ground_takes_more_out_of_the_air_than_warm_ground() {
     let mut world = coastal_world();
     for _ in 0..8 {
         world.step(4).expect("the step must run");
@@ -350,13 +350,35 @@ fn high_ground_takes_more_out_of_the_air_than_low_ground() {
         let Some(summary) = world.pyramid().cell(cell) else {
             continue;
         };
-        let numerator = weather::fall_numerator(summary);
+        // The air met no cooling on the way, so this reads the cell alone.
+        let numerator = weather::fall_numerator(weather::heat_of(summary), 0);
         lowest = lowest.min(numerator);
         highest = highest.max(numerator);
     }
     assert!(
         highest > lowest,
         "every cell takes the same share out of the air, so the ground does nothing"
+    );
+}
+
+/// Cooling along the wind adds to the share that falls.
+///
+/// This is the part that height alone cannot give. Air that arrives from a
+/// warmer cell drops more than air that arrives from a cell of its own
+/// temperature, so the near side of a ridge is wet and the far side is
+/// dry.[^1]
+///
+/// # References
+///
+/// [^1]: ADR-0162, water enters the air where it is hot, and it falls where the air cools, decision D2. `docs/adrs/accepted/adr-0162-water-enters-the-air-where-it-is-hot-and-falls-where-the-air-cools.md`
+#[test]
+fn air_that_cooled_on_the_way_drops_more_than_air_that_did_not() {
+    let cold = cachette_core::HEAT_CEILING / 4;
+    let no_cooling = weather::fall_numerator(cold, 0);
+    let cooled = weather::fall_numerator(cold, cachette_core::HEAT_CEILING / 2);
+    assert!(
+        cooled > no_cooling,
+        "cooling added nothing, so a ridge has no near side and no far side"
     );
 }
 
