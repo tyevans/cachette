@@ -11808,7 +11808,7 @@ file.
 [^F493A]: ADR-0152, a faction plans its roads and zones with one solver, decision D5. `docs/adrs/accepted/adr-0152-a-faction-plans-its-roads-and-zones-with-one-solver.md`
 [^F493B]: ADR-0091, movement takes its direction from a per-cell field, never from a per-unit search, decision D1. `docs/adrs/draft/adr-0091-movement-takes-its-direction-from-a-per-cell-field.md`
 [^F493D]: ADR-0125, the control plane names the seed set of a destination field, decisions D1 and D3. `docs/adrs/draft/adr-0125-the-control-plane-names-the-seed-set-of-a-destination-field.md`
-[^F493E]: ADR-0157, a project order names one category for each unit and one seed set for the faction. `docs/adrs/draft/adr-0157-a-project-order-names-one-category-and-one-seed-set.md`
+[^F493E]: ADR-0159, a project order names one category for each unit and one seed set for the faction. `docs/adrs/draft/adr-0159-a-project-order-names-one-category-and-one-seed-set.md`
 [^F491C]: Decision Record Scope, section 4.6. `.agents/rules/adr-scope.md`
 [^F487A]: ADR-0150, held ground is the ground within reach of a city its faction owns, decision D1. `docs/adrs/draft/adr-0150-held-ground-is-the-ground-within-reach-of-a-city-its-faction-owns.md`
 [^F487B]: Recurring defect shapes, shape 1. `.agents/rules/recurring-defects.md`
@@ -11965,7 +11965,7 @@ the engine has: the direction comes from a per-cell field and never from a
 per-unit search, the reach counts cells to the nearest seed, and the caller
 names the plane while the engine allocates none.[^F493B] [^F363A] [^F493D]
 
-**Follows.** ADR-0157 states the assignment, and it changes ADR-0152 D5.[^F493E]
+**Follows.** ADR-0159 states the assignment, and it changes ADR-0152 D5.[^F493E]
 It says that the order names one category for each unit and one seed set for
 the faction, that the field distributes the units, and that no named unit is
 promised a named project. The reasoning is the design principle: a set-valued

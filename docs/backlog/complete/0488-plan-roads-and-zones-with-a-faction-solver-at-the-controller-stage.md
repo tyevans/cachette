@@ -366,7 +366,7 @@ or a search from each unit, and three records forbid that form.[^17] [^18]
 [^19] It would also forbid the cheaper algorithm a set-valued command exists to
 buy.[^20] The retcon window of ADR-0152 was closed, because source files cite
 D5, this item was refined against it, and another record depends on ADR-0152.
-The ruling is therefore ADR-0157, which changes ADR-0152 D5 and leaves the
+The ruling is therefore ADR-0159, which changes ADR-0152 D5 and leaves the
 other decisions of that record standing.[^21] The finding records the outcome
 rather than the question.[^22]
 
@@ -402,5 +402,5 @@ each.
 [^18]: ADR-0110, a unit returns by climbing a reach field seeded at every site of its faction, decision D3. `docs/adrs/draft/adr-0110-a-unit-returns-by-climbing-a-reach-field.md`
 [^19]: ADR-0125, the control plane names the seed set of a destination field, decision D3. `docs/adrs/draft/adr-0125-the-control-plane-names-the-seed-set-of-a-destination-field.md`
 [^20]: Project orientation, the design principles. `CLAUDE.md`
-[^21]: ADR-0157, a project order names one category for each unit and one seed set for the faction. `docs/adrs/draft/adr-0157-a-project-order-names-one-category-and-one-seed-set.md`
+[^21]: ADR-0159, a project order names one category for each unit and one seed set for the faction. `docs/adrs/draft/adr-0159-a-project-order-names-one-category-and-one-seed-set.md`
 [^22]: Findings register, FND-493. `docs/FINDINGS.md`
