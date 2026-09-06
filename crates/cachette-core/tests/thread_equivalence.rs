@@ -20,8 +20,11 @@ use cachette_core::resource::{Amount, RecoveryRules, ResourceKind};
 use cachette_core::site::CommodityId;
 use cachette_core::terrain::TileKind;
 use cachette_core::unit_type::{UnitTypeId, UnitTypeRow, WORKER_ROW};
-use cachette_core::upgrade::UpgradeCategory;
+use cachette_core::upgrade::{UpgradeCategory, UpgradeRow};
 use cachette_core::{Axial, Entity, FactionId, Fix32, Influence, WinPath, World, WorldConfig};
+
+/// The work the wonder scenario of this file asks a wonder for.
+const WONDER_WORK_OF_THE_SCENARIO: u32 = 240;
 
 /// Returns a worker row that fights with the given attack and armour.
 ///
@@ -167,6 +170,16 @@ fn a_seeded_world_with_the_controller_gives_one_answer_at_every_thread_count() {
 /// The builders stand on an island, an open tile whose every neighbour
 /// refuses a unit, so they never move. One rival unit elsewhere keeps the
 /// domination reader quiet, so the end this run crosses is the wonder.
+///
+/// **The scenario writes its own wonder row.** The project owner raised the
+/// wonder work on 5 September 2026, and a tile of builders now dies before
+/// it finishes one.[^1] A scenario that read the register would measure how
+/// long a unit lives and not the thread count. The value is the one the
+/// register held before the raise.
+///
+/// # References
+///
+/// [^1]: Balance register, the wonder work. `docs/reference/balance.md`
 fn run_with_wonder(threads: usize) -> (Vec<u8>, u64) {
     let config = WorldConfig {
         width: 192,
@@ -179,6 +192,19 @@ fn run_with_wonder(threads: usize) -> (Vec<u8>, u64) {
     world
         .set_choice_schedule(cachette_core::choose::PERIOD_LOG2_CEILING)
         .expect("the exponent is inside the range");
+    world
+        .define_upgrade_row(
+            UpgradeCategory::WONDER.to_u8(),
+            1,
+            UpgradeRow {
+                ground_fit: cachette_core::upgrade::FITS_EVERY_LAND,
+                work: WONDER_WORK_OF_THE_SCENARIO,
+                victory_claim: cachette_core::upgrade::WONDER_VICTORY_CLAIM,
+                own_ground_required: cachette_core::upgrade::OWN_GROUND_REQUIRED,
+                ..UpgradeRow::NONE
+            },
+        )
+        .expect("the category and the level are inside the table");
     let grid = world.grid();
     let open: Vec<Axial> = (0..grid.tile_count())
         .map(|index| Axial::new((index % grid.width()) as i32, (index / grid.width()) as i32))
@@ -221,9 +247,10 @@ fn run_with_wonder(threads: usize) -> (Vec<u8>, u64) {
     world
         .spawn_soldier(elsewhere, FactionId(1))
         .expect("the ground admits a unit");
-    let frames = cachette_core::DEFAULT_UPGRADE_TABLE.work_above(UpgradeCategory::WONDER, 0) as u64
-        / u64::from(room)
-        + 8;
+    // The work comes from the table the world holds, which this scenario
+    // wrote, so the loop and the build read one declaration.
+    let frames =
+        world.upgrade_table().work_above(UpgradeCategory::WONDER, 0) as u64 / u64::from(room) + 8;
     for _ in 0..frames {
         world.step(threads).expect("the step must run");
     }

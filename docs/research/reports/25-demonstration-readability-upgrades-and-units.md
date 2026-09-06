@@ -80,9 +80,14 @@ and the wonder at 8 of 240 measures `846f4d`. The road and the wonder read as
 lighter ground, the terrace as greener ground, and the store as the same
 ground. None of the four reads as a thing that somebody made.
 
-The kind with the most work is the palest for the longest. A wonder needs 240
-work units, so it sits under weight 62 for the first 5 of its work and the
-whole of that time it looks like bare ground.
+The kind with the most work is the palest for the longest. A wonder needed 240
+work units when this report ran, so it sat under weight 62 for the first 5 of
+its work and the whole of that time it looked like bare ground.
+
+The project owner raised the wonder work on 5 September 2026, and the register
+holds the new value.[^21] The raise makes this defect worse and not better,
+because a larger work value keeps the site pale for more ticks. The colours
+above are a reading of one run and this report does not repeat them.
 
 A watcher cannot tell a finished site from an unfinished one, except at the two
 ends. A finished road measures `b28946` against `664e34` for the bare tile
@@ -423,3 +428,4 @@ that the seeding built.
 [^18]: The event panel, module documentation and `lines`. `crates/cachette-view/src/panel/events.rs`
 [^19]: The fallen log, `World::fell_log` and `fell_log_columns`. `crates/cachette-core/src/world.rs`, `python/cachette/_core.pyi`
 [^20]: The painting module, `KIND_COLOURS` and `FACTION_COLOURS`. `crates/cachette-view/src/paint.rs`
+[^21]: Balance register, the wonder work. `docs/reference/balance.md`

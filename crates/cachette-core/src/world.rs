@@ -11346,13 +11346,17 @@ type GameEndReader = fn(&World) -> Option<FactionId>;
 /// Q16.16 quantity summed over every commodity of every settlement of the
 /// faction.
 ///
-/// A provisional value of 4096 whole units. The balance register holds the
-/// row and the derivation.[^1]
+/// A provisional value of 28672 whole units. The project owner asked for a
+/// much higher bar, and the balance register holds the derivation.[^1]
+///
+/// **A store is a `Fix32`, so one settlement of one commodity clamps at
+/// 32767 whole units.** A faction that holds one settlement can therefore
+/// never pass that sum, and a target above it never fires.
 ///
 /// # References
 ///
 /// [^1]: Balance register, the stock target. `docs/reference/balance.md`
-pub const STOCK_TARGET: i64 = 4096 << 16;
+pub const STOCK_TARGET: i64 = 28672 << 16;
 
 /// The renown at which the renown reader fires, as a raw Q16.16 value.
 ///

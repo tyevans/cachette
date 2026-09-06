@@ -24,7 +24,7 @@ use cachette_core::site::CommodityId;
 use cachette_core::terrain::TileKind;
 use cachette_core::types::{FactionId, Fix32};
 use cachette_core::unit_type::{UnitTypeId, UnitTypeRow, WORKER_ROW};
-use cachette_core::upgrade::UpgradeCategory;
+use cachette_core::upgrade::{UpgradeCategory, UpgradeRow};
 use cachette_core::{Axial, WinPath, World, WorldConfig};
 
 /// Returns a worker row that fights with the given attack and armour.
@@ -54,6 +54,11 @@ const STOCKED: Fix32 = Fix32(2000 << 16);
 /// the frames after the game end as well, so it moves when a pass stops
 /// running after the end.
 const WONDER_FRAMES: u64 = 40;
+
+/// The work the wonder scenario of this file asks a wonder for.
+///
+/// A tile of builders finishes it inside the frames above.
+const WONDER_WORK_OF_THE_SCENARIO: u32 = 240;
 
 /// The number of frames that a wide scenario runs.
 ///
@@ -318,10 +323,33 @@ enum Population {
 /// An island is an open tile whose every neighbour refuses a unit, so the
 /// builders never move and the work runs to the end. The scenario asserts
 /// after the run that the wonder completed and the game ended on it.
+///
+/// **The scenario writes its own wonder row.** The project owner raised the
+/// wonder work on 5 September 2026, and a tile of builders now dies before
+/// it finishes one.[^1] A scenario that read the register would run a file
+/// that no wonder ever ends. The value is the one the register held before
+/// the raise.
+///
+/// # References
+///
+/// [^1]: Balance register, the wonder work. `docs/reference/balance.md`
 fn wonder(world: &mut World) {
     world
         .set_choice_schedule(cachette_core::choose::PERIOD_LOG2_CEILING)
         .expect("the exponent is inside the range");
+    world
+        .define_upgrade_row(
+            UpgradeCategory::WONDER.to_u8(),
+            1,
+            UpgradeRow {
+                ground_fit: cachette_core::upgrade::FITS_EVERY_LAND,
+                work: WONDER_WORK_OF_THE_SCENARIO,
+                victory_claim: cachette_core::upgrade::WONDER_VICTORY_CLAIM,
+                own_ground_required: cachette_core::upgrade::OWN_GROUND_REQUIRED,
+                ..UpgradeRow::NONE
+            },
+        )
+        .expect("the category and the level are inside the table");
     let grid = world.grid();
     let open: Vec<Axial> = (0..grid.tile_count())
         .map(|index| Axial::new((index % grid.width()) as i32, (index / grid.width()) as i32))
