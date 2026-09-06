@@ -1147,6 +1147,52 @@ impl PyWorld {
         Ok(())
     }
 
+    /// Founds a city from every settler the identities name.
+    ///
+    /// The units are a sequence of identities, or the NumPy array of
+    /// `numpy.uint64` that `spawn_soldiers` returned.
+    ///
+    /// A settler is a unit whose type row holds a settle column above zero.
+    /// The verb founds a settlement on the tile the unit stands on, for the
+    /// faction of the unit, and it seats the group the column names. **The
+    /// founding spends the settler**, and the group takes its place.[^1]
+    ///
+    /// The verb refuses a unit whose settle column is zero, a tile any
+    /// faction holds, a tile that already carries a settlement, ground that
+    /// admits no unit, and a place inside the founding distance of a city
+    /// that stands.[^2] A refused unit changes nothing and keeps its life.
+    ///
+    /// **The set is not all or nothing.** Each unit is answered on its own,
+    /// because a set of settlers stands in several places and one refusal
+    /// says nothing about the rest. The call returns the number of cities it
+    /// founded.
+    ///
+    /// The call founds. Step the world for the holding pass to give the new
+    /// city its ground, then read `settlement_count` and `standing`.
+    ///
+    /// # Errors
+    ///
+    /// Raises `ViewError` when an identity names no live soldier.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0150, held ground is the ground within reach of a city its faction owns, decision D5. `docs/adrs/draft/adr-0150-held-ground-is-the-ground-within-reach-of-a-city-its-faction-owns.md`
+    /// [^2]: ADR-0076, a founding keeps a fixed distance from the foundings before it, decision D1. `docs/adrs/accepted/adr-0076-a-founding-keeps-a-fixed-distance-from-the-foundings-before-it.md`
+    fn order_settle(&self, units: Vec<u64>) -> PyResult<usize> {
+        let mut world = self.lock();
+        let mut resolved = Vec::with_capacity(units.len());
+        for unit in &units {
+            resolved.push(resolve(&world, *unit)?);
+        }
+        // The set form is the one path the controller takes too, so one loop
+        // serves both callers.
+        let outcomes = world.settle_set(&resolved);
+        Ok(outcomes
+            .iter()
+            .filter(|outcome| outcome.founded())
+            .count())
+    }
+
     /// Writes one row of the shared unit type table.
     ///
     /// A unit type is an index into this table. The table is data that the
@@ -1158,7 +1204,7 @@ impl PyWorld {
     /// names no row. A new soldier carries row zero, which the world builds
     /// as the worker row.
     ///
-    /// **The call takes the whole row.** A row is eight capability columns,
+    /// **The call takes the whole row.** A row is nine capability columns,
     /// and a zero in a column means that the type cannot do what the column
     /// names. There is no two-column form, because a caller that gave two
     /// columns would leave the rest at zero and would define a unit that
@@ -1195,6 +1241,9 @@ impl PyWorld {
     /// - `water_crossing`. A whole count. Nonzero means the unit may stand on
     ///   a water tile, and the terrain table states how many such units one
     ///   water tile holds. Zero refuses the unit at the shoreline.
+    /// - `settle_group`. A whole count. Zero means the type founds no city,
+    ///   and `order_settle` refuses the unit. A count above zero is the
+    ///   group the founding seats at the new city.
     ///
     /// **An attacker whose attack does not exceed the defender's armour
     /// contributes exactly zero, however many attackers stand there.** The
@@ -1232,6 +1281,7 @@ impl PyWorld {
         command_reach,
         weather_reach,
         water_crossing,
+        settle_group,
     ))]
     #[allow(clippy::too_many_arguments)]
     fn define_unit_type(
@@ -1246,6 +1296,7 @@ impl PyWorld {
         command_reach: u32,
         weather_reach: u32,
         water_crossing: u32,
+        settle_group: u32,
     ) -> PyResult<()> {
         let mut world = self.lock();
         let row = UnitTypeRow {
@@ -1258,6 +1309,7 @@ impl PyWorld {
             command_reach,
             weather_reach,
             water_crossing,
+            settle_group,
         };
         world
             .define_unit_type(unit_type, row)

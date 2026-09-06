@@ -35,7 +35,7 @@ TANK = 1
 
 
 def _worker_columns(world: cachette.World) -> dict[str, int]:
-    """Return the six columns beyond attack and armour, as the worker holds them.
+    """Return the columns beyond attack and armour, as the worker holds them.
 
     The worker is row zero of the table a new world is built with. A fighter
     row that keeps these columns differs from the default in the two columns

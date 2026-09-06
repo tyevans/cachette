@@ -146,6 +146,7 @@ const fn middling() -> FactionWeights {
         trade: 4,
         build: 4,
         renown: 4,
+        settle: 4,
     }
 }
 
@@ -224,6 +225,15 @@ fn a_faction_at_peace_raises_no_campaign() {
     seat_two(&mut world);
     declare_peace(&mut world);
     for _ in 0..PATIENCE {
+        // **The peace is written on every tick, not left to the drift.** The
+        // controller moves the relation toward war whenever its draw says
+        // so, so a world left alone reaches war part way through this loop
+        // and the assertion below then measures nothing.[^2]
+        //
+        // [^2]: Testing rules, section 2a. `.agents/rules/testing.md`
+        world.set_relation(A, B, 0);
+        world.set_relation(B, A, 0);
+        assert!(!world.at_war(A, B), "the fixture holds the pair at peace");
         world.step(2).expect("the step runs");
         // The fixture must hold the case it tests. A pair that reaches the
         // war band inside the wait makes every line below vacuous, so the

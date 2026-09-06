@@ -779,3 +779,148 @@ pub fn survey_addresses(
         tiles_read,
     })
 }
+
+// ---------------------------------------------------------------------------
+// The settling of a city by a settler
+// ---------------------------------------------------------------------------
+
+/// The reason the settle verb refused one unit.
+///
+/// Each reason is a named outcome, so a caller learns why a settler founded
+/// nothing and does not derive it from a count.[^1]
+///
+/// # References
+///
+/// [^1]: ADR-0150, held ground is the ground within reach of a city its faction owns, decision D5. `docs/adrs/draft/adr-0150-held-ground-is-the-ground-within-reach-of-a-city-its-faction-owns.md`
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum SettleError {
+    /// The identity names no live unit.
+    NoSuchUnit(Entity),
+    /// The settle column of the type row is zero, so the type founds no city.
+    ///
+    /// The verb reads the column. It never reads a type index.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0145, a unit type is a row of capability columns, and zero means cannot, decisions D1 and D2. `docs/adrs/accepted/adr-0145-a-unit-type-is-a-row-of-capability-columns-and-zero-means-cannot.md`
+    NotASettler(Entity),
+    /// The unit stands outside the world.
+    OutsideWorld(Axial),
+    /// The world holds no such faction, so that faction founds nothing here.
+    FactionMayNotFound(FactionId),
+    /// A faction holds the ground the unit stands on.
+    GroundIsHeld(Axial),
+    /// A settlement already stands on the tile.
+    SettlementStands(Axial),
+    /// The ground admits no unit, so it admits no settlement.
+    GroundAdmitsNobody(Axial),
+    /// The place is inside the founding distance of a settlement that
+    /// stands.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0076, a founding keeps a fixed distance from the foundings before it, decision D1. `docs/adrs/accepted/adr-0076-a-founding-keeps-a-fixed-distance-from-the-foundings-before-it.md`
+    TooCloseToACity(Axial),
+    /// The founding path refused the place.
+    Founding(FoundingError),
+}
+
+impl core::fmt::Display for SettleError {
+    fn fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            Self::NoSuchUnit(unit) => write!(formatter, "the identity {unit:?} names no live unit"),
+            Self::NotASettler(unit) => write!(
+                formatter,
+                "the type of the unit {unit:?} holds a settle column of zero"
+            ),
+            Self::OutsideWorld(address) => write!(
+                formatter,
+                "the address ({}, {}) lies outside the world",
+                address.q, address.r
+            ),
+            Self::FactionMayNotFound(faction) => write!(
+                formatter,
+                "the world holds no faction {}, so it founds nothing",
+                faction.0
+            ),
+            Self::GroundIsHeld(address) => write!(
+                formatter,
+                "a faction holds the ground at ({}, {})",
+                address.q, address.r
+            ),
+            Self::SettlementStands(address) => write!(
+                formatter,
+                "a settlement already stands at ({}, {})",
+                address.q, address.r
+            ),
+            Self::GroundAdmitsNobody(address) => write!(
+                formatter,
+                "the ground at ({}, {}) admits no unit",
+                address.q, address.r
+            ),
+            Self::TooCloseToACity(address) => write!(
+                formatter,
+                "the place ({}, {}) is inside {MINIMUM_FOUNDING_DISTANCE} of a city that stands",
+                address.q, address.r
+            ),
+            Self::Founding(error) => write!(formatter, "the founding refused the place: {error}"),
+        }
+    }
+}
+
+impl std::error::Error for SettleError {}
+
+impl From<FoundingError> for SettleError {
+    fn from(error: FoundingError) -> Self {
+        Self::Founding(error)
+    }
+}
+
+/// What one unit of a settle command got.
+///
+/// The verb takes a set and answers for each unit of it, in the order the
+/// caller gave. One answer for the whole set would hide a refusal beside a
+/// founding, in the way one answer for a run would hide a refused
+/// faction.[^1]
+///
+/// # References
+///
+/// [^1]: ADR-0076, a founding keeps a fixed distance from the foundings before it, decision D2. `docs/adrs/accepted/adr-0076-a-founding-keeps-a-fixed-distance-from-the-foundings-before-it.md`
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct SettleOutcome {
+    unit: Entity,
+    result: Result<Founding, SettleError>,
+}
+
+impl SettleOutcome {
+    /// Builds one outcome. The world is the only caller.
+    pub(crate) const fn new(unit: Entity, result: Result<Founding, SettleError>) -> Self {
+        Self { unit, result }
+    }
+
+    /// Returns the unit this outcome belongs to.
+    #[must_use]
+    pub const fn unit(&self) -> Entity {
+        self.unit
+    }
+
+    /// Returns the founding, or the reason the verb refused the unit.
+    pub const fn result(&self) -> &Result<Founding, SettleError> {
+        &self.result
+    }
+
+    /// Returns the founding, or `None` when the verb refused the unit.
+    #[must_use]
+    pub const fn founding(&self) -> Option<&Founding> {
+        match &self.result {
+            Ok(founding) => Some(founding),
+            Err(_) => None,
+        }
+    }
+
+    /// Reports whether the unit founded a city.
+    #[must_use]
+    pub const fn founded(&self) -> bool {
+        self.result.is_ok()
+    }
+}

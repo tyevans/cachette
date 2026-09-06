@@ -286,6 +286,7 @@ const MIXED: FactionWeights = FactionWeights {
     trade: 4,
     build: 1,
     renown: 1,
+    settle: 1,
 };
 
 #[test]

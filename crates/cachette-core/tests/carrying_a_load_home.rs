@@ -300,6 +300,17 @@ fn the_step_of_a_laden_unit_follows_the_return_field() {
     for _ in 0..TICKS {
         world.step(2).expect("the step runs");
     }
+    // **The controller sends the units again on the next tick.** A project
+    // order, a campaign or a settle order takes the idle units of a faction,
+    // so a fixture that only frees them measures whatever the controller left
+    // behind. Every faction is put under external control, which is the one
+    // gate that stops an evaluation, so the units stay free for the steps
+    // this test reads.[^8]
+    //
+    // [^8]: ADR-0144, a faction controller runs inside the step and acts only through the caller's verbs, decision D6. `docs/adrs/accepted/adr-0144-a-faction-controller-runs-inside-the-step-and-acts-only-through-the-callers-verbs.md`
+    for index in 0..world.config().faction_count {
+        world.set_externally_controlled(FactionId(index), true);
+    }
     let grid = world.grid();
     let mut measured = false;
     let mut read = 0usize;
