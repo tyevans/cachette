@@ -295,6 +295,7 @@ records:
     ./scripts/check-citations.sh
     ./scripts/check-conflict-markers.sh
     ./scripts/check-footnotes.sh
+    ./scripts/check-register-prose.sh
 
 # Install the pre-commit hook, once per clone. The hooks are versioned.
 install-hooks:
@@ -328,6 +329,8 @@ records-probe:
     ! ./scripts/check-conflict-markers.sh tests/fixtures/conflict-broken
     ! ./scripts/check-footnotes.sh tests/fixtures/footnotes-broken
     ! CACHETTE_FOOTNOTE_BASELINE=tests/fixtures/footnotes-stale/baseline.txt ./scripts/check-footnotes.sh tests/fixtures/footnotes-stale
+    ! ./scripts/check-register-prose.sh tests/fixtures/register-prose-broken
+    ! CACHETTE_REGISTER_PROSE_BASELINE=tests/fixtures/register-prose-stale/baseline.txt ./scripts/check-register-prose.sh tests/fixtures/register-prose-stale
     ./scripts/merge-defect-probe.sh
 
 # Everything a commit must pass. The wrapper times the run and reports the

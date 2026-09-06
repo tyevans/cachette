@@ -139,5 +139,5 @@ lesson, and it is a requirement of the check.[^12] [^11]
 [^8]: Target platform costs. `docs/reference/graviton-costs.md`
 [^9]: Backlog item 0243. `docs/backlog/proposed/0243-repair-the-accepted-records-that-state-the-missing-measurement.md`
 [^10]: Findings register, FND-258. `docs/FINDINGS.md`
-[^11]: Backlog item 0242. `docs/backlog/refined/0242-fail-a-check-when-a-document-states-a-register-in-its-own-words.md`
+[^11]: Backlog item 0242. `docs/backlog/complete/0242-fail-a-check-when-a-document-states-a-register-in-its-own-words.md`
 [^12]: Findings register, FND-260. `docs/FINDINGS.md`

@@ -23,7 +23,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^ALLOC]
 
-**Next number: DEC-272**
+**Next number: DEC-273**
 
 ## Open
 
@@ -3885,6 +3885,41 @@ not could never start.
 
 **What stays open.** Whether the downstream game wants a territorial gate is a
 game rule, and a blocker holds the rules of that game.[^DEC214D]
+### DEC-272 — What tells a restatement of a register from a citation of it?
+
+**Closed on 5 September 2026. Option C. A paragraph that states a register's
+content must name the register, by a footnote marker or by a row number.**
+
+**The question.** A check now fails when a document states in prose what a
+register holds.[^DEC272A] A register is the current statement, so a copy of it
+in prose goes false when the register moves and nothing fails. The check reads
+phrases, and a phrase cannot see the difference between a document that repeats
+a register and a document that cites one. A check that cannot tell them apart
+is worse than no check, because everybody learns to ignore it.
+
+**Option A. Forbid the phrase family everywhere except the registers.** The
+strictest reading of the documentation rule, which asks a document to name a
+register and never state its content.
+
+**Option B. Forbid the phrase family in a sentence that carries no citation.**
+The marker sits directly after the claim it supports, so the sentence is the
+unit the documentation rule already uses.
+
+**Option C. Forbid the phrase family in a paragraph that carries no citation,
+and read a row of a table as a paragraph of its own.**
+
+**Why C.** Option A fails on about forty records that nobody may edit, on the
+day it lands, and a gate nobody can turn green is a gate everybody skips.
+Option B fails on ordinary prose: a writer states a claim in one sentence and
+names the register in the next. The measurement is in the findings
+register.[^DEC272B] Option C keeps the failing set to the documents that give a
+reader no route back to the register at all.
+
+**What follows.** The check buys a subset and the script says which subset in
+its own header. A restatement that cites its register passes, and it is still a
+second declaration site. A reader who doubts such a sentence has one hop to the
+thing that decides it, and a reader of a bare sentence has none.
+
 ### DEC-271 — Where does the build cost of a unit type live?
 
 **Closed on 5 September 2026. Option B. A second table, indexed by the same
@@ -4099,6 +4134,9 @@ exactly so that a caller cannot build a wrong one.[^DEC120C]
 
 [^DEC224A]: Review of backlog item 0345, section 10. `docs/reviews/0345-resolve-a-meeting.md`
 [^DEC224B]: Backlog item 0432, decide the lifetime of every log the bindings expose. `docs/backlog/proposed/0432-decide-the-lifetime-of-every-log-the-bindings-expose.md`
+
+[^DEC272A]: The register prose check. `scripts/check_register_prose.py`
+[^DEC272B]: Findings register, FND-532. `docs/FINDINGS.md`
 
 [^DEC261A]: ADR-0014, entity identity is an index plus a generation, decision D3. `docs/adrs/accepted/adr-0014-entity-identity-is-an-index-plus-a-generation.md`
 [^DEC261B]: ADR-0085, an entity crosses to Python as one opaque identity that the engine resolves, decision D2. `docs/adrs/accepted/adr-0085-an-entity-crosses-to-python-as-one-opaque-identity.md`

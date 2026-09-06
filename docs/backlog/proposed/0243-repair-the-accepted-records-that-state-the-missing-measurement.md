@@ -70,4 +70,4 @@ Filled in when the item moves to `complete/`.
 [^2]: ADR Registry, the retcon window and the citation rule. `docs/adrs/REGISTRY.md`
 [^3]: Decisions register, DEC-096. `docs/DECISIONS.md`
 [^4]: Findings register, FND-258. `docs/FINDINGS.md`
-[^5]: Backlog item 0242. `docs/backlog/refined/0242-fail-a-check-when-a-document-states-a-register-in-its-own-words.md`
+[^5]: Backlog item 0242. `docs/backlog/complete/0242-fail-a-check-when-a-document-states-a-register-in-its-own-words.md`

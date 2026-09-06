@@ -110,8 +110,8 @@ placed rather than left at the end.
 - Say what was done, and what was left undone.
 - If a test fails, say so and give the output.
 - If a step was skipped, say so.
-- Do not claim a measurement that was not taken. Every cost figure in this
-  project is derived, not measured, and the difference matters.
+- Do not claim a measurement that was not taken. BLK-007 says which cost
+  figures are measured and which are derived, and the difference matters.
 - Cite a game for observed behaviour only, never for implementation. That
   finding is in the register with its evidence.
 
