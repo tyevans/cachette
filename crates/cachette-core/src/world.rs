@@ -47,6 +47,7 @@ use crate::conversion::{self, ConversionError, Convert, UnitConverted};
 use crate::descent::{DescentId, Parents};
 use crate::event::{ResourceTaken, TileChanged, CHANGE_KIND_LOWERED, CHANGE_KIND_RAISED};
 use crate::founding::{self, Founding, FoundingError, FoundingOutcome, Survey};
+use crate::growth;
 use crate::hash::StateHash;
 use crate::hex::{Axial, Grid, GridError, NEIGHBOUR_COUNT};
 use crate::holding::{FactionMask, Holder, Holding, ReachRules};
@@ -844,6 +845,60 @@ pub struct World {
     ///
     /// [^1]: ADR-0158, a site builds a typed unit from a bounded queue its store pays for, decision D5. `docs/adrs/accepted/adr-0158-a-site-builds-a-typed-unit-from-a-bounded-queue-its-store-pays-for.md`
     queue_schedule: RateSchedule,
+    /// When the growth stage acts.
+    ///
+    /// The interval is a parameter of the world and never a constant of the
+    /// stage.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0157, a site's free places are its built housing less the residents the engine counts, decision D4. `docs/adrs/accepted/adr-0157-a-sites-free-places-are-its-built-housing-less-the-residents-the-engine-counts.md`
+    growth_schedule: RateSchedule,
+    /// The housing that one person takes.
+    ///
+    /// The value is a parameter of the world. The balance register holds the
+    /// row and this field states no value of its own.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: Balance register, the population. `docs/reference/balance.md`
+    housing_per_person: u32,
+    /// The store that one birth costs.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: Balance register, the population. `docs/reference/balance.md`
+    food_per_birth: [Fix32; COMMODITY_COUNT],
+    /// The chance that one proposal of one site becomes a birth.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: Balance register, the population. `docs/reference/balance.md`
+    birth_chance: Fix32,
+    /// The housing that a founded site starts with.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: Balance register, the population. `docs/reference/balance.md`
+    founding_housing: u32,
+    /// How many people the growth stage added on the last tick.
+    ///
+    /// The count is a census of one tick, and the growth stage clears it
+    /// before it acts. A zero is therefore visible: a world that cannot grow
+    /// and a world that chose not to both read zero, and the free places
+    /// beside it say which.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0157, a site's free places are its built housing less the residents the engine counts, the consequences. `docs/adrs/accepted/adr-0157-a-sites-free-places-are-its-built-housing-less-the-residents-the-engine-counts.md`
+    births: u32,
+    /// What growth took out of the stores, for each commodity.
+    ///
+    /// The total is cumulative over the life of the world. It is the growth
+    /// term of the conservation statement: what the stores held, plus what
+    /// production put in, less what upkeep spent, less what the cohorts drew,
+    /// less this, is what the stores hold.
+    growth_ledger: [Accum; COMMODITY_COUNT],
     /// One bit for each unit that the last meeting ended.
     ///
     /// The plane is the batch of a structural change, in the way the plane of
@@ -1247,6 +1302,17 @@ impl World {
             build_costs: BuildCostTable::default(),
             queue_schedule: RateSchedule::new(QUEUE_PERIOD_DEFAULT, QUEUE_PHASE_DEFAULT)
                 .expect("the default period is inside the range"),
+            growth_schedule: RateSchedule::new(
+                growth::GROWTH_PERIOD_DEFAULT,
+                growth::GROWTH_PHASE_DEFAULT,
+            )
+            .expect("the default period is inside the range"),
+            housing_per_person: growth::HOUSING_PER_PERSON_DEFAULT,
+            food_per_birth: growth::FOOD_PER_BIRTH_DEFAULT,
+            birth_chance: growth::BIRTH_CHANCE_DEFAULT,
+            founding_housing: growth::FOUNDING_HOUSING_DEFAULT,
+            births: 0,
+            growth_ledger: [Accum(0); COMMODITY_COUNT],
             // The world is built with the default upgrade table, so a build
             // order names one of the categories that table holds.[^2]
             //
@@ -1796,6 +1862,14 @@ impl World {
         // The queue table follows the same slot column, for the same reason.
         // A new slot holds an empty queue.
         self.queues.open_to(self.settlements.slot_count());
+        // **A founded site starts with the housing of the world parameter.**
+        // A founded site must house the group that founds it, or a run starts
+        // crowded. The housing is stored and the ground never sets it, so the
+        // founding writes it here and no pass derives it later.[^5]
+        //
+        // [^5]: ADR-0157, a site's free places are its built housing less the residents the engine counts, decision D1. `docs/adrs/accepted/adr-0157-a-sites-free-places-are-its-built-housing-less-the-residents-the-engine-counts.md`
+        self.settlements
+            .set_housing(settlement, self.founding_housing);
         Ok(settlement)
     }
 
@@ -3796,6 +3870,21 @@ impl World {
         let hash = hash
             .write_u64(u64::from(self.queue_schedule.period()))
             .write_u64(u64::from(self.queue_schedule.phase()));
+        // The growth parameters decide what a later frame does, so the
+        // whole-world hash covers them. The housing of each site is a column
+        // of the settlement arena, and that arena hashes its own columns.[^18]
+        //
+        // [^18]: ADR-0157, a site's free places are its built housing less the residents the engine counts, decision D6. `docs/adrs/accepted/adr-0157-a-sites-free-places-are-its-built-housing-less-the-residents-the-engine-counts.md`
+        let hash = hash
+            .write_u64(u64::from(self.growth_schedule.period()))
+            .write_u64(u64::from(self.growth_schedule.phase()))
+            .write_u64(u64::from(self.housing_per_person))
+            .write_u64(u64::from(self.founding_housing))
+            .write(&self.birth_chance.0.to_le_bytes());
+        let hash = self
+            .food_per_birth
+            .iter()
+            .fold(hash, |hash, cost| hash.write(&cost.0.to_le_bytes()));
         // The upgrade table decides what a build order does and what an
         // upgrade changes, so the whole-world hash covers it. Two worlds
         // built with different tables never hash the same.[^5]
@@ -3821,6 +3910,12 @@ impl World {
             .write_u64(u64::from(self.schedule.period()))
             .write_u64(u64::from(self.schedule.phase()));
         let hash = self.rate_ledger.hash_into(hash);
+        // What growth took is a term of the world conservation statement, in
+        // the way the rate ledger is, so the whole-world hash covers it.
+        let hash = self
+            .growth_ledger
+            .iter()
+            .fold(hash, |hash, total| hash.write(&total.0.to_le_bytes()));
         // The need of a unit and the deficit that follows it are simulated
         // state, and the unit columns already carry them into the hash. The
         // rule, the cohorts and the draw ledger are the rest of the pass:
@@ -5002,6 +5097,27 @@ impl World {
         // [^25]: ADR-0062, production and upkeep are rates attached to a site, decision D5. `docs/adrs/accepted/adr-0062-production-and-upkeep-are-rates-attached-to-a-site.md`
         // [^26]: ADR-0018, the unit-to-tile bridge is derived, and it rebuilds at the barrier, decision D3. `docs/adrs/accepted/adr-0018-the-unit-to-tile-bridge-is-derived-and-rebuilds-at-the-barrier.md`
         // [^27]: ADR-0158, a site builds a typed unit from a bounded queue its store pays for, decision D5. `docs/adrs/accepted/adr-0158-a-site-builds-a-typed-unit-from-a-bounded-queue-its-store-pays-for.md`
+        // Growth runs after the pass that ends a starved unit, in the same
+        // frame. A place that a death freed this frame is free this frame,
+        // and the occupancy that the admission reads is the settled one.[^28]
+        // The reap above applied its plane already, so no slot this stage
+        // fills can carry a death that the scan had not yet marked.
+        //
+        // It runs before the queue advance, because growth is the only source
+        // of people and the queue is the only consumer of them.[^29] A queue
+        // that spent a person before growth added one would decide against
+        // the population of the frame before.
+        //
+        // The stage takes no thread count. It visits the sites, and it walks
+        // no unit.[^30]
+        //
+        // [^28]: ADR-0082, the store sets the rate of a birth and the housing admits it, decision D4. `docs/adrs/draft/adr-0082-the-store-sets-the-rate-of-a-birth-and-the-housing-admits-it.md`
+        // [^29]: ADR-0157, a site's free places are its built housing less the residents the engine counts, decision D5. `docs/adrs/accepted/adr-0157-a-sites-free-places-are-its-built-housing-less-the-residents-the-engine-counts.md`
+        // [^30]: ADR-0157, a site's free places are its built housing less the residents the engine counts, decision D4. `docs/adrs/accepted/adr-0157-a-sites-free-places-are-its-built-housing-less-the-residents-the-engine-counts.md`
+        {
+            let _span = stage::open(Stage::Grow);
+            self.grow();
+        }
         {
             let _span = stage::open(Stage::QueueAdvance);
             self.advance_queues();
@@ -8211,6 +8327,168 @@ impl World {
         self.queues.set_bound(bound)
     }
 
+    /// Returns the housing that stands at a site.
+    ///
+    /// The answer is a quantity of housing and not a count of people. It
+    /// follows from what has been built at the site, and the ground never
+    /// sets it.[^1]
+    ///
+    /// Returns `None` when the identity names no live site.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0157, a site's free places are its built housing less the residents the engine counts, decision D1. `docs/adrs/accepted/adr-0157-a-sites-free-places-are-its-built-housing-less-the-residents-the-engine-counts.md`
+    #[must_use]
+    pub fn site_housing(&self, site: Entity) -> Option<u32> {
+        self.settlements.housing(site)
+    }
+
+    /// Writes the housing that stands at a site.
+    ///
+    /// Returns `false` when the identity names no live site.
+    pub fn set_site_housing(&mut self, site: Entity, housing: u32) -> bool {
+        self.settlements.set_housing(site, housing)
+    }
+
+    /// Returns how many units live at a site.
+    ///
+    /// **Nothing stores this count.** The answer is the sum of the cohort
+    /// rows of the site, and the cohort table derives every one of those
+    /// rows from the home column of the unit arena.[^1]
+    ///
+    /// The call costs the faction ceiling, which is a structural constant of
+    /// the project. It never walks the population.
+    ///
+    /// Returns `None` when the identity names no live site.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0157, a site's free places are its built housing less the residents the engine counts, decision D2. `docs/adrs/accepted/adr-0157-a-sites-free-places-are-its-built-housing-less-the-residents-the-engine-counts.md`
+    #[must_use]
+    pub fn site_residents(&self, site: Entity) -> Option<u32> {
+        let slot = self.settlements.slot_of(site)?;
+        // A slot the derived table has not covered holds no counted
+        // resident. That is the answer the table gives, and it is the answer
+        // the growth stage reads. A caller that spawned a unit and did not
+        // step reads it before the frame settled, in the way every derived
+        // structure of this engine behaves, and one public check says so.[^1]
+        //
+        // [^1]: ADR-0018, the unit-to-tile bridge is derived, and it rebuilds at the barrier, decision D3. `docs/adrs/accepted/adr-0018-the-unit-to-tile-bridge-is-derived-and-rebuilds-at-the-barrier.md`
+        Some(self.cohorts.residents(slot).unwrap_or(0))
+    }
+
+    /// Returns the free places of a site.
+    ///
+    /// The free places are the people the housing holds, less the residents
+    /// the site has. A site above its housing has no free place, and the
+    /// answer is zero rather than a value below zero.[^1]
+    ///
+    /// Returns `None` when the identity names no live site.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0157, a site's free places are its built housing less the residents the engine counts, decision D2. `docs/adrs/accepted/adr-0157-a-sites-free-places-are-its-built-housing-less-the-residents-the-engine-counts.md`
+    #[must_use]
+    pub fn site_free_places(&self, site: Entity) -> Option<u32> {
+        let slot = self.settlements.slot_of(site)?;
+        Some(self.free_places_of(slot))
+    }
+
+    /// Returns the free places of one settlement slot.
+    fn free_places_of(&self, slot: u32) -> u32 {
+        let housing = self
+            .settlements
+            .housing_column()
+            .get(slot as usize)
+            .copied()
+            .unwrap_or(0);
+        let residents = self.cohorts.residents(slot).unwrap_or(0);
+        growth::free_places(housing, self.housing_per_person, residents)
+    }
+
+    /// Returns the housing that one person takes.
+    #[must_use]
+    pub const fn housing_per_person(&self) -> u32 {
+        self.housing_per_person
+    }
+
+    /// Sets the housing that one person takes.
+    ///
+    /// A value of zero leaves no site with a free place, so no site grows.
+    pub const fn set_housing_per_person(&mut self, housing: u32) {
+        self.housing_per_person = housing;
+    }
+
+    /// Returns the housing that a founded site starts with.
+    #[must_use]
+    pub const fn founding_housing(&self) -> u32 {
+        self.founding_housing
+    }
+
+    /// Sets the housing that a founded site starts with.
+    ///
+    /// The value reaches the sites founded after the call. It changes no site
+    /// that already stands.
+    pub const fn set_founding_housing(&mut self, housing: u32) {
+        self.founding_housing = housing;
+    }
+
+    /// Returns the store that one birth costs.
+    #[must_use]
+    pub const fn food_per_birth(&self) -> [Fix32; COMMODITY_COUNT] {
+        self.food_per_birth
+    }
+
+    /// Sets the store that one birth costs.
+    pub const fn set_food_per_birth(&mut self, cost: [Fix32; COMMODITY_COUNT]) {
+        self.food_per_birth = cost;
+    }
+
+    /// Returns the chance that one proposal becomes a birth.
+    #[must_use]
+    pub const fn birth_chance(&self) -> Fix32 {
+        self.birth_chance
+    }
+
+    /// Sets the chance that one proposal becomes a birth.
+    ///
+    /// A chance at or above one makes every proposal a birth. A chance at or
+    /// below zero makes none.
+    pub const fn set_birth_chance(&mut self, chance: Fix32) {
+        self.birth_chance = chance;
+    }
+
+    /// Returns when the growth stage acts.
+    #[must_use]
+    pub const fn growth_schedule(&self) -> RateSchedule {
+        self.growth_schedule
+    }
+
+    /// Sets when the growth stage acts.
+    pub const fn set_growth_schedule(&mut self, schedule: RateSchedule) {
+        self.growth_schedule = schedule;
+    }
+
+    /// Returns what growth took out of the stores, for each commodity.
+    ///
+    /// The total is cumulative over the life of the world. A caller that
+    /// states the conservation of the stores reads it, because growth is a
+    /// sink that neither the rate ledger nor the draw ledger holds.
+    #[must_use]
+    pub const fn growth_ledger(&self) -> [Accum; COMMODITY_COUNT] {
+        self.growth_ledger
+    }
+
+    /// Returns how many people the growth stage added on the last tick.
+    ///
+    /// The count is a census of one tick. The growth stage clears it before
+    /// it acts, so a zero says that the world grew nobody and not that the
+    /// world never grew.
+    #[must_use]
+    pub const fn births(&self) -> u32 {
+        self.births
+    }
+
     /// Returns when the queue advance acts.
     #[must_use]
     pub const fn queue_schedule(&self) -> RateSchedule {
@@ -8292,6 +8570,134 @@ impl World {
             };
             self.set_store_quantity(slot, commodity, sim_math::sub(held, *wanted));
         }
+    }
+
+    /// Grows the population of every site, and returns nothing.
+    ///
+    /// # What it does
+    ///
+    /// The store of a site sets a rate, and the rate proposes a birth. The
+    /// free places of the site admit the proposals, in ordinal order, until
+    /// no place is free. A refused proposal is discarded and it is not
+    /// carried to the next application.[^1] [^2]
+    ///
+    /// **The housing is a bound and not a factor.** A site at its housing
+    /// grows nobody, however much food it holds. A site with free places
+    /// grows at the rate its store sets, and the free places never scale that
+    /// rate.[^2]
+    ///
+    /// An admitted proposal costs the store, spawns one unit at the address
+    /// of the site, and writes the residence of that unit. The unit carries
+    /// the type the spawn path gives, which is the worker row. This stage
+    /// names no unit type.[^3]
+    ///
+    /// # Where it runs, and why
+    ///
+    /// It runs after the shortage scan and before the queue advance. The
+    /// step states both positions.
+    ///
+    /// # What it costs
+    ///
+    /// The stage visits the settlements in slot order and reads a fixed
+    /// number of proposals at each one. It walks no unit and it searches
+    /// nothing, so its cost follows the settlements and the faction ceiling
+    /// and never the population.[^4]
+    ///
+    /// # Determinism
+    ///
+    /// The sites apply in slot order, and the proposals of one site apply in
+    /// ordinal order. Every draw is keyed on the system, the tick, the site
+    /// and the ordinal of the proposal.[^5] No thread takes part.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0082, the store sets the rate of a birth and the housing admits it, decision D1. `docs/adrs/draft/adr-0082-the-store-sets-the-rate-of-a-birth-and-the-housing-admits-it.md`
+    /// [^2]: ADR-0082, the store sets the rate of a birth and the housing admits it, decision D2. `docs/adrs/draft/adr-0082-the-store-sets-the-rate-of-a-birth-and-the-housing-admits-it.md`
+    /// [^3]: ADR-0157, a site's free places are its built housing less the residents the engine counts, decision D5. `docs/adrs/accepted/adr-0157-a-sites-free-places-are-its-built-housing-less-the-residents-the-engine-counts.md`
+    /// [^4]: ADR-0157, a site's free places are its built housing less the residents the engine counts, decision D4. `docs/adrs/accepted/adr-0157-a-sites-free-places-are-its-built-housing-less-the-residents-the-engine-counts.md`
+    /// [^5]: ADR-0003, every random draw is keyed, never stateful, decision D1. `docs/adrs/accepted/adr-0003-every-random-draw-is-keyed-never-stateful.md`
+    fn grow(&mut self) {
+        // The count is a census of one tick, and this stage is where the
+        // tick starts for it. A world that cannot grow and a world that
+        // chose not to both read zero here, and the free places say which.
+        self.births = 0;
+        if !self.growth_schedule.due(self.tick) {
+            return;
+        }
+        let tick = self.tick.0;
+        let seed = self.config.seed;
+        let cost = self.food_per_birth;
+        let chance = self.birth_chance;
+        let mut grew = false;
+        for slot in 0..self.settlements.slot_count() {
+            let Some(site) = self.settlements.entity_at(slot) else {
+                continue;
+            };
+            // **The housing admits, and it never scales the rate.** The free
+            // places are read once for the site, and each birth takes one of
+            // them. A site with no free place is done here, whatever its
+            // store holds.
+            let mut free = self.free_places_of(slot);
+            if free == 0 {
+                continue;
+            }
+            let Some(store) = self.settlements.store(site) else {
+                continue;
+            };
+            let mut held = [Fix32::ZERO; COMMODITY_COUNT];
+            for (index, quantity) in held.iter_mut().enumerate() {
+                *quantity = store
+                    .quantity(CommodityId(index as u16))
+                    .expect("the index is inside the commodity set");
+            }
+            let proposals = growth::proposals(&held, &cost);
+            let (Some(address), Some(faction)) = (
+                self.settlements.address(site),
+                self.settlements.faction(site),
+            ) else {
+                continue;
+            };
+            for index in 0..proposals {
+                if free == 0 {
+                    break;
+                }
+                if !growth::proposal_takes(seed, tick, slot, index, chance) {
+                    continue;
+                }
+                // The rate counted what the store could pay when the stage
+                // read it. Each birth spends, so the check runs again for
+                // each one rather than once for the site.
+                if !self.store_holds(slot, &cost) {
+                    break;
+                }
+                let Ok(person) = self.spawn_soldier(address, faction) else {
+                    break;
+                };
+                self.set_home_site(person, Some(site));
+                self.take_from_store(slot, &cost);
+                for (index, quantity) in cost.iter().enumerate() {
+                    self.growth_ledger[index] =
+                        sim_math::accumulate(self.growth_ledger[index], *quantity);
+                }
+                free -= 1;
+                self.births += 1;
+                grew = true;
+            }
+        }
+        if !grew {
+            return;
+        }
+        // The cohort table summarises the home column, and this stage changed
+        // that column. A table left stale would state a headcount that no
+        // unit backs, and the invariant check refuses that state.[^6]
+        //
+        // [^6]: Recurring defect shapes, shape 1. `.agents/rules/recurring-defects.md`
+        self.cohorts.rebuild(
+            self.soldiers.home_column(),
+            self.soldiers.faction_column(),
+            self.soldiers.live_column(),
+            self.settlements.slot_count(),
+        );
     }
 
     /// Advances the front entry of every queue, and applies what finished.

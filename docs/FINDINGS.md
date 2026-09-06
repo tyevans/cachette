@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-538**
+**Next number: FND-540**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -12350,6 +12350,53 @@ fire.[^F492B] This is the shape of the fixture rule at the assertion rather
 than at the data: the input was extreme, and it was extreme in the wrong
 direction.
 
+### FND-538 — The world conservation statement held three terms, and growth is a fourth
+
+**Believed.** What the stores of the world hold is what they held, plus what
+production put in, less what upkeep spent, less what the cohorts drew. A test
+of the consumption pass states that equality and calls it "the world must
+balance to zero".[^F538A]
+
+**True.** The statement was complete only while nothing else took from a store.
+The growth stage takes food out of a store to make a person, and the rate
+ledger and the draw ledger hold neither term. The test failed at the first run
+after growth landed, by forty-five whole units of food, which is the number of
+births the fixture made.
+
+The production queue has the same shape and did not show it, because the
+fixture of that test queues nothing.
+
+**Evidence.** The command was `cargo test -p cachette-core --test consumption`
+on the x86-64 development machine, and not on the target platform. The
+assertion reported 10559488 against 13508608 in the raw Q16.16 scale, and the
+difference is 2949120, which is forty-five whole units.
+
+**What follows.** The world holds a growth ledger, and the test reads it as a
+fourth term. **A pass that takes from a store must state what it took**, or the
+next conservation statement fails and the failure names the wrong pass. A
+reviewer who adds a fourth sink should ask which ledger holds it before the
+pass lands.
+
+### FND-539 — One word named the slot ceiling of the settlement arena and was about to name the housing
+
+**Believed.** The settlement arena member named `capacity` could stand for the
+people a site houses. Two backlog items and one decision record each warned
+that it could not, and each warning was written separately.[^F539A] [^F539B]
+
+**True.** The member is the ceiling on the slot index of the arena, and it is a
+property of the identity layout rather than a number of people. A reader who
+took the wrong meaning would get a number near four billion where a housing was
+meant, and nothing would fail.
+
+**Evidence.** The member and its reader are in the settlement column set, and
+the constant behind them is the range of the slot index.
+
+**What follows.** The slot ceiling is named `slot_ceiling`, its two builders
+are named for it, and the housing column is named `housing`. The word
+`capacity` no longer appears in the settlement arena. **A warning repeated in
+three documents is evidence that the name should change, not that the next
+reader will read the warning.**
+
 ### FND-496 — The road chain finished nothing in a run, because the plan bound where a unit builds and not what it builds
 
 **Believed.** The road chain works. Backlog item 0488 was moved to `complete/`
@@ -12703,3 +12750,6 @@ finding that names the shape.
 [^F537C]: The choice tests and the luxury tests. `crates/cachette-core/tests/choice.rs`
 [^F537D]: The hash coverage tests. `crates/cachette-core/tests/state_hash_covers_the_step_parameters.rs`
 [^F537E]: ADR-0164, every stored value the step reads enters the state hash. `docs/adrs/draft/adr-0164-every-stored-value-the-step-reads-enters-the-state-hash.md`
+[^F538A]: The consumption conservation test. `crates/cachette-core/tests/consumption.rs`
+[^F539A]: Backlog item 0059, the done list. `docs/backlog/complete/0059-give-a-site-a-housing-capacity-and-a-resident-reader.md`
+[^F539B]: ADR-0157, a site's free places are its built housing less the residents the engine counts, decision D1. `docs/adrs/accepted/adr-0157-a-sites-free-places-are-its-built-housing-less-the-residents-the-engine-counts.md`

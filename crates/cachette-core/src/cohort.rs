@@ -369,6 +369,34 @@ impl CohortTable {
             .map(|row| row.headcount)
     }
 
+    /// Returns the number of units that live at one site.
+    ///
+    /// The answer is the sum of the cohort rows of that site, over every
+    /// faction. **Nothing stores this count.** The table derives every
+    /// headcount from the home column of the unit arena, and this reader
+    /// sums the rows the table already holds. A second stored count would
+    /// put one fact in three places, and a check between two copies does
+    /// not guard three.[^1]
+    ///
+    /// The sum costs the faction ceiling, which is a structural constant of
+    /// the project and never a population.[^1]
+    ///
+    /// Returns `None` when the site is outside the table.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0157, a site's free places are its built housing less the residents the engine counts, decision D2. `docs/adrs/accepted/adr-0157-a-sites-free-places-are-its-built-housing-less-the-residents-the-engine-counts.md`
+    #[must_use]
+    pub fn residents(&self, site: u32) -> Option<u32> {
+        let start = row_index(site, 0);
+        let rows = self.rows.get(start..start + COHORTS_PER_SITE)?;
+        let mut total = 0u32;
+        for row in rows {
+            total = total.saturating_add(row.headcount);
+        }
+        Some(total)
+    }
+
     /// Returns the number of units that every cohort stands for.
     ///
     /// The sum is exact. A headcount is a whole number and the accumulator

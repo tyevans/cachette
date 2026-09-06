@@ -441,7 +441,18 @@ fn long_run(threads: usize) -> (i64, i64, i64, usize) {
         );
     }
     let ledger = world.rate_ledger();
-    (held, ledger.produced[0].0, ledger.spent[0].0, shortfalls)
+    // Growth is a third term, and the ration of the people it made is a
+    // fourth. Growth takes food out of a store to make a person, and that
+    // person then draws on the same store. The rate ledger holds neither act,
+    // so a statement that left them out would fail the moment a site grew.
+    let born = world.growth_ledger()[0].0;
+    let drawn = world.draw_ledger().granted[0].0;
+    (
+        held + born + drawn,
+        ledger.produced[0].0,
+        ledger.spent[0].0,
+        shortfalls,
+    )
 }
 
 #[test]
@@ -450,7 +461,8 @@ fn what_a_site_produced_minus_what_it_spent_is_what_it_holds() {
     assert_eq!(
         held,
         produced - spent,
-        "the stores started empty, so the holding is the net of the ledger"
+        "the stores started empty, so the holding, plus what growth took, plus \
+         what the cohorts drew, is the net of the ledger"
     );
     assert!(
         produced > 0,

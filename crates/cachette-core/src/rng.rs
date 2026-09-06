@@ -178,3 +178,19 @@ pub const SYSTEM_CONTROLLER: SystemId = 11;
 ///
 /// [^1]: ADR-0003, every random draw is keyed, never stateful, decision D1. `docs/adrs/accepted/adr-0003-every-random-draw-is-keyed-never-stateful.md`
 pub const SYSTEM_LUXURY: SystemId = 12;
+
+/// The system identifier of the growth stage.
+///
+/// The growth stage owns this identifier alone. It does not share the
+/// identifier of the founding, because two systems that share an identifier
+/// draw the same value from the same frame, entity and draw index. A site
+/// would then grow exactly where the founding placed it.[^1]
+///
+/// A growth draw keys the site into the entity slot and the index of the
+/// proposal within the site into the draw slot.[^2]
+///
+/// # References
+///
+/// [^1]: ADR-0003, every random draw is keyed, never stateful, decision D1. `docs/adrs/accepted/adr-0003-every-random-draw-is-keyed-never-stateful.md`
+/// [^2]: ADR-0082, the store sets the rate of a birth and the housing admits it, decision D4. `docs/adrs/draft/adr-0082-the-store-sets-the-rate-of-a-birth-and-the-housing-admits-it.md`
+pub const SYSTEM_GROWTH: SystemId = 13;

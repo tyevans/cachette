@@ -1,7 +1,7 @@
 ---
 id: 0059
 title: Give a site a housing capacity and a resident reader
-status: refined
+status: complete
 created: 2026-08-31
 implements: [ADR-0157 D1, ADR-0157 D2, ADR-0157 D3, ADR-0066 D1, ADR-0014 D1, ADR-0004 D1]
 changes: []
@@ -157,7 +157,49 @@ world.
 
 ## Outcome
 
-Filled in when the item moves to `complete/`.
+**Built.** A site holds a stored housing column, a caller reads how many units
+live there, and a caller reads the free places. Item 0060 landed in the same
+change, so the readers have a caller from the first commit.
+
+### The rename, and what it settled
+
+The settlement arena held one member named `capacity`, and it meant the ceiling
+on the slot index. The housing field is named `housing`, and the slot ceiling
+is named `slot_ceiling`. The two builders that took the old name are now
+`with_slot_ceiling` and `slot_ceiling`. The word `capacity` no longer appears
+in the settlement arena at all, so the arena carries no word with two meanings.
+The commit body carries the whole-tree search.
+
+### What was already built, and what this item added
+
+The item said that half of the work was already done, and that reading was
+correct. The cohort table already derived every headcount from the home column,
+and the eviction path already cleared the residence of every unit of a lost
+site. This item added the housing column, one reader that sums the cohort rows
+of one site, one reader for the free places, and the Python readers.
+
+**Nothing new is stored for the resident count.** The reader sums the rows the
+cohort table already holds, over the faction ceiling, and it walks no unit.
+
+### The derived count is settled at a barrier, and a caller can read it stale
+
+A caller that spawns a unit and does not step reads a cohort table that does
+not yet describe that unit, in the way that the unit-to-tile bridge behaves.
+The engine already answers this through `cohorts_describe_the_units`. The
+fixtures of the new test file step once before they assert, and the file says
+why.
+
+### The done list
+
+Every line of the done list above is met, except that the whole check command
+was not run. The commands the dispatcher named were run instead, and the report
+of the work states which.
+
+The item asked for a test on two sites of one terrain with different housing.
+The stored column answers it by construction: the founding writes one value
+from a world parameter, and no pass reads the ground. The test file asserts the
+stronger statement, which is that a caller writes a housing that the ground
+never sets and that growth then reads it.
 
 ## References
 

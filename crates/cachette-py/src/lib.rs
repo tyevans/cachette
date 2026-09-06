@@ -3040,6 +3040,190 @@ impl PyWorld {
         Ok(report)
     }
 
+    /// Returns the housing of one site and how full it is, as a `dict`.
+    ///
+    /// The site is one settlement identity, as a Python integer.
+    ///
+    /// **The housing is a quantity of housing and not a count of people.**
+    /// It follows from what has been built at the site, and the ground never
+    /// sets it. The people the housing holds is that quantity divided by the
+    /// housing one person takes.
+    ///
+    /// The call answers about one site and it walks no population. The
+    /// resident count is derived from the home column of the units, and
+    /// nothing stores it.
+    ///
+    /// Three entries are Python integers.
+    ///
+    /// - `housing`. The housing that stands at the site.
+    /// - `residents`. How many units live at the site, over every faction.
+    /// - `free_places`. The people the housing holds, less the residents. A
+    ///   site above its housing reads zero and never a value below zero.
+    ///
+    /// # Errors
+    ///
+    /// Raises `ViewError` when the identity names no live settlement.
+    fn site_housing<'py>(&self, python: Python<'py>, site: u64) -> PyResult<Bound<'py, PyDict>> {
+        let world = self.lock();
+        let entity = resolve_site(&world, site)?;
+        let report = PyDict::new(python);
+        report.set_item(
+            "housing",
+            world
+                .site_housing(entity)
+                .expect("the identity resolved to a live site above"),
+        )?;
+        report.set_item(
+            "residents",
+            world
+                .site_residents(entity)
+                .expect("the identity resolved to a live site above"),
+        )?;
+        report.set_item(
+            "free_places",
+            world
+                .site_free_places(entity)
+                .expect("the identity resolved to a live site above"),
+        )?;
+        Ok(report)
+    }
+
+    /// Writes the housing that stands at a set of settlements.
+    ///
+    /// Returns `None`.
+    ///
+    /// The sites are a sequence of settlement identities, or the NumPy array
+    /// of `numpy.uint64` that `found_settlements` returned.
+    ///
+    /// **The housing is a quantity of housing and not a count of people.**
+    /// Divide it by the housing one person takes to get the people it holds.
+    ///
+    /// **The write is absolute and not relative.** The site holds the value
+    /// given, whatever it held before.
+    ///
+    /// **A site above its new housing keeps every resident.** A population
+    /// above the housing that holds it is a state of the world and not a
+    /// fault. The site grows nobody until the housing rises again.
+    ///
+    /// **The housing may be written at any time.** It is simulated state and
+    /// it enters the state hash.[^1]
+    ///
+    /// **Read it back with `site_housing`.**
+    ///
+    /// **The set is all or nothing.** Every identity resolves before anything
+    /// is written.
+    ///
+    /// # Errors
+    ///
+    /// Raises `ViewError` when an identity names no live settlement.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0001, one binary gives one answer at any thread count, decision D4. `docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
+    fn set_site_housing(&self, sites: Vec<u64>, housing: u32) -> PyResult<()> {
+        let mut world = self.lock();
+        let resolved = resolve_sites(&world, &sites)?;
+        for site in resolved {
+            world.set_site_housing(site, housing);
+        }
+        Ok(())
+    }
+
+    /// Returns how many people the growth stage added on the last tick.
+    ///
+    /// The count is a census of one tick. The growth stage clears it before
+    /// it acts, so a zero says that the world grew nobody on that tick.
+    ///
+    /// **A zero beside a free place of zero says why.** A faction that never
+    /// raises its housing stops growing, and the two numbers together state
+    /// that reason.
+    #[getter]
+    fn births(&self) -> u32 {
+        self.lock().births()
+    }
+
+    /// Returns the housing that one person takes.
+    #[getter]
+    fn housing_per_person(&self) -> u32 {
+        self.lock().housing_per_person()
+    }
+
+    /// Sets the housing that one person takes.
+    ///
+    /// Returns `None`. A value of zero leaves no site with a free place, so
+    /// no site grows.
+    fn set_housing_per_person(&self, housing: u32) {
+        self.lock().set_housing_per_person(housing);
+    }
+
+    /// Sets the chance that one proposal of one site becomes a birth.
+    ///
+    /// **The chance is a Q16.16 value as its raw integer.** Multiply the share
+    /// you want by 65536. A chance at or above one whole unit makes every
+    /// proposal a birth. A chance of zero makes none, so it turns growth off.
+    /// Returns `None`.
+    ///
+    /// The chance is a balance row.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: Balance register, the population, the birth rate row. `docs/reference/balance.md`
+    fn set_birth_chance(&self, chance: i32) {
+        self.lock().set_birth_chance(Fix32(chance));
+    }
+
+    /// Sets how often the growth stage acts, and its offset in the period.
+    ///
+    /// The period is the ticks between two applications. The phase is the
+    /// offset inside the period. Returns `None`.
+    ///
+    /// The schedule is a balance row.[^1]
+    ///
+    /// # Errors
+    ///
+    /// Raises `VerbError` when the period is zero or above the range.
+    ///
+    /// # References
+    ///
+    /// [^1]: Balance register, the population, the growth schedule row. `docs/reference/balance.md`
+    fn set_growth_schedule(&self, period: u32, phase: u32) -> PyResult<()> {
+        let schedule = RateSchedule::new(period, phase).ok_or_else(|| {
+            VerbError::new_err(format!("the period {period} is outside the range"))
+        })?;
+        self.lock().set_growth_schedule(schedule);
+        Ok(())
+    }
+
+    /// Sets the store that one birth costs, for one commodity.
+    ///
+    /// The commodity is a commodity number. The quantity is a raw Q16.16
+    /// integer. Returns `None`.
+    ///
+    /// **A birth is never free.** A site whose store cannot pay makes no
+    /// person. The cost is a balance row.[^1]
+    ///
+    /// # Errors
+    ///
+    /// Raises `VerbError` when the number names no commodity of this world.
+    ///
+    /// # References
+    ///
+    /// [^1]: Balance register, the population, the food per birth row. `docs/reference/balance.md`
+    #[pyo3(signature = (quantity, commodity = 0))]
+    fn set_food_per_birth(&self, quantity: i32, commodity: u16) -> PyResult<()> {
+        let mut world = self.lock();
+        let mut cost = world.food_per_birth();
+        let index = commodity as usize;
+        if index >= cost.len() {
+            return Err(VerbError::new_err(format!(
+                "{commodity} names no commodity of this world"
+            )));
+        }
+        cost[index] = Fix32(quantity);
+        world.set_food_per_birth(cost);
+        Ok(())
+    }
+
     /// Returns why one unit chose the intent it carries, as a `dict`.
     ///
     /// The unit is one soldier identity, as a Python integer.

@@ -64,6 +64,10 @@ def a_world(seed: int = 7) -> World:
     # units of a faction to them, and every unit these tests stand somewhere
     # would walk away.[^3]
     world.set_plan_rules(0, 0, 0, 0, 0)
+    # Growth is off. These tests state what a delivery moved into a store, and
+    # a site that grew would take food out of the same store between the two
+    # readings.[^4]
+    world.set_birth_chance(0)
     world.found_run_for_every_faction(24)
     for _ in range(6):
         world.step(threads=1)
