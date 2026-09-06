@@ -136,7 +136,7 @@ fn distance(from: (i64, i64), to: (i64, i64)) -> i64 {
 fn main() {
     let extent = argument(1, 256) as u32;
     let seed = argument(2, 0x2f);
-    let ticks = argument(3, 400) as u64;
+    let ticks = argument(3, 400);
     let bits = argument(4, 0) as u32;
     let scale = WeatherScale::from_bits(bits).expect("the scale describes a lattice");
     let mut world = World::with_weather_scale(
@@ -162,9 +162,7 @@ fn main() {
 
     let ceiling = circulation_ceiling();
     println!("extent {extent} seed {seed:#x} ticks {ticks} scale bits {bits}");
-    println!(
-        "circulation ceiling {ceiling}, storm mark {mark} drops, storm floor {floor} cells"
-    );
+    println!("circulation ceiling {ceiling}, storm mark {mark} drops, storm floor {floor} cells");
 
     let mut live: Vec<Tracked> = Vec::new();
     let mut done: Vec<Tracked> = Vec::new();

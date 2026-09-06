@@ -99,7 +99,7 @@ fn mean(values: &[i64]) -> i64 {
     }
 }
 
-fn median(values: &mut Vec<i64>) -> i64 {
+fn median(values: &mut [i64]) -> i64 {
     if values.is_empty() {
         return 0;
     }
@@ -125,10 +125,12 @@ fn main() {
     )
     .expect("the settings describe a world");
 
-    let count = world.weather().air_plane().len().max(
-        world.weather().warmth_plane().len(),
-    );
-    let (water, water_height) = water_of(&world, extent, bits, count);
+    let count = world
+        .weather()
+        .air_plane()
+        .len()
+        .max(world.weather().warmth_plane().len());
+    let (water, _water_height) = water_of(&world, extent, bits, count);
     // The mean height of every weather cell, folded from the tiles once.
     let mut world_height = vec![0i64; count];
     let mut tiles = vec![0i64; count];
@@ -241,9 +243,7 @@ fn main() {
                 .collect();
             let winds: Vec<i64> = slots
                 .iter()
-                .map(|slot| {
-                    i64::from(wind.get(*slot).copied().unwrap_or_default().speed())
-                })
+                .map(|slot| i64::from(wind.get(*slot).copied().unwrap_or_default().speed()))
                 .collect();
             println!(
                 "  {band:>4} {:>7} {:>11} {:>8} {:>12} {:>12} {:>10}",

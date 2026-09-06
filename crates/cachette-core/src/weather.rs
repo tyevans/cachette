@@ -1457,18 +1457,15 @@ pub fn heat_of(ground: CellGround) -> i32 {
 /// move.**
 #[must_use]
 pub fn lag_of(ground: CellGround) -> i64 {
-    let water = ground.open_share().map_or(Fix32::ZERO, |open| {
-        to_unit(Fix32(Fix32::ONE.0 - open.0))
-    });
+    let water = ground
+        .open_share()
+        .map_or(Fix32::ZERO, |open| to_unit(Fix32(Fix32::ONE.0 - open.0)));
     let shallow = ground.shallowness().map_or(Fix32::ONE, to_unit);
     let deep = Fix32(Fix32::ONE.0 - shallow.0);
     // The extra lag is the whole extra multiplied by how deep the water is
     // and then by how much of the cell is water. A cell with no water gets
     // none of it, and neither does a cell whose water lies at the mark.
-    let extra = i64::from(part_of(
-        part_of((DEEP_WATER_LAG - 1) as i32, deep),
-        water,
-    ));
+    let extra = i64::from(part_of(part_of((DEEP_WATER_LAG - 1) as i32, deep), water));
     1 + extra.max(0)
 }
 
