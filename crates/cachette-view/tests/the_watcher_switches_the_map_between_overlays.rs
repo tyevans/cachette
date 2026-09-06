@@ -35,7 +35,7 @@
 // [^4]: ADR-0067, the viewer reads the world and never writes to it, decision D3. `docs/adrs/accepted/adr-0067-the-viewer-reads-the-world-and-never-writes-to-it.md`
 #![allow(clippy::disallowed_types)]
 
-use cachette_core::upgrade::UpgradeKind;
+use cachette_core::upgrade::UpgradeCategory;
 use cachette_core::{Axial, Entity, FactionId, World, WorldConfig};
 use cachette_view::hud::{self, Readout};
 use cachette_view::metrics::Metrics;
@@ -119,7 +119,7 @@ fn a_stormed_world() -> (World, Axial) {
         !crowd.is_empty(),
         "the fixture put nobody on the tile, so the crowding overlay finds nothing",
     );
-    world.order_build_set(&crowd, UpgradeKind::ALL[0]);
+    world.order_build_set(&crowd, UpgradeCategory::ALL[0]);
     for _ in 0..BUILDING_TICKS {
         world.step(1).expect("the step must run");
     }

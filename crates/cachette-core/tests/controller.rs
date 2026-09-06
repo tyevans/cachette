@@ -138,20 +138,33 @@ fn the_controller_emits_only_through_the_set_verbs_and_logs_each_command() {
     assert_eq!(log.len(), 6, "two factions, three evaluations each");
     for entry in &log {
         assert_eq!(entry.tick.0, 1);
-        assert_eq!(entry.applied, 1, "a seated faction has units to order");
+        assert!(
+            entry.applied <= 1,
+            "the applied field says whether the command reached a unit"
+        );
         assert!(
             entry.kind <= 1,
             "only a gather order or a build order exists"
         );
     }
-    // The census sees the same six.
+    // A build order the ground refuses reaches nobody, and the controller
+    // learns nothing from it.[^1] A seated faction still orders something.
+    //
+    // [^1]: ADR-0151, an upgrade is a category with a ground fit and a level, decision D2. `docs/adrs/draft/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
+    assert!(
+        log.iter().any(|entry| entry.applied == 1),
+        "a seated faction has units to order"
+    );
+    // The census counts the commands a verb took, and the log says which
+    // ones those were.
     let census = world.subsystem_census();
     let commands = census
         .iter()
         .find(|(name, _)| *name == "controller_commands")
         .expect("the row exists")
         .1;
-    assert_eq!(commands, 6);
+    let applied = log.iter().filter(|entry| entry.applied == 1).count() as i64;
+    assert_eq!(commands, applied);
 }
 
 /// Collects the choice of one entry as a comparable pair.
@@ -470,7 +483,7 @@ fn the_set_verbs_count_what_the_arena_refuses() {
     assert!(!units.is_empty());
     let refused = world.order_gather_set(&units, cachette_core::resource::ResourceKind::Wood);
     assert_eq!(refused, 0);
-    let refused = world.order_build_set(&units, cachette_core::upgrade::UpgradeKind::Road);
+    let refused = world.order_build_set(&units, cachette_core::upgrade::UpgradeCategory::ROAD);
     assert_eq!(refused, 0);
     let dead = units[0];
     assert!(world.despawn_soldier(dead));

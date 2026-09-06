@@ -20,7 +20,7 @@ use cachette_core::resource::{Amount, RecoveryRules, ResourceKind};
 use cachette_core::site::CommodityId;
 use cachette_core::terrain::TileKind;
 use cachette_core::unit_type::{UnitTypeId, UnitTypeRow, WORKER_ROW};
-use cachette_core::upgrade::UpgradeKind;
+use cachette_core::upgrade::UpgradeCategory;
 use cachette_core::{Axial, Entity, FactionId, Fix32, Influence, WinPath, World, WorldConfig};
 
 /// Returns a worker row that fights with the given attack and armour.
@@ -211,7 +211,7 @@ fn run_with_wonder(threads: usize) -> (Vec<u8>, u64) {
         let unit = world
             .spawn_soldier(site, FactionId(0))
             .expect("the island admits a unit");
-        assert!(world.order_build(unit, UpgradeKind::Wonder));
+        assert!(world.order_build(unit, UpgradeCategory::WONDER).is_ok());
     }
     let elsewhere = open
         .iter()
@@ -221,7 +221,9 @@ fn run_with_wonder(threads: usize) -> (Vec<u8>, u64) {
     world
         .spawn_soldier(elsewhere, FactionId(1))
         .expect("the ground admits a unit");
-    let frames = UpgradeKind::Wonder.work() as u64 / u64::from(room) + 8;
+    let frames = cachette_core::DEFAULT_UPGRADE_TABLE.work_above(UpgradeCategory::WONDER, 0) as u64
+        / u64::from(room)
+        + 8;
     for _ in 0..frames {
         world.step(threads).expect("the step must run");
     }

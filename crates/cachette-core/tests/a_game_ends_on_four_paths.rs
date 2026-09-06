@@ -15,7 +15,7 @@
 
 use cachette_core::choose;
 use cachette_core::site::CommodityId;
-use cachette_core::upgrade::UpgradeKind;
+use cachette_core::upgrade::UpgradeCategory;
 use cachette_core::{
     Axial, Entity, FactionId, Fix32, World, WorldConfig, RENOWN_TARGET, STOCK_TARGET,
 };
@@ -327,7 +327,7 @@ fn a_wonder_ends_the_game_on_the_tick_it_completes_and_not_the_tick_before() {
             let unit = world
                 .spawn_soldier(site, FactionId(0))
                 .expect("the island admits a unit");
-            assert!(world.order_build(unit, UpgradeKind::Wonder));
+            assert!(world.order_build(unit, UpgradeCategory::WONDER).is_ok());
             unit
         })
         .collect();
@@ -338,7 +338,7 @@ fn a_wonder_ends_the_game_on_the_tick_it_completes_and_not_the_tick_before() {
     world
         .spawn_soldier(elsewhere, FactionId(1))
         .expect("the ground admits a unit");
-    let work = UpgradeKind::Wonder.work();
+    let work = cachette_core::DEFAULT_UPGRADE_TABLE.work_above(UpgradeCategory::WONDER, 0);
     let mut saw_one_short = false;
     let mut slowed = false;
     for _ in 0..(work as u64 + 8) {
@@ -361,12 +361,16 @@ fn a_wonder_ends_the_game_on_the_tick_it_completes_and_not_the_tick_before() {
                 work - 1
             );
         }
-        if progress >= work {
+        // The level rises in place and the work done returns to zero, so
+        // the loop reads the level and not the work done.[^2]
+        //
+        // [^2]: ADR-0151, an upgrade is a category with a ground fit and a level, decision D3. `docs/adrs/draft/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
+        if world.finished_upgrade(site) == Some(UpgradeCategory::WONDER) {
             break;
         }
     }
     assert!(saw_one_short, "the fixture never passed one unit short");
-    assert_eq!(world.finished_upgrade(site), Some(UpgradeKind::Wonder));
+    assert_eq!(world.finished_upgrade(site), Some(UpgradeCategory::WONDER));
     assert_eq!(
         world.tile_holder(site).and_then(|holder| holder.faction()),
         Some(FactionId(0)),

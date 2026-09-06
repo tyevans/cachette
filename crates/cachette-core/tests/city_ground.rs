@@ -24,7 +24,7 @@
 
 use cachette_core::holding::{Holder, ReachRules};
 use cachette_core::trade::Consideration;
-use cachette_core::upgrade::UpgradeKind;
+use cachette_core::upgrade::UpgradeCategory;
 use cachette_core::{Axial, Entity, FactionId, World, WorldConfig};
 
 /// The extent of the worlds below.
@@ -187,7 +187,7 @@ fn build_a_road(field: &mut World, address: Axial, faction: FactionId) -> Entity
         .spawn_soldier(address, faction)
         .expect("the ground admits a unit");
     assert!(
-        field.order_build(unit, UpgradeKind::Road),
+        field.order_build(unit, UpgradeCategory::ROAD).is_ok(),
         "the verb refused a road at {address:?}"
     );
     unit
@@ -232,10 +232,10 @@ fn a_finished_upgrade_extends_the_reach_by_one_step_and_never_past_the_cap() {
     );
 
     // The road finishes, and the reach grows by exactly one step.
-    for _ in 0..UpgradeKind::Road.work() {
+    for _ in 0..cachette_core::DEFAULT_UPGRADE_TABLE.work_above(UpgradeCategory::ROAD, 0) {
         field.step(1).expect("the step must run");
     }
-    assert_eq!(field.finished_upgrade(first), Some(UpgradeKind::Road));
+    assert_eq!(field.finished_upgrade(first), Some(UpgradeCategory::ROAD));
     assert_eq!(
         field.city_reach(site),
         Some(3),
@@ -251,10 +251,10 @@ fn a_finished_upgrade_extends_the_reach_by_one_step_and_never_past_the_cap() {
     // it. Without the cap the reach would answer four.
     let second = Axial::new(seat.q + 2, seat.r);
     build_a_road(&mut field, second, FactionId(0));
-    for _ in 0..=UpgradeKind::Road.work() {
+    for _ in 0..=cachette_core::DEFAULT_UPGRADE_TABLE.work_above(UpgradeCategory::ROAD, 0) {
         field.step(1).expect("the step must run");
     }
-    assert_eq!(field.finished_upgrade(second), Some(UpgradeKind::Road));
+    assert_eq!(field.finished_upgrade(second), Some(UpgradeCategory::ROAD));
     assert_eq!(
         field.city_reach(site),
         Some(rules.cap()),
@@ -290,25 +290,25 @@ fn the_verb_refuses_a_build_off_the_builders_own_ground_and_permits_a_road() {
         .spawn_soldier(seat, FactionId(1))
         .expect("the ground admits a unit");
     assert!(
-        !field.order_build(guest, UpgradeKind::Terrace),
+        field.order_build(guest, UpgradeCategory::TERRACE).is_err(),
         "the verb took a terrace on ground the builder does not hold"
     );
     assert_eq!(field.build_order(guest), Some(None));
     assert!(
-        field.order_build(guest, UpgradeKind::Road),
+        field.order_build(guest, UpgradeCategory::ROAD).is_ok(),
         "the verb refused a road, and a road is the exception"
     );
-    assert_eq!(field.build_order(guest), Some(Some(UpgradeKind::Road)));
+    assert_eq!(field.build_order(guest), Some(Some(UpgradeCategory::ROAD)));
 
     // The owner of the ground may build anything on it.
     let owner = field
         .spawn_soldier(seat, FactionId(0))
         .expect("the ground admits a unit");
-    assert!(field.order_build(owner, UpgradeKind::Terrace));
+    assert!(field.order_build(owner, UpgradeCategory::TERRACE).is_ok());
 
     // The set form counts what it refused, and that count is what the
     // controller reads.
-    let refused = field.order_build_set(&[guest], UpgradeKind::Terrace);
+    let refused = field.order_build_set(&[guest], UpgradeCategory::TERRACE);
     assert_eq!(refused, 1, "the set form took a build it must refuse");
 }
 
@@ -329,7 +329,7 @@ fn a_build_stops_when_the_ground_changes_hands() {
     let unit = field
         .spawn_soldier(seat, FactionId(0))
         .expect("the ground admits a unit");
-    assert!(field.order_build(unit, UpgradeKind::Terrace));
+    assert!(field.order_build(unit, UpgradeCategory::TERRACE).is_ok());
     field.step(1).expect("the step must run");
     let before = field
         .upgrade_at(seat)

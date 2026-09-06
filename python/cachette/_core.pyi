@@ -128,6 +128,29 @@ class UnitTypeColumns(TypedDict):
     command_reach: npt.NDArray[np.int64]
     weather_reach: npt.NDArray[np.int64]
 
+class UpgradeColumns(TypedDict):
+    """One column for each column of a row of the upgrade table.
+
+    Every column holds one entry for each row of the table. The rows run by
+    category and then by level, so the entry of a category at a level sits at
+    the category number times the level count, plus the level, minus one. The
+    keys are the column names the engine declares, in its order, and a test
+    asserts that this class and the engine agree.
+
+    The ground fit holds one bit for each ground kind, at the bit the ground
+    number names. A ground fit of zero says that the table holds no row there.
+    Every other column is a whole number, and a zero says that the row does
+    not change the thing the column names.
+    """
+
+    ground_fit: npt.NDArray[np.int64]
+    work: npt.NDArray[np.int64]
+    yield_change: npt.NDArray[np.int64]
+    capacity_change: npt.NDArray[np.int64]
+    capacity_of_store_change: npt.NDArray[np.int64]
+    victory_claim: npt.NDArray[np.int64]
+    own_ground_required: npt.NDArray[np.int64]
+
 class UnitStarvedColumns(TypedDict):
     """One column for each field of the starved event.
 
@@ -874,9 +897,23 @@ class World:
     def rationed_log_columns(self) -> SiteRationedColumns: ...
     def promoted_log_columns(self) -> UnitPromotedColumns: ...
     def soldier_tile(self, unit: int) -> int: ...
-    def order_build(self, units: Identities, kind: int) -> None: ...
+    def order_build(self, units: Identities, category: int) -> None: ...
     def stop_build(self, units: Identities) -> None: ...
     def build_order(self, unit: int) -> int | None: ...
+    def upgrade_table(self) -> UpgradeColumns: ...
+    def define_upgrade_row(
+        self,
+        category: int,
+        level: int,
+        *,
+        ground_fit: int,
+        work: int,
+        yield_change: int,
+        capacity_change: int,
+        capacity_of_store_change: int,
+        victory_claim: int,
+        own_ground_required: int,
+    ) -> None: ...
     def destroy_upgrades(self, addresses: Sequence[tuple[int, int]]) -> int: ...
     def return_direction(self, faction: int, q: int, r: int) -> int | None: ...
     @staticmethod

@@ -5,3 +5,4 @@
 # It is recommended to check this file in to source control so that
 # everyone who runs the test benefits from these saved cases.
 cc 301217a4ed1ffc1d26a1040c5c3713784fff540e0b6d7a838c7fdd1a30fbe360 # shrinks to crowd = 1, ticks = 1, kind_at = 1
+cc eee2d683ade998d393b32e5b35960a2a2cdbc3f74a19ce3d89b88c41f0ff9db2 # shrinks to crowd = 1, ticks = 1, kind_at = 1

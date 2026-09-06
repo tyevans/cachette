@@ -111,7 +111,7 @@ content that a caller supplies.
 
 [^1]: ADR-0066, entity storage holds four fixed shapes, decision D1. `docs/adrs/accepted/adr-0066-entity-storage-holds-four-fixed-shapes.md`
 [^2]: Project orientation, the design principles. `CLAUDE.md`
-[^3]: Backlog item 0348, make the upgrade catalogue a table the world is built with. `docs/backlog/proposed/0348-make-the-upgrade-catalogue-a-table-the-world-is-built-with.md`
+[^3]: Backlog item 0348, make the upgrade catalogue a table the world is built with. `docs/backlog/complete/0348-make-the-upgrade-catalogue-a-table-the-world-is-built-with.md`
 [^4]: Research report 21, what a god needs from this engine, section 4.5. `docs/research/reports/21-what-a-god-needs.md`
 [^5]: ADR-0121, a meeting between two factions resolves at the tile, decision D3. `docs/adrs/draft/adr-0121-a-meeting-between-two-factions-resolves-at-the-tile.md`
 [^6]: Decision Record Scope, section 4.1. `.claude/rules/adr-scope.md`

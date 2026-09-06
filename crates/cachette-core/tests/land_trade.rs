@@ -17,7 +17,7 @@
 
 use cachette_core::holding::{Holder, ReachRules};
 use cachette_core::terrain::TileKind;
-use cachette_core::upgrade::UpgradeKind;
+use cachette_core::upgrade::UpgradeCategory;
 use cachette_core::{
     Advert, Axial, Consideration, FactionId, Tick, TileIdx, TradeError, World, WorldConfig,
     ACT_SETTLE, ACT_STEP_RELATION, ACT_TRANSFER_LAND, ADVERT_OFFERS, ADVERT_WANTS, TRADE_BOUND,
@@ -348,7 +348,7 @@ fn a_land_side_whose_tile_carries_an_upgrade_is_refused() {
     let builder = world
         .spawn_soldier(address_of(&world, site), ZERO)
         .expect("the spawn must succeed");
-    assert!(world.order_build(builder, UpgradeKind::Road));
+    assert!(world.order_build(builder, UpgradeCategory::ROAD).is_ok());
     for _ in 0..12 {
         if world.upgrade_at(address_of(&world, site)).is_some() {
             break;

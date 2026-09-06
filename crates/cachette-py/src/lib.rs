@@ -20,7 +20,7 @@ use cachette_core::founding::FoundingOutcome;
 use cachette_core::hex::NEIGHBOURS;
 use cachette_core::luxury::{LuxuryId, LUXURY_CEILING};
 use cachette_core::unit_type::{UnitTypeId, UnitTypeRow};
-use cachette_core::upgrade::UpgradeKind;
+use cachette_core::upgrade::{UpgradeCategory, UpgradeRow};
 use cachette_core::TileIdx;
 use cachette_core::{Advert, Consideration, KIND_LAND, KIND_RELATION, KIND_RESOURCE};
 use cachette_core::{
@@ -1337,6 +1337,105 @@ impl PyWorld {
         Ok(columns)
     }
 
+    /// Returns the upgrade table, as a `dict` of NumPy arrays.
+    ///
+    /// The table holds one row for each pair of a category and a level. A row
+    /// names the ground it fits, the work it takes and what it changes.[^1]
+    ///
+    /// Each key is a column name and each value is a `numpy.int64` array with
+    /// one entry for each row. The rows run by category and then by level, so
+    /// the entry of a category at a level sits at the category number times
+    /// the level count, plus the level, minus one.
+    ///
+    /// The `ground_fit` column holds one bit for each ground kind, at the bit
+    /// the ground number names. A `ground_fit` of zero says that the table
+    /// holds no row there.
+    ///
+    /// **The names come from the Rust row declaration.** A test asserts that
+    /// the type stub names the same columns, so no second list can rot.[^2]
+    ///
+    /// This method copies each column.[^3]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0151, an upgrade is a category with a ground fit and a level, decision D1. `docs/adrs/draft/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
+    /// [^2]: Recurring defect shapes, shape 1. `.agents/rules/recurring-defects.md`
+    /// [^3]: ADR-0044, what copies and what does not is declared at the call site. `docs/adrs/REGISTRY.md`
+    fn upgrade_table<'py>(&self, python: Python<'py>) -> PyResult<Bound<'py, PyDict>> {
+        let world = self.lock();
+        let rows = world.upgrade_table().rows();
+        let columns = PyDict::new(python);
+        // The names and the values both come from the row declaration, so
+        // the dictionary cannot name a column the row does not hold.
+        for (index, name) in UpgradeRow::COLUMN_NAMES.iter().enumerate() {
+            let column: Vec<i64> = rows.iter().map(|row| row.columns()[index]).collect();
+            columns.set_item(name, column.to_pyarray(python))?;
+        }
+        Ok(columns)
+    }
+
+    /// Writes one row of the upgrade table.
+    ///
+    /// The category is a row group, as a Python integer. The level is one or
+    /// two. The caller gives every column. There is no partial form, because
+    /// a caller that gave two columns would leave the rest at zero and would
+    /// define an upgrade that changes nothing else without knowing it.[^1]
+    ///
+    /// A `ground_fit` of zero removes the row. A build order that names a
+    /// category with no row at the next level is refused.
+    ///
+    /// **The values are content and not a budget.** A game sets them, and no
+    /// record holds one.[^2]
+    ///
+    /// # Errors
+    ///
+    /// Raises `VerbError` when the number names no category, and when the
+    /// level is not one the table holds.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0145, a unit type is a row of capability columns, and zero means cannot, decision D5. `docs/adrs/accepted/adr-0145-a-unit-type-is-a-row-of-capability-columns-and-zero-means-cannot.md`
+    /// [^2]: Decision Record Scope, section 4.1. `.agents/rules/adr-scope.md`
+    #[pyo3(signature = (
+        category,
+        level,
+        *,
+        ground_fit,
+        work,
+        yield_change,
+        capacity_change,
+        capacity_of_store_change,
+        victory_claim,
+        own_ground_required,
+    ))]
+    #[allow(clippy::too_many_arguments)]
+    fn define_upgrade_row(
+        &self,
+        category: u8,
+        level: u8,
+        ground_fit: u32,
+        work: u32,
+        yield_change: u32,
+        capacity_change: u32,
+        capacity_of_store_change: u32,
+        victory_claim: u32,
+        own_ground_required: u32,
+    ) -> PyResult<()> {
+        let mut world = self.lock();
+        let row = UpgradeRow {
+            ground_fit,
+            work,
+            yield_change,
+            capacity_change,
+            capacity_of_store_change,
+            victory_claim,
+            own_ground_required,
+        };
+        world
+            .define_upgrade_row(category, level, row)
+            .map_err(|error| VerbError::new_err(error.to_string()))
+    }
+
     /// Returns the starved log of the last step, as a `dict` of NumPy arrays.
     ///
     /// A starved event says that a shortage ended one unit. The engine writes
@@ -1645,19 +1744,26 @@ impl PyWorld {
             .ok_or_else(|| ViewError::new_err(format!("the identity {unit} names no live soldier")))
     }
 
-    /// Tells every soldier the identities name to build a kind of upgrade.
+    /// Tells every soldier the identities name to build one category of
+    /// upgrade.
     ///
     /// The units are a sequence of identities, or the NumPy array of
     /// `numpy.uint64` that `spawn_soldiers` returned. Returns `None`.
     ///
-    /// The kind is the upgrade kind, as an integer. A road is zero, a terrace
-    /// is one, a wonder is two and a store is three. The argument has no
-    /// default. A road lets more units stand on the tile. A terrace lets a
-    /// unit take more from the tile in one step. A wonder asks for a large
-    /// amount of work, and its completion wins the game for the faction that
-    /// holds the ground under it.[^6] A store raises the store capacity of a
-    /// settlement on or beside its tile, and **nothing in the engine reads
-    /// that raise today**. Read `site_economy` for the sum.
+    /// The category is a row group of the upgrade table, as an integer. A
+    /// road is zero, a terrace is one, a wonder is two, a store is three and
+    /// a wall is four. The argument has no default. A road lets more units
+    /// stand on the tile. A terrace lets a unit take more from the tile in
+    /// one step. A wonder asks for a large amount of work, and its completion
+    /// wins the game for the faction that holds the ground under it.[^6] A
+    /// store raises the store capacity of a settlement on or beside its tile,
+    /// and **nothing in the engine reads that raise today**. Read
+    /// `site_economy` for the sum.
+    ///
+    /// **The order names no level.** The engine reads the ground under each
+    /// tile and the level that stands there, and it resolves the row of the
+    /// table for the next level. It refuses a tile that no row fits.[^7] Read
+    /// `upgrade_table` for the ground each row fits and the work it takes.
     ///
     /// Each soldier adds to the upgrade on the tile it stands on, at every
     /// step, until something stops it. A soldier does not have to stay. A
@@ -1672,13 +1778,12 @@ impl PyWorld {
     /// The call gives the order and builds nothing. Step the world to make
     /// the soldiers build.
     ///
-    /// **The kind here is an upgrade kind. It is not a resource kind and it
-    /// is not a ground kind.** More than one scale in this module carries the
-    /// name `kind`, and each of them starts at zero. The call accepts every
-    /// resource kind. It accepts the ground kinds of water, plain, forest and
-    /// hill. Each of those numbers also names an upgrade kind. It raises
-    /// nothing, and the soldiers build the wrong thing. The engine sees a
-    /// number and not the scale the caller meant.[^3]
+    /// **The category here is an upgrade category. It is not a resource kind
+    /// and it is not a ground kind.** More than one scale in this module
+    /// starts at zero. The call accepts every resource kind, and each of
+    /// those numbers also names an upgrade category. It raises nothing, and
+    /// the soldiers build the wrong thing. The engine sees a number and not
+    /// the scale the caller meant.[^3]
     ///
     /// **The engine does not check who holds the ground.** A soldier builds
     /// on the tile it stands on, whatever faction holds that tile. A caller
@@ -1697,9 +1802,10 @@ impl PyWorld {
     /// # Errors
     ///
     /// Raises `ViewError` when an identity names no live soldier. Raises
-    /// `VerbError` when the number is four or above, because that names no
-    /// upgrade kind. The message names the number that refused. Raises
-    /// `VerbError` when a unit's type has a build rate of zero.
+    /// `VerbError` when the number names no category of the table. The
+    /// message names the number that refused. Raises `VerbError` when a
+    /// unit's type has a build rate of zero. Raises `VerbError` when the
+    /// engine refuses an order, and the message states the refusal.
     ///
     /// # References
     ///
@@ -1709,10 +1815,11 @@ impl PyWorld {
     /// [^4]: Findings register, FND-380. `docs/FINDINGS.md`
     /// [^5]: ADR-0145, a unit type is a row of capability columns, and zero means cannot, decision D2. `docs/adrs/accepted/adr-0145-a-unit-type-is-a-row-of-capability-columns-and-zero-means-cannot.md`
     /// [^6]: ADR-0148, a game end is recorded once and stops the controllers, decision D3. `docs/adrs/accepted/adr-0148-a-game-end-is-recorded-once-and-stops-the-controllers.md`
-    fn order_build(&self, units: Vec<u64>, kind: u8) -> PyResult<()> {
+    /// [^7]: ADR-0151, an upgrade is a category with a ground fit and a level, decision D2. `docs/adrs/draft/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
+    fn order_build(&self, units: Vec<u64>, category: u8) -> PyResult<()> {
         let mut world = self.lock();
-        let kind = UpgradeKind::from_u8(kind)
-            .ok_or_else(|| VerbError::new_err(format!("{kind} names no upgrade kind")))?;
+        let category = UpgradeCategory::from_u8(category)
+            .ok_or_else(|| VerbError::new_err(format!("{category} names no upgrade category")))?;
         let mut resolved = Vec::with_capacity(units.len());
         for unit in &units {
             let entity = resolve(&world, *unit)?;
@@ -1728,17 +1835,18 @@ impl PyWorld {
         }
         // The set form is the one path the controller takes too, so one loop
         // serves both callers.
-        let refused = world.order_build_set(&resolved, kind);
-        // A build outside the builder's own ground is refused, unless the
-        // kind is a road.[^6] The verb answers with a count, and the boundary
-        // turns that count into an error rather than a silent partial order.
+        let (refused, reason) = world.order_build_set_reporting(&resolved, category);
+        // The engine refuses a ground the row does not fit, a category at its
+        // top, a tile that carries another category, and a build outside the
+        // builder's own ground.[^8] The verb answers with a count and the
+        // first refusal, and the boundary turns those into an error rather
+        // than a silent partial order.
         //
-        // [^6]: ADR-0150, held ground is the ground within reach of a city its faction owns, decision D4. `docs/adrs/draft/adr-0150-held-ground-is-the-ground-within-reach-of-a-city-its-faction-owns.md`
+        // [^8]: ADR-0151, an upgrade is a category with a ground fit and a level, decision D2. `docs/adrs/draft/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
         if refused > 0 {
+            let reason = reason.map_or_else(String::new, |refusal| refusal.to_string());
             return Err(VerbError::new_err(format!(
-                "the world refused {refused} of {} build orders, because a unit \
-                 builds only on ground its own faction holds, and only a road \
-                 elsewhere",
+                "the world refused {refused} of {} build orders: {reason}",
                 resolved.len()
             )));
         }
@@ -1786,9 +1894,9 @@ impl PyWorld {
     /// The unit is one identity, as a Python integer. Take an entry of the
     /// array that `spawn_soldiers` returned.
     ///
-    /// The result is the upgrade kind that `order_build` took: a road is
-    /// zero, a terrace is one, a wonder is two and a store is three. The
-    /// result is `None` when the soldier builds nothing.
+    /// The result is the upgrade category that `order_build` took: a road is
+    /// zero, a terrace is one, a wonder is two, a store is three and a wall
+    /// is four. The result is `None` when the soldier builds nothing.
     ///
     /// **This read stays singular while the write verbs take a set.** A set
     /// form must choose. It fails the whole call for one dead identity, or
@@ -1810,7 +1918,7 @@ impl PyWorld {
         let order = world.build_order(entity).ok_or_else(|| {
             ViewError::new_err(format!("the identity {unit} names no live soldier"))
         })?;
-        Ok(order.map(UpgradeKind::to_u8))
+        Ok(order.map(UpgradeCategory::to_u8))
     }
 
     /// Removes the upgrade at each address and returns how many it removed.
@@ -2617,17 +2725,20 @@ impl PyWorld {
     ///   integer. Divide by 65536.**
     /// - `holder`, an integer or `None`. The faction that holds the ground,
     ///   and `None` for ground that nobody holds.[^1]
-    /// - `upgrade`, an integer or `None`. The upgrade the tile carries,
-    ///   finished or under construction, and `None` for a tile that carries
-    ///   none. A road is zero, a terrace is one, a wonder is two and a store
-    ///   is three.
-    /// - `upgrade_progress`, an integer. The work that has gone into that
-    ///   upgrade, and zero for a tile that carries none. The number never
-    ///   rises above the work its kind asks for.[^2]
-    /// - `upgrade_complete`, a `bool`. Whether that upgrade is finished.
+    /// - `upgrade`, an integer or `None`. The category the tile carries,
+    ///   standing or under construction, and `None` for a tile that carries
+    ///   none. A road is zero, a terrace is one, a wonder is two, a store is
+    ///   three and a wall is four.
+    /// - `upgrade_level`, an integer. The level that stands on the tile, and
+    ///   zero when nothing stands there yet.
+    /// - `upgrade_progress`, an integer. The work that has gone into the next
+    ///   level, and zero for a tile that carries none. The number never rises
+    ///   above the work that the next row asks for, and it returns to zero
+    ///   when the level rises.[^2]
+    /// - `upgrade_complete`, a `bool`. Whether a level stands on the tile.
     ///   `False` for a tile that carries none.
     ///
-    /// The three upgrade entries are what a watcher of a build reads. An
+    /// The four upgrade entries are what a watcher of a build reads. An
     /// unfinished upgrade changes nothing else in this report, so a caller
     /// that watches only the capacity sees nothing until the build ends.[^3]
     ///
@@ -2693,9 +2804,10 @@ impl PyWorld {
         }
         let site = world.upgrade_at(address);
         match site {
-            Some(site) => report.set_item("upgrade", site.kind.to_u8())?,
+            Some(site) => report.set_item("upgrade", site.category.to_u8())?,
             None => report.set_item("upgrade", python.None())?,
         }
+        report.set_item("upgrade_level", site.map_or(0, |site| site.level))?;
         report.set_item("upgrade_progress", site.map_or(0, |site| site.progress.0))?;
         report.set_item(
             "upgrade_complete",

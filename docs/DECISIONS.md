@@ -85,10 +85,14 @@ rather than by default.
 
 ### DEC-143 — Is an upgrade kind a variant in the engine, or a row in a catalogue the world is built with?
 
-**Open. Engineering owns it.**
+**Closed on 5 September 2026. Option B: the kind is a row of a table the world
+is built with.** A record holds the constraint, and item 0486 landed it.[^D143A]
+[^D143B] A row is one category at one level. It names the ground it fits, the
+work it takes and the columns a pass reads. A caller writes a row through the
+boundary, and no pass branches on a category.
 
-The engine holds two upgrade kinds as a Rust enumeration, and each carries a
-fixed work cost. A game that wants a shrine cannot add one from Python.
+The engine held two upgrade kinds as a Rust enumeration, and each carried a
+fixed work cost. A game that wanted a shrine could not add one from Python.
 
 **Option A. Leave it an enumeration.** A new kind is an engine change and a new
 release.
@@ -4344,3 +4348,5 @@ exactly so that a caller cannot build a wrong one.[^DEC120C]
 [^DEC237D]: ADR-0109, the choice key holds a bounded class of the unit's own state, decision D3. `docs/adrs/draft/adr-0109-the-choice-key-holds-a-bounded-class-of-the-unit-state.md`
 [^DEC237E]: PRD-0004, the world has weather that a watcher can read, what good looks like. `docs/product/accepted/prd-0004-the-world-has-weather-that-a-watcher-can-read.md`
 [^DEC238A]: ADR-0141, a weather pass moves water and never scales it, decision D2. `docs/adrs/draft/adr-0141-a-weather-pass-moves-water-and-never-scales-it.md`
+[^D143A]: ADR-0151, an upgrade is a category with a ground fit and a level, decisions D1 and D6. `docs/adrs/draft/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
+[^D143B]: Backlog item 0486. `docs/backlog/complete/0486-turn-the-upgrade-kind-into-a-table-of-category-ground-fit-and-level.md`

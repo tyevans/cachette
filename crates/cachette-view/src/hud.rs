@@ -1932,12 +1932,14 @@ fn tile_lines(tile: Option<&TileReadout>) -> Vec<Line> {
 /// [^1]: ADR-0094, the caller owns the camera and the pixels, decision D5. `docs/adrs/draft/adr-0094-the-caller-owns-the-camera-and-the-pixels.md`
 /// [^2]: Recurring Defect Shapes, shape 1. `.claude/rules/recurring-defects.md`
 #[must_use]
-pub const fn upgrade_name(kind: cachette_core::upgrade::UpgradeKind) -> &'static str {
+pub const fn upgrade_name(kind: cachette_core::upgrade::UpgradeCategory) -> &'static str {
     match kind {
-        cachette_core::upgrade::UpgradeKind::Road => "road",
-        cachette_core::upgrade::UpgradeKind::Terrace => "terrace",
-        cachette_core::upgrade::UpgradeKind::Wonder => "wonder",
-        cachette_core::upgrade::UpgradeKind::Store => "store",
+        cachette_core::upgrade::UpgradeCategory::ROAD => "road",
+        cachette_core::upgrade::UpgradeCategory::TERRACE => "terrace",
+        cachette_core::upgrade::UpgradeCategory::WONDER => "wonder",
+        cachette_core::upgrade::UpgradeCategory::STORE => "store",
+        cachette_core::upgrade::UpgradeCategory::WALL => "wall",
+        _ => "upgrade",
     }
 }
 

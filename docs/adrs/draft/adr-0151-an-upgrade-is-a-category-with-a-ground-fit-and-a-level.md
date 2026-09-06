@@ -237,7 +237,7 @@ table for the demonstration and the balance register holds its rows.[^17]
 [^3]: ADR-0120, a unit carries a type, and the type is an index into a table the world is built with, decisions D1 and D3. `docs/adrs/draft/adr-0120-a-unit-carries-a-type-that-indexes-a-table.md`
 [^4]: ADR-0145, a unit type is a row of capability columns, and zero means cannot, decisions D1 and D2. `docs/adrs/accepted/adr-0145-a-unit-type-is-a-row-of-capability-columns-and-zero-means-cannot.md`
 [^5]: Decisions register, DEC-143. `docs/DECISIONS.md`
-[^6]: Backlog item 0348. `docs/backlog/proposed/0348-make-the-upgrade-catalogue-a-table-the-world-is-built-with.md`
+[^6]: Backlog item 0348. `docs/backlog/complete/0348-make-the-upgrade-catalogue-a-table-the-world-is-built-with.md`
 [^7]: PRD-0055, a god raises the ground its people hold, and sees what stands there. `docs/product/shaped/prd-0055-a-god-raises-the-ground-its-people-hold-and-sees-what-stands-there.md`
 [^8]: Backlog item 0475. `docs/backlog/proposed/0475-give-an-upgrade-a-condition-that-armies-wear-and-workers-repair.md`
 [^9]: Backlog item 0479. `docs/backlog/complete/0479-end-the-game-on-domination-wealth-wonder-or-renown.md`

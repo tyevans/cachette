@@ -43,7 +43,7 @@ use crate::resource::{ResourceKind, RESOURCE_KIND_COUNT};
 use crate::rng;
 use crate::trade::{Advert, ADVERT_OFFERS, ADVERT_WANTS};
 use crate::types::{Entity, FactionId, Tick, TileIdx};
-use crate::upgrade::{UpgradeKind, UPGRADE_KIND_COUNT};
+use crate::upgrade::{UpgradeCategory, UPGRADE_CATEGORY_COUNT};
 
 /// The lowest weight the seeding layer draws.
 ///
@@ -384,7 +384,7 @@ pub enum Choice {
     /// Order the units of the faction to gather one kind.
     Gather(ResourceKind),
     /// Order the units of the faction to build one kind.
-    Build(UpgradeKind),
+    Build(UpgradeCategory),
     /// Move the relation of the faction toward another by one step.
     Relation(FactionId),
     /// Raise a campaign of one objective kind against one tile.
@@ -500,8 +500,8 @@ pub fn evaluate(
     let roll = ((u128::from(raw) * u128::from(bound)) >> 64) as u64;
     let high = (raw >> 32) as u32;
     if roll < u64::from(weights.build) {
-        let index = (high % UPGRADE_KIND_COUNT as u32) as u8;
-        Choice::Build(UpgradeKind::from_u8(index).expect("the index is below the count"))
+        let index = (high % UPGRADE_CATEGORY_COUNT as u32) as u8;
+        Choice::Build(UpgradeCategory::from_u8(index).expect("the index is below the count"))
     } else {
         let index = (high % RESOURCE_KIND_COUNT as u32) as u8;
         Choice::Gather(ResourceKind::from_u8(index).expect("the index is below the count"))

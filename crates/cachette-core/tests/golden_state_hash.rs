@@ -24,7 +24,7 @@ use cachette_core::site::CommodityId;
 use cachette_core::terrain::TileKind;
 use cachette_core::types::{FactionId, Fix32};
 use cachette_core::unit_type::{UnitTypeId, UnitTypeRow, WORKER_ROW};
-use cachette_core::upgrade::UpgradeKind;
+use cachette_core::upgrade::UpgradeCategory;
 use cachette_core::{Axial, WinPath, World, WorldConfig};
 
 /// Returns a worker row that fights with the given attack and armour.
@@ -354,7 +354,7 @@ fn wonder(world: &mut World) {
         let unit = world
             .spawn_soldier(site, FactionId(0))
             .expect("the island admits a unit");
-        assert!(world.order_build(unit, UpgradeKind::Wonder));
+        assert!(world.order_build(unit, UpgradeCategory::WONDER).is_ok());
     }
     let elsewhere = open
         .iter()

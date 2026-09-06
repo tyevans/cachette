@@ -56,7 +56,7 @@
 
 use cachette_core::resource::ResourceKind;
 use cachette_core::terrain::TerrainTile;
-use cachette_core::upgrade::{UpgradeKind, UPGRADE_KIND_COUNT};
+use cachette_core::upgrade::{UpgradeCategory, UPGRADE_CATEGORY_COUNT};
 use cachette_core::weather::Drops;
 use cachette_core::{Axial, FactionId, Holder, World};
 
@@ -431,7 +431,7 @@ impl Layer for Upgrade {
 
     fn value(&self, at: At<'_>) -> i64 {
         at.world.upgrade_at(at.address).map_or(0, |site| {
-            let level = i64::try_from(site.kind.index()).unwrap_or(0) + 1;
+            let level = i64::try_from(site.category.index()).unwrap_or(0) + 1;
             if site.is_complete() {
                 level
             } else {
@@ -441,12 +441,12 @@ impl Layer for Upgrade {
     }
 
     fn span(&self, _world: &World) -> Span {
-        Span::new(0, i64::try_from(UPGRADE_KIND_COUNT).unwrap_or(1))
+        Span::new(0, i64::try_from(UPGRADE_CATEGORY_COUNT).unwrap_or(1))
     }
 
     fn colour(&self, value: i64) -> u32 {
         let level = usize::try_from(value.abs() - 1).unwrap_or(0);
-        UpgradeKind::ALL
+        UpgradeCategory::ALL
             .get(level)
             .map_or(NOTHING_NAMED, |kind| upgrade_colour(*kind))
     }

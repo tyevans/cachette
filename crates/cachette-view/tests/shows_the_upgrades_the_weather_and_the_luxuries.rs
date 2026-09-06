@@ -18,7 +18,7 @@
 
 use cachette_core::luxury::LuxuryId;
 use cachette_core::resource::ResourceKind;
-use cachette_core::upgrade::UpgradeKind;
+use cachette_core::upgrade::UpgradeCategory;
 use cachette_core::{Axial, Entity, FactionId, Holder, World, WorldConfig};
 use cachette_view::hud::TileReadout;
 use cachette_view::paint;
@@ -513,7 +513,7 @@ fn a_building_site_changes_the_tile_it_stands_on() {
                 == Some(FactionId(0))
         })
         .expect("a soldier stands on held ground");
-    assert!(building.order_build(builder, UpgradeKind::Road));
+    assert!(building.order_build(builder, UpgradeCategory::ROAD).is_ok());
     building.step(1).expect("the step must run");
     idle.step(1).expect("the step must run");
 
@@ -584,8 +584,8 @@ fn a_site_under_work_marks_the_middle_and_a_finished_site_washes_the_tile() {
     let mut begun = world.clone();
     let mut finished = world;
     let builder = a_builder(&begun, &soldiers);
-    assert!(begun.order_build(builder, UpgradeKind::Road));
-    assert!(finished.order_build(builder, UpgradeKind::Road));
+    assert!(begun.order_build(builder, UpgradeCategory::ROAD).is_ok());
+    assert!(finished.order_build(builder, UpgradeCategory::ROAD).is_ok());
     begun.step(1).expect("the step must run");
     let site = begun
         .upgrade_sites()
@@ -657,9 +657,9 @@ fn each_kind_of_build_site_draws_its_own_glyph() {
     let bare_corner = corner_of(&drawn_at(&world, address, SITE_TILE), bare_camera, address);
 
     let mut colours = Vec::new();
-    for kind in UpgradeKind::ALL {
+    for kind in UpgradeCategory::ALL {
         let mut building = world.clone();
-        assert!(building.order_build(builder, kind));
+        assert!(building.order_build(builder, kind).is_ok());
         building.step(1).expect("the step must run");
         // The builder stands on the site, and its disc is wider than the
         // glyph, so it would cover the mark this test reads. The fixture
@@ -671,7 +671,7 @@ fn each_kind_of_build_site_draws_its_own_glyph() {
         assert!(
             building
                 .upgrade_at(address)
-                .is_some_and(|site| { site.kind == kind && !site.is_complete() }),
+                .is_some_and(|site| { site.category == kind && !site.is_complete() }),
             "the order for {kind:?} placed no site under work at {address:?}"
         );
         let camera = camera_at(&building, address, SITE_TILE);

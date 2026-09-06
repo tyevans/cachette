@@ -32,7 +32,7 @@ use crate::hex::{Axial, Grid};
 use crate::resource::{Amount, CarryLoad, ResourceKind};
 use crate::types::{Entity, FactionId, Fix32, TileIdx, FACTION_CEILING};
 use crate::unit_type::{UnitTypeId, DEFAULT_UNIT_TYPE, UNIT_TYPE_COUNT};
-use crate::upgrade::UpgradeKind;
+use crate::upgrade::UpgradeCategory;
 
 /// The generation that means a slot carries no identity.
 ///
@@ -165,11 +165,11 @@ const NO_BUILD: u8 = 0;
 pub const DEFAULT_DEED_THRESHOLD: u64 = 24;
 
 /// Returns the build order that a column value names.
-const fn build_of(value: u8) -> Option<UpgradeKind> {
+const fn build_of(value: u8) -> Option<UpgradeCategory> {
     if value == NO_BUILD {
         return None;
     }
-    UpgradeKind::from_u8(value - 1)
+    UpgradeCategory::from_u8(value - 1)
 }
 
 /// The largest generation that a slot can hold.
@@ -1258,7 +1258,7 @@ impl SoldierArena {
     /// The outer option reports whether the identity is live. The inner one
     /// reports whether the soldier builds.
     #[must_use]
-    pub fn build_order(&self, entity: Entity) -> Option<Option<UpgradeKind>> {
+    pub fn build_order(&self, entity: Entity) -> Option<Option<UpgradeCategory>> {
         let slot = self.slot_of(entity)?;
         Some(build_of(self.builds[slot as usize]))
     }
@@ -1271,7 +1271,7 @@ impl SoldierArena {
     /// An order is not a structural fact, so it does not raise the revision.
     /// The derived unit structure maps a tile to the units on it, and an
     /// order moves no unit.
-    pub fn set_build_order(&mut self, entity: Entity, kind: Option<UpgradeKind>) -> bool {
+    pub fn set_build_order(&mut self, entity: Entity, kind: Option<UpgradeCategory>) -> bool {
         let Some(slot) = self.slot_of(entity) else {
             return false;
         };
@@ -1674,7 +1674,7 @@ impl SoldierArena {
         if self
             .builds
             .iter()
-            .any(|order| *order != NO_BUILD && UpgradeKind::from_u8(*order - 1).is_none())
+            .any(|order| *order != NO_BUILD && UpgradeCategory::from_u8(*order - 1).is_none())
         {
             return false;
         }
