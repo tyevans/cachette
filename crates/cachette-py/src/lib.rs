@@ -1621,6 +1621,7 @@ impl PyWorld {
         yield_change,
         capacity_change,
         capacity_of_store_change,
+        housing_change,
         victory_claim,
         own_ground_required,
     ))]
@@ -1634,6 +1635,7 @@ impl PyWorld {
         yield_change: u32,
         capacity_change: u32,
         capacity_of_store_change: u32,
+        housing_change: u32,
         victory_claim: u32,
         own_ground_required: u32,
     ) -> PyResult<()> {
@@ -1644,6 +1646,7 @@ impl PyWorld {
             yield_change,
             capacity_change,
             capacity_of_store_change,
+            housing_change,
             victory_claim,
             own_ground_required,
         };

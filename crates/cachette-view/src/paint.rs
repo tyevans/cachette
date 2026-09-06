@@ -60,7 +60,8 @@ use crate::tween::{between, Motion, Pace};
 /// number.
 ///
 /// A road is ochre, a terrace is green, a wonder is pale gold, a store is
-/// dark brown, a wall is grey and the open category is violet. The table is
+/// dark brown, a wall is grey, a lodging is terracotta and the open category
+/// is violet. The table is
 /// indexed by the number the core gives each category, so a category that
 /// joins the core without a row here fails to compile rather than drawing in
 /// a colour nobody chose.
@@ -70,6 +71,7 @@ const UPGRADE_COLOURS: [u32; UPGRADE_CATEGORY_COUNT] = [
     0x00f0_e0a0,
     0x0078_5030,
     0x0090_9098,
+    0x00d0_6a4a,
     0x00a0_60c0,
 ];
 
@@ -102,6 +104,8 @@ enum SiteGlyph {
     Block,
     /// A bar along the bottom with a merlon at each end.
     Battlement,
+    /// A gable: a peak over a solid base.
+    Gable,
     /// A hollow square.
     Ring,
 }
@@ -129,6 +133,8 @@ const UPGRADE_GLYPHS: [SiteGlyph; UPGRADE_CATEGORY_COUNT] = [
     SiteGlyph::Block,
     // A wall is a defence: a bar with a merlon at each end.
     SiteGlyph::Battlement,
+    // A lodging is a place to live: a gable over a solid base.
+    SiteGlyph::Gable,
     // The open category: a hollow square.
     SiteGlyph::Ring,
 ];
@@ -2451,6 +2457,22 @@ fn mark_site(canvas: &mut Canvas, left: i32, top: i32, wide: i32, tall: i32, sit
             canvas.fill_rect(x, y + side - bar * 2, side, bar * 2, colour);
             canvas.fill_rect(x, y + bar, bar, side - bar * 3, colour);
             canvas.fill_rect(x + side - bar, y + bar, bar, side - bar * 3, colour);
+        }
+        SiteGlyph::Gable => {
+            // The roof is a triangle over the upper half, and the wall is a
+            // solid block under it.
+            let half = side / 2;
+            for row in 0..half {
+                let reach = row;
+                canvas.fill_rect(x + half - reach, y + row, reach * 2 + 1, 1, colour);
+            }
+            canvas.fill_rect(
+                x + bar,
+                y + half,
+                (side - bar * 2).max(1),
+                side - half,
+                colour,
+            );
         }
         SiteGlyph::Ring => {
             canvas.fill_rect(x + bar, y + bar, side - bar * 2, bar, colour);

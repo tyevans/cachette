@@ -174,6 +174,7 @@ class UpgradeColumns(TypedDict):
     yield_change: npt.NDArray[np.int64]
     capacity_change: npt.NDArray[np.int64]
     capacity_of_store_change: npt.NDArray[np.int64]
+    housing_change: npt.NDArray[np.int64]
     victory_claim: npt.NDArray[np.int64]
     own_ground_required: npt.NDArray[np.int64]
 
@@ -988,6 +989,7 @@ class World:
         yield_change: int,
         capacity_change: int,
         capacity_of_store_change: int,
+        housing_change: int,
         victory_claim: int,
         own_ground_required: int,
     ) -> None: ...
