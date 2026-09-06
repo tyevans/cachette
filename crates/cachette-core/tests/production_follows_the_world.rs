@@ -16,11 +16,13 @@
 //! typical case would supply no extreme, and the assertion would then measure
 //! the fixture.[^3]
 //!
-//! **The weather test holds the other three inputs still by construction,
-//! and then checks that it did.** It seats sites across the world and spawns
-//! no unit, so nothing draws a disc down and nothing builds. A fixture that
-//! searched one run for a matching pair would depend on the seed, and a seed
-//! is not a fixture.
+//! **Each fixture holds the other three inputs still by construction, and
+//! then checks that it did.** The weather test seats sites across the world
+//! and spawns no unit, so nothing draws a disc down and nothing builds. The
+//! terrace test names one tile, zones it for a terrace and puts a builder on
+//! it, so the one terrace of the run stands where the test chose. A fixture
+//! that searched one run for a matching pair would depend on the seed, and a
+//! seed is not a fixture.
 //!
 //! # References
 //!
@@ -317,6 +319,7 @@ fn production_rises_when_a_terrace_completes() {
     run(&mut world, SETTLE);
 
     let address = world.settlements().address(site).expect("the site is live");
+    let faction = world.settlements().faction(site).expect("the site is live");
     assert_eq!(
         terraces_over_the_disc(&world, address),
         0,
@@ -324,24 +327,38 @@ fn production_rises_when_a_terrace_completes() {
          measures nothing"
     );
 
+    // The fixture names the tile it terraces. A set order over the units of a
+    // founding reaches whatever tiles those units stand on, and the founding
+    // zones its own disc, so every such order is refused for a project the
+    // plan already holds. This picks a tile that is free of an upgrade and
+    // held by the faction, then zones that tile for a terrace, so the plan
+    // names what the builder is about to build.
+    let chosen = disc(world.grid(), address, SURVEY_RADIUS)
+        .into_iter()
+        .find(|place| {
+            world.upgrade_at(*place).is_none() && world.holds(faction, *place) == Some(true)
+        })
+        .expect("the disc of a seated site holds a free tile its faction holds");
+    world
+        .zone_project(faction, chosen, UpgradeCategory::TERRACE)
+        .expect("a terrace fits a tile the faction holds");
+
+    // A soldier builds the tile it stands on, so the fixture puts one there.
+    let builder = world
+        .spawn_soldier(chosen, faction)
+        .expect("the chosen tile takes a unit");
+    world
+        .order_build(builder, UpgradeCategory::TERRACE)
+        .expect("the plan names a terrace on the tile the builder stands on");
+
     // The order is placed again on every tick. A builder does not stay on the
     // tile it builds, so one order at one tick finishes nothing, and a
     // separate item holds that defect.[^4]
-    let units: Vec<Entity> = world.soldiers().iter().collect();
-    let (refused, reason) = world.order_build_set_reporting(&units, UpgradeCategory::TERRACE);
-    assert!(
-        refused < units.len(),
-        "the fixture must place at least one build order, but every one of {} \
-         was refused for {reason:?}",
-        units.len()
-    );
-
     let mut waited = 0u32;
     while terraces_over_the_disc(&world, address) == 0 && waited < 3000 {
         world.step(THREADS).expect("the fixture steps");
         waited += 1;
-        let live: Vec<Entity> = world.soldiers().iter().collect();
-        world.order_build_set(&live, UpgradeCategory::TERRACE);
+        let _ = world.order_build(builder, UpgradeCategory::TERRACE);
     }
     assert!(
         terraces_over_the_disc(&world, address) > 0,
