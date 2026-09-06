@@ -529,7 +529,10 @@ fn a_faction_that_crossed_can_found_on_the_ground_it_reached() {
     let survey = world
         .survey_places(&[place], GROUP, &[seat])
         .expect("the survey must run");
-    println!("the survey ranks it eligible: {:?}", survey.chosen().is_some());
+    println!(
+        "the survey ranks it eligible: {:?}",
+        survey.chosen().is_some()
+    );
 
     let founded = world.found_settlement(place, ISLAND);
     assert!(
@@ -543,4 +546,58 @@ fn a_faction_that_crossed_can_found_on_the_ground_it_reached() {
         .count();
     println!("the faction now holds {sites} sites");
     assert_eq!(sites, 2, "the faction must hold a second site");
+}
+
+/// The destination plane that the island faction settles on.
+///
+/// The settling plane of a faction is its number raised by twice the faction
+/// count, and the fixture holds two factions.
+const SETTLING_PLANE: u16 = 4;
+
+#[test]
+fn the_controller_sends_a_settler_across_the_water() {
+    // **The crossing and the founding compose through the type table alone.**
+    // The settler row holds a water crossing and a settle group, so a settler
+    // crosses the water as a mariner does. No rule in the engine names either
+    // type, and nothing here drives a verb: the faction runs under its own
+    // controller, which queues the settler and sends it on the settling
+    // plane.
+    //
+    // **The settler does not reach the far shore of this fixture, and the
+    // test does not claim that it does.** The island of this world sits
+    // behind a sea about thirteen tiles wide on the route the target names,
+    // and a lone settler starves after four or five ticks on water. The
+    // founding beyond the water is proven from a place a unit reached, by
+    // the test above. What is open is the target choice: the settling target
+    // comes from a bounded sample drawn over the whole world, so it names a
+    // place on the far mainland rather than the near shore that a mariner
+    // reaches.
+    let world = fixture_world(true);
+    let island = smallest_island(&world);
+    let (mut world, _) = seated_world(true, &island);
+    let mut sent = false;
+    let mut crossed = false;
+    for _ in 0..TICKS {
+        world.step(THREADS).expect("the step must run");
+        for unit in world.soldiers().iter_faction(ISLAND) {
+            if world.soldiers().sent(unit) != Some(Some(SETTLING_PLANE)) {
+                continue;
+            }
+            sent = true;
+            let Some(at) = world.soldiers().address(unit) else {
+                continue;
+            };
+            if world.tile_kind(at) == Some(TileKind::Water) {
+                crossed = true;
+            }
+        }
+    }
+    assert!(
+        sent,
+        "the controller must send a settler on the settling plane of its own accord"
+    );
+    assert!(
+        crossed,
+        "a settler must stand on water, which is what the crossing column buys it"
+    );
 }

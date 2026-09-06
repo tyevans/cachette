@@ -8714,9 +8714,9 @@ impl World {
                             .units_on_tile(&mut cursor, tile)
                             .iter()
                             .filter(|unit| {
-                                self.soldiers.faction(**unit).is_some_and(|guest| {
-                                    self.relations.war_between(owner, guest)
-                                })
+                                self.soldiers
+                                    .faction(**unit)
+                                    .is_some_and(|guest| self.relations.war_between(owner, guest))
                             })
                             .count() as i64;
                         hostile.saturating_mul(upgrade::ARMY_WEAR_FOR_EACH_UNIT)
@@ -11117,11 +11117,9 @@ fn soldier_moves(
                         // gave before the column existed.
                         //
                         // [^24]: ADR-0145, a unit type is a row of capability columns, and zero means cannot, decision D2. `docs/adrs/accepted/adr-0145-a-unit-type-is-a-row-of-capability-columns-and-zero-means-cannot.md`
-                        let water_crossing = soldiers
-                            .unit_type(*soldier)
-                            .map_or(0, |unit_type| {
-                                building.unit_types.row(unit_type).water_crossing
-                            });
+                        let water_crossing = soldiers.unit_type(*soldier).map_or(0, |unit_type| {
+                            building.unit_types.row(unit_type).water_crossing
+                        });
                         let target = step_target(grid, terrain, here, direction, water_crossing);
                         let target = match target {
                             Some(target) => target,
@@ -13229,11 +13227,19 @@ impl World {
     /// again when the settler arrives, so a place that became too near while
     /// the settler walked is still refused.[^2]
     ///
-    /// The order takes the best eligible candidate rather than refusing the
-    /// sample, because the answer names a place to walk to and not a place to
-    /// seat a group. The candidates are ordered on a total key, so the first
-    /// eligible one is a property of the sample and not of the draw
+    /// **The order takes the nearest eligible candidate and not the best
+    /// one.** A settler walks to the place, and it eats on the way. A place
+    /// on the far side of the world is a place the settler starves before it
+    /// reaches, so the highest score in the sample is often a place no
+    /// founding ever happens at. The distance is measured from the site of
+    /// the faction nearest to the candidate, and a tie takes the lower tile
+    /// index, so the answer is a property of the sample and not of the draw
     /// order.[^3]
+    ///
+    /// The order takes an eligible candidate rather than refusing the sample,
+    /// because the answer names a place to walk to and not a place to seat a
+    /// group. The settle verb ranks the place again when the settler arrives,
+    /// so a place the survey would refuse a group is refused there.
     ///
     /// # References
     ///
@@ -13256,9 +13262,20 @@ impl World {
         let tile = survey
             .candidates()
             .iter()
-            .find(|candidate| candidate.is_eligible())
-            .map(|candidate| candidate.tile())?;
-        self.grid.address_of(tile)
+            .filter(|candidate| candidate.is_eligible())
+            .filter_map(|candidate| {
+                let tile = candidate.tile();
+                let address = self.grid.address_of(tile)?;
+                let near = taken
+                    .iter()
+                    .map(|seat| seat.distance(address))
+                    .min()
+                    .unwrap_or(0);
+                Some((near, tile.0, address))
+            })
+            .min_by_key(|(near, tile, _)| (*near, *tile))
+            .map(|(_, _, address)| address)?;
+        Some(tile)
     }
 
     /// Founds a city from every settler of one faction that stands on ground

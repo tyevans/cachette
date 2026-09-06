@@ -479,7 +479,19 @@ pub const MARINER_ROW: UnitTypeRow = UnitTypeRow {
     settle_group: 0,
 };
 
-/// The settler row. It founds a city, and it does nothing else.
+/// The settler row. It founds a city and it crosses open water, and it does
+/// nothing else.
+///
+/// **The crossing is what lets a faction settle a landmass it does not
+/// stand on.** A settler that cannot cross founds only on the ground its own
+/// landmass joins, so a faction on an island holds the island for the whole
+/// run whatever else it builds. The row therefore holds the crossing the
+/// mariner row holds, and the two columns compose without a rule that names
+/// either type.[^1]
+///
+/// # References
+///
+/// [^1]: ADR-0145, a unit type is a row of capability columns, and zero means cannot, decisions D1 and D2. `docs/adrs/accepted/adr-0145-a-unit-type-is-a-row-of-capability-columns-and-zero-means-cannot.md`
 pub const SETTLER_ROW: UnitTypeRow = UnitTypeRow {
     attack: Fix32::ZERO,
     armour: Fix32::ZERO,
@@ -489,7 +501,7 @@ pub const SETTLER_ROW: UnitTypeRow = UnitTypeRow {
     move_cost_scale: PLACEHOLDER_FULL_RATE,
     command_reach: 0,
     weather_reach: 0,
-    water_crossing: 0,
+    water_crossing: PLACEHOLDER_WATER_CROSSING,
     settle_group: PLACEHOLDER_SETTLE_GROUP,
 };
 
