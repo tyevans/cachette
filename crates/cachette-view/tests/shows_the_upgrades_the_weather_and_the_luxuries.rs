@@ -491,23 +491,50 @@ fn a_building_site_changes_the_tile_it_stands_on() {
     );
 }
 
-#[test]
-fn a_finished_upgrade_draws_deeper_than_a_site_just_begun() {
-    let (world, soldiers) = a_held_band();
-    let mut begun = world.clone();
-    let mut finished = world;
-    let (builder, _) = soldiers
+/// The size of a tile in the pictures that read a build site, in pixels.
+///
+/// The glyph of a site sits in the middle of its tile, and so does the disc
+/// of a unit. A tile this wide leaves a corner of the glyph outside the
+/// disc, so a test reads the mark and not the builder standing on it.
+const SITE_TILE: f32 = 32.0;
+
+/// Returns a pixel inside the glyph of a build site.
+///
+/// The position lies outside the disc of a unit on the same tile, at the
+/// tile width the site tests draw at.
+fn site_pixel(canvas: &Canvas, camera: Camera, address: Axial) -> u32 {
+    let (left, top, wide, tall) = tile_rect(camera, address);
+    pixel(canvas, left + wide / 6, top + tall / 6)
+}
+
+/// Returns the first soldier standing on ground its own faction holds.
+fn a_builder(world: &World, soldiers: &[(Entity, Axial)]) -> Entity {
+    soldiers
         .iter()
         .copied()
         .find(|(soldier, _)| {
-            begun
+            world
                 .soldiers()
                 .address(*soldier)
-                .and_then(|at| begun.tile_holder(at))
+                .and_then(|at| world.tile_holder(at))
                 .and_then(Holder::faction)
                 == Some(FactionId(0))
         })
-        .expect("a soldier stands on held ground");
+        .expect("a soldier stands on held ground")
+        .0
+}
+
+#[test]
+fn a_site_under_work_marks_the_middle_and_a_finished_site_washes_the_tile() {
+    // A site under work drew as a wash whose weight ran from a floor of 56.
+    // Over a tinted tile that changes nothing a person can see, so a store
+    // two work units into its forty-eight was absent and not weak.[^6]
+    //
+    // [^6]: Research report 25, defect 1. `docs/research/reports/25-demonstration-readability-upgrades-and-units.md`
+    let (world, soldiers) = a_held_band();
+    let mut begun = world.clone();
+    let mut finished = world;
+    let builder = a_builder(&begun, &soldiers);
     assert!(begun.order_build(builder, UpgradeKind::Road));
     assert!(finished.order_build(builder, UpgradeKind::Road));
     begun.step(1).expect("the step must run");
@@ -519,9 +546,6 @@ fn a_finished_upgrade_draws_deeper_than_a_site_just_begun() {
     assert!(!site.is_complete(), "one tick finished the road");
     let address = address_of(&begun, site.tile.0);
 
-    // The finished world keeps the site under construction until the
-    // progress reaches the work of the kind. The builder may wander, so the
-    // loop is bounded and the test asserts that the work was reached.
     let mut ticks = 0;
     while finished
         .upgrade_at(address)
@@ -531,36 +555,91 @@ fn a_finished_upgrade_draws_deeper_than_a_site_just_begun() {
         finished.step(1).expect("the step must run");
         ticks += 1;
     }
-    let done = finished.upgrade_at(address).expect("the site is there");
-    assert!(done.is_complete());
 
-    // The two worlds are at different ticks, so the ground under the site
-    // may differ in stock. The comparison is of the tint alone: draw each
-    // world twice, once as it is and once with the site destroyed, and take
-    // the difference the site made.
-    let camera = camera_over(&begun, address);
-    let with_begun = corner_of(&drawn(&begun, address), camera, address);
-    let with_finished = corner_of(&drawn(&finished, address), camera, address);
+    // Each world is drawn as it is and again with the site destroyed, so the
+    // difference is the mark of the site and never the tick.
     let mut bare_begun = begun.clone();
     let mut bare_finished = finished.clone();
     assert!(bare_begun.destroy_upgrade(address));
     assert!(bare_finished.destroy_upgrade(address));
-    let without_begun = corner_of(&drawn(&bare_begun, address), camera, address);
-    let without_finished = corner_of(&drawn(&bare_finished, address), camera, address);
-
-    let depth = |with: u32, without: u32| {
-        (0..3)
-            .map(|channel| {
-                let shift = channel * 8;
-                (((with >> shift) & 0xff) as i32 - ((without >> shift) & 0xff) as i32).abs()
-            })
-            .sum::<i32>()
+    let camera = camera_at(&begun, address, SITE_TILE);
+    let read = |world: &World, at: fn(&Canvas, Camera, Axial) -> u32| {
+        at(&drawn_at(world, address, SITE_TILE), camera, address)
     };
-    assert!(
-        depth(with_finished, without_finished) > depth(with_begun, without_begun),
-        "a finished road ({with_finished:06x} over {without_finished:06x}) did not draw deeper \
-         than a site just begun ({with_begun:06x} over {without_begun:06x})"
+
+    // A site under work marks the middle of its tile and leaves the corner.
+    assert_ne!(
+        read(&begun, site_pixel),
+        read(&bare_begun, site_pixel),
+        "a site under work did not mark the middle of its tile"
     );
+    assert_eq!(
+        read(&begun, corner_of),
+        read(&bare_begun, corner_of),
+        "a site under work washed the whole tile"
+    );
+
+    // A finished site washes the whole tile, corner included.
+    assert_ne!(
+        read(&finished, corner_of),
+        read(&bare_finished, corner_of),
+        "a finished site did not wash its tile"
+    );
+}
+
+#[test]
+fn each_kind_of_build_site_draws_its_own_glyph() {
+    // The four kinds separated unevenly as washes, and none of them read as
+    // a thing that somebody made.[^6]
+    let (world, soldiers) = a_held_band();
+    let builder = a_builder(&world, &soldiers);
+    let address = world
+        .soldiers()
+        .address(builder)
+        .expect("the builder stands somewhere");
+
+    let bare_camera = camera_at(&world, address, SITE_TILE);
+    let bare_corner = corner_of(&drawn_at(&world, address, SITE_TILE), bare_camera, address);
+
+    let mut colours = Vec::new();
+    for kind in UpgradeKind::ALL {
+        let mut building = world.clone();
+        assert!(building.order_build(builder, kind));
+        building.step(1).expect("the step must run");
+        assert!(
+            building
+                .upgrade_at(address)
+                .is_some_and(|site| { site.kind == kind && !site.is_complete() }),
+            "the order for {kind:?} placed no site under work at {address:?}"
+        );
+        let camera = camera_at(&building, address, SITE_TILE);
+        let canvas = drawn_at(&building, address, SITE_TILE);
+        // The glyph of each kind fills a different set of pixels, so the
+        // whole tile tells the four apart. One row does not: the bar of a
+        // road and the middle of a diamond cover the same pixels.
+        // A glyph leaves the ground around it. A wash covers the corner as
+        // well, and that is the mark this test refuses.
+        assert_eq!(
+            corner_of(&canvas, camera, address),
+            bare_corner,
+            "the mark of {kind:?} washed the whole tile"
+        );
+        let (left, top, wide, tall) = tile_rect(camera, address);
+        let block: Vec<u32> = (top..top + tall)
+            .flat_map(|row| (left..left + wide).map(move |column| (column, row)))
+            .map(|(column, row)| pixel(&canvas, column, row))
+            .collect();
+        colours.push((kind, block));
+    }
+    for (first, one) in colours.iter().enumerate() {
+        for other in colours.iter().skip(first + 1) {
+            assert_ne!(
+                one.1, other.1,
+                "the glyph of {:?} draws as the glyph of {:?}",
+                one.0, other.0
+            );
+        }
+    }
 }
 
 #[test]
@@ -588,5 +667,81 @@ fn a_luxury_marks_the_tile_that_holds_it() {
         corner_of(&drawn(&bare, place), camera, place),
         corner_of(&drawn(&rich, place), camera, place),
         "the mark covered the whole tile"
+    );
+}
+
+#[test]
+fn two_kinds_of_luxury_draw_in_two_colours() {
+    // One colour stood for every kind, and the catalogue admits sixty-four,
+    // so the mark said that a tile holds a luxury and never which one.[^7]
+    //
+    // [^7]: Research report 24, defect 7. `docs/research/reports/24-demonstration-readability-resources-and-weather.md`
+    let bare = World::new(settings()).expect("the extent describes a world");
+    let place = Axial::new(10, 10);
+    let tile = bare.grid().index_of(place).expect("the place is inside");
+
+    let mut first = bare.clone();
+    first
+        .seed_luxuries(&[(tile, LuxuryId(0))])
+        .expect("one placement seeds");
+    let mut second = bare;
+    second
+        .seed_luxuries(&[(tile, LuxuryId(3))])
+        .expect("one placement seeds");
+
+    let camera = camera_over(&first, place);
+    let (left, top, wide, tall) = tile_rect(camera, place);
+    let middle = |canvas: &Canvas| pixel(canvas, left + wide / 2, top + tall / 2);
+    assert_ne!(
+        middle(&drawn(&first, place)),
+        middle(&drawn(&second, place)),
+        "two kinds of luxury drew in one colour at {place:?}"
+    );
+}
+
+#[test]
+fn a_deposit_marks_the_corner_of_its_tile() {
+    // The ground colour carried the food alone, so a deposit of wood or of
+    // stone changed no pixel.[^8]
+    //
+    // [^8]: Research report 24, defect 5. `docs/research/reports/24-demonstration-readability-resources-and-weather.md`
+    let world = World::new(settings()).expect("the extent describes a world");
+    let grid = world.grid();
+    let stocked = |address: Axial, kind: ResourceKind| {
+        world.tile_stock(address, kind).map_or(0, |stock| stock.0)
+    };
+    let mut carrying = None;
+    let mut without = None;
+    for index in 0..grid.tile_count() {
+        let address = address_of(&world, index);
+        if world.tile_kind(address).is_none() {
+            continue;
+        }
+        if stocked(address, ResourceKind::Stone) > 0 {
+            carrying.get_or_insert(address);
+        } else {
+            without.get_or_insert(address);
+        }
+    }
+    let carrying = carrying.expect("the world holds a tile that carries stone");
+    let without = without.expect("the world holds a tile that carries no stone");
+
+    // The stone pip takes the lower left corner of the tile, inside the
+    // margin the drawing keeps.
+    let read = |address: Axial| {
+        let camera = camera_at(&world, address, SITE_TILE);
+        let canvas = drawn_at(&world, address, SITE_TILE);
+        let (left, top, wide, tall) = tile_rect(camera, address);
+        pixel(&canvas, left + wide / 5, top + tall - tall / 5)
+    };
+    assert_eq!(
+        read(carrying),
+        paint::resource_pip_colour(ResourceKind::Stone),
+        "a tile that carries stone must mark its corner at {carrying:?}"
+    );
+    assert_ne!(
+        read(without),
+        paint::resource_pip_colour(ResourceKind::Stone),
+        "a tile that carries no stone must mark nothing at {without:?}"
     );
 }

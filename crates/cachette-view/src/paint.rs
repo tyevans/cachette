@@ -49,7 +49,7 @@ use cachette_core::founding::FoundingOutcome;
 use cachette_core::hex::NEIGHBOURS;
 use cachette_core::resource::{ResourceKind, RESOURCE_KIND_COUNT};
 use cachette_core::terrain::{TileKind, KIND_COUNT};
-use cachette_core::upgrade::{UpgradeSite, UPGRADE_KIND_COUNT};
+use cachette_core::upgrade::{UpgradeKind, UpgradeSite, UPGRADE_KIND_COUNT};
 use cachette_core::{Axial, BridgeError, Entity, FactionId, Holder, World};
 
 use crate::text;
@@ -125,8 +125,45 @@ const AIR_LEAST_TILE: f32 = 8.0;
 /// [^1]: Research report 24, defect 10. `docs/research/reports/24-demonstration-readability-resources-and-weather.md`
 const AIR_LEAST_WEIGHT: u8 = 8;
 
-/// The colour of the mark on a tile that holds a luxury.
-const LUXURY_MARK: u32 = 0x00ff_5ad2;
+/// The stride the luxury hue turns by, for each step of the kind ordinal.
+///
+/// The stride is odd and shares no factor with the wheel, so the kinds the
+/// catalogue numbers together do not draw together.
+const LUXURY_HUE_STRIDE: u32 = 37;
+
+/// The smallest tile width at which the viewer draws a deposit pip, in
+/// pixels.
+///
+/// A pip needs a few pixels of its own and a margin around it. Below this
+/// width the tile has no room, and the pips would read as speckle.[^1]
+///
+/// # References
+///
+/// [^1]: Research report 24, defect 5. `docs/research/reports/24-demonstration-readability-resources-and-weather.md`
+const PIP_LEAST_TILE: f32 = 16.0;
+
+/// The stock at which a deposit pip draws at its largest.
+///
+/// This is a property of the picture and not of the world, in the same way
+/// the food ramp bound is.
+const PIP_AT_FULL_SIZE: i32 = 8;
+
+/// One colour for each kind of resource, in the order of the kinds.
+///
+/// A pip carries the colour of what the ground holds. The colours are the
+/// viewer's own, and the engine holds none.[^1]
+///
+/// # References
+///
+/// [^1]: ADR-0067, the viewer reads the world and never writes to it, decision D2. `docs/adrs/accepted/adr-0067-the-viewer-reads-the-world-and-never-writes-to-it.md`
+const PIP_COLOURS: [u32; RESOURCE_KIND_COUNT] = [
+    // Food. Pale green.
+    0x00b8_e05a,
+    // Wood. Warm brown.
+    0x008a_5a2a,
+    // Stone. Pale grey.
+    0x00c8_ccd0,
+];
 
 /// The colour of the space outside the world.
 ///
@@ -292,6 +329,32 @@ pub const fn over_capacity_colour() -> u32 {
 #[must_use]
 pub const fn shortage_colour() -> u32 {
     SHORTAGE
+}
+
+/// Returns the colour the viewer draws one kind of upgrade in.
+///
+/// A test and the colour key read this rather than a literal, so the table
+/// has one declaration site.[^1]
+///
+/// # References
+///
+/// [^1]: Recurring Defect Shapes, shape 1. `.claude/rules/recurring-defects.md`
+#[must_use]
+pub fn upgrade_colour(kind: UpgradeKind) -> u32 {
+    UPGRADE_COLOURS[kind.index()]
+}
+
+/// Returns the colour the viewer draws the pip of one resource in.
+///
+/// A test and the colour key read this rather than a literal, so the table
+/// has one declaration site.[^1]
+///
+/// # References
+///
+/// [^1]: Recurring Defect Shapes, shape 1. `.claude/rules/recurring-defects.md`
+#[must_use]
+pub fn resource_pip_colour(kind: ResourceKind) -> u32 {
+    PIP_COLOURS[kind as usize]
 }
 
 /// Returns the colour of the rim the viewer draws around a unit disc.
@@ -488,7 +551,15 @@ const HEADING_TILE: f32 = 24.0;
 /// The mark is three nested rings, so it needs at least five pixels a side.
 /// A watcher who zooms out to a tile of two pixels still finds the places
 /// that founded.
-const FOUNDING_LEAST_SIDE: i32 = 7;
+///
+/// **A seven pixel square is the size of a unit and the shape of the grid.**
+/// A watcher who did not know where to look did not find it. The floor is
+/// the side at which the three rings each separate.[^1]
+///
+/// # References
+///
+/// [^1]: Research report 23, defect 10. `docs/research/reports/23-demonstration-readability-review-1.md`
+const FOUNDING_LEAST_SIDE: i32 = 15;
 
 /// A pixel buffer that the viewer paints and the window shows.
 /// The drawn unit nearest the middle of the window.
@@ -1895,21 +1966,63 @@ pub fn draw_paced(
             // skips it.[^8]
             if any_upgrade {
                 if let Some(site) = world.upgrade_at(address) {
-                    canvas.shade(
-                        left,
-                        top,
-                        wide,
-                        tall,
-                        UPGRADE_COLOURS[site.kind.index()],
-                        upgrade_weight(site),
-                    );
+                    if site.is_complete() {
+                        canvas.shade(
+                            left,
+                            top,
+                            wide,
+                            tall,
+                            UPGRADE_COLOURS[site.kind.index()],
+                            upgrade_weight(site),
+                        );
+                    } else {
+                        // A site under work draws as a glyph and not as a
+                        // wash. A wash at the weight the progress gives is
+                        // the colour of the ground under it, so a store two
+                        // work units into its forty-eight was absent rather
+                        // than weak.[^17]
+                        //
+                        // [^17]: Research report 25, defect 1. `docs/research/reports/25-demonstration-readability-upgrades-and-units.md`
+                        mark_site(canvas, left, top, wide, tall, site.kind);
+                    }
                 }
+            }
+            // A pip in a corner of the tile for each resource the tile still
+            // holds. The ground carried food as a brightness and carried
+            // wood and stone not at all.[^18]
+            //
+            // The pips draw at the close zooms only, so the extra reads
+            // follow a window of a few hundred tiles.[^18]
+            //
+            // [^18]: Research report 24, defect 5. `docs/research/reports/24-demonstration-readability-resources-and-weather.md`
+            if camera.tile_width >= PIP_LEAST_TILE {
+                mark_deposits(
+                    world,
+                    canvas,
+                    address,
+                    ground.kind,
+                    food.0,
+                    left,
+                    top,
+                    wide,
+                    tall,
+                );
             }
             // The luxuries of this tile. The field is a sorted table of the
             // tiles that hold one, so the read is one binary search, and a
             // world with no deposit skips it.
-            if any_luxury && !world.luxuries_at(tile).is_empty() {
-                mark_luxury(canvas, left, top, wide, tall);
+            if any_luxury {
+                let set = world.luxuries_at(tile);
+                if !set.is_empty() {
+                    mark_luxury(
+                        canvas,
+                        left,
+                        top,
+                        wide,
+                        tall,
+                        set.to_bits().trailing_zeros(),
+                    );
+                }
             }
             canvas.tiles_painted += 1;
             canvas.painted_by_kind[ground.kind.to_u8() as usize] += 1;
@@ -1976,6 +2089,22 @@ pub fn mark_foundings(camera: Camera, canvas: &mut Canvas, outcomes: &[FoundingO
             continue;
         }
         let colour = faction_colour(outcome.faction());
+        // The seat tile itself, filled in the faction colour with a dark
+        // core. A ring alone marked the founding and left the place drawing
+        // like every tile beside it, so a watcher read a selection cursor
+        // and not a settlement.[^4]
+        //
+        // [^4]: Research report 23, defect 4, and research report 24, defect 8. `docs/research/reports/23-demonstration-readability-review-1.md`
+        let (seat_left, seat_top, seat_wide, seat_tall) = tile_rect(camera, founding.place());
+        canvas.fill_rect(seat_left, seat_top, seat_wide, seat_tall, colour);
+        let inset = (seat_wide.min(seat_tall) / 4).max(1);
+        canvas.fill_rect(
+            seat_left + inset,
+            seat_top + inset,
+            (seat_wide - inset * 2).max(1),
+            (seat_tall - inset * 2).max(1),
+            FOUNDING_CORE,
+        );
         let left = x as i32 - side / 2;
         let top = y as i32 - side / 2;
         outline(canvas, left, top, side, side, colour);
@@ -2052,11 +2181,144 @@ pub fn air_weight(drops: i64) -> u8 {
 /// The mark is a square of one third of the tile, and at least one pixel, so
 /// the ground shows around it and a watcher still finds it at the smallest
 /// zoom.
-fn mark_luxury(canvas: &mut Canvas, left: i32, top: i32, wide: i32, tall: i32) {
+///
+/// The ordinal is the lowest luxury the tile carries. The hue comes from it,
+/// because one colour for every kind said that a tile holds a luxury and
+/// never which one.[^1]
+///
+/// # References
+///
+/// [^1]: Research report 24, defect 7. `docs/research/reports/24-demonstration-readability-resources-and-weather.md`
+fn mark_luxury(canvas: &mut Canvas, left: i32, top: i32, wide: i32, tall: i32, ordinal: u32) {
     let side = (wide.min(tall) / 3).max(1);
     let x = left + (wide - side) / 2;
     let y = top + (tall - side) / 2;
-    canvas.fill_rect(x, y, side, side, LUXURY_MARK);
+    canvas.fill_rect(x, y, side, side, luxury_colour(ordinal));
+}
+
+/// Returns the colour the viewer marks one kind of luxury in.
+///
+/// The hue turns with the ordinal, and the stride is odd, so two kinds that
+/// the catalogue numbers together do not draw together. The colour is the
+/// viewer's own, and the engine holds none.[^1]
+///
+/// # References
+///
+/// [^1]: ADR-0067, the viewer reads the world and never writes to it, decision D2. `docs/adrs/accepted/adr-0067-the-viewer-reads-the-world-and-never-writes-to-it.md`
+#[must_use]
+pub fn luxury_colour(ordinal: u32) -> u32 {
+    let position = (ordinal.wrapping_mul(LUXURY_HUE_STRIDE)) % 256;
+    let turn = position * 6;
+    let sector = turn / 256;
+    let rise = turn % 256;
+    let fall = 255 - rise;
+    let (red, green, blue) = match sector {
+        0 => (255, rise, 0),
+        1 => (fall, 255, 0),
+        2 => (0, 255, rise),
+        3 => (0, fall, 255),
+        4 => (rise, 0, 255),
+        _ => (255, 0, fall),
+    };
+    (red << 16) | (green << 8) | blue
+}
+
+/// Paints the glyph of a build site in the middle of a tile.
+///
+/// Each kind takes a shape of its own, drawn over a dark square, so a watcher
+/// reads a made thing and not a shade of the ground.[^1]
+///
+/// # References
+///
+/// [^1]: Research report 25, defect 1. `docs/research/reports/25-demonstration-readability-upgrades-and-units.md`
+fn mark_site(canvas: &mut Canvas, left: i32, top: i32, wide: i32, tall: i32, kind: UpgradeKind) {
+    let side = (wide.min(tall) * 2 / 3).max(3);
+    let x = left + (wide - side) / 2;
+    let y = top + (tall - side) / 2;
+    // The dark square is the rim. It separates every glyph from the ground
+    // under it, whatever the ground is.
+    canvas.fill_rect(x, y, side, side, UNIT_RIM);
+    let colour = UPGRADE_COLOURS[kind.index()];
+    let bar = (side / 4).max(1);
+    match kind {
+        // A made way: one bar across the tile.
+        UpgradeKind::Road => canvas.fill_rect(x, y + (side - bar) / 2, side, bar, colour),
+        // Worked ground: two bars, one above the other.
+        UpgradeKind::Terrace => {
+            canvas.fill_rect(x, y + bar, side, bar, colour);
+            canvas.fill_rect(x, y + side - bar * 2, side, bar, colour);
+        }
+        // A great work: a diamond.
+        UpgradeKind::Wonder => {
+            let half = side / 2;
+            for row in 0..side {
+                let reach = half - (row - half).abs();
+                canvas.fill_rect(x + half - reach, y + row, reach * 2 + 1, 1, colour);
+            }
+        }
+        // A storehouse: a solid block inside the square.
+        UpgradeKind::Store => canvas.fill_rect(
+            x + bar,
+            y + bar,
+            (side - bar * 2).max(1),
+            (side - bar * 2).max(1),
+            colour,
+        ),
+    }
+}
+
+/// Paints one pip in a corner of a tile for each resource it still holds.
+///
+/// The pip grows with the amount, so a watcher reads a rich deposit from a
+/// poor one and watches a deposit drain.[^1]
+///
+/// **A resource the tile no longer holds draws no pip.** The colour of the
+/// ground carries the food, and the pips carry all three, so an empty corner
+/// and a small pip are the two states a watcher must tell apart.
+///
+/// The food is the stock the tile pass already read. The other two are one
+/// read each, and the caller draws no pip below the tile width it names, so
+/// the reads follow a window of a few hundred tiles.[^1]
+///
+/// # References
+///
+/// [^1]: Research report 24, defect 5. `docs/research/reports/24-demonstration-readability-resources-and-weather.md`
+#[allow(clippy::too_many_arguments)]
+fn mark_deposits(
+    world: &World,
+    canvas: &mut Canvas,
+    address: Axial,
+    ground: TileKind,
+    food: u32,
+    left: i32,
+    top: i32,
+    wide: i32,
+    tall: i32,
+) {
+    let margin = (wide.min(tall) / 6).max(1);
+    let most = (wide.min(tall) / 4).max(2);
+    for kind in ResourceKind::ALL {
+        let held = if kind == ResourceKind::Food {
+            food
+        } else {
+            match world.tile_stock_of_ground(address, ground, kind) {
+                Some(stock) => stock.0,
+                None => continue,
+            }
+        };
+        if held == 0 {
+            continue;
+        }
+        let side = ((held as i32).min(PIP_AT_FULL_SIZE) * most / PIP_AT_FULL_SIZE).max(2);
+        // One corner for each kind, so two kinds on one tile never overlap.
+        let (x, y) = match kind as usize {
+            0 => (left + margin, top + margin),
+            1 => (left + wide - margin - side, top + margin),
+            _ => (left + margin, top + tall - margin - side),
+        };
+        outline(canvas, x - 1, y - 1, side + 2, side + 2, UNIT_RIM);
+        canvas.fill_rect(x, y, side, side, PIP_COLOURS[kind as usize]);
+    }
 }
 
 /// Draws a one pixel border inside a rectangle.
