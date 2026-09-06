@@ -89,20 +89,38 @@ impl Panel for Inspector {
                 "building",
                 upgrade_name(site.category).to_string(),
             ));
+            // **The level the map draws, in words.** The map draws one pip
+            // for each level that stands, and a watcher who counts the pips
+            // and a watcher who reads this panel must get one answer.[^7]
+            // [^8]
+            //
+            // [^7]: ADR-0151, an upgrade is a category with a ground fit and a level, decision D5. `docs/adrs/draft/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
+            // [^8]: ADR-0070, the head-up display reports what the drawing pass read, decision D1. `docs/adrs/accepted/adr-0070-the-head-up-display-reports-what-the-drawing-pass-read.md`
+            lines.push(Line::row(
+                "level",
+                if site.is_complete() {
+                    grouped(u64::from(site.level))
+                } else {
+                    "none yet".to_string()
+                },
+            ));
+            // **The work reads against the row above the entry, at every
+            // level.** A site that stands is not finished while a level
+            // above it exists, and a panel that said so of a level 1 road
+            // would hide the work going into its level 2.
+            let asked = world
+                .upgrade_table()
+                .work_above(site.category, site.level)
+                .max(0);
             lines.push(Line::row(
                 "work done",
-                if site.is_complete() {
+                if asked == 0 {
                     "finished".to_string()
                 } else {
                     format!(
                         "{} of {}",
                         grouped(site.progress.0.max(0) as u64),
-                        grouped(
-                            world
-                                .upgrade_table()
-                                .work_above(site.category, site.level)
-                                .max(0) as u64
-                        )
+                        grouped(asked as u64)
                     )
                 },
             ));

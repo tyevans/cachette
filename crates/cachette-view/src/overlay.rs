@@ -56,11 +56,11 @@
 
 use cachette_core::resource::ResourceKind;
 use cachette_core::terrain::TerrainTile;
-use cachette_core::upgrade::{UpgradeCategory, UPGRADE_CATEGORY_COUNT};
+use cachette_core::upgrade::UPGRADE_LEVEL_COUNT;
 use cachette_core::weather::Drops;
 use cachette_core::{Axial, FactionId, Holder, World};
 
-use crate::paint::{faction_colour, upgrade_colour};
+use crate::paint::faction_colour;
 
 /// The strength an overlay paints at its high value, of 255.
 ///
@@ -105,6 +105,13 @@ const STONE_COLOUR: u32 = 0x00c3_ccd4;
 
 /// The colour of the height overlay.
 const HEIGHT_COLOUR: u32 = 0x00f0_e2a8;
+
+/// The colour of the upgrade level overlay.
+///
+/// The overlay paints one colour at a strength that follows the level, so a
+/// watcher reads the level from the depth of one hue. The hue is the viewer's
+/// own, and the engine holds none.
+const UPGRADE_LEVEL_COLOUR: u32 = 0x00e8_c46a;
 
 /// The colour of the crowding overlay.
 const CROWD_COLOUR: u32 = 0x00ff_5a3c;
@@ -417,7 +424,20 @@ impl Layer for HolderLayer {
     }
 }
 
-/// What stands on each tile, and how far it has been built.
+/// The level of the upgrade on each tile, and whether one stands.
+///
+/// **The value is the level, and one for a site under work.** A site under
+/// work stands at level zero, and zero is also the tile that carries nothing,
+/// so the bare level could not tell a first build from a bare tile.
+///
+/// The span runs to one above the level count of the table, so the overlay
+/// scales with the table and not with a number this file holds.[^1] It read
+/// the category ordinal before, which is not a level at all.[^2]
+///
+/// # References
+///
+/// [^1]: Recurring Defect Shapes, shape 1. `.agents/rules/recurring-defects.md`
+/// [^2]: ADR-0151, an upgrade is a category with a ground fit and a level, decisions D1 and D5. `docs/adrs/draft/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
 struct Upgrade;
 
 impl Layer for Upgrade {
@@ -426,42 +446,21 @@ impl Layer for Upgrade {
     }
 
     fn unit(&self) -> &'static str {
-        "the level, or nothing"
+        "the level, and one under work"
     }
 
     fn value(&self, at: At<'_>) -> i64 {
-        at.world.upgrade_at(at.address).map_or(0, |site| {
-            let level = i64::try_from(site.category.index()).unwrap_or(0) + 1;
-            if site.is_complete() {
-                level
-            } else {
-                -level
-            }
-        })
+        at.world
+            .upgrade_at(at.address)
+            .map_or(0, |site| i64::from(site.level) + 1)
     }
 
     fn span(&self, _world: &World) -> Span {
-        Span::new(0, i64::try_from(UPGRADE_CATEGORY_COUNT).unwrap_or(1))
+        Span::new(0, i64::try_from(UPGRADE_LEVEL_COUNT).unwrap_or(1) + 1)
     }
 
-    fn colour(&self, value: i64) -> u32 {
-        let level = usize::try_from(value.abs() - 1).unwrap_or(0);
-        UpgradeCategory::ALL
-            .get(level)
-            .map_or(NOTHING_NAMED, |kind| upgrade_colour(*kind))
-    }
-
-    fn strength(&self, value: i64, _span: Span) -> u8 {
-        // The level names a thing, so every finished site paints alike. A site
-        // still under work paints weaker, so a watcher tells the two apart
-        // without reading a number.
-        if value == 0 {
-            0
-        } else if value > 0 {
-            FULL_STRENGTH
-        } else {
-            LEAST_STRENGTH * 3
-        }
+    fn colour(&self, _value: i64) -> u32 {
+        UPGRADE_LEVEL_COLOUR
     }
 }
 

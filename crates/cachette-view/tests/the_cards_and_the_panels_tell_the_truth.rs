@@ -35,6 +35,12 @@ use cachette_view::{draw_frame, glass, Camera, Canvas, Metrics, Overlay};
 /// The size of the window the tests draw into.
 const WINDOW: (usize, usize) = (512, 512);
 
+/// The first level that stands on a tile.
+///
+/// A site at level zero is a first build under construction, and nothing
+/// stands there yet.
+const FIRST_LEVEL: u8 = 1;
+
 /// Builds a world of open ground with two factions.
 fn world(width: u32) -> World {
     World::new(WorldConfig {
@@ -168,6 +174,13 @@ fn the_colour_key_names_every_mark_the_map_draws() {
         "terrace",
         "wonder",
         "store",
+        "wall",
+        // The map draws the category as a shape and the level as a count of
+        // pips under it. A reader who is told the colours and not the count
+        // has to guess what a second pip means.[^10]
+        //
+        // [^10]: ADR-0151, an upgrade is a category with a ground fit and a level, decision D5. `docs/adrs/draft/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
+        "level pip",
     ] {
         assert!(
             lines
@@ -232,6 +245,41 @@ fn the_tile_panel_names_the_upgrade_under_the_pointer() {
             .iter()
             .any(|line| line.starts_with("work done: ") && line.contains(" of ")),
         "the panel did not state the progress: {lines:?}"
+    );
+    // **The panel names the level the map draws.** A watcher who counts the
+    // pips under the mark and a watcher who reads the panel must get one
+    // answer, and nothing stands on this tile yet.[^10]
+    assert!(
+        lines.iter().any(|line| line == "level: none yet"),
+        "the panel did not say that no level stands: {lines:?}"
+    );
+
+    // The same tile once a level stands on it. The builder is put back on the
+    // tile and ordered again each tick, because a unit that finished a level
+    // walks away and a unit that walked away adds no work.
+    let mut ticks = 0;
+    while world
+        .upgrade_at(place)
+        .is_none_or(|site| site.level < FIRST_LEVEL)
+    {
+        assert!(ticks < 200, "the terrace never reached its first level");
+        world
+            .place_soldier(builder, place)
+            .expect("the tile admits the builder");
+        world.rebuild_bridge(1).expect("the bridge rebuilds");
+        world
+            .order_build(builder, UpgradeCategory::TERRACE)
+            .expect("the engine takes the order");
+        world.step(1).expect("the step must run");
+        ticks += 1;
+    }
+    let lines = panel::says(
+        &view(&world, Some(place)),
+        Set::EMPTY.with("inspector").expect("inspector registers"),
+    );
+    assert!(
+        lines.iter().any(|line| line == "level: 1"),
+        "the panel did not name the level that stands: {lines:?}"
     );
 
     // A tile with no site holds neither row, so a watcher never reads a zero
