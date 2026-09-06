@@ -74,6 +74,14 @@ BLK-150, which asks what raises and lowers renown.[^6]
 | Base reach, the hex steps a city holds with no finished upgrade | The holding rewrite | unset, pass 10 | BLK-050 | Provisional default of 4 written by item 0484. A disc of radius 4 holds 61 tiles, the smallest disc that nearly holds the founding group of 64, so a founded faction holds about one tile for each person it founded with. Pass 10 measures it. |
 | Upgrades per reach step, the finished upgrades inside the ground that earn one step | The holding rewrite | unset, pass 10 | BLK-050 | Provisional default of 4 written by item 0484, the base reach again, so the first step of growth asks for as many upgrades as the base has steps. Pass 10 measures it. |
 | Reach bound, the reach a city never passes | The holding rewrite | unset, pass 10 | BLK-050 | Provisional default of 8 written by item 0484, twice the base, so upgrades at most double how far a city reaches and a disc of radius 8 holds 217 tiles. Pass 10 measures it. |
+| Lease raise step, the count one tick of use adds | The lease pass | unset, pass 10 | BLK-050 | |
+| Lease lower step, the count one tick of another faction takes away | The lease pass | unset, pass 10 | BLK-050 | |
+| Lease decay step, the count one decay takes away | The lease decay | unset, pass 10 | BLK-050 | |
+| Lease decay schedule, period and phase | The lease decay | unset, pass 10 | BLK-050 | |
+| Lease bound, the count a lease never passes | The lease pass | unset, pass 10 | BLK-050 | |
+| Lease claim threshold, the count at or above which the lease holds the tile | The holding rewrite | unset, pass 10 | BLK-050 | |
+| Closure pass count, the passes that run after the holder of every tile is decided | The holding rewrite | unset, pass 10 | BLK-050 | |
+| Closure neighbour threshold, the neighbours of one faction that give it an unheld tile | The holding rewrite | unset, pass 10 | BLK-050 | |
 
 ## The seeding layer
 
