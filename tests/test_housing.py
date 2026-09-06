@@ -47,7 +47,7 @@ def test_a_site_reads_its_housing_its_residents_and_its_free_places() -> None:
     # The derived resident count settles at a barrier, so the world steps once
     # before the reader answers about the group the fixture homed.
     world.set_economy_schedule(1, 0)
-    world.step()
+    world.step(threads=1)
     report = world.site_housing(site)
     assert report["housing"] == 8
     assert report["residents"] == GROUP
@@ -57,7 +57,7 @@ def test_a_site_reads_its_housing_its_residents_and_its_free_places() -> None:
 def test_a_site_above_its_housing_reads_no_free_place() -> None:
     world, site = _a_site_with_housing(housing=1, stock=0)
     world.set_economy_schedule(1, 0)
-    world.step()
+    world.step(threads=1)
     report = world.site_housing(site)
     assert report["residents"] == GROUP
     assert report["free_places"] == 0, "a site above its housing has no free place"
@@ -78,7 +78,7 @@ def test_a_dead_identity_refuses_the_reader() -> None:
 def test_the_births_of_the_tick_read_zero_when_a_site_cannot_grow() -> None:
     # The store holds nothing, so the site has room and no food.
     world, _ = _a_site_with_housing(housing=8, stock=0)
-    world.step()
+    world.step(threads=1)
     assert world.births == 0, "a site with no food grew somebody"
 
 
@@ -86,7 +86,7 @@ def test_the_births_of_the_tick_read_above_zero_when_a_site_can_grow() -> None:
     world, site = _a_site_with_housing(housing=8, stock=20 * ONE)
     grew = 0
     for _ in range(5):
-        world.step()
+        world.step(threads=1)
         grew += world.births
     assert grew > 0, "a site with food and room grew nobody"
     assert world.site_housing(site)["residents"] > GROUP

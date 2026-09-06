@@ -8367,7 +8367,14 @@ impl World {
     #[must_use]
     pub fn site_residents(&self, site: Entity) -> Option<u32> {
         let slot = self.settlements.slot_of(site)?;
-        self.cohorts.residents(slot)
+        // A slot the derived table has not covered holds no counted
+        // resident. That is the answer the table gives, and it is the answer
+        // the growth stage reads. A caller that spawned a unit and did not
+        // step reads it before the frame settled, in the way every derived
+        // structure of this engine behaves, and one public check says so.[^1]
+        //
+        // [^1]: ADR-0018, the unit-to-tile bridge is derived, and it rebuilds at the barrier, decision D3. `docs/adrs/accepted/adr-0018-the-unit-to-tile-bridge-is-derived-and-rebuilds-at-the-barrier.md`
+        Some(self.cohorts.residents(slot).unwrap_or(0))
     }
 
     /// Returns the free places of a site.

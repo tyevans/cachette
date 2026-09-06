@@ -3156,6 +3156,22 @@ impl PyWorld {
         self.lock().set_housing_per_person(housing);
     }
 
+    /// Sets the chance that one proposal of one site becomes a birth.
+    ///
+    /// **The chance is a Q16.16 value as its raw integer.** Multiply the share
+    /// you want by 65536. A chance at or above one whole unit makes every
+    /// proposal a birth. A chance of zero makes none, so it turns growth off.
+    /// Returns `None`.
+    ///
+    /// The chance is a balance row.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: Balance register, the population, the birth rate row. `docs/reference/balance.md`
+    fn set_birth_chance(&self, chance: i32) {
+        self.lock().set_birth_chance(Fix32(chance));
+    }
+
     /// Sets how often the growth stage acts, and its offset in the period.
     ///
     /// The period is the ticks between two applications. The phase is the
