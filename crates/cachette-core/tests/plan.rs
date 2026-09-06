@@ -172,6 +172,69 @@ fn a_plan_holds_its_projects_in_tile_order_and_one_project_for_each_tile() {
     assert!(world.check_invariants());
 }
 
+/// The drop row and the refusal row count one act once each.
+///
+/// **A reader adds the two rows.** They once overlapped, because a write past
+/// the bound raised both, and a run that dropped a thousand projects then read
+/// two thousand turned-away writes.[^4]
+///
+/// The fixture reaches both acts in one world: a write the bound drops, and a
+/// write that names a faction the register does not hold.
+///
+/// # References
+///
+/// [^4]: Findings register, FND-496. `docs/FINDINGS.md`
+#[test]
+fn a_drop_and_a_refusal_are_counted_apart() {
+    let mut world = bare(SEED);
+    world.set_plan_rules(world.plan_rules().with_bound(2));
+    let places: Vec<Axial> = addresses()
+        .into_iter()
+        .filter(|address| world.admits_a_unit(*address))
+        .take(3)
+        .collect();
+    for address in places.iter().take(2) {
+        world
+            .zone_project(ZERO, *address, UpgradeCategory::ROAD)
+            .expect("the plan is not full yet");
+    }
+    let dropped = census(&world, "projects_dropped");
+    let refused = census(&world, "projects_refused");
+
+    // The bound drops this write. It is a drop and nothing else.
+    assert!(world
+        .zone_project(ZERO, places[2], UpgradeCategory::ROAD)
+        .is_err());
+    assert_eq!(
+        census(&world, "projects_dropped"),
+        dropped + 1,
+        "the drop row must count the write the bound turned away"
+    );
+    assert_eq!(
+        census(&world, "projects_refused"),
+        refused,
+        "one act raised both rows, so the two cannot be added"
+    );
+
+    // A write that names no faction is a refusal and nothing else.
+    // The world holds four factions, so this number names none of them.
+    let stranger = FactionId(4);
+    assert!(world
+        .zone_project(stranger, places[0], UpgradeCategory::ROAD)
+        .is_err());
+    assert_eq!(
+        census(&world, "projects_refused"),
+        refused + 1,
+        "the refusal row must count the write that named no faction"
+    );
+    assert_eq!(
+        census(&world, "projects_dropped"),
+        dropped + 1,
+        "a refusal that is not a drop raised the drop row"
+    );
+    assert!(world.check_invariants());
+}
+
 #[test]
 fn a_plan_at_its_bound_drops_the_next_project_and_counts_the_drop() {
     // The extreme: the plan is full. A fixture with a large bound would never

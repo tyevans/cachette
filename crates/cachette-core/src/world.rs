@@ -10760,6 +10760,13 @@ pub const SUBSYSTEM_CENSUS: &[CensusRow] = &[
     // What the plans of every faction have taken, finished, dropped and
     // refused. The record asks that a drop and a refusal each be counted.[^3]
     //
+    // **The drop row and the refusal row are disjoint.** A write the plan
+    // turned away at its bound is a drop and nothing else, and every other
+    // refusal of a write or a build is a refusal and nothing else. A reader
+    // adds the two rows and counts each act once. The two once overlapped,
+    // and the sum double-counted a full plan.[^7]
+    //
+    // [^7]: Findings register, FND-496. `docs/FINDINGS.md`
     // [^3]: ADR-0152, a faction plans its roads and zones with one solver, decisions D1, D4 and D5. `docs/adrs/accepted/adr-0152-a-faction-plans-its-roads-and-zones-with-one-solver.md`
     CensusRow {
         name: "projects_zoned",

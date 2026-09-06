@@ -367,8 +367,13 @@ impl PlanRegister {
             }
             Err(position) => {
                 if length as usize >= bound {
+                    // **A drop is not counted here as a refusal.** The two
+                    // counters are disjoint, so a reader adds them and gets
+                    // every write and build the plan turned away, once
+                    // each.[^2]
+                    //
+                    // [^2]: Findings register, FND-496. `docs/FINDINGS.md`
                     self.dropped += 1;
-                    self.refused += 1;
                     return Err(PlanRefusal::PlanFull {
                         bound: self.rules.bound(),
                     });
@@ -426,12 +431,29 @@ impl PlanRegister {
     }
 
     /// Returns how many projects a full plan dropped.
+    ///
+    /// A drop is a write the plan turned away because it stands at its
+    /// bound. It is counted here and nowhere else.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: Findings register, FND-496. `docs/FINDINGS.md`
     #[must_use]
     pub const fn dropped_count(&self) -> i64 {
         self.dropped
     }
 
-    /// Returns how many writes and builds the plan refused.
+    /// Returns how many writes and builds the plan refused for any reason
+    /// other than a full plan.
+    ///
+    /// **This count and the drop count are disjoint.** One act raises one of
+    /// them, so their sum is every write and build the plan turned away. The
+    /// two once overlapped, and a reader that added them counted a full plan
+    /// twice.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: Findings register, FND-496. `docs/FINDINGS.md`
     #[must_use]
     pub const fn refused_count(&self) -> i64 {
         self.refused
