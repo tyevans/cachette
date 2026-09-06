@@ -210,6 +210,110 @@ fn each_mark_carries_the_colour_of_the_faction_that_founded() {
 }
 
 #[test]
+fn a_founded_place_fills_its_seat_tile() {
+    // A ring alone marked the founding, and the seat tile drew like every
+    // tile beside it. A watcher read a selection cursor and not a
+    // settlement.[^4]
+    //
+    // [^4]: Research report 23, defect 4. `docs/research/reports/23-demonstration-readability-review-1.md`
+    let (world, outcomes) = crowded_world();
+    let founding = outcomes
+        .iter()
+        .find_map(cachette_core::founding::FoundingOutcome::founding)
+        .expect("the run seated a faction");
+    let seated = outcomes
+        .iter()
+        .find(|outcome| outcome.is_seated())
+        .expect("the run seated a faction");
+
+    let (marked, camera) = frame_at(&world, &outcomes, founding.place());
+    let (bare, _) = frame_at(&world, &[], founding.place());
+    let (left, top, wide, tall) = paint::tile_rect(camera, founding.place());
+    let at =
+        |canvas: &Canvas, x: i32, y: i32| canvas.pixels()[y as usize * canvas.width() + x as usize];
+
+    assert_ne!(
+        at(&marked, left + 1, top + 1),
+        at(&bare, left + 1, top + 1),
+        "the seat tile drew as it draws with no founding"
+    );
+    assert_eq!(
+        at(&marked, left + 1, top + 1),
+        paint::faction_colour(seated.faction()),
+        "the seat tile must fill in the colour of the faction"
+    );
+    assert_eq!(
+        at(&marked, left + wide / 2, top + tall / 2),
+        paint::founding_core_colour(),
+        "the seat tile must carry a dark core"
+    );
+}
+
+#[test]
+fn the_founding_mark_holds_a_size_floor() {
+    // A seven pixel square is the size of a unit and the shape of the grid,
+    // so a watcher who did not know where to look did not find it.[^5]
+    //
+    // [^5]: Research report 23, defect 10. `docs/research/reports/23-demonstration-readability-review-1.md`
+    let (world, outcomes) = crowded_world();
+    let founding = outcomes
+        .iter()
+        .find_map(cachette_core::founding::FoundingOutcome::founding)
+        .expect("the run seated a faction");
+
+    // The camera holds a tile at a few pixels, so the mark takes its floor
+    // rather than twice the tile.
+    let mut canvas = Canvas::new(760, 760);
+    let camera = Camera::at_tile_size(3.0).looking_at(founding.place(), &canvas);
+    assert!(
+        camera.tile_width * 2.0 < 15.0,
+        "the camera must give a mark that takes its floor: {} pixels a tile",
+        camera.tile_width
+    );
+    draw_frame(
+        &world,
+        camera,
+        &measurements(),
+        &outcomes,
+        Overlay::Panel,
+        &mut canvas,
+    )
+    .expect("the world draws");
+
+    // The mark is a square of the floor side, centred on the place, so its
+    // edge stands seven pixels out from the middle. The same world drawn
+    // with no outcome draws the units and the ground alike, so a pixel that
+    // differs at that distance is the mark and nothing else.
+    let mut bare = Canvas::new(760, 760);
+    draw_frame(
+        &world,
+        camera,
+        &measurements(),
+        &[],
+        Overlay::Panel,
+        &mut bare,
+    )
+    .expect("the world draws");
+
+    let (x, y) = camera.centre_of(founding.place());
+    let (cx, cy) = (x as i32, y as i32);
+    let reach = 15 / 2;
+    let at =
+        |canvas: &Canvas, x: i32, y: i32| canvas.pixels()[y as usize * canvas.width() + x as usize];
+    let edge = [
+        (cx - reach, cy),
+        (cx + reach, cy),
+        (cx, cy - reach),
+        (cx, cy + reach),
+    ];
+    assert!(
+        edge.iter()
+            .any(|&(x, y)| at(&canvas, x, y) != at(&bare, x, y)),
+        "the mark must reach seven pixels from the middle of the place"
+    );
+}
+
+#[test]
 fn the_frame_marks_one_place_for_each_seated_faction() {
     // A count of the marks the pass painted. A pass that marked a refused
     // faction would state a place that nothing founded.

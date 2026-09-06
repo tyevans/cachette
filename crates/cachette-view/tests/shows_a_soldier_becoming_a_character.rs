@@ -168,23 +168,45 @@ fn the_card_names_the_faction_and_the_deeds_while_it_is_fresh() {
 }
 
 #[test]
-fn the_promotion_leaves_the_glass_once_it_is_stale() {
+fn the_promotion_shows_on_the_one_card_and_the_key_holds_the_count() {
     // The moment is held for a while and then released. A card that held it
     // for ever would tell a watcher that a promotion had just happened long
     // after it had, which is a wrong answer presented as a right one.
     let (_, fresh, _) = drawn(STEPS);
     assert!(fresh.characters() > 0, "the fixture promoted nobody");
 
-    let said_fresh = glass::says(&fresh, false);
+    // The key holds the card with the running count.
+    let said_open = glass::says(&fresh, true);
     let heading = "THE CHARACTERS";
     assert!(
-        said_fresh.iter().any(|line| line == heading),
-        "the glass hid the card when a character existed",
+        said_open.iter().any(|line| line == heading),
+        "the key hid the card when a character existed",
     );
     assert!(
-        said_fresh
+        said_open
             .iter()
             .any(|line| line.starts_with("characters in world: ")),
         "the card lost the running count",
+    );
+
+    // **While the key is off the window shows one card.** Three cards
+    // anchored to one corner covered close to half of a close-up.[^3] The
+    // promotion is a moment, so it stays on the one card while it is fresh.
+    //
+    // [^3]: Research report 23, defect 5. `docs/research/reports/23-demonstration-readability-review-1.md`
+    let said_closed = glass::says(&fresh, false);
+    let headings = said_closed
+        .iter()
+        .filter(|line| line.starts_with("THE ") || line.starts_with("WHAT "))
+        .count();
+    assert_eq!(
+        headings, 1,
+        "the window drew more than one card while the key was off: {said_closed:?}"
+    );
+    assert!(
+        said_closed
+            .iter()
+            .any(|line| line.starts_with("just promoted: ")),
+        "the one card lost the promotion: {said_closed:?}"
     );
 }

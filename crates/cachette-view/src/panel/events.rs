@@ -9,9 +9,15 @@
 //! # Which logs this panel reads
 //!
 //! The engine keeps six logs of the step that just ran. This panel reads
-//! four: the units a shortage ended, the sites a draw could not serve in
-//! full, the sites that could not pay their upkeep, and the units a step
-//! promoted. Each names a discrete happening a watcher can read as a line.
+//! five: the units a shortage ended, the units a contest felled, the sites a
+//! draw could not serve in full, the sites that could not pay their upkeep,
+//! and the units a step promoted. Each names a discrete happening a watcher
+//! can read as a line.
+//!
+//! **A fight is the happening this panel exists for, and it read four logs
+//! that do not hold one.** A contest between two groups of eight wrote seven
+//! rows to the fallen log in one step, and the panel said that nothing
+//! happened that tick.[^5]
 //!
 //! The panel does not read the gather log or the tile event log. Both hold
 //! one entry for almost every unit or every tile that changed in a tick, at
@@ -34,7 +40,9 @@
 //! [^2]: Project orientation, the target scale. `CLAUDE.md`
 //! [^3]: ADR-0070, the head-up display reports what the drawing pass read, decision D2. `docs/adrs/accepted/adr-0070-the-head-up-display-reports-what-the-drawing-pass-read.md`
 //! [^4]: ADR-0070, the head-up display reports what the drawing pass read, decision D1. `docs/adrs/accepted/adr-0070-the-head-up-display-reports-what-the-drawing-pass-read.md`
+//! [^5]: Research report 25, defect 3. `docs/research/reports/25-demonstration-readability-upgrades-and-units.md`
 
+use cachette_core::contest::UnitFell;
 use cachette_core::promotion::UnitPromoted;
 use cachette_core::{SiteRationed, SiteShortfall, UnitStarved};
 
@@ -82,12 +90,14 @@ impl Panel for Events {
 
     fn lines(&self, view: &View<'_>) -> Vec<Line> {
         let starved = view.world.starved_log();
+        let fell = view.world.fell_log();
         let rationed = view.world.rationed_log();
         let shortfall = view.world.shortfall_log();
         let promoted = view.world.promoted_log();
 
         let mut lines = Vec::new();
         lines.extend(starved_section(starved));
+        lines.extend(fell_section(fell));
         lines.extend(rationed_section(rationed));
         lines.extend(shortfall_section(shortfall));
         lines.extend(promoted_section(promoted));
@@ -127,6 +137,31 @@ fn starved_section(log: &[UnitStarved]) -> Vec<Line> {
         lines.push(Line::row(
             format!("unit {}", index_of(entry.unit)),
             format!("deficit {}", fraction(Some(entry.deficit))),
+        ));
+    }
+    lines
+}
+
+/// Returns the lines that report the units a contest felled, or nothing.
+///
+/// The section names the faction each unit belonged to, because the question
+/// a watcher asks of a fight is who lost.[^1]
+///
+/// # References
+///
+/// [^1]: Research report 25, defect 3. `docs/research/reports/25-demonstration-readability-upgrades-and-units.md`
+fn fell_section(log: &[UnitFell]) -> Vec<Line> {
+    if log.is_empty() {
+        return Vec::new();
+    }
+    let mut lines = vec![
+        Line::heading("UNITS FELL"),
+        Line::row("fell this tick", grouped(log.len() as u64)),
+    ];
+    for entry in log.iter().take(EVENT_ROWS) {
+        lines.push(Line::row(
+            format!("unit {}", index_of(entry.unit)),
+            format!("faction {}", entry.faction.0),
         ));
     }
     lines

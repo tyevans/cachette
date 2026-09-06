@@ -206,6 +206,15 @@ fn pixel(canvas: &Canvas, x: i32, y: i32) -> u32 {
 /// on it, and the fixture stands a soldier on most of the ground it holds. A
 /// test that read the middle pixel would read the soldier and not the ground.
 /// The sample therefore sits away from the middle, and inside the border.
+///
+/// The sample takes the lower right corner of the tile. The drawing puts a
+/// pip for each resource the tile carries in the other three corners, from
+/// sixteen pixels a tile upward, and the lower right corner is the one it
+/// leaves.[^1]
+///
+/// # References
+///
+/// [^1]: Research report 24, defect 5. `docs/research/reports/24-demonstration-readability-resources-and-weather.md`
 const INSET: i32 = 2;
 
 /// Returns the corner of a tile and a pixel inside it, or `None` when the
@@ -229,7 +238,10 @@ fn corner_and_inside(
     if !inside_the_canvas || wide.min(tall) < 2 * INSET + 3 {
         return None;
     }
-    Some(((left, top), (left + INSET, top + INSET)))
+    Some((
+        (left, top),
+        (left + wide - 1 - INSET, top + tall - 1 - INSET),
+    ))
 }
 
 /// Returns one channel of a colour.

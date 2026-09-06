@@ -153,11 +153,6 @@ fn corner_of(canvas: &Canvas, camera: Camera, address: Axial) -> u32 {
     pixel(canvas, left + 1, top + 1)
 }
 
-/// Returns the sum of the three channels of a pixel.
-fn brightness(colour: u32) -> u32 {
-    ((colour >> 16) & 0xff) + ((colour >> 8) & 0xff) + (colour & 0xff)
-}
-
 /// Asserts that two worlds agree about everything the drawing reads at one
 /// tile, other than the layer under test.
 fn same_ground(one: &World, other: &World, address: Axial) {
@@ -203,7 +198,7 @@ fn a_storm_in_the_air_changes_the_tile_under_it() {
 }
 
 #[test]
-fn wet_ground_draws_darker_than_dry_ground() {
+fn wet_ground_gains_blue_and_holds_its_brightness() {
     let (mut stormy, _) = a_held_band();
     let mut dry = stormy.clone();
     let place = a_held_tile(&stormy);
@@ -248,9 +243,9 @@ fn wet_ground_draws_darker_than_dry_ground() {
             continue;
         }
         // The air over the cell must hold too few drops to show, so the
-        // wet layer is the sole difference. The brightness assertion below
-        // is what proves it: the air overlay brightens and wet ground
-        // darkens, so a pixel that got darker did not get the overlay.
+        // wet layer is the sole difference. The air overlay moves all three
+        // channels toward one pale colour, and the assertion below refuses
+        // that: it holds the red and the green exactly where they were.
         if stormy.air_at(address).unwrap_or(0) > AIR_TOO_THIN_TO_SHOW {
             continue;
         }
@@ -267,9 +262,188 @@ fn wet_ground_draws_darker_than_dry_ground() {
         before, after,
         "wet ground did not change the pixel at {address:?}"
     );
+
+    // **Wet ground moves the blue and nothing else.** The layer used to take
+    // the same number from every channel, which is the number the full food
+    // ramp added, so a wet tile with the most food drew as a dry tile with
+    // none.[^9]
+    //
+    // [^9]: Research report 24, defect 3. `docs/research/reports/24-demonstration-readability-resources-and-weather.md`
+    let channel = |colour: u32, offset: u32| i64::from((colour >> offset) & 0xff);
     assert!(
-        brightness(after) < brightness(before),
-        "wet ground drew brighter than dry ground at {address:?}: {before:06x} then {after:06x}"
+        channel(after, 0) > channel(before, 0),
+        "wet ground must add blue at {address:?}: {before:06x} then {after:06x}"
+    );
+    assert_eq!(
+        channel(after, 16),
+        channel(before, 16),
+        "wet ground must not move the red at {address:?}: {before:06x} then {after:06x}"
+    );
+    assert_eq!(
+        channel(after, 8),
+        channel(before, 8),
+        "wet ground must not move the green at {address:?}: {before:06x} then {after:06x}"
+    );
+}
+
+/// Draws a world at a named tile size over a tile, and returns the canvas.
+fn drawn_at(world: &World, over: Axial, tile: f32) -> Canvas<'static> {
+    let mut canvas = Canvas::new(WINDOW.0, WINDOW.1);
+    paint::draw(world, camera_at(world, over, tile), &mut canvas).expect("the world draws");
+    canvas
+}
+
+/// Returns the camera a picture at a named tile size used.
+fn camera_at(world: &World, over: Axial, tile: f32) -> Camera {
+    let canvas = Canvas::new(WINDOW.0, WINDOW.1);
+    Camera::at_tile_size(tile)
+        .looking_at(over, &canvas)
+        .clamped(world, &canvas)
+}
+
+/// Returns the distance between two colours, as a sum over the channels.
+fn apart(one: u32, other: u32) -> i64 {
+    [16, 8, 0]
+        .iter()
+        .map(|offset| {
+            let channel = |colour: u32| i64::from((colour >> offset) & 0xff);
+            (channel(one) - channel(other)).abs()
+        })
+        .sum()
+}
+
+#[test]
+fn a_storm_keeps_the_faction_that_holds_the_ground() {
+    // The overlay used to cover the finished pixel at a weight near the
+    // holder weight, in a colour no faction uses, so a stormed holding lost
+    // its colour. The air now reaches the ground before the holder takes its
+    // share.[^3]
+    //
+    // [^3]: Research report 24, defect 4. `docs/research/reports/24-demonstration-readability-resources-and-weather.md`
+    let (mut stormy, _) = a_held_band();
+    let dry = stormy.clone();
+    let place = a_held_tile(&stormy);
+    stormy
+        .inflict_weather(FactionId(0), &[place], STRENGTH)
+        .expect("the faction holds the ground it storms");
+    stormy.step(1).expect("the step must run");
+    let mut settled = dry.clone();
+    settled.step(1).expect("the step must run");
+
+    let air = stormy.air_at(place).unwrap_or(0);
+    let weight = paint::air_weight(air);
+    assert!(
+        weight >= paint::air_least_weight(),
+        "the storm must put enough water over the tile to draw: {air} drops"
+    );
+
+    let camera = camera_over(&settled, place);
+    let before = corner_of(&drawn(&settled, place), camera, place);
+    let after = corner_of(&drawn(&stormy, place), camera, place);
+    assert_ne!(before, after, "the storm must change the tile at {place:?}");
+
+    // The colour the old order gave: the overlay mixed over the finished
+    // pixel. The picture must not give it, and it must keep more of the
+    // world than it did.
+    let overlaid = paint::mixed(before, paint::air_colour(), weight);
+    assert_ne!(
+        after, overlaid,
+        "the air must reach the ground before the holder mix at {place:?}"
+    );
+    assert!(
+        apart(after, paint::air_colour()) > apart(overlaid, paint::air_colour()),
+        "a storm must leave more of the holding than an overlay on the \
+         finished pixel: {after:06x} against {overlaid:06x}"
+    );
+}
+
+#[test]
+fn the_air_overlay_is_off_below_eight_pixels_a_tile() {
+    // A layer that covers every tile of the picture carries no information
+    // and costs contrast, so the overlay is off at the region scale.[^4]
+    //
+    // [^4]: Research report 23, defect 2. `docs/research/reports/23-demonstration-readability-review-1.md`
+    let (mut stormy, _) = a_held_band();
+    let mut settled = stormy.clone();
+    let place = a_held_tile(&stormy);
+    stormy
+        .inflict_weather(FactionId(0), &[place], STRENGTH)
+        .expect("the faction holds the ground it storms");
+    stormy.step(1).expect("the step must run");
+    settled.step(1).expect("the step must run");
+    assert!(
+        paint::air_weight(stormy.air_at(place).unwrap_or(0)) >= paint::air_least_weight(),
+        "the storm must put enough water over the tile to draw"
+    );
+
+    let small = 6.0;
+    let large = 10.0;
+    let read = |world: &World, tile: f32| {
+        corner_of(
+            &drawn_at(world, place, tile),
+            camera_at(world, place, tile),
+            place,
+        )
+    };
+    // The ground colour of a tile does not depend on the zoom, so a world
+    // with no storm draws the same colour at both sizes. That is what makes
+    // the difference in the stormed world the overlay and nothing else.
+    assert_eq!(
+        read(&settled, small),
+        read(&settled, large),
+        "a world with no storm must draw one colour at both sizes"
+    );
+    assert_ne!(
+        read(&stormy, small),
+        read(&stormy, large),
+        "the overlay must be off at {small} pixels a tile and on at {large}"
+    );
+}
+
+#[test]
+fn a_cell_at_rest_draws_no_air() {
+    // The air over a cell at rest gives a weight of a few parts in 255. A
+    // cell that still tinted its tiles put an edge on the cell lattice that
+    // followed nothing in the world.[^5]
+    //
+    // [^5]: Research report 24, defect 10. `docs/research/reports/24-demonstration-readability-resources-and-weather.md`
+    let (mut world, _) = a_held_band();
+    let place = a_held_tile(&world);
+    world
+        .inflict_weather(FactionId(0), &[place], STRENGTH)
+        .expect("the faction holds the ground it storms");
+
+    // The air falls tick by tick. The moment this test needs is the one at
+    // which the weight is above zero and below the floor, because that is
+    // the band the floor exists for.
+    let mut found = false;
+    for _ in 0..FALLING_TICKS {
+        world.step(1).expect("the step must run");
+        let weight = paint::air_weight(world.air_at(place).unwrap_or(0));
+        if weight > 0 && weight < paint::air_least_weight() {
+            found = true;
+            break;
+        }
+    }
+    assert!(
+        found,
+        "the fixture must reach a tick at which the air is thin and not gone"
+    );
+
+    // The overlay is off below eight pixels a tile, so the colour there is
+    // the colour of the tile with no air. A large tile must give the same
+    // colour, because a weight under the floor draws nothing.
+    let read = |tile: f32| {
+        corner_of(
+            &drawn_at(&world, place, tile),
+            camera_at(&world, place, tile),
+            place,
+        )
+    };
+    assert_eq!(
+        read(6.0),
+        read(32.0),
+        "a cell at rest must draw no overlay at any zoom"
     );
 }
 
@@ -317,23 +491,52 @@ fn a_building_site_changes_the_tile_it_stands_on() {
     );
 }
 
-#[test]
-fn a_finished_upgrade_draws_deeper_than_a_site_just_begun() {
-    let (world, soldiers) = a_held_band();
-    let mut begun = world.clone();
-    let mut finished = world;
-    let (builder, _) = soldiers
+/// The size of a tile in the pictures that read a build site, in pixels.
+///
+/// The glyph of a site sits in the middle of its tile, and so does the disc
+/// of a unit. A tile this wide leaves a corner of the glyph outside the
+/// disc, so a test reads the mark and not the builder standing on it.
+const SITE_TILE: f32 = 32.0;
+
+/// Returns a pixel inside the glyph of a build site.
+///
+/// The position lies outside the disc of a unit on the same tile, at the
+/// tile width the site tests draw at.
+fn site_pixel(canvas: &Canvas, camera: Camera, address: Axial) -> u32 {
+    let (left, top, wide, tall) = tile_rect(camera, address);
+    // The glyph fills the middle half of the tile, so its corner sits a
+    // quarter of the way in. One pixel further in is inside the glyph.
+    pixel(canvas, left + wide / 4 + 1, top + tall / 4 + 1)
+}
+
+/// Returns the first soldier standing on ground its own faction holds.
+fn a_builder(world: &World, soldiers: &[(Entity, Axial)]) -> Entity {
+    soldiers
         .iter()
         .copied()
         .find(|(soldier, _)| {
-            begun
+            world
                 .soldiers()
                 .address(*soldier)
-                .and_then(|at| begun.tile_holder(at))
+                .and_then(|at| world.tile_holder(at))
                 .and_then(Holder::faction)
                 == Some(FactionId(0))
         })
-        .expect("a soldier stands on held ground");
+        .expect("a soldier stands on held ground")
+        .0
+}
+
+#[test]
+fn a_site_under_work_marks_the_middle_and_a_finished_site_washes_the_tile() {
+    // A site under work drew as a wash whose weight ran from a floor of 56.
+    // Over a tinted tile that changes nothing a person can see, so a store
+    // two work units into its forty-eight was absent and not weak.[^6]
+    //
+    // [^6]: Research report 25, defect 1. `docs/research/reports/25-demonstration-readability-upgrades-and-units.md`
+    let (world, soldiers) = a_held_band();
+    let mut begun = world.clone();
+    let mut finished = world;
+    let builder = a_builder(&begun, &soldiers);
     assert!(begun.order_build(builder, UpgradeKind::Road));
     assert!(finished.order_build(builder, UpgradeKind::Road));
     begun.step(1).expect("the step must run");
@@ -345,9 +548,6 @@ fn a_finished_upgrade_draws_deeper_than_a_site_just_begun() {
     assert!(!site.is_complete(), "one tick finished the road");
     let address = address_of(&begun, site.tile.0);
 
-    // The finished world keeps the site under construction until the
-    // progress reaches the work of the kind. The builder may wander, so the
-    // loop is bounded and the test asserts that the work was reached.
     let mut ticks = 0;
     while finished
         .upgrade_at(address)
@@ -357,36 +557,104 @@ fn a_finished_upgrade_draws_deeper_than_a_site_just_begun() {
         finished.step(1).expect("the step must run");
         ticks += 1;
     }
-    let done = finished.upgrade_at(address).expect("the site is there");
-    assert!(done.is_complete());
 
-    // The two worlds are at different ticks, so the ground under the site
-    // may differ in stock. The comparison is of the tint alone: draw each
-    // world twice, once as it is and once with the site destroyed, and take
-    // the difference the site made.
-    let camera = camera_over(&begun, address);
-    let with_begun = corner_of(&drawn(&begun, address), camera, address);
-    let with_finished = corner_of(&drawn(&finished, address), camera, address);
+    // Each world is drawn as it is and again with the site destroyed, so the
+    // difference is the mark of the site and never the tick.
     let mut bare_begun = begun.clone();
     let mut bare_finished = finished.clone();
     assert!(bare_begun.destroy_upgrade(address));
     assert!(bare_finished.destroy_upgrade(address));
-    let without_begun = corner_of(&drawn(&bare_begun, address), camera, address);
-    let without_finished = corner_of(&drawn(&bare_finished, address), camera, address);
-
-    let depth = |with: u32, without: u32| {
-        (0..3)
-            .map(|channel| {
-                let shift = channel * 8;
-                (((with >> shift) & 0xff) as i32 - ((without >> shift) & 0xff) as i32).abs()
-            })
-            .sum::<i32>()
+    let camera = camera_at(&begun, address, SITE_TILE);
+    let read = |world: &World, at: fn(&Canvas, Camera, Axial) -> u32| {
+        at(&drawn_at(world, address, SITE_TILE), camera, address)
     };
-    assert!(
-        depth(with_finished, without_finished) > depth(with_begun, without_begun),
-        "a finished road ({with_finished:06x} over {without_finished:06x}) did not draw deeper \
-         than a site just begun ({with_begun:06x} over {without_begun:06x})"
+
+    // A site under work marks the middle of its tile and leaves the corner.
+    assert_ne!(
+        read(&begun, site_pixel),
+        read(&bare_begun, site_pixel),
+        "a site under work did not mark the middle of its tile"
     );
+    assert_eq!(
+        read(&begun, corner_of),
+        read(&bare_begun, corner_of),
+        "a site under work washed the whole tile"
+    );
+
+    // A finished site washes the whole tile, corner included.
+    assert_ne!(
+        read(&finished, corner_of),
+        read(&bare_finished, corner_of),
+        "a finished site did not wash its tile"
+    );
+}
+
+#[test]
+fn each_kind_of_build_site_draws_its_own_glyph() {
+    // The four kinds separated unevenly as washes, and none of them read as
+    // a thing that somebody made.[^6]
+    let (world, soldiers) = a_held_band();
+    let builder = a_builder(&world, &soldiers);
+    let address = world
+        .soldiers()
+        .address(builder)
+        .expect("the builder stands somewhere");
+
+    // A tile outside the band, which no unit of the fixture stands on.
+    let aside = (0..EXTENT as i32)
+        .map(|column| Axial::new(column, 0))
+        .find(|at| world.admits_a_unit(*at))
+        .expect("the world holds open ground outside the band");
+
+    let bare_camera = camera_at(&world, address, SITE_TILE);
+    let bare_corner = corner_of(&drawn_at(&world, address, SITE_TILE), bare_camera, address);
+
+    let mut colours = Vec::new();
+    for kind in UpgradeKind::ALL {
+        let mut building = world.clone();
+        assert!(building.order_build(builder, kind));
+        building.step(1).expect("the step must run");
+        // The builder stands on the site, and its disc is wider than the
+        // glyph, so it would cover the mark this test reads. The fixture
+        // moves it aside before the picture is drawn.
+        building
+            .place_soldier(builder, aside)
+            .expect("the tile aside admits the unit");
+        building.rebuild_bridge(1).expect("the bridge rebuilds");
+        assert!(
+            building
+                .upgrade_at(address)
+                .is_some_and(|site| { site.kind == kind && !site.is_complete() }),
+            "the order for {kind:?} placed no site under work at {address:?}"
+        );
+        let camera = camera_at(&building, address, SITE_TILE);
+        let canvas = drawn_at(&building, address, SITE_TILE);
+        // The glyph of each kind fills a different set of pixels, so the
+        // whole tile tells the four apart. One row does not: the bar of a
+        // road and the middle of a diamond cover the same pixels.
+        // A glyph leaves the ground around it. A wash covers the corner as
+        // well, and that is the mark this test refuses.
+        assert_eq!(
+            corner_of(&canvas, camera, address),
+            bare_corner,
+            "the mark of {kind:?} washed the whole tile"
+        );
+        let (left, top, wide, tall) = tile_rect(camera, address);
+        let block: Vec<u32> = (top..top + tall)
+            .flat_map(|row| (left..left + wide).map(move |column| (column, row)))
+            .map(|(column, row)| pixel(&canvas, column, row))
+            .collect();
+        colours.push((kind, block));
+    }
+    for (first, one) in colours.iter().enumerate() {
+        for other in colours.iter().skip(first + 1) {
+            assert_ne!(
+                one.1, other.1,
+                "the glyph of {:?} draws as the glyph of {:?}",
+                one.0, other.0
+            );
+        }
+    }
 }
 
 #[test]
@@ -414,5 +682,81 @@ fn a_luxury_marks_the_tile_that_holds_it() {
         corner_of(&drawn(&bare, place), camera, place),
         corner_of(&drawn(&rich, place), camera, place),
         "the mark covered the whole tile"
+    );
+}
+
+#[test]
+fn two_kinds_of_luxury_draw_in_two_colours() {
+    // One colour stood for every kind, and the catalogue admits sixty-four,
+    // so the mark said that a tile holds a luxury and never which one.[^7]
+    //
+    // [^7]: Research report 24, defect 7. `docs/research/reports/24-demonstration-readability-resources-and-weather.md`
+    let bare = World::new(settings()).expect("the extent describes a world");
+    let place = Axial::new(10, 10);
+    let tile = bare.grid().index_of(place).expect("the place is inside");
+
+    let mut first = bare.clone();
+    first
+        .seed_luxuries(&[(tile, LuxuryId(0))])
+        .expect("one placement seeds");
+    let mut second = bare;
+    second
+        .seed_luxuries(&[(tile, LuxuryId(3))])
+        .expect("one placement seeds");
+
+    let camera = camera_over(&first, place);
+    let (left, top, wide, tall) = tile_rect(camera, place);
+    let middle = |canvas: &Canvas| pixel(canvas, left + wide / 2, top + tall / 2);
+    assert_ne!(
+        middle(&drawn(&first, place)),
+        middle(&drawn(&second, place)),
+        "two kinds of luxury drew in one colour at {place:?}"
+    );
+}
+
+#[test]
+fn a_deposit_marks_the_corner_of_its_tile() {
+    // The ground colour carried the food alone, so a deposit of wood or of
+    // stone changed no pixel.[^8]
+    //
+    // [^8]: Research report 24, defect 5. `docs/research/reports/24-demonstration-readability-resources-and-weather.md`
+    let world = World::new(settings()).expect("the extent describes a world");
+    let grid = world.grid();
+    let stocked = |address: Axial, kind: ResourceKind| {
+        world.tile_stock(address, kind).map_or(0, |stock| stock.0)
+    };
+    let mut carrying = None;
+    let mut without = None;
+    for index in 0..grid.tile_count() {
+        let address = address_of(&world, index);
+        if world.tile_kind(address).is_none() {
+            continue;
+        }
+        if stocked(address, ResourceKind::Stone) > 0 {
+            carrying.get_or_insert(address);
+        } else {
+            without.get_or_insert(address);
+        }
+    }
+    let carrying = carrying.expect("the world holds a tile that carries stone");
+    let without = without.expect("the world holds a tile that carries no stone");
+
+    // The stone pip takes the lower left corner of the tile, inside the
+    // margin the drawing keeps.
+    let read = |address: Axial| {
+        let camera = camera_at(&world, address, SITE_TILE);
+        let canvas = drawn_at(&world, address, SITE_TILE);
+        let (left, top, wide, tall) = tile_rect(camera, address);
+        pixel(&canvas, left + wide / 5, top + tall - tall / 5)
+    };
+    assert_eq!(
+        read(carrying),
+        paint::resource_pip_colour(ResourceKind::Stone),
+        "a tile that carries stone must mark its corner at {carrying:?}"
+    );
+    assert_ne!(
+        read(without),
+        paint::resource_pip_colour(ResourceKind::Stone),
+        "a tile that carries no stone must mark nothing at {without:?}"
     );
 }

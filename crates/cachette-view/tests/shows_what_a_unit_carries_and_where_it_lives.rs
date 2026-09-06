@@ -231,18 +231,32 @@ fn the_card_appears_only_when_something_is_carried() {
     );
     assert!(later.units_carrying() > 0, "the fixture carried nothing");
 
+    // The key holds the card of its own. While the key is off the window
+    // shows one card, and the load takes a row of it.[^3]
+    //
+    // [^3]: Research report 23, defect 5. `docs/research/reports/23-demonstration-readability-review-1.md`
     let heading = "WHAT THEY CARRY";
     assert!(
-        !glass::says(&early, false)
-            .iter()
-            .any(|line| line == heading),
-        "the glass drew the load card when nothing was carried",
+        !glass::says(&early, true).iter().any(|line| line == heading),
+        "the key drew the load card when nothing was carried",
     );
     assert!(
-        glass::says(&later, false)
+        glass::says(&later, true).iter().any(|line| line == heading),
+        "the key hid the load card when something was carried",
+    );
+
+    let row = |readout: &cachette_view::Readout| {
+        glass::says(readout, false)
             .iter()
-            .any(|line| line == heading),
-        "the glass hid the load card when something was carried",
+            .any(|line| line.starts_with("carrying: "))
+    };
+    assert!(
+        !row(&early),
+        "the one card stated a load when nothing was carried",
+    );
+    assert!(
+        row(&later),
+        "the one card lost the load when something was carried",
     );
 }
 

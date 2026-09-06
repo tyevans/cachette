@@ -49,7 +49,7 @@ use cachette_core::founding::FoundingOutcome;
 use cachette_core::hex::NEIGHBOURS;
 use cachette_core::resource::{ResourceKind, RESOURCE_KIND_COUNT};
 use cachette_core::terrain::{TileKind, KIND_COUNT};
-use cachette_core::upgrade::{UpgradeSite, UPGRADE_KIND_COUNT};
+use cachette_core::upgrade::{UpgradeKind, UpgradeSite, UPGRADE_KIND_COUNT};
 use cachette_core::{Axial, BridgeError, Entity, FactionId, Holder, World};
 
 use crate::text;
@@ -91,11 +91,95 @@ const AIR_AT_FULL_SHADE: i64 = 4096;
 /// How much of the air colour covers a tile at the full shade.
 const AIR_WEIGHT_CEILING: i64 = 150;
 
-/// The brightness taken from every channel of a tile on wet ground.
-const WET_SHADE: i32 = 34;
+/// The blue the viewer adds to a tile on wet ground.
+///
+/// **Wet ground moves the blue channel and never the brightness.** The layer
+/// used to take the same number from every channel, which is the number the
+/// full food ramp added, so the two cancelled exactly.[^1]
+///
+/// # References
+///
+/// [^1]: Research report 24, defect 3. `docs/research/reports/24-demonstration-readability-resources-and-weather.md`
+const WET_BLUE_GAIN: i32 = 44;
 
-/// The colour of the mark on a tile that holds a luxury.
-const LUXURY_MARK: u32 = 0x00ff_5ad2;
+/// The smallest tile width at which the viewer draws the air overlay, in
+/// pixels.
+///
+/// A layer that covers every tile of the picture carries no information and
+/// costs contrast. Below this width the overlay is a wash over the whole
+/// window, and a watcher reads a pale world rather than a storm.[^1]
+///
+/// # References
+///
+/// [^1]: Research report 23, defect 2. `docs/research/reports/23-demonstration-readability-review-1.md`
+const AIR_LEAST_TILE: f32 = 8.0;
+
+/// The smallest weight at which the viewer draws the air overlay.
+///
+/// The air over a cell at rest gives a weight of a few parts in 255. A cell
+/// at rest that still tinted its tiles put an edge on the cell lattice that
+/// followed nothing in the world.[^1]
+///
+/// # References
+///
+/// [^1]: Research report 24, defect 10. `docs/research/reports/24-demonstration-readability-resources-and-weather.md`
+const AIR_LEAST_WEIGHT: u8 = 8;
+
+/// The stride the luxury hue turns by, for each step of the kind ordinal.
+///
+/// The stride is odd and shares no factor with the wheel, so the kinds the
+/// catalogue numbers together do not draw together.
+const LUXURY_HUE_STRIDE: u32 = 37;
+
+/// The smallest tile width at which the viewer draws a deposit pip, in
+/// pixels.
+///
+/// A pip needs a few pixels of its own and a margin around it. Below this
+/// width the tile has no room, and the pips would read as speckle.[^1]
+///
+/// # References
+///
+/// [^1]: Research report 24, defect 5. `docs/research/reports/24-demonstration-readability-resources-and-weather.md`
+const PIP_LEAST_TILE: f32 = 16.0;
+
+/// The smallest tile width at which a build site draws its glyph, in pixels.
+///
+/// A glyph needs a few pixels of shape, and a window at the region scale
+/// holds thousands of tiles. Hundreds of small glyphs are speckle, and the
+/// wash is the better mark at that zoom because a field of built tiles reads
+/// as one field.[^1]
+///
+/// The width is the width at which the tile also carries a gap and a deposit
+/// pip, so the close zooms carry every per-tile mark together and the far
+/// zooms carry none of them.
+///
+/// # References
+///
+/// [^1]: Research report 25, defect 1. `docs/research/reports/25-demonstration-readability-upgrades-and-units.md`
+const SITE_LEAST_TILE: f32 = 16.0;
+
+/// The stock at which a deposit pip draws at its largest.
+///
+/// This is a property of the picture and not of the world, in the same way
+/// the food ramp bound is.
+const PIP_AT_FULL_SIZE: i32 = 8;
+
+/// One colour for each kind of resource, in the order of the kinds.
+///
+/// A pip carries the colour of what the ground holds. The colours are the
+/// viewer's own, and the engine holds none.[^1]
+///
+/// # References
+///
+/// [^1]: ADR-0067, the viewer reads the world and never writes to it, decision D2. `docs/adrs/accepted/adr-0067-the-viewer-reads-the-world-and-never-writes-to-it.md`
+const PIP_COLOURS: [u32; RESOURCE_KIND_COUNT] = [
+    // Food. Pale green.
+    0x00b8_e05a,
+    // Wood. Warm brown.
+    0x008a_5a2a,
+    // Stone. Pale grey.
+    0x00c8_ccd0,
+];
 
 /// The colour of the space outside the world.
 ///
@@ -140,20 +224,24 @@ const KIND_COLOURS: [u32; KIND_COUNT] = [
 /// tall tile of one kind is brighter than a short tile of the same kind.
 const HEIGHT_STEPS: i32 = 56;
 
-/// The number of brightness steps that the food of a tile gives it.
+/// How much a full deposit raises the saturation of a tile, in parts of 255.
 ///
 /// The ground is fixed for the life of a world. The food on it is not: the
 /// ground generates a stock, a gatherer takes from it, and the recovery pass
 /// gives part of it back.[^1] A watcher therefore reads a deposit drain and
 /// recover from the colour of the ground it sits on.
 ///
-/// The range is smaller than the height range, so a full deposit brightens a
-/// tile without hiding the relief under it.
+/// **The food moves the saturation and the height moves the brightness.**
+/// The two used to add into one brightness, and a wet tile with the most food
+/// then drew as the same colour as a dry tile with none, because the wet
+/// shade took the same number from every channel.[^2] Two layers that move
+/// one axis in opposite directions carry no information between them.
 ///
 /// # References
 ///
 /// [^1]: ADR-0072, a tile stock is generated, and only what was taken is stored, decision D4. `docs/adrs/accepted/adr-0072-a-tile-stock-is-generated-and-only-what-was-taken-is-stored.md`
-const FOOD_STEPS: i32 = 34;
+/// [^2]: Research report 24, defects 3 and 9. `docs/research/reports/24-demonstration-readability-resources-and-weather.md`
+const FOOD_SATURATION: i32 = 150;
 
 /// The food at which a tile draws at its brightest.
 ///
@@ -259,6 +347,86 @@ pub const fn shortage_colour() -> u32 {
     SHORTAGE
 }
 
+/// Returns the colour the viewer draws one kind of upgrade in.
+///
+/// A test and the colour key read this rather than a literal, so the table
+/// has one declaration site.[^1]
+///
+/// # References
+///
+/// [^1]: Recurring Defect Shapes, shape 1. `.claude/rules/recurring-defects.md`
+#[must_use]
+pub fn upgrade_colour(kind: UpgradeKind) -> u32 {
+    UPGRADE_COLOURS[kind.index()]
+}
+
+/// Returns the colour the viewer draws the pip of one resource in.
+///
+/// A test and the colour key read this rather than a literal, so the table
+/// has one declaration site.[^1]
+///
+/// # References
+///
+/// [^1]: Recurring Defect Shapes, shape 1. `.claude/rules/recurring-defects.md`
+#[must_use]
+pub fn resource_pip_colour(kind: ResourceKind) -> u32 {
+    PIP_COLOURS[kind as usize]
+}
+
+/// Returns the colour of the rim the viewer draws around a unit disc.
+///
+/// The rim is what makes a unit visible over ground its own faction tints,
+/// and below sixteen pixels a tile it is most of the unit.[^1] A test reads
+/// this rather than a literal, so the rim has one declaration site.[^2]
+///
+/// # References
+///
+/// [^1]: Research report 23, defect 1. `docs/research/reports/23-demonstration-readability-review-1.md`
+/// [^2]: Recurring Defect Shapes, shape 1. `.claude/rules/recurring-defects.md`
+#[must_use]
+pub const fn unit_rim_colour() -> u32 {
+    UNIT_RIM
+}
+
+/// Returns the smallest weight at which the viewer draws the air overlay.
+///
+/// A test reads this rather than a literal, so the floor has one declaration
+/// site.[^1]
+///
+/// # References
+///
+/// [^1]: Recurring Defect Shapes, shape 1. `.claude/rules/recurring-defects.md`
+#[must_use]
+pub const fn air_least_weight() -> u8 {
+    AIR_LEAST_WEIGHT
+}
+
+/// Returns the colour the viewer mixes over a tile for the water in the air.
+///
+/// A test reads this rather than a literal, so the colour has one
+/// declaration site.[^1]
+///
+/// # References
+///
+/// [^1]: Recurring Defect Shapes, shape 1. `.claude/rules/recurring-defects.md`
+#[must_use]
+pub const fn air_colour() -> u32 {
+    AIR_COLOUR
+}
+
+/// Returns two colours mixed by a weight, one channel at a time.
+///
+/// A test that must state what a layer would have given reads this rather
+/// than repeating the arithmetic.[^1]
+///
+/// # References
+///
+/// [^1]: Recurring Defect Shapes, shape 1. `.claude/rules/recurring-defects.md`
+#[must_use]
+pub fn mixed(under: u32, over: u32, weight: u8) -> u32 {
+    mix(under, over, weight)
+}
+
 /// Returns the colour the viewer marks a place a faction founded in.
 ///
 /// The founding mark carries the colour of the faction that founded, from the
@@ -349,12 +517,65 @@ const SHORTAGE: u32 = 0x00f2_f0d8;
 /// ground and then reads the ring for the faction that took it.
 const FOUNDING_CORE: u32 = 0x0014_0b04;
 
+/// The smallest radius a unit disc takes, in pixels.
+///
+/// A disc of three tenths of the tile is one pixel across at the region
+/// scale, in the colour of the faction, over ground the same faction tints.
+/// A watcher then reads a world of no people. The floor holds the disc above
+/// the ground speckle at every zoom.[^1]
+///
+/// # References
+///
+/// [^1]: Research report 23, defect 1. `docs/research/reports/23-demonstration-readability-review-1.md`
+const UNIT_LEAST_RADIUS: i32 = 3;
+
+/// The colour of the rim around a unit disc.
+///
+/// Every faction colour collides with the ground its own faction holds,
+/// because the tint and the disc carry one colour at two weights. The rim is
+/// darker than any ground colour, so the shape of a unit reads against the
+/// tint under it.[^1]
+///
+/// # References
+///
+/// [^1]: Research report 23, defect 1. `docs/research/reports/23-demonstration-readability-review-1.md`
+const UNIT_RIM: u32 = 0x0008_0a0c;
+
+/// The tile width from which a crowd shows its count as a badge, in pixels.
+///
+/// Above this width a tile has room for a number beside the disc. Below it
+/// the disc grows with the count instead, because a glyph of six pixels does
+/// not fit on a tile of twelve.[^1]
+///
+/// # References
+///
+/// [^1]: Research report 25, defect 4. `docs/research/reports/25-demonstration-readability-upgrades-and-units.md`
+const CROWD_BADGE_TILE: f32 = 24.0;
+
+/// The tile width from which a unit shows where it came from, in pixels.
+///
+/// The line runs from the tile the unit left to the tile it stands on. Below
+/// this width the line is shorter than the disc and reads as noise.[^1]
+///
+/// # References
+///
+/// [^1]: Research report 23, defect 3. `docs/research/reports/23-demonstration-readability-review-1.md`
+const HEADING_TILE: f32 = 24.0;
+
 /// The smallest side a founding mark takes, in pixels.
 ///
 /// The mark is three nested rings, so it needs at least five pixels a side.
 /// A watcher who zooms out to a tile of two pixels still finds the places
 /// that founded.
-const FOUNDING_LEAST_SIDE: i32 = 7;
+///
+/// **A seven pixel square is the size of a unit and the shape of the grid.**
+/// A watcher who did not know where to look did not find it. The floor is
+/// the side at which the three rings each separate.[^1]
+///
+/// # References
+///
+/// [^1]: Research report 23, defect 10. `docs/research/reports/23-demonstration-readability-review-1.md`
+const FOUNDING_LEAST_SIDE: i32 = 15;
 
 /// A pixel buffer that the viewer paints and the window shows.
 /// The drawn unit nearest the middle of the window.
@@ -1028,6 +1249,70 @@ impl<'a> Canvas<'a> {
             }
         }
     }
+
+    /// Fills a disc divided into one wedge for each colour, inside a rim.
+    ///
+    /// **A tile that two factions stand on shows both.** The pass used to
+    /// paint one disc for each unit at the same centre, so the last unit the
+    /// structure gave covered every earlier one and the colour of a shared
+    /// tile was the colour of whichever unit came last.[^1]
+    ///
+    /// The wedges run in the order the caller gives, which is ascending
+    /// colour order, so the picture does not depend on the order the units
+    /// arrived in.[^2]
+    ///
+    /// # References
+    ///
+    /// [^1]: Research report 25, defect 5. `docs/research/reports/25-demonstration-readability-upgrades-and-units.md`
+    /// [^2]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
+    fn fill_wedges(&mut self, cx: i32, cy: i32, radius: i32, colours: &[u32], rim: u32) {
+        if colours.is_empty() {
+            return;
+        }
+        let inner = (radius - 1).max(0);
+        for row in -radius..=radius {
+            for column in -radius..=radius {
+                let far = column * column + row * row;
+                if far > radius * radius {
+                    continue;
+                }
+                let colour = if far > inner * inner {
+                    rim
+                } else {
+                    colours[wedge_of(column, row, colours.len())]
+                };
+                self.put(cx + column, cy + row, colour);
+            }
+        }
+    }
+
+    /// Draws a straight line of one pixel between two points.
+    ///
+    /// The step count comes from the longer side, so the line has no gap.
+    fn line(&mut self, from: (f32, f32), to: (f32, f32), colour: u32) {
+        let (across, down) = (to.0 - from.0, to.1 - from.1);
+        let steps = across.abs().max(down.abs()).ceil().max(1.0);
+        let count = steps as i32;
+        for step in 0..=count {
+            let share = step as f32 / steps;
+            self.put(
+                (from.0 + across * share) as i32,
+                (from.1 + down * share) as i32,
+                colour,
+            );
+        }
+    }
+}
+
+/// Returns the wedge that a pixel of a disc falls in.
+///
+/// The angle runs from the direction of the negative horizontal axis, so a
+/// disc of two wedges splits left and right and the split does not depend on
+/// the arithmetic of the caller.
+fn wedge_of(column: i32, row: i32, count: usize) -> usize {
+    let angle = (row as f32).atan2(column as f32);
+    let share = (angle + std::f32::consts::PI) / (2.0 * std::f32::consts::PI);
+    ((share * count as f32) as usize).min(count - 1)
 }
 
 /// Where the world sits on the screen.
@@ -1476,13 +1761,45 @@ fn tile_colour(kind: TileKind, height: i32, food: u32) -> u32 {
     // The height is a fraction of the full range in Q16.16, so the unit is
     // 65536. The shift maps the fraction onto the brightness steps.
     let relief = (height.clamp(0, 0x0001_0000) * HEIGHT_STEPS) >> 16;
-    // The food is a whole number of units. The ramp saturates at the shade
-    // bound, so a tile above it draws the same as a tile at it.
+    let channel = |offset: u32| (((base >> offset) & 0xff) as i32 + relief).clamp(0, 0xff) as u32;
+    let lit = (channel(16) << 16) | (channel(8) << 8) | channel(0);
+    // The food is a whole number of units. The ramp saturates at the bound
+    // the viewer chose, so a tile above it draws the same as a tile at it.
     let stock = food.min(FOOD_AT_FULL_SHADE) as i32;
-    let larder = (stock * FOOD_STEPS) / FOOD_AT_FULL_SHADE as i32;
-    let shade = relief + larder;
-    let channel = |offset: u32| (((base >> offset) & 0xff) as i32 + shade).clamp(0, 0xff) as u32;
-    (channel(16) << 16) | (channel(8) << 8) | channel(0)
+    let share = (stock * FOOD_SATURATION) / FOOD_AT_FULL_SHADE as i32;
+    saturated(lit, share)
+}
+
+/// Returns a colour with its channels moved away from their own mean.
+///
+/// The mean is the brightness of the colour, and it does not move. The share
+/// is in parts of 255, so a share of zero returns the colour unchanged.
+///
+/// The arithmetic is on whole numbers and the result goes to a pixel and
+/// nowhere else.[^1]
+///
+/// # References
+///
+/// [^1]: ADR-0067, the viewer reads the world and never writes to it, decision D3. `docs/adrs/accepted/adr-0067-the-viewer-reads-the-world-and-never-writes-to-it.md`
+fn saturated(colour: u32, share: i32) -> u32 {
+    let channel = |offset: u32| ((colour >> offset) & 0xff) as i32;
+    let (red, green, blue) = (channel(16), channel(8), channel(0));
+    let mean = (red + green + blue) / 3;
+    let moved = |value: i32| (mean + (value - mean) * (255 + share) / 255).clamp(0, 0xff) as u32;
+    (moved(red) << 16) | (moved(green) << 8) | moved(blue)
+}
+
+/// Returns a colour with the blue of wet ground added to it.
+///
+/// The red and the green do not move, so the layer cannot cancel the food
+/// ramp or the relief.[^1]
+///
+/// # References
+///
+/// [^1]: Research report 24, defect 3. `docs/research/reports/24-demonstration-readability-resources-and-weather.md`
+fn wetted(colour: u32, gain: i32) -> u32 {
+    let blue = ((colour & 0xff) as i32 + gain).clamp(0, 0xff) as u32;
+    (colour & 0x00ff_ff00) | blue
 }
 
 /// Returns the colour the viewer draws one kind of ground in, at the middle
@@ -1603,7 +1920,24 @@ pub fn draw_paced(
             // read costs one array read through the cell of the tile, and a
             // dry world skips it.
             if !dry && world.ground_is_wet(address) == Some(true) {
-                ground_colour = darkened(ground_colour, WET_SHADE);
+                ground_colour = wetted(ground_colour, WET_BLUE_GAIN);
+            }
+            // The water in the air over this tile, mixed into the ground
+            // before the holder takes its share. A storm used to cover the
+            // finished pixel at a weight near the holder weight, in a colour
+            // no faction uses, so a stormed holding lost its colour.[^15]
+            //
+            // The overlay is off below a tile width the viewer names, and a
+            // weight under the floor draws nothing, so a resting world shows
+            // no wash and no cell lattice.[^15] [^16]
+            //
+            // [^15]: Research report 24, defects 4 and 10. `docs/research/reports/24-demonstration-readability-resources-and-weather.md`
+            // [^16]: Research report 23, defect 2. `docs/research/reports/23-demonstration-readability-review-1.md`
+            if !dry && camera.tile_width >= AIR_LEAST_TILE {
+                let weight = air_weight(world.air_at(address).unwrap_or(0));
+                if weight >= AIR_LEAST_WEIGHT {
+                    ground_colour = mix(ground_colour, AIR_COLOUR, weight);
+                }
             }
             let (left, top, wide, tall) = tile_rect(camera, address);
 
@@ -1648,29 +1982,62 @@ pub fn draw_paced(
             // skips it.[^8]
             if any_upgrade {
                 if let Some(site) = world.upgrade_at(address) {
-                    canvas.shade(
-                        left,
-                        top,
-                        wide,
-                        tall,
-                        UPGRADE_COLOURS[site.kind.index()],
-                        upgrade_weight(site),
-                    );
+                    if site.is_complete() || camera.tile_width < SITE_LEAST_TILE {
+                        canvas.shade(
+                            left,
+                            top,
+                            wide,
+                            tall,
+                            UPGRADE_COLOURS[site.kind.index()],
+                            upgrade_weight(site),
+                        );
+                    } else {
+                        // A site under work draws as a glyph and not as a
+                        // wash. A wash at the weight the progress gives is
+                        // the colour of the ground under it, so a store two
+                        // work units into its forty-eight was absent rather
+                        // than weak.[^17]
+                        //
+                        // [^17]: Research report 25, defect 1. `docs/research/reports/25-demonstration-readability-upgrades-and-units.md`
+                        mark_site(canvas, left, top, wide, tall, site.kind);
+                    }
                 }
+            }
+            // A pip in a corner of the tile for each resource the tile still
+            // holds. The ground carried food as a brightness and carried
+            // wood and stone not at all.[^18]
+            //
+            // The pips draw at the close zooms only, so the extra reads
+            // follow a window of a few hundred tiles.[^18]
+            //
+            // [^18]: Research report 24, defect 5. `docs/research/reports/24-demonstration-readability-resources-and-weather.md`
+            if camera.tile_width >= PIP_LEAST_TILE {
+                mark_deposits(
+                    world,
+                    canvas,
+                    address,
+                    ground.kind,
+                    food.0,
+                    left,
+                    top,
+                    wide,
+                    tall,
+                );
             }
             // The luxuries of this tile. The field is a sorted table of the
             // tiles that hold one, so the read is one binary search, and a
             // world with no deposit skips it.
-            if any_luxury && !world.luxuries_at(tile).is_empty() {
-                mark_luxury(canvas, left, top, wide, tall);
-            }
-            // The water in the air over this tile, as an overlay on whatever
-            // was painted under it. The read costs one array read through
-            // the cell of the tile.[^7]
-            if !dry {
-                let air = world.air_at(address).unwrap_or(0);
-                if air > 0 {
-                    canvas.shade(left, top, wide, tall, AIR_COLOUR, air_weight(air));
+            if any_luxury {
+                let set = world.luxuries_at(tile);
+                if !set.is_empty() {
+                    mark_luxury(
+                        canvas,
+                        left,
+                        top,
+                        wide,
+                        tall,
+                        set.to_bits().trailing_zeros(),
+                    );
                 }
             }
             canvas.tiles_painted += 1;
@@ -1678,7 +2045,12 @@ pub fn draw_paced(
         }
     }
 
-    let radius = ((camera.tile_width * 0.3) as i32).max(1);
+    // The floor holds a unit visible below sixteen pixels a tile, where a
+    // disc of three tenths of the tile is one pixel of the faction colour
+    // over ground that the same faction tints.[^14]
+    //
+    // [^14]: Research report 23, defect 1. `docs/research/reports/23-demonstration-readability-review-1.md`
+    let radius = ((camera.tile_width * 0.3) as i32).max(UNIT_LEAST_RADIUS);
     // The table opens before the pass that paints and closes after it, so a
     // unit the pass did not paint is gone from it when the frame ends.
     motion.begin();
@@ -1733,6 +2105,22 @@ pub fn mark_foundings(camera: Camera, canvas: &mut Canvas, outcomes: &[FoundingO
             continue;
         }
         let colour = faction_colour(outcome.faction());
+        // The seat tile itself, filled in the faction colour with a dark
+        // core. A ring alone marked the founding and left the place drawing
+        // like every tile beside it, so a watcher read a selection cursor
+        // and not a settlement.[^4]
+        //
+        // [^4]: Research report 23, defect 4, and research report 24, defect 8. `docs/research/reports/23-demonstration-readability-review-1.md`
+        let (seat_left, seat_top, seat_wide, seat_tall) = tile_rect(camera, founding.place());
+        canvas.fill_rect(seat_left, seat_top, seat_wide, seat_tall, colour);
+        let inset = (seat_wide.min(seat_tall) / 4).max(1);
+        canvas.fill_rect(
+            seat_left + inset,
+            seat_top + inset,
+            (seat_wide - inset * 2).max(1),
+            (seat_tall - inset * 2).max(1),
+            FOUNDING_CORE,
+        );
         let left = x as i32 - side / 2;
         let top = y as i32 - side / 2;
         outline(canvas, left, top, side, side, colour);
@@ -1774,19 +2162,6 @@ fn on_an_edge(world: &World, address: Axial, holder: Option<Holder>, canvas: &mu
     edge
 }
 
-/// Returns a colour with the same brightness taken from every channel.
-///
-/// The arithmetic is on whole numbers, and the result goes to a pixel and
-/// nowhere else.[^1]
-///
-/// # References
-///
-/// [^1]: ADR-0067, the viewer reads the world and never writes to it, decision D3. `docs/adrs/accepted/adr-0067-the-viewer-reads-the-world-and-never-writes-to-it.md`
-fn darkened(colour: u32, shade: i32) -> u32 {
-    let channel = |offset: u32| (((colour >> offset) & 0xff) as i32 - shade).clamp(0, 0xff) as u32;
-    (channel(16) << 16) | (channel(8) << 8) | channel(0)
-}
-
 /// Returns how much of the upgrade colour covers a tile, from its progress.
 ///
 /// A site that has just begun draws at the floor and a finished site at the
@@ -1804,7 +2179,15 @@ fn upgrade_weight(site: UpgradeSite) -> u8 {
 ///
 /// The shade saturates at the drops the viewer chose, so a storm above that
 /// draws the same as a storm at it.
-fn air_weight(drops: i64) -> u8 {
+///
+/// A test reads this rather than repeating the arithmetic, so the weight has
+/// one declaration site.[^1]
+///
+/// # References
+///
+/// [^1]: Recurring Defect Shapes, shape 1. `.claude/rules/recurring-defects.md`
+#[must_use]
+pub fn air_weight(drops: i64) -> u8 {
     let held = drops.clamp(0, AIR_AT_FULL_SHADE);
     u8::try_from(held * AIR_WEIGHT_CEILING / AIR_AT_FULL_SHADE).unwrap_or(u8::MAX)
 }
@@ -1814,11 +2197,148 @@ fn air_weight(drops: i64) -> u8 {
 /// The mark is a square of one third of the tile, and at least one pixel, so
 /// the ground shows around it and a watcher still finds it at the smallest
 /// zoom.
-fn mark_luxury(canvas: &mut Canvas, left: i32, top: i32, wide: i32, tall: i32) {
+///
+/// The ordinal is the lowest luxury the tile carries. The hue comes from it,
+/// because one colour for every kind said that a tile holds a luxury and
+/// never which one.[^1]
+///
+/// # References
+///
+/// [^1]: Research report 24, defect 7. `docs/research/reports/24-demonstration-readability-resources-and-weather.md`
+fn mark_luxury(canvas: &mut Canvas, left: i32, top: i32, wide: i32, tall: i32, ordinal: u32) {
     let side = (wide.min(tall) / 3).max(1);
     let x = left + (wide - side) / 2;
     let y = top + (tall - side) / 2;
-    canvas.fill_rect(x, y, side, side, LUXURY_MARK);
+    canvas.fill_rect(x, y, side, side, luxury_colour(ordinal));
+}
+
+/// Returns the colour the viewer marks one kind of luxury in.
+///
+/// The hue turns with the ordinal, and the stride is odd, so two kinds that
+/// the catalogue numbers together do not draw together. The colour is the
+/// viewer's own, and the engine holds none.[^1]
+///
+/// # References
+///
+/// [^1]: ADR-0067, the viewer reads the world and never writes to it, decision D2. `docs/adrs/accepted/adr-0067-the-viewer-reads-the-world-and-never-writes-to-it.md`
+#[must_use]
+pub fn luxury_colour(ordinal: u32) -> u32 {
+    let position = (ordinal.wrapping_mul(LUXURY_HUE_STRIDE)) % 256;
+    let turn = position * 6;
+    let sector = turn / 256;
+    let rise = turn % 256;
+    let fall = 255 - rise;
+    let (red, green, blue) = match sector {
+        0 => (255, rise, 0),
+        1 => (fall, 255, 0),
+        2 => (0, 255, rise),
+        3 => (0, fall, 255),
+        4 => (rise, 0, 255),
+        _ => (255, 0, fall),
+    };
+    (red << 16) | (green << 8) | blue
+}
+
+/// Paints the glyph of a build site in the middle of a tile.
+///
+/// Each kind takes a shape of its own, drawn over a dark square, so a watcher
+/// reads a made thing and not a shade of the ground.[^1]
+///
+/// # References
+///
+/// [^1]: Research report 25, defect 1. `docs/research/reports/25-demonstration-readability-upgrades-and-units.md`
+fn mark_site(canvas: &mut Canvas, left: i32, top: i32, wide: i32, tall: i32, kind: UpgradeKind) {
+    // Half the tile. The ground shows around the glyph, so a watcher reads
+    // the kind of ground and the thing somebody is making on it at once.
+    let side = (wide.min(tall) / 2).max(3);
+    let x = left + (wide - side) / 2;
+    let y = top + (tall - side) / 2;
+    // The dark square is the rim. It separates every glyph from the ground
+    // under it, whatever the ground is.
+    canvas.fill_rect(x, y, side, side, UNIT_RIM);
+    let colour = UPGRADE_COLOURS[kind.index()];
+    let bar = (side / 4).max(1);
+    match kind {
+        // A made way: one bar across the tile.
+        UpgradeKind::Road => canvas.fill_rect(x, y + (side - bar) / 2, side, bar, colour),
+        // Worked ground: two bars, one above the other.
+        UpgradeKind::Terrace => {
+            canvas.fill_rect(x, y + bar, side, bar, colour);
+            canvas.fill_rect(x, y + side - bar * 2, side, bar, colour);
+        }
+        // A great work: a diamond.
+        UpgradeKind::Wonder => {
+            let half = side / 2;
+            for row in 0..side {
+                let reach = half - (row - half).abs();
+                canvas.fill_rect(x + half - reach, y + row, reach * 2 + 1, 1, colour);
+            }
+        }
+        // A storehouse: a solid block inside the square.
+        UpgradeKind::Store => canvas.fill_rect(
+            x + bar,
+            y + bar,
+            (side - bar * 2).max(1),
+            (side - bar * 2).max(1),
+            colour,
+        ),
+    }
+}
+
+/// Paints one pip in a corner of a tile for each resource it still holds.
+///
+/// The pip grows with the amount, so a watcher reads a rich deposit from a
+/// poor one and watches a deposit drain.[^1]
+///
+/// **A resource the tile no longer holds draws no pip.** The colour of the
+/// ground carries the food, and the pips carry all three, so an empty corner
+/// and a small pip are the two states a watcher must tell apart.
+///
+/// The food is the stock the tile pass already read. The other two are one
+/// read each, and the caller draws no pip below the tile width it names, so
+/// the reads follow a window of a few hundred tiles.[^1]
+///
+/// # References
+///
+/// [^1]: Research report 24, defect 5. `docs/research/reports/24-demonstration-readability-resources-and-weather.md`
+#[allow(clippy::too_many_arguments)]
+fn mark_deposits(
+    world: &World,
+    canvas: &mut Canvas,
+    address: Axial,
+    ground: TileKind,
+    food: u32,
+    left: i32,
+    top: i32,
+    wide: i32,
+    tall: i32,
+) {
+    let margin = (wide.min(tall) / 6).max(1);
+    // A pip reaches a sixth of the tile at the stock the viewer chose. A
+    // larger pip crowds a window in which most tiles carry something.
+    let most = (wide.min(tall) / 6).max(2);
+    for kind in ResourceKind::ALL {
+        let held = if kind == ResourceKind::Food {
+            food
+        } else {
+            match world.tile_stock_of_ground(address, ground, kind) {
+                Some(stock) => stock.0,
+                None => continue,
+            }
+        };
+        if held == 0 {
+            continue;
+        }
+        let side = ((held as i32).min(PIP_AT_FULL_SIZE) * most / PIP_AT_FULL_SIZE).max(2);
+        // One corner for each kind, so two kinds on one tile never overlap.
+        let (x, y) = match kind as usize {
+            0 => (left + margin, top + margin),
+            1 => (left + wide - margin - side, top + margin),
+            _ => (left + margin, top + tall - margin - side),
+        };
+        outline(canvas, x - 1, y - 1, side + 2, side + 2, UNIT_RIM);
+        canvas.fill_rect(x, y, side, side, PIP_COLOURS[kind as usize]);
+    }
 }
 
 /// Draws a one pixel border inside a rectangle.
@@ -1842,24 +2362,34 @@ fn outline(canvas: &mut Canvas, left: i32, top: i32, wide: i32, tall: i32, colou
 /// [^1]: Findings register, FND-207. `docs/FINDINGS.md`
 const TILE_GAP: i32 = 1;
 
-/// Returns the gap to leave under a tile of a given width.
+/// The smallest tile width that carries a gap, in pixels.
 ///
-/// **A separator that covers more of the picture than the thing it separates
-/// is not a separator.** A tile `w` pixels across keeps `w - 1` pixels of
-/// colour in each direction, so the gap takes `1 - ((w - 1) / w)^2` of the
-/// cell. That share reaches one half when `w * (1 - 1 / sqrt(2))` reaches
-/// one, near three and a half pixels. Below that width the drawing leaves the
-/// gap out, and the colour change from one tile to the next is what separates
-/// them.
+/// **A separator that takes a quarter of the cell is the picture.** At eight
+/// pixels a tile the gap covers about a quarter of the area, the rows step by
+/// half a tile, and a watcher reads the stagger of the bricks before the
+/// ground.[^1]
 ///
-/// The bound is derived from that identity. It is not read off a picture, and
-/// it does not depend on the world, the seed or the window.[^1]
+/// The share the gap takes of a cell is `1 - ((w - 1) / w)^2`, which is about
+/// one eighth at this width and about one half near three and a half pixels.
+/// The earlier bound was the width at which the gap takes half the cell,
+/// which is the width at which it is no longer a separator at all. This is
+/// the width at which it stops dominating.
 ///
 /// # References
 ///
-/// [^1]: Findings register, FND-207. `docs/FINDINGS.md`
+/// [^1]: Research report 23, defect 6. `docs/research/reports/23-demonstration-readability-review-1.md`
+const GAP_LEAST_TILE: f32 = 16.0;
+
+/// Returns the gap to leave under a tile of a given width.
+///
+/// Below the least width the drawing leaves the gap out, and the colour
+/// change from one tile to the next is what separates them.[^1]
+///
+/// # References
+///
+/// [^1]: Research report 23, defect 6. `docs/research/reports/23-demonstration-readability-review-1.md`
 fn gap_for(tile_width: f32) -> i32 {
-    if tile_width * (1.0 - std::f32::consts::FRAC_1_SQRT_2) >= 1.0 {
+    if tile_width >= GAP_LEAST_TILE {
         TILE_GAP
     } else {
         0
@@ -2006,6 +2536,9 @@ fn draw_soldiers(
             // [^5]: ADR-0018, the unit-to-tile bridge is derived, and it rebuilds at the barrier, decision D2. `docs/adrs/accepted/adr-0018-the-unit-to-tile-bridge-is-derived-and-rebuilds-at-the-barrier.md`
             // [^6]: ADR-0070, the head-up display reports what the drawing pass read, decision D1. `docs/adrs/accepted/adr-0070-the-head-up-display-reports-what-the-drawing-pass-read.md`
             let mut run: Option<(Axial, u32)> = None;
+            // The units of the tile the run holds, kept until the run closes
+            // so that the crowd draws as one thing.
+            let mut crowd: Vec<Painted> = Vec::new();
             for soldier in units {
                 let Some(address) = arena.address(*soldier) else {
                     continue;
@@ -2028,13 +2561,24 @@ fn draw_soldiers(
                 // visited, nor the order they are visited in.
                 //
                 // [^13]: ADR-0067, the viewer reads the world and never writes to it, decision D2. `docs/adrs/accepted/adr-0067-the-viewer-reads-the-world-and-never-writes-to-it.md`
+                //
+                // The tile the unit stood on at the last frame is also the
+                // tail of the heading line. The table answers by key, so its
+                // order reaches no pixel.[^13]
+                let came_from = motion.moving_from(*soldier).filter(|&from| from != address);
                 let (x, y) = match motion.place(*soldier, address, pace.phase) {
                     Some(from) => between(camera.centre_of(from), (x, y), pace.phase),
                     None => (x, y),
                 };
                 let slot = colour_slot(faction);
-                canvas.fill_disc(x as i32, y as i32, radius, FACTION_COLOURS[slot]);
                 canvas.soldiers_painted += 1;
+                // The disc is drawn when the run of this tile closes, not
+                // here. The count of a tile decides the radius and the badge,
+                // and the factions on it decide the wedges, so nothing can be
+                // painted until the run is whole.[^15]
+                //
+                // [^15]: Research report 25, defects 4 and 5. `docs/research/reports/25-demonstration-readability-upgrades-and-units.md`
+                let mut short = false;
                 // The condition of this unit, read at the unit that is being
                 // painted, on the loop that already runs. The layer starts no
                 // pass of its own.[^7]
@@ -2058,7 +2602,7 @@ fn draw_soldiers(
                     None | Some(NeedCondition::Fed) => {}
                     Some(NeedCondition::Short | NeedCondition::Starved) => {
                         canvas.units_short += 1;
-                        canvas.fill_disc(x as i32, y as i32, (radius / 2).max(1), SHORTAGE);
+                        short = true;
                     }
                 }
                 // What this unit carries and where it lives, read at the
@@ -2115,15 +2659,134 @@ fn draw_soldiers(
                 match run {
                     Some((held, count)) if held == address => run = Some((held, count + 1)),
                     other => {
+                        draw_crowd(canvas, camera, radius, &mut crowd);
                         close_run(canvas, world, camera, other);
                         run = Some((address, 1));
                     }
                 }
+                crowd.push(Painted {
+                    x,
+                    y,
+                    from: came_from.map(|from| camera.centre_of(from)),
+                    slot,
+                    short,
+                });
             }
+            draw_crowd(canvas, camera, radius, &mut crowd);
             close_run(canvas, world, camera, run);
         }
     }
     Ok(())
+}
+
+/// One unit the pass painted, held until its tile's run closes.
+///
+/// The position is where the unit draws, which is its tile centre or a point
+/// between two tile centres. The tail is where the unit stood at the last
+/// frame, when the table held it.
+struct Painted {
+    /// Where the disc draws, across.
+    x: f32,
+    /// Where the disc draws, down.
+    y: f32,
+    /// Where the unit stood at the last frame, when the table held it.
+    from: Option<(f32, f32)>,
+    /// The colour slot of the faction.
+    slot: usize,
+    /// Whether a shortage holds the unit.
+    short: bool,
+}
+
+/// Returns the radius a crowd of this size draws at.
+///
+/// Below the badge width a tile has no room for a number, so the disc carries
+/// the count instead: a full tile is visibly fuller than a single unit.[^1]
+/// The growth is the square root of the count, so the area of the disc
+/// follows the count, and it is held inside the tile.
+///
+/// # References
+///
+/// [^1]: Research report 25, defect 4. `docs/research/reports/25-demonstration-readability-upgrades-and-units.md`
+fn crowd_radius(base: i32, count: u32, tile_width: f32) -> i32 {
+    if count <= 1 {
+        return base;
+    }
+    let grown = (base as f32 * (count as f32).sqrt()) as i32;
+    let ceiling = ((tile_width * 0.5) as i32).max(base + 2);
+    grown.clamp(base, ceiling)
+}
+
+/// Draws the units of one tile, and empties the run.
+///
+/// **The picture of eight units was the picture of one.** Every unit of a
+/// tile takes the centre of that tile, so the discs landed on each other
+/// exactly and the last one drawn won. This pass draws the run as one crowd:
+/// the factions present take a wedge each, the count sets the radius below
+/// the badge width, and a badge states the count above it.[^1]
+///
+/// The heading line runs from the tile the unit left to the point it draws
+/// at, so a watcher sees where a unit came from.[^2]
+///
+/// # References
+///
+/// [^1]: Research report 25, defects 4 and 5. `docs/research/reports/25-demonstration-readability-upgrades-and-units.md`
+/// [^2]: Research report 23, defect 3. `docs/research/reports/23-demonstration-readability-review-1.md`
+fn draw_crowd(canvas: &mut Canvas, camera: Camera, radius: i32, crowd: &mut Vec<Painted>) {
+    if crowd.is_empty() {
+        return;
+    }
+    // The lines sit under the discs, so a disc is never cut by the line of
+    // the unit it belongs to.
+    if camera.tile_width >= HEADING_TILE {
+        for unit in crowd.iter() {
+            if let Some(from) = unit.from {
+                canvas.line(from, (unit.x, unit.y), FACTION_COLOURS[unit.slot]);
+            }
+        }
+    }
+
+    // The factions on the tile, in ascending colour order. The order of the
+    // wedges is therefore the colour table's and never the order the spatial
+    // structure gave the units in.[^3]
+    //
+    // [^3]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
+    let mut slots: Vec<usize> = crowd.iter().map(|unit| unit.slot).collect();
+    slots.sort_unstable();
+    slots.dedup();
+    let shared: Vec<u32> = slots.iter().map(|&slot| FACTION_COLOURS[slot]).collect();
+
+    let count = crowd.len() as u32;
+    let badged = camera.tile_width >= CROWD_BADGE_TILE;
+    let radius = if badged {
+        radius
+    } else {
+        crowd_radius(radius, count, camera.tile_width)
+    };
+    for unit in crowd.iter() {
+        let one = [FACTION_COLOURS[unit.slot]];
+        let colours: &[u32] = if shared.len() > 1 { &shared } else { &one };
+        canvas.fill_wedges(unit.x as i32, unit.y as i32, radius, colours, UNIT_RIM);
+    }
+    for unit in crowd.iter() {
+        if unit.short {
+            canvas.fill_disc(unit.x as i32, unit.y as i32, (radius / 2).max(1), SHORTAGE);
+        }
+    }
+    if badged && count > 1 {
+        let word = count.to_string();
+        let first = &crowd[0];
+        let left = first.x as i32 - text::width_of(&word, 1) / 2;
+        let top = first.y as i32 - radius - text::GLYPH_HEIGHT - 2;
+        canvas.fill_rect(
+            left - 2,
+            top - 1,
+            text::width_of(&word, 1) + 4,
+            text::GLYPH_HEIGHT + 2,
+            UNIT_RIM,
+        );
+        canvas.write(left, top, &word, 1, SHORTAGE);
+    }
+    crowd.clear();
 }
 
 /// Returns the squared distance in pixels from the middle of the canvas.

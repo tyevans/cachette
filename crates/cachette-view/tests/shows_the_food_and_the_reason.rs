@@ -71,11 +71,31 @@ fn addresses_of(world: &World) -> Vec<Axial> {
 
 /// Returns the sum of the three channels of one colour.
 ///
-/// The shading of a tile adds the same number to each channel, so the sum
-/// orders two tiles of one kind by how much shade each carries.
+/// The relief of a tile adds the same number to each channel, so the sum
+/// orders two tiles of one kind by how much relief each carries. The food
+/// does not move it, because the food moves the saturation.[^1]
+///
+/// # References
+///
+/// [^1]: Research report 24, defect 9. `docs/research/reports/24-demonstration-readability-resources-and-weather.md`
 fn brightness(colour: u32) -> i64 {
     let channel = |offset: u32| i64::from((colour >> offset) & 0xff);
     channel(16) + channel(8) + channel(0)
+}
+
+/// Returns the spread between the widest and the narrowest channel.
+///
+/// This is the saturation of a colour. The food ramp moves the channels of a
+/// tile away from their own mean, so it raises the spread and leaves the sum
+/// of the three where it was.[^1]
+///
+/// # References
+///
+/// [^1]: Research report 24, defect 9. `docs/research/reports/24-demonstration-readability-resources-and-weather.md`
+fn spread(colour: u32) -> i64 {
+    let channel = |offset: u32| i64::from((colour >> offset) & 0xff);
+    let (red, green, blue) = (channel(16), channel(8), channel(0));
+    red.max(green).max(blue) - red.min(green).min(blue)
 }
 
 /// Returns the colour the canvas holds at one pixel.
@@ -102,13 +122,26 @@ fn ground_pixel(camera: Camera, canvas: &Canvas, address: Axial) -> u32 {
     pixel(canvas, left + wide - 1, top + tall - 1)
 }
 
+/// The saturation and the brightness of one tile.
+type Sample = (i64, i64);
+
+/// The samples of the tiles of one ground kind, empty ones and carrying ones.
+type Samples = (Vec<Sample>, Vec<Sample>);
+
 #[test]
-fn the_colour_of_the_ground_rises_with_the_food_on_it() {
-    // The ground draws brighter where there is more food. The height also
-    // brightens a tile, and the two draws are keyed differently, so height
-    // is independent of food across a large sample. The comparison is
-    // therefore between the mean of the tiles that carry food and the mean
-    // of the tiles that carry none, over one kind of ground.
+fn the_saturation_of_the_ground_rises_with_the_food_on_it() {
+    // The ground draws more saturated where there is more food, and it draws
+    // at the same brightness. The height brightens a tile, and the two draws
+    // are keyed differently, so height is independent of food across a large
+    // sample. The comparison is therefore between the mean of the tiles that
+    // carry food and the mean of the tiles that carry none, over one kind of
+    // ground.
+    //
+    // **The two axes must stay apart.** The food ramp used to add up to 34
+    // to every channel, which is what the wet shade took from every channel,
+    // so a wet tile with the most food drew as a dry tile with none.[^2]
+    //
+    // [^2]: Research report 24, defects 3 and 9. `docs/research/reports/24-demonstration-readability-resources-and-weather.md`
     // The world is small enough that a tile is several pixels wide in the
     // canvas. A tile of four pixels leaves no pixel that belongs to one tile
     // alone, and the sample would then read a neighbour.
@@ -121,7 +154,7 @@ fn the_colour_of_the_ground_rises_with_the_food_on_it() {
     // the base colour. The kind is the one the world holds the most of that
     // also carries food, so the fixture picks a case rather than assuming
     // one.
-    let mut by_kind: BTreeMap<u8, (Vec<i64>, Vec<i64>)> = BTreeMap::new();
+    let mut by_kind: BTreeMap<u8, Samples> = BTreeMap::new();
     for address in addresses_of(&world) {
         let Some(kind) = world.tile_kind(address) else {
             continue;
@@ -130,12 +163,13 @@ fn the_colour_of_the_ground_rises_with_the_food_on_it() {
             .tile_stock(address, ResourceKind::Food)
             .expect("the address names a tile")
             .0;
-        let shade = brightness(ground_pixel(camera, &canvas, address));
+        let colour = ground_pixel(camera, &canvas, address);
+        let sample = (spread(colour), brightness(colour));
         let entry = by_kind.entry(kind.to_u8()).or_default();
         if food == 0 {
-            entry.0.push(shade);
+            entry.0.push(sample);
         } else if food >= 4 {
-            entry.1.push(shade);
+            entry.1.push(sample);
         }
     }
     let (empty, carrying) = by_kind
@@ -153,17 +187,40 @@ fn the_colour_of_the_ground_rises_with_the_food_on_it() {
         carrying.len()
     );
 
-    let mean = |values: &[i64]| values.iter().sum::<i64>() as f64 / values.len() as f64;
-    let (bare, fed) = (mean(&empty), mean(&carrying));
+    let mean = |values: &[Sample], pick: fn(&Sample) -> i64| {
+        values.iter().map(pick).sum::<i64>() as f64 / values.len() as f64
+    };
+    let (bare, fed) = (mean(&empty, |s| s.0), mean(&carrying, |s| s.0));
     assert!(
         fed > bare + 10.0,
-        "a tile carrying food must draw brighter than an empty one of the \
-         same ground: {fed:.1} against {bare:.1}"
+        "a tile carrying food must draw more saturated than an empty one of \
+         the same ground: {fed:.1} against {bare:.1}"
+    );
+
+    // The brightness of the two groups must stay together, because the food
+    // no longer moves it. A ramp that moved both axes would cancel against
+    // the wet layer again.
+    let (bare, fed) = (mean(&empty, |s| s.1), mean(&carrying, |s| s.1));
+    assert!(
+        (fed - bare).abs() < 10.0,
+        "food must not move the brightness of a tile: {fed:.1} against \
+         {bare:.1}"
     );
 }
 
+/// Returns the colour of the fill of a tile, inside any edge line.
+///
+/// A tile whose holding meets anything different takes an outline at nearly
+/// the pure faction colour, and the outline covers the last row and the last
+/// column of the rectangle. A sample of the corner therefore reads the
+/// outline and not the ground.
+fn fill_pixel(camera: Camera, canvas: &Canvas, address: Axial) -> u32 {
+    let (left, top, wide, tall) = paint::tile_rect(camera, address);
+    pixel(canvas, left + wide - 2, top + tall - 2)
+}
+
 #[test]
-fn a_gather_darkens_the_tile_it_took_from() {
+fn a_gather_moves_the_tile_toward_its_bare_colour() {
     // This drives the engine and then reads the picture. The gather resolve
     // is a stage of the step, so the test starts at the step and never at
     // the drawing.[^1]
@@ -197,9 +254,16 @@ fn a_gather_darkens_the_tile_it_took_from() {
     world.rebuild_bridge(1).expect("the rebuild must succeed");
 
     let mut canvas = Canvas::new(CANVAS.0, CANVAS.1);
-    let camera = Camera::fitting(&world, &canvas);
+    // The camera holds the deposit at a tile wide enough that the corner of
+    // the tile lies outside the disc of the unit standing on it. A unit disc
+    // has a radius floor of three pixels, so a fitted view of this world
+    // covers the corner and the sample reads the unit rather than the
+    // ground.[^2]
+    //
+    // [^2]: Research report 23, defect 1. `docs/research/reports/23-demonstration-readability-review-1.md`
+    let camera = Camera::at_tile_size(32.0).looking_at(deposit, &canvas);
     paint::draw(&world, camera, &mut canvas).expect("the world draws");
-    let before = ground_pixel(camera, &canvas, deposit);
+    let before = fill_pixel(camera, &canvas, deposit);
     let held_before = world.tile_holder(deposit);
     let stock_before = world
         .tile_stock(deposit, ResourceKind::Food)
@@ -230,13 +294,47 @@ fn a_gather_darkens_the_tile_it_took_from() {
     );
 
     paint::draw(&world, camera, &mut canvas).expect("the world draws");
-    let after = ground_pixel(camera, &canvas, deposit);
-    assert!(
-        brightness(after) < brightness(before),
-        "a drained deposit must draw darker: {:06x} then {:06x}",
-        before,
-        after
+    let after = fill_pixel(camera, &canvas, deposit);
+
+    // The food raises the saturation of a tile, so a drain lowers it. The
+    // holder mixes one colour into the tile at a fixed weight, which is an
+    // affine map, so the direction each channel moves in survives the mix.
+    // A channel of the bare ground above its own mean must fall, and a
+    // channel below it must rise.
+    //
+    // **A ramp on the brightness moves all three channels the same way.**
+    // That is the shape this assertion refuses, and it is the shape that
+    // cancelled against the wet layer.[^2]
+    //
+    // [^2]: Research report 24, defects 3 and 9. `docs/research/reports/24-demonstration-readability-resources-and-weather.md`
+    let bare = paint::kind_colour(
+        world
+            .tile_kind(deposit)
+            .expect("the tile lies in the world"),
     );
+    let channel = |colour: u32, offset: u32| i64::from((colour >> offset) & 0xff);
+    let mean = (channel(bare, 16) + channel(bare, 8) + channel(bare, 0)) / 3;
+    assert_ne!(before, after, "a drain must change the colour of the tile");
+    for offset in [16, 8, 0] {
+        let moved = channel(after, offset) - channel(before, offset);
+        if channel(bare, offset) > mean {
+            assert!(
+                moved <= 0,
+                "channel {offset} of a drained tile must not rise: {:06x} \
+                 then {:06x}",
+                before,
+                after
+            );
+        } else {
+            assert!(
+                moved >= 0,
+                "channel {offset} of a drained tile must not fall: {:06x} \
+                 then {:06x}",
+                before,
+                after
+            );
+        }
+    }
 }
 
 #[test]
