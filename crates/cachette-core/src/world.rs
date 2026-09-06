@@ -7968,8 +7968,85 @@ impl World {
             }
             at = end;
         }
+        // The level that stands at each tile of the run, read before the
+        // merge. The raise below compares it against the level the merge
+        // produced, so nothing else states which build finished.
+        let before: Vec<u8> = run
+            .iter()
+            .map(|(tile, _, _)| {
+                self.upgrades
+                    .at(*tile)
+                    .map_or(upgrade::NO_LEVEL, |site| site.level)
+            })
+            .collect();
         self.upgrades.merge_ascending(&run, &self.upgrade_table);
+        self.lodge_the_finished_levels(&run, &before);
         Ok(())
+    }
+
+    /// Raises the housing of a settlement for each level that the merge
+    /// finished.
+    ///
+    /// **This is the one place that composes an upgrade row and the housing
+    /// of a site.** The row states the housing that one level adds, the
+    /// settlement column stores it, and no second declaration of the number
+    /// exists.[^1] The record asks for a stored field rather than a
+    /// composition derived on read, so the raise is written once when the
+    /// level rises.[^2]
+    ///
+    /// A finished level raises the settlement on its own tile, or on one of
+    /// the six tiles beside it. A level that stands beside no settlement
+    /// houses nobody, which is the same rule the store raise applies.
+    ///
+    /// The pass names no category. It reads the housing column of the row
+    /// the entry indexes.[^3]
+    ///
+    /// The run arrives in ascending tile order and this loop is serial, so
+    /// two lodgings beside one settlement add in tile order and in no other.[^4]
+    ///
+    /// # References
+    ///
+    /// [^1]: Recurring Defect Shapes, shape 1. `.agents/rules/recurring-defects.md`
+    /// [^2]: ADR-0157, a site's free places are its built housing less the residents the engine counts, decision D1. `docs/adrs/accepted/adr-0157-a-sites-free-places-are-its-built-housing-less-the-residents-the-engine-counts.md`
+    /// [^3]: ADR-0151, an upgrade is a category with a ground fit and a level, decision D4. `docs/adrs/accepted/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
+    /// [^4]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
+    fn lodge_the_finished_levels(
+        &mut self,
+        run: &[(TileIdx, UpgradeCategory, i64)],
+        before: &[u8],
+    ) {
+        for ((tile, _, _), stood) in run.iter().zip(before.iter()) {
+            let Some(site) = self.upgrades.at(*tile) else {
+                continue;
+            };
+            if site.level <= *stood {
+                continue;
+            }
+            // Every level the merge crossed adds the housing of its own row.
+            let mut housing = 0u32;
+            let mut level = *stood + 1;
+            while level <= site.level {
+                if let Some(row) = self.upgrade_table.row(site.category, level) {
+                    housing = housing.saturating_add(row.housing_change);
+                }
+                level += 1;
+            }
+            if housing == 0 {
+                continue;
+            }
+            let Some(address) = self.grid.address_of(*tile) else {
+                continue;
+            };
+            let Some(settlement) = core::iter::once(Some(address))
+                .chain(self.grid.neighbours(address))
+                .find_map(|place| place.and_then(|near| self.settlements.on_tile(near)))
+            else {
+                continue;
+            };
+            let held = self.settlements.housing(settlement).unwrap_or(0);
+            self.settlements
+                .set_housing(settlement, held.saturating_add(housing));
+        }
     }
 
     /// Rebuilds the derived structure when it no longer describes the arena.
@@ -11722,6 +11799,31 @@ impl World {
         let stores = self.faction_stores(faction);
         let mark = i64::from(self.controller.surplus_mark());
         let short_of_stores = stores.iter().any(|held| *held < mark);
+        // Whether every site of the faction is full. A faction with no free
+        // place anywhere grows nobody, so the plan puts a lodging first
+        // until one site has room again.[^1]
+        //
+        // The scan follows the settlements of the faction and never the
+        // population.[^2]
+        //
+        // [^1]: ADR-0157, a site's free places are its built housing less the residents the engine counts, decision D2. `docs/adrs/accepted/adr-0157-a-sites-free-places-are-its-built-housing-less-the-residents-the-engine-counts.md`
+        // [^2]: ADR-0096, cost follows the lattice, not the population, decision D1. `docs/adrs/draft/adr-0096-cost-follows-the-lattice-not-the-population.md`
+        let mut holds_a_site = false;
+        let mut every_site_full = true;
+        for site in self.settlements.iter() {
+            if self.settlements.faction(site) != Some(faction) {
+                continue;
+            }
+            holds_a_site = true;
+            if self
+                .settlements
+                .slot_of(site)
+                .is_some_and(|slot| self.free_places_of(slot) > 0)
+            {
+                every_site_full = false;
+            }
+        }
+        let short_of_places = holds_a_site && every_site_full;
         let ground = plan::Ground {
             grid: self.grid,
             terrain: self.terrain,
@@ -11733,6 +11835,7 @@ impl World {
             sites: &sites,
             holders: self.holding.holders(),
             short_of_stores,
+            short_of_places,
         };
         plan::solve(&ground, faction, &needs, &mut self.plan)
     }

@@ -1621,6 +1621,7 @@ impl PyWorld {
         yield_change,
         capacity_change,
         capacity_of_store_change,
+        housing_change,
         victory_claim,
         own_ground_required,
     ))]
@@ -1634,6 +1635,7 @@ impl PyWorld {
         yield_change: u32,
         capacity_change: u32,
         capacity_of_store_change: u32,
+        housing_change: u32,
         victory_claim: u32,
         own_ground_required: u32,
     ) -> PyResult<()> {
@@ -1644,6 +1646,7 @@ impl PyWorld {
             yield_change,
             capacity_change,
             capacity_of_store_change,
+            housing_change,
             victory_claim,
             own_ground_required,
         };
@@ -1925,14 +1928,16 @@ impl PyWorld {
     /// `numpy.uint64` that `spawn_soldiers` returned. Returns `None`.
     ///
     /// The category is a row group of the upgrade table, as an integer. A
-    /// road is zero, a terrace is one, a wonder is two, a store is three and
-    /// a wall is four. The argument has no default. A road lets more units
+    /// road is zero, a terrace is one, a wonder is two, a store is three, a
+    /// wall is four and a lodging is five. The argument has no default. A road lets more units
     /// stand on the tile. A terrace lets a unit take more from the tile in
     /// one step. A wonder asks for a large amount of work, and its completion
     /// wins the game for the faction that holds the ground under it.[^6] A
     /// store raises the store capacity of a settlement on or beside its tile,
     /// and **nothing in the engine reads that raise today**. Read
-    /// `site_economy` for the sum.
+    /// `site_economy` for the sum. A lodging raises the housing of a
+    /// settlement on or beside its tile, so the site holds more people. Read
+    /// `site_housing` for what stands.
     ///
     /// **The order names no level.** The engine reads the ground under each
     /// tile and the level that stands there, and it resolves the row of the
@@ -2069,8 +2074,9 @@ impl PyWorld {
     /// array that `spawn_soldiers` returned.
     ///
     /// The result is the upgrade category that `order_build` took: a road is
-    /// zero, a terrace is one, a wonder is two, a store is three and a wall
-    /// is four. The result is `None` when the soldier builds nothing.
+    /// zero, a terrace is one, a wonder is two, a store is three, a wall is
+    /// four and a lodging is five. The result is `None` when the soldier
+    /// builds nothing.
     ///
     /// **This read stays singular while the write verbs take a set.** A set
     /// form must choose. It fails the whole call for one dead identity, or
@@ -2153,7 +2159,8 @@ impl PyWorld {
     /// The faction is a faction number of this world. The addresses are a
     /// sequence of `(q, r)` pairs of integers. The category is an upgrade
     /// category, as an integer: a road is zero, a terrace is one, a wonder is
-    /// two, a store is three and a wall is four. Returns `None`.
+    /// two, a store is three, a wall is four and a lodging is five. Returns
+    /// `None`.
     ///
     /// **A plan says where a unit may build.** A category whose row asks for
     /// no held ground, such as a road, is laid only inside a project. That is
@@ -3265,7 +3272,7 @@ impl PyWorld {
     /// - `upgrade`, an integer or `None`. The category the tile carries,
     ///   standing or under construction, and `None` for a tile that carries
     ///   none. A road is zero, a terrace is one, a wonder is two, a store is
-    ///   three and a wall is four.
+    ///   three, a wall is four and a lodging is five.
     /// - `upgrade_level`, an integer. The level that stands on the tile, and
     ///   zero when nothing stands there yet.
     /// - `upgrade_progress`, an integer. The work that has gone into the next

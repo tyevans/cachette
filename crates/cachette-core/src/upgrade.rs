@@ -50,9 +50,9 @@ use crate::types::{Accum, TileIdx};
 /// build order, and it is fixed so that a category is a stable index that a
 /// state hash and a viewer both read.
 ///
-/// Five categories are named and one is open. A caller writes the open
+/// Six categories are named and one is open. A caller writes the open
 /// category, and a caller may rewrite any other.
-pub const UPGRADE_CATEGORY_COUNT: usize = 6;
+pub const UPGRADE_CATEGORY_COUNT: usize = 7;
 
 /// The most levels that one category holds.
 ///
@@ -101,9 +101,16 @@ impl UpgradeCategory {
     /// A defence. The default table gives it a work and no effect, because
     /// the condition it wears belongs to a later item.
     pub const WALL: Self = Self(4);
+    /// A dwelling. It raises the housing of the settlement on or beside its
+    /// tile, so the site holds more people.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0157, a site's free places are its built housing less the residents the engine counts, decision D1. `docs/adrs/accepted/adr-0157-a-sites-free-places-are-its-built-housing-less-the-residents-the-engine-counts.md`
+    pub const LODGING: Self = Self(5);
     /// The open category. The default table holds no row for it, so a build
     /// order that names it is refused until a caller writes a row.
-    pub const OPEN: Self = Self(5);
+    pub const OPEN: Self = Self(6);
 
     /// Every category, in the order of the numbering.
     ///
@@ -116,6 +123,7 @@ impl UpgradeCategory {
         Self::WONDER,
         Self::STORE,
         Self::WALL,
+        Self::LODGING,
         Self::OPEN,
     ];
 
@@ -282,6 +290,25 @@ declare_upgrade_row! {
     /// How much the row raises the store capacity of a settlement on or
     /// beside its tile, as a raw Q16.16 quantity.
     capacity_of_store_change: u32,
+    /// How much the row raises the housing of a settlement on or beside its
+    /// tile.
+    ///
+    /// The column is a quantity of housing and not a count of people. The
+    /// people it holds is that quantity divided by the housing one person
+    /// takes.[^1]
+    ///
+    /// **The column never takes the word capacity.** The settlement arena
+    /// uses that word for the ceiling on the slots it opens, and one word
+    /// with two meanings inside one shape is a defect that only a reader
+    /// catches.[^2]
+    ///
+    /// Zero means that the row houses nobody.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0157, a site's free places are its built housing less the residents the engine counts, decision D1. `docs/adrs/accepted/adr-0157-a-sites-free-places-are-its-built-housing-less-the-residents-the-engine-counts.md`
+    /// [^2]: Findings register, FND-539. `docs/FINDINGS.md`
+    housing_change: u32,
     /// The claim toward the wealth-or-wonder end that the finished row
     /// grants the faction that holds its ground.[^1]
     ///
@@ -310,6 +337,7 @@ impl UpgradeRow {
         yield_change: 0,
         capacity_change: 0,
         capacity_of_store_change: 0,
+        housing_change: 0,
         victory_claim: 0,
         own_ground_required: 0,
     };
@@ -538,6 +566,45 @@ pub const WONDER_WORK: u32 = 2400;
 /// [^2]: Blockers register, BLK-007. `docs/BLOCKERS.md`
 pub const STORE_WORK: u32 = 48;
 
+/// The ground that a lodging fits.
+///
+/// A dwelling stands on ground a unit walks and settles. High ground is not
+/// it, so a lodging stops at the mountain.[^1]
+///
+/// # References
+///
+/// [^1]: Balance register, the lodging ground fit. `docs/reference/balance.md`
+pub const LODGING_FIT: u32 =
+    ground_bit(TileKind::Plain) | ground_bit(TileKind::Forest) | ground_bit(TileKind::Hill);
+
+/// The work that finishes the first level of a lodging.[^1] [^2]
+///
+/// # References
+///
+/// [^1]: Balance register, the lodging work by level. `docs/reference/balance.md`
+/// [^2]: Blockers register, BLK-050. `docs/BLOCKERS.md`
+pub const LODGING_LEVEL_1_WORK: u32 = 24;
+
+/// The work that finishes the second level of a lodging.[^1] [^2]
+///
+/// # References
+///
+/// [^1]: Balance register, the lodging work by level. `docs/reference/balance.md`
+/// [^2]: Blockers register, BLK-050. `docs/BLOCKERS.md`
+pub const LODGING_LEVEL_2_WORK: u32 = 72;
+
+/// The housing that one level of a lodging adds to the settlement on or beside
+/// its tile.
+///
+/// The value is half the housing a founding gives, so two levels of one
+/// lodging double the people a founded site holds. It is a quantity of housing
+/// and not a count of people.[^1]
+///
+/// # References
+///
+/// [^1]: Balance register, the lodging housing by level. `docs/reference/balance.md`
+pub const LODGING_LEVEL_HOUSING: u32 = crate::growth::FOUNDING_HOUSING_DEFAULT / 2;
+
 /// The work that finishes a wall.[^1] [^2]
 ///
 /// # References
@@ -624,9 +691,9 @@ pub const BUILD_RATE: i64 = 1;
 
 /// The default table that a world is built with.
 ///
-/// It holds the road, the terrace, the wonder, the store and the wall. The
-/// road and the terrace hold two levels each. The open category holds no row,
-/// so a caller writes one.[^1]
+/// It holds the road, the terrace, the wonder, the store, the wall and the
+/// lodging. The road, the terrace and the lodging hold two levels each. The open
+/// category holds no row, so a caller writes one.[^1]
 ///
 /// # References
 ///
@@ -676,6 +743,20 @@ pub const DEFAULT_UPGRADE_TABLE: UpgradeTable = {
     rows[row_at(UpgradeCategory::WALL, 1)] = UpgradeRow {
         ground_fit: FITS_EVERY_LAND,
         work: WALL_WORK,
+        own_ground_required: OWN_GROUND_REQUIRED,
+        ..UpgradeRow::NONE
+    };
+    rows[row_at(UpgradeCategory::LODGING, 1)] = UpgradeRow {
+        ground_fit: LODGING_FIT,
+        work: LODGING_LEVEL_1_WORK,
+        housing_change: LODGING_LEVEL_HOUSING,
+        own_ground_required: OWN_GROUND_REQUIRED,
+        ..UpgradeRow::NONE
+    };
+    rows[row_at(UpgradeCategory::LODGING, 2)] = UpgradeRow {
+        ground_fit: LODGING_FIT,
+        work: LODGING_LEVEL_2_WORK,
+        housing_change: LODGING_LEVEL_HOUSING,
         own_ground_required: OWN_GROUND_REQUIRED,
         ..UpgradeRow::NONE
     };
