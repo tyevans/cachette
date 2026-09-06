@@ -1,0 +1,653 @@
+//! A faction plans its roads and zones with one solver.
+//!
+//! A plan is a bounded list of projects. A project is one tile and one
+//! category. One solver writes the plan at the controller stage, in a fixed
+//! pass count. A unit builds a category that asks for no held ground only
+//! inside a project, and an idle unit takes the nearest project.[^1]
+//!
+//! Every test here goes through the public interface of the world.[^2] Each
+//! one reaches an extreme rather than the typical case: two paths that tie on
+//! cost, two projects at one distance from one unit, a plan at its bound, a
+//! pair past the search radius, and a world with nothing to plan.[^3]
+//!
+//! **A test that reads the work done cannot tell a stopped build from a
+//! raised one**, so a test of the refusal reads whether an entry exists at
+//! all.[^4]
+//!
+//! # References
+//!
+//! [^1]: ADR-0152, a faction plans its roads and zones with one solver, decisions D1 to D5. `docs/adrs/accepted/adr-0152-a-faction-plans-its-roads-and-zones-with-one-solver.md`
+//! [^2]: Testing rules, section 6. `.agents/rules/testing.md`
+//! [^3]: Testing rules, section 2a. `.agents/rules/testing.md`
+//! [^4]: Findings register, FND-492. `docs/FINDINGS.md`
+
+use cachette_core::holding::ReachRules;
+use cachette_core::plan::PlanRules;
+use cachette_core::upgrade::UpgradeCategory;
+use cachette_core::{Axial, Entity, FactionId, Project, World, WorldConfig, SUBSYSTEM_CENSUS};
+
+/// The extent that these tests read.
+///
+/// The extent is wider than the coarsest lattice spacing of the ground
+/// generator, so the world holds every kind of ground.[^1]
+///
+/// # References
+///
+/// [^1]: Findings register, FND-054. `docs/FINDINGS.md`
+const WIDTH: u32 = 96;
+/// The number of rows of that extent.
+const HEIGHT: u32 = 96;
+/// The seed that these tests read.
+const SEED: u64 = 641;
+/// The faction that plans.
+const ZERO: FactionId = FactionId(0);
+
+/// Builds a world with no city and no plan.
+fn bare(seed: u64) -> World {
+    let mut world = World::new(WorldConfig {
+        width: WIDTH,
+        height: HEIGHT,
+        seed,
+        faction_count: 4,
+        unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
+    })
+    .expect("the extent must describe a world");
+    world
+        .set_choice_schedule(0)
+        .expect("the exponent is inside the range");
+    // The default reach, not a reach that covers the world. A faction that
+    // held every tile would win on territory, and the game end stops every
+    // controller, so the fixture would then measure a stopped controller.[^1]
+    //
+    // [^1]: ADR-0148, a game end is recorded once and stops the controllers. `docs/adrs/accepted/adr-0148-a-game-end-is-recorded-once-and-stops-the-controllers.md`
+    world.set_reach_rules(ReachRules::DEFAULT);
+    world
+}
+
+/// Returns every address of the extent, in row-major order.
+fn addresses() -> Vec<Axial> {
+    let mut all = Vec::with_capacity((WIDTH * HEIGHT) as usize);
+    for r in 0..HEIGHT {
+        for q in 0..WIDTH {
+            all.push(Axial::new(q as i32, r as i32));
+        }
+    }
+    all
+}
+
+/// Returns the first address that admits a unit, from one corner.
+fn open_from(world: &World, from: Axial) -> Axial {
+    addresses()
+        .into_iter()
+        .filter(|address| world.admits_a_unit(*address))
+        .min_by_key(|address| (address.distance(from), address.q, address.r))
+        .expect("the world admits a unit somewhere")
+}
+
+/// Builds a world with two cities of one faction, far enough apart that a
+/// road between them is a road and not one tile.
+fn two_cities(seed: u64) -> (World, Axial, Axial) {
+    let mut world = bare(seed);
+    let seat = open_from(&world, Axial::new(20, 20));
+    let other = open_from(&world, Axial::new(26, 20));
+    assert_ne!(seat, other, "the fixture needs two places");
+    // **The two places must sit inside the search radius.** A pair further
+    // apart than the radius yields no project, and the fixture would then
+    // measure the radius rather than the path.
+    assert!(
+        seat.distance(other) <= world.plan_rules().radius(),
+        "the fixture put its two places {} steps apart, past the radius of {}",
+        seat.distance(other),
+        world.plan_rules().radius()
+    );
+    // **The founding verb records the seat, and the settlement verb does
+    // not.** A faction with no seat receives no evaluation, so a fixture that
+    // only founded a settlement would measure a controller that never
+    // ran.[^1]
+    //
+    // [^1]: ADR-0144, a faction controller runs inside the step and acts only through the caller's verbs, decision D7. `docs/adrs/accepted/adr-0144-a-faction-controller-runs-inside-the-step-and-acts-only-through-the-callers-verbs.md`
+    world
+        .found_group_at(seat, 4, ZERO)
+        .expect("the ground admits a founding");
+    world
+        .found_settlement(other, ZERO)
+        .expect("the ground admits a second city");
+    (world, seat, other)
+}
+
+/// Returns one census count by name.
+fn census(world: &World, name: &str) -> i64 {
+    SUBSYSTEM_CENSUS
+        .iter()
+        .find(|row| row.name == name)
+        .map(|row| (row.read)(world))
+        .expect("the census holds the row")
+}
+
+/// Returns the plan of the first faction as a plain list.
+fn plan_of(world: &World) -> Vec<Project> {
+    world.plan_of(ZERO).to_vec()
+}
+
+// ---------------------------------------------------------------------------
+// D1. The plan is bounded, ordered and hashed
+// ---------------------------------------------------------------------------
+
+#[test]
+fn a_plan_holds_its_projects_in_tile_order_and_one_project_for_each_tile() {
+    let mut world = bare(SEED);
+    let places: Vec<Axial> = addresses()
+        .into_iter()
+        .filter(|address| world.admits_a_unit(*address))
+        .take(6)
+        .collect();
+    // The writes go in descending tile order, so the ascending order of the
+    // plan is the register's own and never the order the caller wrote in.
+    for address in places.iter().rev() {
+        world
+            .zone_project(ZERO, *address, UpgradeCategory::ROAD)
+            .expect("the plan takes a road anywhere");
+    }
+    let plan = plan_of(&world);
+    assert_eq!(plan.len(), places.len());
+    assert!(
+        plan.windows(2).all(|pair| pair[0].tile < pair[1].tile),
+        "the plan is not in ascending tile order: {plan:?}"
+    );
+    assert!(
+        plan.iter().all(|project| project.padding == [0; 3]),
+        "a project carries undeclared padding"
+    );
+
+    // A second write for one tile replaces the project and adds no row.
+    let before = plan.len();
+    world
+        .zone_project(ZERO, places[0], UpgradeCategory::ROAD)
+        .expect("the plan takes the tile again");
+    assert_eq!(
+        world.plan_of(ZERO).len(),
+        before,
+        "a tile gained a second project"
+    );
+    assert!(world.check_invariants());
+}
+
+#[test]
+fn a_plan_at_its_bound_drops_the_next_project_and_counts_the_drop() {
+    // The extreme: the plan is full. A fixture with a large bound would never
+    // reach the drop, so the bound is set to what the fixture writes.
+    let mut world = bare(SEED);
+    world.set_plan_rules(world.plan_rules().with_bound(3));
+    let places: Vec<Axial> = addresses()
+        .into_iter()
+        .filter(|address| world.admits_a_unit(*address))
+        .take(4)
+        .collect();
+    for address in places.iter().take(3) {
+        world
+            .zone_project(ZERO, *address, UpgradeCategory::ROAD)
+            .expect("the plan is not full yet");
+    }
+    assert_eq!(census(&world, "projects_dropped"), 0);
+    assert!(world
+        .zone_project(ZERO, places[3], UpgradeCategory::ROAD)
+        .is_err());
+    assert_eq!(world.plan_of(ZERO).len(), 3, "the plan grew past its bound");
+    assert_eq!(census(&world, "projects_dropped"), 1);
+    assert!(world.check_invariants());
+}
+
+#[test]
+fn the_plan_enters_the_state_hash() {
+    let mut world = bare(SEED);
+    let before = world.state_hash().finish();
+    let address = open_from(&world, Axial::new(10, 10));
+    world
+        .zone_project(ZERO, address, UpgradeCategory::ROAD)
+        .expect("the plan takes a road anywhere");
+    let after = world.state_hash().finish();
+    assert_ne!(
+        before, after,
+        "two worlds that differ in a plan hash the same"
+    );
+
+    // The same plan in another faction is another world.
+    let mut other = bare(SEED);
+    other
+        .zone_project(FactionId(1), address, UpgradeCategory::ROAD)
+        .expect("the plan takes a road anywhere");
+    assert_ne!(
+        after,
+        other.state_hash().finish(),
+        "a project of one faction hashes as a project of another"
+    );
+}
+
+// ---------------------------------------------------------------------------
+// D2. The solver runs a fixed pass count
+// ---------------------------------------------------------------------------
+
+#[test]
+fn the_solver_runs_the_same_pass_count_whatever_the_input() {
+    // Two worlds that differ as much as the fixture can make them: one has a
+    // seat and two cities to join, the other has one city and nothing to
+    // plan. Both run the same number of passes for each faction with a seat.
+    let (mut busy, _, _) = two_cities(SEED);
+    let mut quiet = bare(SEED);
+    let seat = open_from(&quiet, Axial::new(20, 20));
+    quiet
+        .found_group_at(seat, 4, ZERO)
+        .expect("the ground admits a founding");
+
+    // A third world can write nothing at all: its bound is zero, so every
+    // write is dropped. A solver that stopped when a pass wrote nothing would
+    // run fewer passes here than in the busy world.
+    let mut full = bare(SEED);
+    let full_seat = open_from(&full, Axial::new(20, 20));
+    full.found_group_at(full_seat, 4, ZERO)
+        .expect("the ground admits a founding");
+    full.set_plan_rules(full.plan_rules().with_bound(0));
+
+    let passes = i64::from(busy.plan_rules().solver_passes());
+    for tick in 1..=4 {
+        busy.step(1).expect("the step runs");
+        quiet.step(1).expect("the step runs");
+        full.step(1).expect("the step runs");
+        assert_eq!(
+            census(&busy, "plan_passes"),
+            passes * tick,
+            "the busy world ran a different number of passes"
+        );
+        assert_eq!(
+            census(&quiet, "plan_passes"),
+            census(&busy, "plan_passes"),
+            "two worlds ran a different number of passes"
+        );
+        assert_eq!(
+            census(&full, "plan_passes"),
+            census(&busy, "plan_passes"),
+            "a world that can write nothing ran a different number of passes"
+        );
+    }
+}
+
+#[test]
+fn a_faction_with_two_unconnected_places_zones_a_way_between_them() {
+    let (mut world, seat, other) = two_cities(SEED);
+    world.step(1).expect("the step runs");
+    let plan = plan_of(&world);
+    assert!(
+        !plan.is_empty(),
+        "the solver planned nothing for two cities"
+    );
+    assert!(
+        plan.iter()
+            .all(|project| project.category == UpgradeCategory::ROAD),
+        "the solver zoned a category that does not join two places: {plan:?}"
+    );
+    // The projects lie between the two places: each is inside the search
+    // radius of the seat, and one of them touches the far city.
+    let radius = world.plan_rules().radius();
+    for project in &plan {
+        let address = world
+            .grid()
+            .address_of(project.tile)
+            .expect("a project names a tile of this world");
+        assert!(
+            address.distance(seat) <= radius,
+            "a project sits outside the search radius"
+        );
+    }
+    let reaches = plan.iter().any(|project| {
+        world
+            .grid()
+            .address_of(project.tile)
+            .is_some_and(|address| address.distance(other) <= 1)
+    });
+    assert!(reaches, "no project reaches the second city: {plan:?}");
+    assert_eq!(census(&world, "projects_zoned"), plan.len() as i64);
+}
+
+#[test]
+fn the_same_world_gives_the_same_plan_on_every_run() {
+    let (mut first, _, _) = two_cities(SEED);
+    let (mut second, _, _) = two_cities(SEED);
+    for _ in 0..3 {
+        first.step(1).expect("the step runs");
+        second.step(1).expect("the step runs");
+    }
+    assert_eq!(
+        plan_of(&first),
+        plan_of(&second),
+        "two runs planned differently"
+    );
+    assert!(!plan_of(&first).is_empty(), "the fixture planned nothing");
+}
+
+#[test]
+fn the_solver_gives_one_plan_at_every_thread_count() {
+    let plans: Vec<Vec<Project>> = [1usize, 2, 12]
+        .into_iter()
+        .map(|threads| {
+            let (mut world, _, _) = two_cities(SEED);
+            for _ in 0..3 {
+                world.step(threads).expect("the step runs");
+            }
+            plan_of(&world)
+        })
+        .collect();
+    assert_eq!(plans[0], plans[1], "one thread and two threads disagree");
+    assert_eq!(
+        plans[1], plans[2],
+        "two threads and twelve threads disagree"
+    );
+    assert!(!plans[0].is_empty(), "the fixture planned nothing");
+}
+
+#[test]
+fn a_place_past_the_search_radius_yields_no_project() {
+    // The extreme: the second city is outside the window the search builds,
+    // so no path reaches it and no project names its tile.
+    let (mut world, _, other) = two_cities(SEED);
+    world.set_plan_rules(world.plan_rules().with_bound(64));
+    let tight = world.plan_rules();
+    world.set_plan_rules(PlanRules::new(
+        tight.bound(),
+        tight.solver_passes(),
+        tight.projects_per_pass(),
+        tight.path_passes(),
+        1,
+    ));
+    world.step(1).expect("the step runs");
+    let far = world
+        .grid()
+        .index_of(other)
+        .expect("the second city is inside the world");
+    assert!(
+        world
+            .plan_of(ZERO)
+            .iter()
+            .all(|project| project.tile != far),
+        "a project named a place past the radius"
+    );
+}
+
+// ---------------------------------------------------------------------------
+// D3. A path is deterministic, and a tie takes the lower tile index
+// ---------------------------------------------------------------------------
+
+#[test]
+fn two_ways_that_tie_on_cost_resolve_by_the_lower_tile_index() {
+    // The extreme: a pair whose two ends have more than one cheapest way
+    // between them. The fixture searches the world for such a pair rather
+    // than assuming one, because a pair with one cheapest way would let the
+    // cost decide and the tie rule would never fire.
+    let world = bare(SEED);
+    let (from, to, rival) =
+        a_tied_pair(&world).expect("the world holds a pair with two cheapest ways");
+    let path = world.planned_path(from, to);
+    assert!(!path.is_empty(), "the search found no way");
+    assert_eq!(*path.first().expect("the way is not empty"), from);
+    assert_eq!(*path.last().expect("the way is not empty"), to);
+    for pair in path.windows(2) {
+        assert_eq!(pair[0].distance(pair[1]), 1, "the way skips a tile");
+    }
+    // The step into the far end came from the neighbour with the lower tile
+    // index, and the rival neighbour ties with it on cost.
+    let last = path[path.len() - 2];
+    let taken = world
+        .grid()
+        .index_of(last)
+        .expect("the way stays inside the world");
+    let other = world
+        .grid()
+        .index_of(rival)
+        .expect("the rival is inside the world");
+    assert!(
+        taken < other,
+        "the way came through tile {taken:?} when tile {other:?} ties and is lower"
+    );
+}
+
+/// Returns a pair of places with two cheapest ways between them.
+///
+/// The pair is a start, a far end, and a second neighbour of the far end that
+/// costs the same to reach as the one the way took. A fixture that assumed
+/// such a pair would measure whatever the ground gave it.[^1]
+///
+/// # References
+///
+/// [^1]: Testing rules, section 2a. `.agents/rules/testing.md`
+fn a_tied_pair(world: &World) -> Option<(Axial, Axial, Axial)> {
+    // The search is bounded, so a fixture that cannot find a tie fails
+    // quickly rather than walking the world.
+    let region: Vec<Axial> = addresses()
+        .into_iter()
+        .filter(|address| (10..40).contains(&address.q) && (10..40).contains(&address.r))
+        .collect();
+    for from in region.iter().copied() {
+        if !world.admits_a_unit(from) {
+            continue;
+        }
+        for to in region
+            .iter()
+            .copied()
+            .filter(|address| address.distance(from) >= 3 && address.distance(from) <= 6)
+        {
+            if !world.admits_a_unit(to) {
+                continue;
+            }
+            let path = world.planned_path(from, to);
+            if path.len() < 3 {
+                continue;
+            }
+            let last = path[path.len() - 2];
+            let taken = world.planned_path_cost(from, last)?;
+            let rival = world
+                .grid()
+                .neighbours(to)
+                .into_iter()
+                .flatten()
+                .filter(|side| *side != last && world.admits_a_unit(*side))
+                .find(|side| world.planned_path_cost(from, *side) == Some(taken));
+            if let Some(rival) = rival {
+                return Some((from, to, rival));
+            }
+        }
+    }
+    None
+}
+
+// ---------------------------------------------------------------------------
+// D3 and D4. A build outside a project is refused
+// ---------------------------------------------------------------------------
+
+#[test]
+fn a_build_that_no_project_zones_is_refused_by_the_verb_and_ignored_by_the_pass() {
+    let mut world = bare(SEED);
+    let address = open_from(&world, Axial::new(10, 10));
+    let unit = world
+        .spawn_soldier(address, ZERO)
+        .expect("the ground admits a unit");
+
+    // **The verb refuses.** A caller learns at once, and the refusal counts.
+    let before = census(&world, "projects_refused");
+    assert!(
+        world.order_build(unit, UpgradeCategory::ROAD).is_err(),
+        "the verb took a road that no project zones"
+    );
+    assert_eq!(
+        world.build_order(unit),
+        Some(None),
+        "a refused order was stored"
+    );
+    assert!(census(&world, "projects_refused") > before);
+
+    // **The pass ignores.** The order is given while a project stands, and
+    // the project is then cleared. The pass drops the intent, so no entry
+    // appears. A test that read the work done could not tell a stopped build
+    // from a raised one, so this reads whether an entry exists at all.[^1]
+    //
+    // [^1]: Findings register, FND-492. `docs/FINDINGS.md`
+    world
+        .zone_project(ZERO, address, UpgradeCategory::ROAD)
+        .expect("the plan takes a road anywhere");
+    world
+        .order_build(unit, UpgradeCategory::ROAD)
+        .expect("the plan zones the tile");
+    assert!(
+        world.clear_project(ZERO, address),
+        "the plan held the project"
+    );
+    for _ in 0..12 {
+        world.step(1).expect("the step runs");
+    }
+    assert_eq!(
+        world.upgrade_at(address),
+        None,
+        "a road grew on a tile that no project zones"
+    );
+}
+
+#[test]
+fn a_build_the_plan_zones_finishes_and_the_census_counts_it() {
+    let mut world = bare(SEED);
+    let address = open_from(&world, Axial::new(10, 10));
+    world
+        .zone_project(ZERO, address, UpgradeCategory::ROAD)
+        .expect("the plan takes a road anywhere");
+    // **A crowd, not one builder.** A unit wanders off its tile on the next
+    // step, so one builder spreads one unit of work over many tiles and
+    // nothing ever finishes. The crowd finishes the work in the first tick,
+    // and the fixture then measures the build and not the walk.
+    let crowd: Vec<Entity> = (0..24)
+        .map(|_| {
+            world
+                .spawn_soldier(address, ZERO)
+                .expect("a spawn may over-fill a tile")
+        })
+        .collect();
+    for unit in &crowd {
+        world
+            .order_build(*unit, UpgradeCategory::ROAD)
+            .expect("the plan zones the tile");
+    }
+    for _ in 0..4 {
+        world.step(1).expect("the step runs");
+        if world.finished_upgrade(address).is_some() {
+            break;
+        }
+    }
+    assert_eq!(
+        world.finished_upgrade(address),
+        Some(UpgradeCategory::ROAD),
+        "the zoned road never finished"
+    );
+    assert!(world.check_invariants());
+}
+
+// ---------------------------------------------------------------------------
+// D5. An idle unit takes the nearest project
+// ---------------------------------------------------------------------------
+
+#[test]
+fn two_projects_at_one_distance_from_a_unit_resolve_by_the_lower_tile_index() {
+    // The extreme: the unit stands exactly between two projects, in opposite
+    // directions. A fixture that put one project nearer would never reach the
+    // tie rule, and the assertion would then measure the distance.
+    //
+    // The test drives the assignment the controller calls, and not a rule of
+    // its own.[^1]
+    //
+    // [^1]: Testing rules, section 5. `.agents/rules/testing.md`
+    let mut world = bare(SEED);
+    let seat = open_from(&world, Axial::new(30, 30));
+    let span = 4;
+    let west = Axial::new(seat.q - span, seat.r);
+    let east = Axial::new(seat.q + span, seat.r);
+    assert_eq!(
+        west.distance(seat),
+        east.distance(seat),
+        "the fixture is not a tie"
+    );
+    for place in [west, east] {
+        world
+            .zone_project(ZERO, place, UpgradeCategory::ROAD)
+            .expect("the plan takes a road anywhere");
+    }
+    let west_tile = world
+        .grid()
+        .index_of(west)
+        .expect("the place is inside the world");
+    let east_tile = world
+        .grid()
+        .index_of(east)
+        .expect("the place is inside the world");
+    let lower = west_tile.min(east_tile);
+    let unit = world
+        .spawn_soldier(seat, ZERO)
+        .expect("the ground admits a unit");
+
+    let taken = world
+        .project_for(ZERO, unit)
+        .expect("the plan holds two projects");
+    assert_eq!(
+        taken.tile, lower,
+        "the tie went to the higher tile index: took {taken:?}"
+    );
+    // A unit of another faction takes nothing from this plan.
+    let stranger = world
+        .spawn_soldier(seat, FactionId(1))
+        .expect("the ground admits a unit");
+    assert_eq!(world.project_for(ZERO, stranger), None);
+}
+
+#[test]
+fn the_controller_sends_its_idle_units_to_the_projects_it_zoned() {
+    let (mut world, seat, _) = two_cities(SEED);
+    // A second faction, far away, so that no faction holds the world and the
+    // game end does not stop the controllers before the order applies.
+    // **No evaluation draws.** The demonstration controller otherwise draws a
+    // category and orders the whole faction to build it where it stands, and
+    // that build takes the tile a project zones. The fixture removes the
+    // competing draw so that it measures the project order alone.
+    world.set_controller_evaluations(0);
+    let far = open_from(&world, Axial::new(80, 80));
+    world
+        .found_group_at(far, 4, FactionId(1))
+        .expect("the ground admits a founding");
+    world.step(1).expect("the step runs");
+    assert!(!plan_of(&world).is_empty(), "the solver planned nothing");
+    // The founding put units at the seat, and the seat carries no project.
+    // The order sends a unit toward the project nearest to it, and the build
+    // order sticks on the tick the unit stands on a project. The stage
+    // repeats the order on every tick, so the fixture steps until it does.
+    //
+    // The demonstration controller also draws a category and orders the whole
+    // faction to build it where it stands. That order competes with this one,
+    // so the fixture reads whether the project order ever reached a unit and
+    // not what the last tick left.
+    let mut took = false;
+    let mut sent = false;
+    for _ in 0..40 {
+        world.step(1).expect("the step runs");
+        sent |= world
+            .soldiers()
+            .iter()
+            .filter(|unit| world.soldiers().faction(*unit) == Some(ZERO))
+            .any(|unit| world.soldiers().sent(unit) != Some(None));
+        took |= world
+            .soldiers()
+            .iter()
+            .filter(|unit| world.soldiers().faction(*unit) == Some(ZERO))
+            .any(|unit| world.build_order(unit) == Some(Some(UpgradeCategory::ROAD)));
+    }
+    assert!(
+        sent,
+        "the order sent no unit toward a project after {seat:?} was seated"
+    );
+    assert!(
+        took,
+        "no unit of the faction ever took the category its project names"
+    );
+}

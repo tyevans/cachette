@@ -126,6 +126,12 @@ def _short_world(seed: int) -> cachette.World:
         seed=seed,
         faction_count=SHORT_FACTIONS,
     )
+    # The plan is off. The engine otherwise sends the idle units of a faction
+    # to the projects it zoned, and a unit that walks away from its site
+    # starves on another schedule than the fixture expects.[^1]
+    #
+    # [^1]: ADR-0152, a faction plans its roads and zones with one solver, decision D5. ``docs/adrs/accepted/adr-0152-a-faction-plans-its-roads-and-zones-with-one-solver.md``
+    world.set_plan_rules(0, 0, 0, 0, 0)
     world.found_run_for_every_faction(SHORT_GROUP)
     return world
 

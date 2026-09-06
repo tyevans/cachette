@@ -176,6 +176,8 @@ def test_order_build_refuses_a_unit_whose_type_cannot_build() -> None:
     units = world.spawn_soldiers([place, place], faction=0)
     world.set_unit_types(units[:1], CANNOT)
     world.set_unit_types(units[1:], CAN)
+    # A road asks for no held ground, so a project must zone the tile first.
+    world.zone_projects(0, [place], 0)
 
     with pytest.raises(cachette.VerbError, match="cannot build"):
         world.order_build(units, 0)

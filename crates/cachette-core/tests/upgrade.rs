@@ -199,11 +199,22 @@ fn island_with_stock(world: &World, kind: ResourceKind) -> Axial {
         .expect("the world must hold an island that carries the kind")
 }
 
-/// Puts one soldier on a tile and tells it to build.
+/// Puts one soldier on a tile, zones the tile, and tells it to build.
+///
+/// **The plan comes first.** A category that asks for no held ground is laid
+/// only inside a project, so a fixture that ordered the build alone would
+/// measure the refusal. A category that asks for held ground needs no
+/// project, and the plan refuses to zone it on ground nobody holds, so the
+/// zone call here is allowed to fail.[^1]
+///
+/// # References
+///
+/// [^1]: ADR-0152, a faction plans its roads and zones with one solver, decisions D3 and D4. `docs/adrs/accepted/adr-0152-a-faction-plans-its-roads-and-zones-with-one-solver.md`
 fn builder(world: &mut World, address: Axial, kind: UpgradeCategory) -> Entity {
     let unit = world
         .spawn_soldier(address, FactionId(0))
         .expect("the ground admits a unit");
+    let _ = world.zone_project(FactionId(0), address, kind);
     assert!(world.order_build(unit, kind).is_ok());
     unit
 }
@@ -251,10 +262,18 @@ fn the_advance_reads_the_sites_and_not_the_world() {
     // The advance walks the builders and the sites. It takes no grid and no
     // tile count, so it cannot read a tile that carries no upgrade.
     let mut small = world(SEED, 16, 16);
+    // The small world holds no island, so the builder can walk. A road
+    // outside a project stops, so the fixture zones the tile and its
+    // neighbours and the builder stays inside the plan wherever it steps.[^2]
+    //
+    // [^2]: ADR-0152, a faction plans its roads and zones with one solver, decision D3. `docs/adrs/accepted/adr-0152-a-faction-plans-its-roads-and-zones-with-one-solver.md`
     let small_at = addresses(16, 16)
         .into_iter()
         .find(|address| small.admits_a_unit(*address))
         .expect("the small world holds open ground");
+    for side in small.grid().neighbours(small_at).into_iter().flatten() {
+        let _ = small.zone_project(FactionId(0), side, UpgradeCategory::ROAD);
+    }
     builder(&mut small, small_at, UpgradeCategory::ROAD);
     small.step(1).expect("the step must run");
 
@@ -716,6 +735,7 @@ fn crowd(threads: usize) -> World {
         // The category alternates by the column, over the categories the
         // default table holds a row for, so the world holds several.
         let kind = UpgradeCategory::ALL[(address.q as usize) % (UPGRADE_CATEGORY_COUNT - 1)];
+        let _ = field.zone_project(FactionId(0), *address, kind);
         if field.order_build(unit, kind).is_err() {
             // The ground under this unit does not fit the category. The
             // crowd still builds everywhere else, and the refusal is what
@@ -820,8 +840,14 @@ fn admission_reads_the_capacity_that_a_road_raised() {
     // fixture cannot pass by crowding alone.[^1]
     //
     // [^1]: Testing rules, section 2a. `.claude/rules/testing.md`
-    let plain = crowded_tile(false);
-    let paved = crowded_tile(true);
+    let (plain, _) = crowded_tile(false);
+    // The crowd builds for as long as it stands there, so the road reaches
+    // whatever level the work allows. The bound is the capacity of the level
+    // that stands, and the fixture reads the level rather than assuming
+    // one.[^2]
+    //
+    // [^2]: ADR-0151, an upgrade is a category with a ground fit and a level, decision D3. `docs/adrs/draft/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
+    let (paved, level) = crowded_tile(true);
     let ground = TileKind::Plain.capacity() as usize;
 
     assert!(
@@ -832,7 +858,7 @@ fn admission_reads_the_capacity_that_a_road_raised() {
         paved > ground,
         "the paved tile held {paved} units, which the ground alone already allows"
     );
-    assert!(paved <= row_of(UpgradeCategory::ROAD, 1).capacity_change as usize);
+    assert!(paved <= row_of(UpgradeCategory::ROAD, level).capacity_change as usize);
 }
 
 /// Crowds one tile and returns the most units that ever stood on it.
@@ -844,7 +870,7 @@ fn admission_reads_the_capacity_that_a_road_raised() {
 ///
 /// The two worlds run the same seed and spawn the same units in the same
 /// order, so the movement draws are identical and only the capacity differs.
-fn crowded_tile(paved: bool) -> usize {
+fn crowded_tile(paved: bool) -> (usize, u8) {
     let mut field = world(SEED, 48, 48);
     let (target, sides) = crowdable(&field);
 
@@ -856,6 +882,13 @@ fn crowded_tile(paved: bool) -> usize {
                 .spawn_soldier(*side, FactionId(0))
                 .expect("a spawn may over-fill a tile");
             if paved {
+                // The crowd walks onto the target and paves it, so the plan
+                // zones the target as well as the ground the crowd starts
+                // on.[^3]
+                //
+                // [^3]: ADR-0152, a faction plans its roads and zones with one solver, decision D3. `docs/adrs/accepted/adr-0152-a-faction-plans-its-roads-and-zones-with-one-solver.md`
+                let _ = field.zone_project(FactionId(0), *side, UpgradeCategory::ROAD);
+                let _ = field.zone_project(FactionId(0), target, UpgradeCategory::ROAD);
                 assert!(field.order_build(unit, UpgradeCategory::ROAD).is_ok());
             }
         }
@@ -879,7 +912,8 @@ fn crowded_tile(paved: bool) -> usize {
     } else {
         assert_eq!(field.upgrade_at(target), None);
     }
-    most
+    let level = field.upgrade_at(target).map_or(0, |site| site.level);
+    (most, level)
 }
 
 /// Returns a tile of level open ground whose every neighbour is the same.

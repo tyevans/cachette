@@ -134,7 +134,12 @@ fn the_controller_emits_only_through_the_set_verbs_and_logs_each_command() {
     seat(&mut world, 2);
     world.set_controller_evaluations(3);
     world.step(THREADS).expect("the step runs");
-    let log = log_of(&world);
+    // The stage also emits a project order for a faction whose plan the
+    // solver filled, and that command carries its own draw index. A test of
+    // the evaluation draw reads the evaluation commands alone.[^4]
+    //
+    // [^4]: ADR-0152, a faction plans its roads and zones with one solver, decision D5. `docs/adrs/accepted/adr-0152-a-faction-plans-its-roads-and-zones-with-one-solver.md`
+    let log = evaluations_of(&world);
     assert_eq!(log.len(), 6, "two factions, three evaluations each");
     for entry in &log {
         assert_eq!(entry.tick.0, 1);
@@ -163,7 +168,13 @@ fn the_controller_emits_only_through_the_set_verbs_and_logs_each_command() {
         .find(|(name, _)| *name == "controller_commands")
         .expect("the row exists")
         .1;
-    let applied = log.iter().filter(|entry| entry.applied == 1).count() as i64;
+    // The census counts every command the stage emitted, and the evaluation
+    // commands are only part of that list. The comparison reads the whole
+    // log.
+    let applied = log_of(&world)
+        .iter()
+        .filter(|entry| entry.applied == 1)
+        .count() as i64;
     assert_eq!(commands, applied);
 }
 
@@ -304,7 +315,10 @@ fn the_commands_apply_in_faction_then_sequence_order() {
     world.set_controller_evaluations(3);
     world.step(THREADS).expect("the step runs");
     let log = log_of(&world);
-    assert_eq!(log.len(), 9);
+    assert!(
+        log.len() >= 9,
+        "three factions, three evaluations each, and any command the stage adds"
+    );
     let keys: Vec<(FactionId, u32)> = log
         .iter()
         .map(|entry| (entry.faction, entry.sequence))
@@ -483,6 +497,27 @@ fn the_set_verbs_count_what_the_arena_refuses() {
     assert!(!units.is_empty());
     let refused = world.order_gather_set(&units, cachette_core::resource::ResourceKind::Wood);
     assert_eq!(refused, 0);
+    // A road asks for no held ground, so it is laid only inside a project.
+    // The plan zones the tile each unit stands on, and the set verb then
+    // refuses none of them.[^5]
+    //
+    // [^5]: ADR-0152, a faction plans its roads and zones with one solver, decision D3. `docs/adrs/accepted/adr-0152-a-faction-plans-its-roads-and-zones-with-one-solver.md`
+    for unit in &units {
+        let address = world
+            .soldiers()
+            .address(*unit)
+            .expect("a live soldier stands somewhere");
+        assert!(
+            world
+                .zone_project(
+                    FactionId(0),
+                    address,
+                    cachette_core::upgrade::UpgradeCategory::ROAD
+                )
+                .is_ok(),
+            "the plan refused a road project at {address:?}"
+        );
+    }
     let refused = world.order_build_set(&units, cachette_core::upgrade::UpgradeCategory::ROAD);
     assert_eq!(refused, 0);
     let dead = units[0];

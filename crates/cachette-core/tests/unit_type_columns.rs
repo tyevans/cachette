@@ -152,6 +152,17 @@ fn spawn(world: &mut World, address: Axial, unit_type: UnitTypeId) -> Entity {
         .spawn_soldier(address, FactionId(0))
         .expect("the ground admits a unit");
     assert!(world.set_unit_type(unit, unit_type), "the unit is live");
+    // A road asks for no held ground, so a unit lays one only inside a
+    // project. The fixture zones the tile it stands on, and the build order
+    // that follows then measures the build rate and not the refusal.[^1]
+    //
+    // [^1]: ADR-0152, a faction plans its roads and zones with one solver, decisions D3 and D4. `docs/adrs/accepted/adr-0152-a-faction-plans-its-roads-and-zones-with-one-solver.md`
+    assert!(
+        world
+            .zone_project(FactionId(0), address, UpgradeCategory::ROAD)
+            .is_ok(),
+        "the plan refused a road project at {address:?}"
+    );
     unit
 }
 

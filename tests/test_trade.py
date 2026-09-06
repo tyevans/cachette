@@ -56,6 +56,12 @@ FOOD = 0
 def a_world(seed: int = 7) -> World:
     """Build a world in which both factions hold ground and stand somewhere."""
     world = World(width=WIDTH, height=HEIGHT, seed=seed, faction_count=2)
+    # The plan is off. The engine otherwise zones projects and sends the idle
+    # units of a faction to them, and every unit these tests stand somewhere
+    # would walk away.[^1]
+    #
+    # [^1]: ADR-0152, a faction plans its roads and zones with one solver, decision D5. ``docs/adrs/accepted/adr-0152-a-faction-plans-its-roads-and-zones-with-one-solver.md``
+    world.set_plan_rules(0, 0, 0, 0, 0)
     world.found_run_for_every_faction(24)
     for _ in range(6):
         world.step(threads=1)

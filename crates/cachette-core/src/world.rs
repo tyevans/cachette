@@ -53,6 +53,7 @@ use crate::holding::{FactionMask, Holder, Holding, ReachRules};
 use crate::household;
 use crate::influence::{Influence, InfluenceError, InfluenceField};
 use crate::luxury::{LuxuryError, LuxuryField, LuxuryId, LuxurySet, VarietyLevel};
+use crate::plan::{self, Needs, PlanRefusal, PlanRegister, PlanRules, Project};
 use crate::position::{
     self, Position, PositionError, PositionTable, SitePreference, WORK_COMMODITY,
 };
@@ -1040,6 +1041,15 @@ pub struct World {
     ///
     /// [^1]: ADR-0001, one binary gives one answer at any thread count, decision D4. `docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
     campaigns: CampaignRegister,
+    /// The projects each faction has zoned.
+    ///
+    /// The plan is simulated state that the step reads, so it enters the
+    /// whole-world hash.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0152, a faction plans its roads and zones with one solver, decision D1. `docs/adrs/accepted/adr-0152-a-faction-plans-its-roads-and-zones-with-one-solver.md`
+    plan: PlanRegister,
 }
 
 impl World {
@@ -1111,6 +1121,7 @@ impl World {
             weather: WeatherField::new(cell_lattice, config.faction_count)?,
             controller: Controller::new(config.seed, config.faction_count),
             campaigns: CampaignRegister::new(config.faction_count),
+            plan: PlanRegister::new(config.faction_count, PlanRules::DEFAULT),
             schedule: RateSchedule::DEFAULT,
             rates: RateTable::new(),
             rate_ledger: RateLedger::ZERO,
@@ -3723,6 +3734,12 @@ impl World {
         // stage closes a campaign against the holder it recorded at the
         // raise, and the raise refuses while one is live.
         let hash = self.campaigns.hash_into(hash);
+        // The plan of each faction decides where a unit may build, and the
+        // step reads it, so two worlds that differ only in a plan must
+        // diverge and the hash must say so.[^7]
+        //
+        // [^7]: ADR-0152, a faction plans its roads and zones with one solver, decision D1. `docs/adrs/accepted/adr-0152-a-faction-plans-its-roads-and-zones-with-one-solver.md`
+        let hash = self.plan.hash_into(hash);
         // What each faction advertises is state that a controller reads. The
         // table holds no row until somebody advertises, and it then folds
         // nothing, so a world with no board hashes as it did before.
@@ -3788,6 +3805,9 @@ impl World {
             return false;
         }
         if !self.upgrade_table.check_invariants() {
+            return false;
+        }
+        if !self.plan.check_invariants() {
             return false;
         }
         let ceiling = self.config.faction_count.max(1);
@@ -5456,8 +5476,17 @@ impl World {
             self.upgrades.at(tile),
             category,
         )?;
-        if !build_is_permitted(holder, faction, row) {
-            return Err(BuildRefusal::GroundNotHeld { category });
+        let zoned = self.plan.zoned_for(faction, tile, category);
+        if !build_is_permitted(holder, faction, row, zoned) {
+            self.plan.count_refusal();
+            // The two refusals answer two rules. A row that asks for held
+            // ground met the ground rule. A row that asks for none met the
+            // plan.
+            return Err(if row.own_ground_required == 0 {
+                BuildRefusal::NoProject { category }
+            } else {
+                BuildRefusal::GroundNotHeld { category }
+            });
         }
         if self.soldiers.set_build_order(entity, Some(category)) {
             Ok(())
@@ -5496,6 +5525,214 @@ impl World {
             return false;
         };
         self.upgrades.remove(tile).is_some()
+    }
+
+    /// Writes one project into the plan of one faction.
+    ///
+    /// **The solver calls this verb and a Python caller calls it.** No path
+    /// exists for the solver alone, so a god that zones a project by hand
+    /// puts it in the same list the solver writes to, and a unit cannot tell
+    /// the two apart.[^1] [^2]
+    ///
+    /// The verb refuses a tile past the plan bound, a category that no row of
+    /// the table fits, and a tile the faction does not hold when the row asks
+    /// for held ground. A row that asks for no held ground is permitted
+    /// anywhere, because that row is how a faction reaches ground it does not
+    /// yet hold.[^3]
+    ///
+    /// # Errors
+    ///
+    /// Returns a refusal when the number names no faction, when the address
+    /// lies outside the world, when no row fits, when the row asks for held
+    /// ground that the faction does not hold, and when the plan is full.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0152, a faction plans its roads and zones with one solver, decision D4. `docs/adrs/accepted/adr-0152-a-faction-plans-its-roads-and-zones-with-one-solver.md`
+    /// [^2]: ADR-0144, a faction controller runs inside the step and acts only through the caller's verbs, decision D2. `docs/adrs/accepted/adr-0144-a-faction-controller-runs-inside-the-step-and-acts-only-through-the-callers-verbs.md`
+    /// [^3]: ADR-0150, held ground is the ground within reach of a city its faction owns, decision D4. `docs/adrs/draft/adr-0150-held-ground-is-the-ground-within-reach-of-a-city-its-faction-owns.md`
+    pub fn zone_project(
+        &mut self,
+        faction: FactionId,
+        address: Axial,
+        category: UpgradeCategory,
+    ) -> Result<(), PlanRefusal> {
+        if usize::from(faction.0) >= self.plan.faction_count() {
+            self.plan.count_refusal();
+            return Err(PlanRefusal::NoSuchFaction(faction));
+        }
+        let (Some(tile), Some(ground)) = (self.grid.index_of(address), self.terrain.kind(address))
+        else {
+            self.plan.count_refusal();
+            return Err(PlanRefusal::AddressOutsideWorld(address));
+        };
+        let row = resolve_build_row(
+            &self.upgrade_table,
+            ground,
+            self.upgrades.at(tile),
+            category,
+        )
+        .map_err(|_| {
+            self.plan.count_refusal();
+            PlanRefusal::NoRowFits { category }
+        })?;
+        let holder = self
+            .holding
+            .holders()
+            .get(tile.0 as usize)
+            .copied()
+            .unwrap_or(Holder::NOBODY);
+        if row.own_ground_required != 0 && holder.faction().map(|held| held.0) != Some(faction.0) {
+            self.plan.count_refusal();
+            return Err(PlanRefusal::GroundNotHeld { category });
+        }
+        self.plan.write(faction, Project::new(tile, category))
+    }
+
+    /// Removes the project one faction zoned on one tile.
+    ///
+    /// Reports whether it removed one. A caller and the solver both reach
+    /// this verb.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0152, a faction plans its roads and zones with one solver, decision D4. `docs/adrs/accepted/adr-0152-a-faction-plans-its-roads-and-zones-with-one-solver.md`
+    pub fn clear_project(&mut self, faction: FactionId, address: Axial) -> bool {
+        let Some(tile) = self.grid.index_of(address) else {
+            return false;
+        };
+        self.plan.clear(faction, tile)
+    }
+
+    /// Returns the projects one faction has zoned, in ascending tile order.
+    #[must_use]
+    pub fn plan_of(&self, faction: FactionId) -> &[Project] {
+        self.plan.projects_of(faction)
+    }
+
+    /// Returns the category one faction zoned on one tile.
+    #[must_use]
+    pub fn project_at(&self, faction: FactionId, address: Axial) -> Option<UpgradeCategory> {
+        let tile = self.grid.index_of(address)?;
+        self.plan.zones(faction, tile)
+    }
+
+    /// Returns the project one unit takes: the nearest by hex distance.
+    ///
+    /// **This is the assignment rule, and the controller calls this one
+    /// function.** When two projects tie on distance, the lower tile index
+    /// wins. A unit of another faction, a dead unit and a faction with an
+    /// empty plan each give nothing.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0152, a faction plans its roads and zones with one solver, decision D5. `docs/adrs/accepted/adr-0152-a-faction-plans-its-roads-and-zones-with-one-solver.md`
+    #[must_use]
+    pub fn project_for(&self, faction: FactionId, unit: Entity) -> Option<Project> {
+        if self.soldiers.faction(unit) != Some(faction) {
+            return None;
+        }
+        let here = self.grid.address_of(self.soldiers.tile(unit)?)?;
+        // The comparison is the tie rule, and it is written out rather than
+        // left to the order of the list. The plan is in tile order, so a
+        // comparison that took the last of several equals would take the
+        // highest tile index.
+        let mut best: Option<(u32, u32, Project)> = None;
+        for project in self.plan.projects_of(faction) {
+            let Some(there) = self.grid.address_of(project.tile) else {
+                continue;
+            };
+            let key = (here.distance(there), project.tile.0, *project);
+            if best.is_none_or(|held| key < held) {
+                best = Some(key);
+            }
+        }
+        best.map(|(_, _, project)| project)
+    }
+
+    /// Returns the way the solver would lay between two places.
+    ///
+    /// **This is the path search of the plan, and the solver walks the same
+    /// window.** The search relaxes the tiles inside the radius a fixed
+    /// number of times and then walks back from the far end, taking the
+    /// neighbour with the lowest pair of cost and tile index at every step.
+    /// It never runs until the frontier settles.[^1] [^2]
+    ///
+    /// Returns an empty list when either address lies outside the world, when
+    /// the far end lies past the search radius, and when no path of the pass
+    /// budget reaches it.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0152, a faction plans its roads and zones with one solver, decision D3. `docs/adrs/accepted/adr-0152-a-faction-plans-its-roads-and-zones-with-one-solver.md`
+    /// [^2]: ADR-0005, a solver runs a fixed iteration count, decision D1. `docs/adrs/accepted/adr-0005-a-solver-runs-a-fixed-iteration-count.md`
+    #[must_use]
+    pub fn planned_path(&self, from: Axial, to: Axial) -> Vec<Axial> {
+        let ground = plan::Ground {
+            grid: self.grid,
+            terrain: self.terrain,
+            upgrades: &self.upgrades,
+            table: &self.upgrade_table,
+        };
+        let Some(start) = self.grid.index_of(from) else {
+            return Vec::new();
+        };
+        let Some(window) = plan::PathWindow::build(&ground, start, self.plan.rules()) else {
+            return Vec::new();
+        };
+        window
+            .path_to(self.grid, to)
+            .unwrap_or_default()
+            .into_iter()
+            .filter_map(|tile| self.grid.address_of(tile))
+            .collect()
+    }
+
+    /// Returns the cost the path search charged to reach one place from
+    /// another.
+    ///
+    /// The cost is the whole number the ground charges along the way. It is
+    /// the value the tie rule of the path compares first, so a reader can see
+    /// which two ways tie.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0152, a faction plans its roads and zones with one solver, decision D3. `docs/adrs/accepted/adr-0152-a-faction-plans-its-roads-and-zones-with-one-solver.md`
+    #[must_use]
+    pub fn planned_path_cost(&self, from: Axial, to: Axial) -> Option<i64> {
+        let ground = plan::Ground {
+            grid: self.grid,
+            terrain: self.terrain,
+            upgrades: &self.upgrades,
+            table: &self.upgrade_table,
+        };
+        let start = self.grid.index_of(from)?;
+        let window = plan::PathWindow::build(&ground, start, self.plan.rules())?;
+        window.cost_of(to)
+    }
+
+    /// Returns the values the plan and its solver read.
+    #[must_use]
+    pub const fn plan_rules(&self) -> PlanRules {
+        self.plan.rules()
+    }
+
+    /// Sets the values the plan and its solver read.
+    ///
+    /// **The call clears every plan.** The bound decides the size of the
+    /// register, so a register built with another bound holds its rows
+    /// elsewhere, and carrying them over would put a project of one faction
+    /// into the plan of another. A caller that changes the rules zones again.
+    ///
+    /// Every value is a balance row, and a blocker governs each of them.[^1]
+    /// [^2]
+    ///
+    /// # References
+    ///
+    /// [^1]: Balance register, the plan. `docs/reference/balance.md`
+    /// [^2]: Blockers register, BLK-050. `docs/BLOCKERS.md`
+    pub fn set_plan_rules(&mut self, rules: PlanRules) {
+        self.plan = PlanRegister::new(self.config.faction_count, rules);
     }
 
     /// Returns who holds one tile.
@@ -7348,10 +7585,13 @@ impl World {
         let intents = build_intents(
             &self.soldiers,
             &self.holding,
-            self.terrain,
-            self.grid,
-            &self.upgrades,
-            &self.upgrade_table,
+            plan::Ground {
+                grid: self.grid,
+                terrain: self.terrain,
+                upgrades: &self.upgrades,
+                table: &self.upgrade_table,
+            },
+            &self.plan,
             threads,
         )?;
         if intents.is_empty() {
@@ -8081,8 +8321,10 @@ fn build_order_of(keys: &[BoundedKey], ceiling: u64) -> Result<Vec<u32>, SortErr
 /// apart would let a build the verb refused finish anyway.[^1] [^2]
 ///
 /// The holder of the tile must be the builder's own faction when the row asks
-/// for it. A row whose own ground column is zero is built anywhere, because
-/// that is how a faction reaches ground it does not yet hold.[^1]
+/// for it. A row whose own ground column is zero crosses ground nobody holds,
+/// because that is how a faction reaches ground it does not yet hold.[^1] That
+/// row is permitted only where the builder's own faction zoned a project of
+/// the same category, so the plan is the bound on the reach.[^4]
 ///
 /// The rule reads a column of the resolved row. It names no category, so a
 /// row a caller wrote at run time obeys the same rule as a row of the default
@@ -8093,10 +8335,21 @@ fn build_order_of(keys: &[BoundedKey], ceiling: u64) -> Result<Vec<u32>, SortErr
 /// [^1]: ADR-0150, held ground is the ground within reach of a city its faction owns, decision D4. `docs/adrs/draft/adr-0150-held-ground-is-the-ground-within-reach-of-a-city-its-faction-owns.md`
 /// [^2]: Recurring defect shapes, shape 1. `.agents/rules/recurring-defects.md`
 /// [^3]: ADR-0151, an upgrade is a category with a ground fit and a level, decision D4. `docs/adrs/draft/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
+/// [^4]: ADR-0152, a faction plans its roads and zones with one solver, decisions D3 and D4. `docs/adrs/accepted/adr-0152-a-faction-plans-its-roads-and-zones-with-one-solver.md`
 #[must_use]
-const fn build_is_permitted(holder: Holder, faction: FactionId, row: UpgradeRow) -> bool {
+const fn build_is_permitted(
+    holder: Holder,
+    faction: FactionId,
+    row: UpgradeRow,
+    zoned: bool,
+) -> bool {
     if row.own_ground_required == 0 {
-        return true;
+        // A row that asks for no held ground is how a faction reaches ground
+        // it does not hold. The plan is the bound that stops it: a unit lays
+        // one only inside a project of its own faction.[^4]
+        //
+        // [^4]: ADR-0152, a faction plans its roads and zones with one solver, decisions D3 and D4. `docs/adrs/accepted/adr-0152-a-faction-plans-its-roads-and-zones-with-one-solver.md`
+        return zoned;
     }
     match holder.faction() {
         Some(held) => held.0 == faction.0,
@@ -8168,12 +8421,16 @@ fn resolve_build_row(
 fn build_intents(
     soldiers: &SoldierArena,
     holding: &Holding,
-    terrain: Terrain,
-    grid: Grid,
-    upgrades: &UpgradeMap,
-    table: &UpgradeTable,
+    ground: plan::Ground<'_>,
+    plan: &PlanRegister,
     threads: usize,
 ) -> Result<Vec<BuildIntent>, StepError> {
+    let plan::Ground {
+        grid,
+        terrain,
+        upgrades,
+        table,
+    } = ground;
     let live: Vec<Entity> = soldiers.iter().collect();
     if live.is_empty() {
         return Ok(Vec::new());
@@ -8212,7 +8469,13 @@ fn build_intents(
                             .get(tile.0 as usize)
                             .copied()
                             .unwrap_or(Holder::NOBODY);
-                        if !build_is_permitted(holder, soldiers.faction(*unit)?, row) {
+                        let faction = soldiers.faction(*unit)?;
+                        if !build_is_permitted(
+                            holder,
+                            faction,
+                            row,
+                            plan.zoned_for(faction, tile, category),
+                        ) {
                             return None;
                         }
                         Some(BuildIntent {
@@ -9321,6 +9584,30 @@ pub const SUBSYSTEM_CENSUS: &[CensusRow] = &[
         name: "controller_refused",
         read: |world| i64::from(world.controller.refused()),
     },
+    // What the plans of every faction have taken, finished, dropped and
+    // refused. The record asks that a drop and a refusal each be counted.[^3]
+    //
+    // [^3]: ADR-0152, a faction plans its roads and zones with one solver, decisions D1, D4 and D5. `docs/adrs/accepted/adr-0152-a-faction-plans-its-roads-and-zones-with-one-solver.md`
+    CensusRow {
+        name: "projects_zoned",
+        read: |world| world.plan.zoned_count(),
+    },
+    CensusRow {
+        name: "projects_finished",
+        read: |world| world.plan.finished_count(),
+    },
+    CensusRow {
+        name: "projects_dropped",
+        read: |world| world.plan.dropped_count(),
+    },
+    CensusRow {
+        name: "projects_refused",
+        read: |world| world.plan.refused_count(),
+    },
+    CensusRow {
+        name: "plan_passes",
+        read: |world| world.plan.pass_count(),
+    },
     CensusRow {
         name: "game_ended",
         read: |world| i64::from(world.controller.game_end().is_set()),
@@ -10169,6 +10456,148 @@ impl World {
     /// [^2]: ADR-0144, a faction controller runs inside the step and acts only through the caller's verbs, decision D2. `docs/adrs/accepted/adr-0144-a-faction-controller-runs-inside-the-step-and-acts-only-through-the-callers-verbs.md`
     /// [^3]: ADR-0147, a contract consideration is a tagged kind, decision D2. `docs/adrs/accepted/adr-0147-a-contract-consideration-is-a-tagged-kind.md`
     /// [^4]: ADR-0110, a unit returns by climbing a reach field seeded at every site of its faction, decision D1. `docs/adrs/draft/adr-0110-a-unit-returns-by-climbing-a-reach-field.md`
+    /// Writes the plan of one faction, in a fixed pass count.
+    ///
+    /// **The solver reads three things of one faction**: the tiles of its
+    /// settlements, the ground it holds, and whether its stores fall short of
+    /// the mark above which a site offers. It reads no unit, and it reads no
+    /// tile outside the window it builds around the seat.[^1]
+    ///
+    /// The pass count and the window are balance values, and a blocker
+    /// governs each of them.[^2] [^3]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0152, a faction plans its roads and zones with one solver, decision D2. `docs/adrs/accepted/adr-0152-a-faction-plans-its-roads-and-zones-with-one-solver.md`
+    /// [^2]: Balance register, the plan. `docs/reference/balance.md`
+    /// [^3]: Blockers register, BLK-050. `docs/BLOCKERS.md`
+    fn solve_plan(&mut self, faction: FactionId) -> u32 {
+        let Some(seat) = self.seat(faction) else {
+            return 0;
+        };
+        // The settlements of one faction, in ascending tile order. The scan
+        // follows the settlements and never the tile count.
+        let mut sites: Vec<TileIdx> = self
+            .settlements
+            .iter()
+            .filter(|site| self.settlements.faction(*site) == Some(faction))
+            .filter_map(|site| self.settlements.tile(site))
+            .collect();
+        sites.sort_unstable();
+        sites.dedup();
+        let stores = self.faction_stores(faction);
+        let mark = i64::from(self.controller.surplus_mark());
+        let short_of_stores = stores.iter().any(|held| *held < mark);
+        let ground = plan::Ground {
+            grid: self.grid,
+            terrain: self.terrain,
+            upgrades: &self.upgrades,
+            table: &self.upgrade_table,
+        };
+        let needs = Needs {
+            seat,
+            sites: &sites,
+            holders: self.holding.holders(),
+            short_of_stores,
+        };
+        plan::solve(&ground, faction, &needs, &mut self.plan)
+    }
+
+    /// Sends the idle units of one faction to the projects its plan zones.
+    ///
+    /// **Each unit takes the project nearest to it by hex distance, and a tie
+    /// takes the lower tile index.** A unit that is not idle is not moved,
+    /// and the order goes through the send verb and the build verb that a
+    /// Python caller also calls.[^1] [^2]
+    ///
+    /// The faction climbs one destination plane, and the plane of a faction
+    /// is its number. A faction that holds a live campaign or a carrier is
+    /// already climbing that plane, so it takes no project order and the
+    /// command is refused. That rule is the one the campaign already applies
+    /// to a faction that holds a carrier.
+    ///
+    /// The cost follows the idle units multiplied by the plan bound. The
+    /// bound is fixed, so the cost follows the population and not the
+    /// world.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0152, a faction plans its roads and zones with one solver, decision D5. `docs/adrs/accepted/adr-0152-a-faction-plans-its-roads-and-zones-with-one-solver.md`
+    /// [^2]: ADR-0144, a faction controller runs inside the step and acts only through the caller's verbs, decision D2. `docs/adrs/accepted/adr-0144-a-faction-controller-runs-inside-the-step-and-acts-only-through-the-callers-verbs.md`
+    fn controller_take_projects(&mut self, faction: FactionId) -> bool {
+        let projects: Vec<Project> = self.plan.projects_of(faction).to_vec();
+        if projects.is_empty() {
+            return false;
+        }
+        if self.campaigns.live(faction).is_some()
+            || self
+                .controller
+                .carriers()
+                .iter()
+                .any(|entry| entry.faction == faction)
+        {
+            return false;
+        }
+        let mut units: Vec<Entity> = self.soldiers.iter_faction(faction).collect();
+        units.sort_unstable_by_key(|unit| unit.to_bits());
+        // **The order does two things, and which one a unit gets depends on
+        // where it stands.** A unit that already stands on a project of its
+        // faction takes the build order, because the build verb refuses a
+        // tile no project zones. Every other idle unit is sent toward the
+        // project nearest to it. A unit that is neither is left alone.
+        let mut standing: Vec<(Entity, UpgradeCategory)> = Vec::new();
+        let mut walking: Vec<(Entity, Project)> = Vec::new();
+        for unit in units {
+            let Some(tile) = self.soldiers.tile(unit) else {
+                continue;
+            };
+            if let Some(category) = self.plan.zones(faction, tile) {
+                standing.push((unit, category));
+                continue;
+            }
+            if self.soldiers.sent(unit) != Some(None) {
+                continue;
+            }
+            if let Some(project) = self.project_for(faction, unit) {
+                walking.push((unit, project));
+            }
+        }
+        let mut applied = false;
+        if !walking.is_empty() {
+            let plane = faction.0;
+            if plane < self.destinations.plane_count() {
+                // The seeds are the projects the units took. The send verb
+                // sorts and deduplicates the set itself, so the order of this
+                // list decides nothing.
+                let seeds: Vec<Axial> = walking
+                    .iter()
+                    .filter_map(|(_, project)| self.grid.address_of(project.tile))
+                    .collect();
+                let set: Vec<Entity> = walking.iter().map(|(unit, _)| *unit).collect();
+                applied |= self.send_units_to(&set, &seeds, plane).is_ok();
+            }
+        }
+        // The build order names the category of the project the unit stands
+        // on. The units are grouped by category, in category order, so each
+        // call is the set form the boundary already exposes.
+        for category in UpgradeCategory::ALL {
+            let group: Vec<Entity> = standing
+                .iter()
+                .filter(|(_, held)| *held == category)
+                .map(|(unit, _)| *unit)
+                .collect();
+            if group.is_empty() {
+                continue;
+            }
+            let refused = self.order_build_set(&group, category);
+            for _ in 0..refused {
+                self.plan.count_refusal();
+            }
+            applied |= refused < group.len();
+        }
+        applied
+    }
+
     fn controller_carriers(&mut self, faction: FactionId) -> bool {
         let mut kept: Vec<CarrierAssignment> = Vec::new();
         let mut released: Vec<Entity> = Vec::new();
@@ -10343,6 +10772,26 @@ impl World {
         // The three trade commands are pushed only when there is work. A
         // faction that has nothing to advertise, nothing to say and no
         // carrier to move emits nothing, so an idle world costs no command.
+        // **The solver runs before the commands are planned.** It writes the
+        // plan of every faction the controller evaluates, in faction order,
+        // and the project order below then reads what it wrote.[^7]
+        //
+        // [^7]: ADR-0152, a faction plans its roads and zones with one solver, decisions D2 and D5. `docs/adrs/accepted/adr-0152-a-faction-plans-its-roads-and-zones-with-one-solver.md`
+        for index in 0..factions {
+            let faction = FactionId(index as u16);
+            // A faction under external control and a faction with no seat
+            // receive no evaluation, so neither gets a plan.[^8]
+            //
+            // [^8]: ADR-0144, a faction controller runs inside the step and acts only through the caller's verbs, decisions D6 and D7. `docs/adrs/accepted/adr-0144-a-faction-controller-runs-inside-the-step-and-acts-only-through-the-callers-verbs.md`
+            let evaluated = self
+                .controller
+                .row(faction)
+                .is_some_and(|row| row.externally_controlled == 0 && row.seat().is_some());
+            if !evaluated {
+                continue;
+            }
+            self.solve_plan(faction);
+        }
         let due = self.controller.board_due(tick);
         let states: Vec<FactionState> = (0..factions)
             .map(|index| {
@@ -10354,6 +10803,15 @@ impl World {
                     trade_due: self.controller_answer_due(faction).is_some()
                         || self.controller_match_due(faction).is_some(),
                     carry_due: self.controller_carry_work(faction),
+                    // A faction with a march to make marches. The campaign
+                    // and the project order take the same idle units and the
+                    // same destination plane, so one of the two must yield,
+                    // and the campaign is the one the war weight asked
+                    // for.[^9]
+                    //
+                    // [^9]: ADR-0152, a faction plans its roads and zones with one solver, decision D5. `docs/adrs/accepted/adr-0152-a-faction-plans-its-roads-and-zones-with-one-solver.md`
+                    project_due: !self.plan.projects_of(faction).is_empty()
+                        && objectives.get(index).copied().flatten().is_none(),
                 }
             })
             .collect();
@@ -10412,6 +10870,7 @@ impl World {
                 Choice::Advertise => self.controller_write_board(faction, sequence),
                 Choice::Trade => self.controller_trade_step(faction),
                 Choice::Carry => self.controller_carriers(faction),
+                Choice::Project => self.controller_take_projects(faction),
             };
             let applied = u8::from(applied);
             sets[usize::from(faction.0)] = set;

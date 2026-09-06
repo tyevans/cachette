@@ -199,6 +199,8 @@ def test_a_row_written_at_run_time_takes_a_build_order(seed: int) -> None:
     world.step(threads=1)
     units = world.spawn_soldiers([address], faction=0)
     world.define_upgrade_row(OPEN, 1, **_row(ground_fit=1 << PLAIN, work=2))
+    # The row asks for no held ground, so a project must zone the tile.
+    world.zone_projects(0, [address], OPEN)
     world.order_build(units, OPEN)
     assert world.build_order(int(units[0])) == OPEN
     world.step(threads=1)
@@ -217,6 +219,8 @@ def test_the_tile_report_states_the_level_and_the_work_toward_the_next(
     world.found_settlements([address], faction=0)
     world.step(threads=1)
     units = world.spawn_soldiers([address], faction=0)
+    # A road asks for no held ground, so a project must zone the tile first.
+    world.zone_projects(0, [address], ROAD)
     world.order_build(units, ROAD)
     world.step(threads=1)
     report = world.tile_report(*address)

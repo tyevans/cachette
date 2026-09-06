@@ -348,6 +348,13 @@ fn a_land_side_whose_tile_carries_an_upgrade_is_refused() {
     let builder = world
         .spawn_soldier(address_of(&world, site), ZERO)
         .expect("the spawn must succeed");
+    // A road asks for no held ground, so a project must zone the tile before
+    // a unit may lay one.[^1]
+    //
+    // [^1]: ADR-0152, a faction plans its roads and zones with one solver, decision D3. `docs/adrs/accepted/adr-0152-a-faction-plans-its-roads-and-zones-with-one-solver.md`
+    assert!(world
+        .zone_project(ZERO, address_of(&world, site), UpgradeCategory::ROAD)
+        .is_ok());
     assert!(world.order_build(builder, UpgradeCategory::ROAD).is_ok());
     for _ in 0..12 {
         if world.upgrade_at(address_of(&world, site)).is_some() {

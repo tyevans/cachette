@@ -343,6 +343,9 @@ pub const COMMAND_TRADE: u8 = 5;
 /// the faction owes a quantity on. The argument is how many units it assigned.
 pub const COMMAND_CARRY: u8 = 6;
 
+/// The command number of the order that takes the zoned projects.
+pub const COMMAND_PROJECT: u8 = 7;
+
 /// The step the controller moves a relation by when its draw says so. It is
 /// one step toward war, and the drift is what brings the pair back.[^1]
 ///
@@ -417,6 +420,16 @@ pub enum Choice {
     /// Assign the carriers of every contract the faction owes a quantity on,
     /// and release the carriers of every contract that ended.
     Carry,
+    /// Send the idle units of the faction to the projects its plan zones, and
+    /// order each of them to build what its project names.
+    ///
+    /// The assignment is made when the command applies, so it reads the plan
+    /// that the solver wrote on this tick.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0152, a faction plans its roads and zones with one solver, decision D5. `docs/adrs/accepted/adr-0152-a-faction-plans-its-roads-and-zones-with-one-solver.md`
+    Project,
 }
 
 impl Choice {
@@ -436,6 +449,7 @@ impl Choice {
             Self::Advertise => (COMMAND_ADVERTISE, 0),
             Self::Trade => (COMMAND_TRADE, 0),
             Self::Carry => (COMMAND_CARRY, 0),
+            Self::Project => (COMMAND_PROJECT, 0),
         }
     }
 }
@@ -787,6 +801,8 @@ pub struct FactionState {
     pub trade_due: bool,
     /// Whether it holds a carrier to assign or to release.
     pub carry_due: bool,
+    /// Whether its plan holds a project that an idle unit could take.
+    pub project_due: bool,
 }
 
 /// The controller state the world holds.
@@ -1151,6 +1167,9 @@ impl Controller {
             if state.carry_due {
                 commands.push((faction, self.carry_draw_index(), Choice::Carry));
             }
+            if state.project_due {
+                commands.push((faction, self.project_draw_index(), Choice::Project));
+            }
         }
         // The visit order above is fixed, and the sort is what makes the
         // applied order independent of it. The key is unique, because one
@@ -1192,11 +1211,26 @@ impl Controller {
     }
 
     /// Returns the draw index of the carrier command: one past the
-    /// negotiation step. The carrier command draws nothing, and the index
-    /// puts it last in the order the commands apply.
+    /// negotiation step. The carrier command draws nothing, and the index is
+    /// reserved whether it draws or not.
     #[must_use]
     pub const fn carry_draw_index(&self) -> u32 {
         self.evaluations + 4
+    }
+
+    /// Returns the draw index of the project order: one past the carrier
+    /// command.
+    ///
+    /// The project order draws nothing, and the index puts it last in the
+    /// order the commands apply. It applies after the solver has written, so
+    /// an idle unit takes the plan of this tick.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0152, a faction plans its roads and zones with one solver, decision D5. `docs/adrs/accepted/adr-0152-a-faction-plans-its-roads-and-zones-with-one-solver.md`
+    #[must_use]
+    pub const fn project_draw_index(&self) -> u32 {
+        self.evaluations + 5
     }
 
     /// Reports whether a faction rewrites its board on this tick.

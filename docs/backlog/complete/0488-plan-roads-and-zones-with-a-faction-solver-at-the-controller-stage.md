@@ -1,7 +1,7 @@
 ---
 id: 0488
 title: Plan roads and zones with a faction solver at the controller stage
-status: refined
+status: complete
 created: 2026-09-05
 implements: [ADR-0152 D1, ADR-0152 D2, ADR-0152 D3, ADR-0152 D4, ADR-0152 D5, ADR-0144 D2, ADR-0144 D3, ADR-0144 D5, ADR-0005 D1, ADR-0004 D1, ADR-0009 D1, ADR-0001 D4]
 changes: []
@@ -311,7 +311,65 @@ keeps its road exemption and is unchanged.
 
 ## Outcome
 
-Filled in when the item moves to `complete/`.
+Built. Each faction holds a bounded plan of projects. A project is a plain-data
+pair of a tile index and a category index, with declared padding. The rows of
+one faction stay in ascending tile order, one tile holds one project, and the
+register enters the whole-world state hash. A write past the bound is dropped
+and counted.
+
+One solver writes the plan at the controller stage, once for each faction the
+controller evaluates, in a fixed pass count. Each pass clears the projects the
+builders finished, builds one window around the seat, relaxes the window a
+fixed number of times, scores the candidates and writes the best. There is no
+convergence test, no early exit and no clock read. A census row counts the
+passes, so a reader outside the engine can see the fixed count.
+
+A path is a dense window addressed by the offset from the centre. Each pass
+relaxes every cell from its six neighbours in the fixed hex order, taking the
+lowest pair of the step cost and the neighbour tile index. The walk back takes
+the same pair. No container order and no thread order reaches the result.
+
+**No function names a category.** The solver asks the table which category
+joins two places: the one whose first row asks for no held ground. That is the
+column the ground rule already reads, so a table a caller wrote at run time
+obeys the same rule as the default table.
+
+One verb writes a project and one verb clears it. The solver and a Python
+caller call the same two, and neither reads who called it. The build rule gained
+one clause: a row that asks for no held ground is permitted only where the
+builder's own faction zoned a project of that category. The verb and the build
+intent pass call one function, and a new typed refusal names the plan rather
+than the ground.
+
+**Three decisions this item made that the record does not hold.**
+
+1. **A build outside a project is refused for every row that asks for no held
+   ground, and not for a category named road.** The rule reads the column, as
+   the upgrade record requires. Today the road is the only such row.
+2. **A faction with a march to make takes no project order.** The campaign and
+   the project order want the same idle units and the same destination plane,
+   so one must yield, and the campaign is the one the war weight asked for.
+3. **The solver plans toward a deposit only inside the window it already
+   built, and it reads the ground kind rather than a deposit register.**
+   Nothing in the engine names the deposits of a faction, and this item added
+   no index for them.
+
+**One deviation from ADR-0152 D5, recorded as a finding.** The engine moves a
+unit by a destination field, and one faction climbs one plane. The order
+therefore decides which project a unit takes, which is the category its build
+order names, and it decides the seed set the faction climbs. It does not decide
+which seed a walking unit reaches. A reviewer of ADR-0152 must decide what D5
+states.
+
+Five balance rows are new, and every one is unset with a provisional value and
+a filled derivation. The road spacing row that the refinement added was
+removed, because nothing reads it and the project forbids a value that no pass
+reads.
+
+Left undone. The whole check command was not run, because this wave forbids it.
+ADR-0150 and ADR-0151 stay drafts. The deposit reader and the connectivity
+reader stay open questions, and the item states what the solver does without
+each.
 
 ## References
 
