@@ -260,17 +260,17 @@ def test_the_recovery_rules_read_back_what_was_written(seed: int) -> None:
     assert world.recovery_rules() == [7, None, 3]
 
 
-def test_the_recovery_rules_are_outside_the_state_hash(seed: int) -> None:
-    """Assert a defect, so the test fails when the defect is repaired.
+def test_the_recovery_rules_are_hashed_state(seed: int) -> None:
+    """The recovery rules govern the step, so they enter the state hash.
 
-    The recovery rules govern the step and stand outside the state hash.[^2]
+    The finding holds the reading of the defect this replaced.[^2]
     """
     world = a_world(seed)
     before = world.state_hash()
 
     world.set_recovery_rules([1, 1, 1])
 
-    assert world.state_hash() == before
+    assert world.state_hash() != before
     assert world.recovery_rules() == [1, 1, 1]
 
 

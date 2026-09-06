@@ -933,14 +933,18 @@ pub struct World {
     /// The profile is content, and it is a table of values. The engine reads
     /// it and never calls into it.[^1]
     ///
-    /// It is an input to the world and not a fact the world holds, so it
-    /// does not reach the state hash. What it decides does: the intent
-    /// column carries the outcome, and that column is hashed.[^2]
+    /// The profile reaches the state hash. The pass reads it on every tick,
+    /// so it is a value the world holds and not only an input to it. The
+    /// intent column carries the outcome, and an outcome states the effect
+    /// and never the cause: two worlds that hold the same intents and
+    /// different weights hash the same and diverge at the next choice.[^2]
+    /// [^3]
     ///
     /// # References
     ///
     /// [^1]: ADR-0007, content supplies a key vector, never a comparator, decision D3. `docs/adrs/accepted/adr-0007-content-supplies-a-key-vector-never-a-comparator.md`
     /// [^2]: ADR-0064, a unit chooses by scoring a small fixed option set, decision D2. `docs/adrs/accepted/adr-0064-a-unit-chooses-by-scoring-a-small-fixed-option-set.md`
+    /// [^3]: Findings register, FND-537. `docs/FINDINGS.md`
     weights: WeightProfile,
     /// The positions that each site holds, and what each site wants.
     ///
@@ -1008,8 +1012,10 @@ pub struct World {
     /// leaves the field empty, and an unseeded world leaves it empty as well,
     /// so the field cannot answer the question on its own.[^1]
     ///
-    /// The flag never reaches the state hash. Two worlds that hold the same
-    /// luxuries are the same world, whether or not somebody seeded them.
+    /// The flag reaches the state hash. Two worlds that hold the same
+    /// luxuries are not the same world when one took a seed and the other did
+    /// not, because the next seed call is accepted by one and refused by the
+    /// other.
     ///
     /// # References
     ///
@@ -3708,9 +3714,21 @@ impl World {
     ///
     /// The golden test compares this value against a stored file.[^1]
     ///
+    /// **Every stored value that a pass or a verb reads enters this hash.** A
+    /// derived projection stays out, and the inputs of the derivation enter
+    /// instead. A parameter that decides what a pass writes enters, even when
+    /// the column the pass writes is already here: a hash of the effect
+    /// reports a changed parameter one or more ticks after the change.[^2]
+    ///
+    /// A new value needs a test that changes it through the public interface
+    /// and asserts that the hash differs. The golden file cannot do that work,
+    /// because it cannot say which input the hash stopped depending on.[^3]
+    ///
     /// # References
     ///
     /// [^1]: ADR-0001, one binary gives one answer at any thread count, decision D4. `docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
+    /// [^2]: ADR-0164, every stored value the step reads enters the state hash, decisions D1 to D3. `docs/adrs/draft/adr-0164-every-stored-value-the-step-reads-enters-the-state-hash.md`
+    /// [^3]: ADR-0164, every stored value the step reads enters the state hash, decision D4. `docs/adrs/draft/adr-0164-every-stored-value-the-step-reads-enters-the-state-hash.md`
     #[must_use]
     pub fn state_hash(&self) -> StateHash {
         let hash = StateHash::new()
@@ -3738,8 +3756,20 @@ impl World {
         // holds for it: the seed is the input of the generator and only the
         // tiles report a change to the generator itself.
         let hash = self.resources.hash_into(hash);
+        // The ledger writes the recovery rules with its entries. The pass
+        // reads a period on every tick, and a hash that wrote the takes and
+        // not the periods reports the effect one or more ticks after the
+        // cause.[^20]
+        //
+        // [^20]: Findings register, FND-480. `docs/FINDINGS.md`
         let mut hash = self.depletion.hash_into(hash);
         for amount in &self.departed {
+            hash = hash.write_u64(*amount);
+        }
+        // What has been delivered is a stored total that a later frame reads,
+        // in the way the departed total is. It is the term that links the
+        // carry account to the store account.
+        for amount in &self.delivered {
             hash = hash.write_u64(*amount);
         }
         // An upgrade is the difference between the world the generator made
@@ -3831,6 +3861,29 @@ impl World {
             .write_u64(u64::from(self.character_schedule.period()))
             .write_u64(u64::from(self.character_schedule.phase()))
             .write_u64(u64::from(self.promotion_budget));
+        // The four parameters of the choice are read on every tick, and each
+        // one decides what a unit does next. The intent column carries the
+        // outcome, and an outcome states the effect and never the cause: two
+        // worlds that hold the same intents and different parameters hash the
+        // same and diverge at the next frame that chooses.[^21]
+        //
+        // [^21]: Findings register, FND-537. `docs/FINDINGS.md`
+        let hash = self
+            .choice
+            .hash_into(hash)
+            .write_u64(u64::from(self.carry_mark.0));
+        let hash = self.buckets.hash_into(hash);
+        let hash = self.weights.hash_into(hash);
+        // The bound on a land side is a parameter that a verb reads. Two
+        // worlds that differ in it answer the same offer differently.
+        let hash = hash.write_u64(u64::from(self.land_list_bound));
+        // Whether the world took a luxury seed is a fact the field cannot
+        // state: a seed that placed nothing leaves the field as an unseeded
+        // world leaves it, and the two worlds refuse and accept the next seed
+        // differently.[^22]
+        //
+        // [^22]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`
+        let hash = hash.write_u64(u64::from(self.luxuries_seeded));
         let mut hash = self.draw_ledger.hash_into(hash);
         for total in &self.store_account {
             hash = hash.write_u64(total.0 as u64);
