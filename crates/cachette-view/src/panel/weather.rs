@@ -93,6 +93,23 @@ impl Panel for Weather {
         // [^1]: ADR-0160, the wind is carried state, and the pressure gradient accelerates it, decision D1. `docs/adrs/accepted/adr-0160-the-wind-is-carried-state-and-the-pressure-gradient-accelerates-it.md`
         lines.push(Line::row("fastest wind", steps(i64::from(field.fastest()))));
 
+        // **The temperature is what makes the weather travel.** A season
+        // moves a warm band across the lattice, the band turns the wind, and
+        // the wind carries the water. The panel names the coldest and the
+        // warmest cell, so a watcher can see the band go past as a number and
+        // not only as a wash.[^2]
+        //
+        // [^2]: ADR-0166, the temperature of a cell is carried state that a season and the sky drive, decision D2. `docs/adrs/draft/adr-0166-the-temperature-of-a-cell-is-carried-state-that-a-season-and-the-sky-drive.md`
+        let plane = field.warmth_plane();
+        lines.push(Line::row(
+            "coldest cell",
+            degrees(plane.iter().copied().min().unwrap_or(0)),
+        ));
+        lines.push(Line::row(
+            "warmest cell",
+            degrees(plane.iter().copied().max().unwrap_or(0)),
+        ));
+
         lines.push(Line::Rule);
         lines.push(Line::heading("POINTED CELL"));
         match view.pointer {
@@ -112,6 +129,10 @@ impl Panel for Weather {
                         } else {
                             "no"
                         },
+                    ));
+                    lines.push(Line::row(
+                        "temperature",
+                        degrees(world.temperature_at(pointer).unwrap_or(0)),
                     ));
                     let wind = world.wind_at(pointer).unwrap_or(Wind::STILL);
                     lines.push(Line::row("wind", steps(i64::from(wind.speed()))));
@@ -143,6 +164,15 @@ impl Panel for Weather {
 /// number.
 fn steps(speed: i64) -> String {
     format!("{speed} cells")
+}
+
+/// Returns a temperature as text.
+///
+/// The unit is a whole degree on the scale of the weather field. The scale
+/// runs from zero to the heat ceiling, and the ceiling is named beside the
+/// value so that a reader knows what the number is out of.
+fn degrees(warmth: i32) -> String {
+    format!("{warmth} of {}", cachette_core::HEAT_CEILING)
 }
 
 /// Returns a count of drops as text.
@@ -338,6 +368,11 @@ mod tests {
             Line::row("fastest wind", steps(i64::from(SPEED_CEILING))),
             Line::row("wind", steps(i64::from(SPEED_CEILING))),
             Line::row("blowing", "q -1  r  1".to_string()),
+            // The top of the temperature scale, read back from the engine
+            // rather than restated here.
+            Line::row("coldest cell", degrees(cachette_core::HEAT_CEILING)),
+            Line::row("warmest cell", degrees(cachette_core::HEAT_CEILING)),
+            Line::row("temperature", degrees(cachette_core::HEAT_CEILING)),
         ];
         for line in &lines {
             assert!(!line.is_cut(), "line was cut: {line:?}");

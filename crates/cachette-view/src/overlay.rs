@@ -95,6 +95,17 @@ const MOISTURE_COLOUR: u32 = 0x0034_8fd8;
 /// The colour of the air overlay.
 const AIR_COLOUR: u32 = 0x00d8_e8f8;
 
+/// The colour of the temperature overlay.
+///
+/// The warm cells paint at full strength and the cold ones paint at none, so
+/// the warm band of the season reads as a bright stripe that crosses the map
+/// over a run.[^1]
+///
+/// # References
+///
+/// [^1]: ADR-0166, the temperature of a cell is carried state that a season and the sky drive, decision D2. `docs/adrs/draft/adr-0166-the-temperature-of-a-cell-is-carried-state-that-a-season-and-the-sky-drive.md`
+const TEMPERATURE_COLOUR: u32 = 0x00ff_8c42;
+
 /// The colour of the food overlay.
 const FOOD_COLOUR: u32 = 0x008e_d94a;
 
@@ -305,6 +316,56 @@ impl Layer for Air {
 
     fn colour(&self, _value: i64) -> u32 {
         AIR_COLOUR
+    }
+}
+
+/// The temperature of the cell that covers each tile.
+///
+/// **The temperature is what makes the weather travel, so a watcher must be
+/// able to see it.** The season moves a warm band across the lattice, the band
+/// turns the wind, and the wind carries the water. A watcher who reads the
+/// water alone sees the result and never the cause.[^1]
+///
+/// The overlay reads the cell of the tile flat and does not interpolate.
+///
+/// # References
+///
+/// [^1]: ADR-0166, the temperature of a cell is carried state that a season and the sky drive, decision D2. `docs/adrs/draft/adr-0166-the-temperature-of-a-cell-is-carried-state-that-a-season-and-the-sky-drive.md`
+struct Temperature;
+
+impl Layer for Temperature {
+    fn name(&self) -> &'static str {
+        "temperature"
+    }
+
+    fn unit(&self) -> &'static str {
+        "degrees over the cell"
+    }
+
+    fn value(&self, at: At<'_>) -> i64 {
+        at.world.temperature_at(at.address).map_or(0, i64::from)
+    }
+
+    fn span(&self, world: &World) -> Span {
+        // The span runs between the coldest and the warmest cell of this
+        // frame. A span fixed to the whole scale would wash the map flat
+        // whenever the field sits in the middle of it, which it usually does.
+        let plane = world.weather().warmth_plane();
+        let low = plane.iter().copied().min().unwrap_or(0);
+        let high = plane.iter().copied().max().unwrap_or(0);
+        // The low sits one degree under the coldest cell, so the coldest cell
+        // still paints. A span that started at the coldest would paint it as
+        // nothing, and nothing is what an overlay shows for a cell it cannot
+        // read.
+        Span::new(i64::from(low) - 1, i64::from(high))
+    }
+
+    fn on_cells(&self) -> bool {
+        true
+    }
+
+    fn colour(&self, _value: i64) -> u32 {
+        TEMPERATURE_COLOUR
     }
 }
 
@@ -586,6 +647,7 @@ pub fn registered() -> &'static [&'static (dyn Layer + 'static)] {
         &Moisture,
         &Air,
         &WindLayer,
+        &Temperature,
         &Stock {
             kind: ResourceKind::Food,
             name: "food",

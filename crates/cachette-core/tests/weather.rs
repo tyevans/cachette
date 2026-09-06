@@ -20,7 +20,7 @@
 use cachette_core::resource::{Amount, RecoveryRules, ResourceKind};
 use cachette_core::terrain::TileKind;
 use cachette_core::weather::{self, WeatherError};
-use cachette_core::{Axial, Entity, FactionId, World, WorldConfig, SUBSYSTEM_CENSUS};
+use cachette_core::{Axial, Entity, FactionId, Tick, World, WorldConfig, SUBSYSTEM_CENSUS};
 
 /// Returns one census count by name.
 fn census(world: &World, name: &str) -> i64 {
@@ -649,3 +649,204 @@ fn the_solve_runs_a_fixed_number_of_passes() {
         "the solve did not run the fixed count on every frame"
     );
 }
+
+// The temperature is carried state that a season and the sky drive. The tests
+// below test what the value depends on, and not only that it repeats. A
+// deterministic defect passes both determinism tests, so each field of the
+// driver gets its own test.[^1]
+//
+// [^1]: Testing rules, section 2. `.claude/rules/testing.md`
+
+/// The temperature of a fixed cell moves as the season goes past.
+///
+/// **This is the property the project owner asked for.** A field whose driver
+/// is fixed gives a wind that settles and a plume that never moves. The
+/// temperature must therefore change at one place over a run.
+#[test]
+fn the_temperature_of_one_cell_changes_over_a_run() {
+    let mut world = coastal_world();
+    let mut seen: Vec<i32> = Vec::new();
+    for tick in 1..=256 {
+        world.step(4).expect("the step must run");
+        if tick % 16 == 0 {
+            seen.push(world.weather().warmth_at(0));
+        }
+    }
+    let low = seen.iter().copied().min().unwrap_or(0);
+    let high = seen.iter().copied().max().unwrap_or(0);
+    assert!(
+        high > low,
+        "one cell held one temperature for 256 frames, so nothing drives it: {seen:?}"
+    );
+}
+
+/// The season is in the tick, so one cell answers differently later.
+#[test]
+fn the_season_is_keyed_on_the_tick() {
+    let width = 16;
+    let early = weather::season_at(Tick(0), 0, width);
+    let mut moved = false;
+    for tick in 1..512u64 {
+        if weather::season_at(Tick(tick), 0, width) != early {
+            moved = true;
+            break;
+        }
+    }
+    assert!(moved, "the season answers the same at every tick");
+}
+
+/// The season is in the column, so two cells differ at one tick.
+///
+/// **A term that added the same degrees to every cell would move nothing.**
+/// The wind answers to the difference between two cells, and one offset added
+/// to every cell cancels in that difference exactly.
+#[test]
+fn the_season_varies_across_the_lattice_at_one_tick() {
+    let width = 16;
+    let readings: Vec<i32> = (0..width).map(|at| weather::season_at(Tick(0), at, width)).collect();
+    let low = readings.iter().copied().min().unwrap_or(0);
+    let high = readings.iter().copied().max().unwrap_or(0);
+    assert!(
+        high > low,
+        "the season answers the same at every cell, so it cancels in the wind: {readings:?}"
+    );
+}
+
+/// The warm centre of the season travels across the lattice and wraps.
+#[test]
+fn the_warm_centre_of_the_season_travels_across_the_lattice() {
+    let width = 16;
+    let warmest = |tick: u64| {
+        (0..width)
+            .max_by_key(|at| weather::season_at(Tick(tick), *at, width))
+            .unwrap_or(0)
+    };
+    let mut visited: Vec<u32> = Vec::new();
+    for tick in (0..4096u64).step_by(8) {
+        let at = warmest(tick);
+        if !visited.contains(&at) {
+            visited.push(at);
+        }
+    }
+    assert_eq!(
+        visited.len(),
+        width as usize,
+        "the warm centre reached {} of {width} columns, so the band does not cross the map",
+        visited.len()
+    );
+}
+
+/// The cloud is in the air, so a full sky is colder than an empty one.
+#[test]
+fn a_full_sky_takes_more_warmth_than_an_empty_one() {
+    let empty = weather::cloud_at(weather::Drops(0));
+    let full = weather::cloud_at(weather::AIR_SATURATION);
+    assert!(
+        full > empty,
+        "the cloud takes the same at every quantity of air"
+    );
+}
+
+/// The temperature lags its driver, and one pass never reaches it.
+///
+/// The lag is the whole reason the field carries the temperature rather than
+/// deriving it. A pass that assigned the asked temperature would hold the
+/// driver of the moment, and no warm parcel would outlive the cell it left.
+#[test]
+fn the_temperature_does_not_reach_its_driver_in_one_pass() {
+    let mut world = coastal_world();
+    // The field starts at the middle of the scale. One step cannot carry a
+    // cell whose driver sits at an end of the scale all the way there.
+    world.step(4).expect("the step must run");
+    let plane: Vec<i32> = world.weather().warmth_plane().to_vec();
+    assert!(
+        plane
+            .iter()
+            .all(|degrees| *degrees > 0 && *degrees < cachette_core::HEAT_CEILING),
+        "one pass carried a cell to an end of the scale, so nothing lags: {plane:?}"
+    );
+}
+
+/// The carry cannot run away at any wind and over any number of passes.
+///
+/// The six shares of one cell sum to less than one whole, so the new
+/// temperature lies inside the range of the temperatures the pass read. The
+/// temperature is not conserved, so no account reports a defect in it, and the
+/// bound is the only thing a test can check.
+#[test]
+fn the_temperature_stays_inside_its_scale_over_a_long_run() {
+    let mut world = coastal_world();
+    for _ in 0..512 {
+        world.step(4).expect("the step must run");
+        for degrees in world.weather().warmth_plane() {
+            assert!(
+                (0..=cachette_core::HEAT_CEILING).contains(degrees),
+                "a cell left the temperature scale at {degrees}"
+            );
+        }
+    }
+}
+
+/// The peak of the air plane travels, rather than settling on one cell.
+///
+/// **This is the measurement the project owner made.** The peak sat on one
+/// cell from tick 41 to the end of a 400 tick run, because the heat was
+/// derived from ground that does not move. The peak must now move, and keep
+/// moving.
+#[test]
+fn the_peak_of_the_air_plane_keeps_moving() {
+    let mut world = World::new(WorldConfig {
+        width: 256,
+        height: 256,
+        seed: 0x2f,
+        faction_count: 4,
+        unit_capacity: 1024,
+    })
+    .expect("the extent must describe a world");
+    let mut peaks: Vec<usize> = Vec::new();
+    for tick in 1..=400 {
+        world.step(1).expect("the step must run");
+        if tick % 20 != 0 {
+            continue;
+        }
+        let plane = world.weather().air_plane();
+        let mut best = 0usize;
+        for cell in 0..plane.len() {
+            if plane[cell].0 > plane[best].0 {
+                best = cell;
+            }
+        }
+        peaks.push(best);
+    }
+    let mut seen = peaks.clone();
+    seen.sort_unstable();
+    seen.dedup();
+    assert!(
+        seen.len() >= 4,
+        "the peak visited {} cells in 400 frames, so the weather is pinned: {peaks:?}",
+        seen.len()
+    );
+    // The peak must keep moving, and not move once and stop. The second half
+    // of the run has to move as well as the first.
+    let late = &peaks[peaks.len() / 2..];
+    let mut moves = 0usize;
+    for pair in late.windows(2) {
+        if pair[0] != pair[1] {
+            moves += 1;
+        }
+    }
+    assert!(
+        moves >= 3,
+        "the peak moved {moves} times in the second half of the run: {late:?}"
+    );
+}
+
+// **There is no test here that the temperature reaches the state hash.** The
+// claim needs two fields whose only difference is the temperature, and this
+// interface cannot build that pair. Every frame moves the pass counts and the
+// wind as well, and the level 1 summary that would hold the ground still has
+// no constructor a test can call. A test that stepped one world and found two
+// unequal hashes would pass with the temperature removed from the hash, and a
+// test that cannot fail is decoration.[^2]
+//
+// [^2]: Testing rules, section 1. `.claude/rules/testing.md`

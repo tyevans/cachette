@@ -5541,6 +5541,23 @@ impl World {
         Some(self.weather.wind_at(self.cell_of(tile)?))
     }
 
+    /// Returns the temperature of the cell that covers one tile.
+    ///
+    /// The unit is a whole degree on the scale of the weather field, from
+    /// zero to the heat ceiling. It is carried state, so a watcher who reads
+    /// it reads what the next step will read.[^1]
+    ///
+    /// Returns `None` when the address lies outside the world.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0166, the temperature of a cell is carried state that a season and the sky drive, decision D1. `docs/adrs/draft/adr-0166-the-temperature-of-a-cell-is-carried-state-that-a-season-and-the-sky-drive.md`
+    #[must_use]
+    pub fn temperature_at(&self, address: Axial) -> Option<i32> {
+        let tile = self.grid.index_of(address)?;
+        Some(self.weather.warmth_at(self.cell_of(tile)?))
+    }
+
     /// Reports whether the ground under one tile is wet.
     ///
     /// A unit that gathers on wet ground takes more in one tick than a unit
