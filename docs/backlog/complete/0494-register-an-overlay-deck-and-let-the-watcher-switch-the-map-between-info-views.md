@@ -1,7 +1,7 @@
 ---
 id: 0494
 title: Register an overlay deck, and let the watcher switch the map between info views
-status: refined
+status: complete
 created: 2026-09-05
 implements: []
 changes: []
@@ -178,7 +178,40 @@ the demonstration.
 
 ## Outcome
 
-Filled in when the item moves to `complete/`.
+**Nine overlays register in one list, and nothing else says that they
+exist.** They are moisture, air, food, wood, stone, height, holder, upgrade
+and crowding. Each reads only readers the engine already published, so the
+work added no reader to the core. An overlay states its own name, its own
+colour, its own span and the value of one tile, and the boundary answers the
+names from that list.
+
+**The frame command takes one optional overlay name.** The engine refuses a
+name it did not publish, and the refusal names the overlays that exist. A
+name from a published list is a choice among what the one renderer offers,
+so a presenter still draws nothing itself.
+
+**A value on the level 1 cell lattice interpolates between the four nearest
+cell centres.** The storm now reads as a field with no straight edge that the
+world does not have. The interpolation costs four cell reads for each painted
+tile, and the blocker that governs every cost figure still holds, so no
+figure for it is stated.
+
+**The overlay mixes into the ground before the holder takes its share.** The
+holder tint therefore survives at every overlay strength. A test reads each
+overlay at the held tile where that overlay paints most strongly, and it
+fails when the overlay is moved over the finished pixel.
+
+**The colour key names the overlay, its low value, its high value, the unit
+and what the pass met in the window.** An overlay that found nothing says so
+in words, so an empty overlay never reads as a broken one.
+
+**The demonstration binds the number keys.** The keys 1 to 9 name the
+overlays in the order the engine registers them, and 0 turns the overlay off.
+The mapping is as long as the list the engine answers.
+
+Three defects were put back, one at a time, and the tests were watched. Each
+failed the one test that exists to catch it. The commit bodies hold the
+detail.
 
 ## References
 
