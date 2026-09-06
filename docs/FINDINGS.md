@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-486**
+**Next number: FND-487**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -1944,6 +1944,70 @@ changes the hash chain, so a backlog item holds it on its own.[^F480E]
 found it was a binding, and a binding must not move a golden file. The finding
 is the handover.
 
+
+### FND-486 — Every founded unit carries the worker row, whose attack is zero, so a meeting kills nobody
+
+**Believed.** A faction that the seeding founds holds units that can fight. A
+campaign raises a cohort out of those units, and a war between two factions
+costs each side units. A fallen log that stays empty over a run therefore means
+that the two sides never met.
+
+**True.** The seeding gives every founded unit the worker row, and the worker
+row holds an attack of zero.[^F486A] A world builds with the default table, and
+a spawned unit takes the default type, which is row zero of it.[^F486B] The
+seeding founds one group for each faction, and it spawns every person of the
+group through that one call.[^F486C]
+
+The contest pass tests each ordered pair of types before it adds anything. The
+attack of the attacker must exceed the armour of the defender.[^F486D] The
+record states that a pair which fails the test contributes exactly zero,
+however many attackers stand on the tile.[^F486E] The worker row holds an
+attack of zero and an armour of zero, so a worker never penetrates a worker.
+
+Two paths give a unit another type. The type verb sets a set of units. The
+campaign raise sets its cohort to the soldier row, whose attack is one, so a
+raised cohort does kill a worker.[^F486F] Nothing else in a seeded run changes
+a type.
+
+**Evidence.** Read on 5 September 2026, at commit 4f5ed11. The default type
+constant names the worker row. The worker row holds zero in the attack column
+and zero in the armour column. The penetration test compares the two columns
+with a strict inequality. The soldier arena writes the default type on every
+spawn, and the founding calls that spawn for each person of the group.
+
+A readability review of a 1500-tick run of the demonstration reports the same
+fact from the other end. The run produced no fight, and the reviewer had to
+define a type before a fight could be pictured.[^F486G] This work read the code
+and did not run the demonstration.
+
+The harnesses that count the fallen define their own rows first. The
+thread-count harness writes two fighter rows over the default table before it
+spawns anything.[^F486H] That is a second reading of the same fact.
+
+**Follows.** Four things.
+
+**The unit clause of the domination reader cannot fire through combat in the
+demonstration world.** That clause ends a game when every rival holds no
+unit.[^F486I] A contest is the path that empties a faction, and a contest
+between workers kills nobody. The seat clause is unaffected, because it reads
+the holder of a seat tile.
+
+**A fallen log that reads zero reports the seeding and not the contest.** The
+subsystem census holds no row for the fallen, so a reader must open the log to
+see the zero at all.[^F486J] A census row beside the others would make it
+visible. That is the shape FND-483 records for the seat count, where a zero
+meant that no position existed rather than that no position was filled.[^F486K]
+
+**A fixture built from the demonstration world measures the fixture.** The
+testing rule names this shape. A fixture that models the typical case supplies
+no extreme, so the assertion never receives the input that would fail
+it.[^F486L] A combat test seeded the way the demonstration is seeded passes
+whatever the contest pass does.
+
+**A table of four filled rows is one row until something assigns the rest.**
+The record states that zero in a column means cannot.[^F486M] The seeding
+reaches one of the four rows, so three of them describe a unit that the
+demonstration never holds. Backlog item 0491 holds the work.[^F486N]
 
 ## D. Cost estimates that were wrong
 
@@ -11666,3 +11730,17 @@ itself rather than merely underspecified.
 [^F483E]: The work table, which maps each kind of work onto a commodity. `crates/cachette-core/src/position.rs`
 [^F483F]: ADR-0099, a site fills its positions by one sort and one scan. `docs/adrs/draft/adr-0099-a-site-fills-its-positions-by-one-sort-and-one-scan.md`
 [^F483G]: Recurring Defect Shapes, shape 2. `.agents/rules/recurring-defects.md`
+[^F486A]: The worker row of the default unit type table. `crates/cachette-core/src/unit_type.rs`
+[^F486B]: The default unit type, which is row zero of the default table. `crates/cachette-core/src/unit_type.rs`
+[^F486C]: The seeding, `seed_world`, `found_run_for_every_faction` and `settle_group`. `crates/cachette-core/src/world.rs`
+[^F486D]: The penetration test, `penetrates`. `crates/cachette-core/src/unit_type.rs`
+[^F486E]: ADR-0122, an attacker whose attack does not exceed the defender's armour contributes exactly zero, decision D1. `docs/adrs/draft/adr-0122-an-attacker-below-the-armour-contributes-exactly-zero.md`
+[^F486F]: The campaign raise, `raise_campaign`, which types its cohort. `crates/cachette-core/src/world.rs`
+[^F486G]: Research report 25, demonstration readability, upgrades and units, section 5. `docs/research/reports/25-demonstration-readability-upgrades-and-units.md`
+[^F486H]: The thread-count harness, `contenders`. `crates/cachette-core/tests/thread_equivalence.rs`
+[^F486I]: The domination reader, `domination_winner`. `crates/cachette-core/src/world.rs`
+[^F486J]: The subsystem census table. `crates/cachette-core/src/world.rs`
+[^F486K]: Findings register, FND-483, in this document.
+[^F486L]: Testing Rules, rule 2a. `.agents/rules/testing.md`
+[^F486M]: ADR-0145, a unit type is a row of capability columns, and zero means cannot, decision D2. `docs/adrs/accepted/adr-0145-a-unit-type-is-a-row-of-capability-columns-and-zero-means-cannot.md`
+[^F486N]: Backlog item 0491, seed the demonstration world with unit types that can fight, gather and carry. `docs/backlog/proposed/0491-seed-the-demonstration-world-with-unit-types-that-can-fight-gather-and-carry.md`
