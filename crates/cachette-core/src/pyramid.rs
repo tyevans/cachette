@@ -1188,6 +1188,13 @@ impl SeededField {
     /// reads the open tile count, which is the same count the open share
     /// reads, so it states no second rule of its own.[^3] [^4]
     ///
+    /// **A plane whose every unit crosses water conducts everywhere.** The
+    /// caller states that for each plane, in the `crossing` list, and a plane
+    /// with no entry there takes the rule above. The exception is exactly the
+    /// case the rule was written against: a coast is a coast only for a unit
+    /// that the water refuses, and the level 0 step gate is what refuses
+    /// it.[^5]
+    ///
     /// The direction of a cell is the first neighbour, in ascending direction
     /// index, whose reach is strictly smaller than the reach of the cell. The
     /// lowest direction index therefore wins a tie, which is the order every
@@ -1202,23 +1209,25 @@ impl SeededField {
     /// [^1]: ADR-0095, a behavioural strategy arrives as a field over cells, never as a search from a unit, decision D3. `docs/adrs/draft/adr-0095-a-behavioural-strategy-arrives-as-a-field-over-cells.md`
     /// [^2]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
     /// [^3]: ADR-0091, movement takes its direction from a per-cell field, never from a per-unit search, decision D5. `docs/adrs/draft/adr-0091-movement-takes-its-direction-from-a-per-cell-field.md`
-    /// [^4]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`
-    pub fn derive(&mut self, pyramid: &Pyramid, seeds: &[(u16, u32)]) {
+    /// [^4]: Recurring defect shapes, shape 1. `.agents/rules/recurring-defects.md`
+    /// [^5]: ADR-0056, movement is tile-discrete and admitted by sort-then-admit, decision D4. `docs/adrs/accepted/adr-0056-movement-is-tile-discrete-and-admitted-by-sort-then-admit.md`
+    pub fn derive(&mut self, pyramid: &Pyramid, seeds: &[(u16, u32)], crossing: &[u8]) {
         let cells = self.cells;
         let count = cells.tile_count();
         for plane in 0..self.plane_count {
+            let crosses = crossing.get(plane as usize).copied().unwrap_or(0) != 0;
             self.reach.iter_mut().for_each(|cell| *cell = UNREACHED);
             for (seeded, cell) in seeds {
                 if *seeded != plane || *cell >= count {
                     continue;
                 }
-                if !admits_a_unit(pyramid, *cell) {
+                if !conducts(pyramid, *cell, crosses) {
                     continue;
                 }
                 self.reach[*cell as usize] = 0;
             }
             for _ in 0..RETURN_PASSES {
-                self.relax(pyramid);
+                self.relax(pyramid, crosses);
             }
             for cell in 0..count {
                 let at = plane as usize * count as usize + cell as usize;
@@ -1228,12 +1237,12 @@ impl SeededField {
     }
 
     /// Runs one relaxation pass over the reach plane.
-    fn relax(&mut self, pyramid: &Pyramid) {
+    fn relax(&mut self, pyramid: &Pyramid, crosses: bool) {
         let cells = self.cells;
         for cell in 0..cells.tile_count() {
             let index = cell as usize;
             let here = self.reach[index];
-            if !admits_a_unit(pyramid, cell) {
+            if !conducts(pyramid, cell, crosses) {
                 self.scratch[index] = UNREACHED;
                 continue;
             }
@@ -1368,7 +1377,12 @@ impl ReturnField {
             .iter()
             .map(|(faction, cell)| (faction.0, *cell))
             .collect();
-        self.0.derive(pyramid, &planes);
+        // **No return plane conducts across water.** A unit that carries a
+        // load home is any unit of the faction, and a plane that crossed
+        // water would steer the ones that cannot cross at a coast.[^3]
+        //
+        // [^3]: ADR-0091, movement takes its direction from a per-cell field, never from a per-unit search, decision D5. `docs/adrs/draft/adr-0091-movement-takes-its-direction-from-a-per-cell-field.md`
+        self.0.derive(pyramid, &planes, &[]);
     }
 }
 
@@ -1384,4 +1398,26 @@ fn admits_a_unit(pyramid: &Pyramid, cell: u32) -> bool {
     pyramid
         .cell(cell)
         .is_some_and(|summary| summary.open_tiles() > 0)
+}
+
+/// Reports whether the reach of a plane spreads through one cell.
+///
+/// A cell that the level 1 does not hold conducts nothing, whatever the plane
+/// asks for. A plane whose every unit crosses water conducts through every
+/// cell the level 1 does hold, because open water refuses such a unit
+/// nowhere. Every other plane conducts through the cells that hold open
+/// ground.
+///
+/// **The rule is one function, and both the seed test and the relaxation call
+/// it.** A second copy would be one rule in two places, and nothing would
+/// fail when the copies disagreed.[^1]
+///
+/// # References
+///
+/// [^1]: Recurring defect shapes, shape 1. `.agents/rules/recurring-defects.md`
+fn conducts(pyramid: &Pyramid, cell: u32, crosses: bool) -> bool {
+    if crosses {
+        return pyramid.cell(cell).is_some();
+    }
+    admits_a_unit(pyramid, cell)
 }

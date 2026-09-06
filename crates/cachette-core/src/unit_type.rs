@@ -70,6 +70,9 @@ pub const LEADER: UnitTypeId = UnitTypeId(3);
 /// it.
 pub const OPEN: UnitTypeId = UnitTypeId(4);
 
+/// The type that crosses open water.
+pub const MARINER: UnitTypeId = UnitTypeId(5);
+
 /// The reason that the table refused a caller.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum UnitTypeError {
@@ -282,6 +285,15 @@ declare_unit_type_row! {
     /// No pass reads this column yet. The weather verb of a later pass reads
     /// it.
     weather_reach: u32,
+    /// The reach of the unit over open water. Nonzero means the unit may
+    /// stand on a water tile.
+    ///
+    /// The movement pass passes this column to the terrain capacity table,
+    /// and the table answers with the room a water tile holds for a unit of
+    /// this type. Zero means cannot, so a type that states nothing here is
+    /// refused at the shoreline in the way every type was before the column
+    /// existed.
+    water_crossing: u32,
 }
 
 impl UnitTypeRow {
@@ -295,6 +307,7 @@ impl UnitTypeRow {
         move_cost_scale: Fix32::ZERO,
         command_reach: 0,
         weather_reach: 0,
+        water_crossing: 0,
     };
 }
 
@@ -355,6 +368,7 @@ pub const WORKER_ROW: UnitTypeRow = UnitTypeRow {
     move_cost_scale: PLACEHOLDER_FULL_RATE,
     command_reach: 0,
     weather_reach: 0,
+    water_crossing: 0,
 };
 
 /// The soldier row. It fights, and it does nothing else.
@@ -367,6 +381,7 @@ pub const SOLDIER_ROW: UnitTypeRow = UnitTypeRow {
     move_cost_scale: PLACEHOLDER_FULL_RATE,
     command_reach: 0,
     weather_reach: 0,
+    water_crossing: 0,
 };
 
 /// The merchant row. It carries, and it does nothing else.
@@ -379,6 +394,7 @@ pub const MERCHANT_ROW: UnitTypeRow = UnitTypeRow {
     move_cost_scale: PLACEHOLDER_FULL_RATE,
     command_reach: 0,
     weather_reach: 0,
+    water_crossing: 0,
 };
 
 /// The leader row. It holds command reach and weather reach, and it does
@@ -392,13 +408,46 @@ pub const LEADER_ROW: UnitTypeRow = UnitTypeRow {
     move_cost_scale: PLACEHOLDER_FULL_RATE,
     command_reach: PLACEHOLDER_REACH,
     weather_reach: PLACEHOLDER_REACH,
+    water_crossing: 0,
+};
+
+/// The placeholder water crossing of the mariner row.
+///
+/// The terrain capacity table states the room a water tile holds, and this
+/// column states only that the type may take it. The value is therefore the
+/// smallest crossing that table admits, read from the table rather than
+/// written again here.[^1] [^2]
+///
+/// # References
+///
+/// [^1]: Recurring defect shapes, shape 1. `.agents/rules/recurring-defects.md`
+/// [^2]: Balance register, unit types, the default table row. `docs/reference/balance.md`
+pub const PLACEHOLDER_WATER_CROSSING: u32 = crate::terrain::SOME_WATER_CROSSING;
+
+/// The mariner row. It crosses open water, and it gathers, builds and carries
+/// as a worker does.
+///
+/// A faction that holds no mariner reaches only the ground its own landmass
+/// joins. The row is the worker row plus the crossing, so a mariner that has
+/// arrived on new ground is as useful there as the unit that would have
+/// walked to it.
+pub const MARINER_ROW: UnitTypeRow = UnitTypeRow {
+    attack: Fix32::ZERO,
+    armour: Fix32::ZERO,
+    gather_rate: PLACEHOLDER_FULL_RATE,
+    build_rate: PLACEHOLDER_FULL_RATE,
+    carry_capacity: PLACEHOLDER_CARRY_CAPACITY,
+    move_cost_scale: PLACEHOLDER_FULL_RATE,
+    command_reach: 0,
+    weather_reach: 0,
+    water_crossing: PLACEHOLDER_WATER_CROSSING,
 };
 
 /// The default table that a world is built with.
 ///
-/// It holds the worker, the soldier, the merchant, the leader and one open
-/// row, in that order. Every row above the open row is zero, so a caller
-/// that wants a sixth type writes it.[^1]
+/// It holds the worker, the soldier, the merchant, the leader, one open row
+/// and the mariner, in that order. Every row above the mariner is zero, so a
+/// caller that wants a seventh type writes it.[^1]
 ///
 /// # References
 ///
@@ -410,6 +459,7 @@ pub const DEFAULT_UNIT_TYPE_TABLE: UnitTypeTable = {
     rows[MERCHANT.index()] = MERCHANT_ROW;
     rows[LEADER.index()] = LEADER_ROW;
     rows[OPEN.index()] = UnitTypeRow::NONE;
+    rows[MARINER.index()] = MARINER_ROW;
     UnitTypeTable { rows }
 };
 

@@ -134,7 +134,8 @@ impl TileKind {
         self as u8
     }
 
-    /// Reports whether a unit may stand on a tile of this kind.
+    /// Reports whether a unit that carries no water crossing may stand on a
+    /// tile of this kind.
     ///
     /// The answer is the capacity being greater than zero. Ground that holds
     /// nobody admits nobody, so this reader states no rule of its own and it
@@ -150,7 +151,28 @@ impl TileKind {
     /// [^1]: Decisions register, DEC-017. `docs/DECISIONS.md`
     #[must_use]
     pub const fn is_passable(self) -> bool {
-        admits_a_unit(self.capacity())
+        self.is_passable_for(NO_WATER_CROSSING)
+    }
+
+    /// Reports whether a unit of a given water crossing may stand on a tile
+    /// of this kind.
+    ///
+    /// The argument is the water crossing column of the unit type table, and
+    /// zero means that the type does not cross water.[^1]
+    ///
+    /// The answer is still the capacity being greater than zero, and the
+    /// capacity still comes from the one table. **The crossing changes what
+    /// the table answers. It is not a rule beside the table.** A second
+    /// passability rule here would be one fact in two places, and nothing
+    /// would fail when the two disagreed.[^2]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0145, a unit type is a row of capability columns, and zero means cannot, decision D2. `docs/adrs/accepted/adr-0145-a-unit-type-is-a-row-of-capability-columns-and-zero-means-cannot.md`
+    /// [^2]: Recurring defect shapes, shape 1. `.agents/rules/recurring-defects.md`
+    #[must_use]
+    pub const fn is_passable_for(self, water_crossing: u32) -> bool {
+        admits_a_unit(self.capacity_for(water_crossing))
     }
 
     /// Returns the factor that scales the step cost of a tile of this kind.
@@ -203,8 +225,8 @@ impl TileKind {
     /// reader derives its answer from this table. The match is exhaustive over
     /// the kinds, so the compiler refuses a kind that states no capacity.
     ///
-    /// The values come from the scale constants table.[^2] No crossing
-    /// terrain exists yet, so no kind carries the crossing capacity.
+    /// The values come from the scale constants table.[^2] No kind carries
+    /// the crossing capacity of a made way.
     ///
     /// # References
     ///
@@ -212,12 +234,84 @@ impl TileKind {
     /// [^2]: Budgets and costs, the scale constants. `docs/reference/budgets.md`
     #[must_use]
     pub const fn capacity(self) -> u32 {
+        self.capacity_for(NO_WATER_CROSSING)
+    }
+
+    /// Returns the number of units of a given water crossing that may stand
+    /// on a tile of this kind.
+    ///
+    /// **This is the one declaration of which ground admits a unit.** The
+    /// argument is the water crossing column of the unit type table, and zero
+    /// means that the type does not cross water.[^1] A unit that crosses
+    /// water reads the same table as a unit that does not, and the table
+    /// answers differently for the one kind whose admission the crossing
+    /// governs.
+    ///
+    /// Open water holds nobody at all until a unit carries the crossing, so
+    /// the world of a type that carries none is the world this table
+    /// described before the column existed.
+    ///
+    /// The water capacity is smaller than the ordinary capacity, so a strait
+    /// carries fewer units at once than the ground on either side of it.
+    ///
+    /// The match is exhaustive over the kinds, so the compiler refuses a kind
+    /// that states no capacity.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0145, a unit type is a row of capability columns, and zero means cannot, decision D2. `docs/adrs/accepted/adr-0145-a-unit-type-is-a-row-of-capability-columns-and-zero-means-cannot.md`
+    #[must_use]
+    pub const fn capacity_for(self, water_crossing: u32) -> u32 {
         match self {
-            Self::Water => 0,
+            Self::Water => {
+                if water_crossing == 0 {
+                    0
+                } else {
+                    WATER_CAPACITY
+                }
+            }
             Self::Plain | Self::Forest | Self::Hill | Self::Mountain => ORDINARY_CAPACITY,
         }
     }
 }
+
+/// The water crossing of a type that does not cross water.
+///
+/// Zero means cannot, so this is zero. It is named because a caller that asks
+/// the capacity table about the ground alone reads better than a caller that
+/// passes a bare zero.[^1]
+///
+/// # References
+///
+/// [^1]: ADR-0145, a unit type is a row of capability columns, and zero means cannot, decision D2. `docs/adrs/accepted/adr-0145-a-unit-type-is-a-row-of-capability-columns-and-zero-means-cannot.md`
+pub const NO_WATER_CROSSING: u32 = 0;
+
+/// The number of units that stand on one tile of open water.
+///
+/// A unit stands here only when its type carries a water crossing. The value
+/// is half the ordinary capacity, so a strait is a narrower way than the
+/// ground it joins and a crossing is a thing an enemy can block.
+///
+/// **The value is derived, not measured.** No measurement exists on the
+/// target platform, and one blocker governs every cost figure this project
+/// holds.[^1]
+///
+/// # References
+///
+/// [^1]: Blockers register, BLK-007. `docs/BLOCKERS.md`
+pub const WATER_CAPACITY: u32 = ORDINARY_CAPACITY / 2;
+
+/// A water crossing that admits a unit to open water.
+///
+/// Zero means cannot, so every value above zero admits and the smallest of
+/// them is enough. A caller that must ask the capacity table what a water
+/// tile holds for a unit that crosses passes this, rather than a bare one or
+/// a value it read from a type row.[^1]
+///
+/// # References
+///
+/// [^1]: ADR-0145, a unit type is a row of capability columns, and zero means cannot, decision D2. `docs/adrs/accepted/adr-0145-a-unit-type-is-a-row-of-capability-columns-and-zero-means-cannot.md`
+pub const SOME_WATER_CROSSING: u32 = 1;
 
 /// The number of units that stand on a tile of ordinary ground.
 ///
