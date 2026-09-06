@@ -1,7 +1,7 @@
 ---
 id: 0316
 title: Give the panel one standard that a new panel registers with
-status: refined
+status: complete
 created: 2026-09-03
 implements: []
 changes: []
@@ -76,3 +76,32 @@ adding a panel.
 
 [^1]: Recurring Defect Shapes, shape 3. `.claude/rules/recurring-defects.md`
 [^2]: Decision Record Scope, section 1. `.claude/rules/adr-scope.md`
+
+## Outcome
+
+**The standard exists in the viewer, and every panel registers with it.** One
+module declares the panel geometry, the colours, the cut mark and the line
+kinds. It holds one list of the registered panels, and the frame draws the deck
+by walking that list. A panel is one file that states its own name, its own
+title and its own lines.
+
+**There is one draw path.** The head-up display reads the width, the padding,
+the line height and the value column from the standard, so no second file
+declares them. Every line kind writes through one writer that takes a right
+edge, so a caller cannot write past the panel.
+
+**The keys come from the list.** The control plane asks the engine for the
+panel names and gives each one a function key in that order, so a panel that
+joins the list gets a key with no edit to the control plane.
+
+**A run without a window can now draw a panel of the deck.** The demonstration
+takes the panel names on the command line, which is how the panels of item 0318
+were proved outside a window.
+
+The work landed under an earlier commit and this item was never moved. A
+finding records that, because an item nobody moves states work that is open
+when it is done.[^3]
+
+## References
+
+[^3]: Findings register, FND-526. `docs/FINDINGS.md`
