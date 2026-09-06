@@ -105,7 +105,7 @@ use crate::upgrade::{
     self, BuildRefusal, UpgradeCategory, UpgradeMap, UpgradeRow, UpgradeSite, UpgradeTable,
     UpgradeTableError,
 };
-use crate::weather::{Ground, Storm, WeatherError, WeatherField, Wind};
+use crate::weather::{CellGround, Ground, Storm, WeatherError, WeatherField, WeatherScale, Wind};
 
 /// The reason that a value did not name a live entity.
 ///
@@ -1229,6 +1229,33 @@ pub struct World {
     /// [^1]: ADR-0140, weather is a field over the level 1 cell lattice, decision D1. `docs/adrs/draft/adr-0140-weather-is-a-field-over-the-level-1-cell-lattice.md`
     /// [^2]: ADR-0001, one binary gives one answer at any thread count, decision D4. `docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
     weather: WeatherField,
+    /// The block geometry of the weather lattice.
+    ///
+    /// **The weather has a pitch of its own, and it is a parameter of the
+    /// world.** The layout says which weather cell covers a tile. It is the
+    /// same layout as the level 1 layout when the world takes the level 1
+    /// pitch, and a different one at every other pitch.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: The weather scale. [`WeatherScale`]
+    weather_layout: BlockLayout,
+    /// The ground under each weather cell, in cell index order.
+    ///
+    /// **The weather reads the ground, and the ground does not change.** The
+    /// three numbers it holds are the tiles the cell covers, the tiles of it
+    /// that admit a unit, and the sum of their heights. Every one of them is
+    /// a pure function of the world seed and the address, so the world folds
+    /// this once and never rebuilds it.[^1]
+    ///
+    /// It is derived from level 0 and it is not simulated state, so it enters
+    /// no state hash.[^2]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0068, terrain is generated from the seed and is never stored as a map. `docs/adrs/accepted/adr-0068-terrain-is-generated-from-the-seed-and-is-never-stored-as-a-map.md`
+    /// [^2]: ADR-0001, one binary gives one answer at any thread count, decision D4. `docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
+    weather_ground: Vec<CellGround>,
     /// The faction controller: one row for each faction, the two parameters
     /// the step reads on every tick, and the game end record.
     ///
@@ -1331,6 +1358,31 @@ impl World {
     ///
     /// Returns an error when the configured extent does not describe a grid.
     pub fn new(config: WorldConfig) -> Result<Self, WorldError> {
+        Self::with_weather_scale(config, WeatherScale::DEFAULT)
+    }
+
+    /// Builds a world from the settings, at a stated weather resolution.
+    ///
+    /// **The resolution of the weather is a parameter of the world.** The
+    /// scale states the tiles along one side of a weather cell, and one of
+    /// the values it takes gives each tile a cell of its own.[^1]
+    ///
+    /// The cost of the field follows the cell count, so a fine pitch costs
+    /// the world on every tick and a coarse one costs a small fraction of
+    /// it. The default is the level 1 pitch.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the configured extent does not describe a grid,
+    /// and when the scale does not describe a lattice over that extent.
+    ///
+    /// # References
+    ///
+    /// [^1]: The weather scale. [`WeatherScale`]
+    pub fn with_weather_scale(
+        config: WorldConfig,
+        weather_scale: WeatherScale,
+    ) -> Result<Self, WorldError> {
         if config.faction_count > FACTION_CEILING {
             return Err(WorldError::FactionCountAboveCeiling(config.faction_count));
         }
@@ -1350,6 +1402,16 @@ impl World {
         //
         // [^1]: ADR-0017, the world is a rhombus, so a tile index is raw axial, decision D4. `docs/adrs/accepted/adr-0017-the-world-is-a-rhombus-so-a-tile-index-is-raw-axial.md`
         let cell_lattice = Grid::new(layout.blocks_wide(), layout.blocks_high())?;
+        // **The weather lattice states its own pitch.** It is the level 1
+        // lattice when the world takes the level 1 pitch, and a lattice of
+        // its own at any other. The ground under it is folded once here,
+        // because every field the weather reads from it is a pure function
+        // of the seed and the address.[^3]
+        //
+        // [^3]: ADR-0068, terrain is generated from the seed and is never stored as a map. `docs/adrs/accepted/adr-0068-terrain-is-generated-from-the-seed-and-is-never-stored-as-a-map.md`
+        let weather_layout = BlockLayout::new(grid, weather_scale.bits())?;
+        let weather_lattice =
+            Grid::new(weather_layout.blocks_wide(), weather_layout.blocks_high())?;
         let soldiers = SoldierArena::new(grid, config.unit_capacity);
         let settlements = SettlementArena::new(grid);
         // The character tier states its own ceiling, and the arena checks
@@ -1392,7 +1454,9 @@ impl World {
             variety: VarietyLevel::derive(layout, &LuxuryField::new()),
             luxuries_seeded: false,
             influence: InfluenceField::new(cell_lattice, config.faction_count)?,
-            weather: WeatherField::new(cell_lattice, config.faction_count)?,
+            weather: WeatherField::new(weather_lattice, weather_scale, config.faction_count)?,
+            weather_layout,
+            weather_ground: weather_ground_of(weather_layout, terrain),
             controller: Controller::new(config.seed, config.faction_count),
             campaigns: CampaignRegister::new(config.faction_count),
             plan: PlanRegister::new(config.faction_count, PlanRules::DEFAULT),
@@ -5560,7 +5624,7 @@ impl World {
         {
             let _span = stage::open(Stage::WeatherSolve);
             self.weather
-                .solve(tick, seed, self.pyramid.cells(), threads)?;
+                .solve(tick, seed, &self.weather_ground, threads)?;
         }
 
         // Conversion runs after the influence solve, because it reads the
@@ -5745,7 +5809,9 @@ impl World {
     ///
     /// [^1]: ADR-0143, wet ground yields more to a gatherer, decision D2. `docs/adrs/draft/adr-0143-wet-ground-yields-more-to-a-gatherer.md`
     fn wet_bonus(&self, tile: TileIdx) -> u32 {
-        match self.cell_of(tile) {
+        // The weather lattice has a pitch of its own, so the cell of a tile
+        // comes from the weather reader and not from the level 1 reader.
+        match self.weather_cell_of(tile) {
             Some(cell) if self.weather.cell_is_wet(cell) => WET_GATHER_BONUS,
             _ => 0,
         }
@@ -5772,7 +5838,7 @@ impl World {
     #[must_use]
     pub fn air_at(&self, address: Axial) -> Option<i64> {
         let tile = self.grid.index_of(address)?;
-        Some(self.weather.air_at(self.cell_of(tile)?).0)
+        Some(self.weather.air_at(self.weather_cell_of(tile)?).0)
     }
 
     /// Returns the water on the ground of the cell that covers one tile.
@@ -5782,7 +5848,7 @@ impl World {
     #[must_use]
     pub fn ground_water_at(&self, address: Axial) -> Option<i64> {
         let tile = self.grid.index_of(address)?;
-        Some(self.weather.ground_at(self.cell_of(tile)?).0)
+        Some(self.weather.ground_at(self.weather_cell_of(tile)?).0)
     }
 
     /// Returns the wind over the cell that covers one tile.
@@ -5799,7 +5865,7 @@ impl World {
     #[must_use]
     pub fn wind_at(&self, address: Axial) -> Option<Wind> {
         let tile = self.grid.index_of(address)?;
-        Some(self.weather.wind_at(self.cell_of(tile)?))
+        Some(self.weather.wind_at(self.weather_cell_of(tile)?))
     }
 
     /// Returns the temperature of the cell that covers one tile.
@@ -5816,7 +5882,7 @@ impl World {
     #[must_use]
     pub fn temperature_at(&self, address: Axial) -> Option<i32> {
         let tile = self.grid.index_of(address)?;
-        Some(self.weather.warmth_at(self.cell_of(tile)?))
+        Some(self.weather.warmth_at(self.weather_cell_of(tile)?))
     }
 
     /// Reports whether the ground under one tile is wet.
@@ -5832,7 +5898,7 @@ impl World {
     #[must_use]
     pub fn ground_is_wet(&self, address: Axial) -> Option<bool> {
         let tile = self.grid.index_of(address)?;
-        Some(self.weather.cell_is_wet(self.cell_of(tile)?))
+        Some(self.weather.cell_is_wet(self.weather_cell_of(tile)?))
     }
 
     /// Puts weather over a set of places, at the command of a god.
@@ -5865,7 +5931,10 @@ impl World {
         places: &[Axial],
         strength: u8,
     ) -> Result<Storm, WeatherError> {
-        let layout = self.pyramid.layout();
+        // The water lands on the weather cell that covers the place, and the
+        // weather lattice has a pitch of its own. The holder gate below still
+        // asks the level 1 holding, because that is where a holder lives.
+        let layout = self.weather_layout;
         let holding = &self.holding;
         let grid = self.grid;
         let ground = Ground {
@@ -5884,6 +5953,31 @@ impl World {
     fn cell_of(&self, tile: TileIdx) -> Option<u32> {
         let layout = self.pyramid.layout();
         Some(layout.block_of_key(layout.key_of(tile)?))
+    }
+
+    /// Returns the weather cell that covers a tile.
+    ///
+    /// **This is not the level 1 cell.** The weather lattice states its own
+    /// pitch, and the two agree only when the world takes the level 1 pitch.
+    /// Every reader of the weather field asks this rather than the level 1
+    /// reader, so one fact has one declaration site.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: Recurring Defect Shapes, shape 1. `.agents/rules/recurring-defects.md`
+    #[must_use]
+    pub fn weather_cell_of(&self, tile: TileIdx) -> Option<u32> {
+        let layout = self.weather_layout;
+        Some(layout.block_of_key(layout.key_of(tile)?))
+    }
+
+    /// Returns the block geometry of the weather lattice.
+    ///
+    /// The drawing reads it, because the pitch of the lattice decides whether
+    /// a cell value paints as a field or as a tile.
+    #[must_use]
+    pub const fn weather_layout(&self) -> BlockLayout {
+        self.weather_layout
     }
 
     /// Returns why one soldier chose what it chose.
@@ -8844,7 +8938,7 @@ impl World {
             .filter(|site| site.is_complete())
             .map(|site| {
                 let tile = site.tile;
-                let storm = match self.cell_of(tile) {
+                let storm = match self.weather_cell_of(tile) {
                     Some(cell) if self.weather.cell_is_wet(cell) => {
                         upgrade::WEATHER_WEAR_FOR_EACH_TICK
                     }
@@ -10970,6 +11064,54 @@ pub const CARRY_MARK_DEFAULT: Amount = Amount(32);
 /// [^2]: ADR-0109, the choice key holds a bounded class of the unit's own state, decision D3. `docs/adrs/draft/adr-0109-the-choice-key-holds-a-bounded-class-of-the-unit-state.md`
 /// [^3]: Recurring defect shapes, shape 3. `.claude/rules/recurring-defects.md`
 #[must_use]
+/// Folds the terrain into the ground under each weather cell.
+///
+/// **The weather reads three numbers about the ground, and none of them
+/// changes.** The tiles a cell covers, the tiles of it that admit a unit, and
+/// the sum of their heights are each a pure function of the world seed and
+/// the address, so the fold runs once when the world is built.[^1]
+///
+/// **It does not read the level 1 summary.** That summary describes a block
+/// thirty-two tiles a side, and it is the wrong source at any other weather
+/// pitch. The two agree exactly at the level 1 pitch, because both fold the
+/// same three fields over the same tiles.[^2]
+///
+/// The walk is row by row and then column by column, and the combine is
+/// integer addition, so the answer does not depend on the order.[^3]
+///
+/// # References
+///
+/// [^1]: ADR-0068, terrain is generated from the seed and is never stored as a map. `docs/adrs/accepted/adr-0068-terrain-is-generated-from-the-seed-and-is-never-stored-as-a-map.md`
+/// [^2]: ADR-0022, level 0 is the only truth, and every level above it is derived, decision D2. `docs/adrs/accepted/adr-0022-level-0-is-the-only-truth-and-every-level-above-it-is-derived.md`
+/// [^3]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
+fn weather_ground_of(layout: BlockLayout, terrain: Terrain) -> Vec<CellGround> {
+    let grid = layout.grid();
+    let wide = layout.blocks_wide();
+    let count = (wide as usize).saturating_mul(layout.blocks_high() as usize);
+    let mut ground = vec![CellGround::EMPTY; count];
+    for row in 0..grid.height() {
+        for column in 0..grid.width() {
+            let address = Axial::new(column as i32, row as i32);
+            let Some(tile) = terrain.tile(address) else {
+                continue;
+            };
+            let Some(key) = grid.index_of(address).and_then(|at| layout.key_of(at)) else {
+                continue;
+            };
+            let cell = layout.block_of_key(key) as usize;
+            let Some(slot) = ground.get_mut(cell) else {
+                continue;
+            };
+            *slot = slot.combine(CellGround {
+                height_total: sim_math::accumulate(Accum(0), tile.height).0,
+                tiles: 1,
+                open_tiles: i32::from(tile.kind.is_passable()),
+            });
+        }
+    }
+    ground
+}
+
 fn carry_class_of(load: CarryLoad, home: u32, mark: Amount) -> CarryClass {
     if home == NO_HOME {
         return CarryClass::Free;

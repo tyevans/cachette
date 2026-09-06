@@ -149,8 +149,9 @@ pub use upgrade::{
     UPGRADE_CATEGORY_COUNT, UPGRADE_LEVEL_COUNT,
 };
 pub use weather::{
-    Drops, Storm, WeatherError, WeatherField, Wind, AIR_SATURATION, COOLDOWN_TICKS, HEAT_CEILING,
-    PLACES_CEILING, SPEED_CEILING, STRENGTH_CEILING, WET_MARK,
+    CellGround, Drops, Storm, WeatherError, WeatherField, WeatherScale, Wind, AIR_SATURATION,
+    COOLDOWN_TICKS, HEAT_CEILING, PASS_CEILING, PLACES_CEILING, SPEED_CEILING, STRENGTH_CEILING,
+    WET_MARK,
 };
 pub use world::{
     CampaignError, CensusBasis, CensusRow, ConvertError, IdentityError, MoveRelationError,

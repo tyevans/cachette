@@ -115,6 +115,8 @@ pub enum WeatherError {
     FactionCountAboveCeiling(u16),
     /// The summaries do not cover the cell lattice.
     LatticeMismatch,
+    /// The caller asked for a cell side above the ceiling the scale carries.
+    ScaleAboveCeiling(u32),
     /// The caller named a faction that this world does not hold.
     NoSuchFaction(u16),
     /// The caller named a place outside the world.
@@ -143,6 +145,10 @@ impl core::fmt::Display for WeatherError {
             Self::LatticeMismatch => {
                 write!(formatter, "the summaries do not cover the cell lattice")
             }
+            Self::ScaleAboveCeiling(bits) => write!(
+                formatter,
+                "the weather scale {bits} is above the ceiling {SCALE_BITS_CEILING}"
+            ),
             Self::NoSuchFaction(faction) => {
                 write!(formatter, "this world holds no faction {faction}")
             }
@@ -174,6 +180,296 @@ impl core::fmt::Display for WeatherError {
 }
 
 impl std::error::Error for WeatherError {}
+
+/// The pitch of the weather lattice, as the tiles along one cell side.
+///
+/// **The resolution of the weather is a parameter of the world, and not a
+/// constant welded to the level 1 geometry.** The scale holds the base-two
+/// logarithm of the cell side in tiles, so a cell side is always a power of
+/// two and the cell of a tile is a shift rather than a division.
+///
+/// [`Self::PER_TILE`] gives one weather cell to each tile. [`Self::LEVEL_1`]
+/// gives one weather cell to each level 1 block, which is what the field
+/// carried before the resolution became a parameter. The default is the level
+/// 1 pitch, because the cost at the target scale is the reason the coarse
+/// lattice was chosen and no measurement has displaced it.
+///
+/// **Three tuned quantities follow the scale**, because each of them means
+/// something different at a different cell size: the reach and the speed of
+/// the season, the divisor that turns a temperature difference into a wind,
+/// and the transport pass count. Each is derived from the scale by one
+/// formula, so no second declaration of the tuning exists.[^1]
+///
+/// # References
+///
+/// [^1]: Recurring Defect Shapes, shape 1. `.claude/rules/recurring-defects.md`
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct WeatherScale {
+    bits: u32,
+}
+
+/// The largest cell side the scale carries, as a base-two logarithm.
+///
+/// A cell of this side spans 256 tiles, which is the whole of the
+/// demonstration world along one axis. Nothing larger describes a lattice.
+pub const SCALE_BITS_CEILING: u32 = 8;
+
+/// The scale at which the tuning of the field was chosen.
+///
+/// The four derived quantities below return their stated values at this scale
+/// exactly, so a world at the level 1 pitch behaves as it did before the
+/// resolution became a parameter.
+pub const REFERENCE_BITS: u32 = 5;
+
+impl WeatherScale {
+    /// One weather cell for each tile.
+    pub const PER_TILE: Self = Self { bits: 0 };
+
+    /// One weather cell for each level 1 block.
+    pub const LEVEL_1: Self = Self {
+        bits: REFERENCE_BITS,
+    };
+
+    /// The pitch a world takes when the caller states none.
+    pub const DEFAULT: Self = Self::LEVEL_1;
+
+    /// Builds a scale from the base-two logarithm of the cell side.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the logarithm is above the ceiling.
+    pub const fn from_bits(bits: u32) -> Result<Self, WeatherError> {
+        if bits > SCALE_BITS_CEILING {
+            return Err(WeatherError::ScaleAboveCeiling(bits));
+        }
+        Ok(Self { bits })
+    }
+
+    /// Returns the base-two logarithm of the cell side, in tiles.
+    #[must_use]
+    pub const fn bits(self) -> u32 {
+        self.bits
+    }
+
+    /// Returns the tiles along one side of a cell.
+    #[must_use]
+    pub const fn side(self) -> u32 {
+        1 << self.bits
+    }
+
+    /// Reports whether each tile carries its own weather cell.
+    #[must_use]
+    pub const fn is_per_tile(self) -> bool {
+        self.bits == 0
+    }
+
+    /// Returns the transport passes that one solve runs at this scale.
+    ///
+    /// **A transport pass carries water at most one cell**, so the distance a
+    /// solve moves water is the pass count, in cells. A finer lattice must
+    /// run more passes to carry water the same distance in tiles, and the
+    /// count therefore doubles for each halving of the cell side.
+    ///
+    /// **The ceiling is what stops that from being unaffordable.** The work
+    /// of the stage is the pass count multiplied by the cell count, and both
+    /// rise as the lattice gets finer, so an uncapped count would cost the
+    /// square of the refinement. A capped count means that a fine lattice
+    /// carries its water more slowly in tiles than a coarse one. The travel
+    /// probe reports what that costs.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: The weather travel probe. `crates/cachette-core/examples/weather_travel_probe.rs`
+    #[must_use]
+    pub const fn transport_passes(self) -> u32 {
+        let asked = if self.bits >= REFERENCE_BITS {
+            PASSES_AT_REFERENCE >> (self.bits - REFERENCE_BITS)
+        } else {
+            PASSES_AT_REFERENCE << (REFERENCE_BITS - self.bits)
+        };
+        if asked > PASS_CEILING {
+            PASS_CEILING
+        } else if asked == 0 {
+            1
+        } else {
+            asked
+        }
+    }
+
+    /// Returns what a heat difference across one cell is divided by.
+    ///
+    /// **A finer lattice holds a smaller temperature difference between two
+    /// neighbours**, because one map gradient is spread over more cells. A
+    /// fixed divisor would leave the wind at rest at a fine pitch, so the
+    /// divisor follows the cell side and one map gradient then gives one wind
+    /// at every resolution.
+    #[must_use]
+    pub const fn pressure_divisor(self) -> i64 {
+        let asked = (PRESSURE_DIVISOR_AT_REFERENCE >> REFERENCE_BITS) << self.bits;
+        if asked < 1 {
+            1
+        } else {
+            asked
+        }
+    }
+
+    /// Returns the cells from the warm centre of the season to its cold edge.
+    ///
+    /// **The reach is a fixed distance in tiles, and not a fixed count of
+    /// cells.** A fixed count of cells would make the warm band a stripe four
+    /// tiles wide at the per-tile pitch, and no watcher could read a season
+    /// that narrow.
+    #[must_use]
+    pub const fn season_reach(self) -> i64 {
+        let reach = SEASON_REACH_TILES >> self.bits;
+        if reach < 1 {
+            1
+        } else {
+            reach
+        }
+    }
+
+    /// Returns the ticks the warm centre takes to cross one cell.
+    ///
+    /// **The centre travels a fixed distance in tiles for each tick**, so a
+    /// fine lattice does not take thirty-two times as long to show one
+    /// summer. The answer is a ratio, because the centre crosses a fine cell
+    /// in less than one tick.
+    #[must_use]
+    pub const fn season_step(self) -> (i64, i64) {
+        (
+            SEASON_TILES_FOR_EACH_STEP,
+            SEASON_TICKS_FOR_EACH_STEP * self.side() as i64,
+        )
+    }
+}
+
+/// The ground under one weather cell.
+///
+/// **The heat of a cell reads the ground, and the ground does not change.**
+/// The three fields are the tiles the cell covers, the tiles of it that admit
+/// a unit, and the sum of the heights of its tiles. Each of them is a pure
+/// function of the world seed and the address, so the array is built once
+/// when the world is built and never rebuilt.[^1]
+///
+/// **This replaces the level 1 summary as the source of the heat.** The level
+/// 1 summary describes a block thirty-two tiles a side, and it is the wrong
+/// source at any other weather pitch. It also carries four fields that no
+/// weather pass reads, and the step rebuilds it on every tick for the readers
+/// that do need them.[^2]
+///
+/// The type declares its layout. The wide field stands first, so the two
+/// narrow ones fill the tail and the type needs no padding field.[^3]
+///
+/// # References
+///
+/// [^1]: ADR-0068, terrain is generated from the seed and is never stored as a map. `docs/adrs/accepted/adr-0068-terrain-is-generated-from-the-seed-and-is-never-stored-as-a-map.md`
+/// [^2]: ADR-0022, level 0 is the only truth, and every level above it is derived, decision D2. `docs/adrs/accepted/adr-0022-level-0-is-the-only-truth-and-every-level-above-it-is-derived.md`
+/// [^3]: ADR-0006, an event is plain data and applying it is pure, decision D1. `docs/adrs/accepted/adr-0006-an-event-is-plain-data-and-applying-it-is-pure.md`
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Pod, Zeroable)]
+pub struct CellGround {
+    /// The sum of the heights of the tiles the cell covers.
+    ///
+    /// The accumulator is 64 bits wide, because a tile field summed over a
+    /// block of the target world overflows a 32-bit accumulator.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0023, an aggregate combines exactly, in any order, decision D3. `docs/adrs/accepted/adr-0023-an-aggregate-combines-exactly-in-any-order.md`
+    pub height_total: i64,
+    /// The tiles the cell covers.
+    pub tiles: i32,
+    /// The tiles of the cell whose ground admits a unit.
+    pub open_tiles: i32,
+}
+
+impl CellGround {
+    /// A cell that covers no tile.
+    pub const EMPTY: Self = Self {
+        height_total: 0,
+        tiles: 0,
+        open_tiles: 0,
+    };
+
+    /// Builds the ground of a cell from a level 1 summary.
+    ///
+    /// A world at the level 1 pitch reads the same three numbers that the
+    /// pyramid already holds, so the two sources cannot disagree there.
+    #[must_use]
+    pub fn from_summary(summary: CellSummary) -> Self {
+        Self {
+            height_total: summary.height_total().0,
+            tiles: summary.tiles().clamp(0, i64::from(i32::MAX)) as i32,
+            open_tiles: summary.open_tiles().clamp(0, i64::from(i32::MAX)) as i32,
+        }
+    }
+
+    /// Combines the ground of two cells.
+    ///
+    /// The operation is field-wise integer addition. It is exactly
+    /// associative and commutative and its identity is [`Self::EMPTY`], so a
+    /// fold over a set of tiles gives one answer whatever the order.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0023, an aggregate combines exactly, in any order, decisions D1 and D2. `docs/adrs/accepted/adr-0023-an-aggregate-combines-exactly-in-any-order.md`
+    #[must_use]
+    pub const fn combine(self, other: Self) -> Self {
+        Self {
+            height_total: self.height_total.saturating_add(other.height_total),
+            tiles: self.tiles.saturating_add(other.tiles),
+            open_tiles: self.open_tiles.saturating_add(other.open_tiles),
+        }
+    }
+
+    /// Returns the tiles the cell covers.
+    #[must_use]
+    pub const fn tiles(self) -> i64 {
+        self.tiles as i64
+    }
+
+    /// Returns the tiles of the cell whose ground admits a unit.
+    #[must_use]
+    pub const fn open_tiles(self) -> i64 {
+        self.open_tiles as i64
+    }
+
+    /// Returns the share of the cell that admits a unit.
+    ///
+    /// Returns `None` when the cell covers no tile.
+    #[must_use]
+    pub fn open_share(self) -> Option<Fix32> {
+        if self.tiles <= 0 {
+            return None;
+        }
+        Some(Fix32(clamp_to_fix(
+            (self.open_tiles() << crate::types::FIX_FRACTIONAL_BITS) / self.tiles(),
+        )))
+    }
+
+    /// Returns the mean height of the cell.
+    ///
+    /// Returns `None` when the cell covers no tile.
+    #[must_use]
+    pub fn mean_height(self) -> Option<Fix32> {
+        if self.tiles <= 0 {
+            return None;
+        }
+        Some(Fix32(clamp_to_fix(self.height_total / self.tiles())))
+    }
+}
+
+/// Clamps a wide value into the fixed-point range.
+const fn clamp_to_fix(value: i64) -> i32 {
+    if value > i32::MAX as i64 {
+        i32::MAX
+    } else if value < i32::MIN as i64 {
+        i32::MIN
+    } else {
+        value as i32
+    }
+}
 
 /// A quantity of water, counted in drops.
 ///
@@ -418,16 +714,29 @@ fn drag(wind: Wind) -> Wind {
     }
 }
 
-/// The number of spread passes that one solve runs.
+/// The number of spread passes that one solve runs at the reference scale.
 ///
-/// The count is fixed. A solve runs it whatever the field holds and whatever
-/// the thread count. It is not a budget and no measurement chose it: it is
-/// the reach that one frame of weather adds, in cells.[^1]
+/// The count is fixed for a given scale. A solve runs it whatever the field
+/// holds and whatever the thread count. It is not a budget and no measurement
+/// chose it: it is the reach that one frame of weather adds, in cells.[^1]
+///
+/// **The count a solve runs is derived from the scale of the world**, and a
+/// caller reads it there rather than here.[^2]
 ///
 /// # References
 ///
 /// [^1]: ADR-0087, an influence solve runs a fixed iteration count over the whole plane, decision D1. `docs/adrs/draft/adr-0087-an-influence-solve-runs-a-fixed-iteration-count.md`
-pub const PASSES_FOR_EACH_SOLVE: u32 = 4;
+/// [^2]: The transport pass count of a scale. [`WeatherScale::transport_passes`]
+pub const PASSES_AT_REFERENCE: u32 = 4;
+
+/// The most transport passes that one solve runs, at any scale.
+///
+/// **The work of the stage is the pass count multiplied by the cell count.**
+/// Both rise as the lattice gets finer, so a pass count that rose without a
+/// bound would cost the square of the refinement. This is what turns that
+/// square into a line, and the cost is that a fine lattice carries its water
+/// more slowly across the map than a coarse one.
+pub const PASS_CEILING: u32 = 32;
 
 /// The number of wind passes that one solve runs.
 ///
@@ -535,26 +844,39 @@ const GROUND_DIVISOR: i64 = 2;
 /// [^1]: ADR-0166, the temperature of a cell is carried state that a season and the sky drive, decision D2. `docs/adrs/draft/adr-0166-the-temperature-of-a-cell-is-carried-state-that-a-season-and-the-sky-drive.md`
 const SEASON_SWING: i32 = 64;
 
-/// The cells from the warm centre of the season to the cold edge of it.
+/// The tiles from the warm centre of the season to the cold edge of it.
 ///
-/// **The reach is a count of cells and not a share of the lattice.** A share
-/// would make the gradient across one cell fall as the lattice grows, so a
-/// large world would feel a season it could not measure. A fixed reach gives
-/// one gradient at every lattice size.
+/// **The reach is a distance in tiles and not a share of the lattice.** A
+/// share would make the gradient across one cell fall as the lattice grows,
+/// so a large world would feel a season it could not measure. A fixed reach
+/// gives one gradient at every lattice size.
+///
+/// It is a distance in tiles rather than a count of cells, because a count of
+/// cells would make the warm band four tiles wide at the per-tile pitch and
+/// one hundred and twenty-eight tiles wide at the level 1 pitch. The season a
+/// watcher sees would then depend on the resolution.
 ///
 /// A lattice narrower than twice this takes half its width instead, because
 /// the greatest distance on a wrapped axis is half the width.
-const SEASON_REACH: i64 = 4;
+const SEASON_REACH_TILES: i64 = 128;
 
-/// The ticks the warm centre of the season takes to move one cell.
+/// The tiles the warm centre of the season moves in the ticks below.
 ///
-/// The centre travels along the column axis and wraps, so the period of the
-/// season at one cell is this multiplied by the width of the lattice.[^1]
+/// The centre travels along the column axis and wraps. **The pair states one
+/// speed in tiles for each tick**, so the season crosses one map in one time
+/// whatever the pitch of the weather lattice.[^1]
 ///
 /// # References
 ///
 /// [^1]: ADR-0166, the temperature of a cell is carried state that a season and the sky drive, decision D2. `docs/adrs/draft/adr-0166-the-temperature-of-a-cell-is-carried-state-that-a-season-and-the-sky-drive.md`
-const SEASON_TICKS_FOR_EACH_CELL: u64 = 24;
+const SEASON_TILES_FOR_EACH_STEP: i64 = 4;
+
+/// The ticks in which the warm centre moves the tiles above.
+///
+/// Four tiles in three ticks is thirty-two tiles in twenty-four ticks, which
+/// is one level 1 cell in twenty-four ticks. The season therefore travels at
+/// the speed it travelled at before the resolution became a parameter.
+const SEASON_TICKS_FOR_EACH_STEP: i64 = 3;
 
 /// The degrees that a saturated sky takes away from a cell.
 ///
@@ -611,12 +933,21 @@ const _: () = assert!(POSITIVE_PROJECTION_CEILING * CARRY_FOR_EACH_WIND_STEP < C
 /// [^1]: ADR-0001, one binary gives one answer at any thread count, decision D3. `docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
 pub const WARMTH_PASSES_FOR_EACH_SOLVE: u32 = 1;
 
-/// The heat difference that one step of wind acceleration answers to.
+/// The heat difference that one step of wind acceleration answers to, at the
+/// reference scale.
 ///
 /// The acceleration of a cell is the sum, over the six directions, of the
 /// direction times the heat the neighbour holds above this cell. That sum is
-/// divided by this before the step ceiling bounds it.
-const PRESSURE_DIVISOR: i64 = 32;
+/// divided by the divisor of the scale before the step ceiling bounds it.
+///
+/// **A finer lattice holds a smaller difference between two neighbours**, so
+/// the divisor a solve uses follows the cell side and a caller reads it from
+/// the scale rather than here.[^1]
+///
+/// # References
+///
+/// [^1]: The pressure divisor of a scale. [`WeatherScale::pressure_divisor`]
+const PRESSURE_DIVISOR_AT_REFERENCE: i64 = 32;
 
 /// The most the wind of a cell changes in one pass, in lattice steps.
 ///
@@ -860,9 +1191,10 @@ fn part_of(whole: i32, fraction: Fix32) -> i32 {
 ///
 /// **A low coast is hot and a high ridge is cold.** The heat rises with the
 /// share of the cell that holds open water and falls with the mean height of
-/// the cell. Both come from the level 1 summary that the step rebuilt before
-/// the solve ran, so the heat needs no storage and it cannot drift from the
-/// world.[^1]
+/// the cell. Both come from the ground array over the weather lattice, which
+/// the world folds from the terrain once. **They do not come from the level 1
+/// summary**, because that summary describes a block thirty-two tiles a side
+/// and is the wrong source at any other weather pitch.[^1]
 ///
 /// The heat has three readers in one solve: the pressure that drives the
 /// wind, the evaporation, and the fall. It is one derived value, computed
@@ -881,15 +1213,15 @@ fn part_of(whole: i32, fraction: Fix32) -> i32 {
 /// [^2]: ADR-0162, water enters the air where it is hot, and it falls where the air cools, decision D1. `docs/adrs/accepted/adr-0162-water-enters-the-air-where-it-is-hot-and-falls-where-the-air-cools.md`
 /// [^3]: Recurring Defect Shapes, shape 1. `.agents/rules/recurring-defects.md`
 #[must_use]
-pub fn heat_of(summary: CellSummary) -> i32 {
-    if summary.tiles() <= 0 {
+pub fn heat_of(ground: CellGround) -> i32 {
+    if ground.tiles() <= 0 {
         return 0;
     }
     // Water is the only ground that admits no unit, so the share of the cell
     // that admits none is its water share exactly.
-    let open = summary.open_share().map_or(Fix32::ZERO, to_unit);
+    let open = ground.open_share().map_or(Fix32::ZERO, to_unit);
     let water = Fix32(Fix32::ONE.0 - open.0);
-    let height = summary.mean_height().map_or(Fix32::ZERO, to_unit);
+    let height = ground.mean_height().map_or(Fix32::ZERO, to_unit);
     let low = Fix32(Fix32::ONE.0 - height.0);
     part_of(HEAT_FROM_WATER, water) + part_of(HEAT_FROM_LOW_GROUND, low)
 }
@@ -919,16 +1251,21 @@ pub fn heat_of(summary: CellSummary) -> i32 {
 ///
 /// [^1]: ADR-0166, the temperature of a cell is carried state that a season and the sky drive, decision D2. `docs/adrs/draft/adr-0166-the-temperature-of-a-cell-is-carried-state-that-a-season-and-the-sky-drive.md`
 #[must_use]
-pub fn season_at(tick: Tick, column: u32, width: u32) -> i32 {
+pub fn season_at(tick: Tick, column: u32, width: u32, scale: WeatherScale) -> i32 {
     if width == 0 {
         return 0;
     }
     let width = i64::from(width);
-    let centre = (tick.0 / SEASON_TICKS_FOR_EACH_CELL % width as u64) as i64;
+    // The centre travels a fixed distance in tiles for each tick, so the
+    // ticks it takes to cross one cell follow the cell side.
+    let (tiles, ticks) = scale.season_step();
+    let travelled = sim_math::share(Accum(tick.0 as i64), Accum(tiles), Accum(ticks))
+        .map_or(0, |value| value.0);
+    let centre = travelled.rem_euclid(width);
     let apart = (i64::from(column) - centre).abs();
     // The column axis wraps, so the far way round may be the short way.
     let apart = apart.min(width - apart);
-    let reach = SEASON_REACH.min((width / 2).max(1));
+    let reach = scale.season_reach().min((width / 2).max(1));
     if apart >= reach {
         return -SEASON_SWING;
     }
@@ -1052,8 +1389,18 @@ pub struct Storm {
 /// [^1]: PRD-0004, the world has weather that a watcher can read. `docs/product/accepted/prd-0004-the-world-has-weather-that-a-watcher-can-read.md`
 #[derive(Clone, Debug)]
 pub struct WeatherField {
-    /// The cell lattice. It is a hex grid at the pitch of one level 1 cell.
+    /// The cell lattice. It is a hex grid at the pitch the scale states.
     cells: Grid,
+    /// The pitch of the lattice, as the tiles along one cell side.
+    ///
+    /// **The resolution is a parameter and not a constant.** Three tuned
+    /// quantities are derived from it, so the field reads them from here and
+    /// holds no second copy of them.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: Recurring Defect Shapes, shape 1. `.claude/rules/recurring-defects.md`
+    scale: WeatherScale,
     faction_count: u16,
     /// The water in the air above each cell, in cell index order. It is empty
     /// until the first drop enters the world.
@@ -1138,7 +1485,7 @@ impl WeatherField {
     ///
     /// Returns an error when the faction count is above the ceiling the
     /// project supports.
-    pub fn new(cells: Grid, faction_count: u16) -> Result<Self, WeatherError> {
+    pub fn new(cells: Grid, scale: WeatherScale, faction_count: u16) -> Result<Self, WeatherError> {
         if faction_count > FACTION_CEILING {
             return Err(WeatherError::FactionCountAboveCeiling(faction_count));
         }
@@ -1150,6 +1497,7 @@ impl WeatherField {
         let count = cells.tile_count() as usize;
         Ok(Self {
             cells,
+            scale,
             faction_count,
             air: Vec::new(),
             ground: Vec::new(),
@@ -1176,6 +1524,18 @@ impl WeatherField {
     #[must_use]
     pub const fn cells(&self) -> Grid {
         self.cells
+    }
+
+    /// Returns the pitch of the lattice, as the tiles along one cell side.
+    #[must_use]
+    pub const fn scale(&self) -> WeatherScale {
+        self.scale
+    }
+
+    /// Returns the transport passes that one solve runs on this field.
+    #[must_use]
+    pub const fn transport_passes(&self) -> u32 {
+        self.scale.transport_passes()
     }
 
     /// Returns the transport passes that have run since the field was built.
@@ -1487,13 +1847,13 @@ impl WeatherField {
         &mut self,
         tick: Tick,
         seed: u64,
-        summaries: &[CellSummary],
+        ground: &[CellGround],
         threads: usize,
     ) -> Result<(), WeatherError> {
         if threads == 0 {
             return Err(WeatherError::ZeroThreads);
         }
-        if summaries.len() != self.cells.tile_count() as usize {
+        if ground.len() != self.cells.tile_count() as usize {
             return Err(WeatherError::LatticeMismatch);
         }
         // The temperature of every cell moves before anything reads it. Four
@@ -1507,7 +1867,7 @@ impl WeatherField {
         // [^1]: ADR-0162, water enters the air where it is hot, and it falls where the air cools. `docs/adrs/accepted/adr-0162-water-enters-the-air-where-it-is-hot-and-falls-where-the-air-cools.md`
         // [^3]: ADR-0166, the temperature of a cell is carried state that a season and the sky drive, decisions D1, D2 and D3. `docs/adrs/draft/adr-0166-the-temperature-of-a-cell-is-carried-state-that-a-season-and-the-sky-drive.md`
         for _ in 0..WARMTH_PASSES_FOR_EACH_SOLVE {
-            self.warm(tick, summaries);
+            self.warm(tick, ground);
             self.carry(threads);
             self.warmth_passes = self.warmth_passes.saturating_add(1);
         }
@@ -1521,15 +1881,21 @@ impl WeatherField {
             self.blow(threads);
             self.wind_passes = self.wind_passes.saturating_add(1);
         }
-        self.lift(tick, seed, summaries);
+        self.lift(tick, seed, ground);
         if self.air.is_empty() {
             return Ok(());
         }
-        for _ in 0..PASSES_FOR_EACH_SOLVE {
+        // **The pass count follows the resolution.** A pass carries water one
+        // cell, so a finer lattice needs more passes to carry water the same
+        // distance in tiles. The count is fixed for a given scale and it
+        // holds no convergence test.[^4]
+        //
+        // [^4]: ADR-0087, an influence solve runs a fixed iteration count over the whole plane, decision D1. `docs/adrs/draft/adr-0087-an-influence-solve-runs-a-fixed-iteration-count.md`
+        for _ in 0..self.scale.transport_passes() {
             self.transport(threads);
             self.passes = self.passes.saturating_add(1);
         }
-        self.settle(summaries);
+        self.settle(ground);
         Ok(())
     }
 
@@ -1548,9 +1914,9 @@ impl WeatherField {
     ///
     /// [^1]: ADR-0166, the temperature of a cell is carried state that a season and the sky drive, decision D1. `docs/adrs/draft/adr-0166-the-temperature-of-a-cell-is-carried-state-that-a-season-and-the-sky-drive.md`
     /// [^2]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
-    fn warm(&mut self, tick: Tick, summaries: &[CellSummary]) {
+    fn warm(&mut self, tick: Tick, ground: &[CellGround]) {
         let width = self.cells.width();
-        for (cell, summary) in summaries.iter().enumerate() {
+        for (cell, under) in ground.iter().enumerate() {
             let Some(address) = self.cells.address_of(TileIdx(cell as u32)) else {
                 continue;
             };
@@ -1558,8 +1924,8 @@ impl WeatherField {
             let column = address.q.max(0) as u32;
             let air = self.air.get(cell).copied().unwrap_or(Drops::ZERO);
             let asked = asked_warmth(
-                heat_of(*summary),
-                season_at(tick, column, width),
+                heat_of(*under),
+                season_at(tick, column, width, self.scale),
                 cloud_at(air),
             );
             let Some(held) = self.warmth.get_mut(cell) else {
@@ -1649,6 +2015,7 @@ impl WeatherField {
             cells: self.cells,
             wind: &self.wind,
             warmth: &self.warmth,
+            pressure_divisor: self.scale.pressure_divisor(),
         };
         run_in_chunks(count, threads, &mut self.wind_scratch, |low, out| {
             pass.fill(low, out);
@@ -1669,16 +2036,10 @@ impl WeatherField {
     /// # References
     ///
     /// [^1]: ADR-0003, every random draw is keyed, never stateful, decision D1. `docs/adrs/accepted/adr-0003-every-random-draw-is-keyed-never-stateful.md`
-    fn lift(&mut self, tick: Tick, seed: u64, summaries: &[CellSummary]) {
+    fn lift(&mut self, tick: Tick, seed: u64, ground: &[CellGround]) {
         let mut raised = 0i64;
-        for (cell, summary) in summaries.iter().enumerate() {
-            if !cell_lifts(
-                seed,
-                tick,
-                cell as u32,
-                summary.tiles(),
-                summary.open_tiles(),
-            ) {
+        for (cell, under) in ground.iter().enumerate() {
+            if !cell_lifts(seed, tick, cell as u32, under.tiles(), under.open_tiles()) {
                 continue;
             }
             // **A hot sea gives up more than a cold one.** The quantity is
@@ -1774,9 +2135,9 @@ impl WeatherField {
     /// # References
     ///
     /// [^1]: ADR-0141, a weather pass moves water and never scales it, decision D2. `docs/adrs/draft/adr-0141-a-weather-pass-moves-water-and-never-scales-it.md`
-    fn settle(&mut self, summaries: &[CellSummary]) {
+    fn settle(&mut self, ground: &[CellGround]) {
         let mut dried = 0i64;
-        for cell in 0..summaries.len() {
+        for cell in 0..ground.len() {
             let heat = self.warmth.get(cell).copied().unwrap_or(0);
 
             // **Rain falls where the air cools.** The cooling is the heat of
@@ -1940,7 +2301,12 @@ where
     T: Send,
     F: Fn(usize, &mut [T]) + Sync,
 {
-    if count <= threads {
+    // **One thread runs the pass where it stands.** A caller that asked for
+    // one thread and got a spawned one paid for the spawn and gained nothing,
+    // and the spawn cost more than the pass on a small lattice. The answer is
+    // the same either way, because one worker takes one chunk that covers the
+    // whole plane.
+    if threads <= 1 || count <= threads {
         fill(0, out);
         return;
     }
@@ -2100,6 +2466,9 @@ struct WindPass<'a> {
     cells: Grid,
     wind: &'a [Wind],
     warmth: &'a [i32],
+    /// What the pressure sum is divided by. It follows the cell side, because
+    /// a finer lattice holds a smaller difference between two neighbours.
+    pressure_divisor: i64,
 }
 
 impl WindPass<'_> {
@@ -2143,12 +2512,12 @@ impl WindPass<'_> {
                     q: narrow(sim_math::share(
                         Accum(asked_q),
                         Accum(1),
-                        Accum(PRESSURE_DIVISOR),
+                        Accum(self.pressure_divisor),
                     )),
                     r: narrow(sim_math::share(
                         Accum(asked_r),
                         Accum(1),
-                        Accum(PRESSURE_DIVISOR),
+                        Accum(self.pressure_divisor),
                     )),
                 },
                 WIND_STEP,

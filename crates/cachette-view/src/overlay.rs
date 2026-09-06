@@ -238,10 +238,12 @@ pub trait Layer: Sync {
     /// answer does not follow the window.
     fn span(&self, world: &World) -> Span;
 
-    /// Reports whether the value lives on the level 1 cell lattice.
+    /// Reports whether the value lives on the weather cell lattice.
     ///
     /// A cell value paints as a field. The drawing interpolates between the
     /// four nearest cell centres, so the map does not draw a grid of blocks.
+    /// **The drawing reads a cell one tile wide flat instead**, because a
+    /// field at the pitch of the screen is already smooth.
     fn on_cells(&self) -> bool {
         false
     }
@@ -719,8 +721,16 @@ pub fn value_of(
             ground,
         });
     }
-    let layout = world.pyramid().layout();
+    // **Every cell overlay is a weather overlay**, so the pitch comes from
+    // the weather lattice and not from the level 1 lattice. The two agree
+    // only when the world takes the level 1 weather pitch, and a drawing
+    // that read the level 1 pitch would interpolate between the wrong
+    // centres at every other pitch.
+    let layout = world.weather_layout();
     let edge = layout.block_edge();
+    // **A cell one tile wide needs no interpolation.** The field then varies
+    // at the pitch the screen draws at, so a flat read already gives a smooth
+    // picture and the four extra reads would only blur it.
     if edge <= 1 {
         return layer.value(At {
             world,

@@ -240,6 +240,183 @@ fn the_field_gives_one_answer_at_any_thread_count() {
     }
 }
 
+// The resolution of the weather is a parameter of the world, and one of the
+// values it takes gives each tile a cell of its own. The tests below hold the
+// same properties at that pitch. A test at one pitch measures the pitch and
+// not the field.[^1]
+//
+// [^1]: Testing rules, section 2a. `.claude/rules/testing.md`
+
+/// Builds a coastal world that carries one weather cell for each tile.
+fn per_tile_world() -> World {
+    let world = World::with_weather_scale(
+        WorldConfig {
+            width: PER_TILE_EXTENT,
+            height: PER_TILE_EXTENT,
+            seed: WET_SEED,
+            faction_count: 2,
+            unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
+        },
+        weather::WeatherScale::PER_TILE,
+    )
+    .expect("the extent must describe a world");
+    assert!(
+        water_tiles(&world) > 0,
+        "the fixture holds no water, so nothing lifts"
+    );
+    assert_eq!(
+        world.weather().cells().tile_count(),
+        PER_TILE_EXTENT * PER_TILE_EXTENT,
+        "the lattice does not hold one cell for each tile"
+    );
+    world
+}
+
+/// The extent of the per-tile world.
+///
+/// It is smaller than the coastal world, because a per-tile lattice runs the
+/// whole world on every transport pass.
+const PER_TILE_EXTENT: u32 = 48;
+
+#[test]
+fn a_per_tile_field_gives_one_answer_at_any_thread_count() {
+    let mut planes = Vec::new();
+    for threads in THREAD_COUNTS {
+        let mut world = per_tile_world();
+        for _ in 0..16 {
+            world.step(threads).expect("the step must run");
+        }
+        planes.push((
+            threads,
+            world.weather().air_plane().to_vec(),
+            world.weather().ground_plane().to_vec(),
+            world.weather().wind_plane().to_vec(),
+            world.state_hash().finish(),
+        ));
+    }
+    let first = &planes[0];
+    for other in &planes[1..] {
+        assert_eq!(first.1, other.1, "the air differs at {} threads", other.0);
+        assert_eq!(
+            first.2, other.2,
+            "the ground differs at {} threads",
+            other.0
+        );
+        assert_eq!(first.3, other.3, "the wind differs at {} threads", other.0);
+        assert_eq!(first.4, other.4, "the hash differs at {} threads", other.0);
+    }
+}
+
+#[test]
+fn a_per_tile_field_conserves_water_exactly() {
+    let mut world = per_tile_world();
+    for frame in 0..24 {
+        world.step(4).expect("the step must run");
+        let field = world.weather();
+        let accounted = field.air_total().0 + field.ground_total().0 + field.evaporated();
+        assert_eq!(
+            accounted,
+            field.raised(),
+            "the account does not balance at frame {frame}"
+        );
+        assert!(
+            field.air_plane().iter().all(|drops| drops.0 >= 0),
+            "a cell holds negative air at frame {frame}"
+        );
+    }
+    assert!(
+        world.weather().raised() > 0,
+        "nothing lifted water at the per-tile pitch"
+    );
+}
+
+/// The weather still varies over a per-tile map, rather than wetting it alike.
+///
+/// **A finer lattice that stops travelling is worse than a coarse one that
+/// moves.** A field that reached the same value everywhere would pass the
+/// account test and tell a watcher nothing.
+#[test]
+fn a_per_tile_field_still_separates_wet_ground_from_dry() {
+    let mut world = per_tile_world();
+    for _ in 0..48 {
+        world.step(4).expect("the step must run");
+    }
+    let plane = world.weather().ground_plane();
+    let low = plane.iter().map(|drops| drops.0).min().unwrap_or(0);
+    let high = plane.iter().map(|drops| drops.0).max().unwrap_or(0);
+    assert!(
+        high > low,
+        "every tile holds the same water, so the field is not a field"
+    );
+    let wet = world.weather().wet_cells();
+    assert!(
+        wet > 0 && wet < world.weather().cells().tile_count(),
+        "the map is wet everywhere or dry everywhere: {wet} cells"
+    );
+}
+
+/// The wind turns at the per-tile pitch, and does not sit at rest.
+///
+/// **A finer lattice holds a smaller temperature difference between two
+/// neighbours.** The divisor that turns that difference into a wind therefore
+/// follows the cell side. A fixed divisor left every cell still, and a still
+/// field carries no water anywhere.
+#[test]
+fn a_per_tile_field_raises_a_wind() {
+    let mut world = per_tile_world();
+    for _ in 0..48 {
+        world.step(4).expect("the step must run");
+    }
+    let moving = world
+        .weather()
+        .wind_plane()
+        .iter()
+        .filter(|wind| !wind.is_still())
+        .count();
+    let cells = world.weather().wind_plane().len();
+    // **A wind over a few cells is not a wind over the map.** A divisor that
+    // did not follow the cell side left one cell in eighteen moving, and the
+    // rest at rest, so a count of moving cells is what tells the two apart.
+    // A test that asked only for a nonzero fastest speed passed under that
+    // defect.
+    assert!(
+        moving * 2 > cells,
+        "only {moving} of {cells} cells carry a wind, so the field mostly sits"
+    );
+}
+
+/// A tile reads the weather of its own cell at the per-tile pitch.
+///
+/// **The readers of the field must keep working at any resolution.** The
+/// gather resolve asks whether the cell of a tile is wet, and the drawing
+/// asks the same reader for the air and the wind.
+#[test]
+fn a_tile_reads_the_weather_of_its_own_cell() {
+    let mut world = per_tile_world();
+    for _ in 0..48 {
+        world.step(4).expect("the step must run");
+    }
+    let mut different = false;
+    let mut first = None;
+    for address in addresses(&world) {
+        let Some(air) = world.air_at(address) else {
+            continue;
+        };
+        assert!(world.ground_water_at(address).is_some());
+        assert!(world.wind_at(address).is_some());
+        assert!(world.ground_is_wet(address).is_some());
+        match first {
+            None => first = Some(air),
+            Some(seen) if seen != air => different = true,
+            Some(_) => {}
+        }
+    }
+    assert!(
+        different,
+        "every tile reads the same air, so the reader answers for one cell"
+    );
+}
+
 #[test]
 fn the_water_account_balances_at_every_frame() {
     let mut world = coastal_world();
@@ -351,7 +528,11 @@ fn cold_ground_takes_more_out_of_the_air_than_warm_ground() {
             continue;
         };
         // The air met no cooling on the way, so this reads the cell alone.
-        let numerator = weather::fall_numerator(weather::heat_of(summary), 0);
+        // The world runs at the level 1 weather pitch, so the ground under a
+        // weather cell is the ground under the level 1 cell of the same
+        // index. The two fold the same three fields over the same tiles.
+        let ground = weather::CellGround::from_summary(summary);
+        let numerator = weather::fall_numerator(weather::heat_of(ground), 0);
         lowest = lowest.min(numerator);
         highest = highest.max(numerator);
     }
@@ -645,7 +826,7 @@ fn the_solve_runs_a_fixed_number_of_passes() {
     }
     assert_eq!(
         world.weather().passes(),
-        frames * u64::from(weather::PASSES_FOR_EACH_SOLVE),
+        frames * u64::from(weather::WeatherScale::LEVEL_1.transport_passes()),
         "the solve did not run the fixed count on every frame"
     );
 }
@@ -684,10 +865,10 @@ fn the_temperature_of_one_cell_changes_over_a_run() {
 #[test]
 fn the_season_is_keyed_on_the_tick() {
     let width = 16;
-    let early = weather::season_at(Tick(0), 0, width);
+    let early = weather::season_at(Tick(0), 0, width, weather::WeatherScale::LEVEL_1);
     let mut moved = false;
     for tick in 1..512u64 {
-        if weather::season_at(Tick(tick), 0, width) != early {
+        if weather::season_at(Tick(tick), 0, width, weather::WeatherScale::LEVEL_1) != early {
             moved = true;
             break;
         }
@@ -704,7 +885,7 @@ fn the_season_is_keyed_on_the_tick() {
 fn the_season_varies_across_the_lattice_at_one_tick() {
     let width = 16;
     let readings: Vec<i32> = (0..width)
-        .map(|at| weather::season_at(Tick(0), at, width))
+        .map(|at| weather::season_at(Tick(0), at, width, weather::WeatherScale::LEVEL_1))
         .collect();
     let low = readings.iter().copied().min().unwrap_or(0);
     let high = readings.iter().copied().max().unwrap_or(0);
@@ -720,7 +901,9 @@ fn the_warm_centre_of_the_season_travels_across_the_lattice() {
     let width = 16;
     let warmest = |tick: u64| {
         (0..width)
-            .max_by_key(|at| weather::season_at(Tick(tick), *at, width))
+            .max_by_key(|at| {
+                weather::season_at(Tick(tick), *at, width, weather::WeatherScale::LEVEL_1)
+            })
             .unwrap_or(0)
     };
     let mut visited: Vec<u32> = Vec::new();
