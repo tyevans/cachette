@@ -85,6 +85,10 @@ def test_a_terrace_is_a_different_upgrade_from_a_road(seed: int) -> None:
     # would pass the test above.
     world = cachette.World(width=16, height=16, seed=seed, faction_count=2)
     address = _open_address(world)
+    # A unit builds anything only on ground its own faction holds, and a
+    # faction holds the ground its cities reach. A road needs no city.
+    world.found_settlements([address], faction=0)
+    world.step(threads=2)
     units = world.spawn_soldiers([address], faction=0)
     world.order_build(units, TERRACE)
     assert world.build_order(int(units[0])) == TERRACE

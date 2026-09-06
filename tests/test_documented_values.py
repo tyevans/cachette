@@ -209,6 +209,10 @@ def test_every_upgrade_kind_carries_the_documented_number(
     for kind in DOCUMENTED_UPGRADE_KINDS:
         world = cachette.World(width=16, height=16, seed=seed, faction_count=1)
         address = _first_open_address(world)
+        # A unit builds anything but a road only on ground its own faction
+        # holds, and a faction holds the ground its cities reach.
+        world.found_settlements([address], faction=0)
+        world.step(threads=1)
         units = world.spawn_soldiers([address], faction=0)
         world.order_build(units, kind)
         assert world.build_order(int(units[0])) == kind

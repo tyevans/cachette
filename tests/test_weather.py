@@ -68,6 +68,9 @@ def a_congregation() -> tuple[World, tuple[int, int]]:
     world = World(**INLAND)
     place = (2, 2)
     world.spawn_soldiers([place], 0)
+    # A faction holds the ground its cities reach. A unit gives its faction
+    # no claim on the tile it stands on.
+    world.found_settlements([place], faction=0)
     for _ in range(16):
         world.step(1)
     return world, place

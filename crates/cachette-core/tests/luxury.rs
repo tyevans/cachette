@@ -409,10 +409,17 @@ fn a_faction_takes_the_luxuries_of_the_ground_it_takes() {
         .seed_luxuries(&placements)
         .expect("the placements must describe a field");
     let holder_faction = FactionId(1);
+    // The faction takes the ground because it founds a city on the patch. A
+    // unit gives its faction no claim on the tile it stands on.[^2]
+    //
+    // [^2]: ADR-0150, held ground is the ground within reach of a city its faction owns, decision D1. `docs/adrs/draft/adr-0150-held-ground-is-the-ground-within-reach-of-a-city-its-faction-owns.md`
+    world
+        .found_settlement(patch[patch.len() / 2], holder_faction)
+        .expect("the ground admits a city");
     for address in &patch {
         let _ = world.spawn_soldier(*address, holder_faction);
     }
-    for _ in 0..12 {
+    for _ in 0..4 {
         world.step(2).expect("the step must run");
     }
     assert!(world.check_invariants());
@@ -432,7 +439,7 @@ fn a_faction_takes_the_luxuries_of_the_ground_it_takes() {
     }
     assert!(
         expected.variety() > 0,
-        "the garrison must take some ground before the read means anything"
+        "the city must take some ground before the read means anything"
     );
     assert_eq!(world.faction_variety(holder_faction), expected.variety());
     assert!(world.faction_variety(holder_faction) <= world.world_variety());

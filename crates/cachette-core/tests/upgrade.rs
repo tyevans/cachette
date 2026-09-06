@@ -33,6 +33,7 @@
 //! [^4]: Testing rules, section 2a. `.claude/rules/testing.md`
 
 use cachette_core::choose::{self, ChoiceSchedule};
+use cachette_core::holding::ReachRules;
 use cachette_core::resource::{Amount, ResourceKind};
 use cachette_core::terrain::TileKind;
 use cachette_core::upgrade::{
@@ -80,6 +81,22 @@ fn world(seed: u64, width: u32, height: u32) -> World {
     world
         .set_choice_schedule(0)
         .expect("the exponent is inside the range");
+    // A unit builds only on ground its own faction holds, and a road is the
+    // one exception.[^2] The fixture therefore founds one city of the
+    // building faction and gives it a reach that covers the world, so that
+    // every test below measures the build and never the ground rule.
+    //
+    // [^2]: ADR-0150, held ground is the ground within reach of a city its faction owns, decision D4. `docs/adrs/draft/adr-0150-held-ground-is-the-ground-within-reach-of-a-city-its-faction-owns.md`
+    let reach = width + height;
+    world.set_reach_rules(ReachRules::new(reach, 1, reach));
+    let seat = addresses(width, height)
+        .into_iter()
+        .find(|address| world.admits_a_unit(*address))
+        .expect("the world admits a unit somewhere");
+    world
+        .found_settlement(seat, FactionId(0))
+        .expect("the ground admits a city");
+    world.step(1).expect("the step must run");
     world
 }
 

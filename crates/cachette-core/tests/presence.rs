@@ -59,16 +59,30 @@ fn a_world_the_host_holds() -> (World, Axial) {
         .set_choice_schedule(0)
         .expect("the exponent is inside the range");
 
+    // The host holds ground because it owns a city there. A unit gives its
+    // faction no claim on the tile it stands on.[^2]
+    //
+    // [^2]: ADR-0150, held ground is the ground within reach of a city its faction owns, decision D1. `docs/adrs/draft/adr-0150-held-ground-is-the-ground-within-reach-of-a-city-its-faction-owns.md`
     let corner = Axial::new(12, 43);
-    for row in 0..8 {
-        for column in 0..8 {
+    let seat = Axial::new(corner.q + 4, corner.r + 4);
+    assert!(
+        world.admits_a_unit(seat),
+        "the fixture must put the city on ground that admits a unit"
+    );
+    world
+        .found_settlement(seat, HOST)
+        .expect("the ground admits a city");
+    // The host keeps units of its own on that ground, because one test asks
+    // what the relation says about a unit at home.
+    for row in 0..4 {
+        for column in 0..4 {
             let address = Axial::new(corner.q + column, corner.r + row);
             if world.admits_a_unit(address) {
                 let _ = world.spawn_soldier(address, HOST);
             }
         }
     }
-    for _ in 0..6 {
+    for _ in 0..2 {
         world.step(1).expect("the step must run");
     }
 
@@ -245,6 +259,13 @@ fn the_relation_is_the_same_at_every_thread_count() {
             .set_choice_schedule(0)
             .expect("the exponent is inside the range");
         let corner = Axial::new(12, 43);
+        let middle = Axial::new(corner.q + 4, corner.r + 4);
+        // The host holds the ground because it owns a city there.[^2]
+        //
+        // [^2]: ADR-0150, held ground is the ground within reach of a city its faction owns, decision D1. `docs/adrs/draft/adr-0150-held-ground-is-the-ground-within-reach-of-a-city-its-faction-owns.md`
+        world
+            .found_settlement(middle, HOST)
+            .expect("the ground admits a city");
         for row in 0..8 {
             for column in 0..8 {
                 let address = Axial::new(corner.q + column, corner.r + row);
@@ -253,10 +274,9 @@ fn the_relation_is_the_same_at_every_thread_count() {
                 }
             }
         }
-        for _ in 0..6 {
+        for _ in 0..2 {
             world.step(threads).expect("the step must run");
         }
-        let middle = Axial::new(corner.q + 4, corner.r + 4);
         stand_at(&mut world, middle, HOST, HOST_UNITS_ON_THE_VISITED_TILE);
         stand_at(&mut world, middle, GUEST, 1);
         // The guest must not sit in the last chunk of the arena, or a combine

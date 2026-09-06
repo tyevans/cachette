@@ -17,19 +17,21 @@
 //! costs nothing at read time, and maintaining it costs the tiles that
 //! changed rather than the tiles that exist.[^3]
 //!
-//! **The spread rule reads the terrain.** A claim on a tile needs support
-//! from the neighbours of the tile, and the ground says how much support the
-//! tile asks for. Open water asks for more than any claim can raise, so no
-//! faction ever holds water. High ground asks for more than level ground.
+//! **The cities decide the holder.** A tile is held by the faction of the
+//! nearest city that reaches it. Two cities at one distance resolve by the
+//! lower settlement slot. A tile no city reaches is held by nobody, and a
+//! tile whose ground admits no unit is held by nobody whatever reaches
+//! it.[^5]
+//!
+//! **The reach of a city is a whole number of hex steps.** It is a base, plus
+//! one step for each block of finished upgrades that stand on the ground the
+//! city held at the end of the previous step, and it never passes a bound.
+//! The three values are balance rows.[^6]
 //!
 //! **The rule reads one buffer and writes another.** Every candidate tile is
-//! decided against the holders of the previous tick, so the answer does not
-//! depend on the order in which the candidates were visited, and it does not
-//! depend on how many threads visited them.[^4]
-//!
-//! **A contested tile resolves by a stable key.** The key is the support of
-//! the claim, in descending order, then the faction identifier, in ascending
-//! order. Nothing reads a thread completion order.[^4]
+//! decided against the settlement table alone, so the answer does not depend
+//! on the order in which the candidates were visited, and it does not depend
+//! on how many threads visited them.[^4]
 //!
 //! # References
 //!
@@ -37,10 +39,12 @@
 //! [^2]: ADR-0012, tiles are dense columns and units are a generational arena, decision D2. `docs/adrs/accepted/adr-0012-tiles-are-dense-columns-and-units-are-a-generational-arena.md`
 //! [^3]: ADR-0053, a faction is a bit in a mask, and a relation is a plane, decision D4. `docs/adrs/accepted/adr-0053-a-faction-is-a-bit-in-a-mask-and-a-relation-is-a-plane.md`
 //! [^4]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
+//! [^5]: ADR-0150, held ground is the ground within reach of a city its faction owns, decisions D1 and D3. `docs/adrs/draft/adr-0150-held-ground-is-the-ground-within-reach-of-a-city-its-faction-owns.md`
+//! [^6]: Balance register, the holding. `docs/reference/balance.md`
 
 use bytemuck::{Pod, Zeroable};
 
-use crate::bridge::{BlockLayout, BridgeError, TileCursor, UnitTileBridge};
+use crate::bridge::{BlockLayout, BridgeError};
 /// Counts what the holding apply does on each frame.
 ///
 /// **The switch exists because the apply has three parts and the stage table
@@ -137,12 +141,13 @@ pub mod census {
 }
 
 use crate::hash::StateHash;
-use crate::hex::{Axial, Grid, NEIGHBOUR_COUNT};
+use crate::hex::{Axial, Grid};
+use crate::site::SettlementArena;
 use crate::slots::Slots;
-use crate::soldier::SoldierArena;
 use crate::stage::{self, Stage};
 use crate::terrain::{Terrain, TileKind};
 use crate::types::{FactionId, TileIdx, FACTION_CEILING};
+use crate::upgrade::UpgradeMap;
 
 /// The number of bits in a faction mask.
 ///
@@ -303,36 +308,89 @@ impl FactionMask {
     }
 }
 
-/// The support that a unit standing on a tile gives to a claim on it.
+/// How far a city reaches, and what extends the reach.
 ///
-/// A unit outweighs the six neighbours together, so presence takes a tile
-/// from a neighbour that only surrounds it. That is what makes a holding
-/// start. A world in which nobody holds anything has no neighbour to give
-/// support, so without presence nothing would ever be claimed.
-const PRESENCE_SUPPORT: u32 = NEIGHBOUR_COUNT as u32 + 1;
-
-/// Returns the support that a claim on this ground must raise.
+/// The reach of a city is a base, plus one step for each block of finished
+/// upgrades that stand on the ground the city held at the end of the previous
+/// step, and it never passes the cap.[^1] The three numbers are balance rows,
+/// and every value in that register is unset until the balance pass measures
+/// it. The defaults here are the provisional values the register holds, and
+/// the register holds the derivation of each.[^2]
 ///
-/// The ground decides. Open water returns `None`, and no faction ever holds
-/// it. Level ground asks for one supporter, and each step upward asks for one
-/// more, so a holding spreads over a plain and stops against a range of
-/// mountains.[^1]
-///
-/// The numbers are a property of the rule and not a measurement. They are
-/// ordered, and the order is what a reader and a test both need: level ground
-/// is easier to hold than high ground.
+/// The arithmetic is whole numbers. No fraction and no floating point number
+/// reaches a holder.[^3]
 ///
 /// # References
 ///
-/// [^1]: ADR-0053, a faction is a bit in a mask, and a relation is a plane, decision D5. `docs/adrs/accepted/adr-0053-a-faction-is-a-bit-in-a-mask-and-a-relation-is-a-plane.md`
-#[must_use]
-pub const fn claim_threshold(kind: TileKind) -> Option<u32> {
-    match kind {
-        TileKind::Water => None,
-        TileKind::Plain => Some(1),
-        TileKind::Forest => Some(2),
-        TileKind::Hill => Some(3),
-        TileKind::Mountain => Some(4),
+/// [^1]: ADR-0150, held ground is the ground within reach of a city its faction owns, decision D2. `docs/adrs/draft/adr-0150-held-ground-is-the-ground-within-reach-of-a-city-its-faction-owns.md`
+/// [^2]: Balance register, the holding. `docs/reference/balance.md`
+/// [^3]: ADR-0002, simulated and aggregated state holds no floating point number, decision D1. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct ReachRules {
+    base: u32,
+    upgrades_per_step: u32,
+    cap: u32,
+}
+
+impl ReachRules {
+    /// The provisional values that the balance register holds.
+    pub const DEFAULT: Self = Self {
+        base: 4,
+        upgrades_per_step: 4,
+        cap: 8,
+    };
+
+    /// Builds a rule set.
+    ///
+    /// A block of zero upgrades would divide by zero, so the count is raised
+    /// to one. A cap below the base holds the reach at the cap, which is what
+    /// a cap means.
+    #[must_use]
+    pub const fn new(base: u32, upgrades_per_step: u32, cap: u32) -> Self {
+        Self {
+            base,
+            upgrades_per_step: if upgrades_per_step == 0 {
+                1
+            } else {
+                upgrades_per_step
+            },
+            cap,
+        }
+    }
+
+    /// Returns the reach with no finished upgrade.
+    #[must_use]
+    pub const fn base(self) -> u32 {
+        self.base
+    }
+
+    /// Returns the finished upgrades that earn one step of reach.
+    #[must_use]
+    pub const fn upgrades_per_step(self) -> u32 {
+        self.upgrades_per_step
+    }
+
+    /// Returns the reach that a city never passes.
+    #[must_use]
+    pub const fn cap(self) -> u32 {
+        self.cap
+    }
+
+    /// Returns the reach of a city that holds this many finished upgrades.
+    #[must_use]
+    pub const fn reach_of(self, finished: u32) -> u32 {
+        let grown = self.base.saturating_add(finished / self.upgrades_per_step);
+        if grown > self.cap {
+            self.cap
+        } else {
+            grown
+        }
+    }
+}
+
+impl Default for ReachRules {
+    fn default() -> Self {
+        Self::DEFAULT
     }
 }
 
@@ -380,6 +438,15 @@ pub struct Holding {
     ///
     /// [^1]: Findings register, FND-307. `docs/FINDINGS.md`
     block_census: Vec<u32>,
+    /// How far a city reaches, and what extends the reach.
+    ///
+    /// The rewrite reads this on every step, so it enters the state hash
+    /// beside the column it decides.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0150, held ground is the ground within reach of a city its faction owns, decisions D2 and D3. `docs/adrs/draft/adr-0150-held-ground-is-the-ground-within-reach-of-a-city-its-faction-owns.md`
+    rules: ReachRules,
 }
 
 impl Holding {
@@ -394,7 +461,19 @@ impl Holding {
             census: [0; MASK_BITS as usize],
             block_masks: vec![FactionMask::EMPTY; layout.block_count() as usize],
             block_census: vec![0; layout.block_count() as usize * MASK_BITS as usize],
+            rules: ReachRules::DEFAULT,
         }
+    }
+
+    /// Returns how far a city reaches, and what extends the reach.
+    #[must_use]
+    pub const fn rules(&self) -> ReachRules {
+        self.rules
+    }
+
+    /// Sets how far a city reaches, and what extends the reach.
+    pub const fn set_rules(&mut self, rules: ReachRules) {
+        self.rules = rules;
     }
 
     /// Returns the block partition the holding indexes by.
@@ -493,55 +572,69 @@ impl Holding {
     #[must_use]
     pub fn hash_into(&self, hash: StateHash) -> StateHash {
         let hash = hash.write(bytemuck::cast_slice(&self.holders));
-        self.census
+        let hash = self
+            .census
             .iter()
-            .fold(hash, |hash, count| hash.write_u64(*count as u64))
+            .fold(hash, |hash, count| hash.write_u64(*count as u64));
+        // The rewrite reads the three reach values on every step, so they are
+        // inputs of the column above and they enter the hash with it.
+        hash.write_u64(u64::from(self.rules.base()))
+            .write_u64(u64::from(self.rules.upgrades_per_step()))
+            .write_u64(u64::from(self.rules.cap()))
     }
 
-    /// Runs the spread rule for one tick and returns the number of tiles that
-    /// changed hands.
+    /// Rewrites the holder column from the cities and returns the number of
+    /// tiles that changed hands.
     ///
-    /// The rule visits the tiles that a change can reach: the tiles somebody
-    /// already holds, the neighbours of those tiles, and the tiles a unit
-    /// stands on.[^1]
+    /// A tile is held by the faction of the nearest city whose reach covers
+    /// it. Two cities at one distance resolve by the lower settlement slot.
+    /// A tile that no city reaches is held by nobody, and a tile whose ground
+    /// admits no unit is held by nobody whatever reaches it.[^1]
     ///
-    /// **The holding is not small.** At one million units scattered over the
-    /// target world it reaches 39 percent of the tiles, so a cost that grows
-    /// with the holding grows with the world in practice.[^3] The pass that
-    /// chooses the tiles therefore holds a set of the world rather than a
-    /// list of what it touched, and it takes a thread count.
+    /// **The rule reads no previous holder.** A faction that owns no city
+    /// therefore holds nothing after this call, and a unit standing on a tile
+    /// gives its faction no claim on it.[^1]
     ///
-    /// Every candidate is decided against the holders of the previous tick,
-    /// so the result does not depend on the visiting order and it does not
-    /// depend on the thread count.[^2]
+    /// The pass computes one reach for each city first, which costs the
+    /// cities. It then decides the tiles the cities reach, and the tiles the
+    /// held list names, and no other tile. Each thread decides a contiguous
+    /// run of the candidate list and writes its own slot, and the join reads
+    /// the slots in slot order.[^2] Each tile reads the settlement table and
+    /// never another tile, so no thread reads what another wrote.[^2]
+    ///
+    /// The write goes through the apply path that the land transfer uses, so
+    /// the running total, the block masks and the held list repair.[^3]
     ///
     /// # Errors
     ///
-    /// Returns an error when the derived unit structure does not describe the
-    /// arena, or when it was built over another world.
+    /// Returns an error when the settlement arena or the terrain describes
+    /// another world.
     ///
     /// # References
     ///
-    /// [^1]: ADR-0053, a faction is a bit in a mask, and a relation is a plane, decision D4. `docs/adrs/accepted/adr-0053-a-faction-is-a-bit-in-a-mask-and-a-relation-is-a-plane.md`
-    /// [^2]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
-    /// [^3]: Findings register, FND-285. `docs/FINDINGS.md`
-    pub fn advance(
+    /// [^1]: ADR-0150, held ground is the ground within reach of a city its faction owns, decisions D1 and D2. `docs/adrs/draft/adr-0150-held-ground-is-the-ground-within-reach-of-a-city-its-faction-owns.md`
+    /// [^2]: ADR-0009, parallel stages write disjoint outputs, decisions D1, D2 and D3. `docs/adrs/accepted/adr-0009-parallel-stages-write-disjoint-outputs.md`
+    /// [^3]: ADR-0053, a faction is a bit in a mask, and a relation is a plane, decision D4. `docs/adrs/accepted/adr-0053-a-faction-is-a-bit-in-a-mask-and-a-relation-is-a-plane.md`
+    pub fn rewrite(
         &mut self,
         terrain: Terrain,
-        arena: &SoldierArena,
-        bridge: &UnitTileBridge,
+        settlements: &SettlementArena,
+        upgrades: &UpgradeMap,
         threads: usize,
     ) -> Result<usize, BridgeError> {
         let grid = self.layout.grid();
-        if grid != terrain.grid() || grid != arena.grid() {
+        if grid != terrain.grid() || grid != settlements.grid() {
             return Err(BridgeError::GridMismatch);
         }
-        bridge.describes(arena)?;
         let threads = threads.max(1);
 
+        let cities = {
+            let _span = stage::open(Stage::HoldingCandidates);
+            self.cities(settlements, upgrades)
+        };
         let candidates = {
             let _span = stage::open(Stage::HoldingCandidates);
-            self.candidates(arena, threads)
+            self.candidates(&cities)
         };
         if candidates.is_empty() {
             return Ok(0);
@@ -549,45 +642,48 @@ impl Holding {
 
         // Each thread fills its own slot, and the join reads the slots in
         // slot order. The chunks are contiguous runs of the candidate list,
-        // so the joined result is in candidate order at every thread
-        // count.[^1] Nothing reads which thread finished first.
+        // which is in ascending tile order, so the joined result is in tile
+        // order at every thread count.[^1] Nothing reads which thread
+        // finished first.
         //
-        // [^1]: ADR-0009, parallel stages write disjoint outputs, because the memory model is weak. `docs/adrs/accepted/adr-0009-parallel-stages-write-disjoint-outputs.md`
+        // [^1]: ADR-0009, parallel stages write disjoint outputs, decisions D1, D2 and D3. `docs/adrs/accepted/adr-0009-parallel-stages-write-disjoint-outputs.md`
         let chunk_len = candidates.len().div_ceil(threads).max(1);
         let slot_count = candidates.len().div_ceil(chunk_len);
         let mut slots: Slots<Vec<(TileIdx, Holder)>> = Slots::filled(slot_count, Vec::new())
             .expect("the candidate list is not empty, so it needs at least one slot");
         let holders = &self.holders[..];
-        let layout = self.layout;
+        let cities = &cities[..];
         let decide_span = stage::open(Stage::HoldingDecide);
         std::thread::scope(|scope| {
             let mut handles = Vec::new();
             for (chunk, slot) in candidates.chunks(chunk_len).zip(slots.entries_mut()) {
                 handles.push(scope.spawn(move || {
                     let mut changes = Vec::new();
-                    let mut scratch = Scratch::new(bridge);
                     for tile in chunk {
-                        if let Some(holder) =
-                            decide(layout, terrain, holders, arena, bridge, &mut scratch, *tile)
-                        {
-                            changes.push((*tile, holder));
+                        let decided = decide(grid, terrain, cities, *tile);
+                        #[cfg(feature = "census-holding")]
+                        census::record_decide(
+                            cities.len() as u64,
+                            false,
+                            decided != holders[tile.0 as usize],
+                        );
+                        if decided != holders[tile.0 as usize] {
+                            changes.push((*tile, decided));
                         }
                     }
                     *slot = changes;
                 }));
             }
             for handle in handles {
-                // A thread here reads shared memory and writes its own slot.
-                // The freshness of the derived unit structure was established
-                // once, before the walk started, so no thread can refuse.
+                // A thread here reads shared memory and writes its own slot,
+                // so it has no failure of its own.
                 handle.join().expect("a decide thread cannot fail");
             }
         });
         drop(decide_span);
 
         // The join and the write are one stage. The join is what fixes the
-        // order of the result, and the write is what the order is for, so a
-        // reader who wants to know what applying a decision costs wants both.
+        // order of the result, and the write is what the order is for.
         let _span = stage::open(Stage::HoldingApply);
         let changes = slots.combine(Vec::new(), |mut joined, slot| {
             joined.extend_from_slice(slot);
@@ -597,144 +693,109 @@ impl Holding {
         Ok(changes.len())
     }
 
-    /// Returns the tiles that this tick can change, in ascending tile order.
+    /// Returns one entry for each live city: its address, its faction and its
+    /// reach.
     ///
-    /// A tile inside a holding cannot change hands. Its holder draws support
-    /// from all six neighbours and from holding the tile, and no challenger
-    /// can raise more than that, so the list holds the edge of a holding and
-    /// not its area.[^1]
+    /// The list is in settlement slot order, which is the order the tie rule
+    /// of the decision reads.[^1]
     ///
-    /// **The answer is a set, so the pass builds a set and not a list.** One
-    /// bit for each tile of the world holds it. A tile that two sources reach
-    /// sets the same bit twice, and the scan that reads the bits back visits
-    /// the words in ascending order, so the result is in ascending tile order
-    /// with no sort. The earlier pass pushed one index for every tile the
-    /// sources touched and then ordered them, which cost a comparison sort
-    /// over a list several times longer than the answer.[^2]
+    /// **The reach counts the finished upgrades on the ground the city held
+    /// at the end of the previous step.** The holder column names a faction
+    /// and not a city, so a finished upgrade on the ground of one faction
+    /// counts for the nearest city of that faction, and a tie between two
+    /// such cities goes to the lower slot. The count therefore reads the
+    /// column as the previous step left it, and the rule has no
+    /// recursion.[^1] An upgrade under construction counts for nothing.
     ///
-    /// The bit plane covers the world, so its size follows the lattice and
-    /// not the population.[^3] The pass allocates it here rather than holding
-    /// it, because it carries nothing between frames and the holding would
-    /// then copy it on every clone.
+    /// The cost is the finished upgrade entries multiplied by the live
+    /// cities. It reads no tile of the world.
     ///
     /// # References
     ///
-    /// [^1]: ADR-0053, a faction is a bit in a mask, and a relation is a plane, decision D4. `docs/adrs/accepted/adr-0053-a-faction-is-a-bit-in-a-mask-and-a-relation-is-a-plane.md`
-    /// [^2]: Findings register, FND-285. `docs/FINDINGS.md`
-    /// [^3]: ADR-0096, cost follows the lattice, not the population. `docs/adrs/draft/adr-0096-cost-follows-the-lattice-not-the-population.md`
-    fn candidates(&self, arena: &SoldierArena, threads: usize) -> Vec<TileIdx> {
+    /// [^1]: ADR-0150, held ground is the ground within reach of a city its faction owns, decision D2. `docs/adrs/draft/adr-0150-held-ground-is-the-ground-within-reach-of-a-city-its-faction-owns.md`
+    #[must_use]
+    pub fn cities(&self, settlements: &SettlementArena, upgrades: &UpgradeMap) -> Vec<City> {
         let grid = self.layout.grid();
-        let tile_count = grid.tile_count();
-        let words = (tile_count as usize).div_ceil(64);
-        let holders = &self.holders[..];
+        let tiles = settlements.tile_column();
+        let factions = settlements.faction_column();
+        let live = settlements.live_column();
+        let mut finished = vec![0u32; live.len()];
+        for site in upgrades.sites() {
+            if !site.is_complete() {
+                continue;
+            }
+            let Some(holder) = self
+                .holders
+                .get(site.tile.0 as usize)
+                .and_then(|holder| holder.faction())
+            else {
+                continue;
+            };
+            let Some(address) = grid.address_of(site.tile) else {
+                continue;
+            };
+            let mut best: Option<(u32, usize)> = None;
+            for (slot, standing) in live.iter().enumerate() {
+                if *standing != 1 || factions[slot] != holder {
+                    continue;
+                }
+                let Some(seat) = grid.address_of(tiles[slot]) else {
+                    continue;
+                };
+                let distance = address.distance(seat);
+                if best.is_none_or(|(nearest, _)| distance < nearest) {
+                    best = Some((distance, slot));
+                }
+            }
+            if let Some((_, slot)) = best {
+                finished[slot] += 1;
+            }
+        }
 
-        // The held list is divided into contiguous runs, one for each thread.
-        // The division is a function of the list and of the thread count, and
-        // of nothing else, so no thread claims the next piece.[^1]
-        //
-        // Each thread fills its own bit plane, and the join below reads the
-        // planes in slot order. No two threads write one word.[^1] The plane
-        // is the memory that this shape costs, and the record says so.[^1]
-        //
-        // A thread reports the words it touched. The held list is in
-        // ascending tile order, so a run of it reaches one window of the
-        // plane and the pages outside that window are never written and never
-        // read. The whole join therefore costs one plane and not one for each
-        // thread.
-        //
-        // [^1]: ADR-0009, parallel stages write disjoint outputs, decisions D1, D2 and D3. `docs/adrs/accepted/adr-0009-parallel-stages-write-disjoint-outputs.md`
-        // [^2]: Findings register, FND-286. `docs/FINDINGS.md`
-        let threads = threads.max(1);
-        let chunk_len = self.held.len().div_ceil(threads).max(1);
-        let slot_count = self.held.len().div_ceil(chunk_len).max(1);
-        // One allocation holds every plane, and a thread takes one chunk of
-        // it. A plane for each thread in its own allocation costs one mapping
-        // for each thread on every frame, and giving those mappings back
-        // reaches every core.[^2]
-        let mut planes: Vec<u64> = vec![0; slot_count * words];
-        let mut slots: Slots<(usize, usize)> = Slots::filled(slot_count, (words, 0))
-            .expect("a slot count of one or more names at least one slot");
-        std::thread::scope(|scope| {
-            let mut handles = Vec::new();
-            for ((chunk, plane), slot) in self
-                .held
-                .chunks(chunk_len)
-                .zip(planes.chunks_mut(words))
-                .zip(slots.entries_mut())
-            {
-                handles.push(scope.spawn(move || {
-                    let mut lowest = words;
-                    let mut highest = 0usize;
-                    for tile in chunk {
-                        let index = tile.0;
-                        if index >= tile_count {
-                            continue;
-                        }
-                        let holder = holders[index as usize];
-                        let (neighbours, found) = neighbour_indices(grid, index);
-                        // A tile at the edge of the world has fewer than six
-                        // neighbours, so it is never inside a holding. This is
-                        // what the earlier pass said by treating an absent
-                        // neighbour as a mismatch.
-                        let inside = found == NEIGHBOUR_COUNT
-                            && neighbours[..found]
-                                .iter()
-                                .all(|neighbour| holders[*neighbour as usize] == holder);
-                        if inside {
-                            continue;
-                        }
-                        mark(plane, index);
-                        lowest = lowest.min((index / 64) as usize);
-                        highest = highest.max((index / 64) as usize + 1);
-                        for neighbour in &neighbours[..found] {
-                            mark(plane, *neighbour);
-                            lowest = lowest.min((*neighbour / 64) as usize);
-                            highest = highest.max((*neighbour / 64) as usize + 1);
-                        }
+        live.iter()
+            .enumerate()
+            .filter(|(_, standing)| **standing == 1)
+            .filter_map(|(slot, _)| {
+                Some(City {
+                    slot: slot as u32,
+                    address: grid.address_of(tiles[slot])?,
+                    faction: factions[slot],
+                    reach: self.rules.reach_of(finished[slot]),
+                })
+            })
+            .collect()
+    }
+
+    /// Returns the tiles this rewrite can change, in ascending tile order.
+    ///
+    /// A tile changes only when a city reaches it, or when somebody holds it
+    /// now. Every other tile is held by nobody before the rewrite and after
+    /// it, so the pass never visits it. The cost is therefore the cities
+    /// multiplied by the area of the largest reach, plus the ground held, and
+    /// never the world.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0150, held ground is the ground within reach of a city its faction owns, decision D3. `docs/adrs/draft/adr-0150-held-ground-is-the-ground-within-reach-of-a-city-its-faction-owns.md`
+    fn candidates(&self, cities: &[City]) -> Vec<TileIdx> {
+        let grid = self.layout.grid();
+        let mut candidates: Vec<TileIdx> = Vec::with_capacity(self.held.len());
+        candidates.extend_from_slice(&self.held);
+        for city in cities {
+            let reach = city.reach as i32;
+            for dq in -reach..=reach {
+                let low = (-reach).max(-dq - reach);
+                let high = reach.min(-dq + reach);
+                for dr in low..=high {
+                    let address = Axial::new(city.address.q + dq, city.address.r + dr);
+                    if let Some(tile) = grid.index_of(address) {
+                        candidates.push(tile);
                     }
-                    *slot = (lowest, highest);
-                }));
-            }
-            for handle in handles {
-                // A thread here reads shared memory and writes its own chunk,
-                // so it has no failure of its own. A panic inside one is a
-                // defect, and it travels rather than being swallowed.
-                handle.join().expect("a candidate thread cannot fail");
-            }
-        });
-
-        let mut marked: Vec<u64> = vec![0; words];
-        for (plane, (lowest, highest)) in planes.chunks(words).zip(slots.entries()) {
-            for position in *lowest..*highest {
-                marked[position] |= plane[position];
+                }
             }
         }
-
-        // The arena iterates in slot order, which is fixed. The bit plane
-        // makes the answer independent of that anyway, because a set does not
-        // record the order in which it was filled.
-        let column = arena.tile_column();
-        for soldier in arena.iter() {
-            let tile = column[soldier.index() as usize];
-            if tile.0 < tile_count {
-                mark(&mut marked, tile.0);
-            }
-        }
-
-        // The count is read first so that the list is allocated once. It
-        // costs one pass over the words, which is small against the tiles the
-        // scan below emits.
-        let held_count: u32 = marked.iter().map(|word| word.count_ones()).sum();
-        let mut candidates: Vec<TileIdx> = Vec::with_capacity(held_count as usize);
-        for (position, word) in marked.iter().enumerate() {
-            let mut rest = *word;
-            let base = (position as u32) * 64;
-            while rest != 0 {
-                let bit = rest.trailing_zeros();
-                candidates.push(TileIdx(base + bit));
-                rest &= rest - 1;
-            }
-        }
+        candidates.sort_unstable();
+        candidates.dedup();
         candidates
     }
 
@@ -1012,291 +1073,65 @@ impl Holding {
     }
 }
 
-/// Sets the bit of one tile in a tile bit plane.
-#[inline]
-fn mark(marked: &mut [u64], tile: u32) {
-    let word = (tile / 64) as usize;
-    if let Some(entry) = marked.get_mut(word) {
-        *entry |= 1u64 << (tile % 64);
-    }
-}
-
-/// Returns the tile indices of the neighbours of one tile, and how many the
-/// world holds.
+/// One live city, as the decision reads it.
 ///
-/// The grid is axial and the index of an address is the row times the width
-/// plus the column, so each of the six directions is one fixed offset from
-/// the index.[^1] The address arithmetic is therefore one division for the
-/// tile and a comparison for each direction, rather than a conversion to an
-/// address and back for every neighbour.
-///
-/// The order is the direction order that the grid gives, and the entries
-/// after `found` hold nothing. A caller that needs to know which direction is
-/// absent asks the grid instead.
-///
-/// **This is a second way to say what the grid already says.** The test
-/// `neighbour_indices_agree_with_the_grid` derives both answers for every
-/// tile of a small world, edges included, and compares them.[^2]
+/// The list of these is in settlement slot order, and the tie rule of the
+/// decision takes the first entry at the nearest distance. The slot is
+/// carried so that a caller can name the city a reach belongs to.[^1]
 ///
 /// # References
 ///
-/// [^1]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
-/// [^2]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`
-#[inline]
-fn neighbour_indices(grid: Grid, tile: u32) -> ([u32; NEIGHBOUR_COUNT], usize) {
-    let width = grid.width();
-    let height = grid.height();
-    let column = tile % width;
-    let row = tile / width;
-    let mut neighbours = [0u32; NEIGHBOUR_COUNT];
-    let mut found = 0usize;
-    let mut take = |index: u32| {
-        neighbours[found] = index;
-        found += 1;
-    };
-    let east = column + 1 < width;
-    let west = column >= 1;
-    let north = row >= 1;
-    let south = row + 1 < height;
-    if east {
-        take(tile + 1);
-    }
-    if east && north {
-        take(tile + 1 - width);
-    }
-    if north {
-        take(tile - width);
-    }
-    if west {
-        take(tile - 1);
-    }
-    if west && south {
-        take(tile - 1 + width);
-    }
-    if south {
-        take(tile + width);
-    }
-    (neighbours, found)
+/// [^1]: ADR-0150, held ground is the ground within reach of a city its faction owns, decision D1. `docs/adrs/draft/adr-0150-held-ground-is-the-ground-within-reach-of-a-city-its-faction-owns.md`
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct City {
+    /// The settlement slot of the city.
+    pub slot: u32,
+    /// The address the city stands on.
+    pub address: Axial,
+    /// The faction that owns the city.
+    pub faction: FactionId,
+    /// How many hex steps the city reaches.
+    pub reach: u32,
 }
 
-/// The working memory of one thread that decides candidate tiles.
+/// Returns the holder of one tile, decided from the cities alone.
 ///
-/// The tally is indexed by the faction bit, and the supporter list names the
-/// entries that a tile wrote. A tile clears only what it wrote, so the cost of
-/// one tile does not grow with the width of the mask.
-#[derive(Clone, Debug)]
-struct Scratch {
-    tally: [u32; MASK_BITS as usize],
-    supporters: Vec<u16>,
-    /// How far the walk has reached inside each block of the derived unit
-    /// structure.[^1]
-    ///
-    /// # References
-    ///
-    /// [^1]: ADR-0018, the unit-to-tile bridge is derived, and it rebuilds at the barrier, decision D2. `docs/adrs/accepted/adr-0018-the-unit-to-tile-bridge-is-derived-and-rebuilds-at-the-barrier.md`
-    cursor: TileCursor,
-}
-
-impl Scratch {
-    /// Builds working memory in which no faction has support and no block has
-    /// been walked.
-    fn new(bridge: &UnitTileBridge) -> Self {
-        Self {
-            tally: [0; MASK_BITS as usize],
-            supporters: Vec::with_capacity(MASK_BITS as usize),
-            cursor: bridge.tile_cursor(),
-        }
-    }
-
-    /// Adds support for one faction.
-    fn raise(&mut self, faction: FactionId, amount: u32) {
-        let bit = faction.0 as usize;
-        if bit >= self.tally.len() {
-            return;
-        }
-        if self.tally[bit] == 0 {
-            self.supporters.push(faction.0);
-        }
-        self.tally[bit] += amount;
-    }
-
-    /// Returns the support one faction raised.
-    fn support(&self, faction: FactionId) -> u32 {
-        self.tally
-            .get(faction.0 as usize)
-            .copied()
-            .unwrap_or_default()
-    }
-
-    /// Clears what the last tile wrote.
-    fn clear(&mut self) {
-        for faction in self.supporters.drain(..) {
-            self.tally[faction as usize] = 0;
-        }
-    }
-}
-
-/// Decides the holder of one candidate tile, or `None` when it does not
-/// change hands.
+/// The nearest city within reach wins. Two cities at one distance resolve by
+/// the lower settlement slot, and the list is in slot order, so the strict
+/// comparison below keeps the first of them. A tile that no city reaches is
+/// held by nobody, and ground that admits no unit is held by nobody whatever
+/// reaches it.[^1]
 ///
-/// The decision reads the holders of the previous tick and never a holder
-/// that this tick wrote, so it is a pure function of the tile and of the
-/// world before it.[^1]
+/// The call reads no holder, so it is a pure function of the tile, the
+/// terrain and the city list. Two threads that decide two tiles therefore
+/// share nothing.[^2]
 ///
 /// # References
 ///
-/// [^1]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
-fn decide(
-    layout: BlockLayout,
-    terrain: Terrain,
-    holders: &[Holder],
-    arena: &SoldierArena,
-    bridge: &UnitTileBridge,
-    scratch: &mut Scratch,
-    tile: TileIdx,
-) -> Option<Holder> {
-    let grid = layout.grid();
-    scratch.clear();
-    let address = grid.address_of(tile)?;
-
-    // The neighbour index of a tile is one fixed offset from the index, so
-    // this reads the holder column directly rather than converting to an
-    // address and back for each of the six directions.
-    let (neighbours, found) = neighbour_indices(grid, tile.0);
-    for index in &neighbours[..found] {
-        if let Some(faction) = holders[*index as usize].faction() {
-            scratch.raise(faction, 1);
-        }
-    }
-    for unit in bridge.units_on_tile(&mut scratch.cursor, tile) {
-        if let Some(faction) = arena.faction(*unit) {
-            scratch.raise(faction, PRESENCE_SUPPORT);
-        }
-    }
-
-    let current = holders[tile.0 as usize];
-    // A challenger must beat the holder rather than match it. The strict
-    // comparison below is the whole of that rule, and it is stated once. A
-    // second constant that added to the support of the holder would be the
-    // same rule in two places.[^1]
-    //
-    // [^1]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`
-    let incumbent = match current.faction() {
-        Some(faction) => scratch.support(faction),
-        None => 0,
+/// [^1]: ADR-0150, held ground is the ground within reach of a city its faction owns, decision D1. `docs/adrs/draft/adr-0150-held-ground-is-the-ground-within-reach-of-a-city-its-faction-owns.md`
+/// [^2]: ADR-0009, parallel stages write disjoint outputs, decision D1. `docs/adrs/accepted/adr-0009-parallel-stages-write-disjoint-outputs.md`
+fn decide(grid: Grid, terrain: Terrain, cities: &[City], tile: TileIdx) -> Holder {
+    let Some(address) = grid.address_of(tile) else {
+        return Holder::NOBODY;
     };
-
-    // The stable key is the support in descending order, then the faction
-    // identifier in ascending order.[^1]
-    //
-    // **The key is stated in the comparison and never in an ordering of the
-    // supporters.** The list used to be sorted so that ascending identifier
-    // order plus a strict comparison would give the key. The comparison below
-    // gives the same key from any order, so the sort is gone and the result no
-    // longer depends on one.
-    //
-    // The pass read about five million candidates on each frame and sorted
-    // every one of them, while about a quarter raised more than one supporter
-    // and could have been decided by any of them.[^2]
-    //
-    // [^1]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
-    // [^2]: Findings register, FND-309. `docs/FINDINGS.md`
-    #[cfg(feature = "census-holding")]
-    let raised = scratch.supporters.len() as u64;
-    let mut best: Option<(u32, u16)> = None;
-    for faction in &scratch.supporters {
-        if current.faction() == Some(FactionId(*faction)) {
+    // The ground is read first, because it refuses every city at once. No
+    // faction holds ground that admits no unit, and the invariant check names
+    // a tile that breaks it.
+    if !terrain.kind(address).is_some_and(TileKind::is_passable) {
+        return Holder::NOBODY;
+    }
+    let mut best: Option<(u32, FactionId)> = None;
+    for city in cities {
+        let distance = address.distance(city.address);
+        if distance > city.reach {
             continue;
         }
-        let support = scratch.tally[*faction as usize];
-        if support <= incumbent {
-            continue;
-        }
-        if best.is_none_or(|(top, leader)| support > top || (support == top && *faction < leader)) {
-            best = Some((support, *faction));
+        if best.is_none_or(|(nearest, _)| distance < nearest) {
+            best = Some((distance, city.faction));
         }
     }
-    #[cfg(feature = "census-holding")]
-    census::record_decide(raised, raised > 1, best.is_some());
-    let (support, faction) = best?;
-
-    // **The ground is read last, because it can only refuse.** It says how
-    // much support the tile asks for, and open water asks for more than any
-    // claim can raise. A tile whose best challenger does not beat the holder
-    // keeps its holder whatever the ground says, so the read is skipped for
-    // it. Reading the ground first cost a generated value for every candidate
-    // tile, and most candidates have no challenger.[^1]
-    //
-    // The threshold is one number for the tile, so the strongest challenger
-    // is the one most likely to reach it. A challenger that the threshold
-    // refuses is refused for every weaker challenger too.
-    //
-    // [^1]: Findings register, FND-299. `docs/FINDINGS.md`
-    let threshold = claim_threshold(terrain.kind(address)?)?;
-    if support < threshold {
-        // The ground either admits no holder at all, or asks for more support
-        // than the challenger raised. A tile of open water that somebody held
-        // would be a defect, and the invariant check names it.
-        return None;
-    }
-
-    Some(Holder::of(FactionId(faction)))
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    /// The candidate pass derives a neighbour index from an offset. The grid
-    /// derives it from an address. Two sites state one fact, so this test
-    /// derives both for every tile of a small world and compares them.[^1]
-    ///
-    /// The world is deliberately small and not square, so that every edge,
-    /// every corner and the wrap between two rows is covered.
-    ///
-    /// # References
-    ///
-    /// [^1]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`
-    #[test]
-    fn neighbour_indices_agree_with_the_grid() {
-        let grid = Grid::new(7, 5).expect("the extent must describe a grid");
-        for tile in 0..grid.tile_count() {
-            let address = grid
-                .address_of(TileIdx(tile))
-                .expect("the index is inside the world");
-            let expected: Vec<u32> = grid
-                .neighbours(address)
-                .into_iter()
-                .flatten()
-                .filter_map(|neighbour| grid.index_of(neighbour))
-                .map(|index| index.0)
-                .collect();
-            let (found, count) = neighbour_indices(grid, tile);
-            assert_eq!(
-                &found[..count],
-                &expected[..],
-                "the two derivations disagree at tile {tile}"
-            );
-        }
-    }
-
-    /// A bit plane holds a set, and the scan reads it back in ascending
-    /// order. This proves the two halves of that against a small case.
-    #[test]
-    fn a_marked_bit_plane_reads_back_in_ascending_order() {
-        let mut marked = vec![0u64; 3];
-        for tile in [130u32, 0, 63, 64, 130] {
-            mark(&mut marked, tile);
-        }
-        mark(&mut marked, 500);
-        let mut read: Vec<u32> = Vec::new();
-        for (position, word) in marked.iter().enumerate() {
-            let mut rest = *word;
-            while rest != 0 {
-                read.push((position as u32) * 64 + rest.trailing_zeros());
-                rest &= rest - 1;
-            }
-        }
-        assert_eq!(read, vec![0, 63, 64, 130]);
+    match best {
+        Some((_, faction)) => Holder::of(faction),
+        None => Holder::NOBODY,
     }
 }

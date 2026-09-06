@@ -39,10 +39,11 @@ HOST_UNITS_ON_THE_VISITED_TILE = 3
 
 
 def _garrison(world: cachette.World) -> None:
-    """Fill a square with host units and run the world until it holds."""
+    """Found a host city, fill a square with host units, and run the world."""
     addresses = [
         (CORNER[0] + column, CORNER[1] + row) for row in range(8) for column in range(8)
     ]
+    world.found_settlements([(CORNER[0] + 4, CORNER[1] + 4)], faction=HOST)
     world.spawn_soldiers(addresses, HOST)
     for _ in range(6):
         world.step(threads=1)
@@ -123,6 +124,7 @@ def test_the_answer_does_not_change_with_the_thread_count() -> None:
             for row in range(8)
             for column in range(8)
         ]
+        world.found_settlements([(CORNER[0] + 4, CORNER[1] + 4)], faction=HOST)
         world.spawn_soldiers(addresses, HOST)
         for _ in range(6):
             world.step(threads=threads)

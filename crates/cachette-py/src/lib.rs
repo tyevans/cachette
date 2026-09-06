@@ -793,6 +793,66 @@ impl PyWorld {
             .map_err(|error| ViewError::new_err(error.to_string()))
     }
 
+    /// Reports whether one faction holds one tile.
+    ///
+    /// `faction` is a faction number, counted from zero. `q` and `r` are the
+    /// address of the tile. Returns a `bool`.
+    ///
+    /// **A faction holds the ground its cities reach.** A tile that no city
+    /// of the faction reaches is not held by it, whatever stands on the
+    /// tile.[^1]
+    ///
+    /// The answer states the world as the last step left it.
+    ///
+    /// # Errors
+    ///
+    /// Raises `ViewError` when the world holds no such faction, and when the
+    /// address lies outside the world.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0150, held ground is the ground within reach of a city its faction owns, decision D1. `docs/adrs/draft/adr-0150-held-ground-is-the-ground-within-reach-of-a-city-its-faction-owns.md`
+    fn holds(&self, faction: u16, q: i32, r: i32) -> PyResult<bool> {
+        let world = self.lock();
+        let factions = world.config().faction_count;
+        if faction >= factions {
+            return Err(ViewError::new_err(format!(
+                "the faction {faction} is outside a world of {factions} factions"
+            )));
+        }
+        world
+            .holds(FactionId(faction), Axial::new(q, r))
+            .ok_or_else(|| {
+                ViewError::new_err(format!("the address ({q}, {r}) is outside the world"))
+            })
+    }
+
+    /// Returns how far one city reaches, in hex steps.
+    ///
+    /// `site` is a settlement identity, as `found_settlements` returns them.
+    /// Returns an `int`.
+    ///
+    /// **The reach is a base plus one step for each block of finished
+    /// upgrades on the ground the city held at the end of the previous
+    /// step, and it never passes a bound.**[^1] The three values are balance
+    /// values, and the register holds the rows.[^2]
+    ///
+    /// # Errors
+    ///
+    /// Raises `ViewError` when the identity names no live settlement.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0150, held ground is the ground within reach of a city its faction owns, decision D2. `docs/adrs/draft/adr-0150-held-ground-is-the-ground-within-reach-of-a-city-its-faction-owns.md`
+    /// [^2]: Balance register, the holding. `docs/reference/balance.md`
+    fn city_reach(&self, site: u64) -> PyResult<u32> {
+        let world = self.lock();
+        let entity = resolve_site(&world, site)?;
+        world
+            .city_reach(entity)
+            .ok_or_else(|| ViewError::new_err(format!("the identity {site} names no live city")))
+    }
+
     /// Copies the tile holder column into a new NumPy array.
     ///
     /// Returns a one-dimensional array of `numpy.uint16`, one entry for each
@@ -1643,10 +1703,19 @@ impl PyWorld {
         // The set form is the one path the controller takes too, so one loop
         // serves both callers.
         let refused = world.order_build_set(&resolved, kind);
-        assert_eq!(
-            refused, 0,
-            "a resolved identity must name a soldier the arena can order"
-        );
+        // A build outside the builder's own ground is refused, unless the
+        // kind is a road.[^6] The verb answers with a count, and the boundary
+        // turns that count into an error rather than a silent partial order.
+        //
+        // [^6]: ADR-0150, held ground is the ground within reach of a city its faction owns, decision D4. `docs/adrs/draft/adr-0150-held-ground-is-the-ground-within-reach-of-a-city-its-faction-owns.md`
+        if refused > 0 {
+            return Err(VerbError::new_err(format!(
+                "the world refused {refused} of {} build orders, because a unit \
+                 builds only on ground its own faction holds, and only a road \
+                 elsewhere",
+                resolved.len()
+            )));
+        }
         Ok(())
     }
 

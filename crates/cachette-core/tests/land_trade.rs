@@ -15,7 +15,7 @@
 //! [^1]: Testing Rules, section 5. `.claude/rules/testing.md`
 //! [^2]: Testing Rules, section 2a. `.claude/rules/testing.md`
 
-use cachette_core::holding::Holder;
+use cachette_core::holding::{Holder, ReachRules};
 use cachette_core::terrain::TileKind;
 use cachette_core::upgrade::UpgradeKind;
 use cachette_core::{
@@ -210,26 +210,22 @@ fn a_world_with_an_edge_cell() -> (World, Vec<TileIdx>) {
         let all_land = cell
             .iter()
             .all(|tile| world.tile_kind(address_of(&world, *tile)) != Some(TileKind::Water));
-        let left = world
-            .grid()
-            .index_of(Axial::new(0, 0))
-            .expect("the origin is inside");
         let left_is_land = world.tile_kind(Axial::new(0, 0)) != Some(TileKind::Water);
         if !all_land || !left_is_land {
             continue;
         }
-        // Four units meet the claim threshold of every kind of ground.
-        for tile in &cell {
-            for _ in 0..4 {
-                world
-                    .spawn_soldier(address_of(&world, *tile), ZERO)
-                    .expect("the spawn must succeed");
-            }
+        // A faction holds the ground its city reaches, so each faction founds
+        // one. The reach covers the whole edge cell and does not carry the
+        // one city as far as the other.[^1]
+        //
+        // [^1]: ADR-0150, held ground is the ground within reach of a city its faction owns, decisions D1 and D2. `docs/adrs/draft/adr-0150-held-ground-is-the-ground-within-reach-of-a-city-its-faction-owns.md`
+        world.set_reach_rules(ReachRules::new(20, 1, 20));
+        let middle = address_of(&world, cell[cell.len() / 2]);
+        if world.found_settlement(middle, ZERO).is_err() {
+            continue;
         }
-        for _ in 0..4 {
-            world
-                .spawn_soldier(address_of(&world, left), ONE)
-                .expect("the spawn must succeed");
+        if world.found_settlement(Axial::new(0, 0), ONE).is_err() {
+            continue;
         }
         world.step(1).expect("the step must run");
         let held = cell
