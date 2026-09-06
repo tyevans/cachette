@@ -540,7 +540,7 @@ FAR_BELOW_EVERY_EDGE = -(1 << 20)
 
 
 def _worker_columns(world: cachette.World) -> dict[str, int]:
-    """Return the six columns beyond attack and armour, as the worker holds them.
+    """Return the columns beyond attack and armour, as the worker holds them.
 
     The worker is row zero of the table a new world is built with. The values
     are read from the engine rather than written here, so the test holds no
