@@ -222,6 +222,24 @@ pub const fn divide_by_count(total: Accum, count: u32) -> Option<Fix32> {
     Some(Fix32(saturate_i32(total.0 / (count as i64))))
 }
 
+/// Narrows an accumulator into the fixed-point range, saturating.
+///
+/// A pass that sums a per-item quantity over a whole count holds the total in
+/// an accumulator, because the accumulator is the width that a sum over the
+/// world cannot overflow.[^1] A pass that then writes the total into a
+/// fixed-point column needs this one narrowing, and it must saturate rather
+/// than wrap, because a wrap turns a large value into a large negative
+/// one.[^2]
+///
+/// # References
+///
+/// [^1]: ADR-0002, simulated and aggregated state holds no floating point number, decision D1. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
+/// [^2]: ADR-0002, simulated and aggregated state holds no floating point number, decision D3. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
+#[must_use]
+pub const fn narrow(total: Accum) -> Fix32 {
+    Fix32(saturate_i32(total.0))
+}
+
 /// Clamps a 128-bit value into the accumulator range.
 const fn saturate_i64(value: i128) -> i64 {
     if value > i64::MAX as i128 {

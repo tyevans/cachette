@@ -9466,6 +9466,107 @@ impl World {
         Ok(())
     }
 
+    /// Gives the champion of each killer faction the renown its units earned.
+    ///
+    /// # Why this exists
+    ///
+    /// **This is the one source of renown in the engine.** A win path reads
+    /// the renown column, and the standing reading reports it, and no pass
+    /// wrote it. The path could therefore never fire and the reading never
+    /// moved. A quantity that only a reader touches states a capability the
+    /// engine does not have.[^1]
+    ///
+    /// # What it does
+    ///
+    /// The contest of this frame states, for each pair, which faction felled
+    /// how many units of which other faction. The killer of each pair earns
+    /// one share of renown for each unit it felled, and the share is a
+    /// balance value.[^2]
+    ///
+    /// **The renown goes to one character and not to the faction.** The
+    /// reader takes the highest renown among the live characters of a
+    /// faction, so renown spread over every character would never reach the
+    /// target and the source would stay inert. The champion of a faction is
+    /// its live character with the highest renown, and a tie goes to the
+    /// lowest identity.
+    ///
+    /// A faction with no live character earns nothing. Renown is a property
+    /// of a person, and a faction that has promoted nobody has no person to
+    /// carry it.
+    ///
+    /// # Determinism
+    ///
+    /// The scan visits the character arena in slot order and replaces the
+    /// champion only on a strictly greater key, so the answer is a property
+    /// of the arena and never of a thread.[^3] The gains are summed into
+    /// 64-bit accumulators, which combine in any order, and every value is a
+    /// fixed-point value or a whole number.[^4] The renown column already
+    /// enters the state hash.
+    ///
+    /// # Cost
+    ///
+    /// The scan walks the character arena, whose ceiling the character tier
+    /// declares, and never the unit population.[^5]
+    ///
+    /// # References
+    ///
+    /// [^1]: Recurring defect shapes, shape 3. `.agents/rules/recurring-defects.md`
+    /// [^2]: Balance register, the renown target. `docs/reference/balance.md`
+    /// [^3]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
+    /// [^4]: ADR-0002, simulated and aggregated state holds no floating point number, decision D1. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
+    /// [^5]: ADR-0054, an entity belongs to one of three tiers, declared at creation, decision D3. `docs/adrs/accepted/adr-0054-an-entity-belongs-to-one-of-three-tiers-declared-at-creation.md`
+    fn award_renown(&mut self) {
+        let factions = usize::from(self.config.faction_count.max(1));
+        let mut earned = vec![Accum(0); factions];
+        let mut any = false;
+        for grievance in &self.grievances {
+            let Some(slot) = earned.get_mut(usize::from(grievance.killer.0)) else {
+                continue;
+            };
+            *slot = sim_math::combine(
+                *slot,
+                sim_math::scale_by_count(contest::RENOWN_PER_FELL, grievance.count),
+            );
+            any = true;
+        }
+        if !any {
+            return;
+        }
+        // The champion of each faction: the live character with the highest
+        // renown, and the lowest identity among equals.
+        let mut champions: Vec<Option<(Fix32, u64, Entity)>> = vec![None; factions];
+        for character in self.characters.iter() {
+            let (Some(faction), Some(renown)) = (
+                self.characters.faction(character),
+                self.characters.renown(character),
+            ) else {
+                continue;
+            };
+            let Some(slot) = champions.get_mut(usize::from(faction.0)) else {
+                continue;
+            };
+            let bits = character.to_bits();
+            let better = match slot {
+                Some((best, best_bits, _)) => (renown.0, *best_bits) > (best.0, bits),
+                None => true,
+            };
+            if better {
+                *slot = Some((renown, bits, character));
+            }
+        }
+        for (index, gain) in earned.iter().copied().enumerate() {
+            if gain.0 == 0 {
+                continue;
+            }
+            let Some(Some((renown, _, champion))) = champions.get(index).copied() else {
+                continue;
+            };
+            let raised = sim_math::add(renown, sim_math::narrow(gain));
+            let wrote = self.characters.set_renown(champion, raised);
+            debug_assert!(wrote, "the scan above found the character live");
+        }
+    }
+
     /// Resolves every meeting of this frame and ends the units that fell.
     ///
     /// The pass marks in parallel and applies in one ascending scan of the
@@ -9511,6 +9612,7 @@ impl World {
             self.relations
                 .on_units_fell(tick, grievance.victim, grievance.killer, grievance.count);
         }
+        self.award_renown();
         for slot in order {
             let index = slot as usize;
             let tile = self.soldiers.tile_column()[index];
