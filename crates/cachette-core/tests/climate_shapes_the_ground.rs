@@ -192,15 +192,12 @@ fn shaped_ground_of(
             let Some(slot) = ground.get_mut(layout.block_of_key(key) as usize) else {
                 continue;
             };
-            *slot = slot.combine(CellGround {
-                height_total: cachette_core::sim_math::accumulate(
-                    cachette_core::types::Accum(0),
-                    tile.height,
-                )
-                .0,
-                tiles: 1,
-                open_tiles: i32::from(tile.kind.is_passable()),
-            });
+            // The fold of one tile into a cell has one declaration site, and
+            // this fixture calls it rather than holding a second copy. The
+            // copy went stale when the ground gained the water height.[^1]
+            //
+            // [^1]: Recurring Defect Shapes, shape 1. `.agents/rules/recurring-defects.md`
+            *slot = slot.combine(CellGround::of_tile(tile));
         }
     }
     ground
