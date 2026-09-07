@@ -14,6 +14,13 @@ References
 ``docs/product/accepted/prd-0056-a-learner-plays-one-faction-against-the-controllers.md``
 """
 
+from cachette.learn.env import (
+    FACTION_SCOPED_READERS,
+    Env,
+    EnvConfig,
+    StepResult,
+    VectorEnv,
+)
 from cachette.learn.reward import (
     OUTCOMES,
     RUNNING,
@@ -28,14 +35,19 @@ from cachette.learn.reward import (
 )
 
 __all__ = [
+    "FACTION_SCOPED_READERS",
     "OUTCOMES",
     "RUNNING",
     "SHAPED_ROWS",
     "TERMINAL_ROWS",
     "UNSET_WEIGHTING",
+    "Env",
+    "EnvConfig",
     "Reward",
     "RewardStep",
+    "StepResult",
     "TermError",
     "UnsetWeightError",
+    "VectorEnv",
     "Weighting",
 ]

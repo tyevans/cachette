@@ -39,6 +39,7 @@ module, decision D1.
 """
 
 from cachette._core import (
+    Batch,
     CachetteError,
     Camera,
     ConfigError,
@@ -47,6 +48,7 @@ from cachette._core import (
     FrameError,
     SelectorError,
     StepError,
+    StepRow,
     VerbError,
     ViewError,
     World,
@@ -56,6 +58,7 @@ from cachette._core import (
 )
 
 __all__ = [
+    "Batch",
     "CachetteError",
     "Camera",
     "ConfigError",
@@ -64,6 +67,7 @@ __all__ = [
     "FrameError",
     "SelectorError",
     "StepError",
+    "StepRow",
     "VerbError",
     "ViewError",
     "World",
