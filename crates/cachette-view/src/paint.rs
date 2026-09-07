@@ -300,8 +300,9 @@ pub const BACKGROUND: u32 = 0x0010_1418;
 /// [^1]: ADR-0067, the viewer reads the world and never writes to it, decision D2. `docs/adrs/accepted/adr-0067-the-viewer-reads-the-world-and-never-writes-to-it.md`
 /// [^2]: ADR-0068, terrain is generated from the seed and is never stored as a map, decision D4. `docs/adrs/accepted/adr-0068-terrain-is-generated-from-the-seed-and-is-never-stored-as-a-map.md`
 const KIND_COLOURS: [u32; KIND_COUNT] = [
-    // Water. Deep blue, and the only kind that admits no unit.
-    0x0012_3c5e,
+    // Water. One blue, and the drawing gives it no shade of its own. The
+    // constant below states why.
+    WATER_COLOUR,
     // Plain. Open green, leaning yellow.
     0x0055_6b2a,
     // Forest. Deep green, leaning blue, so that the height shading can never
@@ -314,6 +315,32 @@ const KIND_COLOURS: [u32; KIND_COUNT] = [
     // Mountain. Bare grey.
     0x0070_7478,
 ];
+
+/// The one colour that every tile of open water draws in.
+///
+/// **Open water carries one treatment over the whole map.** The ground layers
+/// that shade a land tile say nothing true about the sea, so the drawing
+/// stops each of them at the water line and paints one blue instead.
+///
+/// The height used to shade a water tile the way it shades a hill, so the sea
+/// held a spread of brightness steps that a watcher read as depth. The depth
+/// is not a fact a player can act on: the terrain capacity table gives every
+/// water tile the same capacity, so a unit that carries a water crossing
+/// crosses the deepest tile and the shallowest one alike.[^1] The wet ground
+/// field added blue on top of that, over a sea that is already water, and it
+/// covered part of the map and not the rest.
+///
+/// The value sits at the middle of the brightness the sea used to hold, so
+/// the map keeps the weight it had and loses only the variation.
+///
+/// The weather wash and the overlay the watcher chose still cross the water.
+/// Those are layers over the map, and they cover the land in the same colour
+/// at the same weight, so they are not a treatment of the water.
+///
+/// # References
+///
+/// [^1]: ADR-0145, a unit type is a row of capability columns, and zero means cannot, decision D2. `docs/adrs/accepted/adr-0145-a-unit-type-is-a-row-of-capability-columns-and-zero-means-cannot.md`
+const WATER_COLOUR: u32 = 0x001c_4870;
 
 /// The number of brightness steps that the height gives a tile.
 ///
@@ -1903,12 +1930,17 @@ pub fn canvas_for(world: &World, long_side: usize) -> (usize, usize) {
     )
 }
 
-/// Returns the colour of one tile.
+/// Returns the colour of the ground of one tile.
 ///
 /// The kind chooses the colour and the height brightens it, so a person reads
 /// the relief of the ground as well as its kind.[^1] The food the tile still
 /// holds brightens it further, so a person reads where the food is and
-/// watches a deposit drain and recover.[^3]
+/// watches a deposit drain and recover.[^3] Wet ground draws bluer than dry
+/// ground.
+///
+/// **Open water takes one colour and none of the layers above.** This is the
+/// one place that states it, so a caller cannot reach a water tile through a
+/// path that shades it.[^4]
 ///
 /// The height is a fixed-point number in the engine and the food is a whole
 /// number of units. The viewer turns both into a brightness. That is a
@@ -1920,7 +1952,11 @@ pub fn canvas_for(world: &World, long_side: usize) -> (usize, usize) {
 /// [^1]: PRD-0003, a developer sees a world worth looking at. `docs/product/accepted/prd-0003-a-developer-sees-a-world-worth-looking-at.md`
 /// [^2]: ADR-0067, the viewer reads the world and never writes to it, decision D3. `docs/adrs/accepted/adr-0067-the-viewer-reads-the-world-and-never-writes-to-it.md`
 /// [^3]: ADR-0072, a tile stock is generated, and only what was taken is stored, decision D4. `docs/adrs/accepted/adr-0072-a-tile-stock-is-generated-and-only-what-was-taken-is-stored.md`
-fn tile_colour(kind: TileKind, height: i32, food: u32) -> u32 {
+/// [^4]: Recurring Defect Shapes, shape 1. `.claude/rules/recurring-defects.md`
+fn tile_colour(kind: TileKind, height: i32, food: u32, wet: bool) -> u32 {
+    if matches!(kind, TileKind::Water) {
+        return WATER_COLOUR;
+    }
     let base = KIND_COLOURS[kind.to_u8() as usize];
     // The height is a fraction of the full range in Q16.16, so the unit is
     // 65536. The shift maps the fraction onto the brightness steps.
@@ -1931,7 +1967,15 @@ fn tile_colour(kind: TileKind, height: i32, food: u32) -> u32 {
     // the viewer chose, so a tile above it draws the same as a tile at it.
     let stock = food.min(FOOD_AT_FULL_SHADE) as i32;
     let share = (stock * FOOD_SATURATION) / FOOD_AT_FULL_SHADE as i32;
-    saturated(lit, share)
+    let dressed = saturated(lit, share);
+    // Wet ground draws bluer than dry ground. The field answers a tile from
+    // the cell that covers it, so every tile of one cell darkens together and
+    // the picture shows the lattice.
+    if wet {
+        wetted(dressed, WET_BLUE_GAIN)
+    } else {
+        dressed
+    }
 }
 
 /// Returns a colour with its channels moved away from their own mean.
@@ -1978,7 +2022,7 @@ fn wetted(colour: u32, gain: i32) -> u32 {
 /// [^1]: ADR-0067, the viewer reads the world and never writes to it, decision D2. `docs/adrs/accepted/adr-0067-the-viewer-reads-the-world-and-never-writes-to-it.md`
 #[must_use]
 pub fn kind_colour(kind: TileKind) -> u32 {
-    tile_colour(kind, 0x0000_8000, 0)
+    tile_colour(kind, 0x0000_8000, 0, false)
 }
 
 /// Draws the world onto the canvas.
@@ -2083,15 +2127,12 @@ pub fn draw_paced(
             else {
                 continue;
             };
-            let mut ground_colour = tile_colour(ground.kind, ground.height.0, food.0);
-            // Wet ground draws darker than dry ground. The field answers a
-            // tile from the cell that covers it, so every tile of one cell
-            // darkens together and the picture shows the lattice.[^7] The
-            // read costs one array read through the cell of the tile, and a
-            // dry world skips it.
-            if !dry && world.ground_is_wet(address) == Some(true) {
-                ground_colour = wetted(ground_colour, WET_BLUE_GAIN);
-            }
+            // Wet ground draws bluer than dry ground.[^7] The read costs one
+            // array read through the cell of the tile, and a dry world skips
+            // it. The drawing of the ground decides what the wet field does,
+            // and open water refuses it there.
+            let wet = !dry && world.ground_is_wet(address) == Some(true);
+            let mut ground_colour = tile_colour(ground.kind, ground.height.0, food.0, wet);
             // The water in the air over this tile, mixed into the ground
             // before the holder takes its share. A storm used to cover the
             // finished pixel at a weight near the holder weight, in a colour
