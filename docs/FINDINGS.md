@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-579**
+**Next number: FND-581**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -14214,7 +14214,7 @@ learner at the start of a run pays for the ground it has walked. A record says
 that fog storage grows with observed area, and the read now grows the same
 way.[^F572E]
 
-### FND-580 — The campaign takes no argument position, and the record's context reads as if it takes two
+### FND-579 — The campaign takes no argument position, and the record's context reads as if it takes two
 
 **Believed.** ADR-0176 replaces the fixed verb-target-magnitude triple because
 the choice enumeration does not have that shape. Its context names the campaign
@@ -14252,7 +14252,7 @@ counts. Nothing in it follows the population, so the legality answer that names
 one byte for each row stays affordable. A benchmark measures it beside one
 step, and a blocker keeps every figure of it derived.[^28]
 
-### FND-581 — The legality answer and the verb disagreed on the project order, and only the agreement test saw it
+### FND-580 — The legality answer and the verb disagreed on the project order, and only the agreement test saw it
 
 **Believed.** The three gates the project order reads before it moves a unit are
 the whole of its refusal: the faction holds a project, no campaign holds the
