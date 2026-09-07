@@ -204,6 +204,7 @@ def test_the_standing_of_a_faction_names_every_path_and_the_paths_are_four() -> 
     assert list(standing) == [
         "held_tiles",
         "seats_held",
+        "live_units",
         "store_total",
         "best_renown",
         "wonder_progress",
@@ -230,7 +231,9 @@ def test_a_character_at_the_renown_target_ends_the_game_by_renown() -> None:
     world.spawn_soldiers([address], faction=0)
     world.spawn_soldiers([address], faction=1)
     person = world.create_characters(faction=1, count=1)[0]
-    target = 100 << 16
+    # The engine states the target, and this test reads it. A copy here went
+    # stale the day the project owner raised the bar.
+    target = world.renown_target
     world.set_character_renown([int(person)], target - 1)
     world.step(1)
     assert world.game_end() is None

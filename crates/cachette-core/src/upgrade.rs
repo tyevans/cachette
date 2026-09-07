@@ -726,6 +726,13 @@ pub const STORE_CAPACITY_RAISE: u32 = 64 << 16;
 /// [^2]: ADR-0173, the wealth or wonder path has no reader, decisions D1 and D3. `docs/adrs/draft/adr-0173-the-wealth-or-wonder-path-has-no-reader.md`
 pub const WONDER_VICTORY_CLAIM: u32 = 1;
 
+/// The level of the upgrade table row that holds the wonder.
+///
+/// The wonder is one row, and this constant names its level once. The default
+/// table writes the row at this level, and a caller that changes the work or
+/// the victory claim of the wonder changes the row at this level.
+pub const WONDER_LEVEL: u8 = 1;
+
 /// The value that says a row asks for the builder's own ground.
 ///
 /// The column is a whole number and the rule it holds is a yes or a no. The
@@ -892,7 +899,7 @@ pub const DEFAULT_UPGRADE_TABLE: UpgradeTable = {
         own_ground_required: OWN_GROUND_REQUIRED,
         ..UpgradeRow::NONE
     };
-    rows[row_at(UpgradeCategory::WONDER, 1)] = UpgradeRow {
+    rows[row_at(UpgradeCategory::WONDER, WONDER_LEVEL)] = UpgradeRow {
         ground_fit: FITS_EVERY_LAND,
         work: WONDER_WORK,
         victory_claim: WONDER_VICTORY_CLAIM,

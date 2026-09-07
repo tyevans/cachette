@@ -27,6 +27,7 @@
 //! [^4]: ADR-0003, every random draw is keyed, never stateful, decision D1. `docs/adrs/accepted/adr-0003-every-random-draw-is-keyed-never-stateful.md`
 //! [^5]: ADR-0002, simulated and aggregated state holds no floating point number, decision D2. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
 
+use crate::balance::Balance;
 use crate::bridge::{BlockLayout, BridgeError, UnitTileBridge, BLOCK_BITS_DEFAULT};
 use crate::campaign::{self, CampaignEvent, CampaignRegister, CampaignRow};
 use crate::character::{CharacterArena, CharacterError};
@@ -1399,6 +1400,17 @@ pub struct World {
     ///
     /// [^1]: ADR-0152, a faction plans its roads and zones with one solver, decision D1. `docs/adrs/accepted/adr-0152-a-faction-plans-its-roads-and-zones-with-one-solver.md`
     plan: PlanRegister,
+    /// The win-path balance values: the value each game end reader compares,
+    /// the rate that feeds one of them, and whether the readers run.
+    ///
+    /// **A caller sets these at run time, and each holds a constant as its
+    /// default.** The step reads them, so they enter the state hash.[^1] [^2]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0175, a win threshold decides when a reader fires and never what the simulation does, decisions D1 and D2. `docs/adrs/draft/adr-0175-a-win-threshold-decides-when-a-reader-fires.md`
+    /// [^2]: ADR-0164, every stored value the step reads enters the state hash, decision D1. `docs/adrs/draft/adr-0164-every-stored-value-the-step-reads-enters-the-state-hash.md`
+    balance: Balance,
     /// What the run has produced, for the subsystems that keep a per-tick
     /// count.
     ///
@@ -1661,6 +1673,7 @@ impl World {
             climate: ClimateField::quiet(weather_layout),
             climate_reference: 0,
             controller: Controller::new(config.seed, config.faction_count),
+            balance: Balance::default(),
             campaigns: CampaignRegister::new(config.faction_count),
             plan: PlanRegister::new(config.faction_count, PlanRules::DEFAULT),
             census: CensusTotals::default(),
@@ -4635,6 +4648,13 @@ impl World {
         //
         // [^18]: ADR-0148, a game end is recorded once and stops the controllers, decision D1. `docs/adrs/accepted/adr-0148-a-game-end-is-recorded-once-and-stops-the-controllers.md`
         let hash = self.controller.hash_into(hash);
+        // The win-path balance values are read by a later frame: a reader
+        // compares one on every tick, and the renown pass adds another. Two
+        // worlds that differ only in a balance value must diverge, and the
+        // hash must say so.[^20]
+        //
+        // [^20]: ADR-0175, a win threshold decides when a reader fires and never what the simulation does, decision D1. `docs/adrs/draft/adr-0175-a-win-threshold-decides-when-a-reader-fires.md`
+        let hash = self.balance.hash_into(hash);
         // What each faction marches on is state that a later frame reads: the
         // stage closes a campaign against the holder it recorded at the
         // raise, and the raise refuses while one is live.
@@ -10623,7 +10643,7 @@ impl World {
             };
             *slot = sim_math::combine(
                 *slot,
-                sim_math::scale_by_count(contest::RENOWN_PER_FELL, grievance.count),
+                sim_math::scale_by_count(self.balance.renown_per_fell(), grievance.count),
             );
             any = true;
         }
@@ -14924,31 +14944,41 @@ impl World {
 
     /// Runs the game end readers, while the record is empty.
     ///
-    /// The readers run in the fixed order domination, territory, renown. The
-    /// first that fires writes the record, and the record is written
-    /// once.[^1] Each reader is a pure function of the world, and each
-    /// resolves a tie by the lowest faction identifier, because it visits
-    /// the factions in ascending order and stops at the first that
+    /// The readers run in the fixed order domination, territory, wonder,
+    /// renown. The first that fires writes the record, and the record is
+    /// written once.[^1] Each reader is a pure function of the world, and
+    /// each resolves a tie by the lowest faction identifier, because it
+    /// visits the factions in ascending order and stops at the first that
     /// fires.[^2]
     ///
-    /// **The wealth-or-wonder path has no reader, so no game ends on
-    /// it.**[^3] The path keeps its place in the order and its number, and a
-    /// stored record that names it still resolves.
+    /// **A caller may turn the readers off.** While they are off this
+    /// function records nothing and the world runs to the tick limit. The
+    /// readers decide when the step stops watching, and they change nothing
+    /// else, so a run with the readers off holds the same event log as a run
+    /// with the readers on that never fires.[^4]
+    ///
+    /// **A stock total wins no game.** The wealth path is gone, and the
+    /// wonder is a path of its own with a reader in this table.[^3]
     ///
     /// # References
     ///
     /// [^1]: ADR-0148, a game end is recorded once and stops the controllers, decisions D2 and D3. `docs/adrs/accepted/adr-0148-a-game-end-is-recorded-once-and-stops-the-controllers.md`
     /// [^2]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
-    /// [^3]: ADR-0173, the wealth or wonder path has no reader, decision D1. `docs/adrs/draft/adr-0173-the-wealth-or-wonder-path-has-no-reader.md`
+    /// [^3]: ADR-0174, a wonder is a win path and a stock total is not, decisions D1 and D2. `docs/adrs/draft/adr-0174-a-wonder-is-a-win-path-and-a-stock-total-is-not.md`
+    /// [^4]: ADR-0175, a win threshold decides when a reader fires and never what the simulation does, decision D3. `docs/adrs/draft/adr-0175-a-win-threshold-decides-when-a-reader-fires.md`
     fn check_game_end(&mut self) {
+        if !self.balance.win_readers_enabled() {
+            return;
+        }
         if self.controller.game_end().is_set() {
             return;
         }
         // The order of this table is a rule of the game and not a balance
         // value. A path that has no reader is absent from it.
-        let readers: [(GameEndReader, WinPath); 3] = [
+        let readers: [(GameEndReader, WinPath); 4] = [
             (Self::domination_winner, WinPath::Domination),
             (Self::territory_winner, WinPath::Territory),
+            (Self::wonder_winner, WinPath::Wonder),
             (Self::renown_winner, WinPath::Renown),
         ];
         for (reader, path) in readers {
@@ -15146,35 +15176,28 @@ impl World {
         best
     }
 
-    /// The wealth-or-wonder reader, which the game end table does not call.
+    /// The wonder reader: a finished wonder stands on ground the faction
+    /// holds.
     ///
-    /// **No game ends on this path.** The table of readers omits it, so the
-    /// function decides nothing.[^1] It stays because a caller may still ask
-    /// which faction stands above the stock target or holds a finished
-    /// wonder, and because the quantity behind that question is reported.
+    /// A wonder is an upgrade row that carries a victory claim above zero.
+    /// The reader walks the sparse upgrade map, reads the claim of the row
+    /// that stands at each entry, and finds the first faction that holds a
+    /// standing claim. A tie resolves by the lowest faction identifier.
     ///
-    /// The stock total sums every commodity of every live settlement of the
-    /// faction in a 64-bit accumulator. A tie resolves by the lowest faction
-    /// identifier. The stock target is a balance value, and its row records
-    /// that no reader compares it.[^2]
+    /// **A wonder costs work and stands on held ground, so it is an
+    /// achievement.** A stock total is not, and the wealth clause that
+    /// compared one is gone.[^1] The work a wonder costs and the claim its
+    /// row carries are both columns of the upgrade table, and a caller sets
+    /// them.[^2]
     ///
     /// # References
     ///
-    /// [^1]: ADR-0173, the wealth or wonder path has no reader, decision D1. `docs/adrs/draft/adr-0173-the-wealth-or-wonder-path-has-no-reader.md`
-    /// [^2]: Balance register, the stock target. `docs/reference/balance.md`
-    #[expect(
-        dead_code,
-        reason = "the wealth-or-wonder path has no reader, and the function \
-                  stays so that a stored record still resolves and a caller \
-                  can still read the quantity behind the path"
-    )]
-    fn wealth_or_wonder_winner(&self) -> Option<FactionId> {
-        let totals = self.stock_totals();
+    /// [^1]: ADR-0174, a wonder is a win path and a stock total is not, decisions D1 and D2. `docs/adrs/draft/adr-0174-a-wonder-is-a-win-path-and-a-stock-total-is-not.md`
+    /// [^2]: ADR-0151, an upgrade is a category with a ground fit and a level, decision D4. `docs/adrs/accepted/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
+    fn wonder_winner(&self) -> Option<FactionId> {
         let claims = self.victory_claims();
-        self.factions().find(|faction| {
-            let at = usize::from(faction.0);
-            totals[at].0 >= STOCK_TARGET || claims[at].0 > 0
-        })
+        self.factions()
+            .find(|faction| claims[usize::from(faction.0)].0 > 0)
     }
 
     /// Returns the highest renown of any live character of every faction, by
@@ -15215,11 +15238,10 @@ impl World {
     fn renown_winner(&self) -> Option<FactionId> {
         let best = self.best_renown();
         self.factions()
-            .find(|faction| best[usize::from(faction.0)] >= i64::from(RENOWN_TARGET))
+            .find(|faction| best[usize::from(faction.0)] >= i64::from(self.balance.renown_target()))
     }
 
-    /// Returns the running value of one faction on each win path, and on
-    /// the path that no reader watches.
+    /// Returns the running value of one faction on each win path.
     ///
     /// Returns `None` when the world has no such faction. The values are the
     /// ones the readers compare, so a caller can watch a path approach its
@@ -15237,6 +15259,7 @@ impl World {
         Some(Standing {
             held_tiles: self.holding.holding_of(faction),
             seats_held: self.seats_held_by(faction),
+            live_units: i64::from(self.soldiers.population_by_faction()[at]),
             store_total: self.stock_totals()[at].0,
             best_renown: self.best_renown()[at],
             wonder_progress: self.wonder_progress()[at],
@@ -15270,6 +15293,122 @@ impl World {
         }
         Some(raise.0)
     }
+
+    /// Returns the win-path balance values of the world.
+    ///
+    /// Each value holds a constant as its default, so a world that nobody
+    /// configures behaves as it did before the table existed.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0175, a win threshold decides when a reader fires and never what the simulation does, decision D1. `docs/adrs/draft/adr-0175-a-win-threshold-decides-when-a-reader-fires.md`
+    #[must_use]
+    pub const fn balance(&self) -> Balance {
+        self.balance
+    }
+
+    /// Sets the renown at which the renown reader fires, as a raw Q16.16
+    /// value.
+    ///
+    /// This is a threshold. It decides when the renown reader fires and
+    /// changes nothing else.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0175, a win threshold decides when a reader fires and never what the simulation does, decision D2. `docs/adrs/draft/adr-0175-a-win-threshold-decides-when-a-reader-fires.md`
+    pub const fn set_renown_target(&mut self, raw: i32) {
+        self.balance.set_renown_target(raw);
+    }
+
+    /// Sets the renown that one felled unit gives the champion of the faction
+    /// that felled it, as a raw Q16.16 value.
+    ///
+    /// This is a rate. It changes what the simulation does, because the
+    /// renown column is state that a later frame reads.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0175, a win threshold decides when a reader fires and never what the simulation does, decision D2. `docs/adrs/draft/adr-0175-a-win-threshold-decides-when-a-reader-fires.md`
+    pub const fn set_renown_per_fell(&mut self, raw: i32) {
+        self.balance.set_renown_per_fell(raw);
+    }
+
+    /// Sets whether the game end readers run.
+    ///
+    /// While they do not run, no reader records a game end and the world runs
+    /// to the tick limit. A run with the readers off holds the same event log
+    /// as a run with the readers on that never fires.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0175, a win threshold decides when a reader fires and never what the simulation does, decision D3. `docs/adrs/draft/adr-0175-a-win-threshold-decides-when-a-reader-fires.md`
+    pub const fn set_win_readers_enabled(&mut self, enabled: bool) {
+        self.balance.set_win_readers_enabled(enabled);
+    }
+
+    /// Sets the work that finishes a wonder.
+    ///
+    /// The work is a column of the upgrade table row that holds the wonder,
+    /// and this writes that column and leaves the other columns of the row
+    /// where they are. The table is the one declaration site of the value.
+    ///
+    /// This is a rate. A wonder that costs more work takes longer to build,
+    /// so the value changes what the simulation does.[^1]
+    ///
+    /// Returns `false` when the table holds no wonder row.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0175, a win threshold decides when a reader fires and never what the simulation does, decision D2. `docs/adrs/draft/adr-0175-a-win-threshold-decides-when-a-reader-fires.md`
+    pub fn set_wonder_work(&mut self, work: u32) -> bool {
+        let Some(row) = self
+            .upgrade_table
+            .row(UpgradeCategory::WONDER, upgrade::WONDER_LEVEL)
+        else {
+            return false;
+        };
+        self.upgrade_table
+            .define(
+                UpgradeCategory::WONDER.to_u8(),
+                upgrade::WONDER_LEVEL,
+                UpgradeRow { work, ..row },
+            )
+            .is_ok()
+    }
+
+    /// Sets the victory claim that the wonder row carries.
+    ///
+    /// The claim is a column of the upgrade table row that holds the wonder,
+    /// and this writes that column and leaves the other columns of the row
+    /// where they are. The table is the one declaration site of the value.
+    ///
+    /// This is a threshold. The wonder reader fires for the faction that
+    /// holds a standing claim above zero, so a claim of zero takes the wonder
+    /// path out of the game and changes nothing else.[^1]
+    ///
+    /// Returns `false` when the table holds no wonder row.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0175, a win threshold decides when a reader fires and never what the simulation does, decision D2. `docs/adrs/draft/adr-0175-a-win-threshold-decides-when-a-reader-fires.md`
+    pub fn set_wonder_victory_claim(&mut self, claim: u32) -> bool {
+        let Some(row) = self
+            .upgrade_table
+            .row(UpgradeCategory::WONDER, upgrade::WONDER_LEVEL)
+        else {
+            return false;
+        };
+        self.upgrade_table
+            .define(
+                UpgradeCategory::WONDER.to_u8(),
+                upgrade::WONDER_LEVEL,
+                UpgradeRow {
+                    victory_claim: claim,
+                    ..row
+                },
+            )
+            .is_ok()
+    }
 }
 
 /// One game end reader: a pure function of the world that names the faction
@@ -15294,84 +15433,18 @@ type GameEndReader = fn(&World) -> Option<FactionId>;
 /// [^1]: Findings register, FND-543. `docs/FINDINGS.md`
 pub const STOCK_CEILING_OF_ONE_SETTLEMENT: i64 = (i32::MAX as i64) * (COMMODITY_COUNT as i64);
 
-/// The settlements a wealth win asks a faction to fill.
+/// The running value of one faction on each win path.
 ///
-/// The bar is this many times the stock one settlement carries toward it, so
-/// a faction that holds fewer settlements than this cannot reach the bar by
-/// filling the ones it holds.
-const SETTLEMENTS_A_WEALTH_WIN_ASKS_FOR: i64 = 2;
-
-/// The stock one settlement carries toward the wealth bar, as a raw Q16.16
-/// quantity summed over every commodity of that settlement.
-///
-/// A provisional value of 28672 whole units, which is seven eighths of what
-/// one settlement of one commodity can hold. The balance register holds the
-/// derivation.[^1]
-///
-/// # References
-///
-/// [^1]: Balance register, the stock target. `docs/reference/balance.md`
-const STOCK_TARGET_OF_ONE_SETTLEMENT: i64 = 28672 << 16;
-
-/// The stock total at which the wealth-or-wonder reader fires, as a raw
-/// Q16.16 quantity summed over every commodity of every settlement of the
-/// faction.
-///
-/// **The bar sits above what one settlement can hold.** A faction reaches it
-/// by holding more settlements, and not by waiting at the one it founded.
-/// This is what makes the bar a bar: a stock rises toward the ceiling of its
-/// store, so any bar under that ceiling is crossed given enough ticks, and a
-/// register value cannot change that.[^1] [^2]
-///
-/// The balance register holds the derivation of the per-settlement share.[^3]
-///
-/// # References
-///
-/// [^1]: Findings register, FND-543. `docs/FINDINGS.md`
-/// [^2]: ADR-0165, the wealth bar stands above what one settlement can hold, decision D1. `docs/adrs/draft/adr-0165-the-wealth-bar-stands-above-what-one-settlement-can-hold.md`
-/// [^3]: Balance register, the stock target. `docs/reference/balance.md`
-pub const STOCK_TARGET: i64 = SETTLEMENTS_A_WEALTH_WIN_ASKS_FOR * STOCK_TARGET_OF_ONE_SETTLEMENT;
-
-/// The bar stands above the stock one settlement can hold.
-///
-/// **This is the check, and not a comment.** A bar at or below the ceiling
-/// is reached by one settlement that waits, and the build stops here rather
-/// than shipping a path that ends every game. A rise in the commodity count
-/// raises the ceiling and stops the build until a writer derives the bar
-/// again.[^1]
-///
-/// # References
-///
-/// [^1]: Findings register, FND-543. `docs/FINDINGS.md`
-const _: () = assert!(
-    STOCK_TARGET > STOCK_CEILING_OF_ONE_SETTLEMENT,
-    "the wealth bar must stand above the stock one settlement can hold"
-);
-
-/// The renown at which the renown reader fires, as a raw Q16.16 value.
-///
-/// A provisional value of 1000 whole units, under the blocker that asks what
-/// raises renown.[^1] [^2]
-///
-/// # References
-///
-/// [^1]: Balance register, the renown target. `docs/reference/balance.md`
-/// [^2]: Blockers register, BLK-150. `docs/BLOCKERS.md`
-pub const RENOWN_TARGET: i32 = 1000 << 16;
-
-/// The running value of one faction on each win path, and on the path that
-/// no reader watches.
-///
-/// Three of these five values feed a reader. The stock total and the wonder
-/// progress feed none, because the wealth-or-wonder path has no reader.
-///
-/// Every field is the value the matching reader compares against its
-/// target, so a caller that reads it watches the path the reader
-/// watches.[^1]
+/// A caller that reads this watches every path the readers watch: the held
+/// tiles for territory, the seats and the live units for domination, the
+/// best renown for renown, and the wonder work for the wonder. The stock
+/// total feeds no reader, and it is reported because a caller may want to
+/// see a faction grow rich.[^1] [^2]
 ///
 /// # References
 ///
 /// [^1]: ADR-0148, a game end is recorded once and stops the controllers, decision D1. `docs/adrs/accepted/adr-0148-a-game-end-is-recorded-once-and-stops-the-controllers.md`
+/// [^2]: ADR-0174, a wonder is a win path and a stock total is not, decisions D2 and D4. `docs/adrs/draft/adr-0174-a-wonder-is-a-win-path-and-a-stock-total-is-not.md`
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
 pub struct Standing {
     /// The tiles the faction holds. The territory reader compares it.
@@ -15379,16 +15452,25 @@ pub struct Standing {
     /// The seats the faction holds, its own and every rival's. The
     /// domination reader compares it against the seat count.
     pub seats_held: i64,
+    /// The units of the faction that are alive. The domination reader
+    /// compares it: the clause fires for a faction that still has a unit
+    /// while every rival has none.
+    pub live_units: i64,
     /// The sum of every store of every settlement of the faction, as a raw
-    /// Q16.16 quantity. **No reader compares it**, because the
-    /// wealth-or-wonder path has no reader. It is reported and not read.
+    /// Q16.16 quantity. **No reader compares it**, because a stock total
+    /// wins no game. It is reported and not read.[^2]
+    ///
+    /// # References
+    ///
+    /// [^2]: ADR-0174, a wonder is a win path and a stock total is not, decision D2. `docs/adrs/draft/adr-0174-a-wonder-is-a-win-path-and-a-stock-total-is-not.md`
     pub store_total: i64,
     /// The highest renown of any live character of the faction, as a raw
     /// Q16.16 value. The renown reader compares it.
     pub best_renown: i64,
     /// The most work any wonder on ground the faction holds has reached.
-    /// **No reader compares it**, because the wealth-or-wonder path has no
-    /// reader. It is reported and not read.[^1]
+    /// The wonder reader does not compare this. It compares whether a
+    /// finished wonder stands, and this value is how far the furthest
+    /// unfinished one has come.[^1]
     ///
     /// # References
     ///

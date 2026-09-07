@@ -261,8 +261,16 @@ pub enum WinPath {
     Domination = 0,
     /// At the tick limit, the faction with the most held tiles.
     Territory = 1,
-    /// A stock total reaches a target, or a wonder completes.
-    WealthOrWonder = 2,
+    /// A finished wonder stands on ground the faction holds.
+    ///
+    /// **The number is the one the wealth-or-wonder path held.** A stored
+    /// record and an event carry the number, so it does not change when the
+    /// path does.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0174, a wonder is a win path and a stock total is not, decision D3. `docs/adrs/draft/adr-0174-a-wonder-is-a-win-path-and-a-stock-total-is-not.md`
+    Wonder = 2,
     /// A character reaches a renown target.
     Renown = 3,
 }
@@ -274,7 +282,7 @@ impl WinPath {
         match value {
             0 => Some(Self::Domination),
             1 => Some(Self::Territory),
-            2 => Some(Self::WealthOrWonder),
+            2 => Some(Self::Wonder),
             3 => Some(Self::Renown),
             _ => None,
         }
@@ -292,7 +300,7 @@ impl WinPath {
         match self {
             Self::Domination => "domination",
             Self::Territory => "territory",
-            Self::WealthOrWonder => "wealth_or_wonder",
+            Self::Wonder => "wonder",
             Self::Renown => "renown",
         }
     }

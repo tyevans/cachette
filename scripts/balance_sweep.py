@@ -25,17 +25,21 @@ import multiprocessing
 import pathlib
 import sys
 
-from cachette import World, stock_target
+from cachette import World, stock_ceiling_of_one_settlement
 
 BASE_SEED = 0x0123_4567_89AB_CDEF
 SEED_STRIDE = 0x9E37_79B9_7F4A_7C15
 SEED_MASK = (1 << 64) - 1
 
-# The engine states the wealth bar, and this script reads it. A copy here
-# reported a share against a bar the engine no longer held.[^1]
+# A stock total wins no game, so there is no wealth bar to read a share
+# against. The engine states the stock one settlement can hold, and this
+# script reads that as the scale of the column. A copy here reported a share
+# against a bar the engine no longer held.[^1] [^2]
 #
 # [^1]: Findings register, FND-551. ``docs/FINDINGS.md``
-STOCK_TARGET_RAW = stock_target()
+# [^2]: ADR-0174, a wonder is a win path and a stock total is not, decision D2.
+#       ``docs/adrs/draft/adr-0174-a-wonder-is-a-win-path-and-a-stock-total-is-not.md``
+STOCK_SCALE_RAW = stock_ceiling_of_one_settlement()
 
 
 def seeds_for(count: int) -> list[int]:
@@ -92,13 +96,13 @@ def render(games: list[dict]) -> str:
     """Write one line for each seed."""
     lines = [
         f"{'seed':>18} {'end':>6} {'path':<10} {'fell':>5} {'pop':>16} "
-        f"{'sites':>5} {'held':>18} {'wonder':>7} {'wealth':>8}"
+        f"{'sites':>5} {'held':>18} {'wonder':>7} {'store':>8}"
     ]
     for game in games:
         last = game["samples"][-1]
         pop = ",".join(str(p) for p in last["population"])
         held = ",".join(str(h) for h in last["held"])
-        share = max(last["store"]) * 100 // STOCK_TARGET_RAW
+        share = max(last["store"]) * 100 // STOCK_SCALE_RAW
         lines.append(
             f"{game['seed']:#018x} {game['tick']:>6} {game['path'] or '-'!s:<10} "
             f"{game['fell']:>5} {pop:>16} {last['settlements']:>5} {held:>18} "

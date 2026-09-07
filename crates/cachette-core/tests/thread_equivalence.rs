@@ -367,7 +367,7 @@ fn run_with_wonder(threads: usize) -> (Vec<u8>, u64) {
     }
     assert_eq!(
         world.game_end().win_path(),
-        Some(WinPath::WealthOrWonder),
+        Some(WinPath::Wonder),
         "the run must cross the wonder end"
     );
     (

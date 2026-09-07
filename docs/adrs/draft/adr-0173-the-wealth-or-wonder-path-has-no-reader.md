@@ -1,5 +1,12 @@
 # ADR-0173: The wealth or wonder path has no reader
 
+**ADR-0174 supersedes this record.** Its D1 gave the wealth-or-wonder path no
+reader at all. The project owner then separated the two triggers: a stock total
+wins no game, and a finished wonder is a win path with a reader of its own. Cite
+ADR-0174. D2 of this record, which keeps the stored number, carries over into
+ADR-0174 D3. The stock clause stays retired for the reason this record gives,
+and the ceiling argument in its context is the evidence ADR-0174 rests on.
+
 ## Context
 
 The engine ends a game when a reader fires. A game end record holds the

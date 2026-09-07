@@ -1,6 +1,6 @@
 # ADR-0165: The wealth bar stands above what one settlement can hold
 
-**ADR-0173 supersedes this record.** It asks how high the wealth bar must stand. The project owner then ruled that the path is not a win condition, so the wealth-or-wonder path has no reader and no bar decides anything. Cite ADR-0173. This file stays because the registry keeps the file of a replaced record, and because the ceiling argument in its context is the evidence ADR-0173 rests on.
+**ADR-0173 supersedes this record.** It asks how high the wealth bar must stand. The project owner then ruled that the path is not a win condition, so the wealth-or-wonder path has no reader and no bar decides anything. Cite ADR-0174, which supersedes ADR-0173 and keeps the stock clause retired. This file stays because the registry keeps the file of a replaced record, and because the ceiling argument in its context is the evidence ADR-0173 rests on.
 
 ## Context
 

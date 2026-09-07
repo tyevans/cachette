@@ -14,6 +14,7 @@
 //! [^2]: ADR-0002, simulated and aggregated state holds no floating point number, decision D2. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
 //! [^3]: ADR-0002, simulated and aggregated state holds no floating point number, decision D1. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
 
+pub mod balance;
 pub mod bridge;
 pub mod campaign;
 pub mod census;
@@ -65,6 +66,7 @@ pub mod upgrade;
 pub mod weather;
 pub mod world;
 
+pub use balance::{Balance, RENOWN_TARGET};
 pub use bridge::{BlockLayout, BlockRange, BridgeError, UnitTileBridge};
 pub use census::{census, Census, CensusError};
 pub use character::{CharacterArena, CharacterError, Sex};
@@ -159,6 +161,5 @@ pub use weather::{
 pub use world::{
     CampaignError, CensusBasis, CensusRow, ConvertError, IdentityError, MoveRelationError,
     SeedError, Standing, StepError, World, WorldConfig, WorldError, FOUNDING_GROUP_DEFAULT,
-    LUXURY_DEPOSITS_DEFAULT, RENOWN_TARGET, STOCK_CEILING_OF_ONE_SETTLEMENT, STOCK_TARGET,
-    SUBSYSTEM_CENSUS,
+    LUXURY_DEPOSITS_DEFAULT, STOCK_CEILING_OF_ONE_SETTLEMENT, SUBSYSTEM_CENSUS,
 };

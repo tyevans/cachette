@@ -1,0 +1,73 @@
+{
+  "comment": [
+    "The win-path balance values that a caller sets at run time, one row for each.",
+    "A tuner reads this file and needs no other knowledge of the engine.",
+    "kind is threshold when the value only decides when a reader fires, and rate",
+    "when a change to the value changes what the simulation does. A threshold is",
+    "scored by post-processing one recorded run. A rate needs a new run.",
+    "scale is fix32 for a raw Q16.16 value, and int for a whole number.",
+    "path names the win path the value governs, or null.",
+    "The domination path holds no row, because its reader compares no value.",
+    "The territory reader compares no value either: it fires at the tick limit and",
+    "takes the faction with the most held tiles, so the tick limit is its row.",
+    "Every default_raw is the value a world holds when nobody configures it.",
+    "Each min_raw and max_raw is a search bound and not a rule of the engine."
+  ],
+  "params": [
+    {
+      "name": "renown_target",
+      "setter": "set_renown_target",
+      "kind": "threshold",
+      "scale": "fix32",
+      "default_raw": 65536000,
+      "min_raw": 6553600,
+      "max_raw": 655360000,
+      "path": "renown",
+      "doc": "the renown at which the renown reader fires"
+    },
+    {
+      "name": "renown_per_fell",
+      "setter": "set_renown_per_fell",
+      "kind": "rate",
+      "scale": "fix32",
+      "default_raw": 16384,
+      "min_raw": 655,
+      "max_raw": 65536,
+      "path": "renown",
+      "doc": "the renown one felled unit gives the champion of the faction that felled it"
+    },
+    {
+      "name": "wonder_victory_claim",
+      "setter": "set_wonder_victory_claim",
+      "kind": "threshold",
+      "scale": "int",
+      "default_raw": 1,
+      "min_raw": 0,
+      "max_raw": 1,
+      "path": "wonder",
+      "doc": "the victory claim the wonder row carries; the wonder reader fires above zero, and zero takes the path out of the game"
+    },
+    {
+      "name": "wonder_work",
+      "setter": "set_wonder_work",
+      "kind": "rate",
+      "scale": "int",
+      "default_raw": 14400,
+      "min_raw": 240,
+      "max_raw": 144000,
+      "path": "wonder",
+      "doc": "the work that finishes a wonder"
+    },
+    {
+      "name": "tick_limit",
+      "setter": "set_tick_limit",
+      "kind": "threshold",
+      "scale": "int",
+      "default_raw": 5000,
+      "min_raw": 500,
+      "max_raw": 20000,
+      "path": "territory",
+      "doc": "the tick at which the territory reader fires and gives the game to the faction with the most held tiles"
+    }
+  ]
+}

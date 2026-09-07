@@ -52,7 +52,6 @@ from cachette._core import (
     World,
     faction_colours,
     stock_ceiling_of_one_settlement,
-    stock_target,
     version,
 )
 
@@ -71,7 +70,6 @@ __all__ = [
     "__version__",
     "faction_colours",
     "stock_ceiling_of_one_settlement",
-    "stock_target",
     "version",
 ]
 
