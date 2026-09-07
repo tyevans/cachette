@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-570**
+**Next number: FND-571**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -13896,7 +13896,7 @@ nothing without its extent and its depth**, and the first reading of this row
 carried neither. That figure bounds the throughput of any training run and
 belongs in the sizing of the batch step.
 
-### FND-569 — The reader of a faction's weight vector reported fewer weights than the vector holds
+### FND-570 — The reader of a faction's weight vector reported fewer weights than the vector holds
 
 **Believed.** The weight vector of a faction holds four weights, and the Python
 reader reports all of them. The doc comment of the reader said four. The type
