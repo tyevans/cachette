@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-631**
+**Next number: FND-634**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -1072,7 +1072,7 @@ the clamped one, and every agreement test passed unchanged. The clamp is
 reachable only by the neighbour taps of the tone and of the silhouette, and
 those mirror the edge handling of the array renderer on purpose.
 
-### FND-630 — The keyboard was believed to scroll the map the way the hand does
+### FND-633 — The keyboard was believed to scroll the map the way the hand does
 
 **Believed.** The renderer says how a step across the frame reaches the ground,
 and the callers ask it. The rule is written once, beside the drag.

@@ -10,7 +10,7 @@ no display. They call the same method the frame loop calls.
 
 References
 ----------
-Findings register, FND-630. ``docs/FINDINGS.md``
+Findings register, FND-633. ``docs/FINDINGS.md``
 
 Recurring Defect Shapes, shape 1. ``.agents/rules/recurring-defects.md``
 
