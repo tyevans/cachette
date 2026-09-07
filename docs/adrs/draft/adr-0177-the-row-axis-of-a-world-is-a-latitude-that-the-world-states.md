@@ -166,16 +166,49 @@ form reads it. Without it no published curve can be checked against anything.
 curve, and the liquid curve is clamped there instead until a player can see the
 difference.[^6]
 
+### D5. The sun term and the cloud term are normalised against what they can reach, and the heat base is what the top of the scale leaves
+
+**The sun term is normalised against the reach of its own sum.** The two parts
+never peak at one place at one moment, so the sum of the two amplitudes names a
+swing that no place and no moment holds. The term therefore walks its own
+geometry once, takes the highest and the lowest sum that geometry holds, and
+maps that range onto the swing the heat scale reserves. The two amplitudes are
+then the ratio between the belt and the season, and the reserved swing is the
+whole of the term.
+
+**The reach is a property of the globe, in the same way that the two part
+normalisers are.** It does not follow the span of a world, the pitch of the
+lattice or the size of the table. A world that states a narrow span reads a
+flat slice of the same term.
+
+**The cloud term is derived from the published effect of cloud, on the scale
+the sun term states.** The sun maps watts of insolation onto degrees of warmth,
+so a cloud that shades the ground is worth what the sun it shades is worth. The
+published effect is a net over the cover that the Earth carries, and this term
+answers a whole sky, so the derivation divides the one by the other.
+
+**The heat base is what the top of the scale leaves, and nobody chooses it.**
+The warmest cell of a world is low ground under the strongest sun with a clear
+sky. It stands at the top of the scale, so the base is the top of the scale
+less the whole ground term less the reserved sun swing.
+
+**A base raised by hand is rejected.** A base carries the same degrees to a
+pole that it carries to the equator, so it lifts the whole field and flattens
+the latitude gradient that D1 and D3 build. The defect was the shape of the sun
+term and the size of the cloud term, and neither is a level.
+
+**The cold end of the scale now carries headroom.** The cloud term is a
+published quantity and not a free lever, and it is smaller than the room the
+base leaves under it. So the coldest cell the field can express stands above
+the bottom of the scale. The build refuses the other case, where a term passes
+the bottom and the field clamps, because a clamp puts a flat region into the
+temperature field and the wind then holds a straight line across it.
+
 ## Consequences
 
-**The engine now has a temperature scale, and the field reads cold against
-it.** The four heat terms were balanced so that they span the heat scale
-exactly. The sun term can no longer reach the swing it reserves, because its
-two parts never peak at one place at one moment: the belt peaks at the equator,
-where the season is near nothing, and the season peaks at the middle latitudes,
-where the belt is near nothing. So the top of the scale is out of reach and the
-world runs cold against the temperature the scale declares. A blocker holds
-where the base should stand.[^11]
+**The engine now has a temperature scale, and the field reads against it.** The
+four heat terms span the heat scale at the warm end and leave headroom at the
+cold end. D5 states how each of them is normalised.
 
 **The ceiling of the air plane rose by more than an order of magnitude.** The
 published curve puts the capacity of the hottest cell far above the capacity of
@@ -189,7 +222,7 @@ of a cold cell hold very little, so the poleward transport rains out most of
 what it carries. A test that asks about polar cloud must supply water at the
 pole, because a landlocked pole holds no sky whatever the model does. The cloud
 that the earlier curve gave a polar interior came from a floor of two drops
-rather than from water that reached it.[^12]
+rather than from water that reached it.[^11]
 
 **The engine cannot be a region model without stating a span.** Nothing forces
 a caller to state one, and a world that states none is a planet. A region world
@@ -214,5 +247,4 @@ pass**, against no vertical structure at all.
 [^8]: Blockers register, BLK-130. `docs/BLOCKERS.md`
 [^9]: The arithmetic module, the sine table. `crates/cachette-core/src/sim_math.rs`
 [^10]: ADR-0002, simulated and aggregated state holds no floating point number, decision D1. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
-[^11]: Blockers register, BLK-152. `docs/BLOCKERS.md`
-[^12]: Findings register, FND-578. `docs/FINDINGS.md`
+[^11]: Findings register, FND-578. `docs/FINDINGS.md`

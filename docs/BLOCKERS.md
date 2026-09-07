@@ -136,42 +136,6 @@ may still write the column and read it back, and a game built on this engine may
 make its own rule from it. What is still missing is everything the row asks
 beyond a source: what lowers renown, and whether it falls on its own. Nothing
 lowers it today.
-### BLK-152 — Nobody has said where the heat base of the world should stand
-
-**Owner:** the project owner. **Blocks:** the mean temperature of every world,
-and therefore every climate class the map holds.
-
-**The field now declares a temperature scale, and it reads cold against it.**
-The weather holds an abstract warmth count for each cell, and every published
-curve needs a temperature, so the field declares one linear map from the count
-to degrees Celsius.[^BLK152A] Nothing could read that map before, so nothing
-could notice where the field stood.
-
-Four terms drive the warmth of a cell: the mean height, the open water share,
-the sun and the cloud. A base stands under them, and the four were balanced so
-that they reach the bottom of the scale together and the top of it
-together.[^BLK152B]
-
-**The sun term can no longer reach the swing it reserves.** Its two parts are
-the belt of a latitude and the season around that belt, and the published
-geometry never peaks both at one place at one moment. The belt peaks at the
-equator, where the season is near nothing, and the season peaks at the middle
-latitudes, where the belt is near nothing.[^BLK152C] So the top of the scale is
-out of reach, and a probe over a whole planet grades most of its land as ice
-cap. The commit body holds the readings and the command that produced them.
-
-**What would close this.** A statement of what the mean temperature of a world
-should be, or of which class shares a map should hold. Two levers reach it: the
-base under the four terms, and the divisor that holds the ground term down. A
-third lever is the amount that a full sky takes away, which is larger here than
-the published radiative effect of cloud.
-
-**What the project does meanwhile.** The engine holds the base and the divisor
-as named constants beside the rule that reads each one, and the two build
-checks that bound them still fail the build when they disagree. The record rule
-forbids inventing a value that an unanswered question governs, so no record
-states either.[^BLK110C]
-
 ### BLK-130 — Nobody has said what weather should be worth
 
 **Owner:** the project owner. **Blocks:** every quantity that the weather
@@ -526,6 +490,46 @@ a different game from one in which they do not, and both are playable.
 
 ## Resolved
 
+### BLK-152 — Nobody has said where the heat base of the world should stand
+
+**Resolved on 6 September 2026. The base did not move. The two terms above it
+are now derived, and each is derived from what it can reach.**
+
+The weather holds an abstract warmth count for each cell, and the field declares
+one linear map from that count to degrees Celsius. Four terms drive the warmth:
+the mean height, the open water share, the sun and the cloud. A base stands
+under them.
+
+**What was wrong.** The sun term splits into the belt of a latitude and the
+season around it, and the two never peak at one place at one moment. The belt
+peaks at the equator, where the season is near nothing. The season peaks at the
+middle latitudes, where the belt is near nothing. Each part reserved its own
+share of the heat scale, so the sum reached about half of what the two reserved
+together, and the top of the scale was out of reach.
+
+**A second term was wrong beside it.** A whole sky took away about three times
+the published net effect of cloud. The equator is the wettest band of the world,
+so the cloud cooled the equator far more than the dry poles, and the equator
+stood colder than the subtropics.
+
+**What the answer is.** The sun term walks its own geometry once, takes the
+highest and the lowest sum that geometry holds, and maps that range onto the
+swing the scale reserves. The cloud term reads the published effect of cloud in
+watts and converts it on the scale that the sun term states. The base is what
+the top of the scale leaves under the ground term and the sun swing, and it
+holds the value it already held.
+
+**The base was not raised, and that is the answer.** A base carries the same
+degrees to a pole that it carries to the equator, so raising it would have
+flattened the latitude gradient. The decision record states the rule.[^BLK152D]
+The findings register holds what the project believed and what the measurement
+showed.[^BLK152E]
+
+**What this leaves open.** The annual range of a mid-latitude cell is about
+twice the published range over land, so most mid-latitude land grades
+continental rather than temperate. That is the season against the belt, and the
+row that holds what the weather should be worth governs it.[^BLK152F]
+
 ### BLK-052 — Nobody has measured whether a fight at this granularity looks like a fight
 
 **Resolved on 3 September 2026. The measurement is taken, and a fight resolves
@@ -803,6 +807,6 @@ normally.
 [^BLK130D]: Balance register, the weather. `docs/reference/balance.md`
 
 [^BLK151A]: Findings register, FND-575. `docs/FINDINGS.md`
-[^BLK152A]: ADR-0177, the row axis of a world is a latitude that the world states, decision D4. `docs/adrs/draft/adr-0177-the-row-axis-of-a-world-is-a-latitude-that-the-world-states.md`
-[^BLK152B]: ADR-0166, the temperature of a cell is carried state that a season and the sky drive, decision D2. `docs/adrs/draft/adr-0166-the-temperature-of-a-cell-is-carried-state-that-a-season-and-the-sky-drive.md`
-[^BLK152C]: Research report 30, the published atmospheric math, section 4.3. `docs/research/reports/30-the-published-atmospheric-math.md`
+[^BLK152D]: ADR-0177, the row axis of a world is a latitude that the world states, decision D5. `docs/adrs/draft/adr-0177-the-row-axis-of-a-world-is-a-latitude-that-the-world-states.md`
+[^BLK152E]: Findings register, FND-586. `docs/FINDINGS.md`
+[^BLK152F]: Blockers register, BLK-130. `docs/BLOCKERS.md`

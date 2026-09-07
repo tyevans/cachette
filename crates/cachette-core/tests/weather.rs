@@ -1932,3 +1932,148 @@ fn the_banded_pressure_follows_the_world_row_and_not_the_lattice_row() {
     );
     assert!(inner.height() > 0);
 }
+
+/// Returns the highest and the lowest sun term over the globe and the year.
+fn sun_reach() -> (i32, i32) {
+    let mut top = i32::MIN;
+    let mut floor = i32::MAX;
+    for degree in -90..=90 {
+        let latitude = degree * weather::LATITUDE_FINE;
+        for tick in 0..weather::SEASON_PERIOD_TICKS as u64 {
+            let value = weather::season_at(Tick(tick), latitude);
+            top = top.max(value);
+            floor = floor.min(value);
+        }
+    }
+    (top, floor)
+}
+
+/// The sun term reaches the whole swing the heat scale reserves, at each end.
+///
+/// **This is the test that a written normaliser fails.** The belt peaks at the
+/// equator, where the season is near nothing. The season peaks at the middle
+/// latitudes, where the belt is near nothing. So the sum of the two amplitudes
+/// names a swing that no place and no moment holds. The term therefore
+/// normalises the sum against the reach that its own geometry gives, and that
+/// reach maps onto the reserved swing exactly.
+#[test]
+fn the_sun_term_reaches_the_whole_swing_that_the_scale_reserves() {
+    let (top, floor) = sun_reach();
+    assert_eq!(
+        top,
+        weather::SEASON_SWING,
+        "the warmest place at the warmest moment reads {top} degrees of sun"
+    );
+    assert_eq!(
+        floor,
+        -weather::SEASON_SWING,
+        "the coldest place at the coldest moment reads {floor} degrees of sun"
+    );
+}
+
+/// The warmest sun stands in the subtropics and not at the equator.
+///
+/// The published geometry puts the highest daily energy of the year over the
+/// summer subtropics. The belt is still strong there and the season is near
+/// its own peak. A term that peaked at the equator would put the hottest
+/// ground of the world in the rain belt.
+#[test]
+fn the_warmest_sun_stands_between_the_equator_and_the_middle_latitude() {
+    let over_a_year = |latitude: i32| -> i32 {
+        (0..weather::SEASON_PERIOD_TICKS as u64)
+            .map(|tick| weather::season_at(Tick(tick), latitude))
+            .max()
+            .unwrap_or(0)
+    };
+    let equator = over_a_year(0);
+    let subtropics = over_a_year(33 * weather::LATITUDE_FINE);
+    let far = over_a_year(60 * weather::LATITUDE_FINE);
+    assert!(
+        subtropics > equator && subtropics > far,
+        "the sun reads {equator} at the equator, {subtropics} in the subtropics \
+         and {far} at sixty degrees"
+    );
+}
+
+/// A world that spans three degrees reads a flat slice of the same sun.
+///
+/// **The normalisers are properties of the globe and not of the world.** A
+/// normaliser read from the world would stretch a four percent change across
+/// the whole scale, and a narrow world would then hold every climate zone
+/// inside three degrees. The reach that the normaliser divides by comes from
+/// the whole globe, so a narrow span keeps a narrow spread and no constant
+/// moves with the span.
+#[test]
+fn a_narrow_span_reads_a_flat_slice_of_the_same_sun() {
+    let region = weather::Latitudes::new(45 * weather::LATITUDE_FINE, 3 * weather::LATITUDE_FINE)
+        .expect("three degrees fits on the globe");
+    let rows = 64u32;
+    let mut top = i32::MIN;
+    let mut floor = i32::MAX;
+    for row in 0..rows {
+        let value = weather::season_at(Tick(0), region.of_row(row, rows));
+        top = top.max(value);
+        floor = floor.min(value);
+    }
+    assert!(
+        top - floor < weather::SEASON_SWING / 4,
+        "a three degree world spreads the sun by {}, and the globe reserves {}",
+        top - floor,
+        weather::SEASON_SWING
+    );
+}
+
+/// A full sky takes away what the published effect of cloud is worth on the
+/// scale of the sun.
+///
+/// **The cloud swing is derived and nothing writes it down.** A cloud that
+/// shades the ground is worth what the sun it shades is worth. This test
+/// measures what one watt of insolation is worth in degrees of warmth, through
+/// the public terms alone, and asks that a full sky match the published effect
+/// of cloud on that scale.
+///
+/// The measurement is a slope between two latitudes, and the annual mean of
+/// the season part is not exactly nothing at either one. So the test holds a
+/// band rather than an equality. A figure written down in place of the
+/// derivation was outside the band by a factor of about three, which is the
+/// error this test exists to catch.
+#[test]
+fn a_full_sky_is_worth_the_published_effect_of_cloud() {
+    let ticks = weather::SEASON_PERIOD_TICKS as u64;
+    // The sun term summed over one year, at one latitude.
+    let sun_over_a_year = |latitude: i32| -> i64 {
+        (0..ticks)
+            .map(|tick| i64::from(weather::season_at(Tick(tick), latitude)))
+            .sum()
+    };
+    // The published insolation summed over the same year, at the same
+    // latitude. Both sums walk the same ticks, so the tick count cancels.
+    let watts_over_a_year = |latitude: i32| -> i64 {
+        (0..ticks)
+            .map(|tick| weather::daily_insolation(latitude, weather::declination_at(Tick(tick))))
+            .sum()
+    };
+    let warm = 0;
+    let cool = 30 * weather::LATITUDE_FINE;
+    let degrees = sun_over_a_year(warm) - sun_over_a_year(cool);
+    let watts = watts_over_a_year(warm) - watts_over_a_year(cool);
+    assert!(
+        degrees > 0 && watts > 0,
+        "the equator must hold more sun and more watts than thirty degrees"
+    );
+
+    // The published net effect of cloud is near twenty watts for each square
+    // metre, over a cover near sixty-eight hundredths. A whole sky is the one
+    // divided by the other.
+    let full_sky = 20 * 100 / 68;
+    let asked = full_sky * degrees / watts;
+    let held = i64::from(weather::cloud_at(
+        weather::Drops(1024),
+        weather::Drops(1024),
+    ));
+    assert!(
+        held * 4 >= asked * 3 && held * 3 <= asked * 4,
+        "a full sky takes {held} degrees, and the published effect on the scale \
+         of the sun asks near {asked}"
+    );
+}
