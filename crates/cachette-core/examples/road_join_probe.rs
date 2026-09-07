@@ -61,7 +61,7 @@ fn road_stands(world: &World, address: Axial) -> bool {
 /// The walk starts at each settlement in turn and crosses a tile when a
 /// finished road stands on it, or when a settlement of the same faction
 /// stands on it. Two settlements in one walk are one joined pair.
-fn joined_pairs(world: &World, faction: FactionId, sites: &[Axial]) -> usize {
+fn joined_pairs(world: &World, _faction: FactionId, sites: &[Axial]) -> usize {
     if sites.len() < 2 {
         return 0;
     }

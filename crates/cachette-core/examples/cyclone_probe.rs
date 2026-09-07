@@ -126,8 +126,7 @@ fn main() {
     let warmth = world.weather().warmth_plane().to_vec();
     let mut best = None;
     let mut best_heat = i32::MIN;
-    for cell in 0..under.len() {
-        let ground = under[cell];
+    for (cell, ground) in under.iter().copied().enumerate() {
         if ground.tiles() <= 0 || ground.open_tiles() * 2 > ground.tiles() {
             continue;
         }
@@ -202,8 +201,8 @@ fn main() {
         // The rain under the storm is what the ground of its footprint gained
         // this frame. Everything else is the ambient rain of the world.
         let after = field.ground_plane();
-        for at in 0..after.len() {
-            let gained = after[at].0 - ground_before.get(at).copied().unwrap_or(0);
+        for (at, wet) in after.iter().enumerate() {
+            let gained = wet.0 - ground_before.get(at).copied().unwrap_or(0);
             if gained <= 0 {
                 continue;
             }

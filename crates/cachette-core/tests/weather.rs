@@ -1008,8 +1008,9 @@ fn the_season_slope_holds_no_step() {
         // The slope is read over a block of rows, because the truncation of
         // one row is a whole degree and a single difference is mostly that.
         const BLOCK: usize = 16;
-        let slopes: Vec<i32> = readings
-            .chunks_exact(BLOCK)
+        let (blocks, _) = readings.as_chunks::<BLOCK>();
+        let slopes: Vec<i32> = blocks
+            .iter()
             .map(|block| block[BLOCK - 1] - block[0])
             .collect();
         let bend = slopes
@@ -1626,7 +1627,7 @@ fn the_capacity_never_passes_the_ceiling() {
     for warmth in -8..=(cachette_core::HEAT_CEILING + 8) {
         let held = weather::capacity_at(warmth).0;
         assert!(
-            held >= 2 && held <= weather::AIR_SATURATION.0,
+            (2..=weather::AIR_SATURATION.0).contains(&held),
             "the capacity at warmth {warmth} is {held} drops"
         );
     }

@@ -18,7 +18,10 @@ fn main() {
         unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
     })
     .expect("the settings describe a world");
-    world.found_run_for_every_faction(30);
+    // The probe reads the ground plane of the weather and reads no
+    // settlement, so the founding is scene setting and its report is not a
+    // reading. Other probes that do read the report keep it.
+    let _ = world.found_run_for_every_faction(30);
     let mut histogram = [0u64; 20];
     let mut samples = 0u64;
     for tick in 0..=2000u32 {
