@@ -142,8 +142,13 @@ LIFT_MARGIN = 4
 #
 # The page holds the whole world, and the camera magnifies it. A page drawn at
 # the size of the frame goes soft as soon as a watcher zooms in, so the page is
-# drawn finer as the camera zooms. A page costs the square of this, so it stops
-# here and a closer view softens.
+# drawn finer as the camera zooms.
+#
+# **A page costs the square of this, in the memory of the graphics device.**
+# The page carries four real numbers for each of its points, so a frame of
+# 2256 by 1504 asks the device for about 200 megabytes at two and about 800 at
+# four. A machine that shares its memory with the display cannot hold the
+# second. The page therefore stops here and a closer view softens.
 PAGE_DETAIL_CAP = 2
 
 # The spacing of the contour hatch, in shares of the full height range.

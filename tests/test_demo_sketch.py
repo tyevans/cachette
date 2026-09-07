@@ -650,3 +650,26 @@ def test_the_flat_map_carries_no_compass() -> None:
     demo.compass.visible = False
     demo.advance()
     assert np.array_equal(demo.surface.pixels, shown), "the flat map drew a compass"
+
+
+def test_the_page_grows_with_the_zoom_and_then_stops() -> None:
+    """A closer view is drawn finer, up to the bound and no further.
+
+    **The page costs the square of how fine it is.** A page that followed the
+    zoom without a bound would ask the graphics device for more memory than a
+    machine that shares its memory with the display can give.
+    """
+    world, _ = build()
+    sketch = Sketch(world, view=View())
+    seen = [
+        sketch.detail_of(zoomed(world, factor), WIDTH, HEIGHT)
+        for factor in (1.0, 2.0, 4.0, 9.0)
+    ]
+    assert seen[0] == 1, f"the opening view is drawn at {seen[0]} and not at one"
+    assert seen[1] > seen[0], "a closer view is not drawn finer"
+    assert max(seen) <= ink.PAGE_DETAIL_CAP, (
+        f"the page reached {max(seen)} against a bound of {ink.PAGE_DETAIL_CAP}"
+    )
+    assert seen[-1] == ink.PAGE_DETAIL_CAP, (
+        "a far closer view does not reach the bound, so the bound is untested"
+    )
