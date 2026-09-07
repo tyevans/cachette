@@ -1,0 +1,8 @@
+{
+  "faults": [
+    "The central tree shape is a generic triangle; add a jagged, stepped bottom edge to the silhouette to read as a pine tree rather than a generic mountain or cone.",
+    "The three trees are identical in shape and height; vary the height or width of the side trees to create a more natural, dense canopy composition."
+  ],
+  "score": 65,
+  "verdict": "The candidate reads as a forest at the display size and follows the geometry and flat-fill rules, but the icon is too generic to match the specific 'dense pine' subject."
+}

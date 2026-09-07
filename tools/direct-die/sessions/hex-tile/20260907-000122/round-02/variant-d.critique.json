@@ -1,0 +1,8 @@
+{
+  "faults": [
+    "Change the perspective to flat top-down; the current side-view trees with a horizon line violate the rule 'The view is flat and from above. Do not draw a horizon'.",
+    "Increase the lightness of the tree shapes to match the base fill's lightness difference; the current near-black trees against dark green violate the rule 'A shape on top must differ from the base in lightness, not in hue alone' and fail to match the light-on-dark contrast of the accepted exemplars."
+  ],
+  "score": 40,
+  "verdict": "The candidate fails to match the established style because it uses a side-view perspective and a dark, low-contrast palette that contradicts the flat, top-down, and light-based exemplars."
+}

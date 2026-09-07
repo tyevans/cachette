@@ -1,0 +1,9 @@
+{
+  "faults": [
+    "Increase the size of the diamond shapes to at least 5 units wide in the 64 unit space so they do not become single grey pixels at 64 pixels, per rule 3.",
+    "Reduce the number of internal shapes to six or fewer and simplify the pattern to convey 'dense pine forest' in a quarter of a second, per rule 3.",
+    "Ensure the shapes differ from the base in lightness, not just hue, to maintain visibility at the display size, per rule 2."
+  ],
+  "score": 45,
+  "verdict": "The candidate reads as a generic pattern rather than a forest, and the shapes are too small to be legible at the display size."
+}

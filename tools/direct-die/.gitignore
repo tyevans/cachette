@@ -1,0 +1,10 @@
+# A session is output, not source. One session stays in the tree as
+# sample data, so the review interface has something real to read.
+sessions/*
+!sessions/hex-tile
+sessions/hex-tile/*
+!sessions/hex-tile/20260907-000122
+
+__pycache__/
+*.pyc
+.pytest_cache/

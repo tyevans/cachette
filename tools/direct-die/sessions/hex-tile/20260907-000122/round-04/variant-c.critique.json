@@ -1,0 +1,8 @@
+{
+  "faults": [
+    "Add a two-tone base fill with a distinct lower band to match the perspective and style of the accepted grassland and water exemplars.",
+    "Widen the tree shapes to at least 5 units in the 64-unit space so they do not disappear into the background at the 64-pixel display size."
+  ],
+  "score": 45,
+  "verdict": "The candidate fails to match the established style of the accepted exemplars, which use a two-tone base with a distinct lower band, and the tree shapes are too thin to read clearly at the display size."
+}
