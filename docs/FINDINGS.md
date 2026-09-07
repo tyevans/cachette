@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-594**
+**Next number: FND-602**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -14935,3 +14935,70 @@ is available from the other.
 [^F588B]: ADR-0145, a unit type is a row of capability columns, and zero means cannot, decision D2. `docs/adrs/accepted/adr-0145-a-unit-type-is-a-row-of-capability-columns-and-zero-means-cannot.md`
 [^F588C]: Recurring defect shapes, shape 1. `.agents/rules/recurring-defects.md`
 [^F585B]: Findings register, FND-572. `docs/FINDINGS.md`
+
+### FND-601 — The season is twice the published swing, and the oversized swing hides a cold pole
+
+**Believed.** The temperate band was missing because the world holds too little
+seasonal swing. A world with a correct annual mean and too small a swing grades
+every mid-latitude cell against one temperature, so no cell passes the
+temperate test anywhere.
+
+**True.** The swing is too large, not too small, and the register already said
+so. Reducing it puts the temperate band where the published classification puts
+it. **Reducing it also uncovers a second defect that the oversized swing was
+hiding.** The annual mean at a high latitude is so cold that only a very large
+summer lifted the warmest month above freezing. With a realistic swing the
+polar summer stays below freezing, and the ice cap grows from 1 percent of the
+land to 22 percent.
+
+**Neither term reaches the temperate band alone.** The season decides where the
+band forms. The mean decides whether the pole survives it.
+
+**Evidence.** Four runs of the Köppen probe over one demonstration world, at an
+extent of 128, at seed `0x2f`, at the tile pitch, settled for 400 ticks and
+sampled every 8 ticks over one season period, on 6 September 2026 on one
+development machine (x86-64). Every figure is derived and none is measured on
+the target platform.[^F601A]
+
+At the swing the engine carries, the mid-latitude band at 37 degrees holds 1
+percent temperate, 36 percent continental and 61 percent arid. Its coldest
+month averages −7 °C and its annual range is 40 °C. **The published range that
+the classification is built on is about half that**, and the season term is
+built to reach its whole reserved swing at 45 degrees and then to clamp, so
+every latitude poleward of about 50 degrees receives the same swing.
+
+Halving the season moves that band from 1 percent temperate to 36 percent, and
+the continental share of it from 36 percent to 1 percent. Over the whole land
+the temperate share moves from 1 percent to 3 percent and the ice cap from 1
+percent to 22 percent.
+
+Restoring the constant returned every figure to the first run, cell for cell.
+
+**Raising the season instead does not build.** The heat scale reserves the belt
+and the season together, and a larger season fails the assertion that the
+coldest cell must not clamp at the bottom of the scale. **So the direction the
+hypothesis asked for is not merely wrong. It is unreachable.**
+
+**What follows.** **A share over the whole land is not the measurement here,
+because the land of this world is not distributed as the land of the Earth
+is.** The two bands around the equator hold 3 percent of the land cells of this
+world, and the two polar bands hold 23 percent. The published shares are shares
+of the land of the Earth.[^F601B] **Compare a latitude band against its own
+published class, and do not compare the totals.**
+
+The second defect has no term to repair it. The belt maps the annual mean
+insolation onto the temperature with no transport term, and the published
+energy balance models flatten that profile with a diffusion of heat toward the
+poles.[^F601C] The engine carries the temperature on the wind and mixes it
+nowhere, so it holds no such term. **Adding one is a decision and not a
+constant**, and this finding does not make it.
+
+**Do not reduce the season until the pole has a floor.** The change is correct
+at the middle latitudes and it regresses the poles, and the poles were repaired
+immediately before this work.
+
+## References
+
+[^F601A]: The Köppen probe. `crates/cachette-core/examples/weather_koppen_probe.rs`
+[^F601B]: Research report 30, the published atmospheric math, section 8. `docs/research/reports/30-the-published-atmospheric-math.md`
+[^F601C]: Research report 30, the published atmospheric math, section 4.4. `docs/research/reports/30-the-published-atmospheric-math.md`

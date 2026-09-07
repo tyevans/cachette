@@ -313,7 +313,10 @@ fn main() {
 
     let bands = 12u32;
     println!();
-    println!("  band  latitude  cells   mean C  coldest C  warmest C   rain mm   dominant");
+    println!(
+        "  band  latitude  cells   mean C  coldest C  warmest C   rain mm    \
+         A  BW  BS   C   D  ET  EF"
+    );
     let mut totals = [0usize; 7];
     for band in 0..bands {
         let members: Vec<&Record> = records
@@ -354,14 +357,17 @@ fn main() {
             counts[at] += 1;
             totals[at] += 1;
         }
-        let top = (0..7).max_by_key(|at| counts[*at]).unwrap_or(0);
         let middle = (band * high / bands + (band + 1) * high / bands) / 2;
         let latitude = i64::from(latitudes.of_row(middle, high)) / i64::from(LATITUDE_FINE);
+        // The share of each class in this band, in whole percent, in the
+        // order of `Group::ALL`. A dominant class hides where a band splits.
+        let mut spread = String::new();
+        for at in 0..7 {
+            spread.push_str(&format!("{:>4}", counts[at] * 100 / members.len()));
+        }
         println!(
             "  {band:>4}  {latitude:>8}  {count:>5}  {mean:>7}  {coldest:>9}  {warmest:>9}  \
-             {rain:>8}   {} {}%",
-            Group::ALL[top].name(),
-            counts[top] * 100 / members.len()
+             {rain:>8}  {spread}"
         );
     }
 
