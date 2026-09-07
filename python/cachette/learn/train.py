@@ -270,8 +270,7 @@ def train(
             score = float(load_policy(best_path)[1].get("best_score", -np.inf))
             resumed_best = score
         print(
-            f"  {name} resumes from {latest_path} at generation "
-            f"{first_generation}",
+            f"  {name} resumes from {latest_path} at generation {first_generation}",
             flush=True,
         )
     pairs = train_config.population // 2
