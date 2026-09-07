@@ -10,7 +10,15 @@
     {% include "_sessions.html" %}
     <div class="body">
       <h1>{{ session.asset }} <span class="sid">{{ session.session_id }}</span></h1>
+      {% if live %}
+        <p class="waiting live-line">
+          A run is writing this session now. It is on subject
+          {{ live[1].name }} of the job {{ live[0].job_id }}.
+          <a href="/runs/{{ live[0].job_id }}">Open the run</a>
+        </p>
+      {% endif %}
       <dl class="meta">
+        <dt>Subject</dt><dd>{{ session.subject or "—" }}</dd>
         <dt>Created</dt><dd>{{ session.created or "—" }}</dd>
         <dt>Model</dt><dd>{{ session.model or "—" }}</dd>
         <dt>Guide</dt><dd>{{ session.guide_version or "—" }}</dd>

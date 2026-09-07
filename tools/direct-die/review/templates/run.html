@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+{% block title %}run {{ job.job_id }}{% endblock %}
+
+{% block bar %}
+  <span class="crumb">{{ job.style }} / {{ job.job_id }}</span>
+{% endblock %}
+
+{% block main %}
+  <h1>
+    {{ job.style }}
+    <span class="badge run-{{ job.state_now }}">{{ job.state_now }}</span>
+  </h1>
+  <dl class="meta">
+    <dt>Started</dt><dd>{{ job.started or "—" }}</dd>
+    <dt>Finished</dt><dd>{{ job.finished or "—" }}</dd>
+    <dt>Subjects</dt><dd>{{ job.done_count }} of {{ job.items | length }} finished</dd>
+    <dt>Each subject</dt><dd>{{ job.rounds }} rounds of {{ job.variants }} variants</dd>
+  </dl>
+
+  {% if job.state_now == "abandoned" %}
+    <p class="gap">
+      The server that supervised this job is gone, so nothing will write the
+      end of it. Every drawing on disk is whole, because the tool renames each
+      file into place. Start the subject that was in flight again.
+    </p>
+  {% endif %}
+
+  {% if job.active %}
+    <form method="post" action="/runs/{{ job.job_id }}/stop" class="inline">
+      <button type="submit" class="small">Stop after this subject</button>
+    </form>
+  {% endif %}
+
+  {% for line in lines %}
+    <section class="card item">
+      <h2>
+        {{ line.item.name }}
+        <span class="badge run-{{ line.item.state }}">{{ line.item.state }}</span>
+      </h2>
+      <p class="subject">{{ line.item.subject }}</p>
+      {% if line.waiting %}
+        <p class="waiting">{{ line.waiting }}</p>
+      {% endif %}
+      <p class="links">
+        <a href="/s/{{ job.style }}/{{ line.item.session_id }}">{{ line.item.session_id }}</a>
+        <span class="count">
+          {{ line.session.rounds | length }} round{{ "" if line.session.rounds | length == 1 else "s" }} on disk
+        </span>
+      </p>
+
+      {% if line.session.rounds %}
+        {% set entry = line.session.rounds[-1] %}
+        {% set file_base = "/f/" ~ job.style ~ "/" ~ line.item.session_id ~ "/" ~ entry.name %}
+        <div class="strip-shots">
+          {% for letter in variant_letters[:job.variants] %}
+            {% set variant = (entry.variants | selectattr("letter", "equalto", letter) | list)[0] %}
+            <div class="shot">
+              {% if variant.display_png %}
+                <a href="/s/{{ job.style }}/{{ line.item.session_id }}/{{ entry.name }}">
+                  <img class="checker" src="{{ file_base }}/{{ variant.display_png }}" alt="variant {{ letter }}">
+                </a>
+              {% else %}
+                <span class="empty">{{ letter }} not yet</span>
+              {% endif %}
+              <span class="count">
+                {% if variant.score is not none %}
+                  {{ letter }}: {{ variant.score }}
+                {% elif variant.svg %}
+                  {{ letter }}: the critique is coming
+                {% else %}
+                  {{ letter }}: nothing yet
+                {% endif %}
+              </span>
+            </div>
+          {% endfor %}
+        </div>
+      {% else %}
+        <p class="gap">This subject has written no round yet.</p>
+      {% endif %}
+
+      {% if line.log %}
+        <details>
+          <summary>The last lines of the log</summary>
+          <pre class="log">{{ line.log }}</pre>
+        </details>
+      {% else %}
+        <p class="gap">The log holds nothing yet.</p>
+      {% endif %}
+    </section>
+  {% endfor %}
+{% endblock %}

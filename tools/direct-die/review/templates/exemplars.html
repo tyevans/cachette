@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}direct-die exemplars{% endblock %}
+
+{% block main %}
+  <h1>Exemplars</h1>
+  <p class="lede">
+    The critic judges a candidate against pictures, not only against words.
+    These are the pictures. Promote a drawing from a round page to add one.
+  </p>
+
+  {% if not styles %}
+    <p class="gap">The style guide names no style yet.</p>
+  {% endif %}
+
+  {% for style in styles %}
+    <section class="card">
+      <h2>{{ style }}</h2>
+      {% set found = exemplars.get(style, []) %}
+      {% if not found %}
+        <p class="gap">
+          This style has no exemplar. The critic then judges against the
+          written rules alone, and it aims at nothing.
+        </p>
+      {% else %}
+        <div class="strip-shots">
+          {% for item in found %}
+            <div class="shot">
+              <img class="checker large" src="/e/{{ style }}/{{ item.name }}" alt="{{ item.name }}">
+              <span class="count">{{ item.name }}</span>
+              <form method="post" action="/exemplars/{{ style }}/withdraw" class="inline">
+                <input type="hidden" name="name" value="{{ item.name }}">
+                <button type="submit" class="small">Withdraw</button>
+              </form>
+            </div>
+          {% endfor %}
+        </div>
+        <p class="note">
+          The critic attaches the first pictures by file name, and not every
+          picture. Keep the list short and keep the best ones.
+        </p>
+      {% endif %}
+    </section>
+  {% endfor %}
+{% endblock %}
