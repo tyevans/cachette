@@ -1307,28 +1307,30 @@ const WARMTH_NUMERATOR: i64 = 1;
 /// [^1]: ADR-0166, the temperature of a cell is carried state that a season and the sky drive, decision D1. `docs/adrs/draft/adr-0166-the-temperature-of-a-cell-is-carried-state-that-a-season-and-the-sky-drive.md`
 const WARMTH_DENOMINATOR: i64 = 8;
 
-/// What the whole of the part is multiplied by over the deepest water.
+/// What the temperature divisor of the deepest water is multiplied by.
 ///
-/// **Deep water warms slowly and cools slowly. Land does neither.** A large
-/// column of water takes up the same heat over a greater depth, so its
-/// temperature moves a small part of the way in the time that a field or a
-/// shallow lake moves the whole of it. Shallow water sits between the two,
-/// because the grading runs with the depth and not with the tile count.
+/// **This is the thermal inertia of the sea, and it is derived from a
+/// published seasonal lag.** The warmest month over the ocean falls about two
+/// months after the solstice, where over land it falls about one. A first
+/// order lag driven by a yearly cycle lags its driver by the arc tangent of
+/// two pi times the time constant over the period, so a two month lag on a
+/// twelve month year gives a time constant near a quarter of the year. On the
+/// season period this module carries, that is this multiple of the land
+/// figure.
 ///
-/// **This is what makes a coast interesting.** Two neighbouring cells that
-/// track one driver at one rate hold one temperature, and no wind blows
-/// between them. A land cell that tracks the season while the sea beside it
-/// lags gives a heat difference across the coast, and that difference changes
-/// sign as the season turns. So the coastal wind blows one way in the warm
-/// half of the year and the other way in the cold half.
-///
-/// The doc of the water heat term claimed this behaviour before anything did
-/// it. One share moved every cell at one rate, whatever it held.[^1]
+/// **The old value was eight and it did almost nothing.** At eight the sea
+/// damps its own seasonal swing by about two percent, so a sea tracked the
+/// season as closely as the land beside it and the two never parted. That was
+/// harmless while a second term in the driver gave the sea a mean of its own,
+/// and it stopped being harmless when a record removed that term and named
+/// this lag as the thing that carries the sea.[^2] **A mechanism nominated to
+/// carry an effect must be measured against the effect**, and this one was
+/// not.
 ///
 /// # References
 ///
-/// [^1]: Recurring Defect Shapes, shape 3. `.agents/rules/recurring-defects.md`
-const DEEP_WATER_LAG: i64 = 8;
+/// [^2]: ADR-0182, the temperature a cell is driven toward is a published energy balance, decision D4. `docs/adrs/draft/adr-0182-the-temperature-a-cell-is-driven-toward-is-a-published-energy-balance.md`
+const DEEP_WATER_LAG: i64 = 64;
 
 /// The share of a temperature difference that one step of wind carries.
 const CARRY_FOR_EACH_WIND_STEP: i64 = 1;
@@ -2395,6 +2397,99 @@ const POLEWARD_DIFFUSION_FINE: i64 = 55;
 /// [^1]: ADR-0182, the temperature a cell is driven toward is a published energy balance, decision D2. `docs/adrs/draft/adr-0182-the-temperature-a-cell-is-driven-toward-is-a-published-energy-balance.md`
 const DAMPED_SLOPE_FINE: i64 = OLR_SLOPE_FINE + 6 * POLEWARD_DIFFUSION_FINE;
 
+/// The share of the incoming radiation that ice reflects beyond bare ground,
+/// in hundredths.
+///
+/// **Published.** A diffusive energy balance model that carries an ice albedo
+/// takes the absorbed share as about 0.68 where there is no ice and about
+/// 0.38 where there is, so ice reflects this much more than the ground it
+/// covers.
+const ICE_ALBEDO_DROP_FINE: i64 = 30;
+
+/// The temperature at which half of a cell carries ice, in hundredths of a
+/// degree.
+///
+/// **Published.** The ice line of the reference model stands here.
+const ICE_MIDPOINT: i64 = -10 * DEGREE_FINE;
+
+/// The temperature range over which a cell goes from bare to wholly iced, in
+/// hundredths of a degree.
+///
+/// **This width is a stability condition and the record states it as one.**
+/// The albedo term spans about 19 degrees between a bare cell and an iced
+/// one. A cell that cools grows ice, and the ice cools it further, so the
+/// feedback has a gain of that span divided by this width. **Above a gain of
+/// one the loop runs away**, which is the published instability that takes a
+/// planet to a frozen state. This width holds the gain near two thirds.
+///
+/// A narrower width is not more accurate. It is the same physics with the
+/// runaway left in.
+const ICE_RAMP: i64 = 30 * DEGREE_FINE;
+
+/// The share of the world that carries ice in the published mean, in
+/// hundredths.
+///
+/// **The balance is calibrated on a planet that already carries this ice**, so
+/// the albedo term is an anomaly about it and not an addition to it. A cell at
+/// this share moves nothing. Adding the whole ice albedo instead would count
+/// the same ice twice, which is the defect the cloud term carried.[^1]
+///
+/// # References
+///
+/// [^1]: ADR-0182, the temperature a cell is driven toward is a published energy balance, decision D5. `docs/adrs/draft/adr-0182-the-temperature-a-cell-is-driven-toward-is-a-published-energy-balance.md`
+const MEAN_ICE_FINE: i64 = 10;
+
+/// The radiation that reaches the top of the atmosphere, in watts for each
+/// square metre, averaged over the globe.
+///
+/// The albedo acts on what arrives and not on what is already absorbed, so
+/// this is the quarter of the solar constant and not the absorbed share.
+const INCIDENT_MEAN: i64 = SOLAR_CONSTANT / 4;
+
+/// Returns the share of a cell that carries ice, in hundredths, from the
+/// temperature the cell is carrying.
+///
+/// **The reader takes the carried temperature and never the asked one.** The
+/// albedo changes what the world asks of a cell, so a term that read the asked
+/// value would be a loop with itself. Reading the carried value makes the
+/// feedback explicit: it runs once for each pass, at a count the solve fixes,
+/// and no pass tests whether it settled.[^1]
+///
+/// **This is public so that a test can move one input and watch the answer
+/// move.**
+///
+/// # References
+///
+/// [^1]: ADR-0001, one binary gives one answer at any thread count, decision D3. `docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
+#[must_use]
+pub fn ice_share_of(warmth: i32) -> i64 {
+    let degrees = i64::from(warmth) * i64::from(WARMTH_FINE) + i64::from(WARMTH_FLOOR);
+    let top = ICE_MIDPOINT + ICE_RAMP / 2;
+    let apart = top - degrees;
+    if apart <= 0 {
+        return 0;
+    }
+    if apart >= ICE_RAMP {
+        return 100;
+    }
+    apart * 100 / ICE_RAMP
+}
+
+/// Returns the degrees that the ice of a cell takes off the balance, in
+/// hundredths.
+///
+/// **This is public so that a test can move one input and watch the answer
+/// move.**
+#[must_use]
+pub fn ice_forcing_of(warmth: i32) -> i64 {
+    let anomaly = ice_share_of(warmth) - MEAN_ICE_FINE;
+    // The watts the anomaly reflects away, and then the degrees those watts
+    // are worth. The anomaly varies with the latitude, so it divides by the
+    // damped slope in the way the belt does.
+    let watts = ICE_ALBEDO_DROP_FINE * anomaly * INCIDENT_MEAN / (100 * 100);
+    -watts * DEGREE_FINE * 100 / DAMPED_SLOPE_FINE
+}
+
 /// The hundredths of a degree in one whole degree.
 const DEGREE_FINE: i64 = 100;
 
@@ -2876,14 +2971,21 @@ pub fn cloud_at(air: Drops, capacity: Drops) -> i32 {
 ///
 /// [^1]: ADR-0166, the temperature of a cell is carried state that a season and the sky drive, decision D2. `docs/adrs/draft/adr-0166-the-temperature-of-a-cell-is-carried-state-that-a-season-and-the-sky-drive.md`
 #[must_use]
-pub fn asked_warmth(relief: i32, season: i32, cloud: i32) -> i32 {
+pub fn asked_warmth(relief: i32, season: i32, cloud: i32, held: i32) -> i32 {
     // **The relief arrives in hundredths of a degree and the scale steps by
     // half a degree.** The sun term already carries the level, so the relief
     // is a signed perturbation about it and never an addition to it.[^2]
     //
     // [^2]: ADR-0182, the temperature a cell is driven toward is a published energy balance, decisions D1 and D4. `docs/adrs/draft/adr-0182-the-temperature-a-cell-is-driven-toward-is-a-published-energy-balance.md`
     let relief = (i64::from(relief) / i64::from(WARMTH_FINE)) as i32;
-    (season + relief - cloud).clamp(0, HEAT_CEILING)
+    // **The ice reads the temperature the cell is carrying.** A cold cell
+    // grows ice, the ice reflects more than the ground it covers, and the
+    // cell cools further. The term is an anomaly about the ice the published
+    // balance already carries, so a cell at that share moves nothing.[^3]
+    //
+    // [^3]: ADR-0182, the temperature a cell is driven toward is a published energy balance, decision D5. `docs/adrs/draft/adr-0182-the-temperature-a-cell-is-driven-toward-is-a-published-energy-balance.md`
+    let ice = (ice_forcing_of(held) / i64::from(WARMTH_FINE)) as i32;
+    (season + relief + ice - cloud).clamp(0, HEAT_CEILING)
 }
 
 /// The degrees a cell holds before any of the three terms moves it.
@@ -3808,6 +3910,7 @@ impl WeatherField {
                 relief_cooling_of(*under, self.relief),
                 season_at(tick, latitudes.of_row(row, height)),
                 cloud_at(air, capacity),
+                self.warmth.get(cell).copied().unwrap_or(0),
             );
             let Some(held) = self.warmth.get_mut(cell) else {
                 continue;

@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-612**
+**Next number: FND-614**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -15635,3 +15635,80 @@ recorded because the next plane added to any account will meet the same pair.
 
 ## References
 
+
+
+### FND-612 — The field moved on a terrain contrast that was three times the physics, and correcting it stopped the motion
+
+**Believed.** The pinned air peak was either a driver that damps the field or a
+test threshold carried from the old behaviour, in the way three other failures
+of this landing are.
+
+**True: the driver damps the field, and the threshold is sound.** Measured at
+the configuration the guarding test builds, which is an extent of 256 at the
+default weather scale, over 1024 ticks on one thread, on 7 September 2026 on one
+development machine (x86-64). Every figure is derived.[^F612A]
+
+| | before | after |
+|---|---|---|
+| cells the air peak visited | 6 | 3 |
+| mean wind speed, of a ceiling of 48 | 38 | 34 |
+| mean temperature step between neighbours, hundredths | 391 | 299 |
+
+**The cause is the ground term and it is not a defect in the new one.** The old
+term spanned 64 warmth units, which is 32 degrees, between the lowest wettest
+cell and the highest driest. The published lapse rate over a 1500 metre relief
+spans 19.5 units, which is 9.8. **The old field moved on about three times the
+terrain contrast that correct physics gives.**
+
+**What follows, and it is structural.** A single layer has no baroclinic
+instability, so it grows none of the eddies that move a real atmosphere.[^F602C]
+**Terrain contrast and the seasonal march are the only things left that can move
+this field**, and correcting the terrain term to the published rate leaves too
+little of the first.
+
+**A proposal, which this work did not take.** The rule this landing already
+states for the cloud applies to the relief as well: a term for a quantity the
+published constants already average over must be an anomaly about that
+average.[^F612C] The balance temperature is an observed global mean, and the
+land of a real planet already stands at its mean elevation inside that
+observation. **So the lapse rate should read the height of a cell against the
+mean land height of its world, and not against sea level.** The mean cooling
+then vanishes by construction, the ceiling is free to rise, and the contrast
+comes back with it. That is a design change and it reverses a value the owner
+chose, so it is stated here rather than taken.
+
+### FND-613 — A lag nominated to carry an effect was never measured against the effect
+
+**Believed.** The sea moderates a coast by holding its heat rather than by
+sitting at a different mean, so a record removed the water term from the
+temperature driver and named the existing lag as the thing that carries
+it.[^F612C]
+
+**True in the physics and false in the value.** A first order lag driven by a
+yearly cycle damps its driver by one over the root of one plus the square of two
+pi times the time constant over the period. At the value the lag carried, the
+sea damped its own seasonal swing by **1.9 percent**. It tracked the season as
+closely as the land beside it, and the two never parted.
+
+**The published anchor.** The warmest month over the ocean falls about two
+months after the solstice, where over land it falls about one. A two month lag
+on a twelve month cycle gives a time constant near a quarter of the year, which
+on this module's season period is about eight times the value the lag held.
+
+**Evidence.** The value moved from 8 to 64 and the field was measured again on 7
+September 2026 on one development machine (x86-64). The mean temperature step
+between neighbours moved from 299 hundredths to 308, against 391 before the
+driver. **The correction is real and it recovers about a tenth of what the
+ground term lost**, so it is kept on its own merits and it is not the repair for
+the motion. The class table moved by four cells of 6,544, which is nothing.
+
+**What follows.** **A mechanism nominated to carry an effect must be measured
+against the effect, in the same change that nominates it.** The record removed a
+term and handed its work to a lag without asking what the lag could carry, and
+the answer was two percent. The removal was correct and the handover was not
+checked.
+
+## References
+
+[^F612A]: The motion probe. `crates/cachette-core/examples/weather_motion_probe.rs`
+[^F612C]: ADR-0182, the temperature a cell is driven toward is a published energy balance, decisions D4 and D5. `docs/adrs/draft/adr-0182-the-temperature-a-cell-is-driven-toward-is-a-published-energy-balance.md`
