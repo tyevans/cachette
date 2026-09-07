@@ -204,8 +204,14 @@ def main() -> int:
     parser.add_argument("--workers", type=int, default=16)
     parser.add_argument("--holdout", type=int, default=24)
     parser.add_argument("--hidden", type=int, default=24)
-    parser.add_argument("--sigma", type=float, default=0.08)
-    parser.add_argument("--learning-rate", type=float, default=0.06)
+    # Sigma is a relative size, and its working range was measured rather
+    # than guessed. On the real decisions of a trained policy, a
+    # perturbation of 0.25 changed 0.8 percent of the choices and one of 1.5
+    # changed about a third of them.
+    parser.add_argument("--sigma", type=float, default=1.5)
+    parser.add_argument("--learning-rate", type=float, default=0.3)
+    parser.add_argument("--validation", type=int, default=6)
+    parser.add_argument("--validate-every", type=int, default=3)
     parser.add_argument("--only", type=str, default="")
     parser.add_argument(
         "--resume",
@@ -229,7 +235,15 @@ def main() -> int:
     # comes from a world the policy never trained on.
     pool = viable_seeds(WORLD, arguments.generations * arguments.seeds + 8, 1000)
     holdout = viable_seeds(WORLD, arguments.holdout, 50_000)
-    print(f"training seeds {len(pool)}, holdout seeds {len(holdout)}", flush=True)
+    # The validation seeds pick the checkpoint. They share nothing with the
+    # training pool and nothing with the held-out set, so the figure the
+    # report is judged on never chose the policy it reports.
+    validation = viable_seeds(WORLD, arguments.validation, 20_000)
+    print(
+        f"training seeds {len(pool)}, validation seeds {validation}, "
+        f"holdout seeds {len(holdout)}",
+        flush=True,
+    )
 
     report: dict[str, object] = {
         "holdout": holdout,
@@ -239,6 +253,9 @@ def main() -> int:
         "tick_limit": WORLD.tick_limit,
         "horizon": WORLD.horizon,
         "decision_interval": WORLD.decision_interval,
+        "validation": validation,
+        "sigma": arguments.sigma,
+        "learning_rate": arguments.learning_rate,
         "world": asdict(WORLD),
         "strategies": {},
     }
@@ -293,6 +310,8 @@ def main() -> int:
             kind=kind,
             hidden=arguments.hidden,
             resume=arguments.resume,
+            validation=validation,
+            validate_every=arguments.validate_every,
         )
         trained, _ = load_policy(Path(str(result["weights"])))
         untrained = no_op(kind)

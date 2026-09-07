@@ -63,8 +63,14 @@ class TrainConfig:
     generations: int = 12
     population: int = 16
     seeds_per_generation: int = 4
-    sigma: float = 0.08
-    learning_rate: float = 0.06
+    # Sigma is a relative size. The centre has unit length and each
+    # perturbation has unit length, so sigma is the fraction of the centre
+    # that one candidate moves. A measurement on real decisions of a trained
+    # policy fixed the working range, and it is far above the value a run
+    # would reach by analogy with a gradient method.
+    sigma: float = 1.5
+    # The fraction of the centre that one generation moves.
+    learning_rate: float = 0.3
     workers: int = 4
     seed: int = 0
 
@@ -120,6 +126,34 @@ def run_population(
     return returns.reshape(len(policies), len(seeds)), readings
 
 
+def unit(vector: np.ndarray) -> np.ndarray:
+    """Return the vector scaled to unit length, or the vector when it is zero.
+
+    **A policy chooses by the highest score, and that choice does not change
+    when every weight is multiplied by one positive number.** A linear policy
+    scores an action row as a weighted sum, and a network policy scores it
+    from a fixed projection and a second layer. Scaling the trainable weights
+    scales every score by the same factor, so the row that scores highest
+    stays the row that scores highest.
+
+    The trainer uses that freedom. It holds the centre at unit length, so a
+    perturbation of a fixed size is always the same fraction of the centre.
+    Without it the norm of the centre grows, the same perturbation becomes a
+    smaller and smaller turn, and every candidate of a generation ends up
+    choosing the same actions. The population then has no spread, the ranking
+    has nothing to rank, and the update becomes a walk driven by noise.
+
+    That failure is silent. The run keeps printing generations, and the best
+    score equals the mean because every candidate is the same policy.
+    """
+    length = float(np.linalg.norm(vector))
+    if length == 0.0:
+        # The first generation starts from zero. A zero centre has no
+        # direction to preserve, and the perturbations supply the first one.
+        return vector
+    return vector / length
+
+
 def rank_shape(scores: np.ndarray) -> np.ndarray:
     """Turn raw scores into centred ranks in the range minus a half to a half.
 
@@ -140,6 +174,8 @@ def train(
     kind: str = "linear",
     hidden: int = 32,
     resume: bool = False,
+    validation: list[int] | None = None,
+    validate_every: int = 3,
 ) -> dict[str, object]:
     """Train one policy, and return what each generation scored.
 
@@ -196,6 +232,33 @@ def train(
     history: list[dict[str, float]] = []
     started = time.time()
 
+    # **The last generation is not the best generation.** An evolution
+    # strategy walks, and a walk can end downhill. The trainer therefore
+    # plays the centre on a validation seed set every few generations and
+    # keeps the centre that scored highest.
+    #
+    # The validation seeds belong to neither the training pool nor the
+    # held-out set, so keeping the best of them takes nothing from the
+    # held-out measurement that the report is judged on.
+    best_policy = policy
+    best_score = -np.inf
+    best_generation = -1
+
+    def validate(current: Policy, generation: int) -> float | None:
+        """Play the centre on the validation seeds, and return what it scored."""
+        nonlocal best_policy, best_score, best_generation
+        if not validation:
+            return None
+        scored = float(
+            run_population(
+                env_config, weighting, [current], validation, train_config.workers
+            )[0].mean()
+        )
+        if scored > best_score:
+            best_score, best_policy, best_generation = scored, current, generation
+            store(current)
+        return scored
+
     for generation in range(train_config.generations):
         # A fresh seed set for each generation, taken from the pool in a
         # fixed order, so a repeat of this run takes the same worlds.
@@ -204,8 +267,14 @@ def train(
             seed_pool[(offset + index) % len(seed_pool)]
             for index in range(train_config.seeds_per_generation)
         ]
-        centre = policy.flat()
+        centre = unit(policy.flat())
+        # Each row is one direction of unit length. **The size of a
+        # perturbation must not depend on the dimension or on the norm the
+        # centre happened to reach.** A raw normal vector of d entries has
+        # length about the square root of d, so a fixed sigma means one thing
+        # for a linear policy and another for a network.
         noise = rng.standard_normal((pairs, centre.size))
+        noise = noise / np.linalg.norm(noise, axis=1, keepdims=True)
         # Antithetic sampling: each perturbation is tried in both directions,
         # so the estimate of the direction costs no extra variance from the
         # mean of the population.
@@ -224,35 +293,61 @@ def train(
         for index in range(pairs):
             weight = shaped[2 * index] - shaped[2 * index + 1]
             gradient += weight * noise[index]
-        step = train_config.learning_rate / (
-            train_config.population * train_config.sigma
+        # The rank shaping already threw away the scale of the reward, so the
+        # length of this sum carries no information worth keeping. The
+        # trainer therefore takes a step of a fixed size along the direction,
+        # and the learning rate is the fraction of the centre that one
+        # generation moves.
+        policy = policy.rebuild(
+            unit(centre + train_config.learning_rate * unit(gradient))
         )
-        policy = policy.rebuild(centre + step * gradient)
-        store(policy)
+
+        # The spread of a generation is what the ranking ranks. A spread of
+        # zero means every candidate chose the same actions, and the update
+        # that follows it carries no information. The run reports it, so the
+        # failure that killed the first attempt is visible while it happens.
+        spread = float(scores.max() - scores.min())
+        last = generation == train_config.generations - 1
+        checked = (
+            validate(policy, generation)
+            if last or generation % validate_every == validate_every - 1
+            else None
+        )
         history.append(
             {
                 "generation": generation,
                 "best": float(scores.max()),
                 "mean": float(scores.mean()),
                 "worst": float(scores.min()),
+                "spread": spread,
                 "won": won,
+                "validation": checked,
                 "seconds": round(time.time() - started, 1),
             }
         )
         print(
             f"  {name} generation {generation:2d} "
             f"mean {scores.mean():9.1f} best {scores.max():9.1f} "
-            f"won {won:5.2f} [{history[-1]['seconds']:.0f}s]",
+            f"spread {spread:8.1f} won {won:5.2f} "
+            f"valid {'-' if checked is None else f'{checked:9.1f}'} "
+            f"[{history[-1]['seconds']:.0f}s]",
             flush=True,
         )
 
-    store(policy)
+    # The stored file already holds the best centre, because validate wrote
+    # it when it found it. A run with no validation seeds keeps the last.
+    if not validation:
+        best_policy = policy
+        store(policy)
     return {
         "name": name,
         "kind": kind,
         "history": history,
         "weights": str(path),
-        "parameters": int(policy.flat().size),
+        "parameters": int(best_policy.flat().size),
+        "best_generation": best_generation,
+        "best_validation": None if best_score == -np.inf else best_score,
+        "validation_seeds": list(validation or []),
     }
 
 
