@@ -41,6 +41,11 @@ that passes no crossing, so it stated a stricter rule. Nothing failed until a
 mariner first crossed open water, and the check then accused the engine of a
 defect the engine did not have.[^11]
 
+Local instance. The rule for how a step across the frame reaches the ground was
+declared beside the drag, and the keyboard never asked for it. The mouse was
+correct, so the rule looked like it was applied. A press for right then scrolled
+the map along the axis of the flat map while the picture stood turned.[^12]
+
 **Rule.** Declare a value once. When a second site must exist, add a check that
 fails when the copies disagree. Do not add a comment that names the winner. A
 comment that explains which copy loses is evidence that the second copy should
@@ -162,3 +167,4 @@ Before you claim work is done, check each line.
 [^9]: Definition of Done. `.agents/rules/definition-of-done.md`
 [^10]: Findings register, FND-541. `docs/FINDINGS.md`
 [^11]: Findings register, FND-581. `docs/FINDINGS.md`
+[^12]: Findings register, FND-628. `docs/FINDINGS.md`

@@ -47,6 +47,7 @@ pub mod panel;
 pub mod picture;
 pub mod text;
 pub mod tween;
+pub mod ways;
 
 pub use frame::{fill_frame, fill_frame_paced, FrameError, Surface, LATTICE_BOUND};
 pub use glass::Overlay;
@@ -55,6 +56,7 @@ pub use metrics::{Lap, Metrics};
 pub use overlay::{Layer, Span};
 pub use paint::{Camera, Canvas, Extent, FrameSize};
 pub use tween::{speed_word, Motion, Pace, ONE_TICK_EACH_FRAME, TWEEN_REACH};
+pub use ways::{draws_as_a_way, road_ways, Way, WayShape};
 
 use cachette_core::founding::FoundingOutcome;
 use cachette_core::{BridgeError, World};

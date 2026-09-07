@@ -60,6 +60,7 @@ from typing import TYPE_CHECKING, Any
 
 import numpy as np
 
+from cachette import World
 from cachette.demo import sketch as ink
 from cachette.demo import sketch_shader as source
 from cachette.demo.glpage import Device, DeviceGap
@@ -70,7 +71,6 @@ if TYPE_CHECKING:
 
     import numpy.typing as npt
 
-    from cachette import World
     from cachette._core import Camera, FrameReading
     from cachette.demo.view import View
 
@@ -117,12 +117,19 @@ def _defines() -> str:
         "GRANULATION": ink.GRANULATION,
         "RIM_GAIN": ink.RIM_GAIN,
         "GLAZE_LIFT": ink.GLAZE_LIFT,
+        "WAY_INK": ink.WAY_INK,
+        "WAY_EDGE_INK": ink.WAY_EDGE_INK,
+        "WAY_FILL_INK": ink.WAY_FILL_INK,
+        "WAY_CROWN_INK": ink.WAY_CROWN_INK,
+        "WAY_PLANNED_INK": ink.WAY_PLANNED_INK,
     }
     colours = {"PAPER": ink.PAPER, "INK": ink.INK, "SKY_INK": ink.SKY_INK}
     whole = {
         "PALETTE_ROOM": PALETTE_ROOM,
         "NEAR_REACH": NEAR_REACH,
         "FAR_REACH": FAR_REACH,
+        "CROWNED_LEVEL": ink.CROWNED_LEVEL,
+        "WAY_LEVELS": len(ink.WAY_WIDTH),
     }
     lines = [f"#define {name} {value!r}" for name, value in whole.items()]
     lines += [
@@ -133,6 +140,16 @@ def _defines() -> str:
         f"{float(band[2])!r});"
         for name, band in colours.items()
     ]
+    # The width of a way at each level, and the six directions of the grid.
+    # **Both come from the module that declares them.** The directions are the
+    # engine's own, and this holds no order of its own.
+    widths = ", ".join(f"{float(width)!r}" for width in ink.WAY_WIDTH)
+    lines.append(f"const float WAY_WIDTH[WAY_LEVELS] = float[WAY_LEVELS]({widths});")
+    steps = ", ".join(
+        f"vec2({float(step_q)!r}, {float(step_r)!r})"
+        for step_q, step_r in World.direction_offsets()
+    )
+    lines.append(f"const vec2 WAY_STEPS[6] = vec2[6]({steps});")
     return "\n".join(lines) + "\n"
 
 
@@ -247,7 +264,7 @@ class GlSketch(Sketch):
     # neither the turn nor the lift that the array renderer works out.
     _marks = False
 
-    __slots__ = ("_device", "_held", "_pages", "_palette", "_stamp")
+    __slots__ = ("_device", "_has_ways", "_held", "_pages", "_palette", "_stamp")
 
     def __init__(
         self,
@@ -273,6 +290,10 @@ class GlSketch(Sketch):
         self._stamp: Page | None = None
         self._pages: dict[str, Any] = {}
         self._palette: np.ndarray | None = None
+        # Whether any road stands in the world. The pass that sends the tiles
+        # reads the network and sets this, so the shader skips the ways in a
+        # world where nobody built one.
+        self._has_ways = False
 
     # ------------------------------------------------------------------
     # The device
@@ -460,6 +481,15 @@ class GlSketch(Sketch):
         holders = self._world.tile_holders().reshape(rows, columns)
         device.upload("tile_holder", holders.astype(np.int32), "r32i")
 
+        # **The array renderer holds the one reader, and this calls it**, so
+        # the two renderers cannot read a road network two ways. The answer
+        # follows the roads and not the world, and it crosses on the tile
+        # lattice that the page reads.
+        joins, level = self.road_lattice()
+        device.upload("tile_joins", joins.astype(np.int32), "r32i")
+        device.upload("tile_level", level.astype(np.int32), "r32i")
+        self._has_ways = bool(level.any())
+
         if self._sky:
             cloud = self._world.cloud_shares().reshape(rows, columns).astype(
                 np.float32
@@ -578,7 +608,7 @@ class GlSketch(Sketch):
 
         self._send_fit(page, camera, width, height)
         program = self._program(
-            "composite", source.TONE + source.HATCH + source.COMPOSITE
+            "composite", source.TONE + source.HATCH + source.WAYS + source.COMPOSITE
         )
         program.use()
         units = [
@@ -594,6 +624,8 @@ class GlSketch(Sketch):
             ("palette", 9),
             ("fit_x", 10),
             ("fit_y", 11),
+            ("tile_joins", 12),
+            ("tile_level", 13),
         ]
         for name, unit in units:
             device.bind(program, name, unit)
@@ -617,6 +649,23 @@ class GlSketch(Sketch):
         program["cloud_step"] = max(int(page_cols * ink.CLOUD_SHADOW_STEP), 1)
         program["cloud_lift"] = int(stood.rise * ink.CLOUD_HEIGHT)
         program["fit_size"] = (width, height)
+        # **The ways read the page backwards.** The lift is a whole count of
+        # rows and it follows the height the mesh pass wrote, so the row of
+        # the flat page follows from the row of the lifted page. Turning that
+        # row and its column back into the plan of the world gives the place
+        # inside a tile. These are the numbers of that turn, and they are the
+        # numbers the mesh pass drew with.
+        program["draws_ways"] = 1 if self._has_ways else 0
+        device.put(program, "plan_half", (stood.plan_wide / 2.0, stood.plan_tall / 2.0))
+        device.put(program, "turn_by", (math.cos(stood.turn), math.sin(stood.turn)))
+        device.put(
+            program, "way_page_middle", (stood.cols / 2.0, stood.flat_rows / 2.0)
+        )
+        program["way_scale"] = float(stood.scale)
+        program["way_lean"] = float(stood.lean)
+        program["way_rise"] = float(stood.rise)
+        program["lift_margin"] = float(ink.LIFT_MARGIN)
+        program["row_pitch"] = float(ink.ROW_PITCH)
         program.stop()
 
         device.run(program, width, height, "rgba8")

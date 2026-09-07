@@ -1064,6 +1064,70 @@ impl PyWorld {
         raw.to_pyarray(python)
     }
 
+    /// Returns where every road runs, as a `dict` of NumPy arrays.
+    ///
+    /// **A road is a way and not a tile.** It runs from somewhere to
+    /// somewhere, it joins another road at a junction, it bends, and it ends.
+    /// A renderer that only knows which tiles carry a road can draw a
+    /// coloured cell. It cannot draw a road. This answer carries the joins,
+    /// so a renderer draws the ribbon that runs through the ground.
+    ///
+    /// The keys are:
+    ///
+    /// - `q` and `r`, arrays of `numpy.int32`. The address of each road tile.
+    /// - `level`, an array of `numpy.uint8`. The level that stands there.
+    ///   Zero means that the first level is still under construction.
+    /// - `joins`, an array of `numpy.uint8`. Which of the six neighbours
+    ///   carry a road, as one bit for each. Bit `i` is the neighbour in
+    ///   direction `i`, in the engine's own direction order.
+    ///
+    /// Every array is the same length, and entry `n` of each one describes
+    /// the same road tile. The order is ascending tile order, so two calls on
+    /// one world answer in one order.[^1]
+    ///
+    /// **The cost follows the roads and not the world.** The engine stores an
+    /// upgrade sparsely, so the whole road set is one slice however large the
+    /// world is.[^2] A caller crosses the boundary once for the whole
+    /// network, rather than asking about a tile at a time.[^3]
+    ///
+    /// **The derivation is the engine's own, and no caller repeats it.** The
+    /// join of one road to the next is worked out in one place, so the
+    /// renderers cannot draw two road networks from one world.[^4]
+    ///
+    /// A world in which nobody built a road answers four empty arrays.
+    ///
+    /// This reads the world and writes nothing to it.[^5]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
+    /// [^2]: ADR-0090, a tile upgrade is stored sparsely, as the difference from the generated world, decision D1. `docs/adrs/draft/adr-0090-a-tile-upgrade-is-stored-sparsely.md`
+    /// [^3]: ADR-0040, Python is a control plane, not a data plane, decisions D1 and D2. `docs/adrs/draft/adr-0040-python-is-a-control-plane-not-a-data-plane.md`
+    /// [^4]: Recurring Defect Shapes, shape 1. `.agents/rules/recurring-defects.md`
+    /// [^5]: ADR-0067, the viewer reads the world and never writes to it, decision D3. `docs/adrs/accepted/adr-0067-the-viewer-reads-the-world-and-never-writes-to-it.md`
+    fn road_ways<'py>(&self, python: Python<'py>) -> PyResult<Bound<'py, PyDict>> {
+        let ways = python.detach(|| {
+            let world = self.lock();
+            cachette_view::ways::road_ways(&world)
+        });
+        let mut columns = Vec::with_capacity(ways.len());
+        let mut rows = Vec::with_capacity(ways.len());
+        let mut levels = Vec::with_capacity(ways.len());
+        let mut joins = Vec::with_capacity(ways.len());
+        for way in ways {
+            columns.push(way.address.q);
+            rows.push(way.address.r);
+            levels.push(way.level);
+            joins.push(way.joins);
+        }
+        let answer = PyDict::new(python);
+        answer.set_item("q", columns.to_pyarray(python))?;
+        answer.set_item("r", rows.to_pyarray(python))?;
+        answer.set_item("level", levels.to_pyarray(python))?;
+        answer.set_item("joins", joins.to_pyarray(python))?;
+        Ok(answer)
+    }
+
     /// Copies the tile height column into a new NumPy array.
     ///
     /// Returns a one-dimensional array of `numpy.int32`, one entry for each
