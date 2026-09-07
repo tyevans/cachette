@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-638**
+**Next number: FND-640**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -16638,3 +16638,65 @@ each candidate must play every seat.
 [^F632C]: Findings register, FND-631. `docs/FINDINGS.md`
 [^F630A]: Decisions register, DEC-281. `docs/DECISIONS.md`
 [^F630B]: Recurring Defect Shapes, section 3. `.agents/rules/recurring-defects.md`
+
+### FND-638 — The batch step owned about one thread build in forty, so the spawn and join of the batch was not the cause of the system time
+
+**Believed.** The batch stepped its worlds by opening a thread scope, building
+one thread for each worker, and joining them all. It did that on every tick. A
+training run on the target platform reported a large share of the machine in
+system time, and the shape of that call was read as the cause.
+
+**True in part.** The batch did build and join a whole worker set on every
+tick, and it no longer does. **It was a small share of the thread building the
+engine does.** A world's own step opens a thread scope for each parallel stage,
+and it does that on every tick as well. The stage scopes build the rest.
+
+**The evidence is a count of thread builds, taken before and after the change
+on a development machine.** The workload steps twelve worlds at twelve batch
+workers, one thread for each world, for fifty ticks. The kernel call that
+builds a thread was counted with a system call trace. The count fell by exactly
+the number the batch owned, which is fifty ticks times twelve workers, less the
+twelve the batch now builds once. The commit body holds the two counts and the
+command.
+
+**The share the batch owned was under three percent of the builds.** The rest
+came from the stage scopes of the world's own step.
+
+**The system time share of the workload did not move.** It read the same before
+and after on the development machine, to two decimal places. That is consistent
+with a change that removes under three percent of the builds, and it settles
+nothing about the target platform, because the two platforms do not share a
+cache line width and no cost of a thread build was taken on either.[^28]
+
+**What follows.** The engine builds threads for each stage of each tick, and
+nothing holds that work. An item is open for it, and it is proposed rather than
+refined because the measurement that would justify it does not exist.[^F638B]
+
+**Do not read a plausible cause as a measured one.** The call shape looked like
+the cause, the arithmetic agreed with it, and the count says the batch owned a
+fortieth of it. The count took one trace to obtain and it was not taken until
+somebody asked for it.
+
+### FND-639 — One control of the seated league test proves nothing, and it fails on the unmodified tree
+
+**Believed.** The seated generation test compares two worker counts and then
+plays a different candidate set, so that a run compared against itself cannot
+pass by construction.
+
+**False today.** The control fails. Two different candidate sets give the same
+relative array, so the test that must be able to fail cannot. The failure is on
+the unmodified tree: it was reproduced by stashing an unrelated change,
+rebuilding, and running that test alone.[^F629B]
+
+**The array it produces is degenerate.** Every row holds one of two values, so
+the outcome does not follow the candidates at all.
+
+**What follows.** The comparison of the two worker counts in that test still
+runs, and it still passes. The control beside it does not do the job the
+docstring claims, so nobody should read a green run of that file as evidence
+that the score follows the candidate. This finding does not fix it, and it
+names no cause.
+
+## References
+
+[^F638B]: Backlog item 0525, build the stage workers of a world once. `docs/backlog/proposed/0525-build-the-stage-workers-of-a-world-once.md`

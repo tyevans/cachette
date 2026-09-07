@@ -12,9 +12,14 @@ References
 [^1]: ADR-0155, a batch of worlds steps in one call, in index order.
 ``docs/adrs/accepted/adr-0155-a-batch-of-worlds-steps-in-one-call-in-index-order.md``
 [^2]: Testing Rules, section 1. ``.agents/rules/testing.md``
+[^3]: ADR-0191, the workers of a batch outlive the step.
+``docs/adrs/draft/adr-0191-the-workers-of-a-batch-outlive-the-step.md``
 """
 
 from __future__ import annotations
+
+import gc
+import os
 
 import pytest
 
@@ -56,12 +61,14 @@ def test_a_batch_gives_what_the_worlds_give_alone(workers: int, threads: int) ->
     alone = [run_alone(seed, TICKS, threads) for seed in SEEDS]
 
     worlds = [build(seed) for seed in SEEDS]
-    batch = Batch(worlds)
+    batch = Batch(worlds, workers)
     assert len(batch) == len(SEEDS)
+    # The batch builds one worker for each world when it is asked for more.
+    assert batch.workers == min(workers, len(SEEDS))
 
     batched_counts: list[list[int]] = [[] for _ in SEEDS]
     for _ in range(TICKS):
-        rows = batch.step(workers, threads)
+        rows = batch.step(threads)
         # The rows arrive in index order, whatever order the workers took.
         assert [row.index for row in rows] == list(range(len(SEEDS)))
         for row in rows:
@@ -86,9 +93,9 @@ def test_a_batch_gives_one_answer_at_every_worker_count() -> None:
     hashes: dict[int, list[int]] = {}
     for workers in (1, 8):
         worlds = [build(seed) for seed in SEEDS]
-        batch = Batch(worlds)
+        batch = Batch(worlds, workers)
         for _ in range(TICKS):
-            batch.step(workers, 1)
+            batch.step(1)
         hashes[workers] = [world.state_hash() for world in worlds]
     assert hashes[1] == hashes[8]
 
@@ -110,15 +117,15 @@ def test_the_batch_reports_in_index_order_and_not_in_worker_order() -> None:
         world = World(width=side, height=side, seed=100 + index, faction_count=2)
         world.seed_world()
         worlds.append(world)
-    batch = Batch(worlds)
-    rows = batch.step(2, 1)
+    batch = Batch(worlds, 2)
+    rows = batch.step(1)
     assert [row.index for row in rows] == list(range(len(sides)))
 
 
 def test_the_batch_hands_back_the_world_the_caller_gave_it() -> None:
     """A world of a batch is the world the caller built, and not a copy."""
     worlds = [build(seed) for seed in SEEDS]
-    batch = Batch(worlds)
+    batch = Batch(worlds, 2)
     for index, world in enumerate(worlds):
         assert batch.world(index) is world
     with pytest.raises(IndexError):
@@ -129,15 +136,72 @@ def test_a_batch_refuses_one_world_twice() -> None:
     """Two entries of one world would put two workers on one lock."""
     world = build(SEEDS[0])
     with pytest.raises(ConfigError):
-        Batch([world, world])
+        Batch([world, world], 2)
 
 
 def test_a_batch_refuses_no_world_and_refuses_a_count_of_zero() -> None:
     """An empty batch and a zero count are refusals, not silent no-ops."""
     with pytest.raises(ConfigError):
-        Batch([])
-    batch = Batch([build(SEEDS[0])])
+        Batch([], 1)
+    with pytest.raises(ConfigError):
+        Batch([build(SEEDS[0])], 0)
+    batch = Batch([build(SEEDS[0])], 1)
     with pytest.raises(StepError):
-        batch.step(0, 1)
-    with pytest.raises(StepError):
-        batch.step(1, 0)
+        batch.step(0)
+
+
+def count_threads() -> int:
+    """Count the threads of this process.
+
+    The kernel lists one directory for each thread of the process. The count
+    is therefore the thread count, and it needs no timing.
+    """
+    return len(os.listdir("/proc/self/task"))
+
+
+@pytest.mark.skipif(
+    not os.path.isdir("/proc/self/task"),
+    reason="the thread count comes from the process table of this kernel",
+)
+def test_a_batch_builds_its_workers_once_and_keeps_them() -> None:
+    """The batch builds its workers when the caller builds it, not per step.
+
+    A batch that built its workers inside the step would show no thread
+    between two steps, and a new one during each. The count below is taken
+    between steps, when no worker of a world's own step is running, so a
+    batch that reused nothing would read the base count every time.[^3]
+    """
+    workers = 3
+    worlds = [build(seed) for seed in SEEDS]
+    # An earlier test may still hold a batch through a traceback. Collect
+    # first, so that the base count is this test's base and not that one's.
+    gc.collect()
+    base = count_threads()
+
+    batch = Batch(worlds, workers)
+    after_build = count_threads()
+    assert after_build == base + workers, (
+        "the batch must build its workers when the caller builds the batch"
+    )
+
+    for _ in range(TICKS):
+        batch.step(1)
+        assert count_threads() == after_build, (
+            "the batch must reuse the workers it built, and build no more"
+        )
+
+
+@pytest.mark.skipif(
+    not os.path.isdir("/proc/self/task"),
+    reason="the thread count comes from the process table of this kernel",
+)
+def test_a_batch_ends_its_workers_when_it_goes() -> None:
+    """The workers go with the batch, so a run leaks no thread."""
+    gc.collect()
+    base = count_threads()
+    batch = Batch([build(seed) for seed in SEEDS], 3)
+    batch.step(1)
+    assert count_threads() > base
+    del batch
+    gc.collect()
+    assert count_threads() == base, "a batch that went must leave no worker behind"
