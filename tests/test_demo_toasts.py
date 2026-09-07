@@ -70,3 +70,33 @@ def test_a_collapse_names_the_nation_the_thing_the_place_and_the_cause(
     assert f"near {Names(world.seed).place(q, r)}" in line
     # The line names a nation and not an index.
     assert "Faction " not in line
+
+
+def test_a_founding_line_names_the_nation_and_not_the_index() -> None:
+    """The line that says who founded names a nation.
+
+    The deck reads a name for a collapse, for a war and for a first
+    character. The founding line read the index instead, so one deck showed a
+    watcher a number beside a name and the watcher could not join them.
+
+    The test steps the engine and reads the deck, because a made-up log would
+    prove that the formatting works and not that the deck reaches the
+    engine.[^1]
+
+    References
+    ----------
+    [^1]: Testing rules, section 5. ``.agents/rules/testing.md``
+    """
+    world = World(width=EXTENT, height=EXTENT, seed=SEED, faction_count=FACTIONS)
+    world.seed_world()
+    names = Names(world.seed)
+    announcer = Announcer(names)
+    announcer.after_step(world, 0.0)
+
+    lines = [text for text in announcer.toasts.texts() if "founds a settlement" in text]
+    assert lines, f"the deck said nothing about a founding: {announcer.toasts.texts()}"
+    for line in lines:
+        assert "Faction " not in line, f"the line prints an index: {line}"
+    assert any(line.startswith(names.faction(0)) for line in lines), (
+        f"no line starts with the name of a nation: {lines}"
+    )
