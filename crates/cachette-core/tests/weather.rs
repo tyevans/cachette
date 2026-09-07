@@ -1684,24 +1684,81 @@ fn the_insolation_holds_the_published_table() {
     );
 }
 
+/// Returns the highest and the lowest sun term at one latitude over a year.
+fn reach_at(latitude: i32) -> (i32, i32) {
+    let mut top = i32::MIN;
+    let mut floor = i32::MAX;
+    for tick in 0..weather::SEASON_PERIOD_TICKS as u64 {
+        let value = weather::season_at(Tick(tick), latitude);
+        top = top.max(value);
+        floor = floor.min(value);
+    }
+    (top, floor)
+}
+
 /// The pole holds a summer and a winter, and they are half a year apart.
+///
+/// **Every check here is an equality or an ordering, and none is a margin.**
+/// The test carried a margin of sixty units while the sun term was normalised
+/// onto a swing the heat scale reserved. The term states absolute degrees now,
+/// so a count of units on that scale means nothing, and a margin written
+/// against it would be a number chosen to pass.[^1]
+///
+/// **A solstice is an extreme at a pole and nowhere else.** A pole has one day
+/// and one night in the year, so its warmest and coldest moments are the two
+/// solstices exactly. At any other latitude the extreme lags or leads, so this
+/// equality is a property of a pole and it is the sharpest statement the term
+/// allows.
+///
+/// **The largest swing on the globe stands at a pole.** That is the anchor the
+/// season normaliser is read at, so a change that moved the largest anomaly
+/// anywhere else would leave the normaliser describing a latitude that no
+/// longer holds the extreme.[^2]
+///
+/// # References
+///
+/// [^1]: ADR-0182, the temperature a cell is driven toward is a published energy balance, decisions D1 and D2. `docs/adrs/draft/adr-0182-the-temperature-a-cell-is-driven-toward-is-a-published-energy-balance.md`
+/// [^2]: ADR-0182, decision D3. `docs/adrs/draft/adr-0182-the-temperature-a-cell-is-driven-toward-is-a-published-energy-balance.md`
 #[test]
 fn each_pole_holds_a_summer_of_its_own() {
     let quarter = weather::SEASON_PERIOD_TICKS as u64 / 4;
     let pole = 90 * weather::LATITUDE_FINE;
     let summer = weather::season_at(Tick(quarter), pole);
     let winter = weather::season_at(Tick(3 * quarter), pole);
+    let (top, floor) = reach_at(pole);
+    assert_eq!(
+        summer, top,
+        "the pole read {summer} at its solstice and {top} at its warmest moment"
+    );
+    assert_eq!(
+        winter, floor,
+        "the pole read {winter} at its solstice and {floor} at its coldest moment"
+    );
     assert!(
-        summer > winter + 60,
+        summer > winter,
         "the pole read {summer} in its summer and {winter} in its winter"
     );
-    // The two poles are opposite. One is in summer while the other is in
-    // winter.
+
+    // The two poles are opposite. One stands at its own warmest moment while
+    // the other stands at its own coldest, at the same tick.
     let other = weather::season_at(Tick(quarter), -pole);
-    assert!(
-        summer > other + 60,
-        "the two poles read {summer} and {other} at the same tick"
+    let (_, other_floor) = reach_at(-pole);
+    assert_eq!(
+        other, other_floor,
+        "the far pole read {other} while this one read its summer, and its own \
+         coldest moment is {other_floor}"
     );
+
+    // No latitude swings further over the year than a pole does.
+    let polar = top - floor;
+    for degree in -90..=90 {
+        let (high, low) = reach_at(degree * weather::LATITUDE_FINE);
+        assert!(
+            high - low <= polar,
+            "the sun swings {} at {degree} degrees and {polar} at a pole",
+            high - low
+        );
+    }
 }
 
 /// The annual mean of the sun term falls from the equator to the pole.
@@ -1953,68 +2010,6 @@ fn the_banded_pressure_follows_the_world_row_and_not_the_lattice_row() {
         "a margin cell beyond the pole reads a latitude that no world row holds"
     );
     assert!(inner.height() > 0);
-}
-
-/// Returns the highest and the lowest sun term over the globe and the year.
-fn sun_reach() -> (i32, i32) {
-    let mut top = i32::MIN;
-    let mut floor = i32::MAX;
-    for degree in -90..=90 {
-        let latitude = degree * weather::LATITUDE_FINE;
-        for tick in 0..weather::SEASON_PERIOD_TICKS as u64 {
-            let value = weather::season_at(Tick(tick), latitude);
-            top = top.max(value);
-            floor = floor.min(value);
-        }
-    }
-    (top, floor)
-}
-
-/// The sun term reaches the whole swing the heat scale reserves, at each end.
-///
-/// **This is the test that a written normaliser fails.** The belt peaks at the
-/// equator, where the season is near nothing. The season peaks at the middle
-/// latitudes, where the belt is near nothing. So the sum of the two amplitudes
-/// names a swing that no place and no moment holds. The term therefore
-/// normalises the sum against the reach that its own geometry gives, and that
-/// reach maps onto the reserved swing exactly.
-#[test]
-fn the_sun_term_reaches_the_whole_swing_that_the_scale_reserves() {
-    let (top, floor) = sun_reach();
-    assert_eq!(
-        top,
-        weather::SEASON_SWING,
-        "the warmest place at the warmest moment reads {top} degrees of sun"
-    );
-    assert_eq!(
-        floor,
-        -weather::SEASON_SWING,
-        "the coldest place at the coldest moment reads {floor} degrees of sun"
-    );
-}
-
-/// The warmest sun stands in the subtropics and not at the equator.
-///
-/// The published geometry puts the highest daily energy of the year over the
-/// summer subtropics. The belt is still strong there and the season is near
-/// its own peak. A term that peaked at the equator would put the hottest
-/// ground of the world in the rain belt.
-#[test]
-fn the_warmest_sun_stands_between_the_equator_and_the_middle_latitude() {
-    let over_a_year = |latitude: i32| -> i32 {
-        (0..weather::SEASON_PERIOD_TICKS as u64)
-            .map(|tick| weather::season_at(Tick(tick), latitude))
-            .max()
-            .unwrap_or(0)
-    };
-    let equator = over_a_year(0);
-    let subtropics = over_a_year(33 * weather::LATITUDE_FINE);
-    let far = over_a_year(60 * weather::LATITUDE_FINE);
-    assert!(
-        subtropics > equator && subtropics > far,
-        "the sun reads {equator} at the equator, {subtropics} in the subtropics \
-         and {far} at sixty degrees"
-    );
 }
 
 /// A world that spans three degrees reads a flat slice of the same sun.
