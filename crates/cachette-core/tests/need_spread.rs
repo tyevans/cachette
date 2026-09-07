@@ -24,10 +24,24 @@
 //! produced.[^5]
 //!
 //! **Two placements bound the answer, and neither is a prediction.** The mixed
-//! placement gives neighbouring units different homes, so their stores differ
-//! and their needs diverge. The clustered placement gives every unit of one
-//! region the same home. The measurement register bounds its own collapse
-//! figure the same way, with a packed placement and a scattered one.[^2]
+//! placement gives neighbouring units different homes, so their stores differ.
+//! The clustered placement gives every unit of one region the same home. The
+//! measurement register bounds its own collapse figure the same way, with a
+//! packed placement and a scattered one.[^2]
+//!
+//! **Neither placement is the upper bound of the other.** This file once
+//! asserted that the mixed placement spreads the needs at least as far as the
+//! clustered one, on the ground that different homes hold different stores.
+//! That reasoning was sound when a cohort divided its share by its headcount,
+//! because every unit of one home then held one need and the placement was the
+//! only source of spread. A cohort now serves whole rations to as many of its
+//! units as its share covers, and rotates which ones on every frame, so a
+//! single cohort spreads its own needs.[^6] Measured, that within-cohort spread
+//! is the larger term: a clustered cell holds about nine homes and more
+//! distinct needs than a mixed cell that holds about forty-six. The count a
+//! cell reaches is bounded by the production classes the sites hold, not by
+//! the number of homes standing in it. The findings register holds the
+//! measurement.[^7]
 //!
 //! Run it and read the table:
 //!
@@ -42,6 +56,8 @@
 //! [^3]: Decisions register, DEC-097. `docs/DECISIONS.md`
 //! [^4]: Blockers register, BLK-007. `docs/BLOCKERS.md`
 //! [^5]: Testing rules, section 5. `.claude/rules/testing.md`
+//! [^6]: ADR-0106, a cohort serves whole rations to a keyed subset, never an equal share to everybody, decisions D1 and D2. `docs/adrs/draft/adr-0106-a-cohort-serves-whole-rations-to-a-keyed-subset.md`
+//! [^7]: Findings register, FND-620. `docs/FINDINGS.md`
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -344,12 +360,31 @@ fn distinct(held: &BTreeMap<u32, Vec<Fix32>>, buckets: Option<NeedBuckets>) -> V
 /// [^1]: Testing rules, section 2a. `.claude/rules/testing.md`
 #[test]
 fn a_world_that_consumes_spreads_the_needs_of_one_cell() {
+    // **The two placements must differ in the way this file claims.** The
+    // mixed placement is supposed to put many homes in one cell and the
+    // clustered one few. That is the whole difference between the two runs, so
+    // the file asserts it rather than trusting the arithmetic that produces
+    // the home of each unit. A change to the stride, to the site count or to
+    // the extent could make the two placements the same, and every number
+    // below would then be one measurement reported twice.
+    let mixed_homes = homes_in_the_median_cell(Placement::Mixed);
+    let clustered_homes = homes_in_the_median_cell(Placement::Clustered);
+    assert!(
+        mixed_homes > clustered_homes,
+        "the mixed placement put {mixed_homes} homes in the median cell and \
+         the clustered one put {clustered_homes}, so the two runs are one run"
+    );
+
     let (mixed_units, mixed_exact) = report(Placement::Mixed);
     let (clustered_units, clustered_exact) = report(Placement::Clustered);
 
     assert!(
         mixed_exact > 1,
         "the mixed fixture put one need in the median cell, so it measures the fixture"
+    );
+    assert!(
+        clustered_exact > 1,
+        "the clustered fixture put one need in the median cell, so it measures the fixture"
     );
     assert!(
         mixed_exact <= mixed_units,
@@ -359,9 +394,31 @@ fn a_world_that_consumes_spreads_the_needs_of_one_cell() {
         clustered_exact <= clustered_units,
         "a cell cannot hold more distinct needs than it holds units"
     );
-    assert!(
-        mixed_exact >= clustered_exact,
-        "the mixed placement must not spread the needs less than the clustered one, \
-         because it gives neighbouring units different stores"
-    );
+}
+
+/// Returns the distinct home sites standing in the median occupied cell.
+///
+/// The fixture places a unit and gives it a home, and the unit then walks. The
+/// count is taken after the same frames the needs are read over, so it reports
+/// the cells the assertions read and not the placement alone.
+fn homes_in_the_median_cell(placement: Placement) -> usize {
+    let mut world = consuming_world(placement);
+    for _ in 0..SAMPLES[SAMPLES.len() - 1] {
+        world.step(4).expect("the step must run");
+    }
+    let arena = world.soldiers();
+    let layout = world.pyramid().layout();
+    let mut held: BTreeMap<u32, BTreeSet<u32>> = BTreeMap::new();
+    for unit in arena.iter() {
+        let (Some(tile), Some(Some(home))) = (arena.tile(unit), arena.home(unit)) else {
+            continue;
+        };
+        let Some(key) = layout.key_of(tile) else {
+            continue;
+        };
+        held.entry(layout.block_of_key(key))
+            .or_default()
+            .insert(home);
+    }
+    median(held.values().map(BTreeSet::len).collect())
 }

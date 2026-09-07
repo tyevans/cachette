@@ -460,6 +460,8 @@ fn the_rival_is_the_largest_other_faction_and_a_tie_goes_low() {
 struct SpeakerRun {
     /// The ticks on which the second faction held no speaker.
     speechless: usize,
+    /// The ticks on which the second faction held a speaker.
+    speaking: usize,
     /// The relation commands the second faction planned on those ticks.
     while_speechless: usize,
     /// The relation commands the second faction planned over the whole run.
@@ -498,6 +500,7 @@ fn speaker_run(b_speaks: bool) -> SpeakerRun {
     let start = world.relation(A, B).expect("the pair exists");
     let mut run = SpeakerRun {
         speechless: 0,
+        speaking: 0,
         while_speechless: 0,
         total: 0,
         moves: 0,
@@ -523,6 +526,9 @@ fn speaker_run(b_speaks: bool) -> SpeakerRun {
             })
             .count();
         run.total += by_b;
+        if spoke {
+            run.speaking += 1;
+        }
         if !spoke {
             run.speechless += 1;
             run.while_speechless += by_b;
@@ -580,11 +586,28 @@ fn the_controller_moves_a_relation_through_the_verb() {
         speaks.end
     );
 
-    // Each run must reach the case. A run in which the second faction speaks
-    // on every tick reads the gate on nothing at all.
+    // **Each run must reach the case it exists for, and the two cases are not
+    // the same.** The silent run carries the evidence: it must hold ticks on
+    // which the second faction had no speaker, because those are the ticks the
+    // gate answers for. The speaking run is the control: it must hold ticks on
+    // which the second faction did have one, because a control that never
+    // spoke would plan nothing for a reason other than the gate.
+    //
+    // **The guard once asked both runs to go speechless, and that asked the
+    // control to stop being a control.** A run that gives every unit of the
+    // second faction the leader row holds a speaker from its first tick, and
+    // it loses one only if every such unit dies. Nothing in the gate rule
+    // needs that to happen. The silent run reads the gate on every one of its
+    // speechless ticks, and the control reads the other side of it.
     assert!(
-        silent.speechless > 0 && speaks.speechless > 0,
-        "the second faction held a speaker on every tick, so the gate was never read"
+        silent.speechless > 0,
+        "the second faction held a speaker on every tick of the silent run, \
+         so the gate was never read"
+    );
+    assert!(
+        speaks.speaking > 0,
+        "the second faction held no speaker on any tick of the speaking run, \
+         so the control never reached the case it exists for"
     );
     assert_eq!(
         silent.while_speechless, 0,
