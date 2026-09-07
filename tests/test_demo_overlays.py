@@ -21,6 +21,8 @@ ADR-0094, the caller owns the camera and the pixels, decision D5.
 
 from __future__ import annotations
 
+from string import ascii_uppercase
+
 import pytest
 
 from cachette import FrameError, World
@@ -30,6 +32,7 @@ from cachette.demo.app import (
     _choose_overlay_key,
     overlay_keys,
 )
+from cachette.names import Names
 
 # A world small enough to step many times in a test.
 WIDTH = 32
@@ -37,28 +40,40 @@ HEIGHT = 32
 SEED = 0x0123_4567_89AB_CDEF
 FACTIONS = 3
 
-# The number keys the mapping may use.
-HIGHEST_NUMBER_KEY = 9
+# The digit keys a keyboard carries.
+DIGIT_KEYS = 10
 
 
 def a_demo() -> Demo:
     """Build a demonstration over a small world."""
     world = World(width=WIDTH, height=HEIGHT, seed=SEED, faction_count=FACTIONS)
-    return Demo(world, width=320, height=240, threads=1)
+    return Demo(world, Names(world.seed), width=320, height=240, threads=1)
 
 
 class Keys:
     """A stand-in for the key names the window library holds.
 
-    The tests must not need a window library or a display, so this names the
-    number keys and nothing else. The library names a number key with a
-    leading underscore.
+    The tests must not need a window library or a display. Importing the real
+    key names opens a window, and that fails on a machine with no display, so
+    this names the keys itself.
+
+    **This names a whole keyboard, and not the keys the mapping uses today.**
+    A stand-in that named only the digits made every overlay past the ninth
+    look like an overlay with no key, because the mapping spills onto letters
+    once the digits run out. That is a defect of the stand-in and not of the
+    mapping.
+
+    The library names a digit with a leading underscore, names a letter by its
+    capital, and gives each one its ASCII code. This does the same, so a
+    symbol here is the symbol a keyboard sends.
     """
 
     def __init__(self) -> None:
-        """Name every number key from zero upward."""
-        for number in range(HIGHEST_NUMBER_KEY + 1):
-            setattr(self, f"_{number}", 2000 + number)
+        """Name every digit key and every letter key."""
+        for number in range(DIGIT_KEYS):
+            setattr(self, f"_{number}", ord(str(number)))
+        for letter in ascii_uppercase:
+            setattr(self, letter, ord(letter))
 
     def number(self, digit: int) -> int:
         """Give back the symbol of one number key."""
