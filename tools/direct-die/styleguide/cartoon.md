@@ -5,8 +5,7 @@ terrain tile or an upgrade tile on a strategy game world map. A tile is
 one SVG document. The map draws it at 64 pixels. A person looks at it at
 384 pixels only when that person judges it.
 
-The style is bold and friendly. The drawing looks moulded from thick
-coloured plastic.
+The style is bold and friendly in the style of studio ghibli.  the art, a high quality game tile.
 
 ## 1. Geometry and mechanics
 

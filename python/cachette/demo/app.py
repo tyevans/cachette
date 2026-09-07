@@ -979,7 +979,11 @@ def _overlay_key_line() -> str:
 
     keys = overlay_keys(key)
     names = World.overlay_names()
-    named = ", ".join(f"{label} {name}" for (_, label), name in zip(keys, names))
+    # The two lists may differ in length, and the line below names what is
+    # left over, so the pairing stops at the shorter of the two on purpose.
+    named = ", ".join(
+        f"{label} {name}" for (_, label), name in zip(keys, names, strict=False)
+    )
     # An overlay past the last free key is still real, and a watcher who cannot
     # see it named would believe the renderer holds fewer than it does.
     spare = names[len(keys) :]
