@@ -149,7 +149,7 @@ def read_feedback(
         denies,
         tuple(ranked),
         note.strip() if isinstance(note, str) else "",
-        text if isinstance(text, str) else "",
+        text.strip() if isinstance(text, str) else "",
     )
 
 
