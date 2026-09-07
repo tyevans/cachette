@@ -150,7 +150,13 @@ impl Group {
 /// of a cell are the six months around its own summer, which the probe finds
 /// from the temperature rather than from the calendar, so the two hemispheres
 /// need no separate rule.
-fn grade(record: &Record, rain_for_each_drop: i64, whole: i64) -> Group {
+///
+/// **The boundary between the temperate and the continental class is a
+/// parameter, because the published scheme has two variants of it.** One puts
+/// it at a coldest month of 0 degrees and the other at −3 degrees. The
+/// difference is a convention and not a physical claim, so the probe reports
+/// both rather than choosing.
+fn grade(record: &Record, rain_for_each_drop: i64, whole: i64, boundary: i64) -> Group {
     let millimetres = |month: usize| record.water_of(month) * rain_for_each_drop / whole;
     let annual: i64 = (0..MONTHS).map(millimetres).sum();
     let mean = record.mean_degrees();
@@ -198,7 +204,7 @@ fn grade(record: &Record, rain_for_each_drop: i64, whole: i64) -> Group {
         }
         return Group::Tundra;
     }
-    if coldest >= 0 {
+    if coldest >= boundary {
         Group::Temperate
     } else {
         Group::Continental
@@ -311,7 +317,12 @@ fn main() {
          {MEAN_ANNUAL_RAIN} millimetres"
     );
 
+    // The two published boundaries between the temperate and the continental
+    // class. The probe grades the same world under each.
+    for (label, boundary) in [("0 C", 0i64), ("-3 C", -3i64)] {
     let bands = 12u32;
+    println!();
+    println!("=== the C and D boundary at a coldest month of {label} ===");
     println!();
     println!(
         "  band  latitude  cells   mean C  coldest C  warmest C   rain mm    \
@@ -349,7 +360,7 @@ fn main() {
             / count;
         let mut counts = [0usize; 7];
         for record in &members {
-            let group = grade(record, rain_for_each_drop, whole);
+            let group = grade(record, rain_for_each_drop, whole, boundary);
             let at = Group::ALL
                 .iter()
                 .position(|other| *other == group)
@@ -383,6 +394,7 @@ fn main() {
         );
     }
 
+    }
     // The two headline questions, in one line each.
     let band_of = |degrees: i32| -> Vec<&Record> {
         let low = degrees - 8;

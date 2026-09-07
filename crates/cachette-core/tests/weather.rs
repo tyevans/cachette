@@ -328,7 +328,15 @@ fn a_per_tile_field_conserves_water_exactly() {
     for frame in 0..24 {
         world.step(4).expect("the step must run");
         let field = world.weather();
-        let accounted = field.air_total().0 + field.ground_total().0 + field.evaporated();
+        // **The cloud is the third stored term of the account.** Condensed
+        // water is carried state, so a check that adds only the air and the
+        // ground is short by whatever the sky is holding.[^1]
+        //
+        // [^1]: ADR-0183, condensed water is carried state that falls on a published timescale, decision D1. `docs/adrs/draft/adr-0183-condensed-water-is-carried-state-that-falls-on-a-published-timescale.md`
+        let accounted = field.air_total().0
+            + field.cloud_total().0
+            + field.ground_total().0
+            + field.evaporated();
         assert_eq!(
             accounted,
             field.raised(),
@@ -441,7 +449,15 @@ fn the_water_account_balances_at_every_frame() {
     for frame in 0..48 {
         world.step(4).expect("the step must run");
         let field = world.weather();
-        let accounted = field.air_total().0 + field.ground_total().0 + field.evaporated();
+        // **The cloud is the third stored term of the account.** Condensed
+        // water is carried state, so a check that adds only the air and the
+        // ground is short by whatever the sky is holding.[^1]
+        //
+        // [^1]: ADR-0183, condensed water is carried state that falls on a published timescale, decision D1. `docs/adrs/draft/adr-0183-condensed-water-is-carried-state-that-falls-on-a-published-timescale.md`
+        let accounted = field.air_total().0
+            + field.cloud_total().0
+            + field.ground_total().0
+            + field.evaporated();
         assert_eq!(
             accounted,
             field.raised(),
@@ -1360,7 +1376,7 @@ fn a_sky_that_loses_capacity_puts_its_water_on_the_ground() {
     let field = world.weather();
     assert_eq!(
         field.raised(),
-        field.air_total().0 + field.ground_total().0 + field.evaporated(),
+        field.air_total().0 + field.cloud_total().0 + field.ground_total().0 + field.evaporated(),
         "the account is not exact after the storm drained"
     );
 }

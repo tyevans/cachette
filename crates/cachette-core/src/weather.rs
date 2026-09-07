@@ -23,7 +23,7 @@
 //! every moment, and a check reports it:
 //!
 //! ```text
-//! raised == air total + ground total + evaporated
+//! raised == air total + cloud total + ground total + evaporated
 //! ```
 //!
 //! # What carries the water
@@ -1502,6 +1502,24 @@ const _: () = assert!(
 );
 const _: () = assert!(FALL_NUMERATOR_FLOOR + FALL_FOR_FULL_AIR < FALL_DENOMINATOR);
 
+/// The share of the cloud of a cell that reaches the ground in one solve.
+///
+/// **This is a published timescale and not a chosen share.** A cloud converts
+/// from vapour over about a thousand seconds and falls over about another
+/// thousand, and one tick of this engine carries about a hundred and forty
+/// seconds of simulated time. So one seventh of the cloud reaches the ground
+/// in one solve, and water travels the wind for the ticks it takes to
+/// fall.[^1] [^2]
+///
+/// # References
+///
+/// [^1]: Research report 30, the published atmospheric math, section 3.1. `docs/research/reports/30-the-published-atmospheric-math.md`
+/// [^2]: ADR-0183, condensed water is carried state that falls on a published timescale, decision D3. `docs/adrs/draft/adr-0183-condensed-water-is-carried-state-that-falls-on-a-published-timescale.md`
+const CLOUD_FALL_NUMERATOR: i64 = 1;
+
+/// The whole of the share that the cloud of a cell gives up in one solve.
+const CLOUD_FALL_DENOMINATOR: i64 = 7;
+
 /// The share of the water on the ground that leaves the world in one solve.
 const DRY_DIVISOR: i64 = 32;
 
@@ -2844,6 +2862,18 @@ pub struct WeatherField {
     /// The water in the air above each cell, in cell index order. It is empty
     /// until the first drop enters the world.
     air: Vec<Drops>,
+    /// The condensed water the air of each cell carries, in the same order.
+    ///
+    /// **Cloud is not vapour and it is not rain.** Vapour is what the air
+    /// holds invisibly and it does not fall. Cloud is what condensed out of
+    /// it, and it falls on a timescale while the wind carries it. Keeping the
+    /// two apart is what lets a storm form in one cell and rain in
+    /// another.[^2]
+    ///
+    /// # References
+    ///
+    /// [^2]: ADR-0183, condensed water is carried state that falls on a published timescale, decision D1. `docs/adrs/draft/adr-0183-condensed-water-is-carried-state-that-falls-on-a-published-timescale.md`
+    cloud: Vec<Drops>,
     /// The water on the ground of each cell, in the same order.
     ground: Vec<Drops>,
     /// The write half of one transport pass.
@@ -2989,6 +3019,7 @@ impl WeatherField {
             band,
             faction_count,
             air: Vec::new(),
+            cloud: Vec::new(),
             ground: Vec::new(),
             scratch: Vec::new(),
             wind: vec![Wind::STILL; count],
@@ -3297,6 +3328,29 @@ impl WeatherField {
     #[must_use]
     pub fn air_total(&self) -> Accum {
         total_of(&self.air)
+    }
+
+    /// Returns the condensed water the air carries over the whole lattice.
+    ///
+    /// **The total holds the margin as well as the world**, for the reason
+    /// the air total states. **It is a third term of the water account**, so
+    /// a reader that checks the account against the raised total must add it
+    /// to the air and the ground.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0183, condensed water is carried state that falls on a published timescale, decision D1. `docs/adrs/draft/adr-0183-condensed-water-is-carried-state-that-falls-on-a-published-timescale.md`
+    #[must_use]
+    pub fn cloud_total(&self) -> Accum {
+        total_of(&self.cloud)
+    }
+
+    /// Returns the condensed water the air of one cell carries.
+    ///
+    /// Returns nothing when the cell lies outside the lattice.
+    #[must_use]
+    pub fn cloud_drops_at(&self, cell: u32) -> Drops {
+        self.cloud.get(cell as usize).copied().unwrap_or(Drops::ZERO)
     }
 
     /// Returns the water on the ground over the whole lattice.
@@ -3788,6 +3842,7 @@ impl WeatherField {
         }
         let count = self.cells().tile_count() as usize;
         self.air = vec![Drops::ZERO; count];
+        self.cloud = vec![Drops::ZERO; count];
         self.ground = vec![Drops::ZERO; count];
         self.scratch = vec![Drops::ZERO; count];
     }
@@ -3823,13 +3878,28 @@ impl WeatherField {
         }
         let pass = Pass {
             cells: self.cells(),
-            air: &self.air,
+            plane: &self.air,
             wind: &self.wind,
         };
         run_in_chunks(count, threads, &mut self.scratch, |low, out| {
             pass.fill(low, out);
         });
         self.air.copy_from_slice(&self.scratch);
+        // **The cloud rides the wind too, and that is why it is a plane.**
+        // Condensed water that fell in the cell it formed in could not
+        // travel, so no storm crossed a coast and rain stood where the air
+        // first met colder ground.[^2]
+        //
+        // [^2]: ADR-0183, condensed water is carried state that falls on a published timescale, decision D2. `docs/adrs/draft/adr-0183-condensed-water-is-carried-state-that-falls-on-a-published-timescale.md`
+        let pass = Pass {
+            cells: self.cells(),
+            plane: &self.cloud,
+            wind: &self.wind,
+        };
+        run_in_chunks(count, threads, &mut self.scratch, |low, out| {
+            pass.fill(low, out);
+        });
+        self.cloud.copy_from_slice(&self.scratch);
     }
 
     /// Drops part of the air onto the ground, and dries part of the ground.
@@ -3887,7 +3957,15 @@ impl WeatherField {
             let held = self.air[cell];
             let poured = Drops((held.0 - capacity.0).max(0));
             self.air[cell] = Drops(held.0 - poured.0);
-            self.ground[cell] = self.ground[cell].combine(poured);
+            // **Condensation makes cloud, and cloud is not rain.** What the
+            // air cannot hold becomes condensed water in the cloud plane,
+            // which the transport then carries. The old rule put it on the
+            // ground of the same cell in the same solve, so no condensed drop
+            // ever moved and the rain of a cell was decided by its own
+            // ground.[^7]
+            //
+            // [^7]: ADR-0183, condensed water is carried state that falls on a published timescale, decision D1. `docs/adrs/draft/adr-0183-condensed-water-is-carried-state-that-falls-on-a-published-timescale.md`
+            self.cloud[cell] = self.cloud[cell].combine(poured);
 
             // **What is left drizzles in proportion to how full it is.** A
             // full sky gives up a share each solve and a clear one gives up
@@ -3896,7 +3974,20 @@ impl WeatherField {
             let numerator = fall_numerator(air, capacity);
             let fallen = share_of(air, numerator, FALL_DENOMINATOR);
             self.air[cell] = Drops(air.0 - fallen.0);
-            self.ground[cell] = self.ground[cell].combine(fallen);
+            self.cloud[cell] = self.cloud[cell].combine(fallen);
+
+            // **The cloud gives up a fixed share to the ground each solve,
+            // and that share is a published timescale.** A cloud converts and
+            // falls over about a thousand seconds each, so at the simulated
+            // time one tick carries the share is about one seventh. The share
+            // is what gives a storm a distance: the water travels the wind
+            // for as long as it takes to fall.[^8]
+            //
+            // [^8]: ADR-0183, condensed water is carried state that falls on a published timescale, decision D3. `docs/adrs/draft/adr-0183-condensed-water-is-carried-state-that-falls-on-a-published-timescale.md`
+            let carried = self.cloud[cell];
+            let rain = share_of(carried, CLOUD_FALL_NUMERATOR, CLOUD_FALL_DENOMINATOR);
+            self.cloud[cell] = Drops(carried.0 - rain.0);
+            self.ground[cell] = self.ground[cell].combine(rain);
 
             // **Water leaves the ground of a cell at one site, and the room
             // above it decides where that water goes.** Two terms take it off
@@ -4137,7 +4228,9 @@ fn sent(air: Drops, wind: Wind, direction: usize) -> Drops {
 #[derive(Clone, Copy)]
 struct Pass<'a> {
     cells: Grid,
-    air: &'a [Drops],
+    /// The plane the pass carries. The air and the cloud both ride it, one
+    /// after the other, because a transfer reads only the plane and the wind.
+    plane: &'a [Drops],
     wind: &'a [Wind],
 }
 
@@ -4156,7 +4249,7 @@ impl Pass<'_> {
             let Some(address) = self.cells.address_of(TileIdx(index as u32)) else {
                 continue;
             };
-            let here = self.air[index];
+            let here = self.plane[index];
             let blowing = self.wind[index];
 
             let mut kept = here.0;
@@ -4175,7 +4268,7 @@ impl Pass<'_> {
                 // The neighbour faces this cell the other way round, so the
                 // direction is the opposite one. Both ends compute this from
                 // the same settled planes, so they reach one integer.
-                taken = taken.combine(sent(self.air[at], self.wind[at], opposite(direction)));
+                taken = taken.combine(sent(self.plane[at], self.wind[at], opposite(direction)));
             }
             *cell = Drops(kept).combine(taken);
         }
