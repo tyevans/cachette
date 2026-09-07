@@ -50,7 +50,14 @@ const TICKS_IN_A_SECOND: u64 = 10;
 const FORMATION: u64 = 1_000;
 
 /// The capacity of ordinary ground, in units.
-const ORDINARY_CAPACITY: u64 = 8;
+///
+/// The test reads the terrain declaration rather than restating it, so no
+/// second declaration of the capacity can disagree with the first.[^1]
+///
+/// # References
+///
+/// [^1]: Recurring Defect Shapes, shape 1. `.agents/rules/recurring-defects.md`
+const ORDINARY_CAPACITY: u64 = cachette_core::terrain::ORDINARY_CAPACITY as u64;
 
 /// Returns the ticks that a formation takes to pass a chokepoint.
 ///
