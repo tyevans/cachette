@@ -1,0 +1,9 @@
+{
+  "faults": [
+    "The four inner hexagons are too small; at 64 pixels they are barely visible. Increase the size of the inner shapes so they are at least 5 units wide and clearly legible at the display size.",
+    "The design is generic and does not read as a 'dense pine forest' in a quarter of a second. Replace the abstract hexagon cluster with a more recognizable forest motif, such as a stylized tree canopy or a single large tree shape.",
+    "The use of four separate shapes creates visual noise at the display size. Reduce the number of shapes or merge them into a single, more cohesive form."
+  ],
+  "score": 45,
+  "verdict": "The candidate reads as a generic cluster of dots rather than a forest, and the shapes are too small to be legible at the display size."
+}

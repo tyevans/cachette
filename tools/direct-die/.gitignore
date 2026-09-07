@@ -1,4 +1,13 @@
-# The generation loop writes the session tree. The fixture script writes the
-# fixture tree. Neither belongs in the repository.
-sessions/
+# A session is output, not source. One session stays in the tree as sample
+# data, so the review interface has something real to read.
+sessions/*
+!sessions/hex-tile
+sessions/hex-tile/*
+!sessions/hex-tile/20260907-000122
+
+# The fixture script writes a fabricated tree for the review interface.
 fixtures/
+
+__pycache__/
+*.pyc
+.pytest_cache/

@@ -1,0 +1,9 @@
+{
+  "faults": [
+    "Reduce the number of internal shapes to six or fewer; the current design uses seven distinct shapes (base, shadow, three trees, and two negative-space gaps), which violates the 'Draw six shapes or fewer' rule.",
+    "Increase the lightness difference between the tree fill and the base fill; the current dark green is too close in lightness to the base, violating the rule that shapes must differ in lightness, not hue alone.",
+    "Ensure the negative space between the trees is at least 3 units wide; the gaps between the central and side trees are too narrow and merge into a single dark mass at the display size."
+  ],
+  "score": 40,
+  "verdict": "The candidate reads as a forest at the display size, but it uses too many shapes and relies on a hue-only color difference that fails the style guide's contrast rule."
+}

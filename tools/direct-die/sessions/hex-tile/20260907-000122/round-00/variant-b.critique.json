@@ -1,0 +1,9 @@
+{
+  "faults": [
+    "Increase the overall lightness of the base fill and the tree shapes to match the brightness of the accepted 'grassland' exemplar; the current dark green is too low-contrast against the map background.",
+    "Add a darker 'side wall' polygon to the bottom of the hexagon to create the isometric 3D depth seen in the accepted exemplars, rather than using a flat 2D layout.",
+    "Reduce the number of tree shapes from five to three or four to improve readability at the 64-pixel display size, as the current density creates visual noise."
+  ],
+  "score": 45,
+  "verdict": "The candidate is too dark and lacks the isometric depth cues (side walls and top surface) present in the accepted exemplars, making it look like a flat 2D icon rather than a 3D terrain tile."
+}

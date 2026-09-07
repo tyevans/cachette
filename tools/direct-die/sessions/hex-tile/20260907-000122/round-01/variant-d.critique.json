@@ -1,0 +1,9 @@
+{
+  "faults": [
+    "The central dark band is a flat, horizontal rectangle that does not resemble a forest or any natural terrain feature; replace it with a cluster of organic, rounded shapes to suggest a tree canopy.",
+    "The tile lacks the subtle, low-contrast texture seen in the accepted exemplars (grassland and water); the current high-contrast banding makes the tile look like a UI element or a glitch rather than a terrain tile.",
+    "The composition is too sparse and geometric; add more shapes (within the 6-shape limit) to create a sense of density and organic variation appropriate for a 'dense pine forest'."
+  ],
+  "score": 40,
+  "verdict": "The candidate fails to read as a forest at the display size, appearing instead as a generic, abstract geometric shape with a harsh horizontal band."
+}
