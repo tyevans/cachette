@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-610**
+**Next number: FND-612**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -15501,7 +15501,7 @@ the field is.
 **Believed.** The land of this world stands two to three times higher in its own
 range than the land of the Earth stands in its, so the published lapse rate took
 11 to 18 degrees off every land cell. Either the ceiling or the height
-distribution had to move.[^F607A]
+distribution had to move.[^F603A]
 
 **True, and the ceiling alone was enough.** Moving the ceiling from 4000 metres
 to 1500 puts the mean land near 800 metres, which is the published mean for the
@@ -15567,5 +15567,71 @@ motion of the field is not a trade this work will make quietly.
 
 ## References
 
-[^F607A]: Findings register, FND-604. `docs/FINDINGS.md`
 [^F608A]: ADR-0183, condensed water is carried state that falls on a published timescale, decision D1. `docs/adrs/draft/adr-0183-condensed-water-is-carried-state-that-falls-on-a-published-timescale.md`
+
+
+### FND-610 — The cloud plane does not hold up beside the energy balance, and the run that said it did was reading a broken scale
+
+**Believed.** The energy balance reads a relative humidity where it wants a
+cloud cover, so moving that reader onto the condensed water plane would repair
+it.[^F608A]
+
+**True in the reasoning and false in the result.** Moving both readers onto the
+plane did raise the temperate band, from 23 percent of the band at 37 degrees to
+33. **That gain is an artefact and not a repair.**
+
+**Condensed water is not a cover fraction.** The plane holds what has condensed
+and not yet fallen, and it falls at a share of one seventh in each solve, so it
+is a small transient quantity against the capacity of the air. Read as a cover
+it gives about 5 percent everywhere. The cloud term is an anomaly about a mean
+cover of 68 percent, so a uniform 5 percent is a uniform warming of the whole
+world, and that warming is what moved the band.
+
+**A test caught it that the class table could not.** The painted sky over polar
+land reads 13 of a whole sky of 255, where the field requires the high latitudes
+to hold cloud. **The class table cannot see a uniform offset, and a readability
+test can.**
+
+**Evidence.** Runs of the Köppen probe and the weather test binary over the
+demonstration world at a 1500 metre ceiling, on 7 September 2026 on one
+development machine (x86-64). Three arrangements were measured: the driver
+alone, the driver with the plane and the old readers, and the driver with both
+readers moved. The first two differ by about three points of desert and one of
+temperate, which is a wash. Every figure is derived.
+
+**What follows.** **A quantity that is conserved and a quantity that is a
+fraction are not the same shape, and one cannot be substituted for the other by
+changing what a reader points at.** A cloud cover needs its own scale: how much
+condensed water makes an overcast sky. That is a constant nobody has chosen, and
+choosing it against the picture would be fitting.
+
+So the cloud plane is left out of this landing. **It is not wrong. It has no
+correct reader yet**, and the record that adds it already says the two readers
+must move onto it.[^F608A]
+
+### FND-611 — One account, two readers, and only the test knew about the second
+
+**Believed.** Adding a plane to the water account meant updating the account
+check. Three sites in the test file were found and repaired.
+
+**True, and there was a fourth.** The engine carries its own account check, and
+the world invariant calls it every frame. It read the air and the ground and not
+the cloud, so it failed at frame zero with the whole world still empty.
+
+**The failure was correct and the repair was one line each side.** What made it
+cheap was that the invariant runs inside the world rather than only inside a
+test, so it fired on the first frame of an unrelated test rather than waiting
+for a reviewer.
+
+**Evidence.** The weather test binary over the demonstration world on 7
+September 2026 on one development machine (x86-64). Eight tests failed with the
+account short by the cloud; five failed after the engine check was repaired, and
+the three that recovered were the account tests.
+
+**What follows.** **A rule that lives in a test protects one test. A rule that
+lives in the engine protects every caller.** The account is one fact with two
+readers, and only the one inside the engine caught the omission. The finding is
+recorded because the next plane added to any account will meet the same pair.
+
+## References
+
