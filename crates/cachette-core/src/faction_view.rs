@@ -209,6 +209,72 @@ pub enum Admit {
     SeenEver,
 }
 
+/// The two block forms of one faction over one cell of the lattice.
+///
+/// A reader that walks many cells reads the layer of the faction once, and
+/// takes one form for each cell. A reader that looks the form up inside a
+/// loop over the tiles repeats the lookup for every tile of the cell.
+///
+/// **The mask answers for a whole block when the faction saw no tile of
+/// it.** A cell outside everything the faction ever walked therefore costs
+/// no tile work at all, so the cost of a whole-lattice read follows the
+/// observed area and not the world.[^1]
+///
+/// # References
+///
+/// [^1]: ADR-0059, fog storage grows with observed area, not with world area, decision D2. `docs/adrs/accepted/adr-0059-fog-storage-grows-with-observed-area.md`
+pub(crate) struct BlockMask<'a> {
+    visible: Option<&'a BlockForm>,
+    remembered: Option<&'a BlockForm>,
+}
+
+impl<'a> BlockMask<'a> {
+    /// Reads the two forms of one faction over one block.
+    pub(crate) fn of(world: &'a World, faction: FactionId, block: u32) -> Self {
+        Self::new(
+            world
+                .observation()
+                .visible_layer(faction)
+                .and_then(|layer| layer.block(block)),
+            world
+                .observation()
+                .remembered_layer(faction)
+                .and_then(|layer| layer.block(block)),
+        )
+    }
+
+    /// Builds a mask from two forms that the caller already holds.
+    pub(crate) const fn new(
+        visible: Option<&'a BlockForm>,
+        remembered: Option<&'a BlockForm>,
+    ) -> Self {
+        Self {
+            visible,
+            remembered,
+        }
+    }
+
+    /// Reports whether the faction sees no tile of the block and saw none.
+    pub(crate) fn is_empty(&self) -> bool {
+        Self::vacant(self.visible) && Self::vacant(self.remembered)
+    }
+
+    /// Reports whether the faction sees the tile at one offset now.
+    pub(crate) fn sees_now(&self, offset: u32) -> bool {
+        self.visible.is_some_and(|form| form.holds(offset))
+    }
+
+    /// Reports whether the faction saw the tile at one offset once.
+    pub(crate) fn saw_once(&self, offset: u32) -> bool {
+        self.remembered.is_some_and(|form| form.holds(offset))
+    }
+
+    /// Reports whether a form names no tile at all.
+    fn vacant(form: Option<&BlockForm>) -> bool {
+        matches!(form, None | Some(BlockForm::None))
+    }
+}
+
 /// The summary of one cell, over the tiles one faction may read.
 ///
 /// The summary field holds the same fields the whole-world summary holds, so
@@ -314,23 +380,55 @@ impl World {
         admit: Admit,
     ) -> Option<MaskedSummary> {
         let layout = self.observation().layout();
-        let grid = self.grid();
-        let key = layout.key_of(grid.index_of(address)?)?;
+        let key = layout.key_of(self.grid().index_of(address)?)?;
         let block = layout.block_of_key(key);
+        self.masked_block(&BlockMask::of(self, faction, block), block, admit)
+    }
 
-        // The form of one block is read once, and every tile of the block
-        // tests against it. A read for each tile would repeat the block
-        // lookup for every tile of the cell.
-        let visible = self
-            .observation()
-            .visible_layer(faction)
-            .and_then(|layer| layer.block(block));
-        let remembered = self
-            .observation()
-            .remembered_layer(faction)
-            .and_then(|layer| layer.block(block));
-        let admits =
-            |form: Option<&BlockForm>, offset: u32| form.is_some_and(|form| form.holds(offset));
+    /// Returns the summary of one cell of the lattice, over the tiles one
+    /// faction may read.
+    ///
+    /// **This is the one place that applies the sight rule to a cell.** A
+    /// caller that reads one cell and a caller that reads the whole lattice
+    /// both come here, so the two cannot disagree about what a faction may
+    /// read.[^1]
+    ///
+    /// The caller supplies the block forms, so a caller that walks many
+    /// cells reads the layer of the faction once rather than once for each
+    /// cell.
+    ///
+    /// A block the faction has never seen a tile of costs no tile work at
+    /// all. The mask answers for the whole block, and the reader returns the
+    /// identity.
+    ///
+    /// Returns `None` when the derived unit structure does not describe the
+    /// units.
+    ///
+    /// # References
+    ///
+    /// [^1]: Recurring defect shapes, shape 1. `.agents/rules/recurring-defects.md`
+    pub(crate) fn masked_block(
+        &self,
+        mask: &BlockMask<'_>,
+        block: u32,
+        admit: Admit,
+    ) -> Option<MaskedSummary> {
+        let layout = self.observation().layout();
+        let grid = self.grid();
+        let tiles = i64::from(self.observation().tiles_in_block(block));
+
+        // A block the faction has never seen a tile of answers from the mask
+        // alone. This is the whole of the map for a faction that has walked
+        // a corner of it, so the walk below runs over the observed area and
+        // never over the world.
+        if mask.is_empty() {
+            return Some(MaskedSummary {
+                admit,
+                admitted: 0,
+                withheld: tiles,
+                summary: CellSummary::IDENTITY,
+            });
+        }
 
         let edge = layout.block_edge();
         let first_column = (block % layout.blocks_wide()) * edge;
@@ -351,8 +449,8 @@ impl World {
                     continue;
                 };
                 let offset = layout.offset_of_key(key);
-                let sees_now = admits(visible, offset);
-                let seen_ever = sees_now || admits(remembered, offset);
+                let sees_now = mask.sees_now(offset);
+                let seen_ever = sees_now || mask.saw_once(offset);
                 let reads = match admit {
                     Admit::SeenNow => sees_now,
                     Admit::SeenEver => seen_ever,

@@ -15308,7 +15308,7 @@ impl World {
     ///
     /// [^1]: ADR-0090, a tile upgrade is stored sparsely, as the difference from the generated world, decision D1. `docs/adrs/draft/adr-0090-a-tile-upgrade-is-stored-sparsely.md`
     /// [^2]: ADR-0151, an upgrade is a category with a ground fit and a level, decision D4. `docs/adrs/accepted/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
-    fn victory_claims(&self) -> Vec<(i64, i64)> {
+    pub(crate) fn victory_claims(&self) -> Vec<(i64, i64)> {
         let mut best = vec![(0i64, 0i64); usize::from(self.config.faction_count.max(1))];
         for site in self.upgrades.sites() {
             let standing = self.upgrade_table.row(site.category, site.level);

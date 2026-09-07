@@ -69,7 +69,7 @@ Filled in when the item moves to `complete/`.
 [^2]: ADR-0059, fog storage grows with observed area, not with world area, the consequences. `docs/adrs/accepted/adr-0059-fog-storage-grows-with-observed-area.md`
 [^3]: The faction view of the core crate. `crates/cachette-core/src/faction_view.rs`
 [^4]: Recurring defect shapes, shape 3. `.agents/rules/recurring-defects.md`
-[^5]: Backlog item 0516. `docs/backlog/proposed/0516-give-a-faction-one-flat-observation-array-and-declare-its-layout-in-a-schema.md`
+[^5]: Backlog item 0516. `docs/backlog/complete/0516-give-a-faction-one-flat-observation-array-and-declare-its-layout-in-a-schema.md`
 [^6]: Blockers register, BLK-007. `docs/BLOCKERS.md`
 [^7]: ADR-0059, fog storage grows with observed area, not with world area, decision D5. `docs/adrs/accepted/adr-0059-fog-storage-grows-with-observed-area.md`
 [^8]: ADR-0009, parallel stages write disjoint outputs, decisions D1, D2 and D3. `docs/adrs/accepted/adr-0009-parallel-stages-write-disjoint-outputs.md`
