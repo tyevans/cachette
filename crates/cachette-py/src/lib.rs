@@ -34,8 +34,8 @@ use cachette_core::upgrade::{UpgradeCategory, UpgradeRow};
 use cachette_core::TileIdx;
 use cachette_core::{Advert, Consideration, KIND_LAND, KIND_RELATION, KIND_RESOURCE};
 use cachette_core::{
-    Axial, CommodityId, Entity, FactionId, Fix32, Holder, Influence, ResourceKind, WeatherScale,
-    World as CoreWorld, WorldConfig,
+    Axial, CommodityId, Entity, FactionId, FactionWeights, Fix32, Holder, Influence, ResourceKind,
+    WeatherScale, World as CoreWorld, WorldConfig, WEIGHT_HIGH, WEIGHT_LOW,
 };
 use cachette_view::panel::Set as PanelSet;
 use cachette_view::{
@@ -3846,12 +3846,18 @@ impl PyWorld {
 
     /// Returns the weight vector of one faction, as a `dict`.
     ///
-    /// The faction is a number. The keys are `war`, `trade`, `build` and
-    /// `renown`, and every value is a whole number inside the range the
-    /// balance register holds.[^1] The vector is drawn from the seed when the
-    /// world is built, so two worlds with one seed hold one vector. Only the
-    /// build weight is read today: it biases the controller toward a build
-    /// order over a gather order.
+    /// The faction is a number. The keys are `war`, `trade`, `build`,
+    /// `renown` and `settle`, and every value is a whole number inside the
+    /// range the balance register holds.[^1] The seeding draws the vector
+    /// when the world is built, so two worlds with one seed start on one
+    /// vector. `set_faction_weights` writes it after that.
+    ///
+    /// The renown weight is the one weight that no pass reads today. Every
+    /// other weight biases one controller evaluation.
+    ///
+    /// **The vector is the policy of the faction, and it is simulated
+    /// state.**[^2] It enters the state hash, so two worlds that differ in a
+    /// weight part on the next tick.
     ///
     /// # Errors
     ///
@@ -3860,6 +3866,7 @@ impl PyWorld {
     /// # References
     ///
     /// [^1]: Balance register, the weight vector range. `docs/reference/balance.md`
+    /// [^2]: ADR-0156, a faction's option weights are policy, set through one verb, decision D1. `docs/adrs/accepted/adr-0156-a-factions-option-weights-are-policy-set-through-one-verb.md`
     fn faction_weights<'py>(
         &self,
         python: Python<'py>,
@@ -3874,7 +3881,73 @@ impl PyWorld {
         report.set_item("trade", weights.trade)?;
         report.set_item("build", weights.build)?;
         report.set_item("renown", weights.renown)?;
+        report.set_item("settle", weights.settle)?;
         Ok(report)
+    }
+
+    /// Writes the whole weight vector of one faction.
+    ///
+    /// **The weight a faction gives each option is that faction's policy, and
+    /// this is the one verb that writes it.**[^1] A Python caller calls it.
+    /// The built-in controller calls it. A learner calls it. No second path
+    /// exists, so a learner may write the weights the built-in controller
+    /// would never write, and that is the game played correctly.
+    ///
+    /// The verb writes the whole vector and never a part of it. Read the
+    /// vector with `faction_weights`, change what you want, and write it
+    /// back. One write and one read then hold one shape, so no caller has to
+    /// know which weights the vector holds.
+    ///
+    /// **A weight is simulated state and it enters the state hash.**[^2] The
+    /// verb takes no floating point value: every weight is a whole
+    /// number.[^3]
+    ///
+    /// **The verb states no preference.** It says where a weight lives and
+    /// who writes it. It says nothing about which option a faction should
+    /// favour.
+    ///
+    /// # Errors
+    ///
+    /// Raises `VerbError` when the number names no faction of this world, or
+    /// when a weight lies outside the range the balance register holds.[^4]
+    /// A refused write changes nothing.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0156, a faction's option weights are policy, set through one verb, decision D3. `docs/adrs/accepted/adr-0156-a-factions-option-weights-are-policy-set-through-one-verb.md`
+    /// [^2]: ADR-0156, a faction's option weights are policy, set through one verb, decision D1. `docs/adrs/accepted/adr-0156-a-factions-option-weights-are-policy-set-through-one-verb.md`
+    /// [^3]: ADR-0002, simulated and aggregated state holds no floating point number, decision D1. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
+    /// [^4]: Balance register, the weight vector range. `docs/reference/balance.md`
+    #[pyo3(signature = (faction, *, war, trade, build, renown, settle))]
+    fn set_faction_weights(
+        &self,
+        faction: u16,
+        war: u8,
+        trade: u8,
+        build: u8,
+        renown: u8,
+        settle: u8,
+    ) -> PyResult<()> {
+        let weights = FactionWeights {
+            war,
+            trade,
+            build,
+            renown,
+            settle,
+        };
+        if !weights.is_inside_bound() {
+            return Err(VerbError::new_err(format!(
+                "every weight must lie between {WEIGHT_LOW} and {WEIGHT_HIGH}"
+            )));
+        }
+        let mut world = self.lock();
+        if world.set_faction_weights(FactionId(faction), weights) {
+            Ok(())
+        } else {
+            Err(VerbError::new_err(format!(
+                "{faction} names no faction of this world"
+            )))
+        }
     }
 
     /// Says whether an external caller controls a faction.

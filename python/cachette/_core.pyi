@@ -439,7 +439,6 @@ class SiteHousing(TypedDict):
     residents: int
     free_places: int
 
-
 class SiteProduction(TypedDict):
     """What one site produces now, for one commodity.
 
@@ -454,7 +453,6 @@ class SiteProduction(TypedDict):
     base: int
     scale: int
     effective: int
-
 
 class SiteEconomy(TypedDict):
     """What one site earns, holds and owes, for one commodity.
@@ -579,17 +577,28 @@ class FoundingReport(TypedDict, total=False):
     refusal: str
 
 class FactionWeights(TypedDict):
-    """The four weights that bias the choices of one faction.
+    """The weights that bias the choices of one faction.
 
     Every value is a whole number inside the range the balance register
-    holds. The vector is drawn from the seed when the world is built. Only the
-    build weight is read today.
+    holds. The seeding draws the vector when the world is built, and
+    ``set_faction_weights`` writes it after that. The renown weight is the one
+    weight that no pass reads today.
+
+    The vector is the policy of the faction and it is simulated state, so it
+    enters the state hash.[^1]
+
+    References
+    ----------
+    [^1]: ADR-0156, a faction's option weights are policy, set through one
+    verb, decision D1.
+    ``docs/adrs/accepted/adr-0156-a-factions-option-weights-are-policy-set-through-one-verb.md``
     """
 
     war: int
     trade: int
     build: int
     renown: int
+    settle: int
 
 class GameEnd(TypedDict):
     """How a game ended: the winner, the path and the tick.
@@ -973,6 +982,16 @@ class World:
     def found_run_for_every_faction(self, group: int = ...) -> list[FoundingReport]: ...
     def seed_world(self) -> list[FoundingReport]: ...
     def faction_weights(self, faction: int) -> FactionWeights: ...
+    def set_faction_weights(
+        self,
+        faction: int,
+        *,
+        war: int,
+        trade: int,
+        build: int,
+        renown: int,
+        settle: int,
+    ) -> None: ...
     def set_externally_controlled(self, faction: int, controlled: bool) -> None: ...
     def is_externally_controlled(self, faction: int) -> bool: ...
     @property

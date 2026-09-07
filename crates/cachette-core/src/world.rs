@@ -13300,6 +13300,26 @@ impl World {
         self.controller.row(faction).map(|row| row.weights)
     }
 
+    /// Writes the whole weight vector of one faction.
+    ///
+    /// The weight vector of a faction is that faction's policy, and this is
+    /// the one verb that writes it.[^1] The vector is simulated state and it
+    /// enters the state hash, so a write parts two worlds on the next
+    /// tick.[^2]
+    ///
+    /// Returns `false` and changes nothing when the world has no such
+    /// faction, or when a weight lies outside the range the balance register
+    /// holds.[^3]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0156, a faction's option weights are policy, set through one verb, decision D3. `docs/adrs/accepted/adr-0156-a-factions-option-weights-are-policy-set-through-one-verb.md`
+    /// [^2]: ADR-0156, a faction's option weights are policy, set through one verb, decision D1. `docs/adrs/accepted/adr-0156-a-factions-option-weights-are-policy-set-through-one-verb.md`
+    /// [^3]: Balance register, the weight vector range. `docs/reference/balance.md`
+    pub fn set_faction_weights(&mut self, faction: FactionId, weights: FactionWeights) -> bool {
+        self.controller.set_weights(faction, weights)
+    }
+
     /// Sets the flag that says an external caller controls a faction.
     ///
     /// A faction under external control receives no evaluation from the

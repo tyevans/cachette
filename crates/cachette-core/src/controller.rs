@@ -200,6 +200,30 @@ impl FactionWeights {
             settle: drawn[4],
         }
     }
+
+    /// Says whether every weight of the vector lies inside the bound.
+    ///
+    /// The bound is the range the seeding draws, so a weight a caller writes
+    /// and a weight the seeding draws hold one range and one declaration
+    /// site.[^1] The engine bounds every weight, and this is where it does
+    /// it.[^2]
+    ///
+    /// The check reads the bytes of the vector rather than the fields by
+    /// name. The vector holds one byte for each weight and no padding, so a
+    /// weight added to the shape is checked without a second list of the
+    /// weights.[^3]
+    ///
+    /// # References
+    ///
+    /// [^1]: Balance register, the weight vector range. `docs/reference/balance.md`
+    /// [^2]: ADR-0156, a faction's option weights are policy, set through one verb, decision D1. `docs/adrs/accepted/adr-0156-a-factions-option-weights-are-policy-set-through-one-verb.md`
+    /// [^3]: Recurring defect shapes, shape 1. `.agents/rules/recurring-defects.md`
+    #[must_use]
+    pub fn is_inside_bound(&self) -> bool {
+        bytemuck::bytes_of(self)
+            .iter()
+            .all(|weight| (WEIGHT_LOW..=WEIGHT_HIGH).contains(weight))
+    }
 }
 
 /// One row of the controller table, for one faction.
@@ -1065,6 +1089,32 @@ impl Controller {
                 row.seat = tile.0;
             }
         }
+    }
+
+    /// Writes the whole weight vector of one faction.
+    ///
+    /// The vector is the policy of that faction, and one verb writes it, so a
+    /// caller, the built-in controller and a learner all reach it by this one
+    /// path.[^1] The vector is a field of the row, and the row enters the
+    /// state hash, so a write here parts two worlds on the next tick.[^2]
+    ///
+    /// Returns `false` and changes nothing when the world has no such
+    /// faction, or when a weight lies outside the bound. The caller decides
+    /// how to report the refusal.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0156, a faction's option weights are policy, set through one verb, decision D3. `docs/adrs/accepted/adr-0156-a-factions-option-weights-are-policy-set-through-one-verb.md`
+    /// [^2]: ADR-0156, a faction's option weights are policy, set through one verb, decision D1. `docs/adrs/accepted/adr-0156-a-factions-option-weights-are-policy-set-through-one-verb.md`
+    pub fn set_weights(&mut self, faction: FactionId, weights: FactionWeights) -> bool {
+        if !weights.is_inside_bound() {
+            return false;
+        }
+        let Some(row) = self.rows.get_mut(usize::from(faction.0)) else {
+            return false;
+        };
+        row.weights = weights;
+        true
     }
 
     /// Sets the flag that says an external caller controls a faction.
