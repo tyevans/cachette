@@ -36,8 +36,12 @@ from pathlib import Path
 import numpy as np
 
 from .env import Env, EnvConfig, VectorEnv, viable_seeds
-from .policy import LinearPolicy
+from .policy import LinearPolicy, MLPPolicy
 from .reward import Weighting
+
+# A policy the trainer can perturb. Both kinds answer ``flat`` and
+# ``rebuild``, so the trainer never asks which kind it holds.
+Policy = LinearPolicy | MLPPolicy
 
 # The observation fields a report names. Each holds one position, and each
 # says something a reader of the report recognises.
@@ -74,7 +78,7 @@ def field_starts(env: Env) -> dict[str, int]:
 def run_population(
     config: EnvConfig,
     weighting: Weighting,
-    policies: list[LinearPolicy],
+    policies: list[object],
     seeds: list[int],
     workers: int,
 ) -> tuple[np.ndarray, list[dict[str, float]]]:
@@ -109,6 +113,9 @@ def run_population(
         row = {name: float(values[starts[name]]) for name in REPORT_FIELDS}
         row["won"] = 1.0 if env.outcome == "won" else 0.0
         row["lost"] = 1.0 if env.outcome == "lost" else 0.0
+        row["drawn"] = 1.0 if env.outcome == "drawn" else 0.0
+        row["unresolved"] = 1.0 if env.outcome == "running" else 0.0
+        row["end_tick"] = float(values[starts["tick"]])
         readings.append(row)
     return returns.reshape(len(policies), len(seeds)), readings
 
@@ -130,10 +137,52 @@ def train(
     train_config: TrainConfig,
     out_dir: Path,
     seed_pool: list[int],
+    kind: str = "linear",
+    hidden: int = 32,
 ) -> dict[str, object]:
-    """Train one policy, and return what each generation scored."""
+    """Train one policy, and return what each generation scored.
+
+    The kind entry names the policy the run trains. A linear policy scores
+    each action row from a weighted sum of the features. A network policy
+    puts one hidden layer between them, which lets it state a rule that two
+    features must hold together.
+
+    **The mean of a generation is not a learning curve.** The seed set moves
+    at every generation, so a mean that rises may only mean that the new
+    worlds are easier. Only the held-out measurement is evidence.
+    """
+    path = out_dir / f"{name}.npz"
     probe = Env(env_config, weighting)
-    policy = LinearPolicy.zeros(probe.action_length, probe.observation_length)
+
+    def store(current: Policy) -> None:
+        """Write the weights of the run so far, with what they were trained on.
+
+        The trainer writes after every generation. A run that takes hours
+        therefore leaves a usable policy behind when it stops early.
+        """
+        current.save(
+            path,
+            {
+                "action_version": 1,
+                "observation_version": 1,
+                "observation_length": probe.observation_length,
+                "action_length": probe.action_length,
+                "width": env_config.width,
+                "height": env_config.height,
+                "faction_count": env_config.faction_count,
+                "seat": env_config.seat,
+                "tick_limit": env_config.tick_limit,
+                "horizon": env_config.horizon,
+                "decision_interval": env_config.decision_interval,
+                "hidden": hidden if kind == "mlp" else 0,
+            },
+        )
+
+    policy: Policy
+    if kind == "mlp":
+        policy = MLPPolicy.zeros(probe.action_length, probe.observation_length, hidden)
+    else:
+        policy = LinearPolicy.zeros(probe.action_length, probe.observation_length)
     rng = np.random.default_rng(train_config.seed)
     pairs = train_config.population // 2
     history: list[dict[str, float]] = []
@@ -147,74 +196,87 @@ def train(
             seed_pool[(offset + index) % len(seed_pool)]
             for index in range(train_config.seeds_per_generation)
         ]
-        noise = rng.standard_normal((pairs, *policy.shape))
+        centre = policy.flat()
+        noise = rng.standard_normal((pairs, centre.size))
         # Antithetic sampling: each perturbation is tried in both directions,
         # so the estimate of the direction costs no extra variance from the
         # mean of the population.
         candidates = [
-            LinearPolicy(policy.weights + sign * train_config.sigma * noise[index])
+            policy.rebuild(centre + sign * train_config.sigma * noise[index])
             for index in range(pairs)
             for sign in (1.0, -1.0)
         ]
-        returns, _ = run_population(
+        returns, readings = run_population(
             env_config, weighting, candidates, seeds, train_config.workers
         )
         scores = returns.mean(axis=1)
+        won = float(np.mean([row["won"] for row in readings]))
         shaped = rank_shape(scores)
-        gradient = np.zeros_like(policy.weights)
+        gradient = np.zeros_like(centre)
         for index in range(pairs):
             weight = shaped[2 * index] - shaped[2 * index + 1]
             gradient += weight * noise[index]
         step = train_config.learning_rate / (
             train_config.population * train_config.sigma
         )
-        policy = LinearPolicy(policy.weights + step * gradient)
+        policy = policy.rebuild(centre + step * gradient)
+        store(policy)
         history.append(
             {
                 "generation": generation,
                 "best": float(scores.max()),
                 "mean": float(scores.mean()),
                 "worst": float(scores.min()),
+                "won": won,
                 "seconds": round(time.time() - started, 1),
             }
         )
         print(
             f"  {name} generation {generation:2d} "
             f"mean {scores.mean():9.1f} best {scores.max():9.1f} "
-            f"[{history[-1]['seconds']:.0f}s]",
+            f"won {won:5.2f} [{history[-1]['seconds']:.0f}s]",
             flush=True,
         )
 
-    path = out_dir / f"{name}.npz"
-    probe_world = probe
-    policy.save(
-        path,
-        {
-            "action_version": 1,
-            "observation_version": 1,
-            "observation_length": probe_world.observation_length,
-            "action_length": probe_world.action_length,
-            "width": env_config.width,
-            "height": env_config.height,
-            "faction_count": env_config.faction_count,
-            "seat": env_config.seat,
-        },
-    )
-    return {"name": name, "history": history, "weights": str(path)}
+    store(policy)
+    return {
+        "name": name,
+        "kind": kind,
+        "history": history,
+        "weights": str(path),
+        "parameters": int(policy.flat().size),
+    }
+
+
+OUTCOME_FIELDS = ("won", "lost", "drawn", "unresolved", "end_tick")
 
 
 def evaluate(
     env_config: EnvConfig,
     weighting: Weighting,
-    policy: LinearPolicy,
+    policy: object,
     seeds: list[int],
     workers: int,
+    repeats: int = 1,
 ) -> dict[str, float]:
-    """Play one policy on a seed set, and average what it ended with."""
-    returns, readings = run_population(env_config, weighting, [policy], seeds, workers)
-    summary = {"return": float(returns.mean())}
-    for name in (*REPORT_FIELDS, "won", "lost"):
-        summary[name] = float(np.mean([row[name] for row in readings]))
+    """Play one policy on a seed set, and average what it ended with.
+
+    The repeats entry plays the seed set more than once. The engine is
+    deterministic, so a repeat only changes the answer for a policy that
+    draws at random. A repeat therefore narrows the random baseline, which
+    is the baseline that matters.
+    """
+    rows: list[dict[str, float]] = []
+    values: list[float] = []
+    for _ in range(max(1, repeats)):
+        returns, readings = run_population(
+            env_config, weighting, [policy], seeds, workers
+        )
+        values.append(float(returns.mean()))
+        rows.extend(readings)
+    summary = {"return": float(np.mean(values)), "episodes": float(len(rows))}
+    for name in (*REPORT_FIELDS, *OUTCOME_FIELDS):
+        summary[name] = float(np.mean([row[name] for row in rows]))
     return summary
 
 
