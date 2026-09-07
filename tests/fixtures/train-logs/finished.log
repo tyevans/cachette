@@ -1,0 +1,13 @@
+training seeds 80, holdout seeds 24
+
+=== controller baseline ===
+  controller {'return': -475.7458333333332, 'episodes': 24.0, 'held_tiles': 242.5, 'won': 0.375, 'lost': 0.625}
+
+=== conquer (linear) ===
+  conquer generation  0 mean   -1548.5 best      36.5 spread   1585.0 won  0.11 valid - [317s]
+  conquer generation  1 mean   -1859.1 best    -981.6 spread    877.5 won  0.03 valid   -1995.5 [598s]
+  conquer generation  2 mean   -1734.9 best    -980.8 spread    754.1 won  0.06 valid - [871s]
+  trained     return    -1153.1 tiles   136.0 won  0.21 lost  0.79
+  untrained   return    -1817.4 tiles   159.1 won  0.04 lost  0.96
+  random      return    -1248.5 tiles   292.5 won  0.18 lost  0.82
+  controller  return     -475.7 tiles   242.5 won  0.38 lost  0.62

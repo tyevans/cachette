@@ -207,6 +207,63 @@ graviton-bench profile="full":
 graviton-orphans:
     ./scripts/graviton-benchmark.sh --orphans
 
+# Price a training run on the target platform, and create nothing.
+#
+# Run this first. It reads the spot price in every zone, names the cheapest,
+# and prints the most the run can cost. Nothing is created and nothing bills.
+train-price:
+    ./scripts/graviton-train.sh --dry-run
+
+# Train the learner seat on the target platform.
+#
+# It prices the run, asks for a confirmation, and stops if it does not get
+# one. It then rents one Graviton machine, builds the engine, measures the
+# ticks a second, trains, and prints a dashboard every two minutes. The
+# instance destroys itself after the wall clock cap whatever else happens.
+#
+# Set CACHETTE_TRAIN_INSTANCE for the machine, CACHETTE_TRAIN_ARGS for the
+# trainer, and CACHETTE_TRAIN_MAX_MINUTES for the cap. The script header
+# lists them all.
+train-graviton:
+    ./scripts/graviton-train.sh
+
+# Measure the ticks a second on the target platform, and train nothing.
+#
+# This is the cheap way to get a throughput row for the costs register. It
+# builds the engine, runs the probe, and ends. Give it a short cap.
+train-throughput:
+    CACHETTE_TRAIN_PROBE_ONLY=1 CACHETTE_TRAIN_MAX_MINUTES=60 \
+        ./scripts/graviton-train.sh
+
+# Measure the ticks a second on this machine. It rents nothing.
+#
+# A figure from here is not evidence about the target platform, because the
+# development machines have a different cache line size.
+train-throughput-local:
+    ./scripts/train_throughput.py
+
+# Read the progress of a run, and say whether it is worth its remaining cost.
+#
+# Give the run directory that the launcher made. It holds the log, the price
+# and the machine, so this needs no other argument.
+train-progress dir:
+    @. {{dir}}/instance.env && ./scripts/train_progress.py {{dir}}/train.log \
+        --price "$PRICE" --generations "$TOTAL_GENERATIONS" \
+        --instance-type "$INSTANCE_TYPE" --zone "$ZONE" --run-id "$RUN_ID" \
+        --report {{dir}}/report.json
+
+# Follow a training run this machine started, without ending it.
+train-attach dir:
+    ./scripts/graviton-train.sh --attach {{dir}}
+
+# End a training run, keep everything it wrote, and destroy the machine.
+train-stop dir:
+    ./scripts/graviton-train.sh --stop {{dir}}
+
+# List anything a training run left behind. It should list nothing.
+train-orphans:
+    ./scripts/graviton-train.sh --orphans
+
 # Start the local observability stack. Nothing here gates a commit.
 #
 # It runs ClickHouse for the benchmark rows, Loki for the run logs, an
