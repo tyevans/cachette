@@ -42,6 +42,8 @@ so that a boundary encoding could keep its shape.
 learner needs one integer, one bounded table, and a decoding it derives from a
 schema rather than from a table of its own.[^2] Only the fixed triple fails.
 
+A register holds the disagreement and its evidence.[^16]
+
 The freeze on an accepted record governs the repair. The retcon window is shut,
 because two accepted records cite the decision this record changes.[^12] [^3]
 [^4] So this record changes that decision, and every other decision of that
@@ -181,3 +183,4 @@ the reference tables.[^10]
 [^13]: Recurring Defect Shapes, shape 1. `.agents/rules/recurring-defects.md`
 [^14]: ADR-0154, the observation and the action of a faction are schema-declared bounded tables the engine owns, decision D5. `docs/adrs/accepted/adr-0154-the-observation-and-the-action-of-a-faction-are-schema-declared-bounded-tables.md`
 [^15]: ADR-0154, the observation and the action of a faction are schema-declared bounded tables the engine owns, decision D6. `docs/adrs/accepted/adr-0154-the-observation-and-the-action-of-a-faction-are-schema-declared-bounded-tables.md`
+[^16]: Findings register, FND-565. `docs/FINDINGS.md`

@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-565**
+**Next number: FND-566**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -13725,8 +13725,49 @@ decide which path is strong. It decides which path gets to fire.
 
 **Neither domination nor territory has ended a seeded game at any horizon.** The
 paths the project owner wants are still not the paths that decide a run.
+
+### FND-565 — An accepted record fixed the shape of an enumeration another record owns, and the enumeration never had that shape
+
+**Believed.** The action a learner takes factorises into a verb, a target and a
+magnitude, and the verb set is the set the built-in controller's choice
+enumeration holds. An accepted record states both as one decision.[^F565A]
+
+**True.** The enumeration has never had that shape. One of its choices names two
+things, several name nothing, and none of them carries a quantity. The register
+that would hold the bucket edges of a magnitude holds no row for one. The
+commit body of this change lists every choice and its arguments, because a list
+decays and a record must not hold one.[^F542D]
+
+**Evidence.** The choice enumeration of the controller module on the
+`integration` branch, read against the record. No file under `crates/` and no
+file under `python/` names the record, so no code contradicts it. A research
+report found the same disagreement and named a different number of choices than
+the enumeration holds.[^F565C]
+
+**What follows.** **A record may state a constraint on an artefact it does not
+own. It may not state a property of one as a fact.** The scope rule already says
+to write the constraint the code must satisfy and never what you hope the code
+will do, and this is the first local instance of that failure in this
+project.[^F491C] The constraint underneath the shape was sound: one integer, one
+bounded table, one schema. Only the fixed triple was a description, and the
+description was wrong from the day it was written.
+
+**The repair went to the record and not to the engine.** Every choice of the
+enumeration was added under a record of its own. Reshaping the enumeration to
+fit a boundary encoding would have let the encoding decide what the simulation
+offers a faction, which runs the authority backwards. A later record changes the
+one decision and keeps the rest.[^F565E]
+
+**A research report is fixed to a moment and still gets a count wrong.** The
+report that found this said three choices break the factorisation, then listed
+four, and neither number matches the enumeration. Read the artefact, and take
+the count from the artefact.
+
 ## References
 
+[^F565A]: ADR-0154, the observation and the action of a faction are schema-declared bounded tables the engine owns, decision D4. `docs/adrs/accepted/adr-0154-the-observation-and-the-action-of-a-faction-are-schema-declared-bounded-tables.md`
+[^F565C]: Research report 31, the state of the learner surface. `docs/research/reports/31-the-state-of-the-learner-surface.md`
+[^F565E]: ADR-0174, an action integer is a mixed radix over the argument positions each verb declares. `docs/adrs/draft/adr-0174-an-action-integer-is-a-mixed-radix-over-the-positions-a-verb-declares.md`
 [^F552A]: The unit-to-tile bridge, the block key. `crates/cachette-core/src/bridge.rs`
 [^F494C]: Findings register, FND-486. `docs/FINDINGS.md`
 [^F542C]: ADR-0148, a game end is recorded once and stops the controllers, decision D3. `docs/adrs/accepted/adr-0148-a-game-end-is-recorded-once-and-stops-the-controllers.md`
