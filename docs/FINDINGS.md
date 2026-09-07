@@ -14799,12 +14799,90 @@ apart the seeder places cities. Both are balance values that one blocker
 governs, and the project owner has said he intends to tune from reinforcement
 learning runs rather than ahead of them.[^F494F] [^DEC278]
 
+**The sentence above is history. The project owner gave authority to tune
+these two values on 6 September 2026, and a later finding records what the
+measurement said.**[^F591C]
+
 **Measure the branch that a rule does not take.** A test proved each branch
 works, and a run showed that one of them almost never happens. Neither answer
 is available from the other.
 
+### FND-592 — A siege that asks an army to stand still cannot be done, because the armies of this engine do not stand still
+
+**Believed.** A conquest that costs work over ticks prices the act. The
+besieger holds the site tile, the work rises on each tick it holds, and a
+defender that returns takes the work away.
+
+**True.** The engine has nothing that makes an army stay. A campaign releases
+its cohort when the cohort reaches its objective, and the choice pass then
+moves each unit every tick. A siege that ended whenever the besieger stepped
+off the tile therefore never accumulated. **A run of 8 seeds took no city at
+all and burned one.** The rule was not expensive. It was unreachable.
+
+**Evidence.** Two sweeps of the demonstration world over eight seeds, at three
+factions, at an extent of 48, to a tick limit of 4000, on 6 September 2026 on
+one development machine (x86-64). Two counters were added to the census for
+the measurement: the site ticks a siege pressed, and the sieges that ended
+before the site fell. The sieges pressed for 1167 site ticks in one seed and
+ended 680 times, so a siege lasted under two ticks on average. A second run
+split the ending by cause. **Of 680 endings only 47 were a unit of the owning
+faction. The other 633 were the besieger leaving.** The commit body holds both
+tables and the command.
+
+**What follows.** **A rule that asks a unit to do the same thing for many
+ticks needs something in the engine that keeps it there.** The siege now waits
+when the besieger leaves and ends only when a unit of the owning faction
+stands on the site tile. The defence the project owner asked for is unchanged,
+and the rule is reachable.
+
+**Measure the mechanism before you tune its value.** The first work value was
+refuted for the wrong reason. It looked too expensive, and the value was
+lowered by two thirds with no effect at all, because the cost was never what
+stopped the conquest.
+
+**A counter that reports why a rule did not fire is worth more than one that
+reports how often it did.** The site count of the sweep rose when conquest
+stopped, and it rose again when conquest worked, so it could not tell the two
+apart.[^F592A]
+
+### FND-593 — The reach and the founding distance decide which branch of the raze rule fires, and both had to move
+
+**Believed.** The reach of a city or the distance the seeder places cities
+apart is the lever on whether a taker keeps a city or burns it, and one of the
+two would be enough.[^F593A]
+
+**True.** Both had to move. The base reach decides whether an undeveloped
+faction keeps what it takes, and the reach bound decides whether a developed
+one does. The founding distance must stand between the two. With the distance
+above the bound the keeping branch cannot fire at all, and with the distance
+below the base the burning branch cannot fire between two founded capitals.
+
+**Evidence.** Four sweeps of the demonstration world over eight seeds, at
+three factions, at an extent of 48, to a tick limit of 4000, on 6 September
+2026 on one development machine (x86-64). At a base reach of 4, a bound of 8
+and a founding distance of 16 the eight runs captured nothing. At a base of 8
+and a bound of 16, with the distance still at 16, the runs burned in six seeds
+and still captured nothing. At a founding distance of 12 the runs captured in
+one seed and burned in two, and domination ended seven of the eight. The
+commit body holds every table and the command. The figures stay derived until
+the target platform measures them.[^28]
+
+**What follows.** **A rule that reads two derived quantities inherits the gap
+between them.** The rule states no distance of its own, which is what the
+project wanted, and the values it reads must then be chosen against each
+other. The balance register now states that relation in all three rows.
+
+**A lowered founding distance moves a fixture that has nothing to do with
+conquest.** One seeding test asserts that a small world seats three of four
+factions, and a shorter distance let the same world seat four. The fixture
+seed moved, and the assertion did not.
+
+
 ## References
 
+[^F591C]: Findings register, FND-593. `docs/FINDINGS.md`
+[^F592A]: Recurring defect shapes, shape 3. `.agents/rules/recurring-defects.md`
+[^F593A]: Findings register, FND-591. `docs/FINDINGS.md`
 [^F494F]: Blockers register, BLK-050. `docs/BLOCKERS.md`
 [^DEC278]: Decisions register, DEC-278. `docs/DECISIONS.md`
 

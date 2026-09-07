@@ -132,7 +132,14 @@ pub const SURVEY_CEILING: u64 = SAMPLE_SIZE as u64 * SURVEY_TILES as u64;
 /// The smallest distance that two foundings of one run keep between them.
 ///
 /// The value is a tuning knob of the founding rule, in the way the sample
-/// size is one. The record states the constraint and not the value.[^1]
+/// size is one. The record states the constraint and not the value.[^1] The
+/// balance register holds the row and the derivation.[^3]
+///
+/// **The value stands between the base reach of a city and the reach bound.**
+/// A faction keeps a city its own reach supplies and burns one it does not,
+/// so a capital founded at this distance from a rival capital is burned while
+/// the taker is undeveloped, and kept once the taker has built the ground
+/// that extends its reach.[^4]
 ///
 /// The floor is not a knob. Two foundings closer than twice the survey radius
 /// settle their groups over one piece of ground, so the distance must exceed
@@ -143,7 +150,9 @@ pub const SURVEY_CEILING: u64 = SAMPLE_SIZE as u64 * SURVEY_TILES as u64;
 ///
 /// [^1]: ADR-0076, a founding keeps a fixed distance from the foundings before it, decision D1. `docs/adrs/accepted/adr-0076-a-founding-keeps-a-fixed-distance-from-the-foundings-before-it.md`
 /// [^2]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`
-pub const MINIMUM_FOUNDING_DISTANCE: u32 = 16;
+/// [^3]: Balance register, the seeding layer. `docs/reference/balance.md`
+/// [^4]: ADR-0180, a site changes hands or the taker destroys it, decision D7. `docs/adrs/draft/adr-0180-a-site-changes-hands-or-the-taker-destroys-it.md`
+pub const MINIMUM_FOUNDING_DISTANCE: u32 = 12;
 
 const _: () = assert!(
     MINIMUM_FOUNDING_DISTANCE > 2 * SURVEY_RADIUS,

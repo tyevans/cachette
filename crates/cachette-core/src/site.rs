@@ -258,6 +258,148 @@ impl core::fmt::Display for SettlementError {
 
 impl std::error::Error for SettlementError {}
 
+/// The intent of a besieger that has ordered nothing.
+///
+/// The engine then decides between the two acts from the reach of the cities
+/// the besieger holds.[^1]
+///
+/// # References
+///
+/// [^1]: ADR-0180, a site changes hands or the taker destroys it, decision D7. `docs/adrs/draft/adr-0180-a-site-changes-hands-or-the-taker-destroys-it.md`
+pub const SIEGE_INTENT_REACH: u8 = 0;
+
+/// The intent of a besieger whose faction ordered a raze.
+///
+/// The siege then presses to the raze work whatever the reach says, and the
+/// site burns.[^1]
+///
+/// # References
+///
+/// [^1]: ADR-0180, a site changes hands or the taker destroys it, decision D11. `docs/adrs/draft/adr-0180-a-site-changes-hands-or-the-taker-destroys-it.md`
+pub const SIEGE_INTENT_RAZE: u8 = 1;
+
+/// The siege work that one resident of a site costs a besieger, when nobody
+/// has set another value.
+///
+/// **This is a provisional value and not a measured one.** The rules of the
+/// downstream game are not written down, so a blocker governs it, and the
+/// balance register holds the row with its derivation.[^1] [^2]
+///
+/// **The value is derived from the campaign, and a sweep moved it.** A
+/// besieging unit does one work a tick, which is what a building unit does. A
+/// campaign runs for a deadline before it closes unmet, and it raises a
+/// cohort of a stated size, so a raze inside one campaign must cost less work
+/// than the cohort does in that time. The register holds the derivation and
+/// the sweep that moved the value.[^2]
+///
+/// # References
+///
+/// [^1]: Blockers register, BLK-050. `docs/BLOCKERS.md`
+/// [^2]: Balance register, the siege. `docs/reference/balance.md`
+pub const SIEGE_WORK_FOR_EACH_RESIDENT: i64 = 16;
+
+/// The times over the capture work that a raze costs, when nobody has set
+/// another value.
+///
+/// **This is a provisional value and not a measured one.** A blocker governs
+/// it, and the balance register holds the row.[^1] [^2]
+///
+/// # References
+///
+/// [^1]: Blockers register, BLK-050. `docs/BLOCKERS.md`
+/// [^2]: Balance register, the siege. `docs/reference/balance.md`
+pub const SIEGE_RAZE_MULTIPLE: i64 = 4;
+
+/// What a site resists, and what a raze costs over a capture.
+///
+/// **A site falls to work and never to a moment.** A faction that stands on
+/// an undefended site tile opens a siege, and the site changes hands when the
+/// work of that siege reaches what the site resists. A raze stands further
+/// off than a capture, so burning a city costs more time and more force than
+/// taking one.[^1]
+///
+/// **The resistance is the people.** A site resists by the residents it
+/// holds, so a large city is hard to take and a small one is not. The count
+/// is a quantity the engine already keeps, so no second statement of how
+/// strong a city is enters the project.[^2]
+///
+/// Both numbers are balance rows, and the register holds the derivation of
+/// each.[^3] The arithmetic is whole numbers.[^4]
+///
+/// # References
+///
+/// [^1]: ADR-0180, a site changes hands or the taker destroys it, decisions D8 and D9. `docs/adrs/draft/adr-0180-a-site-changes-hands-or-the-taker-destroys-it.md`
+/// [^2]: ADR-0157, a site's free places are its built housing less the residents the engine counts, decision D3. `docs/adrs/accepted/adr-0157-a-sites-free-places-are-its-built-housing-less-the-residents-the-engine-counts.md`
+/// [^3]: Balance register, the siege. `docs/reference/balance.md`
+/// [^4]: ADR-0002, simulated and aggregated state holds no floating point number, decision D1. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct SiegeRules {
+    work_for_each_resident: i64,
+    raze_multiple: i64,
+}
+
+impl SiegeRules {
+    /// The provisional values that the balance register holds.
+    pub const DEFAULT: Self = Self {
+        work_for_each_resident: SIEGE_WORK_FOR_EACH_RESIDENT,
+        raze_multiple: SIEGE_RAZE_MULTIPLE,
+    };
+
+    /// Builds a rule set.
+    ///
+    /// A work below zero is raised to zero, and a multiple below one is
+    /// raised to one. A raze that cost less than a capture would let a
+    /// faction burn a city it could not take, and the whole of this rule is
+    /// that burning costs more.
+    #[must_use]
+    pub const fn new(work_for_each_resident: i64, raze_multiple: i64) -> Self {
+        Self {
+            work_for_each_resident: if work_for_each_resident < 0 {
+                0
+            } else {
+                work_for_each_resident
+            },
+            raze_multiple: if raze_multiple < 1 { 1 } else { raze_multiple },
+        }
+    }
+
+    /// Returns the siege work that one resident costs a besieger.
+    #[must_use]
+    pub const fn work_for_each_resident(self) -> i64 {
+        self.work_for_each_resident
+    }
+
+    /// Returns the times over the capture work that a raze costs.
+    #[must_use]
+    pub const fn raze_multiple(self) -> i64 {
+        self.raze_multiple
+    }
+
+    /// Returns the work a siege must do before a site changes hands.
+    ///
+    /// **An empty city still resists.** The count is raised to one, so a
+    /// site whose last resident died does not fall to a unit that walks onto
+    /// it in one tick, which is the case this whole rule replaces.
+    #[must_use]
+    pub const fn capture_work(self, residents: u32) -> i64 {
+        let people = if residents < 1 { 1 } else { residents };
+        self.work_for_each_resident.saturating_mul(people as i64)
+    }
+
+    /// Returns the work a siege must do before a site is destroyed.
+    #[must_use]
+    pub const fn raze_work(self, residents: u32) -> i64 {
+        self.capture_work(residents)
+            .saturating_mul(self.raze_multiple)
+    }
+}
+
+impl Default for SiegeRules {
+    fn default() -> Self {
+        Self::DEFAULT
+    }
+}
+
 /// The column set of the settlement shape.
 ///
 /// The arena holds one entry for each slot it has ever opened, and it never
@@ -315,6 +457,41 @@ pub struct SettlementArena {
     /// [^2]: ADR-0023, an aggregate combines exactly in any order, decision D2. `docs/adrs/accepted/adr-0023-an-aggregate-combines-exactly-in-any-order.md`
     /// [^3]: Balance register, the population. `docs/reference/balance.md`
     housing: Vec<u32>,
+    /// The faction that besieges each slot, and zero where none does.
+    ///
+    /// **The column is meaningless where the work column holds zero, so it
+    /// is written back to zero there.** The state hash folds both columns,
+    /// and a besieger left behind by a siege that ended would move the hash
+    /// without moving the world.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0164, every stored value the step reads enters the state hash, decision D1. `docs/adrs/draft/adr-0164-every-stored-value-the-step-reads-enters-the-state-hash.md`
+    besiegers: Vec<FactionId>,
+    /// The siege work that stands against each slot, and zero for no siege.
+    ///
+    /// A siege is work, in the way a build is work, and a site falls when
+    /// the work reaches what the site resists.[^1] The work is a whole
+    /// number, so it combines exactly in any order.[^2]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0180, a site changes hands or the taker destroys it, decision D8. `docs/adrs/draft/adr-0180-a-site-changes-hands-or-the-taker-destroys-it.md`
+    /// [^2]: ADR-0023, an aggregate combines exactly in any order, decision D2. `docs/adrs/accepted/adr-0023-an-aggregate-combines-exactly-in-any-order.md`
+    siege_work: Vec<i64>,
+    /// What the besieger of each slot means to do with the site.
+    ///
+    /// It holds the raze intent where a caller ordered a raze, and the reach
+    /// intent everywhere else. It is a one-byte integer and never a boolean,
+    /// because it crosses into the state hash.[^1]
+    ///
+    /// The column is meaningless where the work column holds zero, and it is
+    /// written back to the reach intent there.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0002, simulated and aggregated state holds no floating point number, decision D4. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
+    siege_intents: Vec<u8>,
     /// The settlement that stands on each tile, in tile order.
     ///
     /// This column is the tile side of the fact that the tile column of the
@@ -359,6 +536,9 @@ impl SettlementArena {
             factions: Vec::new(),
             stores: Vec::new(),
             housing: Vec::new(),
+            besiegers: Vec::new(),
+            siege_work: Vec::new(),
+            siege_intents: Vec::new(),
             holders: vec![None; grid.tile_count() as usize],
             free: VecDeque::new(),
             live_count: 0,
@@ -460,6 +640,13 @@ impl SettlementArena {
         //
         // [^1]: Balance register, the population, the founding housing row. `docs/reference/balance.md`
         self.housing[index] = 0;
+        // A founded settlement stands unbesieged. A slot that comes back
+        // from the free queue carries the columns the settlement before it
+        // left, so the founding writes every column and never only the ones
+        // it changes.
+        self.besiegers[index] = FactionId(0);
+        self.siege_work[index] = 0;
+        self.siege_intents[index] = SIEGE_INTENT_REACH;
         self.live_count += 1;
         let entity = Entity::new(slot, self.generations[index])
             .expect("a generation of one or more makes the identity non-zero");
@@ -479,6 +666,9 @@ impl SettlementArena {
         self.factions.push(FactionId(0));
         self.stores.push(Store::EMPTY);
         self.housing.push(0);
+        self.besiegers.push(FactionId(0));
+        self.siege_work.push(0);
+        self.siege_intents.push(SIEGE_INTENT_REACH);
         Ok(slot)
     }
 
@@ -511,6 +701,12 @@ impl SettlementArena {
         self.live[index] = 0;
         self.live_count -= 1;
         self.holders[self.tiles[index].0 as usize] = None;
+        // The siege dies with the site it stood against. A dead slot holds
+        // no siege, and the hash folds the column whether the slot is live
+        // or not.
+        self.besiegers[index] = FactionId(0);
+        self.siege_work[index] = 0;
+        self.siege_intents[index] = SIEGE_INTENT_REACH;
         if self.generations[index] == LAST_GENERATION {
             // The generation cannot advance, so the slot never returns. One
             // leaked slot beats two settlements that share one identity.
@@ -637,6 +833,125 @@ impl SettlementArena {
         };
         self.factions[slot as usize] = faction;
         true
+    }
+
+    /// Returns the siege that stands against a settlement.
+    ///
+    /// The answer is the besieging faction and the work that faction has
+    /// done. It is `None` when the identity is dead and `None` when no
+    /// siege stands.
+    ///
+    /// A siege is work, in the way a build is work, and the work is what a
+    /// site falls to.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0180, a site changes hands or the taker destroys it, decision D8. `docs/adrs/draft/adr-0180-a-site-changes-hands-or-the-taker-destroys-it.md`
+    #[must_use]
+    pub fn siege(&self, entity: Entity) -> Option<(FactionId, i64)> {
+        let slot = self.slot_of(entity)? as usize;
+        if self.siege_work[slot] <= 0 {
+            return None;
+        }
+        Some((self.besiegers[slot], self.siege_work[slot]))
+    }
+
+    /// Writes the siege that stands against a settlement.
+    ///
+    /// Work at or below zero clears the siege, and clearing writes the
+    /// besieger back to zero. The two columns state one fact together, so a
+    /// besieger that outlived its work would move the state hash without
+    /// moving the world.[^1]
+    ///
+    /// Returns `false` when the identity is dead, and `false` when the
+    /// faction is at or above the ceiling.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0164, every stored value the step reads enters the state hash, decision D1. `docs/adrs/draft/adr-0164-every-stored-value-the-step-reads-enters-the-state-hash.md`
+    pub fn set_siege(&mut self, entity: Entity, besieger: FactionId, work: i64) -> bool {
+        if besieger.0 >= FACTION_CEILING {
+            return false;
+        }
+        let Some(slot) = self.slot_of(entity) else {
+            return false;
+        };
+        let index = slot as usize;
+        if work <= 0 {
+            self.besiegers[index] = FactionId(0);
+            self.siege_work[index] = 0;
+            self.siege_intents[index] = SIEGE_INTENT_REACH;
+            return true;
+        }
+        // An intent belongs to the faction that stated it. A siege that
+        // passes to another faction therefore starts with no order, in the
+        // way it starts with no work.
+        if self.besiegers[index] != besieger {
+            self.siege_intents[index] = SIEGE_INTENT_REACH;
+        }
+        self.besiegers[index] = besieger;
+        self.siege_work[index] = work;
+        true
+    }
+
+    /// Returns what the besieger of a settlement means to do with the site.
+    ///
+    /// The answer is the reach intent when no siege stands, because no
+    /// faction has ordered anything.
+    ///
+    /// Returns `None` when the identity is dead.
+    #[must_use]
+    pub fn siege_intent(&self, entity: Entity) -> Option<u8> {
+        let slot = self.slot_of(entity)? as usize;
+        if self.siege_work[slot] <= 0 {
+            return Some(SIEGE_INTENT_REACH);
+        }
+        Some(self.siege_intents[slot])
+    }
+
+    /// Writes what the besieger of a settlement means to do with the site.
+    ///
+    /// Returns `false` when the identity is dead, and `false` when no siege
+    /// stands. An intent with no siege behind it would name a faction that
+    /// is not there.
+    pub fn set_siege_intent(&mut self, entity: Entity, intent: u8) -> bool {
+        let Some(slot) = self.slot_of(entity) else {
+            return false;
+        };
+        let index = slot as usize;
+        if self.siege_work[index] <= 0 {
+            return false;
+        }
+        self.siege_intents[index] = intent;
+        true
+    }
+
+    /// Returns the intent of the besieger of every slot, in slot order.
+    #[must_use]
+    pub fn siege_intent_column(&self) -> &[u8] {
+        &self.siege_intents
+    }
+
+    /// Clears the siege that stands against a settlement.
+    ///
+    /// Returns `false` when the identity is dead.
+    pub fn clear_siege(&mut self, entity: Entity) -> bool {
+        self.set_siege(entity, FactionId(0), 0)
+    }
+
+    /// Returns the besieging faction of every slot, in slot order.
+    ///
+    /// The entry of a slot that holds no siege is zero, and a reader tells
+    /// the two apart by the work column.
+    #[must_use]
+    pub fn besieger_column(&self) -> &[FactionId] {
+        &self.besiegers
+    }
+
+    /// Returns the siege work against every slot, in slot order.
+    #[must_use]
+    pub fn siege_work_column(&self) -> &[i64] {
+        &self.siege_work
     }
 
     /// Returns the settlement that stands on an address.
@@ -823,6 +1138,9 @@ impl SettlementArena {
             .write(bytemuck::cast_slice(&self.factions))
             .write(bytemuck::cast_slice(&self.stores))
             .write(bytemuck::cast_slice(&self.housing))
+            .write(bytemuck::cast_slice(&self.besiegers))
+            .write(bytemuck::cast_slice(&self.siege_work))
+            .write(&self.siege_intents)
             .write(&self.live);
         for generation in &self.generations {
             hash = hash.write(&generation.to_le_bytes());
@@ -850,8 +1168,30 @@ impl SettlementArena {
             || self.factions.len() != slots
             || self.stores.len() != slots
             || self.housing.len() != slots
+            || self.besiegers.len() != slots
+            || self.siege_work.len() != slots
+            || self.siege_intents.len() != slots
         {
             return false;
+        }
+        // The besieger and the work state one fact together. No siege means
+        // no besieger, a siege names a faction inside the ceiling, and a
+        // slot that is not live carries neither.
+        for slot in 0..slots {
+            if self.siege_work[slot] < 0 {
+                return false;
+            }
+            if self.siege_work[slot] == 0
+                && (self.besiegers[slot] != FactionId(0)
+                    || self.siege_intents[slot] != SIEGE_INTENT_REACH)
+            {
+                return false;
+            }
+            if self.siege_work[slot] > 0
+                && (self.live[slot] != 1 || self.besiegers[slot].0 >= FACTION_CEILING)
+            {
+                return false;
+            }
         }
         if self.holders.len() != self.grid.tile_count() as usize {
             return false;

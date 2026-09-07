@@ -25,6 +25,7 @@
 use cachette_core::event::{TAKE_KIND_CAPTURED, TAKE_KIND_RAZED};
 use cachette_core::holding::{Holder, LeaseRules, ReachRules};
 use cachette_core::site::CommodityId;
+use cachette_core::site::SiegeRules;
 use cachette_core::upgrade::UpgradeCategory;
 use cachette_core::{Axial, Entity, FactionId, Fix32, RazeError, World, WorldConfig};
 
@@ -50,7 +51,39 @@ fn world(seed: u64, factions: u16, reach: u32) -> World {
     // each fixture states the reach it needs. The test never reads a reach
     // value, so this is a fixture choice and not a balance figure.
     field.set_reach_rules(ReachRules::new(reach, 1, reach));
+    // A siege is work, and the default work is chosen for a run of a whole
+    // game. Every fixture here holds one unit against one city, so the
+    // default would make each test step for thousands of ticks. The test
+    // never reads a work value, so this is a fixture choice and not a
+    // balance figure.
+    field.set_siege_rules(SiegeRules::new(SIEGE_WORK, SIEGE_MULTIPLE));
     field
+}
+
+/// The siege work that one resident costs a besieger, in these fixtures.
+const SIEGE_WORK: i64 = 4;
+
+/// The times over the capture work that a raze costs, in these fixtures.
+const SIEGE_MULTIPLE: i64 = 4;
+
+/// The most ticks any fixture here presses a siege for.
+///
+/// A besieging unit does one work a tick, a site of one resident costs four,
+/// and a raze costs four times that. The bound stands far above both, so a
+/// test that reaches it has found a siege that never ends.
+const PRESS_BOUND: u32 = 200;
+
+/// Steps the world until the condition holds, and returns the steps it ran.
+///
+/// The last step it runs is the step that made the condition true, so a
+/// caller reads the log of that step afterwards.
+fn step_until(field: &mut World, bound: u32, mut done: impl FnMut(&World) -> bool) -> u32 {
+    let mut ran = 0;
+    while ran < bound && !done(field) {
+        field.step(1).expect("the step must run");
+        ran += 1;
+    }
+    ran
 }
 
 /// The reach that puts the rival city far outside the island.
@@ -207,7 +240,23 @@ fn a_faction_that_stands_on_an_undefended_city_takes_it_whole() {
     let invader = field
         .spawn_soldier(seat, FactionId(1))
         .expect("the island admits a unit");
-    field.step(2).expect("the step must run");
+    // **A site does not fall on the tick a rival arrives.** The first step
+    // opens a siege and takes nothing.
+    field.step(1).expect("the step must run");
+    assert_eq!(
+        field.settlement_faction(site),
+        Some(FactionId(0)),
+        "the site fell on the tick the invader arrived"
+    );
+    assert_eq!(
+        field.siege_of(site).map(|(who, _)| who),
+        Some(FactionId(1)),
+        "no siege stands against the site"
+    );
+    let ran = 1 + step_until(&mut field, PRESS_BOUND, |field| {
+        field.settlement_faction(site) == Some(FactionId(1))
+    });
+    assert!(ran < PRESS_BOUND, "the siege never took the site");
     assert!(field.check_invariants());
 
     // The control is the same fixture on the same seed with no invader. It
@@ -215,7 +264,9 @@ fn a_faction_that_stands_on_an_undefended_city_takes_it_whole() {
     // so the assertions below read the capture and not the tick.
     let mut control =
         fixture_with_reach(seed, REACH_TOGETHER).expect("the seed builds the fixture");
-    control.field.step(2).expect("the step must run");
+    for _ in 0..ran {
+        control.field.step(1).expect("the step must run");
+    }
 
     assert_eq!(
         field.settlement_faction(site),
@@ -294,12 +345,19 @@ fn a_garrison_of_one_refuses_the_capture() {
             .spawn_soldier(seat, FactionId(1))
             .expect("the island admits a unit");
     }
-    field.step(2).expect("the step must run");
+    for _ in 0..PRESS_BOUND {
+        field.step(1).expect("the step must run");
+    }
     assert!(field.check_invariants());
     assert_eq!(
         field.settlement_faction(site),
         Some(FactionId(0)),
         "a defended city changed hands"
+    );
+    assert_eq!(
+        field.siege_of(site),
+        None,
+        "a siege stood against a defended city"
     );
     assert!(
         field.taken_log().is_empty(),
@@ -332,10 +390,28 @@ fn a_captured_city_beyond_the_takers_reach_is_burned() {
         "the fixture put the two cities within reach of each other"
     );
 
+    let capture_work = field.capture_work_of(site).expect("the site is live");
+    let raze_work = field.raze_work_of(site).expect("the site is live");
+    assert_eq!(
+        raze_work,
+        capture_work * SIEGE_MULTIPLE,
+        "a raze cost no more than a capture"
+    );
+
     field
         .spawn_soldier(seat, FactionId(1))
         .expect("the island admits a unit");
-    field.step(2).expect("the step must run");
+    // One besieger does one work a tick, so the ticks the burn takes are the
+    // work it did. The site must stand past the work a capture would have
+    // cost, because a raze costs more.
+    let ran = step_until(&mut field, PRESS_BOUND, |field| {
+        field.settlement_on(seat).is_none()
+    });
+    assert!(ran < PRESS_BOUND, "the siege never burned the site");
+    assert!(
+        i64::from(ran) > capture_work,
+        "the burn cost no more than a capture"
+    );
 
     assert!(field.check_invariants());
     assert_eq!(
@@ -388,7 +464,10 @@ fn a_taker_that_holds_no_city_keeps_what_it_takes() {
     field
         .spawn_soldier(seat, FactionId(1))
         .expect("the island admits a unit");
-    field.step(2).expect("the step must run");
+    let ran = step_until(&mut field, PRESS_BOUND, |field| {
+        field.settlement_faction(site) == Some(FactionId(1))
+    });
+    assert!(ran < PRESS_BOUND, "the siege never took the site");
 
     assert!(field.check_invariants());
     assert_eq!(
@@ -408,6 +487,9 @@ fn a_taker_that_holds_no_city_keeps_what_it_takes() {
 
 #[test]
 fn a_razed_city_is_gone_and_its_upgrades_with_it() {
+    // **The order is what this test drives, so the reach must disagree with
+    // it.** The fixture puts every city within reach of every tile, so the
+    // engine would keep this city. Only the order burns it.
     let Fixture {
         mut field,
         seat,
@@ -415,7 +497,7 @@ fn a_razed_city_is_gone_and_its_upgrades_with_it() {
         resident,
         rival,
         ..
-    } = any_fixture();
+    } = fixture_with_reach(any_seed(), REACH_TOGETHER).expect("the seed builds the fixture");
     let home = field
         .settlement_on(rival)
         .expect("the rival founded a city");
@@ -425,21 +507,23 @@ fn a_razed_city_is_gone_and_its_upgrades_with_it() {
     let held = field
         .settlement_store(home, GRAIN)
         .expect("the site is live");
-    // The raze runs on the tick the invader lands, before the step reads the
-    // tile, because the step would otherwise capture the city first.
     field
         .spawn_soldier(seat, FactionId(1))
         .expect("the island admits a unit");
-
+    // The order needs a siege to write, so the first step opens one.
+    field.step(1).expect("the step must run");
     field
-        .raze_site(site, FactionId(1))
-        .expect("the razer stands on an undefended site");
+        .order_raze(site, FactionId(1))
+        .expect("a siege of the razer stands against the site");
+    let ran = step_until(&mut field, PRESS_BOUND, |field| {
+        field.settlement_on(seat).is_none()
+    });
+    assert!(ran < PRESS_BOUND, "the ordered raze never burned the site");
     let taken = field.taken_log().to_vec();
     assert_eq!(taken.len(), 1, "the raze wrote no event, or wrote two");
     assert_eq!(taken[0].kind, TAKE_KIND_RAZED);
     assert_eq!(taken[0].from, FactionId(0));
     assert_eq!(taken[0].to, FactionId(1));
-    field.step(2).expect("the step must run");
 
     assert!(field.check_invariants());
     assert_eq!(
@@ -479,7 +563,7 @@ fn a_razed_city_is_gone_and_its_upgrades_with_it() {
 }
 
 #[test]
-fn a_raze_refuses_a_defended_site_and_a_site_nobody_stands_on() {
+fn a_raze_order_refuses_a_defended_site_and_a_site_nobody_besieges() {
     let Fixture {
         mut field,
         seat,
@@ -487,9 +571,9 @@ fn a_raze_refuses_a_defended_site_and_a_site_nobody_stands_on() {
         ..
     } = any_fixture();
     assert_eq!(
-        field.raze_site(site, FactionId(1)),
-        Err(RazeError::NotOccupied),
-        "a raze from nowhere was allowed"
+        field.order_raze(site, FactionId(1)),
+        Err(RazeError::NotBesieging),
+        "an order from nowhere was allowed"
     );
     field
         .spawn_soldier(seat, FactionId(0))
@@ -497,23 +581,79 @@ fn a_raze_refuses_a_defended_site_and_a_site_nobody_stands_on() {
     field
         .spawn_soldier(seat, FactionId(1))
         .expect("the island admits a unit");
+    for _ in 0..4 {
+        field.step(1).expect("the step must run");
+    }
     assert_eq!(
-        field.raze_site(site, FactionId(1)),
-        Err(RazeError::Defended),
-        "a raze of a defended site was allowed"
+        field.order_raze(site, FactionId(1)),
+        Err(RazeError::NotBesieging),
+        "an order against a defended site was allowed"
     );
     assert_eq!(
-        field.raze_site(site, FactionId(0)),
+        field.order_raze(site, FactionId(0)),
         Err(RazeError::OwnSite),
-        "a faction razed its own site"
+        "a faction ordered a raze of its own site"
     );
-    field.step(2).expect("the step must run");
     assert!(field.check_invariants());
     assert_eq!(
         field.settlement_faction(site),
         Some(FactionId(0)),
-        "a refused raze took the city anyway"
+        "a refused order took the city anyway"
     );
+}
+
+#[test]
+fn a_relief_force_ends_the_siege_and_the_work_is_gone() {
+    // **A raze that nothing can stop is a delay and not a defence.** The
+    // trigger is read again on every tick, so a unit of the owning faction
+    // that returns to the tile ends the siege, and the work the besieger did
+    // is gone. A besieger that stands there again starts at nothing.
+    let Fixture {
+        mut field,
+        seat,
+        site,
+        ..
+    } = fixture_with_reach(any_seed(), REACH_TOGETHER).expect("the seed builds the fixture");
+    field
+        .spawn_soldier(seat, FactionId(1))
+        .expect("the island admits a unit");
+    for _ in 0..2 {
+        field.step(1).expect("the step must run");
+    }
+    let pressed = field.siege_of(site).expect("a siege stands");
+    assert_eq!(pressed.0, FactionId(1), "the siege names the wrong faction");
+    assert!(pressed.1 > 0, "the siege did no work");
+
+    // The relief force arrives. The garrison it makes ends the siege.
+    let relief = field
+        .spawn_soldier(seat, FactionId(0))
+        .expect("the island admits a unit");
+    field.step(1).expect("the step must run");
+    assert_eq!(
+        field.siege_of(site),
+        None,
+        "a defender on the tile left the siege standing"
+    );
+    assert_eq!(
+        field.settlement_faction(site),
+        Some(FactionId(0)),
+        "the relieved city changed hands"
+    );
+
+    // The relief force leaves. The besieger starts again at nothing, and
+    // never at the work it did before.
+    assert!(field.despawn_soldier(relief));
+    field.step(1).expect("the step must run");
+    let again = field.siege_of(site).expect("a siege stands again");
+    assert_eq!(
+        again.1, 1,
+        "the siege carried the work it did before the relief"
+    );
+    assert!(
+        again.1 < pressed.1,
+        "the relief did not take the siege work away"
+    );
+    assert!(field.check_invariants());
 }
 
 #[test]
@@ -552,9 +692,10 @@ fn no_unit_is_stranded_when_its_home_is_taken_or_razed() {
     field
         .spawn_soldier(seat, FactionId(1))
         .expect("the island admits a unit");
-    field
-        .raze_site(site, FactionId(1))
-        .expect("the razer stands on an undefended site");
+    let ran = step_until(&mut field, PRESS_BOUND, |field| {
+        field.settlement_on(seat).is_none()
+    });
+    assert!(ran < PRESS_BOUND, "the siege never burned the site");
 
     assert!(
         !field.soldiers().contains(resident),
@@ -595,7 +736,6 @@ fn a_faction_with_no_site_and_no_unit_leaves_the_game_and_releases_its_ground() 
     let Fixture {
         mut field,
         seat,
-        site,
         away,
         ..
     } = any_fixture();
@@ -629,9 +769,10 @@ fn a_faction_with_no_site_and_no_unit_leaves_the_game_and_releases_its_ground() 
     field
         .spawn_soldier(seat, FactionId(1))
         .expect("the island admits a unit");
-    field
-        .raze_site(site, FactionId(1))
-        .expect("the razer stands on an undefended site");
+    let ran = step_until(&mut field, PRESS_BOUND, |field| {
+        field.settlement_on(seat).is_none()
+    });
+    assert!(ran < PRESS_BOUND, "the siege never burned the site");
     // Every remaining unit of the losing faction goes. The elimination reads
     // the site count and the population, and this fixture drives both to
     // zero.
@@ -678,17 +819,15 @@ fn an_eliminated_faction_wins_nothing() {
     // nothing alive kept its tiles for ever, so it could win the game on
     // ground it could not defend. Every reader must refuse it.
     let Fixture {
-        mut field,
-        seat,
-        site,
-        ..
+        mut field, seat, ..
     } = any_fixture();
     field
         .spawn_soldier(seat, FactionId(1))
         .expect("the island admits a unit");
-    field
-        .raze_site(site, FactionId(1))
-        .expect("the razer stands on an undefended site");
+    let ran = step_until(&mut field, PRESS_BOUND, |field| {
+        field.settlement_on(seat).is_none()
+    });
+    assert!(ran < PRESS_BOUND, "the siege never burned the site");
     for unit in field.soldiers().iter().collect::<Vec<_>>() {
         if field.soldier_faction(unit) == Some(FactionId(0)) {
             assert!(field.despawn_soldier(unit));

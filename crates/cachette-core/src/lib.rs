@@ -132,7 +132,8 @@ pub use resource::{
     TileGround,
 };
 pub use site::{
-    CommodityId, SettlementArena, SettlementError, Store, StoreUpdate, COMMODITY_COUNT,
+    CommodityId, SettlementArena, SettlementError, SiegeRules, Store, StoreUpdate, COMMODITY_COUNT,
+    SIEGE_RAZE_MULTIPLE, SIEGE_WORK_FOR_EACH_RESIDENT,
 };
 pub use slots::{Candidate, SlotError, Slots};
 pub use soldier::{SoldierArena, SoldierError};

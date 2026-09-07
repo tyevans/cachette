@@ -334,10 +334,15 @@ pub struct ReachRules {
 
 impl ReachRules {
     /// The provisional values that the balance register holds.
+    ///
+    /// The bound stands above the distance the seeding keeps between two
+    /// foundings, and the base stands below it. A capital is therefore out
+    /// of reach of a rival capital until the faction has built the ground
+    /// that extends the reach.
     pub const DEFAULT: Self = Self {
-        base: 4,
+        base: 8,
         upgrades_per_step: 4,
-        cap: 8,
+        cap: 16,
     };
 
     /// Builds a rule set.
