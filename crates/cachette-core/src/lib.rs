@@ -29,6 +29,7 @@ pub mod descent;
 pub mod effective;
 pub mod event;
 pub mod event_layout;
+pub mod faction_observation;
 pub mod faction_view;
 pub mod founding;
 pub mod growth;

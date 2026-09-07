@@ -553,6 +553,53 @@ class FactionRegionSummary(TypedDict):
     height_total: int
     food_total: int
 
+class ObservationField(TypedDict):
+    """One field of the observation array of a faction.
+
+    The name entry names the field. The start entry gives the position the
+    field starts at, and the positions entry gives how many positions it
+    holds. A field is contiguous, so position ``n`` of it sits at
+    ``start + n``.
+
+    The dtype entry names the NumPy element type of every position.
+
+    The low and high entries give the lowest and the highest value any
+    position of the field may hold. A field whose bounds are the whole range
+    of the element type has no tighter bound that the world parameters give.
+
+    A field whose name starts with ``cell_`` holds one position for each cell
+    of the block lattice, in ascending cell order.
+    """
+
+    name: str
+    start: int
+    positions: int
+    dtype: str
+    low: int
+    high: int
+
+class ObservationSchema(TypedDict):
+    """The declared layout of the observation array of one world.
+
+    This is the only declaration of that layout. Decode the array by
+    arithmetic over this schema. Do not write a position, a length or a bound
+    into a file of your own.
+
+    The version entry gives the version of the layout. A field added,
+    removed, relengthened or rebounded changes the meaning of a stored weight
+    file, so a learner that loads a policy under another version must stop.
+
+    The length entry gives how many positions the whole array holds. It is
+    the length that ``faction_observation`` returns.
+
+    The fields entry lists one entry for each field, in the order the array
+    holds them.
+    """
+
+    version: int
+    length: int
+    fields: list[ObservationField]
+
 class FactionTileReport(TypedDict):
     """What one faction may read about one tile.
 
@@ -1305,6 +1352,8 @@ class World:
     def faction_region_summary(
         self, faction: int, q: int, r: int, admit: str = ...
     ) -> FactionRegionSummary: ...
+    def faction_observation(self, faction: int) -> npt.NDArray[np.int64]: ...
+    def observation_schema(self) -> ObservationSchema: ...
     def site_economy(self, site: int, commodity: int = ...) -> SiteEconomy: ...
     def site_production(self, site: int, commodity: int = ...) -> SiteProduction: ...
     def site_housing(self, site: int) -> SiteHousing: ...

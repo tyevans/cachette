@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-572**
+**Next number: FND-573**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -13950,8 +13950,51 @@ reader returns, so the two cannot part again without a failure.
 This is the first local instance of a partial reader in this project. The
 nearest recorded shape is a value a caller can set and cannot read back.[^F569B]
 
+### FND-572 — The mask made the whole-map read cheap, and the loop shape did not
+
+**Believed.** A point query is the wrong shape for a whole map, so the way to
+make an observation cheap is to stop calling the per-cell reader in a loop. The
+measurement that raised this said a per-cell read costs a part of a step, and
+that reading every cell of a small world for one faction costs about a tenth of
+one.[^F572A]
+
+**True.** The cost was the tile walk, and not the loop. A cell the faction has
+never seen a tile of needs no tile walk at all, because the block form of the
+fog layer answers for the whole block in one test. Moving that test into the
+masking rule removed the cost, and the per-cell reader gained it at the same
+time, because both callers now share one rule. The whole-lattice pass saves the
+layer lookup on top of that, and that saving is the smaller of the two.
+
+**Evidence.** Measured on 6 September 2026 on one loaded development machine
+(x86-64), cells of 1024 tiles, one faction camped in one corner. A world of 64
+cells in which the faction observed 3 of them cost about the same as a world of
+4 cells in which it observed all 4. Sixty-one unobserved cells added nothing
+that the measurement could see. The commit body holds every row and the command
+that produced them. BLK-007 keeps the figures derived until the target platform
+measures them.[^28]
+
+**What follows.** Three things.
+
+**Read the cost before you choose the algorithm.** The design principle that a
+set-valued command permits a cheaper algorithm is sound, and it pointed at the
+loop when the cost was in the tile walk.[^F572C] The whole-set pass is still the
+right shape, and it is not what made the read affordable.
+
+**A shortcut belongs in the shared rule, not in the new caller.** The empty
+block test sits in the one place that applies the sight rule to a cell, so every
+caller pays the lower price and no caller holds a second copy of the rule.[^F487B]
+
+**The cost of an observation follows the observed area, not the lattice.** A
+learner at the start of a run pays for the ground it has walked. A record says
+that fog storage grows with observed area, and the read now grows the same
+way.[^F572E]
+
 
 ## References
+
+[^F572A]: Backlog item 0495, build the observation plane and let every reader answer for one faction. `docs/backlog/complete/0495-build-the-observation-plane-and-let-every-reader-answer-for-one-faction.md`
+[^F572C]: Project orientation, the design principles. `AGENTS.md`
+[^F572E]: ADR-0059, fog storage grows with observed area, not with world area, decision D2. `docs/adrs/accepted/adr-0059-fog-storage-grows-with-observed-area.md`
 
 [^F565A]: ADR-0154, the observation and the action of a faction are schema-declared bounded tables the engine owns, decision D4. `docs/adrs/accepted/adr-0154-the-observation-and-the-action-of-a-faction-are-schema-declared-bounded-tables.md`
 [^F569A]: Research report 31, the state of the learner surface, the judgement of ADR-0156. `docs/research/reports/31-the-state-of-the-learner-surface.md`

@@ -146,4 +146,4 @@ was added.
 [^13]: Decisions register, DEC-276. `docs/DECISIONS.md`
 [^14]: Blockers register, BLK-007. `docs/BLOCKERS.md`
 [^15]: ADR-0068, terrain is generated from the seed and is never stored as a map, decision D1. `docs/adrs/accepted/adr-0068-terrain-is-generated-from-the-seed-and-is-never-stored-as-a-map.md`
-[^16]: Backlog item 0516. `docs/backlog/proposed/0516-give-a-faction-one-flat-observation-array-and-declare-its-layout-in-a-schema.md`
+[^16]: Backlog item 0516. `docs/backlog/complete/0516-give-a-faction-one-flat-observation-array-and-declare-its-layout-in-a-schema.md`

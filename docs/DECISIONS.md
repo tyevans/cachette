@@ -75,6 +75,16 @@ a test holds it. A change to option B or option C changes the layer, the state
 hash and every golden file, so it is cheaper to settle before the learner reads
 the memory.
 
+**The learner now reads the memory, which sharpens the question.** The flat
+observation array carries one row for each cell of the lattice, and a
+remembered cell of it holds the ground and no upgrade.[^DEC276G] A player who
+watched a rival raise a city sees the city on the map and remembers it. A policy
+trained on this array cannot, so the array understates what a player of that
+faction knows. The array itself needs no change under any of the three options,
+because it reads the tile reader and the masked summary rather than the layer.
+Option B or option C therefore changes the layer and the state hash, and it
+changes no position of the observation.
+
 ### DEC-275 — Does the territory reader compare a share of the tiles?
 
 **Open. The project owner owns it.**
@@ -4598,3 +4608,4 @@ exactly so that a caller cannot build a wrong one.[^DEC120C]
 [^DEC276B]: ADR-0059, fog storage grows with observed area, not with world area, decision D2. `docs/adrs/accepted/adr-0059-fog-storage-grows-with-observed-area.md`
 [^DEC276D]: ADR-0072, a tile stock is generated, and only what was taken is stored, decision D1. `docs/adrs/accepted/adr-0072-a-tile-stock-is-generated-and-only-what-was-taken-is-stored.md`
 [^DEC276F]: ADR-0059, fog storage grows with observed area, not with world area, decision D5. `docs/adrs/accepted/adr-0059-fog-storage-grows-with-observed-area.md`
+[^DEC276G]: Backlog item 0516, give a faction one flat observation array, and declare its layout in a schema. `docs/backlog/complete/0516-give-a-faction-one-flat-observation-array-and-declare-its-layout-in-a-schema.md`

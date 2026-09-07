@@ -46,7 +46,7 @@ use numpy::{PyArray1, PyReadwriteArray1, ToPyArray};
 use pyo3::create_exception;
 use pyo3::exceptions::{PyException, PyValueError};
 use pyo3::prelude::*;
-use pyo3::types::PyDict;
+use pyo3::types::{PyDict, PyList};
 use pyo3::PyTypeInfo;
 
 // ADR-0046: one root exception type holds the whole hierarchy. The
@@ -3336,6 +3336,130 @@ impl PyWorld {
         fields.set_item("height_total", summary.height_total().0)?;
         fields.set_item("food_total", summary.food_total().0)?;
         Ok(fields)
+    }
+
+    /// Returns the observation of one faction, as one NumPy `int64` array.
+    ///
+    /// **The array holds what that faction observes, and nothing else.** No
+    /// argument widens the answer. A caller that wants the truth of the
+    /// world calls a reader that names no faction.[^1]
+    ///
+    /// `observation_schema` declares where every field of the array sits, and
+    /// it is the only declaration of that layout. **Do not write an offset,
+    /// a length or a bound into a file outside the engine.** Read the schema
+    /// and decode by arithmetic over it.[^2]
+    ///
+    /// The length is a function of the world parameters, and never of the
+    /// population.[^3] A faction that loses every unit reads an array of the
+    /// same length as a faction that holds a million.
+    ///
+    /// No position holds a floating point number. A fixed-point value crosses
+    /// as its raw integer, and the caller scales it.[^4]
+    ///
+    /// A cell the faction has never seen a tile of reads as zero in every
+    /// position. The `cell_seen_now` and `cell_seen_ever` fields of that cell
+    /// state that the faction holds none of it, so a caller tells an
+    /// unobserved cell from an empty one.
+    ///
+    /// This method copies the array.
+    ///
+    /// # Errors
+    ///
+    /// Raises `VerbError` when the number names no faction of this world.
+    /// Raises `ViewError` when the derived unit structure does not describe
+    /// the units.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0154, the observation and the action of a faction are schema-declared bounded tables, decision D3. `docs/adrs/accepted/adr-0154-the-observation-and-the-action-of-a-faction-are-schema-declared-bounded-tables.md`
+    /// [^2]: ADR-0154, the observation and the action of a faction are schema-declared bounded tables, decision D1. `docs/adrs/accepted/adr-0154-the-observation-and-the-action-of-a-faction-are-schema-declared-bounded-tables.md`
+    /// [^3]: ADR-0154, the observation and the action of a faction are schema-declared bounded tables, decision D2. `docs/adrs/accepted/adr-0154-the-observation-and-the-action-of-a-faction-are-schema-declared-bounded-tables.md`
+    /// [^4]: ADR-0002, state holds no floating point number, decision D1. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
+    fn faction_observation<'py>(
+        &self,
+        python: Python<'py>,
+        faction: u16,
+    ) -> PyResult<Bound<'py, PyArray1<i64>>> {
+        let world = self.lock();
+        if faction >= world.faction_count() {
+            return Err(VerbError::new_err(format!(
+                "{faction} names no faction of this world"
+            )));
+        }
+        let values = world
+            .faction_observation(FactionId(faction))
+            .ok_or_else(|| ViewError::new_err("the world cannot describe its own units"))?;
+        Ok(values.to_pyarray(python))
+    }
+
+    /// Returns the declared layout of the observation array, as a `dict`.
+    ///
+    /// **This is the only declaration of that layout.** The engine builds the
+    /// schema and the array from one field list, so a caller that decodes by
+    /// arithmetic over this schema cannot disagree with the array. No file
+    /// outside the engine may state a position, a length or a bound.[^1]
+    ///
+    /// The dictionary holds three keys.
+    ///
+    /// - `version`, an integer. The version of the layout. A field added,
+    ///   removed, relengthened or rebounded changes the meaning of a stored
+    ///   weight file, so a learner that loads a policy under another version
+    ///   must stop.[^2]
+    /// - `length`, an integer. How many positions the whole array holds. It
+    ///   is the length `faction_observation` returns.
+    /// - `fields`, a list of `dict`. One entry for each field, in the order
+    ///   the array holds them.
+    ///
+    /// Each field entry holds six keys.
+    ///
+    /// - `name`, a string. The name of the field.
+    /// - `start`, an integer. The position the field starts at.
+    /// - `positions`, an integer. How many positions the field holds. A field
+    ///   is contiguous, so position `n` of it sits at `start + n`.
+    /// - `dtype`, a string. The NumPy element type of every position.
+    /// - `low` and `high`, integers. The lowest and the highest value any
+    ///   position of the field may hold.
+    ///
+    /// A field whose bounds are the whole range of the element type has no
+    /// tighter bound that the world parameters give. The engine states no
+    /// measured figure, because a blocker governs every measured figure of
+    /// this project.[^3]
+    ///
+    /// A field whose name starts with `cell_` holds one position for each
+    /// cell of the block lattice, in ascending cell order. That is the same
+    /// lattice the fog layer and the summary level divide the world over, and
+    /// it carries no margin.[^4] [^5]
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the interpreter refuses to hold the dictionary.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0154, the observation and the action of a faction are schema-declared bounded tables, decision D1. `docs/adrs/accepted/adr-0154-the-observation-and-the-action-of-a-faction-are-schema-declared-bounded-tables.md`
+    /// [^2]: ADR-0154, the observation and the action of a faction are schema-declared bounded tables, the consequences. `docs/adrs/accepted/adr-0154-the-observation-and-the-action-of-a-faction-are-schema-declared-bounded-tables.md`
+    /// [^3]: Blockers register, BLK-007. `docs/BLOCKERS.md`
+    /// [^4]: ADR-0022, level 0 is the only truth, and every level above it is derived, decision D2. `docs/adrs/accepted/adr-0022-level-0-is-the-only-truth-and-every-level-above-it-is-derived.md`
+    /// [^5]: Findings register, FND-569. `docs/FINDINGS.md`
+    fn observation_schema<'py>(&self, python: Python<'py>) -> PyResult<Bound<'py, PyDict>> {
+        let world = self.lock();
+        let schema = world.observation_schema();
+        let fields = PyList::empty(python);
+        for row in schema.rows() {
+            let entry = PyDict::new(python);
+            entry.set_item("name", row.name())?;
+            entry.set_item("start", row.start)?;
+            entry.set_item("positions", row.positions)?;
+            entry.set_item("dtype", row.kind().numpy_name())?;
+            entry.set_item("low", row.low)?;
+            entry.set_item("high", row.high)?;
+            fields.append(entry)?;
+        }
+        let out = PyDict::new(python);
+        out.set_item("version", schema.version())?;
+        out.set_item("length", schema.length())?;
+        out.set_item("fields", fields)?;
+        Ok(out)
     }
 
     /// Returns what one site earns, holds and owes, as a `dict`.
