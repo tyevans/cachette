@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-569**
+**Next number: FND-570**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -832,7 +832,7 @@ A test that asserted more border water after the margin was written and it
 failed. The test in the tree asserts the neighbour property, which is the thing
 the margin buys and which fails at margin zero.
 
-### FND-568 — The polar cloud failure was read as a margin defect, and it was a test that indexed a plane at a world address
+### FND-569 — The polar cloud failure was read as a margin defect, and it was a test that indexed a plane at a world address
 
 **Believed.** Two branches that were each correct alone met and broke the
 poles. One branch gave the weather lattice a margin of mirrored cells on all
