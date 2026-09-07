@@ -51,6 +51,11 @@ VARIANT_LENSES: dict[str, tuple[str, float]] = {
     ),
 }
 
+# How many refused drawings go into one prompt. An SVG document of this tool
+# runs about 800 tokens, and the model window is 16384. The newest refusals
+# win, because they answer the drawing that the person just saw.
+MAX_REFUSALS = 2
+
 ARTIST_SYSTEM = (
     "You are a game artist. You write SVG source and nothing else. "
     "You answer with one SVG document. You do not write a sentence "
@@ -164,21 +169,52 @@ def parse_critique(text: str) -> dict:
     }
 
 
+def _refusal_block(denied_sources: Sequence[str]) -> str:
+    """Give the prompt section that shows the drawings a person refused.
+
+    Give the empty string when nobody refused anything. The section holds SVG
+    source, because the generation step sends no picture, and that is what
+    keeps the prompt inside the model window.
+    """
+    taken = [item for item in denied_sources if item and item.strip()][-MAX_REFUSALS:]
+    if not taken:
+        return ""
+    bodies = "\n-----\n".join(item.strip() for item in taken)
+    return (
+        "\nDRAWINGS THE ART DIRECTOR REFUSED. Do not draw like these. Do not "
+        "reuse their shapes or their palette.\n"
+        "-----\n"
+        f"{bodies}\n"
+        "-----\n"
+    )
+
+
 def build_creation_prompt(
     the_guide: guide_module.Guide,
     subject: str,
     lens: str,
     sizes: render.SizeSet,
+    denied_sources: Sequence[str] = (),
+    standing_note: str | None = None,
 ) -> str:
     """Build the prompt that makes the first drawing of an asset."""
+    standing = ""
+    if standing_note:
+        standing = (
+            "\nDIRECTION FROM THE HUMAN ART DIRECTOR. This outranks every "
+            "other note. Do what it says first.\n"
+            f"{standing_note.strip()}\n"
+        )
     return (
         f"Draw one {the_guide.asset} for a strategy game world map.\n"
         f"The subject is: {subject}\n\n"
         "The style guide follows. Obey every rule in it.\n"
         "-----\n"
         f"{the_guide.rules}\n"
-        "-----\n\n"
-        f"Your direction for this drawing: {lens}\n\n"
+        "-----\n"
+        + _refusal_block(denied_sources)
+        + standing
+        + f"\nYour direction for this drawing: {lens}\n\n"
         f"The map draws this asset at {sizes.display} pixels. A person "
         f"inspects it at {sizes.inspection} pixels. It must read at the "
         "smaller size.\n\n"
@@ -194,17 +230,26 @@ def build_revision_prompt(
     parent_svg: str,
     faults: list[str],
     human_text: str | None,
+    standing_note: str | None = None,
+    denied_sources: Sequence[str] = (),
 ) -> str:
     """Build the prompt that revises a drawing.
 
-    Human feedback goes above the model critique, and the prompt says
-    that the human outranks the model.
+    The two human notes go above the model critique, and the prompt says that
+    the human outranks the model. The standing note goes above the note for
+    this round, because it holds for the whole session.
     """
     direction = []
+    if standing_note:
+        direction.append(
+            "STANDING DIRECTION FROM THE HUMAN ART DIRECTOR. It holds for "
+            "the whole session, and it outranks every other note below it.\n"
+            f"{standing_note.strip()}"
+        )
     if human_text:
         direction.append(
-            "DIRECTION FROM THE HUMAN ART DIRECTOR. This outranks every "
-            "other note below it. Do what it says first.\n"
+            "DIRECTION FROM THE HUMAN ART DIRECTOR FOR THIS ROUND. This "
+            "outranks every model note below it. Do what it says first.\n"
             f"{human_text.strip()}"
         )
     if faults:
@@ -229,7 +274,9 @@ def build_revision_prompt(
         "This is the current SVG source.\n"
         "-----\n"
         f"{parent_svg.strip()}\n"
-        "-----\n\n"
+        "-----\n"
+        + _refusal_block(denied_sources)
+        + "\n"
         + "\n\n".join(direction)
         + f"\n\nYour direction for this variant: {lens}\n\n"
         f"The map draws this asset at {sizes.display} pixels. It must "
