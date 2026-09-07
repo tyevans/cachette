@@ -16036,6 +16036,51 @@ work aside is sound; losing it from the ledger is the defect.** A deferred
 mechanism belongs in a register at the moment it is deferred, not at the moment
 it is finally needed.
 
+### FND-624 — The difference between two rendered pictures was not the paint an overlay laid down
+
+**Believed.** The sketchbook renderer read an overlay by asking the engine for
+the frame with the overlay and for the frame without it. The module said in its
+own prose that the difference between the two pictures is the pigment the
+overlay laid down. It then read that difference at the pixel the engine drew
+each tile on, which is a sweep that asks the engine one tile at a time.
+
+**False, in three ways, and each one is silent.** First, the frame without an
+overlay is not the unpainted ground. The drawing pass mixes the sky into the
+ground of every tile when the caller names no overlay, so the two pictures
+differ in their base as well as in the wash. Second, the pass draws shade, ink
+and marks over the fill. A pixel that carries one of those is the same in both
+pictures, so the difference reports no paint on ground the overlay covered.
+Third, the strength that a difference of pixels recovers is the strength of the
+wash times the distance from the overlay colour to the ground under it, so a
+tile whose ground already matches the overlay colour reads as empty.
+
+**Evidence.** A probe over the demonstration world at an extent of 48, at seed
+`0x0123456789ABCDEF`, settled 3 ticks, over eleven overlays, on 7 September 2026
+on one development machine (x86-64). The engine mixes the overlay colour into
+the ground at a declared weight, and that mix explained the drawn pixel on the
+tiles whose fill the probe could reach. It explained no pixel of a tile that
+shade or a mark covered.
+
+**What follows.** **The engine now publishes the paint itself, as a colour and
+a strength for every tile.** The renderer holds no ramp and no palette, so the
+reading cannot drift from what the map draws. The reading also stops being a
+function of the camera, which is what an earlier finding on this renderer
+cost.[^F624A]
+
+**A reader that recovers a quantity from a picture recovers an approximation of
+it.** The picture is the end of a pipeline, and every later stage of that
+pipeline is in the answer. This is the second reader on this renderer to be
+built that way and the second to be deleted. The first recovered the height and
+the cloud of a tile from rendered pixels, and four bulk columns replaced
+it.[^F624B] Ask the engine for the quantity.
+
+**A pixel is the wrong altitude for an agreement test.** The first attempt held
+the bulk column against the drawn frame, and it could not separate a defect in
+the column from shade, ink, a mark, or a tile edge. The test that landed holds
+the column against the per-tile columns the engine already publishes: the
+holder column pins the palette and the tile order, the height column pins the
+ramp, and the cloud column pins the map from a tile to its weather cell.
+
 
 ## References
 
@@ -16052,3 +16097,5 @@ it is finally needed.
 [^F616B]: Findings register, FND-618. `docs/FINDINGS.md`
 [^F619A]: Findings register, FND-605 and FND-606. `docs/FINDINGS.md`
 [^F619B]: Findings register, FND-618. `docs/FINDINGS.md`
+[^F624A]: Findings register, FND-610. `docs/FINDINGS.md`
+[^F624B]: The four bulk tile readers, and the test that holds them to the engine. `tests/test_bulk_tile_readers.py`

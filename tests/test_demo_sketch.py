@@ -334,14 +334,13 @@ def test_the_lean_changes_how_far_the_page_reaches_down_the_frame() -> None:
 # The wash of an overlay against the ground it colours.
 #
 # **The colour and the ink are one page, and a zoom must not part them.** The
-# engine paints an overlay on its own flat map. The sketch reads that paint
-# tile by tile, at the pixel the engine drew each tile on. That pixel is a
-# function of the camera and of the size of the frame, and of nothing else.
+# sketch asks the engine what pigment an overlay lays on each tile, over the
+# whole world in one crossing. That answer stands on the tile order of the
+# world, so no camera and no frame size reaches it.
 #
-# A reading held against the window of whole tiles instead is reused at every
-# camera that covers the same whole tiles. A zoom moves the camera in small
-# steps and the window in whole tiles, so between two steps of the window each
-# tile takes the paint of a neighbour, and the colour walks across the ink.
+# A reading taken at the pixel the engine drew a tile on is a function of the
+# camera. A zoom moves the camera in small steps, and between two steps each
+# tile took the paint of a neighbour, so the colour walked across the ink.
 # The register holds what this cost.[^1]
 #
 # [^1]: Findings register, FND-610. `docs/FINDINGS.md`
@@ -374,32 +373,6 @@ def washed(renderer: object, camera: Camera) -> np.ndarray:
         camera, WIDTH, HEIGHT, surface.pixels, overlay=DRIFT_OVERLAY
     )
     return surface.pixels.copy()
-
-
-def test_every_tile_takes_its_wash_from_the_pixel_the_engine_drew_it_at() -> None:
-    """The reading of a tile stands on that tile, at every zoom.
-
-    **This asks the engine, and it does not repeat the engine.** The renderer
-    says which pixel it read a tile at. The engine says which tile stands at
-    that pixel. The two must name the same tile, or the tile wears the colour
-    of a neighbour.
-    """
-    world, _ = build()
-    sketch = Sketch(world, view=View())
-    for factor in DRIFT_ZOOMS:
-        camera = zoomed(world, factor)
-        washed(sketch, camera)
-        at_x, at_y, seen = sketch.tile_pixels(camera, WIDTH, HEIGHT)
-        rows, columns = np.nonzero(seen)
-        wrong = [
-            (int(q), int(r))
-            for r, q in zip(rows, columns, strict=True)
-            if camera.tile_at(float(at_x[r, q]), float(at_y[r, q])) != (int(q), int(r))
-        ]
-        assert not wrong, (
-            f"at zoom {factor} the sketch read {len(wrong)} of {len(rows)} tiles "
-            f"at a pixel that shows another tile, the first being {wrong[0]}"
-        )
 
 
 def test_a_zoom_does_not_walk_the_wash_across_the_ground() -> None:

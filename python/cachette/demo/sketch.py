@@ -228,11 +228,6 @@ MARGIN = 24
 # card without this.
 PANEL_GROWTH = 2
 
-# How far apart the pixels stand that the wash asks the engine to name, in
-# pixels. A tile of the demonstration world covers several pixels, so a coarse
-# grid still names every tile the camera shows.
-SAMPLE_STEP = 3
-
 
 class BoundaryGap(Exception):
     """The engine does not publish something this renderer needs."""
@@ -505,8 +500,6 @@ class Sketch:
         "_level",
         "_raised",
         "_relief",
-        "_sample",
-        "_sample_at",
         "_scratch",
         "_sky",
         "_water",
@@ -548,7 +541,13 @@ class Sketch:
         Raises ``BoundaryGap`` when the engine publishes no bulk reader for
         the fields the page draws.
         """
-        for name in ("tile_heights", "tile_kinds", "cloud_shares", "tile_winds"):
+        for name in (
+            "tile_heights",
+            "tile_kinds",
+            "cloud_shares",
+            "tile_winds",
+            "overlay_paint",
+        ):
             if not hasattr(world, name):
                 message = (
                     f"the engine publishes no {name!r} reader, and the sketch "
@@ -592,10 +591,6 @@ class Sketch:
         self._scratch: dict[str, npt.NDArray[np.uint32]] = {}
         self._grain: np.ndarray | None = None
         self._grain_size = (0, 0)
-        # Where the engine drew each tile of the world on its own flat map,
-        # and the camera and frame that answer stands for.
-        self._sample: tuple[np.ndarray, np.ndarray, np.ndarray] | None = None
-        self._sample_at: tuple[float, float, float, float, int, int] | None = None
 
     def window(self) -> tuple[int, int, int, int] | None:
         """Give back the window of tiles the last frame drew, or nothing.
@@ -1184,6 +1179,34 @@ class Sketch:
         washed: np.ndarray = page * (1.0 - weight) + page * tint * weight * 2.0
         return washed
 
+    def overlay_paint(self, overlay: str) -> tuple[np.ndarray, np.ndarray]:
+        """Give back the pigment of one overlay, for every tile of the world.
+
+        The answer is two arrays shaped like the world. The first is the
+        strength the overlay paints at, from none to one. The second is the
+        colour it paints in, as three bands of 255.
+
+        **The colours are the engine's own.** This module names no overlay
+        colour and holds no ramp from a value to a strength. It asks the
+        engine for both, over the whole world in one crossing.
+
+        **The pigment belongs to a tile and not to a pixel.** The answer
+        stands on the tile order of the world, so no camera and no frame size
+        reaches it. A reading taken at the pixel the engine drew a tile on
+        walks across the ground as a zoom moves the camera.[^4]
+
+        [^4]: Findings register, FND-610. `docs/FINDINGS.md`
+        """
+        paint = self._world.overlay_paint(overlay)
+        rows, columns = self._world.height, self._world.width
+        flow = paint["strength"].reshape(rows, columns).astype(np.float32) / 255.0
+        packed = paint["colour"].reshape(rows, columns).astype(np.uint32)
+        hue = np.stack(
+            [((packed >> shift) & 0xFF).astype(np.float32) for shift in (16, 8, 0)],
+            axis=-1,
+        )
+        return flow, hue
+
     def _wash(
         self,
         page: np.ndarray,
@@ -1196,9 +1219,9 @@ class Sketch:
         """Lay a named overlay on the ground as a wash of water colour.
 
         **The colours are the engine's own.** This module names no overlay
-        colour. It asks the engine for the frame with the overlay and for the
-        frame without it, and the difference between the two is the pigment
-        the overlay laid down.
+        colour. It asks the engine what pigment the overlay lays on each tile,
+        for the whole world in one crossing, and puts that pigment where the
+        page shows the tile.
 
         **The wash is a glaze and not a coat.** The page multiplies the paper
         by the colour rather than replacing it, so the grain of the paper and
@@ -1211,27 +1234,12 @@ class Sketch:
         """
         if not overlay:
             return page
-        bare = self._buffer("bare", width, height)
-        tinted = self._buffer("tinted", width, height)
-        self._world.draw(camera, width, height, bare)
-        self._world.draw(camera, width, height, tinted, overlay=overlay)
-        plain = _channels(bare, width, height)
-        painted = _channels(tinted, width, height)
+        over_world, colour = self.overlay_paint(overlay)
         # The wash follows the ground, so it is read at the tile the page
         # shows and not at the pixel the flat map put it on.
-        flow = self._by_tile(
-            ground,
-            np.abs(painted - plain).max(axis=-1) / 255.0,
-            camera,
-            width,
-            height,
-        )
+        flow = self._gather(ground, over_world)
         hue = np.stack(
-            [
-                self._by_tile(ground, painted[..., band], camera, width, height)
-                for band in range(3)
-            ],
-            axis=-1,
+            [self._gather(ground, colour[..., band]) for band in range(3)], axis=-1
         )
         if not flow.any():
             return page
@@ -1245,74 +1253,6 @@ class Sketch:
             page * (1.0 - weight[..., None]) + page * tint * weight[..., None]
         )
         return glazed
-
-    def tile_pixels(
-        self, camera: Camera, width: int, height: int
-    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-        """Say where the engine drew each tile of the world on its flat map.
-
-        The answer is three arrays the size of the world: the column of the
-        frame, the row of the frame, and whether any pixel named that tile at
-        all. A tile the frame does not show carries a false flag, and a caller
-        must read no value for it.
-
-        **The engine answers where a tile is.** The pass asks it over a coarse
-        grid of pixels and takes the middle of the pixels that named each
-        tile, so this module holds no layout of its own for the flat map.
-
-        **The answer belongs to one camera and one frame, and nothing else.**
-        It is held against the numbers that produced it and built again when
-        one of them moves. An answer held against the window of tiles instead
-        would be reused at another camera that covers the same whole tiles,
-        and every tile would then take the colour of a neighbour.[^4]
-
-        [^4]: Findings register, FND-610. `docs/FINDINGS.md`
-        """
-        stands = (
-            camera.origin_x,
-            camera.origin_y,
-            camera.tile_width,
-            camera.tile_height,
-            width,
-            height,
-        )
-        held = self._sample
-        if held is not None and self._sample_at == stands:
-            return held
-        rows, columns = self._world.height, self._world.width
-        found_x = np.zeros((rows, columns), dtype=np.int64)
-        found_y = np.zeros((rows, columns), dtype=np.int64)
-        counted = np.zeros((rows, columns), dtype=np.int64)
-        for y in range(0, height, SAMPLE_STEP):
-            for x in range(0, width, SAMPLE_STEP):
-                tile_q, tile_r = camera.tile_at(float(x), float(y))
-                if 0 <= tile_q < columns and 0 <= tile_r < rows:
-                    found_x[tile_r, tile_q] += x
-                    found_y[tile_r, tile_q] += y
-                    counted[tile_r, tile_q] += 1
-        safe = np.clip(counted, 1, None)
-        built = (
-            np.clip(found_x // safe, 0, width - 1).astype(np.int32),
-            np.clip(found_y // safe, 0, height - 1).astype(np.int32),
-            counted > 0,
-        )
-        self._sample = built
-        self._sample_at = stands
-        return built
-
-    def _by_tile(
-        self, ground: Ground, frame: np.ndarray, camera: Camera, width: int, height: int
-    ) -> np.ndarray:
-        """Read a field the engine painted on the flat map, tile by tile.
-
-        The engine paints an overlay on its own map. The page shows the same
-        tiles in another place, so the reading finds where the engine drew
-        each tile and then puts the value where the page shows that tile.
-        """
-        at_x, at_y, seen = self.tile_pixels(camera, width, height)
-        read = frame[at_y, at_x]
-        whole = np.where(seen, read, np.zeros((), dtype=read.dtype))
-        return self._gather(ground, whole)
 
     def _sky_over(self, page: np.ndarray, ground: Ground, rise: int) -> np.ndarray:
         """Put the cloud over the ground, as a layer and not as a tint.

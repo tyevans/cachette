@@ -71,6 +71,17 @@ class TileWinds(TypedDict):
     q: npt.NDArray[np.int32]
     r: npt.NDArray[np.int32]
 
+class OverlayPaint(TypedDict):
+    """What one overlay paints on every tile, as one column for each part.
+
+    Both columns hold one entry for each tile, in the tile order that
+    ``tile_holders`` uses. A colour is ``0x00RRGGBB``. A strength is the
+    weight of 255 that the drawing pass mixes that colour in at.
+    """
+
+    colour: npt.NDArray[np.uint32]
+    strength: npt.NDArray[np.uint8]
+
 class TileChangedColumns(TypedDict):
     """One column for each field of the tile change event.
 
@@ -1267,6 +1278,7 @@ class World:
     def panel_names() -> list[str]: ...
     @staticmethod
     def overlay_names() -> list[str]: ...
+    def overlay_paint(self, name: str) -> OverlayPaint: ...
     def faction_population(self) -> list[int]: ...
     def presence_masks(self) -> npt.NDArray[np.uint64]: ...
     def stands_in_territory(self, guest: int, host: int) -> bool: ...

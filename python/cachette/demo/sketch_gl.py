@@ -488,21 +488,16 @@ class GlSketch(Sketch):
             for name in ("tile_cloud", "tile_across_x", "tile_across_y"):
                 device.ensure(name, "r32f")
 
-    def _send_wash(
-        self,
-        page: Page,
-        overlay: str | None,
-        camera: Camera,
-        width: int,
-        height: int,
-    ) -> bool:
+    def _send_wash(self, overlay: str | None) -> bool:
         """Put the pigment a named overlay laid down on the device.
 
-        **The colours are the engine's own.** This asks the engine for the
-        frame with the overlay and for the frame without it, and the
-        difference between the two is the pigment. It then reads that
-        difference at the place the engine drew each tile, so the wash follows
-        the ground the paper shows rather than the flat map the engine drew.
+        **The colours are the engine's own.** This asks the engine what
+        pigment the overlay lays on each tile, over the whole world in one
+        crossing, and uploads that as two textures on the tile lattice.
+
+        **The array renderer holds the one reader, and this calls it**, so the
+        two renderers cannot read a wash two ways. The answer stands on the
+        tile order of the world, so no camera and no frame size reaches it.
 
         Gives back whether there is any pigment at all.
         """
@@ -511,46 +506,12 @@ class GlSketch(Sketch):
         device.ensure("tile_flow", "r32f")
         if not overlay:
             return False
-        bare = self._buffer("bare", width, height)
-        tinted = self._buffer("tinted", width, height)
-        self._world.draw(camera, width, height, bare)
-        self._world.draw(camera, width, height, tinted, overlay=overlay)
-        plain = ink._channels(bare, width, height)
-        painted = ink._channels(tinted, width, height)
-        flow = self._sampled(
-            np.abs(painted - plain).max(axis=-1) / 255.0, camera, width, height
-        )
+        flow, hue = self.overlay_paint(overlay)
         if not flow.any():
             return False
-        hue = np.stack(
-            [
-                self._sampled(painted[..., band], camera, width, height)
-                for band in range(3)
-            ],
-            axis=-1,
-        )
         device.upload("tile_flow", flow.astype(np.float32), "r32f")
         device.upload("tile_hue", hue.astype(np.float32), "rgb32f")
         return True
-
-    def _sampled(
-        self, frame: np.ndarray, camera: Camera, width: int, height: int
-    ) -> np.ndarray:
-        """Read a field the engine painted on the flat map, tile by tile.
-
-        The engine paints an overlay on its own map. The paper shows the same
-        tiles in another place, so the reading finds where the engine drew
-        each tile and then gives that value for that tile.
-
-        **The array renderer answers where each tile is, and this asks it.**
-        One pass holds that answer, against the camera and the frame that
-        produced it, so the two renderers cannot read a wash at two places.
-        A tile that the frame does not show carries no value at all.
-        """
-        at_x, at_y, seen = self.tile_pixels(camera, width, height)
-        read = frame[at_y, at_x]
-        whole: np.ndarray = np.where(seen, read, np.zeros((), dtype=read.dtype))
-        return whole
 
     # ------------------------------------------------------------------
     # The frame
@@ -607,7 +568,7 @@ class GlSketch(Sketch):
         device.make_current()
         self._draw_page(page)
         self._send_tiles()
-        washes = self._send_wash(page, overlay, camera, width, height)
+        washes = self._send_wash(overlay)
         stood = page.stood
         page_cols, page_rows = stood.cols, stood.rows
         if washes:
