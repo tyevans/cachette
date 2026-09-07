@@ -39,7 +39,12 @@ options=(
     -i "$dir/key.pem"
     -o StrictHostKeyChecking=no
     -o UserKnownHostsFile="$dir/known_hosts"
-    -o ConnectTimeout=5
+    # **A loaded machine answers slowly.** The instance runs every core at
+    # full tilt, so its sshd takes seconds to answer. A short timeout made
+    # this script fall back to the stale copy and print "no answer" while the
+    # run was perfectly healthy.
+    -o ConnectTimeout=15
+    -o ServerAliveInterval=30
     -o ControlMaster=auto
     -o ControlPath="$socket"
     -o ControlPersist=120
@@ -50,6 +55,15 @@ fetched="$dir/watch.log"
 raw="$(ssh "${options[@]}" "ec2-user@$HOST" \
     'cat cachette/runs/learn/train.log 2>/dev/null; printf "@@FACTS@@\n"; \
      uptime; cat /tmp/marker 2>/dev/null' 2>/dev/null)"
+
+if [ -z "$raw" ]; then
+    # One retry. A refresh every second means a single missed answer is
+    # cheap, but two in a row usually means the connection went rather than
+    # the machine being busy.
+    raw="$(ssh "${options[@]}" "ec2-user@$HOST" \
+        'cat cachette/runs/learn/train.log 2>/dev/null; printf "@@FACTS@@\n"; \
+         uptime; cat /tmp/marker 2>/dev/null' 2>/dev/null)"
+fi
 
 if [ -n "$raw" ]; then
     printf '%s' "${raw%%@@FACTS@@*}" > "$fetched"
