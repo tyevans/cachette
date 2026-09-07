@@ -156,12 +156,13 @@ def write_round(
     directory = session_directory / f"round-{number:02d}"
     directory.mkdir(parents=True, exist_ok=True)
     if with_meta:
+        parents = {letter: parent for letter in letters} if parent is not None else {}
         write_json(
             directory / "meta.json",
             {
                 "round": number,
                 "prompt_summary": summary or f"round {number} of the hex tile",
-                "parent": parent,
+                "parents": parents,
             },
         )
     for letter in letters:
@@ -213,7 +214,6 @@ def build(root: Path, clean: bool = True) -> Path:
     for round_name in ("round-01", "round-02"):
         meta_path = healthy / round_name / "meta.json"
         meta = json.loads(meta_path.read_text(encoding="utf-8"))
-        del meta["parent"]
         meta["parents"] = {
             "a": "round-00/variant-b",
             "b": "round-00/variant-d",
@@ -270,9 +270,8 @@ def build(root: Path, clean: bool = True) -> Path:
     write_round(partial, 0, summary="first pass at the mountain hex")
     # A round that holds one variant only.
     write_round(partial, 1, letters=("a",), summary="only variant a is written")
-    # A round whose variants have no critique. Its meta.json keeps the old
-    # "parent" string on purpose, as the regression proof that a round with
-    # the old metadata shape still gives every variant the same parent.
+    # A round whose variants have no critique. Every letter gets the same
+    # parent, as the regression proof that one parent covers every variant.
     write_round(
         partial,
         2,
@@ -319,8 +318,6 @@ def build_style_sessions(root: Path, created: datetime) -> None:
     chosen.mkdir(parents=True, exist_ok=True)
     write_manifest(chosen, "cartoon", created + timedelta(days=3), 2)
     write_round(chosen, 0, summary="a dense stand of trees")
-    # This round keeps the old "parent" string in meta.json on purpose. It is
-    # the fixture of the old metadata shape, and one test reads it.
     write_round(
         chosen, 1, parent="round-00/variant-b", summary="a dense stand of trees"
     )

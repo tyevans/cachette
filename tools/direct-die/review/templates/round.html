@@ -23,6 +23,15 @@
           name {{ promoted }}. The next run reads it.
         </p>
       {% endif %}
+      {% if analysed %}
+        <p class="saved">The analysis is written. It is below the drawings.</p>
+      {% endif %}
+      {% if ruled %}
+        <p class="saved">
+          The rule is now in the style guide of {{ session.asset }}. The next
+          run reads it.
+        </p>
+      {% endif %}
 
       <h1>{{ round.name }}</h1>
 
@@ -190,6 +199,67 @@
         </div>
       </form>
 
+      <section class="card analysis">
+        <h2>What the liked drawings share</h2>
+        <p class="note">
+          The analysis compares the drawings you liked with the drawings you
+          refused. It runs one model call and takes about half a minute. Mark
+          at least one drawing as liked before you ask for it.
+        </p>
+        <form method="post" action="{{ base }}/{{ round.name }}/analyse" class="inline">
+          <button type="submit">Analyse this round</button>
+        </form>
+
+        {% if round.analysis is none %}
+          <p class="gap">No analysis yet for this round.</p>
+        {% else %}
+          <p class="preference">{{ round.analysis.get("preference") }}</p>
+
+          {% if round.analysis.get("order") %}
+            <input
+              type="hidden"
+              id="analysis-order"
+              value="{{ round.analysis['order'] | join(',') }}"
+            >
+            <button type="button" id="take-analysis" class="small">
+              Take this order and this preference into the form above
+            </button>
+            <h3>The order it proposes</h3>
+            <ol class="ranking">
+              {% for letter in round.analysis["order"] %}
+                <li>
+                  <strong>{{ letter }}</strong>
+                  {{ round.analysis.get("reasons", {}).get(letter, "") }}
+                </li>
+              {% endfor %}
+            </ol>
+            <p class="note">
+              Copy this into the order field above to use it. The form is the
+              one place that writes the order.
+            </p>
+          {% endif %}
+
+          {% if round.analysis.get("guide_edit") %}
+            <h3>The rule it proposes</h3>
+            <p class="note">
+              This goes into the style guide of {{ session.asset }} under one
+              heading at the end of the file. Edit it before you accept it.
+              Every later run of every subject reads it.
+            </p>
+            <form method="post" action="/rules/{{ session.asset }}/append">
+              <input type="hidden" name="back" value="{{ base }}/{{ round.name }}">
+              <input
+                type="text"
+                name="rule"
+                class="wide"
+                value="{{ round.analysis['guide_edit'].get('rule', '') }}"
+              >
+              <button type="submit" class="small">Accept the rule</button>
+            </form>
+          {% endif %}
+        {% endif %}
+      </section>
+
       {% if shown %}
         <section class="card promote">
           <h2>Make one of these an exemplar</h2>
@@ -248,4 +318,19 @@
       window.setTimeout(look, 6000);
     })();
   </script>
+  {% if round.analysis and round.analysis.get("order") %}
+    <script>
+      (function () {
+        var field = document.querySelector('input[name="order"]');
+        var note = document.querySelector('textarea[name="note"]');
+        var carrier = document.getElementById("analysis-order");
+        var button = document.getElementById("take-analysis");
+        if (!button || !carrier) { return; }
+        button.addEventListener("click", function () {
+          field.value = carrier.value;
+          note.value = {{ round.analysis.get("preference", "") | tojson }};
+        });
+      })();
+    </script>
+  {% endif %}
 {% endblock %}

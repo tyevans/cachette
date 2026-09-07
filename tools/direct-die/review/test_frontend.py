@@ -37,6 +37,7 @@ if str(HERE.parent) not in sys.path:
 
 import exemplars as exemplar_module  # noqa: E402
 import packs as pack_module  # noqa: E402
+import app as app_module  # noqa: E402
 from app import create_app  # noqa: E402
 from make_fixtures import build_workspace  # noqa: E402
 from store import SessionStore, write_json_atomically  # noqa: E402
@@ -771,3 +772,98 @@ def test_the_highest_score_still_wins_when_nobody_said_anything(tmp_path: Path) 
     assert pick is not None
     assert pick.letter == "c"
     assert pick.source == "score"
+
+
+# -- the analysis ------------------------------------------------------------
+
+
+def test_the_panel_says_so_when_no_analysis_exists(client: TestClient) -> None:
+    response = client.get(f"/s/{CHOSEN}/round-00")
+    assert response.status_code == 200
+    assert "No analysis" in response.text
+
+
+def test_the_panel_shows_the_preference_the_order_and_the_rule(
+    client: TestClient,
+) -> None:
+    response = client.get(f"/s/{CHOSEN}/round-01")
+    assert "three shapes and one flat fill" in response.text
+    assert "Use three shapes or fewer inside the hexagon." in response.text
+    assert 'value="d,b"' in response.text
+
+
+def test_the_analysis_command_is_the_tool_command_line() -> None:
+    found = app_module.analysis_command("python3", "cartoon", "forest-1", 2)
+    assert found == [
+        "python3", "-m", "direct_die", "analyse",
+        "--asset", "cartoon", "--session", "forest-1", "--round", "2",
+    ]
+
+
+def test_the_analyse_route_runs_the_command(monkeypatch, client: TestClient) -> None:
+    seen = {}
+
+    class Done:
+        returncode = 0
+        stdout = "the analysis ranks d, b"
+        stderr = ""
+
+    def fake_run(command, **rest):
+        seen["command"] = command
+        seen["cwd"] = rest.get("cwd")
+        return Done()
+
+    monkeypatch.setattr(app_module.subprocess, "run", fake_run)
+    response = client.post(f"/s/{CHOSEN}/round-01/analyse", follow_redirects=False)
+    assert response.status_code == 303
+    assert seen["command"][3] == "analyse"
+    assert "--round" in seen["command"]
+
+
+def test_the_analyse_route_shows_the_error_the_tool_printed(
+    monkeypatch, client: TestClient
+) -> None:
+    class Failed:
+        returncode = 4
+        stdout = ""
+        stderr = "analysis error: the analysis needs at least one liked drawing"
+
+    monkeypatch.setattr(app_module.subprocess, "run", lambda command, **rest: Failed())
+    response = client.post(f"/s/{CHOSEN}/round-01/analyse", follow_redirects=True)
+    assert "at least one liked drawing" in response.text
+
+
+def test_accepting_a_rule_appends_it_to_the_style(
+    client: TestClient, paths: dict[str, Path]
+) -> None:
+    response = client.post(
+        "/rules/cartoon/append",
+        data={
+            "rule": "Use three shapes or fewer inside the hexagon.",
+            "back": f"/s/{CHOSEN}/round-01",
+        },
+        follow_redirects=False,
+    )
+    assert response.status_code == 303
+    text = (paths["styleguide"] / "cartoon.md").read_text(encoding="utf-8")
+    assert "- Use three shapes or fewer inside the hexagon." in text
+
+
+def test_accepting_an_empty_rule_shows_an_error(client: TestClient) -> None:
+    response = client.post(
+        "/rules/cartoon/append",
+        data={"rule": "   ", "back": f"/s/{CHOSEN}/round-01"},
+        follow_redirects=True,
+    )
+    assert "empty" in response.text.lower()
+
+
+def test_accepting_a_rule_for_a_style_with_no_file_shows_an_error(
+    client: TestClient,
+) -> None:
+    response = client.post(
+        "/rules/nosuchstyle/append",
+        data={"rule": "Use three shapes or fewer.", "back": "/"},
+        follow_redirects=True,
+    )
+    assert "no rules file" in response.text.lower()

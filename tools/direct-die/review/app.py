@@ -38,6 +38,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import subprocess
 import sys
 from collections.abc import Callable
 from pathlib import Path
@@ -63,6 +64,7 @@ if str(HERE) not in sys.path:
 import exemplars as exemplar_module  # noqa: E402
 import matrix as matrix_module  # noqa: E402
 import packs as pack_module  # noqa: E402
+import rules as rule_module  # noqa: E402
 import slugs as slug_table  # noqa: E402
 from runs import RunManager, default_command  # noqa: E402
 from store import (  # noqa: E402
@@ -113,6 +115,34 @@ def no_store(response: Response) -> Response:
     response.headers["Cache-Control"] = "no-store, must-revalidate"
     response.headers["Pragma"] = "no-cache"
     return response
+
+
+# How long the analysis may take. It is one model call with up to eight
+# pictures. A run of a whole subject takes about seventy seconds, and this is
+# smaller than that.
+ANALYSIS_TIMEOUT_SECONDS = 180.0
+
+
+def analysis_command(
+    python: str, style: str, session_id: str, index: int
+) -> list[str]:
+    """Build the command line that analyses one round.
+
+    The server calls the tool this way and no other way. The two halves of
+    the tool share a directory layout, and nothing else.
+    """
+    return [
+        python,
+        "-m",
+        "direct_die",
+        "analyse",
+        "--asset",
+        style,
+        "--session",
+        session_id,
+        "--round",
+        str(index),
+    ]
 
 
 def round_fingerprint(current: Round) -> str:
@@ -347,6 +377,8 @@ def create_app(
             sessions=store.list_sessions(),
             saved=request.query_params.get("saved") == "1",
             promoted=request.query_params.get("promoted"),
+            analysed=request.query_params.get("analysed") == "1",
+            ruled=request.query_params.get("ruled") == "1",
             slug=pack_module.slug_of(session),
             live=live,
             waiting=waiting,
@@ -400,6 +432,70 @@ def create_app(
             return page("error.html", request, message=str(error))
         target = f"/s/{asset}/{session_id}/{round_name}?saved=1"
         return no_store(RedirectResponse(target, status_code=303))
+
+    @app.post("/s/{asset}/{session_id}/{round_name}/analyse")
+    def start_analysis(
+        request: Request, asset: str, session_id: str, round_name: str
+    ) -> Response:
+        """Analyse one round, and show the round again.
+
+        This waits, and a run does not. A run draws up to eleven subjects at
+        about seventy seconds each, so no page waits for it. The analysis is
+        one model call, and the person is looking at the page waiting for
+        exactly that answer. A job record for a call this short would be a
+        second state machine for no gain.
+        """
+        try:
+            index = store.round_index(round_name)
+        except ContractError as error:
+            return page("error.html", request, message=str(error))
+        try:
+            done = subprocess.run(
+                analysis_command(runner.python, asset, session_id, index),
+                cwd=str(runner.tool_directory),
+                capture_output=True,
+                text=True,
+                timeout=ANALYSIS_TIMEOUT_SECONDS,
+            )
+        except subprocess.TimeoutExpired:
+            return page(
+                "error.html",
+                request,
+                message=(
+                    "The analysis did not answer in "
+                    f"{int(ANALYSIS_TIMEOUT_SECONDS)} seconds. The endpoint "
+                    "may be busy. Ask again."
+                ),
+            )
+        except OSError as error:
+            return page(
+                "error.html", request, message=f"the tool did not start: {error}"
+            )
+        if done.returncode != 0:
+            message = (done.stderr or done.stdout or "").strip()
+            return page(
+                "error.html",
+                request,
+                message=message or f"the analysis failed with code {done.returncode}",
+            )
+        target = f"/s/{asset}/{session_id}/{round_name}?analysed=1"
+        return no_store(RedirectResponse(target, status_code=303))
+
+    @app.post("/rules/{style}/append")
+    def append_rule(
+        request: Request,
+        style: str,
+        rule: str = Form(default=""),
+        back: str = Form(default="/"),
+    ) -> Response:
+        """Append one accepted rule to a style rules file."""
+        try:
+            rule_module.append_rule(styleguide_root, style, rule)
+        except rule_module.RuleError as error:
+            return page("error.html", request, message=str(error))
+        target = back if back.startswith("/") else "/"
+        joiner = "&" if "?" in target else "?"
+        return no_store(RedirectResponse(f"{target}{joiner}ruled=1", status_code=303))
 
     @app.get("/api/round/{asset}/{session_id}/{round_name}")
     def round_state(asset: str, session_id: str, round_name: str) -> Response:
