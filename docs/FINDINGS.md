@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-569**
+**Next number: FND-570**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -13848,10 +13848,39 @@ tick rises with the state the world holds: 32 milliseconds at tick 500, 75 at
 2500 and 120 at 5000, on a loaded development machine. That figure bounds the
 throughput of any training run and belongs in the sizing of the batch step.
 
+### FND-569 — The reader of a faction's weight vector reported fewer weights than the vector holds
+
+**Believed.** The weight vector of a faction holds four weights, and the Python
+reader reports all of them. The doc comment of the reader said four. The type
+stub declared four. A research report of the learner surface repeated the
+count.[^F569A]
+
+**True.** The vector holds five. The settle weight joined it when the founding
+work landed, and the controller reads that weight on every evaluation. The
+reader never reported it, so a caller could read the vector and could not see
+the weight that decides whether a faction founds a new city.
+
+**Evidence.** The weight structure of the controller module against the reader
+of the bindings crate, read on 6 September 2026. The structure declares the
+weight count from its own size, so the seeding drew five values while the
+reader reported four. Nothing failed, because no check compares the two.
+
+**What follows.** **A reader is the boundary of a value, and a partial reader
+hides state.** The gap became visible only when a setter arrived beside the
+reader. A caller must read the vector, change one weight, and write the vector
+back, and a reader that drops a weight makes that round trip lose state. The
+setter and the reader now hold one shape, and a test writes back what the
+reader returns, so the two cannot part again without a failure.
+
+This is the first local instance of a partial reader in this project. The
+nearest recorded shape is a value a caller can set and cannot read back.[^F569B]
+
 
 ## References
 
 [^F565A]: ADR-0154, the observation and the action of a faction are schema-declared bounded tables the engine owns, decision D4. `docs/adrs/accepted/adr-0154-the-observation-and-the-action-of-a-faction-are-schema-declared-bounded-tables.md`
+[^F569A]: Research report 31, the state of the learner surface, the judgement of ADR-0156. `docs/research/reports/31-the-state-of-the-learner-surface.md`
+[^F569B]: Findings register, FND-567. `docs/FINDINGS.md`
 [^F565C]: Research report 31, the state of the learner surface. `docs/research/reports/31-the-state-of-the-learner-surface.md`
 [^F565E]: ADR-0176, an action integer is a mixed radix over the argument positions each verb declares. `docs/adrs/draft/adr-0176-an-action-integer-is-a-mixed-radix-over-the-positions-a-verb-declares.md`
 [^F552A]: The unit-to-tile bridge, the block key. `crates/cachette-core/src/bridge.rs`

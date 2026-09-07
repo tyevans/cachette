@@ -41,6 +41,24 @@ states the whole rule.[^4]
 **This item touches `fn step`. Only one worker may hold it at a time.** It
 waits for the pass that holds `fn step` before it to merge.
 
+## What landed already
+
+**The verb of ADR-0156 D3 exists, and the item stays open.** One verb writes the
+whole weight vector of one faction. A Python caller reaches it, and no second
+path exists. The verb refuses a weight outside the range the balance register
+holds, and it refuses a number that names no faction. A refused write changes
+nothing.
+
+The vector was simulated state before this, and it stays simulated state, so
+ADR-0156 D1 holds for every weight the vector holds today. The reader beside the
+verb now reports every weight, and a finding records what it reported before.[^11]
+
+**Nothing of ADR-0156 D2, D4, D6 or D7 landed.** The vector holds no
+own-ground term, the choice pass reads no holder, the built-in controller writes
+no weight set of its own, and the choice key holds no faction. The three ground
+weights stay unset, and the blocker that governs them stays open.[^6] The
+questions below still hold the item in `proposed/`.
+
 ## What is missing before this can be refined
 
 - **What the three weights should be.** The own-ground weight, the
@@ -105,3 +123,4 @@ Filled in when the item moves to `complete/`.
 [^8]: ADR-0110, a unit returns by climbing a reach field seeded at every site of its faction, decision D1. `docs/adrs/draft/adr-0110-a-unit-returns-by-climbing-a-reach-field.md`
 [^9]: Backlog item 0478, let a faction raise a campaign against a faction at war. `docs/backlog/complete/0478-let-a-faction-raise-a-campaign-against-a-faction-at-war.md`
 [^10]: ADR-0154, the observation and the action of a faction are schema-declared bounded tables, decision D3. `docs/adrs/accepted/adr-0154-the-observation-and-the-action-of-a-faction-are-schema-declared-bounded-tables.md`
+[^11]: Findings register, FND-569. `docs/FINDINGS.md`
