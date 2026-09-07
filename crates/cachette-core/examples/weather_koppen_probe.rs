@@ -317,6 +317,57 @@ fn main() {
          {MEAN_ANNUAL_RAIN} millimetres"
     );
 
+    // **The land of a band is not a sample of the band.** A band that is
+    // mostly open water holds its land in a few cells, and those cells sit
+    // where the wind of a whole ocean converges. The land figure of such a
+    // band says what its islands receive and not what its latitude receives.
+    // So the probe reports both, on the same normaliser, and a band where the
+    // two disagree is reporting its geography rather than its climate.
+    {
+        let bands = 12u32;
+        println!();
+        println!("=== the rain of a band over its land and over the whole of it ===");
+        println!();
+        println!(
+            "  band  latitude  cells   land  land %   land mm   whole mm                land over whole"
+        );
+        for band in 0..bands {
+            let members: Vec<&Record> = records
+                .iter()
+                .filter(|record| record.row * bands / high.max(1) == band)
+                .collect();
+            if members.is_empty() {
+                continue;
+            }
+            let dry: Vec<&&Record> = members.iter().filter(|record| record.land).collect();
+            let rain = |set: &[&&Record]| -> i64 {
+                if set.is_empty() {
+                    return 0;
+                }
+                set.iter()
+                    .map(|record| record.year_water() * rain_for_each_drop / whole)
+                    .sum::<i64>()
+                    / set.len() as i64
+            };
+            let all: Vec<&&Record> = members.iter().collect();
+            let land_mm = rain(&dry);
+            let whole_mm = rain(&all);
+            let middle = (band * high / bands + (band + 1) * high / bands) / 2;
+            let latitude = i64::from(latitudes.of_row(middle, high)) / i64::from(LATITUDE_FINE);
+            println!(
+                "  {band:4}  {latitude:8}  {:5}  {:5}  {:5}%  {land_mm:8}  {whole_mm:9}  {:14.2}",
+                members.len(),
+                dry.len(),
+                dry.len() * 100 / members.len().max(1),
+                if whole_mm > 0 {
+                    land_mm as f64 / whole_mm as f64
+                } else {
+                    0.0
+                }
+            );
+        }
+    }
+
     // The two published boundaries between the temperate and the continental
     // class. The probe grades the same world under each.
     for (label, boundary) in [("0 C", 0i64), ("-3 C", -3i64)] {
