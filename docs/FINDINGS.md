@@ -15830,6 +15830,18 @@ arid, where the band at 37 degrees north holds 403 cells at 587 mm and grades
 **Report every class figure both ways from here.** A single total invites the
 project to fix the terrain generator by changing the physics.
 
+**Amended 7 September 2026. Read the conclusion of this finding and treat its
+precision as indicative.**[^F616B] The reweighting above was computed on a
+128-row world whose two equatorial bands held 192 land cells between them, and
+the weighting gives those 192 cells 10.4 percent of the whole. A sample that
+small cannot carry that weight. The conclusion stands and is unchanged: the
+metric was confounded by where this world puts its land, the continental surplus
+is polar land, and the temperate shortfall is the one gap that survives the
+correction. **Take the figures from the 256-row world instead**, where the same
+bands hold 3,323 cells: on Earth's land distribution the temperate share is 12.1
+percent against a published 13.4, and the total absolute error over the five
+classes is 19.7 points.
+
 
 ### FND-617 — The subtropics are not too dry. The equator is too wet and the poles never receive anything
 
@@ -15837,10 +15849,21 @@ project to fix the terrain generator by changing the physics.
 equator to the subtropics against a published 4 to 10, so the subtropics are too
 dry, and that dryness is what holds the temperate share down.[^F617A]
 
-**Corrected on 7 September 2026. The figures below were measured on a 128-row
-world whose two equatorial bands held 95 and 97 land cells, and the excess they
-report is mostly geography and resolution.**[^F618C] Read the conclusion, which
-holds, and not the multiples.
+**Corrected on 7 September 2026. Read the conclusion, which holds, and not the
+multiples.**[^F618C] The figures below were measured on a 128-row world whose
+two equatorial bands held 95 and 97 land cells. That band is 93 percent open
+water, so those cells are islands, and they collect the convergence of a whole
+ocean. At 256 rows the same bands hold 1,470 and 1,853 land cells and read
+between 0.8 and 2.0 times Earth, against the five times this finding reports.
+
+**The same contamination, in the same band, caught the same worker twice in one
+night.** It first produced a claim that the subtropics receive one percent of
+the rain the equator receives, which was corrected to 23 to 1 over land. The
+correction fixed the number and did not record the shape, so the shape returned
+four hours later and was believed again. **A defect shape that catches the same
+person twice in one night belongs in this register more than any number it
+produced.** The shape is: a band whose land is a small minority of its cells
+does not report the climate of that band, and nothing about the figure says so.
 
 **What is true.** The ratio is right and the reading of it is wrong. The probe
 normalises so that the mean land cell of the world receives the mean annual
@@ -15945,3 +15968,4 @@ subtropics are correct and were misread through the normaliser, still holds.
 [^F618A]: Blockers register, BLK-155. `docs/BLOCKERS.md`
 [^F618B]: Findings register, FND-617. `docs/FINDINGS.md`
 [^F618C]: Findings register, FND-618. `docs/FINDINGS.md`
+[^F616B]: Findings register, FND-618. `docs/FINDINGS.md`
