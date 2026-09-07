@@ -177,7 +177,15 @@ fn every_refusal_is_named(outcomes: &[FoundingOutcome]) {
 const SCARCE_EXTENT: u32 = 32;
 
 /// The seed of the scarce world below.
-const SCARCE_SEED: u64 = 22;
+///
+/// **The seed is a fixture choice and the balance register moved it.** The
+/// project lowered the minimum founding distance, so the world this seed
+/// draws seats four factions now and no longer supplies the extreme.[^1]
+///
+/// # References
+///
+/// [^1]: Balance register, the minimum founding distance. `docs/reference/balance.md`
+const SCARCE_SEED: u64 = 28;
 
 /// The seats that the scarce world holds.
 ///

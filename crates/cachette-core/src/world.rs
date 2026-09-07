@@ -86,7 +86,7 @@ use crate::resource::{
 };
 use crate::rng;
 use crate::sim_math;
-use crate::site::{CommodityId, SettlementArena, SettlementError, COMMODITY_COUNT};
+use crate::site::{CommodityId, SettlementArena, SettlementError, SiegeRules, COMMODITY_COUNT};
 use crate::slots::Slots;
 use crate::soldier::{SoldierArena, SoldierError, NO_HOME};
 #[cfg(not(feature = "probe-nondeterminism"))]
@@ -171,7 +171,7 @@ impl core::fmt::Display for IdentityError {
 
 impl std::error::Error for IdentityError {}
 
-/// The reason that the world refused to raze a site.
+/// The reason that the world refused an order to raze a site.
 ///
 /// Each value names the thing that refused, so a caller repairs the call
 /// without guessing which part of it was wrong.[^1]
@@ -185,12 +185,15 @@ pub enum RazeError {
     NoSuchSite,
     /// The razer owns the site. A faction does not raze its own city.
     OwnSite,
-    /// No unit of the razer stands on the tile of the site.
-    NotOccupied,
-    /// A unit of the owning faction stands on the tile and defends it.
-    Defended,
-    /// The derived unit structure refused the read.
-    Bridge(BridgeError),
+    /// No siege of the razer stands against the site.
+    ///
+    /// A raze is an order against a siege, and a siege stands only while the
+    /// razer holds the site tile against no defender.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0180, a site changes hands or the taker destroys it, decisions D8 and D11. `docs/adrs/draft/adr-0180-a-site-changes-hands-or-the-taker-destroys-it.md`
+    NotBesieging,
 }
 
 impl core::fmt::Display for RazeError {
@@ -198,14 +201,51 @@ impl core::fmt::Display for RazeError {
         match self {
             Self::NoSuchSite => write!(formatter, "the identity names no live site"),
             Self::OwnSite => write!(formatter, "a faction does not raze its own site"),
-            Self::NotOccupied => write!(formatter, "no unit of the razer stands on the site tile"),
-            Self::Defended => write!(formatter, "a unit of the owning faction defends the site"),
-            Self::Bridge(error) => write!(formatter, "{error}"),
+            Self::NotBesieging => {
+                write!(formatter, "no siege of the razer stands against the site")
+            }
         }
     }
 }
 
 impl std::error::Error for RazeError {}
+
+/// What the siege pass does to one site on one tick.
+///
+/// A site falls to work and never to a moment. The pass reads the trigger
+/// for every site first, and it writes afterwards, so the answer for one
+/// site is fixed before any write moves the world.[^1]
+///
+/// # References
+///
+/// [^1]: ADR-0180, a site changes hands or the taker destroys it, decision D8. `docs/adrs/draft/adr-0180-a-site-changes-hands-or-the-taker-destroys-it.md`
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum SiegeStep {
+    /// A unit of the owning faction stands on the site tile, so any siege
+    /// the site carried ends and its work is gone.
+    Ends,
+    /// Nobody presses the site this tick, and no unit of the owning faction
+    /// stands on its tile. A siege the site carries waits, unchanged.
+    Waits,
+    /// A siege stands and has not reached the work a capture costs.
+    Presses {
+        /// The faction that stands on the site tile.
+        besieger: FactionId,
+        /// The work the siege has done, including this tick.
+        work: i64,
+    },
+    /// A siege stands and has reached the work a capture costs.
+    Falls {
+        /// The faction that stands on the site tile.
+        besieger: FactionId,
+        /// The work the siege has done, including this tick.
+        work: i64,
+        /// The work a raze of this site costs.
+        raze_work: i64,
+        /// One when the besieging faction ordered a raze, zero otherwise.
+        ordered: u8,
+    },
+}
 
 /// The reason that the world refused to send a set of units somewhere.
 ///
@@ -1327,6 +1367,42 @@ pub struct World {
     ///
     /// [^1]: ADR-0164, every stored value the step reads enters the state hash. `docs/adrs/draft/adr-0164-every-stored-value-the-step-reads-enters-the-state-hash.md`
     taken_log: Vec<SiteTaken>,
+    /// What a site resists, and what a raze costs over a capture.
+    ///
+    /// A site falls to work and never to a moment, and these are the two
+    /// balance rows that price the work.[^1] [^2]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0180, a site changes hands or the taker destroys it, decisions D8 and D9. `docs/adrs/draft/adr-0180-a-site-changes-hands-or-the-taker-destroys-it.md`
+    /// [^2]: Balance register, the siege. `docs/reference/balance.md`
+    siege_rules: SiegeRules,
+    /// The sites that changed hands over the run, and the sites that burned.
+    ///
+    /// **These two count the acts and never the sites that stand.** A run
+    /// that keeps every city it takes and a run that burns every one differ
+    /// here and nowhere else, because the site count reports the outcome of
+    /// both. The census reports them, and no rule of the simulation reads
+    /// them, so they enter no state hash.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0164, every stored value the step reads enters the state hash, decision D1. `docs/adrs/draft/adr-0164-every-stored-value-the-step-reads-enters-the-state-hash.md`
+    sites_captured: i64,
+    /// The sites that burned over the run. See the field above.
+    sites_razed: i64,
+    /// The site ticks that a siege pressed over the run.
+    ///
+    /// One site under siege for one tick adds one. A run in which no army
+    /// ever holds a rival site reads zero here, and that is the reading
+    /// that tells a keeping run from a run with no conquest in it.
+    sieges_pressed: i64,
+    /// The sieges that a relief ended before the site fell, over the run.
+    ///
+    /// A unit of the owning faction on the site tile ends a siege and takes
+    /// its work away. A besieger that leaves ends nothing, so it adds
+    /// nothing here.
+    sieges_relieved: i64,
     /// The factions that left the game, since the last step began.
     ///
     /// The log enters no state hash. The column below is the stored fact,
@@ -1838,6 +1914,11 @@ impl World {
             finished_log: Vec::new(),
             founded_log: Vec::new(),
             taken_log: Vec::new(),
+            siege_rules: SiegeRules::DEFAULT,
+            sites_captured: 0,
+            sites_razed: 0,
+            sieges_pressed: 0,
+            sieges_relieved: 0,
             eliminated_log: Vec::new(),
             eliminated: vec![0u8; FACTION_CEILING as usize],
             market: MarketTable::new(config.faction_count, DEFAULT_BOARD_ROWS),
@@ -3007,21 +3088,31 @@ impl World {
         true
     }
 
-    /// Gives every site that a rival occupies undefended to the occupier, and
-    /// burns the ones the occupier cannot supply.
+    /// Presses the siege against every site that a rival occupies
+    /// undefended, and takes or burns the ones that fall.
     ///
-    /// **The trigger is the ground.** A site changes hands when a faction
-    /// that is not its own stands on its tile and no unit of its own faction
-    /// stands there to defend it. A garrison of one unit refuses the
-    /// capture, whatever stands against it.[^1]
+    /// **A site falls to work and never to a moment.** A faction that stands
+    /// on a site tile with no unit of the owning faction on it besieges the
+    /// site. The siege does one work for each besieging unit on the tile, on
+    /// each tick it stands. The site changes hands when the work reaches what
+    /// the site resists, and the resistance is the residents the site
+    /// holds.[^6]
+    ///
+    /// **A garrison of one refuses the siege, and a relief force ends one.**
+    /// The trigger is read again on every tick. The tick the owner puts a
+    /// unit back on the tile, or the tick the besieger leaves, the siege ends
+    /// and its work is gone. A besieger that returns starts at nothing. A
+    /// besieged city therefore has two answers: keep a unit at home, or send
+    /// one back before the work is done.[^7]
     ///
     /// **The occupier is the faction the occupancy list names, and that list
     /// is built once for the tick.** The lease pass reads it to move a lease
-    /// and this pass reads it to decide a capture, so who stands on a tile is
+    /// and this pass reads it to decide a siege, so who stands on a tile is
     /// stated once. The list names the faction with the most units on the
     /// tile, and a tie goes to the lowest faction identifier. Two factions
-    /// that could take one site on one tick therefore resolve by a rule and
-    /// never by an iteration order.[^2] [^3]
+    /// that could besiege one site therefore resolve by a rule and never by
+    /// an iteration order, and the work of the faction that loses the tile is
+    /// gone.[^2] [^3]
     ///
     /// **What stands at a kept site passes to the taker whole.** The store,
     /// the housing, the rates, the staff and the upgrades on the ground are
@@ -3029,14 +3120,15 @@ impl World {
     /// with it. Only the queue is cleared, because a queue holds orders that
     /// the taker never gave.[^4]
     ///
-    /// **The taker keeps a city it can supply and burns one it cannot.** A
-    /// city of the taker supplies the captured site when the site stands
-    /// inside the reach of that city. The reach is the quantity the ground
-    /// rule already computes for every city on every tick, and the upgrades a
-    /// faction finishes inside its own ground extend it to a bound.[^5] A
-    /// near conquest therefore grows the taker and a far one pays it in
-    /// plunder, and a road between two cities changes which is which. Nothing
-    /// here states a distance of its own.
+    /// **The taker keeps a city it can supply and burns one it cannot, and
+    /// burning costs more.** A city of the taker supplies the captured site
+    /// when the site stands inside the reach of that city. The reach is the
+    /// quantity the ground rule already computes for every city on every
+    /// tick, and the upgrades a faction finishes inside its own ground extend
+    /// it to a bound.[^5] A supplied site changes hands at the capture work.
+    /// A site no city of the taker reaches does not fall there: the siege
+    /// presses on to the raze work, which is a multiple of the capture work,
+    /// and the site burns when the siege reaches that.[^6]
     ///
     /// The pass walks the settlements in slot order, and the occupancy list
     /// is in ascending tile order. Both are stable keys.[^3]
@@ -3048,89 +3140,114 @@ impl World {
     /// [^3]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
     /// [^4]: ADR-0180, a site changes hands or the taker destroys it, decisions D1 and D2. `docs/adrs/draft/adr-0180-a-site-changes-hands-or-the-taker-destroys-it.md`
     /// [^5]: ADR-0180, a site changes hands or the taker destroys it, decision D7. `docs/adrs/draft/adr-0180-a-site-changes-hands-or-the-taker-destroys-it.md`
+    /// [^6]: ADR-0180, a site changes hands or the taker destroys it, decisions D8 and D9. `docs/adrs/draft/adr-0180-a-site-changes-hands-or-the-taker-destroys-it.md`
+    /// [^7]: ADR-0180, a site changes hands or the taker destroys it, decision D10. `docs/adrs/draft/adr-0180-a-site-changes-hands-or-the-taker-destroys-it.md`
     fn capture_sites(&mut self, occupancy: &[(TileIdx, FactionId)]) {
-        // The list is in ascending tile order, so a lookup searches it and
-        // never scans the world.
-        let mut takings: Vec<(Entity, FactionId)> = Vec::new();
+        // **The pass reads every site before it writes one.** A write moves
+        // the faction of a site and the faction of its residents, and a later
+        // read would then see a world that the earlier sites of this same
+        // tick had changed. The plan for each site is fixed first.
+        let mut plans: Vec<(Entity, SiegeStep)> = Vec::new();
+        let mut any_fell = false;
         for slot in 0..self.settlements.slot_count() {
             let Some(site) = self.settlements.entity_at(slot) else {
                 continue;
             };
-            let Some(tile) = self.settlements.tile(site) else {
-                continue;
-            };
-            let Some(owner) = self.settlements.faction(site) else {
-                continue;
-            };
-            let Ok(entry) = occupancy.binary_search_by_key(&tile.0, |(tile, _)| tile.0) else {
-                continue;
-            };
-            let taker = occupancy[entry].1;
-            if taker == owner {
-                continue;
+            let step = self.siege_step(site, occupancy);
+            if matches!(step, SiegeStep::Falls { .. }) {
+                any_fell = true;
             }
-            // **A garrison of one refuses the capture.** The occupancy names
-            // the faction with the most units, so the owner may hold the tile
-            // and still not be named there. The defence is read from the
-            // units that stand on the tile and not from the occupancy.
-            let factions = self.soldiers.faction_column();
-            let defended = self
-                .bridge
-                .on_tile_unguarded(tile)
-                .iter()
-                .any(|unit| factions[unit.index() as usize] == owner);
-            if defended {
-                continue;
-            }
-            takings.push((site, taker));
-        }
-        if takings.is_empty() {
-            return;
+            plans.push((site, step));
         }
         // **The taker keeps a city it can supply and burns one it cannot.**
         // The reach of a city is the quantity the ground rule already
         // computes for every city on every tick, and the upgrades a faction
-        // finishes inside its own ground are what extend it.[^5] A road
+        // finishes inside its own ground are what extend it.[^8] A road
         // between two cities therefore decides which conquests a faction can
         // keep, and nothing here states a distance of its own.
         //
-        // The list is built once for the tick, and only on a tick that takes
-        // something. A tick that takes nothing pays nothing for this rule.
+        // The list is built once for the tick, and only on a tick that has a
+        // site at its capture work. A tick with none pays nothing for it.
         //
-        // [^5]: ADR-0150, held ground is the ground within reach of a city its faction owns, decisions D1 and D2. `docs/adrs/draft/adr-0150-held-ground-is-the-ground-within-reach-of-a-city-its-faction-owns.md`
-        let cities = self.holding.cities(&self.settlements, &self.upgrades);
+        // [^8]: ADR-0150, held ground is the ground within reach of a city its faction owns, decisions D1 and D2. `docs/adrs/draft/adr-0150-held-ground-is-the-ground-within-reach-of-a-city-its-faction-owns.md`
+        let cities = if any_fell {
+            self.holding.cities(&self.settlements, &self.upgrades)
+        } else {
+            Vec::new()
+        };
         let mut moved = false;
-        for (site, taker) in takings {
-            let Some(address) = self.settlements.address(site) else {
-                continue;
-            };
-            // The site being taken still belongs to the faction that is
-            // losing it, so the taker's own cities are the only ones this
-            // walk sees.
-            let mut holds_one = false;
-            let mut supplied = false;
-            for city in &cities {
-                if city.faction != taker {
-                    continue;
+        for (site, step) in plans {
+            match step {
+                SiegeStep::Ends => {
+                    if self.settlements.siege(site).is_some() {
+                        self.sieges_relieved =
+                            sim_math::combine(Accum(self.sieges_relieved), Accum(1)).0;
+                    }
+                    let _ = self.settlements.clear_siege(site);
                 }
-                holds_one = true;
-                if address.distance(city.address) <= city.reach {
-                    supplied = true;
-                    break;
+                SiegeStep::Waits => {}
+                SiegeStep::Presses { besieger, work } => {
+                    self.sieges_pressed = sim_math::combine(Accum(self.sieges_pressed), Accum(1)).0;
+                    let _ = self.settlements.set_siege(site, besieger, work);
+                }
+                SiegeStep::Falls {
+                    besieger,
+                    work,
+                    raze_work,
+                    ordered,
+                } => {
+                    self.sieges_pressed = sim_math::combine(Accum(self.sieges_pressed), Accum(1)).0;
+                    let Some(address) = self.settlements.address(site) else {
+                        continue;
+                    };
+                    // **A faction that ordered a raze burns the site,
+                    // whatever the reach says.** The order is the one way a
+                    // caller states an intent the engine would not have
+                    // chosen, and it costs the raze work like every other
+                    // raze.
+                    if ordered == 1 {
+                        if work >= raze_work {
+                            moved |= self.burn_site(site, besieger);
+                        } else {
+                            let _ = self.settlements.set_siege(site, besieger, work);
+                        }
+                        continue;
+                    }
+                    // The site being taken still belongs to the faction that
+                    // is losing it, so the taker's own cities are the only
+                    // ones this walk sees.
+                    let mut holds_one = false;
+                    let mut supplied = false;
+                    for city in &cities {
+                        if city.faction != besieger {
+                            continue;
+                        }
+                        holds_one = true;
+                        if address.distance(city.address) <= city.reach {
+                            supplied = true;
+                            break;
+                        }
+                    }
+                    // **A taker that holds no city keeps what it takes.** The
+                    // rule asks which of the taker's cities supplies this
+                    // one, and a faction with none is not a faction that
+                    // failed to reach it. A captured city is then the only
+                    // city that faction has, and it supplies itself. Without
+                    // this the last army of a beaten faction could never take
+                    // a capital, and a faction that lost every city could
+                    // never return.
+                    if supplied || !holds_one {
+                        moved |= self.take_site(site, besieger);
+                    } else if work >= raze_work {
+                        moved |= self.burn_site(site, besieger);
+                    } else {
+                        // The taker cannot supply the site, so the siege
+                        // presses on to the raze work. The city stands, and
+                        // its owner has every tick until then to relieve it.
+                        let _ = self.settlements.set_siege(site, besieger, work);
+                    }
                 }
             }
-            // **A taker that holds no city keeps what it takes.** The rule
-            // asks which of the taker's cities supplies this one, and a
-            // faction with none is not a faction that failed to reach it. A
-            // captured city is then the only city that faction has, and it
-            // supplies itself. Without this the last army of a beaten faction
-            // could never take a capital, and a faction that lost every city
-            // could never return.
-            moved |= if supplied || !holds_one {
-                self.take_site(site, taker)
-            } else {
-                self.burn_site(site, taker)
-            };
         }
         let took = moved;
         // **A capture writes the faction of a unit, and that moves the arena
@@ -3144,6 +3261,77 @@ impl World {
                 "the arena and the structure describe one world"
             );
             let _ = self.refresh_bridge();
+        }
+    }
+
+    /// Returns what the siege pass does to one site this tick.
+    ///
+    /// The call writes nothing. It reads the trigger, adds this tick's work
+    /// to the work the siege carried, and compares the total against what the
+    /// site resists.[^1]
+    ///
+    /// **The work the siege carried counts only when the same faction did
+    /// it.** The occupancy names one faction for a tile, so a site whose
+    /// besieger loses the tile starts again at nothing under whoever takes
+    /// it. Two factions that could besiege one site therefore resolve by the
+    /// rule that decides the occupier, and never by an iteration order.[^2]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0180, a site changes hands or the taker destroys it, decisions D8 and D10. `docs/adrs/draft/adr-0180-a-site-changes-hands-or-the-taker-destroys-it.md`
+    /// [^2]: ADR-0153, a tile's lease follows the units that stand on it, decision D3. `docs/adrs/accepted/adr-0153-a-tiles-lease-follows-the-units-that-stand-on-it.md`
+    fn siege_step(&self, site: Entity, occupancy: &[(TileIdx, FactionId)]) -> SiegeStep {
+        let Some(tile) = self.settlements.tile(site) else {
+            return SiegeStep::Waits;
+        };
+        let Some(owner) = self.settlements.faction(site) else {
+            return SiegeStep::Waits;
+        };
+        // **A garrison of one refuses the siege, and it takes the work with
+        // it.** The defence is read from the units that stand on the tile and
+        // never from the occupancy, because the occupancy names only the
+        // largest faction and a garrison of one is rarely that.
+        let factions = self.soldiers.faction_column();
+        let standing = self.bridge.on_tile_unguarded(tile);
+        if standing
+            .iter()
+            .any(|unit| factions[unit.index() as usize] == owner)
+        {
+            return SiegeStep::Ends;
+        }
+        let Ok(entry) = occupancy.binary_search_by_key(&tile.0, |(tile, _)| tile.0) else {
+            return SiegeStep::Waits;
+        };
+        let besieger = occupancy[entry].1;
+        if besieger == owner {
+            return SiegeStep::Waits;
+        }
+        // **The force is the units of the besieging faction on the tile.** A
+        // besieger does one work a tick, which is what a builder does, so a
+        // larger army takes a city sooner and one unit takes a long time.
+        let force = standing
+            .iter()
+            .filter(|unit| factions[unit.index() as usize] == besieger)
+            .count();
+        if force == 0 {
+            return SiegeStep::Waits;
+        }
+        let carried = match self.settlements.siege(site) {
+            Some((who, work)) if who == besieger => work,
+            _ => 0,
+        };
+        let work = sim_math::combine(Accum(carried), Accum(force as i64)).0;
+        let residents = self.site_residents(site).unwrap_or(0);
+        if work < self.siege_rules.capture_work(residents) {
+            return SiegeStep::Presses { besieger, work };
+        }
+        SiegeStep::Falls {
+            besieger,
+            work,
+            raze_work: self.siege_rules.raze_work(residents),
+            ordered: u8::from(
+                self.settlements.siege_intent(site) == Some(crate::site::SIEGE_INTENT_RAZE),
+            ),
         }
     }
 
@@ -3168,6 +3356,9 @@ impl World {
         if owner == taker || !self.settlements.set_faction(site, taker) {
             return false;
         }
+        // The siege ends with the thing it stood against. A site that changed
+        // hands is no longer besieged, and the work that took it is spent.
+        let _ = self.settlements.clear_siege(site);
         // **The residents change hands with the site.** A resident is a live
         // unit whose home names this slot, and the household is the home
         // column read backwards. Conquest makes the taker larger, and a
@@ -3207,6 +3398,7 @@ impl World {
             self.soldiers.live_column(),
             self.settlements.slot_count(),
         );
+        self.sites_captured = sim_math::combine(Accum(self.sites_captured), Accum(1)).0;
         self.taken_log.push(SiteTaken::new(
             self.tick,
             site.to_bits(),
@@ -3218,68 +3410,52 @@ impl World {
         true
     }
 
-    /// Destroys a site that a faction holds undefended, and pays it the
-    /// store.
+    /// Orders the siege of a faction to destroy the site rather than take
+    /// it.
     ///
-    /// **This is the caller's raze, and the step has one of its own.** The
-    /// capture pass burns a site that no city of the taker reaches, and this
-    /// verb lets a caller burn one whatever the reach says.[^1]
+    /// **A raze is an order and never a moment.** The order writes the
+    /// intent of a siege that already stands. The siege then presses to the
+    /// work a raze costs, and the site burns when the work reaches it. The
+    /// order therefore costs the razing faction the same time and the same
+    /// force that the engine charges every other raze.[^1]
     ///
-    /// The trigger is the trigger of a capture. The razer stands on the tile,
-    /// and no unit of the owning faction stands there. The call refuses when
-    /// that does not hold.
+    /// **This is the one thing a caller states that the engine would not.**
+    /// The engine keeps a site its own reach supplies and burns one it does
+    /// not.[^2] A caller that wants a supplied city burned orders this, and
+    /// the reach then decides nothing.
     ///
-    /// **The plunder is the store, and it moves rather than appearing.** The
-    /// store of the razed site is added to the store of the nearest live site
-    /// of the razing faction, and a tie between two goes to the lower
-    /// settlement slot.[^2] Nothing is made and nothing is lost, so the
-    /// account holds without a rule of its own. A razer with no live site
-    /// carries nothing away, and the store goes with the site.
-    ///
-    /// The site, its housing, its upgrades and its residents are gone. The
-    /// residents die with the site, because a raze destroys what a capture
-    /// keeps and that difference is the whole of the choice.
+    /// The order lasts as long as the siege. A relief force that ends the
+    /// siege ends the order with it, and a besieger that comes back must
+    /// order again.[^3]
     ///
     /// # Errors
     ///
     /// Returns an error when the identity names no live site, when the razer
-    /// owns the site, when no unit of the razer stands on the tile, when a
-    /// unit of the owner stands there, and when the bridge refuses.
+    /// owns the site, and when no siege of the razer stands against it.
     ///
     /// # References
     ///
-    /// [^1]: ADR-0180, a site changes hands or the taker destroys it, decision D3. `docs/adrs/draft/adr-0180-a-site-changes-hands-or-the-taker-destroys-it.md`
-    /// [^2]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
-    pub fn raze_site(&mut self, site: Entity, razer: FactionId) -> Result<(), RazeError> {
+    /// [^1]: ADR-0180, a site changes hands or the taker destroys it, decisions D9 and D11. `docs/adrs/draft/adr-0180-a-site-changes-hands-or-the-taker-destroys-it.md`
+    /// [^2]: ADR-0180, a site changes hands or the taker destroys it, decision D7. `docs/adrs/draft/adr-0180-a-site-changes-hands-or-the-taker-destroys-it.md`
+    /// [^3]: ADR-0180, a site changes hands or the taker destroys it, decision D10. `docs/adrs/draft/adr-0180-a-site-changes-hands-or-the-taker-destroys-it.md`
+    pub fn order_raze(&mut self, site: Entity, razer: FactionId) -> Result<(), RazeError> {
         let owner = self
             .settlements
             .faction(site)
             .ok_or(RazeError::NoSuchSite)?;
-        let tile = self.settlements.tile(site).ok_or(RazeError::NoSuchSite)?;
         if owner == razer {
             return Err(RazeError::OwnSite);
         }
-        self.refresh_bridge().map_err(RazeError::Bridge)?;
+        match self.settlements.siege(site) {
+            Some((besieger, _)) if besieger == razer => {}
+            _ => return Err(RazeError::NotBesieging),
+        }
+        if !self
+            .settlements
+            .set_siege_intent(site, crate::site::SIEGE_INTENT_RAZE)
         {
-            let standing = self.bridge.on_tile_unguarded(tile);
-            let factions = self.soldiers.faction_column();
-            if !standing
-                .iter()
-                .any(|unit| factions[unit.index() as usize] == razer)
-            {
-                return Err(RazeError::NotOccupied);
-            }
-            if standing
-                .iter()
-                .any(|unit| factions[unit.index() as usize] == owner)
-            {
-                return Err(RazeError::Defended);
-            }
+            return Err(RazeError::NotBesieging);
         }
-        if !self.burn_site(site, razer) {
-            return Err(RazeError::NoSuchSite);
-        }
-        self.refresh_bridge().map_err(RazeError::Bridge)?;
         Ok(())
     }
 
@@ -3353,6 +3529,7 @@ impl World {
             self.soldiers.live_column(),
             self.settlements.slot_count(),
         );
+        self.sites_razed = sim_math::combine(Accum(self.sites_razed), Accum(1)).0;
         self.taken_log.push(SiteTaken::new(
             self.tick,
             site.to_bits(),
@@ -3494,6 +3671,48 @@ impl World {
             self.eliminated_log
                 .push(FactionEliminated::new(self.tick, released, faction));
         }
+    }
+
+    /// Returns the siege that stands against a site.
+    ///
+    /// The answer is the besieging faction and the work that faction has
+    /// done. It is `None` when the identity names no live site, and `None`
+    /// when no siege stands.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0180, a site changes hands or the taker destroys it, decision D8. `docs/adrs/draft/adr-0180-a-site-changes-hands-or-the-taker-destroys-it.md`
+    #[must_use]
+    pub fn siege_of(&self, site: Entity) -> Option<(FactionId, i64)> {
+        self.settlements.siege(site)
+    }
+
+    /// Returns the work a siege must do before this site changes hands.
+    ///
+    /// The resistance is the residents the site holds, so the answer moves
+    /// as the city grows and as a war empties it.[^1] Returns `None` when
+    /// the identity names no live site.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0180, a site changes hands or the taker destroys it, decision D8. `docs/adrs/draft/adr-0180-a-site-changes-hands-or-the-taker-destroys-it.md`
+    #[must_use]
+    pub fn capture_work_of(&self, site: Entity) -> Option<i64> {
+        let residents = self.site_residents(site)?;
+        Some(self.siege_rules.capture_work(residents))
+    }
+
+    /// Returns the work a siege must do before this site is destroyed.
+    ///
+    /// Returns `None` when the identity names no live site.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0180, a site changes hands or the taker destroys it, decision D9. `docs/adrs/draft/adr-0180-a-site-changes-hands-or-the-taker-destroys-it.md`
+    #[must_use]
+    pub fn raze_work_of(&self, site: Entity) -> Option<i64> {
+        let residents = self.site_residents(site)?;
+        Some(self.siege_rules.raze_work(residents))
     }
 
     /// Returns the sites that changed hands since the last step began.
@@ -8220,6 +8439,23 @@ impl World {
     /// [^1]: Balance register, the holding. `docs/reference/balance.md`
     pub const fn set_reach_rules(&mut self, rules: ReachRules) {
         self.holding.set_rules(rules);
+    }
+
+    /// Returns what a site resists, and what a raze costs over a capture.
+    #[must_use]
+    pub const fn siege_rules(&self) -> SiegeRules {
+        self.siege_rules
+    }
+
+    /// Sets what a site resists, and what a raze costs over a capture.
+    ///
+    /// The two values are balance rows.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: Balance register, the siege. `docs/reference/balance.md`
+    pub const fn set_siege_rules(&mut self, rules: SiegeRules) {
+        self.siege_rules = rules;
     }
 
     /// Returns how a lease rises, falls and claims.
@@ -13957,6 +14193,31 @@ pub const SUBSYSTEM_CENSUS: &[CensusRow] = &[
         name: "campaigns_won",
         basis: CensusBasis::Total,
         read: |world| world.census.campaigns_won + world.campaigns.count(campaign::EVENT_WON),
+    },
+    // The two acts of a conquest over the run. A taker keeps a city its own
+    // reach supplies and burns one it does not, and these two rows are the
+    // only place a reader sees which of the two a run reached.[^8]
+    //
+    // [^8]: ADR-0180, a site changes hands or the taker destroys it, decision D7. `docs/adrs/draft/adr-0180-a-site-changes-hands-or-the-taker-destroys-it.md`
+    CensusRow {
+        name: "sites_captured",
+        basis: CensusBasis::Total,
+        read: |world| world.sites_captured,
+    },
+    CensusRow {
+        name: "sites_razed",
+        basis: CensusBasis::Total,
+        read: |world| world.sites_razed,
+    },
+    CensusRow {
+        name: "sieges_pressed",
+        basis: CensusBasis::Total,
+        read: |world| world.sieges_pressed,
+    },
+    CensusRow {
+        name: "sieges_relieved",
+        basis: CensusBasis::Total,
+        read: |world| world.sieges_relieved,
     },
 ];
 
