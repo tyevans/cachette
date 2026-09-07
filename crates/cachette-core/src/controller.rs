@@ -430,8 +430,26 @@ pub struct ControllerCommand {
     /// One when the verb took the command for at least one unit, zero when
     /// it refused every unit.
     pub applied: u8,
+    /// One when the action column holds the encoding of the choice, zero
+    /// when the action table could not express it.
+    ///
+    /// **A row that states zero here states nothing in its action column.**
+    /// The column then holds the no-op row, which is the value a reader of
+    /// an empty integer gets, and the no-op is a real action a controller
+    /// may take. Without this byte the two are one value, and a reader that
+    /// counted the no-op counted every choice the table refused as
+    /// well.[^1]
+    ///
+    /// The engine emits no such choice today. The byte exists because a
+    /// verb argument that leaves its bound is a silent loss otherwise, and
+    /// a silent loss teaches a learner the wrong label.
+    ///
+    /// # References
+    ///
+    /// [^1]: Recurring defect shapes, shape 1. `.agents/rules/recurring-defects.md`
+    pub encoded: u8,
     /// Declared padding, always zero.
-    pub padding: [u8; 5],
+    pub padding: [u8; 4],
 }
 
 /// How many bytes one row of the command log holds.
@@ -1036,6 +1054,7 @@ pub struct Controller {
     game_end: GameEnd,
     log: Vec<ControllerCommand>,
     refused: u32,
+    unencodable: u32,
     advert: RateSchedule,
     surplus_mark: u32,
     contract_carriers: u32,
@@ -1067,6 +1086,7 @@ impl Controller {
             game_end: GameEnd::EMPTY,
             log: Vec::new(),
             refused: 0,
+            unencodable: 0,
             advert: RateSchedule::new(ADVERT_PERIOD_DEFAULT, ADVERT_PHASE_DEFAULT)
                 .expect("the default period is inside the range"),
             surplus_mark: SURPLUS_MARK_DEFAULT,
@@ -1219,6 +1239,7 @@ impl Controller {
     pub fn clear_log(&mut self) {
         self.log.clear();
         self.refused = 0;
+        self.unencodable = 0;
         self.boards_written = 0;
         self.offers_made = 0;
         self.contracts_bound = 0;
@@ -1336,10 +1357,25 @@ impl Controller {
         self.carriers_assigned
     }
 
+    /// Returns how many choices of the last tick the action table could not
+    /// express.
+    ///
+    /// **A choice the table refuses is counted here and never dropped.** The
+    /// row of such a choice states zero in its encoded column, and its
+    /// action column holds the no-op row. A caller that builds a supervised
+    /// dataset from the log reads this count to state the share it lost.
+    #[must_use]
+    pub const fn unencodable(&self) -> u32 {
+        self.unencodable
+    }
+
     /// Records one command and how the verb answered it.
     pub fn push(&mut self, command: ControllerCommand) {
         if command.applied == 0 {
             self.refused = self.refused.wrapping_add(1);
+        }
+        if command.encoded == 0 {
+            self.unencodable = self.unencodable.wrapping_add(1);
         }
         self.log.push(command);
     }

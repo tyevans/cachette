@@ -676,6 +676,22 @@ class ActionSchema(TypedDict):
     length: int
     verbs: list[ActionVerb]
 
+class ControllerActions(TypedDict):
+    """What the built-in controller did for one faction on the last tick.
+
+    The action column holds one action integer for each command. The applied
+    column holds one where the verb took the command. The encoded column
+    holds one where the action column holds the encoding of the choice.
+
+    **Read the encoded column before the action column.** A row that states
+    zero holds the no-op row in its action column, and the no-op is a real
+    action, so the two are one value without this column.
+    """
+
+    action: npt.NDArray[np.uint32]
+    applied: npt.NDArray[np.uint8]
+    encoded: npt.NDArray[np.uint8]
+
 class ObservationSchema(TypedDict):
     """The declared layout of the observation array of one world.
 
@@ -1482,6 +1498,7 @@ class World:
     def observation_schema(self) -> ObservationSchema: ...
     def action_schema(self) -> ActionSchema: ...
     def legal_actions(self, faction: int) -> npt.NDArray[np.uint8]: ...
+    def controller_actions(self, faction: int) -> ControllerActions: ...
     def act(self, faction: int, action: int) -> bool: ...
     def site_economy(self, site: int, commodity: int = ...) -> SiteEconomy: ...
     def site_production(self, site: int, commodity: int = ...) -> SiteProduction: ...

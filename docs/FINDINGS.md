@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-640**
+**Next number: FND-644**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -16697,6 +16697,103 @@ docstring claims, so nobody should read a green run of that file as evidence
 that the score follows the candidate. This finding does not fix it, and it
 names no cause.
 
+### FND-641 — A controller choice the action table could not express was written into the log as the no-op, and the no-op is a real action
+
+**Believed.** The command log carries the whole action of a controller choice
+in one integer, so a reader that counts one counts both a controller choice and
+a learner action.[^F641A]
+
+**False in one case.** The engine encoded each planned choice through the
+action schema and wrote the result into the action column. The schema gives
+nothing for a choice it cannot express, and the engine wrote zero in that case.
+**Row zero is the no-op**, and the no-op is an action the controller may
+genuinely take.[^F641B] One integer therefore stood for two different facts,
+and nothing failed when they disagreed.
+
+**Evidence.** The one case that reaches the refusal is a relation move against
+a faction the world does not hold, and the schema bounds that position by the
+faction count. A test now asserts that the schema gives nothing for such a
+move, and that the no-op encodes to zero. The test goes red when the bound
+check is removed.
+
+**No command of a recorded run reached the case.** The share the table could
+not express was zero over every episode recorded. The defect was in what the
+log could say, not in what it said.
+
+**What follows.** The row now states whether its action column is an encoding,
+and the stage counts the choices it refused. A reader of the log reads that
+column first. This is the redundant declaration shape at its sharpest: one
+value stood for two facts with nothing that failed when they were
+confused.[^F590A]
+
+### FND-642 — The controller acts many times for each learner decision, so no window of controller play maps to one learner action
+
+**Believed.** A learner action and a controller choice reach one encoding, so
+recording what the controller does gives a supervised label for a learner
+decision.[^F641A]
+
+**True for one command and false for one decision.** The controller plans its
+commands once for each tick and emits one for each entry of its draw order that
+fired. The learner acts once for each decision interval. A window between two
+learner decisions therefore holds many controller commands and takes one
+learner action.
+
+**Evidence.** A recording of the training world counted the commands the
+controller gave in the learner's seat over each window, and the mean was far
+above one. The figures are in the commit body, because a count in a register
+decays.[^F540D]
+
+**What follows.** No reduction of a window to one label is lossless, and the
+loss is chosen rather than discovered. A record states the rule and the
+alternatives it refused, and every accuracy figure from such a dataset is read
+against what one constant answer scores on the same data.[^F641E]
+
+**Do not read a supervised fit of this dataset as an imitation of the
+controller.** It is at best the most common of the things the controller did in
+a window. The action interface takes one integer for one decision, and a policy
+that played the whole set the controller played would need a different
+interface.
+
+### FND-643 — A supervised fit of controller play barely beats one constant answer, so the observation array is the first thing to suspect
+
+**Believed.** No trained policy beats the built-in controller because the
+optimiser is starved. An evolution strategy buys one scalar for one episode, so
+a run of six hours takes a few tens of gradient steps, and the ceiling was read
+as the budget.
+
+**True in part, and the observation array is now the stronger suspect.** A
+supervised fit reads every controller choice of every tick, so it takes
+thousands of labelled windows from the same episodes. The fit reproduces
+controller play barely better than one constant answer does, and a policy that
+plays it wins far less often than the controller.
+
+**Evidence.** A recording of thirty-two episodes gave 5320 decision windows and
+174834 controller commands. The fit trained on twenty-four episodes and was
+scored on the eight it never saw. Both a linear policy and a small network
+scored within two points of the constant answer on the held-out episodes, and
+both scored below it on the share of individual commands they matched. The
+commit body holds every figure and the command that produced them.
+
+**One reading is not available from this measurement.** The label of a window
+reduces about thirty-three commands to one action, so a fit that failed could
+have failed on the reduction rather than on the array.[^F643A] The play result
+is confounded in the same way, because the learner acts once for each window
+and the controller acted many times.[^F643B]
+
+**What follows.** Widen the observation before widening the optimiser. The gap
+between the training score and the held-out score says the fit learns the
+episodes it saw and does not carry across seeds, which is what a representation
+that does not hold the deciding quantity looks like.
+
+**Do not read the play figures as a comparison of two controllers.** They
+compare a policy that acts once for each window against a controller that acts
+many times, and the action rate alone accounts for a large part of the gap.
+
 ## References
 
+[^F643A]: ADR-0192, a window of controller commands is one label distribution over the action table, decision D2. `docs/adrs/draft/adr-0192-a-window-of-controller-commands-is-one-label-distribution.md`
+[^F643B]: Findings register, FND-634. `docs/FINDINGS.md`
 [^F638B]: Backlog item 0525, build the stage workers of a world once. `docs/backlog/proposed/0525-build-the-stage-workers-of-a-world-once.md`
+[^F641A]: ADR-0154, the observation and the action of a faction are schema-declared bounded tables, decision D6. `docs/adrs/accepted/adr-0154-the-observation-and-the-action-of-a-faction-are-schema-declared-bounded-tables.md`
+[^F641B]: ADR-0176, an action integer is a mixed radix over the argument positions each verb declares, decision D2. `docs/adrs/accepted/adr-0176-an-action-integer-is-a-mixed-radix-over-the-positions-a-verb-declares.md`
+[^F641E]: ADR-0192, a window of controller commands is one label distribution over the action table, decisions D2 and D4. `docs/adrs/draft/adr-0192-a-window-of-controller-commands-is-one-label-distribution.md`

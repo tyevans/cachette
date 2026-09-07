@@ -3895,6 +3895,60 @@ impl PyWorld {
         Ok(answer.to_pyarray(python))
     }
 
+    /// Returns the actions the built-in controller took for one faction on
+    /// the last tick, as three NumPy arrays in one dictionary.
+    ///
+    /// The `action` column holds the action integer of each command, in the
+    /// encoding the action table of this world states. The `applied` column
+    /// holds one where the verb took the command. The `encoded` column holds
+    /// one where the action column holds the encoding of the choice, and
+    /// zero where the table could not express it. **Read the encoded column
+    /// before the action column.** A row that states zero holds the no-op
+    /// row in its action column, and the no-op is a real action, so the two
+    /// are one value without this column.[^1]
+    ///
+    /// The engine empties the log at the start of each tick, so this answers
+    /// for the last tick alone. A caller that wants a window of ticks reads
+    /// it after each step.
+    ///
+    /// **This answers for one faction and reads no other.** The rows of the
+    /// other factions stay in the engine, so a learner that records what the
+    /// controller does in its own seat reads nothing the fog hides.[^2]
+    ///
+    /// # Errors
+    ///
+    /// Raises `VerbError` when the number names no faction of this world.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0154, the observation and the action of a faction are schema-declared bounded tables, decision D6. `docs/adrs/accepted/adr-0154-the-observation-and-the-action-of-a-faction-are-schema-declared-bounded-tables.md`
+    /// [^2]: PRD-0001, a faction sees only what it observes. `docs/product/accepted/prd-0001-a-faction-sees-only-what-it-observes.md`
+    fn controller_actions<'py>(
+        &self,
+        python: Python<'py>,
+        faction: u16,
+    ) -> PyResult<Bound<'py, PyDict>> {
+        let world = self.lock();
+        if faction >= world.faction_count().max(1) {
+            return Err(VerbError::new_err(format!(
+                "{faction} names no faction of this world"
+            )));
+        }
+        let rows: Vec<&cachette_core::ControllerCommand> = world
+            .controller_log()
+            .iter()
+            .filter(|row| row.faction.0 == faction)
+            .collect();
+        let action: Vec<u32> = rows.iter().map(|row| row.action).collect();
+        let applied: Vec<u8> = rows.iter().map(|row| row.applied).collect();
+        let encoded: Vec<u8> = rows.iter().map(|row| row.encoded).collect();
+        let out = PyDict::new(python);
+        out.set_item("action", action.to_pyarray(python))?;
+        out.set_item("applied", applied.to_pyarray(python))?;
+        out.set_item("encoded", encoded.to_pyarray(python))?;
+        Ok(out)
+    }
+
     /// Applies one action of one faction, and returns whether the verb took
     /// it.
     ///
