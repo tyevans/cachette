@@ -340,7 +340,7 @@ fn a_cell_value_paints_as_a_field_and_not_as_a_block() {
         edge >= 4,
         "a cell of {edge} tiles is too small for this test"
     );
-    let air = overlay::named("air").expect("the deck registers the air overlay");
+    let cloud = overlay::named("cloud").expect("the deck registers the cloud overlay");
 
     // The centre tile of a cell carries the value of that cell.
     let centre = |cell_column: u32, cell_row: u32| -> Axial {
@@ -369,8 +369,8 @@ fn a_cell_value_paints_as_a_field_and_not_as_a_block() {
                  them one value",
             );
             assert_ne!(
-                overlay::value_of(air, &stormy, near, None),
-                overlay::value_of(air, &stormy, far, None),
+                overlay::value_of(cloud, &stormy, near, None),
+                overlay::value_of(cloud, &stormy, far, None),
                 "two tiles far apart in one cell painted one value at \
                  {near:?} and {far:?}, so the cell still paints as a rectangle",
             );

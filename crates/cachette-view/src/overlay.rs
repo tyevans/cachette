@@ -58,7 +58,7 @@ use cachette_core::hex::NEIGHBOUR_COUNT;
 use cachette_core::resource::ResourceKind;
 use cachette_core::terrain::TerrainTile;
 use cachette_core::upgrade::UPGRADE_LEVEL_COUNT;
-use cachette_core::weather::Drops;
+use cachette_core::weather::{Drops, CLOUD_SHARE_WHOLE};
 use cachette_core::{Axial, FactionId, Holder, World};
 
 use crate::paint::faction_colour;
@@ -292,36 +292,50 @@ impl Layer for Moisture {
     }
 }
 
-/// The water in the air above the cell that covers each tile.
-struct Air;
+/// The cloud in the sky above the cell that covers each tile.
+///
+/// **Cloud is the air held against what that air can hold, and not the air
+/// held against one mark that every cell shares.** Warm air holds a lot of
+/// water and cold air holds very little, so a polar sky holds a small
+/// quantity of water and still stands grey. An overlay that painted the drops
+/// alone would paint that sky black, because the drops are a small part of
+/// what a tropical sky carries. A watcher would then see cloud only over
+/// water and near the equator, which is not what the field holds.
+struct Cloud;
 
-impl Layer for Air {
+impl Layer for Cloud {
     fn name(&self) -> &'static str {
-        "air"
+        "cloud"
     }
 
     fn unit(&self) -> &'static str {
-        "drops in the air"
+        "of the sky the cell can fill, in 255ths"
     }
 
     fn value(&self, at: At<'_>) -> i64 {
-        at.world.air_at(at.address).unwrap_or(0)
+        let Some(tile) = at.world.grid().index_of(at.address) else {
+            return 0;
+        };
+        let Some(cell) = at.world.weather_cell_of(tile) else {
+            return 0;
+        };
+        at.world.weather().cloud_share_at(cell)
     }
 
-    /// Returns the ramp of the air, which the saturation mark tops.
+    /// Returns the ramp of the cloud, which a whole sky tops.
     ///
     /// **The top is a constant of the field, not the largest cell of the
     /// frame.** A ramp that takes the largest cell moves with that cell. One
-    /// saturated cell then sets the top for the whole map, every other cell
-    /// paints at a small share of it, and the brightness of the whole picture
+    /// full cell then sets the top for the whole map, every other cell paints
+    /// at a small share of it, and the brightness of the whole picture
     /// changes between one frame and the next as the largest cell moves. A
     /// watcher reads that as shimmering rather than as weather.
     ///
-    /// The mark is the ceiling that the field itself holds, so a cell at the
-    /// mark paints white and a cell at half the mark paints half. Brightness
-    /// then means the same thing in every frame and in every world.
-    fn span(&self, world: &World) -> Span {
-        Span::new(0, world.weather().air_ceiling())
+    /// A whole sky paints white and half a sky paints half. Brightness then
+    /// means the same thing in every frame, in every world, and at every
+    /// latitude.
+    fn span(&self, _world: &World) -> Span {
+        Span::new(0, CLOUD_SHARE_WHOLE)
     }
 
     fn on_cells(&self) -> bool {
@@ -659,7 +673,7 @@ impl Layer for Crowding {
 pub fn registered() -> &'static [&'static (dyn Layer + 'static)] {
     &[
         &Moisture,
-        &Air,
+        &Cloud,
         &WindLayer,
         &Temperature,
         &Stock {
