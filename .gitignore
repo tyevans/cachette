@@ -46,3 +46,7 @@ observability/runs/*.log
 # rest of the run would go nowhere. The finished artefacts are committed
 # once the run ends.
 runs/learn/night2/
+
+# A running job writes here. A checkout must not manage a path a job writes,
+# and a run directory holds its own private key while its instance lives.
+runs/
