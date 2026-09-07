@@ -430,6 +430,7 @@ without stating a constraint is worse than no record.
 | 0172 | A unit reaches its tile by a second field at tile pitch, seeded only where a destination lies. Extends ADR-0091 D1, which every decision of ADR-0091 keeps | Draft | 0004, 0005, 0009, 0022, 0091, 0095, 0096 | `draft/adr-0172-a-unit-reaches-its-tile-by-a-second-field-at-tile-pitch.md` |
 | 0173 | The wealth or wonder path has no reader, and no game ends on it. Supersedes ADR-0165. Settles the open reading of ADR-0148 D3, which said a path with no reader is skipped "yet" | Draft | 0002, 0148, 0165 | `draft/adr-0173-the-wealth-or-wonder-path-has-no-reader.md` |
 | 0171 | The ground a world generates may be shaped by a climate the world stores, and the shaping is available and not the default. Changes ADR-0068 D1, which states the terrain function reads the seed and the address and nothing else; the other decisions of ADR-0068 stand | Draft | 0001, 0002, 0004, 0005, 0068, 0088, 0140, 0164 | `draft/adr-0171-the-ground-may-be-shaped-by-a-climate-the-world-stores.md` |
+| 0174 | An action integer is a mixed radix over the argument positions each verb declares. Changes ADR-0154 D4, the fixed verb, target and magnitude factorisation, which the controller's choice enumeration never had; the rest of ADR-0154 D4 and every other decision of ADR-0154 stand | Draft | 0075, 0144, 0149, 0154, 0156, 0158, 0159 | `draft/adr-0174-an-action-integer-is-a-mixed-radix-over-the-positions-a-verb-declares.md` |
 
 ### Retired numbers
 
