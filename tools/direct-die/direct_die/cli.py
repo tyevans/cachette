@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import sys
 
+from . import analyse as analyse_module
 from . import guide as guide_module
 from . import loop, render, session, setrun, subjects
 from .client import BASE_URL, MODEL, ClientError
@@ -70,6 +71,36 @@ def _set(arguments: argparse.Namespace) -> int:
     print()
     print(setrun.format_table(arguments.style, results))
     return 0 if any(item.best_score is not None for item in results) else 3
+
+
+def _analyse(arguments: argparse.Namespace) -> int:
+    """Analyse one round, and print what the model said."""
+    try:
+        found = analyse_module.run(
+            arguments.asset,
+            arguments.session,
+            arguments.round,
+            exemplar_limit=arguments.exemplars,
+        )
+    except guide_module.GuideError as error:
+        print(f"guide error: {error}", file=sys.stderr)
+        return 2
+    except ClientError as error:
+        print(f"endpoint error: {error}", file=sys.stderr)
+        return 3
+    except analyse_module.AnalysisError as error:
+        print(f"analysis error: {error}", file=sys.stderr)
+        return 4
+
+    print()
+    print(found["preference"])
+    order = found.get("order") or []
+    if order:
+        print("order: " + " > ".join(order))
+    edit = found.get("guide_edit")
+    if edit:
+        print(f"proposed rule ({edit['section']}): {edit['rule']}")
+    return 0
 
 
 def _guide(arguments: argparse.Namespace) -> int:
@@ -181,6 +212,20 @@ def main(argv: list[str] | None = None) -> int:
         help="how many exemplar images to attach to a critique",
     )
     run_set.set_defaults(handler=_set)
+
+    analysis = commands.add_parser(
+        "analyse", help="say what the liked drawings of a round share"
+    )
+    analysis.add_argument("--asset", default="hex-tile", help="the asset type")
+    analysis.add_argument("--session", required=True, help="the session identifier")
+    analysis.add_argument("--round", type=int, required=True, help="the round index")
+    analysis.add_argument(
+        "--exemplars",
+        type=int,
+        default=guide_module.DEFAULT_EXEMPLAR_LIMIT,
+        help="how many exemplar images to attach",
+    )
+    analysis.set_defaults(handler=_analyse)
 
     commands.add_parser("guide", help="report what the guide holds").set_defaults(
         handler=_guide
