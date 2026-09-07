@@ -713,11 +713,29 @@ fn no_value_is_cut_to_fit_its_column() {
     );
 
     // The check must be able to answer no. A check with no proven failure
-    // mode is decoration. This is the exact value the old row produced on
-    // this world at the widest zoom.
+    // mode is decoration.
+    //
+    // **The value that proves it is grown, not quoted.** This assertion once
+    // named the exact string that overran the panel at the width of the day.
+    // Widening the panel made that string fit, so the proof stopped proving
+    // anything and the test failed for a reason that had nothing to do with
+    // the panel it guards. The value now grows against the room the panel
+    // actually gives, so a later width change moves it too.
+    //
+    // The growth is bounded, so a check that refuses nothing fails here
+    // rather than running for ever.
+    let mut overlong = String::from("8");
+    let mut refused = false;
+    for _ in 0..200 {
+        if !cachette_view::hud::value_fits(&overlong) {
+            refused = true;
+            break;
+        }
+        overlong.push_str(" 8");
+    }
     assert!(
-        !cachette_view::hud::value_fits("12 read, 14 skipped"),
-        "the fit check accepts the value that overran the panel, so it cannot fail",
+        refused,
+        "the fit check accepts a value wider than any panel, so it cannot fail",
     );
     assert!(
         cachette_view::hud::value_fits("14"),
