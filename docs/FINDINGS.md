@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-630**
+**Next number: FND-631**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -16175,6 +16175,39 @@ nothing failed at run time because Python does not read an annotation.
 at several correct callers, the fault is upstream of all of them.
 
 
+### FND-630 — One encoding was read as one rate, and the learner acts about ten times less often than the controller it is measured against
+
+**Believed.** A learner action and a built-in controller choice reach one
+encoding. The action table holds the controller's choice enumeration plus the
+no-op, and the world runs both through one set of verbs.[^F630A] [^F630B] A
+reader takes from this that a learner and a controller reach the world alike,
+so a contest between the two measures policy.
+
+**False for the rate.** The encoding is shared. The rate is not.
+
+The controller emits several commands for one faction on one tick. It makes a
+fixed number of evaluations, each of which emits one order, and it then emits
+up to nine further commands that its own draws and schedules gate.[^F630A]
+
+The learner emits one action for one decision. The environment then runs the
+world for the decision interval, and the shipped interval is five ticks.[^F630C]
+
+**Evidence.** One world 48 tiles on a side, with three factions and the learner
+seat under external control, ran 300 ticks. The engine counted 1227 controller
+commands over the two remaining factions. That is 2.045 commands for one
+faction on one tick, against 0.200 for the learner at the shipped interval. A
+research report holds the measurement and the command that produced it.[^F630D]
+
+**What follows.** **A result measured against the built-in controller measures
+the rate before it measures the policy.** The strongest baseline the project
+states runs the controller in the learner's own seat, and that baseline acts at
+the controller rate.[^F630C] No policy class recovers a factor of ten in
+decision count.
+
+**Compare a rate before you compare a policy.** When two actors share an
+interface, check how often each one uses it.
+
+
 ## References
 
 [^F628A]: The trainer, the resume path. `python/cachette/learn/train.py`
@@ -16182,3 +16215,7 @@ at several correct callers, the fault is upstream of all of them.
 [^F628C]: Testing Rules, section 2a, on what a fixture must supply. `.agents/rules/testing.md`
 [^F629A]: The single-seat environment and the door it widens. `python/cachette/learn/env.py`
 [^F629B]: The seated league tests. `tests/test_learner_league.py`
+[^F630A]: The controller module, the plan of one tick. `crates/cachette-core/src/controller.rs`
+[^F630B]: ADR-0176, an action integer is a mixed radix over the positions a verb declares, decision D4. `docs/adrs/accepted/adr-0176-an-action-integer-is-a-mixed-radix-over-the-positions-a-verb-declares.md`
+[^F630C]: The learner environment, the decision interval and the baselines. `python/cachette/learn/env.py`
+[^F630D]: Report 33, what a learner can see, say and be scored on, section 3. `docs/research/reports/33-what-a-learner-can-see-and-say.md`
