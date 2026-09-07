@@ -135,8 +135,18 @@ esac
 #
 # The worker count matches the cores of the instance, because the batch step
 # takes it and the throughput probe reports what each worker contributed.
+# **The validation seeds are the only figure that compares across
+# generations**, so they carry the resolution of the whole run. A win moves
+# the return by the win weight divided by the seed count, so eight seeds can
+# only report a whole eighth and a policy that improves inside an eighth
+# looks flat. Thirty-two seeds report a thirty-second, and they halve the
+# error of the figure the trainer uses to choose the centre it keeps.
+#
+# They are nearly free. Validation plays one policy, so it runs as many
+# worlds as it has seeds, and thirty-two worlds on sixty-four workers takes
+# about a minute against the ten minutes of a generation.
 default_args="--generations 20 --population 24 --seeds 6 --holdout 24 \
---hidden 24 --sigma 1.5 --learning-rate 0.3 --validation 6 --validate-every 2"
+--hidden 24 --sigma 1.5 --learning-rate 0.3 --validation 32 --validate-every 2"
 train_args="${CACHETTE_TRAIN_ARGS:-$default_args}"
 
 # How many generations the whole run takes, read out of the arguments and
@@ -675,6 +685,18 @@ export NUMEXPR_NUM_THREADS=1
 # added, and nothing would fail.
 names="$(uv run python -c \
     'from cachette.learn.__main__ import STRATEGIES; print(" ".join(STRATEGIES))')"
+
+# **A run that names its strategies trains those and no others.** The loop
+# below gives each process its own `--only`, and the arguments of the run are
+# appended after it, so a second `--only` there would win and every process
+# would train the same strategy at a fraction of the cores. The names are
+# taken here instead, and the argument is removed from what each process
+# receives.
+chosen="$(printf '%s' "$TRAIN_ARGS" | sed -n 's/.*--only \([^ ]*\).*/\1/p' | tr ',' ' ')"
+if [ -n "$chosen" ]; then
+    names="$chosen"
+fi
+TRAIN_ARGS="$(printf '%s' "$TRAIN_ARGS" | sed 's/--only [^ ]*//')"
 count="$(printf '%s' "$names" | wc -w)"
 each="$((cores / count))"
 [ "$each" -ge 1 ] || each=1
