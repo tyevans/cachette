@@ -171,6 +171,7 @@ def run_population(
     returns = np.zeros(len(pairs))
     started = time.perf_counter()
     spoke = started
+    told = 0
     decisions = 0
     while not vector.done:
         observations = np.stack([env.observation() for env in vector.envs])
@@ -198,10 +199,18 @@ def run_population(
         # move a result. It is not a time budget and it ends nothing.
         now = time.perf_counter()
         if label and now - spoke >= HEARTBEAT_SECONDS:
+            # **The rate is what happened since the last line, not since the
+            # start.** A world leaves the batch when its episode ends, so the
+            # live count falls through a generation and a rate taken over the
+            # whole elapsed time falls with it. That reads as a machine
+            # slowing down when it is only running fewer worlds.
+            window = now - spoke
+            since = vector.world_ticks - told
             spoke = now
+            told = vector.world_ticks
             live = sum(1 for env in vector.envs if not env.done)
             elapsed = now - started
-            rate = vector.world_ticks / elapsed if elapsed else 0.0
+            rate = since / window if window else 0.0
             print(
                 f"  {label} working  decisions {decisions:5d} "
                 f"live {live:4d}/{len(pairs):<4d} "
