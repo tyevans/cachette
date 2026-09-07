@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-644**
+**Next number: FND-645**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -2521,6 +2521,35 @@ category fits. The window a deposit and a yield read is unchanged, because
 those two ask where a unit may go and not where a road may stand. A pair of
 settlements that no such ground joins now yields no project, which is a plan
 that says nothing rather than a plan that lies.
+
+### FND-644 — The observation reader refuses to answer once three policies have acted, and the demonstration is the first caller that reaches it
+
+**Believed.** A faction observation is a read. It answers at any tick, for any
+faction, whatever the factions did on the tick before. The learner environment
+reads it after every decision and never sees it refuse.
+
+**True.** The reader answers `None` and the binding raises a view error, once
+three seated policies have run their verbs for about a hundred ticks. The
+message says that the world cannot describe its own units.[^F644A] A world that
+runs the same ticks with nobody acting does not reach it, and a world with one
+seated policy does not reach it inside five hundred ticks.
+
+**Evidence.** Three probes on one world of 48 tiles a side, three factions, one
+thread, at seed `0x0CAC4E770472`. The first stepped 400 ticks with every faction
+externally controlled and nothing acting, and read every observation on every
+tick. It did not raise. The second seated one stored policy on faction zero,
+stepped 500 ticks and took 51 decisions. It did not raise. The third seated
+three stored policies, one for each faction, and raised at tick 110 after 34
+decisions. No renderer ran in any of the three, so the drawing pass is not
+involved.
+
+**What follows.** The demonstration can seat a stored policy, and a watcher
+cannot yet watch one play to the end of a game. The condition is engine side,
+because the three probes differ only in how many factions acted through the
+engine verb. The verbs the policies ran were the settling verb, the queue verb
+and the build verb, so the derived unit structure is the thing to look at
+first.[^F644B] An item holds the repair.[^F644C]
+
 
 ## D. Cost estimates that were wrong
 
@@ -16797,3 +16826,6 @@ many times, and the action rate alone accounts for a large part of the gap.
 [^F641A]: ADR-0154, the observation and the action of a faction are schema-declared bounded tables, decision D6. `docs/adrs/accepted/adr-0154-the-observation-and-the-action-of-a-faction-are-schema-declared-bounded-tables.md`
 [^F641B]: ADR-0176, an action integer is a mixed radix over the argument positions each verb declares, decision D2. `docs/adrs/accepted/adr-0176-an-action-integer-is-a-mixed-radix-over-the-positions-a-verb-declares.md`
 [^F641E]: ADR-0192, a window of controller commands is one label distribution over the action table, decisions D2 and D4. `docs/adrs/draft/adr-0192-a-window-of-controller-commands-is-one-label-distribution.md`
+[^F644A]: The observation reader of the binding. `crates/cachette-py/src/lib.rs`
+[^F644B]: The policy pilot of the demonstration. `python/cachette/demo/pilot.py`
+[^F644C]: Backlog item 0528, let a stored policy play a demonstration to the end of a game. `docs/backlog/proposed/0528-let-a-stored-policy-play-a-demonstration-to-the-end-of-a-game.md`

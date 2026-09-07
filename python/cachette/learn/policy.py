@@ -39,6 +39,8 @@ import numpy as np
 if TYPE_CHECKING:  # pragma: no cover - the import is for the type checker
     from collections.abc import Mapping
 
+    from cachette._core import ActionSchema, ObservationSchema
+
 # The divisor that brings the signed logarithm into roughly one unit. A store
 # total of a raw Q16.16 quantity reaches about twenty in the logarithm, so
 # this puts the widest field near one.
@@ -149,6 +151,30 @@ class PolicyFit:
         )
 
     @classmethod
+    def of_world(cls, world: WorldLike) -> PolicyFit:
+        """Return the fit of one world, read from the schemas it publishes.
+
+        A caller that holds a world and no environment reads the fit here.
+        The demonstration is such a caller: it builds a world of its own and
+        seats a stored policy on one faction of it.
+
+        **The two versions and the two lengths come from the engine
+        schemas**, in the way they do for an environment. Nothing here holds
+        a constant, so a change in the engine reaches both callers at once.
+        """
+        observation = world.observation_schema()
+        action = world.action_schema()
+        return cls(
+            observation_version=int(observation["version"]),
+            action_version=int(action["version"]),
+            observation_length=int(observation["length"]),
+            action_length=int(action["length"]),
+            width=int(world.width),
+            height=int(world.height),
+            faction_count=int(world.faction_count),
+        )
+
+    @classmethod
     def read(cls, meta: Mapping[str, object]) -> PolicyFit | None:
         """Return the fit a weight file states, or nothing when it states none.
 
@@ -236,6 +262,37 @@ class ConfigLike(Protocol):
     @property
     def faction_count(self) -> int:
         """How many factions play the world."""
+
+
+class WorldLike(Protocol):
+    """What a fit reads from a world it did not build.
+
+    The two schemas state the layout, and the three parameters state the
+    world. Naming them here keeps this module free of an import from the
+    engine binding, which the type checker reads from a stub.
+
+    **The three parameters are read-only, because the fit only reads them.**
+    A protocol that declares a plain attribute asks for one that can be
+    written, and the world publishes them as properties.
+    """
+
+    @property
+    def width(self) -> int:
+        """How many tiles the world holds across."""
+
+    @property
+    def height(self) -> int:
+        """How many tiles the world holds down."""
+
+    @property
+    def faction_count(self) -> int:
+        """How many factions play the world."""
+
+    def observation_schema(self) -> ObservationSchema:
+        """Give back the layout of the observation array."""
+
+    def action_schema(self) -> ActionSchema:
+        """Give back the layout of the action table."""
 
 
 class Policy(Protocol):
