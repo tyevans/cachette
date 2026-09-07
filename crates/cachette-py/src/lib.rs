@@ -1281,6 +1281,72 @@ impl PyWorld {
         cachette_view::overlay::names()
     }
 
+    /// Copies the paint of one overlay over every tile into two NumPy arrays.
+    ///
+    /// The name is one of the names that `overlay_names` gives back.
+    ///
+    /// Returns a `dict` with the keys `colour` and `strength`. The colour
+    /// column holds `numpy.uint32`, one entry for each tile. The strength
+    /// column holds `numpy.uint8`, one entry for each tile. Both stand in
+    /// row-major order. Entry `r * width + q` is the tile at the address
+    /// `(q, r)`. The order is the order that `tile_holders` uses, so these
+    /// columns and the other tile columns index alike.
+    ///
+    /// **A colour is `0x00RRGGBB`, and a strength is a weight of 255.** The
+    /// drawing pass mixes that colour into the ground of the tile at that
+    /// weight, so a caller reproduces the pixel the map paints. A strength of
+    /// zero paints nothing, and the colour beside it means nothing.
+    ///
+    /// **These two are the engine's own choices, and not the raw quantity.**
+    /// An overlay owns its palette, and it owns the ramp from a value to a
+    /// strength. The span of that ramp moves with the frame. A caller that
+    /// took the quantity would hold a second copy of both, and nothing would
+    /// fail when the copies drifted.[^1] A caller that wants the quantity
+    /// reads the column that carries it.
+    ///
+    /// **The ramp is the ramp of this frame.** An overlay whose span runs
+    /// between the lowest and the highest value of the world gives another
+    /// strength after a step that moves either end.
+    ///
+    /// The answer is a pure function of the world and the name. This reads
+    /// the world and writes nothing to it.[^2]
+    ///
+    /// # Errors
+    ///
+    /// Raises `ViewError` when no overlay carries the name. The message names
+    /// the overlays that exist, in the way that `draw` does.
+    ///
+    /// # References
+    ///
+    /// [^1]: Recurring Defect Shapes, shape 1. `.agents/rules/recurring-defects.md`
+    /// [^2]: ADR-0067, the viewer reads the world and never writes to it, decision D3. `docs/adrs/accepted/adr-0067-the-viewer-reads-the-world-and-never-writes-to-it.md`
+    fn overlay_paint<'py>(&self, python: Python<'py>, name: &str) -> PyResult<Bound<'py, PyDict>> {
+        let layer = cachette_view::overlay::named(name).ok_or_else(|| {
+            ViewError::new_err(format!(
+                "no overlay is called {name:?}; the overlays are {}",
+                cachette_view::overlay::names().join(", ")
+            ))
+        })?;
+        let (colours, strengths): (Vec<u32>, Vec<u8>) = python.detach(|| {
+            let world = self.lock();
+            let grid = world.grid();
+            let span = layer.span(&world);
+            (0..grid.tile_count())
+                .map(|index| {
+                    let Some(address) = grid.address_of(TileIdx(index)) else {
+                        return (0, 0);
+                    };
+                    let value = cachette_view::overlay::value_of(layer, &world, address, None);
+                    (layer.colour(value), layer.strength(value, span))
+                })
+                .unzip()
+        });
+        let paint = PyDict::new(python);
+        paint.set_item("colour", colours.to_pyarray(python))?;
+        paint.set_item("strength", strengths.to_pyarray(python))?;
+        Ok(paint)
+    }
+
     /// Adds a soldier at each address and returns their identities.
     ///
     /// The addresses are a sequence of `(q, r)` pairs of integers. The
