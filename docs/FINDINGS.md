@@ -15956,6 +15956,53 @@ between 0.8 and 2.0 times Earth. The conclusion of that finding, that the
 subtropics are correct and were misread through the normaliser, still holds.
 
 
+### FND-619 — An explanation that has been right five times stops being tested
+
+**What happened.** In one night five defects were traced to the measuring
+instrument rather than to the engine: a share read as its own complement, a
+contrast metric carrying a gradient the comparison did not, a probe building a
+different lattice from the test it explained, a normaliser coupling every band
+to the wettest one, and a land fraction varying from 6 to 66 percent across the
+bands being compared.[^F619A] [^F619B]
+
+The sixth residual was then explained the same way, and that explanation was
+wrong. The class table was reweighted onto Earth's land distribution, which
+removes the latitude geography **by construction**. The remaining error was
+nonetheless attributed to where this world puts its land, which the reweighting
+had already subtracted. The same excuse was spent twice, and neither the worker
+who offered it nor the reader who published it noticed.
+
+**What the check would have been, and it was cheap.** The error is symmetric
+across the two hemispheres. Terrain is not symmetric and a land fraction is not
+symmetric. A symmetric error is a mechanism. The measurement needed for this
+check was already on the page.
+
+**What is true.** The residual is a missing term. The warmest month of the polar
+band reads 13 degrees against a published −0.1, and it **rises** toward the pole
+where the measurement falls, in both hemispheres alike. The insolation anomaly
+peaks at the pole, so the seasonal amplitude grows poleward while the annual
+mean flattens, and nothing stops the polar summer. On Earth it is held near the
+melting point by the latent heat of fusion until the ice is gone. This model
+carries no ice mass, so it has nothing to melt.
+
+**What follows, and it is two rules.**
+
+**A pattern that keeps being right is the one that stops being checked.** This
+failure mode follows a *successful* investigation rather than a failed one, so
+it arrives when confidence is highest and scrutiny is lowest. When an
+explanation has just worked several times, require of its next use the same
+evidence its first use needed. Ask what measurement would distinguish it from
+the alternative, and take that measurement.
+
+**Work set aside must stay on the ledger.** The missing term above was
+identified hours before it was needed, judged too large to take at that moment,
+and set aside. That judgement was correct. It then left the account entirely, so
+when its symptom reappeared the explanation was rebuilt from nothing. **Setting
+work aside is sound; losing it from the ledger is the defect.** A deferred
+mechanism belongs in a register at the moment it is deferred, not at the moment
+it is finally needed.
+
+
 ## References
 
 [^F612A]: The motion probe. `crates/cachette-core/examples/weather_motion_probe.rs`
@@ -15969,3 +16016,5 @@ subtropics are correct and were misread through the normaliser, still holds.
 [^F618B]: Findings register, FND-617. `docs/FINDINGS.md`
 [^F618C]: Findings register, FND-618. `docs/FINDINGS.md`
 [^F616B]: Findings register, FND-618. `docs/FINDINGS.md`
+[^F619A]: Findings register, FND-605 and FND-606. `docs/FINDINGS.md`
+[^F619B]: Findings register, FND-618. `docs/FINDINGS.md`
