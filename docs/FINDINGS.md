@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-594**
+**Next number: FND-595**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -3650,6 +3650,50 @@ already works, which is one fact in two places.[^F526A]
 
 **An item is not done until it moves.** A directory is a status, and a status
 that nobody sets is a register that decays.
+
+### FND-594 — The camera was believed to say where every renderer stands, and the sketch fits its own page instead
+
+**Believed.** The engine camera says where the view sits. It holds the size of
+a tile in pixels and the pixel offset of the tile at the origin, and every
+renderer draws the view that camera names. A control that moves the camera
+therefore moves what both renderers show, by the same amount.
+
+**True.** That holds for the flat map alone. The sketch renderer reads the
+camera only to name the window of tiles it must cover. It then fits that window
+to the frame with a scale of its own. The size of a tile on the camera reaches
+the picture through which tiles fall inside the frame, and through nothing
+else.
+
+Two things follow from that, and both are visible to a person.
+
+The window changes in whole tiles, because it comes from the address the camera
+gives nine corner pixels, widened by a margin. A pan of a few pixels therefore
+changes the sketch by nothing, and then by a whole tile.
+
+The fit is recomputed for each window, so a pan that changes the window by one
+tile also changes the scale of the page. Grab-and-move is exact on the flat map
+and approximate in the sketch, and no arithmetic in the control layer can
+change that.
+
+**Evidence.** The build pass takes the window and the frame size, derives its
+own scale from the two, and never reads the tile size of the camera. A drag of
+nine pixels for each frame at a tile size of twenty-four rebuilds the page on
+three frames out of six, and holds the page on the other three.
+
+**Follows.** Three things.
+
+**The camera is the one source of truth for where the view stands, and a
+renderer may still choose its own scale.** The two statements are not in
+conflict, and a reader who takes the first for a promise about pixels will be
+wrong about the second.
+
+**Do not make the sketch follow the camera scale in order to fix the drag.** A
+page keyed on a continuous camera rebuilds on every pixel of a pan. The whole
+tile window is what makes the page cacheable at all.
+
+**A renderer that composites on the graphics card can honour the camera
+exactly.** It has no page to cache and no rebuild to avoid, so the limit above
+belongs to the processor path and not to the design.
 
 
 ## F. Sourcing
