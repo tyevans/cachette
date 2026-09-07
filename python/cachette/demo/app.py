@@ -66,6 +66,7 @@ from cachette.demo.minimap import Minimap
 from cachette.demo.mouse import Controls
 from cachette.demo.settings import Settings, load_video, save_video
 from cachette.demo.sketch import RELIEF, BoundaryGap, Sketch
+from cachette.demo.sketch_gl import DeviceGap, GlSketch
 from cachette.demo.surface import Surface
 from cachette.demo.toasts import Announcer
 from cachette.demo.view import View
@@ -872,8 +873,16 @@ def main(argv: list[str] | None = None) -> int:
             "draw the world as a pencil study in ink on paper, lifted by the "
             "height of the ground, instead of as a flat map; it opens at an "
             "isometric angle, and a drag with the right button turns and "
-            "leans it; the frame costs seconds rather than milliseconds, so "
-            "a window in this mode draws slowly"
+            "leans it; it composites on the graphics device"
+        ),
+    )
+    parser.add_argument(
+        "--sketch-on-processor",
+        action="store_true",
+        help=(
+            "composite the sketch on the processor instead of on the graphics "
+            "device; this is the reference the device path is tested against, "
+            "and it costs about ten times as much for each frame"
         ),
     )
     parser.add_argument(
@@ -997,19 +1006,38 @@ def main(argv: list[str] | None = None) -> int:
         # **The sketch is a renderer, not a second demonstration.** It takes
         # the place of the engine at the one call that fills a frame, and the
         # clock, the panels, the keys and the window memory stay shared.
-        print(
-            "the sketch renderer draws one frame in seconds, not in "
-            "milliseconds, so the window will feel slow"
-        )
+        #
+        # **The device path is the one a watcher gets.** The processor path
+        # stays because it is the reference the device path is tested against,
+        # and a flag asks for it. It is not a fallback: a run that asked for
+        # the device and quietly got the processor would report the speed of
+        # the processor while everyone believed the device was drawing.
+        make: type[Sketch] = Sketch if arguments.sketch_on_processor else GlSketch
+        if arguments.sketch_on_processor:
+            print(
+                "the sketch draws on the processor, so one frame costs "
+                "hundreds of milliseconds and the window will feel slow"
+            )
         try:
-            demo.renderer = Sketch(
+            demo.renderer = make(
                 demo.world,
                 view=demo.view,
                 relief=arguments.sketch_relief or RELIEF,
                 sky=arguments.sketch_sky,
             )
+            # **A run that opens no window asks for the device here.** The
+            # renderer opens it on its first frame, because a window run must
+            # draw in the context that the window opens later. A picture and a
+            # run to the end open no window, so nothing else would ask, and
+            # the machine that gives no context must say so before the run.
+            if isinstance(demo.renderer, GlSketch) and not opens_window:
+                demo.renderer.device  # noqa: B018
         except BoundaryGap as gap:
             print(f"the sketch renderer cannot run: {gap}")
+            return 2
+        except DeviceGap as gap:
+            print(f"the graphics device cannot draw the sketch: {gap}")
+            print("run again with --sketch-on-processor to draw it slowly")
             return 2
 
     if arguments.overlay:

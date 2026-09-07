@@ -100,6 +100,13 @@ ignore = [
 # A test module documents itself in its own docstring. Each test function
 # carries its statement in its name.
 "tests/*" = ["D103", "D102", "D101"]
+# The window library ships no type information, so every handle it gives back
+# is an unknown type: a context, a program, a buffer. This module holds every
+# call to that library, and it exists so that no other module holds one. A
+# name here is therefore the boundary of what can be typed, not a gap in what
+# was typed.
+"python/cachette/demo/glpage.py" = ["ANN401"]
+"python/cachette/demo/sketch_gl.py" = ["ANN401"]
 
 [tool.ruff.lint.pydocstyle]
 convention = "pep257"
