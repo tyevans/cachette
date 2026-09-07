@@ -33,16 +33,23 @@ precedent.[^ALLOC]
 
 ### BLK-156 — How much is the terrain height range worth in metres?
 
-**Resolved on 6 September 2026. The range is 0 to 4000 metres.**
+**Resolved on 6 September 2026. The range is 0 to 1500 metres**, revised from 4000 metres on 7 September against a measurement of where this terrain puts its land.
 
 The project owner chose the figure directly, and the scale constants table holds
 it beside the tile edge.[^SCALE] **A world states the range, in the way a world
 states its latitude span**, so a world that wants a different vertical scale
 changes a value rather than the physics.
 
-At the published environmental lapse rate the range gives a spread of 26 degrees
-from the lowest ground to the highest.[^BLK156B] That puts the snow line inside
-the world at most latitudes, which is what the owner asked the figure to buy.
+At the published environmental lapse rate the range gives a spread of about ten
+degrees from the lowest ground to the highest.[^BLK156B] **No ground reaches a
+permanent snow line at any latitude**, and that is a cost the owner accepted
+rather than a defect.
+
+**The first figure was 4000 metres and it was chosen against no measurement.** A
+probe then found the land of this world standing at 41 to 69 percent of its own
+range, so 4000 metres put the mean land near 2000 metres against a published
+mean near 800 for the Earth. The lapse rate then took 11 to 18 degrees off every
+land cell.[^BLK156D]
 
 **What the row held.** The question below is the one the answer settles.
 
@@ -936,6 +943,7 @@ normally.
 [^BLK155A]: Research report 30, the published atmospheric math, section 5.1. `docs/research/reports/30-the-published-atmospheric-math.md`
 [^BLK155B]: Research report 30, the published atmospheric math, section 8.1. `docs/research/reports/30-the-published-atmospheric-math.md`
 [^BLK156B]: Research report 30, the published atmospheric math, section 2. `docs/research/reports/30-the-published-atmospheric-math.md`
+[^BLK156D]: Findings register, FND-604. `docs/FINDINGS.md`
 [^BLK156C]: ADR-0182, the temperature a cell is driven toward is a published energy balance. `docs/adrs/draft/adr-0182-the-temperature-a-cell-is-driven-toward-is-a-published-energy-balance.md`
 [^BLK122A]: ADR-0133, a unit converts to the faction that leads the influence field at its cell, decisions D1 and D4. `docs/adrs/draft/adr-0133-a-unit-converts-to-the-faction-that-leads-the-field.md`
 [^BLK123A]: ADR-0132, conversion changes the faction of a unit and adds no second allegiance, decision D2. `docs/adrs/draft/adr-0132-conversion-changes-the-faction-of-a-unit.md`
